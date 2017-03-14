@@ -1,2 +1,3 @@
 basisset;STO3G
-TEST;TESET
+Charge;Mulliken
+Dipole;Yes
