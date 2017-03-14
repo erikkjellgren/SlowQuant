@@ -1,6 +1,6 @@
 # Hartree-Fock
 
-Hartree-Fock program written in python. Takes Atoms coordinates and settings file as input
+Hartree-Fock program written in python. See input and setting file, as example fils given as inputs.
 
 ## Basis sets:
 
