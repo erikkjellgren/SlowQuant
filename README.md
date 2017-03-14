@@ -2,13 +2,13 @@
 
 Hartree-Fock program written in python. Takes Atoms coordinates and settings file as input
 
-#Basis sets:
+## Basis sets:
 
 STO-3G  : H, O
 
 DZ      : H, O
 
-#Properties:
+## Properties:
 
 HF Energy
 
