@@ -163,6 +163,63 @@ def nucrep(input):
                 Vnn += (input[i][0]*input[j][0])/(math.sqrt((input[i][1]-input[j][1])**2+(input[i][2]-input[j][2])**2+(input[i][3]-input[j][3])**2))
     return Vnn
 
+def u_ObaraSaika(a1, a2, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na, nb, N1, N2, c1, c2, input):
+    #Used to calculate dipolemoment
+    N = N1*N2*c1*c2
+    p = a1 + a2
+    u = a1*a2/p
+    
+    Px = (a1*Ax+a2*Bx)/p
+    Py = (a1*Ay+a2*By)/p
+    Pz = (a1*Az+a2*Bz)/p
+    
+    Cx = 0
+    Cy = 0
+    Cz = 0
+    M = 0
+    for i in range(1, len(input)):
+        M += input[i][0]
+    
+    for i in range(1, len(input)):
+        Cx += (input[i][0]*input[i][1])/M
+        Cy += (input[i][0]*input[i][2])/M
+        Cz += (input[i][0]*input[i][3])/M
+    
+    ux000 = (math.pi/p)**(1/2) * math.exp(-u*(Ax-Bx)**2)
+    uy000 = (math.pi/p)**(1/2) * math.exp(-u*(Ay-By)**2)
+    uz000 = (math.pi/p)**(1/2) * math.exp(-u*(Az-Bz)**2)
+    
+    ux = np.zeros(shape=(la+2,lb+2, 3))
+    uy = np.zeros(shape=(ma+2,mb+2, 3))
+    uz = np.zeros(shape=(na+2,nb+2, 3))
+    ux[0][0][0] = ux000
+    uy[0][0][0] = uy000
+    uz[0][0][0] = uz000
+    
+    for i in range(0, la+1):
+        for j in range(0, lb+1):
+            for e in range(0, 2):
+                ux[i+1][j][e] = (Px-Ax)*ux[i][j][e] + 1/(2*p) * (i*ux[i-1][j][e]+j*ux[i][j-1][e]+e*ux[i][j][e-1])
+                ux[i][j+1][e] = (Px-Bx)*ux[i][j][e] + 1/(2*p) * (i*ux[i-1][j][e]+j*ux[i][j-1][e]+e*ux[i][j][e-1])
+                ux[i][j][e+1] = (Px-Cx)*ux[i][j][e] + 1/(2*p) * (i*ux[i-1][j][e]+j*ux[i][j-1][e]+e*ux[i][j][e-1])
+    
+    for i in range(0, ma+1):
+        for j in range(0, mb+1):
+            for e in range(0, 2):
+                uy[i+1][j][e] = (Py-Ay)*uy[i][j][e] + 1/(2*p) * (i*uy[i-1][j][e]+j*uy[i][j-1][e]+e*uy[i][j][e-1])
+                uy[i][j+1][e] = (Py-By)*uy[i][j][e] + 1/(2*p) * (i*uy[i-1][j][e]+j*uy[i][j-1][e]+e*uy[i][j][e-1])
+                uy[i][j][e+1] = (Py-Cy)*uy[i][j][e] + 1/(2*p) * (i*uy[i-1][j][e]+j*uy[i][j-1][e]+e*uy[i][j][e-1])
+                
+    for i in range(0, na+1):
+        for j in range(0, nb+1):
+            for e in range(0, 2):
+                uz[i+1][j][e] = (Pz-Az)*uz[i][j][e] + 1/(2*p) * (i*uz[i-1][j][e]+j*uz[i][j-1][e]+e*uz[i][j][e-1])
+                uz[i][j+1][e] = (Pz-Bz)*uz[i][j][e] + 1/(2*p) * (i*uz[i-1][j][e]+j*uz[i][j-1][e]+e*uz[i][j][e-1])
+                uz[i][j][e+1] = (Pz-Cz)*uz[i][j][e] + 1/(2*p) * (i*uz[i-1][j][e]+j*uz[i][j-1][e]+e*uz[i][j][e-1])
+    
+    return -N*ux[la][lb][1]*uy[ma][mb][0]*uz[na][nb][0], -N*ux[la][lb][0]*uy[ma][mb][1]*uz[na][nb][0], -N*ux[la][lb][0]*uy[ma][mb][0]*uz[na][nb][1]
+
+
 ##UTILITY FUNCTIONS
 def f(l1, l2, PAc, PBc, k):
     f = 0
@@ -313,8 +370,46 @@ def runIntegrals(input, basis):
     #END OF nucleus electron attraction
     
     
+def run_dipole_int(basis, input):
+    # Set up indexes for integrals
+    See = {}
+    for i in range(1, len(basis)+1):
+        for j in range(1, len(basis)+1):
+            if i >= j:
+                See[str(int(i))+';'+str(int(j))] = 0
     
-    
+    output1 = open('mux.txt', 'w')
+    output2 = open('muy.txt', 'w')
+    output3 = open('muz.txt', 'w')
+    for key in See.keys():
+        a = key.split(";")
+        for i in range(len(a)):
+            a[i] = int(a[i])-1
+        calcx = 0
+        calcy = 0
+        calcz = 0
+        for i in range(basis[a[0]][4]):
+            for j in range(basis[a[1]][4]):
+                x, y, z = u_ObaraSaika(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4],basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2], input)
+                calcx += x
+                calcy += y
+                calcz += z
+        output1.write(key)
+        output1.write(";")
+        output1.write(str(calcx))
+        output1.write("\n")
+        output2.write(key)
+        output2.write(";")
+        output2.write(str(calcy))
+        output2.write("\n")
+        output3.write(key)
+        output3.write(";")
+        output3.write(str(calcz))
+        output3.write("\n")
+    output1.close()
+    output2.close()
+    output3.close()
+
     
     
     

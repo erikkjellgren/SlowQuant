@@ -4,6 +4,7 @@ import HartreeFock as HF
 import os
 import numpy as np
 import time
+import Properties as prop
 
 input = np.genfromtxt('inputH2O.csv', delimiter=';')
 settings = np.genfromtxt('settings.csv', delimiter = ';', dtype='str')
@@ -16,6 +17,10 @@ start = time.time()
 MI.runIntegrals(input, basis)
 print(time.time()-start, 'INTEGRALS')
 start = time.time()
-Cr, Fnew = HF.HartreeFock(input, set, basis)
+CAO, FAO, D = HF.HartreeFock(input, set, basis)
 print(time.time()-start, 'HF')
+start = time.time()
+prop.runprop(basis, input, D, set)
+print(time.time()-start, 'Properties')
+
 

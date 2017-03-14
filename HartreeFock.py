@@ -133,18 +133,18 @@ def HartreeFock(input, set, basis):
     output.write('Iter')
     output.write("\t")
     output.write('Eel')
-    output.write("\t")
+    output.write("\t \t \t \t \t")
     output.write('Etot')
-    output.write("\t")
+    output.write("\t \t \t \t")
     output.write('dE')
-    output.write("\t")
+    output.write("\t \t \t \t \t")
     output.write('rmsD')
     output.write("\n")
     output.write('0')
-    output.write("\t")
-    output.write(str(E0el))
-    output.write("\t")
-    output.write(str(E0el+VNN))
+    output.write("\t \t")
+    output.write("{:14.10f}".format(E0el))
+    output.write("\t \t")
+    output.write("{:14.10f}".format(E0el+VNN))
     
     for iter in range(1, 100):
         output.write("\n")
@@ -215,14 +215,14 @@ def HartreeFock(input, set, basis):
         rmsD = math.sqrt(rmsD)
         
         output.write(str(iter))
-        output.write("\t")
-        output.write(str(Eel))
-        output.write("\t")
-        output.write(str(Eel+VNN))
-        output.write("\t")
-        output.write(str(dE))
-        output.write("\t")
-        output.write(str(rmsD))
+        output.write("\t \t")
+        output.write("{:14.10f}".format(Eel))
+        output.write("\t \t")
+        output.write("{:14.10f}".format(Eel+VNN))
+        output.write("\t \t")
+        output.write("{: 12.8e}".format(dE))
+        output.write("\t \t")
+        output.write("{: 12.8e}".format(rmsD))
     
         D0 = D
         E0el = Eel
@@ -231,7 +231,7 @@ def HartreeFock(input, set, basis):
             
     output.close()
     
-    return Cr, Fnew
+    return Cr, Fnew, D
 
     
 
