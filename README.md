@@ -9,4 +9,9 @@ STO-3G  : H, O
 DZ      : H, O
 
 #Properties:
+
 HF Energy
+
+Mulliken charges
+
+Molecular dipole moment
