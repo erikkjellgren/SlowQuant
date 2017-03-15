@@ -173,7 +173,7 @@ def HartreeFock(input, set, basis):
             break
     output.close()
     
-    return F, D
+    return C, F, D
 
     
 
