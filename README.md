@@ -10,7 +10,7 @@ DZ      : H, O
 
 ## Properties:
 
-HF Energy
+HF energy, MP2 energy (Scales super bad!)
 
 Mulliken charges
 
