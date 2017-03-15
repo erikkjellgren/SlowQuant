@@ -130,7 +130,91 @@ def bassiset(input, set):
                 basis_func = [[0, 0.2137000, 1.0000000, 0,0,1]]
                 basis_out.append([idx,input[i][1],input[i][2],input[i][3],1,basis_func, i])
                 idx += 1
-    
+                
+        elif set['basisset'] == 'DZP':
+            if input[i][0] == 1:
+                basis_func = [[0,19.2406000,0.0328280,0,0,0],
+                                [0,2.8992000,0.2312080,0,0,0],
+                                [0,0.6534000,0.8172380,0,0,0]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],3,basis_func, i])
+                idx += 1
+                basis_func = [[0, 0.1776000, 1.0000000, 0,0,0]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],1,basis_func, i])
+                idx += 1
+                basis_func = [[0, 1.0000000, 1.0000000, 1,0,0]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],1,basis_func, i])
+                idx += 1
+                basis_func = [[0, 1.0000000, 1.0000000, 0,1,0]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],1,basis_func, i])
+                idx += 1
+                basis_func = [[0, 1.0000000, 1.0000000, 0,0,1]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],1,basis_func, i])
+                idx += 1
+            elif input[i][0] == 8:
+                basis_func = [[0,7816.5400000,0.0020310,0,0,0],
+                                [0,1175.8200000,0.0154360,0,0,0],
+                                [0,273.1880000,0.0737710,0,0,0],
+                                [0,81.1696000,0.2476060,0,0,0],
+                                [0,27.1836000,0.6118320,0,0,0],
+                                [0,3.4136000,0.2412050,0,0,0]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],6,basis_func, i])
+                idx += 1
+                basis_func = [[0, 9.5322000, 1.0000000, 0,0,0]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],1,basis_func, i])
+                idx += 1
+                basis_func = [[0, 0.9398000, 1.0000000, 0,0,0]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],1,basis_func, i])
+                idx += 1
+                basis_func = [[0, 0.2846000, 1.0000000, 0,0,0]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],1,basis_func, i])
+                idx += 1
+                basis_func = [[0,35.1832000,0.0195800,1,0,0],
+                                [0,7.9040000,0.1241890,1,0,0],
+                                [0,2.3051000,0.3947270,1,0,0],
+                                [0,0.7171000,0.6273750,1,0,0]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],4,basis_func, i])
+                idx += 1
+                basis_func = [[0,35.1832000,0.0195800,0,1,0],
+                                [0,7.9040000,0.1241890,0,1,0],
+                                [0,2.3051000,0.3947270,0,1,0],
+                                [0,0.7171000,0.6273750,0,1,0]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],4,basis_func, i])
+                idx += 1
+                basis_func = [[0,35.1832000,0.0195800,0,0,1],
+                                [0,7.9040000,0.1241890,0,0,1],
+                                [0,2.3051000,0.3947270,0,0,1],
+                                [0,0.7171000,0.6273750,0,0,1]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],4,basis_func, i])
+                idx += 1
+                basis_func = [[0, 0.2137000, 1.0000000, 1,0,0]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],1,basis_func, i])
+                idx += 1
+                basis_func = [[0, 0.2137000, 1.0000000, 0,1,0]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],1,basis_func, i])
+                idx += 1
+                basis_func = [[0, 0.2137000, 1.0000000, 0,0,1]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],1,basis_func, i])
+                idx += 1
+                basis_func = [[0, 0.8500000, 1.0000000, 2,0,0]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],1,basis_func, i])
+                idx += 1
+                basis_func = [[0, 0.8500000, 1.0000000, 0,2,0]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],1,basis_func, i])
+                idx += 1
+                basis_func = [[0, 0.8500000, 1.0000000, 0,0,2]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],1,basis_func, i])
+                idx += 1
+                basis_func = [[0, 0.8500000, 1.0000000, 1,1,0]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],1,basis_func, i])
+                idx += 1
+                basis_func = [[0, 0.8500000, 1.0000000, 1,0,1]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],1,basis_func, i])
+                idx += 1
+                basis_func = [[0, 0.8500000, 1.0000000, 0,1,1]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],1,basis_func, i])
+                idx += 1
+        else:
+            print('NO BASIS SET DEFINED')
     for i in range(len(basis_out)):
         for j in range(len(basis_out[i][5])):
             basis_out[i][5][j][0] = N(basis_out[i][5][j][1], basis_out[i][5][j][3], basis_out[i][5][j][4], basis_out[i][5][j][5])
