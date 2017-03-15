@@ -1,3 +1,4 @@
-basisset;STO3G
+basisset;DZ
 Charge;Mulliken
 Dipole;Yes
+MPn;No
