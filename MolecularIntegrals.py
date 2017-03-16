@@ -5,9 +5,49 @@ import scipy.special as scs
 from numba import jit
 
 ##INTEGRAL FUNCTIONS
-def Overlap(a, b, la, lb, Ax, Bx):
+def Overlap(a, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na, nb, N1, N2, c1, c2):
     #Obara-Saika scheme, 9.3.8 and 9.3.9 Helgaker
-    #No normalization constants - corrected down in call of the function
+    N = N1*N2*c1*c2
+    p = a + b
+    u = a*b/p
+    
+    Px = (a*Ax+b*Bx)/p
+    Py = (a*Ay+b*By)/p
+    Pz = (a*Az+b*Bz)/p
+    
+    S00x = (math.pi/p)**(1/2) * math.exp(-u*(Ax-Bx)**2)
+    S00y = (math.pi/p)**(1/2) * math.exp(-u*(Ay-By)**2)
+    S00z = (math.pi/p)**(1/2) * math.exp(-u*(Az-Bz)**2)
+    
+    Sijx = np.zeros(shape=(la+2,lb+2))
+    Sijy = np.zeros(shape=(ma+2,mb+2))
+    Sijz = np.zeros(shape=(na+2,nb+2))
+    Sijx[0,0] = S00x
+    Sijy[0,0] = S00y
+    Sijz[0,0] = S00z
+    
+    for i in range(0, la+1):
+        for j in range(0, lb+1):
+            Sijx[i+1,j] = (Px-Ax)*Sijx[i,j] + 1/(2*p) * (i*Sijx[i-1,j] + j*Sijx[i,j-1])
+            Sijx[i,j+1] = (Px-Bx)*Sijx[i,j] + 1/(2*p) * (i*Sijx[i-1,j] + j*Sijx[i,j-1])
+    
+    for i in range(0, ma+1):
+        for j in range(0, mb+1):
+            Sijy[i+1,j] = (Py-Ay)*Sijy[i,j] + 1/(2*p) * (i*Sijy[i-1,j] + j*Sijy[i,j-1])
+            Sijy[i,j+1] = (Py-By)*Sijy[i,j] + 1/(2*p) * (i*Sijy[i-1,j] + j*Sijy[i,j-1])
+    
+    for i in range(0, na+1):
+        for j in range(0, nb+1):
+            Sijz[i+1,j] = (Pz-Az)*Sijz[i,j] + 1/(2*p) * (i*Sijz[i-1,j] + j*Sijz[i,j-1])
+            Sijz[i,j+1] = (Pz-Bz)*Sijz[i,j] + 1/(2*p) * (i*Sijz[i-1,j] + j*Sijz[i,j-1])
+    
+    return Sijx[la,lb]*Sijy[ma,mb]*Sijz[na,nb]*N
+
+def Overlap2(a, b, la, lb, Ax, Bx):
+    #Obara-Saika scheme, 9.3.8 and 9.3.9 Helgaker
+    #Used in Kin integral!, should be linked with the other Overlap, 
+    #    so it is not double calculated
+    
     p = a + b
     u = a*b/p
     
@@ -24,47 +64,50 @@ def Overlap(a, b, la, lb, Ax, Bx):
             Sij[i+1,j] = (Px-Ax)*Sij[i,j] + 1/(2*p) * (i*Sij[i-1,j] + j*Sij[i,j-1])
             Sij[i,j+1] = (Px-Bx)*Sij[i,j] + 1/(2*p) * (i*Sij[i-1,j] + j*Sij[i,j-1])
     
-    return Sij[la,lb]
+    return Sij
 
-def Kin_NOTTESTED(a, b, la, lb, Ax, Bx):
+def Kin(a, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na, nb, N1, N2, c1, c2):
     #Obara-Saika scheme, 9.3.40 and 9.3.41 Helgaker
+    p = a + b
+    N = N1*N2*c1*c2
     Px = (a*Ax+b*Bx)/p
+    Py = (a*Ay+b*By)/p
+    Pz = (a*Az+b*Bz)/p
     XPA = Px - Ax
+    YPA = Py - Ay
+    ZPA = Pz - Az
     XPB = Px - Bx
+    YPB = Py - By
+    ZPB = Pz - Bz
     
-    Tij = np.zeros(shape=(la+2,lb+2))
-    S = Overlap(a, b, la, lb, Ax, Bx)
-    Tij[0,0] = [a-2*a**2*(XPA**2+1/(2*p))]*S[0,0]
+    Tijx = np.zeros(shape=(la+2,lb+2))
+    Tijy = np.zeros(shape=(ma+2,mb+2))
+    Tijz = np.zeros(shape=(na+2,nb+2))
+    Sx = Overlap2(a, b, la, lb, Ax, Bx)
+    Sy = Overlap2(a, b, ma, mb, Ay, By)
+    Sz = Overlap2(a, b, na, nb, Az, Bz)
+    Tijx[0,0] = (a-2*a**2*(XPA**2+1/(2*p)))*Sx[0,0]
+    Tijy[0,0] = (a-2*a**2*(YPA**2+1/(2*p)))*Sy[0,0]
+    Tijz[0,0] = (a-2*a**2*(ZPA**2+1/(2*p)))*Sz[0,0]
     
     for i in range(0, la+1):
         for j in range(0, lb+1):
-            Tij[i+1,j] = XPA*T[i,j] + 1/(2*p)*(i*T[i-1,j]+j*T[i,j-1]) + b/p*(2*a*S[i+1,j] - i*S[i-1,j])
-            Tij[i,j+1] = XPB*T[i,j] + 1/(2*p)*(i*T[i-1,j]+j*T[i,j-1]) + a/p*(2*b*S[i,j+1] - i*S[i,j-1])
+            Tijx[i+1,j] = XPA*Tijx[i,j] + 1/(2*p)*(i*Tijx[i-1,j]+j*Tijx[i,j-1]) + b/p*(2*a*Sx[i+1,j] - i*Sx[i-1,j])
+            Tijx[i,j+1] = XPB*Tijx[i,j] + 1/(2*p)*(i*Tijx[i-1,j]+j*Tijx[i,j-1]) + a/p*(2*b*Sx[i,j+1] - j*Sx[i,j-1])
     
-    return Tij[la, lb]
+    for i in range(0, ma+1):
+        for j in range(0, mb+1):
+            Tijy[i+1,j] = YPA*Tijy[i,j] + 1/(2*p)*(i*Tijy[i-1,j]+j*Tijy[i,j-1]) + b/p*(2*a*Sy[i+1,j] - i*Sy[i-1,j])
+            Tijy[i,j+1] = YPB*Tijy[i,j] + 1/(2*p)*(i*Tijy[i-1,j]+j*Tijy[i,j-1]) + a/p*(2*b*Sy[i,j+1] - j*Sy[i,j-1])
+    
+    for i in range(0, na+1):
+        for j in range(0, nb+1):
+            Tijz[i+1,j] = ZPA*Tijz[i,j] + 1/(2*p)*(i*Tijz[i-1,j]+j*Tijz[i,j-1]) + b/p*(2*a*Sz[i+1,j] - i*Sz[i-1,j])
+            Tijz[i,j+1] = ZPB*Tijz[i,j] + 1/(2*p)*(i*Tijz[i-1,j]+j*Tijz[i,j-1]) + a/p*(2*b*Sz[i,j+1] - j*Sz[i,j-1])
+    
+    return (Tijx[la, lb]*Sy[ma,mb]*Sz[na,nb]+Tijy[ma, mb]*Sx[la,lb]*Sz[na,nb]+Tijz[na, nb]*Sy[ma,mb]*Sx[la,lb])*N
 
-def Kin(a1, a2, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na, nb, N1, N2, c1, c2):
-    #Where is this from?
-    N = N1*N2*c1*c2
-    g = a1 + a2
-    
-    Px = (a1*Ax+a2*Bx)/g
-    Py = (a1*Ay+a2*By)/g
-    Pz = (a1*Az+a2*Bz)/g
-    
-    Ix = I(la, lb, (Px-Ax), (Px-Bx), g)
-    Iy = I(ma, mb, (Py-Ay), (Py-By), g)
-    Iz = I(na, nb, (Pz-Az), (Pz-Bz), g)
-    S = math.exp(-a1*a2*((Ax-Bx)**2+(Ay-By)**2+(Az-Bz)**2)/g)
-    
-    
-    Ixk = a2*(2*lb+1)*S*Ix*Iy*Iz - 2*a2**2*S*I(la, lb+2, (Px-Ax), (Px-Bx), g)*Iy*Iz - ((lb*(lb-1))/(2))*S*I(la, lb-2, (Px-Ax), (Px-Bx), g)*Iy*Iz
-    Iyk = a2*(2*mb+1)*S*Ix*Iy*Iz - 2*a2**2*S*I(ma, mb+2, (Py-Ay), (Py-By), g)*Ix*Iz - ((mb*(mb-1))/(2))*S*I(ma, mb-2, (Py-Ay), (Py-By), g)*Ix*Iz
-    Izk = a2*(2*nb+1)*S*Ix*Iy*Iz - 2*a2**2*S*I(na, nb+2, (Pz-Az), (Pz-Bz), g)*Ix*Iy - ((nb*(nb-1))/(2))*S*I(na, nb-2, (Pz-Az), (Pz-Bz), g)*Ix*Iy
-    
-    T = N*(Ixk + Iyk + Izk)
-    
-    return T
+
 
 def elnuc(a1, a2, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, input):
     #SUPER UGLY
@@ -219,7 +262,45 @@ def u_ObaraSaika(a1, a2, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na, nb, N1, N2,
     
     return -N*ux[la][lb][1]*uy[ma][mb][0]*uz[na][nb][0], -N*ux[la][lb][0]*uy[ma][mb][1]*uz[na][nb][0], -N*ux[la][lb][0]*uy[ma][mb][0]*uz[na][nb][1]
 
+def Velesp(a1, a2, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, rcx, rcy, rcz, input):
+    #SUPER UGLY
+    N = N1*N2*c1*c2
+    gp = a1 + a2
+    ep = (a1*a2)/gp
+    
+    Px = (a1*Ax+a2*Bx)/gp
+    Py = (a1*Ay+a2*By)/gp
+    Pz = (a1*Az+a2*Bz)/gp
+    
+    Fzeta = 0
+        
+    for i1 in range(0, int(l1/2)+1):
+        for i2 in range(0, int(l2/2)+1):
+            for o1 in range(0, l1-2*i1+1):
+                for o2 in range(0,l2-2*i2+1):
+                    for r in range(0, int((o1+o2)/2)+1):
+                        ux = l1+l2-2*(i1+i2)-(o1+o2)
+                        for u in range(0, int(ux/2)+1):
+                            for j1 in range(0, int(m1/2)+1):
+                                for j2 in range(0, int(m2/2)+1):
+                                    for p1 in range(0, m1-2*j1+1):
+                                        for p2 in range(0, m2-2*j2+1):
+                                            for s in range(0, int((p1+p2)/2)+1):
+                                                uy = m1+m2-2*(j1+j2)-(p1+p2)
+                                                for v in range(0, int(uy/2)+1):
+                                                    for k1 in range(0, int(n1/2)+1):
+                                                        for k2 in range(0, int(n2/2)+1):
+                                                            for q1 in range(0, n1-2*k1+1):
+                                                                for q2 in range(0, n2-2*k2+1):
+                                                                    for t in range(0, int((q1+q2)/2)+1):
+                                                                        uz = n1+n2-2*(k1+k2)-(q1+q2)
+                                                                        for w in range(0, int(uz/2)+1):
 
+                                                                            Fzeta += A(l1, l2, a1, a2, Ax, Bx, Px, rcx, i1, i2, o1, o2, r, u)*A(m1, m2, a1, a2, Ay, By, Py, rcy, j1, j2, p1, p2, s, v)*A(n1, n2, a1, a2, Az, Bz, Pz, rcz, k1, k2, q1, q2, t, w)*2*F(gp*((Px-rcx)**2+(Py-rcy)**2+(Pz-rcz)**2), ux+uy+uz-(u+v+w))
+            
+    Vesp = N*math.pi/gp * math.exp(-ep*((Ax-Bx)**2+(Ay-By)**2+(Az-Bz)**2)) * Fzeta
+    return Vesp
+    
 ##UTILITY FUNCTIONS
 def f(l1, l2, PAc, PBc, k):
     f = 0
@@ -326,7 +407,7 @@ def runIntegrals(input, basis):
         for i in range(basis[a[0]][4]):
             for j in range(basis[a[1]][4]):
                 # Normalization multiplied here and not in the function!
-                calc += Overlap(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[0]][1], basis[a[1]][1])*Overlap(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[0]][5][i][4], basis[a[1]][5][j][4], basis[a[0]][2], basis[a[1]][2])*Overlap(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[0]][3], basis[a[1]][3])*basis[a[0]][5][i][0]*basis[a[0]][5][i][2]*basis[a[1]][5][j][0]*basis[a[1]][5][j][2]
+                calc += Overlap(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4],basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2])
         output.write(key)
         output.write(";")
         output.write(str(calc))
