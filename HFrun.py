@@ -6,8 +6,9 @@ import numpy as np
 import time
 import Properties as prop
 import MPn as MP
+import Qfit as QF
 
-input = np.genfromtxt('inputH2O.csv', delimiter=';')
+input = np.genfromtxt('input2_H2O.csv', delimiter=';')
 settings = np.genfromtxt('settings.csv', delimiter = ';', dtype='str')
 set = {}
 for i in range(len(settings)):
@@ -26,4 +27,7 @@ print(time.time()-start, 'Properties')
 start = time.time()
 MP.runMPn(basis, input, FAO, CMO, set)
 print(time.time()-start, 'MP2')
+start = time.time()
+QF.chrfit(basis, input, D)
+print(time.time()-start, 'QFIT')
 

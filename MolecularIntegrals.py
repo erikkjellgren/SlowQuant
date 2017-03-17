@@ -262,7 +262,7 @@ def u_ObaraSaika(a1, a2, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na, nb, N1, N2,
     
     return -N*ux[la][lb][1]*uy[ma][mb][0]*uz[na][nb][0], -N*ux[la][lb][0]*uy[ma][mb][1]*uz[na][nb][0], -N*ux[la][lb][0]*uy[ma][mb][0]*uz[na][nb][1]
 
-def Velesp(a1, a2, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, rcx, rcy, rcz, input):
+def Velesp(a1, a2, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, rcx, rcy, rcz):
     #SUPER UGLY
     N = N1*N2*c1*c2
     gp = a1 + a2
@@ -491,7 +491,27 @@ def run_dipole_int(basis, input):
     output2.close()
     output3.close()
 
+def runQMESP(basis, input, rcx, rcy ,rcz):
+    # Set up indexes for integrals
+    See = {}
+    for i in range(1, len(basis)+1):
+        for j in range(1, len(basis)+1):
+            if i >= j:
+                See[str(int(i))+';'+str(int(j))] = 0
     
+    Ve = {}
+    for key in See.keys():
+        a = key.split(";")
+        for i in range(len(a)):
+            a[i] = int(a[i])-1
+        calc = 0
+        
+        for i in range(basis[a[0]][4]):
+            for j in range(basis[a[1]][4]):
+                calc += Velesp(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4],basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2], rcx, rcy, rcz)
+        Ve[key] = calc
+        
+    return Ve
     
     
     
