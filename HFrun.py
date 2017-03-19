@@ -7,6 +7,7 @@ import time
 import Properties as prop
 import MPn as MP
 import Qfit as QF
+import Utilityfunc as utilF
 
 input = np.genfromtxt('input2_H2O.csv', delimiter=';')
 results = {}
@@ -22,6 +23,9 @@ print(time.time()-start, 'INTEGRALS')
 start = time.time()
 CMO, FAO, D = HF.HartreeFock(input, set, basis)
 print(time.time()-start, 'HF')
+start = time.time()
+utilF.TransformMO(CMO, basis, set)
+print(time.time()-start, 'MO transform')
 start = time.time()
 results = prop.runprop(basis, input, D, set, results)
 print(time.time()-start, 'Properties')

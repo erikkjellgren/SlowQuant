@@ -7,33 +7,8 @@ def MP2(basis, input, F, C):
     eps = np.dot(np.dot(CT, F),C)
 
     #Loading two electron integrals
-    Vee = utilF.load2el(basis)
+    VeeMO = utilF.load2el(basis, MO='yes')
     
-    #Make dict for MO integrals
-    VeeMO = {}
-    for i in range(1, len(basis)+1):
-        for j in range(1, len(basis)+1):
-            for k in range(1, len(basis)+1):
-                for l in range(1, len(basis)+1):
-                    ijkl = utilF.idx2el(i, j, k, l)
-                    VeeMO[ijkl] = 0
-    
-    #Transform two electron integrals to MO basis
-    idxcheck = []
-    for i in range(1, len(basis)+1):
-        for j in range(1, len(basis)+1):
-            for k in range(1, len(basis)+1):
-                for l in range(1, len(basis)+1):
-                    ijkl = utilF.idx2el(i, j, k, l)
-                    if ijkl not in idxcheck:
-                        idxcheck.append(ijkl)
-                        for p in range(1, len(basis)+1):
-                            for q in range(1, len(basis)+1):
-                                for r in range(1, len(basis)+1):
-                                    for s in range(1, len(basis)+1):
-                                        pqrs = utilF.idx2el(p, q, r, s)
-                                        VeeMO[ijkl] += C[p-1,i-1]*C[q-1,j-1]*C[r-1,k-1]*C[s-1,l-1]*Vee[pqrs]
-
     #Calc EMP2
     EMP2 = 0
     for i in range(1, int(input[0][0]/2)+1):
@@ -46,7 +21,7 @@ def MP2(basis, input, F, C):
 
     output = open('out.txt', 'a')
     output.write('\n \n')
-    output.write('MP2 Energy: \t')
+    output.write('MP2 Energy \t')
     output.write("{: 10.8f}".format(EMP2))
     output.close()
 
