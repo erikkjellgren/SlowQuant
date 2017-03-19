@@ -12,7 +12,7 @@ DZP     : H, O
 
 ## Properties:
 
-HF energy, MP2 energy (N^8 scaling!)
+HF energy, MP2 energy
 
 Mulliken charges, ESP fitted charges
 
