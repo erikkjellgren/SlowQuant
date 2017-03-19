@@ -13,6 +13,10 @@ def symm_orth(eigVal, eigVec):
     return M
 
 def HartreeFock(input, set, basis):
+    deTHR = int(set['SCF Energy Threshold'])
+    rmsTHR = int(set['SCF RMSD Threshold'])
+    Maxiter = int(set['SCF Max iterations'])
+    
     #Loading nuclear repulsion
     VNN = np.genfromtxt('enuc.txt', delimiter = ';')
     
@@ -112,7 +116,7 @@ def HartreeFock(input, set, basis):
     output.write("\t \t")
     output.write("{:14.10f}".format(E0el+VNN))
     
-    for iter in range(1, 100):
+    for iter in range(1, Maxiter):
         output.write("\n")
         #New Fock Matrix
         placeholder = []
@@ -169,7 +173,7 @@ def HartreeFock(input, set, basis):
     
         D0 = D
         E0el = Eel
-        if dE < 10**(-12) and rmsD < 10**(-12):
+        if dE < 10**(-deTHR) and rmsD < 10**(-rmsTHR):
             break
     output.close()
     

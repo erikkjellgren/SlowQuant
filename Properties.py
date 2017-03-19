@@ -37,7 +37,7 @@ def MulCharge(basis, input, D):
         output.write('\n')
     output.close()
 
-def dipolemoment(basis, input, D):
+def dipolemoment(basis, input, D, results):
     nucx = []
     nucy = []
     nucz = []
@@ -140,6 +140,11 @@ def dipolemoment(basis, input, D):
     
     u = math.sqrt(ux**2+uy**2+uz**2)
     
+    results['dipolex'] = ux
+    results['dipoley'] = uy
+    results['dipolez'] = uz
+    results['dipoletot'] = u
+    
     output = open('out.txt', 'a')
     output.write('\n \nMolecular dipole moment \n')
     output.write('X \t \t')
@@ -151,10 +156,13 @@ def dipolemoment(basis, input, D):
     output.write('\nTotal \t')
     output.write("{: 10.8f}".format(u))
     output.close()
+    
+    return results
 
-def runprop(basis, input, D, set):
+def runprop(basis, input, D, set, results):
     if set['Charge'] == 'Mulliken':
         MulCharge(basis, input, D)
     if set['Dipole'] == 'Yes':
         MI.run_dipole_int(basis, input)
-        dipolemoment(basis, input, D)
+        results = dipolemoment(basis, input, D, results)
+    return results

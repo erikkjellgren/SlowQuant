@@ -5,45 +5,7 @@ import scipy.special as scs
 from numba import jit
 
 ##INTEGRAL FUNCTIONS
-def Overlap(a, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na, nb, N1, N2, c1, c2):
-    #Obara-Saika scheme, 9.3.8 and 9.3.9 Helgaker
-    N = N1*N2*c1*c2
-    p = a + b
-    u = a*b/p
-    
-    Px = (a*Ax+b*Bx)/p
-    Py = (a*Ay+b*By)/p
-    Pz = (a*Az+b*Bz)/p
-    
-    S00x = (math.pi/p)**(1/2) * math.exp(-u*(Ax-Bx)**2)
-    S00y = (math.pi/p)**(1/2) * math.exp(-u*(Ay-By)**2)
-    S00z = (math.pi/p)**(1/2) * math.exp(-u*(Az-Bz)**2)
-    
-    Sijx = np.zeros(shape=(la+2,lb+2))
-    Sijy = np.zeros(shape=(ma+2,mb+2))
-    Sijz = np.zeros(shape=(na+2,nb+2))
-    Sijx[0,0] = S00x
-    Sijy[0,0] = S00y
-    Sijz[0,0] = S00z
-    
-    for i in range(0, la+1):
-        for j in range(0, lb+1):
-            Sijx[i+1,j] = (Px-Ax)*Sijx[i,j] + 1/(2*p) * (i*Sijx[i-1,j] + j*Sijx[i,j-1])
-            Sijx[i,j+1] = (Px-Bx)*Sijx[i,j] + 1/(2*p) * (i*Sijx[i-1,j] + j*Sijx[i,j-1])
-    
-    for i in range(0, ma+1):
-        for j in range(0, mb+1):
-            Sijy[i+1,j] = (Py-Ay)*Sijy[i,j] + 1/(2*p) * (i*Sijy[i-1,j] + j*Sijy[i,j-1])
-            Sijy[i,j+1] = (Py-By)*Sijy[i,j] + 1/(2*p) * (i*Sijy[i-1,j] + j*Sijy[i,j-1])
-    
-    for i in range(0, na+1):
-        for j in range(0, nb+1):
-            Sijz[i+1,j] = (Pz-Az)*Sijz[i,j] + 1/(2*p) * (i*Sijz[i-1,j] + j*Sijz[i,j-1])
-            Sijz[i,j+1] = (Pz-Bz)*Sijz[i,j] + 1/(2*p) * (i*Sijz[i-1,j] + j*Sijz[i,j-1])
-    
-    return Sijx[la,lb]*Sijy[ma,mb]*Sijz[na,nb]*N
-
-def Overlap2(a, b, la, lb, Ax, Bx):
+def Overlap(a, b, la, lb, Ax, Bx):
     #Obara-Saika scheme, 9.3.8 and 9.3.9 Helgaker
     #Used in Kin integral!, should be linked with the other Overlap, 
     #    so it is not double calculated
@@ -68,6 +30,9 @@ def Overlap2(a, b, la, lb, Ax, Bx):
 
 def Kin(a, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na, nb, N1, N2, c1, c2):
     #Obara-Saika scheme, 9.3.40 and 9.3.41 Helgaker
+    # Calculates electronic kinetic energy and overlap integrals
+    #    at the same time
+    
     p = a + b
     N = N1*N2*c1*c2
     Px = (a*Ax+b*Bx)/p
@@ -83,9 +48,9 @@ def Kin(a, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na, nb, N1, N2, c1, c2):
     Tijx = np.zeros(shape=(la+2,lb+2))
     Tijy = np.zeros(shape=(ma+2,mb+2))
     Tijz = np.zeros(shape=(na+2,nb+2))
-    Sx = Overlap2(a, b, la, lb, Ax, Bx)
-    Sy = Overlap2(a, b, ma, mb, Ay, By)
-    Sz = Overlap2(a, b, na, nb, Az, Bz)
+    Sx = Overlap(a, b, la, lb, Ax, Bx)
+    Sy = Overlap(a, b, ma, mb, Ay, By)
+    Sz = Overlap(a, b, na, nb, Az, Bz)
     Tijx[0,0] = (a-2*a**2*(XPA**2+1/(2*p)))*Sx[0,0]
     Tijy[0,0] = (a-2*a**2*(YPA**2+1/(2*p)))*Sy[0,0]
     Tijz[0,0] = (a-2*a**2*(ZPA**2+1/(2*p)))*Sz[0,0]
@@ -105,8 +70,7 @@ def Kin(a, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na, nb, N1, N2, c1, c2):
             Tijz[i+1,j] = ZPA*Tijz[i,j] + 1/(2*p)*(i*Tijz[i-1,j]+j*Tijz[i,j-1]) + b/p*(2*a*Sz[i+1,j] - i*Sz[i-1,j])
             Tijz[i,j+1] = ZPB*Tijz[i,j] + 1/(2*p)*(i*Tijz[i-1,j]+j*Tijz[i,j-1]) + a/p*(2*b*Sz[i,j+1] - j*Sz[i,j-1])
     
-    return (Tijx[la, lb]*Sy[ma,mb]*Sz[na,nb]+Tijy[ma, mb]*Sx[la,lb]*Sz[na,nb]+Tijz[na, nb]*Sy[ma,mb]*Sx[la,lb])*N
-
+    return (Tijx[la, lb]*Sy[ma,mb]*Sz[na,nb]+Tijy[ma, mb]*Sx[la,lb]*Sz[na,nb]+Tijz[na, nb]*Sy[ma,mb]*Sx[la,lb])*N, Sx[la, lb]*Sy[ma, mb]*Sz[na, nb]*N
 
 
 def elnuc(a1, a2, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, input):
@@ -154,6 +118,8 @@ def elnuc(a1, a2, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2
 
     return Vn
 
+
+    
 def elelrep(a1, a2, a3, a4, Ax, Ay, Az, Bx, By, Bz, Cx, Cy, Cz, Dx, Dy, Dz, la, lb, lc, ld, ma, mb, mc, md, na, nb, nc, nd, N1, N2, N3, N4, c1, c2, c3, c4):
     #SUPER UGLY
     N = N1*N2*N3*N4*c1*c2*c3*c4
@@ -397,40 +363,32 @@ def runIntegrals(input, basis):
     output.close()
     #END OF two electron integrals
     
-    # Overlap
-    output = open('overlap.txt', 'w')
-    for key in See.keys():
-        a = key.split(";")
-        for i in range(len(a)):
-            a[i] = int(a[i])-1
-        calc = 0
-        for i in range(basis[a[0]][4]):
-            for j in range(basis[a[1]][4]):
-                # Normalization multiplied here and not in the function!
-                calc += Overlap(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4],basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2])
-        output.write(key)
-        output.write(";")
-        output.write(str(calc))
-        output.write("\n")
-    output.close()
-    #END OF overlap
-    
-    # Kinetic energy
+    # Kinetic energy and overlap
     output = open('kinen.txt', 'w')
+    output2 = open('overlap.txt', 'w')
     for key in See.keys():
         a = key.split(";")
         for i in range(len(a)):
             a[i] = int(a[i])-1
         calc = 0
+        calc2 = 0
         for i in range(basis[a[0]][4]):
             for j in range(basis[a[1]][4]):
-                calc += Kin(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4],basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2])
+                calct, calct2 = Kin(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4],basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2])
+                calc += calct
+                calc2 += calct2
         output.write(key)
         output.write(";")
         output.write(str(calc))
         output.write("\n")
+        
+        output2.write(key)
+        output2.write(";")
+        output2.write(str(calc2))
+        output2.write("\n")
     output.close()
-    #END OF kinetic energy
+    output2.close()
+    #END OF kinetic energy and overlap
     
     # Nucleus electron attraction
     output = open('nucatt.txt', 'w')

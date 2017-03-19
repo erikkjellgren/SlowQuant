@@ -9,6 +9,7 @@ import MPn as MP
 import Qfit as QF
 
 input = np.genfromtxt('input2_H2O.csv', delimiter=';')
+results = {}
 settings = np.genfromtxt('settings.csv', delimiter = ';', dtype='str')
 set = {}
 for i in range(len(settings)):
@@ -22,12 +23,12 @@ start = time.time()
 CMO, FAO, D = HF.HartreeFock(input, set, basis)
 print(time.time()-start, 'HF')
 start = time.time()
-prop.runprop(basis, input, D, set)
+results = prop.runprop(basis, input, D, set, results)
 print(time.time()-start, 'Properties')
 start = time.time()
 MP.runMPn(basis, input, FAO, CMO, set)
 print(time.time()-start, 'MP2')
 start = time.time()
-QF.chrfit(basis, input, D)
+QF.chrfit(basis, input, D, set, results)
 print(time.time()-start, 'QFIT')
 
