@@ -14,6 +14,6 @@ DZP     : H, O
 
 HF energy, MP2 energy (N^8 scaling!)
 
-Mulliken charges
+Mulliken charges, ESP fitted charges
 
 Molecular dipole moment
