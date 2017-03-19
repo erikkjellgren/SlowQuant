@@ -1,4 +1,11 @@
-basisset;DZ
+basisset;STO3G
+SCF Energy Threshold;12
+SCF RMSD Threshold;12
+SCF Max iterations;100
 Charge;Mulliken
 Dipole;Yes
-MPn;No
+MPn;No(MP2)
+Multipolefit;Yes
+Constraint charge;Yes
+Qtot;0
+Constraint dipole;NOTWORKING
