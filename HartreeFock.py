@@ -1,7 +1,6 @@
 import numpy as np
 import scipy.linalg
 import math
-import Utilityfunc as utilF
 
 def diagonlize(M):
     eigVal, eigVec = np.linalg.eigh(M)
@@ -18,76 +17,36 @@ def HartreeFock(input, set, basis):
     Maxiter = int(set['SCF Max iterations'])
     
     #Loading nuclear repulsion
-    VNN = np.genfromtxt('enuc.txt', delimiter = ';')
+    VNN = np.load('enuc.npy')
     
     #Loading kinetic energy
-    Te = {}
-    kin = np.genfromtxt('kinen.txt', delimiter = ';')
-    
-    for i in range(0, len(kin)):
-        Te[str(int(kin[i][0]))+str(int(kin[i][1]))] = kin[i][2]
+    Te = np.load('Ekin.npy')
     
     #Loading overlap integrals
-    S = {}
-    overlap = np.genfromtxt('overlap.txt', delimiter = ';')
-    
-    for i in range(0, len(overlap)):
-        S[str(int(overlap[i][0]))+str(int(overlap[i][1]))] = overlap[i][2]
+    S = np.load('overlap.npy')
     
     #Loading nuclear attraction
-    VeN = {}
-    nucatt = np.genfromtxt('nucatt.txt', delimiter = ';')
-    
-    for i in range(0, len(nucatt)):
-        VeN[str(int(nucatt[i][0]))+str(int(nucatt[i][1]))] = nucatt[i][2]
+    VeN = np.load('nucatt.npy')
     
     #Loading two electron integrals
-    Vee = utilF.load2el(basis)
-            
+    Vee = np.load('twoint.npy')
     
     #Core Hamiltonian
-    Hcore = []
-    for i in range(1, len(basis)+1):
-        a = []
-        for j in range(1, len(basis)+1):
-            if i > j:
-                a.append(VeN[str(i)+str(j)]+Te[str(i)+str(j)])
-            else:
-                a.append(VeN[str(j)+str(i)]+Te[str(j)+str(i)])
-        
-        Hcore.append(a)
+    Hcore = VeN+Te
     
-
-    #Overlap matrix
-    Sval = []
-    for i in range(1, len(basis)+1):
-        a = []
-        for j in range(1, len(basis)+1):
-            if i > j:
-                a.append(S[str(i)+str(j)])
-            else:
-                a.append(S[str(j)+str(i)])
-        
-        Sval.append(a)
-    
-    
-    S = np.array(Sval)
-
-
     #Diagonalizing overlap matrix
     Lambda_S, L_S = diagonlize(S)
     #Symmetric orthogonal inverse overlap matrix
     S_sqrt = symm_orth(Lambda_S, L_S)
-
     
     #Initial Density
     F0prime = np.dot(np.dot(np.matrix.transpose(S_sqrt),Hcore),np.matrix.transpose(S_sqrt))
     eps0, C0prime = diagonlize(F0prime)
-
+    
     C0 = np.matrix.transpose(np.dot(S_sqrt, C0prime))
     
     #Only using occupied MOs
-    C0 = C0[0:int(input[0][0]/2)]
+    C0 = C0[0:int(input[0,0]/2)]
     C0T = np.matrix.transpose(C0)
     D0 = np.dot(C0T, C0)        
     
@@ -95,7 +54,7 @@ def HartreeFock(input, set, basis):
     E0el = 0
     for i in range(0, len(D0)):
         for j in range(0, len(D0[0])):
-            E0el += D0[i][j]*(Hcore[i][j]+Hcore[i][j])
+            E0el += D0[i,j]*(Hcore[i,j]+Hcore[i,j])
     
     
     #SCF iterations
@@ -114,27 +73,19 @@ def HartreeFock(input, set, basis):
     output.write("\t \t")
     output.write("{:14.10f}".format(E0el))
     output.write("\t \t")
-    output.write("{:14.10f}".format(E0el+VNN))
+    output.write("{:14.10f}".format(E0el+VNN[0]))
     
     for iter in range(1, Maxiter):
         output.write("\n")
         #New Fock Matrix
-        placeholder = []
-        for i in range(1, len(basis)+1):
-            a = []
-            for j in range(1, len(basis)+1):
-                b = 0
-                for k in range(1, len(basis)+1):
-                    for l in range(1, len(basis)+1):
-                        ijkl = utilF.idx2el(i, j, k, l)
-                        ikjl = utilF.idx2el(i, k, j, l)
-                        b += D0[k-1][l-1] * (2 * Vee[ijkl] - Vee[ikjl])
-                a.append(b)
-            placeholder.append(a)
-                        
+        Part = np.zeros((len(basis),len(basis)))
+        for mu in range(0, len(basis)):
+            for nu in range(0, len(basis)):
+                for lam in range(0, len(basis)):
+                    for sig in range(0, len(basis)):
+                        Part[mu,nu] += D0[lam,sig]*(2*Vee[mu,nu,lam,sig]-Vee[mu,lam,nu,sig])
         
-        F = np.add(Hcore, placeholder)
-        
+        F = Hcore + Part
         #New Density Matrix
         Fprime = np.dot(np.dot(np.transpose(S_sqrt),F),S_sqrt)
         eps, Cprime = diagonlize(Fprime)
@@ -142,7 +93,7 @@ def HartreeFock(input, set, basis):
         C = np.dot(S_sqrt, Cprime)
         
         CT = np.matrix.transpose(C)
-        CTocc = CT[0:int(input[0][0]/2)]
+        CTocc = CT[0:int(input[0,0]/2)]
         Cocc = np.matrix.transpose(CTocc)
         
         D = np.dot(Cocc, CTocc)
@@ -151,21 +102,21 @@ def HartreeFock(input, set, basis):
         Eel = 0
         for i in range(0, len(D)):
             for j in range(0, len(D[0])):
-                Eel += D[i][j]*(Hcore[i][j]+F[i][j])
+                Eel += D[i,j]*(Hcore[i,j]+F[i,j])
 
         #Convergance
         dE = Eel - E0el
         rmsD = 0
         for i in range(0, len(D0)):
             for j in range(0, len(D0[0])):
-                rmsD += (D[i][j] - D0[i][j])**2
+                rmsD += (D[i,j] - D0[i,j])**2
         rmsD = math.sqrt(rmsD)
         
         output.write(str(iter))
         output.write("\t \t")
         output.write("{:14.10f}".format(Eel))
         output.write("\t \t")
-        output.write("{:14.10f}".format(Eel+VNN))
+        output.write("{:14.10f}".format(Eel+VNN[0]))
         output.write("\t \t")
         output.write("{: 12.8e}".format(dE))
         output.write("\t \t")

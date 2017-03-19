@@ -1,75 +1,5 @@
 import numpy as np
-
-
-def idx2el(i, j, k, l):
-    if i>j:
-        ij = i * (i + 1)/2 + j
-    else:
-        ij = j * (j + 1)/2 + i
-    if k>l:
-        kl = k * (k + 1)/2 + l
-    else:
-        kl = l * (l + 1)/2 + k
-    if ij > kl:
-        ijkl = ij*(ij+1)/2 + kl
-    else:
-        ijkl = kl*(kl+1)/2 + ij
-
-    return int(ijkl)
-    
-
-def load2el(basis, **kwargs):
-    if 'MO' in kwargs:
-        Vee = {}
-        for i in range(1, len(basis)+1):
-            for j in range(1, len(basis)+1):
-                for k in range(1, len(basis)+1):
-                    for l in range(1, len(basis)+1):
-                        ijkl = idx2el(i, j, k, l)
-                        Vee[ijkl] = 0
-        twoint = np.genfromtxt('twointMO.txt', delimiter = ';')
-        for i in range(0, len(twoint)):
-            if int(twoint[i][0])>int(twoint[i][1]):
-                ij = int(twoint[i][0]) * (int(twoint[i][0]) + 1)/2 + int(twoint[i][1])
-            else:
-                ij = int(twoint[i][1]) * (int(twoint[i][1]) + 1)/2 + int(twoint[i][0])
-            if int(twoint[i][2])>int(twoint[i][3]):
-                kl = int(twoint[i][2]) * (int(twoint[i][2]) + 1)/2 + int(twoint[i][3])
-            else:
-                kl = int(twoint[i][3]) * (int(twoint[i][3]) + 1)/2 + int(twoint[i][2])
-            if ij > kl:
-                ijkl = ij*(ij+1)/2 + kl
-            else:
-                ijkl = kl*(kl+1)/2 + ij
-            Vee[int(ijkl)] = twoint[i][4]
-        
-        return Vee
-        
-    else:
-        Vee = {}
-        for i in range(1, len(basis)+1):
-            for j in range(1, len(basis)+1):
-                for k in range(1, len(basis)+1):
-                    for l in range(1, len(basis)+1):
-                        ijkl = idx2el(i, j, k, l)
-                        Vee[ijkl] = 0
-        twoint = np.genfromtxt('twoint.txt', delimiter = ';')
-        for i in range(0, len(twoint)):
-            if int(twoint[i][0])>int(twoint[i][1]):
-                ij = int(twoint[i][0]) * (int(twoint[i][0]) + 1)/2 + int(twoint[i][1])
-            else:
-                ij = int(twoint[i][1]) * (int(twoint[i][1]) + 1)/2 + int(twoint[i][0])
-            if int(twoint[i][2])>int(twoint[i][3]):
-                kl = int(twoint[i][2]) * (int(twoint[i][2]) + 1)/2 + int(twoint[i][3])
-            else:
-                kl = int(twoint[i][3]) * (int(twoint[i][3]) + 1)/2 + int(twoint[i][2])
-            if ij > kl:
-                ijkl = ij*(ij+1)/2 + kl
-            else:
-                ijkl = kl*(kl+1)/2 + ij
-            Vee[int(ijkl)] = twoint[i][4]
-        
-        return Vee
+from numba import jit
 
 def TransformMO(C, basis, set):
     #Check for key that require MO integrals
@@ -78,45 +8,29 @@ def TransformMO(C, basis, set):
         MOcheck = 1
     if MOcheck == 1:
         #Loading two electron integrals
-        Vee = load2el(basis)
+        Vee = np.load('twoint.npy')
         
-        #Make dict for MO integrals
-        VeeMO = {}
-        for i in range(1, len(basis)+1):
-            for j in range(1, len(basis)+1):
-                for k in range(1, len(basis)+1):
-                    for l in range(1, len(basis)+1):
-                        ijkl = idx2el(i, j, k, l)
-                        VeeMO[ijkl] = 0
-    
-        #Transform two electron integrals to MO basis
-        idxcheck = []
-        for i in range(1, len(basis)+1):
-            for j in range(1, len(basis)+1):
-                for k in range(1, len(basis)+1):
-                    for l in range(1, len(basis)+1):
-                        ijkl = idx2el(i, j, k, l)
-                        if ijkl not in idxcheck:
-                            idxcheck.append(ijkl)
-                            for p in range(1, len(basis)+1):
-                                for q in range(1, len(basis)+1):
-                                    for r in range(1, len(basis)+1):
-                                        for s in range(1, len(basis)+1):
-                                            pqrs = idx2el(p, q, r, s)
-                                            VeeMO[ijkl] += C[p-1,i-1]*C[q-1,j-1]*C[r-1,k-1]*C[s-1,l-1]*Vee[pqrs]
+        VeeMO = np.zeros((len(basis),len(basis),len(basis),len(basis)))
 
-        output = open('twointMO.txt', 'w')
-        idxcheck = []
-        for i in range(1, len(basis)+1):
-            for j in range(1, len(basis)+1):
-                for k in range(1, len(basis)+1):
-                    for l in range(1, len(basis)+1):
-                        ijkl = idx2el(i, j, k, l)
-                        if ijkl not in idxcheck:
-                            idxcheck.append(ijkl)
-                            output.write(str(i)+';'+str(j)+';'+str(k)+';'+str(l))
-                            output.write(";")
-                            output.write(str(VeeMO[ijkl]))
-                            output.write("\n")
-        output.close()
+        MO1 = np.zeros((len(basis),len(basis),len(basis),len(basis)))
+        MO2 = np.zeros((len(basis),len(basis),len(basis),len(basis)))
+        MO3 = np.zeros((len(basis),len(basis),len(basis),len(basis)))
+        
+        for s in range(0, len(basis)):
+            for sig in range(0, len(basis)):
+                MO1[:,:,:,s] += C[sig,s]*Vee[:,:,:,sig]
+            
+            for r in range(0, len(basis)):
+                for lam in range(0, len(basis)):
+                    MO2[:,:,r,s] += C[lam,r]*MO1[:,:,lam,s]
+            
+                for q in range(0, len(basis)):
+                    for nu in range(0, len(basis)):
+                        MO3[:,q,r,s] += C[nu,q]*MO2[:,nu,r,s]
+                    
+                    for p in range(0, len(basis)):
+                        for mu in range(0, len(basis)):
+                            VeeMO[p,q,r,s] += C[mu,p]*MO3[mu,q,r,s]
+
+        np.save('twointMO.npy', VeeMO)
 

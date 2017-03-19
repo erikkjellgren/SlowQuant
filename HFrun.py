@@ -9,7 +9,7 @@ import MPn as MP
 import Qfit as QF
 import Utilityfunc as utilF
 
-input = np.genfromtxt('input2_H2O.csv', delimiter=';')
+input = np.genfromtxt('inputH2O.csv', delimiter=';')
 results = {}
 settings = np.genfromtxt('settings.csv', delimiter = ';', dtype='str')
 set = {}

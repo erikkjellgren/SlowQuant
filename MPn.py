@@ -7,17 +7,15 @@ def MP2(basis, input, F, C):
     eps = np.dot(np.dot(CT, F),C)
 
     #Loading two electron integrals
-    VeeMO = utilF.load2el(basis, MO='yes')
+    VeeMO = np.load('twointMO.npy')
     
     #Calc EMP2
     EMP2 = 0
-    for i in range(1, int(input[0][0]/2)+1):
-        for a in range(int(input[0][0]/2)+1, len(basis)+1):
-            for j in range(1, int(input[0][0]/2)+1):
-                for b in range(int(input[0][0]/2)+1, len(basis)+1):
-                    ibja = utilF.idx2el(i, b, j, a)
-                    iajb = utilF.idx2el(i, a, j, b)
-                    EMP2 += VeeMO[iajb]*(2*VeeMO[iajb]-VeeMO[ibja])/(eps[i-1, i-1] + eps[j-1, j-1] -eps[a-1, a-1] -eps[b-1, b-1])
+    for i in range(0, int(input[0][0]/2)):
+        for a in range(int(input[0][0]/2), len(basis)):
+            for j in range(0, int(input[0][0]/2)):
+                for b in range(int(input[0][0]/2), len(basis)):
+                    EMP2 += VeeMO[i,a,j,b]*(2*VeeMO[i,a,j,b]-VeeMO[i,b,j,a])/(eps[i, i] + eps[j, j] -eps[a, a] -eps[b, b])
 
     output = open('out.txt', 'a')
     output.write('\n \n')

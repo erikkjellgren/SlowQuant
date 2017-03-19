@@ -4,7 +4,6 @@ import scipy.misc as scm
 import scipy.special as scs
 from numba import jit
 
-
 ##INTEGRAL FUNCTIONS
 def Overlap(a, b, la, lb, Ax, Bx):
     #Obara-Saika scheme, 9.3.8 and 9.3.9 Helgaker
@@ -324,151 +323,136 @@ def runIntegrals(input, basis):
         for j in range(1, len(basis)+1):
             if i >= j:
                 See[str(int(i))+';'+str(int(j))] = 0
-    
-    Vee = {}
-    for i in range(1, len(basis)+1):
-        for j in range(1, len(basis)+1):
-            for k in range(1, len(basis)+1):
-                for l in range(1, len(basis)+1):
-                    if i>=j and i>=k and i>=l and k>=l:
-                        if i == k or i == l:
-                            if i*j >= k*l:
-                                Vee[str(int(i))+';'+str(int(j))+';'+str(int(k))+';'+str(int(l))] = 0
-                        else:
-                            Vee[str(int(i))+';'+str(int(j))+';'+str(int(k))+';'+str(int(l))] = 0
     #END OF set up indexes for integrals
     
     # Nuclear-nuclear repulsion
-    output = open('enuc.txt', 'w')
-    calc = nucrep(input)
-    output.write(str(calc))
-    output.close()
+    E = np.zeros(1)
+    E[0] = nucrep(input)
+    np.save('enuc.npy',E)
     #END OF nuclear-nuclear repulsion
     
     # Two electron integrals
-    output = open('twoint.txt', 'w')
-    for key in Vee.keys():
-        a = key.split(";")
-        for i in range(len(a)):
-            a[i] = int(a[i])-1
-        calc = 0
-        for i in range(basis[a[0]][4]):
-            for j in range(basis[a[1]][4]):
-                for k in range(basis[a[2]][4]):
-                    for l in range(basis[a[3]][4]):
-                        calc += elelrep(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[2]][5][k][1], basis[a[3]][5][l][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[2]][1], basis[a[2]][2], basis[a[2]][3], basis[a[3]][1], basis[a[3]][2], basis[a[3]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[2]][5][k][3], basis[a[3]][5][l][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4], basis[a[2]][5][k][4], basis[a[3]][5][l][4], basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[2]][5][k][5], basis[a[3]][5][l][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[2]][5][k][0], basis[a[3]][5][l][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2], basis[a[2]][5][k][2], basis[a[3]][5][l][2])
-        output.write(key)
-        output.write(";")
-        output.write(str(calc))
-        output.write("\n")
-    output.close()
+    ERI = np.zeros((len(basis),len(basis),len(basis),len(basis)))
+    for mu in range(0, len(basis)):
+        for nu in range(0, len(basis)):
+            if mu >= nu:
+                for lam in range(0, len(basis)):
+                    for sig in range(0, len(basis)):
+                        munu = mu*(mu+1)/2+nu
+                        lamsig = lam*(lam+1)/2+sig
+                        if lam >= sig and munu >= lamsig:
+                            a = np.zeros(4)
+                            a[0] = mu
+                            a[1] = nu
+                            a[2] = lam
+                            a[3] = sig
+                            a = a.astype(int)
+                            calc = 0
+                            for i in range(basis[a[0]][4]):
+                                for j in range(basis[a[1]][4]):
+                                    for k in range(basis[a[2]][4]):
+                                        for l in range(basis[a[3]][4]):
+                                            calc += elelrep(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[2]][5][k][1], basis[a[3]][5][l][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[2]][1], basis[a[2]][2], basis[a[2]][3], basis[a[3]][1], basis[a[3]][2], basis[a[3]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[2]][5][k][3], basis[a[3]][5][l][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4], basis[a[2]][5][k][4], basis[a[3]][5][l][4], basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[2]][5][k][5], basis[a[3]][5][l][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[2]][5][k][0], basis[a[3]][5][l][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2], basis[a[2]][5][k][2], basis[a[3]][5][l][2])
+                            ERI[mu,nu,lam,sig] = calc
+                            ERI[nu,mu,lam,sig] = calc
+                            ERI[mu,nu,sig,lam] = calc
+                            ERI[nu,mu,sig,lam] = calc
+                            ERI[lam,sig,mu,nu] = calc
+                            ERI[sig,lam,mu,nu] = calc
+                            ERI[lam,sig,nu,mu] = calc
+                            ERI[sig,lam,nu,mu] = calc
+    np.save('twoint.npy',ERI)
     #END OF two electron integrals
     
     # Kinetic energy and overlap
-    output = open('kinen.txt', 'w')
-    output2 = open('overlap.txt', 'w')
-    for key in See.keys():
-        a = key.split(";")
-        for i in range(len(a)):
-            a[i] = int(a[i])-1
-        calc = 0
-        calc2 = 0
-        for i in range(basis[a[0]][4]):
-            for j in range(basis[a[1]][4]):
-                calct, calct2 = Kin(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4],basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2])
-                calc += calct
-                calc2 += calct2
-        output.write(key)
-        output.write(";")
-        output.write(str(calc))
-        output.write("\n")
-        
-        output2.write(key)
-        output2.write(";")
-        output2.write(str(calc2))
-        output2.write("\n")
-    output.close()
-    output2.close()
+    S = np.zeros((len(basis),len(basis)))
+    T = np.zeros((len(basis),len(basis)))
+    for k in range(0, len(basis)):
+        for l in range(0, len(basis)):
+            if k >= l:
+                a = np.zeros(2)
+                a[0] = k
+                a[1] = l
+                a = a.astype(int)
+                calc = 0
+                calc2 = 0
+                for i in range(basis[a[0]][4]):
+                    for j in range(basis[a[1]][4]):
+                        calct, calct2 = Kin(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4],basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2])
+                        calc += calct
+                        calc2 += calct2
+                S[k,l] = calc2
+                S[l,k] = calc2
+                T[k,l] = calc
+                T[l,k] = calc
+    np.save('overlap.npy',S)
+    np.save('Ekin.npy',T)
     #END OF kinetic energy and overlap
     
     # Nucleus electron attraction
-    output = open('nucatt.txt', 'w')
-    for key in See.keys():
-        a = key.split(";")
-        for i in range(len(a)):
-            a[i] = int(a[i])-1
-        calc = 0
-        for i in range(basis[a[0]][4]):
-            for j in range(basis[a[1]][4]):
-                calc += elnuc(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4],basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2], input)
-        output.write(key)
-        output.write(";")
-        output.write(str(calc))
-        output.write("\n")
-    
-    output.close()
+    Na = np.zeros((len(basis),len(basis)))
+    for k in range(0, len(basis)):
+        for l in range(0, len(basis)):
+            if k >= l:
+                a = np.zeros(2)
+                a[0] = k
+                a[1] = l
+                a = a.astype(int)
+                calc = 0
+                for i in range(basis[a[0]][4]):
+                    for j in range(basis[a[1]][4]):
+                        calc += elnuc(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4],basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2], input)
+                Na[k,l] = calc
+                Na[l,k] = calc
+    np.save('nucatt.npy',Na)
     #END OF nucleus electron attraction
     
-    
 def run_dipole_int(basis, input):
-    # Set up indexes for integrals
-    See = {}
-    for i in range(1, len(basis)+1):
-        for j in range(1, len(basis)+1):
-            if i >= j:
-                See[str(int(i))+';'+str(int(j))] = 0
-    
-    output1 = open('mux.txt', 'w')
-    output2 = open('muy.txt', 'w')
-    output3 = open('muz.txt', 'w')
-    for key in See.keys():
-        a = key.split(";")
-        for i in range(len(a)):
-            a[i] = int(a[i])-1
-        calcx = 0
-        calcy = 0
-        calcz = 0
-        for i in range(basis[a[0]][4]):
-            for j in range(basis[a[1]][4]):
-                x, y, z = u_ObaraSaika(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4],basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2], input)
-                calcx += x
-                calcy += y
-                calcz += z
-        output1.write(key)
-        output1.write(";")
-        output1.write(str(calcx))
-        output1.write("\n")
-        output2.write(key)
-        output2.write(";")
-        output2.write(str(calcy))
-        output2.write("\n")
-        output3.write(key)
-        output3.write(";")
-        output3.write(str(calcz))
-        output3.write("\n")
-    output1.close()
-    output2.close()
-    output3.close()
+    X = np.zeros((len(basis),len(basis)))
+    Y = np.zeros((len(basis),len(basis)))
+    Z = np.zeros((len(basis),len(basis)))
+    for k in range(0, len(basis)):
+        for l in range(0, len(basis)):
+            if k >= l:
+                a = np.zeros(2)
+                a[0] = k
+                a[1] = l
+                a = a.astype(int)
+                calcx = 0
+                calcy = 0
+                calcz = 0
+                for i in range(basis[a[0]][4]):
+                    for j in range(basis[a[1]][4]):
+                        x, y, z = u_ObaraSaika(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4],basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2], input)
+                        calcx += x
+                        calcy += y
+                        calcz += z
+                X[k,l] = calcx
+                X[l,k] = calcx
+                Y[k,l] = calcy
+                Y[l,k] = calcy
+                Z[k,l] = calcz
+                Z[l,k] = calcz
+    np.save('mux.npy',X)
+    np.save('muy.npy',Y)
+    np.save('muz.npy',Z)
 
 def runQMESP(basis, input, rcx, rcy ,rcz):
     # Set up indexes for integrals
-    See = {}
-    for i in range(1, len(basis)+1):
-        for j in range(1, len(basis)+1):
-            if i >= j:
-                See[str(int(i))+';'+str(int(j))] = 0
-    
-    Ve = {}
-    for key in See.keys():
-        a = key.split(";")
-        for i in range(len(a)):
-            a[i] = int(a[i])-1
-        calc = 0
-        
-        for i in range(basis[a[0]][4]):
-            for j in range(basis[a[1]][4]):
-                calc += Velesp(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4],basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2], rcx, rcy, rcz)
-        Ve[key] = calc
+    Ve = np.zeros((len(basis),len(basis)))
+    for k in range(0, len(basis)):
+        for l in range(0, len(basis)):
+            if k >= l:
+                a = np.zeros(2)
+                a[0] = k
+                a[1] = l
+                a = a.astype(int)
+                calc = 0
+                for i in range(basis[a[0]][4]):
+                    for j in range(basis[a[1]][4]):
+                        calc += Velesp(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4],basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2], rcx, rcy, rcz)
+            Ve[k,l] = calc
+            Ve[l,k] = calc
         
     return Ve
     

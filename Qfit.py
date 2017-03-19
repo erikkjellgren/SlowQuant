@@ -57,12 +57,10 @@ def chrfit(basis, input, D, set, results):
             NucESP += input[j, 0]/r12
             
         ElecESP = 0
-        for j in range(1, len(basis)+1):
-            for k in range(1, len(basis)+1):
-                if j >= k:
-                    ElecESP += D[j-1,k-1]*Ve[str(int(j))+';'+str(int(k))]
-                else:
-                    ElecESP += D[j-1,k-1]*Ve[str(int(k))+';'+str(int(j))]
+        for j in range(0, len(basis)):
+            for k in range(0, len(basis)):
+                ElecESP += D[j,k]*Ve[j,k]
+
         
         V[i,3] = NucESP - 2*ElecESP
     # END OF calculate QM potential
