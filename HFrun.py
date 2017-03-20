@@ -1,7 +1,7 @@
 import BasisSet as BS
 import MolecularIntegrals as MI
 import HartreeFock as HF
-import os
+import os   
 import numpy as np
 import time
 import Properties as prop
@@ -28,11 +28,11 @@ utilF.TransformMO(CMO, basis, set)
 print(time.time()-start, 'MO transform')
 start = time.time()
 results = prop.runprop(basis, input, D, set, results)
-print(time.time()-start, 'Properties')
+print(time.time()-start, 'PROPERTIES')
 start = time.time()
 MP.runMPn(basis, input, FAO, CMO, set)
 print(time.time()-start, 'MP2')
 start = time.time()
-QF.chrfit(basis, input, D, set, results)
+QF.runQfit(basis, input, D, set, results)
 print(time.time()-start, 'QFIT')
 

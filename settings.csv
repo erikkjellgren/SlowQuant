@@ -1,11 +1,18 @@
+        ; INPUT SETTINGS
 basisset;STO3G
+        ; SCF SETTINGS
 SCF Energy Threshold;12
 SCF RMSD Threshold;12
-SCF Max iterations;100
+SCF Max iterations;1000
+        ; PROPERTY SETTINGS
 Charge;Mulliken
 Dipole;Yes
-MPn;No(MP2)
-Multipolefit;Yes
+MPn;MP2
+        ; FITTING SETTINGS
+Multipolefit;Charge
+Gridpoints;100
 Constraint charge;Yes
 Qtot;0
-Constraint dipole;NOTWORKING
+Constraint dipole;Yes
+COMMENT;Constraint dipole is untested
+COMMENT;Dipole fit is not working
