@@ -1,5 +1,7 @@
 import numpy as np
 import MolecularIntegrals as MI
+import random as rng
+
 #### DIPOLE FIT NOT WORKING
 #### UNKNOWN IF DIPOLE CONSTRAIN WORK FOR CHARGE FITTING
 
@@ -9,44 +11,49 @@ def magvec(v1, v2):
     z = v2[2] - v1[2]
     return (x**2+y**2+z**2)**0.5
 
-## CHARGE FIT
-def chrfit(basis, input, D, set, results):
-    meshtot = int(set['Gridpoints'])
-    imesh = int((meshtot)**0.5)
-    jmesh = int((meshtot)**0.5)
-    Atoms = len(input)-1
-    
-    # [x, y, z, VQM]
-    V = np.zeros((imesh*jmesh,4))
-    
-    # CHOOSE POINTS
+def centerofcharge(input):
     Xcm = 0
     Ycm = 0
     Zcm = 0
     M = 0
     for i in range(1, len(input)):
         M += input[i][0]
-    
     for i in range(1, len(input)):
         Xcm += (input[i][0]*input[i][1])/M
         Ycm += (input[i][0]*input[i][2])/M
         Zcm += (input[i][0]*input[i][3])/M
-    
-    radius = 3.4 + np.sqrt(np.max((Xcm-input[1:,1])**2)+np.max((Ycm-input[1:,2])**2)+np.max((Zcm-input[1:,3])**2))
-    
+    return Xcm, Ycm, Zcm
+
+def makepoints(Xcm, Ycm, Zcm, set, input):
+    meshtot = int(set['Gridpoints'])
+    # [x, y, z, VQM]
+    V = np.zeros((meshtot,4))
     idx = 0
-    for i in range(0, imesh):
-        for j in range(0, jmesh):
-            V[idx, 0] = radius*np.cos(2*3.14/imesh*i)*np.sin(3.14/jmesh*j) + Xcm
-            V[idx, 1] = radius*np.sin(2*3.14/imesh*i)*np.sin(3.14/jmesh*j) + Ycm
-            V[idx, 2] = radius*np.cos(3.14/jmesh*j) + Zcm
-            idx += 1
-    # END OF CHOOSING POINTS
+    radius = 3.4 + np.sqrt(np.max((Xcm-input[1:,1])**2)+np.max((Ycm-input[1:,2])**2)+np.max((Zcm-input[1:,3])**2))
+    for i in range(0, meshtot):
+        z = rng.uniform(-radius,radius)
+        phi = rng.uniform(0, 2*np.pi)
+        x = (radius**2-z**2)**0.5*np.cos(phi)
+        y = (radius**2-z**2)**0.5*np.sin(phi)
+        V[idx, 0] = x + Xcm
+        V[idx, 1] = y + Ycm
+        V[idx, 2] = z + Zcm
+        idx += 1
+    
+    return V
+    
+
+## CHARGE FIT
+def chrfit(basis, input, D, set, results):
+    
+    # CHOOSE POINTS
+    Atoms = len(input)-1
+    Xcm, Ycm, Zcm = centerofcharge(input)
+    V = makepoints(Xcm, Ycm, Zcm, set, input)
     
     #Caclculate QM potential
     for i in range(len(V)):
         Ve = MI.runQMESP(basis, input, V[i,0], V[i,1], V[i,2])
-        
         NucESP = 0
         for j in range(1, len(input)):
             v1 = [input[j, 1], input[j, 2], input[j, 3]]
@@ -131,7 +138,7 @@ def chrfit(basis, input, D, set, results):
                 B = np.delete(B,i,axis=0)
                 break
     # END OF building A and B matrix
-
+    
     #WORKING EQUATIONS
     Ainv = np.linalg.inv(A)
     q = np.dot(Ainv, B)
@@ -160,41 +167,17 @@ def chrfit(basis, input, D, set, results):
     output.write("{: 12.8e}".format(RMSD))
     output.close()
     # END OF writing output
+    if set['Write ESP'] == 'Yes':
+        potentialPBD(V, input)
 
 
 ## CHARGE AND DIPOLE FIT
 def dipolefit(basis, input, D, set, results):
-    meshtot = int(set['Gridpoints'])
-    imesh = int((meshtot)**0.5)
-    jmesh = int((meshtot)**0.5)
-    Atoms = len(input)-1
-    
-    # [x, y, z, VQM]
-    V = np.zeros((imesh*jmesh,4))
     
     # CHOOSE POINTS
-    Xcm = 0
-    Ycm = 0
-    Zcm = 0
-    M = 0
-    for i in range(1, len(input)):
-        M += input[i][0]
-    
-    for i in range(1, len(input)):
-        Xcm += (input[i][0]*input[i][1])/M
-        Ycm += (input[i][0]*input[i][2])/M
-        Zcm += (input[i][0]*input[i][3])/M
-    
-    radius = 3.4 + np.sqrt(np.max((Xcm-input[1:,1])**2)+np.max((Ycm-input[1:,2])**2)+np.max((Zcm-input[1:,3])**2))
-    
-    idx = 0
-    for i in range(0, imesh):
-        for j in range(0, jmesh):
-            V[idx, 0] = radius*np.cos(2*3.14/imesh*i)*np.sin(3.14/jmesh*j) + Xcm
-            V[idx, 1] = radius*np.sin(2*3.14/imesh*i)*np.sin(3.14/jmesh*j) + Ycm
-            V[idx, 2] = radius*np.cos(3.14/jmesh*j) + Zcm
-            idx += 1
-    # END OF CHOOSING POINTS
+    Atoms = len(input)-1
+    Xcm, Ycm, Zcm = centerofcharge(input)
+    V = makepoints(Xcm, Ycm, Zcm, set, input)
     
     #Caclculate QM potential
     for i in range(len(V)):
@@ -223,89 +206,56 @@ def dipolefit(basis, input, D, set, results):
         Constr += 3
     B = np.zeros((Atoms)*4+Constr)
     A = np.zeros(((Atoms)*4+Constr,(Atoms)*4+Constr))
-    
+        
     #Assign values to B vector
-    for k in range(1, len(B)+1-Constr):
-        if k <= Atoms:
-            kidx = (k-1)%Atoms+1
-            for i in range(len(V)):
-                B[k-1] += V[i,3]/(((input[kidx, 1]-V[i, 0])**2+(input[kidx, 2]-V[i, 1])**2+(input[kidx, 3]-V[i, 2])**2)**0.5)
-        elif k<=(Atoms)*2:
-            for i in range(len(V)):
-                B[k-1] += (V[i, 0]-input[kidx, 1])*V[i,3]/((((input[kidx, 1]-V[i, 0])**2+(input[kidx, 2]-V[i, 1])**2+(input[kidx, 3]-V[i, 2])**2)**0.5)**3)
-        elif k<=(Atoms)*3:
-            for i in range(len(V)):
-                B[k-1] += (V[i, 1]-input[kidx, 2])*V[i,3]/((((input[kidx, 1]-V[i, 0])**2+(input[kidx, 2]-V[i, 1])**2+(input[kidx, 3]-V[i, 2])**2)**0.5)**3)
-        elif k<=(Atoms)*4:
-            for i in range(len(V)):
-                B[k-1] += (V[i, 2]-input[kidx, 3])*V[i,3]/((((input[kidx, 1]-V[i, 0])**2+(input[kidx, 2]-V[i, 1])**2+(input[kidx, 3]-V[i, 2])**2)**0.5)**3)
+    for k in range(0, Atoms):
+        vk = [input[k+1,1],input[k+1,2],input[k+1,3]]
+        for i in range(len(V)):
+            vi = [V[i,0],V[i,1],V[i,2]]
+            rik = magvec(vi, vk)
+            rikx = vi[0] - vk[0]
+            riky = vi[1] - vk[1]
+            rikz = vi[2] - vk[2]
+            
+            B[k] += V[i,3]/rik
+            B[k+Atoms] += rikx*V[i,3]/(rik**3)
+            B[k+2*Atoms] += riky*V[i,3]/(rik**3)
+            B[k+3*Atoms] += rikz*V[i,3]/(rik**3)
     
     #Assign values to A matrix
-    for j in range(1, len(A)+1-Constr):
-        for k in range(1, j+1):
-            kidx = (k-1)%Atoms+1
-            jidx = (j-1)%Atoms+1
-            vj = [input[jidx, 1], input[jidx, 2], input[jidx, 3]]
-            vk = [input[kidx, 1], input[kidx, 2], input[kidx, 3]]
-            if j <= Atoms and k <= Atoms:
+    for j in range(0, Atoms):
+        for k in range(0, Atoms):
+            vj = [input[j+1, 1], input[j+1, 2], input[j+1, 3]]
+            vk = [input[k+1, 1], input[k+1, 2], input[k+1, 3]]
+            for i in range(len(V)):
+                vi = [V[i, 0], V[i, 1], V[i, 2]]
+                rij = magvec(vi, vj)
+                rik = magvec(vi, vk)
+                rikx = vi[0] - vk[0]
+                riky = vi[1] - vk[1]
+                rikz = vi[2] - vk[2]
+                rijx = vi[0] - vj[0]
+                rijy = vi[1] - vj[1]
+                rijz = vi[2] - vj[2]
                 # Charge 
-                for i in range(len(V)):
-                    vi = [V[i, 0], V[i, 1], V[i, 2]]
-                    rij = magvec(vi, vj)
-                    rik = magvec(vi, vk)
-                    if j == k:
-                        A[j-1,k-1] += 1/(rij*rik)
-                    else:
-                        A[j-1,k-1] += 1/(rij*rik)
-                        A[k-1,j-1] += 1/(rij*rik)
-            elif j <= (Atoms)*2 and k <= Atoms:
+                A[j,k] += 1/(rij*rik)
                 # dipole_x charge
-                for i in range(len(V)):
-                    vi = [V[i, 0], V[i, 1], V[i, 2]]
-                    rij = magvec(vi, vj)
-                    rik = magvec(vi, vk)
-                    A[j-1,k-1] += (V[i, 0]-input[jidx, 1])/(rij**3 * rik)
-                    A[k-1,j-1] += (V[i, 0]-input[jidx, 1])/(rij**3 * rik)
-            elif j <= (Atoms)*3 and k <= Atoms:
+                A[j+Atoms,k] += rijx/(rij**3 * rik)
+                A[j,k+Atoms] += rikx/(rij * rik**3)
                 # dipole_y charge
-                for i in range(len(V)):
-                    vi = [V[i, 0], V[i, 1], V[i, 2]]
-                    rij = magvec(vi, vj)
-                    rik = magvec(vi, vk)
-                    A[j-1,k-1] += (V[i, 1]-input[jidx, 2])/(rij**3 * rik)
-                    A[k-1,j-1] += (V[i, 1]-input[jidx, 2])/(rij**3 * rik)
-            elif j <= (Atoms)*4 and k <= Atoms:
+                A[j+2*Atoms,k] += rijy/(rij**3 * rik)
+                A[j,k+2*Atoms] += riky/(rij * rik**3)
                 # dipole_z charge
-                for i in range(len(V)):
-                    vi = [V[i, 0], V[i, 1], V[i, 2]]
-                    rij = magvec(vi, vj)
-                    rik = magvec(vi, vk)
-                    A[j-1,k-1] += (V[i, 2]-input[jidx, 3])/(rij**3 * rik)
-                    A[k-1,j-1] += (V[i, 2]-input[jidx, 3])/(rij**3 * rik)
-            elif j <= (Atoms)*2 and k <= (Atoms)*2:
-                # dipole_x
-                for i in range(len(V)):
-                    vi = [V[i, 0], V[i, 1], V[i, 2]]
-                    rij = magvec(vi, vj)
-                    rik = magvec(vi, vk)
-                    A[j-1,k-1] += (V[i, 0]-input[kidx, 1])*(V[i, 0]-input[jidx, 1])/(rij**3 * rik**3)
-                    A[k-1,j-1] += (V[i, 0]-input[kidx, 1])*(V[i, 0]-input[jidx, 1])/(rij**3 * rik**3)
-            elif j <= (Atoms)*3 and k <= (Atoms)*3:
+                A[j+3*Atoms,k] += rijz/(rij**3 * rik)
+                A[j,k+3*Atoms] += rikz/(rij * rik**3)
+                # dipole_x  
+                A[j+Atoms,k+Atoms] += rikx*rijx/(rij**3 * rik**3)
                 # dipole_y
-                for i in range(len(V)):
-                    vi = [V[i, 0], V[i, 1], V[i, 2]]
-                    rij = magvec(vi, vj)
-                    rik = magvec(vi, vk)
-                    A[j-1,k-1] += (V[i, 1]-input[kidx, 2])*(input[jidx, 2]-V[i, 1])/(rij**3 * rik**3)
-                    A[k-1,j-1] += (V[i, 1]-input[kidx, 2])*(input[jidx, 2]-V[i, 1])/(rij**3 * rik**3)
-            elif j <= (Atoms)*4 and k <= (Atoms)*4:
+                A[j+2*Atoms,k+2*Atoms] += riky*rijy/(rij**3 * rik**3)
                 # dipole_z
-                for i in range(len(V)):
-                    vi = [V[i, 0], V[i, 1], V[i, 2]]
-                    rij = magvec(vi, vj)
-                    rik = magvec(vi, vk)
-                    A[j-1,k-1] += (V[i, 2]-input[kidx, 3])*(input[jidx, 3]-V[i, 2])/(rij**3 * rik**3)
-                    A[k-1,j-1] += (V[i, 2]-input[kidx, 3])*(input[jidx, 3]-V[i, 2])/(rij**3 * rik**3)
+                A[j+3*Atoms,k+3*Atoms] += rikz*rijz/(rij**3 * rik**3)
+
+    
     
     Bshift = 0
     #Checking constraints in construction of B Vector
@@ -361,15 +311,6 @@ def dipolefit(basis, input, D, set, results):
         Ashift += 1
     
     
-    #Check print of z, x, and y dipole
-    if set['Constraint dipole'] == 'Yes':
-        check = 0
-        if set['Constraint charge'] == 'Yes':
-            check = 1
-        checksumX = np.sum(np.abs(A[4*Atoms+check,:]))
-        checksumY = np.sum(np.abs(A[4*Atoms+check+1,:]))
-        checksumZ = np.sum(np.abs(A[4*Atoms+check+2,:]))
-    
     #Check A for all zero rows
     for j in range(0, len(A)):
         #Double loop because A changes len when row/coloum is removed
@@ -384,6 +325,7 @@ def dipolefit(basis, input, D, set, results):
     # END OF building A and B matrix
     
     np.savetxt('A2.txt', A)
+    np.savetxt('B2.txt', B)
     #WORKING EQUATIONS
     Ainv = np.linalg.inv(A)
     q = np.dot(Ainv, B)
@@ -423,6 +365,66 @@ def dipolefit(basis, input, D, set, results):
     output.write("{: 12.8e}".format(RMSD))
     output.close()
     # END OF writing output
+    if set['Write ESP'] == 'Yes':
+        potentialPBD(V, input)
+
+def potentialPBD(V, input):
+    #Write potential to pdb
+    f = open('potential.pdb', 'w+')
+    idx = 1
+    for i in range(1, len(input)):
+        f.write('{:>6}'.format('HETATM'))
+        f.write('{:>5}'.format(str(idx)))
+        f.write('{:>1}'.format(' '))
+        if input[i,0] == 1:
+            f.write('{:>4}'.format('H'))
+        elif input[i,0] == 6:
+            f.write('{:>4}'.format('C'))
+        elif input[i,0] == 8:
+            f.write('{:>4}'.format('O'))
+        f.write('{:>1}'.format(' '))
+        f.write('{:>3}'.format('RES'))
+        f.write('{:>1}'.format(' '))
+        f.write('{:>1}'.format(' '))
+        f.write('{:>4}'.format(' '))
+        f.write('{:>1}'.format(' '))
+        f.write('{:>3}'.format(' '))
+        f.write('{: 8.3f}'.format(input[i,1]))
+        f.write('{: 8.3f}'.format(input[i,2]))
+        f.write('{: 8.3f}'.format(input[i,3]))
+        f.write('{: 6.2f}'.format(1))
+        f.write('{: 6.2f}'.format(1))
+        f.write('{:>6}'.format(' '))
+        f.write('{:>4}'.format(' '))
+        f.write('{:>2}'.format(' '))
+        f.write('{:>2}'.format(' '))
+        f.write('\n')
+        idx += 1
+    for i in range(0, len(V)):
+        f.write('{:>6}'.format('HETATM')) #Record name     "HETATM" 
+        f.write('{:>5}'.format(str(idx))) #Integer         Atom serial number. 
+        f.write('{:>1}'.format(' '))      #Blanck space
+        f.write('{:>4}'.format('He'))     #Atom            Atom name    
+        f.write('{:>1}'.format(' '))      #Character       Alternate location indicator 
+        f.write('{:>3}'.format('RES'))    #Residue name    Residue name 
+        f.write('{:>1}'.format(' '))      #Blanck space
+        f.write('{:>1}'.format(' '))      #Character       Chain identifier 
+        f.write('{:>4}'.format(' '))      #Integer         Residue sequence number   
+        f.write('{:>1}'.format(' '))      #AChar           Code for insertion of residues 
+        f.write('{:>3}'.format(' '))      #Blank space
+        f.write('{: 8.3f}'.format(V[i,0]))#Real(8.3)       Orthogonal coordinates for X    
+        f.write('{: 8.3f}'.format(V[i,1]))#Real(8.3)       Orthogonal coordinates for Y   
+        f.write('{: 8.3f}'.format(V[i,2]))#Real(8.3)       Orthogonal coordinates for Z   
+        f.write('{: 6.2f}'.format(V[i,3]*100))#Real(6.2)       Occupancy 
+        f.write('{: 6.2f}'.format(1))#Real(6.2)       Temperature factor 
+        f.write('{:>6}'.format(' ')) #Blank space
+        f.write('{:>4}'.format(' ')) #LString(4)      Segment identifier, left-justified  
+        f.write('{:>2}'.format(' ')) #LString(2)      Element symbol, right-justified 
+        f.write('{:>2}'.format(' ')) #LString(2)      Charge on the atom 
+        f.write('\n')
+        idx += 1
+    f.close()
+    
 
 def runQfit(basis, input, D, set, results):
     if set['Multipolefit'] == 'Charge':

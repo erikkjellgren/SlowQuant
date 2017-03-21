@@ -9,10 +9,11 @@ Charge;Mulliken
 Dipole;Yes
 MPn;MP2
         ; FITTING SETTINGS
-Multipolefit;Charge
-Gridpoints;100
+Multipolefit;Dipole
+Gridpoints;10000
 Constraint charge;Yes
 Qtot;0
-Constraint dipole;Yes
+Constraint dipole;No
+Write ESP;Yes
 COMMENT;Constraint dipole is untested
 COMMENT;Dipole fit is not working
