@@ -9,8 +9,8 @@ Charge;Mulliken
 Dipole;Yes
 MPn;MP2
         ; FITTING SETTINGS
-Multipolefit;Dipole
-Gridpoints;10000
+Multipolefit;Charge
+Gridpoints;100
 Constraint charge;Yes
 Qtot;0
 Constraint dipole;No
