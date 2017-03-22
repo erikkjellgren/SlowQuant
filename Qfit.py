@@ -27,9 +27,9 @@ def centerofcharge(input):
 def makepoints(Xcm, Ycm, Zcm, set, input):
     meshtot = int(set['Gridpoints'])
     # [x, y, z, VQM]
-    V = np.zeros((meshtot,4))
+    V = np.zeros((meshtot,5))
     idx = 0
-    radius = 3.4 + np.sqrt(np.max((Xcm-input[1:,1])**2)+np.max((Ycm-input[1:,2])**2)+np.max((Zcm-input[1:,3])**2))
+    radius= 3.4 + np.sqrt(np.max((Xcm-input[1:,1])**2)+np.max((Ycm-input[1:,2])**2)+np.max((Zcm-input[1:,3])**2))
     for i in range(0, meshtot):
         z = rng.uniform(-radius,radius)
         phi = rng.uniform(0, 2*np.pi)
@@ -39,8 +39,23 @@ def makepoints(Xcm, Ycm, Zcm, set, input):
         V[idx, 1] = y + Ycm
         V[idx, 2] = z + Zcm
         idx += 1
-    
+    #V = np.array([[-0.19523982, -5.11636437, -1.74206068,  0,          0,        ],[ 3.78732559, -0.63947779, -4.09453905,  0,          0,        ]])
     return V
+
+def RMSDcalc(V, q, Constr, input, Atoms, set):
+    RMSD = 0
+    for i in range(len(V)):
+        E = 0
+        for j in range(0, Atoms):
+            rij = ((input[j+1, 1]-V[i, 0])**2+(input[j+1, 2]-V[i, 1])**2+(input[j+1, 3]-V[i, 2])**2)**0.5
+            if set['Multipolefit'] == 'Charge':
+                E += q[j]/(rij)
+            elif set['Multipolefit'] == 'Dipole':
+                E += q[j]/(rij) + q[j+Atoms]*(V[i, 0]-input[j+1, 1])/(rij)**3 + q[j+2*Atoms]*(V[i, 1]-input[j+1, 2])/(rij)**3 + q[j+3*Atoms]*(V[i, 2]-input[j+1, 3])/(rij)**3 
+        V[i,4] = V[i, 3] - E #Difference between QM and classical potential
+        RMSD += (V[i, 3] - E)**2
+    RMSD = (RMSD/len(V))**0.5
+    return RMSD, V
     
 
 ## CHARGE FIT
@@ -145,15 +160,7 @@ def chrfit(basis, input, D, set, results):
     # END OF WORKING EQUATIONS
     
     #Calculate RMSD
-    RMSD = 0
-    for i in range(len(V)):
-        E = 0
-        for j in range(len(q)-Constr):
-            rij = ((input[j+1, 1]-V[i, 0])**2+(input[j+1, 2]-V[i, 1])**2+(input[j+1, 3]-V[i, 2])**2)**0.5
-            E += q[j]/(rij)
-        RMSD += (V[i, 3] - E)**2
-    RMSD = (RMSD/len(V))**0.5
-    # END OF calculating RMSD
+    RMSD, V = RMSDcalc(V, q, Constr, input, Atoms, set)
     
     #Write output
     output = open('out.txt', 'a')
@@ -209,9 +216,9 @@ def dipolefit(basis, input, D, set, results):
         
     #Assign values to B vector
     for k in range(0, Atoms):
-        vk = [input[k+1,1],input[k+1,2],input[k+1,3]]
+        vk = np.array([input[k+1,1],input[k+1,2],input[k+1,3]])
         for i in range(len(V)):
-            vi = [V[i,0],V[i,1],V[i,2]]
+            vi = np.array([V[i,0],V[i,1],V[i,2]])
             rik = magvec(vi, vk)
             rikx = vi[0] - vk[0]
             riky = vi[1] - vk[1]
@@ -225,10 +232,10 @@ def dipolefit(basis, input, D, set, results):
     #Assign values to A matrix
     for j in range(0, Atoms):
         for k in range(0, Atoms):
-            vj = [input[j+1, 1], input[j+1, 2], input[j+1, 3]]
-            vk = [input[k+1, 1], input[k+1, 2], input[k+1, 3]]
+            vj = np.array([input[j+1, 1], input[j+1, 2], input[j+1, 3]])
+            vk = np.array([input[k+1, 1], input[k+1, 2], input[k+1, 3]])
             for i in range(len(V)):
-                vi = [V[i, 0], V[i, 1], V[i, 2]]
+                vi = np.array([V[i, 0], V[i, 1], V[i, 2]])
                 rij = magvec(vi, vj)
                 rik = magvec(vi, vk)
                 rikx = vi[0] - vk[0]
@@ -240,21 +247,20 @@ def dipolefit(basis, input, D, set, results):
                 # Charge 
                 A[j,k] += 1/(rij*rik)
                 # dipole_x charge
-                A[j+Atoms,k] += rijx/(rij**3 * rik)
-                A[j,k+Atoms] += rikx/(rij * rik**3)
+                A[j,k+Atoms] += rijx/(rij**3 * rik)
+                A[j+Atoms,k] += rikx/(rik**3 * rij)
                 # dipole_y charge
-                A[j+2*Atoms,k] += rijy/(rij**3 * rik)
-                A[j,k+2*Atoms] += riky/(rij * rik**3)
+                A[j,k+2*Atoms] += rijy/(rij**3 * rik)
+                A[j+2*Atoms,k] += riky/(rik**3 * rij)
                 # dipole_z charge
-                A[j+3*Atoms,k] += rijz/(rij**3 * rik)
-                A[j,k+3*Atoms] += rikz/(rij * rik**3)
+                A[j,k+3*Atoms] += rijz/(rij**3 * rik)
+                A[j+3*Atoms,k] += rikz/(rik**3 * rij)
                 # dipole_x  
                 A[j+Atoms,k+Atoms] += rikx*rijx/(rij**3 * rik**3)
                 # dipole_y
                 A[j+2*Atoms,k+2*Atoms] += riky*rijy/(rij**3 * rik**3)
                 # dipole_z
                 A[j+3*Atoms,k+3*Atoms] += rikz*rijz/(rij**3 * rik**3)
-
     
     
     Bshift = 0
@@ -332,16 +338,7 @@ def dipolefit(basis, input, D, set, results):
     # END OF WORKING EQUATIONS
     
     #Calculate RMSD
-    RMSD = 0
-    for i in range(len(V)):
-        E = 0
-        for j in range(0, Atoms):
-            rij = ((input[j+1, 1]-V[i, 0])**2+(input[j+1, 2]-V[i, 1])**2+(input[j+1, 3]-V[i, 2])**2)**0.5
-            E += q[j]/(rij) + q[j+Atoms]*(V[i, 0]-input[j+1, 1])/(rij)**3 + q[j+2*Atoms]*(V[i, 1]-input[j+1, 2])/(rij)**3 + q[j+3*Atoms]*(V[i, 2]-input[j+1, 3])/(rij)**3 
-            
-        RMSD += (V[i, 3] - E)**2
-    RMSD = (RMSD/len(V))**0.5
-    # END OF calculating RMSD
+    RMSD, V = RMSDcalc(V, q, Constr, input, Atoms, set)
     
     #Write output
     output = open('out.txt', 'a')
@@ -383,7 +380,7 @@ def potentialPBD(V, input):
         elif input[i,0] == 8:
             f.write('{:>4}'.format('O'))
         f.write('{:>1}'.format(' '))
-        f.write('{:>3}'.format('RES'))
+        f.write('{:>3}'.format('MOL'))
         f.write('{:>1}'.format(' '))
         f.write('{:>1}'.format(' '))
         f.write('{:>4}'.format(' '))
@@ -406,7 +403,7 @@ def potentialPBD(V, input):
         f.write('{:>1}'.format(' '))      #Blanck space
         f.write('{:>4}'.format('He'))     #Atom            Atom name    
         f.write('{:>1}'.format(' '))      #Character       Alternate location indicator 
-        f.write('{:>3}'.format('RES'))    #Residue name    Residue name 
+        f.write('{:>3}'.format('POT'))    #Residue name    Residue name 
         f.write('{:>1}'.format(' '))      #Blanck space
         f.write('{:>1}'.format(' '))      #Character       Chain identifier 
         f.write('{:>4}'.format(' '))      #Integer         Residue sequence number   
@@ -416,7 +413,7 @@ def potentialPBD(V, input):
         f.write('{: 8.3f}'.format(V[i,1]))#Real(8.3)       Orthogonal coordinates for Y   
         f.write('{: 8.3f}'.format(V[i,2]))#Real(8.3)       Orthogonal coordinates for Z   
         f.write('{: 6.2f}'.format(V[i,3]*100))#Real(6.2)       Occupancy 
-        f.write('{: 6.2f}'.format(1))#Real(6.2)       Temperature factor 
+        f.write('{: 6.2f}'.format(V[i,4]*10000))#Real(6.2)       Temperature factor 
         f.write('{:>6}'.format(' ')) #Blank space
         f.write('{:>4}'.format(' ')) #LString(4)      Segment identifier, left-justified  
         f.write('{:>2}'.format(' ')) #LString(2)      Element symbol, right-justified 
