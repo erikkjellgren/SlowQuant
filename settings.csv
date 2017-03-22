@@ -15,5 +15,4 @@ Constraint charge;Yes
 Qtot;0
 Constraint dipole;No
 Write ESP;Yes
-COMMENT;Constraint dipole is untested
 COMMENT;Dipole fit is not working
