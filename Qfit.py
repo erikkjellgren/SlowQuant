@@ -24,22 +24,53 @@ def centerofcharge(input):
         Zcm += (input[i][0]*input[i][3])/M
     return Xcm, Ycm, Zcm
 
-def makepoints(Xcm, Ycm, Zcm, set, input):
-    meshtot = int(set['Gridpoints'])
+def makepoints(set, input):
+    density = float(set['Griddensity'])
+    cf = 0.01889725988579
+    vdW = {1:120*cf, 6:170*cf, 8:152*cf}
+    points = np.zeros(len(input)-1)
+    for i in range(1, len(input)):
+        points[i-1] = int(density*4*np.pi*1.4*vdW[input[i,0]])
     # [x, y, z, VQM]
-    V = np.zeros((meshtot,5))
+    V = np.zeros((np.int(np.sum(points)),5))
     idx = 0
-    radius= 3.4 + np.sqrt(np.max((Xcm-input[1:,1])**2)+np.max((Ycm-input[1:,2])**2)+np.max((Zcm-input[1:,3])**2))
-    for i in range(0, meshtot):
-        z = rng.uniform(-radius,radius)
-        phi = rng.uniform(0, 2*np.pi)
-        x = (radius**2-z**2)**0.5*np.cos(phi)
-        y = (radius**2-z**2)**0.5*np.sin(phi)
-        V[idx, 0] = x + Xcm
-        V[idx, 1] = y + Ycm
-        V[idx, 2] = z + Zcm
-        idx += 1
-    #V = np.array([[-0.19523982, -5.11636437, -1.74206068,  0,          0,        ],[ 3.78732559, -0.63947779, -4.09453905,  0,          0,        ]])
+    for i in range(1, len(input)):
+        N = int(points[i-1])
+        #Saff & Kuijlaars algorithm)
+        for k in range(1, N+1):
+            h = -1 +2*(k-1)/(N-1)
+            theta = np.arccos(h)
+            if k == 1 or k == N:
+                phi = 0
+            else:
+                phi = ((phiold + 3.6/((N*(1-h**2))**0.5))) % (2*np.pi)
+            phiold = phi
+            x = 1.4*vdW[input[i,0]]*np.cos(phi)*np.sin(theta)
+            y = 1.4*vdW[input[i,0]]*np.sin(phi)*np.sin(theta)
+            z = 1.4*vdW[input[i,0]]*np.cos(theta)
+            V[idx, 0] = x + input[i,1]
+            V[idx, 1] = y + input[i,2]
+            V[idx, 2] = z + input[i,3]
+            idx += 1
+    # Get point distance
+    dist = ((V[0,0]-V[1,0])**2+(V[0,1]-V[1,1])**2+(V[0,2]-V[1,2])**2)**0.5
+    
+    # Remove overlap
+    for i in range(1, len(input)):
+        chkrm = 0
+        for j in range(0, len(V)):
+            r = ((V[j-chkrm,0]-input[i,1])**2+(V[j-chkrm,1]-input[i,2])**2+(V[j-chkrm,2]-input[i,3])**2)**0.5
+            if r < 1.39*vdW[input[i,0]]:
+                V = np.delete(V,j-chkrm,axis=0)
+                chkrm += 1
+    chkrm = 0
+    # Double loop over V to remove
+    for i in range(0, len(V)):
+        for j in range(0, len(V)):
+            if 0.9*dist > ((V[i-chkrm,0]-V[j,0])**2+(V[i-chkrm,1]-V[j,1])**2+(V[i-chkrm,2]-V[j,2])**2)**0.5 and i-chkrm != j:
+                V = np.delete(V,j,axis=0)
+                chkrm += 1
+                break
     return V
 
 def RMSDcalc(V, q, Constr, input, Atoms, set):
@@ -64,7 +95,7 @@ def chrfit(basis, input, D, set, results):
     # CHOOSE POINTS
     Atoms = len(input)-1
     Xcm, Ycm, Zcm = centerofcharge(input)
-    V = makepoints(Xcm, Ycm, Zcm, set, input)
+    V = makepoints(set, input)
     
     #Caclculate QM potential
     for i in range(len(V)):
@@ -155,9 +186,7 @@ def chrfit(basis, input, D, set, results):
     # END OF building A and B matrix
     
     #WORKING EQUATIONS
-    Ainv = np.linalg.inv(A)
-    q = np.dot(Ainv, B)
-    # END OF WORKING EQUATIONS
+    q = np.linalg.solve(A, B)
     
     #Calculate RMSD
     RMSD, V = RMSDcalc(V, q, Constr, input, Atoms, set)
@@ -184,7 +213,7 @@ def dipolefit(basis, input, D, set, results):
     # CHOOSE POINTS
     Atoms = len(input)-1
     Xcm, Ycm, Zcm = centerofcharge(input)
-    V = makepoints(Xcm, Ycm, Zcm, set, input)
+    V = makepoints(set, input)
     
     #Caclculate QM potential
     for i in range(len(V)):
@@ -330,12 +359,8 @@ def dipolefit(basis, input, D, set, results):
                 break
     # END OF building A and B matrix
     
-    np.savetxt('A2.txt', A)
-    np.savetxt('B2.txt', B)
     #WORKING EQUATIONS
-    Ainv = np.linalg.inv(A)
-    q = np.dot(Ainv, B)
-    # END OF WORKING EQUATIONS
+    q = np.linalg.solve(A, B)
     
     #Calculate RMSD
     RMSD, V = RMSDcalc(V, q, Constr, input, Atoms, set)

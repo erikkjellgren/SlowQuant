@@ -10,9 +10,9 @@ Dipole;Yes
 MPn;MP2
         ; FITTING SETTINGS
 Multipolefit;Charge
-Gridpoints;100
+Griddensity;4
 Constraint charge;Yes
 Qtot;0
-Constraint dipole;No
+Constraint dipole;Yes
 Write ESP;Yes
 COMMENT;Dipole fit is not working
