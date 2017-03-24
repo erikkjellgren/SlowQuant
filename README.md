@@ -17,3 +17,17 @@ HF energy, MP2 energy
 Mulliken charges, ESP fitted charges
 
 Molecular dipole moment
+
+## Schemes
+
+SCF, DIIS
+
+Overlap integral, Obara-Saika
+
+Electronic kinetic energy integral, Obara-Saika
+
+Multipole integral, Obara-Saika
+
+One electron coulomb integral, MacMurchie-Davidson
+
+ERI, MacMurchie-Davidson
