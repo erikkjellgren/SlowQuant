@@ -100,7 +100,6 @@ def elnuc(a, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, 
 
     return -val*2*np.pi/p*N
 
-
 def elelrep(a, b, c, d, Ax, Ay, Az, Bx, By, Bz, Cx, Cy, Cz, Dx, Dy, Dz, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, N4, c1, c2, c3, c4):
     #McMurchie-Davidson scheme   
     N = N1*N2*N3*N4*c1*c2*c3*c4
@@ -116,25 +115,36 @@ def elelrep(a, b, c, d, Ax, Ay, Az, Bx, By, Bz, Cx, Cy, Cz, Dx, Dy, Dz, l1, l2, 
     Q = gaussian_product_center(c,C,d,D)
     RPQ = np.linalg.norm(P-Q)
 
+    E2 = np.zeros(m1+m2+1)
+    E3 = np.zeros(n1+n2+1)
+    E4 = np.zeros(l3+l4+1)
+    E5 = np.zeros(m3+m4+1)
+    E6 = np.zeros(n3+n4+1)
+    
+    for u in range(m1+m2+1):
+        E2[u] = E(m1,m2,u,A[1]-B[1],a,b,P[1]-A[1],P[1]-B[1],A[1]-B[1])
+    for v in range(n1+n2+1):
+        E3[v] = E(n1,n2,v,A[2]-B[2],a,b,P[2]-A[2],P[2]-B[2],A[2]-B[2])
+    for tau in range(l3+l4+1):
+        E4[tau] = E(l3,l4,tau,C[0]-D[0],c,d,Q[0]-C[0],Q[0]-D[0],C[0]-D[0])
+    for nu in range(m3+m4+1):
+        E5[nu] = E(m3,m4,nu ,C[1]-D[1],c,d,Q[1]-C[1],Q[1]-D[1],C[1]-D[1])
+    for phi in range(n3+n4+1):
+        E6[phi] = E(n3,n4,phi,C[2]-D[2],c,d,Q[2]-C[2],Q[2]-D[2],C[2]-D[2])
+
     val = 0.0
     for t in range(l1+l2+1):
         E1 = E(l1,l2,t,A[0]-B[0],a,b,P[0]-A[0],P[0]-B[0],A[0]-B[0])
         for u in range(m1+m2+1):
-            E2 = E(m1,m2,u,A[1]-B[1],a,b,P[1]-A[1],P[1]-B[1],A[1]-B[1])
             for v in range(n1+n2+1):
-                E3 = E(n1,n2,v,A[2]-B[2],a,b,P[2]-A[2],P[2]-B[2],A[2]-B[2])
                 for tau in range(l3+l4+1):
-                    E4 = E(l3,l4,tau,C[0]-D[0],c,d,Q[0]-C[0],Q[0]-D[0],C[0]-D[0])
                     for nu in range(m3+m4+1):
-                        E5 = E(m3,m4,nu ,C[1]-D[1],c,d,Q[1]-C[1],Q[1]-D[1],C[1]-D[1])
                         for phi in range(n3+n4+1):
-                            E6 = E(n3,n4,phi,C[2]-D[2],c,d,Q[2]-C[2],Q[2]-D[2],C[2]-D[2])
                             R1 = R(t+tau,u+nu,v+phi,0,alpha,P[0]-Q[0],P[1]-Q[1],P[2]-Q[2],RPQ) 
-                            val += E1*E2*E3*E4*E5*E6*np.power(-1,tau+nu+phi)*R1
+                            val += E1*E2[u]*E3[v]*E4[tau]*E5[nu]*E6[phi]*np.power(-1,tau+nu+phi)*R1
 
     val *= 2*np.power(np.pi,2.5)/(p*q*np.sqrt(p+q)) 
     return val*N
-
 
 def nucrep(input):
     #Classical nucleus nucleus repulsion

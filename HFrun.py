@@ -7,7 +7,7 @@ import time
 import Properties as prop
 import MPn as MP
 import Qfit as QF
-import Utilityfunc as utilF
+import Utilityfunc as utilF 
 
 input = np.genfromtxt('inputH2O.csv', delimiter=';')
 results = {}

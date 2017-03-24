@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.linalg
 import math
+from DIIS import runDIIS
 
 def diagonlize(M):
     eigVal, eigVec = np.linalg.eigh(M)
@@ -56,7 +57,6 @@ def HartreeFock(input, set, basis):
         for j in range(0, len(D0[0])):
             E0el += D0[i,j]*(Hcore[i,j]+Hcore[i,j])
     
-    
     #SCF iterations
     output = open('out.txt', 'w')
     output.write('Iter')
@@ -68,6 +68,9 @@ def HartreeFock(input, set, basis):
     output.write('dE')
     output.write("\t \t \t \t \t")
     output.write('rmsD')
+    if set['DIIS'] == 'Yes':
+        output.write("\t \t \t \t \t")
+        output.write('DIIS')
     output.write("\n")
     output.write('0')
     output.write("\t \t")
@@ -86,7 +89,14 @@ def HartreeFock(input, set, basis):
                         Part[mu,nu] += D0[lam,sig]*(2*Vee[mu,nu,lam,sig]-Vee[mu,lam,nu,sig])
         
         F = Hcore + Part
-        #New Density Matrix
+        
+        if set['DIIS'] == 'Yes':
+            #Estimate F by DIIS
+            if iter == 1:
+                F, errorFock, errorDens, errorDIIS = runDIIS(F,D0,S,iter,set,basis,0,0)
+            else:
+                F, errorFock, errorDens, errorDIIS  = runDIIS(F,D0,S,iter,set,basis,errorFock, errorDens)
+            
         Fprime = np.dot(np.dot(np.transpose(S_sqrt),F),S_sqrt)
         eps, Cprime = diagonlize(Fprime)
         
@@ -121,6 +131,10 @@ def HartreeFock(input, set, basis):
         output.write("{: 12.8e}".format(dE))
         output.write("\t \t")
         output.write("{: 12.8e}".format(rmsD))
+        if set['DIIS'] == 'Yes':
+            if errorDIIS != 'None':
+                output.write("\t \t")
+                output.write("{: 12.8e}".format(errorDIIS))
     
         D0 = D
         E0el = Eel

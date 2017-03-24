@@ -3,14 +3,17 @@ basisset;STO3G
         ; SCF SETTINGS
 SCF Energy Threshold;12
 SCF RMSD Threshold;12
-SCF Max iterations;1000
+SCF Max iterations;100
+DIIS;Yes
+Keep Steps;6
         ; PROPERTY SETTINGS
 Charge;Mulliken
 Dipole;Yes
 MPn;MP2
         ; FITTING SETTINGS
-Multipolefit;Charge
-Griddensity;4
+Multipolefit;No
+Griddensity;1
+vdW scaling;1.4
 Constraint charge;Yes
 Qtot;0
 Constraint dipole;Yes
