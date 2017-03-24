@@ -2,6 +2,8 @@ import math
 import numpy as np
 import scipy.misc as scm
 import scipy.special as scs
+import time as time
+from numba import jit
 
 ##INTEGRAL FUNCTIONS
 def Overlap(a, b, la, lb, Ax, Bx):
@@ -89,17 +91,16 @@ def elnuc(a, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, 
         RPC = np.linalg.norm(P-C)
         
         for t in range(0, l1+l2+1):
+            Ex = E(l1,l2,t,A[0]-B[0],a,b,P[0]-A[0],P[0]-B[0],A[0]-B[0])
             for u in range(0, m1+m2+1):
+                Ey = E(m1,m2,u,A[1]-B[1],a,b,P[1]-A[1],P[1]-B[1],A[1]-B[1])
                 for v in range(0, n1+n2+1):
-                    Ex = E(l1,l2,t,A[0]-B[0],a,b,P[0]-A[0],P[0]-B[0],A[0]-B[0])
-                    Ey = E(m1,m2,u,A[1]-B[1],a,b,P[1]-A[1],P[1]-B[1],A[1]-B[1])
                     Ez = E(n1,n2,v,A[2]-B[2],a,b,P[2]-A[2],P[2]-B[2],A[2]-B[2])
                     val += Ex*Ey*Ez*R(t,u,v,0,p,P[0]-C[0],P[1]-C[1],P[2]-C[2],RPC)*Zc
 
     return -val*2*np.pi/p*N
 
 
-    
 def elelrep(a, b, c, d, Ax, Ay, Az, Bx, By, Bz, Cx, Cy, Cz, Dx, Dy, Dz, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, N4, c1, c2, c3, c4):
     #McMurchie-Davidson scheme   
     N = N1*N2*N3*N4*c1*c2*c3*c4
@@ -117,16 +118,16 @@ def elelrep(a, b, c, d, Ax, Ay, Az, Bx, By, Bz, Cx, Cy, Cz, Dx, Dy, Dz, l1, l2, 
 
     val = 0.0
     for t in range(l1+l2+1):
+        E1 = E(l1,l2,t,A[0]-B[0],a,b,P[0]-A[0],P[0]-B[0],A[0]-B[0])
         for u in range(m1+m2+1):
+            E2 = E(m1,m2,u,A[1]-B[1],a,b,P[1]-A[1],P[1]-B[1],A[1]-B[1])
             for v in range(n1+n2+1):
+                E3 = E(n1,n2,v,A[2]-B[2],a,b,P[2]-A[2],P[2]-B[2],A[2]-B[2])
                 for tau in range(l3+l4+1):
+                    E4 = E(l3,l4,tau,C[0]-D[0],c,d,Q[0]-C[0],Q[0]-D[0],C[0]-D[0])
                     for nu in range(m3+m4+1):
+                        E5 = E(m3,m4,nu ,C[1]-D[1],c,d,Q[1]-C[1],Q[1]-D[1],C[1]-D[1])
                         for phi in range(n3+n4+1):
-                            E1 = E(l1,l2,t,A[0]-B[0],a,b,P[0]-A[0],P[0]-B[0],A[0]-B[0])
-                            E2 = E(m1,m2,u,A[1]-B[1],a,b,P[1]-A[1],P[1]-B[1],A[1]-B[1])
-                            E3 = E(n1,n2,v,A[2]-B[2],a,b,P[2]-A[2],P[2]-B[2],A[2]-B[2])
-                            E4 = E(l3,l4,tau,C[0]-D[0],c,d,Q[0]-C[0],Q[0]-D[0],C[0]-D[0])
-                            E5 = E(m3,m4,nu ,C[1]-D[1],c,d,Q[1]-C[1],Q[1]-D[1],C[1]-D[1])
                             E6 = E(n3,n4,phi,C[2]-D[2],c,d,Q[2]-C[2],Q[2]-D[2],C[2]-D[2])
                             R1 = R(t+tau,u+nu,v+phi,0,alpha,P[0]-Q[0],P[1]-Q[1],P[2]-Q[2],RPQ) 
                             val += E1*E2*E3*E4*E5*E6*np.power(-1,tau+nu+phi)*R1
@@ -207,10 +208,10 @@ def Velesp(a, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2,
     RPC = np.linalg.norm(P-C)
     val = 0
     for t in range(0, l1+l2+1):
+        Ex = E(l1,l2,t,A[0]-B[0],a,b,P[0]-A[0],P[0]-B[0],A[0]-B[0])
         for u in range(0, m1+m2+1):
+            Ey = E(m1,m2,u,A[1]-B[1],a,b,P[1]-A[1],P[1]-B[1],A[1]-B[1])
             for v in range(0, n1+n2+1):
-                Ex = E(l1,l2,t,A[0]-B[0],a,b,P[0]-A[0],P[0]-B[0],A[0]-B[0])
-                Ey = E(m1,m2,u,A[1]-B[1],a,b,P[1]-A[1],P[1]-B[1],A[1]-B[1])
                 Ez = E(n1,n2,v,A[2]-B[2],a,b,P[2]-A[2],P[2]-B[2],A[2]-B[2])
                 val += Ex*Ey*Ez*R(t,u,v,0,p,P[0]-C[0],P[1]-C[1],P[2]-C[2],RPC)
     return val*2*np.pi/p*N
@@ -228,6 +229,7 @@ def E(i,j,t,Qx,a,b,XPA,XPB,XAB):
         return (1/(2*p))*E(i-1,j,t-1,Qx,a,b,XPA,XPB,XAB) + XPA*E(i-1,j,t,Qx,a,b,XPA,XPB,XAB) + (t+1)*E(i-1,j,t+1,Qx,a,b,XPA,XPB,XAB)
     else:
         return (1/(2*p))*E(i,j-1,t-1,Qx,a,b,XPA,XPB,XAB) + XPB*E(i,j-1,t,Qx,a,b,XPA,XPB,XAB) + (t+1)*E(i,j-1,t+1,Qx,a,b,XPA,XPB,XAB)
+        
 
 def R(t,u,v,n,p,PCx,PCy,PCz,RPC):
     #McMurchie-Davidson scheme, 9.9.18, 9.9.19 and 9.9.20 Helgaker
@@ -276,6 +278,7 @@ def runIntegrals(input, basis):
     #END OF nuclear-nuclear repulsion
     
     # Two electron integrals
+    start = time.time()
     ERI = np.zeros((len(basis),len(basis),len(basis),len(basis)))
     for mu in range(0, len(basis)):
         for nu in range(0, len(basis)):
@@ -306,9 +309,11 @@ def runIntegrals(input, basis):
                             ERI[lam,sig,nu,mu] = calc
                             ERI[sig,lam,nu,mu] = calc
     np.save('twoint.npy',ERI)
+    print(time.time()-start, 'ERI')
     #END OF two electron integrals
     
     # Kinetic energy and overlap
+    start = time.time()
     S = np.zeros((len(basis),len(basis)))
     T = np.zeros((len(basis),len(basis)))
     for k in range(0, len(basis)):
@@ -331,9 +336,11 @@ def runIntegrals(input, basis):
                 T[l,k] = calc
     np.save('overlap.npy',S)
     np.save('Ekin.npy',T)
+    print(time.time()-start, 'Overlap + kin')
     #END OF kinetic energy and overlap
     
     # Nucleus electron attraction
+    start = time.time()
     Na = np.zeros((len(basis),len(basis)))
     for k in range(0, len(basis)):
         for l in range(0, len(basis)):
@@ -349,6 +356,7 @@ def runIntegrals(input, basis):
                 Na[k,l] = calc
                 Na[l,k] = calc
     np.save('nucatt.npy',Na)
+    print(time.time()-start, 'Nuc att')
     #END OF nucleus electron attraction
     
 def run_dipole_int(basis, input):
