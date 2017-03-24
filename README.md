@@ -18,7 +18,7 @@ Mulliken charges, ESP fitted charges
 
 Molecular dipole moment
 
-## Schemes
+## Schemes:
 
 SCF, DIIS
 
