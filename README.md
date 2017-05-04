@@ -1,6 +1,6 @@
 # Hartree-Fock
 
-Hartree-Fock program written in python. See input and setting file, as example fils given as inputs.
+Hartree-Fock program written in python. See input and setting file, as example files given as inputs.
 
 ## Basis sets:
 
