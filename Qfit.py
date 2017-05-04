@@ -26,11 +26,12 @@ def centerofcharge(input):
 
 def makepoints(set, input):
     density = float(set['Griddensity'])
+    vdWscale = float(set['vdW scaling'])
     cf = 0.01889725988579
     vdW = {1:120*cf, 6:170*cf, 8:152*cf}
     points = np.zeros(len(input)-1)
     for i in range(1, len(input)):
-        points[i-1] = int(density*4*np.pi*1.4*vdW[input[i,0]])
+        points[i-1] = int(density*4*np.pi*vdWscale*vdW[input[i,0]])
     # [x, y, z, VQM]
     V = np.zeros((np.int(np.sum(points)),5))
     idx = 0
@@ -45,32 +46,36 @@ def makepoints(set, input):
             else:
                 phi = ((phiold + 3.6/((N*(1-h**2))**0.5))) % (2*np.pi)
             phiold = phi
-            x = 1.4*vdW[input[i,0]]*np.cos(phi)*np.sin(theta)
-            y = 1.4*vdW[input[i,0]]*np.sin(phi)*np.sin(theta)
-            z = 1.4*vdW[input[i,0]]*np.cos(theta)
+            x = vdWscale*vdW[input[i,0]]*np.cos(phi)*np.sin(theta)
+            y = vdWscale*vdW[input[i,0]]*np.sin(phi)*np.sin(theta)
+            z = vdWscale*vdW[input[i,0]]*np.cos(theta)
             V[idx, 0] = x + input[i,1]
             V[idx, 1] = y + input[i,2]
             V[idx, 2] = z + input[i,3]
             idx += 1
+
     # Get point distance
     dist = ((V[0,0]-V[1,0])**2+(V[0,1]-V[1,1])**2+(V[0,2]-V[1,2])**2)**0.5
-    
+
     # Remove overlap
     for i in range(1, len(input)):
         chkrm = 0
         for j in range(0, len(V)):
             r = ((V[j-chkrm,0]-input[i,1])**2+(V[j-chkrm,1]-input[i,2])**2+(V[j-chkrm,2]-input[i,3])**2)**0.5
-            if r < 1.39*vdW[input[i,0]]:
+            if r < vdWscale*0.97*vdW[input[i,0]]:
                 V = np.delete(V,j-chkrm,axis=0)
                 chkrm += 1
+    
     chkrm = 0
     # Double loop over V to remove
     for i in range(0, len(V)):
         for j in range(0, len(V)):
-            if 0.9*dist > ((V[i-chkrm,0]-V[j,0])**2+(V[i-chkrm,1]-V[j,1])**2+(V[i-chkrm,2]-V[j,2])**2)**0.5 and i-chkrm != j:
+            if 0.95*dist > ((V[i-chkrm,0]-V[j,0])**2+(V[i-chkrm,1]-V[j,1])**2+(V[i-chkrm,2]-V[j,2])**2)**0.5 and i-chkrm != j:
                 V = np.delete(V,j,axis=0)
                 chkrm += 1
                 break
+    
+    #V = np.array([[-0.19523982,	-5.11636437,	-1.74206068, 0, 0],[3.78732559,	-0.63947779,	-4.09453905,0,0]])
     return V
 
 def RMSDcalc(V, q, Constr, input, Atoms, set):
@@ -87,7 +92,9 @@ def RMSDcalc(V, q, Constr, input, Atoms, set):
         RMSD += (V[i, 3] - E)**2
     RMSD = (RMSD/len(V))**0.5
     return RMSD, V
-    
+
+def solveFit(A, B):
+    return np.linalg.solve(A, B)
 
 ## CHARGE FIT
 def chrfit(basis, input, D, set, results):
@@ -186,7 +193,7 @@ def chrfit(basis, input, D, set, results):
     # END OF building A and B matrix
     
     #WORKING EQUATIONS
-    q = np.linalg.solve(A, B)
+    q = solveFit(A, B)
     
     #Calculate RMSD
     RMSD, V = RMSDcalc(V, q, Constr, input, Atoms, set)
@@ -276,22 +283,30 @@ def dipolefit(basis, input, D, set, results):
                 # Charge 
                 A[j,k] += 1/(rij*rik)
                 # dipole_x charge
-                A[j,k+Atoms] += rijx/(rij**3 * rik)
-                A[j+Atoms,k] += rikx/(rik**3 * rij)
+                A[j,k+Atoms] += rikx/(rik**3 * rij)
+                A[j+Atoms,k] += rijx/(rij**3 * rik)
                 # dipole_y charge
-                A[j,k+2*Atoms] += rijy/(rij**3 * rik)
-                A[j+2*Atoms,k] += riky/(rik**3 * rij)
+                A[j,k+Atoms*2] += riky/(rik**3 * rij)
+                A[j+Atoms*2,k] += rijy/(rij**3 * rik)
                 # dipole_z charge
-                A[j,k+3*Atoms] += rijz/(rij**3 * rik)
-                A[j+3*Atoms,k] += rikz/(rik**3 * rij)
+                A[j,k+Atoms*3] += rikz/(rik**3 * rij)
+                A[j+Atoms*3,k] += rijz/(rij**3 * rik)
                 # dipole_x  
                 A[j+Atoms,k+Atoms] += rikx*rijx/(rij**3 * rik**3)
                 # dipole_y
-                A[j+2*Atoms,k+2*Atoms] += riky*rijy/(rij**3 * rik**3)
+                A[j+2*Atoms,k+2*Atoms] += riky*rijy/(rij**3 * rik**3) 
                 # dipole_z
                 A[j+3*Atoms,k+3*Atoms] += rikz*rijz/(rij**3 * rik**3)
-    
-    
+                # dipole_x dipole_y
+                A[j+Atoms,k+2*Atoms] += rijx*riky/(rij**3 * rik**3)
+                A[j+2*Atoms,k+Atoms] += rikx*rijy/(rij**3 * rik**3)
+                # dipole_x dipole_z
+                A[j+Atoms,k+3*Atoms] += rijx*rikz/(rij**3 * rik**3)
+                A[j+3*Atoms,k+Atoms] += rikx*rijz/(rij**3 * rik**3)
+                # dipole_y dipole_z
+                A[j+2*Atoms,k+3*Atoms] += rijy*rikz/(rij**3 * rik**3)
+                A[j+3*Atoms,k+2*Atoms] += riky*rijz/(rij**3 * rik**3)
+
     Bshift = 0
     #Checking constraints in construction of B Vector
     if set['Constraint charge'] == 'Yes':
@@ -360,8 +375,8 @@ def dipolefit(basis, input, D, set, results):
     # END OF building A and B matrix
     
     #WORKING EQUATIONS
-    q = np.linalg.solve(A, B)
-    
+    q = solveFit(A, B)
+
     #Calculate RMSD
     RMSD, V = RMSDcalc(V, q, Constr, input, Atoms, set)
     
