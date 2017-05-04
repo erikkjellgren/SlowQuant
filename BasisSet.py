@@ -47,7 +47,32 @@ def bassiset(input, set):
                                 [0,0.2222899,0.39195739,0,0,1]]
                 basis_out.append([idx,input[i][1],input[i][2],input[i][3],3,basis_func, i])
                 idx += 1
-                
+            elif input[i][0] == 7:
+                basis_func = [[0, 99.1061690,0.15432897,0,0,0],
+                                [0,18.0523120 ,0.53532814,0,0,0],
+                                [0,4.8856602,0.44463454,0,0,0]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],3,basis_func, i])
+                idx += 1
+                basis_func = [[0,3.7804559,-0.09996723,0,0,0],
+                                [0,0.8784966,0.39951283,0,0,0],
+                                [0,0.2857144,0.70011547,0,0,0]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],3,basis_func, i])
+                idx += 1
+                basis_func = [[0,3.7804559,0.15591627,1,0,0],
+                                [0,0.8784966,0.60768372,1,0,0],
+                                [0,0.2857144,0.39195739,1,0,0]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],3,basis_func, i])
+                idx += 1
+                basis_func = [[0,3.7804559,0.15591627,0,1,0],
+                                [0,0.8784966,0.60768372,0,1,0],
+                                [0,0.2857144,0.39195739,0,1,0]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],3,basis_func, i])
+                idx += 1
+                basis_func = [[0,3.7804559,0.15591627,0,0,1],
+                                [0,0.8784966,0.60768372,0,0,1],
+                                [0,0.2857144,0.39195739,0,0,1]]
+                basis_out.append([idx,input[i][1],input[i][2],input[i][3],3,basis_func, i])
+                idx += 1
             elif input[i][0] == 8:
                 basis_func = [[0,130.7093200,0.15432897,0,0,0],
                                 [0,23.8088610,0.53532814,0,0,0],
