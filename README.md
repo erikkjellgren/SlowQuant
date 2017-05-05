@@ -4,7 +4,7 @@ Hartree-Fock program written in python. See input and setting file, as example f
 
 ## Basis sets:
 
-STO-3G  : H, C, O
+STO-3G  : H, C, N, O
 
 DZ      : H, O
 
