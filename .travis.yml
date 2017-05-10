@@ -14,14 +14,11 @@ install:
 
 script:
   - if [[ $TRAVIS_PYTHON_VERSION == 3.5 ]];
-    then py.test -vv example.py --cov example;
-    else py.test -vv example.py;
+    py.test MolecularIntegrals.py;
+    py.test Qfit.py;
     fi
 
 after_success:
   - if [[ $TRAVIS_PYTHON_VERSION == 3.5 ]];
     then coveralls;
     fi
-
-notifications:
-  email: false
