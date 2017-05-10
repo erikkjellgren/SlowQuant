@@ -31,3 +31,14 @@ Multipole integral, Obara-Saika
 One electron coulomb integral, MacMurchie-Davidson
 
 ERI, MacMurchie-Davidson
+
+
+## Requirements:
+
+Numpy
+
+Scipy
+
+Numba
+
+pytest
