@@ -1,7 +1,9 @@
-sudo: false
 
 virtualenv:
   system_site_packages: true
+  
+before_install:
+ - sudo apt-get install -qq python-numpy python-scipy
 
 language:
  - python
@@ -9,12 +11,9 @@ language:
 python:
  - 3.4
  - 3.5
-
-before install:
- - apt-get install python-scipy
  
 install:
- - pip install pytest python-coveralls numpy numba
+ - pip install pytest python-coveralls numba
  
 script: 
  - pytest Qfit.py
