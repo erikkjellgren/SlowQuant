@@ -206,25 +206,6 @@ def u_ObaraSaika(a1, a2, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na, nb, N1, N2,
                 uz[i][j+1][e] = (Pz-Bz)*uz[i][j][e] + 1/(2*p) * (i*uz[i-1][j][e]+j*uz[i][j-1][e]+e*uz[i][j][e-1])
                 uz[i][j][e+1] = (Pz-Cz)*uz[i][j][e] + 1/(2*p) * (i*uz[i-1][j][e]+j*uz[i][j-1][e]+e*uz[i][j][e-1])
     return -N*ux[la][lb][1]*uy[ma][mb][0]*uz[na][nb][0], -N*ux[la][lb][0]*uy[ma][mb][1]*uz[na][nb][0], -N*ux[la][lb][0]*uy[ma][mb][0]*uz[na][nb][1]
-
-def Velesp(a, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, rcx, rcy, rcz):
-    #McMurchie-Davidson scheme    
-    N = N1*N2*c1*c2
-    p = a + b
-    A = np.array([Ax, Ay, Az])
-    B = np.array([Bx, By, Bz])
-    C = np.array([rcx, rcy, rcz])
-    P = gaussian_product_center(a,A,b,B)
-    RPC = np.linalg.norm(P-C)
-    val = 0
-    for t in range(0, l1+l2+1):
-        Ex = E(l1,l2,t,A[0]-B[0],a,b,P[0]-A[0],P[0]-B[0],A[0]-B[0])
-        for u in range(0, m1+m2+1):
-            Ey = E(m1,m2,u,A[1]-B[1],a,b,P[1]-A[1],P[1]-B[1],A[1]-B[1])
-            for v in range(0, n1+n2+1):
-                Ez = E(n1,n2,v,A[2]-B[2],a,b,P[2]-A[2],P[2]-B[2],A[2]-B[2])
-                val += Ex*Ey*Ez*R(t,u,v,0,p,P[0]-C[0],P[1]-C[1],P[2]-C[2],RPC)
-    return val*2*np.pi/p*N
     
 ##UTILITY FUNCTIONS
 def E(i,j,t,Qx,a,b,XPA,XPB,XAB):
@@ -273,14 +254,6 @@ def gaussian_product_center(a,A,b,B):
 
 ##CALC OF INTEGRALS
 def runIntegrals(input, basis):
-    # Set up indexes for integrals
-    See = {}
-    for i in range(1, len(basis)+1):
-        for j in range(1, len(basis)+1):
-            if i >= j:
-                See[str(int(i))+';'+str(int(j))] = 0
-    #END OF set up indexes for integrals
-    
     # Nuclear-nuclear repulsion
     E = np.zeros(1)
     E[0] = nucrep(input)
@@ -402,6 +375,7 @@ def run_dipole_int(basis, input):
 def runQMESP(basis, input, rcx, rcy ,rcz):
     # Set up indexes for integrals
     Ve = np.zeros((len(basis),len(basis)))
+    point = np.array([['None''None','None','None'],[-1, rcx, rcy ,rcz]])
     for k in range(0, len(basis)):
         for l in range(0, len(basis)):
             if k >= l:
@@ -412,8 +386,15 @@ def runQMESP(basis, input, rcx, rcy ,rcz):
                 calc = 0
                 for i in range(basis[a[0]][4]):
                     for j in range(basis[a[1]][4]):
-                        calc += Velesp(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4],basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2], rcx, rcy, rcz)
+                        calc += elnuc(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4],basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2], point)
             Ve[k,l] = calc
             Ve[l,k] = calc
         
     return Ve
+
+## TESTING
+
+def test_gaussian_product_center():
+    check = 3.5
+    calc = gaussian_product_center(1.0,2.0,3.0,4.0)
+    assert abs(check - calc) < 10**-12
