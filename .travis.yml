@@ -21,7 +21,7 @@ install:
   - source activate test-environment
 
 script:
-  - pytest Qfit.py
+  - py.test -vv Qfit.py
   
 notifications:
   email: false
