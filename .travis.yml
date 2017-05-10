@@ -1,0 +1,27 @@
+sudo: false
+
+language:
+  - python
+
+python:
+  - 2.6
+  - 2.7
+  - 3.4
+  - 3.5
+
+install:
+  - pip install pytest pytest-cov python-coveralls
+
+script:
+  - if [[ $TRAVIS_PYTHON_VERSION == 3.5 ]];
+    then py.test -vv example.py --cov example;
+    else py.test -vv example.py;
+    fi
+
+after_success:
+  - if [[ $TRAVIS_PYTHON_VERSION == 3.5 ]];
+    then coveralls;
+    fi
+
+notifications:
+  email: false
