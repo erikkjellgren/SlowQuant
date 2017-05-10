@@ -12,3 +12,6 @@ install:
   
 script: 
   - pytest Qfit.py
+
+notifications:
+  email: false
