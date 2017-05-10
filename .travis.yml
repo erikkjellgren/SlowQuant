@@ -1,14 +1,20 @@
 sudo: false
 
+virtualenv:
+  system_site_packages: true
+
 language:
  - python
 
 python:
  - 3.4
  - 3.5
+
+before install:
+ - apt-get install python-scipy
  
 install:
- - pip install pytest python-coveralls scipy
+ - pip install pytest python-coveralls numpy numba
  
 script: 
  - pytest Qfit.py
