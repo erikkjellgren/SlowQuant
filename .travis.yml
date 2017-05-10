@@ -11,4 +11,4 @@ install:
   - pip install pytest python-coveralls
   
 script: 
-  - py.test -vv qfit.py
+  - pytest Qfit.py
