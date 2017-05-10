@@ -1,17 +1,17 @@
--sudo: false
- -
- -language:
- -  - python
- -
- -python:
- -  - 3.4
- -  - 3.5
- -
- -install:
- -  - pip install pytest python-coveralls scipy numpy
- -  
- -script: 
- -  - pytest Qfit.py
- -
- -notifications:
- -  email: false
+sudo: false
+
+language:
+ - python
+
+python:
+ - 3.4
+ - 3.5
+ 
+install:
+ - pip install pytest python-coveralls scipy numpy  
+ 
+script: 
+ - pytest Qfit.py
+
+notifications:
+ email: false
