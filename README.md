@@ -39,6 +39,4 @@ Numpy
 
 Scipy
 
-Numba
-
 pytest
