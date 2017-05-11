@@ -250,7 +250,7 @@ def bassiset(input, set):
 
 def test_N():
     check = 5.701643762839922
-    calc = N(1,1,1,1)
+    calc = N(1.0,1.0,1.0,1.0)
     assert abs(check-calc) < 10**-12
 
 def test_bassiset():
