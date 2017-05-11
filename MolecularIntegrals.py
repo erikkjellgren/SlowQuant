@@ -391,10 +391,4 @@ def runQMESP(basis, input, rcx, rcy ,rcz):
             Ve[l,k] = calc
         
     return Ve
-
-## TESTING
-
-def test_gaussian_product_center():
-    check = 3.5
-    calc = gaussian_product_center(1.0,2.0,3.0,4.0)
-    assert abs(check - calc) < 10**-12
+    

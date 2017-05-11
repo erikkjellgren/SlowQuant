@@ -11,11 +11,10 @@ Charge;Mulliken
 Dipole;Yes
 MPn;MP2
         ; FITTING SETTINGS
-Multipolefit;No
+Multipolefit;Charge
 Griddensity;1
 vdW scaling;1.4
 Constraint charge;Yes
 Qtot;0
 Constraint dipole;Yes
 Write ESP;Yes
-COMMENT;Dipole fit is not working
