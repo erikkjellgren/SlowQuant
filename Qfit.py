@@ -2,9 +2,6 @@ import numpy as np
 import MolecularIntegrals as MI
 import random as rng
 
-#### DIPOLE FIT NOT WORKING
-#### UNKNOWN IF DIPOLE CONSTRAIN WORK FOR CHARGE FITTING
-
 def magvec(v1, v2):
     x = v2[0] - v1[0]
     y = v2[1] - v1[1]
@@ -16,19 +13,21 @@ def centerofcharge(input):
     Ycm = 0
     Zcm = 0
     M = 0
+    print(input)
     for i in range(1, len(input)):
         M += input[i][0]
     for i in range(1, len(input)):
         Xcm += (input[i][0]*input[i][1])/M
         Ycm += (input[i][0]*input[i][2])/M
         Zcm += (input[i][0]*input[i][3])/M
+    print(Xcm, Ycm, Zcm)
     return Xcm, Ycm, Zcm
 
 def makepoints(set, input):
     density = float(set['Griddensity'])
     vdWscale = float(set['vdW scaling'])
     cf = 0.01889725988579
-    vdW = {1:120*cf, 6:170*cf, 8:152*cf}
+    vdW = {1:120*cf, 6:170*cf, 7:155*cf, 8:152*cf}
     points = np.zeros(len(input)-1)
     for i in range(1, len(input)):
         points[i-1] = int(density*4*np.pi*vdWscale*vdW[input[i,0]])
@@ -37,7 +36,7 @@ def makepoints(set, input):
     idx = 0
     for i in range(1, len(input)):
         N = int(points[i-1])
-        #Saff & Kuijlaars algorithm)
+        #Saff & Kuijlaars algorithm
         for k in range(1, N+1):
             h = -1 +2*(k-1)/(N-1)
             theta = np.arccos(h)
@@ -74,8 +73,6 @@ def makepoints(set, input):
                 V = np.delete(V,j,axis=0)
                 chkrm += 1
                 break
-    
-    #V = np.array([[-0.19523982,	-5.11636437,	-1.74206068, 0, 0],[3.78732559,	-0.63947779,	-4.09453905,0,0]])
     return V
 
 def RMSDcalc(V, q, Constr, input, Atoms, set):
@@ -95,6 +92,7 @@ def RMSDcalc(V, q, Constr, input, Atoms, set):
 
 def solveFit(A, B):
     return np.linalg.solve(A, B)
+
 
 ## CHARGE FIT
 def chrfit(basis, input, D, set, results):
@@ -121,6 +119,7 @@ def chrfit(basis, input, D, set, results):
 
         V[i,3] = NucESP - 2*ElecESP #Where does the 2 come from?
     # END OF calculate QM potential
+
     
     #Building A and B matrix
     Constr = 0
@@ -256,9 +255,9 @@ def dipolefit(basis, input, D, set, results):
         for i in range(len(V)):
             vi = np.array([V[i,0],V[i,1],V[i,2]])
             rik = magvec(vi, vk)
-            rikx = vi[0] - vk[0]
-            riky = vi[1] - vk[1]
-            rikz = vi[2] - vk[2]
+            rikx = vk[0] - vi[0]
+            riky = vk[1] - vi[1]
+            rikz = vk[2] - vi[2] 
             
             B[k] += V[i,3]/rik
             B[k+Atoms] += rikx*V[i,3]/(rik**3)
@@ -280,6 +279,14 @@ def dipolefit(basis, input, D, set, results):
                 rijx = vi[0] - vj[0]
                 rijy = vi[1] - vj[1]
                 rijz = vi[2] - vj[2]
+                
+                rikx *= -1 
+                riky *= -1 
+                rikz *= -1 
+                rijx *= -1 
+                rijy *= -1 
+                rijz *= -1 
+                
                 # Charge 
                 A[j,k] += 1/(rij*rik)
                 # dipole_x charge
@@ -376,7 +383,7 @@ def dipolefit(basis, input, D, set, results):
     
     #WORKING EQUATIONS
     q = solveFit(A, B)
-
+    
     #Calculate RMSD
     RMSD, V = RMSDcalc(V, q, Constr, input, Atoms, set)
     
@@ -468,3 +475,39 @@ def runQfit(basis, input, D, set, results):
         chrfit(basis, input, D, set, results)
     if set['Multipolefit'] == 'Dipole':
         dipolefit(basis, input, D, set, results)
+        
+        
+## TESTING
+
+def test_magvec():
+    check = 5.196152422706632
+    calc = magvec([1,2,3],[4,5,6])
+    assert abs(check - calc) < 10**-12
+
+def test_centerofcharge():
+    check1 = 0.1020452034
+    check2 = 0.162516435
+    check3 = 0.0
+    input1 = np.array([[10,0,0,0],[8.0, 0.0, 0.0, 0],[1.0, 1.70075339, 0.0, 0],[1.0, -0.68030136, 1.62516435, 0.0]])
+    calc1, calc2, calc3 = centerofcharge(input1)
+    assert abs(check1 - calc1) < 10**-8
+    assert abs(check2 - calc2) < 10**-8
+    assert abs(check3 - calc3) < 10**-8
+
+def test_solveFit():
+    check = np.array([-4.0, 4.5])
+    A = np.array([[1.0,2.0],[3.0,4.0]])
+    B = np.array([5.0,6.0])
+    calc = solveFit(A,B)
+    assert abs(check[0] - calc[0]) < 10**-12
+    assert abs(check[1] - calc[1]) < 10**-12
+
+def test_makepoints():
+    check = np.array([[  4.92471737e-16,   0.00000000e+00,  -4.02133690e+00,
+          0.00000000e+00,   0.00000000e+00],
+       [  0.00000000e+00,   0.00000000e+00,   4.02133690e+00,
+          0.00000000e+00,   0.00000000e+00]])
+    settting = {'Griddensity':0.07, 'vdW scaling':1.4}
+    input1 = np.array([[10,0,0,0],[8.0, 0.0, 0.0, 0],[1.0, 1.70075339, 0.0, 0],[1.0, -0.68030136, 1.62516435, 0.0]])
+    calc = makepoints(settting, input1)
+    assert np.sum(np.abs(check-calc)) < 10**-8
