@@ -23,12 +23,8 @@ install:
   
 script:
   - if [[ $TRAVIS_PYTHON_VERSION == 3.6 ]];
-    then py.test -vv Qfit.py --cov Qfit;
-    else py.test -vv Qfit.py;
-    fi
-  - if [[ $TRAVIS_PYTHON_VERSION == 3.6 ]];
-    then py.test -vv MolecularIntegrals.py --cov MolecularIntegrals;
-    else py.test -vv MolecularIntegrals.py;
+    then py.test -vv --cov Qfit, MolecularIntegrals;
+    else py.test -vv;
     fi
 
 after_success:
