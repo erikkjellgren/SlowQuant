@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/Melisius/Hartree-Fock.svg?branch=master)](https://travis-ci.org/Melisius/Hartree-Fock)
+[![Coverage Status](https://coveralls.io/repos/github/Melisius/Hartree-Fock/badge.svg)](https://coveralls.io/github/Melisius/Hartree-Fock)
+
 # Hartree-Fock
 
 Hartree-Fock program written in python. See input and setting file, as example files given as inputs.
