@@ -245,3 +245,18 @@ def bassiset(input, set):
             basis_out[i][5][j][0] = N(basis_out[i][5][j][1], basis_out[i][5][j][3], basis_out[i][5][j][4], basis_out[i][5][j][5])
     
     return basis_out
+
+## TESTING
+
+def test_N():
+    check = 5.701643762839922
+    calc = N(1,1,1,1)
+    assert abs(check-calc) < 10**-12
+
+def test_bassiset():
+    check = [[1,0,0,0,3,
+  [[1.7944418322184352, 3.42525091, 0.15432897, 0, 0, 0],
+   [0.5003264923314032, 0.62391373, 0.53532814, 0, 0, 0],
+   [0.18773545851092535, 0.1688554, 0.44463454, 0, 0, 0]],1]]
+    calc = bassiset([[0,0,0,0],[1,0,0,0]],set={'basisset':'STO3G'})
+    assert abs(np.mean(check[0][5][2][1] - calc[0][5][2][1])) < 10**-8
