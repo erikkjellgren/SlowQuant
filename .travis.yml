@@ -22,12 +22,19 @@ install:
   - pip install python-coveralls pytest-cov
   
 script:
-  - py.test -vv Qfit.py
-  - py.test -vv MolecularIntegrals.py
+  - if [[ $TRAVIS_PYTHON_VERSION == 3.6 ]];
+    then py.test -vv Qfit.py --cov Qfit;
+    else py.test -vv Qfit.py;
+    fi
+  - if [[ $TRAVIS_PYTHON_VERSION == 3.6 ]];
+    then py.test -vv MolecularIntegrals.py --cov MolecularIntegrals;
+    else py.test -vv MolecularIntegrals.py;
+    fi
 
 after_success:
-  - coveralls
-
+  - if [[ $TRAVIS_PYTHON_VERSION == 3.6 ]];
+    then coveralls;
+    fi
 
 notifications:
   email: false
