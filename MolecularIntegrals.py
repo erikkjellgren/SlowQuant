@@ -3,7 +3,6 @@ import numpy as np
 import scipy.misc as scm
 import scipy.special as scs
 import time as time
-from numba import jit
 
 ##INTEGRAL FUNCTIONS
 def Overlap(a, b, la, lb, Ax, Bx):
