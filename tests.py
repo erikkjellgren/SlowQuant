@@ -183,6 +183,3 @@ def test_MP2_2():
     calc = MP.MP2(basis, input, F, C)
     check = -0.152709879075
     assert abs(calc - check) < 10**-7
-
-def test_dipolemoment():
-    
