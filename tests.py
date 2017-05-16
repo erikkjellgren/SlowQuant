@@ -89,6 +89,6 @@ def test_boys():
             1.91851951160577E-18,
             7.75391047694625E-55]
     for i in range(0, len(x)):
-        assert abs(MI.boys(m[i], x[i])-result)*10**scale[i] < 10**-8
+        assert abs(MI.boys(m[i], x[i])-result[i])*10**scale[i] < 10**-8
     
 
