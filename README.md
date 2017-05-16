@@ -17,9 +17,15 @@ DZP     : H, O
 
 HF energy, MP2 energy
 
-Mulliken charges, ESP fitted charges
+Mulliken charges, 
 
 Molecular dipole moment
+
+## Fitted properties:
+
+ESP fitted charges
+
+ESP fitted dipoles
 
 ## Schemes:
 
