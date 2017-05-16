@@ -51,3 +51,24 @@ def test_makepoints():
     input1 = np.array([[10,0,0,0],[8.0, 0.0, 0.0, 0],[1.0, 1.70075339, 0.0, 0],[1.0, -0.68030136, 1.62516435, 0.0]])
     calc = QFIT.makepoints(settting, input1)
     assert np.sum(np.abs(check-calc)) < 10**-8
+
+def test_basissets():
+    Basis = ['STO3G','DZ','DZP']
+    Atoms = {'STO3G':[1,6,7,8],'DZ':[1,8],'DZP':[1,8]}
+    for i in Basis:
+        Atom = Atoms[i]
+        for j in Atom:
+            A = BS.bassiset([[0,0,0,0],[j,0,0,0]], set={'basisset':i})
+            sum1 = 0
+            sum2 = 0
+            sum3 = 0
+            assert len(A[0][5]) == A[0][4]
+            for k in range(0, len(A[0][5])):
+                sum1 = sum1 + A[0][5][k][-1]
+                sum2 = sum2 + A[0][5][k][-2]
+                sum3 = sum3 + A[0][5][k][-3]
+            assert sum1 == sum2
+            assert sum1 == sum3
+                
+    
+    
