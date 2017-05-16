@@ -3,11 +3,10 @@ import math
 import scipy.misc as scm
 
 def N(a, l, m, n):
-    part1 = (2/math.pi)**(3/4)
-    part2 = 2**(l+m+n) * a**((2*l+2*m+2*n+3)/(4))
+    part1 = (2.0/math.pi)**(3.0/4.0)
+    part2 = 2.0**(l+m+n) * a**((2.0*l+2.0*m+2.0*n+3.0)/(4.0))
     part3 = math.sqrt(scm.factorial2(int(2*l-1))*scm.factorial2(int(2*m-1))*scm.factorial2(int(2*n-1)))
     N = part1 * ((part2)/(part3))
-    
     return N
 
 def bassiset(input, set):
