@@ -74,7 +74,7 @@ def test_boys():
     m = [0.5, 13.0, 20.6, 25.0, 64.0, 75.5, 80.3, 4.0, 8.5, 15.3, 1.8, 30, 46.8, 100.0]
     x = [6.8, 14.1, 32.4, 6.4, 50.0, 40.8, 78.2, 7.0, 3.6, 20.7, 25.3, 26.0, 37.6, 125.1]
     scale = [2,7,14,5,24,20,36,4,3,10,4,13,18,55]
-    result = [7.34475165333247E-02,
+    check = [7.34475165333247E-02,
             1.56775160456192E-07,
             2.17602798734846E-14,
             4.28028518677348E-05,
@@ -89,6 +89,62 @@ def test_boys():
             1.91851951160577E-18,
             7.75391047694625E-55]
     for i in range(0, len(x)):
-        assert abs(MI.boys(m[i], x[i])-result[i])*10**scale[i] < 10**-8
+        assert abs(MI.boys(m[i], x[i])-check[i])*10**scale[i] < 10**-8
     
+def test_HartreeFock1():
+    settings = np.genfromtxt('Standardsettings.csv', delimiter = ';', dtype='str')
+    set = {}
+    for i in range(len(settings)):
+        set.update({settings[i][0]:settings[i][1]})
+    input    = np.genfromtxt('testfiles/inputH2O.csv', delimiter=';')
+    set['DIIS'] = 'No'
+    VNN      = np.load('testfiles/enucH2O_STO3G.npy')
+    Te       = np.load('testfiles/EkinH2O_STO3G.npy')
+    S        = np.load('testfiles/overlapH2O_STO3G.npy')
+    VeN      = np.load('testfiles/nucattH2O_STO3G.npy')
+    Vee      = np.load('testfiles/twointH2O_STO3G.npy')
+    Dcheck   = np.genfromtxt('testfiles/dH2O_STO3G.csv',delimiter=';')
+    basis    = BS.bassiset(input, set={'basisset':'STO3G'})
+    CMO, FAO, D = HF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee)
+    for i in range(0, len(D)):
+        for j in range(0, len(D)):
+            assert abs(Dcheck[i,j] - D[i,j]) < 10**-7
+    
+def test_HartreeFock2():
+    settings = np.genfromtxt('Standardsettings.csv', delimiter = ';', dtype='str')
+    set = {}
+    for i in range(len(settings)):
+        set.update({settings[i][0]:settings[i][1]})
+    input    = np.genfromtxt('testfiles/inputCH4.csv', delimiter=';')
+    set['DIIS'] = 'No'
+    VNN      = np.load('testfiles/enucCH4_STO3G.npy')
+    Te       = np.load('testfiles/EkinCH4_STO3G.npy')
+    S        = np.load('testfiles/overlapCH4_STO3G.npy')
+    VeN      = np.load('testfiles/nucattCH4_STO3G.npy')
+    Vee      = np.load('testfiles/twointCH4_STO3G.npy')
+    Dcheck   = np.genfromtxt('testfiles/dCH4_STO3G.csv',delimiter=';')
+    basis    = BS.bassiset(input, set={'basisset':'STO3G'})
+    CMO, FAO, D = HF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee)
+    for i in range(0, len(D)):
+        for j in range(0, len(D)):
+            assert abs(Dcheck[i,j] - D[i,j]) < 10**-7
+
+def test_HartreeFock3():
+    settings = np.genfromtxt('Standardsettings.csv', delimiter = ';', dtype='str')
+    set = {}
+    for i in range(len(settings)):
+        set.update({settings[i][0]:settings[i][1]})
+    input    = np.genfromtxt('testfiles/inputH2O.csv', delimiter=';')
+    set['DIIS'] = 'No'
+    VNN      = np.load('testfiles/enucH2O_DZ.npy')
+    Te       = np.load('testfiles/EkinH2O_DZ.npy')
+    S        = np.load('testfiles/overlapH2O_DZ.npy')
+    VeN      = np.load('testfiles/nucattH2O_DZ.npy')
+    Vee      = np.load('testfiles/twointH2O_DZ.npy')
+    Dcheck   = np.genfromtxt('testfiles/dH2O_DZ.csv',delimiter=';')
+    basis    = BS.bassiset(input, set={'basisset':'DZ'})
+    CMO, FAO, D = HF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee)
+    for i in range(0, len(D)):
+        for j in range(0, len(D)):
+            assert abs(Dcheck[i,j] - D[i,j]) < 10**-7
 

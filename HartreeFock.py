@@ -12,25 +12,20 @@ def symm_orth(eigVal, eigVec):
     M = np.dot(np.dot(eigVec,scipy.linalg.sqrtm(np.linalg.inv(np.diag(eigVal)))),np.matrix.transpose(eigVec))
     return M
 
-def HartreeFock(input, set, basis):
+def HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee):
+    # ###############################
+    #
+    # VNN = nuclear repulsion
+    # Te  = kinetic energy
+    # S   = overlap integrals
+    # VeN = nuclear attraction
+    # Vee = two electron integrals
+    # 
+    # ###############################
+    
     deTHR = int(set['SCF Energy Threshold'])
     rmsTHR = int(set['SCF RMSD Threshold'])
     Maxiter = int(set['SCF Max iterations'])
-    
-    #Loading nuclear repulsion
-    VNN = np.load('enuc.npy')
-    
-    #Loading kinetic energy
-    Te = np.load('Ekin.npy')
-    
-    #Loading overlap integrals
-    S = np.load('overlap.npy')
-    
-    #Loading nuclear attraction
-    VeN = np.load('nucatt.npy')
-    
-    #Loading two electron integrals
-    Vee = np.load('twoint.npy')
     
     #Core Hamiltonian
     Hcore = VeN+Te

@@ -13,14 +13,12 @@ def centerofcharge(input):
     Ycm = 0
     Zcm = 0
     M = 0
-    print(input)
     for i in range(1, len(input)):
         M += input[i][0]
     for i in range(1, len(input)):
         Xcm += (input[i][0]*input[i][1])/M
         Ycm += (input[i][0]*input[i][2])/M
         Zcm += (input[i][0]*input[i][3])/M
-    print(Xcm, Ycm, Zcm)
     return Xcm, Ycm, Zcm
 
 def makepoints(set, input):

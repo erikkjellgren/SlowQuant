@@ -9,19 +9,24 @@ import MPn as MP
 import Qfit as QF
 import Utilityfunc as utilF 
 
-input = np.genfromtxt('inputH2O.csv', delimiter=';')
-results = {}
-settings = np.genfromtxt('settings.csv', delimiter = ';', dtype='str')
+settings = np.genfromtxt('Standardsettings.csv', delimiter = ';', dtype='str')
 set = {}
 for i in range(len(settings)):
     set.update({settings[i][0]:settings[i][1]})
+
+input = np.genfromtxt('inputH2O.csv', delimiter=';')
+results = {}
+settings = np.genfromtxt('settings.csv', delimiter = ';', dtype='str')
+for i in range(len(settings)):
+    set[settings[i][0]] = settings[i][1]
+
 
 basis = BS.bassiset(input, set)
 start = time.time()
 MI.runIntegrals(input, basis)
 print(time.time()-start, 'INTEGRALS')
 start = time.time()
-CMO, FAO, D = HF.HartreeFock(input, set, basis)
+CMO, FAO, D = HF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'))
 print(time.time()-start, 'HF')
 start = time.time()
 utilF.TransformMO(CMO, basis, set)
