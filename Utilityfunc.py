@@ -1,15 +1,12 @@
 import numpy as np
-from numba import jit
 
-def TransformMO(C, basis, set):
+def TransformMO(C, basis, set, Vee):
     #Check for key that require MO integrals
     MOcheck = 0
     if set['MPn'] == 'MP2':
         MOcheck = 1
     if MOcheck == 1:
         #Loading two electron integrals
-        Vee = np.load('twoint.npy')
-        
         VeeMO = np.zeros((len(basis),len(basis),len(basis),len(basis)))
 
         MO1 = np.zeros((len(basis),len(basis),len(basis),len(basis)))

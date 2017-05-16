@@ -8,7 +8,7 @@ def MP2(basis, input, F, C):
 
     #Loading two electron integrals
     VeeMO = np.load('twointMO.npy')
-    
+
     #Calc EMP2
     EMP2 = 0
     for i in range(0, int(input[0][0]/2)):
@@ -22,6 +22,7 @@ def MP2(basis, input, F, C):
     output.write('MP2 Energy \t')
     output.write("{: 10.8f}".format(EMP2))
     output.close()
+    return EMP2
 
 def runMPn(basis, input, F, C, set):
     if set['MPn'] == 'MP2':

@@ -98,13 +98,14 @@ def test_HartreeFock1():
         set.update({settings[i][0]:settings[i][1]})
     input    = np.genfromtxt('testfiles/inputH2O.csv', delimiter=';')
     set['DIIS'] = 'No'
+    set['basisset'] = 'STO3G'
     VNN      = np.load('testfiles/enucH2O_STO3G.npy')
     Te       = np.load('testfiles/EkinH2O_STO3G.npy')
     S        = np.load('testfiles/overlapH2O_STO3G.npy')
     VeN      = np.load('testfiles/nucattH2O_STO3G.npy')
     Vee      = np.load('testfiles/twointH2O_STO3G.npy')
     Dcheck   = np.genfromtxt('testfiles/dH2O_STO3G.csv',delimiter=';')
-    basis    = BS.bassiset(input, set={'basisset':'STO3G'})
+    basis    = BS.bassiset(input, set)
     CMO, FAO, D = HF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee)
     for i in range(0, len(D)):
         for j in range(0, len(D)):
@@ -117,13 +118,14 @@ def test_HartreeFock2():
         set.update({settings[i][0]:settings[i][1]})
     input    = np.genfromtxt('testfiles/inputCH4.csv', delimiter=';')
     set['DIIS'] = 'No'
+    set['basisset'] = 'STO3G'
     VNN      = np.load('testfiles/enucCH4_STO3G.npy')
     Te       = np.load('testfiles/EkinCH4_STO3G.npy')
     S        = np.load('testfiles/overlapCH4_STO3G.npy')
     VeN      = np.load('testfiles/nucattCH4_STO3G.npy')
     Vee      = np.load('testfiles/twointCH4_STO3G.npy')
     Dcheck   = np.genfromtxt('testfiles/dCH4_STO3G.csv',delimiter=';')
-    basis    = BS.bassiset(input, set={'basisset':'STO3G'})
+    basis    = BS.bassiset(input, set)
     CMO, FAO, D = HF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee)
     for i in range(0, len(D)):
         for j in range(0, len(D)):
@@ -136,15 +138,51 @@ def test_HartreeFock3():
         set.update({settings[i][0]:settings[i][1]})
     input    = np.genfromtxt('testfiles/inputH2O.csv', delimiter=';')
     set['DIIS'] = 'No'
+    set['basisset'] = 'DZ'
     VNN      = np.load('testfiles/enucH2O_DZ.npy')
     Te       = np.load('testfiles/EkinH2O_DZ.npy')
     S        = np.load('testfiles/overlapH2O_DZ.npy')
     VeN      = np.load('testfiles/nucattH2O_DZ.npy')
     Vee      = np.load('testfiles/twointH2O_DZ.npy')
     Dcheck   = np.genfromtxt('testfiles/dH2O_DZ.csv',delimiter=';')
-    basis    = BS.bassiset(input, set={'basisset':'DZ'})
+    basis    = BS.bassiset(input, set)
     CMO, FAO, D = HF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee)
     for i in range(0, len(D)):
         for j in range(0, len(D)):
             assert abs(Dcheck[i,j] - D[i,j]) < 10**-7
 
+def test_MP2_1():
+    settings = np.genfromtxt('Standardsettings.csv', delimiter = ';', dtype='str')
+    set = {}
+    for i in range(len(settings)):
+        set.update({settings[i][0]:settings[i][1]})
+    set['basisset'] = 'STO3G'
+    set['MPn'] = 'MP2'
+    input    = np.genfromtxt('testfiles/inputCH4.csv', delimiter=';')
+    basis    = BS.bassiset(input, set)
+    F        = np.load('testfiles/faoCH4_STO3G.npy')
+    C        = np.load('testfiles/cmoCH4_STO3G.npy')
+    UF.TransformMO(C, basis, set, Vee=np.load('testfiles/twointCH4_STO3G.npy'))
+    calc = MP.MP2(basis, input, F, C)
+    check = -0.056046676165
+    assert abs(calc - check) < 10**-7
+
+
+def test_MP2_2():
+    settings = np.genfromtxt('Standardsettings.csv', delimiter = ';', dtype='str')
+    set = {}
+    for i in range(len(settings)):
+        set.update({settings[i][0]:settings[i][1]})
+    set['basisset'] = 'DZ'
+    set['MPn'] = 'MP2'
+    input    = np.genfromtxt('testfiles/inputH2O.csv', delimiter=';')
+    basis    = BS.bassiset(input, set)
+    F        = np.load('testfiles/faoH2O_DZ.npy')
+    C        = np.load('testfiles/cmoH2O_DZ.npy')
+    UF.TransformMO(C, basis, set, Vee=np.load('testfiles/twointH2O_DZ.npy'))
+    calc = MP.MP2(basis, input, F, C)
+    check = -0.152709879075
+    assert abs(calc - check) < 10**-7
+
+def test_dipolemoment():
+    
