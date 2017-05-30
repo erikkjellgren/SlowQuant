@@ -17,11 +17,17 @@ DZP     : H, O
 
 HF energy, MP2 energy
 
-Mulliken charges, ESP fitted charges
+Mulliken charges, 
 
 Molecular dipole moment, ESP fitted dipoles
 
 Geometry Optimization for HF, analytic gradient
+
+## Fitted properties:
+
+ESP fitted charges
+
+ESP fitted dipoles
 
 ## Schemes:
 
