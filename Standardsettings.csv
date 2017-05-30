@@ -18,3 +18,8 @@ Constraint charge;Yes
 Qtot;0
 Constraint dipole;Yes
 Write ESP;Yes
+        ; GEOMOETRY OPTIMIZATION SETTINGS
+GeoOpt;No
+Max iteration GeoOpt;100
+Geometry Tolerance;3
+Gradient Decent Step;1.0

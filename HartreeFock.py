@@ -53,7 +53,7 @@ def HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee):
             E0el += D0[i,j]*(Hcore[i,j]+Hcore[i,j])
     
     #SCF iterations
-    output = open('out.txt', 'w')
+    output = open('out.txt', 'a')
     output.write('Iter')
     output.write("\t")
     output.write('Eel')
@@ -135,6 +135,7 @@ def HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee):
         E0el = Eel
         if dE < 10**(-deTHR) and rmsD < 10**(-rmsTHR):
             break
+    output.write('\n \n')
     output.close()
     
     return C, F, D

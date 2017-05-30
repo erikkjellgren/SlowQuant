@@ -8,18 +8,33 @@ import Properties as prop
 import MPn as MP
 import Qfit as QF
 import Utilityfunc as utilF 
+import GeometryOptimization as GO
 
 settings = np.genfromtxt('Standardsettings.csv', delimiter = ';', dtype='str')
 set = {}
 for i in range(len(settings)):
     set.update({settings[i][0]:settings[i][1]})
 
-input = np.genfromtxt('inputH2O.csv', delimiter=';')
+input = np.genfromtxt('input2_H2O.csv', delimiter=';')
 results = {}
 settings = np.genfromtxt('settings.csv', delimiter = ';', dtype='str')
 for i in range(len(settings)):
     set[settings[i][0]] = settings[i][1]
 
+output = open('out.txt', 'w')
+for key in set:
+    output.write(str(key)+'    '+str(set[key])+'\n')
+output.write('\n \n')
+for i in range(0, len(input)):
+    for j in range(0, 4):
+        output.write("{: 12.8e}".format(input[i,j]))
+        output.write("\t \t")
+    output.write('\n')
+output.write('\n \n')
+output.close()
+
+if set['GeoOpt'] == 'Yes':
+    input = GO.runGO(input, set)
 
 basis = BS.bassiset(input, set)
 start = time.time()
@@ -40,4 +55,3 @@ print(time.time()-start, 'MP2')
 start = time.time()
 QF.runQfit(basis, input, D, set, results)
 print(time.time()-start, 'QFIT')
-

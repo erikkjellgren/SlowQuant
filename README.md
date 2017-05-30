@@ -19,7 +19,9 @@ HF energy, MP2 energy
 
 Mulliken charges, ESP fitted charges
 
-Molecular dipole moment
+Molecular dipole moment, ESP fitted dipoles
+
+Geometry Optimization for HF, analytic gradient
 
 ## Schemes:
 
@@ -42,4 +44,3 @@ Numpy
 
 Scipy
 
-pytest

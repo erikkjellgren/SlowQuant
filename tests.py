@@ -13,6 +13,8 @@ def test_N():
     check = 5.701643762839922
     calc = BS.N(1.0,1.0,1.0,1.0)
     assert abs(check-calc) < 10**-12
+    calc = MI.N(1.0,1.0,1.0,1.0)
+    assert abs(check-calc) < 10**-12
 
 def test_gaussian_product_center():
     check = 3.5
@@ -183,3 +185,25 @@ def test_MP2_2():
     calc = MP.MP2(basis, input, F, C)
     check = -0.152709879075
     assert abs(calc - check) < 10**-7
+
+
+def test_derivative():
+    settings = np.genfromtxt('Standardsettings.csv', delimiter = ';', dtype='str')
+    set = {}
+    for i in range(len(settings)):
+        set.update({settings[i][0]:settings[i][1]})
+    input = np.array([[8, 0, 0, 0],[8, 0, 0, 0]])
+    basis = BS.bassiset(input, set)
+    MI.rungeometric_derivatives(input, basis)
+    VNe = np.load('1dynucatt.npy')
+    S   = np.load('1dyoverlap.npy')
+    Te  = np.load('1dyEkin.npy')
+    VNN = np.load('1dyenuc.npy')
+    ERI = np.load('1dytwoint.npy')
+    
+    assert np.max(np.abs(ERI)) < 10**-12
+    assert np.max(np.abs(VNN)) < 10**-12
+    assert np.max(np.abs(Te)) < 10**-12
+    assert np.max(np.abs(S)) < 10**-12
+    assert np.max(np.abs(VNe)) < 10**-12
+

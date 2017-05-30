@@ -237,8 +237,7 @@ def bassiset(input, set):
                 basis_func = [[0, 0.8500000, 1.0000000, 0,1,1]]
                 basis_out.append([idx,input[i][1],input[i][2],input[i][3],1,basis_func, i])
                 idx += 1
-        else:
-            print('NO BASIS SET DEFINED')
+
     for i in range(len(basis_out)):
         for j in range(len(basis_out[i][5])):
             basis_out[i][5][j][0] = N(basis_out[i][5][j][1], basis_out[i][5][j][3], basis_out[i][5][j][4], basis_out[i][5][j][5])
