@@ -285,7 +285,57 @@ def elnucExclude(a, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c
                         val += Ex*Ey*Ez*R(t,u,v,0,p,P[0]-C[0],P[1]-C[1],P[2]-C[2],RPC)*Zc
 
     return -val*2*np.pi/p*N
+
+def elelrep2(a, b, c, d, Ax, Ay, Az, Bx, By, Bz, Cx, Cy, Cz, Dx, Dy, Dz, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, N4, c1, c2, c3, c4, E1, E2, E3, E4, E5, E6):
+    # #############################################################
+    #
+    # Used in ERI for speed up should later be used
+    # for all MacMurchie davidson integrals to replace elelrep()
+    #
+    # #############################################################
     
+    #McMurchie-Davidson scheme   
+    N = N1*N2*N3*N4*c1*c2*c3*c4
+    A = np.array([Ax, Ay, Az])
+    B = np.array([Bx, By, Bz])
+    C = np.array([Cx, Cy, Cz])
+    D = np.array([Dx, Dy, Dz])
+    
+    p = a+b
+    q = c+d
+    alpha = p*q/(p+q)
+    P = gaussian_product_center(a,A,b,B)
+    Q = gaussian_product_center(c,C,d,D)
+    RPQ = np.linalg.norm(P-Q)
+
+    Rpre = np.ones((l1+l2+l3+l4+2,m1+m2+m3+m4+2,n1+n2+n3+n4+2,l1+l2+l3+l4+m1+m2+m3+m4+n1+n2+n3+n4+6))
+    
+
+    E2a = np.zeros(m1+m2+1)
+    
+    for u in range(m1+m2+1):
+        E2a[u] = E(m1,m2,u,A[1]-B[1],a,b,P[1]-A[1],P[1]-B[1],A[1]-B[1])
+    
+    for i in range(len(E2a)):
+        if E2a[i] != E2[i]:
+            print('OK')
+            print(E2a)
+            print(E2)
+            break
+    
+    val = 0.0
+    for t in range(l1+l2+1):
+        for u in range(m1+m2+1):
+            for v in range(n1+n2+1):
+                for tau in range(l3+l4+1):
+                    for nu in range(m3+m4+1):
+                        for phi in range(n3+n4+1):
+                            R1, Rpre = R2(t+tau,u+nu,v+phi,0,alpha,P[0]-Q[0],P[1]-Q[1],P[2]-Q[2],RPQ, Rpre)
+                            val += E1[t]*E2[u]*E3[v]*E4[tau]*E5[nu]*E6[phi]*np.power(-1,tau+nu+phi)*R1
+
+
+    val *= 2*np.power(np.pi,2.5)/(p*q*np.sqrt(p+q)) 
+    return val*N
     
 ##UTILITY FUNCTIONS
 def E(i,j,t,Qx,a,b,XPA,XPB,XAB):
@@ -300,7 +350,8 @@ def E(i,j,t,Qx,a,b,XPA,XPB,XAB):
         return (1/(2*p))*E(i-1,j,t-1,Qx,a,b,XPA,XPB,XAB) + XPA*E(i-1,j,t,Qx,a,b,XPA,XPB,XAB) + (t+1)*E(i-1,j,t+1,Qx,a,b,XPA,XPB,XAB)
     else:
         return (1/(2*p))*E(i,j-1,t-1,Qx,a,b,XPA,XPB,XAB) + XPB*E(i,j-1,t,Qx,a,b,XPA,XPB,XAB) + (t+1)*E(i,j-1,t+1,Qx,a,b,XPA,XPB,XAB)
-        
+
+
 
 def R2(t,u,v,n,p,PCx,PCy,PCz,RPC, Rpre):
     # #############################################################
@@ -386,6 +437,60 @@ def N(a, l, m, n):
     N = part1 * ((part2)/(part3))
     return N
 
+def Eprecalculation(basis, diffx1=0, diffx2=0, diffy1=0, diffy2=0, diffz1=0, diffz2=0):
+    # #############################################################
+    #
+    # Precalculation of the expansion coefficients, used in 
+    # MacMurchie davidson ERI. Speed up compared to on the fly
+    # calculation. Should later be used for all MacMurchie davidson integrals
+    #
+    # #############################################################
+    Edict = {}
+    for k in range(0, len(basis)):
+        for l in range(0, len(basis)):
+            if k >= l:
+                a = np.zeros(2)
+                a[0] = k
+                a[1] = l
+                a = a.astype(int)
+                for i in range(basis[a[0]][4]):
+                    for j in range(basis[a[1]][4]):
+                        a2=basis[a[0]][5][i][1]
+                        b=basis[a[1]][5][j][1]
+                        Ax=basis[a[0]][1]
+                        Ay=basis[a[0]][2]
+                        Az=basis[a[0]][3]
+                        Bx=basis[a[1]][1]
+                        By=basis[a[1]][2]
+                        Bz=basis[a[1]][3]
+                        l1=basis[a[0]][5][i][3]+diffx1
+                        l2=basis[a[1]][5][j][3]+diffx2
+                        m1=basis[a[0]][5][i][4]+diffy1
+                        m2=basis[a[1]][5][j][4]+diffy2
+                        n1=basis[a[0]][5][i][5]+diffz1
+                        n2=basis[a[1]][5][j][5]+diffz2
+                        
+                        A = np.array([Ax, Ay, Az])
+                        B = np.array([Bx, By, Bz])
+                        
+                        P = gaussian_product_center(a2,A,b,B)
+                        
+                        E1 = np.zeros(l1+l2+1)
+                        E2 = np.zeros(m1+m2+1)
+                        E3 = np.zeros(n1+n2+1)
+                        
+                        for t in range(l1+l2+1):
+                            E1[t] = E(l1,l2,t,A[0]-B[0],a2,b,P[0]-A[0],P[0]-B[0],A[0]-B[0])
+                        for u in range(m1+m2+1):
+                            E2[u] = E(m1,m2,u,A[1]-B[1],a2,b,P[1]-A[1],P[1]-B[1],A[1]-B[1])
+                        for v in range(n1+n2+1):
+                            E3[v] = E(n1,n2,v,A[2]-B[2],a2,b,P[2]-A[2],P[2]-B[2],A[2]-B[2])
+                        
+                        Edict[str(k)+str(l)+str(i)+str(j)+'E1'] = E1
+                        Edict[str(k)+str(l)+str(i)+str(j)+'E2'] = E2
+                        Edict[str(k)+str(l)+str(i)+str(j)+'E3'] = E3
+    return Edict
+
 
 ##CALC OF INTEGRALS
 def runIntegrals(input, basis):
@@ -394,6 +499,8 @@ def runIntegrals(input, basis):
     E[0] = nucrep(input)
     np.save('enuc.npy',E)
     #END OF nuclear-nuclear repulsion
+    
+    Edict = Eprecalculation(basis)
     
     # Two electron integrals
     start = time.time()
@@ -415,9 +522,15 @@ def runIntegrals(input, basis):
                             calc = 0
                             for i in range(basis[a[0]][4]):
                                 for j in range(basis[a[1]][4]):
+                                    E1 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E1']
+                                    E2 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E2']
+                                    E3 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E3']
                                     for k in range(basis[a[2]][4]):
                                         for l in range(basis[a[3]][4]):
-                                            calc += elelrep(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[2]][5][k][1], basis[a[3]][5][l][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[2]][1], basis[a[2]][2], basis[a[2]][3], basis[a[3]][1], basis[a[3]][2], basis[a[3]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[2]][5][k][3], basis[a[3]][5][l][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4], basis[a[2]][5][k][4], basis[a[3]][5][l][4], basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[2]][5][k][5], basis[a[3]][5][l][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[2]][5][k][0], basis[a[3]][5][l][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2], basis[a[2]][5][k][2], basis[a[3]][5][l][2])
+                                            E4 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E1']
+                                            E5 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E2']
+                                            E6 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E3']
+                                            calc += elelrep2(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[2]][5][k][1], basis[a[3]][5][l][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[2]][1], basis[a[2]][2], basis[a[2]][3], basis[a[3]][1], basis[a[3]][2], basis[a[3]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[2]][5][k][3], basis[a[3]][5][l][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4], basis[a[2]][5][k][4], basis[a[3]][5][l][4], basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[2]][5][k][5], basis[a[3]][5][l][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[2]][5][k][0], basis[a[3]][5][l][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2], basis[a[2]][5][k][2], basis[a[3]][5][l][2], E1,E2,E3,E4,E5,E6)
                             ERI[mu,nu,lam,sig] = calc
                             ERI[nu,mu,lam,sig] = calc
                             ERI[mu,nu,sig,lam] = calc

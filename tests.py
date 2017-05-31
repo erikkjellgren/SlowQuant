@@ -260,5 +260,3 @@ def test_geoopt():
             calcMP2 = float(line[12:])
     
     assert checkMP2 == calcMP2
-
-test_geoopt()
