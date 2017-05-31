@@ -132,6 +132,8 @@ def elelrep(a, b, c, d, Ax, Ay, Az, Bx, By, Bz, Cx, Cy, Cz, Dx, Dy, Dz, l1, l2, 
     for phi in range(n3+n4+1):
         E6[phi] = E(n3,n4,phi,C[2]-D[2],c,d,Q[2]-C[2],Q[2]-D[2],C[2]-D[2])
 
+    Rpre = np.ones((l1+l2+l3+l4+3,m1+m2+m3+m4+3,n1+n2+n3+n4+3,l1+l2+l3+l4+m1+m2+m3+m4+n1+n2+n3+n4))
+    
     val = 0.0
     for t in range(l1+l2+1):
         E1 = E(l1,l2,t,A[0]-B[0],a,b,P[0]-A[0],P[0]-B[0],A[0]-B[0])
@@ -140,8 +142,9 @@ def elelrep(a, b, c, d, Ax, Ay, Az, Bx, By, Bz, Cx, Cy, Cz, Dx, Dy, Dz, l1, l2, 
                 for tau in range(l3+l4+1):
                     for nu in range(m3+m4+1):
                         for phi in range(n3+n4+1):
-                            R1 = R(t+tau,u+nu,v+phi,0,alpha,P[0]-Q[0],P[1]-Q[1],P[2]-Q[2],RPQ) 
+                            R1, Rpre = R2(t+tau,u+nu,v+phi,0,alpha,P[0]-Q[0],P[1]-Q[1],P[2]-Q[2],RPQ, Rpre)
                             val += E1*E2[u]*E3[v]*E4[tau]*E5[nu]*E6[phi]*np.power(-1,tau+nu+phi)*R1
+
 
     val *= 2*np.power(np.pi,2.5)/(p*q*np.sqrt(p+q)) 
     return val*N
@@ -299,6 +302,46 @@ def E(i,j,t,Qx,a,b,XPA,XPB,XAB):
         return (1/(2*p))*E(i,j-1,t-1,Qx,a,b,XPA,XPB,XAB) + XPB*E(i,j-1,t,Qx,a,b,XPA,XPB,XAB) + (t+1)*E(i,j-1,t+1,Qx,a,b,XPA,XPB,XAB)
         
 
+def R2(t,u,v,n,p,PCx,PCy,PCz,RPC, Rpre):
+    # #############################################################
+    #
+    # Used in ERI for speed up at p or higher orbitals
+    # should later be used for all MacMurchie davidson integrals
+    # to replace R()
+    #
+    # #############################################################
+    
+    #McMurchie-Davidson scheme, 9.9.18, 9.9.19 and 9.9.20 Helgaker
+    if Rpre[t,u,v,n] == 1:
+        T = p*RPC*RPC
+        val = 0.0
+        if t == u == v == 0:
+            val += np.power(-2*p,n)*boys(n,T)
+        elif t == u == 0:
+            if v > 1:
+                res,Rpre = R2(t,u,v-2,n+1,p,PCx,PCy,PCz,RPC,Rpre)
+                val+=(v-1)*res
+            res,Rpre = R2(t,u,v-1,n+1,p,PCx,PCy,PCz,RPC,Rpre)  
+            val+=PCz*res
+        elif t == 0:
+            if u > 1:
+                res,Rpre = R2(t,u-2,v,n+1,p,PCx,PCy,PCz,RPC,Rpre) 
+                val+=(u-1)*res  
+            res,Rpre = R2(t,u-1,v,n+1,p,PCx,PCy,PCz,RPC,Rpre)  
+            val+=PCy*res
+        else:
+            if t > 1:
+                res,Rpre = R2(t-2,u,v,n+1,p,PCx,PCy,PCz,RPC,Rpre)  
+                val+=(t-1)*res
+            res,Rpre = R2(t-1,u,v,n+1,p,PCx,PCy,PCz,RPC,Rpre)  
+            val+=PCx*res
+        
+        Rpre[t,u,v,n] = val
+        return Rpre[t,u,v,n] , Rpre
+    else:
+        return Rpre[t,u,v,n] , Rpre
+    
+
 def R(t,u,v,n,p,PCx,PCy,PCz,RPC):
     #McMurchie-Davidson scheme, 9.9.18, 9.9.19 and 9.9.20 Helgaker
     T = p*RPC*RPC
@@ -317,6 +360,7 @@ def R(t,u,v,n,p,PCx,PCy,PCz,RPC):
         if t > 1:
             val += (t-1)*R(t-2,u,v,n+1,p,PCx,PCy,PCz,RPC)  
         val += PCx*R(t-1,u,v,n+1,p,PCx,PCy,PCz,RPC)
+
     return val
 
 def boys(m,T):
