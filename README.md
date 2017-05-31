@@ -3,6 +3,8 @@
 
 # Hartree-Fock
 
+![SlowQuant logo](https://cloud.githubusercontent.com/assets/11976167/26658726/5e125b02-466c-11e7-8790-8412789fc9fb.jpg)
+
 Hartree-Fock program written in python. See input and setting file, as example files given as inputs.
 
 ## Basis sets:
