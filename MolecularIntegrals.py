@@ -132,7 +132,7 @@ def elelrep(a, b, c, d, Ax, Ay, Az, Bx, By, Bz, Cx, Cy, Cz, Dx, Dy, Dz, l1, l2, 
     for phi in range(n3+n4+1):
         E6[phi] = E(n3,n4,phi,C[2]-D[2],c,d,Q[2]-C[2],Q[2]-D[2],C[2]-D[2])
 
-    Rpre = np.ones((l1+l2+l3+l4+3,m1+m2+m3+m4+3,n1+n2+n3+n4+3,l1+l2+l3+l4+m1+m2+m3+m4+n1+n2+n3+n4))
+    Rpre = np.ones((l1+l2+l3+l4+2,m1+m2+m3+m4+2,n1+n2+n3+n4+2,l1+l2+l3+l4+m1+m2+m3+m4+n1+n2+n3+n4+6))
     
     val = 0.0
     for t in range(l1+l2+1):
