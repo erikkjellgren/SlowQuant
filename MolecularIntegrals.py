@@ -239,22 +239,6 @@ def electricfield(a, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, 
     else:
         dz = 1
 
-    """
-    val = 0
-    for k in range(1, len(input)):
-        if k != atomidx:
-            Zc = input[k][0]
-            C = np.array([input[k][1],input[k][2],input[k][3]])
-            RPC = np.linalg.norm(P-C)
-            
-            for t in range(0, l1+l2+1):
-                Ex = E(l1,l2,t,A[0]-B[0],a,b,P[0]-A[0],P[0]-B[0],A[0]-B[0])
-                for u in range(0, m1+m2+1):
-                    Ey = E(m1,m2,u,A[1]-B[1],a,b,P[1]-A[1],P[1]-B[1],A[1]-B[1])
-                    for v in range(0, n1+n2+1):
-                        Ez = E(n1,n2,v,A[2]-B[2],a,b,P[2]-A[2],P[2]-B[2],A[2]-B[2])
-                        val += Ex*Ey*Ez*R(t+dx,u+dy,v+dz,0,p,P[0]-C[0],P[1]-C[1],P[2]-C[2],RPC)*Zc
-    """
     val = 0
     Zc = input[atomidx][0]
     C = np.array([input[atomidx][1],input[atomidx][2],input[atomidx][3]])

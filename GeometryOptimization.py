@@ -86,9 +86,9 @@ def runGO(input, set):
         
         
         for j in range(1, len(dX)):
-            input[j,1] = input[j,1] - 1.0*dX[j]
-            input[j,2] = input[j,2] - 1.0*dY[j]
-            input[j,3] = input[j,3] - 1.0*dZ[j]
+            input[j,1] = input[j,1] - stepsize*dX[j]
+            input[j,2] = input[j,2] - stepsize*dY[j]
+            input[j,3] = input[j,3] - stepsize*dZ[j]
         
         output = open('out.txt', 'a')
         for j in range(1, len(input)):

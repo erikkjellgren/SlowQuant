@@ -7,7 +7,7 @@ import Properties as PROP
 import Qfit as QFIT
 import Utilityfunc as UF
 import numpy as np
-
+import HFrun as HFrun
 
 def test_N():
     check = 5.701643762839922
@@ -207,3 +207,58 @@ def test_derivative():
     assert np.max(np.abs(S)) < 10**-12
     assert np.max(np.abs(VNe)) < 10**-12
 
+## REGRESSION TESTS
+def test_prop():
+    HFrun.run('testfiles/inputH2O.csv','testfiles/settingsPROP.csv')
+    check = open('testfiles/outPROP.txt','r')
+    calc = open('out.txt')
+    for line in check:
+        if line[0:3] == 'MP2':
+            checkMP2 = float(line[12:])
+        if line[0:5] == 'Total':
+            checkMolDip = float(line[7:])
+        if line[0:5] == 'Atom1':
+            checkMulChr = float(line[7:])
+    
+    for line in calc:
+        if line[0:3] == 'MP2':
+            calcMP2 = float(line[12:])
+        if line[0:5] == 'Total':
+            calcMolDip = float(line[7:])
+        if line[0:5] == 'Atom1':
+            calcMulChr = float(line[7:])
+    
+    assert checkMP2 == calcMP2
+    assert checkMolDip == calcMolDip
+    assert checkMulChr == calcMulChr
+
+def test_qfit():
+    HFrun.run('testfiles/input2_H2O.csv','testfiles/settingsQFIT.csv')
+    check = open('testfiles/outQFIT.txt','r')
+    calc = open('out.txt')
+    for line in check:
+        if line[0:4] == 'RMSD':
+            checkRMSD = float(line[6:])
+    
+    for line in calc:
+        if line[0:4] == 'RMSD':
+            calcRMSD = float(line[6:])
+    
+    assert checkRMSD == calcRMSD
+        
+    
+def test_geoopt():
+    HFrun.run('testfiles/inputH2.csv','testfiles/settingsGEO.csv')
+    check = open('testfiles/outGEO.txt','r')
+    calc = open('out.txt')
+    for line in check:
+        if line[0:3] == 'MP2':
+            checkMP2 = float(line[12:])
+
+    for line in calc:
+        if line[0:3] == 'MP2':
+            calcMP2 = float(line[12:])
+    
+    assert checkMP2 == calcMP2
+
+test_geoopt()
