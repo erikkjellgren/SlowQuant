@@ -12,7 +12,7 @@ def symm_orth(eigVal, eigVec):
     M = np.dot(np.dot(eigVec,scipy.linalg.sqrtm(np.linalg.inv(np.diag(eigVal)))),np.matrix.transpose(eigVec))
     return M
 
-def HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee):
+def HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results, print_SCF='Yes'):
     # ###############################
     #
     # VNN = nuclear repulsion
@@ -53,28 +53,30 @@ def HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee):
             E0el += D0[i,j]*(Hcore[i,j]+Hcore[i,j])
     
     #SCF iterations
-    output = open('out.txt', 'a')
-    output.write('Iter')
-    output.write("\t")
-    output.write('Eel')
-    output.write("\t \t \t \t \t")
-    output.write('Etot')
-    output.write("\t \t \t \t")
-    output.write('dE')
-    output.write("\t \t \t \t \t")
-    output.write('rmsD')
-    if set['DIIS'] == 'Yes':
+    if print_SCF == 'Yes':
+        output = open('out.txt', 'a')
+        output.write('Iter')
+        output.write("\t")
+        output.write('Eel')
         output.write("\t \t \t \t \t")
-        output.write('DIIS')
-    output.write("\n")
-    output.write('0')
-    output.write("\t \t")
-    output.write("{:14.10f}".format(E0el))
-    output.write("\t \t")
-    output.write("{:14.10f}".format(E0el+VNN[0]))
+        output.write('Etot')
+        output.write("\t \t \t \t")
+        output.write('dE')
+        output.write("\t \t \t \t \t")
+        output.write('rmsD')
+        if set['DIIS'] == 'Yes':
+            output.write("\t \t \t \t \t")
+            output.write('DIIS')
+        output.write("\n")
+        output.write('0')
+        output.write("\t \t")
+        output.write("{:14.10f}".format(E0el))
+        output.write("\t \t")
+        output.write("{:14.10f}".format(E0el+VNN[0]))
     
     for iter in range(1, Maxiter):
-        output.write("\n")
+        if print_SCF == 'Yes':
+            output.write("\n")
         #New Fock Matrix
         Part = np.zeros((len(basis),len(basis)))
         for mu in range(0, len(basis)):
@@ -117,28 +119,32 @@ def HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee):
                 rmsD += (D[i,j] - D0[i,j])**2
         rmsD = math.sqrt(rmsD)
         
-        output.write(str(iter))
-        output.write("\t \t")
-        output.write("{:14.10f}".format(Eel))
-        output.write("\t \t")
-        output.write("{:14.10f}".format(Eel+VNN[0]))
-        output.write("\t \t")
-        output.write("{: 12.8e}".format(dE))
-        output.write("\t \t")
-        output.write("{: 12.8e}".format(rmsD))
-        if set['DIIS'] == 'Yes':
-            if errorDIIS != 'None':
-                output.write("\t \t")
-                output.write("{: 12.8e}".format(errorDIIS))
+        if print_SCF == 'Yes':
+            output.write(str(iter))
+            output.write("\t \t")
+            output.write("{:14.10f}".format(Eel))
+            output.write("\t \t")
+            output.write("{:14.10f}".format(Eel+VNN[0]))
+            output.write("\t \t")
+            output.write("{: 12.8e}".format(dE))
+            output.write("\t \t")
+            output.write("{: 12.8e}".format(rmsD))
+            if set['DIIS'] == 'Yes':
+                if errorDIIS != 'None':
+                    output.write("\t \t")
+                    output.write("{: 12.8e}".format(errorDIIS))
     
         D0 = D
         E0el = Eel
         if dE < 10**(-deTHR) and rmsD < 10**(-rmsTHR):
             break
-    output.write('\n \n')
-    output.close()
+            
+    if print_SCF == 'Yes':
+        output.write('\n \n')
+        output.close()
+    results['HFenergy'] = Eel+VNN[0]
     
-    return C, F, D
+    return C, F, D, results
 
     
 

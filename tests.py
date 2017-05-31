@@ -108,7 +108,8 @@ def test_HartreeFock1():
     Vee      = np.load('testfiles/twointH2O_STO3G.npy')
     Dcheck   = np.genfromtxt('testfiles/dH2O_STO3G.csv',delimiter=';')
     basis    = BS.bassiset(input, set)
-    CMO, FAO, D = HF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee)
+    results  = {}
+    CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results)
     for i in range(0, len(D)):
         for j in range(0, len(D)):
             assert abs(Dcheck[i,j] - D[i,j]) < 10**-7
@@ -128,7 +129,8 @@ def test_HartreeFock2():
     Vee      = np.load('testfiles/twointCH4_STO3G.npy')
     Dcheck   = np.genfromtxt('testfiles/dCH4_STO3G.csv',delimiter=';')
     basis    = BS.bassiset(input, set)
-    CMO, FAO, D = HF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee)
+    results  = {}
+    CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results=results)
     for i in range(0, len(D)):
         for j in range(0, len(D)):
             assert abs(Dcheck[i,j] - D[i,j]) < 10**-7
@@ -148,7 +150,8 @@ def test_HartreeFock3():
     Vee      = np.load('testfiles/twointH2O_DZ.npy')
     Dcheck   = np.genfromtxt('testfiles/dH2O_DZ.csv',delimiter=';')
     basis    = BS.bassiset(input, set)
-    CMO, FAO, D = HF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee)
+    results  = {}
+    CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results=results)
     for i in range(0, len(D)):
         for j in range(0, len(D)):
             assert abs(Dcheck[i,j] - D[i,j]) < 10**-7

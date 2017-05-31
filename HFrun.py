@@ -34,14 +34,14 @@ def run(inputname, settingsname):
     output.close()
     
     if set['GeoOpt'] == 'Yes':
-        input = GO.runGO(input, set)
+        input, results = GO.runGO(input, set, results)
     
     basis = BS.bassiset(input, set)
     start = time.time()
     MI.runIntegrals(input, basis)
     print(time.time()-start, 'INTEGRALS')
     start = time.time()
-    CMO, FAO, D = HF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'))
+    CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results)
     print(time.time()-start, 'HF')
     start = time.time()
     utilF.TransformMO(CMO, basis, set, Vee=np.load('twoint.npy'))
@@ -57,4 +57,4 @@ def run(inputname, settingsname):
     print(time.time()-start, 'QFIT')
 
 if __name__ == "__main__":
-    run('inputH2.csv', 'settings.csv')
+    run('inputH2O.csv', 'settings.csv')
