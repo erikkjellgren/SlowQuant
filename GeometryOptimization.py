@@ -187,7 +187,7 @@ def run_numeric(input, set, results):
     return input
     
         
-def runGO(input, set, results, settings):
+def runGO(input, set, results):
     if set['Force Numeric'] == 'Yes':
         input = run_numeric(input, set, results, settings)
     else:
