@@ -9,7 +9,7 @@ def run_analytic(input, set, results):
     stepsize = float(set['Gradient Decent Step'])
     for i in range(1, maxstep):
         basis = BS.bassiset(input, set)
-        MI.runIntegrals(input, basis, settings)
+        MI.runIntegrals(input, basis, set)
         MI.rungeometric_derivatives(input, basis)
         CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results)
         CTMO = np.transpose(CMO)
@@ -117,39 +117,39 @@ def run_numeric(input, set, results):
         for j in range(1, len(input)):
             input[j,1] += 10**-6
             basis = BS.bassiset(input, set)
-            MI.runIntegrals(input, basis, settings)
+            MI.runIntegrals(input, basis, set)
             input[j,1] -= 10**-6
             CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results, print_SCF='No')
             xplus = results['HFenergy']
             input[j,1] -= 10**-6
             basis = BS.bassiset(input, set)
-            MI.runIntegrals(input, basis, settings)
+            MI.runIntegrals(input, basis, set)
             input[j,1] += 10**-6
             CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results, print_SCF='No')
             xminus = results['HFenergy']
             
             input[j,2] += 10**-6
             basis = BS.bassiset(input, set)
-            MI.runIntegrals(input, basis, settings)
+            MI.runIntegrals(input, basis, set)
             input[j,2] -= 10**-6
             CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results, print_SCF='No')
             yplus = results['HFenergy']
             input[j,2] -= 10**-6
             basis = BS.bassiset(input, set)
-            MI.runIntegrals(input, basis, settings)
+            MI.runIntegrals(input, basis, set)
             input[j,2] += 10**-6
             CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results, print_SCF='No')
             yminus = results['HFenergy']
             
             input[j,3] += 10**-6
             basis = BS.bassiset(input, set)
-            MI.runIntegrals(input, basis, settings)
+            MI.runIntegrals(input, basis, set)
             input[j,3] -= 10**-6
             CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results, print_SCF='No')
             zplus = results['HFenergy']
             input[j,3] -= 10**-6
             basis = BS.bassiset(input, set)
-            MI.runIntegrals(input, basis, settings)
+            MI.runIntegrals(input, basis, set)
             input[j,3] += 10**-6
             CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results, print_SCF='No')
             zminus = results['HFenergy']
