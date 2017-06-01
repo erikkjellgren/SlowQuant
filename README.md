@@ -93,7 +93,7 @@ Constraint charge;Yes - Constrain charges
 
 Qtot;0 - Total charge of molecule
 
-Constraint dipole;Yes - Constain dipole moments
+Constraint dipole;Yes - Constrain dipole moments
 
 Write ESP;Yes - Write ESP to a PBD file
 
