@@ -3,7 +3,7 @@ import MolecularIntegrals as MI
 import HartreeFock as HF
 import BasisSet as BS
 
-def run_analytic(input, set, results, settings):
+def run_analytic(input, set, results):
     maxstep = int(set['Max iteration GeoOpt'])
     GeoOptol = float(set['Geometry Tolerance'])
     stepsize = float(set['Gradient Decent Step'])
@@ -189,8 +189,8 @@ def run_numeric(input, set, results):
         
 def runGO(input, set, results):
     if set['Force Numeric'] == 'Yes':
-        input = run_numeric(input, set, results, settings)
+        input = run_numeric(input, set, results)
     else:
-        input = run_analytic(input, set, results, settings)
+        input = run_analytic(input, set, results)
     
     return input, results
