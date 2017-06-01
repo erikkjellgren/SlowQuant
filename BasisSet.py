@@ -152,9 +152,11 @@ def bassiset(input, set):
                 
             if basisload[j,1] == 'H' and input[i,0] == 1:
                 writecheck = 1
-            elif basisload[j,1] == 'Be' and input[i,0] == 2:
+            elif basisload[j,1] == 'He' and input[i,0] == 2:
                 writecheck = 1
             elif basisload[j,1] == 'Li' and input[i,0] == 3:
+                writecheck = 1
+            elif basisload[j,1] == 'Be' and input[i,0] == 4:
                 writecheck = 1
             elif basisload[j,1] == 'B' and input[i,0] == 5:
                 writecheck = 1
