@@ -13,7 +13,7 @@ def N(a, l, m, n):
 def bassiset(input, set):
     basisname = set['basisset']
     basisload = np.genfromtxt('basissets/'+str(basisname)+'.csv', dtype=str, delimiter=';')
-
+    
     basis_out = []
     idx = 1
     for i in range(1, len(input)):

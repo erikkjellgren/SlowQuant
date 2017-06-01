@@ -17,17 +17,19 @@ def run(inputname, settingsname):
     
     input = np.genfromtxt(str(inputname), delimiter=';')
     results = {}
+    
+    output = open('out.txt', 'w')
+    output.write('User specified settings: \n')
     settings = np.genfromtxt(str(settingsname), delimiter = ';', dtype='str')
     for i in range(len(settings)):
         set[settings[i][0]] = settings[i][1]
-    
-    output = open('out.txt', 'w')
-    for key in set:
-        output.write(str(key)+'    '+str(set[key])+'\n')
+        output.write('    '+str(settings[i][0])+'    '+str(settings[i][1])+'\n')
     output.write('\n \n')
+
+    output.write('Inputfile: \n')
     for i in range(0, len(input)):
         for j in range(0, 4):
-            output.write("{: 12.8e}".format(input[i,j]))
+            output.write("   {: 12.8e}".format(input[i,j]))
             output.write("\t \t")
         output.write('\n')
     output.write('\n \n')
@@ -38,7 +40,7 @@ def run(inputname, settingsname):
     
     basis = BS.bassiset(input, set)
     start = time.time()
-    MI.runIntegrals(input, basis)
+    MI.runIntegrals(input, basis, set)
     print(time.time()-start, 'INTEGRALS')
     start = time.time()
     CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results)

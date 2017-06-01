@@ -61,6 +61,10 @@ Scipy
         
 basisset;STO3G - See basissets below
 
+        ; INTEGRAL SETTINGS
+		
+Cauchy-Schwarz Threshold;10 - Threshold for not calculating an ERI, given as 10^-x
+
         ; SCF SETTINGS
         
 SCF Energy Threshold;12 - Threshold for convergence of the SCF, given as 10^-x
@@ -112,7 +116,7 @@ Force Numeric;No - Choose to evaluate Forces numerically, Yes, is the key to run
 
 ### Basis sets:
 
-STO2G, STO3G, DZ, DZP, 3-21G - For up to the first 20 elements.
+STO2G, STO3G, DZ, DZP, 3-21G, 6-31ppGss (6-31++G**) - For up to the first 20 elements.
 
 ### Properties:
 

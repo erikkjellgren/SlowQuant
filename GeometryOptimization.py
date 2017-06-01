@@ -3,13 +3,13 @@ import MolecularIntegrals as MI
 import HartreeFock as HF
 import BasisSet as BS
 
-def run_analytic(input, set, results):
+def run_analytic(input, set, results, settings):
     maxstep = int(set['Max iteration GeoOpt'])
     GeoOptol = float(set['Geometry Tolerance'])
     stepsize = float(set['Gradient Decent Step'])
     for i in range(1, maxstep):
         basis = BS.bassiset(input, set)
-        MI.runIntegrals(input, basis)
+        MI.runIntegrals(input, basis, settings)
         MI.rungeometric_derivatives(input, basis)
         CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results)
         CTMO = np.transpose(CMO)
@@ -117,39 +117,39 @@ def run_numeric(input, set, results):
         for j in range(1, len(input)):
             input[j,1] += 10**-6
             basis = BS.bassiset(input, set)
-            MI.runIntegrals(input, basis)
+            MI.runIntegrals(input, basis, settings)
             input[j,1] -= 10**-6
             CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results, print_SCF='No')
             xplus = results['HFenergy']
             input[j,1] -= 10**-6
             basis = BS.bassiset(input, set)
-            MI.runIntegrals(input, basis)
+            MI.runIntegrals(input, basis, settings)
             input[j,1] += 10**-6
             CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results, print_SCF='No')
             xminus = results['HFenergy']
             
             input[j,2] += 10**-6
             basis = BS.bassiset(input, set)
-            MI.runIntegrals(input, basis)
+            MI.runIntegrals(input, basis, settings)
             input[j,2] -= 10**-6
             CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results, print_SCF='No')
             yplus = results['HFenergy']
             input[j,2] -= 10**-6
             basis = BS.bassiset(input, set)
-            MI.runIntegrals(input, basis)
+            MI.runIntegrals(input, basis, settings)
             input[j,2] += 10**-6
             CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results, print_SCF='No')
             yminus = results['HFenergy']
             
             input[j,3] += 10**-6
             basis = BS.bassiset(input, set)
-            MI.runIntegrals(input, basis)
+            MI.runIntegrals(input, basis, settings)
             input[j,3] -= 10**-6
             CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results, print_SCF='No')
             zplus = results['HFenergy']
             input[j,3] -= 10**-6
             basis = BS.bassiset(input, set)
-            MI.runIntegrals(input, basis)
+            MI.runIntegrals(input, basis, settings)
             input[j,3] += 10**-6
             CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results, print_SCF='No')
             zminus = results['HFenergy']
@@ -164,6 +164,15 @@ def run_numeric(input, set, results):
             input[j,3] = input[j,3] - stepsize*dZ[j]
         
         output = open('out.txt', 'a')
+        for j in range(1, len(dX)):
+                output.write("{: 12.8e}".format(dX[j]))
+                output.write("\t \t")
+                output.write("{: 12.8e}".format(dY[j]))
+                output.write("\t \t")
+                output.write("{: 12.8e}".format(dZ[j]))
+                output.write('\n')
+        output.write('\n \n')
+                
         for j in range(1, len(input)):
             for k in range(0, 4):
                 output.write("{: 12.8e}".format(input[j,k]))
@@ -178,10 +187,10 @@ def run_numeric(input, set, results):
     return input
     
         
-def runGO(input, set, results):
+def runGO(input, set, results, settings):
     if set['Force Numeric'] == 'Yes':
-        input = run_numeric(input, set, results)
+        input = run_numeric(input, set, results, settings)
     else:
-        input = run_analytic(input, set, results)
+        input = run_analytic(input, set, results, settings)
     
     return input, results

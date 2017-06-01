@@ -310,19 +310,6 @@ def elelrep2(a, b, c, d, Ax, Ay, Az, Bx, By, Bz, Cx, Cy, Cz, Dx, Dy, Dz, l1, l2,
 
     Rpre = np.ones((l1+l2+l3+l4+2,m1+m2+m3+m4+2,n1+n2+n3+n4+2,l1+l2+l3+l4+m1+m2+m3+m4+n1+n2+n3+n4+6))
     
-
-    E2a = np.zeros(m1+m2+1)
-    
-    for u in range(m1+m2+1):
-        E2a[u] = E(m1,m2,u,A[1]-B[1],a,b,P[1]-A[1],P[1]-B[1],A[1]-B[1])
-    
-    for i in range(len(E2a)):
-        if E2a[i] != E2[i]:
-            print('OK')
-            print(E2a)
-            print(E2)
-            break
-    
     val = 0.0
     for t in range(l1+l2+1):
         for u in range(m1+m2+1):
@@ -493,7 +480,7 @@ def Eprecalculation(basis, diffx1=0, diffx2=0, diffy1=0, diffy2=0, diffz1=0, dif
 
 
 ##CALC OF INTEGRALS
-def runIntegrals(input, basis):
+def runIntegrals(input, basis, settings):
     # Nuclear-nuclear repulsion
     E = np.zeros(1)
     E[0] = nucrep(input)
@@ -503,8 +490,45 @@ def runIntegrals(input, basis):
     Edict = Eprecalculation(basis)
     
     # Two electron integrals
+    ScreenTHR = 10**-float(settings['Cauchy-Schwarz Threshold'])
     start = time.time()
+    # First run the diagonal elements, this is used in the screening
     ERI = np.zeros((len(basis),len(basis),len(basis),len(basis)))
+    Gab = np.zeros((len(basis),len(basis)))
+    for mu in range(0, len(basis)):
+        for nu in range(0, len(basis)):
+            if mu >= nu:
+                lam = mu
+                sig = nu
+                a = np.zeros(4)
+                a[0] = mu
+                a[1] = nu
+                a[2] = lam
+                a[3] = sig
+                a = a.astype(int)
+                calc = 0
+                for i in range(basis[a[0]][4]):
+                    for j in range(basis[a[1]][4]):
+                        E1 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E1']
+                        E2 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E2']
+                        E3 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E3']
+                        for k in range(basis[a[2]][4]):
+                            for l in range(basis[a[3]][4]):
+                                E4 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E1']
+                                E5 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E2']
+                                E6 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E3']
+                                calc += elelrep2(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[2]][5][k][1], basis[a[3]][5][l][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[2]][1], basis[a[2]][2], basis[a[2]][3], basis[a[3]][1], basis[a[3]][2], basis[a[3]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[2]][5][k][3], basis[a[3]][5][l][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4], basis[a[2]][5][k][4], basis[a[3]][5][l][4], basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[2]][5][k][5], basis[a[3]][5][l][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[2]][5][k][0], basis[a[3]][5][l][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2], basis[a[2]][5][k][2], basis[a[3]][5][l][2], E1,E2,E3,E4,E5,E6)
+                ERI[mu,nu,lam,sig] = calc
+                ERI[nu,mu,lam,sig] = calc
+                ERI[mu,nu,sig,lam] = calc
+                ERI[nu,mu,sig,lam] = calc
+                ERI[lam,sig,mu,nu] = calc
+                ERI[sig,lam,mu,nu] = calc
+                ERI[lam,sig,nu,mu] = calc
+                ERI[sig,lam,nu,mu] = calc
+                Gab[mu,nu] = (calc)**0.5
+                
+    # Run all the off diagonal elements
     for mu in range(0, len(basis)):
         for nu in range(0, len(basis)):
             if mu >= nu:
@@ -512,33 +536,36 @@ def runIntegrals(input, basis):
                     for sig in range(0, len(basis)):
                         munu = mu*(mu+1)/2+nu
                         lamsig = lam*(lam+1)/2+sig
-                        if lam >= sig and munu >= lamsig:
-                            a = np.zeros(4)
-                            a[0] = mu
-                            a[1] = nu
-                            a[2] = lam
-                            a[3] = sig
-                            a = a.astype(int)
-                            calc = 0
-                            for i in range(basis[a[0]][4]):
-                                for j in range(basis[a[1]][4]):
-                                    E1 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E1']
-                                    E2 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E2']
-                                    E3 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E3']
-                                    for k in range(basis[a[2]][4]):
-                                        for l in range(basis[a[3]][4]):
-                                            E4 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E1']
-                                            E5 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E2']
-                                            E6 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E3']
-                                            calc += elelrep2(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[2]][5][k][1], basis[a[3]][5][l][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[2]][1], basis[a[2]][2], basis[a[2]][3], basis[a[3]][1], basis[a[3]][2], basis[a[3]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[2]][5][k][3], basis[a[3]][5][l][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4], basis[a[2]][5][k][4], basis[a[3]][5][l][4], basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[2]][5][k][5], basis[a[3]][5][l][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[2]][5][k][0], basis[a[3]][5][l][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2], basis[a[2]][5][k][2], basis[a[3]][5][l][2], E1,E2,E3,E4,E5,E6)
-                            ERI[mu,nu,lam,sig] = calc
-                            ERI[nu,mu,lam,sig] = calc
-                            ERI[mu,nu,sig,lam] = calc
-                            ERI[nu,mu,sig,lam] = calc
-                            ERI[lam,sig,mu,nu] = calc
-                            ERI[sig,lam,mu,nu] = calc
-                            ERI[lam,sig,nu,mu] = calc
-                            ERI[sig,lam,nu,mu] = calc
+                        if lam >= sig and munu > lamsig:
+                            # Cauchy-Schwarz inequality
+                            if Gab[mu,nu]*Gab[lam,sig] > ScreenTHR:
+                                a = np.zeros(4)
+                                a[0] = mu
+                                a[1] = nu
+                                a[2] = lam
+                                a[3] = sig
+                                a = a.astype(int)
+                                calc = 0
+                                for i in range(basis[a[0]][4]):
+                                    for j in range(basis[a[1]][4]):
+                                        E1 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E1']
+                                        E2 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E2']
+                                        E3 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E3']
+                                        for k in range(basis[a[2]][4]):
+                                            for l in range(basis[a[3]][4]):
+                                                E4 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E1']
+                                                E5 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E2']
+                                                E6 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E3']
+                                                calc += elelrep2(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[2]][5][k][1], basis[a[3]][5][l][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[2]][1], basis[a[2]][2], basis[a[2]][3], basis[a[3]][1], basis[a[3]][2], basis[a[3]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[2]][5][k][3], basis[a[3]][5][l][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4], basis[a[2]][5][k][4], basis[a[3]][5][l][4], basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[2]][5][k][5], basis[a[3]][5][l][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[2]][5][k][0], basis[a[3]][5][l][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2], basis[a[2]][5][k][2], basis[a[3]][5][l][2], E1,E2,E3,E4,E5,E6)
+                                ERI[mu,nu,lam,sig] = calc
+                                ERI[nu,mu,lam,sig] = calc
+                                ERI[mu,nu,sig,lam] = calc
+                                ERI[nu,mu,sig,lam] = calc
+                                ERI[lam,sig,mu,nu] = calc
+                                ERI[sig,lam,mu,nu] = calc
+                                ERI[lam,sig,nu,mu] = calc
+                                ERI[sig,lam,nu,mu] = calc
+
     np.save('twoint.npy',ERI)
     print(time.time()-start, 'ERI')
     #END OF two electron integrals

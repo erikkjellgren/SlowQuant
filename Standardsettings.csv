@@ -1,5 +1,7 @@
         ; INPUT SETTINGS
 basisset;STO3G
+        ; INTEGRAL SETTINGS
+Cauchy-Schwarz Threshold;10
         ; SCF SETTINGS
 SCF Energy Threshold;12
 SCF RMSD Threshold;12
