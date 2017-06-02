@@ -1,5 +1,5 @@
-[![Build Status](https://travis-ci.org/Melisius/Hartree-Fock.svg?branch=master)](https://travis-ci.org/Melisius/Hartree-Fock)
-[![Coverage Status](https://coveralls.io/repos/github/Melisius/Hartree-Fock/badge.svg?branch=master)](https://coveralls.io/github/Melisius/Hartree-Fock?branch=master)
+[![Build Status](https://travis-ci.org/Melisius/SlowQuant.svg?branch=master)](https://travis-ci.org/Melisius/SlowQuant)
+[![Coverage Status](https://coveralls.io/repos/github/Melisius/SlowQuant/badge.svg?branch=master)](https://coveralls.io/github/Melisius/SlowQuant?branch=master)
 
 # SlowQuant
 
