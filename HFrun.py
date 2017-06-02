@@ -41,7 +41,7 @@ def run(inputname, settingsname):
         start = time.time()
         MI.runIntegrals(input, basis, set)
         print(time.time()-start, 'INTEGRALS')
-        a, b, c, d = UHF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results)
+        C_alpha, F_alpha, D_alpha, C_beta, F_beta, D_beta, results = UHF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results)
 
     elif set['GeoOpt'] == 'Yes':
         input, results = GO.runGO(input, set, results)
