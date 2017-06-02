@@ -245,3 +245,17 @@ def test_geoopt():
             calcMP2 = float(line[12:])
     
     assert checkMP2 == calcMP2
+
+def test_UHF():
+    HFrun.run('testfiles/inputH2_UHF.csv','testfiles/settingsUHF.csv')
+    check = open('testfiles/outUHF.txt','r')
+    calc = open('out.txt')
+    for line in check:
+        if line[0:2] == '27':
+            checkUHF = float(line[23:30])
+
+    for line in calc:
+        if line[0:2] == '27':
+            calcUHF = float(line[23:30])
+    
+    assert checkUHF == calcUHF

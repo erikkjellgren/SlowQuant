@@ -1,10 +1,12 @@
 import numpy as np
 import math
 import MolecularIntegrals as MI
+import scipy.linalg
 
 def MulCharge(basis, input, D):
     #Loading overlap integrals
     S = np.load('overlap.npy')
+    D = 2*D
     
     DS = np.dot(D,S)
     output = open('out.txt', 'a')
@@ -16,7 +18,31 @@ def MulCharge(basis, input, D):
             if basis[j][6] == i:
                 mu = basis[j][0]-1
                 q += DS[mu,mu]
-        q = input[i,0] - 2*q
+        q = input[i,0] - q
+        output.write('Atom'+str(i)+'\t')
+        output.write("{: 10.8f}".format(q))
+        output.write('\n')
+    output.close()
+
+def LowdinCharge(basis, input, D):
+    #Loading overlap integrals
+    S = np.load('overlap.npy')
+    D = 2*D
+    
+    output = open('out.txt', 'a')
+    output.write('\n \n')
+    output.write('Lowdin Charges \n')
+    
+    S_sqrt = scipy.linalg.sqrtm(S)
+    SDS = np.dot(np.dot(S_sqrt,D),S_sqrt)
+    
+    for i in range(1, len(input)):
+        q = 0
+        for j in range(len(basis)):
+            if basis[j][6] == i:
+                mu = basis[j][0]-1
+                q += SDS[mu,mu]
+        q = input[i,0] - q
         output.write('Atom'+str(i)+'\t')
         output.write("{: 10.8f}".format(q))
         output.write('\n')
@@ -98,6 +124,8 @@ def dipolemoment(basis, input, D, results):
 def runprop(basis, input, D, set, results):
     if set['Charge'] == 'Mulliken':
         MulCharge(basis, input, D)
+    elif set['Charge'] == 'Lowdin':
+        LowdinCharge(basis, input, D)
     if set['Dipole'] == 'Yes':
         MI.run_dipole_int(basis, input)
         results = dipolemoment(basis, input, D, results)

@@ -22,7 +22,7 @@ def bassiset(input, set):
         typecheck = 0
         for j in range(len(basisload)):
             if writecheck == 1:
-                if basisload[j,0] == 'S' or basisload[j,0] == 'P' or basisload[j,0] == 'D':
+                if basisload[j,0] == 'S' or basisload[j,0] == 'P' or basisload[j,0] == 'D' or basisload[j,0] == 'F':
                     if firstcheck != 0:
                         if typecheck == 'S':
                             basis_func = np.array(basis_func, dtype=float)
@@ -81,6 +81,76 @@ def bassiset(input, set):
                             basis_func[:,4] = 0
                             basis_func[:,5] = 0
                             idx += 1
+                        elif typecheck == 'F':
+                            basis_func = np.array(basis_func, dtype=float)
+                            basis_func[:,3] = 3 
+                            basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
+                            basis_func[:,3] = 0
+                            idx += 1
+                            
+                            basis_func = np.array(basis_func, dtype=float)
+                            basis_func[:,4] = 3 
+                            basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
+                            basis_func[:,3] = 0
+                            idx += 1
+                            
+                            basis_func = np.array(basis_func, dtype=float)
+                            basis_func[:,5] = 3 
+                            basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
+                            basis_func[:,3] = 0
+                            idx += 1
+                            
+                            basis_func[:,3] = 2
+                            basis_func[:,4] = 1
+                            basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
+                            basis_func[:,3] = 0
+                            basis_func[:,4] = 0
+                            idx += 1
+                            
+                            basis_func[:,4] = 2
+                            basis_func[:,5] = 1
+                            basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
+                            basis_func[:,4] = 0
+                            basis_func[:,5] = 0
+                            idx += 1
+                            
+                            basis_func[:,3] = 2
+                            basis_func[:,5] = 1
+                            basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
+                            basis_func[:,3] = 0
+                            basis_func[:,5] = 0
+                            idx += 1
+                            
+                            basis_func[:,3] = 1
+                            basis_func[:,4] = 2
+                            basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
+                            basis_func[:,3] = 0
+                            basis_func[:,4] = 0
+                            idx += 1
+                            
+                            basis_func[:,4] = 1
+                            basis_func[:,5] = 2
+                            basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
+                            basis_func[:,4] = 0
+                            basis_func[:,5] = 0
+                            idx += 1
+                            
+                            basis_func[:,3] = 1
+                            basis_func[:,5] = 2
+                            basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
+                            basis_func[:,3] = 0
+                            basis_func[:,5] = 0
+                            idx += 1
+                            
+                            basis_func[:,3] = 1
+                            basis_func[:,4] = 1
+                            basis_func[:,5] = 1
+                            basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
+                            basis_func[:,3] = 0
+                            basis_func[:,4] = 0
+                            basis_func[:,5] = 0
+                            idx += 1
+                            
                     basis_func = []
                     typecheck = basisload[j,0]
                     firstcheck = 1
@@ -145,6 +215,75 @@ def bassiset(input, set):
                     basis_func[:,4] = 1
                     basis_func[:,5] = 1
                     basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
+                    basis_func[:,4] = 0
+                    basis_func[:,5] = 0
+                    idx += 1
+                elif typecheck == 'F':
+                    basis_func = np.array(basis_func, dtype=float)
+                    basis_func[:,3] = 3 
+                    basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
+                    basis_func[:,3] = 0
+                    idx += 1
+                    
+                    basis_func = np.array(basis_func, dtype=float)
+                    basis_func[:,4] = 3 
+                    basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
+                    basis_func[:,3] = 0
+                    idx += 1
+                    
+                    basis_func = np.array(basis_func, dtype=float)
+                    basis_func[:,5] = 3 
+                    basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
+                    basis_func[:,3] = 0
+                    idx += 1
+                    
+                    basis_func[:,3] = 2
+                    basis_func[:,4] = 1
+                    basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
+                    basis_func[:,3] = 0
+                    basis_func[:,4] = 0
+                    idx += 1
+                    
+                    basis_func[:,4] = 2
+                    basis_func[:,5] = 1
+                    basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
+                    basis_func[:,4] = 0
+                    basis_func[:,5] = 0
+                    idx += 1
+                    
+                    basis_func[:,3] = 2
+                    basis_func[:,5] = 1
+                    basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
+                    basis_func[:,3] = 0
+                    basis_func[:,5] = 0
+                    idx += 1
+                    
+                    basis_func[:,3] = 1
+                    basis_func[:,4] = 2
+                    basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
+                    basis_func[:,3] = 0
+                    basis_func[:,4] = 0
+                    idx += 1
+                    
+                    basis_func[:,4] = 1
+                    basis_func[:,5] = 2
+                    basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
+                    basis_func[:,4] = 0
+                    basis_func[:,5] = 0
+                    idx += 1
+                    
+                    basis_func[:,3] = 1
+                    basis_func[:,5] = 2
+                    basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
+                    basis_func[:,3] = 0
+                    basis_func[:,5] = 0
+                    idx += 1
+                    
+                    basis_func[:,3] = 1
+                    basis_func[:,4] = 1
+                    basis_func[:,5] = 1
+                    basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
+                    basis_func[:,3] = 0
                     basis_func[:,4] = 0
                     basis_func[:,5] = 0
                     idx += 1

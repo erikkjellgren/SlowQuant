@@ -8,6 +8,7 @@ import MPn as MP
 import Qfit as QF
 import Utilityfunc as utilF 
 import GeometryOptimization as GO
+import UHF
 
 def run(inputname, settingsname):
     settings = np.genfromtxt('Standardsettings.csv', delimiter = ';', dtype='str')
@@ -35,28 +36,37 @@ def run(inputname, settingsname):
     output.write('\n \n')
     output.close()
     
-    if set['GeoOpt'] == 'Yes':
+    if set['Initial method'] == 'UHF':
+        basis = BS.bassiset(input, set)
+        start = time.time()
+        MI.runIntegrals(input, basis, set)
+        print(time.time()-start, 'INTEGRALS')
+        a, b, c, d = UHF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results)
+
+    elif set['GeoOpt'] == 'Yes':
         input, results = GO.runGO(input, set, results)
     
-    basis = BS.bassiset(input, set)
-    start = time.time()
-    MI.runIntegrals(input, basis, set)
-    print(time.time()-start, 'INTEGRALS')
-    start = time.time()
-    CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results)
-    print(time.time()-start, 'HF')
-    start = time.time()
-    utilF.TransformMO(CMO, basis, set, Vee=np.load('twoint.npy'))
-    print(time.time()-start, 'MO transform')
-    start = time.time()
-    results = prop.runprop(basis, input, D, set, results)
-    print(time.time()-start, 'PROPERTIES')
-    start = time.time()
-    MP.runMPn(basis, input, FAO, CMO, set)
-    print(time.time()-start, 'MP2')
-    start = time.time()
-    QF.runQfit(basis, input, D, set, results)
-    print(time.time()-start, 'QFIT')
+    if set['Initial method'] == 'HF':
+        basis = BS.bassiset(input, set)
+        start = time.time()
+        MI.runIntegrals(input, basis, set)
+        print(time.time()-start, 'INTEGRALS')
+        start = time.time()
+        CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results)
+        print(time.time()-start, 'HF')
+        start = time.time()
+        utilF.TransformMO(CMO, basis, set, Vee=np.load('twoint.npy'))
+        print(time.time()-start, 'MO transform')
+        start = time.time()
+        results = prop.runprop(basis, input, D, set, results)
+        print(time.time()-start, 'PROPERTIES')
+        start = time.time()
+        MP.runMPn(basis, input, FAO, CMO, set)
+        print(time.time()-start, 'MP2')
+        start = time.time()
+        QF.runQfit(basis, input, D, set, results)
+        print(time.time()-start, 'QFIT')
 
+    
 if __name__ == "__main__":
-    run('inputH2O.csv', 'settings.csv')
+    run('H2O.csv', 'settings.csv')

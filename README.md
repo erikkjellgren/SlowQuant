@@ -43,6 +43,7 @@ MPn;MP2
 -----------------------------------------
 
 When a calculation is run, first the Standardsettings.csv is loaded in. The user given settings file will then overrule the specified settings. The above file will make a calculation using the basisset STO3G. It will perform a MP2 calculation.
+
 ## Features:
 
 As of now the program have the following features and settings.
@@ -61,6 +62,8 @@ Scipy
         
 basisset;STO3G - See basissets below
 
+Initial Method;HF - Can be set to UHF (Only low spin and energy for UHF)
+
         ; INTEGRAL SETTINGS
 		
 Cauchy-Schwarz Threshold;10 - Threshold for not calculating an ERI, given as 10^-x
@@ -77,9 +80,11 @@ DIIS;Yes - Activation of DISS
 
 Keep Steps;6 - Number of steps saved in the DIIS algorithm
 
+UHF mix guess;0.15 - Mix initial coefficients to break spin symmetry.
+
         ; PROPERTY SETTINGS
         
-Charge;Mulliken - Type of charge to be calculated
+Charge;Mulliken - Type of charge to be calculated, Lowdin, also an option. 
 
 Dipole;Yes - Calculation of molecular dipolemoment
 
@@ -116,13 +121,13 @@ Force Numeric;No - Choose to evaluate Forces numerically, Yes, is the key to run
 
 ### Basis sets:
 
-STO2G, STO3G, DZ, DZP, 3-21G, 6-31ppGss (6-31++G**) - For up to the first 20 elements.
+STO2G, STO3G, DZ, DZP, 3-21G, 6-31ppGss (6-31++G**), 6-31Gs (6-31G*), 6-31pGs (6-31+G*) - For up to the first 20 elements.
 
 ### Properties:
 
-HF energy, MP2 energy
+HF energy, MP2 energy, UHF energy
 
-Mulliken charges 
+Mulliken charges, Lowdin charges 
 
 Molecular dipole moment
 

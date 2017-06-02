@@ -1,0 +1,4 @@
+basisset;STO3G
+Initial method;UHF
+SCF Energy Threshold;6
+SCF RMSD Threshold;6

@@ -1,5 +1,6 @@
         ; INPUT SETTINGS
 basisset;STO3G
+Initial method;HF
         ; INTEGRAL SETTINGS
 Cauchy-Schwarz Threshold;10
         ; SCF SETTINGS
@@ -8,6 +9,7 @@ SCF RMSD Threshold;12
 SCF Max iterations;100
 DIIS;Yes
 Keep Steps;6
+UHF mix guess;0.15
         ; PROPERTY SETTINGS
 Charge;Mulliken
 Dipole;Yes
