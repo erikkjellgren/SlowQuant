@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.linalg
 import math
-from DIIS import runDIIS
+from slowquant import DIIS
 
 def diagonlize(M):
     eigVal, eigVec = np.linalg.eigh(M)
@@ -90,9 +90,9 @@ def HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results, print_SCF='Yes
         if set['DIIS'] == 'Yes':
             #Estimate F by DIIS
             if iter == 1:
-                F, errorFock, errorDens, errorDIIS = runDIIS(F,D0,S,iter,set,basis,0,0)
+                F, errorFock, errorDens, errorDIIS = DIIS.runDIIS(F,D0,S,iter,set,basis,0,0)
             else:
-                F, errorFock, errorDens, errorDIIS  = runDIIS(F,D0,S,iter,set,basis,errorFock, errorDens)
+                F, errorFock, errorDens, errorDIIS  = DIIS.runDIIS(F,D0,S,iter,set,basis,errorFock, errorDens)
             
         Fprime = np.dot(np.dot(np.transpose(S_sqrt),F),S_sqrt)
         eps, Cprime = diagonlize(Fprime)

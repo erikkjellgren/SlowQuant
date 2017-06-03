@@ -1,11 +1,11 @@
 import numpy as np
 import math
-import MolecularIntegrals as MI
+from slowquant import MolecularIntegrals as MI
 import scipy.linalg
 
 def MulCharge(basis, input, D):
     #Loading overlap integrals
-    S = np.load('overlap.npy')
+    S = np.load('slowquant/temp/overlap.npy')
     D = 2*D
     
     DS = np.dot(D,S)
@@ -26,7 +26,7 @@ def MulCharge(basis, input, D):
 
 def LowdinCharge(basis, input, D):
     #Loading overlap integrals
-    S = np.load('overlap.npy')
+    S = np.load('slowquant/temp/overlap.npy')
     D = 2*D
     
     output = open('out.txt', 'a')
@@ -57,11 +57,9 @@ def dipolemoment(basis, input, D, results):
         nucy.append(input[i,2])
         nucz.append(input[i,3])
     
-    mux = np.load('mux.npy')
-    muy = np.load('muy.npy')
-    muz = np.load('muz.npy')
-    
-
+    mux = np.load('slowquant/temp/mux.npy')
+    muy = np.load('slowquant/temp/muy.npy')
+    muz = np.load('slowquant/temp/muz.npy')
     
     ux = 0
     for i in range(0, len(D)):

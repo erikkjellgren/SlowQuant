@@ -29,5 +29,5 @@ def TransformMO(C, basis, set, Vee):
                         for mu in range(0, len(basis)):
                             VeeMO[p,q,r,s] += C[mu,p]*MO3[mu,q,r,s]
 
-        np.save('twointMO.npy', VeeMO)
+        np.save('slowquant/temp/twointMO.npy', VeeMO)
 

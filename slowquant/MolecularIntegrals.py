@@ -484,7 +484,7 @@ def runIntegrals(input, basis, settings):
     # Nuclear-nuclear repulsion
     E = np.zeros(1)
     E[0] = nucrep(input)
-    np.save('enuc.npy',E)
+    np.save('slowquant/temp/enuc.npy',E)
     #END OF nuclear-nuclear repulsion
     
     Edict = Eprecalculation(basis)
@@ -566,7 +566,7 @@ def runIntegrals(input, basis, settings):
                                 ERI[lam,sig,nu,mu] = calc
                                 ERI[sig,lam,nu,mu] = calc
 
-    np.save('twoint.npy',ERI)
+    np.save('slowquant/temp/twoint.npy',ERI)
     print(time.time()-start, 'ERI')
     #END OF two electron integrals
     
@@ -592,8 +592,8 @@ def runIntegrals(input, basis, settings):
                 S[l,k] = calc2
                 T[k,l] = calc
                 T[l,k] = calc
-    np.save('overlap.npy',S)
-    np.save('Ekin.npy',T)
+    np.save('slowquant/temp/overlap.npy',S)
+    np.save('slowquant/temp/Ekin.npy',T)
     print(time.time()-start, 'Overlap + kin')
     #END OF kinetic energy and overlap
     
@@ -613,7 +613,7 @@ def runIntegrals(input, basis, settings):
                         calc += elnuc(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4],basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2], input)
                 Na[k,l] = calc
                 Na[l,k] = calc
-    np.save('nucatt.npy',Na)
+    np.save('slowquant/temp/nucatt.npy',Na)
     print(time.time()-start, 'Nuc att')
     #END OF nucleus electron attraction
     
@@ -643,9 +643,9 @@ def run_dipole_int(basis, input):
                 Y[l,k] = calcy
                 Z[k,l] = calcz
                 Z[l,k] = calcz
-    np.save('mux.npy',X)
-    np.save('muy.npy',Y)
-    np.save('muz.npy',Z)
+    np.save('slowquant/temp/mux.npy',X)
+    np.save('slowquant/temp/muy.npy',Y)
+    np.save('slowquant/temp/muz.npy',Z)
 
 def runQMESP(basis, input, rcx, rcy ,rcz):
     # Set up indexes for integrals
@@ -694,15 +694,15 @@ def rungeometric_derivatives(input, basis):
         # Nuclear-nuclear repulsion
         E = np.zeros(1)
         E[0] = nucdiff(input, atomidx, 1)
-        np.save(str(atomidx)+'dxenuc.npy',E)
+        np.save('slowquant/temp/'+str(atomidx)+'dxenuc.npy',E)
         
         E = np.zeros(1)
         E[0] = nucdiff(input, atomidx, 2)
-        np.save(str(atomidx)+'dyenuc.npy',E)
+        np.save('slowquant/temp/'+str(atomidx)+'dyenuc.npy',E)
         
         E = np.zeros(1)
         E[0] = nucdiff(input, atomidx, 3)
-        np.save(str(atomidx)+'dzenuc.npy',E)
+        np.save('slowquant/temp/'+str(atomidx)+'dzenuc.npy',E)
         #END OF nuclear-nuclear repulsion
         
         # Two electron integrals x diff
@@ -804,7 +804,7 @@ def rungeometric_derivatives(input, basis):
                                 ERI[sig,lam,mu,nu] = calc
                                 ERI[lam,sig,nu,mu] = calc
                                 ERI[sig,lam,nu,mu] = calc
-        np.save(str(atomidx)+'dxtwoint.npy',ERI)
+        np.save('slowquant/temp/'+str(atomidx)+'dxtwoint.npy',ERI)
         print(time.time()-start, 'ERI x diff: atom'+str(atomidx))
         #END OF two electron integrals x diff
         
@@ -907,7 +907,7 @@ def rungeometric_derivatives(input, basis):
                                 ERI[sig,lam,mu,nu] = calc
                                 ERI[lam,sig,nu,mu] = calc
                                 ERI[sig,lam,nu,mu] = calc
-        np.save(str(atomidx)+'dytwoint.npy',ERI)
+        np.save('slowquant/temp/'+str(atomidx)+'dytwoint.npy',ERI)
         print(time.time()-start, 'ERI y diff: atom'+str(atomidx))
         #END OF two electron integrals y diff
         
@@ -1010,7 +1010,7 @@ def rungeometric_derivatives(input, basis):
                                 ERI[sig,lam,mu,nu] = calc
                                 ERI[lam,sig,nu,mu] = calc
                                 ERI[sig,lam,nu,mu] = calc
-        np.save(str(atomidx)+'dztwoint.npy',ERI)
+        np.save('slowquant/temp/'+str(atomidx)+'dztwoint.npy',ERI)
         print(time.time()-start, 'ERI z diff: atom'+str(atomidx))
         #END OF two electron integrals z diff
         
@@ -1072,8 +1072,8 @@ def rungeometric_derivatives(input, basis):
                     S[l,k] = calc2
                     T[k,l] = calc
                     T[l,k] = calc
-        np.save(str(atomidx)+'dxoverlap.npy',S)
-        np.save(str(atomidx)+'dxEkin.npy',T)
+        np.save('slowquant/temp/'+str(atomidx)+'dxoverlap.npy',S)
+        np.save('slowquant/temp/'+str(atomidx)+'dxEkin.npy',T)
         print(time.time()-start, 'Overlap + kin diff x atom: '+str(atomidx))
         #END OF kinetic energy and overlap x diff
         
@@ -1136,8 +1136,8 @@ def rungeometric_derivatives(input, basis):
                     S[l,k] = calc2
                     T[k,l] = calc
                     T[l,k] = calc
-        np.save(str(atomidx)+'dyoverlap.npy',S)
-        np.save(str(atomidx)+'dyEkin.npy',T)
+        np.save('slowquant/temp/'+str(atomidx)+'dyoverlap.npy',S)
+        np.save('slowquant/temp/'+str(atomidx)+'dyEkin.npy',T)
         print(time.time()-start, 'Overlap + kin diff y atom: '+str(atomidx))
         #END OF kinetic energy and overlap y diff
         
@@ -1199,8 +1199,8 @@ def rungeometric_derivatives(input, basis):
                     S[l,k] = calc2
                     T[k,l] = calc
                     T[l,k] = calc
-        np.save(str(atomidx)+'dzoverlap.npy',S)
-        np.save(str(atomidx)+'dzEkin.npy',T)
+        np.save('slowquant/temp/'+str(atomidx)+'dzoverlap.npy',S)
+        np.save('slowquant/temp/'+str(atomidx)+'dzEkin.npy',T)
         print(time.time()-start, 'Overlap + kin diff z atom: '+str(atomidx))
         #END OF kinetic energy and overlap z diff
 
@@ -1260,7 +1260,7 @@ def rungeometric_derivatives(input, basis):
         
                     Na[k,l] = calc
                     Na[l,k] = calc
-        np.save(str(atomidx)+'dxnucatt.npy',Na)
+        np.save('slowquant/temp/'+str(atomidx)+'dxnucatt.npy',Na)
         print(time.time()-start, 'Nuc att diffx atom: '+str(atomidx))
         #END OF nucleus electron attraction x diff
 
@@ -1321,7 +1321,7 @@ def rungeometric_derivatives(input, basis):
                         
                     Na[k,l] = calc
                     Na[l,k] = calc
-        np.save(str(atomidx)+'dynucatt.npy',Na)
+        np.save('slowquant/temp/'+str(atomidx)+'dynucatt.npy',Na)
         print(time.time()-start, 'Nuc att diff y atom: '+str(atomidx))
         #END OF nucleus electron attraction y diff
 
@@ -1381,6 +1381,6 @@ def rungeometric_derivatives(input, basis):
         
                     Na[k,l] = calc
                     Na[l,k] = calc
-        np.save(str(atomidx)+'dznucatt.npy',Na)
+        np.save('slowquant/temp/'+str(atomidx)+'dznucatt.npy',Na)
         print(time.time()-start, 'Nuc att diff z atom: '+str(atomidx))
         #END OF nucleus electron attraction z diff

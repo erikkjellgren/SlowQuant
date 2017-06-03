@@ -1,0 +1,7 @@
+basisset;STO3G
+SCF Energy Threshold;6
+SCF RMSD Threshold;6
+SCF Max iterations;100
+DIIS;No
+Charge;No
+Dipole;No

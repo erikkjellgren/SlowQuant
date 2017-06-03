@@ -1,7 +1,6 @@
 import numpy as np
 import scipy.linalg
 import math
-from DIIS import runDIIS
 
 def diagonlize(M):
     eigVal, eigVec = np.linalg.eigh(M)

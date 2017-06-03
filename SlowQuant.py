@@ -1,17 +1,17 @@
-import BasisSet as BS
-import MolecularIntegrals as MI
-import HartreeFock as HF   
 import numpy as np
 import time
-import Properties as prop
-import MPn as MP
-import Qfit as QF
-import Utilityfunc as utilF 
-import GeometryOptimization as GO
-import UHF
+from slowquant import BasisSet as BS
+from slowquant import MolecularIntegrals as MI
+from slowquant import HartreeFock as HF   
+from slowquant import Properties as prop
+from slowquant import MPn as MP
+from slowquant import Qfit as QF
+from slowquant import IntegralTransform as utilF 
+from slowquant import GeometryOptimization as GO
+from slowquant import UHF
 
 def run(inputname, settingsname):
-    settings = np.genfromtxt('Standardsettings.csv', delimiter = ';', dtype='str')
+    settings = np.genfromtxt('slowquant/Standardsettings.csv', delimiter = ';', dtype='str')
     set = {}
     for i in range(len(settings)):
         set.update({settings[i][0]:settings[i][1]})
@@ -41,7 +41,7 @@ def run(inputname, settingsname):
         start = time.time()
         MI.runIntegrals(input, basis, set)
         print(time.time()-start, 'INTEGRALS')
-        C_alpha, F_alpha, D_alpha, C_beta, F_beta, D_beta, results = UHF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results)
+        C_alpha, F_alpha, D_alpha, C_beta, F_beta, D_beta, results = UHF.HartreeFock(input, set, basis, VNN=np.load('slowquant/temp/enuc.npy'), Te=np.load('slowquant/temp/Ekin.npy'), S=np.load('slowquant/temp/overlap.npy'), VeN=np.load('slowquant/temp/nucatt.npy'), Vee=np.load('slowquant/temp/twoint.npy'), results=results)
 
     elif set['GeoOpt'] == 'Yes':
         input, results = GO.runGO(input, set, results)
@@ -52,10 +52,10 @@ def run(inputname, settingsname):
         MI.runIntegrals(input, basis, set)
         print(time.time()-start, 'INTEGRALS')
         start = time.time()
-        CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('enuc.npy'), Te=np.load('Ekin.npy'), S=np.load('overlap.npy'), VeN=np.load('nucatt.npy'), Vee=np.load('twoint.npy'), results=results)
+        CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('slowquant/temp/enuc.npy'), Te=np.load('slowquant/temp/Ekin.npy'), S=np.load('slowquant/temp/overlap.npy'), VeN=np.load('slowquant/temp/nucatt.npy'), Vee=np.load('slowquant/temp/twoint.npy'), results=results)
         print(time.time()-start, 'HF')
         start = time.time()
-        utilF.TransformMO(CMO, basis, set, Vee=np.load('twoint.npy'))
+        utilF.TransformMO(CMO, basis, set, Vee=np.load('slowquant/temp/twoint.npy'))
         print(time.time()-start, 'MO transform')
         start = time.time()
         results = prop.runprop(basis, input, D, set, results)
@@ -69,4 +69,4 @@ def run(inputname, settingsname):
 
     
 if __name__ == "__main__":
-    run('H2O.csv', 'settings.csv')
+    run('inputExampleH2O.csv', 'settingExample.csv')

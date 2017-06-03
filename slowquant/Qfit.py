@@ -1,6 +1,5 @@
 import numpy as np
-import MolecularIntegrals as MI
-import random as rng
+from slowquant import MolecularIntegrals as MI
 
 def magvec(v1, v2):
     x = v2[0] - v1[0]

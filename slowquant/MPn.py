@@ -1,4 +1,4 @@
-import Utilityfunc as utilF
+from slowquant import IntegralTransform as utilF
 import numpy as np
 
 def MP2(basis, input, F, C):
@@ -7,7 +7,7 @@ def MP2(basis, input, F, C):
     eps = np.dot(np.dot(CT, F),C)
 
     #Loading two electron integrals
-    VeeMO = np.load('twointMO.npy')
+    VeeMO = np.load('slowquant/temp/twointMO.npy')
 
     #Calc EMP2
     EMP2 = 0

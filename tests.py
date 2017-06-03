@@ -1,13 +1,13 @@
-import BasisSet as BS
-import DIIS as DIIS
-import HartreeFock as HF
-import MolecularIntegrals as MI
-import MPn as MP
-import Properties as PROP
-import Qfit as QFIT
-import Utilityfunc as UF
 import numpy as np
-import HFrun as HFrun
+import SlowQuant as HFrun
+from slowquant import BasisSet as BS
+from slowquant import DIIS as DIIS
+from slowquant import HartreeFock as HF
+from slowquant import MolecularIntegrals as MI
+from slowquant import MPn as MP
+from slowquant import Properties as PROP
+from slowquant import Qfit as QFIT
+from slowquant import IntegralTransform as UF
 
 def test_N():
     check = 5.701643762839922
@@ -76,7 +76,7 @@ def test_boys():
         assert abs(MI.boys(m[i], x[i])-check[i])*10**scale[i] < 10**-8
     
 def test_HartreeFock1():
-    settings = np.genfromtxt('Standardsettings.csv', delimiter = ';', dtype='str')
+    settings = np.genfromtxt('slowquant/Standardsettings.csv', delimiter = ';', dtype='str')
     set = {}
     for i in range(len(settings)):
         set.update({settings[i][0]:settings[i][1]})
@@ -97,7 +97,7 @@ def test_HartreeFock1():
             assert abs(Dcheck[i,j] - D[i,j]) < 10**-7
     
 def test_HartreeFock2():
-    settings = np.genfromtxt('Standardsettings.csv', delimiter = ';', dtype='str')
+    settings = np.genfromtxt('slowquant/Standardsettings.csv', delimiter = ';', dtype='str')
     set = {}
     for i in range(len(settings)):
         set.update({settings[i][0]:settings[i][1]})
@@ -118,7 +118,7 @@ def test_HartreeFock2():
             assert abs(Dcheck[i,j] - D[i,j]) < 10**-7
 
 def test_HartreeFock3():
-    settings = np.genfromtxt('Standardsettings.csv', delimiter = ';', dtype='str')
+    settings = np.genfromtxt('slowquant/Standardsettings.csv', delimiter = ';', dtype='str')
     set = {}
     for i in range(len(settings)):
         set.update({settings[i][0]:settings[i][1]})
@@ -139,7 +139,7 @@ def test_HartreeFock3():
             assert abs(Dcheck[i,j] - D[i,j]) < 10**-7
 
 def test_MP2_1():
-    settings = np.genfromtxt('Standardsettings.csv', delimiter = ';', dtype='str')
+    settings = np.genfromtxt('slowquant/Standardsettings.csv', delimiter = ';', dtype='str')
     set = {}
     for i in range(len(settings)):
         set.update({settings[i][0]:settings[i][1]})
@@ -156,7 +156,7 @@ def test_MP2_1():
 
 
 def test_MP2_2():
-    settings = np.genfromtxt('Standardsettings.csv', delimiter = ';', dtype='str')
+    settings = np.genfromtxt('slowquant/Standardsettings.csv', delimiter = ';', dtype='str')
     set = {}
     for i in range(len(settings)):
         set.update({settings[i][0]:settings[i][1]})
@@ -173,18 +173,18 @@ def test_MP2_2():
 
 
 def test_derivative():
-    settings = np.genfromtxt('Standardsettings.csv', delimiter = ';', dtype='str')
+    settings = np.genfromtxt('slowquant/Standardsettings.csv', delimiter = ';', dtype='str')
     set = {}
     for i in range(len(settings)):
         set.update({settings[i][0]:settings[i][1]})
     input = np.array([[8, 0, 0, 0],[8, 0, 0, 0]])
     basis = BS.bassiset(input, set)
     MI.rungeometric_derivatives(input, basis)
-    VNe = np.load('1dynucatt.npy')
-    S   = np.load('1dyoverlap.npy')
-    Te  = np.load('1dyEkin.npy')
-    VNN = np.load('1dyenuc.npy')
-    ERI = np.load('1dytwoint.npy')
+    VNe = np.load('slowquant/temp/1dynucatt.npy')
+    S   = np.load('slowquant/temp/1dyoverlap.npy')
+    Te  = np.load('slowquant/temp/1dyEkin.npy')
+    VNN = np.load('slowquant/temp/1dyenuc.npy')
+    ERI = np.load('slowquant/temp/1dytwoint.npy')
     
     assert np.max(np.abs(ERI)) < 10**-12
     assert np.max(np.abs(VNN)) < 10**-12
