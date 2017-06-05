@@ -91,13 +91,13 @@ def bassiset(input, set):
                             basis_func = np.array(basis_func, dtype=float)
                             basis_func[:,4] = 3 
                             basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
-                            basis_func[:,3] = 0
+                            basis_func[:,4] = 0
                             idx += 1
                             
                             basis_func = np.array(basis_func, dtype=float)
                             basis_func[:,5] = 3 
                             basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
-                            basis_func[:,3] = 0
+                            basis_func[:,5] = 0
                             idx += 1
                             
                             basis_func[:,3] = 2
@@ -228,13 +228,13 @@ def bassiset(input, set):
                     basis_func = np.array(basis_func, dtype=float)
                     basis_func[:,4] = 3 
                     basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
-                    basis_func[:,3] = 0
+                    basis_func[:,4] = 0
                     idx += 1
                     
                     basis_func = np.array(basis_func, dtype=float)
                     basis_func[:,5] = 3 
                     basis_out.append([idx,input[i,1],input[i,2],input[i,3],len(basis_func),np.ndarray.tolist(np.copy(basis_func)), i])
-                    basis_func[:,3] = 0
+                    basis_func[:,5] = 0
                     idx += 1
                     
                     basis_func[:,3] = 2
