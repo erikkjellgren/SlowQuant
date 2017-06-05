@@ -217,6 +217,7 @@ def test_prop():
     assert checkMolDip == calcMolDip
     assert checkMulChr == calcMulChr
 
+
 def test_qfit():
     HFrun.run('testfiles/input2_H2O.csv','testfiles/settingsQFIT.csv')
     check = open('testfiles/outQFIT.txt','r')
@@ -231,7 +232,7 @@ def test_qfit():
     
     assert checkRMSD == calcRMSD
         
-    
+        
 def test_geoopt():
     HFrun.run('testfiles/inputH2.csv','testfiles/settingsGEO.csv')
     check = open('testfiles/outGEO.txt','r')
@@ -246,6 +247,7 @@ def test_geoopt():
     
     assert checkMP2 == calcMP2
 
+
 def test_UHF():
     HFrun.run('testfiles/inputH2_UHF.csv','testfiles/settingsUHF.csv')
     check = open('testfiles/outUHF.txt','r')
@@ -259,3 +261,20 @@ def test_UHF():
             calcUHF = float(line[23:30])
     
     assert checkUHF == calcUHF
+
+
+def test_Lowdin():
+    HFrun.run('testfiles/inputH2O.csv','testfiles/settingsLowdin.csv')
+    check = open('testfiles/outLowdin.txt','r')
+    calc = open('out.txt')
+    for line in check:
+        if line[0:5] == 'Atom1':
+            checkLow = float(line[7:])
+    for line in calc:
+        if line[0:5] == 'Atom1':
+            calcLow = float(line[7:])
+    
+    assert calcLow == checkLow
+
+
+    
