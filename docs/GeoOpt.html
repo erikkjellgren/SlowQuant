@@ -1,0 +1,314 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Geometry optimization &mdash; SLOWQUANT  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="SLOWQUANT  documentation" href="index.html"/>
+        <link rel="prev" title="Propeties" href="Properties.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> SLOWQUANT
+          
+
+          
+            
+            <img src="_static/slowquant.png" class="logo" />
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">How to use</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="keywords.html">List of keywords</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Examples.html">Example input files</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Working equations and functions</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="General.html">General Considerations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="MolecularIntegral.html">Molecular Integrals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="IntegralTrans.html">Integral Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="HFMethods.html">Hartree-Fock methods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="DIIS.html">DIIS</a></li>
+<li class="toctree-l1"><a class="reference internal" href="MPn.html">Perturbations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Properties.html">Propeties</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Geometry optimization</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#gradient-descent">Gradient Descent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#analytic-hartree-fock">Analytic Hartree-Fock</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#finite-difference">Finite difference</a></li>
+</ul>
+</li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">SLOWQUANT</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Geometry optimization</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/GeoOpt.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="geometry-optimization">
+<h1>Geometry optimization<a class="headerlink" href="#geometry-optimization" title="Permalink to this headline">¶</a></h1>
+<p>In this section the geometry optimization are described. In general the derivative of the Gaussian basisset functions is given as:</p>
+<div class="math">
+<p><img src="_images/math/0d57a9c843290a4e8428311af63c3574d3306cf2.png" alt="\frac{\partial\phi_{l,m,n}}{\partial X_{A}}=\left[\left(2l+1\right)a\right]^{1/2}\phi_{l+1,m,n}-2l\left(\frac{a}{2l-1}\right)^{1/2}\phi_{l-1,m,n}"/></p>
+</div><div class="section" id="gradient-descent">
+<h2>Gradient Descent<a class="headerlink" href="#gradient-descent" title="Permalink to this headline">¶</a></h2>
+<p>The molecular structure is propagated using the Gradient Descent method:</p>
+<div class="math">
+<p><img src="_images/math/093eeeec76a8c964eb93e4a73d270c47a5eeac8d.png" alt="X_{A,i+1}=X_{A,i}-\zeta\frac{\partial E_{\mathrm{HF}}}{\partial X_{A}}"/></p>
+</div><p>FUNCTION:</p>
+<ul class="simple">
+<li>None</li>
+</ul>
+<p>References:</p>
+<ul class="simple">
+<li>None</li>
+</ul>
+</div>
+<div class="section" id="analytic-hartree-fock">
+<h2>Analytic Hartree-Fock<a class="headerlink" href="#analytic-hartree-fock" title="Permalink to this headline">¶</a></h2>
+<p>The analytic Hartree-Fock derivative is given as:</p>
+<div class="math">
+<p><img src="_images/math/d5366ed63dada62eb3a5706f6e71a0819761263a.png" alt="\frac{\partial E_{\mathrm{HF}}}{\partial X_{A}}=\sum_{i,j}D_{i,j}\frac{H_{i,j}^{\mathrm{core}}}{\partial X_{A}}+\frac{1}{2}\sum_{i,j,k,l}D_{j,i}D_{k,l}\frac{\partial\left(ij\left|\right|kl\right)}{\partial X_{A}}-2\sum_{i,j}\sum_{a}^{\mathrm{occ}}\varepsilon_{a}C_{j,a}C_{i,a}\frac{\partial S_{i,j}}{\partial X_{A}}+\frac{\partial V_{NN}}{\partial X_{A}}"/></p>
+</div><p>FUNCTION:</p>
+<ul class="simple">
+<li>GeometryOptimization.run_analytic(input, set, results)</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>input, inputfile object</li>
+<li>set, settingsfile object</li>
+<li>results, results object</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>input, inputfile object with opdated coordinates</li>
+</ul>
+<p>References:</p>
+<ul class="simple">
+<li>Szabo and Ostlund, Modern Quantum Chemistry: Introduction to Advanced Electronic Structure Theory</li>
+</ul>
+</div>
+<div class="section" id="finite-difference">
+<h2>Finite difference<a class="headerlink" href="#finite-difference" title="Permalink to this headline">¶</a></h2>
+<p>The numerical gradient is calculated by the use of finite difference, and is found as:</p>
+<div class="math">
+<p><img src="_images/math/21e2e1cce1e30f92cb3c637dbd4c16e365ed973f.png" alt="\frac{\partial E_{\mathrm{HF}}}{\partial X_{A}}=\frac{E_{\mathrm{HF}}\left(X_{A}+\epsilon\right)-E_{\mathrm{HF}}\left(X_{A}-\epsilon\right)}{2\epsilon}"/></p>
+</div><p>FUNCTION:</p>
+<ul class="simple">
+<li>GeometryOptimization.run_numeric(input, set, results)</li>
+<li>return input</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>input, inputfile object</li>
+<li>set, settingsfile object</li>
+<li>results, results object</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>input, inputfile object with opdated coordinates</li>
+</ul>
+<p>References:</p>
+<ul class="simple">
+<li>None</li>
+</ul>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+      
+        <a href="Properties.html" class="btn btn-neutral" title="Propeties" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, Erik Kjellgren.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

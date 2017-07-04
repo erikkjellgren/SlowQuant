@@ -1,0 +1,277 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>General Considerations &mdash; SLOWQUANT  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="SLOWQUANT  documentation" href="index.html"/>
+        <link rel="next" title="Molecular Integrals" href="MolecularIntegral.html"/>
+        <link rel="prev" title="Example input files" href="Examples.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> SLOWQUANT
+          
+
+          
+            
+            <img src="_static/slowquant.png" class="logo" />
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">How to use</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="keywords.html">List of keywords</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Examples.html">Example input files</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Working equations and functions</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">General Considerations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#basisset-object">Basisset object</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#inputfile-obejct">Inputfile obejct</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#settings-obejct">Settings obejct</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#results-object">Results object</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="MolecularIntegral.html">Molecular Integrals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="IntegralTrans.html">Integral Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="HFMethods.html">Hartree-Fock methods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="DIIS.html">DIIS</a></li>
+<li class="toctree-l1"><a class="reference internal" href="MPn.html">Perturbations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Properties.html">Propeties</a></li>
+<li class="toctree-l1"><a class="reference internal" href="GeoOpt.html">Geometry optimization</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">SLOWQUANT</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>General Considerations</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/General.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="general-considerations">
+<h1>General Considerations<a class="headerlink" href="#general-considerations" title="Permalink to this headline">¶</a></h1>
+<p>Inside the code are four different objects that ties the different moduels together. The basisset obejct &#8220;basis&#8221;, the inputfile object &#8220;input&#8221;, the settingsfile object &#8220;settings&#8221; and the results object &#8220;results&#8221;.</p>
+<div class="section" id="basisset-object">
+<h2>Basisset object<a class="headerlink" href="#basisset-object" title="Permalink to this headline">¶</a></h2>
+<p>The basisset object is a list of list with the following structure:</p>
+<div class="math">
+<p><img src="_images/math/ff0349fcd2c5d09eba28062b4afd7f0002008564.png" alt="\left[\begin{array}{ccccccc}Idx &amp; x &amp; y &amp; z &amp; \#CONTR &amp; CONTR &amp; Atomidx\end{array}\right]"/></p>
+</div><p>Idx is the AO index. Atomidx, is the index of the associated atom. #CONTR contains the number of primitive functions in the contracted.</p>
+<p>CONTR contains all the information about the primitive functions and have the form:</p>
+<div class="math">
+<p><img src="_images/math/721137c66644ac35e8541d590f15f2642b2c4eda.png" alt="\left[\begin{array}{cccccc}N &amp; \zeta &amp; c &amp; l &amp; m &amp; n\end{array}\right]"/></p>
+</div></div>
+<div class="section" id="inputfile-obejct">
+<h2>Inputfile obejct<a class="headerlink" href="#inputfile-obejct" title="Permalink to this headline">¶</a></h2>
+<p>The inputfile obejct is a numpy array containing the following informations:</p>
+<div class="math">
+<p><img src="_images/math/069ee3e10114332968eb31c835842b6218cc5c30.png" alt="\left[\begin{array}{cccc}\#electrons &amp; None &amp; None &amp; None\\Atom_{1}\,nr. &amp; Atom_{1}\,x &amp; Atom_{1}\,y &amp; Atom_{1}\,z\\Atom_{2}\,nr. &amp; Atom_{2}\,x &amp; Atom_{2}\,y &amp; Atom_{2}\,z\\... &amp; ... &amp; ... &amp; ...\\Atom_{i}\,nr. &amp; Atom_{i}\,x &amp; Atom_{i}\,y &amp; Atom_{i}\,z\end{array}\right]"/></p>
+</div></div>
+<div class="section" id="settings-obejct">
+<h2>Settings obejct<a class="headerlink" href="#settings-obejct" title="Permalink to this headline">¶</a></h2>
+<p>The settings are parsed around in the code as a dictionary.</p>
+</div>
+<div class="section" id="results-object">
+<h2>Results object<a class="headerlink" href="#results-object" title="Permalink to this headline">¶</a></h2>
+<p>The results are parsed around in the code as a dictionary.</p>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="MolecularIntegral.html" class="btn btn-neutral float-right" title="Molecular Integrals" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="Examples.html" class="btn btn-neutral" title="Example input files" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, Erik Kjellgren.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

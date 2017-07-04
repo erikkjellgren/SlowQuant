@@ -1,0 +1,352 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Hartree-Fock methods &mdash; SLOWQUANT  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="SLOWQUANT  documentation" href="index.html"/>
+        <link rel="next" title="DIIS" href="DIIS.html"/>
+        <link rel="prev" title="Integral Transformations" href="IntegralTrans.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> SLOWQUANT
+          
+
+          
+            
+            <img src="_static/slowquant.png" class="logo" />
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">How to use</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="keywords.html">List of keywords</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Examples.html">Example input files</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Working equations and functions</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="General.html">General Considerations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="MolecularIntegral.html">Molecular Integrals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="IntegralTrans.html">Integral Transformations</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Hartree-Fock methods</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#restricted-hartree-fock">Restricted Hartree-Fock</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#unrestricted-hartee-fock">Unrestricted Hartee-Fock</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="DIIS.html">DIIS</a></li>
+<li class="toctree-l1"><a class="reference internal" href="MPn.html">Perturbations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Properties.html">Propeties</a></li>
+<li class="toctree-l1"><a class="reference internal" href="GeoOpt.html">Geometry optimization</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">SLOWQUANT</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Hartree-Fock methods</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/HFMethods.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="hartree-fock-methods">
+<h1>Hartree-Fock methods<a class="headerlink" href="#hartree-fock-methods" title="Permalink to this headline">¶</a></h1>
+<p>In this section the Hartree-Fock methods will be described.</p>
+<div class="section" id="restricted-hartree-fock">
+<h2>Restricted Hartree-Fock<a class="headerlink" href="#restricted-hartree-fock" title="Permalink to this headline">¶</a></h2>
+<p>For the Roothan-Hartee-Fock equations an orthogonal basis is needed, first the first orthogonalization matrix is constructed from the overlap matrix. First by a diagonalization:</p>
+<div class="math">
+<p><img src="_images/math/3a87ce51f94bcd74fb8541b77d3ec405b3fffc72.png" alt="SL_{S}=L_{S}\Lambda_{S}"/></p>
+</div><p>and then the orthogonalization matrix is constructed:</p>
+<div class="math">
+<p><img src="_images/math/f92bef38c769637f5d8ec1305f18531751d14632.png" alt="S_{\mathrm{ortho}}=L_{S}\Lambda_{S}^{-1/2}L_{S}^{T}"/></p>
+</div><p>The SCF iterations requires an initial Fock matrix given as:</p>
+<div class="math">
+<p><img src="_images/math/cc82d3d3de18ccbafaec2868187dc571ff98538b.png" alt="F_{0}=H^{\mathrm{core}}"/></p>
+</div><p>The SCF procedure is calulated as the following equations. First the fock matrix is constructed:</p>
+<div class="math">
+<p><img src="_images/math/689a7dbd4bfbfcbc904134fa837c0e06d9a50c56.png" alt="\left.F_{n,ij}\right|_{n\neq0}=H_{ij}^{\mathrm{core}}+\sum_{kl}^{\mathrm{AO}}D_{n-1,kl}\left(2\left(ij\left|\right|kl\right)-\left(ik\left|\right|jl\right)\right)"/></p>
+</div><p>Then the Fock matrix is brought into the orthogonal basis:</p>
+<div class="math">
+<p><img src="_images/math/b8f1a46c3fe9d5a8ab63de2c590afd4a0f2845be.png" alt="F_{n}^{'}=S_{\mathrm{ortho}}^{T}H^{\mathrm{core}}S_{\mathrm{ortho}}"/></p>
+</div><p>The F&#8217; is then diagonalized:</p>
+<div class="math">
+<p><img src="_images/math/b327c9600582cbcb1e298ac21e69729951472324.png" alt="F_{n}^{'}C_{n}^{'}=C_{n}^{'}\epsilon_{n}"/></p>
+</div><p>The coefficients are transformed back:</p>
+<div class="math">
+<p><img src="_images/math/15b73cae82ff8b48180b92cfb5b5a26b9ac92836.png" alt="C_{n}=S_{\mathrm{ortho}}C_{n}^{'}"/></p>
+</div><p>A density matrix can be made from the coefficients:</p>
+<div class="math">
+<p><img src="_images/math/d0d239eb58b5d8e764a478a01e29c98a57d0333d.png" alt="D_{n,ij}=\sum_{k}^{\mathrm{occ}}C_{n,ki}C_{n,kj}"/></p>
+</div><p>The electronic energy of system can be found as:</p>
+<div class="math">
+<p><img src="_images/math/38954efab5bf39a913efe8b8e8e493839abe9722.png" alt="E_{n,\mathrm{elec}}=\sum_{ij}^{\mathrm{AO}}D_{0,ij}\left(H_{ij}^{\mathrm{core}}+F_{n,ij}\right)"/></p>
+</div><p>The above SCF procedure will is stopped at certain tresholds. The change in energy and the RMSD of the density matrix can be found as:</p>
+<div class="math">
+<p><img src="_images/math/f7c659aab99c8cdb956bc576def0a9fbd9710dc4.png" alt="\Delta E_{n}=E_{n,\mathrm{elec}}-E_{n-1,\mathrm{elec}}
+
+\mathrm{RMSD}_{n}=\sqrt{\sum_{ij}D_{n,ij}-D_{n-1,ij}}"/></p>
+</div><p>FUNCTION:</p>
+<ul class="simple">
+<li>HartreeFock.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results, print_SCF=&#8217;Yes&#8217;)</li>
+<li>return C, F, D, results</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>input, inputfile object</li>
+<li>set, settingsfile object</li>
+<li>basis, basisset object</li>
+<li>VNN, nuclear-nuclear repulsion</li>
+<li>Te, electronic energy matrix</li>
+<li>S, overlap matrix</li>
+<li>VeN, nuclear-electron attraction matrix</li>
+<li>Vee, ERI matrix</li>
+<li>results, results object</li>
+<li>print_SCF, wether to print SCF to output</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>C, MO coefficients</li>
+<li>F, Fock matrix</li>
+<li>D, density matrix</li>
+<li>results, results obejct with added entries</li>
+<li>results[&#8216;HFenergy&#8217;], total Hartree-Fock energy</li>
+</ul>
+<p>References:</p>
+<ul class="simple">
+<li><a class="reference external" href="http://sirius.chem.vt.edu/wiki/doku.php?id=crawdad:programming:project3">http://sirius.chem.vt.edu/wiki/doku.php?id=crawdad:programming:project3</a></li>
+</ul>
+</div>
+<div class="section" id="unrestricted-hartee-fock">
+<h2>Unrestricted Hartee-Fock<a class="headerlink" href="#unrestricted-hartee-fock" title="Permalink to this headline">¶</a></h2>
+<p>The unrestricted Hartee-Fock method uses the same SCF procedure as as the restricted Hartree-Fock, but with the Fock matrix coupling the alpha and beta spins:</p>
+<div class="math">
+<p><img src="_images/math/92dd4509c6aa4ebee90704017091fdc95b5fa90b.png" alt="F_{n,\alpha,ij}=H_{ij}^{\mathrm{core}}+\sum_{kl}^{\mathrm{AO}}D_{n-1,\alpha,kl}\left(\left(ij\left|\right|kl\right)-\left(ik\left|\right|jl\right)\right)+\sum_{kl}^{\mathrm{AO}}D_{n-1,\beta,kl}\left(ij\left|\right|kl\right)"/></p>
+</div><p>FUNCTION:</p>
+<ul class="simple">
+<li>UHF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results, print_SCF=&#8217;Yes&#8217;)</li>
+<li>return C, F, D, results</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>input, inputfile object</li>
+<li>set, settingsfile object</li>
+<li>basis, basisset object</li>
+<li>VNN, nuclear-nuclear repulsion</li>
+<li>Te, electronic energy matrix</li>
+<li>S, overlap matrix</li>
+<li>VeN, nuclear-electron attraction matrix</li>
+<li>Vee, ERI matrix</li>
+<li>results, results object</li>
+<li>print_SCF, wether to print SCF to output</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>C, MO coefficients</li>
+<li>F, Fock matrix</li>
+<li>D, density matrix</li>
+<li>results, results obejct with added entries</li>
+<li>results[&#8216;UHFenergy&#8217;], total unrestricted Hartree-Fock energy</li>
+</ul>
+<p>References:</p>
+<ul class="simple">
+<li>Szabo and Ostlund, Modern Quantum Chemistry: Introduction to Advanced Electronic Structure Theory</li>
+</ul>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="DIIS.html" class="btn btn-neutral float-right" title="DIIS" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="IntegralTrans.html" class="btn btn-neutral" title="Integral Transformations" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, Erik Kjellgren.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

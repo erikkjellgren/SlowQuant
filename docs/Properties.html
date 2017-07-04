@@ -1,0 +1,332 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Propeties &mdash; SLOWQUANT  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="SLOWQUANT  documentation" href="index.html"/>
+        <link rel="next" title="Geometry optimization" href="GeoOpt.html"/>
+        <link rel="prev" title="Perturbations" href="MPn.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> SLOWQUANT
+          
+
+          
+            
+            <img src="_static/slowquant.png" class="logo" />
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">How to use</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="keywords.html">List of keywords</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Examples.html">Example input files</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Working equations and functions</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="General.html">General Considerations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="MolecularIntegral.html">Molecular Integrals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="IntegralTrans.html">Integral Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="HFMethods.html">Hartree-Fock methods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="DIIS.html">DIIS</a></li>
+<li class="toctree-l1"><a class="reference internal" href="MPn.html">Perturbations</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Propeties</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#molecular-dipole">Molecular dipole</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mulliken-charges">Mulliken charges</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#lowdin-charges">Lowdin charges</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="GeoOpt.html">Geometry optimization</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">SLOWQUANT</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Propeties</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/Properties.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="propeties">
+<h1>Propeties<a class="headerlink" href="#propeties" title="Permalink to this headline">¶</a></h1>
+<p>This section containts information about atomic and molecular properties that can be calculated.</p>
+<div class="section" id="molecular-dipole">
+<h2>Molecular dipole<a class="headerlink" href="#molecular-dipole" title="Permalink to this headline">¶</a></h2>
+<p>The molecular dipole in one dimension is found as:</p>
+<div class="math">
+<p><img src="_images/math/dc1640c2581bd17c09999c0b3fcda77234c3f0df.png" alt="\mu_{x}=-\sum_{i}\sum_{j}D_{i,j}\left(i\left|x\right|j\right)+\sum_{A}Z_{A}X_{A}"/></p>
+</div><p>FUNCTION:</p>
+<ul class="simple">
+<li>Properties.dipolemoment(basis, input, D, results)</li>
+<li>return results</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>basis, basisset object</li>
+<li>input, inputfile object</li>
+<li>D, density matrix</li>
+<li>results, results object</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>results, results obejct with added entries</li>
+<li>results[&#8216;dipolex&#8217;] = ux</li>
+<li>results[&#8216;dipoley&#8217;] = uy</li>
+<li>results[&#8216;dipolez&#8217;] = uz</li>
+<li>results[&#8216;dipoletot&#8217;] = u</li>
+</ul>
+<p>Refrence:</p>
+<ul class="simple">
+<li>Szabo and Ostlund, Modern Quantum Chemistry: Introduction to Advanced Electronic Structure Theory</li>
+</ul>
+</div>
+<div class="section" id="mulliken-charges">
+<h2>Mulliken charges<a class="headerlink" href="#mulliken-charges" title="Permalink to this headline">¶</a></h2>
+<p>The atomic charge of the A&#8217;th atom can be found as:</p>
+<div class="math">
+<p><img src="_images/math/a93cd379353a2396b1a558c3ee9e43004abc957e.png" alt="q_{A}=Z_{A}-\sum_{i\in A}\left(D\cdot S\right)_{i,i}"/></p>
+</div><p>FUNCTION:</p>
+<ul class="simple">
+<li>Properties.MulCharge(basis, input, D)</li>
+<li>None</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>basis, basisset object</li>
+<li>input, inputfile object</li>
+<li>D, density matrix</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>None</li>
+</ul>
+<p>Refrence:</p>
+<ul class="simple">
+<li>Szabo and Ostlund, Modern Quantum Chemistry: Introduction to Advanced Electronic Structure Theory</li>
+</ul>
+</div>
+<div class="section" id="lowdin-charges">
+<h2>Lowdin charges<a class="headerlink" href="#lowdin-charges" title="Permalink to this headline">¶</a></h2>
+<p>The atomic charge of the A&#8217;th atom can be found as:</p>
+<div class="math">
+<p><img src="_images/math/e0d9ddb04b35a69dca78a16ad0c32e74bea50411.png" alt="q_{A}=Z_{A}-\sum_{i\in A}\left(S^{1/2}\cdot D\cdot S^{1/2}\right)_{i,i}"/></p>
+</div><p>FUNCTION:</p>
+<ul class="simple">
+<li>Properties.LowdinCharge(basis, input, D)</li>
+<li>None</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>basis, basisset object</li>
+<li>input, inputfile object</li>
+<li>D, density matrix</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>None</li>
+</ul>
+<p>Refrence:</p>
+<ul class="simple">
+<li>Szabo and Ostlund, Modern Quantum Chemistry: Introduction to Advanced Electronic Structure Theory</li>
+</ul>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="GeoOpt.html" class="btn btn-neutral float-right" title="Geometry optimization" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="MPn.html" class="btn btn-neutral" title="Perturbations" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, Erik Kjellgren.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

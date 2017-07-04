@@ -1,0 +1,67 @@
+
+
+Hartree Fock methods
+====================
+
+In this section the Hartree-Fock methods will be described.
+
+Restricted Hartree Fock
+-----------------------
+
+For the Roothan-Hartee-Fock equations an orthogonal basis is needed, first the first orthogonalization matrix is constructed from the overlap matrix. First by a diagonalization:
+
+.. math::
+   SL_{S}=L_{S}\Lambda_{S}
+
+and then the orthogonalization matrix is constructed:
+
+.. math::
+   S_{\mathrm{ortho}}=L_{S}\Lambda_{S}^{-1/2}L_{S}^{T}
+
+The SCF iterations requires an initial Fock matrix given as:
+
+.. math::
+   F_{0}=H^{\mathrm{core}}
+
+The SCF procedure is calulated as the following equations. First the fock matrix is constructed:
+
+.. math::
+   \left.F_{n,ij}\right|_{n\neq0}=H_{ij}^{\mathrm{core}}+\sum_{kl}^{\mathrm{AO}}D_{n-1,kl}\left(2\left(ij\left|\right|kl\right)-\left(ik\left|\right|jl\right)\right)
+
+Then the Fock matrix is brought into the orthogonal basis:
+
+.. math::
+   F_{n}^{'}=S_{\mathrm{ortho}}^{T}H^{\mathrm{core}}S_{\mathrm{ortho}}
+
+The F' is then diagonalized:
+
+.. math::
+   F_{n}^{'}C_{n}^{'}=C_{n}^{'}\epsilon_{n}
+
+The coefficients are transformed back:
+
+.. math::
+   C_{n}=S_{\mathrm{ortho}}C_{n}^{'}
+
+A density matrix can be made from the coefficients:
+
+.. math::
+   D_{n,ij}=\sum_{k}^{\mathrm{occ}}C_{n,ki}C_{n,kj}
+
+The electronic energy of system can be found as:
+
+.. math::
+   E_{n,\mathrm{elec}}=\sum_{ij}^{\mathrm{AO}}D_{0,ij}\left(H_{ij}^{\mathrm{core}}+F_{n,ij}\right)
+
+The above SCF procedure will is stopped at certain tresholds. The change in energy and the RMSD of the density matrix can be found as:
+
+.. math::
+   \Delta E_{n}=E_{n,\mathrm{elec}}-E_{n-1,\mathrm{elec}}
+
+   \mathrm{RMSD}_{n}=\sqrt{\sum_{ij}D_{n,ij}-D_{n-1,ij}}
+
+
+Unrestricted Hartee Fock
+------------------------
+
+More exciting documentation in here.

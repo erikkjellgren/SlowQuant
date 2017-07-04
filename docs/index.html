@@ -1,0 +1,323 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>SlowQuant &mdash; SLOWQUANT  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="SLOWQUANT  documentation" href="#"/>
+        <link rel="next" title="List of keywords" href="keywords.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="#" class="icon icon-home"> SLOWQUANT
+          
+
+          
+            
+            <img src="_static/slowquant.png" class="logo" />
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">How to use</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="keywords.html">List of keywords</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Examples.html">Example input files</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Working equations and functions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="General.html">General Considerations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="MolecularIntegral.html">Molecular Integrals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="IntegralTrans.html">Integral Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="HFMethods.html">Hartree-Fock methods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="DIIS.html">DIIS</a></li>
+<li class="toctree-l1"><a class="reference internal" href="MPn.html">Perturbations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Properties.html">Propeties</a></li>
+<li class="toctree-l1"><a class="reference internal" href="GeoOpt.html">Geometry optimization</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">SLOWQUANT</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="#">Docs</a> &raquo;</li>
+        
+      <li>SlowQuant</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="slowquant">
+<h1>SlowQuant<a class="headerlink" href="#slowquant" title="Permalink to this headline">¶</a></h1>
+<p>SlowQuant is a molecular quantum chemistry program written in python. Even the computational demanding parts are written in python, so it lacks speed, thus the name SlowQuant. The program is run from SlowQuant.py by specifing an input file and a settings file in the buttom of the script.</p>
+<p>SlowQuant have the following requirements:</p>
+<ul class="simple">
+<li>Python 3.4 or above</li>
+<li>Numpy</li>
+<li>Scipy</li>
+</ul>
+<div class="toctree-wrapper compound">
+<p class="caption"><span class="caption-text">How to use</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="keywords.html">List of keywords</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="keywords.html#integrals">Integrals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="keywords.html#initial-method">Initial Method</a></li>
+<li class="toctree-l2"><a class="reference internal" href="keywords.html#scf">SCF</a></li>
+<li class="toctree-l2"><a class="reference internal" href="keywords.html#perturbation">Perturbation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="keywords.html#properties">Properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="keywords.html#geomoetry-optimization">Geomoetry Optimization</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="Examples.html">Example input files</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="Examples.html#hartree-fock-calculation">Hartree-Fock calculation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Examples.html#mp2-calculation">MP2 calculation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Examples.html#geometry-optimization">Geometry optimization</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<p class="caption"><span class="caption-text">Working equations and functions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="General.html">General Considerations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="General.html#basisset-object">Basisset object</a></li>
+<li class="toctree-l2"><a class="reference internal" href="General.html#inputfile-obejct">Inputfile obejct</a></li>
+<li class="toctree-l2"><a class="reference internal" href="General.html#settings-obejct">Settings obejct</a></li>
+<li class="toctree-l2"><a class="reference internal" href="General.html#results-object">Results object</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="MolecularIntegral.html">Molecular Integrals</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="MolecularIntegral.html#boys-function">Boys Function</a></li>
+<li class="toctree-l2"><a class="reference internal" href="MolecularIntegral.html#expansion-coefficients">Expansion coefficients</a></li>
+<li class="toctree-l2"><a class="reference internal" href="MolecularIntegral.html#hermite-coulomb-integral">Hermite coulomb integral</a></li>
+<li class="toctree-l2"><a class="reference internal" href="MolecularIntegral.html#overlap">Overlap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="MolecularIntegral.html#kinetic-energy">Kinetic energy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="MolecularIntegral.html#electron-nuclear-attraction">Electron-nuclear attraction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="MolecularIntegral.html#electron-nuclear-field">Electron-nuclear field</a></li>
+<li class="toctree-l2"><a class="reference internal" href="MolecularIntegral.html#electron-electron-repulsion">Electron-electron repulsion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="MolecularIntegral.html#nuclear-nuclear-repulsion">Nuclear-nuclear repulsion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="MolecularIntegral.html#nuclear-nuclear-field">Nuclear-nuclear field</a></li>
+<li class="toctree-l2"><a class="reference internal" href="MolecularIntegral.html#dipole-moment-integral">Dipole moment integral</a></li>
+<li class="toctree-l2"><a class="reference internal" href="MolecularIntegral.html#cauchy-schwarz-inequality">Cauchy-Schwarz inequality</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="IntegralTrans.html">Integral Transformations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="IntegralTrans.html#ao-to-mo-basis-2-electron-integrals">AO to MO basis 2 electron integrals</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="HFMethods.html">Hartree-Fock methods</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="HFMethods.html#restricted-hartree-fock">Restricted Hartree-Fock</a></li>
+<li class="toctree-l2"><a class="reference internal" href="HFMethods.html#unrestricted-hartee-fock">Unrestricted Hartee-Fock</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="DIIS.html">DIIS</a></li>
+<li class="toctree-l1"><a class="reference internal" href="MPn.html">Perturbations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="MPn.html#moller-plesset-second-order">Møller-Plesset, second order</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="Properties.html">Propeties</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="Properties.html#molecular-dipole">Molecular dipole</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Properties.html#mulliken-charges">Mulliken charges</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Properties.html#lowdin-charges">Lowdin charges</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="GeoOpt.html">Geometry optimization</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="GeoOpt.html#gradient-descent">Gradient Descent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="GeoOpt.html#analytic-hartree-fock">Analytic Hartree-Fock</a></li>
+<li class="toctree-l2"><a class="reference internal" href="GeoOpt.html#finite-difference">Finite difference</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="keywords.html" class="btn btn-neutral float-right" title="List of keywords" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, Erik Kjellgren.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

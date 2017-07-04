@@ -1,0 +1,341 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>List of keywords &mdash; SLOWQUANT  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="SLOWQUANT  documentation" href="index.html"/>
+        <link rel="next" title="Example input files" href="Examples.html"/>
+        <link rel="prev" title="SlowQuant" href="index.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> SLOWQUANT
+          
+
+          
+            
+            <img src="_static/slowquant.png" class="logo" />
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">How to use</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">List of keywords</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#integrals">Integrals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#initial-method">Initial Method</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#scf">SCF</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#perturbation">Perturbation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#properties">Properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#geomoetry-optimization">Geomoetry Optimization</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="Examples.html">Example input files</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Working equations and functions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="General.html">General Considerations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="MolecularIntegral.html">Molecular Integrals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="IntegralTrans.html">Integral Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="HFMethods.html">Hartree-Fock methods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="DIIS.html">DIIS</a></li>
+<li class="toctree-l1"><a class="reference internal" href="MPn.html">Perturbations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Properties.html">Propeties</a></li>
+<li class="toctree-l1"><a class="reference internal" href="GeoOpt.html">Geometry optimization</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">SLOWQUANT</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>List of keywords</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/keywords.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="list-of-keywords">
+<h1>List of keywords<a class="headerlink" href="#list-of-keywords" title="Permalink to this headline">¶</a></h1>
+<p>Settings are given in the setting inputfile by using the below keywords. The order of the keywords in the setting inputfile does not matter at all.</p>
+<ul class="simple">
+<li>basisset;x</li>
+</ul>
+<p>x=bassiset used in calculation. STO2G, STO3G, DZ, DZP, 3-21G, 6-31ppGss (6-31++G**), 6-31Gs (6-31G*), 6-31pGs (6-31+G*).</p>
+<div class="section" id="integrals">
+<h2>Integrals<a class="headerlink" href="#integrals" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>Cauchy-Schwarz Threshold;x</li>
+</ul>
+<p>Threshold for not calculating an ERI, given as 10^-x</p>
+</div>
+<div class="section" id="initial-method">
+<h2>Initial Method<a class="headerlink" href="#initial-method" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>Initial Method;x</li>
+</ul>
+<p>Method to use during SCF. x=HF for Hartree-Fock calculation. x=UHF for unrestricted Hartree-Fock calculation.</p>
+<ul class="simple">
+<li>UHF mix guess;x</li>
+</ul>
+<p>Mix initial coefficients to break spin symmetry</p>
+</div>
+<div class="section" id="scf">
+<h2>SCF<a class="headerlink" href="#scf" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>SCF Energy Threshold;x</li>
+</ul>
+<p>Threshold for convergence of the SCF, given as 10^-x</p>
+<ul class="simple">
+<li>SCF RMSD Threshold;x</li>
+</ul>
+<p>Threshold for convergence of the SCF, given as 10^-x</p>
+<ul class="simple">
+<li>SCF Max iterations;x</li>
+</ul>
+<p>Maximum SCF iterations</p>
+<ul class="simple">
+<li>DIIS;x</li>
+</ul>
+<p>Activation of DISS, x=Yes</p>
+<ul class="simple">
+<li>Keep Steps;x</li>
+</ul>
+<p>Number of steps saved in the DIIS algorithm</p>
+</div>
+<div class="section" id="perturbation">
+<h2>Perturbation<a class="headerlink" href="#perturbation" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>MPn;x</li>
+</ul>
+<p>Møller-Plesset energy correction, x=MP2</p>
+</div>
+<div class="section" id="properties">
+<h2>Properties<a class="headerlink" href="#properties" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>Charge;x</li>
+</ul>
+<p>Calculation of atomic charges. x=Mulliken gives Mulliken charges. x=Lowdin gives Lowdin charges.</p>
+<ul class="simple">
+<li>Dipole;x</li>
+</ul>
+<p>Calcultion of molecular dipolemomemnt. x=Yes for calcultion.</p>
+</div>
+<div class="section" id="geomoetry-optimization">
+<h2>Geomoetry Optimization<a class="headerlink" href="#geomoetry-optimization" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>GeoOpt;x</li>
+</ul>
+<p>Turns on geometry optimization. x=Yes to turn it on. Only works for Hartree-Fock.</p>
+<ul class="simple">
+<li>Max iteration GeoOpt;x</li>
+</ul>
+<p>Maximum geometry optimization steps.</p>
+<ul class="simple">
+<li>Geometry Tolerance;x</li>
+</ul>
+<p>Tolerance for convergence, given as 10^-x</p>
+<ul class="simple">
+<li>Gradient Decent Step;x</li>
+</ul>
+<p>Gradient scaling factor in Gradient Decent algorithm</p>
+<ul class="simple">
+<li>Force Numeric;x</li>
+</ul>
+<p>Choose to evaluate Forces numerically. x=Yes to activate. Only works for Hartree-Fock.</p>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="Examples.html" class="btn btn-neutral float-right" title="Example input files" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="index.html" class="btn btn-neutral" title="SlowQuant" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, Erik Kjellgren.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

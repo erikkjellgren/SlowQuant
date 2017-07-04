@@ -1,0 +1,21 @@
+
+Molecular Integrals
+===================
+
+Contains the information about how the integrals are calculated.
+
+Overlap
+-------
+
+.. math::
+
+   S_{i+1,j}=X_{PA}S_{ij}+\frac{1}{2p}\left(iS_{i-1,j}+jS_{i,j-1}\right)
+
+   S_{i,j+1}=X_{PB}S_{ij}+\frac{1}{2p}\left(iS_{i-1,j}+jS_{i,j-1}\right)
+
+With the boundary condition that:
+
+.. math::
+
+   S_{00}=\sqrt{\frac{\pi}{p}}\exp\left(-\mu X_{AB}^{2}\right)
+

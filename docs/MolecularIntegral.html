@@ -1,0 +1,709 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Molecular Integrals &mdash; SLOWQUANT  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="SLOWQUANT  documentation" href="index.html"/>
+        <link rel="next" title="Integral Transformations" href="IntegralTrans.html"/>
+        <link rel="prev" title="General Considerations" href="General.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> SLOWQUANT
+          
+
+          
+            
+            <img src="_static/slowquant.png" class="logo" />
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">How to use</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="keywords.html">List of keywords</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Examples.html">Example input files</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Working equations and functions</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="General.html">General Considerations</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Molecular Integrals</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#boys-function">Boys Function</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#expansion-coefficients">Expansion coefficients</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#hermite-coulomb-integral">Hermite coulomb integral</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#overlap">Overlap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#kinetic-energy">Kinetic energy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#electron-nuclear-attraction">Electron-nuclear attraction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#electron-nuclear-field">Electron-nuclear field</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#electron-electron-repulsion">Electron-electron repulsion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#nuclear-nuclear-repulsion">Nuclear-nuclear repulsion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#nuclear-nuclear-field">Nuclear-nuclear field</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dipole-moment-integral">Dipole moment integral</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#cauchy-schwarz-inequality">Cauchy-Schwarz inequality</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="IntegralTrans.html">Integral Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="HFMethods.html">Hartree-Fock methods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="DIIS.html">DIIS</a></li>
+<li class="toctree-l1"><a class="reference internal" href="MPn.html">Perturbations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Properties.html">Propeties</a></li>
+<li class="toctree-l1"><a class="reference internal" href="GeoOpt.html">Geometry optimization</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">SLOWQUANT</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Molecular Integrals</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/MolecularIntegral.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="molecular-integrals">
+<h1>Molecular Integrals<a class="headerlink" href="#molecular-integrals" title="Permalink to this headline">¶</a></h1>
+<p>Contains the information about how the integrals are calculated. In the equations in this section the following definitions is used.</p>
+<div class="math">
+<p><img src="_images/math/670c1c7ac81b2e4cfdf0cb4ffc0fe160d0c7a774.png" alt="p=a+b"/></p>
+</div><div class="math">
+<p><img src="_images/math/718d4c83f3e31a748c3e69d77c116dee6d4a2083.png" alt="\mu=\frac{ab}{a+b}"/></p>
+</div><div class="math">
+<p><img src="_images/math/7e26ba5946d7e2678e7c59313d0879d9a4c1503a.png" alt="P_{x}=\frac{aA_{x}+bB_{x}}{p}"/></p>
+</div><div class="math">
+<p><img src="_images/math/620d9bc5c1d6501084b3d66bd85afa11e6d40d55.png" alt="X_{AB}=A_{x}-B_{x}"/></p>
+</div><p>Here a and b are Gaussian exponent factors. Ax and Bx are the position of the Gaussians in one dimension. Further the basisset functions is of Gaussian kind and given as:</p>
+<div class="math">
+<p><img src="_images/math/6fdf87f713dfbadff22be07b15b00db85bf3d513.png" alt="\phi_{A}\left(r\right)=N\left(x-A_{x}\right)^{l}\left(y-A_{y}\right)^{m}\left(z-A_{z}\right)^{n}\exp\left(-\zeta\left(\vec{r}-\vec{A}\right)^{2}\right)"/></p>
+</div><p>with a normalization constant given as:</p>
+<div class="math">
+<p><img src="_images/math/eda23067ca9835526f6190e9dc82ba9e8b56365e.png" alt="N=\left(\frac{2\alpha}{\pi}\right)^{3/4}\left[\frac{\left(8\alpha\right)^{l+m+n}l!m!n!}{\left(2l\right)!\left(2m\right)!\left(2n\right)!}\right]"/></p>
+</div><div class="section" id="boys-function">
+<h2>Boys Function<a class="headerlink" href="#boys-function" title="Permalink to this headline">¶</a></h2>
+<p>The Boys function is given as:</p>
+<div class="math">
+<p><img src="_images/math/6f154e4ed18da49646e5c46a41351ef2da89e9c1.png" alt="F_{n}\left(x\right)=\int_{0}^{1}\exp\left(-xt^{2}\right)t^{2n}dt"/></p>
+</div><p>FUNCTION:</p>
+<ul class="simple">
+<li>MolecularIntegrals.boys(m,T)</li>
+<li>return value</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>m, subscript of the Boys function</li>
+<li>T, argument of the Boys function</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>value, value corrosponding to given m and T</li>
+</ul>
+<p>References:</p>
+<ul class="simple">
+<li>Trygve Helgaker, Poul Jorgensen and Jeppe Olsen, Molecular Electronic-Structure Theory</li>
+</ul>
+</div>
+<div class="section" id="expansion-coefficients">
+<h2>Expansion coefficients<a class="headerlink" href="#expansion-coefficients" title="Permalink to this headline">¶</a></h2>
+<p>The expansion coefficient is found by the following recurrence relation:</p>
+<div class="math">
+<p><img src="_images/math/cd016ef6ef7fa0e217a8e9a19b90ef2d2009d1c2.png" alt="E_{t}^{i,j}=0,\,\,\,\,t&lt;0\,\,\mathrm{or}\,\,t&gt;i+j
+
+E_{t}^{i+1,j}=\frac{1}{2p}E_{t-1}^{i,j}+X_{\mathrm{PA}}E_{t}^{i,j}+\left(t+1\right)E_{t+1}^{i,j}
+
+E_{t}^{i,j+1}=\frac{1}{2p}E_{t-1}^{i,j}+X_{\mathrm{PB}}E_{t}^{i,j}+\left(t+1\right)E_{t+1}^{i,j}"/></p>
+</div><p>With the boundary condition that:</p>
+<div class="math">
+<p><img src="_images/math/f5dfbded3ab11cc0e5cd65948e91639160f33af5.png" alt="E_{0}^{0,0}=\exp\left(-pX_{\mathrm{AB}}^{2}\right)"/></p>
+</div><p>FUNCTION:</p>
+<ul class="simple">
+<li>MolecularIntegrals.E(i,j,t,Qx,a,b,XPA,XPB,XAB)</li>
+<li>return val</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>i, input values</li>
+<li>j, input values</li>
+<li>t, input values</li>
+<li>Qx, input values</li>
+<li>a, input values</li>
+<li>b, input values</li>
+<li>XPA, input values</li>
+<li>XPB, input values</li>
+<li>XAB, input values</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>val, value corrosponding to the given input</li>
+</ul>
+<p>References:</p>
+<ul class="simple">
+<li>Trygve Helgaker, Poul Jorgensen and Jeppe Olsen, Molecular Electronic-Structure Theory</li>
+<li><a class="reference external" href="http://joshuagoings.com/assets/integrals.pdf">http://joshuagoings.com/assets/integrals.pdf</a></li>
+</ul>
+</div>
+<div class="section" id="hermite-coulomb-integral">
+<h2>Hermite coulomb integral<a class="headerlink" href="#hermite-coulomb-integral" title="Permalink to this headline">¶</a></h2>
+<p>The hermite coulomb integrals is given as the following recurrence relations:</p>
+<div class="math">
+<p><img src="_images/math/9dbed7a064ecdfe30c3abd15985bcee747917a6e.png" alt="R_{t+1,u,v}^{n}\left(p,R_{\mathrm{PC}}\right)=tR_{t-1,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)+X_{\mathrm{PC}}R_{t,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)
+
+R_{t,u+1,v}^{n}\left(p,R_{\mathrm{PC}}\right)=uR_{t,u-1,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)+Y_{\mathrm{PC}}R_{t,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)
+
+R_{t,u,v+1}^{n}\left(p,R_{\mathrm{PC}}\right)=vR_{t,u,v-1}^{n+1}\left(p,R_{\mathrm{PC}}\right)+Z_{\mathrm{PC}}R_{t,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)"/></p>
+</div><p>With the boundary condition:</p>
+<div class="math">
+<p><img src="_images/math/f156200f7a8a9a2af93947d614babe4e8c266e37.png" alt="R_{0,0,0}^{n}\left(p,R_{\mathrm{PC}}\right)=\left(-2p\right)^{n}F_{n}\left(pR_{\mathrm{PC}}^{2}\right)"/></p>
+</div><p>FUNCTION:</p>
+<ul class="simple">
+<li>MolecularIntegrals.R(t,u,v,n,p,PCx,PCy,PCz,RPC)</li>
+<li>return val</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>t, input value</li>
+<li>u, input value</li>
+<li>v, input value</li>
+<li>n, input value</li>
+<li>p, input value</li>
+<li>PCx, input value</li>
+<li>PCy, input value</li>
+<li>PCz, input value</li>
+<li>RPC, input value</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>val, value corrosponding to the given input</li>
+</ul>
+<p>References:</p>
+<ul class="simple">
+<li>Trygve Helgaker, Poul Jorgensen and Jeppe Olsen, Molecular Electronic-Structure Theory</li>
+<li><a class="reference external" href="http://joshuagoings.com/assets/integrals.pdf">http://joshuagoings.com/assets/integrals.pdf</a></li>
+</ul>
+</div>
+<div class="section" id="overlap">
+<h2>Overlap<a class="headerlink" href="#overlap" title="Permalink to this headline">¶</a></h2>
+<p>The overlap integrals are solved by the following recurrence relation:</p>
+<div class="math">
+<p><img src="_images/math/507cf5d17511789d54c3dca2d6f20eb54d302144.png" alt="S_{i+1,j}=X_{PA}S_{ij}+\frac{1}{2p}\left(iS_{i-1,j}+jS_{i,j-1}\right)
+
+S_{i,j+1}=X_{PB}S_{ij}+\frac{1}{2p}\left(iS_{i-1,j}+jS_{i,j-1}\right)"/></p>
+</div><p>With the boundary condition that:</p>
+<div class="math">
+<p><img src="_images/math/1bd6ca56103861721f56d5e91a3c24c5f66fb547.png" alt="S_{00}=\sqrt{\frac{\pi}{p}}\exp\left(-\mu X_{AB}^{2}\right)"/></p>
+</div><p>FUNCTION:</p>
+<ul class="simple">
+<li>MolecularIntegrals.Overlap(a, b, la, lb, Ax, Bx)</li>
+<li>return Sij</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>a, Gaussian exponent factor</li>
+<li>b, Gaussian exponent factor</li>
+<li>la, angular momentum quantum number</li>
+<li>lb, angular momentum quantum number</li>
+<li>Ax, position along one axis</li>
+<li>Bx, position along one axis</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>Sij, non-normalized overlap element in one dimension</li>
+</ul>
+<p>References:</p>
+<ul class="simple">
+<li>Trygve Helgaker, Poul Jorgensen and Jeppe Olsen, Molecular Electronic-Structure Theory</li>
+</ul>
+</div>
+<div class="section" id="kinetic-energy">
+<h2>Kinetic energy<a class="headerlink" href="#kinetic-energy" title="Permalink to this headline">¶</a></h2>
+<p>The kinetic energy integrals are solved by the following recurrence relation:</p>
+<div class="math">
+<p><img src="_images/math/cc45153852fa52c63a75f2471b3ab5fd56b43f60.png" alt="T_{i+1,j}=X_{\mathrm{PA}}T_{i,j}+\frac{1}{2p}\left(iT_{i-1,j}+jT_{i,j-1}\right)+\frac{b}{p}\left(2aS_{i+1,j}-iS_{i-1,j}\right)
+
+T_{i,j+1}=X_{\mathrm{PB}}T_{i,j}+\frac{1}{2p}\left(iT_{i-1,j}+jT_{i,j-1}\right)+\frac{a}{p}\left(2bS_{i,j+1}-iS_{i,j-1}\right)"/></p>
+</div><p>With the boundary condition that:</p>
+<div class="math">
+<p><img src="_images/math/30c1caed6d45921a8003b439300645e279712582.png" alt="T_{00}=\left[a-2a^{2}\left(X_{\mathrm{PA}}^{2}+\frac{1}{2p}\right)\right]S_{00}"/></p>
+</div><p>FUNCTION:</p>
+<ul class="simple">
+<li>Kin(a, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na, nb, N1, N2, c1, c2)</li>
+<li>return Tij, Sij</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>a, Gaussian exponent factor</li>
+<li>b, Gaussian exponent factor</li>
+<li>Ax, position along the x-axis</li>
+<li>Bx, position along the x-axis</li>
+<li>Ay, position along the y-axis</li>
+<li>By, position along the y-axis</li>
+<li>Az, position along the z-axis</li>
+<li>Bz, position along the z-axis</li>
+<li>la, angular momentum quantum number</li>
+<li>lb, angular momentum quantum number</li>
+<li>ma, angular momentum quantum number</li>
+<li>mb, angular momentum quantum number</li>
+<li>na, angular momentum quantum number</li>
+<li>nb, angular momentum quantum number</li>
+<li>N1, normalization constant</li>
+<li>N2, normalization constant</li>
+<li>c1, Gaussian prefactor</li>
+<li>c2, Gaussian prefactor</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>Tij, normalized kinetic energy matrix element</li>
+<li>Sij, normalized overlap matrix element</li>
+</ul>
+<p>References:</p>
+<ul class="simple">
+<li>Trygve Helgaker, Poul Jorgensen and Jeppe Olsen, Molecular Electronic-Structure Theory</li>
+</ul>
+</div>
+<div class="section" id="electron-nuclear-attraction">
+<h2>Electron-nuclear attraction<a class="headerlink" href="#electron-nuclear-attraction" title="Permalink to this headline">¶</a></h2>
+<p>The electron-nuclear interaction integral is given as:</p>
+<div class="math">
+<p><img src="_images/math/1e47261d87c24723a3651203285c580b7534c6e3.png" alt="V_{ijklmn}^{000}=\frac{2\pi}{p}\sum_{t}^{i+j}E_{t}^{ij}\sum_{u}^{k+l}E_{u}^{kl}\sum_{v}^{m+n}E_{v}^{mn}R_{tuv}"/></p>
+</div><p>FUNCTION:</p>
+<ul class="simple">
+<li>MolecularIntegrals.elnuc(a, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, input)</li>
+<li>return Vij</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>a, Gaussian exponent factor</li>
+<li>b, Gaussian exponent factor</li>
+<li>Ax, position along the x-axis</li>
+<li>Ay, position along the y-axis</li>
+<li>Az, position along the z-axis</li>
+<li>Bx, position along the x-axis</li>
+<li>By, position along the y-axis</li>
+<li>Bz, position along the z-axis</li>
+<li>l1, angular momentum quantum number</li>
+<li>l2, angular momentum quantum number</li>
+<li>m1, angular momentum quantum number</li>
+<li>n1, angular momentum quantum number</li>
+<li>n2, angular momentum quantum number</li>
+<li>N1, normalization constant</li>
+<li>N2, normalization constant</li>
+<li>c1, Gaussian prefactor</li>
+<li>c2, Gaussian prefactor</li>
+<li>input, inputfile object</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>Vij, normalized electron-nuclei attraction matrix element</li>
+</ul>
+<p>References:</p>
+<ul class="simple">
+<li>Trygve Helgaker, Poul Jorgensen and Jeppe Olsen, Molecular Electronic-Structure Theory</li>
+<li><a class="reference external" href="http://joshuagoings.com/assets/integrals.pdf">http://joshuagoings.com/assets/integrals.pdf</a></li>
+</ul>
+</div>
+<div class="section" id="electron-nuclear-field">
+<h2>Electron-nuclear field<a class="headerlink" href="#electron-nuclear-field" title="Permalink to this headline">¶</a></h2>
+<p>The electron-nuclear interaction integral is given as:</p>
+<div class="math">
+<p><img src="_images/math/cf4518b1f90454818007b456404fdf3669e614b5.png" alt="V_{ijklmn}^{efg}=\left(-1\right)^{e+f+g}\frac{2\pi}{p}\sum_{t}^{i+j}E_{t}^{ij}\sum_{u}^{k+l}E_{u}^{kl}\sum_{v}^{m+n}E_{v}^{mn}R_{t+e,u+f,v+g}"/></p>
+</div><p>Here e, f and g detones the order of derivate with respect to x, y and z</p>
+<p>FUNCTION:</p>
+<ul class="simple">
+<li>MolecularIntegrals.electricfield(a, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, input, derivative, atomidx)</li>
+<li>return VijA</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>a, Gaussian exponent factor</li>
+<li>b, Gaussian exponent factor</li>
+<li>Ax, position along the x-axis</li>
+<li>Ay, position along the y-axis</li>
+<li>Az, position along the z-axis</li>
+<li>Bx, position along the x-axis</li>
+<li>By, position along the y-axis</li>
+<li>Bz, position along the z-axis</li>
+<li>l1, angular momentum quantum number</li>
+<li>l2, angular momentum quantum number</li>
+<li>m1, angular momentum quantum number</li>
+<li>n1, angular momentum quantum number</li>
+<li>n2, angular momentum quantum number</li>
+<li>N1, normalization constant</li>
+<li>N2, normalization constant</li>
+<li>c1, Gaussian prefactor</li>
+<li>c2, Gaussian prefactor</li>
+<li>input, inputfile object</li>
+<li>derivative, axis of derivative (dx,dy or dz)</li>
+<li>atomidx, index of atom for which the electricfield is calculated</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>VijA, normalized electron-nuclei field of nuclei A matrix element</li>
+</ul>
+<p>References:</p>
+<ul class="simple">
+<li>Trygve Helgaker, Poul Jorgensen and Jeppe Olsen, Molecular Electronic-Structure Theory</li>
+</ul>
+</div>
+<div class="section" id="electron-electron-repulsion">
+<h2>Electron-electron repulsion<a class="headerlink" href="#electron-electron-repulsion" title="Permalink to this headline">¶</a></h2>
+<p>The electron-electron repulsion integral is calculated as:</p>
+<div class="math">
+<p><img src="_images/math/283dbf3109baffb1b0b8ee384693c474e63f11a7.png" alt="g_{abcd}=\sum_{t}^{l1+l2}E_{t}^{ab}\sum_{u}^{m1+m2}E_{u}^{ab}\sum_{v}^{n1+n2}E_{v}^{ab}\sum_{\tau}^{l3+l4}E_{\tau}^{cd}\sum_{\nu}^{m3+m4}E_{\nu}^{cd}\sum_{\phi}^{n3+n4}E_{\phi}^{cd}\left(-1\right)^{\tau+\nu+\phi}\frac{2\pi^{5/2}}{pq\sqrt{p+q}}R_{t+\tau,u+\nu,v+\phi}\left(\alpha,R_{\mathrm{PQ}}\right)"/></p>
+</div><p>FUNCTION:</p>
+<ul class="simple">
+<li>MolecularIntegrals.elelrep(a, b, c, d, Ax, Ay, Az, Bx, By, Bz, Cx, Cy, Cz, Dx, Dy, Dz, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, N4, c1, c2, c3, c4)</li>
+<li>return Veeijkl</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>a, Gaussian exponent factor</li>
+<li>b, Gaussian exponent factor</li>
+<li>c, Gaussian exponent factor</li>
+<li>d, Gaussian exponent factor</li>
+<li>Ax, position along the x-axis</li>
+<li>Ay, position along the y-axis</li>
+<li>Az, position along the z-axis</li>
+<li>Bx, position along the x-axis</li>
+<li>By, position along the y-axis</li>
+<li>Bz, position along the z-axis</li>
+<li>Cx, position along the x-axis</li>
+<li>Cy, position along the y-axis</li>
+<li>Cz, position along the z-axis</li>
+<li>Dx, position along the x-axis</li>
+<li>Dy, position along the y-axis</li>
+<li>Dz, position along the z-axis</li>
+<li>l1, angular momentum quantum number</li>
+<li>l2, angular momentum quantum number</li>
+<li>l3, angular momentum quantum number</li>
+<li>l4, angular momentum quantum number</li>
+<li>m1, angular momentum quantum number</li>
+<li>m2, angular momentum quantum number</li>
+<li>m3, angular momentum quantum number</li>
+<li>m4, angular momentum quantum number</li>
+<li>n1, angular momentum quantum number</li>
+<li>n2, angular momentum quantum number</li>
+<li>n3, angular momentum quantum number</li>
+<li>n4, angular momentum quantum number</li>
+<li>N1, normalization constant</li>
+<li>N2, normalization constant</li>
+<li>N3, normalization constant</li>
+<li>N4, normalization constant</li>
+<li>c1, Gaussian prefactor</li>
+<li>c2, Gaussian prefactor</li>
+<li>c3, Gaussian prefactor</li>
+<li>c4, Gaussian prefactor</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>Veeijkl, normalized electron-electron repulsion matrix element</li>
+</ul>
+<p>References:</p>
+<ul class="simple">
+<li>Trygve Helgaker, Poul Jorgensen and Jeppe Olsen, Molecular Electronic-Structure Theory</li>
+<li><a class="reference external" href="http://joshuagoings.com/assets/integrals.pdf">http://joshuagoings.com/assets/integrals.pdf</a></li>
+</ul>
+</div>
+<div class="section" id="nuclear-nuclear-repulsion">
+<h2>Nuclear-nuclear repulsion<a class="headerlink" href="#nuclear-nuclear-repulsion" title="Permalink to this headline">¶</a></h2>
+<p>The nucleus-nucleus repulsion term is calculated with classical nuclie as follows:</p>
+<div class="math">
+<p><img src="_images/math/b9fa3c823afdc15f0995de7809874c6968270d10.png" alt="V_{NN}=\sum_{A}\sum_{B&lt;A}\frac{Z_{A}Z_{B}}{r_{AB}}"/></p>
+</div><p>FUNCTION:</p>
+<ul class="simple">
+<li>MolecularIntegrals.nucrep(input)</li>
+<li>return Vnn</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>input, inputfile object</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>Vnn, nuclear repulsion energy</li>
+</ul>
+<p>References:</p>
+<ul class="simple">
+<li>None</li>
+</ul>
+</div>
+<div class="section" id="nuclear-nuclear-field">
+<h2>Nuclear-nuclear field<a class="headerlink" href="#nuclear-nuclear-field" title="Permalink to this headline">¶</a></h2>
+<p>The nucleus-nucleus field term is calculated with classical nuclie as follows:</p>
+<div class="math">
+<p><img src="_images/math/36afd3d51eebbe6be945c881e7a8d161811ff8f5.png" alt="\frac{\partial V_{NN}}{\partial X_{A}}=-Z_{A}\sum_{B\neq A}\frac{Z_{B}\left(X_{B}-X_{A}\right)}{r_{AB}^{3}}"/></p>
+</div><p>FUNCTION:</p>
+<ul class="simple">
+<li>MolecularIntegrals.nucdiff(input, atomidx, direction)</li>
+<li>return Vnn</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>input, inputfile object</li>
+<li>atomidx, atom which is differentiated with respect to</li>
+<li>direction, axis of differentiation (1 = dx, 2 = dy, 3 = dz)</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>Vnn, nucleus-nucleus field</li>
+</ul>
+<p>References:</p>
+<ul class="simple">
+<li>None</li>
+</ul>
+</div>
+<div class="section" id="dipole-moment-integral">
+<h2>Dipole moment integral<a class="headerlink" href="#dipole-moment-integral" title="Permalink to this headline">¶</a></h2>
+<p>The dipole moment integral is calculated by using the following relations:</p>
+<div class="math">
+<p><img src="_images/math/a3e6313945770142e044983e7f0ba86748d9df99.png" alt="S_{i+1,j}^{e}=X_{\mathrm{PA}}S_{i,j}^{e}+\frac{1}{2p}\left(iS_{i-1,j}^{e}+jS_{i,j-1}^{e}+eS_{ij}^{e-1}\right)
+
+S_{i,j+1}^{e}=X_{\mathrm{PB}}S_{i,j}^{e}+\frac{1}{2p}\left(iS_{i-1,j}^{e}+jS_{i,j-1}^{e}+eS_{ij}^{e-1}\right)
+
+S_{i,j}^{e+1}=X_{\mathrm{PC}}S_{i,j}^{e}+\frac{1}{2p}\left(iS_{i-1,j}^{e}+jS_{i,j-1}^{e}+eS_{ij}^{e-1}\right)"/></p>
+</div><p>Here e is the order of multipole moment, e=1 is dipole moment.</p>
+<p>FUNCTION:</p>
+<ul class="simple">
+<li>MolecularIntegrals.u_ObaraSaika(a1, a2, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na, nb, N1, N2, c1, c2, input)</li>
+<li>return muxij, muyij, muzij</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>a1, Gaussian exponent factor</li>
+<li>a2, Gaussian exponent factor</li>
+<li>Ax, position along x axis</li>
+<li>Ay, position along y axis</li>
+<li>Az, position along z axis</li>
+<li>Bx, position along x axis</li>
+<li>By, position along y axis</li>
+<li>Bz, position along z axis</li>
+<li>la, angular momentum quantum number</li>
+<li>lb, angular momentum quantum number</li>
+<li>ma, angular momentum quantum number</li>
+<li>mb, angular momentum quantum number</li>
+<li>na, angular momentum quantum number</li>
+<li>nb, angular momentum quantum number</li>
+<li>N1, normalization constant</li>
+<li>N2, normalization constant</li>
+<li>c1, Gaussian prefactor</li>
+<li>c2, Gaussian prefactor</li>
+<li>input, inputfile object</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>muxij, dipolemoment integral matrix element for x axis</li>
+<li>muyij, dipolemoment integral matrix element for y axis</li>
+<li>muzij, dipolemoment integral matrix element for z axis</li>
+</ul>
+<p>References:</p>
+<ul class="simple">
+<li>Trygve Helgaker, Poul Jorgensen and Jeppe Olsen, Molecular Electronic-Structure Theory</li>
+</ul>
+</div>
+<div class="section" id="cauchy-schwarz-inequality">
+<h2>Cauchy-Schwarz inequality<a class="headerlink" href="#cauchy-schwarz-inequality" title="Permalink to this headline">¶</a></h2>
+<p>The electron-electron repulsion integrals is screened by the use of the Cauchy-Schwarz inequality given as:</p>
+<div class="math">
+<p><img src="_images/math/b8cbc08236da804dd8605eaf2fbd6f8cf7d0e616.png" alt="\left|g_{abcd}\right|\leq\sqrt{g_{abab}}\sqrt{g_{cdcd}}"/></p>
+</div><p>FUNCTION:</p>
+<ul class="simple">
+<li>None</li>
+</ul>
+<p>References:</p>
+<ul class="simple">
+<li>Trygve Helgaker, Poul Jorgensen and Jeppe Olsen, Molecular Electronic-Structure Theory</li>
+</ul>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="IntegralTrans.html" class="btn btn-neutral float-right" title="Integral Transformations" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="General.html" class="btn btn-neutral" title="General Considerations" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, Erik Kjellgren.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

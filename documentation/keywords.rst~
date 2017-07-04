@@ -1,0 +1,94 @@
+
+List of keywords
+================
+
+Settings are given in the setting inputfile by using the below keywords. The order of the keywords in the setting inputfile does not matter at all.
+
+- basisset;x
+
+x=bassiset used in calculation
+
+Integrals
+---------
+
+- Cauchy-Schwarz Threshold;x
+
+Threshold for not calculating an ERI, given as 10^-x
+
+
+Initial Method
+--------------
+
+- Initial Method;x
+
+Method to use during SCF. x=HF for Hartree-Fock calculation. x=UHF for unrestricted Hartree-Fock calculation.
+
+- UHF mix guess;x
+
+Mix initial coefficients to break spin symmetry
+
+SCF
+---
+
+- SCF Energy Threshold;x
+
+Threshold for convergence of the SCF, given as 10^-x
+
+- SCF RMSD Threshold;x
+
+Threshold for convergence of the SCF, given as 10^-x
+
+- SCF Max iterations;x
+
+Maximum SCF iterations
+
+- DIIS;x
+
+Activation of DISS, x=Yes
+
+- Keep Steps;x
+
+Number of steps saved in the DIIS algorithm
+
+Perturbation
+------------
+
+- MPn;x
+
+Møller-Plesset energy correction, x=MP2
+
+
+Properties
+----------
+
+- Charge;x
+
+Calculation of atomic charges. x=Mulliken gives Mulliken charges. x=Lowdin gives Lowdin charges.
+
+- Dipole;x
+
+Calcultion of molecular dipolemomemnt. x=Yes for calcultion.
+
+
+Geomoetry Optimization
+----------------------
+
+- GeoOpt;x
+
+Turns on geometry optimization. x=Yes to turn it on. Only works for Hartree-Fock.
+
+- Max iteration GeoOpt;x
+
+Maximum geometry optimization steps. 
+
+- Geometry Tolerance;x
+
+Tolerance for convergence, given as 10^-x
+
+- Gradient Decent Step;x
+
+Gradient scaling factor in Gradient Decent algorithm
+
+- Force Numeric;x
+
+Choose to evaluate Forces numerically. x=Yes to activate. Only works for Hartree-Fock.
