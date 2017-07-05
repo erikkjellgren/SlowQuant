@@ -10,7 +10,7 @@ SlowQuant is a molecular quantum chemistry program written in python. Even the c
 
 Documentation can be found at:
 
-http://slowquant.readthedocs.io/en/latest/?
+http://slowquant.readthedocs.io/en/latest/
 
 
 # Requirements
