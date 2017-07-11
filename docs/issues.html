@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>List of keywords &mdash; SLOWQUANT  documentation</title>
+  <title>Issues &mdash; SLOWQUANT  documentation</title>
   
 
   
@@ -36,8 +36,8 @@
               href="genindex.html"/>
         <link rel="search" title="Search" href="search.html"/>
     <link rel="top" title="SLOWQUANT  documentation" href="index.html"/>
-        <link rel="next" title="Example input files" href="Examples.html"/>
-        <link rel="prev" title="SlowQuant" href="index.html"/> 
+        <link rel="next" title="General Considerations" href="General.html"/>
+        <link rel="prev" title="Example input files" href="Examples.html"/> 
 
   
   <script src="_static/js/modernizr.min.js"></script>
@@ -91,17 +91,14 @@
             
               <p class="caption"><span class="caption-text">How to use</span></p>
 <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">List of keywords</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#integrals">Integrals</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#initial-method">Initial Method</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#scf">SCF</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#perturbation">Perturbation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#properties">Properties</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#geomoetry-optimization">Geomoetry Optimization</a></li>
+<li class="toctree-l1"><a class="reference internal" href="keywords.html">List of keywords</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Examples.html">Example input files</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Issues</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#general">General</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#need-testing">Need testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#broken">Broken</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="Examples.html">Example input files</a></li>
-<li class="toctree-l1"><a class="reference internal" href="issues.html">Issues</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Working equations and functions</span></p>
 <ul>
@@ -157,13 +154,13 @@
     
       <li><a href="index.html">Docs</a> &raquo;</li>
         
-      <li>List of keywords</li>
+      <li>Issues</li>
     
     
       <li class="wy-breadcrumbs-aside">
         
             
-            <a href="_sources/keywords.rst.txt" rel="nofollow"> View page source</a>
+            <a href="_sources/issues.rst.txt" rel="nofollow"> View page source</a>
           
         
       </li>
@@ -176,94 +173,30 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="list-of-keywords">
-<h1>List of keywords<a class="headerlink" href="#list-of-keywords" title="Permalink to this headline">¶</a></h1>
-<p>Settings are given in the setting inputfile by using the below keywords. The order of the keywords in the setting inputfile does not matter at all.</p>
+  <div class="section" id="issues">
+<h1>Issues<a class="headerlink" href="#issues" title="Permalink to this headline">¶</a></h1>
+<p>In this section known problems with the ccode can be found</p>
+<div class="section" id="general">
+<h2>General<a class="headerlink" href="#general" title="Permalink to this headline">¶</a></h2>
 <ul class="simple">
-<li>basisset;x</li>
+<li>MolecularIntegrals.py is a mess</li>
+<li>Code in general is a gigantic mess</li>
+<li>Numerical methods, makes code none module like</li>
+<li>No checking of input files at all at any stages of the code</li>
 </ul>
-<p>x=bassiset used in calculation. STO2G, STO3G, DZ, DZP, 3-21G, 6-31ppGss (6-31++G**), 6-31Gs (6-31G*), 6-31pGs (6-31+G*).</p>
-<div class="section" id="integrals">
-<h2>Integrals<a class="headerlink" href="#integrals" title="Permalink to this headline">¶</a></h2>
-<ul class="simple">
-<li>Cauchy-Schwarz Threshold;x</li>
-</ul>
-<p>Threshold for not calculating an ERI, given as 10^-x</p>
 </div>
-<div class="section" id="initial-method">
-<h2>Initial Method<a class="headerlink" href="#initial-method" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="need-testing">
+<h2>Need testing<a class="headerlink" href="#need-testing" title="Permalink to this headline">¶</a></h2>
 <ul class="simple">
-<li>Initial Method;x</li>
+<li>Contracted derivatives is not properly normalized, geometry optimization might not work properly</li>
+<li>No tests for normalization of contracted basisfunctions of D or higher angular momentum</li>
 </ul>
-<p>Method to use during SCF. x=HF for Hartree-Fock calculation. x=UHF for unrestricted Hartree-Fock calculation.</p>
-<ul class="simple">
-<li>UHF mix guess;x</li>
-</ul>
-<p>Mix initial coefficients to break spin symmetry</p>
 </div>
-<div class="section" id="scf">
-<h2>SCF<a class="headerlink" href="#scf" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="broken">
+<h2>Broken<a class="headerlink" href="#broken" title="Permalink to this headline">¶</a></h2>
 <ul class="simple">
-<li>SCF Energy Threshold;x</li>
+<li>None known</li>
 </ul>
-<p>Threshold for convergence of the SCF, given as 10^-x</p>
-<ul class="simple">
-<li>SCF RMSD Threshold;x</li>
-</ul>
-<p>Threshold for convergence of the SCF, given as 10^-x</p>
-<ul class="simple">
-<li>SCF Max iterations;x</li>
-</ul>
-<p>Maximum SCF iterations</p>
-<ul class="simple">
-<li>DIIS;x</li>
-</ul>
-<p>Activation of DISS, x=Yes</p>
-<ul class="simple">
-<li>Keep Steps;x</li>
-</ul>
-<p>Number of steps saved in the DIIS algorithm</p>
-</div>
-<div class="section" id="perturbation">
-<h2>Perturbation<a class="headerlink" href="#perturbation" title="Permalink to this headline">¶</a></h2>
-<ul class="simple">
-<li>MPn;x</li>
-</ul>
-<p>Møller-Plesset energy correction, x=MP2</p>
-</div>
-<div class="section" id="properties">
-<h2>Properties<a class="headerlink" href="#properties" title="Permalink to this headline">¶</a></h2>
-<ul class="simple">
-<li>Charge;x</li>
-</ul>
-<p>Calculation of atomic charges. x=Mulliken gives Mulliken charges. x=Lowdin gives Lowdin charges.</p>
-<ul class="simple">
-<li>Dipole;x</li>
-</ul>
-<p>Calcultion of molecular dipolemomemnt. x=Yes for calcultion.</p>
-</div>
-<div class="section" id="geomoetry-optimization">
-<h2>Geomoetry Optimization<a class="headerlink" href="#geomoetry-optimization" title="Permalink to this headline">¶</a></h2>
-<ul class="simple">
-<li>GeoOpt;x</li>
-</ul>
-<p>Turns on geometry optimization. x=Yes to turn it on. Only works for Hartree-Fock.</p>
-<ul class="simple">
-<li>Max iteration GeoOpt;x</li>
-</ul>
-<p>Maximum geometry optimization steps.</p>
-<ul class="simple">
-<li>Geometry Tolerance;x</li>
-</ul>
-<p>Tolerance for convergence, given as 10^-x</p>
-<ul class="simple">
-<li>Gradient Decent Step;x</li>
-</ul>
-<p>Gradient scaling factor in Gradient Decent algorithm</p>
-<ul class="simple">
-<li>Force Numeric;x</li>
-</ul>
-<p>Choose to evaluate Forces numerically. x=Yes to activate. Only works for Hartree-Fock.</p>
 </div>
 </div>
 
@@ -277,10 +210,10 @@
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="Examples.html" class="btn btn-neutral float-right" title="Example input files" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="General.html" class="btn btn-neutral float-right" title="General Considerations" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="index.html" class="btn btn-neutral" title="SlowQuant" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="Examples.html" class="btn btn-neutral" title="Example input files" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   

@@ -16,7 +16,8 @@ SlowQuant have the following requirements:
    :caption: How to use
    
    keywords.rst
-   Examples.rst   
+   Examples.rst
+   issues.rst   
 
 .. toctree::
    :maxdepth: 2

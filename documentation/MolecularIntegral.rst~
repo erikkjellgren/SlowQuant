@@ -26,6 +26,9 @@ with a normalization constant given as:
 .. math::
    N=\left(\frac{2\alpha}{\pi}\right)^{3/4}\left[\frac{\left(8\alpha\right)^{l+m+n}l!m!n!}{\left(2l\right)!\left(2m\right)!\left(2n\right)!}\right]
 
+If the basis functions is constracted the normalization of the contraction is given as:
+
+
 Boys Function
 -------------
 
@@ -480,6 +483,22 @@ Output:
 - muxij, dipolemoment integral matrix element for x axis
 - muyij, dipolemoment integral matrix element for y axis
 - muzij, dipolemoment integral matrix element for z axis
+
+References:
+
+- Trygve Helgaker, Poul Jorgensen and Jeppe Olsen, Molecular Electronic-Structure Theory
+
+Cauchy-Schwarz inequality
+-------------------------
+
+The electron-electron repulsion integrals is screened by the use of the Cauchy-Schwarz inequality given as:
+
+.. math::
+   \left|g_{abcd}\right|\leq\sqrt{g_{abab}}\sqrt{g_{cdcd}}
+
+FUNCTION:
+
+- None
 
 References:
 

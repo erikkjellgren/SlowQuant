@@ -128,3 +128,13 @@ Output:
 References:
 
 - Szabo and Ostlund, Modern Quantum Chemistry: Introduction to Advanced Electronic Structure Theory
+
+In unrestricted Hartree-Fock for a closed shell system the spin-symmetry needs to be broken else restricted Hartree-Fock is restored. This is done by the following method, after the first MO coefficients have been made:
+
+.. math::
+   C_{i,\mathrm{HOMO}}^{\mathrm{new}}=\frac{1}{\sqrt{1+k^{2}}}\left(C_{i,\mathrm{HOMO}}^{\mathrm{old}}+kC_{i,\mathrm{LUMO}}^{\mathrm{old}}\right)
+
+   C_{i,\mathrm{LUMO}}^{\mathrm{new}}=\frac{1}{\sqrt{1+k^{2}}}\left(-kC_{i,\mathrm{HOMO}}^{\mathrm{old}}+C_{i,\mathrm{LUMO}}^{\mathrm{old}}\right)
+
+
+

@@ -93,6 +93,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="keywords.html">List of keywords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Examples.html">Example input files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="issues.html">Issues</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Working equations and functions</span></p>
 <ul class="current">
@@ -274,7 +275,12 @@
 <ul class="simple">
 <li>Szabo and Ostlund, Modern Quantum Chemistry: Introduction to Advanced Electronic Structure Theory</li>
 </ul>
-</div>
+<p>In unrestricted Hartree-Fock for a closed shell system the spin-symmetry needs to be broken else restricted Hartree-Fock is restored. This is done by the following method, after the first MO coefficients have been made:</p>
+<div class="math">
+<p><img src="_images/math/5bac5a4a27ce7ba7c29f36f7fc64d1fb55409217.png" alt="C_{i,\mathrm{HOMO}}^{\mathrm{new}}=\frac{1}{\sqrt{1+k^{2}}}\left(C_{i,\mathrm{HOMO}}^{\mathrm{old}}+kC_{i,\mathrm{LUMO}}^{\mathrm{old}}\right)
+
+C_{i,\mathrm{LUMO}}^{\mathrm{new}}=\frac{1}{\sqrt{1+k^{2}}}\left(-kC_{i,\mathrm{HOMO}}^{\mathrm{old}}+C_{i,\mathrm{LUMO}}^{\mathrm{old}}\right)"/></p>
+</div></div>
 </div>
 
 

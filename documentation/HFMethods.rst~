@@ -1,11 +1,11 @@
 
 
-Hartree Fock methods
+Hartree-Fock methods
 ====================
 
 In this section the Hartree-Fock methods will be described.
 
-Restricted Hartree Fock
+Restricted Hartree-Fock
 -----------------------
 
 For the Roothan-Hartee-Fock equations an orthogonal basis is needed, first the first orthogonalization matrix is constructed from the overlap matrix. First by a diagonalization:
@@ -60,8 +60,88 @@ The above SCF procedure will is stopped at certain tresholds. The change in ener
 
    \mathrm{RMSD}_{n}=\sqrt{\sum_{ij}D_{n,ij}-D_{n-1,ij}}
 
+FUNCTION:
 
-Unrestricted Hartee Fock
+- HartreeFock.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results, print_SCF='Yes')
+- return C, F, D, results
+
+Input:
+
+- input, inputfile object
+- set, settingsfile object
+- basis, basisset object
+- VNN, nuclear-nuclear repulsion
+- Te, electronic energy matrix
+- S, overlap matrix
+- VeN, nuclear-electron attraction matrix
+- Vee, ERI matrix
+- results, results object
+- print_SCF, wether to print SCF to output
+
+Output:
+
+- C, MO coefficients
+- F, Fock matrix
+- D, density matrix
+- results, results obejct with added entries
+- results['HFenergy'], total Hartree-Fock energy
+
+References:
+
+- http://sirius.chem.vt.edu/wiki/doku.php?id=crawdad:programming:project3
+
+
+Unrestricted Hartee-Fock
 ------------------------
 
-More exciting documentation in here.
+The unrestricted Hartee-Fock method uses the same SCF procedure as as the restricted Hartree-Fock, but with the Fock matrix coupling the alpha and beta spins:
+
+.. math::
+   F_{n,\alpha,ij}=H_{ij}^{\mathrm{core}}+\sum_{kl}^{\mathrm{AO}}D_{n-1,\alpha,kl}\left(\left(ij\left|\right|kl\right)-\left(ik\left|\right|jl\right)\right)+\sum_{kl}^{\mathrm{AO}}D_{n-1,\beta,kl}\left(ij\left|\right|kl\right)
+
+FUNCTION:
+
+- UHF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results, print_SCF='Yes')
+- return C, F, D, results
+
+Input:
+
+- input, inputfile object
+- set, settingsfile object
+- basis, basisset object
+- VNN, nuclear-nuclear repulsion
+- Te, electronic energy matrix
+- S, overlap matrix
+- VeN, nuclear-electron attraction matrix
+- Vee, ERI matrix
+- results, results object
+- print_SCF, wether to print SCF to output
+
+Output:
+
+- C, MO coefficients
+- F, Fock matrix
+- D, density matrix
+- results, results obejct with added entries
+- results['UHFenergy'], total unrestricted Hartree-Fock energy
+
+References:
+
+- Szabo and Ostlund, Modern Quantum Chemistry: Introduction to Advanced Electronic Structure Theory
+
+In unrestricted Hartree-Fock for a closed shell system the spin-symmetry needs to be broken else restricted Hartree-Fock is restored. This is done by the following method, after the first MO coefficients have been made:
+
+.. math::
+   C_{i,\mathrm{HOMO}}^{\mathrm{new}}=\frac{1}{\sqrt{1+k^{2}}}\left(C_{i,\mathrm{HOMO}}^{\mathrm{old}}+kC_{i,\mathrm{LUMO}}^{\mathrm{old}}\right)
+
+   C_{i,\mathrm{LUMO}}^{\mathrm{new}}=\frac{1}{\sqrt{1+k^{2}}}\left(-kC_{i,\mathrm{HOMO}}^{\mathrm{old}}+C_{i,\mathrm{LUMO}}^{\mathrm{old}}\right)
+
+FUNCTION:
+
+- None
+
+References:
+
+- None
+
+

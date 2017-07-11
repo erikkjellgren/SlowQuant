@@ -26,6 +26,11 @@ with a normalization constant given as:
 .. math::
    N=\left(\frac{2\alpha}{\pi}\right)^{3/4}\left[\frac{\left(8\alpha\right)^{l+m+n}l!m!n!}{\left(2l\right)!\left(2m\right)!\left(2n\right)!}\right]
 
+If the basis functions is constracted the normalization of the contraction is given as:
+
+.. math::
+   N_{\mathrm{contracted}}=\left[\frac{\pi^{3/2}\left(2l-1\right)!!\left(2m-1\right)!!\left(2n-1\right)!!}{2^{l+m+n}}\sum_{i,j}^{basis}\frac{c_{i}N_{i}c_{j}N_{j}}{\left(\alpha_{i}+\alpha_{j}\right)^{l+m+n+3/2}}\right]^{-1/2}
+
 Boys Function
 -------------
 
