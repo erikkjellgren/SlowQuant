@@ -149,7 +149,9 @@ def test_MP2_1():
     basis    = BS.bassiset(input, set)
     F        = np.load('testfiles/faoCH4_STO3G.npy')
     C        = np.load('testfiles/cmoCH4_STO3G.npy')
-    UF.TransformMO(C, basis, set, Vee=np.load('testfiles/twointCH4_STO3G.npy'))
+    A = np.load('testfiles/twointCH4_STO3G.npy')
+    np.save('slowquant/temp/twoint.npy', A)
+    UF.TransformMO(C, basis, set)
     calc = MP.MP2(basis, input, F, C)
     check = -0.056046676165
     assert abs(calc - check) < 10**-7
@@ -166,7 +168,9 @@ def test_MP2_2():
     basis    = BS.bassiset(input, set)
     F        = np.load('testfiles/faoH2O_DZ.npy')
     C        = np.load('testfiles/cmoH2O_DZ.npy')
-    UF.TransformMO(C, basis, set, Vee=np.load('testfiles/twointH2O_DZ.npy'))
+    A = np.load('testfiles/twointH2O_DZ.npy')
+    np.save('slowquant/temp/twoint.npy', A)
+    UF.TransformMO(C, basis, set)
     calc = MP.MP2(basis, input, F, C)
     check = -0.152709879075
     assert abs(calc - check) < 10**-7
@@ -279,3 +283,4 @@ def test_Lowdin():
 def test_Ffunction():
     results = HFrun.run('testfiles/Hm.csv','testfiles/settingFfunctions.csv')
     assert results['HFenergy'] + 0.475129018306 < 10**-5
+    
