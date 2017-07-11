@@ -85,9 +85,9 @@ Maximum geometry optimization steps.
 
 Tolerance for convergence, given as 10^-x
 
-- Gradient Decent Step;x
+- Gradient Descent Step;x
 
-Gradient scaling factor in Gradient Decent algorithm
+Gradient scaling factor in Gradient Descent algorithm
 
 - Force Numeric;x
 

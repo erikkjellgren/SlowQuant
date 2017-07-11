@@ -419,12 +419,48 @@ def Ndiff1(l,a):
 def Ndiff2(l,a):
     return -2*l*(a/(2*l-1))**0.5
 
+def Nrun(basisset):
+    basisset_temp = copy.deepcopy(basisset)
+    for i in range(len(basisset)):
+        for j in range(len(basisset[i][5])):
+            if len(basisset[i][5]) == 1:
+                basisset[i][5][j][0] = N(basisset[i][5][j][1], basisset[i][5][j][3], basisset[i][5][j][4], basisset[i][5][j][5])
+            
+            else:
+                basisset_temp[i][5][j][2] *= N(basisset[i][5][j][1], basisset[i][5][j][3], basisset[i][5][j][4], basisset[i][5][j][5])
+                basisset[i][5][j][0] = N(basisset[i][5][j][1], basisset[i][5][j][3], basisset[i][5][j][4], basisset[i][5][j][5])
+
+    for i in range(len(basisset)):
+        for j in range(len(basisset[i][5])):
+            if len(basisset[i][5]) != 1:
+                basisset[i][5][j][0] *= Ncontr(basisset_temp[i][5], j)
+    return basisset
+    
+
 def N(a, l, m, n):
     part1 = (2.0/math.pi)**(3.0/4.0)
     part2 = 2.0**(l+m+n) * a**((2.0*l+2.0*m+2.0*n+3.0)/(4.0))
     part3 = math.sqrt(scm.factorial2(int(2*l-1))*scm.factorial2(int(2*m-1))*scm.factorial2(int(2*n-1)))
     N = part1 * ((part2)/(part3))
     return N
+
+def Ncontr(basisset, k):
+    l = basisset[k][3]
+    m = basisset[k][4]
+    n = basisset[k][5]
+    L = l+m+n
+    factor = (np.pi**(3.0/2.0)*scm.factorial2(int(2*l-1))*scm.factorial2(int(2*m-1))*scm.factorial2(int(2*n-1)))/(2.0**L)
+    sum = 0
+    for i in range(len(basisset)):
+        for j in range(len(basisset)):
+            alphai = basisset[i][1]
+            alphaj = basisset[j][1]
+            ai     = basisset[i][2]
+            aj     = basisset[j][2]
+            
+            sum += ai*aj/((alphai+alphaj)**(L+3.0/2.0))
+    Nc = (factor*sum)**(-1.0/2.0)
+    return Nc
 
 def Eprecalculation(basis, diffx1=0, diffx2=0, diffy1=0, diffy2=0, diffz1=0, diffz2=0):
     # #############################################################
@@ -751,17 +787,25 @@ def rungeometric_derivatives(input, basis):
     Nzminus = copy.deepcopy(basis)
     for i in range(len(basis)):
         for j in range(len(basis[i][5])):
-            Nxplus[i][5][j][0] = N(Nxplus[i][5][j][1], Nxplus[i][5][j][3]+1, Nxplus[i][5][j][4], Nxplus[i][5][j][5])
-            if Nxplus[i][5][j][3] != 0:
-                Nxminus[i][5][j][0] = N(Nxminus[i][5][j][1], Nxminus[i][5][j][3]-1, Nxminus[i][5][j][4], Nxminus[i][5][j][5])
+            Nxplus[i][5][j][3] += 1
+            if Nxminus[i][5][j][3] != 0:
+                Nxminus[i][5][j][3] -= 1
+            
+            Nyplus[i][5][j][4] += 1
+            if Nyminus[i][5][j][4] != 0:
+                Nyminus[i][5][j][4] -= 1
+            
+            Nzplus[i][5][j][5] += 1    
+            if Nzminus[i][5][j][5] != 0:
+                Nzminus[i][5][j][5] -= 1
                 
-            Nyplus[i][5][j][0] = N(Nyplus[i][5][j][1], Nyplus[i][5][j][3], Nyplus[i][5][j][4]+1, Nyplus[i][5][j][5])
-            if Nyplus[i][5][j][4] != 0:
-                Nyminus[i][5][j][0] = N(Nyminus[i][5][j][1], Nyminus[i][5][j][3], Nyminus[i][5][j][4]-1, Nyminus[i][5][j][5])
-                
-            Nzplus[i][5][j][0] = N(Nzplus[i][5][j][1], Nzplus[i][5][j][3], Nzplus[i][5][j][4], Nzplus[i][5][j][5]+1)
-            if Nzplus[i][5][j][5] != 0:
-                Nzminus[i][5][j][0] = N(Nzminus[i][5][j][1], Nzminus[i][5][j][3], Nzminus[i][5][j][4], Nzminus[i][5][j][5]-1)
+    Nxplus = Nrun(Nxplus)
+    Nxminus = Nrun(Nxminus)
+    Nyplus = Nrun(Nyplus)
+    Nyminus = Nrun(Nyminus)
+    Nzplus = Nrun(Nzplus)
+    Nzminus = Nrun(Nzminus)
+    
     
     for atomidx in range(1, len(input)):
         # Nuclear-nuclear repulsion
@@ -1119,26 +1163,32 @@ def rungeometric_derivatives(input, basis):
                                 mb=basis[a[1]][5][j][4]
                                 na=basis[a[0]][5][i][5]
                                 nb=basis[a[1]][5][j][5]
-                                #N1=basis[a[0]][5][i][0]
-                                #N2=basis[a[1]][5][j][0]
+                                N1=basis[a[0]][5][i][0]
+                                N2=basis[a[1]][5][j][0]
                                 c1=basis[a[0]][5][i][2]
                                 c2=basis[a[1]][5][j][2]
                                 
+                                N1p=Nxplus[a[0]][5][i][0]
+                                N2p=Nxplus[a[1]][5][j][0]
+                                
+                                N1m=Nxminus[a[0]][5][i][0]
+                                N2m=Nxminus[a[1]][5][j][0]
+                                
                                 if atomidx == basis[a[0]][6]:
-                                    calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la+1, lb, ma, mb, na, nb, N(a2, la+1, ma, na), N(b, lb, mb, nb), c1, c2)
+                                    calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la+1, lb, ma, mb, na, nb, N1p, N2, c1, c2)
                                     calc += calct*Ndiff1(la,a2)
                                     calc2 += calct2*Ndiff1(la,a2)
                                     if la != 0:
-                                        calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la-1, lb, ma, mb, na, nb, N(a2, la-1, ma, na), N(b, lb, mb, nb), c1, c2)
+                                        calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la-1, lb, ma, mb, na, nb, N1m, N2, c1, c2)
                                         calc += calct*Ndiff2(la,a2)
                                         calc2 += calct2*Ndiff2(la,a2)
                                         
                                 if atomidx == basis[a[1]][6]:
-                                    calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la, lb+1, ma, mb, na, nb, N(a2, la, ma, na), N(b, lb+1, mb, nb), c1, c2)
+                                    calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la, lb+1, ma, mb, na, nb, N1, N2p, c1, c2)
                                     calc += calct*Ndiff1(lb,b)
                                     calc2 += calct2*Ndiff1(lb,b)
                                     if lb != 0:
-                                        calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la, lb-1, ma, mb, na, nb, N(a2, la, ma, na), N(b, lb-1, mb, nb), c1, c2)
+                                        calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la, lb-1, ma, mb, na, nb, N1, N2m, c1, c2)
                                         calc += calct*Ndiff2(lb,b)
                                         calc2 += calct2*Ndiff2(lb,b)
                     S[k,l] = calc2
@@ -1183,26 +1233,32 @@ def rungeometric_derivatives(input, basis):
                                 mb=basis[a[1]][5][j][4]
                                 na=basis[a[0]][5][i][5]
                                 nb=basis[a[1]][5][j][5]
-                                #N1=basis[a[0]][5][i][0]
-                                #N2=basis[a[1]][5][j][0]
+                                N1=basis[a[0]][5][i][0]
+                                N2=basis[a[1]][5][j][0]
                                 c1=basis[a[0]][5][i][2]
                                 c2=basis[a[1]][5][j][2]
                                 
+                                N1p=Nyplus[a[0]][5][i][0]
+                                N2p=Nyplus[a[1]][5][j][0]
+                                
+                                N1m=Nyminus[a[0]][5][i][0]
+                                N2m=Nyminus[a[1]][5][j][0]
+                                
                                 if atomidx == basis[a[0]][6]:
-                                    calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma+1, mb, na, nb, N(a2, la, ma+1, na), N(b, lb, mb, nb), c1, c2)
+                                    calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma+1, mb, na, nb, N1p, N2, c1, c2)
                                     calc += calct*Ndiff1(ma,a2)
                                     calc2 += calct2*Ndiff1(ma,a2)
                                     if ma != 0:
-                                        calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma-1, mb, na, nb, N(a2, la, ma-1, na), N(b, lb, mb, nb), c1, c2)
+                                        calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma-1, mb, na, nb, N1m, N2, c1, c2)
                                         calc += calct*Ndiff2(ma,a2)
                                         calc2 += calct2*Ndiff2(ma,a2)
                                         
                                 if atomidx == basis[a[1]][6]:
-                                    calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb+1, na, nb, N(a2, la, ma, na), N(b, lb, mb+1, nb), c1, c2)
+                                    calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb+1, na, nb, N1, N2p, c1, c2)
                                     calc += calct*Ndiff1(mb,b)
                                     calc2 += calct2*Ndiff1(mb,b)
                                     if mb != 0:
-                                        calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb-1, na, nb, N(a2, la, ma, na), N(b, lb, mb-1, nb), c1, c2)
+                                        calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb-1, na, nb, N1, N2m, c1, c2)
                                         calc += calct*Ndiff2(mb,b)
                                         calc2 += calct2*Ndiff2(mb,b)
                     S[k,l] = calc2
@@ -1246,26 +1302,32 @@ def rungeometric_derivatives(input, basis):
                                 mb=basis[a[1]][5][j][4]
                                 na=basis[a[0]][5][i][5]
                                 nb=basis[a[1]][5][j][5]
-                                #N1=basis[a[0]][5][i][0]
-                                #N2=basis[a[1]][5][j][0]
+                                N1=basis[a[0]][5][i][0]
+                                N2=basis[a[1]][5][j][0]
                                 c1=basis[a[0]][5][i][2]
                                 c2=basis[a[1]][5][j][2]
                                 
+                                N1p=Nzplus[a[0]][5][i][0]
+                                N2p=Nzplus[a[1]][5][j][0]
+                                
+                                N1m=Nzminus[a[0]][5][i][0]
+                                N2m=Nzminus[a[1]][5][j][0]
+                                
                                 if atomidx == basis[a[0]][6]:
-                                    calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na+1, nb, N(a2, la, ma, na+1), N(b, lb, mb, nb), c1, c2)
+                                    calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na+1, nb, N1p, N2, c1, c2)
                                     calc += calct*Ndiff1(na,a2)
                                     calc2 += calct2*Ndiff1(na,a2)
                                     if na != 0:
-                                        calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na-1, nb, N(a2, la, ma, na-1), N(b, lb, mb, nb), c1, c2)
+                                        calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na-1, nb, N1m, N2, c1, c2)
                                         calc += calct*Ndiff2(na,a2)
                                         calc2 += calct2*Ndiff2(na,a2)
                                         
                                 if atomidx == basis[a[1]][6]:
-                                    calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na, nb+1, N(a2, la, ma, na), N(b, lb, mb, nb+1), c1, c2)
+                                    calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na, nb+1, N1, N2p, c1, c2)
                                     calc += calct*Ndiff1(nb,b)
                                     calc2 += calct2*Ndiff1(nb,b)
                                     if nb != 0:
-                                        calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na, nb-1, N(a2, la, ma, na), N(b, lb, mb, nb-1), c1, c2)
+                                        calct, calct2 = Kin(a2, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na, nb-1, N1, N2m, c1, c2)
                                         calc += calct*Ndiff2(nb,b)
                                         calc2 += calct2*Ndiff2(nb,b)
                     S[k,l] = calc2
@@ -1308,28 +1370,34 @@ def rungeometric_derivatives(input, basis):
                             N2=basis[a[1]][5][j][0]
                             c1=basis[a[0]][5][i][2]
                             c2=basis[a[1]][5][j][2]
+                              
+                            N1p=Nxplus[a[0]][5][i][0]
+                            N2p=Nxplus[a[1]][5][j][0]
+                            
+                            N1m=Nxminus[a[0]][5][i][0]
+                            N2m=Nxminus[a[1]][5][j][0]
                             
                             if atomidx == basis[a[0]][6] and atomidx == basis[a[1]][6]:
-                                calc += Ndiff1(l1,a2)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1+1, l2, m1, m2, n1, n2, N(a2, l1+1, m1, n1), N(b, l2, m2, n2), c1, c2, input, atomidx)
+                                calc += Ndiff1(l1,a2)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1+1, l2, m1, m2, n1, n2, N1p, N2, c1, c2, input, atomidx)
                                 if l1 != 0:
-                                    calc += Ndiff2(l1,a2)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1-1, l2, m1, m2, n1, n2, N(a2, l1-1, m1, n1), N(b, l2, m2, n2), c1, c2, input, atomidx)
+                                    calc += Ndiff2(l1,a2)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1-1, l2, m1, m2, n1, n2, N1m, N2, c1, c2, input, atomidx)
                                 
-                                calc += Ndiff1(l2,b)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2+1, m1, m2, n1, n2, N(a2, l1, m1, n1), N(b, l2+1, m2, n2), c1, c2, input, atomidx)
+                                calc += Ndiff1(l2,b)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2+1, m1, m2, n1, n2, N1, N2p, c1, c2, input, atomidx)
                                 if l2 != 0:
-                                    calc += Ndiff2(l2,b)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2-1, m1, m2, n1, n2, N(a2, l1, m1, n1), N(b, l2-1, m2, n2), c1, c2, input, atomidx)
+                                    calc += Ndiff2(l2,b)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2-1, m1, m2, n1, n2, N1, N2m, c1, c2, input, atomidx)
                             
                             else:
                                 calc += electricfield(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, input, 'x', atomidx)
                                 
                                 if atomidx == basis[a[0]][6]:
-                                    calc += Ndiff1(l1,a2)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1+1, l2, m1, m2, n1, n2, N(a2, l1+1, m1, n1), N(b, l2, m2, n2), c1, c2, input)
+                                    calc += Ndiff1(l1,a2)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1+1, l2, m1, m2, n1, n2, N1p, N2, c1, c2, input)
                                     if l1 != 0:
-                                        calc += Ndiff2(l1,a2)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1-1, l2, m1, m2, n1, n2, N(a2, l1-1, m1, n1), N(b, l2, m2, n2), c1, c2, input)
+                                        calc += Ndiff2(l1,a2)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1-1, l2, m1, m2, n1, n2, N1m, N2, c1, c2, input)
         
                                 if atomidx == basis[a[1]][6]:
-                                    calc += Ndiff1(l2,b)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2+1, m1, m2, n1, n2, N(a2, l1, m1, n1), N(b, l2+1, m2, n2), c1, c2, input)
+                                    calc += Ndiff1(l2,b)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2+1, m1, m2, n1, n2, N1, N2p, c1, c2, input)
                                     if l2 != 0:
-                                        calc += Ndiff2(l2,b)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2-1, m1, m2, n1, n2, N(a2, l1, m1, n1), N(b, l2-1, m2, n2), c1, c2, input)
+                                        calc += Ndiff2(l2,b)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2-1, m1, m2, n1, n2, N1, N2m, c1, c2, input)
         
                     Na[k,l] = calc
                     Na[l,k] = calc
@@ -1368,29 +1436,34 @@ def rungeometric_derivatives(input, basis):
                             N2=basis[a[1]][5][j][0]
                             c1=basis[a[0]][5][i][2]
                             c2=basis[a[1]][5][j][2]
+                              
+                            N1p=Nyplus[a[0]][5][i][0]
+                            N2p=Nyplus[a[1]][5][j][0]
                             
+                            N1m=Nyminus[a[0]][5][i][0]
+                            N2m=Nyminus[a[1]][5][j][0]
                             
                             if atomidx == basis[a[0]][6] and atomidx == basis[a[1]][6]:
-                                calc += Ndiff1(m1,a2)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1+1, m2, n1, n2, N(a2, l1, m1+1, n1), N(b, l2, m2, n2), c1, c2, input, atomidx)
+                                calc += Ndiff1(m1,a2)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1+1, m2, n1, n2, N1p, N2, c1, c2, input, atomidx)
                                 if m1 != 0:
-                                    calc += Ndiff2(m1,a2)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1-1, m2, n1, n2, N(a2, l1, m1-1, n1), N(b, l2, m2, n2), c1, c2, input, atomidx)
+                                    calc += Ndiff2(m1,a2)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1-1, m2, n1, n2, N1m, N2, c1, c2, input, atomidx)
                                 
-                                calc += Ndiff1(m2,b)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2+1, n1, n2, N(a2, l1, m1, n1), N(b, l2, m2+1, n2), c1, c2, input, atomidx)
+                                calc += Ndiff1(m2,b)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2+1, n1, n2, N1, N2p, c1, c2, input, atomidx)
                                 if m2 != 0:
-                                    calc += Ndiff2(m2,b)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2-1, n1, n2, N(a2, l1, m1, n1), N(b, l2, m2-1, n2), c1, c2, input, atomidx)
+                                    calc += Ndiff2(m2,b)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2-1, n1, n2, N1, N2m, c1, c2, input, atomidx)
                             
                             else:
                                 calc += electricfield(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, input, 'y', atomidx)
                                 
                                 if atomidx == basis[a[0]][6]:
-                                    calc += Ndiff1(m1,a2)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1+1, m2, n1, n2, N(a2, l1, m1+1, n1), N(b, l2, m2, n2), c1, c2, input)
+                                    calc += Ndiff1(m1,a2)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1+1, m2, n1, n2, N1p, N2, c1, c2, input)
                                     if m1 != 0:
-                                        calc += Ndiff2(m1,a2)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1-1, m2, n1, n2, N(a2, l1, m1-1, n1), N(b, l2, m2, n2), c1, c2, input)
+                                        calc += Ndiff2(m1,a2)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1-1, m2, n1, n2, N1m, N2, c1, c2, input)
         
                                 if atomidx == basis[a[1]][6]:
-                                    calc += Ndiff1(m2,b)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2+1, n1, n2, N(a2, l1, m1, n1), N(b, l2, m2+1, n2), c1, c2, input)
+                                    calc += Ndiff1(m2,b)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2+1, n1, n2, N1, N2p, c1, c2, input)
                                     if m2 != 0:
-                                        calc += Ndiff2(m2,b)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2-1, n1, n2, N(a2, l1, m1, n1), N(b, l2, m2-1, n2), c1, c2, input)
+                                        calc += Ndiff2(m2,b)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2-1, n1, n2, N1, N2m, c1, c2, input)
                         
                     Na[k,l] = calc
                     Na[l,k] = calc
@@ -1430,27 +1503,33 @@ def rungeometric_derivatives(input, basis):
                             c1=basis[a[0]][5][i][2]
                             c2=basis[a[1]][5][j][2]
                             
+                            N1p=Nzplus[a[0]][5][i][0]
+                            N2p=Nzplus[a[1]][5][j][0]
+                            
+                            N1m=Nzminus[a[0]][5][i][0]
+                            N2m=Nzminus[a[1]][5][j][0]
+                            
                             if atomidx == basis[a[0]][6] and atomidx == basis[a[1]][6]:
-                                calc += Ndiff1(n1,a2)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1+1, n2, N(a2, l1, m1, n1+1), N(b, l2, m2, n2), c1, c2, input, atomidx)
+                                calc += Ndiff1(n1,a2)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1+1, n2, N1p, N2, c1, c2, input, atomidx)
                                 if n1 != 0:
-                                    calc += Ndiff2(n1,a2)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1-1, n2, N(a2, l1, m1, n1-1), N(b, l2, m2, n2), c1, c2, input, atomidx)
+                                    calc += Ndiff2(n1,a2)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1-1, n2, N1m, N2, c1, c2, input, atomidx)
                                 
-                                calc += Ndiff1(n2,b)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2+1, N(a2, l1, m1, n1), N(b, l2, m2, n2+1), c1, c2, input, atomidx)
+                                calc += Ndiff1(n2,b)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2+1, N1, N2p, c1, c2, input, atomidx)
                                 if n2 != 0:
-                                    calc += Ndiff2(n2,b)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2-1, N(a2, l1, m1, n1), N(b, l2, m2, n2-1), c1, c2, input, atomidx)
+                                    calc += Ndiff2(n2,b)*elnucExclude(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2-1, N1, N2m, c1, c2, input, atomidx)
                             
                             else:
                                 calc += electricfield(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, input, 'z', atomidx)
                                 
                                 if atomidx == basis[a[0]][6]:
-                                    calc += Ndiff1(n1,a2)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1+1, n2, N(a2, l1, m1, n1+1), N(b, l2, m2, n2), c1, c2, input)
+                                    calc += Ndiff1(n1,a2)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1+1, n2, N1p, N2, c1, c2, input)
                                     if n1 != 0:
-                                        calc += Ndiff2(n1,a2)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1-1, n2, N(a2, l1, m1, n1-1), N(b, l2, m2, n2), c1, c2, input)
+                                        calc += Ndiff2(n1,a2)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1-1, n2, N1m, N2, c1, c2, input)
         
                                 if atomidx == basis[a[1]][6]:
-                                    calc += Ndiff1(n2,b)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2+1, N(a2, l1, m1, n1), N(b, l2, m2, n2+1), c1, c2, input)
+                                    calc += Ndiff1(n2,b)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2+1, N1, N2p, c1, c2, input)
                                     if n2 != 0:
-                                        calc += Ndiff2(n2,b)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2-1, N(a2, l1, m1, n1), N(b, l2, m2, n2-1), c1, c2, input)
+                                        calc += Ndiff2(n2,b)*elnuc(a2, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2-1, N1, N2m, c1, c2, input)
         
                     Na[k,l] = calc
                     Na[l,k] = calc

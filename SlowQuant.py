@@ -9,6 +9,7 @@ from slowquant import Qfit as QF
 from slowquant import IntegralTransform as utilF 
 from slowquant import GeometryOptimization as GO
 from slowquant import UHF
+from slowquant import CI
 
 def run(inputname, settingsname):
     settings = np.genfromtxt('slowquant/Standardsettings.csv', delimiter = ';', dtype='str')
@@ -55,7 +56,7 @@ def run(inputname, settingsname):
         CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('slowquant/temp/enuc.npy'), Te=np.load('slowquant/temp/Ekin.npy'), S=np.load('slowquant/temp/overlap.npy'), VeN=np.load('slowquant/temp/nucatt.npy'), Vee=np.load('slowquant/temp/twoint.npy'), results=results)
         print(time.time()-start, 'HF')
         start = time.time()
-        utilF.TransformMO(CMO, basis, set, Vee=np.load('slowquant/temp/twoint.npy'))
+        utilF.runTransform(CMO, basis, set, FAO)
         print(time.time()-start, 'MO transform')
         start = time.time()
         results = prop.runprop(basis, input, D, set, results)
@@ -66,6 +67,9 @@ def run(inputname, settingsname):
         start = time.time()
         QF.runQfit(basis, input, D, set, results)
         print(time.time()-start, 'QFIT')
+        start = time.time()
+        CI.runCI(FAO, CMO, input, set)
+        print(time.time()-start, 'CI')
     
     return results
 

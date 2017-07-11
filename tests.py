@@ -279,5 +279,3 @@ def test_Lowdin():
 def test_Ffunction():
     results = HFrun.run('testfiles/Hm.csv','testfiles/settingFfunctions.csv')
     assert results['HFenergy'] + 0.475129018306 < 10**-5
-
-test_geoopt()

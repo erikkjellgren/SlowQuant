@@ -26,5 +26,7 @@ Write ESP;Yes
 GeoOpt;No
 Max iteration GeoOpt;100
 Geometry Tolerance;3
-Gradient Decent Step;1.0
+Gradient Descent Step;1.0
 Force Numeric;No
+        ; CONFIGURATION INTERACTION
+CI;No
