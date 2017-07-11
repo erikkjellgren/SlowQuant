@@ -66,7 +66,10 @@ def run(inputname, settingsname):
         start = time.time()
         QF.runQfit(basis, input, D, set, results)
         print(time.time()-start, 'QFIT')
+    
+    return results
 
     
 if __name__ == "__main__":
-    run('inputExampleH2O.csv', 'settingExample.csv')
+    results = run('Hm.csv', 'settingExample.csv')
+    

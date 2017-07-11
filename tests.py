@@ -276,5 +276,7 @@ def test_Lowdin():
     
     assert calcLow == checkLow
 
-
+def test_Ffunction():
+    results = HFrun.run('testfiles/Hm.csv','testfiles/settingFfunctions.csv')
+    assert results['HFenergy'] + 0.475129018306 < 10**-5
     

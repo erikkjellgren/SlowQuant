@@ -2,6 +2,22 @@ import numpy as np
 import math
 import scipy.misc as scm
 
+def Nrun(basisset):
+    for i in range(len(basisset)):
+        for j in range(len(basisset[i][5])):
+            if len(basisset[i][5]) == 1:
+                basisset[i][5][j][0] = N(basisset[i][5][j][1], basisset[i][5][j][3], basisset[i][5][j][4], basisset[i][5][j][5])
+            
+            else:
+                basisset[i][5][j][2] *= N(basisset[i][5][j][1], basisset[i][5][j][3], basisset[i][5][j][4], basisset[i][5][j][5])
+                
+    for i in range(len(basisset)):
+        for j in range(len(basisset[i][5])):
+            if len(basisset[i][5]) != 1:
+                basisset[i][5][j][0] = Ncontr(basisset[i][5], j)
+    return basisset
+    
+
 def N(a, l, m, n):
     part1 = (2.0/math.pi)**(3.0/4.0)
     part2 = 2.0**(l+m+n) * a**((2.0*l+2.0*m+2.0*n+3.0)/(4.0))
@@ -9,10 +25,28 @@ def N(a, l, m, n):
     N = part1 * ((part2)/(part3))
     return N
 
+def Ncontr(basisset, k):
+    l = basisset[k][3]
+    m = basisset[k][4]
+    n = basisset[k][5]
+    L = l+m+n
+    factor = (np.pi**(3.0/2.0)*scm.factorial2(int(2*l-1))*scm.factorial2(int(2*m-1))*scm.factorial2(int(2*n-1)))/(2.0**L)
+    sum = 0
+    for i in range(len(basisset)):
+        for j in range(len(basisset)):
+            alphai = basisset[i][1]
+            alphaj = basisset[j][1]
+            ai     = basisset[i][2]
+            aj     = basisset[j][2]
+            
+            sum += ai*aj/((alphai+alphaj)**(L+3.0/2.0))
+    Nc = (factor*sum)**(-1.0/2.0)
+    return Nc
+
 
 def bassiset(input, set):
     basisname = set['basisset']
-    basisload = np.genfromtxt('basissets/'+str(basisname)+'.csv', dtype=str, delimiter=';')
+    basisload = np.genfromtxt('slowquant/basissets/'+str(basisname)+'.csv', dtype=str, delimiter=';')
     
     basis_out = []
     idx = 1
@@ -335,5 +369,7 @@ def bassiset(input, set):
             basis_out[i][5][j][3] = int(basis_out[i][5][j][3])
             basis_out[i][5][j][4] = int(basis_out[i][5][j][4])
             basis_out[i][5][j][5] = int(basis_out[i][5][j][5])
-            basis_out[i][5][j][0] = N(basis_out[i][5][j][1], basis_out[i][5][j][3], basis_out[i][5][j][4], basis_out[i][5][j][5])
+
+    basis_out = Nrun(basis_out)
+            
     return basis_out

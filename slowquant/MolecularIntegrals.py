@@ -406,7 +406,9 @@ def boys(m,T):
     if abs(T) < 1e-12:
         return 1/(2*m + 1)
     else:
-        return scs.gammainc(m+0.5,T)*scs.gamma(m+0.5)/(2*np.power(T,m+0.5))
+        #return scs.gammainc(m+0.5,T)*scs.gamma(m+0.5)/(2*np.power(T,m+0.5))
+        return scs.hyp1f1(m+0.5,m+1.5,-T)/(2.0*m+1.0)
+        
 
 def gaussian_product_center(a,A,b,B):
     return (a*A+b*B)/(a+b)
@@ -517,7 +519,43 @@ def runIntegrals(input, basis, settings):
                                 E4 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E1']
                                 E5 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E2']
                                 E6 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E3']
-                                calc += elelrep2(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[2]][5][k][1], basis[a[3]][5][l][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[2]][1], basis[a[2]][2], basis[a[2]][3], basis[a[3]][1], basis[a[3]][2], basis[a[3]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[2]][5][k][3], basis[a[3]][5][l][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4], basis[a[2]][5][k][4], basis[a[3]][5][l][4], basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[2]][5][k][5], basis[a[3]][5][l][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[2]][5][k][0], basis[a[3]][5][l][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2], basis[a[2]][5][k][2], basis[a[3]][5][l][2], E1,E2,E3,E4,E5,E6)
+                                a2=basis[a[0]][5][i][1]
+                                b=basis[a[1]][5][j][1]
+                                c=basis[a[2]][5][k][1]
+                                d=basis[a[3]][5][l][1]
+                                Ax=basis[a[0]][1]
+                                Ay=basis[a[0]][2]
+                                Az=basis[a[0]][3] 
+                                Bx=basis[a[1]][1]
+                                By=basis[a[1]][2]
+                                Bz=basis[a[1]][3]
+                                Cx=basis[a[2]][1]
+                                Cy=basis[a[2]][2]
+                                Cz=basis[a[2]][3]
+                                Dx=basis[a[3]][1]
+                                Dy=basis[a[3]][2]
+                                Dz=basis[a[3]][3]
+                                l1=basis[a[0]][5][i][3]
+                                l2=basis[a[1]][5][j][3]
+                                l3=basis[a[2]][5][k][3]
+                                l4=basis[a[3]][5][l][3] 
+                                m1=basis[a[0]][5][i][4]
+                                m2=basis[a[1]][5][j][4]
+                                m3=basis[a[2]][5][k][4]
+                                m4=basis[a[3]][5][l][4] 
+                                n1=basis[a[0]][5][i][5]
+                                n2=basis[a[1]][5][j][5]
+                                n3=basis[a[2]][5][k][5]
+                                n4=basis[a[3]][5][l][5] 
+                                N1=basis[a[0]][5][i][0]
+                                N2=basis[a[1]][5][j][0]
+                                N3=basis[a[2]][5][k][0]
+                                N4=basis[a[3]][5][l][0]
+                                c1=basis[a[0]][5][i][2]
+                                c2=basis[a[1]][5][j][2]
+                                c3=basis[a[2]][5][k][2]
+                                c4=basis[a[3]][5][l][2]
+                                calc += elelrep2(a2, b, c, d, Ax, Ay, Az, Bx, By, Bz, Cx, Cy, Cz, Dx, Dy, Dz, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, N4, c1, c2, c3, c4, E1,E2,E3,E4,E5,E6)
                 ERI[mu,nu,lam,sig] = calc
                 ERI[nu,mu,lam,sig] = calc
                 ERI[mu,nu,sig,lam] = calc
@@ -556,7 +594,43 @@ def runIntegrals(input, basis, settings):
                                                 E4 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E1']
                                                 E5 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E2']
                                                 E6 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E3']
-                                                calc += elelrep2(basis[a[0]][5][i][1], basis[a[1]][5][j][1], basis[a[2]][5][k][1], basis[a[3]][5][l][1], basis[a[0]][1], basis[a[0]][2], basis[a[0]][3], basis[a[1]][1], basis[a[1]][2], basis[a[1]][3], basis[a[2]][1], basis[a[2]][2], basis[a[2]][3], basis[a[3]][1], basis[a[3]][2], basis[a[3]][3], basis[a[0]][5][i][3], basis[a[1]][5][j][3], basis[a[2]][5][k][3], basis[a[3]][5][l][3], basis[a[0]][5][i][4], basis[a[1]][5][j][4], basis[a[2]][5][k][4], basis[a[3]][5][l][4], basis[a[0]][5][i][5], basis[a[1]][5][j][5], basis[a[2]][5][k][5], basis[a[3]][5][l][5], basis[a[0]][5][i][0], basis[a[1]][5][j][0], basis[a[2]][5][k][0], basis[a[3]][5][l][0], basis[a[0]][5][i][2], basis[a[1]][5][j][2], basis[a[2]][5][k][2], basis[a[3]][5][l][2], E1,E2,E3,E4,E5,E6)
+                                                a2=basis[a[0]][5][i][1]
+                                                b=basis[a[1]][5][j][1]
+                                                c=basis[a[2]][5][k][1]
+                                                d=basis[a[3]][5][l][1]
+                                                Ax=basis[a[0]][1]
+                                                Ay=basis[a[0]][2]
+                                                Az=basis[a[0]][3] 
+                                                Bx=basis[a[1]][1]
+                                                By=basis[a[1]][2]
+                                                Bz=basis[a[1]][3]
+                                                Cx=basis[a[2]][1]
+                                                Cy=basis[a[2]][2]
+                                                Cz=basis[a[2]][3]
+                                                Dx=basis[a[3]][1]
+                                                Dy=basis[a[3]][2]
+                                                Dz=basis[a[3]][3]
+                                                l1=basis[a[0]][5][i][3]
+                                                l2=basis[a[1]][5][j][3]
+                                                l3=basis[a[2]][5][k][3]
+                                                l4=basis[a[3]][5][l][3] 
+                                                m1=basis[a[0]][5][i][4]
+                                                m2=basis[a[1]][5][j][4]
+                                                m3=basis[a[2]][5][k][4]
+                                                m4=basis[a[3]][5][l][4] 
+                                                n1=basis[a[0]][5][i][5]
+                                                n2=basis[a[1]][5][j][5]
+                                                n3=basis[a[2]][5][k][5]
+                                                n4=basis[a[3]][5][l][5] 
+                                                N1=basis[a[0]][5][i][0]
+                                                N2=basis[a[1]][5][j][0]
+                                                N3=basis[a[2]][5][k][0]
+                                                N4=basis[a[3]][5][l][0]
+                                                c1=basis[a[0]][5][i][2]
+                                                c2=basis[a[1]][5][j][2]
+                                                c3=basis[a[2]][5][k][2]
+                                                c4=basis[a[3]][5][l][2]
+                                                calc += elelrep2(a2, b, c, d, Ax, Ay, Az, Bx, By, Bz, Cx, Cy, Cz, Dx, Dy, Dz, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, N4, c1, c2, c3, c4, E1,E2,E3,E4,E5,E6)
                                 ERI[mu,nu,lam,sig] = calc
                                 ERI[nu,mu,lam,sig] = calc
                                 ERI[mu,nu,sig,lam] = calc
