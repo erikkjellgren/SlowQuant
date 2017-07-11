@@ -743,7 +743,6 @@ def runQMESP(basis, input, rcx, rcy ,rcz):
 
 def rungeometric_derivatives(input, basis):
     # Calculating the normalization of the derivatives. For now only used in ERI
-    # Thanks to Tom for suggesting copy.deepcopy
     Nxplus  = copy.deepcopy(basis)
     Nxminus = copy.deepcopy(basis)
     Nyplus  = copy.deepcopy(basis)

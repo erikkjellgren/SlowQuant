@@ -245,7 +245,7 @@ def test_geoopt():
         if line[0:3] == 'MP2':
             calcMP2 = float(line[12:])
     
-    assert checkMP2 == calcMP2
+    assert checkMP2 - calcMP2 < 10**-5
 
 
 def test_UHF():
@@ -279,4 +279,5 @@ def test_Lowdin():
 def test_Ffunction():
     results = HFrun.run('testfiles/Hm.csv','testfiles/settingFfunctions.csv')
     assert results['HFenergy'] + 0.475129018306 < 10**-5
-    
+
+test_geoopt()

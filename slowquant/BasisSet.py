@@ -1,20 +1,23 @@
 import numpy as np
 import math
 import scipy.misc as scm
+import copy
 
 def Nrun(basisset):
+    basisset_temp = copy.deepcopy(basisset)
     for i in range(len(basisset)):
         for j in range(len(basisset[i][5])):
             if len(basisset[i][5]) == 1:
                 basisset[i][5][j][0] = N(basisset[i][5][j][1], basisset[i][5][j][3], basisset[i][5][j][4], basisset[i][5][j][5])
             
             else:
-                basisset[i][5][j][2] *= N(basisset[i][5][j][1], basisset[i][5][j][3], basisset[i][5][j][4], basisset[i][5][j][5])
-                
+                basisset_temp[i][5][j][2] *= N(basisset[i][5][j][1], basisset[i][5][j][3], basisset[i][5][j][4], basisset[i][5][j][5])
+                basisset[i][5][j][0] = N(basisset[i][5][j][1], basisset[i][5][j][3], basisset[i][5][j][4], basisset[i][5][j][5])
+
     for i in range(len(basisset)):
         for j in range(len(basisset[i][5])):
             if len(basisset[i][5]) != 1:
-                basisset[i][5][j][0] = Ncontr(basisset[i][5], j)
+                basisset[i][5][j][0] *= Ncontr(basisset_temp[i][5], j)
     return basisset
     
 

@@ -115,48 +115,48 @@ def run_numeric(input, set, results):
         dZ = np.zeros(len(input))
     
         for j in range(1, len(input)):
-            input[j,1] += 10**-6
+            input[j,1] += 10**-8
             basis = BS.bassiset(input, set)
             MI.runIntegrals(input, basis, set)
-            input[j,1] -= 10**-6
+            input[j,1] -= 10**-8
             CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('slowquant/temp/enuc.npy'), Te=np.load('slowquant/temp/Ekin.npy'), S=np.load('slowquant/temp/overlap.npy'), VeN=np.load('slowquant/temp/nucatt.npy'), Vee=np.load('slowquant/temp/twoint.npy'), results=results, print_SCF='No')
             xplus = results['HFenergy']
-            input[j,1] -= 10**-6
+            input[j,1] -= 10**-8
             basis = BS.bassiset(input, set)
             MI.runIntegrals(input, basis, set)
-            input[j,1] += 10**-6
+            input[j,1] += 10**-8
             CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('slowquant/temp/enuc.npy'), Te=np.load('slowquant/temp/Ekin.npy'), S=np.load('slowquant/temp/overlap.npy'), VeN=np.load('slowquant/temp/nucatt.npy'), Vee=np.load('slowquant/temp/twoint.npy'), results=results, print_SCF='No')
             xminus = results['HFenergy']
             
-            input[j,2] += 10**-6
+            input[j,2] += 10**-8
             basis = BS.bassiset(input, set)
             MI.runIntegrals(input, basis, set)
-            input[j,2] -= 10**-6
+            input[j,2] -= 10**-8
             CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('slowquant/temp/enuc.npy'), Te=np.load('slowquant/temp/Ekin.npy'), S=np.load('slowquant/temp/overlap.npy'), VeN=np.load('slowquant/temp/nucatt.npy'), Vee=np.load('slowquant/temp/twoint.npy'), results=results, print_SCF='No')
             yplus = results['HFenergy']
-            input[j,2] -= 10**-6
+            input[j,2] -= 10**-8
             basis = BS.bassiset(input, set)
             MI.runIntegrals(input, basis, set)
-            input[j,2] += 10**-6
+            input[j,2] += 10**-8
             CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('slowquant/temp/enuc.npy'), Te=np.load('slowquant/temp/Ekin.npy'), S=np.load('slowquant/temp/overlap.npy'), VeN=np.load('slowquant/temp/nucatt.npy'), Vee=np.load('slowquant/temp/twoint.npy'), results=results, print_SCF='No')
             yminus = results['HFenergy']
             
-            input[j,3] += 10**-6
+            input[j,3] += 10**-8
             basis = BS.bassiset(input, set)
             MI.runIntegrals(input, basis, set)
-            input[j,3] -= 10**-6
+            input[j,3] -= 10**-8
             CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('slowquant/temp/enuc.npy'), Te=np.load('slowquant/temp/Ekin.npy'), S=np.load('slowquant/temp/overlap.npy'), VeN=np.load('slowquant/temp/nucatt.npy'), Vee=np.load('slowquant/temp/twoint.npy'), results=results, print_SCF='No')
             zplus = results['HFenergy']
-            input[j,3] -= 10**-6
+            input[j,3] -= 10**-8
             basis = BS.bassiset(input, set)
             MI.runIntegrals(input, basis, set)
-            input[j,3] += 10**-6
+            input[j,3] += 10**-8
             CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('slowquant/temp/enuc.npy'), Te=np.load('slowquant/temp/Ekin.npy'), S=np.load('slowquant/temp/overlap.npy'), VeN=np.load('slowquant/temp/nucatt.npy'), Vee=np.load('slowquant/temp/twoint.npy'), results=results, print_SCF='No')
             zminus = results['HFenergy']
             
-            dX[j] = (xplus-xminus)/(2*10**-6)
-            dY[j] = (yplus-yminus)/(2*10**-6)
-            dZ[j] = (zplus-zminus)/(2*10**-6)
+            dX[j] = (xplus-xminus)/(2*10**-8)
+            dY[j] = (yplus-yminus)/(2*10**-8)
+            dZ[j] = (zplus-zminus)/(2*10**-8)
         
         for j in range(1, len(dX)):
             input[j,1] = input[j,1] - stepsize*dX[j]

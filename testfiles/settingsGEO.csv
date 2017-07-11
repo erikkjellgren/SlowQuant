@@ -2,3 +2,5 @@ basisset;DZ
 GeoOpt;Yes
 Geometry Tolerance;3
 MPn;MP2
+SCF Energy Threshold;5
+SCF RMSD Threshold;5

@@ -71,5 +71,5 @@ def run(inputname, settingsname):
 
     
 if __name__ == "__main__":
-    results = run('Hm.csv', 'settingExample.csv')
+    results = run('inputExampleH2O.csv', 'settingExample.csv')
     
