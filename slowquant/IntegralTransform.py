@@ -30,11 +30,13 @@ def Transform2eSPIN():
     VeeMO=np.load('slowquant/temp/twointMO.npy')
     VeeMOspin = np.zeros((len(VeeMO)*2,len(VeeMO)*2,len(VeeMO)*2,len(VeeMO)*2))
     for p in range(1,len(VeeMO)*2+1):
-        for q in range(1,len(VeeMO)*2+1):
-            for r in range(1,len(VeeMO)*2+1):
-                for s in range(1,len(VeeMO)*2+1):
-                    VeeMOspin[p-1,q-1,r-1,s-1] = VeeMO[(p+1)//2-1,(r+1)//2-1,(q+1)//2-1,(s+1)//2-1] * (p%2 == r%2) * (q%2 == s%2)
-    
+        for r in range(1,len(VeeMO)*2+1):
+            if (p%2 == r%2):
+                for q in range(1,len(VeeMO)*2+1):
+                    for s in range(1,len(VeeMO)*2+1):
+                        if (q%2 == s%2):
+                            VeeMOspin[p-1,q-1,r-1,s-1] = VeeMO[(p+1)//2-1,(r+1)//2-1,(q+1)//2-1,(s+1)//2-1]
+        
     np.save('slowquant/temp/twointMOspin.npy', VeeMOspin)
 
 def runTransform(CMO, basis, set, FAO):

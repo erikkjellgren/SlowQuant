@@ -36,3 +36,8 @@ Results object
 --------------
 
 The results are parsed around in the code as a dictionary.
+
+Integral storage
+----------------
+
+All of the integrals used in the code, is stored in slowquant/temp

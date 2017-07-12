@@ -31,4 +31,5 @@ SlowQuant have the following requirements:
    MPn.rst
    Properties.rst
    GeoOpt.rst
+   CI.rst
    
