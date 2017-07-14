@@ -102,6 +102,7 @@
 <li class="toctree-l2"><a class="reference internal" href="#inputfile-obejct">Inputfile obejct</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#settings-obejct">Settings obejct</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#results-object">Results object</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#integral-storage">Integral storage</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="MolecularIntegral.html">Molecular Integrals</a></li>
@@ -111,6 +112,7 @@
 <li class="toctree-l1"><a class="reference internal" href="MPn.html">Perturbations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Properties.html">Propeties</a></li>
 <li class="toctree-l1"><a class="reference internal" href="GeoOpt.html">Geometry optimization</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CI.html">Configuration Interaction</a></li>
 </ul>
 
             
@@ -200,6 +202,19 @@
 <div class="section" id="results-object">
 <h2>Results object<a class="headerlink" href="#results-object" title="Permalink to this headline">¶</a></h2>
 <p>The results are parsed around in the code as a dictionary.</p>
+</div>
+<div class="section" id="integral-storage">
+<h2>Integral storage<a class="headerlink" href="#integral-storage" title="Permalink to this headline">¶</a></h2>
+<p>All of the integrals used in the code, is stored in slowquant/temp.</p>
+<ul class="simple">
+<li>enuc.npy, nuclear-nucelar repulsion</li>
+<li>Ekin.npy, electronic kinetic energy AO basis</li>
+<li>nucatt.npy, nuclear-electron attraction AO basis</li>
+<li>overlap.npy, electron-electron overlap AO basis</li>
+<li>twoint.npy, electron-electron repulsion AO basis</li>
+<li>twointMO.npy, electron-electron repulsion MO basis</li>
+<li>twointMOspin.npy, electron-electron repulsion MO spin basis</li>
+</ul>
 </div>
 </div>
 

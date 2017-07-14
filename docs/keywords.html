@@ -98,6 +98,7 @@
 <li class="toctree-l2"><a class="reference internal" href="#perturbation">Perturbation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#properties">Properties</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#geomoetry-optimization">Geomoetry Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#configuartion-interaction">Configuartion Interaction</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="Examples.html">Example input files</a></li>
@@ -113,6 +114,7 @@
 <li class="toctree-l1"><a class="reference internal" href="MPn.html">Perturbations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Properties.html">Propeties</a></li>
 <li class="toctree-l1"><a class="reference internal" href="GeoOpt.html">Geometry optimization</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CI.html">Configuration Interaction</a></li>
 </ul>
 
             
@@ -241,6 +243,10 @@
 <li>Dipole;x</li>
 </ul>
 <p>Calcultion of molecular dipolemomemnt. x=Yes for calcultion.</p>
+<ul class="simple">
+<li>Excitation energy;x</li>
+</ul>
+<p>Calculation of excitation energies. x=RPA for using TDHF/RPA.</p>
 </div>
 <div class="section" id="geomoetry-optimization">
 <h2>Geomoetry Optimization<a class="headerlink" href="#geomoetry-optimization" title="Permalink to this headline">¶</a></h2>
@@ -257,13 +263,20 @@
 </ul>
 <p>Tolerance for convergence, given as 10^-x</p>
 <ul class="simple">
-<li>Gradient Decent Step;x</li>
+<li>Gradient Descent Step;x</li>
 </ul>
-<p>Gradient scaling factor in Gradient Decent algorithm</p>
+<p>Gradient scaling factor in Gradient Descent algorithm</p>
 <ul class="simple">
 <li>Force Numeric;x</li>
 </ul>
 <p>Choose to evaluate Forces numerically. x=Yes to activate. Only works for Hartree-Fock.</p>
+</div>
+<div class="section" id="configuartion-interaction">
+<h2>Configuartion Interaction<a class="headerlink" href="#configuartion-interaction" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>CI;x</li>
+</ul>
+<p>To get exciation energies with CI singles. x=CIS</p>
 </div>
 </div>
 

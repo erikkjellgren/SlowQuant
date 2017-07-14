@@ -36,3 +36,16 @@ Results object
 --------------
 
 The results are parsed around in the code as a dictionary.
+
+Integral storage
+----------------
+
+All of the integrals used in the code, is stored in slowquant/temp.
+
+- enuc.npy, nuclear-nucelar repulsion 
+- Ekin.npy, electronic kinetic energy AO basis
+- nucatt.npy, nuclear-electron attraction AO basis
+- overlap.npy, electron-electron overlap AO basis
+- twoint.npy, electron-electron repulsion AO basis
+- twointMO.npy, electron-electron repulsion MO basis
+- twointMOspin.npy, electron-electron repulsion MO spin basis

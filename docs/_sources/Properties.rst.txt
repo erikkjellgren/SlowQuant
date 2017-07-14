@@ -90,4 +90,40 @@ Refrence:
 
 - Szabo and Ostlund, Modern Quantum Chemistry: Introduction to Advanced Electronic Structure Theory
 
+Random-Phase Approximation Exciation energy
+-------------------------------------------
+
+The excitation energies can be calculated by using the random-phase approximation also known as time dependent Hartree-Fock. The exciation energy is found by diagonalizing the following equation:
+
+.. math::
+   \left(A+B\right)\left(A-B\right)X=E^{2}X
+ 
+with the elements given as:
+
+.. math::
+   A_{ia,jb}=f_{ab}\delta_{ij}-f_{ij}\delta_{ab}+\left\langle aj\left|\right|ib\right\rangle 
+   
+   B_{ia,jb}=\left\langle ab\left|\right|ij\right\rangle 
+  
+All of the elements are in spin basis.
+
+FUNCTION:
+
+- Properties.RPA(F, C, input, results)
+
+Input:
+
+- F, fock matrix in spatial basis
+- C, MO coeffcients in spatial basis
+- input, inputfile object
+- results, results object
+
+Output:
+
+- results, results obejct with added entries
+- results['RPA Exc'] = Exc
+
+References:
+
+- http://sirius.chem.vt.edu/wiki/doku.php?id=crawdad:programming:project12
 

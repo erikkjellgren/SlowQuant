@@ -107,9 +107,11 @@
 <li class="toctree-l2"><a class="reference internal" href="#molecular-dipole">Molecular dipole</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#mulliken-charges">Mulliken charges</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#lowdin-charges">Lowdin charges</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#random-phase-approximation-exciation-energy">Random-Phase Approximation Exciation energy</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="GeoOpt.html">Geometry optimization</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CI.html">Configuration Interaction</a></li>
 </ul>
 
             
@@ -254,6 +256,38 @@
 <p>Refrence:</p>
 <ul class="simple">
 <li>Szabo and Ostlund, Modern Quantum Chemistry: Introduction to Advanced Electronic Structure Theory</li>
+</ul>
+</div>
+<div class="section" id="random-phase-approximation-exciation-energy">
+<h2>Random-Phase Approximation Exciation energy<a class="headerlink" href="#random-phase-approximation-exciation-energy" title="Permalink to this headline">¶</a></h2>
+<p>The excitation energies can be calculated by using the random-phase approximation also known as time dependent Hartree-Fock. The exciation energy is found by diagonalizing the following equation:</p>
+<div class="math">
+<p><img src="_images/math/88c1f4a67f915dfe02be80f30bacbb384780f948.png" alt="\left(A+B\right)\left(A-B\right)X=E^{2}X"/></p>
+</div><p>with the elements given as:</p>
+<div class="math">
+<p><img src="_images/math/de4b06033b242ee28542aa5aca92b10f452aed28.png" alt="A_{ia,jb}=f_{ab}\delta_{ij}-f_{ij}\delta_{ab}+\left\langle aj\left|\right|ib\right\rangle
+
+B_{ia,jb}=\left\langle ab\left|\right|ij\right\rangle"/></p>
+</div><p>All of the elements are in spin basis.</p>
+<p>FUNCTION:</p>
+<ul class="simple">
+<li>Properties.RPA(F, C, input, results)</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>F, fock matrix in spatial basis</li>
+<li>C, MO coeffcients in spatial basis</li>
+<li>input, inputfile object</li>
+<li>results, results object</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>results, results obejct with added entries</li>
+<li>results[&#8216;RPA Exc&#8217;] = Exc</li>
+</ul>
+<p>References:</p>
+<ul class="simple">
+<li><a class="reference external" href="http://sirius.chem.vt.edu/wiki/doku.php?id=crawdad:programming:project12">http://sirius.chem.vt.edu/wiki/doku.php?id=crawdad:programming:project12</a></li>
 </ul>
 </div>
 </div>

@@ -101,6 +101,7 @@
 <li class="toctree-l1"><a class="reference internal" href="MolecularIntegral.html">Molecular Integrals</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Integral Transformations</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#ao-to-mo-basis-2-electron-integrals">AO to MO basis 2 electron integrals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mo-spatial-to-mo-spin-basis-2-electron-integrals">MO spatial to MO spin basis 2 electron integrals</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="HFMethods.html">Hartree-Fock methods</a></li>
@@ -108,6 +109,7 @@
 <li class="toctree-l1"><a class="reference internal" href="MPn.html">Perturbations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Properties.html">Propeties</a></li>
 <li class="toctree-l1"><a class="reference internal" href="GeoOpt.html">Geometry optimization</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CI.html">Configuration Interaction</a></li>
 </ul>
 
             
@@ -178,21 +180,34 @@
 <h2>AO to MO basis 2 electron integrals<a class="headerlink" href="#ao-to-mo-basis-2-electron-integrals" title="Permalink to this headline">¶</a></h2>
 <p>The integral transformation of the AO two electron integrals to the MO two electron integrals is given as:</p>
 <div class="math">
-<p><img src="_images/math/fbb41dcf9aed1da386b960076e50224eeb88cacc.png" alt="\left(ij\left|\right|kl\right)=\sum_{\mu}\sum_{\nu}\sum_{\lambda}\sum_{\sigma}C_{\mu}^{i}C_{\nu}^{j}\left(\mu\nu\left|\right|\lambda\sigma\right)C_{\lambda}^{k}C_{\sigma}^{l}"/></p>
+<p><img src="_images/math/926067842b2ca3a7ba9fcdc6dddc092ccfd8cadf.png" alt="\left(ij\left.\right|kl\right)=\sum_{\mu}\sum_{\nu}\sum_{\lambda}\sum_{\sigma}C_{\mu}^{i}C_{\nu}^{j}\left(\mu\nu\left.\right|\lambda\sigma\right)C_{\lambda}^{k}C_{\sigma}^{l}"/></p>
 </div><p>FUNCTION:</p>
 <ul class="simple">
-<li>IntegralTransform.TransformMO(C, basis, set, Vee)</li>
+<li>IntegralTransform.TransformMO(C, basis, set)</li>
 </ul>
 <p>Input:</p>
 <ul class="simple">
 <li>C, MO coefficients from SCF calculation</li>
 <li>basis, basisset obejct</li>
 <li>set, settingsfile object</li>
-<li>Vee, ERI matrix</li>
 </ul>
 <p>References:</p>
 <ul class="simple">
 <li><a class="reference external" href="http://sirius.chem.vt.edu/wiki/doku.php?id=crawdad:programming:project4">http://sirius.chem.vt.edu/wiki/doku.php?id=crawdad:programming:project4</a></li>
+</ul>
+</div>
+<div class="section" id="mo-spatial-to-mo-spin-basis-2-electron-integrals">
+<h2>MO spatial to MO spin basis 2 electron integrals<a class="headerlink" href="#mo-spatial-to-mo-spin-basis-2-electron-integrals" title="Permalink to this headline">¶</a></h2>
+<p>The integral transformation from MO spatial to MO spin orbitals is given by the following equation:</p>
+<div class="math">
+<p><img src="_images/math/80b1023e1aa4d9b9b8e7b2ce32bcd57527ef9795.png" alt="\left\langle \left.ij\right|kl\right\rangle =\left(\left.\sigma_{1}i\sigma_{2}k\right|\sigma_{3}j\sigma_{4}l\right)\delta_{\sigma_{1}\sigma_{2}}\delta_{\sigma_{3}\sigma_{4}}"/></p>
+</div><p>FUNCTION:</p>
+<ul class="simple">
+<li>IntegralTransform.Transform2eSPIN()</li>
+</ul>
+<p>References:</p>
+<ul class="simple">
+<li>None</li>
 </ul>
 </div>
 </div>

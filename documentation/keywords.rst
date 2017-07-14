@@ -69,6 +69,10 @@ Calculation of atomic charges. x=Mulliken gives Mulliken charges. x=Lowdin gives
 
 Calcultion of molecular dipolemomemnt. x=Yes for calcultion.
 
+- Excitation energy;x
+
+Calculation of excitation energies. x=RPA for using TDHF/RPA.
+
 
 Geomoetry Optimization
 ----------------------
@@ -92,3 +96,10 @@ Gradient scaling factor in Gradient Descent algorithm
 - Force Numeric;x
 
 Choose to evaluate Forces numerically. x=Yes to activate. Only works for Hartree-Fock.
+
+Configuartion Interaction
+-------------------------
+
+- CI;x
+
+To get exciation energies with CI singles. x=CIS

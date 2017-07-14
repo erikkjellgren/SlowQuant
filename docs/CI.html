@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Perturbations &mdash; SLOWQUANT  documentation</title>
+  <title>Configuration Interaction &mdash; SLOWQUANT  documentation</title>
   
 
   
@@ -36,8 +36,7 @@
               href="genindex.html"/>
         <link rel="search" title="Search" href="search.html"/>
     <link rel="top" title="SLOWQUANT  documentation" href="index.html"/>
-        <link rel="next" title="Propeties" href="Properties.html"/>
-        <link rel="prev" title="DIIS" href="DIIS.html"/> 
+        <link rel="prev" title="Geometry optimization" href="GeoOpt.html"/> 
 
   
   <script src="_static/js/modernizr.min.js"></script>
@@ -102,13 +101,13 @@
 <li class="toctree-l1"><a class="reference internal" href="IntegralTrans.html">Integral Transformations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="HFMethods.html">Hartree-Fock methods</a></li>
 <li class="toctree-l1"><a class="reference internal" href="DIIS.html">DIIS</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Perturbations</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#moller-plesset-second-order">Møller-Plesset, second order</a></li>
-</ul>
-</li>
+<li class="toctree-l1"><a class="reference internal" href="MPn.html">Perturbations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Properties.html">Propeties</a></li>
 <li class="toctree-l1"><a class="reference internal" href="GeoOpt.html">Geometry optimization</a></li>
-<li class="toctree-l1"><a class="reference internal" href="CI.html">Configuration Interaction</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Configuration Interaction</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#ci-singles">CI Singles</a></li>
+</ul>
+</li>
 </ul>
 
             
@@ -153,13 +152,13 @@
     
       <li><a href="index.html">Docs</a> &raquo;</li>
         
-      <li>Perturbations</li>
+      <li>Configuration Interaction</li>
     
     
       <li class="wy-breadcrumbs-aside">
         
             
-            <a href="_sources/MPn.rst.txt" rel="nofollow"> View page source</a>
+            <a href="_sources/CI.rst.txt" rel="nofollow"> View page source</a>
           
         
       </li>
@@ -172,35 +171,34 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="perturbations">
-<h1>Perturbations<a class="headerlink" href="#perturbations" title="Permalink to this headline">¶</a></h1>
-<p>Contains information about perturbative methods.</p>
-<div class="section" id="moller-plesset-second-order">
-<h2>Møller-Plesset, second order<a class="headerlink" href="#moller-plesset-second-order" title="Permalink to this headline">¶</a></h2>
-<p>The second order Møller-Plesset correction to the energy is given as:</p>
+  <div class="section" id="configuration-interaction">
+<h1>Configuration Interaction<a class="headerlink" href="#configuration-interaction" title="Permalink to this headline">¶</a></h1>
+<p>In this section configuration interaction methods will be described.</p>
+<div class="section" id="ci-singles">
+<h2>CI Singles<a class="headerlink" href="#ci-singles" title="Permalink to this headline">¶</a></h2>
+<p>The CI singles are done by building a Hamiltonian and diagonalizing it. The Hamiltonian build accourding to:</p>
 <div class="math">
-<p><img src="_images/math/4057611a6e86a0fd66d9929c424161e796b7d68d.png" alt="E_{\mathrm{MP2}}=\sum_{i,j}^{\mathrm{occ}}\sum_{a,b}^{\mathrm{unocc}}\frac{\left(ia\left|jb\right.\right)\left[2\left(ia\left|jb\right.\right)-\left(ib\left|ja\right.\right)\right]}{\epsilon_{i}+\epsilon_{j}-\epsilon_{a}-\epsilon_{b}}"/></p>
-</div><p>The above equation is valid for closed shell systems. The integrals is in Mulliken notation, and the denominator is the orbital energies in MO, obtained from an SCF procedure.</p>
+<p><img src="_images/math/08a978380b4868fdef73268b3aa03059cf922c76.png" alt="\left\langle \phi_{i}^{a}\left|H\right|\phi_{j}^{b}\right\rangle =f_{ab}\delta_{ij}-f_{ij}\delta_{ab}+\left\langle aj\left|\right|ib\right\rangle"/></p>
+</div><p>Here everything is in spin orbital basis.</p>
 <p>FUNCTION:</p>
 <ul class="simple">
-<li>MPn.MP2(basis, input, F, C)</li>
-<li>return EMP2</li>
+<li>CI.CIS(F, C, input, results)</li>
 </ul>
 <p>Input:</p>
 <ul class="simple">
-<li>basis, basis set object</li>
-<li>input, input file object</li>
-<li>F, Fock matrix</li>
-<li>C, MO coefficient matrix</li>
+<li>F, fock matrix in spatial basis</li>
+<li>C, MO coeffcients in spatial basis</li>
+<li>input, inputfile object</li>
+<li>results, results object</li>
 </ul>
 <p>Output:</p>
 <ul class="simple">
-<li>EMP2, MP2 correction to the energy</li>
+<li>results, results obejct with added entries</li>
+<li>results[&#8216;CIS Exc&#8217;] = Exc</li>
 </ul>
 <p>References:</p>
 <ul class="simple">
-<li><a class="reference external" href="http://sirius.chem.vt.edu/wiki/doku.php?id=crawdad:programming:project4">http://sirius.chem.vt.edu/wiki/doku.php?id=crawdad:programming:project4</a></li>
-<li>Szabo and Ostlund, Modern Quantum Chemistry: Introduction to Advanced Electronic Structure Theory</li>
+<li><a class="reference external" href="http://sirius.chem.vt.edu/wiki/doku.php?id=crawdad:programming:project12">http://sirius.chem.vt.edu/wiki/doku.php?id=crawdad:programming:project12</a></li>
 </ul>
 </div>
 </div>
@@ -215,10 +213,8 @@
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="Properties.html" class="btn btn-neutral float-right" title="Propeties" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
-      
-        <a href="DIIS.html" class="btn btn-neutral" title="DIIS" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="GeoOpt.html" class="btn btn-neutral" title="Geometry optimization" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
