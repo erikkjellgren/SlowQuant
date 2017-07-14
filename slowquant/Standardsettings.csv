@@ -14,6 +14,7 @@ UHF mix guess;0.15
 Charge;Mulliken
 Dipole;Yes
 MPn;No
+Excitation;No
         ; FITTING SETTINGS
 Multipolefit;No
 Griddensity;1

@@ -59,7 +59,7 @@ def run(inputname, settingsname):
         utilF.runTransform(CMO, basis, set, FAO)
         print(time.time()-start, 'MO transform')
         start = time.time()
-        results = prop.runprop(basis, input, D, set, results)
+        results = prop.runprop(basis, input, D, set, results, FAO, CMO)
         print(time.time()-start, 'PROPERTIES')
         start = time.time()
         MP.runMPn(basis, input, FAO, CMO, set)
@@ -68,7 +68,7 @@ def run(inputname, settingsname):
         QF.runQfit(basis, input, D, set, results)
         print(time.time()-start, 'QFIT')
         start = time.time()
-        CI.runCI(FAO, CMO, input, set)
+        CI.runCI(FAO, CMO, input, set, results)
         print(time.time()-start, 'CI')
     
     return results

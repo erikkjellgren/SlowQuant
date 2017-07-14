@@ -1,6 +1,6 @@
 import numpy as np
 
-def CIS(F, C, input):
+def CIS(F, C, input, results):
     # Load in spin MO integrals
     VeeMOspin = np.load('slowquant/temp/twointMOspin.npy')
     
@@ -31,9 +31,26 @@ def CIS(F, C, input):
                     if a == b:
                         H[iaidx,jbidx] -= FMOspin[i,j]
     
-    print(np.linalg.eigvalsh(H))
+    Exc = np.linalg.eigvalsh(H)
+    
+    output = open('out.txt', 'a')
+    output = open('out.txt', 'a')
+    output.write('CIS Excitation Energies: \n')
+    output.write(' # \t\t Hartree \n')
+    output.write('-- \t\t -------------- \n')
+    for i in range(len(Exc)):
+        output.write(str(i+1)+'\t\t')
+        output.write("{: 12.8e}".format(Exc[i]))
+        output.write('\n')
+    output.write('\n \n')
+    output.close()
+    
+    results['CIS Exc'] = Exc
+    return results
 
 
-def runCI(F, C, input, set):
+def runCI(F, C, input, set, results):
     if set['CI'] == 'CIS':
-        CIS(F, C, input)
+        results = CIS(F, C, input, results)
+    
+    return results
