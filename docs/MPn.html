@@ -36,7 +36,7 @@
               href="genindex.html"/>
         <link rel="search" title="Search" href="search.html"/>
     <link rel="top" title="SLOWQUANT  documentation" href="index.html"/>
-        <link rel="next" title="Propeties" href="Properties.html"/>
+        <link rel="next" title="Properties" href="Properties.html"/>
         <link rel="prev" title="DIIS" href="DIIS.html"/> 
 
   
@@ -104,9 +104,11 @@
 <li class="toctree-l1"><a class="reference internal" href="DIIS.html">DIIS</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Perturbations</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#moller-plesset-second-order">Møller-Plesset, second order</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#moller-plesset-third-order">Møller-Plesset, third order</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#degeneracy-corrected-perturbation-second-order">Degeneracy-corrected perturbation, second order</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="Properties.html">Propeties</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Properties.html">Properties</a></li>
 <li class="toctree-l1"><a class="reference internal" href="GeoOpt.html">Geometry optimization</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CI.html">Configuration Interaction</a></li>
 </ul>
@@ -183,8 +185,8 @@
 </div><p>The above equation is valid for closed shell systems. The integrals is in Mulliken notation, and the denominator is the orbital energies in MO, obtained from an SCF procedure.</p>
 <p>FUNCTION:</p>
 <ul class="simple">
-<li>MPn.MP2(basis, input, F, C)</li>
-<li>return EMP2</li>
+<li>MPn.MP2(basis, input, F, C, results)</li>
+<li>return results</li>
 </ul>
 <p>Input:</p>
 <ul class="simple">
@@ -192,15 +194,74 @@
 <li>input, input file object</li>
 <li>F, Fock matrix</li>
 <li>C, MO coefficient matrix</li>
+<li>results, results obejct</li>
 </ul>
 <p>Output:</p>
 <ul class="simple">
-<li>EMP2, MP2 correction to the energy</li>
+<li>results, results obejct with added entries</li>
+<li>results[&#8216;EMP2&#8217;] = EMP2</li>
 </ul>
 <p>References:</p>
 <ul class="simple">
 <li><a class="reference external" href="http://sirius.chem.vt.edu/wiki/doku.php?id=crawdad:programming:project4">http://sirius.chem.vt.edu/wiki/doku.php?id=crawdad:programming:project4</a></li>
 <li>Szabo and Ostlund, Modern Quantum Chemistry: Introduction to Advanced Electronic Structure Theory</li>
+</ul>
+</div>
+<div class="section" id="moller-plesset-third-order">
+<h2>Møller-Plesset, third order<a class="headerlink" href="#moller-plesset-third-order" title="Permalink to this headline">¶</a></h2>
+<p>The third order Møller-Plesset correction to the energy is given as:</p>
+<div class="math">
+<p><img src="_images/math/772322a47bb66ab19df171ec30b9954ecfd85b20.png" alt="E^{(3)}=\frac{1}{8}\sum_{abcdrs}\frac{\left\langle ab\left|\right|rs\right\rangle \left\langle cd\left|\right|ab\right\rangle \left\langle rs\left|\right|cd\right\rangle }{\left(\epsilon_{a}+\epsilon_{b}-\epsilon_{r}-\epsilon_{s}\right)\left(\epsilon_{c}+\epsilon_{d}-\epsilon_{r}-\epsilon_{s}\right)}+\frac{1}{8}\sum_{abrstu}\frac{\left\langle ab\left|\right|rs\right\rangle \left\langle rs\left|\right|tu\right\rangle \left\langle tu\left|\right|ab\right\rangle }{\left(\epsilon_{a}+\epsilon_{b}-\epsilon_{r}-\epsilon_{s}\right)\left(\epsilon_{a}+\epsilon_{b}-\epsilon_{t}-\epsilon_{u}\right)}+\sum_{abcrst}\frac{\left\langle ab\left|\right|rs\right\rangle \left\langle cs\left|\right|tb\right\rangle \left\langle rt\left|\right|ac\right\rangle }{\left(\epsilon_{a}+\epsilon_{b}-\epsilon_{r}-\epsilon_{s}\right)\left(\epsilon_{a}+\epsilon_{c}-\epsilon_{r}-\epsilon_{t}\right)}"/></p>
+</div><p>FUNCTION:</p>
+<ul class="simple">
+<li>MPn.MP3(basis, input, F, C, results)</li>
+<li>return results</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>basis, basis set object</li>
+<li>input, input file object</li>
+<li>F, Fock matrix</li>
+<li>C, MO coefficient matrix</li>
+<li>results, results obejct</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>results, results obejct with added entries</li>
+<li>results[&#8216;EMP3&#8217;] = EMP3</li>
+</ul>
+<p>References:</p>
+<ul class="simple">
+<li>Szabo and Ostlund, Modern Quantum Chemistry: Introduction to Advanced Electronic Structure Theory</li>
+</ul>
+</div>
+<div class="section" id="degeneracy-corrected-perturbation-second-order">
+<h2>Degeneracy-corrected perturbation, second order<a class="headerlink" href="#degeneracy-corrected-perturbation-second-order" title="Permalink to this headline">¶</a></h2>
+<p>The second order Degeneracy-corrected correction to the energy is given as:</p>
+<div class="math">
+<p><img src="_images/math/21a44a27f6066060d3305b319738c70d91b606bd.png" alt="E^{(2)}=\frac{1}{2}\left(D_{abij}-\sqrt{D_{abij}^{2}+4\left\langle \left.\left.ij\right|ab\right|\right\rangle ^{2}}\right)+\frac{1}{4}\left(D_{abij}-\sqrt{D_{abij}^{2}+4\left(\left\langle \left.\left.ij\right|ab\right|\right\rangle -\left\langle \left.\left.ij\right|ba\right|\right\rangle \right)^{2}}\right)"/></p>
+</div><p>with:</p>
+<p>FUNCTION:</p>
+<ul class="simple">
+<li>MPn.DCPT2(basis, input, F, C, results)</li>
+<li>return results</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>basis, basis set object</li>
+<li>input, input file object</li>
+<li>F, Fock matrix</li>
+<li>C, MO coefficient matrix</li>
+<li>results, results obejct</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>results, results obejct with added entries</li>
+<li>results[&#8216;EDCPT2&#8217;] = EDCPT2</li>
+</ul>
+<p>References:</p>
+<ul class="simple">
+<li>Xavier Assfeld, Jan E Almlöf, and Donald G Truhlar. Degeneracy-corrected perturbation theory for electronic structure calculations. Chemical physics letters, 241(4):438–444, 1995</li>
 </ul>
 </div>
 </div>
@@ -215,7 +276,7 @@
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="Properties.html" class="btn btn-neutral float-right" title="Propeties" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="Properties.html" class="btn btn-neutral float-right" title="Properties" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
         <a href="DIIS.html" class="btn btn-neutral" title="DIIS" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>

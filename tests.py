@@ -153,7 +153,7 @@ def test_MP2_1():
     A = np.load('testfiles/twointCH4_STO3G.npy')
     np.save('slowquant/temp/twoint.npy', A)
     UF.TransformMO(C, basis, set)
-    calc = MP.MP2(basis, input, F, C)['EMP2']
+    calc = MP.MP2(basis, input, F, C, results)['EMP2']
     check = -0.056046676165
     assert abs(calc - check) < 10**-7
 
@@ -173,7 +173,7 @@ def test_MP2_2():
     A = np.load('testfiles/twointH2O_DZ.npy')
     np.save('slowquant/temp/twoint.npy', A)
     UF.TransformMO(C, basis, set)
-    calc = MP.MP2(basis, input, F, C)['EMP2']
+    calc = MP.MP2(basis, input, F, C, results)['EMP2']
     check = -0.152709879075
     assert abs(calc - check) < 10**-7
 
@@ -197,26 +197,6 @@ def test_derivative():
     assert np.max(np.abs(Te)) < 10**-12
     assert np.max(np.abs(S)) < 10**-12
     assert np.max(np.abs(VNe)) < 10**-12
-
-def test_MP3():
-    settings = np.genfromtxt('slowquant/Standardsettings.csv', delimiter = ';', dtype='str')
-    set = {}
-    for i in range(len(settings)):
-        set.update({settings[i][0]:settings[i][1]})
-    set['basisset'] = 'STO3G'
-    set['MPn'] = 'MP3'
-    input    = np.genfromtxt('testfiles/inputH2.csv', delimiter=';')
-    basis    = BS.bassiset(input, set)
-    results  = {}
-    F        = np.load('testfiles/faoCH4_STO3G.npy')
-    C        = np.load('testfiles/cmoCH4_STO3G.npy')
-    A = np.load('testfiles/twointCH4_STO3G.npy')
-    np.save('slowquant/temp/twoint.npy', A)
-    UF.TransformMO(C, basis, set)
-    results = MP.MP2(basis, input, F, C, results)
-    check = results['EMP2'] + results['EMP3']
-    check = -0.0180
-    assert abs(calc - check) < 10**-5
 
 ## REGRESSION TESTS
 def test_prop():

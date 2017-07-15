@@ -17,6 +17,7 @@ Need testing
 
 - No tests for normalization of contracted basisfunctions of D or higher angular momentum
 - Geometry optimization is not properly tested
+- DCPT2 not tested, no case in paper, where cartesian integrals was used (all had D orbitals)
 
 Broken
 ------

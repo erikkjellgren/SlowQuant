@@ -1,5 +1,5 @@
-Propeties
-=========
+Properties
+==========
 
 This section containts information about atomic and molecular properties that can be calculated.
 
