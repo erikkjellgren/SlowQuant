@@ -97,7 +97,7 @@ Gradient scaling factor in Gradient Descent algorithm
 
 Choose to evaluate Forces numerically. x=Yes to activate. Only works for Hartree-Fock.
 
-Configuartion Interaction
+Configuration Interaction
 -------------------------
 
 - CI;x

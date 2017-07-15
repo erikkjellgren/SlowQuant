@@ -62,8 +62,8 @@ def run(inputname, settingsname):
         results = prop.runprop(basis, input, D, set, results, FAO, CMO)
         print(time.time()-start, 'PROPERTIES')
         start = time.time()
-        MP.runMPn(basis, input, FAO, CMO, set)
-        print(time.time()-start, 'MP2')
+        results = MP.runMPn(basis, input, FAO, CMO, set, results)
+        print(time.time()-start, 'Perturbation')
         start = time.time()
         QF.runQfit(basis, input, D, set, results)
         print(time.time()-start, 'QFIT')
@@ -75,5 +75,5 @@ def run(inputname, settingsname):
 
     
 if __name__ == "__main__":
-    results = run('inputExampleH2O.csv', 'settingExample.csv')
+    results = run('H2O.csv', 'settingExample.csv')
     

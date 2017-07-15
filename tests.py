@@ -145,6 +145,7 @@ def test_MP2_1():
         set.update({settings[i][0]:settings[i][1]})
     set['basisset'] = 'STO3G'
     set['MPn'] = 'MP2'
+    results  = {}
     input    = np.genfromtxt('testfiles/inputCH4.csv', delimiter=';')
     basis    = BS.bassiset(input, set)
     F        = np.load('testfiles/faoCH4_STO3G.npy')
@@ -152,7 +153,7 @@ def test_MP2_1():
     A = np.load('testfiles/twointCH4_STO3G.npy')
     np.save('slowquant/temp/twoint.npy', A)
     UF.TransformMO(C, basis, set)
-    calc = MP.MP2(basis, input, F, C)
+    calc = MP.MP2(basis, input, F, C)['EMP2']
     check = -0.056046676165
     assert abs(calc - check) < 10**-7
 
@@ -166,12 +167,13 @@ def test_MP2_2():
     set['MPn'] = 'MP2'
     input    = np.genfromtxt('testfiles/inputH2O.csv', delimiter=';')
     basis    = BS.bassiset(input, set)
+    results  = {}
     F        = np.load('testfiles/faoH2O_DZ.npy')
     C        = np.load('testfiles/cmoH2O_DZ.npy')
     A = np.load('testfiles/twointH2O_DZ.npy')
     np.save('slowquant/temp/twoint.npy', A)
     UF.TransformMO(C, basis, set)
-    calc = MP.MP2(basis, input, F, C)
+    calc = MP.MP2(basis, input, F, C)['EMP2']
     check = -0.152709879075
     assert abs(calc - check) < 10**-7
 
@@ -195,6 +197,26 @@ def test_derivative():
     assert np.max(np.abs(Te)) < 10**-12
     assert np.max(np.abs(S)) < 10**-12
     assert np.max(np.abs(VNe)) < 10**-12
+
+def test_MP3():
+    settings = np.genfromtxt('slowquant/Standardsettings.csv', delimiter = ';', dtype='str')
+    set = {}
+    for i in range(len(settings)):
+        set.update({settings[i][0]:settings[i][1]})
+    set['basisset'] = 'STO3G'
+    set['MPn'] = 'MP3'
+    input    = np.genfromtxt('testfiles/inputH2.csv', delimiter=';')
+    basis    = BS.bassiset(input, set)
+    results  = {}
+    F        = np.load('testfiles/faoCH4_STO3G.npy')
+    C        = np.load('testfiles/cmoCH4_STO3G.npy')
+    A = np.load('testfiles/twointCH4_STO3G.npy')
+    np.save('slowquant/temp/twoint.npy', A)
+    UF.TransformMO(C, basis, set)
+    results = MP.MP2(basis, input, F, C, results)
+    check = results['EMP2'] + results['EMP3']
+    check = -0.0180
+    assert abs(calc - check) < 10**-5
 
 ## REGRESSION TESTS
 def test_prop():
@@ -295,3 +317,9 @@ def test_RPA():
     check = [0.285163717,0.285163717,0.285163717,0.299743447,0.299743447,0.299743447,0.352626661,0.352626661,0.352626661,0.354778253,0.365131311,0.365131311,0.365131311,0.415317495,0.50010114,0.510661051,0.510661051,0.510661051,0.546071909,0.546071909,0.546071909,0.551371885,0.650270712,0.873425371,1.103818796,1.103818796,1.103818796,1.195787071,1.195787071,1.195787071,1.283205318,1.323742189,19.95850406,19.95850406,19.95850406,20.01094716,20.01130746,20.01130746,20.01130746,20.05049194]
     for i in range(len(results['RPA Exc'])):
         assert results['RPA Exc'][i] - check[i] < 10**-6
+
+def test_MP3():
+    results = HFrun.run('testfiles/inputH2.csv','testfiles/settingMP3.csv')
+    calc = results['EMP2'] + results['EMP3']
+    check = -0.0180
+    assert abs(calc - check) < 10**-5
