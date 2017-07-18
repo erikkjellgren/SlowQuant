@@ -4,7 +4,7 @@ from slowquant import HartreeFock as HF
 from slowquant import BasisSet as BS
 
 def run_analytic(input, set, results):
-    maxstep = int(set['Max iteration GeoOpt'])
+    maxstep = int(set['Max iteration GeoOpt'])+1
     GeoOptol = float(set['Geometry Tolerance'])
     stepsize = float(set['Gradient Descent Step'])
     for i in range(1, maxstep):
@@ -106,7 +106,7 @@ def run_analytic(input, set, results):
 
 
 def run_numeric(input, set, results):
-    maxstep = int(set['Max iteration GeoOpt'])
+    maxstep = int(set['Max iteration GeoOpt'])+1
     GeoOptol = float(set['Geometry Tolerance'])
     stepsize = float(set['Gradient Descent Step'])
     for i in range(1, maxstep):

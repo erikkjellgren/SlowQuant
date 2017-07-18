@@ -418,49 +418,46 @@ def Ndiff1(l,a):
 
 def Ndiff2(l,a):
     return -2*l*(a/(2*l-1))**0.5
-
-def Nrun(basisset):
-    basisset_temp = copy.deepcopy(basisset)
-    for i in range(len(basisset)):
-        for j in range(len(basisset[i][5])):
-            if len(basisset[i][5]) == 1:
-                basisset[i][5][j][0] = N(basisset[i][5][j][1], basisset[i][5][j][3], basisset[i][5][j][4], basisset[i][5][j][5])
-            
-            else:
-                basisset_temp[i][5][j][2] *= N(basisset[i][5][j][1], basisset[i][5][j][3], basisset[i][5][j][4], basisset[i][5][j][5])
-                basisset[i][5][j][0] = N(basisset[i][5][j][1], basisset[i][5][j][3], basisset[i][5][j][4], basisset[i][5][j][5])
-
-    for i in range(len(basisset)):
-        for j in range(len(basisset[i][5])):
-            if len(basisset[i][5]) != 1:
-                basisset[i][5][j][0] *= Ncontr(basisset_temp[i][5], j)
-    return basisset
     
-
-def N(a, l, m, n):
-    part1 = (2.0/math.pi)**(3.0/4.0)
-    part2 = 2.0**(l+m+n) * a**((2.0*l+2.0*m+2.0*n+3.0)/(4.0))
-    part3 = math.sqrt(scm.factorial2(int(2*l-1))*scm.factorial2(int(2*m-1))*scm.factorial2(int(2*n-1)))
-    N = part1 * ((part2)/(part3))
-    return N
-
-def Ncontr(basisset, k):
-    l = basisset[k][3]
-    m = basisset[k][4]
-    n = basisset[k][5]
-    L = l+m+n
-    factor = (np.pi**(3.0/2.0)*scm.factorial2(int(2*l-1))*scm.factorial2(int(2*m-1))*scm.factorial2(int(2*n-1)))/(2.0**L)
-    sum = 0
+    
+def Nrun(basisset):
+    # Normalize primitive functions
     for i in range(len(basisset)):
-        for j in range(len(basisset)):
-            alphai = basisset[i][1]
-            alphaj = basisset[j][1]
-            ai     = basisset[i][2]
-            aj     = basisset[j][2]
+        for j in range(len(basisset[i][5])):
+            a = basisset[i][5][j][1]
+            l = basisset[i][5][j][3]
+            m = basisset[i][5][j][4]
+            n = basisset[i][5][j][5]
             
-            sum += ai*aj/((alphai+alphaj)**(L+3.0/2.0))
-    Nc = (factor*sum)**(-1.0/2.0)
-    return Nc
+            part1 = (2.0/math.pi)**(3.0/4.0)
+            part2 = 2.0**(l+m+n) * a**((2.0*l+2.0*m+2.0*n+3.0)/(4.0))
+            part3 = math.sqrt(scm.factorial2(int(2*l-1))*scm.factorial2(int(2*m-1))*scm.factorial2(int(2*n-1)))
+            basisset[i][5][j][0] = part1 * ((part2)/(part3))
+    """
+    # Normalize contractions
+    for k in range(len(basisset)):
+        if len(basisset[k][5]) != 1:
+            l = basisset[k][5][0][3]
+            m = basisset[k][5][0][4]
+            n = basisset[k][5][0][5]
+            L = l+m+n
+            factor = (np.pi**(3.0/2.0)*scm.factorial2(int(2*l-1))*scm.factorial2(int(2*m-1))*scm.factorial2(int(2*n-1)))/(2.0**L)
+            sum = 0
+            for i in range(len(basisset[k][5])):
+                for j in range(len(basisset[k][5])):
+                    alphai = basisset[k][5][i][1]
+                    alphaj = basisset[k][5][j][1]
+                    ai     = basisset[k][5][i][2]*basisset[k][5][i][0]
+                    aj     = basisset[k][5][j][2]*basisset[k][5][j][0]
+                    
+                    sum += ai*aj/((alphai+alphaj)**(L+3.0/2.0))
+            
+            Nc = (factor*sum)**(-1.0/2.0)
+            for i in range(len(basisset[k][5])):
+                basisset[k][5][i][0] *= Nc
+    """
+    return basisset
+              
 
 def Eprecalculation(basis, diffx1=0, diffx2=0, diffy1=0, diffy2=0, diffz1=0, diffz2=0):
     # #############################################################
@@ -785,6 +782,7 @@ def rungeometric_derivatives(input, basis):
     Nyminus = copy.deepcopy(basis)
     Nzplus  = copy.deepcopy(basis)
     Nzminus = copy.deepcopy(basis)
+    
     for i in range(len(basis)):
         for j in range(len(basis[i][5])):
             Nxplus[i][5][j][3] += 1
@@ -798,14 +796,13 @@ def rungeometric_derivatives(input, basis):
             Nzplus[i][5][j][5] += 1    
             if Nzminus[i][5][j][5] != 0:
                 Nzminus[i][5][j][5] -= 1
-                
+    
     Nxplus = Nrun(Nxplus)
     Nxminus = Nrun(Nxminus)
     Nyplus = Nrun(Nyplus)
     Nyminus = Nrun(Nyminus)
     Nzplus = Nrun(Nzplus)
     Nzminus = Nrun(Nzminus)
-    
     
     for atomidx in range(1, len(input)):
         # Nuclear-nuclear repulsion
