@@ -9,18 +9,6 @@ from slowquant import Properties as PROP
 from slowquant import Qfit as QFIT
 from slowquant import IntegralTransform as UF
 
-def test_N():
-    check = 5.701643762839922
-    calc = BS.N(1.0,1.0,1.0,1.0)
-    assert abs(check-calc) < 10**-12
-    calc = MI.N(1.0,1.0,1.0,1.0)
-    assert abs(check-calc) < 10**-12
-
-def test_gaussian_product_center():
-    check = 3.5
-    calc = MI.gaussian_product_center(1.0,2.0,3.0,4.0)
-    assert abs(check - calc) < 10**-12
-
 def test_magvec():
     check = 5.196152422706632
     calc = QFIT.magvec([1,2,3],[4,5,6])
@@ -179,6 +167,7 @@ def test_MP2_2():
 
 
 def test_derivative():
+    # Tests that a single atom have no geometric gradient
     settings = np.genfromtxt('slowquant/Standardsettings.csv', delimiter = ';', dtype='str')
     set = {}
     for i in range(len(settings)):
@@ -240,18 +229,41 @@ def test_qfit():
         
         
 def test_geoopt():
-    HFrun.run('testfiles/inputH2.csv','testfiles/settingsGEO.csv')
-    check = open('testfiles/outGEO.txt','r')
-    calc = open('out.txt')
-    for line in check:
-        if line[0:3] == 'MP2':
-            checkMP2 = float(line[12:])
-
-    for line in calc:
-        if line[0:3] == 'MP2':
-            calcMP2 = float(line[12:])
+    HFrun.run('testfiles/H2.csv','testfiles/settingsGEO.csv')
+    e = 0.000001
+    dp = np.load('testfiles/enucp.npy')
+    dm = np.load('testfiles/enucm.npy')
+    dS = np.load('slowquant/temp/1dxenuc.npy')
+    dnS = (dp-dm)/(2*e)
+    assert np.max(np.abs(dS-dnS)) < 10**-9
     
-    assert checkMP2 - calcMP2 < 10**-5
+    e = 0.000001
+    dp = np.load('testfiles/overlapp.npy')
+    dm = np.load('testfiles/overlapm.npy')
+    dS = np.load('slowquant/temp/1dxoverlap.npy')
+    dnS = (dp-dm)/(2*e)
+    assert np.max(np.abs(dS-dnS)) < 10**-9
+    
+    e = 0.000001
+    dp = np.load('testfiles/Ekinp.npy')
+    dm = np.load('testfiles/Ekinm.npy')
+    dS = np.load('slowquant/temp/1dxEkin.npy')
+    dnS = (dp-dm)/(2*e)
+    assert np.max(np.abs(dS-dnS)) < 10**-9
+    
+    e = 0.000001
+    dp = np.load('testfiles/nucattp.npy')
+    dm = np.load('testfiles/nucattm.npy')
+    dS = np.load('slowquant/temp/1dxnucatt.npy')
+    dnS = (dp-dm)/(2*e)
+    assert np.max(np.abs(dS-dnS)) < 10**-9
+    
+    e = 0.000001
+    dp = np.load('testfiles/twointp.npy')
+    dm = np.load('testfiles/twointm.npy')
+    dS = np.load('slowquant/temp/1dxtwoint.npy')
+    dnS = (dp-dm)/(2*e)
+    assert np.max(np.abs(dS-dnS)) < 10**-9
 
 
 def test_UHF():
