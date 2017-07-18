@@ -6,9 +6,8 @@ import math
 ##INTEGRAL FUNCTIONS
 def Overlap(a, b, la, lb, Ax, Bx):
     #Obara-Saika scheme, 9.3.8 and 9.3.9 Helgaker
-    #Used in Kin integral!, should be linked with the other Overlap, 
-    #    so it is not double calculated
-    
+    #Used in Kin integral!
+
     p = a + b
     u = a*b/p
     
@@ -161,6 +160,7 @@ def u_ObaraSaika(a1, a2, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na, nb, N1, N2,
                 uz[i][j+1][e] = (Pz-Bz)*uz[i][j][e] + 1/(2*p) * (i*uz[i-1][j][e]+j*uz[i][j-1][e]+e*uz[i][j][e-1])
                 uz[i][j][e+1] = (Pz-Cz)*uz[i][j][e] + 1/(2*p) * (i*uz[i-1][j][e]+j*uz[i][j-1][e]+e*uz[i][j][e-1])
     return -N*ux[la][lb][1]*uy[ma][mb][0]*uz[na][nb][0], -N*ux[la][lb][0]*uy[ma][mb][1]*uz[na][nb][0], -N*ux[la][lb][0]*uy[ma][mb][0]*uz[na][nb][1]
+    
     
 def electricfield(a, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, input, derivative, atomidx):
     #McMurchie-Davidson scheme    
