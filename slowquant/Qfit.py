@@ -1,5 +1,5 @@
 import numpy as np
-from slowquant import MolecularIntegrals as MI
+from slowquant import runMolecularIntegrals as MI
 
 def magvec(v1, v2):
     x = v2[0] - v1[0]

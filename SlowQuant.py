@@ -1,7 +1,7 @@
 import numpy as np
 import time
 from slowquant import BasisSet as BS
-from slowquant import MolecularIntegrals as MI
+from slowquant import runMolecularIntegrals as MI
 from slowquant import HartreeFock as HF   
 from slowquant import Properties as prop
 from slowquant import MPn as MP

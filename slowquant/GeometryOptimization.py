@@ -1,5 +1,5 @@
 import numpy as np
-from slowquant import MolecularIntegrals as MI
+from slowquant import runMolecularIntegrals as MI
 from slowquant import HartreeFock as HF
 from slowquant import BasisSet as BS
 

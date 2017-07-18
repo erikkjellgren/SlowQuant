@@ -1,6 +1,6 @@
 import numpy as np
 import math
-from slowquant import MolecularIntegrals as MI
+from slowquant import runMolecularIntegrals as MI
 import scipy.linalg
 
 def MulCharge(basis, input, D):

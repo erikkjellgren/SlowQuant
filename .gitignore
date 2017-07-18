@@ -1,0 +1,6 @@
+# Files made by program
+/slowquant/temp/*npy
+out.txt
+
+# Files made by python
+__pycache__/
