@@ -1,7 +1,7 @@
 import numpy as np
 import time as time
 import copy
-from slowquant.molecularintegrals.MolecularIntegrals import E, Overlap, Kin, elnuc, elelrep, nucdiff, u_ObaraSaika, electricfield, Ndiff1, Ndiff2, Nrun, Eprecalculation, nucrep
+from slowquant.molecularintegrals.MolecularIntegrals import E, Overlap, Kin, elnuc, elelrep, nucdiff, u_ObaraSaika, electricfield, Ndiff1, Ndiff2, Nrun, Eprecalculation, nucrep, R
 
 ##CALC OF INTEGRALS
 def runIntegrals(input, basis, settings):
@@ -100,6 +100,16 @@ def runIntegrals(input, basis, settings):
                         E3 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E3']
                         P  = GPdict[str(mu)+str(nu)+str(i)+str(j)]
                         p  = pdict[str(mu)+str(nu)+str(i)+str(j)]
+                        l1=basis[a[0]][5][i][3]
+                        l2=basis[a[1]][5][j][3]
+                        m1=basis[a[0]][5][i][4]
+                        m2=basis[a[1]][5][j][4]
+                        n1=basis[a[0]][5][i][5]
+                        n2=basis[a[1]][5][j][5]
+                        N1=basis[a[0]][5][i][0]
+                        N2=basis[a[1]][5][j][0]
+                        c1=basis[a[0]][5][i][2]
+                        c2=basis[a[1]][5][j][2]
                         for k in range(basis[a[2]][4]):
                             for l in range(basis[a[3]][4]):
                                 E4 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E1']
@@ -107,27 +117,29 @@ def runIntegrals(input, basis, settings):
                                 E6 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E3']
                                 Q  = GPdict[str(lam)+str(sig)+str(k)+str(l)]
                                 q  = pdict[str(lam)+str(sig)+str(k)+str(l)]
-                                l1=basis[a[0]][5][i][3]
-                                l2=basis[a[1]][5][j][3]
                                 l3=basis[a[2]][5][k][3]
                                 l4=basis[a[3]][5][l][3] 
-                                m1=basis[a[0]][5][i][4]
-                                m2=basis[a[1]][5][j][4]
                                 m3=basis[a[2]][5][k][4]
                                 m4=basis[a[3]][5][l][4] 
-                                n1=basis[a[0]][5][i][5]
-                                n2=basis[a[1]][5][j][5]
                                 n3=basis[a[2]][5][k][5]
                                 n4=basis[a[3]][5][l][5] 
-                                N1=basis[a[0]][5][i][0]
-                                N2=basis[a[1]][5][j][0]
                                 N3=basis[a[2]][5][k][0]
                                 N4=basis[a[3]][5][l][0]
-                                c1=basis[a[0]][5][i][2]
-                                c2=basis[a[1]][5][j][2]
                                 c3=basis[a[2]][5][k][2]
                                 c4=basis[a[3]][5][l][2]
-                                calc += elelrep(p, q, P, Q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, N4, c1, c2, c3, c4, E1,E2,E3,E4,E5,E6)
+                                
+                                alpha = p*q/(p+q)
+                                RPQ = ((P[0]-Q[0])**2+(P[1]-Q[1])**2+(P[2]-Q[2])**2)**0.5
+                                Rpre = np.ones((l1+l2+l3+l4+1,m1+m2+m3+m4+1,n1+n2+n3+n4+1))
+                                Rtemp = np.ones((l1+l2+l3+l4+1,m1+m2+m3+m4+1,n1+n2+n3+n4+1,l1+l2+l3+l4+m1+m2+m3+m4+n1+n2+n3+n4+1))
+                                
+                                for t_tau in range(l1+l2+l3+l4+1):
+                                    for u_nu in range(m1+m2+m3+m4+1):
+                                        for v_phi in range(n1+n2+n3+n4+1):
+                                            Rpre[t_tau,u_nu,v_phi], Rtemp = R(t_tau,u_nu,v_phi,0,alpha,P[0]-Q[0],P[1]-Q[1],P[2]-Q[2],RPQ, Rtemp)
+
+                                calc += elelrep(p,q,l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, N4, c1, c2, c3, c4, E1,E2,E3,E4,E5,E6,Rpre)
+
                 ERI[mu,nu,lam,sig] = calc
                 ERI[nu,mu,lam,sig] = calc
                 ERI[mu,nu,sig,lam] = calc
@@ -144,11 +156,11 @@ def runIntegrals(input, basis, settings):
             if mu >= nu:
                 for lam in range(0, len(basis)):
                     for sig in range(0, len(basis)):
-                        munu = mu*(mu+1)/2+nu
-                        lamsig = lam*(lam+1)/2+sig
-                        if lam >= sig and munu > lamsig:
-                            # Cauchy-Schwarz inequality
-                            if Gab[mu,nu]*Gab[lam,sig] > ScreenTHR:
+                        # Cauchy-Schwarz inequality
+                        if Gab[mu,nu]*Gab[lam,sig] > ScreenTHR:
+                            munu = mu*(mu+1)/2+nu
+                            lamsig = lam*(lam+1)/2+sig
+                            if lam >= sig and munu > lamsig:
                                 a = np.zeros(4)
                                 a[0] = mu
                                 a[1] = nu
@@ -163,6 +175,16 @@ def runIntegrals(input, basis, settings):
                                         E3 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E3']
                                         P  = GPdict[str(mu)+str(nu)+str(i)+str(j)]
                                         p  = pdict[str(mu)+str(nu)+str(i)+str(j)]
+                                        l1=basis[a[0]][5][i][3]
+                                        l2=basis[a[1]][5][j][3]
+                                        m1=basis[a[0]][5][i][4]
+                                        m2=basis[a[1]][5][j][4]
+                                        n1=basis[a[0]][5][i][5]
+                                        n2=basis[a[1]][5][j][5]
+                                        N1=basis[a[0]][5][i][0]
+                                        N2=basis[a[1]][5][j][0]
+                                        c1=basis[a[0]][5][i][2]
+                                        c2=basis[a[1]][5][j][2]
                                         for k in range(basis[a[2]][4]):
                                             for l in range(basis[a[3]][4]):
                                                 E4 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E1']
@@ -170,27 +192,29 @@ def runIntegrals(input, basis, settings):
                                                 E6 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E3']
                                                 Q  = GPdict[str(lam)+str(sig)+str(k)+str(l)]
                                                 q  = pdict[str(lam)+str(sig)+str(k)+str(l)]
-                                                l1=basis[a[0]][5][i][3]
-                                                l2=basis[a[1]][5][j][3]
                                                 l3=basis[a[2]][5][k][3]
                                                 l4=basis[a[3]][5][l][3] 
-                                                m1=basis[a[0]][5][i][4]
-                                                m2=basis[a[1]][5][j][4]
                                                 m3=basis[a[2]][5][k][4]
                                                 m4=basis[a[3]][5][l][4] 
-                                                n1=basis[a[0]][5][i][5]
-                                                n2=basis[a[1]][5][j][5]
                                                 n3=basis[a[2]][5][k][5]
                                                 n4=basis[a[3]][5][l][5] 
-                                                N1=basis[a[0]][5][i][0]
-                                                N2=basis[a[1]][5][j][0]
                                                 N3=basis[a[2]][5][k][0]
                                                 N4=basis[a[3]][5][l][0]
-                                                c1=basis[a[0]][5][i][2]
-                                                c2=basis[a[1]][5][j][2]
                                                 c3=basis[a[2]][5][k][2]
                                                 c4=basis[a[3]][5][l][2]
-                                                calc += elelrep(p, q, P, Q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, N4, c1, c2, c3, c4, E1,E2,E3,E4,E5,E6)
+                                                
+                                                alpha = p*q/(p+q)
+                                                RPQ = ((P[0]-Q[0])**2+(P[1]-Q[1])**2+(P[2]-Q[2])**2)**0.5
+                                                Rpre = np.ones((l1+l2+l3+l4+1,m1+m2+m3+m4+1,n1+n2+n3+n4+1))
+                                                Rtemp = np.ones((l1+l2+l3+l4+1,m1+m2+m3+m4+1,n1+n2+n3+n4+1,l1+l2+l3+l4+m1+m2+m3+m4+n1+n2+n3+n4+1))
+                                                
+                                                for t_tau in range(l1+l2+l3+l4+1):
+                                                    for u_nu in range(m1+m2+m3+m4+1):
+                                                        for v_phi in range(n1+n2+n3+n4+1):
+                                                            Rpre[t_tau,u_nu,v_phi], Rtemp = R(t_tau,u_nu,v_phi,0,alpha,P[0]-Q[0],P[1]-Q[1],P[2]-Q[2],RPQ, Rtemp)
+                
+                                                calc += elelrep(p,q,l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, N4, c1, c2, c3, c4, E1,E2,E3,E4,E5,E6,Rpre)
+                                
                                 ERI[mu,nu,lam,sig] = calc
                                 ERI[nu,mu,lam,sig] = calc
                                 ERI[mu,nu,sig,lam] = calc
@@ -322,7 +346,9 @@ def rungeometric_derivatives(input, basis):
         
         # Two electron integrals x diff
         start = time.time()
-        ERI = np.zeros((len(basis),len(basis),len(basis),len(basis)))
+        ERIx = np.zeros((len(basis),len(basis),len(basis),len(basis)))
+        ERIy = np.zeros((len(basis),len(basis),len(basis),len(basis)))
+        ERIz = np.zeros((len(basis),len(basis),len(basis),len(basis)))
         for mu in range(0, len(basis)):
             for nu in range(0, len(basis)):
                 if mu >= nu:
@@ -337,378 +363,263 @@ def rungeometric_derivatives(input, basis):
                                 a[2] = lam
                                 a[3] = sig
                                 a = a.astype(int)
-                                calc = 0
-                                for i in range(basis[a[0]][4]):
-                                    for j in range(basis[a[1]][4]):
-                                        E1 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E1']
-                                        E2 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E2']
-                                        E3 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E3']
-                                        P  = GPdict[str(mu)+str(nu)+str(i)+str(j)]
-                                        p  = pdict[str(mu)+str(nu)+str(i)+str(j)]
-                                        for k in range(basis[a[2]][4]):
-                                            for l in range(basis[a[3]][4]):
-                                                E4 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E1']
-                                                E5 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E2']
-                                                E6 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E3']
-                                                Q  = GPdict[str(lam)+str(sig)+str(k)+str(l)]
-                                                q  = pdict[str(lam)+str(sig)+str(k)+str(l)]
-                                                if atomidx == basis[a[0]][6] and atomidx == basis[a[1]][6] and atomidx == basis[a[2]][6] and atomidx == basis[a[3]][6]:
-                                                    calc += 0
-                                                else:
-                                                    a2=basis[a[0]][5][i][1]
-                                                    b=basis[a[1]][5][j][1]
+                                calcx = 0
+                                calcy = 0
+                                calcz = 0
+                                if atomidx == basis[a[0]][6] and atomidx == basis[a[1]][6] and atomidx == basis[a[2]][6] and atomidx == basis[a[3]][6]:
+                                    calcx = 0
+                                    calcy = 0
+                                    calcz = 0
+                                else:
+                                    for i in range(basis[a[0]][4]):
+                                        for j in range(basis[a[1]][4]):
+                                            E1 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E1']
+                                            E2 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E2']
+                                            E3 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E3']
+                                            P  = GPdict[str(mu)+str(nu)+str(i)+str(j)]
+                                            p  = pdict[str(mu)+str(nu)+str(i)+str(j)]
+                                            a2=basis[a[0]][5][i][1]
+                                            b=basis[a[1]][5][j][1]
+                                            Ax=basis[a[0]][1]
+                                            Bx=basis[a[1]][1]
+                                            Ay=basis[a[0]][2]
+                                            By=basis[a[1]][2]
+                                            Az=basis[a[0]][3] 
+                                            Bz=basis[a[1]][3]
+                                            l1=basis[a[0]][5][i][3]
+                                            l2=basis[a[1]][5][j][3]
+                                            m1=basis[a[0]][5][i][4]
+                                            m2=basis[a[1]][5][j][4]
+                                            n1=basis[a[0]][5][i][5]
+                                            n2=basis[a[1]][5][j][5]
+                                            N1=basis[a[0]][5][i][0]
+                                            N2=basis[a[1]][5][j][0]
+                                            c1=basis[a[0]][5][i][2]
+                                            c2=basis[a[1]][5][j][2]
+                                            Nxp1=Nxplus[a[0]][5][i][0]
+                                            Nxp2=Nxplus[a[1]][5][j][0]
+                                            Nxm1=Nxminus[a[0]][5][i][0]
+                                            Nxm2=Nxminus[a[1]][5][j][0]
+                                            Nyp1=Nyplus[a[0]][5][i][0]
+                                            Nyp2=Nyplus[a[1]][5][j][0]
+                                            Nym1=Nyminus[a[0]][5][i][0]
+                                            Nym2=Nyminus[a[1]][5][j][0]
+                                            Nzp1=Nzplus[a[0]][5][i][0]
+                                            Nzp2=Nzplus[a[1]][5][j][0]
+                                            Nzm1=Nzminus[a[0]][5][i][0]
+                                            Nzm2=Nzminus[a[1]][5][j][0]
+                                            for k in range(basis[a[2]][4]):
+                                                for l in range(basis[a[3]][4]):
+                                                    E4 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E1']
+                                                    E5 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E2']
+                                                    E6 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E3']
+                                                    Q  = GPdict[str(lam)+str(sig)+str(k)+str(l)]
+                                                    q  = pdict[str(lam)+str(sig)+str(k)+str(l)]
                                                     c=basis[a[2]][5][k][1]
                                                     d=basis[a[3]][5][l][1]
-                                                    Ax=basis[a[0]][1]
-                                                    Bx=basis[a[1]][1]
                                                     Cx=basis[a[2]][1]
                                                     Dx=basis[a[3]][1]
-                                                    l1=basis[a[0]][5][i][3]
-                                                    l2=basis[a[1]][5][j][3]
+                                                    Cy=basis[a[2]][2]
+                                                    Dy=basis[a[3]][2]
+                                                    Cz=basis[a[2]][3]
+                                                    Dz=basis[a[3]][3]
                                                     l3=basis[a[2]][5][k][3]
                                                     l4=basis[a[3]][5][l][3] 
-                                                    m1=basis[a[0]][5][i][4]
-                                                    m2=basis[a[1]][5][j][4]
                                                     m3=basis[a[2]][5][k][4]
                                                     m4=basis[a[3]][5][l][4] 
-                                                    n1=basis[a[0]][5][i][5]
-                                                    n2=basis[a[1]][5][j][5]
                                                     n3=basis[a[2]][5][k][5]
                                                     n4=basis[a[3]][5][l][5] 
-                                                    N1=basis[a[0]][5][i][0]
-                                                    N2=basis[a[1]][5][j][0]
                                                     N3=basis[a[2]][5][k][0]
                                                     N4=basis[a[3]][5][l][0]
-                                                    c1=basis[a[0]][5][i][2]
-                                                    c2=basis[a[1]][5][j][2]
                                                     c3=basis[a[2]][5][k][2]
-                                                    c4=basis[a[3]][5][l][2]
-                                                    
-                                                    Nxp1=Nxplus[a[0]][5][i][0]
-                                                    Nxp2=Nxplus[a[1]][5][j][0]
+                                                    c4=basis[a[3]][5][l][2]    
                                                     Nxp3=Nxplus[a[2]][5][k][0]
                                                     Nxp4=Nxplus[a[3]][5][l][0]
-                                                    
-                                                    Nxm1=Nxminus[a[0]][5][i][0]
-                                                    Nxm2=Nxminus[a[1]][5][j][0]
                                                     Nxm3=Nxminus[a[2]][5][k][0]
-                                                    Nxm4=Nxminus[a[3]][5][l][0]
-                                                                                                        
+                                                    Nxm4=Nxminus[a[3]][5][l][0]  
+                                                    Nyp3=Nyplus[a[2]][5][k][0]
+                                                    Nyp4=Nyplus[a[3]][5][l][0]
+                                                    Nym3=Nyminus[a[2]][5][k][0]
+                                                    Nym4=Nyminus[a[3]][5][l][0]
+                                                    Nzp3=Nzplus[a[2]][5][k][0]
+                                                    Nzp4=Nzplus[a[3]][5][l][0]
+                                                    Nzm3=Nzminus[a[2]][5][k][0]
+                                                    Nzm4=Nzminus[a[3]][5][l][0]
+                                                    
+                                                    alpha = p*q/(p+q)
+                                                    RPQ = ((P[0]-Q[0])**2+(P[1]-Q[1])**2+(P[2]-Q[2])**2)**0.5
+                                                    Rpre = np.ones((l1+l2+l3+l4+2,m1+m2+m3+m4+2,n1+n2+n3+n4+2))
+                                                    Rtemp = np.ones((l1+l2+l3+l4+2,m1+m2+m3+m4+2,n1+n2+n3+n4+2,l1+l2+l3+l4+m1+m2+m3+m4+n1+n2+n3+n4+4))
+                                                    
+                                                    for t_tau in range(l1+l2+l3+l4+2):
+                                                        for u_nu in range(m1+m2+m3+m4+2):
+                                                            for v_phi in range(n1+n2+n3+n4+2):
+                                                                Rpre[t_tau,u_nu,v_phi], Rtemp = R(t_tau,u_nu,v_phi,0,alpha,P[0]-Q[0],P[1]-Q[1],P[2]-Q[2],RPQ, Rtemp)
+                                                    
+                                                    # Calculate x derivative
                                                     if atomidx == basis[a[0]][6]:
                                                         E1p = np.zeros(l1+1+l2+1)
                                                         for t in range(l1+1+l2+1):
                                                             E1p[t] = E(l1+1,l2,t,Ax-Bx,a2,b,P[0]-Ax,P[0]-Bx,Ax-Bx)
-                                                        calc += Ndiff1(l1, a2)*elelrep(p, q, P, Q, l1+1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, Nxp1, N2, N3, N4, c1, c2, c3, c4, E1p,E2,E3,E4,E5,E6)
+                                                        calcx += Ndiff1(l1, a2)*elelrep(p, q, l1+1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, Nxp1, N2, N3, N4, c1, c2, c3, c4, E1p,E2,E3,E4,E5,E6,Rpre)
                                                         if l1 != 0:
                                                             E1m = np.zeros(l1-1+l2+1)
                                                             for t in range(l1-1+l2+1):
                                                                 E1m[t] = E(l1-1,l2,t,Ax-Bx,a2,b,P[0]-Ax,P[0]-Bx,Ax-Bx)
-                                                            calc += Ndiff2(l1, a2)*elelrep(p, q, P, Q, l1-1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, Nxm1, N2, N3, N4, c1, c2, c3, c4, E1m,E2,E3,E4,E5,E6)
+                                                            calcx += Ndiff2(l1, a2)*elelrep(p, q,l1-1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, Nxm1, N2, N3, N4, c1, c2, c3, c4, E1m,E2,E3,E4,E5,E6,Rpre)
                                                             
                                                     if atomidx == basis[a[1]][6]:
                                                         E1p = np.zeros(l1+1+l2+1)
                                                         for t in range(l1+l2+1+1):
                                                             E1p[t] = E(l1,l2+1,t,Ax-Bx,a2,b,P[0]-Ax,P[0]-Bx,Ax-Bx)
-                                                        calc += Ndiff1(l2, b)*elelrep(p, q, P, Q, l1, l2+1, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, Nxp2, N3, N4, c1, c2, c3, c4, E1p,E2,E3,E4,E5,E6)
+                                                        calcx += Ndiff1(l2, b)*elelrep(p, q, l1, l2+1, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, Nxp2, N3, N4, c1, c2, c3, c4, E1p,E2,E3,E4,E5,E6,Rpre)
                                                         if l2 != 0:
                                                             E1m = np.zeros(l1-1+l2+1)
                                                             for t in range(l1+l2-1+1):
                                                                 E1m[t] = E(l1,l2-1,t,Ax-Bx,a2,b,P[0]-Ax,P[0]-Bx,Ax-Bx)
-                                                            calc += Ndiff2(l2, b)*elelrep(p, q, P, Q, l1, l2-1, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, Nxm2, N3, N4, c1, c2, c3, c4, E1m,E2,E3,E4,E5,E6)
+                                                            calcx += Ndiff2(l2, b)*elelrep(p, q, l1, l2-1, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, Nxm2, N3, N4, c1, c2, c3, c4, E1m,E2,E3,E4,E5,E6,Rpre)
                                                             
                                                     if atomidx == basis[a[2]][6]:  
                                                         E4p = np.zeros(l3+1+l4+1)
                                                         for t in range(l3+1+l4+1):
                                                             E4p[t] = E(l3+1,l4,t,Cx-Dx,c,d,Q[0]-Cx,Q[0]-Dx,Cx-Dx)
-                                                        calc += Ndiff1(l3, c)*elelrep(p, q, P, Q, l1, l2, l3+1, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, Nxp3, N4, c1, c2, c3, c4, E1,E2,E3,E4p,E5,E6)
+                                                        calcx += Ndiff1(l3, c)*elelrep(p, q, l1, l2, l3+1, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, Nxp3, N4, c1, c2, c3, c4, E1,E2,E3,E4p,E5,E6,Rpre)
                                                         if l3 != 0:
                                                             E4m = np.zeros(l3-1+l4+1)
                                                             for t in range(l3-1+l4+1):
                                                                 E4m[t] = E(l3-1,l4,t,Cx-Dx,c,d,Q[0]-Cx,Q[0]-Dx,Cx-Dx)
-                                                            calc += Ndiff2(l3, c)*elelrep(p, q, P, Q, l1, l2, l3-1, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, Nxm3, N4, c1, c2, c3, c4, E1,E2,E3,E4m,E5,E6)
+                                                            calcx += Ndiff2(l3, c)*elelrep(p, q, l1, l2, l3-1, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, Nxm3, N4, c1, c2, c3, c4, E1,E2,E3,E4m,E5,E6,Rpre)
                                                         
                                                     if atomidx == basis[a[3]][6]:
                                                         E4p = np.zeros(l3+1+l4+1)
                                                         for t in range(l3+l4+1+1):
                                                             E4p[t] = E(l3,l4+1,t,Cx-Dx,c,d,Q[0]-Cx,Q[0]-Dx,Cx-Dx)
-                                                        calc += Ndiff1(l4, d)*elelrep(p, q, P, Q, l1, l2, l3, l4+1, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, Nxp4, c1, c2, c3, c4, E1,E2,E3,E4p,E5,E6)
+                                                        calcx += Ndiff1(l4, d)*elelrep(p, q, l1, l2, l3, l4+1, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, Nxp4, c1, c2, c3, c4, E1,E2,E3,E4p,E5,E6,Rpre)
                                                         if l4 != 0:
                                                             E4m = np.zeros(l3-1+l4+1)
                                                             for t in range(l3+l4-1+1):
                                                                 E4m[t] = E(l3,l4-1,t,Cx-Dx,c,d,Q[0]-Cx,Q[0]-Dx,Cx-Dx)
-                                                            calc += Ndiff2(l4, d)*elelrep(p, q, P, Q, l1, l2, l3, l4-1, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, Nxm4, c1, c2, c3, c4, E1,E2,E3,E4m,E5,E6)
-                                                                                            
-                                ERI[mu,nu,lam,sig] = calc
-                                ERI[nu,mu,lam,sig] = calc
-                                ERI[mu,nu,sig,lam] = calc
-                                ERI[nu,mu,sig,lam] = calc
-                                ERI[lam,sig,mu,nu] = calc
-                                ERI[sig,lam,mu,nu] = calc
-                                ERI[lam,sig,nu,mu] = calc
-                                ERI[sig,lam,nu,mu] = calc
-        np.save('slowquant/temp/'+str(atomidx)+'dxtwoint.npy',ERI)
-        print(time.time()-start, 'ERI x diff: atom'+str(atomidx))
-        #END OF two electron integrals x diff
-        
-        # Two electron integrals y diff
-        start = time.time()
-        ERI = np.zeros((len(basis),len(basis),len(basis),len(basis)))
-        for mu in range(0, len(basis)):
-            for nu in range(0, len(basis)):
-                if mu >= nu:
-                    for lam in range(0, len(basis)):
-                        for sig in range(0, len(basis)):
-                            munu = mu*(mu+1)/2+nu
-                            lamsig = lam*(lam+1)/2+sig
-                            if lam >= sig and munu >= lamsig:
-                                a = np.zeros(4)
-                                a[0] = mu
-                                a[1] = nu
-                                a[2] = lam
-                                a[3] = sig
-                                a = a.astype(int)
-                                calc = 0
-                                for i in range(basis[a[0]][4]):
-                                    for j in range(basis[a[1]][4]):
-                                        E1 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E1']
-                                        E2 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E2']
-                                        E3 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E3']
-                                        P  = GPdict[str(mu)+str(nu)+str(i)+str(j)]
-                                        p  = pdict[str(mu)+str(nu)+str(i)+str(j)]
-                                        for k in range(basis[a[2]][4]):
-                                            for l in range(basis[a[3]][4]):
-                                                E4 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E1']
-                                                E5 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E2']
-                                                E6 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E3']
-                                                Q  = GPdict[str(lam)+str(sig)+str(k)+str(l)]
-                                                q  = pdict[str(lam)+str(sig)+str(k)+str(l)]
-                                                if atomidx == basis[a[0]][6] and atomidx == basis[a[1]][6] and atomidx == basis[a[2]][6] and atomidx == basis[a[3]][6]:
-                                                    calc += 0
-                                                else:
-                                                    a2=basis[a[0]][5][i][1]
-                                                    b=basis[a[1]][5][j][1]
-                                                    c=basis[a[2]][5][k][1]
-                                                    d=basis[a[3]][5][l][1]
-                                                    Ay=basis[a[0]][2]
-                                                    By=basis[a[1]][2]
-                                                    Cy=basis[a[2]][2]
-                                                    Dy=basis[a[3]][2]
-                                                    l1=basis[a[0]][5][i][3]
-                                                    l2=basis[a[1]][5][j][3]
-                                                    l3=basis[a[2]][5][k][3]
-                                                    l4=basis[a[3]][5][l][3] 
-                                                    m1=basis[a[0]][5][i][4]
-                                                    m2=basis[a[1]][5][j][4]
-                                                    m3=basis[a[2]][5][k][4]
-                                                    m4=basis[a[3]][5][l][4] 
-                                                    n1=basis[a[0]][5][i][5]
-                                                    n2=basis[a[1]][5][j][5]
-                                                    n3=basis[a[2]][5][k][5]
-                                                    n4=basis[a[3]][5][l][5] 
-                                                    N1=basis[a[0]][5][i][0]
-                                                    N2=basis[a[1]][5][j][0]
-                                                    N3=basis[a[2]][5][k][0]
-                                                    N4=basis[a[3]][5][l][0]
-                                                    c1=basis[a[0]][5][i][2]
-                                                    c2=basis[a[1]][5][j][2]
-                                                    c3=basis[a[2]][5][k][2]
-                                                    c4=basis[a[3]][5][l][2]
+                                                            calcx += Ndiff2(l4, d)*elelrep(p, q, l1, l2, l3, l4-1, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, Nxm4, c1, c2, c3, c4, E1,E2,E3,E4m,E5,E6,Rpre)
                                                     
-                                                    Nyp1=Nyplus[a[0]][5][i][0]
-                                                    Nyp2=Nyplus[a[1]][5][j][0]
-                                                    Nyp3=Nyplus[a[2]][5][k][0]
-                                                    Nyp4=Nyplus[a[3]][5][l][0]
-                                                    
-                                                    Nym1=Nyminus[a[0]][5][i][0]
-                                                    Nym2=Nyminus[a[1]][5][j][0]
-                                                    Nym3=Nyminus[a[2]][5][k][0]
-                                                    Nym4=Nyminus[a[3]][5][l][0]
-
+                                                    # Calculate y derivative
                                                     if atomidx == basis[a[0]][6]:
                                                         E2p = np.zeros(m1+1+m2+1)
                                                         for t in range(m1+1+m2+1):
                                                             E2p[t] = E(m1+1,m2,t,Ay-By,a2,b,P[1]-Ay,P[1]-By,Ay-By)
-                                                        calc += Ndiff1(m1, a2)*elelrep(p, q, P, Q, l1, l2, l3, l4, m1+1, m2, m3, m4, n1, n2, n3, n4, Nyp1, N2, N3, N4, c1, c2, c3, c4, E1,E2p,E3,E4,E5,E6)
+                                                        calcy += Ndiff1(m1, a2)*elelrep(p, q, l1, l2, l3, l4, m1+1, m2, m3, m4, n1, n2, n3, n4, Nyp1, N2, N3, N4, c1, c2, c3, c4, E1,E2p,E3,E4,E5,E6,Rpre)
                                                         if m1 != 0:
                                                             E2m = np.zeros(m1-1+m2+1)
                                                             for t in range(m1-1+m2+1):
                                                                 E2m[t] = E(m1-1,m2,t,Ay-By,a2,b,P[1]-Ay,P[1]-By,Ay-By)
-                                                            calc += Ndiff2(m1, a2)*elelrep(p, q, P, Q, l1, l2, l3, l4, m1-1, m2, m3, m4, n1, n2, n3, n4, Nym1, N2, N3, N4, c1, c2, c3, c4, E1,E2m,E3,E4,E5,E6)
+                                                            calcy += Ndiff2(m1, a2)*elelrep(p, q, l1, l2, l3, l4, m1-1, m2, m3, m4, n1, n2, n3, n4, Nym1, N2, N3, N4, c1, c2, c3, c4, E1,E2m,E3,E4,E5,E6,Rpre)
                                                             
                                                     if atomidx == basis[a[1]][6]:
                                                         E2p = np.zeros(m1+1+m2+1)
                                                         for t in range(m1+m2+1+1):
                                                             E2p[t] = E(m1,m2+1,t,Ay-By,a2,b,P[1]-Ay,P[1]-By,Ay-By)
-                                                        calc += Ndiff1(m2, b)*elelrep(p, q, P, Q, l1, l2, l3, l4, m1, m2+1, m3, m4, n1, n2, n3, n4, N1, Nyp2, N3, N4, c1, c2, c3, c4, E1,E2p,E3,E4,E5,E6)
+                                                        calcy += Ndiff1(m2, b)*elelrep(p, q, l1, l2, l3, l4, m1, m2+1, m3, m4, n1, n2, n3, n4, N1, Nyp2, N3, N4, c1, c2, c3, c4, E1,E2p,E3,E4,E5,E6,Rpre)
                                                         if m2 != 0:
                                                             E2m = np.zeros(m1-1+m2+1)
                                                             for t in range(m1+m2-1+1):
                                                                 E2m[t] = E(m1,m2-1,t,Ay-By,a2,b,P[1]-Ay,P[1]-By,Ay-By)
-                                                            calc += Ndiff2(m2, b)*elelrep(p, q, P, Q, l1, l2, l3, l4, m1, m2-1, m3, m4, n1, n2, n3, n4, N1, Nym2, N3, N4, c1, c2, c3, c4,E1,E2m,E3,E4,E5,E6)
+                                                            calcy += Ndiff2(m2, b)*elelrep(p, q, l1, l2, l3, l4, m1, m2-1, m3, m4, n1, n2, n3, n4, N1, Nym2, N3, N4, c1, c2, c3, c4,E1,E2m,E3,E4,E5,E6,Rpre)
                                                             
                                                     if atomidx == basis[a[2]][6]:  
                                                         E5p = np.zeros(m3+1+m4+1)
                                                         for t in range(m3+1+m4+1):
                                                             E5p[t] = E(m3+1,m4,t,Cy-Dy,c,d,Q[1]-Cy,Q[1]-Dy,Cy-Dy)
-                                                        calc += Ndiff1(m3, c)*elelrep(p, q, P, Q, l1, l2, l3, l4, m1, m2, m3+1, m4, n1, n2, n3, n4, N1, N2, Nyp3, N4, c1, c2, c3, c4, E1,E2,E3,E4,E5p,E6)
+                                                        calcy += Ndiff1(m3, c)*elelrep(p, q, l1, l2, l3, l4, m1, m2, m3+1, m4, n1, n2, n3, n4, N1, N2, Nyp3, N4, c1, c2, c3, c4, E1,E2,E3,E4,E5p,E6,Rpre)
                                                         if m3 != 0:
                                                             E5m = np.zeros(m3-1+m4+1)
                                                             for t in range(m3-1+m4+1):
                                                                 E5m[t] = E(m3-1,m4,t,Cy-Dy,c,d,Q[1]-Cy,Q[1]-Dy,Cy-Dy)
-                                                            calc += Ndiff2(m3, c)*elelrep(p, q, P, Q, l1, l2, l3, l4, m1, m2, m3-1, m4, n1, n2, n3, n4, N1, N2, Nym3, N4, c1, c2, c3, c4,E1,E2,E3,E4,E5m,E6)
+                                                            calcy += Ndiff2(m3, c)*elelrep(p, q, l1, l2, l3, l4, m1, m2, m3-1, m4, n1, n2, n3, n4, N1, N2, Nym3, N4, c1, c2, c3, c4,E1,E2,E3,E4,E5m,E6,Rpre)
                                                         
                                                     if atomidx == basis[a[3]][6]:
                                                         E5p = np.zeros(m3+1+m4+1)
                                                         for t in range(m3+m4+1+1):
                                                             E5p[t] = E(m3,m4+1,t,Cy-Dy,c,d,Q[1]-Cy,Q[1]-Dy,Cy-Dy)
-                                                        calc += Ndiff1(m4, d)*elelrep(p, q, P, Q, l1, l2, l3, l4, m1, m2, m3, m4+1, n1, n2, n3, n4, N1, N2, N3, Nyp4, c1, c2, c3, c4,E1,E2,E3,E4,E5p,E6)
+                                                        calcy += Ndiff1(m4, d)*elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4+1, n1, n2, n3, n4, N1, N2, N3, Nyp4, c1, c2, c3, c4,E1,E2,E3,E4,E5p,E6,Rpre)
                                                         if m4 != 0:
                                                             E5m = np.zeros(m3-1+m4+1)
                                                             for t in range(m3+m4-1+1):
                                                                 E5m[t] = E(m3,m4-1,t,Cy-Dy,c,d,Q[1]-Cy,Q[1]-Dy,Cy-Dy)
-                                                            calc += Ndiff2(m4, d)*elelrep(p, q, P, Q, l1, l2, l3, l4, m1, m2, m3, m4-1, n1, n2, n3, n4, N1, N2, N3, Nym4, c1, c2, c3, c4,E1,E2,E3,E4,E5m,E6)
-                                                                                            
-                                ERI[mu,nu,lam,sig] = calc
-                                ERI[nu,mu,lam,sig] = calc
-                                ERI[mu,nu,sig,lam] = calc
-                                ERI[nu,mu,sig,lam] = calc
-                                ERI[lam,sig,mu,nu] = calc
-                                ERI[sig,lam,mu,nu] = calc
-                                ERI[lam,sig,nu,mu] = calc
-                                ERI[sig,lam,nu,mu] = calc
-        np.save('slowquant/temp/'+str(atomidx)+'dytwoint.npy',ERI)
-        print(time.time()-start, 'ERI y diff: atom'+str(atomidx))
-        #END OF two electron integrals y diff
-        
-        # Two electron integrals z diff
-        start = time.time()
-        ERI = np.zeros((len(basis),len(basis),len(basis),len(basis)))
-        for mu in range(0, len(basis)):
-            for nu in range(0, len(basis)):
-                if mu >= nu:
-                    for lam in range(0, len(basis)):
-                        for sig in range(0, len(basis)):
-                            munu = mu*(mu+1)/2+nu
-                            lamsig = lam*(lam+1)/2+sig
-                            if lam >= sig and munu >= lamsig:
-                                a = np.zeros(4)
-                                a[0] = mu
-                                a[1] = nu
-                                a[2] = lam
-                                a[3] = sig
-                                a = a.astype(int)
-                                calc = 0
-                                for i in range(basis[a[0]][4]):
-                                    for j in range(basis[a[1]][4]):
-                                        E1 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E1']
-                                        E2 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E2']
-                                        E3 = Edict[str(mu)+str(nu)+str(i)+str(j)+'E3']
-                                        P  = GPdict[str(mu)+str(nu)+str(i)+str(j)]
-                                        p  = pdict[str(mu)+str(nu)+str(i)+str(j)]
-                                        for k in range(basis[a[2]][4]):
-                                            for l in range(basis[a[3]][4]):
-                                                E4 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E1']
-                                                E5 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E2']
-                                                E6 = Edict[str(lam)+str(sig)+str(k)+str(l)+'E3']
-                                                Q  = GPdict[str(lam)+str(sig)+str(k)+str(l)]
-                                                q  = pdict[str(lam)+str(sig)+str(k)+str(l)]
-                                                if atomidx == basis[a[0]][6] and atomidx == basis[a[1]][6] and atomidx == basis[a[2]][6] and atomidx == basis[a[3]][6]:
-                                                    calc += 0
-                                                else:
-                                                    a2=basis[a[0]][5][i][1]
-                                                    b=basis[a[1]][5][j][1]
-                                                    c=basis[a[2]][5][k][1]
-                                                    d=basis[a[3]][5][l][1]
-                                                    Az=basis[a[0]][3] 
-                                                    Bz=basis[a[1]][3]
-                                                    Cz=basis[a[2]][3]
-                                                    Dz=basis[a[3]][3]
-                                                    l1=basis[a[0]][5][i][3]
-                                                    l2=basis[a[1]][5][j][3]
-                                                    l3=basis[a[2]][5][k][3]
-                                                    l4=basis[a[3]][5][l][3] 
-                                                    m1=basis[a[0]][5][i][4]
-                                                    m2=basis[a[1]][5][j][4]
-                                                    m3=basis[a[2]][5][k][4]
-                                                    m4=basis[a[3]][5][l][4] 
-                                                    n1=basis[a[0]][5][i][5]
-                                                    n2=basis[a[1]][5][j][5]
-                                                    n3=basis[a[2]][5][k][5]
-                                                    n4=basis[a[3]][5][l][5] 
-                                                    N1=basis[a[0]][5][i][0]
-                                                    N2=basis[a[1]][5][j][0]
-                                                    N3=basis[a[2]][5][k][0]
-                                                    N4=basis[a[3]][5][l][0]
-                                                    c1=basis[a[0]][5][i][2]
-                                                    c2=basis[a[1]][5][j][2]
-                                                    c3=basis[a[2]][5][k][2]
-                                                    c4=basis[a[3]][5][l][2]
+                                                            calcy += Ndiff2(m4, d)*elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4-1, n1, n2, n3, n4, N1, N2, N3, Nym4, c1, c2, c3, c4,E1,E2,E3,E4,E5m,E6,Rpre)
                                                     
-                                                    Nzp1=Nzplus[a[0]][5][i][0]
-                                                    Nzp2=Nzplus[a[1]][5][j][0]
-                                                    Nzp3=Nzplus[a[2]][5][k][0]
-                                                    Nzp4=Nzplus[a[3]][5][l][0]
-                                                    
-                                                    Nzm1=Nzminus[a[0]][5][i][0]
-                                                    Nzm2=Nzminus[a[1]][5][j][0]
-                                                    Nzm3=Nzminus[a[2]][5][k][0]
-                                                    Nzm4=Nzminus[a[3]][5][l][0]
-
+                                                    # Calculate z derivative
                                                     if atomidx == basis[a[0]][6]:
                                                         E3p = np.zeros(n1+1+n2+1)
                                                         for t in range(n1+1+n2+1):
                                                             E3p[t] = E(n1+1,n2,t,Az-Bz,a2,b,P[2]-Az,P[2]-Bz,Az-Bz)
-                                                        calc += Ndiff1(n1, a2)*elelrep(p, q, P, Q, l1, l2, l3, l4, m1, m2, m3, m4, n1+1, n2, n3, n4, Nzp1, N2, N3, N4, c1, c2, c3, c4, E1,E2,E3p,E4,E5,E6)
+                                                        calcz += Ndiff1(n1, a2)*elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1+1, n2, n3, n4, Nzp1, N2, N3, N4, c1, c2, c3, c4, E1,E2,E3p,E4,E5,E6,Rpre)
                                                         if n1 != 0:
-                                                            E3m = np.zeros(n1-n1+n2+1)
+                                                            E3m = np.zeros(n1-1+n2+1)
                                                             for t in range(n1-1+n2+1):
                                                                 E3m[t] = E(n1-1,n2,t,Az-Bz,a2,b,P[2]-Az,P[2]-Bz,Az-Bz)
-                                                            calc += Ndiff2(n1, a2)*elelrep(p, q, P, Q, l1, l2, l3, l4, m1, m2, m3, m4, n1-1, n2, n3, n4, Nzm1, N2, N3, N4, c1, c2, c3, c4, E1,E2,E3m,E4,E5,E6)
+                                                            calcz += Ndiff2(n1, a2)*elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1-1, n2, n3, n4, Nzm1, N2, N3, N4, c1, c2, c3, c4, E1,E2,E3m,E4,E5,E6,Rpre)
                                                             
                                                     if atomidx == basis[a[1]][6]:
                                                         E3p = np.zeros(n1+1+n2+1)
                                                         for t in range(n1+n2+1+1):
                                                             E3p[t] = E(n1,n2+1,t,Az-Bz,a2,b,P[2]-Az,P[2]-Bz,Az-Bz)
-                                                        calc += Ndiff1(n2, b)*elelrep(p, q, P, Q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2+1, n3, n4, N1, Nzp2, N3, N4, c1, c2, c3, c4, E1,E2,E3p,E4,E5,E6)
+                                                        calcz += Ndiff1(n2, b)*elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2+1, n3, n4, N1, Nzp2, N3, N4, c1, c2, c3, c4, E1,E2,E3p,E4,E5,E6,Rpre)
                                                         if n2 != 0:
-                                                            E3m = np.zeros(n1-n1+n2+1)
+                                                            E3m = np.zeros(n1-1+n2+1)
                                                             for t in range(n1+n2-1+1):
                                                                 E3m[t] = E(n1,n2-1,t,Az-Bz,a2,b,P[2]-Az,P[2]-Bz,Az-Bz)
-                                                            calc += Ndiff2(n2, b)*elelrep(p, q, P, Q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2-1, n3, n4, N1, Nzm2, N3, N4, c1, c2, c3, c4,E1,E2,E3m,E4,E5,E6)
+                                                            calcz += Ndiff2(n2, b)*elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2-1, n3, n4, N1, Nzm2, N3, N4, c1, c2, c3, c4,E1,E2,E3m,E4,E5,E6,Rpre)
                                                             
                                                     if atomidx == basis[a[2]][6]: 
                                                         E6p = np.zeros(n3+1+n4+1)
                                                         for t in range(n3+1+n4+1):
                                                             E6p[t] = E(n3+1,n4,t,Cz-Dz,c,d,Q[2]-Cz,Q[2]-Dz,Cz-Dz)
-                                                        calc += Ndiff1(n3, c)*elelrep(p, q, P, Q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3+1, n4, N1, N2, Nzp3, N4, c1, c2, c3, c4, E1,E2,E3,E4,E5,E6p)
+                                                        calcz += Ndiff1(n3, c)*elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3+1, n4, N1, N2, Nzp3, N4, c1, c2, c3, c4, E1,E2,E3,E4,E5,E6p,Rpre)
                                                         if n3 != 0:
                                                             E6m = np.zeros(n3-1+n4+1)
                                                             for t in range(n3-1+n4+1):
                                                                 E6m[t] = E(n3-1,n4,t,Cz-Dz,c,d,Q[2]-Cz,Q[2]-Dz,Cz-Dz)
-                                                            calc += Ndiff2(n3, c)*elelrep(p, q, P, Q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3-1, n4, N1, N2, Nzm3, N4, c1, c2, c3, c4,E1,E2,E3,E4,E5,E6m)
+                                                            calcz += Ndiff2(n3, c)*elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3-1, n4, N1, N2, Nzm3, N4, c1, c2, c3, c4,E1,E2,E3,E4,E5,E6m,Rpre)
                                                         
                                                     if atomidx == basis[a[3]][6]:
                                                         E6p = np.zeros(n3+1+n4+1)
                                                         for t in range(n3+n4+1+1):
                                                             E6p[t] = E(n3,n4+1,t,Cz-Dz,c,d,Q[2]-Cz,Q[2]-Dz,Cz-Dz)
-                                                        calc += Ndiff1(n4, d)*elelrep(p, q, P, Q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4+1, N1, N2, N3, Nzp4, c1, c2, c3, c4,E1,E2,E3,E4,E5,E6p)
+                                                        calcz += Ndiff1(n4, d)*elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4+1, N1, N2, N3, Nzp4, c1, c2, c3, c4,E1,E2,E3,E4,E5,E6p,Rpre)
                                                         if n4 != 0:
                                                             E6m = np.zeros(n3-1+n4+1)
                                                             for t in range(n3+n4-1+1):
                                                                 E6m[t] = E(n3,n4-1,t,Cz-Dz,c,d,Q[2]-Cz,Q[2]-Dz,Cz-Dz)
-                                                            calc += Ndiff2(n4, d)*elelrep(p, q, P, Q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4-1, N1, N2, N3, Nzm4, c1, c2, c3, c4,E1,E2,E3,E4,E5,E6m)
-                                                                                            
-                                ERI[mu,nu,lam,sig] = calc
-                                ERI[nu,mu,lam,sig] = calc
-                                ERI[mu,nu,sig,lam] = calc
-                                ERI[nu,mu,sig,lam] = calc
-                                ERI[lam,sig,mu,nu] = calc
-                                ERI[sig,lam,mu,nu] = calc
-                                ERI[lam,sig,nu,mu] = calc
-                                ERI[sig,lam,nu,mu] = calc
-        np.save('slowquant/temp/'+str(atomidx)+'dztwoint.npy',ERI)
-        print(time.time()-start, 'ERI z diff: atom'+str(atomidx))
-        #END OF two electron integrals z diff
+                                                            calcz += Ndiff2(n4, d)*elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4-1, N1, N2, N3, Nzm4, c1, c2, c3, c4,E1,E2,E3,E4,E5,E6m,Rpre)
+                                                                                        
+                                ERIx[mu,nu,lam,sig] = calcx
+                                ERIx[nu,mu,lam,sig] = calcx
+                                ERIx[mu,nu,sig,lam] = calcx
+                                ERIx[nu,mu,sig,lam] = calcx
+                                ERIx[lam,sig,mu,nu] = calcx
+                                ERIx[sig,lam,mu,nu] = calcx
+                                ERIx[lam,sig,nu,mu] = calcx
+                                ERIx[sig,lam,nu,mu] = calcx
+                                ERIy[mu,nu,lam,sig] = calcy
+                                ERIy[nu,mu,lam,sig] = calcy
+                                ERIy[mu,nu,sig,lam] = calcy
+                                ERIy[nu,mu,sig,lam] = calcy
+                                ERIy[lam,sig,mu,nu] = calcy
+                                ERIy[sig,lam,mu,nu] = calcy
+                                ERIy[lam,sig,nu,mu] = calcy
+                                ERIy[sig,lam,nu,mu] = calcy
+                                ERIz[mu,nu,lam,sig] = calcz
+                                ERIz[nu,mu,lam,sig] = calcz
+                                ERIz[mu,nu,sig,lam] = calcz
+                                ERIz[nu,mu,sig,lam] = calcz
+                                ERIz[lam,sig,mu,nu] = calcz
+                                ERIz[sig,lam,mu,nu] = calcz
+                                ERIz[lam,sig,nu,mu] = calcz
+                                ERIz[sig,lam,nu,mu] = calcz
+        np.save('slowquant/temp/'+str(atomidx)+'dxtwoint.npy',ERIx)
+        np.save('slowquant/temp/'+str(atomidx)+'dytwoint.npy',ERIy)
+        np.save('slowquant/temp/'+str(atomidx)+'dztwoint.npy',ERIz)
+        print(time.time()-start, 'ERI diff: atom'+str(atomidx))
+        #END OF two electron integrals x diff
         
         # Kinetic energy and overlap x diff
         start = time.time()

@@ -10,6 +10,7 @@ SlowQuant have the following requirements:
 - Python 3.4 or above
 - Numpy
 - Scipy
+- Numba
 
 .. toctree::
    :maxdepth: 2
@@ -17,7 +18,8 @@ SlowQuant have the following requirements:
    
    keywords.rst
    Examples.rst
-   issues.rst   
+   issues.rst
+   illustrativecalc.rst
 
 .. toctree::
    :maxdepth: 2

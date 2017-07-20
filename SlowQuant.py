@@ -75,5 +75,7 @@ def run(inputname, settingsname):
 
     
 if __name__ == "__main__":
+    total = time.time()
     results = run('H2O.csv', 'settingExample.csv')
+    print(time.time() - total, 'Execution time')
     

@@ -21,3 +21,4 @@ Numpy
 
 Scipy
 
+Numba

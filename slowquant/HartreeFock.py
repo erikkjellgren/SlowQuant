@@ -78,14 +78,9 @@ def HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results, print_SCF='Yes
         if print_SCF == 'Yes':
             output.write("\n")
         #New Fock Matrix
-        Part = np.zeros((len(basis),len(basis)))
-        for mu in range(0, len(basis)):
-            for nu in range(0, len(basis)):
-                for lam in range(0, len(basis)):
-                    for sig in range(0, len(basis)):
-                        Part[mu,nu] += D0[lam,sig]*(2*Vee[mu,nu,lam,sig]-Vee[mu,lam,nu,sig])
-        
-        F = Hcore + Part
+        J = np.einsum('pqrs,sr->pq', Vee,D0)
+        K = np.einsum('psqr,sr->pq', Vee,D0)
+        F = Hcore + 2*J-K
         
         if set['DIIS'] == 'Yes':
             #Estimate F by DIIS

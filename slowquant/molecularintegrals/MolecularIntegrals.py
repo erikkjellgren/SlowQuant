@@ -2,6 +2,7 @@ import numpy as np
 import scipy.misc as scm
 import scipy.special as scs
 import math
+from numba import jit
 
 ##INTEGRAL FUNCTIONS
 def Overlap(a, b, la, lb, Ax, Bx):
@@ -198,8 +199,8 @@ def electricfield(a, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, 
     
     return val*2*np.pi/p*N
 
-
-def elelrep(p, q, P, Q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, N4, c1, c2, c3, c4, E1, E2, E3, E4, E5, E6):
+@jit
+def elelrep(p,q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, N4, c1, c2, c3, c4, E1, E2, E3, E4, E5, E6, Rpre):
     # #############################################################
     #
     # Used in ERI for speed up should later be used
@@ -209,21 +210,16 @@ def elelrep(p, q, P, Q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, 
     
     #McMurchie-Davidson scheme   
     N = N1*N2*N3*N4*c1*c2*c3*c4
-
-    alpha = p*q/(p+q)
-    RPQ = ((P[0]-Q[0])**2+(P[1]-Q[1])**2+(P[2]-Q[2])**2)**0.5
-
-    Rpre = np.ones((l1+l2+l3+l4+2,m1+m2+m3+m4+2,n1+n2+n3+n4+2,l1+l2+l3+l4+m1+m2+m3+m4+n1+n2+n3+n4+6))
     
     val = 0.0
-    for t in range(l1+l2+1):
-        for u in range(m1+m2+1):
-            for v in range(n1+n2+1):
-                for tau in range(l3+l4+1):
-                    for nu in range(m3+m4+1):
-                        for phi in range(n3+n4+1):
-                            R1, Rpre = R(t+tau,u+nu,v+phi,0,alpha,P[0]-Q[0],P[1]-Q[1],P[2]-Q[2],RPQ, Rpre)
-                            val += E1[t]*E2[u]*E3[v]*E4[tau]*E5[nu]*E6[phi]*np.power(-1,tau+nu+phi)*R1
+    for tau in range(l3+l4+1):
+        for nu in range(m3+m4+1):
+            for phi in range(n3+n4+1):
+                factor = np.power(-1,tau+nu+phi)
+                for t in range(l1+l2+1):
+                    for u in range(m1+m2+1):
+                        for v in range(n1+n2+1):
+                            val += E1[t]*E2[u]*E3[v]*E4[tau]*E5[nu]*E6[phi]*Rpre[t+tau,u+nu,v+phi]*factor
 
 
     val *= 2*np.power(np.pi,2.5)/(p*q*np.sqrt(p+q)) 
@@ -244,18 +240,15 @@ def E(i,j,t,Qx,a,b,XPA,XPB,XAB):
         return (1/(2*p))*E(i,j-1,t-1,Qx,a,b,XPA,XPB,XAB) + XPB*E(i,j-1,t,Qx,a,b,XPA,XPB,XAB) + (t+1)*E(i,j-1,t+1,Qx,a,b,XPA,XPB,XAB)
 
 
-
 def R(t,u,v,n,p,PCx,PCy,PCz,RPC, Rpre):
     # #############################################################
     #
     # Used in ERI for speed up at p or higher orbitals
-    # should later be used for all MacMurchie davidson integrals
-    # to replace R()
     #
     # #############################################################
     
     #McMurchie-Davidson scheme, 9.9.18, 9.9.19 and 9.9.20 Helgaker
-    if Rpre[t,u,v,n] == 1:
+    if Rpre[t,u,v,n] == 1.0:
         T = p*RPC*RPC
         val = 0.0
         if t == u == v == 0:
