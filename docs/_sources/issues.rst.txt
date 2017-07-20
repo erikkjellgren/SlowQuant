@@ -22,4 +22,4 @@ Need testing
 Broken
 ------
 
-- None known
+- Self overlap integrals is non-one for contracted  basisfunctions

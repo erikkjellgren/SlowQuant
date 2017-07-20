@@ -4,3 +4,6 @@ out.txt
 
 # Files made by python
 __pycache__/
+
+# Editing documentation
+*~
