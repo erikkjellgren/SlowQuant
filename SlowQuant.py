@@ -10,6 +10,7 @@ from slowquant import IntegralTransform as utilF
 from slowquant import GeometryOptimization as GO
 from slowquant import UHF
 from slowquant import CI
+from slowquant import CC
 
 def run(inputname, settingsname):
     settings = np.genfromtxt('slowquant/Standardsettings.csv', delimiter = ';', dtype='str')
@@ -70,6 +71,9 @@ def run(inputname, settingsname):
         start = time.time()
         CI.runCI(FAO, CMO, input, set, results)
         print(time.time()-start, 'CI')
+        start = time.time()
+        CC.runCC(FAO, CMO, input, set, results)
+        print(time.time()-start, 'CC')
     
     return results
 

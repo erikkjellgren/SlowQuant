@@ -199,7 +199,7 @@ def electricfield(a, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, 
     
     return val*2*np.pi/p*N
 
-@jit
+@jit(cache=True,nopython=True)
 def elelrep(p,q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, N4, c1, c2, c3, c4, E1, E2, E3, E4, E5, E6, Rpre):
     # #############################################################
     #
@@ -221,7 +221,6 @@ def elelrep(p,q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, N4,
                         for v in range(n1+n2+1):
                             val += E1[t]*E2[u]*E3[v]*E4[tau]*E5[nu]*E6[phi]*Rpre[t+tau,u+nu,v+phi]*factor
 
-
     val *= 2*np.power(np.pi,2.5)/(p*q*np.sqrt(p+q)) 
     return val*N
     
@@ -240,7 +239,7 @@ def E(i,j,t,Qx,a,b,XPA,XPB,XAB):
         return (1/(2*p))*E(i,j-1,t-1,Qx,a,b,XPA,XPB,XAB) + XPB*E(i,j-1,t,Qx,a,b,XPA,XPB,XAB) + (t+1)*E(i,j-1,t+1,Qx,a,b,XPA,XPB,XAB)
 
 
-def R(t,u,v,n,p,PCx,PCy,PCz,RPC, Rpre):
+def R(t,u,v,n,p,PCx,PCy,PCz,RPC,Rpre):
     # #############################################################
     #
     # Used in ERI for speed up at p or higher orbitals
@@ -276,14 +275,13 @@ def R(t,u,v,n,p,PCx,PCy,PCz,RPC, Rpre):
         return Rpre[t,u,v,n] , Rpre
     else:
         return Rpre[t,u,v,n] , Rpre
-    
+
 
 def boys(m,T):
     #Boys functions
     if abs(T) < 1e-12:
         return 1/(2*m + 1)
     else:
-        #return scs.gammainc(m+0.5,T)*scs.gamma(m+0.5)/(2*np.power(T,m+0.5))
         return scs.hyp1f1(m+0.5,m+1.5,-T)/(2.0*m+1.0)
         
 
@@ -335,9 +333,7 @@ def Nrun(basisset):
 def Eprecalculation(basis):
     # #############################################################
     #
-    # Precalculation of the expansion coefficients, used in 
-    # MacMurchie davidson ERI. Speed up compared to on the fly
-    # calculation. Should later be used for all MacMurchie davidson integrals
+    # Precalculation of the expansion coefficients.
     #
     # #############################################################
     Edict  = {}

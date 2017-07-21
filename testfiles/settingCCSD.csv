@@ -1,7 +1,8 @@
-basisset;6-31pGs
+basisset;STO3G
 Charge;No
 Dipole;No
 MPn;No
 DIIS;Yes
 SCF Energy Threshold;12
 SCF RMSD Threshold;12
+CC;CCSD

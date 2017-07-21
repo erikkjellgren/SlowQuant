@@ -131,7 +131,7 @@ def HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results, print_SCF='Yes
     
         D0 = D
         E0el = Eel
-        if dE < 10**(-deTHR) and rmsD < 10**(-rmsTHR):
+        if np.abs(dE) < 10**(-deTHR) and rmsD < 10**(-rmsTHR):
             break
             
     if print_SCF == 'Yes':

@@ -31,3 +31,8 @@ Gradient Descent Step;1.0
 Force Numeric;No
         ; CONFIGURATION INTERACTION
 CI;No
+        ; COUPLED CLUSTER
+CC;No
+CC Max iterations;100
+CC RMSD Threshold;10
+CC Energy Threshold;10

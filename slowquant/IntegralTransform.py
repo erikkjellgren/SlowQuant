@@ -40,8 +40,8 @@ def Transform2eSPIN():
     np.save('slowquant/temp/twointMOspin.npy', VeeMOspin)
 
 def runTransform(CMO, basis, set, FAO):
-    if set['MPn'] == 'MP2' or set['CI'] == 'CIS' or set['Excitation'] == 'RPA' or set['MPn'] == 'MP3' or set['MPn'] == 'DCPT2':
+    if set['MPn'] == 'MP2' or set['CI'] == 'CIS' or set['Excitation'] == 'RPA' or set['MPn'] == 'MP3' or set['MPn'] == 'DCPT2' or set['CC'] == 'CCSD':
         TransformMO(CMO, basis, set)
-    if set['CI'] == 'CIS' or set['Excitation'] == 'RPA' or set['MPn'] == 'MP3':
+    if set['CI'] == 'CIS' or set['Excitation'] == 'RPA' or set['MPn'] == 'MP3' or set['CC'] == 'CCSD':
         Transform2eSPIN()
     

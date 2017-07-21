@@ -316,3 +316,9 @@ def test_MP3():
     calc = results['EMP2'] + results['EMP3']
     check = -0.0180
     assert abs(calc - check) < 10**-5
+
+def test_CCSD():
+    results = HFrun.run('testfiles/inputH2O.csv','testfiles/settingCCSD.csv')
+    check = -0.070680088376
+    calc = results['ECCSD']
+    assert abs(calc-check) < 10**-10
