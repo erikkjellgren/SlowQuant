@@ -99,6 +99,7 @@
 <li class="toctree-l2"><a class="reference internal" href="#properties">Properties</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#geomoetry-optimization">Geomoetry Optimization</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#configuration-interaction">Configuration Interaction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#couple-cluster">Couple Cluster</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="Examples.html">Example input files</a></li>
@@ -116,6 +117,7 @@
 <li class="toctree-l1"><a class="reference internal" href="Properties.html">Properties</a></li>
 <li class="toctree-l1"><a class="reference internal" href="GeoOpt.html">Geometry optimization</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CI.html">Configuration Interaction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CC.html">Coupled Cluster</a></li>
 </ul>
 
             
@@ -278,6 +280,25 @@
 <li>CI;x</li>
 </ul>
 <p>To get exciation energies with CI singles. x=CIS</p>
+</div>
+<div class="section" id="couple-cluster">
+<h2>Couple Cluster<a class="headerlink" href="#couple-cluster" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>CC;x</li>
+</ul>
+<p>To run CCSD, x=CCSD. To run CCSD(T), x=CCSD(T)</p>
+<ul class="simple">
+<li>CC Max iterations;x</li>
+</ul>
+<p>Maximaum CC amplitudes iterations.</p>
+<ul class="simple">
+<li>CC RMSD Threshold;10</li>
+</ul>
+<p>RMSD Threshold for T1 and T2, given as 10^-x</p>
+<ul class="simple">
+<li>CC Energy Threshold;10</li>
+</ul>
+<p>Energy change Threshold for CC, given as 10^-x</p>
 </div>
 </div>
 

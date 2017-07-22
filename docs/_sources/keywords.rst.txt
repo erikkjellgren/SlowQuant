@@ -103,3 +103,22 @@ Configuration Interaction
 - CI;x
 
 To get exciation energies with CI singles. x=CIS
+
+Couple Cluster
+--------------
+
+- CC;x
+
+To run CCSD, x=CCSD. To run CCSD(T), x=CCSD(T)
+
+- CC Max iterations;x
+
+Maximaum CC amplitudes iterations. 
+
+- CC RMSD Threshold;10
+
+RMSD Threshold for T1 and T2, given as 10^-x
+
+- CC Energy Threshold;10
+
+Energy change Threshold for CC, given as 10^-x
