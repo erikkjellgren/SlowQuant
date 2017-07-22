@@ -90,8 +90,8 @@ Refrence:
 
 - Szabo and Ostlund, Modern Quantum Chemistry: Introduction to Advanced Electronic Structure Theory
 
-Random-Phase Approximation Exciation energy
--------------------------------------------
+Random-Phase Approximation Excitation energy
+--------------------------------------------
 
 The excitation energies can be calculated by using the random-phase approximation also known as time dependent Hartree-Fock. The exciation energy is found by diagonalizing the following equation:
 

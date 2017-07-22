@@ -109,7 +109,7 @@ Couple Cluster
 
 - CC;x
 
-To run CCSD. x=CCSD
+To run CCSD, x=CCSD. To run CCSD(T), x=CCSD(T)
 
 - CC Max iterations;x
 
@@ -117,7 +117,7 @@ Maximaum CC amplitudes iterations.
 
 - CC RMSD Threshold;10
 
-RMSD Threshold for T1 and T1, given as 10^-x
+RMSD Threshold for T1 and T2, given as 10^-x
 
 - CC Energy Threshold;10
 

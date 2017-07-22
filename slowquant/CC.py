@@ -10,6 +10,24 @@ def tautilde(i,j,a,b,tdouble,tsingle):
 def tau(i,j,a,b,tdouble,tsingle):
     return tdouble[i,j,a,b] + tsingle[i,a]*tsingle[j,b]-tsingle[i,b]*tsingle[j,a]
 
+def ttripledis(a,b,c,i,j,k,tsingle,Vee):
+    #Used in CCSD(T)
+    return tsingle[i,a]*doublebar(j,k,b,c,Vee)
+
+def ttriplecon1(a,b,c,i,j,k,occ,dim,tdouble,Vee):
+    # Sum over virtuel, used in CCSD(T)
+    sum = 0
+    for e in range(occ, dim):
+        sum += tdouble[j,k,a,e]*doublebar(e,i,b,c,Vee)
+    return sum
+
+def ttriplecon2(a,b,c,i,j,k,occ,tdouble,Vee):
+    # Sum over occupied, used in CCSD(T)
+    sum = 0
+    for m in range(0, occ):
+        sum -= tdouble[i,m,b,c]*doublebar(m,a,j,k,Vee)
+    return sum
+
 
 def CCSD(F, C, input, results, set):
     maxiter = int(set['CC Max iterations'])+1
@@ -42,7 +60,7 @@ def CCSD(F, C, input, results, set):
                     EMP2 += 0.25*doublebar(i,j,a,b,VeeMOspin)*tdouble[i,j,a,b]
     
     output = open('out.txt', 'a')
-    output.write('\n MP2 Energy \t')
+    output.write('\nMP2 Energy \t')
     output.write("{: 10.8f}".format(EMP2))
     results['EMP2'] = EMP2
     
@@ -232,13 +250,77 @@ def CCSD(F, C, input, results, set):
         
         if np.abs(dE) < 10**(-deTHR) and rmsDsingle < 10**(-rmsTHR) and rmsDdouble < 10**(-rmsTHR):
             break
-            
+    
+    
     output.write('\n \n')
+    if set['CC'] == 'CCSD(T)':
+        ET = 0
+        for i in range(0, occ):
+            for j in range(0, occ):
+                for k in range(0, occ):
+                    for a in range(occ, dimension):
+                        for b in range(occ, dimension):
+                            for c in range(occ, dimension):
+                                ttripledisconnected = 0
+                                ttripleconnected = 0
+                                Dijkabc = FMOspin[i,i]+FMOspin[j,j]+FMOspin[k,k]-FMOspin[a,a]-FMOspin[b,b]-FMOspin[c,c]
+                                
+                                # Construct disconnected triples
+                                ttripledisconnected += ttripledis(a,b,c,i,j,k,tsingle,VeeMOspin)
+                                ttripledisconnected -= ttripledis(a,b,c,j,i,k,tsingle,VeeMOspin)
+                                ttripledisconnected -= ttripledis(a,b,c,k,j,i,tsingle,VeeMOspin)
+                                
+                                ttripledisconnected -= ttripledis(b,a,c,i,j,k,tsingle,VeeMOspin)
+                                ttripledisconnected += ttripledis(b,a,c,j,i,k,tsingle,VeeMOspin)
+                                ttripledisconnected += ttripledis(b,a,c,k,j,i,tsingle,VeeMOspin)
+                                
+                                ttripledisconnected -= ttripledis(c,b,a,i,j,k,tsingle,VeeMOspin)
+                                ttripledisconnected += ttripledis(c,b,a,j,i,k,tsingle,VeeMOspin)
+                                ttripledisconnected += ttripledis(c,b,a,k,j,i,tsingle,VeeMOspin)
+                                
+                                ttripledisconnected = ttripledisconnected/Dijkabc
+                                
+                                # Construct connected triples
+                                ttripleconnected += ttriplecon1(a,b,c,i,j,k,occ,dimension,tdouble,VeeMOspin)
+                                ttripleconnected -= ttriplecon1(a,b,c,j,i,k,occ,dimension,tdouble,VeeMOspin)
+                                ttripleconnected -= ttriplecon1(a,b,c,k,j,i,occ,dimension,tdouble,VeeMOspin)
+                                
+                                ttripleconnected -= ttriplecon1(b,a,c,i,j,k,occ,dimension,tdouble,VeeMOspin)
+                                ttripleconnected += ttriplecon1(b,a,c,j,i,k,occ,dimension,tdouble,VeeMOspin)
+                                ttripleconnected += ttriplecon1(b,a,c,k,j,i,occ,dimension,tdouble,VeeMOspin)
+                                
+                                ttripleconnected -= ttriplecon1(c,b,a,i,j,k,occ,dimension,tdouble,VeeMOspin)
+                                ttripleconnected += ttriplecon1(c,b,a,j,i,k,occ,dimension,tdouble,VeeMOspin)
+                                ttripleconnected += ttriplecon1(c,b,a,k,j,i,occ,dimension,tdouble,VeeMOspin)
+
+                                ttripleconnected += ttriplecon2(a,b,c,i,j,k,occ,tdouble,VeeMOspin)
+                                ttripleconnected -= ttriplecon2(a,b,c,j,i,k,occ,tdouble,VeeMOspin)
+                                ttripleconnected -= ttriplecon2(a,b,c,k,j,i,occ,tdouble,VeeMOspin)
+                                
+                                ttripleconnected -= ttriplecon2(b,a,c,i,j,k,occ,tdouble,VeeMOspin)
+                                ttripleconnected += ttriplecon2(b,a,c,j,i,k,occ,tdouble,VeeMOspin)
+                                ttripleconnected += ttriplecon2(b,a,c,k,j,i,occ,tdouble,VeeMOspin)
+                                
+                                ttripleconnected -= ttriplecon2(c,b,a,i,j,k,occ,tdouble,VeeMOspin)
+                                ttripleconnected += ttriplecon2(c,b,a,j,i,k,occ,tdouble,VeeMOspin)
+                                ttripleconnected += ttriplecon2(c,b,a,k,j,i,occ,tdouble,VeeMOspin)
+                                
+                                ttripleconnected = ttripleconnected/Dijkabc
+                                
+                                ET += ttripleconnected*Dijkabc*(ttripleconnected+ttripledisconnected)
+        
+        ET = ET/36.0
+        
+        output.write('E(T) \t')
+        output.write("{:14.10f}".format(ET))
+        results['E(T)'] = ET
+    
+    
     output.close()
     results['ECCSD'] = ECCSD
     return results
 
 def runCC(F, C, input, set, results):
-    if set['CC'] == 'CCSD':
+    if set['CC'] == 'CCSD' or set['CC'] == 'CCSD(T)':
         results = CCSD(F, C, input, results, set)
     return results
