@@ -172,7 +172,14 @@
             
   <div class="section" id="slowquant">
 <h1>SlowQuant<a class="headerlink" href="#slowquant" title="Permalink to this headline">¶</a></h1>
-<p>SlowQuant is a molecular quantum chemistry program written in python. Even the computational demanding parts are written in python, so it lacks speed, thus the name SlowQuant. The program is run from SlowQuant.py by specifing an input file and a settings file in the buttom of the script.</p>
+<p>SlowQuant is a molecular quantum chemistry program written in python. Even the computational demanding parts are written in python, so it lacks speed, thus the name SlowQuant. The program is run as:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">SlowQuant</span><span class="o">.</span><span class="n">py</span> <span class="n">MOLECULE</span> <span class="n">SETTINGS</span>
+</pre></div>
+</div>
+<p>As a ready to run example:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">SlowQuant</span><span class="o">.</span><span class="n">py</span> <span class="n">H2O</span><span class="o">.</span><span class="n">csv</span> <span class="n">settingExample</span><span class="o">.</span><span class="n">csv</span>
+</pre></div>
+</div>
 <p>SlowQuant have the following requirements:</p>
 <ul class="simple">
 <li>Python 3.5 or above</li>
@@ -224,6 +231,25 @@
 <p>For Windows 10, an Ubunutu can be installed following the guide in the following link:</p>
 <p><a class="reference external" href="https://www.howtogeek.com/249966/how-to-install-and-use-the-linux-bash-shell-on-windows-10/">https://www.howtogeek.com/249966/how-to-install-and-use-the-linux-bash-shell-on-windows-10/</a></p>
 <p>Here after all the above steps can be followed.</p>
+</div>
+<div class="section" id="compiling-documentation">
+<h2>Compiling documentation<a class="headerlink" href="#compiling-documentation" title="Permalink to this headline">¶</a></h2>
+<p>The documentation is compiled using sphinx:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">install</span> <span class="n">sphinx</span>
+</pre></div>
+</div>
+<p>To make the equations LaTeX is needed, and can be installed by:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">apt</span><span class="o">-</span><span class="n">get</span> <span class="n">install</span> <span class="n">texlive</span><span class="o">-</span><span class="n">full</span>
+</pre></div>
+</div>
+<p>The theme is downloaded by:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">sphinx_rtd_theme</span>
+</pre></div>
+</div>
+<p>The documentation is now compiled by:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">sphinx</span><span class="o">-</span><span class="n">build</span> <span class="n">documentation</span> <span class="n">docs</span>
+</pre></div>
+</div>
 <div class="toctree-wrapper compound">
 <p class="caption"><span class="caption-text">How to use</span></p>
 <ul>

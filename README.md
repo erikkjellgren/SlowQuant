@@ -12,6 +12,26 @@ Documentation can be found at:
 
 http://slowquant.readthedocs.io/en/latest/
 
+The program is run by:
+
+```
+python SlowQuant.py MOLECULE SETTINGS
+```
+  
+As a ready to run example:
+
+```
+python SlowQuant.py H2O.csv settingExample.csv
+```
+  
+# Setup
+
+The program is setup by executing the following command. See documentation for more detailed installation.
+
+```
+python setup.py build_ext --inplace
+```
+
 
 # Requirements
 
@@ -27,10 +47,4 @@ cython
 
 gcc
 
-# Setup
 
-The program is setup by executing the following command. See documentation for more detailed installation.
-
-```
-python setup.py build_ext --inplace
-```

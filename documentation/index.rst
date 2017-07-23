@@ -3,7 +3,17 @@
 SlowQuant
 ===========
 
-SlowQuant is a molecular quantum chemistry program written in python. Even the computational demanding parts are written in python, so it lacks speed, thus the name SlowQuant. The program is run from SlowQuant.py by specifing an input file and a settings file in the buttom of the script.
+SlowQuant is a molecular quantum chemistry program written in python. Even the computational demanding parts are written in python, so it lacks speed, thus the name SlowQuant. The program is run as:
+
+::
+  
+  python SlowQuant.py MOLECULE SETTINGS
+  
+As a ready to run example:
+
+::
+  
+  python SlowQuant.py H2O.csv settingExample.csv
 
 SlowQuant have the following requirements:
 
@@ -77,6 +87,33 @@ For Windows 10, an Ubunutu can be installed following the guide in the following
 https://www.howtogeek.com/249966/how-to-install-and-use-the-linux-bash-shell-on-windows-10/
 
 Here after all the above steps can be followed.
+
+Compiling documentation
+-----------------------
+
+The documentation is compiled using sphinx:
+
+::
+  
+  conda install sphinx
+
+To make the equations LaTeX is needed, and can be installed by:
+
+::
+  
+  sudo apt-get install texlive-full
+
+The theme is downloaded by:
+
+::
+  
+  pip install sphinx_rtd_theme
+
+The documentation is now compiled by:
+
+::
+  
+  sphinx-build documentation docs 
 
 .. toctree::
    :maxdepth: 2
