@@ -1,9 +1,15 @@
 # Files made by program
 /slowquant/temp/*npy
 out.txt
+potential.pdb
 
 # Files made by python
 __pycache__/
 
 # Editing documentation
 *~
+
+# Files made from setup
+build/
+*.c
+*.so

@@ -1,5 +1,6 @@
 import numpy as np
 import time
+import sys
 from slowquant import BasisSet as BS
 from slowquant import runMolecularIntegrals as MI
 from slowquant import HartreeFock as HF   
@@ -80,6 +81,8 @@ def run(inputname, settingsname):
     
 if __name__ == "__main__":
     total = time.time()
-    results = run('H2O.csv', 'settingExample.csv')
+    mol = str(sys.argv[1])
+    set = str(sys.argv[2])
+    results = run(mol, set)
     print(time.time() - total, 'Execution time')
     

@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# python setup.py build_ext --inplace
+# sphinx-build documentation docs
+
 import sphinx_rtd_theme
 
 # -- General configuration ------------------------------------------------
