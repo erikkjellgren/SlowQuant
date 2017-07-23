@@ -15,10 +15,22 @@ http://slowquant.readthedocs.io/en/latest/
 
 # Requirements
 
-Python 3.4 or above
+Python 3.5 or above
 
-Numpy
+numpy
 
-Scipy
+scipy
 
-Numba
+numba
+
+cython
+
+gcc
+
+# Setup
+
+The program is setup by executing the following command. See documentation for more detailed installation.
+
+```
+python setup.py build_ext --inplace
+```

@@ -195,7 +195,7 @@
 </div><p>Then the Fock matrix is brought into the orthogonal basis:</p>
 <div class="math">
 <p><img src="_images/math/b8f1a46c3fe9d5a8ab63de2c590afd4a0f2845be.png" alt="F_{n}^{'}=S_{\mathrm{ortho}}^{T}H^{\mathrm{core}}S_{\mathrm{ortho}}"/></p>
-</div><p>The F&#8217; is then diagonalized:</p>
+</div><p>The F’ is then diagonalized:</p>
 <div class="math">
 <p><img src="_images/math/b327c9600582cbcb1e298ac21e69729951472324.png" alt="F_{n}^{'}C_{n}^{'}=C_{n}^{'}\epsilon_{n}"/></p>
 </div><p>The coefficients are transformed back:</p>
@@ -214,7 +214,7 @@
 \mathrm{RMSD}_{n}=\sqrt{\sum_{ij}D_{n,ij}-D_{n-1,ij}}"/></p>
 </div><p>FUNCTION:</p>
 <ul class="simple">
-<li>HartreeFock.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results, print_SCF=&#8217;Yes&#8217;)</li>
+<li>HartreeFock.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results, print_SCF=’Yes’)</li>
 <li>return C, F, D, results</li>
 </ul>
 <p>Input:</p>
@@ -236,7 +236,7 @@
 <li>F, Fock matrix</li>
 <li>D, density matrix</li>
 <li>results, results obejct with added entries</li>
-<li>results[&#8216;HFenergy&#8217;], total Hartree-Fock energy</li>
+<li>results[‘HFenergy’], total Hartree-Fock energy</li>
 </ul>
 <p>References:</p>
 <ul class="simple">
@@ -250,7 +250,7 @@
 <p><img src="_images/math/92dd4509c6aa4ebee90704017091fdc95b5fa90b.png" alt="F_{n,\alpha,ij}=H_{ij}^{\mathrm{core}}+\sum_{kl}^{\mathrm{AO}}D_{n-1,\alpha,kl}\left(\left(ij\left|\right|kl\right)-\left(ik\left|\right|jl\right)\right)+\sum_{kl}^{\mathrm{AO}}D_{n-1,\beta,kl}\left(ij\left|\right|kl\right)"/></p>
 </div><p>FUNCTION:</p>
 <ul class="simple">
-<li>UHF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results, print_SCF=&#8217;Yes&#8217;)</li>
+<li>UHF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results, print_SCF=’Yes’)</li>
 <li>return C, F, D, results</li>
 </ul>
 <p>Input:</p>
@@ -272,7 +272,7 @@
 <li>F, Fock matrix</li>
 <li>D, density matrix</li>
 <li>results, results obejct with added entries</li>
-<li>results[&#8216;UHFenergy&#8217;], total unrestricted Hartree-Fock energy</li>
+<li>results[‘UHFenergy’], total unrestricted Hartree-Fock energy</li>
 </ul>
 <p>References:</p>
 <ul class="simple">
