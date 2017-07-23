@@ -2,7 +2,6 @@ import numpy as np
 import scipy.misc as scm
 import scipy.special as scs
 import math
-from numba import jit
 
 ##INTEGRAL FUNCTIONS
 def Overlap(a, b, la, lb, Ax, Bx):
@@ -72,19 +71,15 @@ def Kin(a, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na, nb, N1, N2, c1, c2):
     return (Tijx[la, lb]*Sy[ma,mb]*Sz[na,nb]+Tijy[ma, mb]*Sx[la,lb]*Sz[na,nb]+Tijz[na, nb]*Sy[ma,mb]*Sx[la,lb])*N, Sx[la, lb]*Sy[ma, mb]*Sz[na, nb]*N
 
 
-def elnuc(P, p, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, Zc, C, Ex, Ey, Ez):
+def elnuc(P, p, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, Zc, Ex, Ey, Ez, R1):
     #McMurchie-Davidson scheme    
     N = N1*N2*c1*c2
-    
-    RPC = ((P[0]-C[0])**2+(P[1]-C[1])**2+(P[2]-C[2])**2)**0.5
-    Rpre = np.ones((l1+l2+2,m1+m2+2,n1+n2+2,l1+l2+m1+m2+n1+n2+6))
-    
+
     val = 0
     for t in range(0, l1+l2+1):
         for u in range(0, m1+m2+1):
             for v in range(0, n1+n2+1):
-                R1, Rpre = R(t,u,v,0,p,P[0]-C[0],P[1]-C[1],P[2]-C[2],RPC,Rpre)
-                val += Ex[t]*Ey[u]*Ez[v]*R1*Zc
+                val += Ex[t]*Ey[u]*Ez[v]*R1[t,u,v]*Zc
 
     return -val*2*np.pi/p*N
 
@@ -163,14 +158,9 @@ def u_ObaraSaika(a1, a2, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na, nb, N1, N2,
     return -N*ux[la][lb][1]*uy[ma][mb][0]*uz[na][nb][0], -N*ux[la][lb][0]*uy[ma][mb][1]*uz[na][nb][0], -N*ux[la][lb][0]*uy[ma][mb][0]*uz[na][nb][1]
     
     
-def electricfield(a, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, input, derivative, atomidx):
-    #McMurchie-Davidson scheme    
+def electricfield(p,Ex,Ey,Ez,Zc, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, derivative, R1):
+    #McMurchie-Davidson scheme
     N = N1*N2*c1*c2
-    p = a + b
-    
-    A = np.array([Ax, Ay, Az])
-    B = np.array([Bx, By, Bz])
-    P = (a*A+b*B)/p
     
     dx = 0
     dy = 0
@@ -182,48 +172,14 @@ def electricfield(a, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, 
     else:
         dz = 1
 
-    val = 0
-    Zc = input[atomidx][0]
-    C = np.array([input[atomidx][1],input[atomidx][2],input[atomidx][3]])
-    RPC = ((P[0]-C[0])**2+(P[1]-C[1])**2+(P[2]-C[2])**2)**0.5
-    Rpre = np.ones((l1+l2+2,m1+m2+2,n1+n2+2,l1+l2+m1+m2+n1+n2+6))
-    
-    for t in range(0, l1+l2+1):
-        Ex = E(l1,l2,t,A[0]-B[0],a,b,P[0]-A[0],P[0]-B[0],A[0]-B[0])
-        for u in range(0, m1+m2+1):
-            Ey = E(m1,m2,u,A[1]-B[1],a,b,P[1]-A[1],P[1]-B[1],A[1]-B[1])
-            for v in range(0, n1+n2+1):
-                Ez = E(n1,n2,v,A[2]-B[2],a,b,P[2]-A[2],P[2]-B[2],A[2]-B[2])
-                R1, Rpre = R(t+dx,u+dy,v+dz,0,p,P[0]-C[0],P[1]-C[1],P[2]-C[2],RPC,Rpre)
-                val += Ex*Ey*Ez*R1*Zc
-    
-    return val*2*np.pi/p*N
-
-@jit(cache=True,nopython=True)
-def elelrep(p,q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, N4, c1, c2, c3, c4, E1, E2, E3, E4, E5, E6, Rpre):
-    # #############################################################
-    #
-    # Used in ERI for speed up should later be used
-    # for all MacMurchie davidson integrals to replace elelrep()
-    #
-    # #############################################################
-    
-    #McMurchie-Davidson scheme   
-    N = N1*N2*N3*N4*c1*c2*c3*c4
-    
     val = 0.0
-    for tau in range(l3+l4+1):
-        for nu in range(m3+m4+1):
-            for phi in range(n3+n4+1):
-                factor = np.power(-1,tau+nu+phi)
-                for t in range(l1+l2+1):
-                    for u in range(m1+m2+1):
-                        for v in range(n1+n2+1):
-                            val += E1[t]*E2[u]*E3[v]*E4[tau]*E5[nu]*E6[phi]*Rpre[t+tau,u+nu,v+phi]*factor
-
-    val *= 2*np.power(np.pi,2.5)/(p*q*np.sqrt(p+q)) 
-    return val*N
+    for t in range(0, l1+l2+1):
+        for u in range(0, m1+m2+1):
+            for v in range(0, n1+n2+1):
+                val += Ex[t]*Ey[u]*Ez[v]*R1[t+dx,u+dy,v+dz]*Zc
     
+    return val*2.0*np.pi/p*N
+
 ##UTILITY FUNCTIONS
 def E(i,j,t,Qx,a,b,XPA,XPB,XAB):
     #McMurchie-Davidson scheme, 9.5.6 and 9.5.7 Helgaker
@@ -236,54 +192,7 @@ def E(i,j,t,Qx,a,b,XPA,XPB,XAB):
     elif j == 0:
         return (1/(2*p))*E(i-1,j,t-1,Qx,a,b,XPA,XPB,XAB) + XPA*E(i-1,j,t,Qx,a,b,XPA,XPB,XAB) + (t+1)*E(i-1,j,t+1,Qx,a,b,XPA,XPB,XAB)
     else:
-        return (1/(2*p))*E(i,j-1,t-1,Qx,a,b,XPA,XPB,XAB) + XPB*E(i,j-1,t,Qx,a,b,XPA,XPB,XAB) + (t+1)*E(i,j-1,t+1,Qx,a,b,XPA,XPB,XAB)
-
-
-def R(t,u,v,n,p,PCx,PCy,PCz,RPC,Rpre):
-    # #############################################################
-    #
-    # Used in ERI for speed up at p or higher orbitals
-    #
-    # #############################################################
-    
-    #McMurchie-Davidson scheme, 9.9.18, 9.9.19 and 9.9.20 Helgaker
-    if Rpre[t,u,v,n] == 1.0:
-        T = p*RPC*RPC
-        val = 0.0
-        if t == u == v == 0:
-            val += np.power(-2*p,n)*boys(n,T)
-        elif t == u == 0:
-            if v > 1:
-                res,Rpre = R(t,u,v-2,n+1,p,PCx,PCy,PCz,RPC,Rpre)
-                val+=(v-1)*res
-            res,Rpre = R(t,u,v-1,n+1,p,PCx,PCy,PCz,RPC,Rpre)  
-            val+=PCz*res
-        elif t == 0:
-            if u > 1:
-                res,Rpre = R(t,u-2,v,n+1,p,PCx,PCy,PCz,RPC,Rpre) 
-                val+=(u-1)*res  
-            res,Rpre = R(t,u-1,v,n+1,p,PCx,PCy,PCz,RPC,Rpre)  
-            val+=PCy*res
-        else:
-            if t > 1:
-                res,Rpre = R(t-2,u,v,n+1,p,PCx,PCy,PCz,RPC,Rpre)  
-                val+=(t-1)*res
-            res,Rpre = R(t-1,u,v,n+1,p,PCx,PCy,PCz,RPC,Rpre)  
-            val+=PCx*res
-        
-        Rpre[t,u,v,n] = val
-        return Rpre[t,u,v,n] , Rpre
-    else:
-        return Rpre[t,u,v,n] , Rpre
-
-
-def boys(m,T):
-    #Boys functions
-    if abs(T) < 1e-12:
-        return 1/(2*m + 1)
-    else:
-        return scs.hyp1f1(m+0.5,m+1.5,-T)/(2.0*m+1.0)
-        
+        return (1/(2*p))*E(i,j-1,t-1,Qx,a,b,XPA,XPB,XAB) + XPB*E(i,j-1,t,Qx,a,b,XPA,XPB,XAB) + (t+1)*E(i,j-1,t+1,Qx,a,b,XPA,XPB,XAB)    
 
 def Ndiff1(l,a):
     return ((2*l+1)*a)**0.5
@@ -291,7 +200,6 @@ def Ndiff1(l,a):
 def Ndiff2(l,a):
     return -2*l*(a/(2*l-1))**0.5
         
-
 def Nrun(basisset):
     # Normalize primitive functions
     for i in range(len(basisset)):

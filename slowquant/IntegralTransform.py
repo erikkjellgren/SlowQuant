@@ -45,3 +45,4 @@ def runTransform(CMO, basis, set, FAO):
     if set['CI'] == 'CIS' or set['Excitation'] == 'RPA' or set['MPn'] == 'MP3' or set['CC'] == 'CCSD' or set['CC'] == 'CCSD(T)':
         Transform2eSPIN()
     
+

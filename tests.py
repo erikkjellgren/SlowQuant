@@ -4,7 +4,7 @@ from slowquant import BasisSet as BS
 from slowquant import DIIS as DIIS
 from slowquant import HartreeFock as HF
 from slowquant import runMolecularIntegrals as MI
-from slowquant.molecularintegrals.MolecularIntegrals import boys
+from slowquant.molecularintegrals.MIcython import boysPrun
 from slowquant import MPn as MP
 from slowquant import Properties as PROP
 from slowquant import Qfit as QFIT
@@ -62,7 +62,7 @@ def test_boys():
             1.91851951160577E-18,
             7.75391047694625E-55]
     for i in range(0, len(x)):
-        assert abs(boys(m[i], x[i])-check[i])*10**scale[i] < 10**-8
+        assert abs(boysPrun(m[i], x[i])-check[i])*10**scale[i] < 10**-8
     
 def test_HartreeFock1():
     settings = np.genfromtxt('slowquant/Standardsettings.csv', delimiter = ';', dtype='str')
@@ -173,7 +173,7 @@ def test_derivative():
     set = {}
     for i in range(len(settings)):
         set.update({settings[i][0]:settings[i][1]})
-    input = np.array([[8, 0, 0, 0],[8, 0, 0, 0]])
+    input = np.array([[8, 0, 0, 0],[8, 0.0, 0.0, 0.0]])
     basis = BS.bassiset(input, set)
     MI.rungeometric_derivatives(input, basis)
     VNe = np.load('slowquant/temp/1dynucatt.npy')
