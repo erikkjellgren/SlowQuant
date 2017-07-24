@@ -59,9 +59,11 @@ The expansion coefficient is found by the following recurrence relation:
 
 .. math::
    E_{t}^{i,j}=0,\,\,\,\,t<0\,\,\mathrm{or}\,\,t>i+j
-
+   
+.. math::
    E_{t}^{i+1,j}=\frac{1}{2p}E_{t-1}^{i,j}+X_{\mathrm{PA}}E_{t}^{i,j}+\left(t+1\right)E_{t+1}^{i,j}
-
+   
+.. math::
    E_{t}^{i,j+1}=\frac{1}{2p}E_{t-1}^{i,j}+X_{\mathrm{PB}}E_{t}^{i,j}+\left(t+1\right)E_{t+1}^{i,j}
 
 With the boundary condition that:
@@ -104,8 +106,10 @@ The hermite coulomb integrals is given as the following recurrence relations:
 .. math::
    R_{t+1,u,v}^{n}\left(p,R_{\mathrm{PC}}\right)=tR_{t-1,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)+X_{\mathrm{PC}}R_{t,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)
 
+.. math::
    R_{t,u+1,v}^{n}\left(p,R_{\mathrm{PC}}\right)=uR_{t,u-1,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)+Y_{\mathrm{PC}}R_{t,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)
 
+.. math::
    R_{t,u,v+1}^{n}\left(p,R_{\mathrm{PC}}\right)=vR_{t,u,v-1}^{n+1}\left(p,R_{\mathrm{PC}}\right)+Z_{\mathrm{PC}}R_{t,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)
 
 With the boundary condition:
@@ -145,15 +149,14 @@ Overlap
 The overlap integrals are solved by the following recurrence relation:
 
 .. math::
-
    S_{i+1,j}=X_{PA}S_{ij}+\frac{1}{2p}\left(iS_{i-1,j}+jS_{i,j-1}\right)
 
+.. math::
    S_{i,j+1}=X_{PB}S_{ij}+\frac{1}{2p}\left(iS_{i-1,j}+jS_{i,j-1}\right)
 
 With the boundary condition that:
 
 .. math::
-
    S_{00}=\sqrt{\frac{\pi}{p}}\exp\left(-\mu X_{AB}^{2}\right)
 
 FUNCTION:
@@ -184,9 +187,9 @@ Kinetic energy
 The kinetic energy integrals are solved by the following recurrence relation:
 
 .. math::
-
    T_{i+1,j}=X_{\mathrm{PA}}T_{i,j}+\frac{1}{2p}\left(iT_{i-1,j}+jT_{i,j-1}\right)+\frac{b}{p}\left(2aS_{i+1,j}-iS_{i-1,j}\right)
 
+.. math::
    T_{i,j+1}=X_{\mathrm{PB}}T_{i,j}+\frac{1}{2p}\left(iT_{i-1,j}+jT_{i,j-1}\right)+\frac{a}{p}\left(2bS_{i,j+1}-iS_{i,j-1}\right)
 
 With the boundary condition that:
@@ -442,8 +445,10 @@ The dipole moment integral is calculated by using the following relations:
 .. math::
    S_{i+1,j}^{e}=X_{\mathrm{PA}}S_{i,j}^{e}+\frac{1}{2p}\left(iS_{i-1,j}^{e}+jS_{i,j-1}^{e}+eS_{ij}^{e-1}\right)
 
+.. math::
    S_{i,j+1}^{e}=X_{\mathrm{PB}}S_{i,j}^{e}+\frac{1}{2p}\left(iS_{i-1,j}^{e}+jS_{i,j-1}^{e}+eS_{ij}^{e-1}\right)
 
+.. math::
    S_{i,j}^{e+1}=X_{\mathrm{PC}}S_{i,j}^{e}+\frac{1}{2p}\left(iS_{i-1,j}^{e}+jS_{i,j-1}^{e}+eS_{ij}^{e-1}\right)
 
 Here e is the order of multipole moment, e=1 is dipole moment.

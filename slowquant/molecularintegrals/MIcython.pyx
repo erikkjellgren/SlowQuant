@@ -42,7 +42,7 @@ cpdef double [:,:,:] runR(int l1l2, int m1m2, int n1n2, double [:] C, double [:]
 @cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef R2(int t, int u, int v, int n, double p, double PCx, double PCy, double PCz, double RPC):
+cdef double R2(int t, int u, int v, int n, double p, double PCx, double PCy, double PCz, double RPC):
     cdef double T, val, res    
 
     T = p*RPC*RPC

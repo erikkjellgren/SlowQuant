@@ -91,6 +91,7 @@
             
               <p class="caption"><span class="caption-text">How to use</span></p>
 <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation and Running</a></li>
 <li class="toctree-l1"><a class="reference internal" href="keywords.html">List of keywords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Examples.html">Example input files</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Issues</a><ul>
@@ -182,10 +183,10 @@
 <div class="section" id="general">
 <h2>General<a class="headerlink" href="#general" title="Permalink to this headline">¶</a></h2>
 <ul class="simple">
-<li>MolecularIntegrals.py is a mess</li>
 <li>Code in general is a gigantic mess</li>
 <li>Numerical methods makes code none module like</li>
 <li>No checking of input files at all at any stages of the code</li>
+<li>Basisset object has a bad structure</li>
 </ul>
 </div>
 <div class="section" id="need-testing">
@@ -200,6 +201,7 @@
 <h2>Broken<a class="headerlink" href="#broken" title="Permalink to this headline">¶</a></h2>
 <ul class="simple">
 <li>Self overlap integrals is non-one for contracted  basisfunctions</li>
+<li>No check for singularity in DIIS, H2/STO3G breaks the code if used with DIIS</li>
 </ul>
 </div>
 </div>

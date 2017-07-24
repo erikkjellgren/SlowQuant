@@ -91,6 +91,7 @@
             
               <p class="caption"><span class="caption-text">How to use</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation and Running</a></li>
 <li class="toctree-l1"><a class="reference internal" href="keywords.html">List of keywords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Examples.html">Example input files</a></li>
 <li class="toctree-l1"><a class="reference internal" href="issues.html">Issues</a></li>
@@ -230,11 +231,11 @@
 <h2>Expansion coefficients<a class="headerlink" href="#expansion-coefficients" title="Permalink to this headline">¶</a></h2>
 <p>The expansion coefficient is found by the following recurrence relation:</p>
 <div class="math">
-<p><img src="_images/math/cd016ef6ef7fa0e217a8e9a19b90ef2d2009d1c2.png" alt="E_{t}^{i,j}=0,\,\,\,\,t&lt;0\,\,\mathrm{or}\,\,t&gt;i+j
-
-E_{t}^{i+1,j}=\frac{1}{2p}E_{t-1}^{i,j}+X_{\mathrm{PA}}E_{t}^{i,j}+\left(t+1\right)E_{t+1}^{i,j}
-
-E_{t}^{i,j+1}=\frac{1}{2p}E_{t-1}^{i,j}+X_{\mathrm{PB}}E_{t}^{i,j}+\left(t+1\right)E_{t+1}^{i,j}"/></p>
+<p><img src="_images/math/cae5b4513e5dc8df9bb67fac522ad8ed326328fd.png" alt="E_{t}^{i,j}=0,\,\,\,\,t&lt;0\,\,\mathrm{or}\,\,t&gt;i+j"/></p>
+</div><div class="math">
+<p><img src="_images/math/77e1d9f9023ec0c6885ccfd2e066ecafecc4936e.png" alt="E_{t}^{i+1,j}=\frac{1}{2p}E_{t-1}^{i,j}+X_{\mathrm{PA}}E_{t}^{i,j}+\left(t+1\right)E_{t+1}^{i,j}"/></p>
+</div><div class="math">
+<p><img src="_images/math/9a3f7452b0dea7c89356b95843438944d6282b46.png" alt="E_{t}^{i,j+1}=\frac{1}{2p}E_{t-1}^{i,j}+X_{\mathrm{PB}}E_{t}^{i,j}+\left(t+1\right)E_{t+1}^{i,j}"/></p>
 </div><p>With the boundary condition that:</p>
 <div class="math">
 <p><img src="_images/math/f5dfbded3ab11cc0e5cd65948e91639160f33af5.png" alt="E_{0}^{0,0}=\exp\left(-pX_{\mathrm{AB}}^{2}\right)"/></p>
@@ -269,11 +270,11 @@ E_{t}^{i,j+1}=\frac{1}{2p}E_{t-1}^{i,j}+X_{\mathrm{PB}}E_{t}^{i,j}+\left(t+1\rig
 <h2>Hermite coulomb integral<a class="headerlink" href="#hermite-coulomb-integral" title="Permalink to this headline">¶</a></h2>
 <p>The hermite coulomb integrals is given as the following recurrence relations:</p>
 <div class="math">
-<p><img src="_images/math/9dbed7a064ecdfe30c3abd15985bcee747917a6e.png" alt="R_{t+1,u,v}^{n}\left(p,R_{\mathrm{PC}}\right)=tR_{t-1,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)+X_{\mathrm{PC}}R_{t,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)
-
-R_{t,u+1,v}^{n}\left(p,R_{\mathrm{PC}}\right)=uR_{t,u-1,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)+Y_{\mathrm{PC}}R_{t,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)
-
-R_{t,u,v+1}^{n}\left(p,R_{\mathrm{PC}}\right)=vR_{t,u,v-1}^{n+1}\left(p,R_{\mathrm{PC}}\right)+Z_{\mathrm{PC}}R_{t,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)"/></p>
+<p><img src="_images/math/d2424e06239ab29383e635e9d99828e73ebcdd6e.png" alt="R_{t+1,u,v}^{n}\left(p,R_{\mathrm{PC}}\right)=tR_{t-1,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)+X_{\mathrm{PC}}R_{t,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)"/></p>
+</div><div class="math">
+<p><img src="_images/math/d376c2acbc373420c21122bc173b0992633406ad.png" alt="R_{t,u+1,v}^{n}\left(p,R_{\mathrm{PC}}\right)=uR_{t,u-1,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)+Y_{\mathrm{PC}}R_{t,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)"/></p>
+</div><div class="math">
+<p><img src="_images/math/29d1a67b1ec5b3464e49ab2d32bac4e844168e2e.png" alt="R_{t,u,v+1}^{n}\left(p,R_{\mathrm{PC}}\right)=vR_{t,u,v-1}^{n+1}\left(p,R_{\mathrm{PC}}\right)+Z_{\mathrm{PC}}R_{t,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)"/></p>
 </div><p>With the boundary condition:</p>
 <div class="math">
 <p><img src="_images/math/f156200f7a8a9a2af93947d614babe4e8c266e37.png" alt="R_{0,0,0}^{n}\left(p,R_{\mathrm{PC}}\right)=\left(-2p\right)^{n}F_{n}\left(pR_{\mathrm{PC}}^{2}\right)"/></p>
@@ -308,9 +309,9 @@ R_{t,u,v+1}^{n}\left(p,R_{\mathrm{PC}}\right)=vR_{t,u,v-1}^{n+1}\left(p,R_{\math
 <h2>Overlap<a class="headerlink" href="#overlap" title="Permalink to this headline">¶</a></h2>
 <p>The overlap integrals are solved by the following recurrence relation:</p>
 <div class="math">
-<p><img src="_images/math/507cf5d17511789d54c3dca2d6f20eb54d302144.png" alt="S_{i+1,j}=X_{PA}S_{ij}+\frac{1}{2p}\left(iS_{i-1,j}+jS_{i,j-1}\right)
-
-S_{i,j+1}=X_{PB}S_{ij}+\frac{1}{2p}\left(iS_{i-1,j}+jS_{i,j-1}\right)"/></p>
+<p><img src="_images/math/f17839ba4ceaeb7831c6bd80e65de0dd9d3c7d52.png" alt="S_{i+1,j}=X_{PA}S_{ij}+\frac{1}{2p}\left(iS_{i-1,j}+jS_{i,j-1}\right)"/></p>
+</div><div class="math">
+<p><img src="_images/math/36841f6f072d1847c6f983497cc199aa62632d26.png" alt="S_{i,j+1}=X_{PB}S_{ij}+\frac{1}{2p}\left(iS_{i-1,j}+jS_{i,j-1}\right)"/></p>
 </div><p>With the boundary condition that:</p>
 <div class="math">
 <p><img src="_images/math/1bd6ca56103861721f56d5e91a3c24c5f66fb547.png" alt="S_{00}=\sqrt{\frac{\pi}{p}}\exp\left(-\mu X_{AB}^{2}\right)"/></p>
@@ -341,9 +342,9 @@ S_{i,j+1}=X_{PB}S_{ij}+\frac{1}{2p}\left(iS_{i-1,j}+jS_{i,j-1}\right)"/></p>
 <h2>Kinetic energy<a class="headerlink" href="#kinetic-energy" title="Permalink to this headline">¶</a></h2>
 <p>The kinetic energy integrals are solved by the following recurrence relation:</p>
 <div class="math">
-<p><img src="_images/math/cc45153852fa52c63a75f2471b3ab5fd56b43f60.png" alt="T_{i+1,j}=X_{\mathrm{PA}}T_{i,j}+\frac{1}{2p}\left(iT_{i-1,j}+jT_{i,j-1}\right)+\frac{b}{p}\left(2aS_{i+1,j}-iS_{i-1,j}\right)
-
-T_{i,j+1}=X_{\mathrm{PB}}T_{i,j}+\frac{1}{2p}\left(iT_{i-1,j}+jT_{i,j-1}\right)+\frac{a}{p}\left(2bS_{i,j+1}-iS_{i,j-1}\right)"/></p>
+<p><img src="_images/math/16b6cbbf532289647733c72763df4e340bf6e2e7.png" alt="T_{i+1,j}=X_{\mathrm{PA}}T_{i,j}+\frac{1}{2p}\left(iT_{i-1,j}+jT_{i,j-1}\right)+\frac{b}{p}\left(2aS_{i+1,j}-iS_{i-1,j}\right)"/></p>
+</div><div class="math">
+<p><img src="_images/math/bcfacd8af07f2a4969c8b9e6136f14aa29cf737e.png" alt="T_{i,j+1}=X_{\mathrm{PB}}T_{i,j}+\frac{1}{2p}\left(iT_{i-1,j}+jT_{i,j-1}\right)+\frac{a}{p}\left(2bS_{i,j+1}-iS_{i,j-1}\right)"/></p>
 </div><p>With the boundary condition that:</p>
 <div class="math">
 <p><img src="_images/math/30c1caed6d45921a8003b439300645e279712582.png" alt="T_{00}=\left[a-2a^{2}\left(X_{\mathrm{PA}}^{2}+\frac{1}{2p}\right)\right]S_{00}"/></p>
@@ -578,11 +579,11 @@ T_{i,j+1}=X_{\mathrm{PB}}T_{i,j}+\frac{1}{2p}\left(iT_{i-1,j}+jT_{i,j-1}\right)+
 <h2>Dipole moment integral<a class="headerlink" href="#dipole-moment-integral" title="Permalink to this headline">¶</a></h2>
 <p>The dipole moment integral is calculated by using the following relations:</p>
 <div class="math">
-<p><img src="_images/math/a3e6313945770142e044983e7f0ba86748d9df99.png" alt="S_{i+1,j}^{e}=X_{\mathrm{PA}}S_{i,j}^{e}+\frac{1}{2p}\left(iS_{i-1,j}^{e}+jS_{i,j-1}^{e}+eS_{ij}^{e-1}\right)
-
-S_{i,j+1}^{e}=X_{\mathrm{PB}}S_{i,j}^{e}+\frac{1}{2p}\left(iS_{i-1,j}^{e}+jS_{i,j-1}^{e}+eS_{ij}^{e-1}\right)
-
-S_{i,j}^{e+1}=X_{\mathrm{PC}}S_{i,j}^{e}+\frac{1}{2p}\left(iS_{i-1,j}^{e}+jS_{i,j-1}^{e}+eS_{ij}^{e-1}\right)"/></p>
+<p><img src="_images/math/22b48da58363c51ae62e49da32894feb0cbaabc6.png" alt="S_{i+1,j}^{e}=X_{\mathrm{PA}}S_{i,j}^{e}+\frac{1}{2p}\left(iS_{i-1,j}^{e}+jS_{i,j-1}^{e}+eS_{ij}^{e-1}\right)"/></p>
+</div><div class="math">
+<p><img src="_images/math/ddafdef32e5fc30bb4a93097fbb604644e0f8cfd.png" alt="S_{i,j+1}^{e}=X_{\mathrm{PB}}S_{i,j}^{e}+\frac{1}{2p}\left(iS_{i-1,j}^{e}+jS_{i,j-1}^{e}+eS_{ij}^{e-1}\right)"/></p>
+</div><div class="math">
+<p><img src="_images/math/fa38a0b45e955741c9089f6d3896354b68306448.png" alt="S_{i,j}^{e+1}=X_{\mathrm{PC}}S_{i,j}^{e}+\frac{1}{2p}\left(iS_{i-1,j}^{e}+jS_{i,j-1}^{e}+eS_{ij}^{e-1}\right)"/></p>
 </div><p>Here e is the order of multipole moment, e=1 is dipole moment.</p>
 <p>FUNCTION:</p>
 <ul class="simple">

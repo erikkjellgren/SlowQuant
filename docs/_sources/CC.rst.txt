@@ -10,53 +10,62 @@ Coupled Cluster Singles Double
 For CCSD the T1 (tia) and T2 (tijab) amplitudes is constructed to calculate the energy. These are constructed by the fisrt creating some intermediates:
 
 .. math::
-   
    F_{ae}=\left(1-\delta_{ae}\right)f_{ae}-\frac{1}{2}\sum_{m}^{occ}f_{me}t_{m}^{a}+\sum_{m,f}^{occ,virt}t_{m}^{f}\left\langle ma\left|\right|fe\right\rangle -\frac{1}{2}\sum_{m,n,f}^{occ,occ,virt}\tilde{\tau}_{mn}^{af}\left\langle mn\left|\right|ef\right\rangle 
-   
+
+.. math::
    F_{mi}=\left(1-\delta_{mi}\right)f_{mi}+\frac{1}{2}\sum_{e}^{virt}t_{i}^{e}f_{me}+\sum_{e,n}^{virt,occ}\left\langle mn\left|\right|ie\right\rangle +\frac{1}{2}\sum_{n,e,f}^{occ,virt,virt}\tilde{\tau}_{in}^{ef}\left\langle mn\left|\right|ef\right\rangle 
    
+.. math::
    F_{me}=f_{me}+\sum_{n,f}^{occ,virt}t_{n}^{f}\left\langle mn\left|\right|ef\right\rangle 
    
+.. math::
    W_{mnij}=\left\langle mn\left|\right|ij\right\rangle +P_{-}\left(ij\right)\sum_{e}^{virt}t_{j}^{e}\left\langle mn\left|\right|ie\right\rangle +\frac{1}{4}\sum_{e,f}^{virt,virt}\tau_{ij}^{ef}\left\langle mn\left|\right|ef\right\rangle 
    
+.. math::
    W_{abef}=\left\langle ab\left|\right|ef\right\rangle -P_{-}\left(ab\right)\sum_{m}^{occ}t_{m}^{b}\left\langle ma\left|\right|ef\right\rangle +\frac{1}{4}\sum_{m,n}^{occ,occ}\tau_{mn}^{ab}\left\langle mn\left|\right|ef\right\rangle 
    
+.. math::
    W_{mbej}=\left\langle mb\left|\right|ej\right\rangle +\sum_{f}^{virt}\left\langle mb\left|\right|ef\right\rangle -\sum_{n}^{occ}t_{n}^{b}\left\langle mn\left|\right|ej\right\rangle -\sum_{n,f}^{occ,virt}\left(\frac{1}{2}t_{jn}^{fb}+t_{j}^{f}t_{n}^{b}\right)\left\langle mn\left|\right|ef\right\rangle 
    
 In the above equations the following definitions is used:
 
 .. math::
-   
    \tilde{\tau}_{ij}^{ab}=t_{ij}^{ab}+\frac{1}{2}\left(t_{i}^{a}t_{j}^{b}-t_{i}^{b}t_{j}^{a}\right)
-   
+
+.. math::
    \tau=t_{ij}^{ab}+t_{i}^{a}t_{j}^{b}-t_{i}^{b}t_{j}^{a}
    
+.. math::
    P_{-}\left(ij\right)=1-P\left(ij\right)
 
 The T1 and T2 is the constructed as:
 
 .. math::
+   t_{i}^{a}D_{i}^{a}=f_{ia}+\sum_{e}^{occ}t_{i}^{e}F_{ae}-\sum_{m}^{occ}t_{m}^{a}F_{mi}+\sum_{m,e}^{occ,virt}t_{im}^{ae}F_{me}
    
-   t_{i}^{a}D_{i}^{a}=f_{ia}+\sum_{e}^{occ}t_{i}^{e}F_{ae}-\sum_{m}^{occ}t_{m}^{a}F_{mi}+\sum_{m,e}^{occ,virt}t_{im}^{ae}F_{me}-\sum_{n,f}^{occ,virt}t_{n}^{f}\left\langle na\left|\right|if\right\rangle -\frac{1}{2}\sum_{m,e,f}^{occ,virt,virt}t_{im}^{ef}\left\langle ma\left|\right|ef\right\rangle -\frac{1}{2}\sum_{m,e,n}^{occ,virt,occ}t_{mn}^{ae}\left\langle mn\left|\right|ei\right\rangle 
+   -\sum_{n,f}^{occ,virt}t_{n}^{f}\left\langle na\left|\right|if\right\rangle -\frac{1}{2}\sum_{m,e,f}^{occ,virt,virt}t_{im}^{ef}\left\langle ma\left|\right|ef\right\rangle -\frac{1}{2}\sum_{m,e,n}^{occ,virt,occ}t_{mn}^{ae}\left\langle mn\left|\right|ei\right\rangle 
    
-   t_{ij}^{ab}D_{ij}^{ab}=\left\langle ij\left|\right|ab\right\rangle +P_{-}\left(ab\right)\sum_{e}^{virt}t_{ij}^{ae}\left(F_{be}-\frac{1}{2}\sum_{m}^{occ}t_{m}^{b}F_{me}\right)-P_{-}\left(ij\right)\sum_{m}^{occ}t_{im}^{ab}\left(F_{mj}+\frac{1}{2}\sum_{e}^{virt}t_{j}^{e}F_{me}\right)+\frac{1}{2}\sum_{m,n}^{occ,occ}\tau_{mn}^{ab}W_{mnij}
+.. math::
+   t_{ij}^{ab}D_{ij}^{ab}=\left\langle ij\left|\right|ab\right\rangle +P_{-}\left(ab\right)\sum_{e}^{virt}t_{ij}^{ae}\left(F_{be}-\frac{1}{2}\sum_{m}^{occ}t_{m}^{b}F_{me}\right)-P_{-}\left(ij\right)\sum_{m}^{occ}t_{im}^{ab}\left(F_{mj}
    
-   +\frac{1}{2}\sum_{e,f}^{virt,virt}\tau_{ij}^{ef}W_{abef}+P_{-}\left(ij\right)P_{-}\left(ab\right)\sum_{m,e}^{occ,virt}\left(t_{im}^{ae}W_{mbej}-t_{i}^{e}t_{m}^{a}\left\langle mb\left|\right|ej\right\rangle \right)+P_{-}\left(ij\right)\sum_{e}^{virt}t_{i}^{e}\left\langle ab\left|\right|ej\right\rangle -P_{-}\left(ab\right)\sum_{m}^{occ}t_{m}^{a}\left\langle mb\left|\right|ij\right\rangle 
+   +\frac{1}{2}\sum_{e}^{virt}t_{j}^{e}F_{me}\right)+\frac{1}{2}\sum_{m,n}^{occ,occ}\tau_{mn}^{ab}W_{mnij}+\frac{1}{2}\sum_{e,f}^{virt,virt}\tau_{ij}^{ef}W_{abef}+P_{-}\left(ij\right)P_{-}\left(ab\right)\sum_{m,e}^{occ,virt}\left(t_{im}^{ae}W_{mbej}-t_{i}^{e}t_{m}^{a}\left\langle mb\left|\right|ej\right\rangle \right)
+   
+   +P_{-}\left(ij\right)\sum_{e}^{virt}t_{i}^{e}\left\langle ab\left|\right|ej\right\rangle -P_{-}\left(ab\right)\sum_{m}^{occ}t_{m}^{a}\left\langle mb\left|\right|ij\right\rangle 
 
 Here:
 
 .. math::
-
    D_{i}^{a}=f_{ii}-f_{aa}
-   
+ 
+.. math::
    D_{ij}^{ab}=f_{ii}+f_{jj}-f_{aa}-f_{bb}
 
 It can be noted that the T1 and T2 equations depends on T1 and T2. Thus it have to be solver iteratively. The initial guess is given as:
 
 .. math::
-   
    t_{i}^{a}=0
    
+.. math::
    t_{ij}^{ab}=\frac{\left\langle ij\left|\right|ab\right\rangle }{D_{ij}^{ab}}
 
 The CCSD energy is then found as:
@@ -105,9 +114,9 @@ And the connected is found as:
 In the above equations the following definitions is used:
 
 .. math::
-   
    D_{ijk}^{abc}=f_{ii}+f_{jj}+f_{kk}-f_{aa}-f_{bb}-f_{cc}
-   
+
+.. math::
    P\left(i/jk\right)f\left(i,j,k\right)=f\left(i,j,k\right)-f\left(j,i,k\right)-f\left(k,j,i\right)
 
 The energy correction can now be found as:

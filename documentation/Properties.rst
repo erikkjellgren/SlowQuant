@@ -103,6 +103,7 @@ with the elements given as:
 .. math::
    A_{ia,jb}=f_{ab}\delta_{ij}-f_{ij}\delta_{ab}+\left\langle aj\left|\right|ib\right\rangle 
    
+.. math::
    B_{ia,jb}=\left\langle ab\left|\right|ij\right\rangle 
   
 All of the elements are in spin basis.

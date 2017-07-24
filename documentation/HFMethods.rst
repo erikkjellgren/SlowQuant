@@ -58,6 +58,7 @@ The above SCF procedure will is stopped at certain tresholds. The change in ener
 .. math::
    \Delta E_{n}=E_{n,\mathrm{elec}}-E_{n-1,\mathrm{elec}}
 
+.. math::
    \mathrm{RMSD}_{n}=\sqrt{\sum_{ij}D_{n,ij}-D_{n-1,ij}}
 
 FUNCTION:
@@ -134,6 +135,7 @@ In unrestricted Hartree-Fock for a closed shell system the spin-symmetry needs t
 .. math::
    C_{i,\mathrm{HOMO}}^{\mathrm{new}}=\frac{1}{\sqrt{1+k^{2}}}\left(C_{i,\mathrm{HOMO}}^{\mathrm{old}}+kC_{i,\mathrm{LUMO}}^{\mathrm{old}}\right)
 
+.. math::
    C_{i,\mathrm{LUMO}}^{\mathrm{new}}=\frac{1}{\sqrt{1+k^{2}}}\left(-kC_{i,\mathrm{HOMO}}^{\mathrm{old}}+C_{i,\mathrm{LUMO}}^{\mathrm{old}}\right)
 
 

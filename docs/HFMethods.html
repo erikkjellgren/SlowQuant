@@ -91,6 +91,7 @@
             
               <p class="caption"><span class="caption-text">How to use</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation and Running</a></li>
 <li class="toctree-l1"><a class="reference internal" href="keywords.html">List of keywords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Examples.html">Example input files</a></li>
 <li class="toctree-l1"><a class="reference internal" href="issues.html">Issues</a></li>
@@ -209,9 +210,9 @@
 <p><img src="_images/math/38954efab5bf39a913efe8b8e8e493839abe9722.png" alt="E_{n,\mathrm{elec}}=\sum_{ij}^{\mathrm{AO}}D_{0,ij}\left(H_{ij}^{\mathrm{core}}+F_{n,ij}\right)"/></p>
 </div><p>The above SCF procedure will is stopped at certain tresholds. The change in energy and the RMSD of the density matrix can be found as:</p>
 <div class="math">
-<p><img src="_images/math/f7c659aab99c8cdb956bc576def0a9fbd9710dc4.png" alt="\Delta E_{n}=E_{n,\mathrm{elec}}-E_{n-1,\mathrm{elec}}
-
-\mathrm{RMSD}_{n}=\sqrt{\sum_{ij}D_{n,ij}-D_{n-1,ij}}"/></p>
+<p><img src="_images/math/177400a4de83138c01737efb55c06e2393d0d8e6.png" alt="\Delta E_{n}=E_{n,\mathrm{elec}}-E_{n-1,\mathrm{elec}}"/></p>
+</div><div class="math">
+<p><img src="_images/math/2b4930310392442308a1f4bb2b75e435eaa75879.png" alt="\mathrm{RMSD}_{n}=\sqrt{\sum_{ij}D_{n,ij}-D_{n-1,ij}}"/></p>
 </div><p>FUNCTION:</p>
 <ul class="simple">
 <li>HartreeFock.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results, print_SCF=’Yes’)</li>
@@ -280,9 +281,9 @@
 </ul>
 <p>In unrestricted Hartree-Fock for a closed shell system the spin-symmetry needs to be broken else restricted Hartree-Fock is restored. This is done by the following method, after the first MO coefficients have been made:</p>
 <div class="math">
-<p><img src="_images/math/5bac5a4a27ce7ba7c29f36f7fc64d1fb55409217.png" alt="C_{i,\mathrm{HOMO}}^{\mathrm{new}}=\frac{1}{\sqrt{1+k^{2}}}\left(C_{i,\mathrm{HOMO}}^{\mathrm{old}}+kC_{i,\mathrm{LUMO}}^{\mathrm{old}}\right)
-
-C_{i,\mathrm{LUMO}}^{\mathrm{new}}=\frac{1}{\sqrt{1+k^{2}}}\left(-kC_{i,\mathrm{HOMO}}^{\mathrm{old}}+C_{i,\mathrm{LUMO}}^{\mathrm{old}}\right)"/></p>
+<p><img src="_images/math/fdb3cf5b74d2894e76ab30132f2803a95de0c9bf.png" alt="C_{i,\mathrm{HOMO}}^{\mathrm{new}}=\frac{1}{\sqrt{1+k^{2}}}\left(C_{i,\mathrm{HOMO}}^{\mathrm{old}}+kC_{i,\mathrm{LUMO}}^{\mathrm{old}}\right)"/></p>
+</div><div class="math">
+<p><img src="_images/math/001a492d808197478b849b7b10beb5d1250c6a99.png" alt="C_{i,\mathrm{LUMO}}^{\mathrm{new}}=\frac{1}{\sqrt{1+k^{2}}}\left(-kC_{i,\mathrm{HOMO}}^{\mathrm{old}}+C_{i,\mathrm{LUMO}}^{\mathrm{old}}\right)"/></p>
 </div></div>
 </div>
 

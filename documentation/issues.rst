@@ -7,10 +7,10 @@ In this section known problems with the code can be found
 General
 -------
 
-- MolecularIntegrals.py is a mess
 - Code in general is a gigantic mess
 - Numerical methods makes code none module like
 - No checking of input files at all at any stages of the code
+- Basisset object has a bad structure
 
 Need testing
 ------------
@@ -23,3 +23,4 @@ Broken
 ------
 
 - Self overlap integrals is non-one for contracted  basisfunctions
+- No check for singularity in DIIS, H2/STO3G breaks the code if used with DIIS
