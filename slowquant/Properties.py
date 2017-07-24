@@ -3,9 +3,8 @@ import math
 from slowquant import runMolecularIntegrals as MI
 import scipy.linalg
 
-def MulCharge(basis, input, D):
+def MulCharge(basis, input, D, S):
     #Loading overlap integrals
-    S = np.load('slowquant/temp/overlap.npy')
     D = 2*D
     
     DS = np.dot(D,S)
@@ -14,7 +13,7 @@ def MulCharge(basis, input, D):
     output.write('Mulliken Charges \n')
     for i in range(1, len(input)):
         q = 0
-        for j in range(len(basis)):
+        for j in range(len(S)):
             if basis[j][6] == i:
                 mu = basis[j][0]-1
                 q += DS[mu,mu]
@@ -23,10 +22,10 @@ def MulCharge(basis, input, D):
         output.write("{: 10.8f}".format(q))
         output.write('\n')
     output.close()
+    
 
-def LowdinCharge(basis, input, D):
+def LowdinCharge(basis, input, D, S):
     #Loading overlap integrals
-    S = np.load('slowquant/temp/overlap.npy')
     D = 2*D
     
     output = open('out.txt', 'a')
@@ -48,7 +47,8 @@ def LowdinCharge(basis, input, D):
         output.write('\n')
     output.close()
 
-def dipolemoment(basis, input, D, results):
+
+def dipolemoment(input, D, mux, muy, muz):
     nucx = []
     nucy = []
     nucz = []
@@ -56,10 +56,6 @@ def dipolemoment(basis, input, D, results):
         nucx.append(input[i,1])
         nucy.append(input[i,2])
         nucz.append(input[i,3])
-    
-    mux = np.load('slowquant/temp/mux.npy')
-    muy = np.load('slowquant/temp/muy.npy')
-    muz = np.load('slowquant/temp/muz.npy')
     
     ux = 0
     for i in range(0, len(D)):
@@ -100,11 +96,6 @@ def dipolemoment(basis, input, D, results):
     
     u = math.sqrt(ux**2+uy**2+uz**2)
     
-    results['dipolex'] = ux
-    results['dipoley'] = uy
-    results['dipolez'] = uz
-    results['dipoletot'] = u
-    
     output = open('out.txt', 'a')
     output.write('\n \nMolecular dipole moment \n')
     output.write('X \t \t')
@@ -117,12 +108,10 @@ def dipolemoment(basis, input, D, results):
     output.write("{: 10.8f}".format(u))
     output.close()
     
-    return results
+    return ux, uy, uz, u
+ 
     
-def RPA(F, C, input, results):
-    # Load in spin MO integrals
-    VeeMOspin = np.load('slowquant/temp/twointMOspin.npy')
-    
+def RPA(occ, F, C, VeeMOspin):
     # Make the spin MO fock matrix
     Fspin = np.zeros((len(F)*2,len(F)*2))
     Cspin = np.zeros((len(F)*2,len(F)*2))
@@ -134,7 +123,6 @@ def RPA(F, C, input, results):
 
 
     #Construct hamiltonian
-    occ = int(input[0,0])
     A = np.zeros((occ*(len(Fspin)-occ),occ*(len(Fspin)-occ)))
     B = np.zeros((occ*(len(Fspin)-occ),occ*(len(Fspin)-occ)))
     jbidx = -1
@@ -167,18 +155,21 @@ def RPA(F, C, input, results):
     output.write('\n \n')
     output.close()
     
-    results['RPA Exc'] = Exc
+    return Exc
 
-    return results
-
-def runprop(basis, input, D, set, results, F, C):
+def runprop(basis, input, set, results):
     if set['Charge'] == 'Mulliken':
-        MulCharge(basis, input, D)
+        MulCharge(basis, input, results['D'], results['S'])
     elif set['Charge'] == 'Lowdin':
-        LowdinCharge(basis, input, D)
+        LowdinCharge(basis, input, results['D'], results['S'])
     if set['Dipole'] == 'Yes':
-        MI.run_dipole_int(basis, input)
-        results = dipolemoment(basis, input, D, results)
+        results = MI.run_dipole_int(basis, input, results)
+        ux, uy, uz, u = dipolemoment(input,results['D'], results['mu_x'], results['mu_y'], results['mu_z'])
+        results['dipolex'] = ux
+        results['dipoley'] = uy
+        results['dipolez'] = uz
+        results['dipoletot'] = u
     if set['Excitation'] == 'RPA':
-        results = RPA(F, C, input, results)
+        Exc = RPA(occ=int(input[0,0]), F=results['F'], C=results['C_MO'], VeeMOspin=results['VeeMOspin'])
+        results['RPA Exc'] = Exc
     return results

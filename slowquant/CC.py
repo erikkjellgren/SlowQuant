@@ -29,13 +29,7 @@ def ttriplecon2(a,b,c,i,j,k,occ,tdouble,Vee):
     return sum
 
 
-def CCSD(F, C, input, results, set):
-    maxiter = int(set['CC Max iterations'])+1
-    deTHR = float(set['CC Energy Threshold'])
-    rmsTHR = float(set['CC RMSD Threshold'])
-    # Load in spin MO integrals
-    VeeMOspin = np.load('slowquant/temp/twointMOspin.npy')
-           
+def CCSD(occ, F, C, VeeMOspin, maxiter, deTHR, rmsTHR, runCCSDT=0):           
     # Make the spin MO fock matrix
     Fspin = np.zeros((len(F)*2,len(F)*2))
     Cspin = np.zeros((len(F)*2,len(F)*2))
@@ -49,7 +43,6 @@ def CCSD(F, C, input, results, set):
     dimension = len(VeeMOspin)
     tsingle = np.zeros((dimension,dimension))
     tdouble = np.zeros((dimension,dimension,dimension,dimension))
-    occ = int(input[0,0])
     EMP2 = 0
     for i in range(0, occ):
         for j in range(0, occ):
@@ -62,7 +55,6 @@ def CCSD(F, C, input, results, set):
     output = open('out.txt', 'a')
     output.write('\nMP2 Energy \t')
     output.write("{: 10.8f}".format(EMP2))
-    results['EMP2'] = EMP2
     
     output.write('\n \n')
     output.write('Iter')
@@ -253,7 +245,7 @@ def CCSD(F, C, input, results, set):
     
     
     output.write('\n \n')
-    if set['CC'] == 'CCSD(T)':
+    if runCCSDT == 1:
         ET = 0
         for i in range(0, occ):
             for j in range(0, occ):
@@ -313,14 +305,24 @@ def CCSD(F, C, input, results, set):
         
         output.write('E(T) \t')
         output.write("{:14.10f}".format(ET))
-        results['E(T)'] = ET
-    
-    
-    output.close()
-    results['ECCSD'] = ECCSD
-    return results
+        
+        output.close()
+        return EMP2, ECCSD, ET
+        
+    else:
+        output.close()
+        return EMP2, ECCSD, ET
 
-def runCC(F, C, input, set, results):
+
+def runCC(input, set, results):
     if set['CC'] == 'CCSD' or set['CC'] == 'CCSD(T)':
-        results = CCSD(F, C, input, results, set)
+        if set['CC'] == 'CCSD(T)':
+            Elist = CCSD(occ=int(input[0,0]), F=results['F'], C=results['C_MO'], VeeMOspin=results['VeeMOspin'], maxiter=int(set['CC Max iterations'])+1, deTHR=float(set['CC Energy Threshold']), rmsTHR=float(set['CC RMSD Threshold']),runCCSDT=1)
+            results['E(T)'] = Elist[2]
+        else:
+            Elist = CCSD(occ=int(input[0,0]), F=results['F'], C=results['C_MO'], VeeMOspin=results['VeeMOspin'], maxiter=int(set['CC Max iterations'])+1, deTHR=float(set['CC Energy Threshold']), rmsTHR=float(set['CC RMSD Threshold']))
+        results['EMP2'] = Elist[0]
+        results['ECCSD'] = Elist[1]
+            
+        
     return results

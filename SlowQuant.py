@@ -42,40 +42,51 @@ def run(inputname, settingsname):
     if set['Initial method'] == 'UHF':
         basis = BS.bassiset(input, set)
         start = time.time()
-        MI.runIntegrals(input, basis, set)
+        results = MI.runIntegrals(input, basis, set, results)
         print(time.time()-start, 'INTEGRALS')
-        C_alpha, F_alpha, D_alpha, C_beta, F_beta, D_beta, results = UHF.HartreeFock(input, set, basis, VNN=np.load('slowquant/temp/enuc.npy'), Te=np.load('slowquant/temp/Ekin.npy'), S=np.load('slowquant/temp/overlap.npy'), VeN=np.load('slowquant/temp/nucatt.npy'), Vee=np.load('slowquant/temp/twoint.npy'), results=results)
+        
+        start = time.time()
+        C_alpha, F_alpha, D_alpha, C_beta, F_beta, D_beta, results = UHF.HartreeFock(input, set, basis, VNN=results['VNN'], Te=results['Te'], S=results['S'], VeN=results['VNe'], Vee=results['Vee'], results=results)
+        print(time.time()-start, 'UHF')
 
     elif set['GeoOpt'] == 'Yes':
         input, results = GO.runGO(input, set, results)
     
     if set['Initial method'] == 'HF':
         basis = BS.bassiset(input, set)
+        
         start = time.time()
-        MI.runIntegrals(input, basis, set)
+        results = MI.runIntegrals(input, basis, set, results)
         print(time.time()-start, 'INTEGRALS')
+        
         start = time.time()
-        CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('slowquant/temp/enuc.npy'), Te=np.load('slowquant/temp/Ekin.npy'), S=np.load('slowquant/temp/overlap.npy'), VeN=np.load('slowquant/temp/nucatt.npy'), Vee=np.load('slowquant/temp/twoint.npy'), results=results)
+        results = HF.HartreeFock(input, set, basis, VNN=results['VNN'], Te=results['Te'], S=results['S'], VeN=results['VNe'], Vee=results['Vee'], results=results)
         print(time.time()-start, 'HF')
+        
         start = time.time()
-        utilF.runTransform(CMO, basis, set, FAO)
+        results = utilF.runTransform(set, results)
         print(time.time()-start, 'MO transform')
+        
         start = time.time()
-        results = prop.runprop(basis, input, D, set, results, FAO, CMO)
+        results = prop.runprop(basis, input, set, results)
         print(time.time()-start, 'PROPERTIES')
+        
         start = time.time()
-        results = MP.runMPn(basis, input, FAO, CMO, set, results)
+        results = MP.runMPn(input, results, set)
         print(time.time()-start, 'Perturbation')
+        
         start = time.time()
-        QF.runQfit(basis, input, D, set, results)
+        results = QF.runQfit(basis, input, set, results)
         print(time.time()-start, 'QFIT')
+        
         start = time.time()
-        CI.runCI(FAO, CMO, input, set, results)
+        results = CI.runCI(set, results, input)
         print(time.time()-start, 'CI')
+        
         start = time.time()
-        CC.runCC(FAO, CMO, input, set, results)
+        results = CC.runCC(input, set, results)
         print(time.time()-start, 'CC')
-    
+        
     return results
 
     

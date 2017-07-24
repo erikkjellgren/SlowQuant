@@ -5,11 +5,11 @@ from slowquant.molecularintegrals.MolecularIntegrals import E, Overlap, Kin, eln
 from slowquant.molecularintegrals.MIcython import elelrep, runR
 
 ##CALC OF INTEGRALS
-def runIntegrals(input, basis, settings):
+def runIntegrals(input, basis, settings, results):
     # Nuclear-nuclear repulsion
     VNN = np.zeros(1)
     VNN[0] = nucrep(input)
-    np.save('slowquant/temp/enuc.npy',VNN)
+    results['VNN'] = VNN
     #END OF nuclear-nuclear repulsion
     
     # Precalul1tions
@@ -73,9 +73,10 @@ def runIntegrals(input, basis, settings):
                 S[l,k]  = calc3
                 T[k,l]  = calc2
                 T[l,k]  = calc2
-    np.save('slowquant/temp/nucatt.npy',Na)
-    np.save('slowquant/temp/overlap.npy',S)
-    np.save('slowquant/temp/Ekin.npy',T)
+    
+    results['VNe'] = Na
+    results['S'] = S
+    results['Te'] = T
     print(time.time()-start, 'One electron integral')
     #END OF one electron integrals
     
@@ -215,13 +216,14 @@ def runIntegrals(input, basis, settings):
                                 ERI[sig,l1m,mu,nu] = calc
                                 ERI[l1m,sig,nu,mu] = calc
                                 ERI[sig,l1m,nu,mu] = calc
-
-    np.save('slowquant/temp/twoint.npy',ERI)
+    
+    results['Vee'] = ERI
     print(time.time()-start, 'ERI')
+    return results
     #END OF two electron integrals
 
     
-def run_dipole_int(basis, input):
+def run_dipole_int(basis, input, results):
     X = np.zeros((len(basis),len(basis)))
     Y = np.zeros((len(basis),len(basis)))
     Z = np.zeros((len(basis),len(basis)))
@@ -247,9 +249,11 @@ def run_dipole_int(basis, input):
                 Y[l,k] = calcy
                 Z[k,l] = calcz
                 Z[l,k] = calcz
-    np.save('slowquant/temp/mux.npy',X)
-    np.save('slowquant/temp/muy.npy',Y)
-    np.save('slowquant/temp/muz.npy',Z)
+    
+    results['mu_x'] = X
+    results['mu_y'] = Y
+    results['mu_z'] = Z
+    return results
 
 def runQMESP(basis, input, rcx, rcy ,rcz):
     # Set up indexes for integrals
@@ -292,7 +296,7 @@ def runQMESP(basis, input, rcx, rcy ,rcz):
         
     return Ve
 
-def rungeometric_derivatives(input, basis):
+def rungeometric_derivatives(input, basis, results):
     # Calcul1ting the norm1lization of the derivatives. For now only used in ERI
     Nxplus  = copy.deepcopy(basis)
     Nxminus = copy.deepcopy(basis)
@@ -328,15 +332,15 @@ def rungeometric_derivatives(input, basis):
         # Nuclear-nuclear repulsion
         VNN = np.zeros(1)
         VNN[0] = nucdiff(input, atomidx, 1)
-        np.save('slowquant/temp/'+str(atomidx)+'dxenuc.npy',VNN)
+        results[str(atomidx)+'dxVNN'] = VNN
         
         VNN = np.zeros(1)
         VNN[0] = nucdiff(input, atomidx, 2)
-        np.save('slowquant/temp/'+str(atomidx)+'dyenuc.npy',VNN)
+        results[str(atomidx)+'dyVNN'] = VNN
         
         VNN = np.zeros(1)
         VNN[0] = nucdiff(input, atomidx, 3)
-        np.save('slowquant/temp/'+str(atomidx)+'dzenuc.npy',VNN)
+        results[str(atomidx)+'dzVNN'] = VNN
         #END OF nuclear-nuclear repulsion
         
         # Two electron integrals x diff
@@ -605,9 +609,9 @@ def rungeometric_derivatives(input, basis):
                                 ERIz[sig,l1m,mu,nu] = calcz
                                 ERIz[l1m,sig,nu,mu] = calcz
                                 ERIz[sig,l1m,nu,mu] = calcz
-        np.save('slowquant/temp/'+str(atomidx)+'dxtwoint.npy',ERIx)
-        np.save('slowquant/temp/'+str(atomidx)+'dytwoint.npy',ERIy)
-        np.save('slowquant/temp/'+str(atomidx)+'dztwoint.npy',ERIz)
+        results[str(atomidx)+'dxVee'] = ERIx
+        results[str(atomidx)+'dyVee'] = ERIy
+        results[str(atomidx)+'dzVee'] = ERIz
         print(time.time()-start, 'ERI diff: atom'+str(atomidx))
         #END OF two electron integrals x diff
         
@@ -923,16 +927,18 @@ def rungeometric_derivatives(input, basis):
                     VNeyarr[l,k] = VNey
                     VNezarr[k,l] = VNez
                     VNezarr[l,k] = VNez
-        np.save('slowquant/temp/'+str(atomidx)+'dxoverlap.npy',Sxarr)
-        np.save('slowquant/temp/'+str(atomidx)+'dyoverlap.npy',Syarr)
-        np.save('slowquant/temp/'+str(atomidx)+'dzoverlap.npy',Szarr)
-        np.save('slowquant/temp/'+str(atomidx)+'dxEkin.npy',Txarr)
-        np.save('slowquant/temp/'+str(atomidx)+'dyEkin.npy',Tyarr)
-        np.save('slowquant/temp/'+str(atomidx)+'dzEkin.npy',Tzarr)
-        np.save('slowquant/temp/'+str(atomidx)+'dxnucatt.npy',VNexarr)
-        np.save('slowquant/temp/'+str(atomidx)+'dynucatt.npy',VNeyarr)
-        np.save('slowquant/temp/'+str(atomidx)+'dznucatt.npy',VNezarr)
+        results[str(atomidx)+'dxS'] = Sxarr
+        results[str(atomidx)+'dyS'] = Syarr
+        results[str(atomidx)+'dzS'] = Szarr
+        results[str(atomidx)+'dxTe'] = Txarr
+        results[str(atomidx)+'dyTe'] = Tyarr
+        results[str(atomidx)+'dzTe'] = Tzarr
+        results[str(atomidx)+'dxVNe'] = VNexarr
+        results[str(atomidx)+'dyVNe'] = VNeyarr
+        results[str(atomidx)+'dzVNe'] = VNezarr
         print(time.time()-start, 'One electron integral diff atom: '+str(atomidx))
+        
+    return results
         #END OF one electron integrals
         
 

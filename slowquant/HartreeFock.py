@@ -138,5 +138,8 @@ def HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results, print_SCF='Yes
         output.write('\n \n')
         output.close()
     results['HFenergy'] = Eel+VNN[0]
+    results['C_MO']     = C
+    results['F']        = F
+    results['D']        = D
     
-    return C, F, D, results
+    return results

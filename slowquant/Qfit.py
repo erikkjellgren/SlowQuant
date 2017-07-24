@@ -467,9 +467,10 @@ def potentialPBD(V, input):
     f.close()
     
 
-def runQfit(basis, input, D, set, results):
+def runQfit(basis, input, set, results):
     if set['Multipolefit'] == 'Charge':
-        chrfit(basis, input, D, set, results)
+        chrfit(basis, input, results['D'], set, results)
     if set['Multipolefit'] == 'Dipole':
-        dipolefit(basis, input, D, set, results)
+        dipolefit(basis, input, results['D'], set, results)
+    return results
         

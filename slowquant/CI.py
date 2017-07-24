@@ -1,9 +1,6 @@
 import numpy as np
 
-def CIS(F, C, input, results):
-    # Load in spin MO integrals
-    VeeMOspin = np.load('slowquant/temp/twointMOspin.npy')
-    
+def CIS(occ, F, C, VeeMOspin):
     # Make the spin MO fock matrix
     Fspin = np.zeros((len(F)*2,len(F)*2))
     Cspin = np.zeros((len(F)*2,len(F)*2))
@@ -15,7 +12,6 @@ def CIS(F, C, input, results):
 
 
     #Construct hamiltonian
-    occ = int(input[0,0])
     H = np.zeros((occ*(len(Fspin)-occ),occ*(len(Fspin)-occ)))
     jbidx = -1
     for j in range(0, occ):
@@ -45,12 +41,11 @@ def CIS(F, C, input, results):
     output.write('\n \n')
     output.close()
     
-    results['CIS Exc'] = Exc
-    return results
+    return Exc
 
 
-def runCI(F, C, input, set, results):
+def runCI(set, results, input):
     if set['CI'] == 'CIS':
-        results = CIS(F, C, input, results)
-    
+        Exc = CIS(occ=int(input[0,0]), F=results['F'], C=results['C_MO'], VeeMOspin=results['VeeMOspin'])
+        results['CIS Exc'] = Exc
     return results

@@ -4,25 +4,23 @@ import numpy as np
 def doublebar(i,j,k,l, Vee):
     return Vee[i,j,k,l] - Vee[i,j,l,k]
 
+
 def Dir2Mul(p,q,r,s, Vee):
     #Dirac to Mulliken notation
     return Vee[p,r,q,s]
     
 
-def MP2(basis, input, F, C, results):
+def MP2(occ, F, C, VeeMO):
     #Get MO orbital energies
     CT = np.transpose(C)
     eps = np.dot(np.dot(CT, F),C)
 
-    #Loading two electron integrals
-    VeeMO = np.load('slowquant/temp/twointMO.npy')
-
     #Calc EMP2
     EMP2 = 0
-    for i in range(0, int(input[0][0]/2)):
-        for a in range(int(input[0][0]/2), len(basis)):
-            for j in range(0, int(input[0][0]/2)):
-                for b in range(int(input[0][0]/2), len(basis)):
+    for i in range(0, occ):
+        for a in range(occ, len(F)):
+            for j in range(0, occ):
+                for b in range(occ, len(F)):
                     EMP2 += VeeMO[i,a,j,b]*(2*VeeMO[i,a,j,b]-VeeMO[i,b,j,a])/(eps[i, i] + eps[j, j] -eps[a, a] -eps[b, b])
 
     output = open('out.txt', 'a')
@@ -31,13 +29,10 @@ def MP2(basis, input, F, C, results):
     output.write("{: 10.8f}".format(EMP2))
     output.close()
 
-    results['EMP2'] = EMP2
-    return results
+    return EMP2
 
-def MP3(basis, input, F, C, results):
-    # Load in spin MO integrals
-    VeeMOspin = np.load('slowquant/temp/twointMOspin.npy')
-    
+
+def MP3(occ, F, C, VeeMOspin):
     # Make the spin MO fock matrix
     Fspin = np.zeros((len(F)*2,len(F)*2))
     Cspin = np.zeros((len(F)*2,len(F)*2))
@@ -48,7 +43,6 @@ def MP3(basis, input, F, C, results):
     FMOspin = np.dot(np.transpose(Cspin),np.dot(Fspin,Cspin))
 
     #Calc EMP3
-    occ = int(input[0][0])
     Epart1 = 0
     for a in range(0, occ):
         for b in range(0, occ):
@@ -82,17 +76,14 @@ def MP3(basis, input, F, C, results):
     output.write('MP3 Energy \t')
     output.write("{: 10.8f}".format(EMP3))
     output.close()
+
+    return EMP3
     
-    results['EMP3'] = EMP3
-    return results
     
-def DCPT2(basis, input, F, C, results):
+def DCPT2(occ, F, C, VeeMO):
     #Get MO orbital energies
     CT = np.transpose(C)
     eps = np.dot(np.dot(CT, F),C)
-
-    #Loading two electron integrals
-    VeeMO = np.load('slowquant/temp/twointMO.npy')
     
     #Calc DCPT2 energy
     Epart1 = 0
@@ -114,15 +105,17 @@ def DCPT2(basis, input, F, C, results):
     output.write("{: 10.8f}".format(EDCPT2))
     output.close()
     
-    results['EDCPT2'] = EDCPT2
-    return results
+    return EDCPT2
     
 
-def runMPn(basis, input, F, C, set, results):
+def runMPn(input, results, set):
     if set['MPn'] == 'MP2' or set['MPn'] == 'MP3':
-        results = MP2(basis, input, F, C, results)
+        EMP2 = MP2(occ=int(input[0][0]/2), F=results['F'], C=results['C_MO'], VeeMO=results['VeeMO'])
+        results['EMP2'] = EMP2
     if set['MPn'] == 'MP3':
-        results = MP3(basis, input, F, C, results)
+        EMP3 = MP3(occ=int(input[0][0]), F=results['F'], C=results['C_MO'], VeeMOspin=results['VeeMOspin'])
+        results['EMP3'] = EMP3
     elif set['MPn'] == 'DCPT2':
-        results = DCPT2(basis, input, F, C, results)
+        EDCPT2 = DCPT2(occ=int(input[0][0]/2), F=results['F'], C=results['C_MO'], VeeMO=results['VeeMO'])
+        results['EDCPT2'] = EDCPT2
     return results

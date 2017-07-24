@@ -80,7 +80,8 @@ def test_HartreeFock1():
     Dcheck   = np.genfromtxt('testfiles/dH2O_STO3G.csv',delimiter=';')
     basis    = BS.bassiset(input, set)
     results  = {}
-    CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results)
+    results = HF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results)
+    D = results['D']
     for i in range(0, len(D)):
         for j in range(0, len(D)):
             assert abs(Dcheck[i,j] - D[i,j]) < 10**-7
@@ -101,7 +102,8 @@ def test_HartreeFock2():
     Dcheck   = np.genfromtxt('testfiles/dCH4_STO3G.csv',delimiter=';')
     basis    = BS.bassiset(input, set)
     results  = {}
-    CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results=results)
+    results = HF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results)
+    D = results['D']
     for i in range(0, len(D)):
         for j in range(0, len(D)):
             assert abs(Dcheck[i,j] - D[i,j]) < 10**-7
@@ -122,7 +124,8 @@ def test_HartreeFock3():
     Dcheck   = np.genfromtxt('testfiles/dH2O_DZ.csv',delimiter=';')
     basis    = BS.bassiset(input, set)
     results  = {}
-    CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results=results)
+    results = HF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results)
+    D = results['D']
     for i in range(0, len(D)):
         for j in range(0, len(D)):
             assert abs(Dcheck[i,j] - D[i,j]) < 10**-7
@@ -137,12 +140,11 @@ def test_MP2_1():
     results  = {}
     input    = np.genfromtxt('testfiles/inputCH4.csv', delimiter=';')
     basis    = BS.bassiset(input, set)
-    F        = np.load('testfiles/faoCH4_STO3G.npy')
-    C        = np.load('testfiles/cmoCH4_STO3G.npy')
-    A = np.load('testfiles/twointCH4_STO3G.npy')
-    np.save('slowquant/temp/twoint.npy', A)
-    UF.TransformMO(C, basis, set)
-    calc = MP.MP2(basis, input, F, C, results)['EMP2']
+    results['F']        = np.load('testfiles/faoCH4_STO3G.npy')
+    results['C_MO']     = np.load('testfiles/cmoCH4_STO3G.npy')
+    results['Vee']      = np.load('testfiles/twointCH4_STO3G.npy')
+    results = UF.runTransform(set, results)
+    calc = MP.MP2(occ=int(input[0][0]/2), F=results['F'], C=results['C_MO'], VeeMO=results['VeeMO'])
     check = -0.056046676165
     assert abs(calc - check) < 10**-7
 
@@ -157,12 +159,11 @@ def test_MP2_2():
     input    = np.genfromtxt('testfiles/inputH2O.csv', delimiter=';')
     basis    = BS.bassiset(input, set)
     results  = {}
-    F        = np.load('testfiles/faoH2O_DZ.npy')
-    C        = np.load('testfiles/cmoH2O_DZ.npy')
-    A = np.load('testfiles/twointH2O_DZ.npy')
-    np.save('slowquant/temp/twoint.npy', A)
-    UF.TransformMO(C, basis, set)
-    calc = MP.MP2(basis, input, F, C, results)['EMP2']
+    results['F']         = np.load('testfiles/faoH2O_DZ.npy')
+    results['C_MO']      = np.load('testfiles/cmoH2O_DZ.npy')
+    results['Vee']       = np.load('testfiles/twointH2O_DZ.npy')
+    results = UF.runTransform(set, results)
+    calc = MP.MP2(occ=int(input[0][0]/2), F=results['F'], C=results['C_MO'], VeeMO=results['VeeMO'])
     check = -0.152709879075
     assert abs(calc - check) < 10**-7
 
@@ -171,16 +172,17 @@ def test_derivative():
     # Tests that a single atom have no geometric gradient
     settings = np.genfromtxt('slowquant/Standardsettings.csv', delimiter = ';', dtype='str')
     set = {}
+    results = {}
     for i in range(len(settings)):
         set.update({settings[i][0]:settings[i][1]})
     input = np.array([[8, 0, 0, 0],[8, 0.0, 0.0, 0.0]])
     basis = BS.bassiset(input, set)
-    MI.rungeometric_derivatives(input, basis)
-    VNe = np.load('slowquant/temp/1dynucatt.npy')
-    S   = np.load('slowquant/temp/1dyoverlap.npy')
-    Te  = np.load('slowquant/temp/1dyEkin.npy')
-    VNN = np.load('slowquant/temp/1dyenuc.npy')
-    ERI = np.load('slowquant/temp/1dytwoint.npy')
+    results = MI.rungeometric_derivatives(input, basis, results)
+    VNe = results['1dyVNe']
+    S   = results['1dyS']
+    Te  = results['1dyTe']
+    VNN = results['1dyVNN']
+    ERI = results['1dyVee']
     
     assert np.max(np.abs(ERI)) < 10**-12
     assert np.max(np.abs(VNN)) < 10**-12
@@ -230,45 +232,45 @@ def test_qfit():
         
         
 def test_geoopt():
-    HFrun.run('testfiles/H2.csv','testfiles/settingsGEO.csv')
+    results = HFrun.run('testfiles/H2.csv','testfiles/settingsGEO.csv')
     e = 0.000001
     dp = np.load('testfiles/enucp.npy')
     dm = np.load('testfiles/enucm.npy')
-    dS = np.load('slowquant/temp/1dxenuc.npy')
+    dS = results['1dxVNN']
     dnS = (dp-dm)/(2*e)
     assert np.max(np.abs(dS-dnS)) < 10**-9
     
     e = 0.000001
     dp = np.load('testfiles/overlapp.npy')
     dm = np.load('testfiles/overlapm.npy')
-    dS = np.load('slowquant/temp/1dxoverlap.npy')
+    dS = dS = results['1dxS']
     dnS = (dp-dm)/(2*e)
     assert np.max(np.abs(dS-dnS)) < 10**-9
     
     e = 0.000001
     dp = np.load('testfiles/Ekinp.npy')
     dm = np.load('testfiles/Ekinm.npy')
-    dS = np.load('slowquant/temp/1dxEkin.npy')
+    dS = dS = results['1dxTe']
     dnS = (dp-dm)/(2*e)
     assert np.max(np.abs(dS-dnS)) < 10**-9
     
     e = 0.000001
     dp = np.load('testfiles/nucattp.npy')
     dm = np.load('testfiles/nucattm.npy')
-    dS = np.load('slowquant/temp/1dxnucatt.npy')
+    dS = results['1dxVNe']
     dnS = (dp-dm)/(2*e)
     assert np.max(np.abs(dS-dnS)) < 10**-9
     
     e = 0.000001
     dp = np.load('testfiles/twointp.npy')
     dm = np.load('testfiles/twointm.npy')
-    dS = np.load('slowquant/temp/1dxtwoint.npy')
+    dS = results['1dxVee']
     dnS = (dp-dm)/(2*e)
     assert np.max(np.abs(dS-dnS)) < 10**-9
 
 
 def test_UHF():
-    HFrun.run('testfiles/inputH2_UHF.csv','testfiles/settingsUHF.csv')
+    results = HFrun.run('testfiles/inputH2_UHF.csv','testfiles/settingsUHF.csv')
     check = open('testfiles/outUHF.txt','r')
     calc = open('out.txt')
     for line in check:
@@ -313,6 +315,7 @@ def test_RPA():
 
 def test_MP3():
     results = HFrun.run('testfiles/inputH2.csv','testfiles/settingMP3.csv')
+    print(results)
     calc = results['EMP2'] + results['EMP3']
     check = -0.0180
     assert abs(calc - check) < 10**-5

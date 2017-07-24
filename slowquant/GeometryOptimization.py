@@ -7,11 +7,15 @@ def run_analytic(input, set, results):
     maxstep = int(set['Max iteration GeoOpt'])+1
     GeoOptol = float(set['Geometry Tolerance'])
     stepsize = float(set['Gradient Descent Step'])
+    
     for i in range(1, maxstep):
         basis = BS.bassiset(input, set)
-        MI.runIntegrals(input, basis, set)
-        MI.rungeometric_derivatives(input, basis)
-        CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('slowquant/temp/enuc.npy'), Te=np.load('slowquant/temp/Ekin.npy'), S=np.load('slowquant/temp/overlap.npy'), VeN=np.load('slowquant/temp/nucatt.npy'), Vee=np.load('slowquant/temp/twoint.npy'), results=results)
+        results = MI.runIntegrals(input, basis, set, results)
+        results = MI.rungeometric_derivatives(input, basis, results)
+        results = HF.HartreeFock(input, set, basis, VNN=results['VNN'], Te=results['Te'], S=results['S'], VeN=results['VNe'], Vee=results['Vee'], results=results)
+        D = results['D']
+        CMO = results['C_MO']
+        FAO = results['F']
         CTMO = np.transpose(CMO)
         eps = np.dot(np.dot(CTMO, FAO),CMO)
         P = 2*D
@@ -27,25 +31,25 @@ def run_analytic(input, set, results):
         dZ = np.zeros(len(input))
         
         for j in range(1, len(input)):
-            dxenuc = np.load('slowquant/temp/'+str(j)+'dxenuc.npy')
-            dyenuc = np.load('slowquant/temp/'+str(j)+'dyenuc.npy')
-            dzenuc = np.load('slowquant/temp/'+str(j)+'dzenuc.npy')
+            dxenuc = results[str(j)+'dxVNN']
+            dyenuc = results[str(j)+'dyVNN']
+            dzenuc = results[str(j)+'dzVNN']
             
-            dxEkin = np.load('slowquant/temp/'+str(j)+'dxEkin.npy')
-            dyEkin = np.load('slowquant/temp/'+str(j)+'dyEkin.npy')
-            dzEkin = np.load('slowquant/temp/'+str(j)+'dzEkin.npy')
+            dxEkin = results[str(j)+'dxTe']
+            dyEkin = results[str(j)+'dyTe']
+            dzEkin = results[str(j)+'dzTe']
             
-            dxoverlap = np.load('slowquant/temp/'+str(j)+'dxoverlap.npy')
-            dyoverlap = np.load('slowquant/temp/'+str(j)+'dyoverlap.npy')
-            dzoverlap = np.load('slowquant/temp/'+str(j)+'dzoverlap.npy')
+            dxoverlap = results[str(j)+'dxS']
+            dyoverlap = results[str(j)+'dyS']
+            dzoverlap = results[str(j)+'dzS']
             
-            dxnucatt = np.load('slowquant/temp/'+str(j)+'dxnucatt.npy')
-            dynucatt = np.load('slowquant/temp/'+str(j)+'dynucatt.npy')
-            dznucatt = np.load('slowquant/temp/'+str(j)+'dznucatt.npy')
+            dxnucatt = results[str(j)+'dxVNe']
+            dynucatt = results[str(j)+'dyVNe']
+            dznucatt = results[str(j)+'dzVNe']
             
-            dxtwoint = np.load('slowquant/temp/'+str(j)+'dxtwoint.npy')
-            dytwoint = np.load('slowquant/temp/'+str(j)+'dytwoint.npy')
-            dztwoint = np.load('slowquant/temp/'+str(j)+'dztwoint.npy')
+            dxtwoint = results[str(j)+'dxVee']
+            dytwoint = results[str(j)+'dyVee']
+            dztwoint = results[str(j)+'dzVee']
             
             dxHcore = 0
             dyHcore = 0
@@ -117,41 +121,41 @@ def run_numeric(input, set, results):
         for j in range(1, len(input)):
             input[j,1] += 10**-6
             basis = BS.bassiset(input, set)
-            MI.runIntegrals(input, basis, set)
+            results = MI.runIntegrals(input, basis, set, results)
             input[j,1] -= 10**-6
-            CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('slowquant/temp/enuc.npy'), Te=np.load('slowquant/temp/Ekin.npy'), S=np.load('slowquant/temp/overlap.npy'), VeN=np.load('slowquant/temp/nucatt.npy'), Vee=np.load('slowquant/temp/twoint.npy'), results=results, print_SCF='No')
+            results = HF.HartreeFock(input, set, basis, VNN=results['VNN'], Te=results['Te'], S=results['S'], VeN=results['VNe'], Vee=results['Vee'], results=results)
             xplus = results['HFenergy']
             input[j,1] -= 10**-6
             basis = BS.bassiset(input, set)
-            MI.runIntegrals(input, basis, set)
+            results = MI.runIntegrals(input, basis, set, results)
             input[j,1] += 10**-6
-            CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('slowquant/temp/enuc.npy'), Te=np.load('slowquant/temp/Ekin.npy'), S=np.load('slowquant/temp/overlap.npy'), VeN=np.load('slowquant/temp/nucatt.npy'), Vee=np.load('slowquant/temp/twoint.npy'), results=results, print_SCF='No')
+            results = HF.HartreeFock(input, set, basis, VNN=results['VNN'], Te=results['Te'], S=results['S'], VeN=results['VNe'], Vee=results['Vee'], results=results)
             xminus = results['HFenergy']
             
             input[j,2] += 10**-6
             basis = BS.bassiset(input, set)
-            MI.runIntegrals(input, basis, set)
+            results = MI.runIntegrals(input, basis, set, results)
             input[j,2] -= 10**-6
-            CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('slowquant/temp/enuc.npy'), Te=np.load('slowquant/temp/Ekin.npy'), S=np.load('slowquant/temp/overlap.npy'), VeN=np.load('slowquant/temp/nucatt.npy'), Vee=np.load('slowquant/temp/twoint.npy'), results=results, print_SCF='No')
+            results = HF.HartreeFock(input, set, basis, VNN=results['VNN'], Te=results['Te'], S=results['S'], VeN=results['VNe'], Vee=results['Vee'], results=results)
             yplus = results['HFenergy']
             input[j,2] -= 10**-6
             basis = BS.bassiset(input, set)
-            MI.runIntegrals(input, basis, set)
+            results = MI.runIntegrals(input, basis, set, results)
             input[j,2] += 10**-6
-            CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('slowquant/temp/enuc.npy'), Te=np.load('slowquant/temp/Ekin.npy'), S=np.load('slowquant/temp/overlap.npy'), VeN=np.load('slowquant/temp/nucatt.npy'), Vee=np.load('slowquant/temp/twoint.npy'), results=results, print_SCF='No')
+            results = HF.HartreeFock(input, set, basis, VNN=results['VNN'], Te=results['Te'], S=results['S'], VeN=results['VNe'], Vee=results['Vee'], results=results)
             yminus = results['HFenergy']
             
             input[j,3] += 10**-6
             basis = BS.bassiset(input, set)
-            MI.runIntegrals(input, basis, set)
+            results = MI.runIntegrals(input, basis, set, results)
             input[j,3] -= 10**-6
-            CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('slowquant/temp/enuc.npy'), Te=np.load('slowquant/temp/Ekin.npy'), S=np.load('slowquant/temp/overlap.npy'), VeN=np.load('slowquant/temp/nucatt.npy'), Vee=np.load('slowquant/temp/twoint.npy'), results=results, print_SCF='No')
+            results = HF.HartreeFock(input, set, basis, VNN=results['VNN'], Te=results['Te'], S=results['S'], VeN=results['VNe'], Vee=results['Vee'], results=results)
             zplus = results['HFenergy']
             input[j,3] -= 10**-6
             basis = BS.bassiset(input, set)
-            MI.runIntegrals(input, basis, set)
+            results = MI.runIntegrals(input, basis, set, results)
             input[j,3] += 10**-6
-            CMO, FAO, D, results = HF.HartreeFock(input, set, basis, VNN=np.load('slowquant/temp/enuc.npy'), Te=np.load('slowquant/temp/Ekin.npy'), S=np.load('slowquant/temp/overlap.npy'), VeN=np.load('slowquant/temp/nucatt.npy'), Vee=np.load('slowquant/temp/twoint.npy'), results=results, print_SCF='No')
+            results = HF.HartreeFock(input, set, basis, VNN=results['VNN'], Te=results['Te'], S=results['S'], VeN=results['VNe'], Vee=results['Vee'], results=results)
             zminus = results['HFenergy']
             
             dX[j] = (xplus-xminus)/(2*10**-6)
