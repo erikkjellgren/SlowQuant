@@ -10,7 +10,7 @@ CI Singles
 The CI singles are done by building a Hamiltonian and diagonalizing it. The Hamiltonian build accourding to:
 
 .. math::
-   \left\langle \phi_{i}^{a}\left|H\right|\phi_{j}^{b}\right\rangle =f_{ab}\delta_{ij}-f_{ij}\delta_{ab}+\left\langle aj\left|\right|ib\right\rangle 
+   H_{ia,jb} =f_{ab}\delta_{ij}-f_{ij}\delta_{ab}+\left\langle aj\left|\right|ib\right\rangle 
    
 Here everything is in spin orbital basis.
 
