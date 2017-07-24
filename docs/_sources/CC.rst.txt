@@ -41,14 +41,16 @@ In the above equations the following definitions is used:
 The T1 and T2 is the constructed as:
 
 .. math::
-   t_{i}^{a}D_{i}^{a}=f_{ia}+\sum_{e}^{occ}t_{i}^{e}F_{ae}-\sum_{m}^{occ}t_{m}^{a}F_{mi}+\sum_{m,e}^{occ,virt}t_{im}^{ae}F_{me}
+   t_{i}^{a}D_{i}^{a}=f_{ia}+\sum_{e}^{occ}t_{i}^{e}F_{ae}-\sum_{m}^{occ}t_{m}^{a}F_{mi}+\sum_{m,e}^{occ,virt}t_{im}^{ae}F_{me}-\sum_{n,f}^{occ,virt}t_{n}^{f}\left\langle na\left|\right|if\right\rangle 
    
-   -\sum_{n,f}^{occ,virt}t_{n}^{f}\left\langle na\left|\right|if\right\rangle -\frac{1}{2}\sum_{m,e,f}^{occ,virt,virt}t_{im}^{ef}\left\langle ma\left|\right|ef\right\rangle -\frac{1}{2}\sum_{m,e,n}^{occ,virt,occ}t_{mn}^{ae}\left\langle mn\left|\right|ei\right\rangle 
+   -\frac{1}{2}\sum_{m,e,f}^{occ,virt,virt}t_{im}^{ef}\left\langle ma\left|\right|ef\right\rangle -\frac{1}{2}\sum_{m,e,n}^{occ,virt,occ}t_{mn}^{ae}\left\langle mn\left|\right|ei\right\rangle 
    
 .. math::
-   t_{ij}^{ab}D_{ij}^{ab}=\left\langle ij\left|\right|ab\right\rangle +P_{-}\left(ab\right)\sum_{e}^{virt}t_{ij}^{ae}\left(F_{be}-\frac{1}{2}\sum_{m}^{occ}t_{m}^{b}F_{me}\right)-P_{-}\left(ij\right)\sum_{m}^{occ}t_{im}^{ab}\left(F_{mj}+\frac{1}{2}\sum_{e}^{virt}t_{j}^{e}F_{me}\right)
+   t_{ij}^{ab}D_{ij}^{ab}=\left\langle ij\left|\right|ab\right\rangle +P_{-}\left(ab\right)\sum_{e}^{virt}t_{ij}^{ae}\left(F_{be}-\frac{1}{2}\sum_{m}^{occ}t_{m}^{b}F_{me}\right)+\frac{1}{2}\sum_{e,f}^{virt,virt}\tau_{ij}^{ef}W_{abef}
    
-   +\frac{1}{2}\sum_{m,n}^{occ,occ}\tau_{mn}^{ab}W_{mnij}+\frac{1}{2}\sum_{e,f}^{virt,virt}\tau_{ij}^{ef}W_{abef}+P_{-}\left(ij\right)P_{-}\left(ab\right)\sum_{m,e}^{occ,virt}\left(t_{im}^{ae}W_{mbej}-t_{i}^{e}t_{m}^{a}\left\langle mb\left|\right|ej\right\rangle \right)
+   -P_{-}\left(ij\right)\sum_{m}^{occ}t_{im}^{ab}\left(F_{mj}+\frac{1}{2}\sum_{e}^{virt}t_{j}^{e}F_{me}\right)+\frac{1}{2}\sum_{m,n}^{occ,occ}\tau_{mn}^{ab}W_{mnij}
+   
+   +P_{-}\left(ij\right)P_{-}\left(ab\right)\sum_{m,e}^{occ,virt}\left(t_{im}^{ae}W_{mbej}-t_{i}^{e}t_{m}^{a}\left\langle mb\left|\right|ej\right\rangle \right)
    
    +P_{-}\left(ij\right)\sum_{e}^{virt}t_{i}^{e}\left\langle ab\left|\right|ej\right\rangle -P_{-}\left(ab\right)\sum_{m}^{occ}t_{m}^{a}\left\langle mb\left|\right|ij\right\rangle 
 

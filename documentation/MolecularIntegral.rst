@@ -36,7 +36,7 @@ The Boys function is given as:
 
 FUNCTION:
 
-- MolecularIntegrals.boys(m,T)
+- MIcython.boys(m,T)
 - return value
 
 Input:
@@ -119,7 +119,7 @@ With the boundary condition:
 
 FUNCTION:
 
-- MolecularIntegrals.R(t,u,v,n,p,PCx,PCy,PCz,RPC)
+- MIcython.R2(t,u,v,n,p,PCx,PCy,PCz,RPC)
 - return val
 
 Input:
@@ -244,19 +244,13 @@ The electron-nuclear interaction integral is given as:
 
 FUNCTION:
 
-- MolecularIntegrals.elnuc(a, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, input)
+- MolecularIntegrals.elnuc(P, p, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, Zc, Ex, Ey, Ez, R1)
 - return Vij
 
 Input:
 
-- a, Gaussian exponent factor
-- b, Gaussian exponent factor
-- Ax, position along the x-axis
-- Ay, position along the y-axis
-- Az, position along the z-axis
-- Bx, position along the x-axis
-- By, position along the y-axis
-- Bz, position along the z-axis
+- P, Gaussian product
+- p, exponent from Guassian product
 - l1, angular momentum quantum number
 - l2, angular momentum quantum number
 - m1, angular momentum quantum number
@@ -266,7 +260,11 @@ Input:
 - N2, normalization constant
 - c1, Gaussian prefactor
 - c2, Gaussian prefactor
-- input, inputfile object 
+- Zc, Nuclear charge
+- Ex, expansion coefficients
+- Ey, expansion coefficients
+- Ez, expansion coefficients
+- R1, hermite coulomb integrals
 
 Output:
 
@@ -290,19 +288,15 @@ Here e, f and g detones the order of derivate with respect to x, y and z
 
 FUNCTION:
 
-- MolecularIntegrals.electricfield(a, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, input, derivative, atomidx)
+- MolecularIntegrals.electricfield(p, Ex, Ey, Ez, Zc, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, derivative, R1)
 - return VijA
 
 Input:
 
-- a, Gaussian exponent factor
-- b, Gaussian exponent factor
-- Ax, position along the x-axis
-- Ay, position along the y-axis
-- Az, position along the z-axis
-- Bx, position along the x-axis
-- By, position along the y-axis
-- Bz, position along the z-axis
+- p, Gaussian exponent form Gaussian product
+- Ex, expansion coefficient
+- Ey, expansion coefficient
+- Ez, expansion coefficient
 - l1, angular momentum quantum number
 - l2, angular momentum quantum number
 - m1, angular momentum quantum number
@@ -312,9 +306,8 @@ Input:
 - N2, normalization constant
 - c1, Gaussian prefactor
 - c2, Gaussian prefactor
-- input, inputfile object
 - derivative, axis of derivative (dx,dy or dz)
-- atomidx, index of atom for which the electricfield is calculated
+- R1, hermite coulomb integral
 
 Output:
 
@@ -334,27 +327,13 @@ The electron-electron repulsion integral is calculated as:
 
 FUNCTION:
 
-- MolecularIntegrals.elelrep(a, b, c, d, Ax, Ay, Az, Bx, By, Bz, Cx, Cy, Cz, Dx, Dy, Dz, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, N4, c1, c2, c3, c4)
+- MIcython.elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, N4, c1, c2, c3, c4, E1, E2, E3, E4, E5, E6, Rpre)
 - return Veeijkl
 
 Input:
 
-- a, Gaussian exponent factor
-- b, Gaussian exponent factor
-- c, Gaussian exponent factor
-- d, Gaussian exponent factor
-- Ax, position along the x-axis
-- Ay, position along the y-axis
-- Az, position along the z-axis
-- Bx, position along the x-axis
-- By, position along the y-axis
-- Bz, position along the z-axis
-- Cx, position along the x-axis
-- Cy, position along the y-axis
-- Cz, position along the z-axis
-- Dx, position along the x-axis
-- Dy, position along the y-axis
-- Dz, position along the z-axis
+- p, Gaussian exponent factor from Gaussian product
+- q, Gaussian exponent factor from Gaussian product
 - l1, angular momentum quantum number
 - l2, angular momentum quantum number
 - l3, angular momentum quantum number
@@ -375,6 +354,13 @@ Input:
 - c2, Gaussian prefactor
 - c3, Gaussian prefactor
 - c4, Gaussian prefactor
+- E1, expansion coefficient
+- E2, expansion coefficient
+- E3, expansion coefficient
+- E4, expansion coefficient
+- E5, expansion coefficient
+- E6, expansion coefficient
+- Rpre, hermite coulomb integral
 
 Output:
 

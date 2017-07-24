@@ -37,14 +37,14 @@ python setup.py build_ext --inplace
 
 Python 3.5 or above
 
-numpy
+numpy 1.13.1 
 
-scipy
+scipy 0.19.1    
 
-numba
+numba 0.34.0
 
-cython
+cython 0.25.2
 
-gcc
+gcc 5.4.0
 
 

@@ -210,7 +210,7 @@
 <p><img src="_images/math/6f154e4ed18da49646e5c46a41351ef2da89e9c1.png" alt="F_{n}\left(x\right)=\int_{0}^{1}\exp\left(-xt^{2}\right)t^{2n}dt"/></p>
 </div><p>FUNCTION:</p>
 <ul class="simple">
-<li>MolecularIntegrals.boys(m,T)</li>
+<li>MIcython.boys(m,T)</li>
 <li>return value</li>
 </ul>
 <p>Input:</p>
@@ -280,7 +280,7 @@
 <p><img src="_images/math/f156200f7a8a9a2af93947d614babe4e8c266e37.png" alt="R_{0,0,0}^{n}\left(p,R_{\mathrm{PC}}\right)=\left(-2p\right)^{n}F_{n}\left(pR_{\mathrm{PC}}^{2}\right)"/></p>
 </div><p>FUNCTION:</p>
 <ul class="simple">
-<li>MolecularIntegrals.R(t,u,v,n,p,PCx,PCy,PCz,RPC)</li>
+<li>MIcython.R2(t,u,v,n,p,PCx,PCy,PCz,RPC)</li>
 <li>return val</li>
 </ul>
 <p>Input:</p>
@@ -391,19 +391,13 @@
 <p><img src="_images/math/1e47261d87c24723a3651203285c580b7534c6e3.png" alt="V_{ijklmn}^{000}=\frac{2\pi}{p}\sum_{t}^{i+j}E_{t}^{ij}\sum_{u}^{k+l}E_{u}^{kl}\sum_{v}^{m+n}E_{v}^{mn}R_{tuv}"/></p>
 </div><p>FUNCTION:</p>
 <ul class="simple">
-<li>MolecularIntegrals.elnuc(a, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, input)</li>
+<li>MolecularIntegrals.elnuc(P, p, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, Zc, Ex, Ey, Ez, R1)</li>
 <li>return Vij</li>
 </ul>
 <p>Input:</p>
 <ul class="simple">
-<li>a, Gaussian exponent factor</li>
-<li>b, Gaussian exponent factor</li>
-<li>Ax, position along the x-axis</li>
-<li>Ay, position along the y-axis</li>
-<li>Az, position along the z-axis</li>
-<li>Bx, position along the x-axis</li>
-<li>By, position along the y-axis</li>
-<li>Bz, position along the z-axis</li>
+<li>P, Gaussian product</li>
+<li>p, exponent from Guassian product</li>
 <li>l1, angular momentum quantum number</li>
 <li>l2, angular momentum quantum number</li>
 <li>m1, angular momentum quantum number</li>
@@ -413,7 +407,11 @@
 <li>N2, normalization constant</li>
 <li>c1, Gaussian prefactor</li>
 <li>c2, Gaussian prefactor</li>
-<li>input, inputfile object</li>
+<li>Zc, Nuclear charge</li>
+<li>Ex, expansion coefficients</li>
+<li>Ey, expansion coefficients</li>
+<li>Ez, expansion coefficients</li>
+<li>R1, hermite coulomb integrals</li>
 </ul>
 <p>Output:</p>
 <ul class="simple">
@@ -433,19 +431,15 @@
 </div><p>Here e, f and g detones the order of derivate with respect to x, y and z</p>
 <p>FUNCTION:</p>
 <ul class="simple">
-<li>MolecularIntegrals.electricfield(a, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, input, derivative, atomidx)</li>
+<li>MolecularIntegrals.electricfield(p, Ex, Ey, Ez, Zc, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, derivative, R1)</li>
 <li>return VijA</li>
 </ul>
 <p>Input:</p>
 <ul class="simple">
-<li>a, Gaussian exponent factor</li>
-<li>b, Gaussian exponent factor</li>
-<li>Ax, position along the x-axis</li>
-<li>Ay, position along the y-axis</li>
-<li>Az, position along the z-axis</li>
-<li>Bx, position along the x-axis</li>
-<li>By, position along the y-axis</li>
-<li>Bz, position along the z-axis</li>
+<li>p, Gaussian exponent form Gaussian product</li>
+<li>Ex, expansion coefficient</li>
+<li>Ey, expansion coefficient</li>
+<li>Ez, expansion coefficient</li>
 <li>l1, angular momentum quantum number</li>
 <li>l2, angular momentum quantum number</li>
 <li>m1, angular momentum quantum number</li>
@@ -455,9 +449,8 @@
 <li>N2, normalization constant</li>
 <li>c1, Gaussian prefactor</li>
 <li>c2, Gaussian prefactor</li>
-<li>input, inputfile object</li>
 <li>derivative, axis of derivative (dx,dy or dz)</li>
-<li>atomidx, index of atom for which the electricfield is calculated</li>
+<li>R1, hermite coulomb integral</li>
 </ul>
 <p>Output:</p>
 <ul class="simple">
@@ -475,27 +468,13 @@
 <p><img src="_images/math/283dbf3109baffb1b0b8ee384693c474e63f11a7.png" alt="g_{abcd}=\sum_{t}^{l1+l2}E_{t}^{ab}\sum_{u}^{m1+m2}E_{u}^{ab}\sum_{v}^{n1+n2}E_{v}^{ab}\sum_{\tau}^{l3+l4}E_{\tau}^{cd}\sum_{\nu}^{m3+m4}E_{\nu}^{cd}\sum_{\phi}^{n3+n4}E_{\phi}^{cd}\left(-1\right)^{\tau+\nu+\phi}\frac{2\pi^{5/2}}{pq\sqrt{p+q}}R_{t+\tau,u+\nu,v+\phi}\left(\alpha,R_{\mathrm{PQ}}\right)"/></p>
 </div><p>FUNCTION:</p>
 <ul class="simple">
-<li>MolecularIntegrals.elelrep(a, b, c, d, Ax, Ay, Az, Bx, By, Bz, Cx, Cy, Cz, Dx, Dy, Dz, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, N4, c1, c2, c3, c4)</li>
+<li>MIcython.elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, N4, c1, c2, c3, c4, E1, E2, E3, E4, E5, E6, Rpre)</li>
 <li>return Veeijkl</li>
 </ul>
 <p>Input:</p>
 <ul class="simple">
-<li>a, Gaussian exponent factor</li>
-<li>b, Gaussian exponent factor</li>
-<li>c, Gaussian exponent factor</li>
-<li>d, Gaussian exponent factor</li>
-<li>Ax, position along the x-axis</li>
-<li>Ay, position along the y-axis</li>
-<li>Az, position along the z-axis</li>
-<li>Bx, position along the x-axis</li>
-<li>By, position along the y-axis</li>
-<li>Bz, position along the z-axis</li>
-<li>Cx, position along the x-axis</li>
-<li>Cy, position along the y-axis</li>
-<li>Cz, position along the z-axis</li>
-<li>Dx, position along the x-axis</li>
-<li>Dy, position along the y-axis</li>
-<li>Dz, position along the z-axis</li>
+<li>p, Gaussian exponent factor from Gaussian product</li>
+<li>q, Gaussian exponent factor from Gaussian product</li>
 <li>l1, angular momentum quantum number</li>
 <li>l2, angular momentum quantum number</li>
 <li>l3, angular momentum quantum number</li>
@@ -516,6 +495,13 @@
 <li>c2, Gaussian prefactor</li>
 <li>c3, Gaussian prefactor</li>
 <li>c4, Gaussian prefactor</li>
+<li>E1, expansion coefficient</li>
+<li>E2, expansion coefficient</li>
+<li>E3, expansion coefficient</li>
+<li>E4, expansion coefficient</li>
+<li>E5, expansion coefficient</li>
+<li>E6, expansion coefficient</li>
+<li>Rpre, hermite coulomb integral</li>
 </ul>
 <p>Output:</p>
 <ul class="simple">

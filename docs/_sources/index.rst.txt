@@ -18,11 +18,11 @@ As a ready to run example:
 SlowQuant have the following requirements:
 
 - Python 3.5 or above
-- numpy
-- scipy
-- numba
-- cython
-- gcc
+- numpy 1.13.1 
+- scipy 0.19.1  
+- numba 0.34.0
+- cython 0.25.2
+- gcc 5.4.0
 
 .. toctree::
    :maxdepth: 2
