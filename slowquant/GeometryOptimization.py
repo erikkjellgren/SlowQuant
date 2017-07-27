@@ -11,7 +11,7 @@ def run_analytic(input, set, results):
     for i in range(1, maxstep):
         basis = BS.bassiset(input, set)
         results = MI.runIntegrals(input, basis, set, results)
-        results = MI.rungeometric_derivatives(input, basis, results)
+        results = MI.rungeometric_derivatives(input, basis, set, results)
         results = HF.HartreeFock(input, set, basis, VNN=results['VNN'], Te=results['Te'], S=results['S'], VeN=results['VNe'], Vee=results['Vee'], results=results)
         D = results['D']
         CMO = results['C_MO']

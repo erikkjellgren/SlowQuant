@@ -91,6 +91,7 @@
             
               <p class="caption"><span class="caption-text">How to use</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation and Running</a></li>
 <li class="toctree-l1"><a class="reference internal" href="keywords.html">List of keywords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Examples.html">Example input files</a></li>
 <li class="toctree-l1"><a class="reference internal" href="issues.html">Issues</a></li>
@@ -103,7 +104,6 @@
 <li class="toctree-l2"><a class="reference internal" href="#inputfile-obejct">Inputfile obejct</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#settings-obejct">Settings obejct</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#results-object">Results object</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#integral-storage">Integral storage</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="MolecularIntegral.html">Molecular Integrals</a></li>
@@ -190,7 +190,23 @@
 <p>CONTR contains all the information about the primitive functions and have the form:</p>
 <div class="math">
 <p><img src="_images/math/721137c66644ac35e8541d590f15f2642b2c4eda.png" alt="\left[\begin{array}{cccccc}N &amp; \zeta &amp; c &amp; l &amp; m &amp; n\end{array}\right]"/></p>
-</div></div>
+</div><p>Inside the integral call, the basisset file is reconstructed into three different arrays, containing the basisset information. The first one is basisidx that have the following form:</p>
+<div class="math">
+<p><img src="_images/math/e27e034cc1d400294d514a93e8b8f5e0b51c7b99.png" alt="\left[\begin{array}{cc}\mathrm{\#primitives} &amp; \mathrm{loop\,start\,idx}\end{array}\right]"/></p>
+</div><p>It thus contains the number of primitives in each basisfunction, and what start index it have for loop inside the integral code.</p>
+<p>The second array is basisint, that have the following forms:</p>
+<div class="math">
+<p><img src="_images/math/0306ccae310632d4763770d8db7ae44e3ffd1005.png" alt="\left[\begin{array}{ccc}l &amp; m &amp; n\end{array}\right]"/></p>
+</div><div class="math">
+<p><img src="_images/math/ba3d25fdd31652e03449e810b55bba41f549e244.png" alt="\left[\begin{array}{cccc}l &amp; m &amp; n &amp; \mathrm{atom\,idx}\end{array}\right]"/></p>
+</div><p>The first one is for regular integrals and the second one is for derivatives. Both contains all the angular momentum quantum numbers, and the derivative also contains the atom index (used in derivative of VNe).</p>
+<p>The last array is basisfloat and have the following forms:</p>
+<div class="math">
+<p><img src="_images/math/65a6d1fa81a5f7bded0b7a375f1ece63cd70fcc9.png" alt="\left[\begin{array}{cccccc}N &amp; \zeta &amp; c &amp; x &amp; y &amp; z\end{array}\right]"/></p>
+</div><div class="math">
+<p><img src="_images/math/6cf9dfd6614ef84dcf6b89467c10b571554d76d6.png" alt="\left[\begin{array}{cccccccccccc}N &amp; \zeta &amp; c &amp; x &amp; y &amp; z &amp; N_{x,+} &amp; N_{x,-} &amp; N_{y,+} &amp; N_{y,-} &amp; N_{z,+} &amp; N_{z,-}\end{array}\right]"/></p>
+</div><p>basisfloat contains the normalization constants, Gaussian exponent and prefacor and the coordinates of the atoms. The second one is again for the derivatives, it contains normalization constants of the differentiated primitives.</p>
+</div>
 <div class="section" id="inputfile-obejct">
 <h2>Inputfile obejct<a class="headerlink" href="#inputfile-obejct" title="Permalink to this headline">¶</a></h2>
 <p>The inputfile obejct is a numpy array containing the following informations:</p>
@@ -203,20 +219,7 @@
 </div>
 <div class="section" id="results-object">
 <h2>Results object<a class="headerlink" href="#results-object" title="Permalink to this headline">¶</a></h2>
-<p>The results are parsed around in the code as a dictionary.</p>
-</div>
-<div class="section" id="integral-storage">
-<h2>Integral storage<a class="headerlink" href="#integral-storage" title="Permalink to this headline">¶</a></h2>
-<p>All of the integrals used in the code, is stored in slowquant/temp.</p>
-<ul class="simple">
-<li>enuc.npy, nuclear-nucelar repulsion</li>
-<li>Ekin.npy, electronic kinetic energy AO basis</li>
-<li>nucatt.npy, nuclear-electron attraction AO basis</li>
-<li>overlap.npy, electron-electron overlap AO basis</li>
-<li>twoint.npy, electron-electron repulsion AO basis</li>
-<li>twointMO.npy, electron-electron repulsion MO basis</li>
-<li>twointMOspin.npy, electron-electron repulsion MO spin basis</li>
-</ul>
+<p>The results are parsed around in the code as a dictionary. It contains the results from different calculatations that are either used in other calculations or given as an output.</p>
 </div>
 </div>
 

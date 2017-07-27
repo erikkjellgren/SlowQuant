@@ -11,10 +11,7 @@ x=bassiset used in calculation. STO2G, STO3G, DZ, DZP, 3-21G, 6-31ppGss (6-31++G
 Integrals
 ---------
 
-- Cauchy-Schwarz Threshold;x
-
-Threshold for not calculating an ERI, given as 10^-x
-
+- None
 
 Initial Method
 --------------

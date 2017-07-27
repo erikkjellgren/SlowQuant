@@ -96,6 +96,7 @@
 <li class="toctree-l1"><a class="reference internal" href="Examples.html">Example input files</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Issues</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#general">General</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#performance">Performance</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#need-testing">Need testing</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#broken">Broken</a></li>
 </ul>
@@ -187,6 +188,13 @@
 <li>Numerical methods makes code none module like</li>
 <li>No checking of input files at all at any stages of the code</li>
 <li>Basisset object has a bad structure</li>
+<li>Loops should be replaced with np.einsum() in many cases</li>
+</ul>
+</div>
+<div class="section" id="performance">
+<h2>Performance<a class="headerlink" href="#performance" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>Integral derivatives dosen’t fully utilize precalculation of expansion coefficients, E</li>
 </ul>
 </div>
 <div class="section" id="need-testing">

@@ -13,6 +13,8 @@ from slowquant import UHF
 from slowquant import CI
 from slowquant import CC
 
+import slowquant.molecularintegrals.runMIcython as prof
+
 def run(inputname, settingsname):
     settings = np.genfromtxt('slowquant/Standardsettings.csv', delimiter = ';', dtype='str')
     set = {}

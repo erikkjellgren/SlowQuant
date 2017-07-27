@@ -4,7 +4,7 @@ from slowquant import BasisSet as BS
 from slowquant import DIIS as DIIS
 from slowquant import HartreeFock as HF
 from slowquant import runMolecularIntegrals as MI
-from slowquant.molecularintegrals.MIcython import boysPrun
+from slowquant.molecularintegrals.runMIcython import boysPrun
 from slowquant import MPn as MP
 from slowquant import Properties as PROP
 from slowquant import Qfit as QFIT
@@ -177,7 +177,7 @@ def test_derivative():
         set.update({settings[i][0]:settings[i][1]})
     input = np.array([[8, 0, 0, 0],[8, 0.0, 0.0, 0.0]])
     basis = BS.bassiset(input, set)
-    results = MI.rungeometric_derivatives(input, basis, results)
+    results = MI.rungeometric_derivatives(input, basis, set, results)
     VNe = results['1dyVNe']
     S   = results['1dyS']
     Te  = results['1dyTe']
@@ -236,37 +236,39 @@ def test_geoopt():
     e = 0.000001
     dp = np.load('testfiles/enucp.npy')
     dm = np.load('testfiles/enucm.npy')
-    dS = results['1dxVNN']
-    dnS = (dp-dm)/(2*e)
-    assert np.max(np.abs(dS-dnS)) < 10**-9
+    dVNN = results['1dxVNN']
+    dnVNN = (dp-dm)/(2*e)
+    assert np.max(np.abs(dVNN-dnVNN)) < 10**-9
     
     e = 0.000001
     dp = np.load('testfiles/overlapp.npy')
     dm = np.load('testfiles/overlapm.npy')
-    dS = dS = results['1dxS']
+    dS = results['1dxS']
     dnS = (dp-dm)/(2*e)
     assert np.max(np.abs(dS-dnS)) < 10**-9
     
     e = 0.000001
     dp = np.load('testfiles/Ekinp.npy')
     dm = np.load('testfiles/Ekinm.npy')
-    dS = dS = results['1dxTe']
-    dnS = (dp-dm)/(2*e)
-    assert np.max(np.abs(dS-dnS)) < 10**-9
-    
-    e = 0.000001
-    dp = np.load('testfiles/nucattp.npy')
-    dm = np.load('testfiles/nucattm.npy')
-    dS = results['1dxVNe']
-    dnS = (dp-dm)/(2*e)
-    assert np.max(np.abs(dS-dnS)) < 10**-9
+    dTe = results['1dxTe']
+    dnTe = (dp-dm)/(2*e)
+    assert np.max(np.abs(dTe-dnTe)) < 10**-9
     
     e = 0.000001
     dp = np.load('testfiles/twointp.npy')
     dm = np.load('testfiles/twointm.npy')
-    dS = results['1dxVee']
-    dnS = (dp-dm)/(2*e)
-    assert np.max(np.abs(dS-dnS)) < 10**-9
+    dERI = results['1dxVee']
+    dnERI = (dp-dm)/(2*e)
+    assert np.max(np.abs(dERI-dnERI)) < 10**-9
+    
+    e = 0.000001
+    dp = np.load('testfiles/nucattp.npy')
+    dm = np.load('testfiles/nucattm.npy')
+    dVNe = results['1dxVNe']
+    dnVNe = (dp-dm)/(2*e)
+    assert np.max(np.abs(dVNe-dnVNe)) < 10**-9
+    
+
 
 
 def test_UHF():

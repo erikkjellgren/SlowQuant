@@ -5,6 +5,7 @@ potential.pdb
 
 # Files made by python
 __pycache__/
+.cache/
 
 # Editing documentation
 *~

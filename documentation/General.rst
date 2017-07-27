@@ -18,6 +18,33 @@ CONTR contains all the information about the primitive functions and have the fo
 
 .. math::
    \left[\begin{array}{cccccc}N & \zeta & c & l & m & n\end{array}\right]
+   
+Inside the integral call, the basisset file is reconstructed into three different arrays, containing the basisset information. The first one is basisidx that have the following form:
+
+.. math::
+   \left[\begin{array}{cc}\mathrm{\#primitives} & \mathrm{loop\,start\,idx}\end{array}\right]
+   
+It thus contains the number of primitives in each basisfunction, and what start index it have for loop inside the integral code.
+
+The second array is basisint, that have the following forms:
+
+.. math::
+   \left[\begin{array}{ccc}l & m & n\end{array}\right]
+
+.. math::
+   \left[\begin{array}{cccc}l & m & n & \mathrm{atom\,idx}\end{array}\right]
+
+The first one is for regular integrals and the second one is for derivatives. Both contains all the angular momentum quantum numbers, and the derivative also contains the atom index (used in derivative of VNe).
+
+The last array is basisfloat and have the following forms:
+
+.. math::
+   \left[\begin{array}{cccccc}N & \zeta & c & x & y & z\end{array}\right]
+
+.. math::
+   \left[\begin{array}{cccccccccccc}N & \zeta & c & x & y & z & N_{x,+} & N_{x,-} & N_{y,+} & N_{y,-} & N_{z,+} & N_{z,-}\end{array}\right]
+   
+basisfloat contains the normalization constants, Gaussian exponent and prefacor and the coordinates of the atoms. The second one is again for the derivatives, it contains normalization constants of the differentiated primitives.
 
 Inputfile obejct
 ----------------

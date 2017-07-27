@@ -475,19 +475,3 @@ Output:
 References:
 
 - Trygve Helgaker, Poul Jorgensen and Jeppe Olsen, Molecular Electronic-Structure Theory
-
-Cauchy-Schwarz inequality
--------------------------
-
-The electron-electron repulsion integrals is screened by the use of the Cauchy-Schwarz inequality given as:
-
-.. math::
-   \left|g_{abcd}\right|\leq\sqrt{g_{abab}}\sqrt{g_{cdcd}}
-
-FUNCTION:
-
-- None
-
-References:
-
-- Trygve Helgaker, Poul Jorgensen and Jeppe Olsen, Molecular Electronic-Structure Theory
