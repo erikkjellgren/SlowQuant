@@ -327,3 +327,10 @@ def test_CCSD():
     check = -0.070680088376-0.000099877272
     calc = results['ECCSD']+results['E(T)']
     assert abs(calc-check) < 10**-10
+
+def test_GeoOptimization():
+    # New geometry optimization test, after bug was found
+    results = HFrun.run('testfiles/inputH2O.csv','testfiles/settingFullGeoOpt.csv')
+    check = -74.9658980993
+    assert abs(check-results['HFenergy']) < 10**-10
+    

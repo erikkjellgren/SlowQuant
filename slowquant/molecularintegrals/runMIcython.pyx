@@ -9,7 +9,7 @@ cpdef runCythonIntegrals(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] 
     cdef double [:] Ex, Ey, Ez, E1, E2, E3, E4, E5, E6
     cdef double [:,:,:] R1
     cdef double [:,:,:,:,:] E1arr, E2arr, E3arr
-    cdef int k, l, i, j, mu, nu, lam, sig, t, u, v, atom, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4
+    cdef int k, l, i, j, mu, nu, lam, sig, t, u, v, atom, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, munu, lamsig
     
     # basisidx [number of primitives, start index in basisfloat and basisint]
     # basisfloat array of float values for basis, N, zeta, c, x, y, z 
@@ -88,27 +88,27 @@ cpdef runCythonIntegrals(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] 
             if mu >= nu:
                 for lam in range(0, len(basisidx)):
                     for sig in range(0, len(basisidx)):
-                        munu = mu*(mu+1)/2+nu
-                        lamsig = lam*(lam+1)/2+sig
+                        munu = mu*(mu+1)//2+nu
+                        lamsig = lam*(lam+1)//2+sig
                         if lam >= sig and munu >= lamsig:
                             calc = 0.0
                             for i in range(basisidx[mu,1],basisidx[mu,1]+basisidx[mu,0]):
+                                N1 = basisfloat[i,0]
+                                a  = basisfloat[i,1]
+                                c1 = basisfloat[i,2]
+                                Ax = basisfloat[i,3]
+                                Ay = basisfloat[i,4]
+                                Az = basisfloat[i,5]
+                                l1 = basisint[i,0]
+                                m1 = basisint[i,1]
+                                n1 = basisint[i,2]
                                 for j in range(basisidx[nu,1],basisidx[nu,1]+basisidx[nu,0]):
-                                    N1 = basisfloat[i,0]
-                                    a  = basisfloat[i,1]
-                                    c1 = basisfloat[i,2]
-                                    Ax = basisfloat[i,3]
-                                    Ay = basisfloat[i,4]
-                                    Az = basisfloat[i,5]
                                     N2 = basisfloat[j,0]
                                     b  = basisfloat[j,1]
                                     c2 = basisfloat[j,2]
                                     Bx = basisfloat[j,3]
                                     By = basisfloat[j,4]
                                     Bz = basisfloat[j,5]
-                                    l1 = basisint[i,0]
-                                    m1 = basisint[i,1]
-                                    n1 = basisint[i,2]
                                     l2 = basisint[j,0]
                                     m2 = basisint[j,1]
                                     n2 = basisint[j,2]
@@ -123,22 +123,22 @@ cpdef runCythonIntegrals(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] 
                                     E3 = E3arr[mu,nu,i,j]
 
                                     for k in range(basisidx[lam,1],basisidx[lam,1]+basisidx[lam,0]):
+                                        N3 = basisfloat[k,0]
+                                        c  = basisfloat[k,1]
+                                        c3 = basisfloat[k,2]
+                                        Cx = basisfloat[k,3]
+                                        Cy = basisfloat[k,4]
+                                        Cz = basisfloat[k,5]
+                                        l3 = basisint[k,0]
+                                        m3 = basisint[k,1]
+                                        n3 = basisint[k,2]
                                         for l in range(basisidx[sig,1],basisidx[sig,1]+basisidx[sig,0]):
-                                            N3 = basisfloat[k,0]
-                                            c  = basisfloat[k,1]
-                                            c3 = basisfloat[k,2]
-                                            Cx = basisfloat[k,3]
-                                            Cy = basisfloat[k,4]
-                                            Cz = basisfloat[k,5]
                                             N4 = basisfloat[l,0]
                                             d  = basisfloat[l,1]
                                             c4 = basisfloat[l,2]
                                             Dx = basisfloat[l,3]
                                             Dy = basisfloat[l,4]
                                             Dz = basisfloat[l,5]
-                                            l3 = basisint[k,0]
-                                            m3 = basisint[k,1]
-                                            n3 = basisint[k,2]
                                             l4 = basisint[l,0]
                                             m4 = basisint[l,1]
                                             n4 = basisint[l,2]
@@ -153,7 +153,6 @@ cpdef runCythonIntegrals(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] 
                                             E6 = E3arr[lam,sig,k,l]
                                             
                                             alpha = p*q/(p+q)
-                                            RPQ = ((Px-Qx)**2+(Py-Qy)**2+(Pz-Qz)**2)**0.5
                                             
                                             R1 = runR(l1+l2+l3+l4, m1+m2+m3+m4, n1+n2+n3+n4, Qx, Qy, Qz, Px, Py, Pz, alpha)
                                             calc += elelrep(p,q,l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, N4, c1, c2, c3, c4, E1, E2, E3, E4, E5, E6, R1)
@@ -162,6 +161,7 @@ cpdef runCythonIntegrals(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] 
                                 
     #END OF run ERI
     return Na, S, T, ERI
+    
 
 cpdef runE(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] basisint, double [:,:] input):
     # Used to precalc E for geometric derivatives
@@ -210,9 +210,15 @@ cpdef runE(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] basisint, doub
 
 cpdef runCythonRunGeoDev(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] basisint, double[:,:] input, double [:,:,:,:,:] E1arr, double [:,:,:,:,:] E2arr, double [:,:,:,:,:] E3arr, double[:,:] Sxarr, double[:,:] Syarr, double[:,:] Szarr, double[:,:] Txarr, double[:,:] Tyarr, double[:,:] Tzarr, double[:,:] VNexarr, double[:,:] VNeyarr, double[:,:] VNezarr, double[:,:,:,:] ERIx, double[:,:,:,:] ERIy, double[:,:,:,:] ERIz, int atomidx):
     cdef double a, b, c, d, Ax, Bx, Cx, Dx, Ay, By, Cy, Dy, Az, Bz, Cz, Dz, Zc, Px, Py, Pz, Qx, Qy, Qz, p, q, RPC, RPQ, N1, N2, N3, N4, c1, c2, c3, c4, aplha, Nxp1, Nxm1, Nyp1, Nym1, Nzp1, Nzm1, Nxp2, Nxm2, Nyp2, Nym2, Nzp2, Nzm2, Nxp3, Nxm3, Nyp3, Nym3, Nzp3, Nzm3, Nxp4, Nxm4, Nyp4, Nym4, Nzp4, Nzm4, Tx, Ty, Tz, Sx, Sy, Sz, VNex, VNey, VNez, calcx, calcy, calcz, calct, calct2
-    cdef double [:] E1, E2, E3, E4, E5, E6, E1p, E1m, E2p, E2m, E3p, E3m, E4p, E4m, E5p, E5m, E6p, E6m, Ex, Ey, Ez, Exp, Exm, Eyp, Eym, Ezp, Ezm
+    cdef double [:] E1, E2, E3, E4, E5, E6, Ep, Em
     cdef double [:,:,:] R1
     cdef int k, l, i, j, mu, nu, lam, sig, t, u, v, atom, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, atomidx_k, atomidx_l, atomidx_mu, atomidx_nu, atomidx_lam, atomidx_sig
+    
+    # Eplus and Eminus arrays to reduce overhead from creating arrays. 
+    # This is a temporary solution, later Ep and Em should be precalculated before
+    # doing the derivative integrals
+    Ep = np.zeros(2*np.max(basisint[:,:3])+2)
+    Em = np.zeros(2*np.max(basisint[:,:3]))
     
     # One electron integrals
     for k in range(0, len(basisidx)):
@@ -285,7 +291,7 @@ cpdef runCythonRunGeoDev(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] 
                                 Tx += calct
                                 Sx += calct2
                                 if l1 != 0:
-                                    calct, calct2 = Kin(a, b, Ax, Ay, Az, Bx, By, Bz, l1-1, l2, m1, m2, n1, n2, Nxm2, N2, c1, c2)
+                                    calct, calct2 = Kin(a, b, Ax, Ay, Az, Bx, By, Bz, l1-1, l2, m1, m2, n1, n2, Nxm1, N2, c1, c2)
                                     Tx += calct
                                     Sx += calct2
                                     
@@ -343,145 +349,119 @@ cpdef runCythonRunGeoDev(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] 
                                 Cx = input[atom,1]
                                 Cy = input[atom,2]
                                 Cz = input[atom,3]
-                                RPC = ((Px-Cx)**2+(Py-Cy)**2+(Pz-Cz)**2)**0.5
                                 R1 = runR(l1+l2, m1+m2, n1+n2, Cx, Cy, Cz, Px, Py, Pz, p, check=1)
                         # x derivative
                                 if atomidx == atomidx_k and atomidx == atomidx_l:
                                     if atom != atomidx:
-                                        Exp = np.zeros(l1+1+l2+1)
                                         for t in range(0, l1+1+l2+1):
-                                            Exp[t] = E(l1+1,l2,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
-                                        VNex += elnuc(p, l1+1, l2, m1, m2, n1, n2, Nxp1, N2, c1, c2, Zc, Exp, Ey, Ez,R1)
+                                            Ep[t] = E(l1+1,l2,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
+                                        VNex += elnuc(p, l1+1, l2, m1, m2, n1, n2, Nxp1, N2, c1, c2, Zc, Ep, Ey, Ez,R1)
                                         if l1 != 0:
-                                            Exm = np.zeros(l1-1+l2+1)
                                             for t in range(0, l1-1+l2+1):
-                                                Exm[t] = E(l1-1,l2,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
-                                            VNex += elnuc(p, l1-1, l2, m1, m2, n1, n2, Nxm1, N2, c1, c2, Zc, Exm, Ey, Ez,R1)
+                                                Em[t] = E(l1-1,l2,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
+                                            VNex += elnuc(p, l1-1, l2, m1, m2, n1, n2, Nxm1, N2, c1, c2, Zc, Em, Ey, Ez,R1)
                                         
-                                        Exp = np.zeros(l1+1+l2+1)
                                         for t in range(0, l1+1+l2+1):
-                                            Exp[t] = E(l1,l2+1,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
-                                        VNex += elnuc(p, l1, l2+1, m1, m2, n1, n2, N1, Nxp2, c1, c2, Zc, Exp, Ey, Ez,R1)
+                                            Ep[t] = E(l1,l2+1,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
+                                        VNex += elnuc(p, l1, l2+1, m1, m2, n1, n2, N1, Nxp2, c1, c2, Zc, Ep, Ey, Ez,R1)
                                         if l2 != 0:
-                                            Exm = np.zeros(l1-1+l2+1)
                                             for t in range(0, l1+l2-1+1):
-                                                Exm[t] = E(l1,l2-1,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
-                                            VNex += elnuc(p, l1, l2-1, m1, m2, n1, n2, N1, Nxm2, c1, c2, Zc, Exm, Ey, Ez,R1)
+                                                Em[t] = E(l1,l2-1,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
+                                            VNex += elnuc(p, l1, l2-1, m1, m2, n1, n2, N1, Nxm2, c1, c2, Zc, Em, Ey, Ez,R1)
                                 
                                 else:
                                     if atomidx == atomidx_k:
-                                        Exp = np.zeros(l1+1+l2+1)
                                         for t in range(0, l1+1+l2+1):
-                                            Exp[t] = E(l1+1,l2,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
-                                        VNex += elnuc(p, l1+1, l2, m1, m2, n1, n2, Nxp1, N2, c1, c2, Zc, Exp, Ey, Ez,R1)
+                                            Ep[t] = E(l1+1,l2,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
+                                        VNex += elnuc(p, l1+1, l2, m1, m2, n1, n2, Nxp1, N2, c1, c2, Zc, Ep, Ey, Ez,R1)
                                         if l1 != 0:
-                                            Exm = np.zeros(l1-1+l2+1)
                                             for t in range(0, l1-1+l2+1):
-                                                Exm[t] = E(l1-1,l2,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
-                                            VNex += elnuc(p, l1-1, l2, m1, m2, n1, n2, Nxm1, N2, c1, c2, Zc, Exm, Ey, Ez,R1)
+                                                Em[t] = E(l1-1,l2,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
+                                            VNex += elnuc(p, l1-1, l2, m1, m2, n1, n2, Nxm1, N2, c1, c2, Zc, Em, Ey, Ez,R1)
             
                                     if atomidx == atomidx_l:
-
-                                        Exp = np.zeros(l1+1+l2+1)
                                         for t in range(0, l1+1+l2+1):
-                                            Exp[t] = E(l1,l2+1,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
-                                        VNex += elnuc(p, l1, l2+1, m1, m2, n1, n2, N1, Nxp2, c1, c2, Zc, Exp, Ey, Ez,R1)
+                                            Ep[t] = E(l1,l2+1,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
+                                        VNex += elnuc(p, l1, l2+1, m1, m2, n1, n2, N1, Nxp2, c1, c2, Zc, Ep, Ey, Ez,R1)
                                         if l2 != 0:
-                                            Exm = np.zeros(l1-1+l2+1)
                                             for t in range(0, l1+l2-1+1):
-                                                Exm[t] = E(l1,l2-1,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
-                                            VNex += elnuc(p, l1, l2-1, m1, m2, n1, n2, N1, Nxm2, c1, c2, Zc, Exm, Ey, Ez,R1)
+                                                Em[t] = E(l1,l2-1,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
+                                            VNex += elnuc(p, l1, l2-1, m1, m2, n1, n2, N1, Nxm2, c1, c2, Zc, Em, Ey, Ez,R1)
                         # y derivative
                                 if atomidx == atomidx_k and atomidx == atomidx_l:
                                     if atom != atomidx:
-                                        Eyp = np.zeros(m1+1+m2+1)
                                         for t in range(0, m1+1+m2+1):
-                                            Eyp[t] = E(m1+1,m2,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
-                                        VNey += elnuc(p, l1, l2, m1+1, m2, n1, n2, Nyp1, N2, c1, c2, Zc, Ex, Eyp, Ez,R1)
+                                            Ep[t] = E(m1+1,m2,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
+                                        VNey += elnuc(p, l1, l2, m1+1, m2, n1, n2, Nyp1, N2, c1, c2, Zc, Ex, Ep, Ez,R1)
                                         if m1 != 0:
-                                            Eym = np.zeros(m1-1+m2+1)
                                             for t in range(0, m1-1+m2+1):
-                                                Eym[t] = E(m1-1,m2,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
-                                            VNey += elnuc(p, l1, l2, m1-1, m2, n1, n2, Nym1, N2, c1, c2, Zc, Ex, Eym, Ez,R1)
-                                        
-                                        Eyp = np.zeros(m1+1+m2+1)
+                                                Em[t] = E(m1-1,m2,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
+                                            VNey += elnuc(p, l1, l2, m1-1, m2, n1, n2, Nym1, N2, c1, c2, Zc, Ex, Em, Ez,R1)
+
                                         for t in range(0, m1+1+m2+1):
-                                            Eyp[t] = E(m1,m2+1,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
-                                        VNey += elnuc(p, l1, l2, m1, m2+1, n1, n2, N1, Nyp2, c1, c2, Zc, Ex, Eyp, Ez,R1)
+                                            Ep[t] = E(m1,m2+1,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
+                                        VNey += elnuc(p, l1, l2, m1, m2+1, n1, n2, N1, Nyp2, c1, c2, Zc, Ex, Ep, Ez,R1)
                                         if m2 != 0:
-                                            Eym = np.zeros(m1-1+m2+1)
                                             for t in range(0, m1+m2-1+1):
-                                                Eym[t] = E(m1,m2-1,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
-                                            VNey += elnuc(p, l1, l2, m1, m2-1, n1, n2, N1, Nym2, c1, c2, Zc, Ex, Eym, Ez,R1)
+                                                Em[t] = E(m1,m2-1,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
+                                            VNey += elnuc(p, l1, l2, m1, m2-1, n1, n2, N1, Nym2, c1, c2, Zc, Ex, Em, Ez,R1)
                                 
                                 else:
                                     if atomidx == atomidx_k:
-                                        Eyp = np.zeros(m1+1+m2+1)
                                         for t in range(0, m1+1+m2+1):
-                                            Eyp[t] = E(m1+1,m2,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
-                                        VNey += elnuc(p, l1, l2, m1+1, m2, n1, n2, Nyp1, N2, c1, c2, Zc, Ex, Eyp, Ez,R1)
+                                            Ep[t] = E(m1+1,m2,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
+                                        VNey += elnuc(p, l1, l2, m1+1, m2, n1, n2, Nyp1, N2, c1, c2, Zc, Ex, Ep, Ez,R1)
                                         if m1 != 0:
-                                            Eym = np.zeros(m1-1+m2+1)
                                             for t in range(0, m1-1+m2+1):
-                                                Eym[t] = E(m1-1,m2,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
-                                            VNey += elnuc(p, l1, l2, m1-1, m2, n1, n2, Nym1, N2, c1, c2, Zc, Ex, Eym, Ez,R1)
+                                                Em[t] = E(m1-1,m2,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
+                                            VNey += elnuc(p, l1, l2, m1-1, m2, n1, n2, Nym1, N2, c1, c2, Zc, Ex, Em, Ez,R1)
             
                                     if atomidx == atomidx_l:
-                                        Eyp = np.zeros(m1+1+m2+1)
                                         for t in range(0, m1+1+m2+1):
-                                            Eyp[t] = E(m1,m2+1,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
-                                        VNey += elnuc(p, l1, l2, m1, m2+1, n1, n2, N1, Nyp2, c1, c2, Zc, Ex, Eyp, Ez,R1)
+                                            Ep[t] = E(m1,m2+1,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
+                                        VNey += elnuc(p, l1, l2, m1, m2+1, n1, n2, N1, Nyp2, c1, c2, Zc, Ex, Ep, Ez,R1)
                                         if m2 != 0:
-                                            Eym = np.zeros(m1-1+m2+1)
                                             for t in range(0, m1+m2-1+1):
-                                                Eym[t] = E(m1,m2-1,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
-                                            VNey += elnuc(p, l1, l2, m1, m2-1, n1, n2, N1, Nym2, c1, c2, Zc, Ex, Eym, Ez,R1)
+                                                Em[t] = E(m1,m2-1,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
+                                            VNey += elnuc(p, l1, l2, m1, m2-1, n1, n2, N1, Nym2, c1, c2, Zc, Ex, Em, Ez,R1)
                                     
                         # z derivative
                                 if atomidx == atomidx_k and atomidx == atomidx_l:
                                     if atom != atomidx:
-                                        Ezp = np.zeros(n1+1+n2+1)
                                         for t in range(0, n1+1+n2+1):
-                                            Ezp[t] = E(n1+1,n2,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
-                                        VNez += elnuc(p, l1, l2, m1, m2, n1+1, n2, Nzp1, N2, c1, c2, Zc, Ex, Ey, Ezp,R1)
+                                            Ep[t] = E(n1+1,n2,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
+                                        VNez += elnuc(p, l1, l2, m1, m2, n1+1, n2, Nzp1, N2, c1, c2, Zc, Ex, Ey, Ep,R1)
                                         if n1 != 0:
-                                            Ezm = np.zeros(n1-1+n2+1)
                                             for t in range(0, n1-1+n2+1):
-                                                Ezm[t] = E(n1-1,n2,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
-                                            VNez += elnuc(p, l1, l2, m1, m2, n1-1, n2, Nzm1, N2, c1, c2, Zc, Ex, Ey, Ezm,R1)
+                                                Em[t] = E(n1-1,n2,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
+                                            VNez += elnuc(p, l1, l2, m1, m2, n1-1, n2, Nzm1, N2, c1, c2, Zc, Ex, Ey, Em,R1)
                                         
-                                        Ezp = np.zeros(n1+1+n2+1)
                                         for t in range(0, n1+1+n2+1):
-                                            Ezp[t] = E(n1,n2+1,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
-                                        VNez += elnuc(p, l1, l2, m1, m2, n1, n2+1, N1, Nzp2, c1, c2, Zc, Ex, Ey, Ezp,R1)
+                                            Ep[t] = E(n1,n2+1,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
+                                        VNez += elnuc(p, l1, l2, m1, m2, n1, n2+1, N1, Nzp2, c1, c2, Zc, Ex, Ey, Ep,R1)
                                         if n2 != 0:
-                                            Ezm = np.zeros(n1-1+n2+1)
                                             for t in range(0, n1+n2-1+1):
-                                                Ezm[t] = E(n1,n2-1,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
-                                            VNez += elnuc(p, l1, l2, m1, m2, n1, n2-1, N1, Nzm2, c1, c2, Zc, Ex, Ey, Ezm,R1)
+                                                Em[t] = E(n1,n2-1,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
+                                            VNez += elnuc(p, l1, l2, m1, m2, n1, n2-1, N1, Nzm2, c1, c2, Zc, Ex, Ey, Em,R1)
                                 
                                 else:
                                     if atomidx == atomidx_k:
-                                        Ezp = np.zeros(n1+1+n2+1)
                                         for t in range(0, n1+1+n2+1):
-                                            Ezp[t] = E(n1+1,n2,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
-                                        VNez += elnuc(p, l1, l2, m1, m2, n1+1, n2, Nzp1, N2, c1, c2, Zc, Ex, Ey, Ezp,R1)
+                                            Ep[t] = E(n1+1,n2,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
+                                        VNez += elnuc(p, l1, l2, m1, m2, n1+1, n2, Nzp1, N2, c1, c2, Zc, Ex, Ey, Ep,R1)
                                         if n1 != 0:
-                                            Ezm = np.zeros(n1-1+n2+1)
                                             for t in range(0, n1-1+n2+1):
-                                                Ezm[t] = E(n1-1,n2,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
-                                            VNez += elnuc(p, l1, l2, m1, m2, n1-1, n2, Nzm1, N2, c1, c2, Zc, Ex, Ey, Ezm,R1)
+                                                Em[t] = E(n1-1,n2,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
+                                            VNez += elnuc(p, l1, l2, m1, m2, n1-1, n2, Nzm1, N2, c1, c2, Zc, Ex, Ey, Em,R1)
             
                                     if atomidx == atomidx_l:
-                                        Ezp = np.zeros(n1+1+n2+1)
                                         for t in range(0, n1+1+n2+1):
-                                            Ezp[t] = E(n1,n2+1,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
-                                        VNez += elnuc(p, l1, l2, m1, m2, n1, n2+1, N1, Nzp2, c1, c2, Zc, Ex, Ey, Ezp,R1)
+                                            Ep[t] = E(n1,n2+1,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
+                                        VNez += elnuc(p, l1, l2, m1, m2, n1, n2+1, N1, Nzp2, c1, c2, Zc, Ex, Ey, Ep,R1)
                                         if n2 != 0:
-                                            Ezm = np.zeros(n1-1+n2+1)
                                             for t in range(0, n1+n2-1+1):
-                                                Ezm[t] = E(n1,n2-1,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
-                                            VNez += elnuc(p, l1, l2, m1, m2, n1, n2-1, N1, Nzm2, c1, c2, Zc, Ex, Ey, Ezm,R1)
+                                                Em[t] = E(n1,n2-1,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
+                                            VNez += elnuc(p, l1, l2, m1, m2, n1, n2-1, N1, Nzm2, c1, c2, Zc, Ex, Ey, Em,R1)
                         
                         # Electricfield contribution
                         if atomidx == atomidx_k and atomidx == atomidx_l:
@@ -492,7 +472,6 @@ cpdef runCythonRunGeoDev(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] 
                             Cx = input[atomidx,1]
                             Cy = input[atomidx,2]
                             Cz = input[atomidx,3]
-                            RPC = ((Px-Cx)**2+(Py-Cy)**2+(Pz-Cz)**2)**0.5
                             R1 = runR(l1+l2, m1+m2, n1+n2, Cx, Cy, Cz, Px, Py, Pz, p, check=1)
                             VNex += electricfield(p,Ex,Ey,Ez,Zc, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, 1,R1)
                             VNey += electricfield(p,Ex,Ey,Ez,Zc, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, 2,R1)
@@ -526,29 +505,36 @@ cpdef runCythonRunGeoDev(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] 
                             # can just choose the first one to get atomix
                             atomidx_mu = basisint[basisidx[mu,1],3]
                             atomidx_nu = basisint[basisidx[nu,1],3]
-                            atomidx_lam= basisint[basisidx[lam,1],3]
+                            atomidx_lam = basisint[basisidx[lam,1],3]
                             atomidx_sig = basisint[basisidx[sig,1],3]
                             
                             if atomidx == atomidx_mu and atomidx == atomidx_nu and atomidx == atomidx_lam and atomidx == atomidx_sig:
                                 None
                             else:
                                 for i in range(basisidx[mu,1],basisidx[mu,1]+basisidx[mu,0]):
+                                    N1 = basisfloat[i,0]
+                                    a  = basisfloat[i,1]
+                                    c1 = basisfloat[i,2]
+                                    Ax = basisfloat[i,3]
+                                    Ay = basisfloat[i,4]
+                                    Az = basisfloat[i,5]
+                                    l1 = basisint[i,0]
+                                    m1 = basisint[i,1]
+                                    n1 = basisint[i,2]
+                                    
+                                    Nxp1=basisfloat[i,6]
+                                    Nxm1=basisfloat[i,7]
+                                    Nyp1=basisfloat[i,8]
+                                    Nym1=basisfloat[i,9]
+                                    Nzp1=basisfloat[i,10]
+                                    Nzm1=basisfloat[i,11]
                                     for j in range(basisidx[nu,1],basisidx[nu,1]+basisidx[nu,0]):
-                                        N1 = basisfloat[i,0]
-                                        a  = basisfloat[i,1]
-                                        c1 = basisfloat[i,2]
-                                        Ax = basisfloat[i,3]
-                                        Ay = basisfloat[i,4]
-                                        Az = basisfloat[i,5]
                                         N2 = basisfloat[j,0]
                                         b  = basisfloat[j,1]
                                         c2 = basisfloat[j,2]
                                         Bx = basisfloat[j,3]
                                         By = basisfloat[j,4]
                                         Bz = basisfloat[j,5]
-                                        l1 = basisint[i,0]
-                                        m1 = basisint[i,1]
-                                        n1 = basisint[i,2]
                                         l2 = basisint[j,0]
                                         m2 = basisint[j,1]
                                         n2 = basisint[j,2]
@@ -562,13 +548,6 @@ cpdef runCythonRunGeoDev(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] 
                                         E2 = E2arr[mu,nu,i,j]
                                         E3 = E3arr[mu,nu,i,j]
                                         
-                                        Nxp1=basisfloat[i,6]
-                                        Nxm1=basisfloat[i,7]
-                                        Nyp1=basisfloat[i,8]
-                                        Nym1=basisfloat[i,9]
-                                        Nzp1=basisfloat[i,10]
-                                        Nzm1=basisfloat[i,11]
-                                        
                                         Nxp2=basisfloat[j,6]
                                         Nxm2=basisfloat[j,7]
                                         Nyp2=basisfloat[j,8]
@@ -577,22 +556,29 @@ cpdef runCythonRunGeoDev(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] 
                                         Nzm2=basisfloat[j,11]
     
                                         for k in range(basisidx[lam,1],basisidx[lam,1]+basisidx[lam,0]):
+                                            N3 = basisfloat[k,0]
+                                            c  = basisfloat[k,1]
+                                            c3 = basisfloat[k,2]
+                                            Cx = basisfloat[k,3]
+                                            Cy = basisfloat[k,4]
+                                            Cz = basisfloat[k,5]
+                                            l3 = basisint[k,0]
+                                            m3 = basisint[k,1]
+                                            n3 = basisint[k,2]
+                                            
+                                            Nxp3=basisfloat[k,6]
+                                            Nxm3=basisfloat[k,7]
+                                            Nyp3=basisfloat[k,8]
+                                            Nym3=basisfloat[k,9]
+                                            Nzp3=basisfloat[k,10]
+                                            Nzm3=basisfloat[k,11]
                                             for l in range(basisidx[sig,1],basisidx[sig,1]+basisidx[sig,0]):
-                                                N3 = basisfloat[k,0]
-                                                c  = basisfloat[k,1]
-                                                c3 = basisfloat[k,2]
-                                                Cx = basisfloat[k,3]
-                                                Cy = basisfloat[k,4]
-                                                Cz = basisfloat[k,5]
                                                 N4 = basisfloat[l,0]
                                                 d  = basisfloat[l,1]
                                                 c4 = basisfloat[l,2]
                                                 Dx = basisfloat[l,3]
                                                 Dy = basisfloat[l,4]
                                                 Dz = basisfloat[l,5]
-                                                l3 = basisint[k,0]
-                                                m3 = basisint[k,1]
-                                                n3 = basisint[k,2]
                                                 l4 = basisint[l,0]
                                                 m4 = basisint[l,1]
                                                 n4 = basisint[l,2]
@@ -606,13 +592,6 @@ cpdef runCythonRunGeoDev(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] 
                                                 E5 = E2arr[lam,sig,k,l]
                                                 E6 = E3arr[lam,sig,k,l]
                                                 
-                                                Nxp3=basisfloat[k,6]
-                                                Nxm3=basisfloat[k,7]
-                                                Nyp3=basisfloat[k,8]
-                                                Nym3=basisfloat[k,9]
-                                                Nzp3=basisfloat[k,10]
-                                                Nzm3=basisfloat[k,11]
-                                                
                                                 Nxp4=basisfloat[l,6]
                                                 Nxm4=basisfloat[l,7]
                                                 Nyp4=basisfloat[l,8]
@@ -621,144 +600,120 @@ cpdef runCythonRunGeoDev(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] 
                                                 Nzm4=basisfloat[l,11]
                                                 
                                                 alpha = p*q/(p+q)
-                                                RPQ = ((Px-Qx)**2+(Py-Qy)**2+(Pz-Qz)**2)**0.5
                                                 
                                                 R1 = runR(l1+l2+l3+l4, m1+m2+m3+m4, n1+n2+n3+n4, Qx, Qy, Qz, Px, Py, Pz, alpha, check=1)
                                                 
+                                                
                                                 # Calcul1te x derivative
                                                 if atomidx == atomidx_mu:
-                                                    E1p = np.zeros(l1+1+l2+1)
                                                     for t in range(l1+1+l2+1):
-                                                        E1p[t] = E(l1+1,l2,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
-                                                    calcx += elelrep(p, q, l1+1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, Nxp1, N2, N3, N4, c1, c2, c3, c4, E1p,E2,E3,E4,E5,E6,R1)
+                                                        Ep[t] = E(l1+1,l2,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
+                                                    calcx += elelrep(p, q, l1+1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, Nxp1, N2, N3, N4, c1, c2, c3, c4, Ep,E2,E3,E4,E5,E6,R1)
                                                     if l1 != 0:
-                                                        E1m = np.zeros(l1-1+l2+1)
                                                         for t in range(l1-1+l2+1):
-                                                            E1m[t] = E(l1-1,l2,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
-                                                        calcx += elelrep(p, q,l1-1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, Nxm1, N2, N3, N4, c1, c2, c3, c4, E1m,E2,E3,E4,E5,E6,R1)
+                                                            Em[t] = E(l1-1,l2,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
+                                                        calcx += elelrep(p, q,l1-1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, Nxm1, N2, N3, N4, c1, c2, c3, c4, Em,E2,E3,E4,E5,E6,R1)
                                                         
                                                 if atomidx == atomidx_nu:
-                                                    E1p = np.zeros(l1+1+l2+1)
                                                     for t in range(l1+l2+1+1):
-                                                        E1p[t] = E(l1,l2+1,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
-                                                    calcx += elelrep(p, q, l1, l2+1, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, Nxp2, N3, N4, c1, c2, c3, c4, E1p,E2,E3,E4,E5,E6,R1)
+                                                        Ep[t] = E(l1,l2+1,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
+                                                    calcx += elelrep(p, q, l1, l2+1, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, Nxp2, N3, N4, c1, c2, c3, c4, Ep,E2,E3,E4,E5,E6,R1)
                                                     if l2 != 0:
-                                                        E1m = np.zeros(l1-1+l2+1)
                                                         for t in range(l1+l2-1+1):
-                                                            E1m[t] = E(l1,l2-1,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
-                                                        calcx += elelrep(p, q, l1, l2-1, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, Nxm2, N3, N4, c1, c2, c3, c4, E1m,E2,E3,E4,E5,E6,R1)
+                                                            Em[t] = E(l1,l2-1,t,Ax-Bx,a,b,Px-Ax,Px-Bx,Ax-Bx)
+                                                        calcx += elelrep(p, q, l1, l2-1, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, Nxm2, N3, N4, c1, c2, c3, c4, Em,E2,E3,E4,E5,E6,R1)
                                                         
                                                 if atomidx == atomidx_lam:  
-                                                    E4p = np.zeros(l3+1+l4+1)
                                                     for t in range(l3+1+l4+1):
-                                                        E4p[t] = E(l3+1,l4,t,Cx-Dx,c,d,Qx-Cx,Qx-Dx,Cx-Dx)
-                                                    calcx += elelrep(p, q, l1, l2, l3+1, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, Nxp3, N4, c1, c2, c3, c4, E1,E2,E3,E4p,E5,E6,R1)
+                                                        Ep[t] = E(l3+1,l4,t,Cx-Dx,c,d,Qx-Cx,Qx-Dx,Cx-Dx)
+                                                    calcx += elelrep(p, q, l1, l2, l3+1, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, Nxp3, N4, c1, c2, c3, c4, E1,E2,E3,Ep,E5,E6,R1)
                                                     if l3 != 0:
-                                                        E4m = np.zeros(l3-1+l4+1)
                                                         for t in range(l3-1+l4+1):
-                                                            E4m[t] = E(l3-1,l4,t,Cx-Dx,c,d,Qx-Cx,Qx-Dx,Cx-Dx)
-                                                        calcx += elelrep(p, q, l1, l2, l3-1, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, Nxm3, N4, c1, c2, c3, c4, E1,E2,E3,E4m,E5,E6,R1)
+                                                            Em[t] = E(l3-1,l4,t,Cx-Dx,c,d,Qx-Cx,Qx-Dx,Cx-Dx)
+                                                        calcx += elelrep(p, q, l1, l2, l3-1, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, Nxm3, N4, c1, c2, c3, c4, E1,E2,E3,Em,E5,E6,R1)
                                                     
                                                 if atomidx == atomidx_sig:
-                                                    E4p = np.zeros(l3+1+l4+1)
                                                     for t in range(l3+l4+1+1):
-                                                        E4p[t] = E(l3,l4+1,t,Cx-Dx,c,d,Qx-Cx,Qx-Dx,Cx-Dx)
-                                                    calcx += elelrep(p, q, l1, l2, l3, l4+1, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, Nxp4, c1, c2, c3, c4, E1,E2,E3,E4p,E5,E6,R1)
+                                                        Ep[t] = E(l3,l4+1,t,Cx-Dx,c,d,Qx-Cx,Qx-Dx,Cx-Dx)
+                                                    calcx += elelrep(p, q, l1, l2, l3, l4+1, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, Nxp4, c1, c2, c3, c4, E1,E2,E3,Ep,E5,E6,R1)
                                                     if l4 != 0:
-                                                        E4m = np.zeros(l3-1+l4+1)
                                                         for t in range(l3+l4-1+1):
-                                                            E4m[t] = E(l3,l4-1,t,Cx-Dx,c,d,Qx-Cx,Qx-Dx,Cx-Dx)
-                                                        calcx += elelrep(p, q, l1, l2, l3, l4-1, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, Nxm4, c1, c2, c3, c4, E1,E2,E3,E4m,E5,E6,R1)
+                                                            Em[t] = E(l3,l4-1,t,Cx-Dx,c,d,Qx-Cx,Qx-Dx,Cx-Dx)
+                                                        calcx += elelrep(p, q, l1, l2, l3, l4-1, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, Nxm4, c1, c2, c3, c4, E1,E2,E3,Em,E5,E6,R1)
                                                 
                                                 # Calcul1te y derivative
                                                 if atomidx == atomidx_mu:
-                                                    E2p = np.zeros(m1+1+m2+1)
                                                     for t in range(m1+1+m2+1):
-                                                        E2p[t] = E(m1+1,m2,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
-                                                    calcy += elelrep(p, q, l1, l2, l3, l4, m1+1, m2, m3, m4, n1, n2, n3, n4, Nyp1, N2, N3, N4, c1, c2, c3, c4, E1,E2p,E3,E4,E5,E6,R1)
+                                                        Ep[t] = E(m1+1,m2,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
+                                                    calcy += elelrep(p, q, l1, l2, l3, l4, m1+1, m2, m3, m4, n1, n2, n3, n4, Nyp1, N2, N3, N4, c1, c2, c3, c4, E1,Ep,E3,E4,E5,E6,R1)
                                                     if m1 != 0:
-                                                        E2m = np.zeros(m1-1+m2+1)
                                                         for t in range(m1-1+m2+1):
-                                                            E2m[t] = E(m1-1,m2,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
-                                                        calcy += elelrep(p, q, l1, l2, l3, l4, m1-1, m2, m3, m4, n1, n2, n3, n4, Nym1, N2, N3, N4, c1, c2, c3, c4, E1,E2m,E3,E4,E5,E6,R1)
+                                                            Em[t] = E(m1-1,m2,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
+                                                        calcy += elelrep(p, q, l1, l2, l3, l4, m1-1, m2, m3, m4, n1, n2, n3, n4, Nym1, N2, N3, N4, c1, c2, c3, c4, E1,Em,E3,E4,E5,E6,R1)
                                                         
                                                 if atomidx == atomidx_nu:
-                                                    E2p = np.zeros(m1+1+m2+1)
                                                     for t in range(m1+m2+1+1):
-                                                        E2p[t] = E(m1,m2+1,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
-                                                    calcy += elelrep(p, q, l1, l2, l3, l4, m1, m2+1, m3, m4, n1, n2, n3, n4, N1, Nyp2, N3, N4, c1, c2, c3, c4, E1,E2p,E3,E4,E5,E6,R1)
+                                                        Ep[t] = E(m1,m2+1,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
+                                                    calcy += elelrep(p, q, l1, l2, l3, l4, m1, m2+1, m3, m4, n1, n2, n3, n4, N1, Nyp2, N3, N4, c1, c2, c3, c4, E1,Ep,E3,E4,E5,E6,R1)
                                                     if m2 != 0:
-                                                        E2m = np.zeros(m1-1+m2+1)
                                                         for t in range(m1+m2-1+1):
-                                                            E2m[t] = E(m1,m2-1,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
-                                                        calcy += elelrep(p, q, l1, l2, l3, l4, m1, m2-1, m3, m4, n1, n2, n3, n4, N1, Nym2, N3, N4, c1, c2, c3, c4,E1,E2m,E3,E4,E5,E6,R1)
+                                                            Em[t] = E(m1,m2-1,t,Ay-By,a,b,Py-Ay,Py-By,Ay-By)
+                                                        calcy += elelrep(p, q, l1, l2, l3, l4, m1, m2-1, m3, m4, n1, n2, n3, n4, N1, Nym2, N3, N4, c1, c2, c3, c4,E1,Em,E3,E4,E5,E6,R1)
                                                         
                                                 if atomidx == atomidx_lam:  
-                                                    E5p = np.zeros(m3+1+m4+1)
                                                     for t in range(m3+1+m4+1):
-                                                        E5p[t] = E(m3+1,m4,t,Cy-Dy,c,d,Qy-Cy,Qy-Dy,Cy-Dy)
-                                                    calcy += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3+1, m4, n1, n2, n3, n4, N1, N2, Nyp3, N4, c1, c2, c3, c4, E1,E2,E3,E4,E5p,E6,R1)
+                                                        Ep[t] = E(m3+1,m4,t,Cy-Dy,c,d,Qy-Cy,Qy-Dy,Cy-Dy)
+                                                    calcy += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3+1, m4, n1, n2, n3, n4, N1, N2, Nyp3, N4, c1, c2, c3, c4, E1,E2,E3,E4,Ep,E6,R1)
                                                     if m3 != 0:
-                                                        E5m = np.zeros(m3-1+m4+1)
                                                         for t in range(m3-1+m4+1):
-                                                            E5m[t] = E(m3-1,m4,t,Cy-Dy,c,d,Qy-Cy,Qy-Dy,Cy-Dy)
-                                                        calcy += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3-1, m4, n1, n2, n3, n4, N1, N2, Nym3, N4, c1, c2, c3, c4,E1,E2,E3,E4,E5m,E6,R1)
+                                                            Em[t] = E(m3-1,m4,t,Cy-Dy,c,d,Qy-Cy,Qy-Dy,Cy-Dy)
+                                                        calcy += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3-1, m4, n1, n2, n3, n4, N1, N2, Nym3, N4, c1, c2, c3, c4,E1,E2,E3,E4,Em,E6,R1)
                                                     
                                                 if atomidx == atomidx_sig:
-                                                    E5p = np.zeros(m3+1+m4+1)
                                                     for t in range(m3+m4+1+1):
-                                                        E5p[t] = E(m3,m4+1,t,Cy-Dy,c,d,Qy-Cy,Qy-Dy,Cy-Dy)
-                                                    calcy += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4+1, n1, n2, n3, n4, N1, N2, N3, Nyp4, c1, c2, c3, c4,E1,E2,E3,E4,E5p,E6,R1)
+                                                        Ep[t] = E(m3,m4+1,t,Cy-Dy,c,d,Qy-Cy,Qy-Dy,Cy-Dy)
+                                                    calcy += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4+1, n1, n2, n3, n4, N1, N2, N3, Nyp4, c1, c2, c3, c4,E1,E2,E3,E4,Ep,E6,R1)
                                                     if m4 != 0:
-                                                        E5m = np.zeros(m3-1+m4+1)
                                                         for t in range(m3+m4-1+1):
-                                                            E5m[t] = E(m3,m4-1,t,Cy-Dy,c,d,Qy-Cy,Qy-Dy,Cy-Dy)
-                                                        calcy += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4-1, n1, n2, n3, n4, N1, N2, N3, Nym4, c1, c2, c3, c4,E1,E2,E3,E4,E5m,E6,R1)
+                                                            Em[t] = E(m3,m4-1,t,Cy-Dy,c,d,Qy-Cy,Qy-Dy,Cy-Dy)
+                                                        calcy += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4-1, n1, n2, n3, n4, N1, N2, N3, Nym4, c1, c2, c3, c4,E1,E2,E3,E4,Em,E6,R1)
                                                 
                                                 # Calcul1te z derivative
                                                 if atomidx == atomidx_mu:
-                                                    E3p = np.zeros(n1+1+n2+1)
                                                     for t in range(n1+1+n2+1):
-                                                        E3p[t] = E(n1+1,n2,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
-                                                    calcz += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1+1, n2, n3, n4, Nzp1, N2, N3, N4, c1, c2, c3, c4, E1,E2,E3p,E4,E5,E6,R1)
+                                                        Ep[t] = E(n1+1,n2,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
+                                                    calcz += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1+1, n2, n3, n4, Nzp1, N2, N3, N4, c1, c2, c3, c4, E1,E2,Ep,E4,E5,E6,R1)
                                                     if n1 != 0:
-                                                        E3m = np.zeros(n1-1+n2+1)
                                                         for t in range(n1-1+n2+1):
-                                                            E3m[t] = E(n1-1,n2,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
-                                                        calcz += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1-1, n2, n3, n4, Nzm1, N2, N3, N4, c1, c2, c3, c4, E1,E2,E3m,E4,E5,E6,R1)
+                                                            Em[t] = E(n1-1,n2,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
+                                                        calcz += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1-1, n2, n3, n4, Nzm1, N2, N3, N4, c1, c2, c3, c4, E1,E2,Em,E4,E5,E6,R1)
                                                         
                                                 if atomidx == atomidx_nu:
-                                                    E3p = np.zeros(n1+1+n2+1)
                                                     for t in range(n1+n2+1+1):
-                                                        E3p[t] = E(n1,n2+1,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
-                                                    calcz += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2+1, n3, n4, N1, Nzp2, N3, N4, c1, c2, c3, c4, E1,E2,E3p,E4,E5,E6,R1)
+                                                        Ep[t] = E(n1,n2+1,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
+                                                    calcz += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2+1, n3, n4, N1, Nzp2, N3, N4, c1, c2, c3, c4, E1,E2,Ep,E4,E5,E6,R1)
                                                     if n2 != 0:
-                                                        E3m = np.zeros(n1-1+n2+1)
                                                         for t in range(n1+n2-1+1):
-                                                            E3m[t] = E(n1,n2-1,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
-                                                        calcz += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2-1, n3, n4, N1, Nzm2, N3, N4, c1, c2, c3, c4,E1,E2,E3m,E4,E5,E6,R1)
+                                                            Em[t] = E(n1,n2-1,t,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
+                                                        calcz += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2-1, n3, n4, N1, Nzm2, N3, N4, c1, c2, c3, c4,E1,E2,Em,E4,E5,E6,R1)
                                                         
                                                 if atomidx == atomidx_lam: 
-                                                    E6p = np.zeros(n3+1+n4+1)
                                                     for t in range(n3+1+n4+1):
-                                                        E6p[t] = E(n3+1,n4,t,Cz-Dz,c,d,Qz-Cz,Qz-Dz,Cz-Dz)
-                                                    calcz += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3+1, n4, N1, N2, Nzp3, N4, c1, c2, c3, c4, E1,E2,E3,E4,E5,E6p,R1)
+                                                        Ep[t] = E(n3+1,n4,t,Cz-Dz,c,d,Qz-Cz,Qz-Dz,Cz-Dz)
+                                                    calcz += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3+1, n4, N1, N2, Nzp3, N4, c1, c2, c3, c4, E1,E2,E3,E4,E5,Ep,R1)
                                                     if n3 != 0:
-                                                        E6m = np.zeros(n3-1+n4+1)
                                                         for t in range(n3-1+n4+1):
-                                                            E6m[t] = E(n3-1,n4,t,Cz-Dz,c,d,Qz-Cz,Qz-Dz,Cz-Dz)
-                                                        calcz += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3-1, n4, N1, N2, Nzm3, N4, c1, c2, c3, c4,E1,E2,E3,E4,E5,E6m,R1)
+                                                            Em[t] = E(n3-1,n4,t,Cz-Dz,c,d,Qz-Cz,Qz-Dz,Cz-Dz)
+                                                        calcz += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3-1, n4, N1, N2, Nzm3, N4, c1, c2, c3, c4,E1,E2,E3,E4,E5,Em,R1)
                                                     
                                                 if atomidx == atomidx_sig:
-                                                    E6p = np.zeros(n3+1+n4+1)
                                                     for t in range(n3+n4+1+1):
-                                                        E6p[t] = E(n3,n4+1,t,Cz-Dz,c,d,Qz-Cz,Qz-Dz,Cz-Dz)
-                                                    calcz += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4+1, N1, N2, N3, Nzp4, c1, c2, c3, c4,E1,E2,E3,E4,E5,E6p,R1)
+                                                        Ep[t] = E(n3,n4+1,t,Cz-Dz,c,d,Qz-Cz,Qz-Dz,Cz-Dz)
+                                                    calcz += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4+1, N1, N2, N3, Nzp4, c1, c2, c3, c4,E1,E2,E3,E4,E5,Ep,R1)
                                                     if n4 != 0:
-                                                        E6m = np.zeros(n3-1+n4+1)
                                                         for t in range(n3+n4-1+1):
-                                                            E6m[t] = E(n3,n4-1,t,Cz-Dz,c,d,Qz-Cz,Qz-Dz,Cz-Dz)
-                                                        calcz += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4-1, N1, N2, N3, Nzm4, c1, c2, c3, c4,E1,E2,E3,E4,E5,E6m,R1)
+                                                            Em[t] = E(n3,n4-1,t,Cz-Dz,c,d,Qz-Cz,Qz-Dz,Cz-Dz)
+                                                        calcz += elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4-1, N1, N2, N3, Nzm4, c1, c2, c3, c4,E1,E2,E3,E4,E5,Em,R1)
                                                                                     
                             ERIx[mu,nu,lam,sig] = ERIx[nu,mu,lam,sig] = ERIx[mu,nu,sig,lam] = ERIx[nu,mu,sig,lam] = ERIx[lam,sig,mu,nu] = ERIx[sig,lam,mu,nu] = ERIx[lam,sig,nu,mu] = ERIx[sig,lam,nu,mu] = calcx
                             ERIy[mu,nu,lam,sig] = ERIy[nu,mu,lam,sig] = ERIy[mu,nu,sig,lam] = ERIy[nu,mu,sig,lam] = ERIy[lam,sig,mu,nu] = ERIy[sig,lam,mu,nu] = ERIy[lam,sig,nu,mu] = ERIy[sig,lam,nu,mu] = calcy

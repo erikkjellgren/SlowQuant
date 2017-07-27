@@ -98,4 +98,3 @@ if __name__ == "__main__":
     set = str(sys.argv[2])
     results = run(mol, set)
     print(time.time() - total, 'Execution time')
-    
