@@ -82,12 +82,6 @@ cdef double elelrep(double p, double q, int l1, int l2, int l3, int l4, int m1, 
     val *= 2.0*pi**2.5/(p*q*(p+q)**0.5) 
     return val*N
 
-
-cpdef double boysPrun(double m,double T):
-    # boys_Python_run, used in tests.py to test boys function
-    return boys(m, T)
-  
-  
 cdef double E(int i, int j, int t, double Qx, double a, double b, double XPA, double XPB, double XAB):
     #McMurchie-Davidson scheme, 9.5.6 and 9.5.7 Helgaker
     cdef double p, q
