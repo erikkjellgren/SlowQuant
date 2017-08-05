@@ -3,5 +3,5 @@ Charge;No
 Dipole;No
 MPn;No
 DIIS;Yes
-SCF Energy Threshold;5
-SCF RMSD Threshold;5
+SCF Energy Threshold;12
+SCF RMSD Threshold;12

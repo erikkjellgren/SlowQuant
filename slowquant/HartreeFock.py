@@ -80,7 +80,7 @@ def HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results, print_SCF='Yes
         #New Fock Matrix
         J = np.einsum('pqrs,sr->pq', Vee,D0)
         K = np.einsum('psqr,sr->pq', Vee,D0)
-        F = Hcore + 2*J-K
+        F = Hcore + 2.0*J-K
         
         if set['DIIS'] == 'Yes':
             #Estimate F by DIIS

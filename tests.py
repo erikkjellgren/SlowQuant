@@ -255,21 +255,19 @@ def test_geoopt():
     assert np.max(np.abs(dTe-dnTe)) < 10**-9
     
     e = 0.000001
-    dp = np.load('testfiles/twointp.npy')
-    dm = np.load('testfiles/twointm.npy')
-    dERI = results['1dxVee']
-    dnERI = (dp-dm)/(2*e)
-    assert np.max(np.abs(dERI-dnERI)) < 10**-9
-    
-    e = 0.000001
     dp = np.load('testfiles/nucattp.npy')
     dm = np.load('testfiles/nucattm.npy')
     dVNe = results['1dxVNe']
     dnVNe = (dp-dm)/(2*e)
     assert np.max(np.abs(dVNe-dnVNe)) < 10**-9
     
-
-
+    e = 0.000001
+    dp = np.load('testfiles/twointp.npy')
+    dm = np.load('testfiles/twointm.npy')
+    dERI = results['1dxVee']
+    dnERI = (dp-dm)/(2*e)
+    assert np.max(np.abs(dERI-dnERI)) < 10**-9
+    
 
 def test_UHF():
     results = HFrun.run('testfiles/inputH2_UHF.csv','testfiles/settingsUHF.csv')

@@ -135,9 +135,10 @@ def rungeometric_derivatives(input, basis, settings, results):
             idxfi += 1
     
     basisint = basisint.astype(np.int32)
-
-
-    E1arr, E2arr, E3arr = runE(basisidx, basisfloat, basisint, input)
+    
+    start = time.time()
+    Earr = runE(basisidx, basisfloat, basisint, input)
+    print(time.time()-start,'Derivative precalc')
     
     for atomidx in range(1, len(input)):
         start = time.time()
@@ -168,7 +169,7 @@ def rungeometric_derivatives(input, basis, settings, results):
         ERIy = np.zeros((len(basisidx),len(basisidx),len(basisidx),len(basisidx)))
         ERIz = np.zeros((len(basisidx),len(basisidx),len(basisidx),len(basisidx)))
         
-        Sxarr, Syarr, Szarr, Txarr, Tyarr, Tzarr, VNexarr, VNeyarr, VNezarr, ERIx, ERIy, ERIz = runCythonRunGeoDev(basisidx, basisfloat, basisint, input, E1arr, E2arr, E3arr, Sxarr, Syarr, Szarr, Txarr, Tyarr, Tzarr, VNexarr, VNeyarr, VNezarr, ERIx, ERIy, ERIz, atomidx)
+        Sxarr, Syarr, Szarr, Txarr, Tyarr, Tzarr, VNexarr, VNeyarr, VNezarr, ERIx, ERIy, ERIz = runCythonRunGeoDev(basisidx, basisfloat, basisint, input, Earr, Sxarr, Syarr, Szarr, Txarr, Tyarr, Tzarr, VNexarr, VNeyarr, VNezarr, ERIx, ERIy, ERIz, atomidx)
         
         results[str(atomidx)+'dxS']   = np.array(Sxarr)
         results[str(atomidx)+'dyS']   = np.array(Syarr)
