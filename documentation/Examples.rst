@@ -43,3 +43,17 @@ Geometry optimization
   GeoOpt;Yes
 
 Example of settingsfile. Performs a geometry optimization calculation with the basisset STO3G
+
+BOMD simulation
+---------------
+::
+
+   basisset;3-21G
+   Initial method;BOMD
+   SCF Energy Threshold;12
+   SCF RMSD Threshold;12
+   steps;100
+   stepsize;1.0
+   SCF Max iterations;1000
+
+Example of settingsfile. Perfoms a BOMD simulation of 100 steps, with a time step of 1.0 a.u.

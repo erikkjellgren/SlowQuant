@@ -162,7 +162,7 @@ def runprop(basis, input, set, results):
         MulCharge(basis, input, results['D'], results['S'])
     elif set['Charge'] == 'Lowdin':
         LowdinCharge(basis, input, results['D'], results['S'])
-    if set['Dipole'] == 'Yes':
+    if set['Dipole'] == 'Yes' or set['Multipolefit'] == 'Dipole':
         results = MI.run_dipole_int(basis, input, results)
         ux, uy, uz, u = dipolemoment(input,results['D'], results['mu_x'], results['mu_y'], results['mu_z'])
         results['dipolex'] = ux

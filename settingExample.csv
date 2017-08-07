@@ -1,10 +1,8 @@
-basisset;3-21G
-Initial method;BOMD
+basisset;6-31ppGss
+Initial method;HF
 Charge;No
 Dipole;No
 MPn;No
 DIIS;Yes
 SCF Energy Threshold;12
 SCF RMSD Threshold;12
-steps;100
-SCF Max iterations;1000

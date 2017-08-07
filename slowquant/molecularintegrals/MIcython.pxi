@@ -4,39 +4,36 @@ cimport numpy as np
 from scipy.special.cython_special cimport hyp1f1, gamma
 
 
-cdef double [:,:,:] runR(int l1l2, int m1m2, int n1n2, double Cx, double Cy, double Cz, double Px,  double Py, double Pz, double p, int check=0):
+cdef double [:,:,:] runR(int l1l2, int m1m2, int n1n2, double Cx, double Cy, double Cz, double Px,  double Py, double Pz, double p, double [:,:,:] R1, int check=0):
     cdef double RPC
-    cdef double [:,:,:] R1
     cdef int t, u, v
     # check = 0, normal calculation. 
     # check = 1, derivative calculation
     if check == 0:
         RPC = ((Px-Cx)**2+(Py-Cy)**2+(Pz-Cz)**2)**0.5
-        R1 = np.zeros((l1l2+1,m1m2+1,n1n2+1))
         for t in range(0, l1l2+1):
             for u in range(0, m1m2+1):
                 for v in range(0, n1n2+1):
-                    R1[t,u,v] = R2(t,u,v,0,p,Px-Cx,Py-Cy,Pz-Cz,RPC)
+                    R1[t,u,v] = R(t,u,v,0,p,Px-Cx,Py-Cy,Pz-Cz,RPC)
                     
     elif check == 1:
         # For the first derivative +1 is needed in t, u and v
         # but only one at a time.
         RPC = ((Px-Cx)**2+(Py-Cy)**2+(Pz-Cz)**2)**0.5
-        R1 = np.zeros((l1l2+2,m1m2+2,n1n2+2))
         for t in range(0, l1l2+1):
             for u in range(0, m1m2+1):
-                R1[t,u,n1n2+1] = R2(t,u,n1n2+1,0,p,Px-Cx,Py-Cy,Pz-Cz,RPC)
+                R1[t,u,n1n2+1] = R(t,u,n1n2+1,0,p,Px-Cx,Py-Cy,Pz-Cz,RPC)
                 for v in range(0, n1n2+1):
-                    R1[t,u,v] = R2(t,u,v,0,p,Px-Cx,Py-Cy,Pz-Cz,RPC)
+                    R1[t,u,v] = R(t,u,v,0,p,Px-Cx,Py-Cy,Pz-Cz,RPC)
                     if t == 0:
-                        R1[l1l2+1,u,v] = R2(l1l2+1,u,v,0,p,Px-Cx,Py-Cy,Pz-Cz,RPC)
+                        R1[l1l2+1,u,v] = R(l1l2+1,u,v,0,p,Px-Cx,Py-Cy,Pz-Cz,RPC)
                     if u == 0:
-                        R1[t,m1m2+1,v] = R2(t,m1m2+1,v,0,p,Px-Cx,Py-Cy,Pz-Cz,RPC) 
+                        R1[t,m1m2+1,v] = R(t,m1m2+1,v,0,p,Px-Cx,Py-Cy,Pz-Cz,RPC) 
                         
     return R1
     
 
-cdef double R2(int t, int u, int v, int n, double p, double PCx, double PCy, double PCz, double RPC):
+cdef double R(int t, int u, int v, int n, double p, double PCx, double PCy, double PCz, double RPC):
     cdef double T, val, res    
 
     T = p*RPC*RPC
@@ -45,19 +42,19 @@ cdef double R2(int t, int u, int v, int n, double p, double PCx, double PCy, dou
         val += (-2.0*p)**n*boys(n,T)
     elif t == u == 0:
         if v > 1:
-            val+=(v-1)*R2(t,u,v-2,n+1,p,PCx,PCy,PCz,RPC)
+            val+=(v-1)*R(t,u,v-2,n+1,p,PCx,PCy,PCz,RPC)
         if PCz != 0:
-            val+=PCz*R2(t,u,v-1,n+1,p,PCx,PCy,PCz,RPC)  
+            val+=PCz*R(t,u,v-1,n+1,p,PCx,PCy,PCz,RPC)  
     elif t == 0:
         if u > 1:
-            val+=(u-1)*R2(t,u-2,v,n+1,p,PCx,PCy,PCz,RPC) 
+            val+=(u-1)*R(t,u-2,v,n+1,p,PCx,PCy,PCz,RPC) 
         if PCy != 0:
-            val+=PCy*R2(t,u-1,v,n+1,p,PCx,PCy,PCz,RPC)  
+            val+=PCy*R(t,u-1,v,n+1,p,PCx,PCy,PCz,RPC)  
     else:
         if t > 1:
-            val+=(t-1)*R2(t-2,u,v,n+1,p,PCx,PCy,PCz,RPC)
+            val+=(t-1)*R(t-2,u,v,n+1,p,PCx,PCy,PCz,RPC)
         if PCx != 0:
-            val+=PCx*R2(t-1,u,v,n+1,p,PCx,PCy,PCz,RPC)
+            val+=PCx*R(t-1,u,v,n+1,p,PCx,PCy,PCz,RPC)
     
     return val
 
