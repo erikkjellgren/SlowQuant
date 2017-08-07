@@ -119,3 +119,14 @@ RMSD Threshold for T1 and T2, given as 10^-x
 - CC Energy Threshold;10
 
 Energy change Threshold for CC, given as 10^-x
+
+Ab-Inition Molecular Dynamics
+-----------------------------
+
+- stepsize;x
+
+Integration stepsize for the movement of the nuclei.
+
+- steps;20
+
+Number of steps for the dynamics simulation

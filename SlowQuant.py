@@ -12,6 +12,7 @@ from slowquant import GeometryOptimization as GO
 from slowquant import UHF
 from slowquant import CI
 from slowquant import CC
+from slowquant import runBOMD as MD
 
 import slowquant.molecularintegrals.runMIcython as prof
 
@@ -41,7 +42,10 @@ def run(inputname, settingsname):
     output.write('\n \n')
     output.close()
     
-    if set['Initial method'] == 'UHF':
+    if set['Initial method'] == 'BOMD':
+        results = MD.BOMD(input, set, results)
+    
+    elif set['Initial method'] == 'UHF':
         basis = BS.bassiset(input, set)
         start = time.time()
         results = MI.runIntegrals(input, basis, set, results)
@@ -50,11 +54,11 @@ def run(inputname, settingsname):
         start = time.time()
         C_alpha, F_alpha, D_alpha, C_beta, F_beta, D_beta, results = UHF.HartreeFock(input, set, basis, VNN=results['VNN'], Te=results['Te'], S=results['S'], VeN=results['VNe'], Vee=results['Vee'], results=results)
         print(time.time()-start, 'UHF')
-
-    elif set['GeoOpt'] == 'Yes':
-        input, results = GO.runGO(input, set, results)
     
-    if set['Initial method'] == 'HF':
+    elif set['Initial method'] == 'HF':
+        if set['GeoOpt'] == 'Yes':
+            input, results = GO.runGO(input, set, results)
+        
         basis = BS.bassiset(input, set)
         
         start = time.time()

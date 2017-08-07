@@ -36,3 +36,7 @@ CC;No
 CC Max iterations;100
 CC RMSD Threshold;10
 CC Energy Threshold;10
+        ; BOMD
+stepsize;1.0
+steps;20
+Temperature;0.0

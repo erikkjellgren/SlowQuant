@@ -141,5 +141,6 @@ def HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results, print_SCF='Yes
     results['C_MO']     = C
     results['F']        = F
     results['D']        = D
+    results['HF iterations'] = iter
     
     return results

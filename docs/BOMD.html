@@ -1,6 +1,5 @@
 
 
-
 <!DOCTYPE html>
 <!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
 <!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
@@ -9,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Index &mdash; SLOWQUANT  documentation</title>
+  <title>Ab-Initio Molecular Dynamics &mdash; SLOWQUANT  documentation</title>
   
 
   
@@ -34,9 +33,10 @@
 
   
         <link rel="index" title="Index"
-              href="#"/>
+              href="genindex.html"/>
         <link rel="search" title="Search" href="search.html"/>
-    <link rel="top" title="SLOWQUANT  documentation" href="index.html"/> 
+    <link rel="top" title="SLOWQUANT  documentation" href="index.html"/>
+        <link rel="prev" title="Coupled Cluster" href="CC.html"/> 
 
   
   <script src="_static/js/modernizr.min.js"></script>
@@ -97,7 +97,7 @@
 <li class="toctree-l1"><a class="reference internal" href="illustrativecalc.html">Illustrative calculations</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Working equations and functions</span></p>
-<ul>
+<ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="General.html">General Considerations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="MolecularIntegral.html">Molecular Integrals</a></li>
 <li class="toctree-l1"><a class="reference internal" href="IntegralTrans.html">Integral Transformations</a></li>
@@ -108,7 +108,10 @@
 <li class="toctree-l1"><a class="reference internal" href="GeoOpt.html">Geometry optimization</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CI.html">Configuration Interaction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CC.html">Coupled Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="BOMD.html">Ab-Initio Molecular Dynamics</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Ab-Initio Molecular Dynamics</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#velocity-verlet-integrator">Velocity Verlet integrator</a></li>
+</ul>
+</li>
 </ul>
 
             
@@ -153,12 +156,14 @@
     
       <li><a href="index.html">Docs</a> &raquo;</li>
         
-      <li>Index</li>
+      <li>Ab-Initio Molecular Dynamics</li>
     
     
       <li class="wy-breadcrumbs-aside">
         
             
+            <a href="_sources/BOMD.rst.txt" rel="nofollow"> View page source</a>
+          
         
       </li>
     
@@ -170,11 +175,39 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-
-<h1 id="index">Index</h1>
-
-<div class="genindex-jumpbox">
- 
+  <div class="section" id="ab-initio-molecular-dynamics">
+<h1>Ab-Initio Molecular Dynamics<a class="headerlink" href="#ab-initio-molecular-dynamics" title="Permalink to this headline">¶</a></h1>
+<p>In this section, working equations for AIMD is presented.
+For the Forces see Geometry Optimization section.</p>
+<div class="section" id="velocity-verlet-integrator">
+<h2>Velocity Verlet integrator<a class="headerlink" href="#velocity-verlet-integrator" title="Permalink to this headline">¶</a></h2>
+<p>The Velocity Verlet is given is three steps. First the position is updated:</p>
+<div class="math">
+<p><img src="_images/math/58fc765418f5928811dd89d3d341539ad18b16a0.png" alt="x\left(t+\Delta t\right)=x\left(t\right)+v\left(t\right)\Delta t+\frac{1}{2}a\left(t\right)\Delta t^{2}"/></p>
+</div><p>Then the forces are calculated. At last the velocties are updated:</p>
+<div class="math">
+<p><img src="_images/math/0d11a96e69371f7b4f2426a6f9febb622b3d305f.png" alt="v\left(t+\Delta t\right)=v\left(t\right)+\frac{1}{2}\left[a\left(t\right)+a\left(t+\Delta t\right)\right]\Delta t"/></p>
+</div><p>FUNCTION:</p>
+<ul class="simple">
+<li>runBOMD.VelocityVerlet(inputBOMD, dt, results, set)</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>inputBOMD, inputfile object for BOMD</li>
+<li>dt, integration step size</li>
+<li>results, results object</li>
+<li>set, settings object</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>inputBOMD, inputfile object for BOMD</li>
+<li>results, results object</li>
+</ul>
+<p>References:</p>
+<ul class="simple">
+<li>None</li>
+</ul>
+</div>
 </div>
 
 
@@ -184,6 +217,13 @@
            </div>
           </div>
           <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+      
+        <a href="CC.html" class="btn btn-neutral" title="Coupled Cluster" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
   
 
   <hr/>

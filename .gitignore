@@ -2,6 +2,7 @@
 /slowquant/temp/*npy
 out.txt
 potential.pdb
+coords.xyz
 
 # Files made by python
 __pycache__/

@@ -48,4 +48,5 @@ SlowQuant have the following requirements:
    GeoOpt.rst
    CI.rst
    CC.rst
+   BOMD.rst
    

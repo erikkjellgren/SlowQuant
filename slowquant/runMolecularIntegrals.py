@@ -59,7 +59,7 @@ def runIntegrals(input, basis, settings, results):
     #END OF two electron integrals
 
 
-def rungeometric_derivatives(input, basis, settings, results):    
+def rungeometric_derivatives(input, basis, settings, results, print_time='Yes'):    
     # Reform basisset information
     
     # basisidx [number of primitives, start index in basisfloat and basisint]
@@ -136,9 +136,7 @@ def rungeometric_derivatives(input, basis, settings, results):
     
     basisint = basisint.astype(np.int32)
     
-    start = time.time()
     Earr = runE(basisidx, basisfloat, basisint, input)
-    print(time.time()-start,'Derivative precalc')
     
     for atomidx in range(1, len(input)):
         start = time.time()
@@ -183,7 +181,8 @@ def rungeometric_derivatives(input, basis, settings, results):
         results[str(atomidx)+'dxVee'] = np.array(ERIx)
         results[str(atomidx)+'dyVee'] = np.array(ERIy)
         results[str(atomidx)+'dzVee'] = np.array(ERIz)
-        print(time.time()-start, 'Integral derivative: atom'+str(atomidx))
+        if print_time == 'Yes':
+            print(time.time()-start, 'Integral derivative: atom'+str(atomidx))
     
     return results
 

@@ -1,7 +1,7 @@
 import cython
 import numpy as np
 cimport numpy as np
-from scipy.special.cython_special cimport hyp1f1   
+from scipy.special.cython_special cimport hyp1f1, gamma
 
 
 cdef double [:,:,:] runR(int l1l2, int m1m2, int n1n2, double Cx, double Cy, double Cz, double Px,  double Py, double Pz, double p, int check=0):
@@ -46,15 +46,18 @@ cdef double R2(int t, int u, int v, int n, double p, double PCx, double PCy, dou
     elif t == u == 0:
         if v > 1:
             val+=(v-1)*R2(t,u,v-2,n+1,p,PCx,PCy,PCz,RPC)
-        val+=PCz*R2(t,u,v-1,n+1,p,PCx,PCy,PCz,RPC)  
+        if PCz != 0:
+            val+=PCz*R2(t,u,v-1,n+1,p,PCx,PCy,PCz,RPC)  
     elif t == 0:
         if u > 1:
-            val+=(u-1)*R2(t,u-2,v,n+1,p,PCx,PCy,PCz,RPC)  
-        val+=PCy*R2(t,u-1,v,n+1,p,PCx,PCy,PCz,RPC)  
+            val+=(u-1)*R2(t,u-2,v,n+1,p,PCx,PCy,PCz,RPC) 
+        if PCy != 0:
+            val+=PCy*R2(t,u-1,v,n+1,p,PCx,PCy,PCz,RPC)  
     else:
         if t > 1:
-            val+=(t-1)*R2(t-2,u,v,n+1,p,PCx,PCy,PCz,RPC) 
-        val+=PCx*R2(t-1,u,v,n+1,p,PCx,PCy,PCz,RPC)
+            val+=(t-1)*R2(t-2,u,v,n+1,p,PCx,PCy,PCz,RPC)
+        if PCx != 0:
+            val+=PCx*R2(t-1,u,v,n+1,p,PCx,PCy,PCz,RPC)
     
     return val
 
@@ -216,3 +219,28 @@ cdef double electricfield(double p, double [:] Ex, double [:] Ey, double [:] Ez,
                 val += Ex[t]*Ey[u]*Ez[v]*R1[t+dx,u+dy,v+dz]*Zc
     
     return val*2.0*pi/p*N
+    
+
+
+
+"""
+cdef double factorial2(double n):
+    cdef double pi = 3.141592653589793238462643383279
+    if n%2 == 0:
+        return 2**(n/2)*gamma(n/2)
+    elif n%2 == 1:
+        return gamma(n/2+1)*2**((n+1)/2)/(pi)**0.5
+    else:
+        print('n in boys is not an integer')
+
+cdef double boys(double m,double T):
+    cdef double pi = 3.141592653589793238462643383279
+    if T == 0.0:
+        # special case of T = 0
+        return 1.0/(2.0*m+1.0)
+    elif T > 2.4951*m + 35.451:
+        # Long range approximation, table from Obara1986
+        return factorial2(2.0*m-1.0)/(2.0**(m+1))*(pi/(T**(2*m+1)))**0.5        
+    else:
+        return hyp1f1(m+0.5,m+1.5,-T)/(2.0*m+1.0) 
+"""
