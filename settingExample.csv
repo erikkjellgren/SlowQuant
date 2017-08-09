@@ -1,4 +1,4 @@
-basisset;6-31ppGss
+basisset;STO3G
 Initial method;HF
 Charge;No
 Dipole;No
@@ -6,3 +6,4 @@ MPn;No
 DIIS;Yes
 SCF Energy Threshold;12
 SCF RMSD Threshold;12
+CC;CCSD(T)

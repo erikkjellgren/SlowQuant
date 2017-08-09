@@ -16,13 +16,14 @@ General
 Performance
 -----------
 
-- Integral derivatives dosen't fully utilize precalculation of expansion coefficients, E
+- Alot of recalculations in R. No efficient way to cache Cython compiled functions found
+- Not sure variables are passed around in integral code the right way with respect to Cython
+- The SCF seem to have trouble converging if BOMD time steps are above 1.0 a.u.
 
 Need testing
 ------------
 
-- No tests for normalization of contracted basisfunctions of D or higher angular momentum
-- Geometry optimization is not properly tested
+- BOMD not tested at all
 - DCPT2 not tested, no case in paper, where cartesian integrals was used (all had D orbitals)
 
 Broken
@@ -30,3 +31,4 @@ Broken
 
 - Self overlap integrals is non-one for contracted  basisfunctions
 - No check for singularity in DIIS, H2/STO3G breaks the code if used with DIIS
+- Changing Cython directive_defaults seem to make the code break sometimes, not very reproduceable

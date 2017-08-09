@@ -11,10 +11,8 @@ from slowquant import IntegralTransform as utilF
 from slowquant import GeometryOptimization as GO
 from slowquant import UHF
 from slowquant import CI
-from slowquant import CC
+from slowquant import runCC as CC
 from slowquant import runBOMD as MD
-
-import slowquant.molecularintegrals.runMIcython as prof
 
 def run(inputname, settingsname):
     settings = np.genfromtxt('slowquant/Standardsettings.csv', delimiter = ';', dtype='str')

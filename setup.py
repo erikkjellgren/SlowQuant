@@ -7,6 +7,8 @@ import numpy
 #Cython.Compiler.Options.get_directive_defaults()['boundscheck'] = False
 #Cython.Compiler.Options.get_directive_defaults()['wraparound'] = False
 
-my_integrals = [Extension('slowquant.molecularintegrals.runMIcython',['slowquant/molecularintegrals/runMIcython.pyx'])]
+ext_modules=[
+    Extension('slowquant.molecularintegrals.runMIcython',['slowquant/molecularintegrals/runMIcython.pyx']),
+    Extension('slowquant.coupledcluster.CythonCC',['slowquant/coupledcluster/CythonCC.pyx'])]
 
-setup(ext_modules=cythonize(my_integrals), include_dirs=[numpy.get_include()])
+setup(ext_modules=cythonize(ext_modules), include_dirs=[numpy.get_include()])
