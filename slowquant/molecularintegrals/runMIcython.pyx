@@ -4,7 +4,7 @@ cimport numpy as np
 include "MIcython.pxi"
 
 
-cpdef runCythonIntegrals(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] basisint, double[:,:] input, double[:,:] Na, double[:,:] S, double[:,:] T, double[:,:,:,:] ERI, double [:,:,:,:,:]  E1arr, double [:,:,:,:,:] E2arr, double [:,:,:,:,:] E3arr, double [:,:,:] Rbuffer):
+cpdef runCythonIntegrals(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] basisint, double[:,:] input, double[:,:] Na, double[:,:] S, double[:,:] T, double[:,:,:,:] ERI, double [:,:,:,:,:]  E1arr, double [:,:,:,:,:] E2arr, double [:,:,:,:,:] E3arr, double [:,:,:] R1buffer, double [:,:,:,:] Rbuffer):
     cdef double calc, calc2, calc3, a, b, c, d, Ax, Bx, Cx, Dx, Ay, By, Cy, Dy, Az, Bz, Cz, Dz, Zc, Px, Py, Pz, Qx, Qy, Qz, p, q, RPC, RPQ, calct, calct2, N1, N2, N3, N4, c1, c2, c3, c4, alpha
     cdef double [:] Ex, Ey, Ez, E1, E2, E3, E4, E5, E6
     cdef double [:,:,:] R1
@@ -63,7 +63,7 @@ cpdef runCythonIntegrals(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] 
                         Cy = input[atom,2]
                         Cz = input[atom,3]
                         RPC = ((Px-Cx)**2+(Py-Cy)**2+(Pz-Cz)**2)**0.5
-                        R1 = runR(l1+l2, m1+m2, n1+n2, Cx, Cy, Cz, Px, Py, Pz, p, Rbuffer)
+                        R1 = R(l1+l2, m1+m2, n1+n2, Cx, Cy, Cz, Px, Py, Pz, p, R1buffer, Rbuffer)
 
                         calc += elnuc(p, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, Zc, Ex, Ey, Ez, R1)
                     calct, calct2 = Kin(a, b, Ax, Ay, Az, Bx, By, Bz, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2)
@@ -146,7 +146,7 @@ cpdef runCythonIntegrals(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] 
                                         
                                         alpha = p*q/(p+q)
                                         
-                                        R1 = runR(l1+l2+l3+l4, m1+m2+m3+m4, n1+n2+n3+n4, Qx, Qy, Qz, Px, Py, Pz, alpha, Rbuffer)
+                                        R1 = R(l1+l2+l3+l4, m1+m2+m3+m4, n1+n2+n3+n4, Qx, Qy, Qz, Px, Py, Pz, alpha, R1buffer, Rbuffer)
                                         calc += elelrep(p,q,l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, N4, c1, c2, c3, c4, E1, E2, E3, E4, E5, E6, R1)
                             
                         ERI[mu,nu,lam,sig] = ERI[nu,mu,lam,sig] = ERI[mu,nu,sig,lam] = ERI[nu,mu,sig,lam] = ERI[lam,sig,mu,nu] = ERI[sig,lam,mu,nu] = ERI[lam,sig,nu,mu] = ERI[sig,lam,nu,mu] = calc            
@@ -247,7 +247,7 @@ cpdef runE(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] basisint, doub
     return Earr
 
 
-cpdef runCythonRunGeoDev(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] basisint, double[:,:] input, double [:,:,:,:,:,:] Earr, double[:,:] Sxarr, double[:,:] Syarr, double[:,:] Szarr, double[:,:] Txarr, double[:,:] Tyarr, double[:,:] Tzarr, double[:,:] VNexarr, double[:,:] VNeyarr, double[:,:] VNezarr, double[:,:,:,:] ERIx, double[:,:,:,:] ERIy, double[:,:,:,:] ERIz, int atomidx, double [:,:,:] Rbuffer):
+cpdef runCythonRunGeoDev(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] basisint, double[:,:] input, double [:,:,:,:,:,:] Earr, double[:,:] Sxarr, double[:,:] Syarr, double[:,:] Szarr, double[:,:] Txarr, double[:,:] Tyarr, double[:,:] Tzarr, double[:,:] VNexarr, double[:,:] VNeyarr, double[:,:] VNezarr, double[:,:,:,:] ERIx, double[:,:,:,:] ERIy, double[:,:,:,:] ERIz, int atomidx, double [:,:,:] R1buffer, double [:,:,:,:] Rbuffer):
     cdef double a, b, c, d, Ax, Bx, Cx, Dx, Ay, By, Cy, Dy, Az, Bz, Cz, Dz, Zc, Px, Py, Pz, Qx, Qy, Qz, p, q, RPC, RPQ, N1, N2, N3, N4, c1, c2, c3, c4, alpha, Nxp1, Nxm1, Nyp1, Nym1, Nzp1, Nzm1, Nxp2, Nxm2, Nyp2, Nym2, Nzp2, Nzm2, Nxp3, Nxm3, Nyp3, Nym3, Nzp3, Nzm3, Nxp4, Nxm4, Nyp4, Nym4, Nzp4, Nzm4, Tx, Ty, Tz, Sx, Sy, Sz, VNex, VNey, VNez, calcx, calcy, calcz, calct, calct2
     cdef double [:] E1, E2, E3, E4, E5, E6, Ex, Ey, Ez, Exp1, Exm1, Exp2, Exm2, Eyp1, Eym1, Eyp2, Eym2, Ezp1, Ezm1, Ezp2, Ezm2, E1p1, E1m1, E1p2, E1m2, E2p1, E2m1, E2p2, E2m2, E3p1, E3m1, E3p2, E3m2, E4p1, E4m1, E4p2, E4m2, E5p1, E5m1, E5p2, E5m2, E6p1, E6m1, E6p2, E6m2
     cdef double [:,:,:] R1
@@ -401,7 +401,7 @@ cpdef runCythonRunGeoDev(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] 
                             Cx = input[atom,1]
                             Cy = input[atom,2]
                             Cz = input[atom,3]
-                            R1 = runR(l1+l2, m1+m2, n1+n2, Cx, Cy, Cz, Px, Py, Pz, p, Rbuffer, check=1)
+                            R1 = R(l1+l2, m1+m2, n1+n2, Cx, Cy, Cz, Px, Py, Pz, p, R1buffer, Rbuffer, check=1)
                     # x derivative
                             if atomidx == atomidx_k and atomidx == atomidx_l:
                                 if atom != atomidx:
@@ -476,7 +476,7 @@ cpdef runCythonRunGeoDev(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] 
                         Cx = input[atomidx,1]
                         Cy = input[atomidx,2]
                         Cz = input[atomidx,3]
-                        R1 = runR(l1+l2, m1+m2, n1+n2, Cx, Cy, Cz, Px, Py, Pz, p, Rbuffer, check=1)
+                        R1 = R(l1+l2, m1+m2, n1+n2, Cx, Cy, Cz, Px, Py, Pz, p, R1buffer, Rbuffer, check=1)
                         VNex += electricfield(p,Ex,Ey,Ez,Zc, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, 1,R1)
                         VNey += electricfield(p,Ex,Ey,Ez,Zc, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, 2,R1)
                         VNez += electricfield(p,Ex,Ey,Ez,Zc, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, 3,R1)
@@ -636,7 +636,7 @@ cpdef runCythonRunGeoDev(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] 
                                             
                                             alpha = p*q/(p+q)
                                             
-                                            R1 = runR(l1+l2+l3+l4, m1+m2+m3+m4, n1+n2+n3+n4, Qx, Qy, Qz, Px, Py, Pz, alpha, Rbuffer, check=1)
+                                            R1 = R(l1+l2+l3+l4, m1+m2+m3+m4, n1+n2+n3+n4, Qx, Qy, Qz, Px, Py, Pz, alpha, R1buffer, Rbuffer, check=1)
                                             
                                             
                                             # Calcul1te x derivative
@@ -709,7 +709,7 @@ cpdef runCythonRunGeoDev(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] 
     return Sxarr, Syarr, Szarr, Txarr, Tyarr, Tzarr, VNexarr, VNeyarr, VNezarr, ERIx, ERIy, ERIz
     
 
-cpdef double [:,:] runQMESPcython(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] basisint, double[:,:] Ve, double Zc, double Cx, double Cy, double Cz, double [:,:,:] Rbuffer):
+cpdef double [:,:] runQMESPcython(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] basisint, double[:,:] Ve, double Zc, double Cx, double Cy, double Cz, double [:,:,:] R1buffer, double [:,:,:,:] Rbuffer):
     cdef double calc, p, Px, Py, Pz, RPC
     cdef int k, l, i, j, t, u, v
     cdef double [:] Ex, Ey, Ez
@@ -756,7 +756,7 @@ cpdef double [:,:] runQMESPcython(int [:,:] basisidx, double [:,:] basisfloat, i
                         Ez[v] = E(n1,n2,v,Az-Bz,a,b,Pz-Az,Pz-Bz,Az-Bz)
 
                     RPC = ((Px-Cx)**2+(Py-Cy)**2+(Pz-Cz)**2)**0.5
-                    R1 = runR(l1+l2, m1+m2, n1+n2, Cx, Cy, Cz, Px, Py, Pz, p, Rbuffer)
+                    R1 = R(l1+l2, m1+m2, n1+n2, Cx, Cy, Cz, Px, Py, Pz, p, R1buffer, Rbuffer)
 
                     calc += elnuc(p, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, Zc, Ex, Ey, Ez, R1)
 

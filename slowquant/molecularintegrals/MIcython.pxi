@@ -4,60 +4,163 @@ cimport numpy as np
 from scipy.special.cython_special cimport hyp1f1, gamma
 
 
-cdef double [:,:,:] runR(int l1l2, int m1m2, int n1n2, double Cx, double Cy, double Cz, double Px,  double Py, double Pz, double p, double [:,:,:] R1, int check=0):
-    cdef double RPC
-    cdef int t, u, v
+cdef double [:,:,:] R(int l1l2, int m1m2, int n1n2, double Cx, double Cy, double Cz, double Px,  double Py, double Pz, double p, double [:,:,:] R1, double [:,:,:,:] Rbuffer, check=0):
+    cdef double RPC, PCx, PCy, PCz, val
+    cdef int t, u, v, n, exclude_from_n
     # check = 0, normal calculation. 
     # check = 1, derivative calculation
+    
+    PCx = Px-Cx
+    PCy = Py-Cy
+    PCz = Pz-Cz
+    RPC = ((PCx)**2+(PCy)**2+(PCz)**2)**0.5
     if check == 0:
-        RPC = ((Px-Cx)**2+(Py-Cy)**2+(Pz-Cz)**2)**0.5
         for t in range(0, l1l2+1):
             for u in range(0, m1m2+1):
                 for v in range(0, n1n2+1):
-                    R1[t,u,v] = R(t,u,v,0,p,Px-Cx,Py-Cy,Pz-Cz,RPC)
-                    
+                    # Check the range of n, to ensure no redundent n are calculated
+                    if t == u == 0:
+                        exclude_from_n = v
+                    elif t == 0:
+                        exclude_from_n = n1n2 + u
+                    else:
+                        exclude_from_n = n1n2 + m1m2 + t
+                    for n in range(0, l1l2+m1m2+n1n2+1-exclude_from_n):
+                        val = 0.0
+                        if t == u == v == 0:
+                            Rbuffer[t,u,v,n] = (-2.0*p)**n*boys(n,p*RPC*RPC)
+                        else:
+                            if t == u == 0:
+                                if v > 1:
+                                    val += (v-1)*Rbuffer[t,u,v-2,n+1]
+                                val += PCz*Rbuffer[t,u,v-1,n+1]  
+                            elif t == 0:
+                                if u > 1:
+                                    val += (u-1)*Rbuffer[t,u-2,v,n+1]
+                                val += PCy*Rbuffer[t,u-1,v,n+1]
+                            else:
+                                if t > 1:
+                                    val += (t-1)*Rbuffer[t-2,u,v,n+1]
+                                val += PCx*Rbuffer[t-1,u,v,n+1]
+                            Rbuffer[t,u,v,n] = val
+                            
+                        if n == 0:
+                            R1[t,u,v] = Rbuffer[t,u,v,n]
+                            
+                            
     elif check == 1:
         # For the first derivative +1 is needed in t, u and v
-        # but only one at a time.
-        RPC = ((Px-Cx)**2+(Py-Cy)**2+(Pz-Cz)**2)**0.5
+        # First the "normal" Rs are calculated
         for t in range(0, l1l2+1):
             for u in range(0, m1m2+1):
-                R1[t,u,n1n2+1] = R(t,u,n1n2+1,0,p,Px-Cx,Py-Cy,Pz-Cz,RPC)
                 for v in range(0, n1n2+1):
-                    R1[t,u,v] = R(t,u,v,0,p,Px-Cx,Py-Cy,Pz-Cz,RPC)
+                    # Check the range of n, to ensure no redundent n are calculated
+                    if t == u == 0:
+                        exclude_from_n = v
+                    elif t == 0:
+                        exclude_from_n = n1n2 + u
+                    else:
+                        exclude_from_n = n1n2 + m1m2 + t
+                    # +1 in n because of derivative    
+                    for n in range(0, l1l2+m1m2+n1n2+1+1-exclude_from_n):
+                        val = 0.0
+                        if t == u == v == 0:
+                            Rbuffer[t,u,v,n] = (-2.0*p)**n*boys(n,p*RPC*RPC)
+                        else:
+                            if t == u == 0:
+                                if v > 1:
+                                    val += (v-1)*Rbuffer[t,u,v-2,n+1]
+                                val += PCz*Rbuffer[t,u,v-1,n+1]  
+                            elif t == 0:
+                                if u > 1:
+                                    val += (u-1)*Rbuffer[t,u-2,v,n+1]
+                                val += PCy*Rbuffer[t,u-1,v,n+1]
+                            else:
+                                if t > 1:
+                                    val += (t-1)*Rbuffer[t-2,u,v,n+1]
+                                val += PCx*Rbuffer[t-1,u,v,n+1]
+                            Rbuffer[t,u,v,n] = val
+
+                        if n == 0:
+                            R1[t,u,v] = Rbuffer[t,u,v,n]
+        
+        # The next three blocks of code, calculates the
+        # +1 incriments in the different angularmoment directions.
+        # only one direction is +1 at a time.
+        # eg. no need to calc R(t+1,u+1,v+1)
+        # but only; R(t+1,u,v), R(t,u,v+1), R(t,u+,v)
+        v = n1n2+1
+        for t in range(0, l1l2+1):
+            for u in range(0, m1m2+1):
+                # Check the range of n, to ensure no redundent n are calculated
+                if t == u == 0:
+                    exclude_from_n = v
+                elif t == 0:
+                    exclude_from_n = n1n2 + 1 + u
+                else:
+                    exclude_from_n = n1n2 + 1 + m1m2 + t
+                # +1 in n because of derivative    
+                for n in range(0, l1l2+m1m2+n1n2+1+1-exclude_from_n):
+                    val = 0.0
+                    if t == u == 0:
+                        if v > 1:
+                            val += (v-1)*Rbuffer[t,u,v-2,n+1]
+                        val += PCz*Rbuffer[t,u,v-1,n+1]  
+                    elif t == 0:
+                        if u > 1:
+                            val += (u-1)*Rbuffer[t,u-2,v,n+1]
+                        val += PCy*Rbuffer[t,u-1,v,n+1]
+                    else:
+                        if t > 1:
+                            val += (t-1)*Rbuffer[t-2,u,v,n+1]
+                        val += PCx*Rbuffer[t-1,u,v,n+1]
+                    Rbuffer[t,u,v,n] = val
+
+                    if n == 0:
+                        R1[t,u,v] = Rbuffer[t,u,v,n]
+        
+        u = m1m2+1
+        for t in range(0, l1l2+1):
+            for v in range(0, n1n2+1):
+                # Check the range of n, to ensure no redundent n are calculated
+                if t == 0:
+                    exclude_from_n = n1n2 + u
+                else:
+                    exclude_from_n = n1n2 + m1m2 + 1 + t
+                # +1 in n because of derivative    
+                for n in range(0, l1l2+m1m2+n1n2+1+1-exclude_from_n):
+                    val = 0.0
                     if t == 0:
-                        R1[l1l2+1,u,v] = R(l1l2+1,u,v,0,p,Px-Cx,Py-Cy,Pz-Cz,RPC)
-                    if u == 0:
-                        R1[t,m1m2+1,v] = R(t,m1m2+1,v,0,p,Px-Cx,Py-Cy,Pz-Cz,RPC) 
-                        
+                        if u > 1:
+                            val += (u-1)*Rbuffer[t,u-2,v,n+1]
+                        val += PCy*Rbuffer[t,u-1,v,n+1]
+                    else:
+                        if t > 1:
+                            val += (t-1)*Rbuffer[t-2,u,v,n+1]
+                        val += PCx*Rbuffer[t-1,u,v,n+1]
+                    Rbuffer[t,u,v,n] = val
+
+                    if n == 0:
+                        R1[t,u,v] = Rbuffer[t,u,v,n]
+
+        t = l1l2+1
+        for u in range(0, m1m2+1):
+            for v in range(0, n1n2+1):
+                # Check the range of n, to ensure no redundent n are calculated
+                exclude_from_n = n1n2 + m1m2 + t
+                # +1 in n because of derivative    
+                for n in range(0, l1l2+m1m2+n1n2+1+1-exclude_from_n):
+                    val = 0.0
+                    if t > 1:
+                        val += (t-1)*Rbuffer[t-2,u,v,n+1]
+                    val += PCx*Rbuffer[t-1,u,v,n+1]
+                    Rbuffer[t,u,v,n] = val
+
+                    if n == 0:
+                        R1[t,u,v] = Rbuffer[t,u,v,n]
+        
     return R1
     
-
-cdef double R(int t, int u, int v, int n, double p, double PCx, double PCy, double PCz, double RPC):
-    cdef double T, val, res    
-
-    T = p*RPC*RPC
-    val = 0.0
-    if t == u == v == 0:
-        val += (-2.0*p)**n*boys(n,T)
-    elif t == u == 0:
-        if v > 1:
-            val+=(v-1)*R(t,u,v-2,n+1,p,PCx,PCy,PCz,RPC)
-        if PCz != 0:
-            val+=PCz*R(t,u,v-1,n+1,p,PCx,PCy,PCz,RPC)  
-    elif t == 0:
-        if u > 1:
-            val+=(u-1)*R(t,u-2,v,n+1,p,PCx,PCy,PCz,RPC) 
-        if PCy != 0:
-            val+=PCy*R(t,u-1,v,n+1,p,PCx,PCy,PCz,RPC)  
-    else:
-        if t > 1:
-            val+=(t-1)*R(t-2,u,v,n+1,p,PCx,PCy,PCz,RPC)
-        if PCx != 0:
-            val+=PCx*R(t-1,u,v,n+1,p,PCx,PCy,PCz,RPC)
-    
-    return val
-
 
 cdef double boys(double m,double T):
     return hyp1f1(m+0.5,m+1.5,-T)/(2.0*m+1.0) 

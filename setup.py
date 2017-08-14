@@ -6,6 +6,7 @@ import numpy
 #Cython.Compiler.Options.get_directive_defaults()['cdivision'] = True
 #Cython.Compiler.Options.get_directive_defaults()['boundscheck'] = False
 #Cython.Compiler.Options.get_directive_defaults()['wraparound'] = False
+#Cython.Compiler.Options.get_directive_defaults()['profile'] = True
 
 ext_modules=[
     Extension('slowquant.molecularintegrals.runMIcython',['slowquant/molecularintegrals/runMIcython.pyx']),

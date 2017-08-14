@@ -1,4 +1,4 @@
-basisset;6-31ppGss
+basisset;3-21G
 Initial method;BOMD
 SCF Energy Threshold;12
 SCF RMSD Threshold;12

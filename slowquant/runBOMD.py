@@ -4,87 +4,17 @@ import time
 from slowquant import BasisSet as BS
 from slowquant import runMolecularIntegrals as MI
 from slowquant import HartreeFock as HF
+from slowquant import Force as F
 
-def Forces(results, input, set):
-    basis = BS.bassiset(input, set)
-    results = MI.runIntegrals(input, basis, set, results)
-    results = MI.rungeometric_derivatives(input, basis, set, results, print_time='No')
-    results = HF.HartreeFock(input, set, basis, VNN=results['VNN'], Te=results['Te'], S=results['S'], VeN=results['VNe'], Vee=results['Vee'], results=results, print_SCF='No')
-    D = results['D']
-    CMO = results['C_MO']
-    FAO = results['F']
-    CTMO = np.transpose(CMO)
-    eps = np.dot(np.dot(CTMO, FAO),CMO)
-    P = 2*D
-
-    Q = np.zeros((len(CMO),len(CMO)))
-    for v in range(0, len(CMO)):
-        for u in range(0, len(CMO)):
-            for a in range(0, int(input[0][0]/2)):
-                Q[v,u] += 2*eps[a,a]*CMO[u,a]*CMO[v,a]
-    
-    for j in range(1, len(input)):
-        dxenuc = results[str(j)+'dxVNN']
-        dyenuc = results[str(j)+'dyVNN']
-        dzenuc = results[str(j)+'dzVNN']
-        
-        dxEkin = results[str(j)+'dxTe']
-        dyEkin = results[str(j)+'dyTe']
-        dzEkin = results[str(j)+'dzTe']
-        
-        dxoverlap = results[str(j)+'dxS']
-        dyoverlap = results[str(j)+'dyS']
-        dzoverlap = results[str(j)+'dzS']
-        
-        dxnucatt = results[str(j)+'dxVNe']
-        dynucatt = results[str(j)+'dyVNe']
-        dznucatt = results[str(j)+'dzVNe']
-        
-        dxtwoint = results[str(j)+'dxVee']
-        dytwoint = results[str(j)+'dyVee']
-        dztwoint = results[str(j)+'dzVee']
-        
-        dxHcore = 0
-        dyHcore = 0
-        dzHcore = 0
-        
-        dxERI = 0
-        dyERI = 0
-        dzERI = 0
-        
-        dxS = 0
-        dyS = 0
-        dzS = 0
-        
-        for u in range(0, len(P)):
-            for v in range(0, len(P)):
-                dxHcore += P[v,u]*(dxEkin[u,v]+dxnucatt[u,v])
-                dyHcore += P[v,u]*(dyEkin[u,v]+dynucatt[u,v])
-                dzHcore += P[v,u]*(dzEkin[u,v]+dznucatt[u,v])
-        
-        for u in range(0, len(P)):
-            for v in range(0, len(P)):
-                for l in range(0, len(P)):
-                    for s in range(0, len(P)):
-                        dxERI += 0.5*P[v,u]*P[l,s]*(dxtwoint[u,v,s,l]-0.5*dxtwoint[u,l,s,v])
-                        dyERI += 0.5*P[v,u]*P[l,s]*(dytwoint[u,v,s,l]-0.5*dytwoint[u,l,s,v])
-                        dzERI += 0.5*P[v,u]*P[l,s]*(dztwoint[u,v,s,l]-0.5*dztwoint[u,l,s,v])
-        
-        for u in range(0, len(dxoverlap)):
-            for v in range(0, len(dxoverlap)):
-                dxS += Q[v,u]*dxoverlap[u,v]
-                dyS += Q[v,u]*dyoverlap[u,v]
-                dzS += Q[v,u]*dzoverlap[u,v]
-        
-        
-        input[j,8]  = -1.0*(dxHcore + dxERI - dxS + dxenuc[0])
-        input[j,9]  = -1.0*(dyHcore + dyERI - dyS + dyenuc[0])
-        input[j,10] = -1.0*(dzHcore + dzERI - dzS + dzenuc[0])
-    
+def Get_Forces(results, input, set):
+    dX, dY, dZ, results = F.Force(input, set, results, print_scf='No')
+    input[:,8]  = -1.0*dX
+    input[:,9]  = -1.0*dY
+    input[:,10] = -1.0*dZ
     return input, results
     
-def VelocityVerlet(input, dt, results, set):
     
+def VelocityVerlet(input, dt, results, set):
     Forces_old = np.zeros((len(input),len(input[0])))
     # Update position
     for i in range(1, len(input)):
@@ -98,7 +28,7 @@ def VelocityVerlet(input, dt, results, set):
         Forces_old[i,10] = input[i,10]
         
     # Get forces
-    input, results = Forces(results, input, set)
+    input, results = Get_Forces(results, input, set)
     
     # Update velocity
     for i in range(1, len(input)):
@@ -111,7 +41,7 @@ def VelocityVerlet(input, dt, results, set):
 
 def BOMD(input, set, results):
     
-    Temperature = float(set['Temperature'])/(3.1577464*10**5)
+    Temperature = float(set['Temperature'])/(3.1577464*10**5) # Convert from K til a.u.
     steps       = int(set['steps'])
     stepsize    = float(set['stepsize'])
     

@@ -53,9 +53,10 @@ def runIntegrals(input, basis, settings, results):
     E2arr = np.zeros((len(basisidx),len(basisidx),np.max(basisidx[:,0]),np.max(basisidx[:,0]),np.max(basisint[:,0:3])*2+1))
     E3arr = np.zeros((len(basisidx),len(basisidx),np.max(basisidx[:,0]),np.max(basisidx[:,0]),np.max(basisint[:,0:3])*2+1))
     # Array to store R values, only created once if created here
-    Rbuffer = np.zeros((4*np.max(basisint)+1,4*np.max(basisint)+1,4*np.max(basisint)+1))
+    R1buffer = np.zeros((4*np.max(basisint)+1,4*np.max(basisint)+1,4*np.max(basisint)+1))
+    Rbuffer = np.zeros((4*np.max(basisint)+1,4*np.max(basisint)+1,4*np.max(basisint)+1,3*4*np.max(basisint)+1))
     
-    Na, S, T, ERI = runCythonIntegrals(basisidx, basisfloat, basisint, input, Na, S, T, ERI, E1arr, E2arr, E3arr, Rbuffer)
+    Na, S, T, ERI = runCythonIntegrals(basisidx, basisfloat, basisint, input, Na, S, T, ERI, E1arr, E2arr, E3arr, R1buffer, Rbuffer)
 
     results['VNN'] = VNN
     results['VNe'] = np.array(Na)
@@ -146,7 +147,8 @@ def rungeometric_derivatives(input, basis, settings, results, print_time='Yes'):
     # Precalculat all E, they are the same for all atom derivatives
     Earr = runE(basisidx, basisfloat, basisint, input)
     # Array to store R values, only created once if created here
-    Rbuffer = np.zeros((4*np.max(basisint)+1,4*np.max(basisint)+1,4*np.max(basisint)+1))
+    R1buffer = np.zeros((4*np.max(basisint)+2,4*np.max(basisint)+2,4*np.max(basisint)+2))
+    Rbuffer = np.zeros((4*np.max(basisint)+2,4*np.max(basisint)+2,4*np.max(basisint)+2,3*4*(np.max(basisint)+1)+1))
     
     for atomidx in range(1, len(input)):
         start = time.time()
@@ -177,7 +179,7 @@ def rungeometric_derivatives(input, basis, settings, results, print_time='Yes'):
         ERIy = np.zeros((len(basisidx),len(basisidx),len(basisidx),len(basisidx)))
         ERIz = np.zeros((len(basisidx),len(basisidx),len(basisidx),len(basisidx)))
         
-        Sxarr, Syarr, Szarr, Txarr, Tyarr, Tzarr, VNexarr, VNeyarr, VNezarr, ERIx, ERIy, ERIz = runCythonRunGeoDev(basisidx, basisfloat, basisint, input, Earr, Sxarr, Syarr, Szarr, Txarr, Tyarr, Tzarr, VNexarr, VNeyarr, VNezarr, ERIx, ERIy, ERIz, atomidx, Rbuffer)
+        Sxarr, Syarr, Szarr, Txarr, Tyarr, Tzarr, VNexarr, VNeyarr, VNezarr, ERIx, ERIy, ERIz = runCythonRunGeoDev(basisidx, basisfloat, basisint, input, Earr, Sxarr, Syarr, Szarr, Txarr, Tyarr, Tzarr, VNexarr, VNeyarr, VNezarr, ERIx, ERIy, ERIz, atomidx, R1buffer, Rbuffer)
         
         results[str(atomidx)+'dxS']   = np.array(Sxarr)
         results[str(atomidx)+'dyS']   = np.array(Syarr)
@@ -262,11 +264,12 @@ def runQMESP(basis, input, rcx, rcy ,rcz):
     
     basisint = basisint.astype(np.int32)
     # Array to store R values, only created once if created here
-    Rbuffer = np.zeros((2*np.max(basisint)+1,2*np.max(basisint)+1,2*np.max(basisint)+1))
+    R1buffer = np.zeros((2*np.max(basisint)+1,2*np.max(basisint)+1,2*np.max(basisint)+1))
+    Rbuffer = np.zeros((2*np.max(basisint)+1,2*np.max(basisint)+1,2*np.max(basisint)+1,3*2*np.max(basisint)+1))
     
     Ve = np.zeros((len(basis),len(basis)))
     Zc = -1.0
     
-    Ve = runQMESPcython(basisidx, basisfloat, basisint, Ve, Zc, rcx, rcy ,rcz, Rbuffer)
+    Ve = runQMESPcython(basisidx, basisfloat, basisint, Ve, Zc, rcx, rcy ,rcz, R1buffer, Rbuffer)
         
     return np.array(Ve)
