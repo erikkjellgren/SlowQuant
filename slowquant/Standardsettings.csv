@@ -2,10 +2,10 @@
 basisset;STO3G
 Initial method;HF
         ; INTEGRAL SETTINGS
-Cauchy-Schwarz Threshold;10
+Cauchy-Schwarz Threshold;1e-10
         ; SCF SETTINGS
-SCF Energy Threshold;12
-SCF RMSD Threshold;12
+SCF Energy Threshold;1e-12
+SCF RMSD Threshold;1e-12
 SCF Max iterations;100
 DIIS;Yes
 Keep Steps;6
@@ -26,7 +26,7 @@ Write ESP;Yes
         ; GEOMOETRY OPTIMIZATION SETTINGS
 GeoOpt;No
 Max iteration GeoOpt;100
-Geometry Tolerance;3
+Geometry Tolerance;1e-3
 Gradient Descent Step;1.0
 Force Numeric;No
         ; CONFIGURATION INTERACTION
@@ -34,8 +34,8 @@ CI;No
         ; COUPLED CLUSTER
 CC;No
 CC Max iterations;100
-CC RMSD Threshold;10
-CC Energy Threshold;10
+CC RMSD Threshold;1e-10
+CC Energy Threshold;1e-10
         ; BOMD
 stepsize;1.0
 steps;20

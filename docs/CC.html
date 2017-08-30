@@ -36,6 +36,7 @@
               href="genindex.html"/>
         <link rel="search" title="Search" href="search.html"/>
     <link rel="top" title="SLOWQUANT  documentation" href="index.html"/>
+        <link rel="next" title="Ab-Initio Molecular Dynamics" href="BOMD.html"/>
         <link rel="prev" title="Configuration Interaction" href="CI.html"/> 
 
   
@@ -112,6 +113,7 @@
 <li class="toctree-l2"><a class="reference internal" href="#perturbative-triples-correction">Perturbative Triples Correction</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="BOMD.html">Ab-Initio Molecular Dynamics</a></li>
 </ul>
 
             
@@ -228,20 +230,22 @@
 <p><img src="_images/math/27dad6008b4988e11232046614412cff26bddd09.png" alt="E_{\mathrm{CCSD}}=\sum_{i,a}^{occ,virt}f_{ia}t_{i}^{a}+\sum_{i,j,a,b}^{occ,occ,virt,virt}\left\langle ij\left|\right|ab\right\rangle \left(\frac{1}{4}t_{ij}^{ab}+\frac{1}{2}t_{i}^{a}t_{j}^{b}\right)"/></p>
 </div><p>FUNCTION:</p>
 <ul class="simple">
-<li>CC.CCSD(F, C, input, results, set)</li>
+<li>CC.CCSD(occ, F, C, VeeMOspin, maxiter, deTHR, rmsTHR, runCCSDT=0)</li>
+<li>return EMP2, ECCSD</li>
 </ul>
 <p>Input:</p>
 <ul class="simple">
 <li>F, fock matrix in spatial basis</li>
 <li>C, MO coeffcients in spatial basis</li>
-<li>input, inputfile object</li>
-<li>results, results object</li>
-<li>set, settings object</li>
+<li>VeeMOspin, two electron integrals in spinbasis</li>
+<li>deTHR, change in energy check for convergence</li>
+<li>rmsTHR, check for change in T1 and T2</li>
+<li>runCCSDT, 0 for CCSD and 1 for CCSD(T)</li>
 </ul>
 <p>Output:</p>
 <ul class="simple">
-<li>results, results obejct with added entries</li>
-<li>results[‘ECCSD’] = ECCSD</li>
+<li>EMP2, MP2 energy</li>
+<li>ECCSD, CCSD energy</li>
 </ul>
 <p>References:</p>
 <ul class="simple">
@@ -267,20 +271,18 @@
 <p><img src="_images/math/584e825881f117d11d095bfbd0ee6f6cfeb4bc07.png" alt="E_{\mathrm{\left(T\right)}}=\frac{1}{36}\sum_{i,j,k,a,b,c}^{occ,occ,occ,virt,virt,virt}t_{ijk,\mathrm{connected}}^{abc}D_{ijk}^{abc}\left(t_{ijk,\mathrm{connected}}^{abc}+t_{ijk,\mathrm{disconnected}}^{abc}\right)"/></p>
 </div><p>FUNCTION:</p>
 <ul class="simple">
-<li>CC.CCSD(F, C, input, results, set)</li>
+<li>see CCSD function above</li>
+<li>return EMP2, ECCSD, ET</li>
 </ul>
 <p>Input:</p>
 <ul class="simple">
-<li>F, fock matrix in spatial basis</li>
-<li>C, MO coeffcients in spatial basis</li>
-<li>input, inputfile object</li>
-<li>results, results object</li>
-<li>set, settings object</li>
+<li>runCCSDT=1</li>
 </ul>
 <p>Output:</p>
 <ul class="simple">
-<li>results, results obejct with added entries</li>
-<li>results[‘E(T)’] = ET</li>
+<li>EMP2, MP2 energy</li>
+<li>ECCSD, CCSD energy</li>
+<li>ET, perturbative triples corrections</li>
 </ul>
 <p>References:</p>
 <ul class="simple">
@@ -298,6 +300,8 @@
           <footer>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="BOMD.html" class="btn btn-neutral float-right" title="Ab-Initio Molecular Dynamics" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
         <a href="CI.html" class="btn btn-neutral" title="Configuration Interaction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>

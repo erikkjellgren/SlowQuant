@@ -112,6 +112,7 @@
 <li class="toctree-l1"><a class="reference internal" href="GeoOpt.html">Geometry optimization</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CI.html">Configuration Interaction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CC.html">Coupled Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="BOMD.html">Ab-Initio Molecular Dynamics</a></li>
 </ul>
 
             
@@ -192,16 +193,16 @@
 <span class="n">Charge</span><span class="p">;</span><span class="n">No</span>
 <span class="n">Dipole</span><span class="p">;</span><span class="n">No</span>
 <span class="n">DIIS</span><span class="p">;</span><span class="n">Yes</span>
-<span class="n">SCF</span> <span class="n">Energy</span> <span class="n">Threshold</span><span class="p">;</span><span class="mi">5</span>
-<span class="n">SCF</span> <span class="n">RMSD</span> <span class="n">Threshold</span><span class="p">;</span><span class="mi">5</span>
+<span class="n">SCF</span> <span class="n">Energy</span> <span class="n">Threshold</span><span class="p">;</span><span class="mf">1e-5</span>
+<span class="n">SCF</span> <span class="n">RMSD</span> <span class="n">Threshold</span><span class="p">;</span><span class="mf">1e-5</span>
 </pre></div>
 </div>
 <div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">basisset</span><span class="p">;</span><span class="mi">6</span><span class="o">-</span><span class="mi">31</span><span class="n">ppGss</span>
 <span class="n">Charge</span><span class="p">;</span><span class="n">No</span>
 <span class="n">Dipole</span><span class="p">;</span><span class="n">No</span>
 <span class="n">DIIS</span><span class="p">;</span><span class="n">No</span>
-<span class="n">SCF</span> <span class="n">Energy</span> <span class="n">Threshold</span><span class="p">;</span><span class="mi">5</span>
-<span class="n">SCF</span> <span class="n">RMSD</span> <span class="n">Threshold</span><span class="p">;</span><span class="mi">5</span>
+<span class="n">SCF</span> <span class="n">Energy</span> <span class="n">Threshold</span><span class="p">;</span><span class="mf">1e-5</span>
+<span class="n">SCF</span> <span class="n">RMSD</span> <span class="n">Threshold</span><span class="p">;</span><span class="mf">1e-5</span>
 </pre></div>
 </div>
 <p>First a SCF calculation was performed with DIIS enabled giving:</p>

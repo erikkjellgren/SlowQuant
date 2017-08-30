@@ -91,11 +91,13 @@
             
               <p class="caption"><span class="caption-text">How to use</span></p>
 <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation and Running</a></li>
 <li class="toctree-l1"><a class="reference internal" href="keywords.html">List of keywords</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Example input files</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#hartree-fock-calculation">Hartree-Fock calculation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#mp2-calculation">MP2 calculation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#geometry-optimization">Geometry optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#bomd-simulation">BOMD simulation</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="issues.html">Issues</a></li>
@@ -113,6 +115,7 @@
 <li class="toctree-l1"><a class="reference internal" href="GeoOpt.html">Geometry optimization</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CI.html">Configuration Interaction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CC.html">Coupled Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="BOMD.html">Ab-Initio Molecular Dynamics</a></li>
 </ul>
 
             
@@ -210,6 +213,19 @@
 </pre></div>
 </div>
 <p>Example of settingsfile. Performs a geometry optimization calculation with the basisset STO3G</p>
+</div>
+<div class="section" id="bomd-simulation">
+<h2>BOMD simulation<a class="headerlink" href="#bomd-simulation" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">basisset</span><span class="p">;</span><span class="mi">3</span><span class="o">-</span><span class="mi">21</span><span class="n">G</span>
+<span class="n">Initial</span> <span class="n">method</span><span class="p">;</span><span class="n">BOMD</span>
+<span class="n">SCF</span> <span class="n">Energy</span> <span class="n">Threshold</span><span class="p">;</span><span class="mf">1e-12</span>
+<span class="n">SCF</span> <span class="n">RMSD</span> <span class="n">Threshold</span><span class="p">;</span><span class="mf">1e-12</span>
+<span class="n">steps</span><span class="p">;</span><span class="mi">100</span>
+<span class="n">stepsize</span><span class="p">;</span><span class="mf">1.0</span>
+<span class="n">SCF</span> <span class="n">Max</span> <span class="n">iterations</span><span class="p">;</span><span class="mi">1000</span>
+</pre></div>
+</div>
+<p>Example of settingsfile. Perfoms a BOMD simulation of 100 steps, with a time step of 1.0 a.u.</p>
 </div>
 </div>
 

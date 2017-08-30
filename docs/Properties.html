@@ -115,6 +115,7 @@
 <li class="toctree-l1"><a class="reference internal" href="GeoOpt.html">Geometry optimization</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CI.html">Configuration Interaction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CC.html">Coupled Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="BOMD.html">Ab-Initio Molecular Dynamics</a></li>
 </ul>
 
             
@@ -188,23 +189,23 @@
 <p><img src="_images/math/dc1640c2581bd17c09999c0b3fcda77234c3f0df.png" alt="\mu_{x}=-\sum_{i}\sum_{j}D_{i,j}\left(i\left|x\right|j\right)+\sum_{A}Z_{A}X_{A}"/></p>
 </div><p>FUNCTION:</p>
 <ul class="simple">
-<li>Properties.dipolemoment(basis, input, D, results)</li>
-<li>return results</li>
+<li>Properties.dipolemoment(input, D, mux, muy, muz)</li>
+<li>return ux, uy, uz, u</li>
 </ul>
 <p>Input:</p>
 <ul class="simple">
-<li>basis, basisset object</li>
 <li>input, inputfile object</li>
 <li>D, density matrix</li>
-<li>results, results object</li>
+<li>mux, dipolemoment integrals in x direction</li>
+<li>muy, dipolemoment integrals in y direction</li>
+<li>muz, dipolemoment integrals in z direction</li>
 </ul>
 <p>Output:</p>
 <ul class="simple">
-<li>results, results obejct with added entries</li>
-<li>results[‘dipolex’] = ux</li>
-<li>results[‘dipoley’] = uy</li>
-<li>results[‘dipolez’] = uz</li>
-<li>results[‘dipoletot’] = u</li>
+<li>ux, dipolemoment in x direction</li>
+<li>uy, dipolemoment in y direction</li>
+<li>uz, dipolemoment in z direction</li>
+<li>u, total dipolemoment</li>
 </ul>
 <p>Refrence:</p>
 <ul class="simple">
@@ -218,18 +219,19 @@
 <p><img src="_images/math/a93cd379353a2396b1a558c3ee9e43004abc957e.png" alt="q_{A}=Z_{A}-\sum_{i\in A}\left(D\cdot S\right)_{i,i}"/></p>
 </div><p>FUNCTION:</p>
 <ul class="simple">
-<li>Properties.MulCharge(basis, input, D)</li>
-<li>None</li>
+<li>Properties.MulCharge(basis, input, D, S)</li>
+<li>return qvec</li>
 </ul>
 <p>Input:</p>
 <ul class="simple">
 <li>basis, basisset object</li>
 <li>input, inputfile object</li>
 <li>D, density matrix</li>
+<li>S, overlap matrix</li>
 </ul>
 <p>Output:</p>
 <ul class="simple">
-<li>None</li>
+<li>qvec, vector of Mulliken charges</li>
 </ul>
 <p>Refrence:</p>
 <ul class="simple">
@@ -243,18 +245,19 @@
 <p><img src="_images/math/e0d9ddb04b35a69dca78a16ad0c32e74bea50411.png" alt="q_{A}=Z_{A}-\sum_{i\in A}\left(S^{1/2}\cdot D\cdot S^{1/2}\right)_{i,i}"/></p>
 </div><p>FUNCTION:</p>
 <ul class="simple">
-<li>Properties.LowdinCharge(basis, input, D)</li>
-<li>None</li>
+<li>Properties.LowdinCharge(basis, input, D, S)</li>
+<li>return qvec</li>
 </ul>
 <p>Input:</p>
 <ul class="simple">
 <li>basis, basisset object</li>
 <li>input, inputfile object</li>
 <li>D, density matrix</li>
+<li>S, overlap matrix</li>
 </ul>
 <p>Output:</p>
 <ul class="simple">
-<li>None</li>
+<li>qvec, vector of Lowdin charges</li>
 </ul>
 <p>Refrence:</p>
 <ul class="simple">
@@ -274,19 +277,19 @@
 </div><p>All of the elements are in spin basis.</p>
 <p>FUNCTION:</p>
 <ul class="simple">
-<li>Properties.RPA(F, C, input, results)</li>
+<li>Properties.RPA(occ, F, C, VeeMOspin)</li>
+<li>return Exc</li>
 </ul>
 <p>Input:</p>
 <ul class="simple">
+<li>occ, number of occupied MOs in spinbasis</li>
 <li>F, fock matrix in spatial basis</li>
 <li>C, MO coeffcients in spatial basis</li>
-<li>input, inputfile object</li>
-<li>results, results object</li>
+<li>VeeMOspin, MO integrals in spin basis</li>
 </ul>
 <p>Output:</p>
 <ul class="simple">
-<li>results, results obejct with added entries</li>
-<li>results[‘RPA Exc’] = Exc</li>
+<li>Exc, single excitation energies</li>
 </ul>
 <p>References:</p>
 <ul class="simple">

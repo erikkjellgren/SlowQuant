@@ -1,18 +1,16 @@
 import numpy as np
 import time
 import sys
-from slowquant import BasisSet as BS
-from slowquant import runMolecularIntegrals as MI
-from slowquant import HartreeFock as HF   
-from slowquant import Properties as prop
-from slowquant import MPn as MP
-from slowquant import Qfit as QF
-from slowquant import IntegralTransform as utilF 
-from slowquant import GeometryOptimization as GO
-from slowquant import UHF
-from slowquant import CI
-from slowquant import runCC as CC
-from slowquant import runBOMD as MD
+import slowquant.basissets.BasisSet as BS
+import slowquant.molecularintegrals.runMolecularIntegrals as MI
+import slowquant.hartreefock.runHartreeFock as HF   
+import slowquant.properties.runProperties as prop
+import slowquant.mollerplesset.runMPn as MP
+import slowquant.qfit.Qfit as QF
+import slowquant.geometryoptimization.GeometryOptimization as GO
+import slowquant.configurationinteraction.runCI as CI
+import slowquant .coupledcluster.runCC as CC
+import slowquant.bomd.runBOMD as MD
 
 def run(inputname, settingsname):
     settings = np.genfromtxt('slowquant/Standardsettings.csv', delimiter = ';', dtype='str')
@@ -41,7 +39,7 @@ def run(inputname, settingsname):
     output.close()
     
     if set['Initial method'] == 'BOMD':
-        results = MD.BOMD(input, set, results)
+        results = MD.runBOMD(input, set, results)
     
     elif set['Initial method'] == 'UHF':
         basis = BS.bassiset(input, set)
@@ -50,7 +48,7 @@ def run(inputname, settingsname):
         print(time.time()-start, 'INTEGRALS')
         
         start = time.time()
-        C_alpha, F_alpha, D_alpha, C_beta, F_beta, D_beta, results = UHF.HartreeFock(input, set, basis, VNN=results['VNN'], Te=results['Te'], S=results['S'], VeN=results['VNe'], Vee=results['Vee'], results=results)
+        results = HF.runHartreeFock(input, set, results)
         print(time.time()-start, 'UHF')
     
     elif set['Initial method'] == 'HF':
@@ -64,12 +62,8 @@ def run(inputname, settingsname):
         print(time.time()-start, 'INTEGRALS')
         
         start = time.time()
-        results = HF.HartreeFock(input, set, basis, VNN=results['VNN'], Te=results['Te'], S=results['S'], VeN=results['VNe'], Vee=results['Vee'], results=results)
+        results = HF.runHartreeFock(input, set, results)
         print(time.time()-start, 'HF')
-        
-        start = time.time()
-        results = utilF.runTransform(set, results)
-        print(time.time()-start, 'MO transform')
         
         start = time.time()
         results = prop.runprop(basis, input, set, results)

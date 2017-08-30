@@ -114,6 +114,7 @@
 <li class="toctree-l1"><a class="reference internal" href="GeoOpt.html">Geometry optimization</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CI.html">Configuration Interaction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CC.html">Coupled Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="BOMD.html">Ab-Initio Molecular Dynamics</a></li>
 </ul>
 
             
@@ -188,21 +189,19 @@
 </div><p>The above equation is valid for closed shell systems. The integrals is in Mulliken notation, and the denominator is the orbital energies in MO, obtained from an SCF procedure.</p>
 <p>FUNCTION:</p>
 <ul class="simple">
-<li>MPn.MP2(basis, input, F, C, results)</li>
-<li>return results</li>
+<li>MPn.MP2(occ, F, C, VeeMO)</li>
+<li>return EMP2</li>
 </ul>
 <p>Input:</p>
 <ul class="simple">
-<li>basis, basis set object</li>
-<li>input, input file object</li>
+<li>occ, number of occupied MOs</li>
 <li>F, Fock matrix</li>
 <li>C, MO coefficient matrix</li>
-<li>results, results obejct</li>
+<li>VeeMO, twoelecron integral matrix</li>
 </ul>
 <p>Output:</p>
 <ul class="simple">
-<li>results, results obejct with added entries</li>
-<li>results[‘EMP2’] = EMP2</li>
+<li>EMP2, MP2 correction to the Hartree-Fock energy</li>
 </ul>
 <p>References:</p>
 <ul class="simple">
@@ -221,21 +220,19 @@
 +\sum_{abcrst}\frac{\left\langle ab\left|\right|rs\right\rangle \left\langle cs\left|\right|tb\right\rangle \left\langle rt\left|\right|ac\right\rangle }{\left(\epsilon_{a}+\epsilon_{b}-\epsilon_{r}-\epsilon_{s}\right)\left(\epsilon_{a}+\epsilon_{c}-\epsilon_{r}-\epsilon_{t}\right)}"/></p>
 </div><p>FUNCTION:</p>
 <ul class="simple">
-<li>MPn.MP3(basis, input, F, C, results)</li>
-<li>return results</li>
+<li>MPn.MP3(occ, F, C, VeeMO)</li>
+<li>return EMP3</li>
 </ul>
 <p>Input:</p>
 <ul class="simple">
-<li>basis, basis set object</li>
-<li>input, input file object</li>
+<li>occ, number of occupied MOs in spinbasis</li>
 <li>F, Fock matrix</li>
 <li>C, MO coefficient matrix</li>
-<li>results, results obejct</li>
+<li>VeeMOspin, twoelecron integral matrix in spinbasis</li>
 </ul>
 <p>Output:</p>
 <ul class="simple">
-<li>results, results obejct with added entries</li>
-<li>results[‘EMP3’] = EMP3</li>
+<li>EMP3, MP3 correction to the energy</li>
 </ul>
 <p>References:</p>
 <ul class="simple">
@@ -250,21 +247,19 @@
 </div><p>with:</p>
 <p>FUNCTION:</p>
 <ul class="simple">
-<li>MPn.DCPT2(basis, input, F, C, results)</li>
-<li>return results</li>
+<li>MPn.DCPT2(occ, F, C, VeeMO)</li>
+<li>return EDCPT2</li>
 </ul>
 <p>Input:</p>
 <ul class="simple">
-<li>basis, basis set object</li>
-<li>input, input file object</li>
+<li>occ, number of occupied MOs</li>
 <li>F, Fock matrix</li>
 <li>C, MO coefficient matrix</li>
-<li>results, results obejct</li>
+<li>VeeMO, twoelecron integral matrix</li>
 </ul>
 <p>Output:</p>
 <ul class="simple">
-<li>results, results obejct with added entries</li>
-<li>results[‘EDCPT2’] = EDCPT2</li>
+<li>EDCPT2, DCPT2 correction to the Hartree-Fock energy</li>
 </ul>
 <p>References:</p>
 <ul class="simple">

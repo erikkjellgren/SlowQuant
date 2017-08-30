@@ -1,0 +1,7 @@
+basisset;cc-pVQZ
+Charge;No
+Dipole;No
+MPn;No
+DIIS;Yes
+SCF Energy Threshold;1e-5
+SCF RMSD Threshold;1e-5

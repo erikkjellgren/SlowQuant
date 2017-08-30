@@ -2,7 +2,7 @@
 /slowquant/temp/*npy
 out.txt
 potential.pdb
-coords.xyz
+traj.xyz
 
 # Files made by python
 __pycache__/
@@ -15,3 +15,6 @@ __pycache__/
 build/
 *.c
 *.so
+
+# Using Jupyter
+.ipynb_checkpoints/

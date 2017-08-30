@@ -112,6 +112,7 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="CC.html">Coupled Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="BOMD.html">Ab-Initio Molecular Dynamics</a></li>
 </ul>
 
             
@@ -186,19 +187,19 @@
 </div><p>Here everything is in spin orbital basis.</p>
 <p>FUNCTION:</p>
 <ul class="simple">
-<li>CI.CIS(F, C, input, results)</li>
+<li>CI.CIS(occ, F, C, VeeMOspin)</li>
+<li>return Exc</li>
 </ul>
 <p>Input:</p>
 <ul class="simple">
+<li>occ, number of occupied MOs in spinbasis</li>
 <li>F, fock matrix in spatial basis</li>
 <li>C, MO coeffcients in spatial basis</li>
-<li>input, inputfile object</li>
-<li>results, results object</li>
+<li>VeeMOspin, MO integrals in spin basis</li>
 </ul>
 <p>Output:</p>
 <ul class="simple">
-<li>results, results obejct with added entries</li>
-<li>results[‘CIS Exc’] = Exc</li>
+<li>Exc, single excitation energies</li>
 </ul>
 <p>References:</p>
 <ul class="simple">

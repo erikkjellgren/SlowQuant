@@ -1,14 +1,15 @@
 import numpy as np
 import SlowQuant as HFrun
-from slowquant import BasisSet as BS
-from slowquant import DIIS as DIIS
-from slowquant import HartreeFock as HF
-from slowquant import runMolecularIntegrals as MI
+import slowquant.basissets.BasisSet as BS
+import slowquant.hartreefock.DIIS as DIIS
+import slowquant.hartreefock.runHartreeFock as HF   
+from slowquant.hartreefock.HartreeFock import HartreeFock
+import slowquant.molecularintegrals.runMolecularIntegrals as MI
 from slowquant.molecularintegrals.runMIcython import boysPrun
-from slowquant import MPn as MP
-from slowquant import Properties as PROP
-from slowquant import Qfit as QFIT
-from slowquant import IntegralTransform as UF
+import slowquant.mollerplesset.runMPn as MP
+import slowquant.properties.runProperties as prop
+import slowquant.qfit.Qfit as QFIT
+import slowquant.integraltransformation.IntegralTransform as UF
 
 def test_magvec():
     check = 5.196152422706632
@@ -66,21 +67,21 @@ def test_boys():
     
 def test_HartreeFock1():
     settings = np.genfromtxt('slowquant/Standardsettings.csv', delimiter = ';', dtype='str')
+    results = {}
     set = {}
     for i in range(len(settings)):
         set.update({settings[i][0]:settings[i][1]})
-    input    = np.genfromtxt('testfiles/inputH2O.csv', delimiter=';')
+    input    = np.genfromtxt('data/testfiles/inputH2O.csv', delimiter=';')
     set['DIIS'] = 'No'
     set['basisset'] = 'STO3G'
-    VNN      = np.load('testfiles/enucH2O_STO3G.npy')
-    Te       = np.load('testfiles/EkinH2O_STO3G.npy')
-    S        = np.load('testfiles/overlapH2O_STO3G.npy')
-    VeN      = np.load('testfiles/nucattH2O_STO3G.npy')
-    Vee      = np.load('testfiles/twointH2O_STO3G.npy')
-    Dcheck   = np.genfromtxt('testfiles/dH2O_STO3G.csv',delimiter=';')
+    results['VNN']      = np.load('data/testfiles/enucH2O_STO3G.npy')
+    results['Te']       = np.load('data/testfiles/EkinH2O_STO3G.npy')
+    results['S']        = np.load('data/testfiles/overlapH2O_STO3G.npy')
+    results['VNe']      = np.load('data/testfiles/nucattH2O_STO3G.npy')
+    results['Vee']      = np.load('data/testfiles/twointH2O_STO3G.npy')
+    Dcheck   = np.genfromtxt('data/testfiles/dH2O_STO3G.csv',delimiter=';')
     basis    = BS.bassiset(input, set)
-    results  = {}
-    results = HF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results)
+    results = HF.runHartreeFock(input, set, results, print_SCF='No')
     D = results['D']
     for i in range(0, len(D)):
         for j in range(0, len(D)):
@@ -91,18 +92,18 @@ def test_HartreeFock2():
     set = {}
     for i in range(len(settings)):
         set.update({settings[i][0]:settings[i][1]})
-    input    = np.genfromtxt('testfiles/inputCH4.csv', delimiter=';')
+    input    = np.genfromtxt('data/testfiles/inputCH4.csv', delimiter=';')
     set['DIIS'] = 'No'
     set['basisset'] = 'STO3G'
-    VNN      = np.load('testfiles/enucCH4_STO3G.npy')
-    Te       = np.load('testfiles/EkinCH4_STO3G.npy')
-    S        = np.load('testfiles/overlapCH4_STO3G.npy')
-    VeN      = np.load('testfiles/nucattCH4_STO3G.npy')
-    Vee      = np.load('testfiles/twointCH4_STO3G.npy')
-    Dcheck   = np.genfromtxt('testfiles/dCH4_STO3G.csv',delimiter=';')
+    results = {}
+    results['VNN']      = np.load('data/testfiles/enucCH4_STO3G.npy')
+    results['Te']       = np.load('data/testfiles/EkinCH4_STO3G.npy')
+    results['S']        = np.load('data/testfiles/overlapCH4_STO3G.npy')
+    results['VNe']      = np.load('data/testfiles/nucattCH4_STO3G.npy')
+    results['Vee']      = np.load('data/testfiles/twointCH4_STO3G.npy')
+    Dcheck   = np.genfromtxt('data/testfiles/dCH4_STO3G.csv',delimiter=';')
     basis    = BS.bassiset(input, set)
-    results  = {}
-    results = HF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results)
+    results = HF.runHartreeFock(input, set, results, print_SCF='No')
     D = results['D']
     for i in range(0, len(D)):
         for j in range(0, len(D)):
@@ -113,18 +114,18 @@ def test_HartreeFock3():
     set = {}
     for i in range(len(settings)):
         set.update({settings[i][0]:settings[i][1]})
-    input    = np.genfromtxt('testfiles/inputH2O.csv', delimiter=';')
+    input    = np.genfromtxt('data/testfiles/inputH2O.csv', delimiter=';')
     set['DIIS'] = 'No'
     set['basisset'] = 'DZ'
-    VNN      = np.load('testfiles/enucH2O_DZ.npy')
-    Te       = np.load('testfiles/EkinH2O_DZ.npy')
-    S        = np.load('testfiles/overlapH2O_DZ.npy')
-    VeN      = np.load('testfiles/nucattH2O_DZ.npy')
-    Vee      = np.load('testfiles/twointH2O_DZ.npy')
-    Dcheck   = np.genfromtxt('testfiles/dH2O_DZ.csv',delimiter=';')
+    results = {}
+    results['VNN']      = np.load('data/testfiles/enucH2O_DZ.npy')
+    results['Te']       = np.load('data/testfiles/EkinH2O_DZ.npy')
+    results['S']        = np.load('data/testfiles/overlapH2O_DZ.npy')
+    results['VNe']      = np.load('data/testfiles/nucattH2O_DZ.npy')
+    results['Vee']      = np.load('data/testfiles/twointH2O_DZ.npy')
+    Dcheck   = np.genfromtxt('data/testfiles/dH2O_DZ.csv',delimiter=';')
     basis    = BS.bassiset(input, set)
-    results  = {}
-    results = HF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results)
+    results = HF.runHartreeFock(input, set, results, print_SCF='No')
     D = results['D']
     for i in range(0, len(D)):
         for j in range(0, len(D)):
@@ -138,15 +139,14 @@ def test_MP2_1():
     set['basisset'] = 'STO3G'
     set['MPn'] = 'MP2'
     results  = {}
-    input    = np.genfromtxt('testfiles/inputCH4.csv', delimiter=';')
+    input    = np.genfromtxt('data/testfiles/inputCH4.csv', delimiter=';')
     basis    = BS.bassiset(input, set)
-    results['F']        = np.load('testfiles/faoCH4_STO3G.npy')
-    results['C_MO']     = np.load('testfiles/cmoCH4_STO3G.npy')
-    results['Vee']      = np.load('testfiles/twointCH4_STO3G.npy')
-    results = UF.runTransform(set, results)
-    calc = MP.MP2(occ=int(input[0][0]/2), F=results['F'], C=results['C_MO'], VeeMO=results['VeeMO'])
+    results['F']        = np.load('data/testfiles/faoCH4_STO3G.npy')
+    results['C_MO']     = np.load('data/testfiles/cmoCH4_STO3G.npy')
+    results['Vee']      = np.load('data/testfiles/twointCH4_STO3G.npy')
+    results = MP.runMPn(input, results, set)
     check = -0.056046676165
-    assert abs(calc - check) < 10**-7
+    assert abs(results['EMP2'] - check) < 10**-7
 
 
 def test_MP2_2():
@@ -156,16 +156,15 @@ def test_MP2_2():
         set.update({settings[i][0]:settings[i][1]})
     set['basisset'] = 'DZ'
     set['MPn'] = 'MP2'
-    input    = np.genfromtxt('testfiles/inputH2O.csv', delimiter=';')
+    input    = np.genfromtxt('data/testfiles/inputH2O.csv', delimiter=';')
     basis    = BS.bassiset(input, set)
     results  = {}
-    results['F']         = np.load('testfiles/faoH2O_DZ.npy')
-    results['C_MO']      = np.load('testfiles/cmoH2O_DZ.npy')
-    results['Vee']       = np.load('testfiles/twointH2O_DZ.npy')
-    results = UF.runTransform(set, results)
-    calc = MP.MP2(occ=int(input[0][0]/2), F=results['F'], C=results['C_MO'], VeeMO=results['VeeMO'])
+    results['F']         = np.load('data/testfiles/faoH2O_DZ.npy')
+    results['C_MO']      = np.load('data/testfiles/cmoH2O_DZ.npy')
+    results['Vee']       = np.load('data/testfiles/twointH2O_DZ.npy')
+    results = MP.runMPn(input, results, set)
     check = -0.152709879075
-    assert abs(calc - check) < 10**-7
+    assert abs(results['EMP2'] - check) < 10**-7
 
 
 def test_derivative():
@@ -192,8 +191,8 @@ def test_derivative():
 
 ## REGRESSION TESTS
 def test_prop():
-    HFrun.run('testfiles/inputH2O.csv','testfiles/settingsPROP.csv')
-    check = open('testfiles/outPROP.txt','r')
+    results = HFrun.run('data/testfiles/inputH2O.csv','data/testfiles/settingsPROP.csv')
+    check = open('data/testfiles/outPROP.txt','r')
     calc = open('out.txt')
     for line in check:
         if line[0:3] == 'MP2':
@@ -217,8 +216,8 @@ def test_prop():
 
 
 def test_qfit():
-    HFrun.run('testfiles/input2_H2O.csv','testfiles/settingsQFIT.csv')
-    check = open('testfiles/outQFIT.txt','r')
+    HFrun.run('data/testfiles/input2_H2O.csv','data/testfiles/settingsQFIT.csv')
+    check = open('data/testfiles/outQFIT.txt','r')
     calc = open('out.txt')
     for line in check:
         if line[0:4] == 'RMSD':
@@ -232,61 +231,56 @@ def test_qfit():
         
         
 def test_geoopt():
-    results = HFrun.run('testfiles/H2.csv','testfiles/settingsGEO.csv')
+    results = HFrun.run('data/testfiles/H2.csv','data/testfiles/settingsGEO.csv')
     e = 0.000001
-    dp = np.load('testfiles/enucp.npy')
-    dm = np.load('testfiles/enucm.npy')
+    dp = np.load('data/testfiles/enucp.npy')
+    dm = np.load('data/testfiles/enucm.npy')
     dVNN = results['1dxVNN']
     dnVNN = (dp-dm)/(2*e)
     assert np.max(np.abs(dVNN-dnVNN)) < 10**-9
     
     e = 0.000001
-    dp = np.load('testfiles/overlapp.npy')
-    dm = np.load('testfiles/overlapm.npy')
+    dp = np.load('data/testfiles/overlapp.npy')
+    dm = np.load('data/testfiles/overlapm.npy')
     dS = results['1dxS']
     dnS = (dp-dm)/(2*e)
     assert np.max(np.abs(dS-dnS)) < 10**-9
     
     e = 0.000001
-    dp = np.load('testfiles/Ekinp.npy')
-    dm = np.load('testfiles/Ekinm.npy')
+    dp = np.load('data/testfiles/Ekinp.npy')
+    dm = np.load('data/testfiles/Ekinm.npy')
     dTe = results['1dxTe']
     dnTe = (dp-dm)/(2*e)
     assert np.max(np.abs(dTe-dnTe)) < 10**-9
     
     e = 0.000001
-    dp = np.load('testfiles/nucattp.npy')
-    dm = np.load('testfiles/nucattm.npy')
+    dp = np.load('data/testfiles/nucattp.npy')
+    dm = np.load('data/testfiles/nucattm.npy')
     dVNe = results['1dxVNe']
     dnVNe = (dp-dm)/(2*e)
     assert np.max(np.abs(dVNe-dnVNe)) < 10**-9
     
     e = 0.000001
-    dp = np.load('testfiles/twointp.npy')
-    dm = np.load('testfiles/twointm.npy')
+    dp = np.load('data/testfiles/twointp.npy')
+    dm = np.load('data/testfiles/twointm.npy')
     dERI = results['1dxVee']
     dnERI = (dp-dm)/(2*e)
     assert np.max(np.abs(dERI-dnERI)) < 10**-9
     
 
 def test_UHF():
-    results = HFrun.run('testfiles/inputH2_UHF.csv','testfiles/settingsUHF.csv')
-    check = open('testfiles/outUHF.txt','r')
-    calc = open('out.txt')
+    results = HFrun.run('data/testfiles/inputH2_UHF.csv','data/testfiles/settingsUHF.csv')
+    check = open('data/testfiles/outUHF.txt','r')
     for line in check:
         if line[0:2] == '27':
             checkUHF = float(line[23:30])
-
-    for line in calc:
-        if line[0:2] == '27':
-            calcUHF = float(line[23:30])
     
-    assert checkUHF == calcUHF
+    assert abs(checkUHF - results['UHFenergy']) < 10**-4
 
 
 def test_Lowdin():
-    HFrun.run('testfiles/inputH2O.csv','testfiles/settingsLowdin.csv')
-    check = open('testfiles/outLowdin.txt','r')
+    HFrun.run('data/testfiles/inputH2O.csv','data/testfiles/settingsLowdin.csv')
+    check = open('data/testfiles/outLowdin.txt','r')
     calc = open('out.txt')
     for line in check:
         if line[0:5] == 'Atom1':
@@ -298,42 +292,41 @@ def test_Lowdin():
     assert calcLow == checkLow
 
 def test_Ffunction():
-    results = HFrun.run('testfiles/Hm.csv','testfiles/settingFfunctions.csv')
+    results = HFrun.run('data/testfiles/Hm.csv','data/testfiles/settingFfunctions.csv')
     assert results['HFenergy'] + 0.475129018306 < 10**-5
 
 def test_CIS():
-    results = HFrun.run('testfiles/inputH2O.csv','testfiles/settingsCIS.csv')
+    results = HFrun.run('data/testfiles/inputH2O.csv','data/testfiles/settingsCIS.csv')
     check = [0.2872555,0.2872555,0.2872555,0.344424996,0.344424996,0.344424996,0.356461759,0.365988995,0.365988995,0.365988995,0.394513799,0.394513799,0.394513799,0.416071739,0.505628288,0.514289997,0.514289997,0.514289997,0.555191886,0.563055764,0.563055764,0.563055764,0.655318449,0.910121689,1.108770966,1.108770966,1.108770966,1.200096133,1.200096133,1.200096133,1.300785195,1.325762065,19.95852641,19.95852641,19.95852641,20.01097942,20.01134209,20.01134209,20.01134209,20.05053194]
     for i in range(len(results['CIS Exc'])):
         assert results['CIS Exc'][i] - check[i] < 10**-6
 
 def test_RPA():
-    results = HFrun.run('testfiles/inputH2O.csv','testfiles/settingRPA.csv')
+    results = HFrun.run('data/testfiles/inputH2O.csv','data/testfiles/settingRPA.csv')
     check = [0.285163717,0.285163717,0.285163717,0.299743447,0.299743447,0.299743447,0.352626661,0.352626661,0.352626661,0.354778253,0.365131311,0.365131311,0.365131311,0.415317495,0.50010114,0.510661051,0.510661051,0.510661051,0.546071909,0.546071909,0.546071909,0.551371885,0.650270712,0.873425371,1.103818796,1.103818796,1.103818796,1.195787071,1.195787071,1.195787071,1.283205318,1.323742189,19.95850406,19.95850406,19.95850406,20.01094716,20.01130746,20.01130746,20.01130746,20.05049194]
     for i in range(len(results['RPA Exc'])):
         assert results['RPA Exc'][i] - check[i] < 10**-6
 
 def test_MP3():
-    results = HFrun.run('testfiles/inputH2.csv','testfiles/settingMP3.csv')
+    results = HFrun.run('data/testfiles/inputH2.csv','data/testfiles/settingMP3.csv')
     print(results)
     calc = results['EMP2'] + results['EMP3']
     check = -0.0180
     assert abs(calc - check) < 10**-5
 
 def test_CCSD():
-    results = HFrun.run('testfiles/inputH2O.csv','testfiles/settingCCSD.csv')
+    results = HFrun.run('data/testfiles/inputH2O.csv','data/testfiles/settingCCSD.csv')
     check = -0.070680088376-0.000099877272
     calc = results['ECCSD']+results['E(T)']
     assert abs(calc-check) < 10**-10
 
 def test_GeoOptimization():
     # New geometry optimization test, after bug was found
-    results = HFrun.run('testfiles/inputH2O.csv','testfiles/settingFullGeoOpt.csv')
+    results = HFrun.run('data/testfiles/inputH2O.csv','data/testfiles/settingFullGeoOpt.csv')
     check = -74.9658980993
     assert abs(check-results['HFenergy']) < 10**-10
 
 def test_BOMD():
-    results = HFrun.run('testfiles/inputH2O.csv','testfiles/settingBOMD.csv')
+    results = HFrun.run('data/testfiles/inputH2O.csv','data/testfiles/settingBOMD.csv')
     check = -75.5667945588
     assert abs(check-results['HFenergy']) < 10**-10
-    

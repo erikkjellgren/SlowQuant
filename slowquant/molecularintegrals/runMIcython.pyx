@@ -74,7 +74,7 @@ cpdef runCythonIntegrals(int [:,:] basisidx, double [:,:] basisfloat, int [:,:] 
             S[k,l]  = S[l,k]  = calc3
             T[k,l]  = T[l,k]  = calc2
     #END OF one electron integrals
-    
+
     # Run ERI
     for mu in range(0, len(basisidx)):
         for nu in range(mu, len(basisidx)):

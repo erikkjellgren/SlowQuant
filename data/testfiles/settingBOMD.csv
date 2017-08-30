@@ -1,0 +1,7 @@
+basisset;3-21G
+Initial method;BOMD
+SCF Energy Threshold;1e-12
+SCF RMSD Threshold;1e-12
+steps;10
+stepsize;1.0
+SCF Max iterations;1000

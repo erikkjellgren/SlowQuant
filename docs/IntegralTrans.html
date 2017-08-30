@@ -91,6 +91,7 @@
             
               <p class="caption"><span class="caption-text">How to use</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation and Running</a></li>
 <li class="toctree-l1"><a class="reference internal" href="keywords.html">List of keywords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Examples.html">Example input files</a></li>
 <li class="toctree-l1"><a class="reference internal" href="issues.html">Issues</a></li>
@@ -112,6 +113,7 @@
 <li class="toctree-l1"><a class="reference internal" href="GeoOpt.html">Geometry optimization</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CI.html">Configuration Interaction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CC.html">Coupled Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="BOMD.html">Ab-Initio Molecular Dynamics</a></li>
 </ul>
 
             
@@ -185,13 +187,17 @@
 <p><img src="_images/math/926067842b2ca3a7ba9fcdc6dddc092ccfd8cadf.png" alt="\left(ij\left.\right|kl\right)=\sum_{\mu}\sum_{\nu}\sum_{\lambda}\sum_{\sigma}C_{\mu}^{i}C_{\nu}^{j}\left(\mu\nu\left.\right|\lambda\sigma\right)C_{\lambda}^{k}C_{\sigma}^{l}"/></p>
 </div><p>FUNCTION:</p>
 <ul class="simple">
-<li>IntegralTransform.TransformMO(C, basis, set)</li>
+<li>IntegralTransform.Transform2eMO(C, Vee)</li>
+<li>return VeeMO</li>
 </ul>
 <p>Input:</p>
 <ul class="simple">
 <li>C, MO coefficients from SCF calculation</li>
-<li>basis, basisset obejct</li>
-<li>set, settingsfile object</li>
+<li>Vee, two electron integrals in AO basis</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>VeeMO, two electron integrals in MO basis</li>
 </ul>
 <p>References:</p>
 <ul class="simple">
@@ -205,7 +211,16 @@
 <p><img src="_images/math/80b1023e1aa4d9b9b8e7b2ce32bcd57527ef9795.png" alt="\left\langle \left.ij\right|kl\right\rangle =\left(\left.\sigma_{1}i\sigma_{2}k\right|\sigma_{3}j\sigma_{4}l\right)\delta_{\sigma_{1}\sigma_{2}}\delta_{\sigma_{3}\sigma_{4}}"/></p>
 </div><p>FUNCTION:</p>
 <ul class="simple">
-<li>IntegralTransform.Transform2eSPIN()</li>
+<li>IntegralTransform.Transform2eSPIN(Vee)</li>
+<li>return VeeSpin</li>
+</ul>
+<p>Input:</p>
+<ul class="simple">
+<li>Vee, two electron integrals</li>
+</ul>
+<p>Output:</p>
+<ul class="simple">
+<li>VeeSpin, two electron integrals in spinbasis</li>
 </ul>
 <p>References:</p>
 <ul class="simple">

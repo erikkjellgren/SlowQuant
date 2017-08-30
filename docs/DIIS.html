@@ -91,6 +91,7 @@
             
               <p class="caption"><span class="caption-text">How to use</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation and Running</a></li>
 <li class="toctree-l1"><a class="reference internal" href="keywords.html">List of keywords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Examples.html">Example input files</a></li>
 <li class="toctree-l1"><a class="reference internal" href="issues.html">Issues</a></li>
@@ -108,6 +109,7 @@
 <li class="toctree-l1"><a class="reference internal" href="GeoOpt.html">Geometry optimization</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CI.html">Configuration Interaction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CC.html">Coupled Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="BOMD.html">Ab-Initio Molecular Dynamics</a></li>
 </ul>
 
             
@@ -195,7 +197,7 @@ Makes new F’ guesses bassed on previous guesses.</p>
 <p><img src="_images/math/c2de1735f832e7a443ecb430550107affcdad26a.png" alt="F'=\sum_{i}c_{i}F_{i}"/></p>
 </div><p>FUNCTION:</p>
 <ul class="simple">
-<li>DIIS.DIIS(F,D,S,Efock,Edens,basis,numbF)</li>
+<li>DIIS.DIIS(F,D,S,Efock,Edens,numbF)</li>
 <li>return Fprime, Efock, Edens, Emax</li>
 </ul>
 <p>Input:</p>
@@ -205,7 +207,6 @@ Makes new F’ guesses bassed on previous guesses.</p>
 <li>S, overlap matrix</li>
 <li>Efock, saved fock matrices</li>
 <li>Edens, saved density matrices</li>
-<li>basis, basis set</li>
 <li>numbF, number of matrixes to save</li>
 </ul>
 <p>Output:</p>

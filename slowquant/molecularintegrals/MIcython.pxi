@@ -161,10 +161,8 @@ cdef double [:,:,:] R(int l1l2, int m1m2, int n1n2, double Cx, double Cy, double
         
     return R1
     
-
 cdef double boys(double m,double T):
     return hyp1f1(m+0.5,m+1.5,-T)/(2.0*m+1.0) 
-    
 
 cdef double elelrep(double p, double q, int l1, int l2, int l3, int l4, int m1, int m2, int m3, int m4, int n1, int n2, int n3, int n4, double N1, double N2, double N3, double N4, double c1, double c2, double c3, double c4, double [:] E1, double [:] E2, double [:] E3, double [:] E4, double [:] E5, double [:] E6, double [:,:,:] Rpre):
     cdef double N, val, factor
@@ -177,11 +175,11 @@ cdef double elelrep(double p, double q, int l1, int l2, int l3, int l4, int m1, 
     for tau in range(l3+l4+1):
         for nu in range(m3+m4+1):
             for phi in range(n3+n4+1):
-                factor = (-1.0)**(tau+nu+phi)
+                factor = (-1.0)**(tau+nu+phi)*E4[tau]*E5[nu]*E6[phi]
                 for t in range(l1+l2+1):
                     for u in range(m1+m2+1):
                         for v in range(n1+n2+1):
-                            val += E1[t]*E2[u]*E3[v]*E4[tau]*E5[nu]*E6[phi]*Rpre[t+tau,u+nu,v+phi]*factor
+                            val += E1[t]*E2[u]*E3[v]*Rpre[t+tau,u+nu,v+phi]*factor
 
     val *= 2.0*pi**2.5/(p*q*(p+q)**0.5) 
     return val*N
@@ -322,16 +320,16 @@ cdef double electricfield(double p, double [:] Ex, double [:] Ey, double [:] Ez,
     
 
 
-
 """
 cdef double factorial2(double n):
-    cdef double pi = 3.141592653589793238462643383279
-    if n%2 == 0:
-        return 2**(n/2)*gamma(n/2)
-    elif n%2 == 1:
-        return gamma(n/2+1)*2**((n+1)/2)/(pi)**0.5
-    else:
-        print('n in boys is not an integer')
+    cdef int i, n_range
+    cdef double out
+    n_range = int(n)
+    out = 1.0
+    if n > 0:
+        for i in range(0, int(n_range+1)//2):
+            out = out*(n-2*i)
+    return out
 
 cdef double boys(double m,double T):
     cdef double pi = 3.141592653589793238462643383279
@@ -342,5 +340,5 @@ cdef double boys(double m,double T):
         # Long range approximation, table from Obara1986
         return factorial2(2.0*m-1.0)/(2.0**(m+1))*(pi/(T**(2*m+1)))**0.5        
     else:
-        return hyp1f1(m+0.5,m+1.5,-T)/(2.0*m+1.0) 
+        return hyp1f1(m+0.5,m+1.5,-T)/(2.0*m+1.0)
 """

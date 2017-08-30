@@ -1,5 +1,5 @@
-basisset;6-31ppGss
-Initial method;BOMD
+basisset;4-31G
+Initial method;HF
 SCF Energy Threshold;12
 SCF RMSD Threshold;12
 steps;10

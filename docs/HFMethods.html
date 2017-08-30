@@ -113,6 +113,7 @@
 <li class="toctree-l1"><a class="reference internal" href="GeoOpt.html">Geometry optimization</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CI.html">Configuration Interaction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CC.html">Coupled Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="BOMD.html">Ab-Initio Molecular Dynamics</a></li>
 </ul>
 
             
@@ -215,29 +216,31 @@
 <p><img src="_images/math/2b4930310392442308a1f4bb2b75e435eaa75879.png" alt="\mathrm{RMSD}_{n}=\sqrt{\sum_{ij}D_{n,ij}-D_{n-1,ij}}"/></p>
 </div><p>FUNCTION:</p>
 <ul class="simple">
-<li>HartreeFock.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results, print_SCF=’Yes’)</li>
-<li>return C, F, D, results</li>
+<li>HartreeFock.HartreeFock(input, VNN, Te, S, VeN, Vee, deTHR=10**-6,rmsTHR=10**-6,Maxiter=100, DO_DIIS=’Yes’, DIIS_steps=6, print_SCF=’Yes’)</li>
+<li>return EHF, C, F, D, iter</li>
 </ul>
 <p>Input:</p>
 <ul class="simple">
 <li>input, inputfile object</li>
-<li>set, settingsfile object</li>
-<li>basis, basisset object</li>
 <li>VNN, nuclear-nuclear repulsion</li>
 <li>Te, electronic energy matrix</li>
 <li>S, overlap matrix</li>
 <li>VeN, nuclear-electron attraction matrix</li>
 <li>Vee, ERI matrix</li>
-<li>results, results object</li>
+<li>deTHR, energy change threshold for convergence</li>
+<li>rmsTHR, RMS threshold for convergence</li>
+<li>Maxiter, max SCF iterations</li>
+<li>DO_DIIS, enable DIIS, if = ‘Yes’</li>
+<li>DIIS_steps, how many steps are stored in DIIS</li>
 <li>print_SCF, wether to print SCF to output</li>
 </ul>
 <p>Output:</p>
 <ul class="simple">
+<li>EHF, Total Hartree-Fock energy</li>
 <li>C, MO coefficients</li>
 <li>F, Fock matrix</li>
 <li>D, density matrix</li>
-<li>results, results obejct with added entries</li>
-<li>results[‘HFenergy’], total Hartree-Fock energy</li>
+<li>iter, SCF iterations used</li>
 </ul>
 <p>References:</p>
 <ul class="simple">
@@ -251,29 +254,32 @@
 <p><img src="_images/math/92dd4509c6aa4ebee90704017091fdc95b5fa90b.png" alt="F_{n,\alpha,ij}=H_{ij}^{\mathrm{core}}+\sum_{kl}^{\mathrm{AO}}D_{n-1,\alpha,kl}\left(\left(ij\left|\right|kl\right)-\left(ik\left|\right|jl\right)\right)+\sum_{kl}^{\mathrm{AO}}D_{n-1,\beta,kl}\left(ij\left|\right|kl\right)"/></p>
 </div><p>FUNCTION:</p>
 <ul class="simple">
-<li>UHF.HartreeFock(input, set, basis, VNN, Te, S, VeN, Vee, results, print_SCF=’Yes’)</li>
-<li>return C, F, D, results</li>
+<li>UHF.HartreeFock(input, VNN, Te, S, VeN, Vee, deTHR=10**-6,rmsTHR=10**-6,Maxiter=100, UHF_mix=0.15, print_SCF=’Yes’)</li>
+<li>return EUHF, C_alpha, F_alpha, D_alpha, C_beta, F_beta, D_beta, iter</li>
 </ul>
 <p>Input:</p>
 <ul class="simple">
 <li>input, inputfile object</li>
-<li>set, settingsfile object</li>
-<li>basis, basisset object</li>
 <li>VNN, nuclear-nuclear repulsion</li>
 <li>Te, electronic energy matrix</li>
 <li>S, overlap matrix</li>
 <li>VeN, nuclear-electron attraction matrix</li>
 <li>Vee, ERI matrix</li>
-<li>results, results object</li>
+<li>deTHR, energy change threshold for convergence</li>
+<li>rmsTHR, RMS threshold for convergence</li>
+<li>Maxiter, max SCF iterations</li>
+<li>UHF_mix, how much beta and alpha are mixed to break symmetry</li>
 <li>print_SCF, wether to print SCF to output</li>
 </ul>
 <p>Output:</p>
 <ul class="simple">
-<li>C, MO coefficients</li>
-<li>F, Fock matrix</li>
-<li>D, density matrix</li>
-<li>results, results obejct with added entries</li>
-<li>results[‘UHFenergy’], total unrestricted Hartree-Fock energy</li>
+<li>EUHF, total UHF energy</li>
+<li>C_alpha, MO coefficients</li>
+<li>F_alpha, Fock matrix</li>
+<li>D_alpha, density matrix</li>
+<li>C_beta, MO coefficients</li>
+<li>F_beta, Fock matrix</li>
+<li>D_beta, density matrix</li>
 </ul>
 <p>References:</p>
 <ul class="simple">
