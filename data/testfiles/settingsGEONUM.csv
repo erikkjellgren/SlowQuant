@@ -4,4 +4,5 @@ SCF Energy Threshold;1e-12
 SCF RMSD Threshold;1e-12
 GeoOpt;Yes
 Max iteration GeoOpt;100
+Force Numeric;Yes
 Gradient Descent Step;0.5

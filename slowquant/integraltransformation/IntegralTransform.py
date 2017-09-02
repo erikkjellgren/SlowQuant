@@ -34,5 +34,23 @@ def Transform2eSPIN(VeeMO):
                     for s in range(1,len(VeeMO)*2+1):
                         if (q%2 == s%2):
                             VeeMOspin[p-1,q-1,r-1,s-1] = VeeMO[(p+1)//2-1,(r+1)//2-1,(q+1)//2-1,(s+1)//2-1]
-    
     return VeeMOspin
+
+
+def Transform1eMO(S, C):
+    SMO = np.zeros((len(C),len(C)))
+    for i in range(len(C)):
+        for j in range(len(C)):
+            for p in range(len(C)):
+                for q in range(len(C)):
+                    SMO[i,j] += C[p,i]*C[q,j]*S[p,q]
+    return SMO
+
+
+def Transform1eSPIN(S):
+    Sspin = np.zeros((len(S)*2,len(S)*2))
+    for p in range(1,len(S)*2+1):
+        for q in range(1,len(S)*2+1):
+            if (p%2 == q%2):
+                Sspin[p-1,q-1] = S[(p+1)//2-1,(q+1)//2-1]
+    return Sspin

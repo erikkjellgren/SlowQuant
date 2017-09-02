@@ -18,3 +18,4 @@ build/
 
 # Using Jupyter
 .ipynb_checkpoints/
+data/notebooks/*.png

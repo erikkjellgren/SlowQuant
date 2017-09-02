@@ -22,8 +22,6 @@ The used settings can be seen below:
 ::
 
   basisset;6-31ppGss
-  Charge;No
-  Dipole;No
   DIIS;Yes
   SCF Energy Threshold;1e-5
   SCF RMSD Threshold;1e-5
@@ -31,8 +29,6 @@ The used settings can be seen below:
 ::
 
   basisset;6-31ppGss
-  Charge;No
-  Dipole;No
   DIIS;No
   SCF Energy Threshold;1e-5
   SCF RMSD Threshold;1e-5
@@ -78,3 +74,38 @@ Then a SCF calculation was performed without DIIS giving:
   99	 	-65.7626043489	 	-57.7602372879	 	 3.63795182e+01	 	 1.22477235e+01
  
 As it can bee seen the one with DIIS converges in 10 iterations, whereas without DIIS it never converges
+
+Hartee-Fock H2 dissociation
+---------------------------
+
+Under the Hartee-Fock approximation the dissociation of dihydrogen can be considered. To investigate this the following geometry input was used:
+
+::
+
+  2;;; 
+  1;0.0;0.0;0.0
+  1;x;0.0;0.0
+
+Here x is varied to make the dissociation curve. The following settings were used:
+
+::
+  
+  Initial method;HF
+  basisset;3-21G
+
+and,
+
+::
+  
+  Initial method;UHF
+  basisset;3-21G
+
+For x varried from 0.5 to 13 a.u. the following curve can be made:
+
+.. image:: _static/H2dissociation.png
+
+For a script to calculate the curves see SlowQuant/data/notebooks/H2 dissociation HF vs UHF.ipynb
+
+It can be seen from the curve that (R)HF and UHF converges to two different values. By calculating H- and H radical it can be seen that RHF converges to H- and H+, whereas UHF converges towards 2x H radicals.
+This can be understood since RHF is a closed-shell method. When H2 dissociates it is expected that each hydrogen will be associated with one electron, this cannot be descirbed with RHF. UHF can describe open-shells and therefore, seem to have a better describtion of the dissocation.
+UHF have other problems like spin contamination to be aware of.

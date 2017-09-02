@@ -97,6 +97,7 @@
 <li class="toctree-l1"><a class="reference internal" href="issues.html">Issues</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Illustrative calculations</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#scf-with-and-without-diis">SCF with and without DIIS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#hartee-fock-h2-dissociation">Hartee-Fock H2 dissociation</a></li>
 </ul>
 </li>
 </ul>
@@ -190,16 +191,12 @@
 </div>
 <p>The used settings can be seen below:</p>
 <div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">basisset</span><span class="p">;</span><span class="mi">6</span><span class="o">-</span><span class="mi">31</span><span class="n">ppGss</span>
-<span class="n">Charge</span><span class="p">;</span><span class="n">No</span>
-<span class="n">Dipole</span><span class="p">;</span><span class="n">No</span>
 <span class="n">DIIS</span><span class="p">;</span><span class="n">Yes</span>
 <span class="n">SCF</span> <span class="n">Energy</span> <span class="n">Threshold</span><span class="p">;</span><span class="mf">1e-5</span>
 <span class="n">SCF</span> <span class="n">RMSD</span> <span class="n">Threshold</span><span class="p">;</span><span class="mf">1e-5</span>
 </pre></div>
 </div>
 <div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">basisset</span><span class="p">;</span><span class="mi">6</span><span class="o">-</span><span class="mi">31</span><span class="n">ppGss</span>
-<span class="n">Charge</span><span class="p">;</span><span class="n">No</span>
-<span class="n">Dipole</span><span class="p">;</span><span class="n">No</span>
 <span class="n">DIIS</span><span class="p">;</span><span class="n">No</span>
 <span class="n">SCF</span> <span class="n">Energy</span> <span class="n">Threshold</span><span class="p">;</span><span class="mf">1e-5</span>
 <span class="n">SCF</span> <span class="n">RMSD</span> <span class="n">Threshold</span><span class="p">;</span><span class="mf">1e-5</span>
@@ -240,6 +237,31 @@
 </pre></div>
 </div>
 <p>As it can bee seen the one with DIIS converges in 10 iterations, whereas without DIIS it never converges</p>
+</div>
+<div class="section" id="hartee-fock-h2-dissociation">
+<h2>Hartee-Fock H2 dissociation<a class="headerlink" href="#hartee-fock-h2-dissociation" title="Permalink to this headline">¶</a></h2>
+<p>Under the Hartee-Fock approximation the dissociation of dihydrogen can be considered. To investigate this the following geometry input was used:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="mi">2</span><span class="p">;;;</span>
+<span class="mi">1</span><span class="p">;</span><span class="mf">0.0</span><span class="p">;</span><span class="mf">0.0</span><span class="p">;</span><span class="mf">0.0</span>
+<span class="mi">1</span><span class="p">;</span><span class="n">x</span><span class="p">;</span><span class="mf">0.0</span><span class="p">;</span><span class="mf">0.0</span>
+</pre></div>
+</div>
+<p>Here x is varied to make the dissociation curve. The following settings were used:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Initial</span> <span class="n">method</span><span class="p">;</span><span class="n">HF</span>
+<span class="n">basisset</span><span class="p">;</span><span class="mi">3</span><span class="o">-</span><span class="mi">21</span><span class="n">G</span>
+</pre></div>
+</div>
+<p>and,</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Initial</span> <span class="n">method</span><span class="p">;</span><span class="n">UHF</span>
+<span class="n">basisset</span><span class="p">;</span><span class="mi">3</span><span class="o">-</span><span class="mi">21</span><span class="n">G</span>
+</pre></div>
+</div>
+<p>For x varried from 0.5 to 13 a.u. the following curve can be made:</p>
+<img alt="_images/H2dissociation.png" src="_images/H2dissociation.png" />
+<p>For a script to calculate the curves see SlowQuant/data/notebooks/H2 dissociation HF vs UHF.ipynb</p>
+<p>It can be seen from the curve that (R)HF and UHF converges to two different values. By calculating H- and H radical it can be seen that RHF converges to H- and H+, whereas UHF converges towards 2x H radicals.
+This can be understood since RHF is a closed-shell method. When H2 dissociates it is expected that each hydrogen will be associated with one electron, this cannot be descirbed with RHF. UHF can describe open-shells and therefore, seem to have a better describtion of the dissocation.
+UHF have other problems like spin contamination to be aware of.</p>
 </div>
 </div>
 
