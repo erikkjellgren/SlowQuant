@@ -20,6 +20,7 @@ install:
   - conda info -a
   - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy scipy pytest numba cython
   - source activate test-environment
+  - pip install hypothesis
   - pip install python-coveralls pytest-cov
   - python setup.py build_ext --inplace
   

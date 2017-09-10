@@ -3,6 +3,7 @@
 out.txt
 potential.pdb
 traj.xyz
+.hypothesis/
 
 # Files made by python
 __pycache__/

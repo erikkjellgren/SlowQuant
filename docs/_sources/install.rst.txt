@@ -50,6 +50,7 @@ To test the installation install pytest:
 ::
   
   conda install pytest
+  pip install hypothesis
 
 And then run:
 
