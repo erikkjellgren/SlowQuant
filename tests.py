@@ -344,19 +344,19 @@ def test_BOMD():
 
 ## HYPOTHESIS TESTS
 @given(integers(min_value=0,max_value=130), floats(min_value=0.0,max_value=1e+16, allow_nan=False, allow_infinity=False))	
-def test_boys(N, x):
+def test_boys_H(N, x):
     assert 0.0 <= boysPrun(N, x) <= 1/(2*N+1)
     assert boysPrun(N, x) >= boysPrun(N+1, x)
 
 @given(arrays(np.float, 3, elements=floats(-1e+16, 1e+16)), arrays(np.float, 3, elements=floats(-1e+16, 1e+16)))
-def test_magvec(v1, v2):
+def test_magvec_H(v1, v2):
     assert 0.0 <= QFIT.magvec(v1, v2)
     assert not np.isnan(QFIT.magvec(v1, v2))
     assert not np.isinf(QFIT.magvec(v1, v2))
 
 
 @given(arrays(np.float, (10,3), elements=floats(-1e+16, 1e+16)),arrays(np.float, 10, elements=floats(1e-16, 1e+16)))
-def test_centerofcharge(mol, mass):
+def test_centerofcharge_H(mol, mass):
     inp = np.zeros((len(mass),4))
     inp[:,0]  = mass
     inp[:,1:] = mol
