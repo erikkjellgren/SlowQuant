@@ -341,7 +341,7 @@ def test_BOMD():
     results = HFrun.run('data/testfiles/inputH2O.csv','data/testfiles/settingBOMD.csv')
     check = -75.5667945588
     assert abs(check-results['HFenergy']) < 10**-10
-
+"""
 ## HYPOTHESIS TESTS
 @given(integers(min_value=0,max_value=130), floats(min_value=0.0,max_value=1e+16, allow_nan=False, allow_infinity=False))	
 def test_boys_H(N, x):
@@ -354,7 +354,6 @@ def test_magvec_H(v1, v2):
     assert not np.isnan(QFIT.magvec(v1, v2))
     assert not np.isinf(QFIT.magvec(v1, v2))
 
-"""
 @given(arrays(np.float, (10,3), elements=floats(-1e+16, 1e+16)),arrays(np.float, 10, elements=floats(1e-16, 1e+16)))
 def test_centerofcharge_H(mol, mass):
     inp = np.zeros((len(mass),4))
