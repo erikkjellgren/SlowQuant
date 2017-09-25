@@ -5,8 +5,8 @@ import slowquant.molecularintegrals.runMolecularIntegrals as MI
 import slowquant.integraltransformation.IntegralTransform as IT
 import numpy as np
 
-def HartreeFock(input, VNN, Te, S, VeN, Vee, deTHR=10**-6,rmsTHR=10**-6,Maxiter=100, DO_DIIS='Yes', DIIS_steps=6, print_SCF='Yes'):
-    return HF.HartreeFock(input, VNN, Te, S, VeN, Vee, deTHR=10**-6,rmsTHR=10**-6,Maxiter=100, DO_DIIS='Yes', DIIS_steps=6, print_SCF='Yes')
+def HartreeFock(input, VNN, Te, S, VeN, Vee, deTHR=10**-6,rmsTHR=10**-6,Maxiter=100, do_diis='Yes', DIIS_steps=6, print_SCF='Yes'):
+    return HF.HartreeFock(input, VNN, Te, S, VeN, Vee, deTHR=10**-6,rmsTHR=10**-6,Maxiter=100, DO_DIIS=do_diis, DIIS_steps=6, print_SCF='Yes')
 
 def UnrestrictedHartreeFock(input, VNN, Te, S, VeN, Vee, deTHR=10**-6,rmsTHR=10**-6,Maxiter=100, UHF_mix=0.15, print_SCF='Yes'):
     return UHF.UnrestrictedHartreeFock(input, VNN, Te, S, VeN, Vee, deTHR=10**-6,rmsTHR=10**-6,Maxiter=100, UHF_mix=0.15, print_SCF='Yes')
