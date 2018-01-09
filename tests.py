@@ -335,7 +335,7 @@ def test_GeoOptimizationNUM():
     # New geometry optimization test, after bug was found
     results = HFrun.run('data/testfiles/inputH2O.csv','data/testfiles/settingsGEONUM.csv')
     check = -74.9658980993
-    assert abs(check-results['HFenergy']) < 10**-10
+    assert abs(check-results['HFenergy']) < 10**-9
 
 def test_BOMD():
     results = HFrun.run('data/testfiles/inputH2O.csv','data/testfiles/settingBOMD.csv')
