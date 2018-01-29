@@ -2,6 +2,7 @@ import numpy as np
 import math
 import scipy.misc as scm
 import copy
+import os
 
 def Nrun(basisset):
     # Normalize primitive functions
@@ -41,9 +42,9 @@ def Nrun(basisset):
     """
     return basisset
 
-def bassiset(input, set, path='slowquant/basissets/'):
-    basisname = set['basisset']
-    basisload = np.genfromtxt(path+str(basisname)+'.csv', dtype=str, delimiter=';')
+def bassiset(input, basisname):
+    this_file_location = os.path.dirname(os.path.abspath(__file__))
+    basisload = np.genfromtxt(this_file_location+"/"+str(basisname)+'.csv', dtype=str, delimiter=';')
     
     basis_out = []
     idx = 1

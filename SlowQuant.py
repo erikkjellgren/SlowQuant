@@ -9,7 +9,7 @@ import slowquant.mollerplesset.runMPn as MP
 import slowquant.qfit.Qfit as QF
 import slowquant.geometryoptimization.GeometryOptimization as GO
 import slowquant.configurationinteraction.runCI as CI
-import slowquant .coupledcluster.runCC as CC
+import slowquant.coupledcluster.runCC as CC
 import slowquant.bomd.runBOMD as MD
 
 def run(inputname, settingsname):

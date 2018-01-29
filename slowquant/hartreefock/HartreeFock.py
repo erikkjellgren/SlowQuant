@@ -48,7 +48,10 @@ def HartreeFock(input, VNN, Te, S, VeN, Vee, deTHR=10**-6,rmsTHR=10**-6,Maxiter=
             E0el += D0[i,j]*(Hcore[i,j]+Hcore[i,j])
     
     #SCF iterations
+    
     if print_SCF == 'Yes':
+        print("Iter\t Eel\t")
+        """
         output = open('out.txt', 'a')
         output.write('Iter')
         output.write("\t")
@@ -68,10 +71,9 @@ def HartreeFock(input, VNN, Te, S, VeN, Vee, deTHR=10**-6,rmsTHR=10**-6,Maxiter=
         output.write("{:14.10f}".format(E0el))
         output.write("\t \t")
         output.write("{:14.10f}".format(E0el+VNN[0]))
+        """
     
     for iter in range(1, Maxiter):
-        if print_SCF == 'Yes':
-            output.write("\n")
         #New Fock Matrix
         J = np.einsum('pqrs,sr->pq', Vee,D0)
         K = np.einsum('psqr,sr->pq', Vee,D0)
@@ -110,27 +112,18 @@ def HartreeFock(input, VNN, Te, S, VeN, Vee, deTHR=10**-6,rmsTHR=10**-6,Maxiter=
         rmsD = (rmsD)**0.5
         
         if print_SCF == 'Yes':
-            output.write(str(iter))
-            output.write("\t \t")
-            output.write("{:14.10f}".format(Eel))
-            output.write("\t \t")
-            output.write("{:14.10f}".format(Eel+VNN[0]))
-            output.write("\t \t")
-            output.write("{: 12.8e}".format(dE))
-            output.write("\t \t")
-            output.write("{: 12.8e}".format(rmsD))
             if DO_DIIS == 'Yes':
                 if errorDIIS != 'None':
-                    output.write("\t \t")
-                    output.write("{: 12.8e}".format(errorDIIS))
+                    print(iter,"\t","{:14.10f}".format(Eel),"\t","{:14.10f}".format(Eel+VNN[0]),"\t","{: 12.8e}".format(dE),"\t","{: 12.8e}".format(rmsD),"\t","{: 12.8e}".format(errorDIIS))
+                else:
+                    print(iter,"\t","{:14.10f}".format(Eel),"\t","{:14.10f}".format(Eel+VNN[0]),"\t","{: 12.8e}".format(dE),"\t","{: 12.8e}".format(rmsD))
+            else:
+                print(iter,"\t","{:14.10f}".format(Eel),"\t","{:14.10f}".format(Eel+VNN[0]),"\t","{: 12.8e}".format(dE),"\t","{: 12.8e}".format(rmsD))
     
         D0 = D
         E0el = Eel
         if np.abs(dE) < deTHR and rmsD < rmsTHR:
             break
-            
-    if print_SCF == 'Yes':
-        output.write('\n \n')
-        output.close()
+
     
-    return Eel+VNN[0], C, F, D, iter
+    return Eel+VNN[0], C, F, 2*D

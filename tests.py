@@ -1,7 +1,4 @@
 import numpy as np
-from hypothesis.strategies import floats, integers, data
-from hypothesis import given, settings, assume
-from hypothesis.extra.numpy import arrays
 import SlowQuant as HFrun
 import slowquant.basissets.BasisSet as BS
 import slowquant.hartreefock.DIIS as DIIS
@@ -341,29 +338,5 @@ def test_BOMD():
     results = HFrun.run('data/testfiles/inputH2O.csv','data/testfiles/settingBOMD.csv')
     check = -75.5667945588
     assert abs(check-results['HFenergy']) < 10**-10
-"""
-## HYPOTHESIS TESTS
-@given(integers(min_value=0,max_value=130), floats(min_value=0.0,max_value=1e+16, allow_nan=False, allow_infinity=False))	
-def test_boys_H(N, x):
-    assert 0.0 <= boysPrun(N, x) <= 1/(2*N+1)
-    assert boysPrun(N, x) >= boysPrun(N+1, x)
 
-@given(arrays(np.float, 3, elements=floats(-1e+16, 1e+16)), arrays(np.float, 3, elements=floats(-1e+16, 1e+16)))
-def test_magvec_H(v1, v2):
-    assert 0.0 <= QFIT.magvec(v1, v2)
-    assert not np.isnan(QFIT.magvec(v1, v2))
-    assert not np.isinf(QFIT.magvec(v1, v2))
 
-@given(arrays(np.float, (10,3), elements=floats(-1e+16, 1e+16)),arrays(np.float, 10, elements=floats(1e-16, 1e+16)))
-def test_centerofcharge_H(mol, mass):
-    inp = np.zeros((len(mass),4))
-    inp[:,0]  = mass
-    inp[:,1:] = mol
-    x,y,z = QFIT.centerofcharge(inp)
-    x = round(x, 12)
-    y = round(y, 12)
-    z = round(z, 12)
-    assert np.min(mol[:,0]) <= x <= np.max(mol[:,0])
-    assert np.min(mol[:,1]) <= y <= np.max(mol[:,1])
-    assert np.min(mol[:,2]) <= z <= np.max(mol[:,2])
-"""

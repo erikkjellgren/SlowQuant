@@ -3,7 +3,6 @@ import scipy.linalg
 
 def MulCharge(basis, input, D, S):
     #Loading overlap integrals
-    D = 2*D
     qvec = np.zeros(len(input)-1)
     
     DS = np.dot(D,S)
@@ -19,7 +18,6 @@ def MulCharge(basis, input, D, S):
 
 def LowdinCharge(basis, input, D, S):
     #Loading overlap integrals
-    D = 2*D
     qvec = np.zeros(len(input)-1)
     
     S_sqrt = scipy.linalg.sqrtm(S)
@@ -47,17 +45,17 @@ def dipolemoment(input, D, mux, muy, muz):
     ux = 0
     for i in range(0, len(D)):
         for j in range(0, len(D[0])):
-            ux += 2*D[i,j]*mux[i,j]
+            ux += D[i,j]*mux[i,j]
             
     uy = 0
     for i in range(0, len(D)):
         for j in range(0, len(D[0])):
-            uy += 2*D[i,j]*muy[i,j]
+            uy += D[i,j]*muy[i,j]
             
     uz = 0
     for i in range(0, len(D)):
         for j in range(0, len(D[0])):
-            uz += 2*D[i,j]*muz[i,j]
+            uz += D[i,j]*muz[i,j]
             
     Cx = 0
     Cy = 0
@@ -83,7 +81,7 @@ def dipolemoment(input, D, mux, muy, muz):
     
     u = (ux**2+uy**2+uz**2)**0.5
     
-    return ux, uy, uz, u
+    return ux, uy, uz, u_mag
  
     
 def RPA(occ, F, C, VeeMOspin):
