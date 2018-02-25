@@ -29,8 +29,6 @@ def runBOMD(input, set, results):
     output.write("\t \t \t \t \t")
     output.write('EKIN')
     output.write("\t \t \t \t")
-    output.write('HF iterations')
-    output.write("\t \t \t \t")
     output.write('calc time')
     output.write('\n')
     
@@ -60,8 +58,6 @@ def runBOMD(input, set, results):
         output.write("{:14.10f}".format(results['HFenergy']))
         output.write("\t \t")
         output.write("{:14.10f}".format(Ekin))
-        output.write("\t \t")
-        output.write(str(results['HF iterations']))
         output.write("\t \t \t \t")
         output.write("{: 12.8e}".format(time.time()-steptime))
         output.write('\n')

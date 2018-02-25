@@ -79,7 +79,7 @@ def dipolemoment(input, D, mux, muy, muz):
     for i in range(0, len(nucx)):
         uz += input[i+1,0]*(nucz[i]-Cz)
     
-    u = (ux**2+uy**2+uz**2)**0.5
+    u_mag = (ux**2+uy**2+uz**2)**0.5
     
     return ux, uy, uz, u_mag
  

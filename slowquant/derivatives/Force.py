@@ -3,7 +3,7 @@ import numpy as np
 def Force(input, D, CMO, FAO, results):
     CTMO = np.transpose(CMO)
     eps = np.dot(np.dot(CTMO, FAO),CMO)
-    P = 2*D
+    P = D
     occ = int(input[0][0]/2)
 
     Q = 2*np.einsum('aa,ua,va->vu',eps[0:occ,0:occ],CMO[:,0:occ],CMO[:,0:occ])
