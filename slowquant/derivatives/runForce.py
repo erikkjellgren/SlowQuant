@@ -5,7 +5,7 @@ import slowquant.basissets.BasisSet as BS
 from slowquant.derivatives.Force import Force
 
 def runForce(input, set, results, print_time='No', print_scf='Yes'):
-    basis = BS.bassiset(input, set)
+    basis = BS.bassiset(input, set['basisset'])
     results = MI.runIntegrals(input, basis, set, results)
     results = MI.rungeometric_derivatives(input, basis, set, results, print_time=print_time)
     results = HF.runHartreeFock(input, set, results, print_SCF=print_scf)

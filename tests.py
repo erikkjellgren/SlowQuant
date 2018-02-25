@@ -1,7 +1,4 @@
 import numpy as np
-from hypothesis.strategies import floats, integers, data
-from hypothesis import given, settings, assume
-from hypothesis.extra.numpy import arrays
 import SlowQuant as HFrun
 import slowquant.basissets.BasisSet as BS
 import slowquant.hartreefock.DIIS as DIIS
@@ -85,12 +82,12 @@ def test_HartreeFock1():
     results['VNe']      = np.load('data/testfiles/nucattH2O_STO3G.npy')
     results['Vee']      = np.load('data/testfiles/twointH2O_STO3G.npy')
     Dcheck   = np.genfromtxt('data/testfiles/dH2O_STO3G.csv',delimiter=';')
-    basis    = BS.bassiset(input, set)
+    basis    = BS.bassiset(input, set['basisset'])
     results = HF.runHartreeFock(input, set, results, print_SCF='No')
     D = results['D']
     for i in range(0, len(D)):
         for j in range(0, len(D)):
-            assert abs(Dcheck[i,j] - D[i,j]) < 10**-7
+            assert abs(2*Dcheck[i,j] - D[i,j]) < 10**-7
     
 def test_HartreeFock2():
     settings = np.genfromtxt('slowquant/Standardsettings.csv', delimiter = ';', dtype='str')
@@ -107,12 +104,12 @@ def test_HartreeFock2():
     results['VNe']      = np.load('data/testfiles/nucattCH4_STO3G.npy')
     results['Vee']      = np.load('data/testfiles/twointCH4_STO3G.npy')
     Dcheck   = np.genfromtxt('data/testfiles/dCH4_STO3G.csv',delimiter=';')
-    basis    = BS.bassiset(input, set)
+    basis    = BS.bassiset(input, set['basisset'])
     results = HF.runHartreeFock(input, set, results, print_SCF='No')
     D = results['D']
     for i in range(0, len(D)):
         for j in range(0, len(D)):
-            assert abs(Dcheck[i,j] - D[i,j]) < 10**-7
+            assert abs(2*Dcheck[i,j] - D[i,j]) < 10**-7
 
 def test_HartreeFock3():
     settings = np.genfromtxt('slowquant/Standardsettings.csv', delimiter = ';', dtype='str')
@@ -129,12 +126,12 @@ def test_HartreeFock3():
     results['VNe']      = np.load('data/testfiles/nucattH2O_DZ.npy')
     results['Vee']      = np.load('data/testfiles/twointH2O_DZ.npy')
     Dcheck   = np.genfromtxt('data/testfiles/dH2O_DZ.csv',delimiter=';')
-    basis    = BS.bassiset(input, set)
+    basis    = BS.bassiset(input, set['basisset'])
     results = HF.runHartreeFock(input, set, results, print_SCF='No')
     D = results['D']
     for i in range(0, len(D)):
         for j in range(0, len(D)):
-            assert abs(Dcheck[i,j] - D[i,j]) < 10**-7
+            assert abs(2*Dcheck[i,j] - D[i,j]) < 10**-7
 
 def test_MP2_1():
     settings = np.genfromtxt('slowquant/Standardsettings.csv', delimiter = ';', dtype='str')
@@ -145,7 +142,7 @@ def test_MP2_1():
     set['MPn'] = 'MP2'
     results  = {}
     input    = np.genfromtxt('data/testfiles/inputCH4.csv', delimiter=';')
-    basis    = BS.bassiset(input, set)
+    basis    = BS.bassiset(input, set['basisset'])
     results['F']        = np.load('data/testfiles/faoCH4_STO3G.npy')
     results['C_MO']     = np.load('data/testfiles/cmoCH4_STO3G.npy')
     results['Vee']      = np.load('data/testfiles/twointCH4_STO3G.npy')
@@ -162,7 +159,7 @@ def test_MP2_2():
     set['basisset'] = 'DZ'
     set['MPn'] = 'MP2'
     input    = np.genfromtxt('data/testfiles/inputH2O.csv', delimiter=';')
-    basis    = BS.bassiset(input, set)
+    basis    = BS.bassiset(input, set['basisset'])
     results  = {}
     results['F']         = np.load('data/testfiles/faoH2O_DZ.npy')
     results['C_MO']      = np.load('data/testfiles/cmoH2O_DZ.npy')
@@ -180,7 +177,7 @@ def test_derivative():
     for i in range(len(settings)):
         set.update({settings[i][0]:settings[i][1]})
     input = np.array([[8, 0, 0, 0],[8, 0.0, 0.0, 0.0]])
-    basis = BS.bassiset(input, set)
+    basis = BS.bassiset(input, set['basisset'])
     results = MI.rungeometric_derivatives(input, basis, set, results)
     VNe = results['1dyVNe']
     S   = results['1dyS']
@@ -341,29 +338,5 @@ def test_BOMD():
     results = HFrun.run('data/testfiles/inputH2O.csv','data/testfiles/settingBOMD.csv')
     check = -75.5667945588
     assert abs(check-results['HFenergy']) < 10**-10
-"""
-## HYPOTHESIS TESTS
-@given(integers(min_value=0,max_value=130), floats(min_value=0.0,max_value=1e+16, allow_nan=False, allow_infinity=False))	
-def test_boys_H(N, x):
-    assert 0.0 <= boysPrun(N, x) <= 1/(2*N+1)
-    assert boysPrun(N, x) >= boysPrun(N+1, x)
 
-@given(arrays(np.float, 3, elements=floats(-1e+16, 1e+16)), arrays(np.float, 3, elements=floats(-1e+16, 1e+16)))
-def test_magvec_H(v1, v2):
-    assert 0.0 <= QFIT.magvec(v1, v2)
-    assert not np.isnan(QFIT.magvec(v1, v2))
-    assert not np.isinf(QFIT.magvec(v1, v2))
 
-@given(arrays(np.float, (10,3), elements=floats(-1e+16, 1e+16)),arrays(np.float, 10, elements=floats(1e-16, 1e+16)))
-def test_centerofcharge_H(mol, mass):
-    inp = np.zeros((len(mass),4))
-    inp[:,0]  = mass
-    inp[:,1:] = mol
-    x,y,z = QFIT.centerofcharge(inp)
-    x = round(x, 12)
-    y = round(y, 12)
-    z = round(z, 12)
-    assert np.min(mol[:,0]) <= x <= np.max(mol[:,0])
-    assert np.min(mol[:,1]) <= y <= np.max(mol[:,1])
-    assert np.min(mol[:,2]) <= z <= np.max(mol[:,2])
-"""

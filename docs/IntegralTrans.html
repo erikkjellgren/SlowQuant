@@ -183,9 +183,9 @@
 <div class="section" id="ao-to-mo-basis-2-electron-integrals">
 <h2>AO to MO basis 2 electron integrals<a class="headerlink" href="#ao-to-mo-basis-2-electron-integrals" title="Permalink to this headline">¶</a></h2>
 <p>The integral transformation of the AO two electron integrals to the MO two electron integrals is given as:</p>
-<div class="math">
-<p><img src="_images/math/926067842b2ca3a7ba9fcdc6dddc092ccfd8cadf.png" alt="\left(ij\left.\right|kl\right)=\sum_{\mu}\sum_{\nu}\sum_{\lambda}\sum_{\sigma}C_{\mu}^{i}C_{\nu}^{j}\left(\mu\nu\left.\right|\lambda\sigma\right)C_{\lambda}^{k}C_{\sigma}^{l}"/></p>
-</div><p>FUNCTION:</p>
+<div class="math notranslate">
+\[\left(ij\left.\right|kl\right)=\sum_{\mu}\sum_{\nu}\sum_{\lambda}\sum_{\sigma}C_{\mu}^{i}C_{\nu}^{j}\left(\mu\nu\left.\right|\lambda\sigma\right)C_{\lambda}^{k}C_{\sigma}^{l}\]</div>
+<p>FUNCTION:</p>
 <ul class="simple">
 <li>IntegralTransform.Transform2eMO(C, Vee)</li>
 <li>return VeeMO</li>
@@ -207,9 +207,9 @@
 <div class="section" id="mo-spatial-to-mo-spin-basis-2-electron-integrals">
 <h2>MO spatial to MO spin basis 2 electron integrals<a class="headerlink" href="#mo-spatial-to-mo-spin-basis-2-electron-integrals" title="Permalink to this headline">¶</a></h2>
 <p>The integral transformation from MO spatial to MO spin orbitals is given by the following equation:</p>
-<div class="math">
-<p><img src="_images/math/80b1023e1aa4d9b9b8e7b2ce32bcd57527ef9795.png" alt="\left\langle \left.ij\right|kl\right\rangle =\left(\left.\sigma_{1}i\sigma_{2}k\right|\sigma_{3}j\sigma_{4}l\right)\delta_{\sigma_{1}\sigma_{2}}\delta_{\sigma_{3}\sigma_{4}}"/></p>
-</div><p>FUNCTION:</p>
+<div class="math notranslate">
+\[\left\langle \left.ij\right|kl\right\rangle =\left(\left.\sigma_{1}i\sigma_{2}k\right|\sigma_{3}j\sigma_{4}l\right)\delta_{\sigma_{1}\sigma_{2}}\delta_{\sigma_{3}\sigma_{4}}\]</div>
+<p>FUNCTION:</p>
 <ul class="simple">
 <li>IntegralTransform.Transform2eSPIN(Vee)</li>
 <li>return VeeSpin</li>
@@ -283,6 +283,7 @@
       <script type="text/javascript" src="_static/jquery.js"></script>
       <script type="text/javascript" src="_static/underscore.js"></script>
       <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 
   
 

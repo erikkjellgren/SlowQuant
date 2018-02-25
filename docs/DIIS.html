@@ -178,24 +178,24 @@
 <p>Direct Inversion in the Iterative Subspace (DIIS).
 Makes new F’ guesses bassed on previous guesses.</p>
 <p>The error vector in DIIS is given as:</p>
-<div class="math">
-<p><img src="_images/math/64d62b5ee109449cdffe238497825299e0624ac0.png" alt="e_{i}=F_{i}D_{i}S - SD_{i}F_{i}"/></p>
-</div><p>It is wanted that the sum of error vectors is zero:</p>
-<div class="math">
-<p><img src="_images/math/92b4c25a916817ee2d2bd4695de9cfefb9cf9a27.png" alt="e'=\sum_{i}c_{i}e_{i}=0"/></p>
-</div><p>And now with the requirement that the sum of all c is zero, the following matrix eqution is solwed:</p>
-<div class="math">
-<p><img src="_images/math/476ab8fc4a5f9bf88e1cdb5b02e1a73b0280755d.png" alt="B_{i,j}c_{i}=b0"/></p>
-</div><p>Here:</p>
-<div class="math">
-<p><img src="_images/math/3b6af70b9de1a8bec2467c4559ce96150c97dae7.png" alt="B_{ij}=\mathrm{tr}\left(e_{i}\cdot e_{j}\right)"/></p>
-</div><p>and,</p>
-<div class="math">
-<p><img src="_images/math/baf63dcd363683ab3a58c2788ebe63a135946e65.png" alt="b0=\left(\begin{array}{c} 0\\ 0\\ ...\\ -1 \end{array}\right)"/></p>
-</div><p>Finally the new F’ is constructed as:</p>
-<div class="math">
-<p><img src="_images/math/c2de1735f832e7a443ecb430550107affcdad26a.png" alt="F'=\sum_{i}c_{i}F_{i}"/></p>
-</div><p>FUNCTION:</p>
+<div class="math notranslate">
+\[e_{i}=F_{i}D_{i}S - SD_{i}F_{i}\]</div>
+<p>It is wanted that the sum of error vectors is zero:</p>
+<div class="math notranslate">
+\[e'=\sum_{i}c_{i}e_{i}=0\]</div>
+<p>And now with the requirement that the sum of all c is zero, the following matrix eqution is solwed:</p>
+<div class="math notranslate">
+\[B_{i,j}c_{i}=b0\]</div>
+<p>Here:</p>
+<div class="math notranslate">
+\[B_{ij}=\mathrm{tr}\left(e_{i}\cdot e_{j}\right)\]</div>
+<p>and,</p>
+<div class="math notranslate">
+\[\begin{split}b0=\left(\begin{array}{c} 0\\ 0\\ ...\\ -1 \end{array}\right)\end{split}\]</div>
+<p>Finally the new F’ is constructed as:</p>
+<div class="math notranslate">
+\[F'=\sum_{i}c_{i}F_{i}\]</div>
+<p>FUNCTION:</p>
 <ul class="simple">
 <li>DIIS.DIIS(F,D,S,Efock,Edens,numbF)</li>
 <li>return Fprime, Efock, Edens, Emax</li>
@@ -280,6 +280,7 @@ Makes new F’ guesses bassed on previous guesses.</p>
       <script type="text/javascript" src="_static/jquery.js"></script>
       <script type="text/javascript" src="_static/underscore.js"></script>
       <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 
   
 

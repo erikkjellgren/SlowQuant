@@ -184,9 +184,9 @@
 <div class="section" id="moller-plesset-second-order">
 <h2>Møller-Plesset, second order<a class="headerlink" href="#moller-plesset-second-order" title="Permalink to this headline">¶</a></h2>
 <p>The second order Møller-Plesset correction to the energy is given as:</p>
-<div class="math">
-<p><img src="_images/math/4057611a6e86a0fd66d9929c424161e796b7d68d.png" alt="E_{\mathrm{MP2}}=\sum_{i,j}^{\mathrm{occ}}\sum_{a,b}^{\mathrm{unocc}}\frac{\left(ia\left|jb\right.\right)\left[2\left(ia\left|jb\right.\right)-\left(ib\left|ja\right.\right)\right]}{\epsilon_{i}+\epsilon_{j}-\epsilon_{a}-\epsilon_{b}}"/></p>
-</div><p>The above equation is valid for closed shell systems. The integrals is in Mulliken notation, and the denominator is the orbital energies in MO, obtained from an SCF procedure.</p>
+<div class="math notranslate">
+\[E_{\mathrm{MP2}}=\sum_{i,j}^{\mathrm{occ}}\sum_{a,b}^{\mathrm{unocc}}\frac{\left(ia\left|jb\right.\right)\left[2\left(ia\left|jb\right.\right)-\left(ib\left|ja\right.\right)\right]}{\epsilon_{i}+\epsilon_{j}-\epsilon_{a}-\epsilon_{b}}\]</div>
+<p>The above equation is valid for closed shell systems. The integrals is in Mulliken notation, and the denominator is the orbital energies in MO, obtained from an SCF procedure.</p>
 <p>FUNCTION:</p>
 <ul class="simple">
 <li>MPn.MP2(occ, F, C, VeeMO)</li>
@@ -212,13 +212,9 @@
 <div class="section" id="moller-plesset-third-order">
 <h2>Møller-Plesset, third order<a class="headerlink" href="#moller-plesset-third-order" title="Permalink to this headline">¶</a></h2>
 <p>The third order Møller-Plesset correction to the energy is given as:</p>
-<div class="math">
-<p><img src="_images/math/8682bfecf7ea87db9f61fc7de6891fec2dd4865f.png" alt="E^{(3)}=\frac{1}{8}\sum_{abcdrs}\frac{\left\langle ab\left|\right|rs\right\rangle \left\langle cd\left|\right|ab\right\rangle \left\langle rs\left|\right|cd\right\rangle }{\left(\epsilon_{a}+\epsilon_{b}-\epsilon_{r}-\epsilon_{s}\right)\left(\epsilon_{c}+\epsilon_{d}-\epsilon_{r}-\epsilon_{s}\right)}
-
-+\frac{1}{8}\sum_{abrstu}\frac{\left\langle ab\left|\right|rs\right\rangle \left\langle rs\left|\right|tu\right\rangle \left\langle tu\left|\right|ab\right\rangle }{\left(\epsilon_{a}+\epsilon_{b}-\epsilon_{r}-\epsilon_{s}\right)\left(\epsilon_{a}+\epsilon_{b}-\epsilon_{t}-\epsilon_{u}\right)}
-
-+\sum_{abcrst}\frac{\left\langle ab\left|\right|rs\right\rangle \left\langle cs\left|\right|tb\right\rangle \left\langle rt\left|\right|ac\right\rangle }{\left(\epsilon_{a}+\epsilon_{b}-\epsilon_{r}-\epsilon_{s}\right)\left(\epsilon_{a}+\epsilon_{c}-\epsilon_{r}-\epsilon_{t}\right)}"/></p>
-</div><p>FUNCTION:</p>
+<div class="math notranslate">
+\[ \begin{align}\begin{aligned}E^{(3)}=\frac{1}{8}\sum_{abcdrs}\frac{\left\langle ab\left|\right|rs\right\rangle \left\langle cd\left|\right|ab\right\rangle \left\langle rs\left|\right|cd\right\rangle }{\left(\epsilon_{a}+\epsilon_{b}-\epsilon_{r}-\epsilon_{s}\right)\left(\epsilon_{c}+\epsilon_{d}-\epsilon_{r}-\epsilon_{s}\right)}\\+\frac{1}{8}\sum_{abrstu}\frac{\left\langle ab\left|\right|rs\right\rangle \left\langle rs\left|\right|tu\right\rangle \left\langle tu\left|\right|ab\right\rangle }{\left(\epsilon_{a}+\epsilon_{b}-\epsilon_{r}-\epsilon_{s}\right)\left(\epsilon_{a}+\epsilon_{b}-\epsilon_{t}-\epsilon_{u}\right)}\\+\sum_{abcrst}\frac{\left\langle ab\left|\right|rs\right\rangle \left\langle cs\left|\right|tb\right\rangle \left\langle rt\left|\right|ac\right\rangle }{\left(\epsilon_{a}+\epsilon_{b}-\epsilon_{r}-\epsilon_{s}\right)\left(\epsilon_{a}+\epsilon_{c}-\epsilon_{r}-\epsilon_{t}\right)}\end{aligned}\end{align} \]</div>
+<p>FUNCTION:</p>
 <ul class="simple">
 <li>MPn.MP3(occ, F, C, VeeMO)</li>
 <li>return EMP3</li>
@@ -242,9 +238,9 @@
 <div class="section" id="degeneracy-corrected-perturbation-second-order">
 <h2>Degeneracy-corrected perturbation, second order<a class="headerlink" href="#degeneracy-corrected-perturbation-second-order" title="Permalink to this headline">¶</a></h2>
 <p>The second order Degeneracy-corrected correction to the energy is given as:</p>
-<div class="math">
-<p><img src="_images/math/21a44a27f6066060d3305b319738c70d91b606bd.png" alt="E^{(2)}=\frac{1}{2}\left(D_{abij}-\sqrt{D_{abij}^{2}+4\left\langle \left.\left.ij\right|ab\right|\right\rangle ^{2}}\right)+\frac{1}{4}\left(D_{abij}-\sqrt{D_{abij}^{2}+4\left(\left\langle \left.\left.ij\right|ab\right|\right\rangle -\left\langle \left.\left.ij\right|ba\right|\right\rangle \right)^{2}}\right)"/></p>
-</div><p>with:</p>
+<div class="math notranslate">
+\[E^{(2)}=\frac{1}{2}\left(D_{abij}-\sqrt{D_{abij}^{2}+4\left\langle \left.\left.ij\right|ab\right|\right\rangle ^{2}}\right)+\frac{1}{4}\left(D_{abij}-\sqrt{D_{abij}^{2}+4\left(\left\langle \left.\left.ij\right|ab\right|\right\rangle -\left\langle \left.\left.ij\right|ba\right|\right\rangle \right)^{2}}\right)\]</div>
+<p>with:</p>
 <p>FUNCTION:</p>
 <ul class="simple">
 <li>MPn.DCPT2(occ, F, C, VeeMO)</li>
@@ -322,6 +318,7 @@
       <script type="text/javascript" src="_static/jquery.js"></script>
       <script type="text/javascript" src="_static/underscore.js"></script>
       <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 
   
 

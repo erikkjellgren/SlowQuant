@@ -183,38 +183,38 @@
 <div class="section" id="restricted-hartree-fock">
 <h2>Restricted Hartree-Fock<a class="headerlink" href="#restricted-hartree-fock" title="Permalink to this headline">¶</a></h2>
 <p>For the Roothan-Hartee-Fock equations an orthogonal basis is needed, first the first orthogonalization matrix is constructed from the overlap matrix. First by a diagonalization:</p>
-<div class="math">
-<p><img src="_images/math/3a87ce51f94bcd74fb8541b77d3ec405b3fffc72.png" alt="SL_{S}=L_{S}\Lambda_{S}"/></p>
-</div><p>and then the orthogonalization matrix is constructed:</p>
-<div class="math">
-<p><img src="_images/math/f92bef38c769637f5d8ec1305f18531751d14632.png" alt="S_{\mathrm{ortho}}=L_{S}\Lambda_{S}^{-1/2}L_{S}^{T}"/></p>
-</div><p>The SCF iterations requires an initial Fock matrix given as:</p>
-<div class="math">
-<p><img src="_images/math/cc82d3d3de18ccbafaec2868187dc571ff98538b.png" alt="F_{0}=H^{\mathrm{core}}"/></p>
-</div><p>The SCF procedure is calulated as the following equations. First the fock matrix is constructed:</p>
-<div class="math">
-<p><img src="_images/math/689a7dbd4bfbfcbc904134fa837c0e06d9a50c56.png" alt="\left.F_{n,ij}\right|_{n\neq0}=H_{ij}^{\mathrm{core}}+\sum_{kl}^{\mathrm{AO}}D_{n-1,kl}\left(2\left(ij\left|\right|kl\right)-\left(ik\left|\right|jl\right)\right)"/></p>
-</div><p>Then the Fock matrix is brought into the orthogonal basis:</p>
-<div class="math">
-<p><img src="_images/math/b8f1a46c3fe9d5a8ab63de2c590afd4a0f2845be.png" alt="F_{n}^{'}=S_{\mathrm{ortho}}^{T}H^{\mathrm{core}}S_{\mathrm{ortho}}"/></p>
-</div><p>The F’ is then diagonalized:</p>
-<div class="math">
-<p><img src="_images/math/b327c9600582cbcb1e298ac21e69729951472324.png" alt="F_{n}^{'}C_{n}^{'}=C_{n}^{'}\epsilon_{n}"/></p>
-</div><p>The coefficients are transformed back:</p>
-<div class="math">
-<p><img src="_images/math/15b73cae82ff8b48180b92cfb5b5a26b9ac92836.png" alt="C_{n}=S_{\mathrm{ortho}}C_{n}^{'}"/></p>
-</div><p>A density matrix can be made from the coefficients:</p>
-<div class="math">
-<p><img src="_images/math/d0d239eb58b5d8e764a478a01e29c98a57d0333d.png" alt="D_{n,ij}=\sum_{k}^{\mathrm{occ}}C_{n,ki}C_{n,kj}"/></p>
-</div><p>The electronic energy of system can be found as:</p>
-<div class="math">
-<p><img src="_images/math/38954efab5bf39a913efe8b8e8e493839abe9722.png" alt="E_{n,\mathrm{elec}}=\sum_{ij}^{\mathrm{AO}}D_{0,ij}\left(H_{ij}^{\mathrm{core}}+F_{n,ij}\right)"/></p>
-</div><p>The above SCF procedure will is stopped at certain tresholds. The change in energy and the RMSD of the density matrix can be found as:</p>
-<div class="math">
-<p><img src="_images/math/177400a4de83138c01737efb55c06e2393d0d8e6.png" alt="\Delta E_{n}=E_{n,\mathrm{elec}}-E_{n-1,\mathrm{elec}}"/></p>
-</div><div class="math">
-<p><img src="_images/math/2b4930310392442308a1f4bb2b75e435eaa75879.png" alt="\mathrm{RMSD}_{n}=\sqrt{\sum_{ij}D_{n,ij}-D_{n-1,ij}}"/></p>
-</div><p>FUNCTION:</p>
+<div class="math notranslate">
+\[SL_{S}=L_{S}\Lambda_{S}\]</div>
+<p>and then the orthogonalization matrix is constructed:</p>
+<div class="math notranslate">
+\[S_{\mathrm{ortho}}=L_{S}\Lambda_{S}^{-1/2}L_{S}^{T}\]</div>
+<p>The SCF iterations requires an initial Fock matrix given as:</p>
+<div class="math notranslate">
+\[F_{0}=H^{\mathrm{core}}\]</div>
+<p>The SCF procedure is calulated as the following equations. First the fock matrix is constructed:</p>
+<div class="math notranslate">
+\[\left.F_{n,ij}\right|_{n\neq0}=H_{ij}^{\mathrm{core}}+\sum_{kl}^{\mathrm{AO}}D_{n-1,kl}\left(2\left(ij\left|\right|kl\right)-\left(ik\left|\right|jl\right)\right)\]</div>
+<p>Then the Fock matrix is brought into the orthogonal basis:</p>
+<div class="math notranslate">
+\[F_{n}^{'}=S_{\mathrm{ortho}}^{T}H^{\mathrm{core}}S_{\mathrm{ortho}}\]</div>
+<p>The F’ is then diagonalized:</p>
+<div class="math notranslate">
+\[F_{n}^{'}C_{n}^{'}=C_{n}^{'}\epsilon_{n}\]</div>
+<p>The coefficients are transformed back:</p>
+<div class="math notranslate">
+\[C_{n}=S_{\mathrm{ortho}}C_{n}^{'}\]</div>
+<p>A density matrix can be made from the coefficients:</p>
+<div class="math notranslate">
+\[D_{n,ij}=\sum_{k}^{\mathrm{occ}}C_{n,ki}C_{n,kj}\]</div>
+<p>The electronic energy of system can be found as:</p>
+<div class="math notranslate">
+\[E_{n,\mathrm{elec}}=\sum_{ij}^{\mathrm{AO}}D_{0,ij}\left(H_{ij}^{\mathrm{core}}+F_{n,ij}\right)\]</div>
+<p>The above SCF procedure will is stopped at certain tresholds. The change in energy and the RMSD of the density matrix can be found as:</p>
+<div class="math notranslate">
+\[\Delta E_{n}=E_{n,\mathrm{elec}}-E_{n-1,\mathrm{elec}}\]</div>
+<div class="math notranslate">
+\[\mathrm{RMSD}_{n}=\sqrt{\sum_{ij}D_{n,ij}-D_{n-1,ij}}\]</div>
+<p>FUNCTION:</p>
 <ul class="simple">
 <li>HartreeFock.HartreeFock(input, VNN, Te, S, VeN, Vee, deTHR=10**-6,rmsTHR=10**-6,Maxiter=100, DO_DIIS=’Yes’, DIIS_steps=6, print_SCF=’Yes’)</li>
 <li>return EHF, C, F, D, iter</li>
@@ -250,9 +250,9 @@
 <div class="section" id="unrestricted-hartee-fock">
 <h2>Unrestricted Hartee-Fock<a class="headerlink" href="#unrestricted-hartee-fock" title="Permalink to this headline">¶</a></h2>
 <p>The unrestricted Hartee-Fock method uses the same SCF procedure as as the restricted Hartree-Fock, but with the Fock matrix coupling the alpha and beta spins:</p>
-<div class="math">
-<p><img src="_images/math/92dd4509c6aa4ebee90704017091fdc95b5fa90b.png" alt="F_{n,\alpha,ij}=H_{ij}^{\mathrm{core}}+\sum_{kl}^{\mathrm{AO}}D_{n-1,\alpha,kl}\left(\left(ij\left|\right|kl\right)-\left(ik\left|\right|jl\right)\right)+\sum_{kl}^{\mathrm{AO}}D_{n-1,\beta,kl}\left(ij\left|\right|kl\right)"/></p>
-</div><p>FUNCTION:</p>
+<div class="math notranslate">
+\[F_{n,\alpha,ij}=H_{ij}^{\mathrm{core}}+\sum_{kl}^{\mathrm{AO}}D_{n-1,\alpha,kl}\left(\left(ij\left|\right|kl\right)-\left(ik\left|\right|jl\right)\right)+\sum_{kl}^{\mathrm{AO}}D_{n-1,\beta,kl}\left(ij\left|\right|kl\right)\]</div>
+<p>FUNCTION:</p>
 <ul class="simple">
 <li>UHF.HartreeFock(input, VNN, Te, S, VeN, Vee, deTHR=10**-6,rmsTHR=10**-6,Maxiter=100, UHF_mix=0.15, print_SCF=’Yes’)</li>
 <li>return EUHF, C_alpha, F_alpha, D_alpha, C_beta, F_beta, D_beta, iter</li>
@@ -286,11 +286,11 @@
 <li>Szabo and Ostlund, Modern Quantum Chemistry: Introduction to Advanced Electronic Structure Theory</li>
 </ul>
 <p>In unrestricted Hartree-Fock for a closed shell system the spin-symmetry needs to be broken else restricted Hartree-Fock is restored. This is done by the following method, after the first MO coefficients have been made:</p>
-<div class="math">
-<p><img src="_images/math/fdb3cf5b74d2894e76ab30132f2803a95de0c9bf.png" alt="C_{i,\mathrm{HOMO}}^{\mathrm{new}}=\frac{1}{\sqrt{1+k^{2}}}\left(C_{i,\mathrm{HOMO}}^{\mathrm{old}}+kC_{i,\mathrm{LUMO}}^{\mathrm{old}}\right)"/></p>
-</div><div class="math">
-<p><img src="_images/math/001a492d808197478b849b7b10beb5d1250c6a99.png" alt="C_{i,\mathrm{LUMO}}^{\mathrm{new}}=\frac{1}{\sqrt{1+k^{2}}}\left(-kC_{i,\mathrm{HOMO}}^{\mathrm{old}}+C_{i,\mathrm{LUMO}}^{\mathrm{old}}\right)"/></p>
-</div></div>
+<div class="math notranslate">
+\[C_{i,\mathrm{HOMO}}^{\mathrm{new}}=\frac{1}{\sqrt{1+k^{2}}}\left(C_{i,\mathrm{HOMO}}^{\mathrm{old}}+kC_{i,\mathrm{LUMO}}^{\mathrm{old}}\right)\]</div>
+<div class="math notranslate">
+\[C_{i,\mathrm{LUMO}}^{\mathrm{new}}=\frac{1}{\sqrt{1+k^{2}}}\left(-kC_{i,\mathrm{HOMO}}^{\mathrm{old}}+C_{i,\mathrm{LUMO}}^{\mathrm{old}}\right)\]</div>
+</div>
 </div>
 
 
@@ -347,6 +347,7 @@
       <script type="text/javascript" src="_static/jquery.js"></script>
       <script type="text/javascript" src="_static/underscore.js"></script>
       <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 
   
 

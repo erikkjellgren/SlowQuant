@@ -9,7 +9,7 @@ import slowquant.mollerplesset.runMPn as MP
 import slowquant.qfit.Qfit as QF
 import slowquant.geometryoptimization.GeometryOptimization as GO
 import slowquant.configurationinteraction.runCI as CI
-import slowquant .coupledcluster.runCC as CC
+import slowquant.coupledcluster.runCC as CC
 import slowquant.bomd.runBOMD as MD
 
 def run(inputname, settingsname):
@@ -42,7 +42,7 @@ def run(inputname, settingsname):
         results = MD.runBOMD(input, set, results)
     
     elif set['Initial method'] == 'UHF':
-        basis = BS.bassiset(input, set)
+        basis = BS.bassiset(input, set['basisset'])
         start = time.time()
         results = MI.runIntegrals(input, basis, set, results)
         print(time.time()-start, 'INTEGRALS')
@@ -55,7 +55,7 @@ def run(inputname, settingsname):
         if set['GeoOpt'] == 'Yes':
             input, results = GO.runGO(input, set, results)
         
-        basis = BS.bassiset(input, set)
+        basis = BS.bassiset(input, set['basisset'])
         
         start = time.time()
         results = MI.runIntegrals(input, basis, set, results)

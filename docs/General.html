@@ -185,35 +185,35 @@
 <div class="section" id="basisset-object">
 <h2>Basisset object<a class="headerlink" href="#basisset-object" title="Permalink to this headline">¶</a></h2>
 <p>The basisset object is a list of list with the following structure:</p>
-<div class="math">
-<p><img src="_images/math/ff0349fcd2c5d09eba28062b4afd7f0002008564.png" alt="\left[\begin{array}{ccccccc}Idx &amp; x &amp; y &amp; z &amp; \#CONTR &amp; CONTR &amp; Atomidx\end{array}\right]"/></p>
-</div><p>Idx is the AO index. Atomidx, is the index of the associated atom. #CONTR contains the number of primitive functions in the contracted.</p>
+<div class="math notranslate">
+\[\left[\begin{array}{ccccccc}Idx &amp; x &amp; y &amp; z &amp; \#CONTR &amp; CONTR &amp; Atomidx\end{array}\right]\]</div>
+<p>Idx is the AO index. Atomidx, is the index of the associated atom. #CONTR contains the number of primitive functions in the contracted.</p>
 <p>CONTR contains all the information about the primitive functions and have the form:</p>
-<div class="math">
-<p><img src="_images/math/721137c66644ac35e8541d590f15f2642b2c4eda.png" alt="\left[\begin{array}{cccccc}N &amp; \zeta &amp; c &amp; l &amp; m &amp; n\end{array}\right]"/></p>
-</div><p>Inside the integral call, the basisset file is reconstructed into three different arrays, containing the basisset information. The first one is basisidx that have the following form:</p>
-<div class="math">
-<p><img src="_images/math/e27e034cc1d400294d514a93e8b8f5e0b51c7b99.png" alt="\left[\begin{array}{cc}\mathrm{\#primitives} &amp; \mathrm{loop\,start\,idx}\end{array}\right]"/></p>
-</div><p>It thus contains the number of primitives in each basisfunction, and what start index it have for loop inside the integral code.</p>
+<div class="math notranslate">
+\[\left[\begin{array}{cccccc}N &amp; \zeta &amp; c &amp; l &amp; m &amp; n\end{array}\right]\]</div>
+<p>Inside the integral call, the basisset file is reconstructed into three different arrays, containing the basisset information. The first one is basisidx that have the following form:</p>
+<div class="math notranslate">
+\[\left[\begin{array}{cc}\mathrm{\#primitives} &amp; \mathrm{loop\,start\,idx}\end{array}\right]\]</div>
+<p>It thus contains the number of primitives in each basisfunction, and what start index it have for loop inside the integral code.</p>
 <p>The second array is basisint, that have the following forms:</p>
-<div class="math">
-<p><img src="_images/math/0306ccae310632d4763770d8db7ae44e3ffd1005.png" alt="\left[\begin{array}{ccc}l &amp; m &amp; n\end{array}\right]"/></p>
-</div><div class="math">
-<p><img src="_images/math/ba3d25fdd31652e03449e810b55bba41f549e244.png" alt="\left[\begin{array}{cccc}l &amp; m &amp; n &amp; \mathrm{atom\,idx}\end{array}\right]"/></p>
-</div><p>The first one is for regular integrals and the second one is for derivatives. Both contains all the angular momentum quantum numbers, and the derivative also contains the atom index (used in derivative of VNe).</p>
+<div class="math notranslate">
+\[\left[\begin{array}{ccc}l &amp; m &amp; n\end{array}\right]\]</div>
+<div class="math notranslate">
+\[\left[\begin{array}{cccc}l &amp; m &amp; n &amp; \mathrm{atom\,idx}\end{array}\right]\]</div>
+<p>The first one is for regular integrals and the second one is for derivatives. Both contains all the angular momentum quantum numbers, and the derivative also contains the atom index (used in derivative of VNe).</p>
 <p>The last array is basisfloat and have the following forms:</p>
-<div class="math">
-<p><img src="_images/math/65a6d1fa81a5f7bded0b7a375f1ece63cd70fcc9.png" alt="\left[\begin{array}{cccccc}N &amp; \zeta &amp; c &amp; x &amp; y &amp; z\end{array}\right]"/></p>
-</div><div class="math">
-<p><img src="_images/math/6cf9dfd6614ef84dcf6b89467c10b571554d76d6.png" alt="\left[\begin{array}{cccccccccccc}N &amp; \zeta &amp; c &amp; x &amp; y &amp; z &amp; N_{x,+} &amp; N_{x,-} &amp; N_{y,+} &amp; N_{y,-} &amp; N_{z,+} &amp; N_{z,-}\end{array}\right]"/></p>
-</div><p>basisfloat contains the normalization constants, Gaussian exponent and prefacor and the coordinates of the atoms. The second one is again for the derivatives, it contains normalization constants of the differentiated primitives.</p>
+<div class="math notranslate">
+\[\left[\begin{array}{cccccc}N &amp; \zeta &amp; c &amp; x &amp; y &amp; z\end{array}\right]\]</div>
+<div class="math notranslate">
+\[\left[\begin{array}{cccccccccccc}N &amp; \zeta &amp; c &amp; x &amp; y &amp; z &amp; N_{x,+} &amp; N_{x,-} &amp; N_{y,+} &amp; N_{y,-} &amp; N_{z,+} &amp; N_{z,-}\end{array}\right]\]</div>
+<p>basisfloat contains the normalization constants, Gaussian exponent and prefacor and the coordinates of the atoms. The second one is again for the derivatives, it contains normalization constants of the differentiated primitives.</p>
 </div>
 <div class="section" id="inputfile-obejct">
 <h2>Inputfile obejct<a class="headerlink" href="#inputfile-obejct" title="Permalink to this headline">¶</a></h2>
 <p>The inputfile obejct is a numpy array containing the following informations:</p>
-<div class="math">
-<p><img src="_images/math/069ee3e10114332968eb31c835842b6218cc5c30.png" alt="\left[\begin{array}{cccc}\#electrons &amp; None &amp; None &amp; None\\Atom_{1}\,nr. &amp; Atom_{1}\,x &amp; Atom_{1}\,y &amp; Atom_{1}\,z\\Atom_{2}\,nr. &amp; Atom_{2}\,x &amp; Atom_{2}\,y &amp; Atom_{2}\,z\\... &amp; ... &amp; ... &amp; ...\\Atom_{i}\,nr. &amp; Atom_{i}\,x &amp; Atom_{i}\,y &amp; Atom_{i}\,z\end{array}\right]"/></p>
-</div></div>
+<div class="math notranslate">
+\[\begin{split}\left[\begin{array}{cccc}\#electrons &amp; None &amp; None &amp; None\\Atom_{1}\,nr. &amp; Atom_{1}\,x &amp; Atom_{1}\,y &amp; Atom_{1}\,z\\Atom_{2}\,nr. &amp; Atom_{2}\,x &amp; Atom_{2}\,y &amp; Atom_{2}\,z\\... &amp; ... &amp; ... &amp; ...\\Atom_{i}\,nr. &amp; Atom_{i}\,x &amp; Atom_{i}\,y &amp; Atom_{i}\,z\end{array}\right]\end{split}\]</div>
+</div>
 <div class="section" id="settings-obejct">
 <h2>Settings obejct<a class="headerlink" href="#settings-obejct" title="Permalink to this headline">¶</a></h2>
 <p>The settings are parsed around in the code as a dictionary.</p>
@@ -278,6 +278,7 @@
       <script type="text/javascript" src="_static/jquery.js"></script>
       <script type="text/javascript" src="_static/underscore.js"></script>
       <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 
   
 

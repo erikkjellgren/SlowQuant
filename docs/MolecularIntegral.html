@@ -189,26 +189,26 @@
   <div class="section" id="molecular-integrals">
 <h1>Molecular Integrals<a class="headerlink" href="#molecular-integrals" title="Permalink to this headline">¶</a></h1>
 <p>Contains the information about how the integrals are calculated. In the equations in this section the following definitions is used.</p>
-<div class="math">
-<p><img src="_images/math/670c1c7ac81b2e4cfdf0cb4ffc0fe160d0c7a774.png" alt="p=a+b"/></p>
-</div><div class="math">
-<p><img src="_images/math/718d4c83f3e31a748c3e69d77c116dee6d4a2083.png" alt="\mu=\frac{ab}{a+b}"/></p>
-</div><div class="math">
-<p><img src="_images/math/7e26ba5946d7e2678e7c59313d0879d9a4c1503a.png" alt="P_{x}=\frac{aA_{x}+bB_{x}}{p}"/></p>
-</div><div class="math">
-<p><img src="_images/math/620d9bc5c1d6501084b3d66bd85afa11e6d40d55.png" alt="X_{AB}=A_{x}-B_{x}"/></p>
-</div><p>Here a and b are Gaussian exponent factors. Ax and Bx are the position of the Gaussians in one dimension. Further the basisset functions is of Gaussian kind and given as:</p>
-<div class="math">
-<p><img src="_images/math/6fdf87f713dfbadff22be07b15b00db85bf3d513.png" alt="\phi_{A}\left(r\right)=N\left(x-A_{x}\right)^{l}\left(y-A_{y}\right)^{m}\left(z-A_{z}\right)^{n}\exp\left(-\zeta\left(\vec{r}-\vec{A}\right)^{2}\right)"/></p>
-</div><p>with a normalization constant given as:</p>
-<div class="math">
-<p><img src="_images/math/eda23067ca9835526f6190e9dc82ba9e8b56365e.png" alt="N=\left(\frac{2\alpha}{\pi}\right)^{3/4}\left[\frac{\left(8\alpha\right)^{l+m+n}l!m!n!}{\left(2l\right)!\left(2m\right)!\left(2n\right)!}\right]"/></p>
-</div><div class="section" id="boys-function">
+<div class="math notranslate">
+\[p=a+b\]</div>
+<div class="math notranslate">
+\[\mu=\frac{ab}{a+b}\]</div>
+<div class="math notranslate">
+\[P_{x}=\frac{aA_{x}+bB_{x}}{p}\]</div>
+<div class="math notranslate">
+\[X_{AB}=A_{x}-B_{x}\]</div>
+<p>Here a and b are Gaussian exponent factors. Ax and Bx are the position of the Gaussians in one dimension. Further the basisset functions is of Gaussian kind and given as:</p>
+<div class="math notranslate">
+\[\phi_{A}\left(r\right)=N\left(x-A_{x}\right)^{l}\left(y-A_{y}\right)^{m}\left(z-A_{z}\right)^{n}\exp\left(-\zeta\left(\vec{r}-\vec{A}\right)^{2}\right)\]</div>
+<p>with a normalization constant given as:</p>
+<div class="math notranslate">
+\[N=\left(\frac{2\alpha}{\pi}\right)^{3/4}\left[\frac{\left(8\alpha\right)^{l+m+n}l!m!n!}{\left(2l\right)!\left(2m\right)!\left(2n\right)!}\right]\]</div>
+<div class="section" id="boys-function">
 <h2>Boys Function<a class="headerlink" href="#boys-function" title="Permalink to this headline">¶</a></h2>
 <p>The Boys function is given as:</p>
-<div class="math">
-<p><img src="_images/math/6f154e4ed18da49646e5c46a41351ef2da89e9c1.png" alt="F_{n}\left(x\right)=\int_{0}^{1}\exp\left(-xt^{2}\right)t^{2n}dt"/></p>
-</div><p>FUNCTION:</p>
+<div class="math notranslate">
+\[F_{n}\left(x\right)=\int_{0}^{1}\exp\left(-xt^{2}\right)t^{2n}dt\]</div>
+<p>FUNCTION:</p>
 <ul class="simple">
 <li>MIcython.boys(m,T)</li>
 <li>return value</li>
@@ -230,16 +230,16 @@
 <div class="section" id="expansion-coefficients">
 <h2>Expansion coefficients<a class="headerlink" href="#expansion-coefficients" title="Permalink to this headline">¶</a></h2>
 <p>The expansion coefficient is found by the following recurrence relation:</p>
-<div class="math">
-<p><img src="_images/math/cae5b4513e5dc8df9bb67fac522ad8ed326328fd.png" alt="E_{t}^{i,j}=0,\,\,\,\,t&lt;0\,\,\mathrm{or}\,\,t&gt;i+j"/></p>
-</div><div class="math">
-<p><img src="_images/math/77e1d9f9023ec0c6885ccfd2e066ecafecc4936e.png" alt="E_{t}^{i+1,j}=\frac{1}{2p}E_{t-1}^{i,j}+X_{\mathrm{PA}}E_{t}^{i,j}+\left(t+1\right)E_{t+1}^{i,j}"/></p>
-</div><div class="math">
-<p><img src="_images/math/9a3f7452b0dea7c89356b95843438944d6282b46.png" alt="E_{t}^{i,j+1}=\frac{1}{2p}E_{t-1}^{i,j}+X_{\mathrm{PB}}E_{t}^{i,j}+\left(t+1\right)E_{t+1}^{i,j}"/></p>
-</div><p>With the boundary condition that:</p>
-<div class="math">
-<p><img src="_images/math/f5dfbded3ab11cc0e5cd65948e91639160f33af5.png" alt="E_{0}^{0,0}=\exp\left(-pX_{\mathrm{AB}}^{2}\right)"/></p>
-</div><p>FUNCTION:</p>
+<div class="math notranslate">
+\[E_{t}^{i,j}=0,\,\,\,\,t&lt;0\,\,\mathrm{or}\,\,t&gt;i+j\]</div>
+<div class="math notranslate">
+\[E_{t}^{i+1,j}=\frac{1}{2p}E_{t-1}^{i,j}+X_{\mathrm{PA}}E_{t}^{i,j}+\left(t+1\right)E_{t+1}^{i,j}\]</div>
+<div class="math notranslate">
+\[E_{t}^{i,j+1}=\frac{1}{2p}E_{t-1}^{i,j}+X_{\mathrm{PB}}E_{t}^{i,j}+\left(t+1\right)E_{t+1}^{i,j}\]</div>
+<p>With the boundary condition that:</p>
+<div class="math notranslate">
+\[E_{0}^{0,0}=\exp\left(-pX_{\mathrm{AB}}^{2}\right)\]</div>
+<p>FUNCTION:</p>
 <ul class="simple">
 <li>MolecularIntegrals.E(i,j,t,Qx,a,b,XPA,XPB,XAB)</li>
 <li>return val</li>
@@ -269,16 +269,16 @@
 <div class="section" id="hermite-coulomb-integral">
 <h2>Hermite coulomb integral<a class="headerlink" href="#hermite-coulomb-integral" title="Permalink to this headline">¶</a></h2>
 <p>The hermite coulomb integrals is given as the following recurrence relations:</p>
-<div class="math">
-<p><img src="_images/math/d2424e06239ab29383e635e9d99828e73ebcdd6e.png" alt="R_{t+1,u,v}^{n}\left(p,R_{\mathrm{PC}}\right)=tR_{t-1,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)+X_{\mathrm{PC}}R_{t,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)"/></p>
-</div><div class="math">
-<p><img src="_images/math/d376c2acbc373420c21122bc173b0992633406ad.png" alt="R_{t,u+1,v}^{n}\left(p,R_{\mathrm{PC}}\right)=uR_{t,u-1,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)+Y_{\mathrm{PC}}R_{t,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)"/></p>
-</div><div class="math">
-<p><img src="_images/math/29d1a67b1ec5b3464e49ab2d32bac4e844168e2e.png" alt="R_{t,u,v+1}^{n}\left(p,R_{\mathrm{PC}}\right)=vR_{t,u,v-1}^{n+1}\left(p,R_{\mathrm{PC}}\right)+Z_{\mathrm{PC}}R_{t,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)"/></p>
-</div><p>With the boundary condition:</p>
-<div class="math">
-<p><img src="_images/math/f156200f7a8a9a2af93947d614babe4e8c266e37.png" alt="R_{0,0,0}^{n}\left(p,R_{\mathrm{PC}}\right)=\left(-2p\right)^{n}F_{n}\left(pR_{\mathrm{PC}}^{2}\right)"/></p>
-</div><p>FUNCTION:</p>
+<div class="math notranslate">
+\[R_{t+1,u,v}^{n}\left(p,R_{\mathrm{PC}}\right)=tR_{t-1,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)+X_{\mathrm{PC}}R_{t,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)\]</div>
+<div class="math notranslate">
+\[R_{t,u+1,v}^{n}\left(p,R_{\mathrm{PC}}\right)=uR_{t,u-1,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)+Y_{\mathrm{PC}}R_{t,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)\]</div>
+<div class="math notranslate">
+\[R_{t,u,v+1}^{n}\left(p,R_{\mathrm{PC}}\right)=vR_{t,u,v-1}^{n+1}\left(p,R_{\mathrm{PC}}\right)+Z_{\mathrm{PC}}R_{t,u,v}^{n+1}\left(p,R_{\mathrm{PC}}\right)\]</div>
+<p>With the boundary condition:</p>
+<div class="math notranslate">
+\[R_{0,0,0}^{n}\left(p,R_{\mathrm{PC}}\right)=\left(-2p\right)^{n}F_{n}\left(pR_{\mathrm{PC}}^{2}\right)\]</div>
+<p>FUNCTION:</p>
 <ul class="simple">
 <li>MIcython.R2(t,u,v,n,p,PCx,PCy,PCz,RPC)</li>
 <li>return val</li>
@@ -308,14 +308,14 @@
 <div class="section" id="overlap">
 <h2>Overlap<a class="headerlink" href="#overlap" title="Permalink to this headline">¶</a></h2>
 <p>The overlap integrals are solved by the following recurrence relation:</p>
-<div class="math">
-<p><img src="_images/math/f17839ba4ceaeb7831c6bd80e65de0dd9d3c7d52.png" alt="S_{i+1,j}=X_{PA}S_{ij}+\frac{1}{2p}\left(iS_{i-1,j}+jS_{i,j-1}\right)"/></p>
-</div><div class="math">
-<p><img src="_images/math/36841f6f072d1847c6f983497cc199aa62632d26.png" alt="S_{i,j+1}=X_{PB}S_{ij}+\frac{1}{2p}\left(iS_{i-1,j}+jS_{i,j-1}\right)"/></p>
-</div><p>With the boundary condition that:</p>
-<div class="math">
-<p><img src="_images/math/1bd6ca56103861721f56d5e91a3c24c5f66fb547.png" alt="S_{00}=\sqrt{\frac{\pi}{p}}\exp\left(-\mu X_{AB}^{2}\right)"/></p>
-</div><p>FUNCTION:</p>
+<div class="math notranslate">
+\[S_{i+1,j}=X_{PA}S_{ij}+\frac{1}{2p}\left(iS_{i-1,j}+jS_{i,j-1}\right)\]</div>
+<div class="math notranslate">
+\[S_{i,j+1}=X_{PB}S_{ij}+\frac{1}{2p}\left(iS_{i-1,j}+jS_{i,j-1}\right)\]</div>
+<p>With the boundary condition that:</p>
+<div class="math notranslate">
+\[S_{00}=\sqrt{\frac{\pi}{p}}\exp\left(-\mu X_{AB}^{2}\right)\]</div>
+<p>FUNCTION:</p>
 <ul class="simple">
 <li>MolecularIntegrals.Overlap(a, b, la, lb, Ax, Bx)</li>
 <li>return Sij</li>
@@ -341,14 +341,14 @@
 <div class="section" id="kinetic-energy">
 <h2>Kinetic energy<a class="headerlink" href="#kinetic-energy" title="Permalink to this headline">¶</a></h2>
 <p>The kinetic energy integrals are solved by the following recurrence relation:</p>
-<div class="math">
-<p><img src="_images/math/16b6cbbf532289647733c72763df4e340bf6e2e7.png" alt="T_{i+1,j}=X_{\mathrm{PA}}T_{i,j}+\frac{1}{2p}\left(iT_{i-1,j}+jT_{i,j-1}\right)+\frac{b}{p}\left(2aS_{i+1,j}-iS_{i-1,j}\right)"/></p>
-</div><div class="math">
-<p><img src="_images/math/bcfacd8af07f2a4969c8b9e6136f14aa29cf737e.png" alt="T_{i,j+1}=X_{\mathrm{PB}}T_{i,j}+\frac{1}{2p}\left(iT_{i-1,j}+jT_{i,j-1}\right)+\frac{a}{p}\left(2bS_{i,j+1}-iS_{i,j-1}\right)"/></p>
-</div><p>With the boundary condition that:</p>
-<div class="math">
-<p><img src="_images/math/30c1caed6d45921a8003b439300645e279712582.png" alt="T_{00}=\left[a-2a^{2}\left(X_{\mathrm{PA}}^{2}+\frac{1}{2p}\right)\right]S_{00}"/></p>
-</div><p>FUNCTION:</p>
+<div class="math notranslate">
+\[T_{i+1,j}=X_{\mathrm{PA}}T_{i,j}+\frac{1}{2p}\left(iT_{i-1,j}+jT_{i,j-1}\right)+\frac{b}{p}\left(2aS_{i+1,j}-iS_{i-1,j}\right)\]</div>
+<div class="math notranslate">
+\[T_{i,j+1}=X_{\mathrm{PB}}T_{i,j}+\frac{1}{2p}\left(iT_{i-1,j}+jT_{i,j-1}\right)+\frac{a}{p}\left(2bS_{i,j+1}-iS_{i,j-1}\right)\]</div>
+<p>With the boundary condition that:</p>
+<div class="math notranslate">
+\[T_{00}=\left[a-2a^{2}\left(X_{\mathrm{PA}}^{2}+\frac{1}{2p}\right)\right]S_{00}\]</div>
+<p>FUNCTION:</p>
 <ul class="simple">
 <li>Kin(a, b, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na, nb, N1, N2, c1, c2)</li>
 <li>return Tij, Sij</li>
@@ -387,9 +387,9 @@
 <div class="section" id="electron-nuclear-attraction">
 <h2>Electron-nuclear attraction<a class="headerlink" href="#electron-nuclear-attraction" title="Permalink to this headline">¶</a></h2>
 <p>The electron-nuclear interaction integral is given as:</p>
-<div class="math">
-<p><img src="_images/math/1e47261d87c24723a3651203285c580b7534c6e3.png" alt="V_{ijklmn}^{000}=\frac{2\pi}{p}\sum_{t}^{i+j}E_{t}^{ij}\sum_{u}^{k+l}E_{u}^{kl}\sum_{v}^{m+n}E_{v}^{mn}R_{tuv}"/></p>
-</div><p>FUNCTION:</p>
+<div class="math notranslate">
+\[V_{ijklmn}^{000}=\frac{2\pi}{p}\sum_{t}^{i+j}E_{t}^{ij}\sum_{u}^{k+l}E_{u}^{kl}\sum_{v}^{m+n}E_{v}^{mn}R_{tuv}\]</div>
+<p>FUNCTION:</p>
 <ul class="simple">
 <li>MolecularIntegrals.elnuc(P, p, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, Zc, Ex, Ey, Ez, R1)</li>
 <li>return Vij</li>
@@ -426,9 +426,9 @@
 <div class="section" id="electron-nuclear-field">
 <h2>Electron-nuclear field<a class="headerlink" href="#electron-nuclear-field" title="Permalink to this headline">¶</a></h2>
 <p>The electron-nuclear interaction integral is given as:</p>
-<div class="math">
-<p><img src="_images/math/cf4518b1f90454818007b456404fdf3669e614b5.png" alt="V_{ijklmn}^{efg}=\left(-1\right)^{e+f+g}\frac{2\pi}{p}\sum_{t}^{i+j}E_{t}^{ij}\sum_{u}^{k+l}E_{u}^{kl}\sum_{v}^{m+n}E_{v}^{mn}R_{t+e,u+f,v+g}"/></p>
-</div><p>Here e, f and g detones the order of derivate with respect to x, y and z</p>
+<div class="math notranslate">
+\[V_{ijklmn}^{efg}=\left(-1\right)^{e+f+g}\frac{2\pi}{p}\sum_{t}^{i+j}E_{t}^{ij}\sum_{u}^{k+l}E_{u}^{kl}\sum_{v}^{m+n}E_{v}^{mn}R_{t+e,u+f,v+g}\]</div>
+<p>Here e, f and g detones the order of derivate with respect to x, y and z</p>
 <p>FUNCTION:</p>
 <ul class="simple">
 <li>MolecularIntegrals.electricfield(p, Ex, Ey, Ez, Zc, l1, l2, m1, m2, n1, n2, N1, N2, c1, c2, derivative, R1)</li>
@@ -464,9 +464,9 @@
 <div class="section" id="electron-electron-repulsion">
 <h2>Electron-electron repulsion<a class="headerlink" href="#electron-electron-repulsion" title="Permalink to this headline">¶</a></h2>
 <p>The electron-electron repulsion integral is calculated as:</p>
-<div class="math">
-<p><img src="_images/math/283dbf3109baffb1b0b8ee384693c474e63f11a7.png" alt="g_{abcd}=\sum_{t}^{l1+l2}E_{t}^{ab}\sum_{u}^{m1+m2}E_{u}^{ab}\sum_{v}^{n1+n2}E_{v}^{ab}\sum_{\tau}^{l3+l4}E_{\tau}^{cd}\sum_{\nu}^{m3+m4}E_{\nu}^{cd}\sum_{\phi}^{n3+n4}E_{\phi}^{cd}\left(-1\right)^{\tau+\nu+\phi}\frac{2\pi^{5/2}}{pq\sqrt{p+q}}R_{t+\tau,u+\nu,v+\phi}\left(\alpha,R_{\mathrm{PQ}}\right)"/></p>
-</div><p>FUNCTION:</p>
+<div class="math notranslate">
+\[g_{abcd}=\sum_{t}^{l1+l2}E_{t}^{ab}\sum_{u}^{m1+m2}E_{u}^{ab}\sum_{v}^{n1+n2}E_{v}^{ab}\sum_{\tau}^{l3+l4}E_{\tau}^{cd}\sum_{\nu}^{m3+m4}E_{\nu}^{cd}\sum_{\phi}^{n3+n4}E_{\phi}^{cd}\left(-1\right)^{\tau+\nu+\phi}\frac{2\pi^{5/2}}{pq\sqrt{p+q}}R_{t+\tau,u+\nu,v+\phi}\left(\alpha,R_{\mathrm{PQ}}\right)\]</div>
+<p>FUNCTION:</p>
 <ul class="simple">
 <li>MIcython.elelrep(p, q, l1, l2, l3, l4, m1, m2, m3, m4, n1, n2, n3, n4, N1, N2, N3, N4, c1, c2, c3, c4, E1, E2, E3, E4, E5, E6, Rpre)</li>
 <li>return Veeijkl</li>
@@ -516,9 +516,9 @@
 <div class="section" id="nuclear-nuclear-repulsion">
 <h2>Nuclear-nuclear repulsion<a class="headerlink" href="#nuclear-nuclear-repulsion" title="Permalink to this headline">¶</a></h2>
 <p>The nucleus-nucleus repulsion term is calculated with classical nuclie as follows:</p>
-<div class="math">
-<p><img src="_images/math/b9fa3c823afdc15f0995de7809874c6968270d10.png" alt="V_{NN}=\sum_{A}\sum_{B&lt;A}\frac{Z_{A}Z_{B}}{r_{AB}}"/></p>
-</div><p>FUNCTION:</p>
+<div class="math notranslate">
+\[V_{NN}=\sum_{A}\sum_{B&lt;A}\frac{Z_{A}Z_{B}}{r_{AB}}\]</div>
+<p>FUNCTION:</p>
 <ul class="simple">
 <li>MolecularIntegrals.nucrep(input)</li>
 <li>return Vnn</li>
@@ -539,9 +539,9 @@
 <div class="section" id="nuclear-nuclear-field">
 <h2>Nuclear-nuclear field<a class="headerlink" href="#nuclear-nuclear-field" title="Permalink to this headline">¶</a></h2>
 <p>The nucleus-nucleus field term is calculated with classical nuclie as follows:</p>
-<div class="math">
-<p><img src="_images/math/36afd3d51eebbe6be945c881e7a8d161811ff8f5.png" alt="\frac{\partial V_{NN}}{\partial X_{A}}=-Z_{A}\sum_{B\neq A}\frac{Z_{B}\left(X_{B}-X_{A}\right)}{r_{AB}^{3}}"/></p>
-</div><p>FUNCTION:</p>
+<div class="math notranslate">
+\[\frac{\partial V_{NN}}{\partial X_{A}}=-Z_{A}\sum_{B\neq A}\frac{Z_{B}\left(X_{B}-X_{A}\right)}{r_{AB}^{3}}\]</div>
+<p>FUNCTION:</p>
 <ul class="simple">
 <li>MolecularIntegrals.nucdiff(input, atomidx, direction)</li>
 <li>return Vnn</li>
@@ -564,13 +564,13 @@
 <div class="section" id="dipole-moment-integral">
 <h2>Dipole moment integral<a class="headerlink" href="#dipole-moment-integral" title="Permalink to this headline">¶</a></h2>
 <p>The dipole moment integral is calculated by using the following relations:</p>
-<div class="math">
-<p><img src="_images/math/22b48da58363c51ae62e49da32894feb0cbaabc6.png" alt="S_{i+1,j}^{e}=X_{\mathrm{PA}}S_{i,j}^{e}+\frac{1}{2p}\left(iS_{i-1,j}^{e}+jS_{i,j-1}^{e}+eS_{ij}^{e-1}\right)"/></p>
-</div><div class="math">
-<p><img src="_images/math/ddafdef32e5fc30bb4a93097fbb604644e0f8cfd.png" alt="S_{i,j+1}^{e}=X_{\mathrm{PB}}S_{i,j}^{e}+\frac{1}{2p}\left(iS_{i-1,j}^{e}+jS_{i,j-1}^{e}+eS_{ij}^{e-1}\right)"/></p>
-</div><div class="math">
-<p><img src="_images/math/fa38a0b45e955741c9089f6d3896354b68306448.png" alt="S_{i,j}^{e+1}=X_{\mathrm{PC}}S_{i,j}^{e}+\frac{1}{2p}\left(iS_{i-1,j}^{e}+jS_{i,j-1}^{e}+eS_{ij}^{e-1}\right)"/></p>
-</div><p>Here e is the order of multipole moment, e=1 is dipole moment.</p>
+<div class="math notranslate">
+\[S_{i+1,j}^{e}=X_{\mathrm{PA}}S_{i,j}^{e}+\frac{1}{2p}\left(iS_{i-1,j}^{e}+jS_{i,j-1}^{e}+eS_{ij}^{e-1}\right)\]</div>
+<div class="math notranslate">
+\[S_{i,j+1}^{e}=X_{\mathrm{PB}}S_{i,j}^{e}+\frac{1}{2p}\left(iS_{i-1,j}^{e}+jS_{i,j-1}^{e}+eS_{ij}^{e-1}\right)\]</div>
+<div class="math notranslate">
+\[S_{i,j}^{e+1}=X_{\mathrm{PC}}S_{i,j}^{e}+\frac{1}{2p}\left(iS_{i-1,j}^{e}+jS_{i,j-1}^{e}+eS_{ij}^{e-1}\right)\]</div>
+<p>Here e is the order of multipole moment, e=1 is dipole moment.</p>
 <p>FUNCTION:</p>
 <ul class="simple">
 <li>MolecularIntegrals.u_ObaraSaika(a1, a2, Ax, Ay, Az, Bx, By, Bz, la, lb, ma, mb, na, nb, N1, N2, c1, c2, input)</li>
@@ -665,6 +665,7 @@
       <script type="text/javascript" src="_static/jquery.js"></script>
       <script type="text/javascript" src="_static/underscore.js"></script>
       <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 
   
 

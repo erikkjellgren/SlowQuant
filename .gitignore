@@ -8,6 +8,7 @@ traj.xyz
 # Files made by python
 __pycache__/
 .cache/
+.pytest_cache/
 
 # Editing documentation
 *~

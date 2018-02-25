@@ -232,7 +232,7 @@ def dipolefit(basis, input, D, set, results):
         ElecESP = 0
         for j in range(0, len(basis)):
             for k in range(0, len(basis)):
-                ElecESP += D[j,k]*Ve[j,k]
+                ElecESP += 0.5*D[j,k]*Ve[j,k]
 
         V[i,3] = NucESP - 2*ElecESP #Where does the 2 come from?
     # END OF calculate QM potential

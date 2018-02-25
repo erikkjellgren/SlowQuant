@@ -14,12 +14,11 @@ def runHartreeFock(input, set, results, print_SCF='Yes'):
         maxiter = int(set['SCF Max iterations'])
         diis_steps = int(set['Keep Steps'])
         do_diis = set['DIIS'] 
-        EHF, C, F, D, iter = HartreeFock(input, VNN, Te, S, VeN, Vee, deTHR=dethr, rmsTHR=dethr, Maxiter=maxiter, DO_DIIS=do_diis, DIIS_steps=diis_steps, print_SCF=print_SCF)
+        EHF, C, F, D = HartreeFock(input, VNN, Te, S, VeN, Vee, deTHR=dethr, rmsTHR=dethr, Maxiter=maxiter, DO_DIIS=do_diis, DIIS_steps=diis_steps, print_SCF=print_SCF)
         results['HFenergy'] = EHF
         results['C_MO']     = C
         results['F']        = F
         results['D']        = D
-        results['HF iterations'] = iter
     elif set['Initial method'] == 'UHF':
         dethr   = float(set['SCF Energy Threshold'])
         rmsthr  = float(set['SCF RMSD Threshold'])

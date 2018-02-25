@@ -185,9 +185,9 @@
 <div class="section" id="molecular-dipole">
 <h2>Molecular dipole<a class="headerlink" href="#molecular-dipole" title="Permalink to this headline">¶</a></h2>
 <p>The molecular dipole in one dimension is found as:</p>
-<div class="math">
-<p><img src="_images/math/dc1640c2581bd17c09999c0b3fcda77234c3f0df.png" alt="\mu_{x}=-\sum_{i}\sum_{j}D_{i,j}\left(i\left|x\right|j\right)+\sum_{A}Z_{A}X_{A}"/></p>
-</div><p>FUNCTION:</p>
+<div class="math notranslate">
+\[\mu_{x}=-\sum_{i}\sum_{j}D_{i,j}\left(i\left|x\right|j\right)+\sum_{A}Z_{A}X_{A}\]</div>
+<p>FUNCTION:</p>
 <ul class="simple">
 <li>Properties.dipolemoment(input, D, mux, muy, muz)</li>
 <li>return ux, uy, uz, u</li>
@@ -215,9 +215,9 @@
 <div class="section" id="mulliken-charges">
 <h2>Mulliken charges<a class="headerlink" href="#mulliken-charges" title="Permalink to this headline">¶</a></h2>
 <p>The atomic charge of the A’th atom can be found as:</p>
-<div class="math">
-<p><img src="_images/math/a93cd379353a2396b1a558c3ee9e43004abc957e.png" alt="q_{A}=Z_{A}-\sum_{i\in A}\left(D\cdot S\right)_{i,i}"/></p>
-</div><p>FUNCTION:</p>
+<div class="math notranslate">
+\[q_{A}=Z_{A}-\sum_{i\in A}\left(D\cdot S\right)_{i,i}\]</div>
+<p>FUNCTION:</p>
 <ul class="simple">
 <li>Properties.MulCharge(basis, input, D, S)</li>
 <li>return qvec</li>
@@ -241,9 +241,9 @@
 <div class="section" id="lowdin-charges">
 <h2>Lowdin charges<a class="headerlink" href="#lowdin-charges" title="Permalink to this headline">¶</a></h2>
 <p>The atomic charge of the A’th atom can be found as:</p>
-<div class="math">
-<p><img src="_images/math/e0d9ddb04b35a69dca78a16ad0c32e74bea50411.png" alt="q_{A}=Z_{A}-\sum_{i\in A}\left(S^{1/2}\cdot D\cdot S^{1/2}\right)_{i,i}"/></p>
-</div><p>FUNCTION:</p>
+<div class="math notranslate">
+\[q_{A}=Z_{A}-\sum_{i\in A}\left(S^{1/2}\cdot D\cdot S^{1/2}\right)_{i,i}\]</div>
+<p>FUNCTION:</p>
 <ul class="simple">
 <li>Properties.LowdinCharge(basis, input, D, S)</li>
 <li>return qvec</li>
@@ -267,14 +267,14 @@
 <div class="section" id="random-phase-approximation-excitation-energy">
 <h2>Random-Phase Approximation Excitation energy<a class="headerlink" href="#random-phase-approximation-excitation-energy" title="Permalink to this headline">¶</a></h2>
 <p>The excitation energies can be calculated by using the random-phase approximation also known as time dependent Hartree-Fock. The exciation energy is found by diagonalizing the following equation:</p>
-<div class="math">
-<p><img src="_images/math/88c1f4a67f915dfe02be80f30bacbb384780f948.png" alt="\left(A+B\right)\left(A-B\right)X=E^{2}X"/></p>
-</div><p>with the elements given as:</p>
-<div class="math">
-<p><img src="_images/math/cdc80926ef995828153a8bccc54d2ee3f38c16db.png" alt="A_{ia,jb}=f_{ab}\delta_{ij}-f_{ij}\delta_{ab}+\left\langle aj\left|\right|ib\right\rangle"/></p>
-</div><div class="math">
-<p><img src="_images/math/9a98e799b97a00ace6c34f7dd7c63dc1711a9c61.png" alt="B_{ia,jb}=\left\langle ab\left|\right|ij\right\rangle"/></p>
-</div><p>All of the elements are in spin basis.</p>
+<div class="math notranslate">
+\[\left(A+B\right)\left(A-B\right)X=E^{2}X\]</div>
+<p>with the elements given as:</p>
+<div class="math notranslate">
+\[A_{ia,jb}=f_{ab}\delta_{ij}-f_{ij}\delta_{ab}+\left\langle aj\left|\right|ib\right\rangle\]</div>
+<div class="math notranslate">
+\[B_{ia,jb}=\left\langle ab\left|\right|ij\right\rangle\]</div>
+<p>All of the elements are in spin basis.</p>
 <p>FUNCTION:</p>
 <ul class="simple">
 <li>Properties.RPA(occ, F, C, VeeMOspin)</li>
@@ -352,6 +352,7 @@
       <script type="text/javascript" src="_static/jquery.js"></script>
       <script type="text/javascript" src="_static/underscore.js"></script>
       <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 
   
 

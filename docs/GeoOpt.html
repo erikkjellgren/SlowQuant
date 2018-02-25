@@ -181,14 +181,14 @@
   <div class="section" id="geometry-optimization">
 <h1>Geometry optimization<a class="headerlink" href="#geometry-optimization" title="Permalink to this headline">¶</a></h1>
 <p>In this section the geometry optimization are described. In general the derivative of the Gaussian basisset functions is given as:</p>
-<div class="math">
-<p><img src="_images/math/0d57a9c843290a4e8428311af63c3574d3306cf2.png" alt="\frac{\partial\phi_{l,m,n}}{\partial X_{A}}=\left[\left(2l+1\right)a\right]^{1/2}\phi_{l+1,m,n}-2l\left(\frac{a}{2l-1}\right)^{1/2}\phi_{l-1,m,n}"/></p>
-</div><div class="section" id="gradient-descent">
+<div class="math notranslate">
+\[\frac{\partial\phi_{l,m,n}}{\partial X_{A}}=\left[\left(2l+1\right)a\right]^{1/2}\phi_{l+1,m,n}-2l\left(\frac{a}{2l-1}\right)^{1/2}\phi_{l-1,m,n}\]</div>
+<div class="section" id="gradient-descent">
 <h2>Gradient Descent<a class="headerlink" href="#gradient-descent" title="Permalink to this headline">¶</a></h2>
 <p>The molecular structure is propagated using the Gradient Descent method:</p>
-<div class="math">
-<p><img src="_images/math/093eeeec76a8c964eb93e4a73d270c47a5eeac8d.png" alt="X_{A,i+1}=X_{A,i}-\zeta\frac{\partial E_{\mathrm{HF}}}{\partial X_{A}}"/></p>
-</div><p>FUNCTION:</p>
+<div class="math notranslate">
+\[X_{A,i+1}=X_{A,i}-\zeta\frac{\partial E_{\mathrm{HF}}}{\partial X_{A}}\]</div>
+<p>FUNCTION:</p>
 <ul class="simple">
 <li>None</li>
 </ul>
@@ -200,9 +200,9 @@
 <div class="section" id="analytic-hartree-fock">
 <h2>Analytic Hartree-Fock<a class="headerlink" href="#analytic-hartree-fock" title="Permalink to this headline">¶</a></h2>
 <p>The analytic Hartree-Fock derivative is given as:</p>
-<div class="math">
-<p><img src="_images/math/d5366ed63dada62eb3a5706f6e71a0819761263a.png" alt="\frac{\partial E_{\mathrm{HF}}}{\partial X_{A}}=\sum_{i,j}D_{i,j}\frac{H_{i,j}^{\mathrm{core}}}{\partial X_{A}}+\frac{1}{2}\sum_{i,j,k,l}D_{j,i}D_{k,l}\frac{\partial\left(ij\left|\right|kl\right)}{\partial X_{A}}-2\sum_{i,j}\sum_{a}^{\mathrm{occ}}\varepsilon_{a}C_{j,a}C_{i,a}\frac{\partial S_{i,j}}{\partial X_{A}}+\frac{\partial V_{NN}}{\partial X_{A}}"/></p>
-</div><p>FUNCTION:</p>
+<div class="math notranslate">
+\[\frac{\partial E_{\mathrm{HF}}}{\partial X_{A}}=\sum_{i,j}D_{i,j}\frac{H_{i,j}^{\mathrm{core}}}{\partial X_{A}}+\frac{1}{2}\sum_{i,j,k,l}D_{j,i}D_{k,l}\frac{\partial\left(ij\left|\right|kl\right)}{\partial X_{A}}-2\sum_{i,j}\sum_{a}^{\mathrm{occ}}\varepsilon_{a}C_{j,a}C_{i,a}\frac{\partial S_{i,j}}{\partial X_{A}}+\frac{\partial V_{NN}}{\partial X_{A}}\]</div>
+<p>FUNCTION:</p>
 <ul class="simple">
 <li>GeometryOptimization.run_analytic(input, set, results)</li>
 </ul>
@@ -224,9 +224,9 @@
 <div class="section" id="finite-difference">
 <h2>Finite difference<a class="headerlink" href="#finite-difference" title="Permalink to this headline">¶</a></h2>
 <p>The numerical gradient is calculated by the use of finite difference, and is found as:</p>
-<div class="math">
-<p><img src="_images/math/21e2e1cce1e30f92cb3c637dbd4c16e365ed973f.png" alt="\frac{\partial E_{\mathrm{HF}}}{\partial X_{A}}=\frac{E_{\mathrm{HF}}\left(X_{A}+\epsilon\right)-E_{\mathrm{HF}}\left(X_{A}-\epsilon\right)}{2\epsilon}"/></p>
-</div><p>FUNCTION:</p>
+<div class="math notranslate">
+\[\frac{\partial E_{\mathrm{HF}}}{\partial X_{A}}=\frac{E_{\mathrm{HF}}\left(X_{A}+\epsilon\right)-E_{\mathrm{HF}}\left(X_{A}-\epsilon\right)}{2\epsilon}\]</div>
+<p>FUNCTION:</p>
 <ul class="simple">
 <li>GeometryOptimization.run_numeric(input, set, results)</li>
 <li>return input</li>
@@ -302,6 +302,7 @@
       <script type="text/javascript" src="_static/jquery.js"></script>
       <script type="text/javascript" src="_static/underscore.js"></script>
       <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 
   
 

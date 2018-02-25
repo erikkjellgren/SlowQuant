@@ -182,12 +182,12 @@ For the Forces see Geometry Optimization section.</p>
 <div class="section" id="velocity-verlet-integrator">
 <h2>Velocity Verlet integrator<a class="headerlink" href="#velocity-verlet-integrator" title="Permalink to this headline">¶</a></h2>
 <p>The Velocity Verlet is given is three steps. First the position is updated:</p>
-<div class="math">
-<p><img src="_images/math/58fc765418f5928811dd89d3d341539ad18b16a0.png" alt="x\left(t+\Delta t\right)=x\left(t\right)+v\left(t\right)\Delta t+\frac{1}{2}a\left(t\right)\Delta t^{2}"/></p>
-</div><p>Then the forces are calculated. At last the velocties are updated:</p>
-<div class="math">
-<p><img src="_images/math/0d11a96e69371f7b4f2426a6f9febb622b3d305f.png" alt="v\left(t+\Delta t\right)=v\left(t\right)+\frac{1}{2}\left[a\left(t\right)+a\left(t+\Delta t\right)\right]\Delta t"/></p>
-</div><p>FUNCTION:</p>
+<div class="math notranslate">
+\[x\left(t+\Delta t\right)=x\left(t\right)+v\left(t\right)\Delta t+\frac{1}{2}a\left(t\right)\Delta t^{2}\]</div>
+<p>Then the forces are calculated. At last the velocties are updated:</p>
+<div class="math notranslate">
+\[v\left(t+\Delta t\right)=v\left(t\right)+\frac{1}{2}\left[a\left(t\right)+a\left(t+\Delta t\right)\right]\Delta t\]</div>
+<p>FUNCTION:</p>
 <ul class="simple">
 <li>runBOMD.VelocityVerlet(inputBOMD, dt, results, set)</li>
 </ul>
@@ -262,6 +262,7 @@ For the Forces see Geometry Optimization section.</p>
       <script type="text/javascript" src="_static/jquery.js"></script>
       <script type="text/javascript" src="_static/underscore.js"></script>
       <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 
   
 
