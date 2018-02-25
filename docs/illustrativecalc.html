@@ -183,27 +183,27 @@
 <div class="section" id="scf-with-and-without-diis">
 <h2>SCF with and without DIIS<a class="headerlink" href="#scf-with-and-without-diis" title="Permalink to this headline">¶</a></h2>
 <p>The used geometry can be seen below:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="mi">10</span><span class="p">;;;</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="mi">10</span><span class="p">;;;</span>
 <span class="mi">1</span><span class="p">;</span><span class="mf">1.63803684</span><span class="p">;</span><span class="mf">1.136548823</span><span class="p">;</span><span class="mi">0</span>
 <span class="mi">8</span><span class="p">;</span><span class="mi">0</span><span class="p">;</span><span class="o">-</span><span class="mf">0.143225817</span><span class="p">;</span><span class="mi">0</span>
 <span class="mi">1</span><span class="p">;</span><span class="o">-</span><span class="mf">1.63803684</span><span class="p">;</span><span class="mf">1.136548823</span><span class="p">;</span><span class="mi">0</span>
 </pre></div>
 </div>
 <p>The used settings can be seen below:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">basisset</span><span class="p">;</span><span class="mi">6</span><span class="o">-</span><span class="mi">31</span><span class="n">ppGss</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">basisset</span><span class="p">;</span><span class="mi">6</span><span class="o">-</span><span class="mi">31</span><span class="n">ppGss</span>
 <span class="n">DIIS</span><span class="p">;</span><span class="n">Yes</span>
 <span class="n">SCF</span> <span class="n">Energy</span> <span class="n">Threshold</span><span class="p">;</span><span class="mf">1e-5</span>
 <span class="n">SCF</span> <span class="n">RMSD</span> <span class="n">Threshold</span><span class="p">;</span><span class="mf">1e-5</span>
 </pre></div>
 </div>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">basisset</span><span class="p">;</span><span class="mi">6</span><span class="o">-</span><span class="mi">31</span><span class="n">ppGss</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">basisset</span><span class="p">;</span><span class="mi">6</span><span class="o">-</span><span class="mi">31</span><span class="n">ppGss</span>
 <span class="n">DIIS</span><span class="p">;</span><span class="n">No</span>
 <span class="n">SCF</span> <span class="n">Energy</span> <span class="n">Threshold</span><span class="p">;</span><span class="mf">1e-5</span>
 <span class="n">SCF</span> <span class="n">RMSD</span> <span class="n">Threshold</span><span class="p">;</span><span class="mf">1e-5</span>
 </pre></div>
 </div>
 <p>First a SCF calculation was performed with DIIS enabled giving:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Iter</span>          <span class="n">Eel</span>                     <span class="n">Etot</span>                    <span class="n">dE</span>                       <span class="n">rmsD</span>                    <span class="n">DIIS</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Iter</span>          <span class="n">Eel</span>                     <span class="n">Etot</span>                    <span class="n">dE</span>                       <span class="n">rmsD</span>                    <span class="n">DIIS</span>
 <span class="mi">0</span>             <span class="o">-</span><span class="mf">134.1449183618</span>         <span class="o">-</span><span class="mf">126.1425513008</span>
 <span class="mi">1</span>             <span class="o">-</span><span class="mf">61.4018313732</span>          <span class="o">-</span><span class="mf">53.3994643122</span>           <span class="mf">7.27430870e+01</span>          <span class="mf">1.37140022e+01</span>
 <span class="mi">2</span>             <span class="o">-</span><span class="mf">82.1748278956</span>          <span class="o">-</span><span class="mf">74.1724608346</span>          <span class="o">-</span><span class="mf">2.07729965e+01</span>          <span class="mf">1.34573050e+01</span>          <span class="mf">7.81843771e-01</span>
@@ -218,7 +218,7 @@
 </pre></div>
 </div>
 <p>Then a SCF calculation was performed without DIIS giving:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Iter</span>          <span class="n">Eel</span>                     <span class="n">Etot</span>                    <span class="n">dE</span>                      <span class="n">rmsD</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Iter</span>          <span class="n">Eel</span>                     <span class="n">Etot</span>                    <span class="n">dE</span>                      <span class="n">rmsD</span>
 <span class="mi">0</span>             <span class="o">-</span><span class="mf">134.1449183618</span>         <span class="o">-</span><span class="mf">126.1425513008</span>
 <span class="mi">1</span>             <span class="o">-</span><span class="mf">61.4018313732</span>          <span class="o">-</span><span class="mf">53.3994643122</span>           <span class="mf">7.27430870e+01</span>          <span class="mf">1.37140022e+01</span>
 <span class="mi">2</span>             <span class="o">-</span><span class="mf">104.9615819231</span>         <span class="o">-</span><span class="mf">96.9592148621</span>          <span class="o">-</span><span class="mf">4.35597505e+01</span>          <span class="mf">1.35548186e+01</span>
@@ -241,18 +241,18 @@
 <div class="section" id="hartee-fock-h2-dissociation">
 <h2>Hartee-Fock H2 dissociation<a class="headerlink" href="#hartee-fock-h2-dissociation" title="Permalink to this headline">¶</a></h2>
 <p>Under the Hartee-Fock approximation the dissociation of dihydrogen can be considered. To investigate this the following geometry input was used:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="mi">2</span><span class="p">;;;</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="mi">2</span><span class="p">;;;</span>
 <span class="mi">1</span><span class="p">;</span><span class="mf">0.0</span><span class="p">;</span><span class="mf">0.0</span><span class="p">;</span><span class="mf">0.0</span>
 <span class="mi">1</span><span class="p">;</span><span class="n">x</span><span class="p">;</span><span class="mf">0.0</span><span class="p">;</span><span class="mf">0.0</span>
 </pre></div>
 </div>
 <p>Here x is varied to make the dissociation curve. The following settings were used:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Initial</span> <span class="n">method</span><span class="p">;</span><span class="n">HF</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Initial</span> <span class="n">method</span><span class="p">;</span><span class="n">HF</span>
 <span class="n">basisset</span><span class="p">;</span><span class="mi">3</span><span class="o">-</span><span class="mi">21</span><span class="n">G</span>
 </pre></div>
 </div>
 <p>and,</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Initial</span> <span class="n">method</span><span class="p">;</span><span class="n">UHF</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Initial</span> <span class="n">method</span><span class="p">;</span><span class="n">UHF</span>
 <span class="n">basisset</span><span class="p">;</span><span class="mi">3</span><span class="o">-</span><span class="mi">21</span><span class="n">G</span>
 </pre></div>
 </div>
@@ -319,6 +319,7 @@ UHF have other problems like spin contamination to be aware of.</p>
       <script type="text/javascript" src="_static/jquery.js"></script>
       <script type="text/javascript" src="_static/underscore.js"></script>
       <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 
   
 

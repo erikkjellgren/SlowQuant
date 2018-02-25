@@ -6,7 +6,7 @@ import sphinx_rtd_theme
 # -- General configuration ------------------------------------------------
 # If your documentation needs a minimal Sphinx version, state it here.
 # needs_sphinx = '1.0'
-extensions = ['sphinx.ext.imgmath']
+extensions = ['sphinx.ext.mathjax']
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
