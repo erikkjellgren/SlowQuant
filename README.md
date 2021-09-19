@@ -1,5 +1,5 @@
-[![Build Status](https://travis-ci.org/Melisius/SlowQuant.svg?branch=master)](https://travis-ci.org/Melisius/SlowQuant)
-[![Coverage Status](https://coveralls.io/repos/github/Melisius/SlowQuant/badge.svg?branch=master)](https://coveralls.io/github/Melisius/SlowQuant?branch=master)
+[![Build Status](https://travis-ci.com/erikkjellgren/SlowQuant.svg?branch=master)](https://travis-ci.com/erikkjellgren/SlowQuant)
+[![Coverage Status](https://coveralls.io/repos/github/erikkjellgren/SlowQuant/badge.svg?branch=master)](https://coveralls.io/github/erikkjellgren/SlowQuant?branch=master)
 [![Documentation Status](https://readthedocs.org/projects/slowquant/badge/?version=latest)](http://slowquant.readthedocs.io/en/latest/?badge=latest)
 
 # SlowQuant
