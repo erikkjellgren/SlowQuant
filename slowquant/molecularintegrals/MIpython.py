@@ -1,5 +1,5 @@
 import math
-import scipy.misc as scm
+import scipy.special as scm
 import numpy as np
 
 ##INTEGRAL FUNCTIONS

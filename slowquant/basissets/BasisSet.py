@@ -1,6 +1,6 @@
 import numpy as np
 import math
-import scipy.misc as scm
+import scipy.special as scm
 import copy
 import os
 

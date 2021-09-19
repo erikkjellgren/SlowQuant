@@ -29,7 +29,7 @@ def makepoints(set, input):
     for i in range(1, len(input)):
         points[i-1] = int(density*4*np.pi*vdWscale*vdW[input[i,0]])
     # [x, y, z, VQM]
-    V = np.zeros((np.int(np.sum(points)),5))
+    V = np.zeros((int(np.sum(points)),5))
     idx = 0
     for i in range(1, len(input)):
         N = int(points[i-1])
