@@ -1,7 +1,0 @@
-basisset;STO3G
-DIIS;Yes
-SCF Energy Threshold;1e-12
-SCF RMSD Threshold;1e-12
-GeoOpt;Yes
-Max iteration GeoOpt;100
-Gradient Descent Step;0.5
