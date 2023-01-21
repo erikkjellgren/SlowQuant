@@ -47,4 +47,5 @@ repos:
     rev: 6.2.3
     hooks:
       - id: pydocstyle
-        files: ^slowquant/
+        args:
+          - --ignore=D100,D101,D104,D213,D406,D407,D413

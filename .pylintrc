@@ -1,2 +1,10 @@
 [MASTER]
-disable=line-too-long
+disable=import-error,
+        invalid-name,
+        line-too-long,
+        missing-class-docstring,
+        missing-module-docstring,
+        too-few-public-methods,
+        too-many-arguments,
+        too-many-branches,
+        too-many-locals
