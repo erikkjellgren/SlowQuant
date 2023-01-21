@@ -3,7 +3,7 @@ import os
 import numpy as np
 
 
-def read_basis(atom_name: str, basisset: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def read_basis(atom_name: str, basis_set: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Read basis set from file.
 
     Args:
@@ -16,7 +16,7 @@ def read_basis(atom_name: str, basisset: str) -> tuple[np.ndarray, np.ndarray, n
     this_file_location = os.path.dirname(os.path.abspath(__file__))
     if len(atom_name) == 1:
         atom_name = f"{atom_name} "
-    with open(f"{this_file_location}/basisset/{basisset}.basis", "r", encoding="UTF-8") as basisfile:
+    with open(f"{this_file_location}/basisset/{basis_set.lower()}.basis", "r", encoding="UTF-8") as basisfile:
         for line in basisfile:
             if line[0:2] == atom_name.lower():
                 # Found the correct atom.

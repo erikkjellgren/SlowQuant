@@ -1,5 +1,6 @@
 [MASTER]
-disable=import-error,
+disable=duplicate-code,
+        import-error,
         invalid-name,
         line-too-long,
         missing-class-docstring,

@@ -6,3 +6,9 @@ molecularintegrals
 
 .. automodule:: slowquant.molecularintegrals.integralfunctions
     :members:
+
+.. automodule:: slowquant.molecularintegrals.overlap
+    :members:
+
+.. automodule:: slowquant.molecularintegrals.kineticenergy
+    :members:
