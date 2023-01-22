@@ -8,4 +8,5 @@ disable=duplicate-code,
         too-few-public-methods,
         too-many-arguments,
         too-many-branches,
-        too-many-locals
+        too-many-locals,
+        too-many-nested-blocks

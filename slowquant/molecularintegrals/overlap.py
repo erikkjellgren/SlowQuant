@@ -40,16 +40,16 @@ def overlap_integral_driver(mol_obj: _Molecule) -> np.ndarray:
 
 
 def overlap_integral(
-    center1,
-    center2,
-    exponents1,
-    exponents2,
-    contra_coeff1,
-    contra_coeff2,
-    norm1,
-    norm2,
-    angular_moments1,
-    angular_moments2,
+    center1: np.ndarray,
+    center2: np.ndarray,
+    exponents1: np.ndarray,
+    exponents2: np.ndarray,
+    contra_coeff1: np.ndarray,
+    contra_coeff2: np.ndarray,
+    norm1: np.ndarray,
+    norm2: np.ndarray,
+    angular_moments1: np.ndarray,
+    angular_moments2: np.ndarray,
 ) -> np.ndarray:
     r"""Calculate overlap integral over shells.
 

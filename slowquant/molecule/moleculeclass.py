@@ -82,6 +82,30 @@ class _Molecule:
                 )
                 self.number_bf += len(bf_angular_moments)
 
+    @property
+    def atom_coordinates(self) -> np.ndarray:
+        """Get atom coordinates.
+
+        Returns:
+            Atom coordinates.
+        """
+        coords = np.zeros((len(self.atoms), 3))
+        for i, atom in enumerate(self.atoms):
+            coords[i, :] = atom.coordinate
+        return coords
+
+    @property
+    def atom_charges(self) -> np.ndarray:
+        """Get atom charges.
+
+        Returns:
+            Atom charges.
+        """
+        charges = np.zeros(len(self.atoms))
+        for i, atom in enumerate(self.atoms):
+            charges[i] = atom.nuclear_charge
+        return charges
+
 
 class Atom:
     def __init__(

@@ -12,3 +12,6 @@ molecularintegrals
 
 .. automodule:: slowquant.molecularintegrals.kineticenergy
     :members:
+
+.. automodule:: slowquant.molecularintegrals.nuclearattraction
+    :members:

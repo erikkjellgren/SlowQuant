@@ -6,7 +6,6 @@ SlowQuant
    :caption: How to use
 
    install.rst
-   issues.rst
 
 .. toctree::
    :maxdepth: 2

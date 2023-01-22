@@ -40,20 +40,24 @@ def kinetic_energy_integral_driver(mol_obj: _Molecule) -> np.ndarray:
 
 
 def kinetic_energy_integral(
-    center1,
-    center2,
-    exponents1,
-    exponents2,
-    contra_coeff1,
-    contra_coeff2,
-    norm1,
-    norm2,
-    angular_moments1,
-    angular_moments2,
+    center1: np.ndarray,
+    center2: np.ndarray,
+    exponents1: np.ndarray,
+    exponents2: np.ndarray,
+    contra_coeff1: np.ndarray,
+    contra_coeff2: np.ndarray,
+    norm1: np.ndarray,
+    norm2: np.ndarray,
+    angular_moments1: np.ndarray,
+    angular_moments2: np.ndarray,
 ) -> np.ndarray:
     r"""Calculate kinetic energy integral over shells.
 
     .. math::
+        D^2_{ij} = 4a^2S_{i+2,j} - 2a(2i+1)S_{ij}+i(i-1)S_[i-2,j]
+
+    .. math::
+        T_\mathrm{primitive} = -\frac{1}{2}\left( D^2_{ij}S_{kl}S_{mn} + S_{ij}D^2_{kl}S_{mn} + S_{ij}S_{kl}D^2_{mn} \right)
 
     .. math::
         T = \sum_{ij}N_iN_jc_ic_jT_{\mathrm{primitive},ij}
