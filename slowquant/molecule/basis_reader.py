@@ -52,8 +52,21 @@ def read_basis(atom_name: str, basis_set: str) -> tuple[np.ndarray, np.ndarray, 
                     angulars = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
                 elif angular == "d":
                     angulars = [[2, 0, 0], [1, 1, 0], [1, 0, 1], [0, 2, 0], [0, 1, 1], [0, 0, 2]]
+                elif angular == "f":
+                    angulars = [
+                        [3, 0, 0],
+                        [2, 1, 0],
+                        [2, 0, 1],
+                        [1, 2, 0],
+                        [1, 1, 1],
+                        [1, 0, 2],
+                        [0, 3, 0],
+                        [0, 2, 1],
+                        [0, 1, 2],
+                        [0, 0, 3],
+                    ]
                 else:
-                    raise ValueError("None implemented angular moment: {angular}")
+                    raise ValueError(f"None implemented angular moment: {angular}")
                 exponents.append(np.array(exponents_primitive))
                 coefficients.append(np.array(coefficients_primitive))
                 angular_moments.append(np.array(angulars))
