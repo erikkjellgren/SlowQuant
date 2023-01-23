@@ -15,3 +15,6 @@ molecularintegrals
 
 .. automodule:: slowquant.molecularintegrals.nuclearattraction
     :members:
+
+.. automodule:: slowquant.molecularintegrals.electronrepulsion
+    :members:

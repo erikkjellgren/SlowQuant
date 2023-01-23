@@ -97,21 +97,21 @@ def nuclear_attraction_integral(
     for i in range(number_primitives1):
         for j in range(number_primitives2):
             E_x = expansion_coefficients(
-                center1[0], center2[0], exponents1[i], exponents2[j], max_ang1 + 1, max_ang2 + 1
+                center1[0], center2[0], exponents1[i], exponents2[j], max_ang1, max_ang2
             )
             E_y = expansion_coefficients(
-                center1[1], center2[1], exponents1[i], exponents2[j], max_ang1 + 1, max_ang2 + 1
+                center1[1], center2[1], exponents1[i], exponents2[j], max_ang1, max_ang2
             )
             E_z = expansion_coefficients(
-                center1[2], center2[2], exponents1[i], exponents2[j], max_ang1 + 1, max_ang2 + 1
+                center1[2], center2[2], exponents1[i], exponents2[j], max_ang1, max_ang2
             )
             p = exponents1[i] + exponents2[j]
             P = (exponents1[i] * center1 + exponents2[j] * center2) / p
             for atom_coordinate, charge in zip(atom_coordinates, atom_charges):
                 R = hermite_coulomb_integral(
-                    max_ang1 + max_ang2 + 1,
-                    max_ang1 + max_ang2 + 1,
-                    max_ang1 + max_ang2 + 1,
+                    max_ang1 + max_ang2,
+                    max_ang1 + max_ang2,
+                    max_ang1 + max_ang2,
                     exponents1[i] + exponents2[j],
                     P - atom_coordinate,
                 )
@@ -123,10 +123,10 @@ def nuclear_attraction_integral(
                             * norm2[bf_j, j]
                             * np.einsum(
                                 "t,u,v,tuv->",
-                                E_x[x1, x2, : x1 + x2 + 2],
-                                E_y[y1, y2, : y1 + y2 + 2],
-                                E_z[z1, z2, : z1 + z2 + 2],
-                                R[: x1 + x2 + 2, : y1 + y2 + 2, : z1 + z2 + 2],
+                                E_x[x1, x2, : x1 + x2 + 1],
+                                E_y[y1, y2, : y1 + y2 + 1],
+                                E_z[z1, z2, : z1 + z2 + 1],
+                                R[: x1 + x2 + 1, : y1 + y2 + 1, : z1 + z2 + 1],
                             )
                         )
             V_primitive[:, :, i, j] *= -2 * np.pi / p

@@ -1,5 +1,8 @@
 import numpy as np
 
+from slowquant.molecularintegrals.electronrepulsion import (
+    electron_repulsion_integral_driver,
+)
 from slowquant.molecularintegrals.kineticenergy import kinetic_energy_integral_driver
 from slowquant.molecularintegrals.nuclearattraction import (
     nuclear_attraction_integral_driver,
@@ -40,3 +43,11 @@ class _Integral:
             Nuclear-attraction integral matrix.
         """
         return nuclear_attraction_integral_driver(self.molecule_object)
+
+    def get_electron_repulsion_tensor(self) -> np.ndarray:
+        """Compute electron-repulsion integral tensor.
+
+        Returns:
+            Electron-repulsion integral tensor.
+        """
+        return electron_repulsion_integral_driver(self.molecule_object)

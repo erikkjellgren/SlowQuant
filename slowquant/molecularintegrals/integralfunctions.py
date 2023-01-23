@@ -1,10 +1,12 @@
 import math
 
 import numpy as np
+from numba import float64, int64, jit
 
 from slowquant.molecule.moleculefunctions import factorial2
 
 
+@jit(float64[:, :, :](float64, float64, float64, float64, int64, int64), nopython=True, cache=True)
 def expansion_coefficients(
     A_x: float, B_x: float, a: float, b: float, angular_a: int, angular_b: int
 ) -> np.ndarray:
@@ -69,6 +71,33 @@ def expansion_coefficients(
     return e_coeff
 
 
+@jit(float64(int64, float64), nopython=True, cache=True)
+def boys_function(n: int, z: float) -> float:
+    r"""Calculate Boys function."""
+    if n == 0 and z < 10**-10:
+        F = 1.0
+    elif n == 0:
+        F = (np.pi / (4.0 * z)) ** 0.5 * math.erf(z**0.5)
+    elif z > 25:
+        # Long range approximation
+        F = factorial2(2 * n - 1) / (2.0 ** (n + 1.0)) * (np.pi / (z ** (2.0 * n + 1.0))) ** 0.5
+    elif z < 10**-10:
+        # special case of z = 0
+        F = 1.0 / (2.0 * n + 1.0)
+    else:
+        F = 0.0
+        threshold = 10**-12
+        for i in range(0, 1000):
+            Fcheck = F
+            F += (2.0 * z) ** i / (factorial2(2 * n + 2 * i + 1))
+            Fcheck -= F
+            if abs(Fcheck) < threshold:
+                break
+        F *= np.exp(-z) * factorial2(2 * n - 1)
+    return F
+
+
+@jit(float64[:, :, :](int64, int64, int64, float64, float64[:]), nopython=True, cache=True)
 def hermite_coulomb_integral(
     angular_x: int, angular_y: int, angular_z: int, p: float, PC: np.ndarray
 ) -> np.ndarray:
@@ -117,28 +146,3 @@ def hermite_coulomb_integral(
                             value += X_PC * r_integral[t - 1, u, v, n + 1]
                     r_integral[t, u, v, n] = value
     return r_integral[:, :, :, 0]
-
-
-def boys_function(n: int, z: float) -> float:
-    r"""Calculate Boys function."""
-    if n == 0 and z < 10**-10:
-        F = 1.0
-    elif n == 0:
-        F = (np.pi / (4.0 * z)) ** 0.5 * math.erf(z**0.5)
-    elif z > 25:
-        # Long range approximation
-        F = factorial2(2 * n - 1) / (2.0 ** (n + 1.0)) * (np.pi / (z ** (2.0 * n + 1.0))) ** 0.5
-    elif z < 10**-10:
-        # special case of z = 0
-        F = 1.0 / (2.0 * n + 1.0)
-    else:
-        F = 0.0
-        threshold = 10**-12
-        for i in range(0, 1000):
-            Fcheck = F
-            F += (2.0 * z) ** i / (factorial2(2 * n + 2 * i + 1))
-            Fcheck -= F
-            if abs(Fcheck) < threshold:
-                break
-        F *= np.exp(-z) * factorial2(2 * n - 1)
-    return F

@@ -1,6 +1,10 @@
 import numpy as np
+from numba import float64, jit
 
 
+# Is float64. int64 gives overflow.
+# Only approximate value as a float is needed.
+@jit(float64(float64), nopython=True, cache=True)
 def factorial2(number: int) -> int:
     r"""Double factorial.
 
