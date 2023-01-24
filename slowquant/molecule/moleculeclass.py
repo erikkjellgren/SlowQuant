@@ -9,16 +9,19 @@ from slowquant.molecule.moleculefunctions import (
 
 
 class _Molecule:
-    def __init__(self, molecule_file: str, distance_unit: str = "bohr", basis_set: str | None = None) -> None:
+    def __init__(self, molecule_file: str, molecular_charge_: int = 0, distance_unit: str = "bohr") -> None:
         """Initialize molecule instance.
 
         Args:
             molecule_file: Filename of file containing molecular coordinates.
+            molecular_charge_: Total charge of molecule.
             distance_unit: Distance unit used coordinate file.
                            Angstrom or Bohr (default).
                            Internal representation is Bohr.
-            basis_set: Name of atom-centered basis set.
         """
+        self.molecular_charge = molecular_charge_
+        self.shells: list[Shell] | None = None
+        self.number_bf = 0
         if distance_unit.lower() == "angstrom":
             unit_factor = 1.889725989
         elif distance_unit.lower() == "au" or distance_unit.lower() == "bohr":
@@ -45,7 +48,7 @@ class _Molecule:
                                     float(line.split()[3]) * unit_factor,
                                 ]
                             ),
-                            atom_to_properties(line.split()[0], "charge"),
+                            int(atom_to_properties(line.split()[0], "charge")),
                             atom_to_properties(line.split()[0], "mass"),
                         )
                     )
@@ -53,16 +56,13 @@ class _Molecule:
         else:
             raise ValueError("Does only support .xyz files for molecule coordinates.")
 
-        if basis_set:
-            self.set_basis_set(basis_set)
-
-    def set_basis_set(self, basis_set: str) -> None:
+    def _set_basis_set(self, basis_set: str) -> None:
         """Set basis set.
 
         Args:
             basis_set: Name of basis set.
         """
-        self.shells: list[Shell] = []
+        self.shells = []
         self.number_bf = 0
         for atom in self.atoms:
             bfs_exponents, bfs_contraction_coefficients, bfs_angular_moments = read_basis(
@@ -106,13 +106,25 @@ class _Molecule:
             charges[i] = atom.nuclear_charge
         return charges
 
+    @property
+    def number_electrons(self) -> int:
+        """Get number of electrons.
+
+        Returns:
+            Number of electrons.
+        """
+        n_elec = -self.molecular_charge
+        for atom in self.atoms:
+            n_elec += atom.nuclear_charge
+        return n_elec
+
 
 class Atom:
     def __init__(
         self,
         name: str,
         coordinate_: float,
-        charge: float,
+        charge: int,
         mass: float,
     ) -> None:
         """Initialize atom instance.
