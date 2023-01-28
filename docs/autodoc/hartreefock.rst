@@ -6,3 +6,6 @@ hartreefock
 
 .. automodule:: slowquant.hartreefock.hartreefock_in_memory
     :members:
+
+.. automodule:: slowquant.hartreefock.diis
+    :members:

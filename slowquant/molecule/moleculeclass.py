@@ -55,6 +55,10 @@ class _Molecule:
             lines = molecule_file.split(";")
             self.atoms = []
             for line in lines:
+                if len(line) == 0 or line == "\n":
+                    # If last line in input got an ";",
+                    # then last line in the reading will be empty, or just a newline.
+                    continue
                 self.atoms.append(
                     Atom(
                         line.split()[0],

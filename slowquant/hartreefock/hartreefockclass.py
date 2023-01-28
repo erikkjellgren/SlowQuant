@@ -14,9 +14,10 @@ class _HartreeFock:
         """
         self.mol_obj = molecule_obj
         self.int_obj = integral_obj
-        self.de_threshold = 10**-9
-        self.rmsd_threshold = 10**-9
+        self.de_threshold = 10**-12
+        self.rmsd_threshold = 10**-12
         self.max_scf_iterations = 100
+        self.use_diis = True
         self.logger = _Logger()
         # Attributes generated from calculations
         self.E_hf: float | None = None
@@ -41,6 +42,7 @@ class _HartreeFock:
             self.de_threshold,
             self.rmsd_threshold,
             self.max_scf_iterations,
+            self.use_diis,
         )
         self.E_hf = E
         self.mo_coeff = C

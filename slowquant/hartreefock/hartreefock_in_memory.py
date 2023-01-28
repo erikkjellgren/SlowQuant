@@ -1,5 +1,6 @@
 import numpy as np
 
+from slowquant.hartreefock.diis import DIIS
 from slowquant.logger import _Logger
 
 
@@ -13,6 +14,7 @@ def run_hartree_fock(
     dE_threshold: float,
     rmsd_threshold: float,
     max_scf_iterations: int,
+    use_diis: bool = True,
 ) -> tuple[float, np.ndarray, np.ndarray, np.ndarray]:
     r"""Run restricted Hartree-Fock calculation.
 
@@ -42,12 +44,21 @@ def run_hartree_fock(
     # Initial Energy
     E0 = np.einsum("ij,ij->", D0, 2 * Hcore)
 
+    # Init DIIS
+    if use_diis:
+        # len(S) is number of basis functions
+        diis_acceleration = DIIS(len(S))
+
     # SCF iterations
     for iteration in range(1, max_scf_iterations):
         # New Fock Matrix
         J = np.einsum("pqrs,sr->pq", ERI, D0)
         K = np.einsum("psqr,sr->pq", ERI, D0)
         F = Hcore + 2.0 * J - K
+
+        # Do DIIS acceleration
+        if use_diis:
+            F = diis_acceleration.get_extrapolated_fock_matrix(F, D0, S)
 
         Fprime = np.dot(np.dot(np.transpose(S_sqrt), F), S_sqrt)
         _, Cprime = np.linalg.eigh(Fprime)
