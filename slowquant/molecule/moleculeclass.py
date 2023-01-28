@@ -34,7 +34,6 @@ class _Molecule:
         if ".xyz" in molecule_file:
             with open(molecule_file, "r", encoding="UTF-8") as file:
                 self.atoms = []
-                counter = 0
                 for i, line in enumerate(file):
                     if i < 2:
                         continue
@@ -52,9 +51,28 @@ class _Molecule:
                             atom_to_properties(line.split()[0], "mass"),
                         )
                     )
-                    counter += 1
+        elif ";" in molecule_file:
+            lines = molecule_file.split(";")
+            self.atoms = []
+            for line in lines:
+                self.atoms.append(
+                    Atom(
+                        line.split()[0],
+                        np.array(
+                            [
+                                float(line.split()[1]) * unit_factor,
+                                float(line.split()[2]) * unit_factor,
+                                float(line.split()[3]) * unit_factor,
+                            ]
+                        ),
+                        int(atom_to_properties(line.split()[0], "charge")),
+                        atom_to_properties(line.split()[0], "mass"),
+                    )
+                )
         else:
-            raise ValueError("Does only support .xyz files for molecule coordinates.")
+            raise ValueError(
+                "Does only support:\n    .xyz files for molecule coordinates.\n    A string with the elements and coordinates (; delimited)."
+            )
 
     def _set_basis_set(self, basis_set: str) -> None:
         """Set basis set.

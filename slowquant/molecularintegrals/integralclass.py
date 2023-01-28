@@ -1,5 +1,6 @@
 import numpy as np
 
+from slowquant.logger import _Logger
 from slowquant.molecularintegrals.electronrepulsion import (
     electron_repulsion_integral_driver,
 )
@@ -21,9 +22,11 @@ class _Integral:
         self.molecule_object = molecule_object_
         self.store_1e_int = True
         self.store_2e_int = True
+        self.logger = _Logger()
         if self.molecule_object.number_bf**4 * 8 / 10**9 > 2:
-            print(
-                "WARNING: Storing 2-electron integrals in memory will use approx {self.molecule_object.number_bf**4*8/10**9} GB"
+            self.logger.add_to_log(
+                "Storing 2-electron integrals in memory will use approx {self.molecule_object.number_bf**4*8/10**9} GB",
+                is_warning=True,
             )
         self.force_recompute = False
         self._overlap_int: np.ndarray | None = None

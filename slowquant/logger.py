@@ -12,12 +12,13 @@ class _Logger:
             content: Content to add to log.
             is_warning: Log is a warning.
         """
+        content += "\n"
         if is_warning:
             content = f"WARNING: {content}"
         if self.print_output:
-            print(content)
+            print(content, end="")
             self.log.join(content)
         elif is_warning and self.print_warnings:
-            print(content)
+            print(content, end="")
             self.log.join(content)
         self.log.join(content)

@@ -1,5 +1,6 @@
 # pylint: disable=C0103
 from slowquant.hartreefock.hartreefockclass import _HartreeFock
+from slowquant.logger import _Logger
 from slowquant.molecularintegrals.integralclass import _Integral
 from slowquant.molecule.moleculeclass import _Molecule
 
@@ -10,6 +11,7 @@ class SlowQuant:
         self.molecule: _Molecule | None = None
         self.integral: _Integral | None = None
         self.hartree_fock: _HartreeFock | None = None
+        self.logger = _Logger()
 
     def set_molecule(
         self,
@@ -41,7 +43,7 @@ class SlowQuant:
             self.molecule._set_basis_set(basis_set)  # pylint: disable=W0212
             self.integral = _Integral(self.molecule)
         else:
-            print("WARNING: Cannot set basis set, molecule is not defined")
+            logger.add_to_log("Cannot set basis set, molecule is not defined.", is_warning=True)
 
     def init_hartree_fock(self) -> None:
         """Initialize Hartree-Fock module."""
