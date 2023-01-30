@@ -20,7 +20,7 @@ class _Molecule:
                            Internal representation is Bohr.
         """
         self.molecular_charge = molecular_charge_
-        self.shells: list[Shell] | None = None
+        self.shells: list[Shell]
         self.number_bf = 0
         if distance_unit.lower() == "angstrom":
             unit_factor = 1.889725989
@@ -55,9 +55,9 @@ class _Molecule:
             lines = molecule_file.split(";")
             self.atoms = []
             for line in lines:
-                if len(line) == 0 or line == "\n":
+                if len(line.strip()) == 0:
                     # If last line in input got an ";",
-                    # then last line in the reading will be empty, or just a newline.
+                    # then last line in the reading will be empty.
                     continue
                 self.atoms.append(
                     Atom(
@@ -100,6 +100,7 @@ class _Molecule:
                         bf_contraction_coefficients,
                         bf_angular_moments,
                         self.number_bf,
+                        atom,
                     )
                 )
                 self.number_bf += len(bf_angular_moments)
@@ -140,6 +141,51 @@ class _Molecule:
             n_elec += atom.nuclear_charge
         return n_elec
 
+    @property
+    def nuclear_repulsion(self) -> float:
+        r"""Get nuclear-nuclear repulsion.
+
+        .. math::
+            V_\mathrm{NN} = \sum_{i < j}\frac{Z_i Z_j}{|R_i-R_j|}
+
+        Returns:
+            Nuclear-nuclear repulsion.
+        """
+        Z = self.atom_charges
+        R = self.atom_coordinates
+        V = 0.0
+        for i, (Z_i, R_i) in enumerate(zip(Z, R)):
+            for j, (Z_j, R_j) in enumerate(zip(Z, R)):
+                if i >= j:
+                    continue
+                V += Z_i * Z_j / np.einsum("k->", (R_i - R_j) ** 2) ** 0.5
+        return V
+
+    @property
+    def center_of_mass(self) -> np.ndarray:
+        r"""Get center of mass.
+
+        Returns:
+            Center of mass.
+        """
+        masses = np.zeros(len(self.atoms))
+        for i, atom in enumerate(self.atoms):
+            masses[i] = atom.mass
+        return np.einsum("ij,i->j", self.atom_coordinates, masses) / np.einsum("i->", masses)
+
+    @property
+    def basis_function_labels(self) -> list[str]:
+        """Get labels of basis functions.
+
+        Returns:
+            Labels of basis functions.
+        """
+        bf_labels = []
+        for shell in self.shells:
+            for angular_moment in shell.angular_moments:
+                bf_labels.append(f"{shell.origin_atom.atom_name} {angular_moment}")
+        return bf_labels
+
 
 class Atom:
     def __init__(
@@ -147,7 +193,7 @@ class Atom:
         name: str,
         coordinate_: float,
         charge: int,
-        mass: float,
+        mass_: float,
     ) -> None:
         """Initialize atom instance.
 
@@ -155,12 +201,12 @@ class Atom:
             name: Atom name.
             coordinate_: Atom coordinate.
             charge: Atom nuclear charge.
-            mass: Atomic mass.
+            mass_: Atomic mass.
         """
         self.atom_name = name
         self.coordinate = coordinate_
         self.nuclear_charge = charge
-        self.atomic_mass = mass
+        self.mass = mass_
 
 
 class Shell:
@@ -171,6 +217,7 @@ class Shell:
         contraction_coefficients_: np.ndarray,
         angular_moments_: np.ndarray,
         bf_idx_: int,
+        origin_atom_: Atom,
     ):
         """Initialize shell instance.
 
@@ -180,11 +227,13 @@ class Shell:
             contraction_coefficients_: Contraction coefficients.
             angular_moments_: Angular moments of the form x,y,z.
             bf_idx_: Starting index of basis-function in shell.
+            origin_atom_: Atom which the shell is placed on.
         """
         self.center = center_
         self.exponents = exponents_
         self.contraction_coefficients = contraction_coefficients_
         self.normalization = np.zeros((len(angular_moments_), len(exponents_)))
+        self.origin_atom = origin_atom_
         for bf_i, angular_moment in enumerate(angular_moments_):
             for i, exponent in enumerate(exponents_):
                 self.normalization[bf_i, i] = primitive_normalization(exponent, angular_moment)

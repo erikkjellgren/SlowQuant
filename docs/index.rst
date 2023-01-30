@@ -15,3 +15,4 @@ SlowQuant
    autodoc/molecule.rst
    autodoc/molecularintegrals.rst
    autodoc/hartreefock.rst
+   autodoc/properties.rst

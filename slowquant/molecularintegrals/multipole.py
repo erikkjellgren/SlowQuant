@@ -1,24 +1,27 @@
 import numpy as np
 
-from slowquant.molecularintegrals.integralfunctions import expansion_coefficients
+from slowquant.molecularintegrals.integralfunctions import (
+    expansion_coefficients,
+    hermite_multipole_integral,
+)
 from slowquant.molecule.moleculeclass import _Molecule
 
 
-def overlap_integral_driver(mol_obj: _Molecule) -> np.ndarray:
+def multipole_integral_driver(mol_obj: _Molecule, multipole_moment: np.ndarray) -> np.ndarray:
     """Driver function for calculating overlap integrals.
 
     Args:
         mol_obj: Molecule object.
 
     Returns:
-        Overlap integrals.
+        Multipole integrals.
     """
     S = np.zeros((mol_obj.number_bf, mol_obj.number_bf))
     for i, shell1 in enumerate(mol_obj.shells):
         for j, shell2 in enumerate(mol_obj.shells):
             if j > i:  # Matrix is symmetric
                 break
-            S_slice = overlap_integral(
+            S_slice = multipole_integral(
                 shell1.center,
                 shell2.center,
                 shell1.exponents,
@@ -29,6 +32,8 @@ def overlap_integral_driver(mol_obj: _Molecule) -> np.ndarray:
                 shell2.normalization,
                 shell1.angular_moments,
                 shell2.angular_moments,
+                mol_obj.center_of_mass,
+                multipole_moment,
             )
             start_idx1 = shell1.bf_idx[0]
             end_idx1 = shell1.bf_idx[-1] + 1
@@ -39,7 +44,7 @@ def overlap_integral_driver(mol_obj: _Molecule) -> np.ndarray:
     return S
 
 
-def overlap_integral(
+def multipole_integral(
     center1: np.ndarray,
     center2: np.ndarray,
     exponents1: np.ndarray,
@@ -50,11 +55,13 @@ def overlap_integral(
     norm2: np.ndarray,
     angular_moments1: np.ndarray,
     angular_moments2: np.ndarray,
+    multipole_origin: np.ndarray,
+    multipole_moment: np.ndarray,
 ) -> np.ndarray:
     r"""Calculate overlap integral over shells.
 
     .. math::
-        S_\mathrm{primitive} = \left(\frac{\pi}{p}\right)^{3/2}E_0^{ij}E_0^{kl}E_0^{mn}
+        S^{efg}_\mathrm{primitive} = \sum_{t=0}^{\mathrm{min}(i+j,e)}\sum_{r=0}^{\mathrm{min}(k+l,f)}\sum_{p=0}^{\mathrm{min}(m+n,g)}E_t^{ij}E_s^{kl}E_k^{mn}M^e_tM^f_rM^g_p
 
     .. math::
         S = \sum_{ij}N_iN_jc_ic_jS_{\mathrm{primitive},ij}
@@ -74,6 +81,8 @@ def overlap_integral(
         norm2: Normalization constant of basis-functions in second shell.
         angular_moments1: Cartesian angular moments of basis-functions in first shell.
         angular_moments2: Cartesian angular moments of basis-functions in second shell.
+        multipole_origin: Origin with respect to the multipole moment. Does not matter for the case when all the moments are zero (overlap integral).
+        multipole_moment: Cartesian multipole moment (x, y, z).
 
     Returns:
         Overlap integral between two shells.
@@ -96,14 +105,30 @@ def overlap_integral(
             E_z = expansion_coefficients(
                 center1[2], center2[2], exponents1[i], exponents2[j], max_ang1, max_ang2
             )
+            M_x = hermite_multipole_integral(
+                center1[0], center2[0], multipole_origin[0], exponents1[i], exponents2[j], multipole_moment[0]
+            )
+            M_y = hermite_multipole_integral(
+                center1[1], center2[1], multipole_origin[1], exponents1[i], exponents2[j], multipole_moment[1]
+            )
+            M_z = hermite_multipole_integral(
+                center1[2], center2[2], multipole_origin[2], exponents1[i], exponents2[j], multipole_moment[2]
+            )
             for bf_i, (x1, y1, z1) in enumerate(angular_moments1):
                 temp = norm1[bf_i, i]
                 for bf_j, (x2, y2, z2) in enumerate(angular_moments2):
-                    S_primitive[bf_i, bf_j, i, j] = (
-                        temp * norm2[bf_j, j] * E_x[x1, x2, 0] * E_y[y1, y2, 0] * E_z[z1, z2, 0]
-                    )
-            p = exponents1[i] + exponents2[j]
-            S_primitive[:, :, i, j] *= (np.pi / p) ** (3 / 2)
+                    for t1 in range(min(x1 + x2, multipole_moment[0]) + 1):
+                        for t2 in range(min(y1 + y2, multipole_moment[1]) + 1):
+                            for t3 in range(min(z1 + z2, multipole_moment[2]) + 1):
+                                S_primitive[bf_i, bf_j, i, j] += (
+                                    M_x[multipole_moment[0], t1]
+                                    * M_y[multipole_moment[1], t2]
+                                    * M_z[multipole_moment[2], t3]
+                                    * E_x[x1, x2, t1]
+                                    * E_y[y1, y2, t2]
+                                    * E_z[z1, z2, t3]
+                                )
+                    S_primitive[bf_i, bf_j, i, j] *= temp * norm2[bf_j, j]
 
     S_slice = np.einsum("i,j,klij->kl", contra_coeff1, contra_coeff2, S_primitive)
     return S_slice

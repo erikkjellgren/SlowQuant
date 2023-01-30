@@ -5,7 +5,12 @@
 # -- General configuration ------------------------------------------------
 # If your documentation needs a minimal Sphinx version, state it here.
 # needs_sphinx = '1.0'
-extensions = ["sphinx.ext.mathjax", "sphinx.ext.autodoc"]
+extensions = [
+    "sphinx.ext.mathjax",
+    "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.autosectionlabel",
+]
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:

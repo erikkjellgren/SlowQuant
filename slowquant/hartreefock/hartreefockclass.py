@@ -14,16 +14,16 @@ class _HartreeFock:
         """
         self.mol_obj = molecule_obj
         self.int_obj = integral_obj
-        self.de_threshold = 10**-12
-        self.rmsd_threshold = 10**-12
+        self.de_threshold = 10**-9
+        self.rmsd_threshold = 10**-9
         self.max_scf_iterations = 100
         self.use_diis = True
         self.logger = _Logger()
         # Attributes generated from calculations
-        self.E_hf: float | None = None
-        self.mo_coeff: np.ndarray | None = None
-        self.RDM1: np.ndarray | None = None
-        self.fock_matrix: np.ndarray | None = None
+        self.E_hf: float
+        self.mo_coeff: np.ndarray
+        self.rdm1: np.ndarray
+        self.fock_matrix: np.ndarray
 
     @property
     def log(self) -> str:
@@ -46,5 +46,5 @@ class _HartreeFock:
         )
         self.E_hf = E
         self.mo_coeff = C
-        self.RDM1 = D
+        self.rdm1 = D
         self.fock_matrix = F

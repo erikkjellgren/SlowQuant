@@ -146,3 +146,38 @@ def hermite_coulomb_integral(
                             value += X_PC * r_integral[t - 1, u, v, n + 1]
                     r_integral[t, u, v, n] = value
     return r_integral[:, :, :, 0]
+
+
+def hermite_multipole_integral(
+    A_x: float, B_x: float, C_x: float, a: float, b: float, multipole_order: int
+) -> np.ndarray:
+    r"""Calculate Hermite multipole integral.
+
+    .. math::
+        M_t^{e+1} = tM_{t-1}^e + X_{PC}M_t^e + \frac{1}{2p}M_{t+1}^e
+
+    .. math::
+        M_t^0 = \delta_{t0}\left(\frac{\pi}{p}\right)^(1/2)
+
+    .. math::
+        M_t^e = 0,\quad\quad t>e
+    """
+    p = a + b
+    P_x = (a * A_x + b * B_x) / p
+    X_PC = P_x - C_x
+    m_integral = np.zeros((multipole_order + 1, multipole_order + 1))
+    for e in range(multipole_order + 1):
+        for t in range(e + 1):
+            value = 0.0
+            if e == 0 and t == 0:
+                value = (np.pi / p) ** 0.5
+            elif e == 0:
+                value = 0.0
+            else:  # Increment e
+                if t > 0:
+                    value += t * m_integral[e - 1, t - 1]
+                value += X_PC * m_integral[e - 1, t]
+                if t + 1 <= e - 1:
+                    value += 1 / (2 * p) * m_integral[e - 1, t + 1]
+            m_integral[e, t] = value
+    return m_integral

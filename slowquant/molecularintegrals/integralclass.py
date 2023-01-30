@@ -5,10 +5,10 @@ from slowquant.molecularintegrals.electronrepulsion import (
     electron_repulsion_integral_driver,
 )
 from slowquant.molecularintegrals.kineticenergy import kinetic_energy_integral_driver
+from slowquant.molecularintegrals.multipole import multipole_integral_driver
 from slowquant.molecularintegrals.nuclearattraction import (
     nuclear_attraction_integral_driver,
 )
-from slowquant.molecularintegrals.overlap import overlap_integral_driver
 from slowquant.molecule.moleculeclass import _Molecule
 
 
@@ -43,9 +43,11 @@ class _Integral:
         """
         if self.store_1e_int:
             if self._overlap_int is None or self.force_recompute:
-                self._overlap_int = overlap_integral_driver(self.molecule_object)
+                self._overlap_int = multipole_integral_driver(self.molecule_object, np.array([0, 0, 0]))
             return self._overlap_int
-        return overlap_integral_driver(self.molecule_object)
+        # Overlap integral is a special case of multipole integral,
+        # where the multipole moments are all zero.
+        return multipole_integral_driver(self.molecule_object, np.array([0, 0, 0]))
 
     @property
     def kinetic_energy_matrix(self) -> np.ndarray:
@@ -85,3 +87,14 @@ class _Integral:
                 self._electronrepulsion_int = electron_repulsion_integral_driver(self.molecule_object)
             return self._electronrepulsion_int
         return electron_repulsion_integral_driver(self.molecule_object)
+
+    def get_multipole_matrix(self, multipole_order: np.ndarray) -> np.ndarray:
+        """Compute multipole integral matrix.
+
+        Args:
+            multipole_order: Cartesian multipole orders (x, y, z).
+
+        Returns:
+            Multipole integral matrix.
+        """
+        return multipole_integral_driver(self.molecule_object, multipole_order)

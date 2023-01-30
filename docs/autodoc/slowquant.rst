@@ -1,5 +1,5 @@
-SlowQuant
-=========
+SlowQuant (class)
+=================
 
 .. automodule:: slowquant.SlowQuant
     :members:
