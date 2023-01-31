@@ -8,11 +8,22 @@ from slowquant.molecularintegrals.integralfunctions import (
 from slowquant.molecule.moleculeclass import _Molecule
 
 
-def electron_repulsion_integral_driver(mol_obj: _Molecule) -> np.ndarray:
-    """Driver function for calculating electron-repulsion integrals.
+def electron_repulsion_integral_driver(
+    mol_obj: _Molecule, cauchy_schwarz_matrix: np.ndarray = None, cauchy_schwarz_threshold: float = 10**-10
+) -> np.ndarray:
+    r"""Driver function for calculating electron-repulsion integrals.
+
+    Might use the Cauchy Schwarz inequility to do integral screening:
+
+    .. math::
+        |g_{abcd}| \geq \sqrt{g_{abab}}\sqrt{{g_{cdcd}}}
+
+    Reference: Molecular Electronic-Structure Theory, https://onlinelibrary.wiley.com/doi/book/10.1002/9781119019572
 
     Args:
         mol_obj: Molecule object.
+        cauchy_schwarz_matrix: Cauchy Schwarz matrix, :math:`\sqrt{g_{ijij}}`.
+        cauchy_schwarz_threshold: Integral threshold using Cauchy Scwartz inequlity.
 
     Returns:
         Electron-repulsion integrals.
@@ -30,6 +41,12 @@ def electron_repulsion_integral_driver(mol_obj: _Molecule) -> np.ndarray:
                     kl = k * (k + 1) // 2 + k
                     if ij < kl:
                         continue
+                    if cauchy_schwarz_matrix is not None:
+                        if (
+                            cauchy_schwarz_matrix[i, j] * cauchy_schwarz_matrix[k, l]
+                            < cauchy_schwarz_threshold
+                        ):
+                            continue
                     V_slice = electron_repulsion_integral(
                         shell1.center,
                         shell2.center,
@@ -234,3 +251,45 @@ def electron_repulsion_integral(
                                         * V_primitive[bf_i, bf_j, bf_k, bf_l, i, j, k, l]
                                     )
     return V_slice
+
+
+def get_cauchy_schwarz_matrix(mol_obj: _Molecule) -> np.ndarray:
+    r"""Calculate Cauchy Schwarz inequality matrix on shell level.
+
+    Integrals of the form :math:`\sqrt{g_{ijij}}` will be the Cauchy Schwarz marix.
+
+    Args:
+        mol_obj: Molecule object.
+
+    Returns:
+        Cauchy Schwarz inequality matrix.
+    """
+    cauchy_schwarz_matrix = np.zeros((mol_obj.number_shell, mol_obj.number_shell))
+    for i, shell1 in enumerate(mol_obj.shells):
+        for j, shell2 in enumerate(mol_obj.shells):
+            if j < i:
+                continue
+            V_slice = electron_repulsion_integral(
+                shell1.center,
+                shell2.center,
+                shell1.center,
+                shell2.center,
+                shell1.exponents,
+                shell2.exponents,
+                shell1.exponents,
+                shell2.exponents,
+                shell1.contraction_coefficients,
+                shell2.contraction_coefficients,
+                shell1.contraction_coefficients,
+                shell2.contraction_coefficients,
+                shell1.normalization,
+                shell2.normalization,
+                shell1.normalization,
+                shell2.normalization,
+                shell1.angular_moments,
+                shell2.angular_moments,
+                shell1.angular_moments,
+                shell2.angular_moments,
+            )
+            cauchy_schwarz_matrix[i, j] = cauchy_schwarz_matrix[j, i] = np.max(V_slice) ** 0.5
+    return cauchy_schwarz_matrix

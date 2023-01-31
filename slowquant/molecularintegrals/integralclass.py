@@ -3,6 +3,7 @@ import numpy as np
 from slowquant.logger import _Logger
 from slowquant.molecularintegrals.electronrepulsion import (
     electron_repulsion_integral_driver,
+    get_cauchy_schwarz_matrix,
 )
 from slowquant.molecularintegrals.kineticenergy import kinetic_energy_integral_driver
 from slowquant.molecularintegrals.multipole import multipole_integral_driver
@@ -23,9 +24,14 @@ class _Integral:
         self.store_1e_int = True
         self.store_2e_int = True
         self.logger = _Logger()
-        if self.molecule_object.number_bf**4 * 8 / 10**9 > 2:
+        if (2 * self.molecule_object.number_bf) ** 4 * 8 / 10**9 > 6:
             self.logger.add_to_log(
-                "Storing 2-electron integrals in memory will use approx {self.molecule_object.number_bf**4*8/10**9} GB",
+                (
+                    f"Storing 2-electron integrals in memory will use approx {self.molecule_object.number_bf**4*8/10**9:3.1f} GB (in AO)"
+                    f"Storing 2-electron integrals in memory will use approx {self.molecule_object.number_bf**4*8/10**9:3.1f} GB (in MO)"
+                    f"Storing 2-electron integrals in memory will use approx {(2*self.molecule_object.number_bf)**4*8/10**9:3.1f} GB (in MO-spin)"
+                    "These numbers are addiative if post-SCF methods are used."
+                ),
                 is_warning=True,
             )
         self.force_recompute = False
@@ -33,6 +39,9 @@ class _Integral:
         self._kineticenergy_int: np.ndarray | None = None
         self._nuclearattraction_int: np.ndarray | None = None
         self._electronrepulsion_int: np.ndarray | None = None
+        # Integral screening
+        self._cauchy_schwarz_matrix = get_cauchy_schwarz_matrix(self.molecule_object)
+        self.cauchy_schwarz_threshold = 10**-10
 
     @property
     def overlap_matrix(self) -> np.ndarray:
@@ -84,9 +93,13 @@ class _Integral:
         """
         if self.store_2e_int:
             if self._electronrepulsion_int is None or self.force_recompute:
-                self._electronrepulsion_int = electron_repulsion_integral_driver(self.molecule_object)
+                self._electronrepulsion_int = electron_repulsion_integral_driver(
+                    self.molecule_object, self._cauchy_schwarz_matrix, self.cauchy_schwarz_threshold
+                )
             return self._electronrepulsion_int
-        return electron_repulsion_integral_driver(self.molecule_object)
+        return electron_repulsion_integral_driver(
+            self.molecule_object, self._cauchy_schwarz_matrix, self.cauchy_schwarz_threshold
+        )
 
     def get_multipole_matrix(self, multipole_order: np.ndarray) -> np.ndarray:
         """Compute multipole integral matrix.

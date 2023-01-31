@@ -186,6 +186,15 @@ class _Molecule:
                 bf_labels.append(f"{shell.origin_atom.atom_name} {angular_moment}")
         return bf_labels
 
+    @property
+    def number_shell(self) -> int:
+        """Get number of shells.
+
+        Returns:
+            Number of shells.
+        """
+        return len(self.shells)
+
 
 class Atom:
     def __init__(
