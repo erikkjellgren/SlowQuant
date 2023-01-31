@@ -14,6 +14,7 @@ def read_basis(atom_name: str, basis_set: str) -> tuple[np.ndarray, np.ndarray, 
         Basisset information, exponents, contraction coefficients and angular moments.
     """
     this_file_location = os.path.dirname(os.path.abspath(__file__))
+    basis_set = basis_set.replace("*", "_st_")
     if len(atom_name) == 1:
         atom_name = f"{atom_name} "
     with open(f"{this_file_location}/basisset/{basis_set.lower()}.basis", "r", encoding="UTF-8") as basisfile:
