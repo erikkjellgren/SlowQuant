@@ -5,7 +5,7 @@ from numba import float64, jit
 # Is float64. int64 gives overflow.
 # Only approximate value as a float is needed.
 @jit(float64(float64), nopython=True, cache=True)
-def factorial2(number: int) -> int:
+def factorial2(number: float) -> float:
     r"""Double factorial.
 
     .. math::
@@ -19,7 +19,7 @@ def factorial2(number: int) -> int:
     Returns:
         Double factorial of number.
     """
-    out = 1
+    out = 1.0
     if number > 0:
         for i in range(0, int(number + 1) // 2):
             out = out * (number - 2 * i)
