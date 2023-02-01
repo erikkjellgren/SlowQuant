@@ -24,14 +24,9 @@ class _Integral:
         self.store_1e_int = True
         self.store_2e_int = True
         self.logger = _Logger()
-        if (2 * self.molecule_object.number_bf) ** 4 * 8 / 10**9 > 6:
+        if (self.molecule_object.number_bf) ** 4 * 8 / 10**9 > 6:
             self.logger.add_to_log(
-                (
-                    f"Storing 2-electron integrals in memory will use approx {self.molecule_object.number_bf**4*8/10**9:3.1f} GB (in AO)"
-                    f"Storing 2-electron integrals in memory will use approx {self.molecule_object.number_bf**4*8/10**9:3.1f} GB (in MO)"
-                    f"Storing 2-electron integrals in memory will use approx {(2*self.molecule_object.number_bf)**4*8/10**9:3.1f} GB (in MO-spin)"
-                    "These numbers are addiative if post-SCF methods are used."
-                ),
+                f"Storing 2-electron integrals in memory will use approx {self.molecule_object.number_bf**4*8/10**9:3.1f} GB",
                 is_warning=True,
             )
         self.force_recompute = False
@@ -41,7 +36,7 @@ class _Integral:
         self._electronrepulsion_int: np.ndarray | None = None
         # Integral screening
         self._cauchy_schwarz_matrix = get_cauchy_schwarz_matrix(self.molecule_object)
-        self.cauchy_schwarz_threshold = 10**-10
+        self.cauchy_schwarz_threshold = 10**-12
 
     @property
     def overlap_matrix(self) -> np.ndarray:

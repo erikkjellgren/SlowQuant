@@ -218,11 +218,8 @@ def electron_repulsion_integral(
                         P - Q,
                     )
                     for bf_i, (x1, y1, z1) in enumerate(angular_moments1):
-                        temp = norm1[bf_i, i]
                         for bf_j, (x2, y2, z2) in enumerate(angular_moments2):
-                            temp2 = temp * norm2[bf_j, j]
                             for bf_k, (x3, y3, z3) in enumerate(angular_moments3):
-                                temp3 = temp2 * norm3[bf_k, k]
                                 for bf_l, (x4, y4, z4) in enumerate(angular_moments4):
                                     for tau in range(x3 + x4 + 1):
                                         for nu in range(y3 + y4 + 1):
@@ -245,7 +242,9 @@ def electron_repulsion_integral(
                                                                 * E_zb[z1, z2, v]
                                                                 * R[t + tau, u + nu, v + phi]
                                                             )
-                                    V_primitive[bf_i, bf_j, bf_k, bf_l, i, j, k, l] *= temp3 * norm4[bf_l, l]
+                                    V_primitive[bf_i, bf_j, bf_k, bf_l, i, j, k, l] *= (
+                                        norm1[bf_i, i] * norm2[bf_j, j] * norm3[bf_k, k] * norm4[bf_l, l]
+                                    )
                     V_primitive[:, :, :, :, i, j, k, l] *= 2 * (np.pi) ** (5 / 2) / (p * q * (p + q) ** 0.5)
 
     V_slice = np.zeros((number_bf1, number_bf2, number_bf3, number_bf4))
@@ -254,14 +253,13 @@ def electron_repulsion_integral(
             for bf_k in range(number_bf3):
                 for bf_l in range(number_bf4):
                     for i in range(number_primitives1):
-                        temp1 = contra_coeff1[i]
                         for j in range(number_primitives2):
-                            temp2 = temp1 * contra_coeff2[j]
                             for k in range(number_primitives3):
-                                temp3 = temp2 * contra_coeff3[k]
                                 for l in range(number_primitives4):
                                     V_slice[bf_i, bf_j, bf_k, bf_l] += (
-                                        temp3
+                                        contra_coeff1[i]
+                                        * contra_coeff2[j]
+                                        * contra_coeff3[k]
                                         * contra_coeff4[l]
                                         * V_primitive[bf_i, bf_j, bf_k, bf_l, i, j, k, l]
                                     )
