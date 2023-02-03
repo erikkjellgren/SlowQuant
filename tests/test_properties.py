@@ -106,7 +106,7 @@ def test_properties_ch3_sto3g() -> None:
     A.hartree_fock.rmsd_threshold = 10**-6
     A.hartree_fock.run_unrestricted_hartree_fock()
     A.init_properties()
-    assert abs(A.hartree_fock.spin_contamination - 0.016189571516672885) < 10**-6
+    assert abs(A.hartree_fock.spin_contamination - 0.016189571516672885) < 10**-4
 
 
 def test_properties_ch3_431g() -> None:

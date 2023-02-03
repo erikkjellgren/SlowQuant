@@ -183,6 +183,26 @@ def electron_repulsion_integral(
             number_primitives4,
         )
     )
+    pre_E_xk = np.zeros(
+        (number_primitives3, number_primitives4, max_ang3 + 1, max_ang4 + 1, max_ang3 + max_ang4 + 1)
+    )
+    pre_E_yk = np.zeros(
+        (number_primitives3, number_primitives4, max_ang3 + 1, max_ang4 + 1, max_ang3 + max_ang4 + 1)
+    )
+    pre_E_zk = np.zeros(
+        (number_primitives3, number_primitives4, max_ang3 + 1, max_ang4 + 1, max_ang3 + max_ang4 + 1)
+    )
+    for k in range(number_primitives3):
+        for l in range(number_primitives4):
+            pre_E_xk[k, l, :, :, :] = expansion_coefficients(
+                center3[0], center4[0], exponents3[k], exponents4[l], max_ang3, max_ang4
+            )
+            pre_E_yk[k, l, :, :, :] = expansion_coefficients(
+                center3[1], center4[1], exponents3[k], exponents4[l], max_ang3, max_ang4
+            )
+            pre_E_zk[k, l, :, :, :] = expansion_coefficients(
+                center3[2], center4[2], exponents3[k], exponents4[l], max_ang3, max_ang4
+            )
     for i in range(number_primitives1):
         for j in range(number_primitives2):
             E_xb = expansion_coefficients(
@@ -198,15 +218,6 @@ def electron_repulsion_integral(
             P = (exponents1[i] * center1 + exponents2[j] * center2) / p
             for k in range(number_primitives3):
                 for l in range(number_primitives4):
-                    E_xk = expansion_coefficients(
-                        center3[0], center4[0], exponents3[k], exponents4[l], max_ang3, max_ang4
-                    )
-                    E_yk = expansion_coefficients(
-                        center3[1], center4[1], exponents3[k], exponents4[l], max_ang3, max_ang4
-                    )
-                    E_zk = expansion_coefficients(
-                        center3[2], center4[2], exponents3[k], exponents4[l], max_ang3, max_ang4
-                    )
                     q = exponents3[k] + exponents4[l]
                     Q = (exponents3[k] * center3 + exponents4[l] * center4) / q
                     alpha = p * q / (p + q)
@@ -226,9 +237,9 @@ def electron_repulsion_integral(
                                             for phi in range(z3 + z4 + 1):
                                                 E_temp = (
                                                     (-1.0) ** (tau + nu + phi)
-                                                    * E_xk[x3, x4, tau]
-                                                    * E_yk[y3, y4, nu]
-                                                    * E_zk[z3, z4, phi]
+                                                    * pre_E_xk[k, l, x3, x4, tau]
+                                                    * pre_E_yk[k, l, y3, y4, nu]
+                                                    * pre_E_zk[k, l, z3, z4, phi]
                                                 )
                                                 for t in range(x1 + x2 + 1):
                                                     for u in range(y1 + y2 + 1):
