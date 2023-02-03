@@ -65,7 +65,8 @@ class _HartreeFock:
             self.int_obj.kinetic_energy_matrix,
             self.int_obj.nuclear_attraction_matrix,
             self.int_obj.electron_repulsion_tensor,
-            self.mol_obj.number_electrons,
+            self.mol_obj.number_electrons_alpha,
+            self.mol_obj.number_electrons_beta,
             self.uhf_lumo_homo_mix_coeff,
             self.logger,
             self.de_threshold,
@@ -80,3 +81,49 @@ class _HartreeFock:
         self.rdm1_beta = D_beta
         self.fock_matrix_alpha = F_alpha
         self.fock_matrix_beta = F_beta
+
+    @property
+    def rdm1_charge(self) -> np.ndarray:
+        r"""Get charge density 1-RDM.
+
+        .. math::
+            D_\mathrm{C} = D_\alpha + D_\beta
+
+        Returns:
+            Charge density 1-RDM.
+        """
+        return self.rdm1_alpha + self.rdm1_beta
+
+    @property
+    def rdm1_spin(self) -> np.ndarray:
+        r"""Get spin density 1-RDM.
+
+        .. math::
+            D_\mathrm{S} = D_\alpha - D_\beta
+
+        Returns:
+            Spin density 1-RDM.
+        """
+        return self.rdm1_alpha - self.rdm1_beta
+
+    @property
+    def spin_contamination(self) -> np.ndarray:
+        r"""Get spin contamination.
+
+        .. math::
+            s = \sum_{i,j}^{N_\alpha,N_beta}\left|S_{ij}^{\alpha\beta}\right|^2
+
+        .. math::
+            S_{ij}^{\alpha\beta} = C_{ai}^\alpha C_{bj}^\beta S_{ab}^\mathrm{AO}
+
+        Returns:
+            Spin density 1-RDM.
+        """
+        spin_contamination = 0.0
+        S_alpha_beta = np.einsum(
+            "ai,bj,ab->ij", self.mo_coeff_alpha, self.mo_coeff_beta, self.int_obj.overlap_matrix
+        )
+        for i in range(self.mol_obj.number_electrons_alpha):
+            for j in range(self.mol_obj.number_electrons_beta):
+                spin_contamination += S_alpha_beta[i, j] ** 2
+        return self.mol_obj.number_electrons_beta - spin_contamination

@@ -9,7 +9,8 @@ def run_unrestricted_hartree_fock(
     T: np.ndarray,
     V: np.ndarray,
     ERI: np.ndarray,
-    number_electrons: int,
+    number_electrons_alpha: int,
+    number_electrons_beta: int,
     lumo_homo_mix_coeff: float,
     log: _Logger,
     dE_threshold: float,
@@ -22,12 +23,6 @@ def run_unrestricted_hartree_fock(
     log.add_to_log(
         f"{'Iter':^4}    {'E_UHF':^18}    {'DeltaE':^13}    {'RMS_D_alpha':^12}    {'RMS_D_beta':^12}"
     )
-
-    # Asign alpha and beta electrons
-    number_electrons_alpha = number_electrons // 2
-    number_electrons_beta = number_electrons // 2
-    if number_electrons_alpha + number_electrons_beta < number_electrons:
-        number_electrons_alpha += 1
 
     # Core Hamiltonian
     Hcore = T + V

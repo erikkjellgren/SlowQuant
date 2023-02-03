@@ -106,3 +106,14 @@ class _Integral:
             Multipole integral matrix.
         """
         return multipole_integral_driver(self.molecule_object, multipole_order)
+
+    def get_overlap_distribution(self, point: np.ndarray) -> float:
+        """Compute overlap distribution in a point.
+
+        Args:
+            point: Point in which overlap distribution is evaulated.
+
+        Returns:
+            Overlap distribution in a point.
+        """
+        raise Exception("Not implemented")

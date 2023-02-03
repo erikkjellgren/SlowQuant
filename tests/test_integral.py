@@ -5,7 +5,12 @@ import slowquant.SlowQuant as sq
 
 
 def test_cauchy_schwarz_inequality() -> None:
-    """Test the use of Cauchy Schwarz inequaility."""
+    """Test the use of Cauchy Schwarz inequaility.
+
+    Test that integrals are identical within screening threshold, compared to a reference.
+
+    Test that all integrals are zero if the sceening threshold is huge.
+    """
     ref = sq.SlowQuant()
     ref.set_molecule(
         """H   0.000000000000   0.000000000000   0.000000000000;

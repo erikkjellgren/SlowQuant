@@ -42,7 +42,7 @@ def test_restricted_hartree_fock_h2o_dz() -> None:
 def test_restricted_hartree_fock_h2o_dzp() -> None:
     """Test restricted Hartree-Fock for H2O with DZP.
 
-    Does NOT give the same as in the reference.
+    Does NOT give the same as in the reference. (Reference is: -84.011188854711)
     Reference data: https://github.com/CrawfordGroup/ProgrammingProjects/tree/master/Project%2303
     """
     A = sq.SlowQuant()

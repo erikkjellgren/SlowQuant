@@ -142,6 +142,27 @@ class _Molecule:
         return n_elec
 
     @property
+    def number_electrons_alpha(self) -> int:
+        """Get number of alpha electrons.
+
+        Returns:
+            Number of alpha electrons.
+        """
+        n_elec = -self.molecular_charge
+        for atom in self.atoms:
+            n_elec += atom.nuclear_charge
+        return (self.number_electrons + 1) // 2
+
+    @property
+    def number_electrons_beta(self) -> int:
+        """Get number of beta electrons.
+
+        Returns:
+            Number of beta electrons.
+        """
+        return self.number_electrons // 2
+
+    @property
     def nuclear_repulsion(self) -> float:
         r"""Get nuclear-nuclear repulsion.
 
