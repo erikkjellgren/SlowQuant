@@ -1,4 +1,6 @@
 # pylint: disable=C0103
+from slowquant.dft.dftclass import _KSDFT
+from slowquant.grid.gridclass import _Grid
 from slowquant.hartreefock.hartreefockclass import _HartreeFock
 from slowquant.logger import _Logger
 from slowquant.molecularintegrals.integralclass import _Integral
@@ -9,10 +11,11 @@ from slowquant.properties.propertiesclass import _Properties
 class SlowQuant:
     def __init__(self) -> None:
         """Initialize SlowQuant."""
-        self.molecule: _Molecule
+        self.molecule: _Molecule | None = None
         self.integral: _Integral
         self.hartree_fock: _HartreeFock
         self.properties: _Properties
+        self.grid: _Grid
         self.logger = _Logger()
 
     def set_molecule(
@@ -44,6 +47,7 @@ class SlowQuant:
         if self.molecule is not None:
             self.molecule._set_basis_set(basis_set)  # pylint: disable=W0212
             self.integral = _Integral(self.molecule)
+            self.grid = _Grid(self.molecule)
         else:
             self.logger.add_to_log("Cannot set basis set, molecule is not defined.", is_warning=True)
 
@@ -54,3 +58,7 @@ class SlowQuant:
     def init_properties(self) -> None:
         """Initialize Hartree-Fock module."""
         self.properties = _Properties(self.molecule, self.integral)
+
+    def init_kohn_sham_dft(self) -> None:
+        """Initialize Kohn-Sham DFT module."""
+        self.ksdft = _KSDFT(self.molecule, self.integral, self.grid)

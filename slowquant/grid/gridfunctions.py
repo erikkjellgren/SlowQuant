@@ -1,13 +1,13 @@
 import numpy as np
 
-from slowquant.dft.constants import BRAGG, LEBEDEV, POPLE_RADII
+from slowquant.grid.constants import BRAGG, LEBEDEV, POPLE_RADII
 
 
-def SG1_grid(coordinate, charge, n_rad, n_ang=0):
+def calculate_sg1_grid(coordinate: np.ndarray, charge: int, n_rad: int, n_ang: int) -> np.ndarray:
     # https://www.sciencedirect.com/science/article/pii/0009261493801259?via%3Dihub
     grid_parameters = []
     grid = []
-    pople_radii = POPLE_RADII[Z]
+    pople_radii = POPLE_RADII[charge]
     for i in range(1, n_rad + 1):
         # includes a factor of 4pi
         w = 8.0 * np.pi * pople_radii**3 * (n_rad + 1.0) * i**5 * (n_rad + 1 - i) ** (-7)
@@ -46,16 +46,18 @@ def SG1_grid(coordinate, charge, n_rad, n_ang=0):
     return np.array(grid)
 
 
-def becke_reweight(coordinates, charges, atom_grids):
+def becke_reweight(
+    coordinates: np.ndarray, charges: np.ndarray, atom_grids: list[np.ndarray]
+) -> list[np.ndarray]:
     # https://aip-scitation-org.proxy1-bib.sdu.dk/doi/abs/10.1063/1.454033
     for grid_idx in range(0, len(atom_grids)):
         for point_idx in range(0, len(atom_grids[grid_idx])):
             xyz_point = atom_grids[grid_idx][point_idx, :3]
             Ps = []
-            for atom_idx in range(0, len(atom_xyzZ)):
+            for atom_idx in range(0, len(coordinates)):
                 s_product = 1
-                r_ip = np.linalg.norm(atom_xyzZ[atom_idx, :3] - xyz_point)
-                for atom_idx2 in range(0, len(atom_xyzZ)):
+                r_ip = np.linalg.norm(coordinates[atom_idx] - xyz_point)
+                for atom_idx2 in range(0, len(coordinates)):
                     if atom_idx == atom_idx2:
                         continue
                     r_ij = np.linalg.norm(coordinates[atom_idx] - coordinates[atom_idx2])
@@ -76,14 +78,3 @@ def becke_reweight(coordinates, charges, atom_grids):
             P = Ps[grid_idx] / np.sum(Ps)
             atom_grids[grid_idx][point_idx, 3] = P * atom_grids[grid_idx][point_idx, 3]
     return atom_grids
-
-
-def generate_grid(mol_obj):
-    atomic_grids = []
-    for atom in mol_obj.atoms:
-        atomic_grids.append(atom.coordinate, atom.charge, 64)
-    reweighted_atomic_grids = becke_reweight(atom_xyzZ, grids)
-    grid = reweighted_atomic_grids[0]
-    for i in range(1, len(reweighted_atomic_grids)):
-        grid = np.vstack((grid, reweighted_atomic_grids[i]))
-    return grid

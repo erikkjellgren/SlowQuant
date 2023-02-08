@@ -4,6 +4,7 @@ from slowquant.molecule.basis_reader import read_basis
 from slowquant.molecule.constants import atom_to_properties
 from slowquant.molecule.moleculefunctions import (
     contracted_normalization,
+    primitive_gauss,
     primitive_normalization,
 )
 
@@ -216,55 +217,31 @@ class _Molecule:
         """
         return len(self.shells)
 
-    def get_overlap_distribution(self, point: np.ndarray) -> np.ndarray:
-        """Compute overlap distribution in a point.
+    def get_basis_function_amplitude(self, points: np.ndarray) -> np.ndarray:
+        """Compute basis function amplitudes in a set of points.
 
         Args:
-            point: Point in which overlap distribution is evaulated.
+            points: Points in which the basis function amplitudes are evaulated.
 
         Returns:
-            Overlap distribution in a point.
+            Basis function amplitudes in a set of points.
         """
-        px, py, pz = point
-        overlap_distribution = np.zeros((self.number_bf, self.number_bf))
-        for i, shell1 in enumerate(self.shells):
-            for j, shell2 in enumerate(self.shells):
-                for bf_1 in range(len(shell1.angular_moments)):
-                    for bf_2 in range(len(shell2.angular_moments)):
-                        bf_idx1 = shell1.bf_idx[bf_1]
-                        bf_idx2 = shell2.bf_idx[bf_2]
-                        ang1_x, ang1_y, ang1_z = shell1.angular_moments[bf_1]
-                        ang2_x, ang2_y, ang2_z = shell2.angular_moments[bf_2]
-                        for prim_1 in range(len(shell1.contraction_coefficients)):
-                            for prim_2 in range(len(shell2.contraction_coefficients)):
-                                x1, y1, z1 = shell1.center
-                                x2, y2, z2 = shell2.center
-                                exponent1 = shell1.exponents[prim_1]
-                                exponent2 = shell2.exponents[prim_2]
-                                coeff1 = shell1.contraction_coefficients[prim_1]
-                                coeff2 = shell2.contraction_coefficients[prim_2]
-                                norm1 = shell1.normalization[bf_1, prim_1]
-                                norm2 = shell2.normalization[bf_2, prim_2]
-                                overlap_distribution[bf_idx1, bf_idx2] += (
-                                    norm1
-                                    * norm2
-                                    * coeff1
-                                    * coeff2
-                                    * gauss(px, py, pz, x1, y1, z1, exponent1, ang1_x, ang1_y, ang1_z)
-                                    * gauss(px, py, pz, x2, y2, z2, exponent2, ang2_x, ang2_y, ang2_z)
-                                )
-        return overlap_distribution
-
-
-def gauss(coord_x, coord_y, coord_z, center_x, center_y, center_z, exponent, ang_x, ang_y, ang_z):
-    return (
-        (coord_x - center_x) ** ang_x
-        * (coord_y - center_y) ** ang_y
-        * (coord_z - center_z) ** ang_z
-        * np.exp(
-            -exponent * ((coord_x - center_x) ** 2 + (coord_y - center_y) ** 2 + (coord_z - center_z) ** 2)
-        )
-    )
+        bf_amplitudes = np.zeros((len(points), self.number_bf))
+        for shell in self.shells:
+            x, y, z = shell.center
+            for bf_i in range(len(shell.angular_moments)):
+                bf_idx = shell.bf_idx[bf_i]
+                ang_x, ang_y, ang_z = shell.angular_moments[bf_i]
+                for prim_i in range(len(shell.contraction_coefficients)):
+                    exponent = shell.exponents[prim_i]
+                    coeff = shell.contraction_coefficients[prim_i]
+                    norm = shell.normalization[bf_i, prim_i]
+                    for k, point in enumerate(points):
+                        px, py, pz = point
+                        bf_amplitudes[k, bf_idx] += (
+                            norm * coeff * primitive_gauss(px, py, pz, x, y, z, exponent, ang_x, ang_y, ang_z)
+                        )
+        return bf_amplitudes
 
 
 class Atom:

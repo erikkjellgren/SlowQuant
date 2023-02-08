@@ -86,3 +86,25 @@ def contracted_normalization(
         * factorial2(2 * angular_z - 1)
     ) / (2 ** (angular_x + angular_y + angular_z))
     return normalization_factor ** (-1 / 2)
+
+
+def primitive_gauss(
+    coord_x: float,
+    coord_y: float,
+    coord_z: float,
+    center_x: float,
+    center_y: float,
+    center_z: float,
+    exponent: float,
+    ang_x: int,
+    ang_y: int,
+    ang_z: int,
+) -> float:
+    return (
+        (coord_x - center_x) ** ang_x
+        * (coord_y - center_y) ** ang_y
+        * (coord_z - center_z) ** ang_z
+        * np.exp(
+            -exponent * ((coord_x - center_x) ** 2 + (coord_y - center_y) ** 2 + (coord_z - center_z) ** 2)
+        )
+    )
