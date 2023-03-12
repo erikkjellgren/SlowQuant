@@ -181,3 +181,13 @@ def hermite_multipole_integral(
                     value += 1 / (2 * p) * m_integral[e - 1, t + 1]
             m_integral[e, t] = value
     return m_integral
+
+
+def one_electron_integral_transform(C: np.ndarray, int1e: np.ndarray) -> np.ndarray:
+    return np.einsum("ai,bj,ab->ij", C, C, int1e, optimize=["einsum_path", (0, 2), (0, 1)])
+
+
+def two_electron_integral_transform(C: np.ndarray, int2e: np.ndarray) -> np.ndarray:
+    return np.einsum(
+        "ai,bj,ck,dl,abcd->ijkl", C, C, C, C, int2e, optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)]
+    )
