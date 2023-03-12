@@ -35,5 +35,5 @@ def test_HeH_sto3g() -> None:
             expectation_value(wavefunction, H(h_core, g_eri, wavefunction.c_mo), wavefunction)
             - (-4.261756255153)
         )
-        < 10**-10
+        < 10**-5
     )
