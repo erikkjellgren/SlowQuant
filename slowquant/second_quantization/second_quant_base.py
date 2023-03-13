@@ -13,6 +13,13 @@ from slowquant.molecularintegrals.integralfunctions import (
 
 class a_op:
     def __init__(self, spinless_idx: int, spin: str, dagger: bool) -> None:
+        """Initialize fermionic annihilation operator.
+
+        Args:
+            spinless_idx: Spatial orbital index.
+            spin: Alpha or beta spin.
+            dagger: If creation operator.
+        """
         self.spinless_idx = spinless_idx
         self.idx = 2 * self.spinless_idx
         self.dagger = dagger
@@ -21,73 +28,118 @@ class a_op:
             self.idx += 1
 
 
-class FermionicString:
-    def __init__(self, annihilation_operator: list[list[a_op]], factor: list[float]) -> None:
-        if not isinstance(annihilation_operator, list):
-            self.operators = [[annihilation_operator]]
-            self.factors = [factor]
+def operator_string_to_key(operator_string: list[a_op]) -> str:
+    """Make key string to index a fermionic operator in a dict structure.
+
+    Args:
+        operator_string: Fermionic opreators.
+
+    Returns:
+        Dictionary key.
+    """
+    string_key = ""
+    for a in operator_string:
+        if a.dagger:
+            string_key += f"c{a.idx}"
+        else:
+            string_key += f"a{a.idx}"
+    return string_key
+
+
+def check_always_zero(operator: list[a_op]) -> bool:
+    max_idx = 0
+    for a in operator:
+        max_idx = max(max_idx, a.idx + 1)
+    state = [0] * max_idx
+    for a in operator[::-1]:
+        idx = a.idx
+        if a.dagger:
+            state[idx] += 1
+            if state[idx] == 2:
+                return True
+        else:
+            state[idx] -= 1
+            if state[idx] == -2:
+                return True
+    return False
+
+
+class FermionicOperator:
+    def __init__(self, annihilation_operator: dict[str, list[a_op]], factor: dict[str, float]) -> None:
+        if not isinstance(annihilation_operator, dict):
+            string_key = operator_string_to_key([annihilation_operator])
+            self.operators = {}
+            self.operators[string_key] = [annihilation_operator]
+            self.factors = {}
+            self.factors[string_key] = factor
         else:
             self.operators = annihilation_operator
             self.factors = factor
 
-    def __add__(self, fermistring: FermionicString) -> FermionicString:
+    def __add__(self, fermistring: FermionicOperator) -> FermionicOperator:
         operators = copy.copy(self.operators)
         factors = copy.copy(self.factors)
-        for operator, factor in zip(fermistring.operators, fermistring.factors):
-            operators.append(operator)
-            factors.append(factor)
-        return FermionicString(operators, factors)
-
-    def __sub__(self, fermistring: FermionicString) -> FermionicString:
-        operators = copy.copy(self.operators)
-        factors = copy.copy(self.factors)
-        for operator, factor in zip(fermistring.operators, fermistring.factors):
-            operators.append(operator)
-            factors.append(-factor)
-        return FermionicString(operators, factors)
-
-    def __mul__(self, fermistring: FermionicString) -> FermionicString:
-        operators = []
-        factors = []
-        for operator, factor in zip(fermistring.operators, fermistring.factors):
-            for operator2, factor2 in zip(self.operators, self.factors):
-                operators.append(operator2 + operator)
-                factors.append(factor * factor2)
-        return FermionicString(operators, factors)
-
-    def __rmul__(self, number: float) -> FermionicString:
-        operators = []
-        factors = []
-        for operator, factor in zip(self.operators, self.factors):
-            operators.append(operator)
-            factors.append(factor * number)
-        return FermionicString(operators, factors)
-
-    def get_latex(self, do_spin_idx: bool = False) -> str:
-        latex_code = ""
-        for term, factor in zip(self.operators, self.factors):
-            if factor > 0:
-                if factor != 1:
-                    latex_code += f" +{factor} "
-                else:
-                    latex_code += " + "
+        for string_key in fermistring.operators.keys():
+            if string_key in operators.keys():
+                factors[string_key] += fermistring.factors[string_key]
+                if abs(factors[string_key]) < 10**-14:
+                    del factors[string_key]
+                    del operators[string_key]
             else:
-                if factor != -1:
-                    latex_code += f" {factor} "
+                operators[string_key] = fermistring.operators[string_key]
+                factors[string_key] = fermistring.factors[string_key]
+        return FermionicOperator(operators, factors)
+
+    def __sub__(self, fermistring: FermionicOperator) -> FermionicOperator:
+        operators = copy.copy(self.operators)
+        factors = copy.copy(self.factors)
+        for string_key in fermistring.operators.keys():
+            if string_key in operators.keys():
+                factors[string_key] -= fermistring.factors[string_key]
+                if abs(factors[string_key]) < 10**-14:
+                    del factors[string_key]
+                    del operators[string_key]
+            else:
+                operators[string_key] = fermistring.operators[string_key]
+                factors[string_key] = -fermistring.factors[string_key]
+        return FermionicOperator(operators, factors)
+
+    def __mul__(self, fermistring: FermionicOperator) -> FermionicOperator:
+        operators = {}
+        factors = {}
+        for string_key1 in fermistring.operators.keys():
+            for string_key2 in self.operators.keys():
+                str_key = string_key2 + string_key1
+                if str_key not in operators.keys():
+                    operators[str_key] = self.operators[string_key2] + fermistring.operators[string_key1]
+                    factors[str_key] = self.factors[string_key2] * fermistring.factors[string_key1]
+                    if check_always_zero(operators[str_key]):
+                        del operators[str_key]
+                        del factors[str_key]
                 else:
-                    latex_code += " - "
-            for a in term:
-                if do_spin_idx:
-                    if a.dagger:
-                        latex_code += f"\hat{{a}}_{a.idx}^\dagger "
-                    else:
-                        latex_code += f"\hat{{a}}_{a.idx} "
-                else:
-                    if a.dagger:
-                        latex_code += f"\hat{{a}}_{{{a.spinless_idx}, \\{a.spin}}}^\dagger "
-                    else:
-                        latex_code += f"\hat{{a}}_{{{a.spinless_idx}, \\{a.spin}}} "
-        return latex_code
+                    factors[str_key] += self.factors[string_key2] * fermistring.factors[string_key1]
+                    if abs(factors[str_key]) < 10**-14:
+                        del factors[str_key]
+                        del operators[str_key]
+        return FermionicOperator(operators, factors)
+
+    def __rmul__(self, number: float) -> FermionicOperator:
+        operators = {}
+        factors = {}
+        for key_string in self.operators:
+            operators[key_string] = self.operators[key_string]
+            factors[key_string] = self.factors[key_string] * number
+        return FermionicOperator(operators, factors)
+
+    def get_operator_count(self) -> dict[int, int]:
+        op_count = {}
+        for string_key in self.operators.keys():
+            op_lenght = len(self.operators[string_key])
+            if op_lenght not in op_count:
+                op_count[op_lenght] = 1
+            else:
+                op_count[op_lenght] += 1
+        return op_count
 
 
 class WaveFunction:
@@ -125,7 +177,7 @@ class WaveFunction:
 
 
 def collapse_operator_on_determinant(operator: list[a_op], determinant: list[int]) -> tuple[list[int], int]:
-    determinant_out = copy.copy(determinant)
+    determinant_out = np.array(determinant).astype(int)
     phase = 1
     for a in operator[::-1]:
         idx = a.idx
@@ -137,17 +189,19 @@ def collapse_operator_on_determinant(operator: list[a_op], determinant: list[int
             if determinant_out[idx] == 0:
                 return [], 0
             determinant_out[idx] = 0
-        if int(np.sum(determinant_out[:idx])) % 2 == 1:
+        if np.sum(determinant_out[:idx]) % 2 == 1:
             phase *= -1
-    return determinant_out, phase
+    return determinant_out.tolist(), phase
 
 
-def apply_on_ket(operators: FermionicString, ket: WaveFunction) -> tuple[list[int], list[int]]:
+def apply_on_ket(operators: FermionicOperator, ket: WaveFunction) -> tuple[list[int], list[int]]:
     determinants = []
     phases = []
-    for factor, operator in zip(operators.factors, operators.operators):
-        for ket_determinant, ket_coeff in zip(ket.determinants, ket.coefficients):
-            collapsed_determinant, phase = collapse_operator_on_determinant(operator, ket_determinant)
+    for key_string in operators.operators.keys():
+        for ket_determinant in ket.determinants:
+            collapsed_determinant, phase = collapse_operator_on_determinant(
+                operators.operators[key_string], ket_determinant
+            )
             if phase == 0:
                 continue
             determinants.append(collapsed_determinant)
@@ -155,24 +209,28 @@ def apply_on_ket(operators: FermionicString, ket: WaveFunction) -> tuple[list[in
     return determinants, phases
 
 
-def Epq(p: int, q: int) -> FermionicString:
-    E = FermionicString(a_op(p, "alpha", dagger=True), 1) * FermionicString(a_op(q, "alpha", dagger=False), 1)
-    E += FermionicString(a_op(p, "beta", dagger=True), 1) * FermionicString(a_op(q, "beta", dagger=False), 1)
+def Epq(p: int, q: int) -> FermionicOperator:
+    E = FermionicOperator(a_op(p, "alpha", dagger=True), 1) * FermionicOperator(
+        a_op(q, "alpha", dagger=False), 1
+    )
+    E += FermionicOperator(a_op(p, "beta", dagger=True), 1) * FermionicOperator(
+        a_op(q, "beta", dagger=False), 1
+    )
     return E
 
 
-def epqrs(p: int, q: int, r: int, s: int) -> FermionicString:
+def epqrs(p: int, q: int, r: int, s: int) -> FermionicOperator:
     if q == r:
         return Epq(p, q) * Epq(r, s) - Epq(p, s)
     return Epq(p, q) * Epq(r, s)
 
 
-def Eminuspq(p: int, q: int) -> FermionicString:
+def Eminuspq(p: int, q: int) -> FermionicOperator:
     return Epq(p, q) - Epq(q, p)
 
 
-def H(h: np.ndarray, g: np.ndarray, c_mo: np.ndarray) -> FermionicString:
-    H_operator = FermionicString([], [])
+def H(h: np.ndarray, g: np.ndarray, c_mo: np.ndarray) -> FermionicOperator:
+    H_operator = FermionicOperator({}, {})
     h_mo = one_electron_integral_transform(c_mo, h)
     g_mo = two_electron_integral_transform(c_mo, g)
     num_bf = len(c_mo)
@@ -187,5 +245,5 @@ def H(h: np.ndarray, g: np.ndarray, c_mo: np.ndarray) -> FermionicString:
     return H_operator
 
 
-def comm(A: FermionicString, B: FermionicString) -> FermionicString:
+def comm(A: FermionicOperator, B: FermionicOperator) -> FermionicOperator:
     return A * B - B * A
