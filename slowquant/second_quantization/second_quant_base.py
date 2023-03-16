@@ -10,7 +10,6 @@ from slowquant.molecularintegrals.integralfunctions import (
     two_electron_integral_transform,
 )
 
-
 class a_op:
     def __init__(self, spinless_idx: int, spin: str, dagger: bool) -> None:
         """Initialize fermionic annihilation operator.
@@ -131,6 +130,7 @@ class FermionicOperator:
             factors[key_string] = self.factors[key_string] * number
         return FermionicOperator(operators, factors)
 
+    @property
     def get_operator_count(self) -> dict[int, int]:
         op_count = {}
         for string_key in self.operators.keys():
@@ -152,7 +152,7 @@ class WaveFunction:
         self.c_mo = scipy.linalg.expm(-self.kappa)
 
     def add_determinant(self, determinant: list[int], coefficient: float) -> None:
-        self.determinants.append(determinant)
+        self.determinants.append(np.array(determinant).astype(int))
         self.coefficients.append(coefficient)
 
     def get_non_redundant_kappa(self) -> list[int, int]:
@@ -175,9 +175,8 @@ class WaveFunction:
         self.c_mo = np.matmul(self.c_mo, scipy.linalg.expm(-self.kappa))
         self.kappa[:, :] = 0.0
 
-
-def collapse_operator_on_determinant(operator: list[a_op], determinant: list[int]) -> tuple[list[int], int]:
-    determinant_out = np.array(determinant).astype(int)
+def collapse_operator_on_determinant(operator: list[a_op], determinant: np.ndarray) -> tuple[np.ndarray, int]:
+    determinant_out = np.copy(determinant)
     phase = 1
     for a in operator[::-1]:
         idx = a.idx
@@ -191,7 +190,7 @@ def collapse_operator_on_determinant(operator: list[a_op], determinant: list[int
             determinant_out[idx] = 0
         if np.sum(determinant_out[:idx]) % 2 == 1:
             phase *= -1
-    return determinant_out.tolist(), phase
+    return determinant_out, phase
 
 
 def apply_on_ket(operators: FermionicOperator, ket: WaveFunction) -> tuple[list[int], list[int]]:

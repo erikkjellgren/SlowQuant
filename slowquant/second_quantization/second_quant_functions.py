@@ -26,7 +26,7 @@ def expectation_value(bra: WaveFunction, operators: FermionicOperator, ket: Wave
             if phase == 0:
                 continue
             for bra_determinant, bra_coeff in zip(bra.determinants, bra.coefficients):
-                if bra_determinant == collapsed_determinant:
+                if np.array_equal(bra_determinant, collapsed_determinant):
                     value += operators.factors[key_string] * phase * bra_coeff * ket_coeff
     return value
 
