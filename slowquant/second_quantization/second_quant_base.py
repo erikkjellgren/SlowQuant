@@ -44,23 +44,74 @@ def operator_string_to_key(operator_string: list[a_op]) -> str:
             string_key += f"a{a.idx}"
     return string_key
 
-
-def check_always_zero(operator: list[a_op]) -> bool:
-    max_idx = 0
-    for a in operator:
-        max_idx = max(max_idx, a.idx + 1)
-    state = [0] * max_idx
-    for a in operator[::-1]:
-        idx = a.idx
-        if a.dagger:
-            state[idx] += 1
-            if state[idx] == 2:
-                return True
-        else:
-            state[idx] -= 1
-            if state[idx] == -2:
-                return True
-    return False
+def do_extended_normal_ordering(fermistring: FermionicOperator) -> tuple[dict[str, float], dict[str, list[a_op]]]:
+    operator_queue = []
+    factor_queue = []
+    new_operators = {}
+    new_factors = {}
+    for key in fermistring.operators:
+        operator_queue.append(fermistring.operators[key])
+        factor_queue.append(fermistring.factors[key])
+    while len(operator_queue) > 0:
+        next_operator = operator_queue.pop(0)
+        factor = factor_queue.pop(0)
+        is_zero = False
+        # Doing a dumber version cycle-sort (it is easy, but N**2)
+        while True:
+            current_idx = 0
+            while True:
+                a = next_operator[current_idx]
+                b = next_operator[current_idx+1]
+                i = current_idx
+                j = current_idx+1
+                changed = False
+                if a.dagger and b.dagger:
+                    if a.idx == b.idx:
+                        is_zero = True
+                    elif a.idx < b.idx:
+                        next_operator[i], next_operator[j] = next_operator[j], next_operator[i]
+                        factor *= -1
+                        changed = True
+                elif not a.dagger and b.dagger:
+                    if a.idx == b.idx:
+                        new_op = copy.copy(next_operator)
+                        new_op.pop(j)
+                        new_op.pop(i)
+                        if len(new_op) > 0:
+                            operator_queue.append(new_op)
+                            factor_queue.append(factor)
+                        next_operator[i], next_operator[j] = next_operator[j], next_operator[i]
+                        factor *= -1
+                        changed = True
+                    else:
+                        next_operator[i], next_operator[j] = next_operator[j], next_operator[i]
+                        factor *= -1
+                        changed = True
+                elif a.dagger and not b.dagger:
+                    None
+                else:
+                    if a.idx == b.idx:
+                        is_zero = True
+                    elif a.idx < b.idx:
+                        next_operator[i], next_operator[j] = next_operator[j], next_operator[i]
+                        factor *= -1
+                        changed = True
+                current_idx += 1
+                if current_idx+1 == len(next_operator) or is_zero:
+                    break
+            if not changed or is_zero:
+                if not is_zero:
+                    key_string = operator_string_to_key(next_operator)
+                    if key_string not in new_operators:
+                        new_operators[key_string] = next_operator
+                        new_factors[key_string] = factor
+                    else:
+                        new_factors[key_string] += factor
+                        if abs(new_factors[key_string]) < 10**-14:
+                            del new_operators[key_string]
+                            del new_factors[key_string]
+                break
+    return new_operators, new_factors
 
 
 class FermionicOperator:
@@ -108,18 +159,16 @@ class FermionicOperator:
         factors = {}
         for string_key1 in fermistring.operators.keys():
             for string_key2 in self.operators.keys():
-                str_key = string_key2 + string_key1
-                if str_key not in operators.keys():
-                    operators[str_key] = self.operators[string_key2] + fermistring.operators[string_key1]
-                    factors[str_key] = self.factors[string_key2] * fermistring.factors[string_key1]
-                    if check_always_zero(operators[str_key]):
-                        del operators[str_key]
-                        del factors[str_key]
-                else:
-                    factors[str_key] += self.factors[string_key2] * fermistring.factors[string_key1]
-                    if abs(factors[str_key]) < 10**-14:
-                        del factors[str_key]
-                        del operators[str_key]
+                new_ops, new_facs = do_extended_normal_ordering(FermionicOperator({string_key1+string_key2: self.operators[string_key2] + fermistring.operators[string_key1]}, {string_key1+string_key2: self.factors[string_key2] * fermistring.factors[string_key1]}))
+                for str_key in new_ops.keys():
+                    if str_key not in operators.keys():
+                        operators[str_key] = new_ops[str_key] 
+                        factors[str_key] = new_facs[str_key]
+                    else:
+                        factors[str_key] += new_facs[str_key]
+                        if abs(factors[str_key]) < 10**-14:
+                            del factors[str_key]
+                            del operators[str_key]
         return FermionicOperator(operators, factors)
 
     def __rmul__(self, number: float) -> FermionicOperator:
