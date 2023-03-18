@@ -52,23 +52,17 @@ def optimize_kappa(wavefunction: WaveFunction, h_core: np.ndarray, g_eri: np.nda
                 hess[i, j] = hess[j, i] = expectation_value(wavefunction, hess_op, wavefunction)
         kappa = np.zeros(len(kappa_idx))
         hess_eig, _ = np.linalg.eigh(hess)
-        if np.min(hess_eig) >= 0.0:
-            delta = np.matmul(np.linalg.inv(hess), grad)
-            for i in range(len(delta)):
-                delta[i] = np.sign(delta[i]) * min(abs(delta[i]), 0.3)
-            did_newton = True
-        else:
-            delta = grad
-            for i in range(len(delta)):
-                delta[i] = np.sign(delta[i]) * min(abs(delta[i]), 0.3)
-            did_newton = False
+        mu = min(np.min(hess_eig-10**-3), 0)
+        delta = np.matmul(np.linalg.inv(hess-mu*np.diag(np.ones(len(hess_eig)))), grad)
+        for i in range(len(delta)):
+            delta[i] = np.sign(delta[i]) * min(abs(delta[i]), np.pi/6)
         for i in range(len(delta)):
             kappa[i] = -delta[i]
         wavefunction.update_kappa(kappa, kappa_idx)
         E_new = expectation_value(wavefunction, H(h_core, g_eri, wavefunction.c_mo), wavefunction)
         if abs(E_new - E_old) < 10**-6 and np.max(np.abs(grad)) < 10**-3:
             break
-        print("kappa:", E_new, did_newton)
+        print("kappa:", E_new)
         E_old = E_new
     return wavefunction
 
@@ -94,7 +88,6 @@ def optimize_wavefunction_parameters(
 ) -> WaveFunction:
     E_old = expectation_value(wavefunction, H(h_core, g_eri, wavefunction.c_mo), wavefunction)
     for _ in range(200):
-        wavefunction = optimize_kappa(wavefunction, h_core, g_eri)
         H_ci = build_H_CI(wavefunction, h_core, g_eri)
         _, eigvec = np.linalg.eigh(H_ci)
         wavefunction.coefficients = eigvec[:, 0]
@@ -103,4 +96,5 @@ def optimize_wavefunction_parameters(
             break
         print("****CI:", E_new)
         E_old = E_new
+        wavefunction = optimize_kappa(wavefunction, h_core, g_eri)
     return wavefunction
