@@ -3,6 +3,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     two_electron_integral_transform,
 )
 import numpy as np
+from scipy.sparse import csr_matrix
 
 Z_mat = np.array([[1, 0], [0, -1]])
 I_mat = np.array([[1, 0], [0, 1]])
@@ -70,27 +71,24 @@ def kronecker_product(A: list[a_op] | list[a_op_spin]) -> np.ndarray:
     total = np.kron(A[0], A[1])
     for operator in A[2:]:
         total = np.kron(total, operator)
-    return total
+    return csr_matrix(total)
 
 
 def Epq(p: int, q: int, num_spin_orbs: int, num_elec: int) -> np.ndarray:
-    E = np.matmul(
-        a_op(p, "alpha", True, num_spin_orbs, num_elec).matrix_form,
-        a_op(q, "alpha", False, num_spin_orbs, num_elec).matrix_form,
-    )
-    E += np.matmul(
-        a_op(p, "beta", True, num_spin_orbs, num_elec).matrix_form,
-        a_op(q, "beta", False, num_spin_orbs, num_elec).matrix_form,
+    E = a_op(p, "alpha", True, num_spin_orbs, num_elec).matrix_form.dot(
+        a_op(q, "alpha", False, num_spin_orbs, num_elec).matrix_form) 
+    E += a_op(p, "beta", True, num_spin_orbs, num_elec).matrix_form.dot(
+        a_op(q, "beta", False, num_spin_orbs, num_elec).matrix_form
     )
     return E
 
 
 def epqrs(p: int, q: int, r: int, s: int, num_spin_orbs: int, num_elec: int) -> np.ndarray:
     if q == r:
-        return np.matmul(Epq(p, q, num_spin_orbs, num_elec), Epq(r, s, num_spin_orbs, num_elec)) - Epq(
+        return Epq(p, q, num_spin_orbs, num_elec).dot(Epq(r, s, num_spin_orbs, num_elec)) - Epq(
             p, s, num_spin_orbs, num_elec
         )
-    return np.matmul(Epq(p, q, num_spin_orbs, num_elec), Epq(r, s, num_spin_orbs, num_elec))
+    return Epq(p, q, num_spin_orbs, num_elec).dot(Epq(r, s, num_spin_orbs, num_elec))
 
 
 def Eminuspq(p: int, q: int, num_spin_orbs: int, num_elec: int) -> np.ndarray:
@@ -110,4 +108,4 @@ def H(h: np.ndarray, g: np.ndarray, c_mo: np.ndarray, num_spin_orbs: int, num_el
             for r in range(num_bf):
                 for s in range(num_bf):
                     H_operator += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s, num_spin_orbs, num_elec)
-    return H_operator
+    return csr_matrix(H_operator)
