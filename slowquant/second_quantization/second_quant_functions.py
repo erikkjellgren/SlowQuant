@@ -52,10 +52,10 @@ def optimize_kappa(wavefunction: WaveFunction, h_core: np.ndarray, g_eri: np.nda
                 hess[i, j] = hess[j, i] = expectation_value(wavefunction, hess_op, wavefunction)
         kappa = np.zeros(len(kappa_idx))
         hess_eig, _ = np.linalg.eigh(hess)
-        mu = min(np.min(hess_eig-10**-3), 0)
-        delta = np.matmul(np.linalg.inv(hess-mu*np.diag(np.ones(len(hess_eig)))), grad)
+        mu = min(np.min(hess_eig - 10**-3), 0)
+        delta = np.matmul(np.linalg.inv(hess - mu * np.diag(np.ones(len(hess_eig)))), grad)
         for i in range(len(delta)):
-            delta[i] = np.sign(delta[i]) * min(abs(delta[i]), np.pi/6)
+            delta[i] = np.sign(delta[i]) * min(abs(delta[i]), np.pi / 6)
         for i in range(len(delta)):
             kappa[i] = -delta[i]
         wavefunction.update_kappa(kappa, kappa_idx)

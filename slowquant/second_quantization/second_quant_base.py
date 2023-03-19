@@ -10,6 +10,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     two_electron_integral_transform,
 )
 
+
 class a_op:
     def __init__(self, spinless_idx: int, spin: str, dagger: bool) -> None:
         """Initialize fermionic annihilation operator.
@@ -44,7 +45,10 @@ def operator_string_to_key(operator_string: list[a_op]) -> str:
             string_key += f"a{a.idx}"
     return string_key
 
-def do_extended_normal_ordering(fermistring: FermionicOperator) -> tuple[dict[str, float], dict[str, list[a_op]]]:
+
+def do_extended_normal_ordering(
+    fermistring: FermionicOperator,
+) -> tuple[dict[str, float], dict[str, list[a_op]]]:
     operator_queue = []
     factor_queue = []
     new_operators = {}
@@ -61,9 +65,9 @@ def do_extended_normal_ordering(fermistring: FermionicOperator) -> tuple[dict[st
             current_idx = 0
             while True:
                 a = next_operator[current_idx]
-                b = next_operator[current_idx+1]
+                b = next_operator[current_idx + 1]
                 i = current_idx
-                j = current_idx+1
+                j = current_idx + 1
                 changed = False
                 if a.dagger and b.dagger:
                     if a.idx == b.idx:
@@ -97,7 +101,7 @@ def do_extended_normal_ordering(fermistring: FermionicOperator) -> tuple[dict[st
                         factor *= -1
                         changed = True
                 current_idx += 1
-                if current_idx+1 == len(next_operator) or is_zero:
+                if current_idx + 1 == len(next_operator) or is_zero:
                     break
             if not changed or is_zero:
                 if not is_zero:
@@ -159,10 +163,22 @@ class FermionicOperator:
         factors = {}
         for string_key1 in fermistring.operators.keys():
             for string_key2 in self.operators.keys():
-                new_ops, new_facs = do_extended_normal_ordering(FermionicOperator({string_key1+string_key2: self.operators[string_key2] + fermistring.operators[string_key1]}, {string_key1+string_key2: self.factors[string_key2] * fermistring.factors[string_key1]}))
+                new_ops, new_facs = do_extended_normal_ordering(
+                    FermionicOperator(
+                        {
+                            string_key1
+                            + string_key2: self.operators[string_key2]
+                            + fermistring.operators[string_key1]
+                        },
+                        {
+                            string_key1
+                            + string_key2: self.factors[string_key2] * fermistring.factors[string_key1]
+                        },
+                    )
+                )
                 for str_key in new_ops.keys():
                     if str_key not in operators.keys():
-                        operators[str_key] = new_ops[str_key] 
+                        operators[str_key] = new_ops[str_key]
                         factors[str_key] = new_facs[str_key]
                     else:
                         factors[str_key] += new_facs[str_key]
@@ -223,6 +239,7 @@ class WaveFunction:
             self.kappa[q, p] = -value
         self.c_mo = np.matmul(self.c_mo, scipy.linalg.expm(-self.kappa))
         self.kappa[:, :] = 0.0
+
 
 def collapse_operator_on_determinant(operator: list[a_op], determinant: np.ndarray) -> tuple[np.ndarray, int]:
     determinant_out = np.copy(determinant)
