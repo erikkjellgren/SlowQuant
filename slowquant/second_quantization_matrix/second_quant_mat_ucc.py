@@ -4,6 +4,7 @@ import scipy.optimize
 from slowquant.second_quantization_matrix.second_quant_mat_base import H, kronecker_product
 from functools import partial
 import time
+from scipy.sparse import csr_matrix
 
 
 class WaveFunctionUCC:
@@ -118,6 +119,6 @@ def total_energy_HF(
         kappa_mat[p, q] = kappa_val
         kappa_mat[q, p] = -kappa_val
     c_trans = np.matmul(c_orthonormal, scipy.linalg.expm(-kappa_mat))
-    HF_ket = on_vector
+    HF_ket = on_vector.transpose()
     HF_bra = np.conj(HF_ket).transpose()
-    return np.matmul(HF_bra, np.matmul(H(h_core, g_eri, c_trans, num_spin_orbs, num_elec), HF_ket))
+    return HF_bra.dot(H(h_core, g_eri, c_trans, num_spin_orbs, num_elec).dot(HF_ket)).toarray()[0,0]
