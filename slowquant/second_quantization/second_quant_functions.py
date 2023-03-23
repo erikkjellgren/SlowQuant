@@ -60,7 +60,7 @@ def optimize_kappa(wavefunction: WaveFunction, h_core: np.ndarray, g_eri: np.nda
             kappa[i] = -delta[i]
         wavefunction.update_kappa(kappa, kappa_idx)
         E_new = expectation_value(wavefunction, H(h_core, g_eri, wavefunction.c_mo), wavefunction)
-        if abs(E_new - E_old) < 10**-6 and np.max(np.abs(grad)) < 10**-3:
+        if abs(E_new - E_old) < 10**-10 and np.max(np.abs(grad)) < 10**-5:
             break
         print("kappa:", E_new)
         E_old = E_new
@@ -92,7 +92,7 @@ def optimize_wavefunction_parameters(
         _, eigvec = np.linalg.eigh(H_ci)
         wavefunction.coefficients = eigvec[:, 0]
         E_new = expectation_value(wavefunction, H(h_core, g_eri, wavefunction.c_mo), wavefunction)
-        if abs(E_new - E_old) < 10**-6:
+        if abs(E_new - E_old) < 10**-10:
             break
         print("****CI:", E_new)
         E_old = E_new
