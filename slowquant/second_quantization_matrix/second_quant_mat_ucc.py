@@ -5,7 +5,7 @@ from slowquant.second_quantization_matrix.second_quant_mat_base import H, kronec
 from functools import partial
 import time
 from scipy.sparse import csr_matrix
-
+from slowquant.second_quantization_matrix.second_quant_mat_util import construct_integral_trans_mat, iterate_T1, iterate_T2 
 
 class WaveFunctionUCC:
     def __init__(
@@ -71,20 +71,12 @@ class WaveFunctionUCC:
                 self.kappa_idx.append([p // 2, q // 2])
         # Construct theta1
         self.theta1 = []
-        for a in self.active_unocc:
-            for i in self.active_occ:
-                self.theta1.append(0)
+        for _ in iterate_T1(self.active_occ, self.active_unocc):
+            self.theta1.append(0)
         # Construct theta2
         self.theta2 = []
-        for a in self.active_unocc:
-            for b in self.active_unocc:
-                if a >= b:
-                    continue
-                for i in self.active_occ:
-                    for j in self.active_occ:
-                        if i >= j:
-                            continue
-                        self.theta2.append(0)
+        for _ in iterate_T2(self.active_occ, self.active_unocc):
+            self.theta2.append(0)
 
     def run_HF(self) -> None:
         e_tot = partial(
@@ -178,14 +170,6 @@ class WaveFunctionUCC:
             param_idx += len(self.theta2)
 
 
-def construct_integral_trans_mat(c_orthonormal, kappa, kappa_idx):
-    kappa_mat = np.zeros_like(c_orthonormal)
-    for kappa_val, (p, q) in zip(kappa, kappa_idx):
-        kappa_mat[p, q] = kappa_val
-        kappa_mat[q, p] = -kappa_val
-    c_trans = np.matmul(c_orthonormal, scipy.linalg.expm(-kappa_mat))
-    return c_trans
-
 def total_energy_HF(
     kappa: list[float],
     kappa_idx: list[list[int, int]],
@@ -196,11 +180,7 @@ def total_energy_HF(
     h_core: np.ndarray,
     g_eri: np.ndarray,
 ) -> float:
-    kappa_mat = np.zeros_like(c_orthonormal)
-    for kappa_val, (p, q) in zip(kappa, kappa_idx):
-        kappa_mat[p, q] = kappa_val
-        kappa_mat[q, p] = -kappa_val
-    c_trans = np.matmul(c_orthonormal, scipy.linalg.expm(-kappa_mat))
+    c_trans = construct_integral_trans_mat(c_orthonormal, kappa, kappa_idx)
     HF_ket = on_vector.transpose()
     HF_bra = np.conj(HF_ket).transpose()
     return HF_bra.dot(H(h_core, g_eri, c_trans, num_spin_orbs, num_elec).dot(HF_ket)).toarray()[0,0]
@@ -227,23 +207,13 @@ def total_energy_UCC(
         kappa.append(parameters[idx_counter])
         idx_counter += 1
     if "s" in excitations:
-        for a in range(num_spin_orbs):
-            for i in range(num_spin_orbs):
-                if i in active_occ and a in active_unocc:
-                    theta1.append(parameters[idx_counter])
-                    idx_counter += 1
+        for _ in iterate_T1(active_occ, active_unocc):
+            theta1.append(parameters[idx_counter])
+            idx_counter += 1
     if "d" in excitations:
-        for a in range(num_spin_orbs):
-            for b in range(num_spin_orbs):
-                if a >= b:
-                    continue
-                for i in range(num_spin_orbs):
-                    for j in range(num_spin_orbs):
-                        if i >= j:
-                            continue
-                        if i in active_occ and j in active_occ and a in active_unocc and b in active_unocc:
-                            theta2.append(parameters[idx_counter])
-                            idx_counter += 1
+        for _ in iterate_T2(active_occ, active_unocc):
+            theta2.append(parameters[idx_counter])
+            idx_counter += 1
 
     if orbital_optimized:
         kappa_mat = np.zeros_like(c_orthonormal)
@@ -257,29 +227,19 @@ def total_energy_UCC(
     t = np.zeros((2**num_spin_orbs,2**num_spin_orbs))
     if "s" in excitations:
         counter = 0
-        for a in range(num_spin_orbs):
-            for i in range(num_spin_orbs):
-                if i in active_occ and a in active_unocc:
-                    tmp = a_op_spin(a, True, num_spin_orbs, num_elec).matrix_form.dot(a_op_spin(i, False, num_spin_orbs, num_elec).matrix_form)
-                    t += theta1[counter]*tmp
-                    counter += 1
+        for (a, i) in iterate_T1(active_occ, active_unocc):
+            tmp = a_op_spin(a, True, num_spin_orbs, num_elec).matrix_form.dot(a_op_spin(i, False, num_spin_orbs, num_elec).matrix_form)
+            t += theta1[counter]*tmp
+            counter += 1
     
     if "d" in excitations:
         counter = 0
-        for a in range(num_spin_orbs):
-            for b in range(num_spin_orbs):
-                if a >= b:
-                    continue
-                for i in range(num_spin_orbs):
-                    for j in range(num_spin_orbs):
-                        if i >= j:
-                            continue
-                        if i in active_occ and j in active_occ and a in active_unocc and b in active_unocc:
-                            tmp = a_op_spin(a, True, num_spin_orbs, num_elec).matrix_form.dot(a_op_spin(b, True, num_spin_orbs, num_elec).matrix_form)
-                            tmp = tmp.dot(a_op_spin(j, False, num_spin_orbs, num_elec).matrix_form)
-                            tmp = tmp.dot(a_op_spin(i, False, num_spin_orbs, num_elec).matrix_form)
-                            t += theta2[counter]*tmp
-                            counter += 1
+        for (a, i, b, j) in iterate_T2(active_occ, active_unocc):
+            tmp = a_op_spin(a, True, num_spin_orbs, num_elec).matrix_form.dot(a_op_spin(b, True, num_spin_orbs, num_elec).matrix_form)
+            tmp = tmp.dot(a_op_spin(j, False, num_spin_orbs, num_elec).matrix_form)
+            tmp = tmp.dot(a_op_spin(i, False, num_spin_orbs, num_elec).matrix_form)
+            t += theta2[counter]*tmp
+            counter += 1
 
     T = t - np.conj(t).transpose()
     U = csr_matrix(scipy.linalg.expm(T))
