@@ -28,8 +28,6 @@ def test_HeH_sto3g() -> None:
     wavefunction = WaveFunction(num_bf * 2)
     wavefunction.add_determinant(hf_det, 1)
     wavefunction.c_mo = S_sqrt
-    h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
-    g_eri = A.integral.electron_repulsion_tensor
     wavefunction = optimize_kappa(wavefunction, h_core, g_eri)
     assert (
         abs(

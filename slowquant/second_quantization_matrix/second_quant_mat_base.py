@@ -98,14 +98,14 @@ def Eminuspq(p: int, q: int, num_spin_orbs: int, num_elec: int) -> np.ndarray:
 def H(h: np.ndarray, g: np.ndarray, c_mo: np.ndarray, num_spin_orbs: int, num_elec: int) -> np.ndarray:
     h_mo = one_electron_integral_transform(c_mo, h)
     g_mo = two_electron_integral_transform(c_mo, g)
-    num_bf = len(c_mo)
+    num_spatial_orbs = num_spin_orbs//2
     H_operator = np.zeros((2**num_spin_orbs, 2**num_spin_orbs))
-    for p in range(num_bf):
-        for q in range(num_bf):
+    for p in range(num_spatial_orbs):
+        for q in range(num_spatial_orbs):
             H_operator += h_mo[p, q] * Epq(p, q, num_spin_orbs, num_elec)
-    for p in range(num_bf):
-        for q in range(num_bf):
-            for r in range(num_bf):
-                for s in range(num_bf):
+    for p in range(num_spatial_orbs):
+        for q in range(num_spatial_orbs):
+            for r in range(num_spatial_orbs):
+                for s in range(num_spatial_orbs):
                     H_operator += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s, num_spin_orbs, num_elec)
     return csr_matrix(H_operator)

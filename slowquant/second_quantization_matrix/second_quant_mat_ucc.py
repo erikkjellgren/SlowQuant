@@ -44,6 +44,16 @@ class WaveFunctionUCC:
                 self.active_unocc.append(i)
             else:
                 self.virtual.append(i)
+        # Construct on_vectors for subspaces
+        on_vector_inactive_active = [o] * (len(self.inactive) + len(self.active_occ)) + [z] * len(self.active_unocc)
+        self.on_vector_inactive_active = kronecker_product(on_vector_inactive_active)
+        if len(self.active) != 0:
+            on_vector_active = [o] * len(self.active_occ) + [z] * len(self.active_unocc)
+            self.on_vector_active = kronecker_product(on_vector_active)
+        if len(self.inactive) != 0:
+            on_vector_inactive = [o] * len(self.inactive)
+            self.on_vector_inactive = kronecker_product(on_vector_inactive)
+        self.num_virtual_orbs = len(self.virtual)
         # Find non-redundant kappas
         self.kappa = []
         self.kappa_idx = []
@@ -52,11 +62,11 @@ class WaveFunctionUCC:
             for q in range(p + 2, self.num_spin_orbs, 2):
                 if p in self.inactive and q in self.inactive:
                     continue
+                elif p in self.virtual and q in self.virtual:
+                    continue
                 elif not include_active_kappa:
                     if p in self.active and q in self.active:
                         continue
-                elif p in self.virtual and q in self.virtual:
-                    continue
                 self.kappa.append(0)
                 self.kappa_idx.append([p // 2, q // 2])
         # Construct theta1
@@ -80,9 +90,9 @@ class WaveFunctionUCC:
         e_tot = partial(
             total_energy_HF,
             kappa_idx=self.kappa_idx,
-            num_spin_orbs=self.num_spin_orbs,
+            num_spin_orbs=self.num_spin_orbs - self.num_virtual_orbs,
             num_elec=self.num_elec,
-            on_vector=self.on_vector,
+            on_vector=self.on_vector_inactive_active,
             c_orthonormal=self.c_orthonormal,
             h_core=self.h_core,
             g_eri=self.g_eri,
@@ -103,34 +113,35 @@ class WaveFunctionUCC:
         self.hf_energy = res["fun"]
         self.kappa = res["x"]
 
-    def run_UCCS(self, orbital_optimization: bool = False) -> None:
+    def run_UCC(self, excitations: str, orbital_optimization: bool = False) -> None:
+        excitations = excitations.lower()
         if orbital_optimization:
             e_tot = partial(
                 total_energy_UCC,
-                num_spin_orbs=self.num_spin_orbs,
+                num_spin_orbs=self.num_spin_orbs - self.num_virtual_orbs,
                 num_elec=self.num_elec,
-                on_vector=self.on_vector,
+                on_vector=self.on_vector_inactive_active,
                 c_orthonormal=self.c_orthonormal,
                 h_core=self.h_core,
                 g_eri=self.g_eri,
                 active_occ=self.active_occ,
                 active_unocc=self.active_unocc,
-                excitations="S",
-                orbital_optimized =  True,
+                excitations=excitations,
+                orbital_optimized = True,
                 kappa_idx=self.kappa_idx
             )
         else:
             e_tot = partial(
                 total_energy_UCC,
-                num_spin_orbs=self.num_spin_orbs,
+                num_spin_orbs=self.num_spin_orbs - self.num_virtual_orbs,
                 num_elec=self.num_elec,
-                on_vector=self.on_vector,
-                c_orthonormal=self.c_orthonormal,
+                on_vector=self.on_vector_inactive_active,
+                c_orthonormal=construct_integral_trans_mat(self.c_orthonormal, self.kappa, self.kappa_idx),
                 h_core=self.h_core,
                 g_eri=self.g_eri,
                 active_occ=self.active_occ,
                 active_unocc=self.active_unocc,
-                excitations="S",
+                excitations=excitations,
                 orbital_optimized = False,
                 kappa_idx = []
             )
@@ -146,22 +157,34 @@ class WaveFunctionUCC:
             iteration += 1
             start = time.time()
 
+        parameters = []
         if orbital_optimization:
-            res = scipy.optimize.minimize(e_tot, self.kappa+self.theta1, tol=1e-6, callback=print_progress)
-            self.uccs_energy = res["fun"]
-            self.kappa = res["x"][:len(self.kappa)]
-            self.theta1 = res["x"][len(self.kappa):]
-        else:
-            res = scipy.optimize.minimize(e_tot, self.theta1, tol=1e-6, callback=print_progress)
-            self.uccs_energy = res["fun"]
-            self.theta1 = res["x"]
+            parameters += self.kappa
+        if "s" in excitations:
+            parameters += self.theta1
+        if "d" in excitations:
+            parameters += self.theta2
+        res = scipy.optimize.minimize(e_tot, parameters, tol=1e-6, callback=print_progress)
+        self.ucc_energy = res["fun"]
+        param_idx = 0
+        if orbital_optimization:
+            self.kappa = res["x"][param_idx:len(self.kappa)+param_idx]
+            param_idx += len(self.kappa)
+        if "s" in excitations:
+            self.theta1 = res["x"][param_idx:len(self.theta1)+param_idx]
+            param_idx += len(self.theta1)
+        if "d" in excitations:
+            self.theta2 = res["x"][param_idx:len(self.theta2)+param_idx]
+            param_idx += len(self.theta2)
 
-    def run_UCCD(self, orbutal_optimization: bool = False) -> None:
-        None
 
-    def run_UCCSD(self, orbutal_optimization: bool = False) -> None:
-        None
-
+def construct_integral_trans_mat(c_orthonormal, kappa, kappa_idx):
+    kappa_mat = np.zeros_like(c_orthonormal)
+    for kappa_val, (p, q) in zip(kappa, kappa_idx):
+        kappa_mat[p, q] = kappa_val
+        kappa_mat[q, p] = -kappa_val
+    c_trans = np.matmul(c_orthonormal, scipy.linalg.expm(-kappa_mat))
+    return c_trans
 
 def total_energy_HF(
     kappa: list[float],
@@ -203,13 +226,13 @@ def total_energy_UCC(
     for i in range(len(kappa_idx)):
         kappa.append(parameters[idx_counter])
         idx_counter += 1
-    if "S" in excitations:
+    if "s" in excitations:
         for a in range(num_spin_orbs):
             for i in range(num_spin_orbs):
                 if i in active_occ and a in active_unocc:
                     theta1.append(parameters[idx_counter])
                     idx_counter += 1
-    if "D" in excitations:
+    if "d" in excitations:
         for a in range(num_spin_orbs):
             for b in range(num_spin_orbs):
                 if a >= b:
@@ -232,7 +255,7 @@ def total_energy_UCC(
         c_trans = c_orthonormal
     
     t = np.zeros((2**num_spin_orbs,2**num_spin_orbs))
-    if "S" in excitations:
+    if "s" in excitations:
         counter = 0
         for a in range(num_spin_orbs):
             for i in range(num_spin_orbs):
@@ -241,7 +264,7 @@ def total_energy_UCC(
                     t += theta1[counter]*tmp
                     counter += 1
     
-    if "D" in excitations:
+    if "d" in excitations:
         counter = 0
         for a in range(num_spin_orbs):
             for b in range(num_spin_orbs):
