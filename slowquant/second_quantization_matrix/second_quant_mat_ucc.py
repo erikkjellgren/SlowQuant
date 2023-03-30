@@ -1,11 +1,11 @@
 import numpy as np
 import scipy
 import scipy.optimize
-from slowquant.second_quantization_matrix.second_quant_mat_base import H, kronecker_product, a_op_spin
+from slowquant.second_quantization_matrix.second_quant_mat_base import Hamiltonian, kronecker_product, a_op_spin
 from functools import partial
 import time
 from scipy.sparse import csr_matrix
-from slowquant.second_quantization_matrix.second_quant_mat_util import construct_integral_trans_mat, iterate_T1, iterate_T2 
+from slowquant.second_quantization_matrix.second_quant_mat_util import construct_integral_trans_mat, iterate_T1, iterate_T2, construct_UCC_ket 
 
 class WaveFunctionUCC:
     def __init__(
@@ -77,6 +77,10 @@ class WaveFunctionUCC:
         self.theta2 = []
         for _ in iterate_T2(self.active_occ, self.active_unocc):
             self.theta2.append(0)
+
+    @property
+    def UCC_ket(self) -> csr_matrix:
+        return construct_UCC_ket(self.num_spin_orbs, self.num_elec, self.on_vector, self.theta1+self.theta2, 'sd', self.active_occ, self.active_unocc)
 
     def run_HF(self) -> None:
         e_tot = partial(
@@ -160,13 +164,13 @@ class WaveFunctionUCC:
         self.ucc_energy = res["fun"]
         param_idx = 0
         if orbital_optimization:
-            self.kappa = res["x"][param_idx:len(self.kappa)+param_idx]
+            self.kappa = res["x"][param_idx:len(self.kappa)+param_idx].tolist()
             param_idx += len(self.kappa)
         if "s" in excitations:
-            self.theta1 = res["x"][param_idx:len(self.theta1)+param_idx]
+            self.theta1 = res["x"][param_idx:len(self.theta1)+param_idx].tolist()
             param_idx += len(self.theta1)
         if "d" in excitations:
-            self.theta2 = res["x"][param_idx:len(self.theta2)+param_idx]
+            self.theta2 = res["x"][param_idx:len(self.theta2)+param_idx].tolist()
             param_idx += len(self.theta2)
 
 
@@ -175,7 +179,7 @@ def total_energy_HF(
     kappa_idx: list[list[int, int]],
     num_spin_orbs: int,
     num_elec: int,
-    on_vector: np.ndarray,
+    on_vector: csr_matrix,
     c_orthonormal: np.ndarray,
     h_core: np.ndarray,
     g_eri: np.ndarray,
@@ -183,13 +187,13 @@ def total_energy_HF(
     c_trans = construct_integral_trans_mat(c_orthonormal, kappa, kappa_idx)
     HF_ket = on_vector.transpose()
     HF_bra = np.conj(HF_ket).transpose()
-    return HF_bra.dot(H(h_core, g_eri, c_trans, num_spin_orbs, num_elec).dot(HF_ket)).toarray()[0,0]
+    return HF_bra.dot(Hamiltonian(h_core, g_eri, c_trans, num_spin_orbs, num_elec).dot(HF_ket)).toarray()[0,0]
 
 def total_energy_UCC(
     parameters: list[float],
     num_spin_orbs: int,
     num_elec: int,
-    on_vector: np.ndarray,
+    on_vector: csr_matrix,
     c_orthonormal: np.ndarray,
     h_core: np.ndarray,
     g_eri: np.ndarray,
@@ -224,25 +228,6 @@ def total_energy_UCC(
     else:
         c_trans = c_orthonormal
     
-    t = np.zeros((2**num_spin_orbs,2**num_spin_orbs))
-    if "s" in excitations:
-        counter = 0
-        for (a, i) in iterate_T1(active_occ, active_unocc):
-            tmp = a_op_spin(a, True, num_spin_orbs, num_elec).matrix_form.dot(a_op_spin(i, False, num_spin_orbs, num_elec).matrix_form)
-            t += theta1[counter]*tmp
-            counter += 1
-    
-    if "d" in excitations:
-        counter = 0
-        for (a, i, b, j) in iterate_T2(active_occ, active_unocc):
-            tmp = a_op_spin(a, True, num_spin_orbs, num_elec).matrix_form.dot(a_op_spin(b, True, num_spin_orbs, num_elec).matrix_form)
-            tmp = tmp.dot(a_op_spin(j, False, num_spin_orbs, num_elec).matrix_form)
-            tmp = tmp.dot(a_op_spin(i, False, num_spin_orbs, num_elec).matrix_form)
-            t += theta2[counter]*tmp
-            counter += 1
-
-    T = t - np.conj(t).transpose()
-    U = csr_matrix(scipy.linalg.expm(T))
-    UCC_ket = U.dot(on_vector.transpose())
+    UCC_ket = construct_UCC_ket(num_spin_orbs, num_elec, on_vector, theta1+theta2, excitations, active_occ, active_unocc)
     UCC_bra = np.conj(UCC_ket).transpose()
-    return UCC_bra.dot(H(h_core, g_eri, c_trans, num_spin_orbs, num_elec).dot(UCC_ket)).toarray()[0,0]
+    return UCC_bra.dot(Hamiltonian(h_core, g_eri, c_trans, num_spin_orbs, num_elec).dot(UCC_ket)).toarray()[0,0]

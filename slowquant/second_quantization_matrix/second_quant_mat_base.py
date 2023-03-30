@@ -95,7 +95,7 @@ def Eminuspq(p: int, q: int, num_spin_orbs: int, num_elec: int) -> np.ndarray:
     return Epq(p, q, num_spin_orbs, num_elec) - Epq(q, p, num_spin_orbs, num_elec)
 
 
-def H(h: np.ndarray, g: np.ndarray, c_mo: np.ndarray, num_spin_orbs: int, num_elec: int) -> np.ndarray:
+def Hamiltonian(h: np.ndarray, g: np.ndarray, c_mo: np.ndarray, num_spin_orbs: int, num_elec: int) -> np.ndarray:
     h_mo = one_electron_integral_transform(c_mo, h)
     g_mo = two_electron_integral_transform(c_mo, g)
     num_spatial_orbs = num_spin_orbs//2
@@ -109,3 +109,7 @@ def H(h: np.ndarray, g: np.ndarray, c_mo: np.ndarray, num_spin_orbs: int, num_el
                 for s in range(num_spatial_orbs):
                     H_operator += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s, num_spin_orbs, num_elec)
     return csr_matrix(H_operator)
+
+
+def commutator(A: csr_matrix, B: csr_matrix) -> csr_matrix:
+    return A.dot(B) - B.dot(A)
