@@ -27,7 +27,7 @@ def iterate_T2(active_occ: list[int], active_unocc: list[int]) -> tuple[int]:
                         continue
                     yield a, i, b, j
 
-def construct_UCC_ket(num_spin_orbs: int, num_elec: int, on_vector: csr_matrix, theta: list[float], excitations: str, active_occ: list[int], active_unocc: list[int]) -> csr_matrix:
+def construct_UCC_U(num_spin_orbs: int, num_elec: int, theta: list[float], excitations: str, active_occ: list[int], active_unocc: list[int]) -> csr_matrix:
     t = np.zeros((2**num_spin_orbs,2**num_spin_orbs))
     counter = 0
     if "s" in excitations:
@@ -36,7 +36,7 @@ def construct_UCC_ket(num_spin_orbs: int, num_elec: int, on_vector: csr_matrix, 
                 tmp = a_op_spin(a, True, num_spin_orbs, num_elec).matrix_form.dot(a_op_spin(i, False, num_spin_orbs, num_elec).matrix_form)
                 t += theta[counter]*tmp
             counter += 1
-    
+
     if "d" in excitations:
         for (a, i, b, j) in iterate_T2(active_occ, active_unocc):
             if theta[counter] != 0.0:
@@ -47,6 +47,4 @@ def construct_UCC_ket(num_spin_orbs: int, num_elec: int, on_vector: csr_matrix, 
             counter += 1
 
     T = t - np.conj(t).transpose()
-    U = csr_matrix(scipy.linalg.expm(T))
-    UCC_ket = U.dot(on_vector.transpose())
-    return UCC_ket
+    return csr_matrix(scipy.linalg.expm(T))

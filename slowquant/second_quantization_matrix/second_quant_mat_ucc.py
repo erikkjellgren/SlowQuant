@@ -5,7 +5,7 @@ from slowquant.second_quantization_matrix.second_quant_mat_base import Hamiltoni
 from functools import partial
 import time
 from scipy.sparse import csr_matrix
-from slowquant.second_quantization_matrix.second_quant_mat_util import construct_integral_trans_mat, iterate_T1, iterate_T2, construct_UCC_ket 
+from slowquant.second_quantization_matrix.second_quant_mat_util import construct_integral_trans_mat, iterate_T1, iterate_T2, construct_UCC_U
 
 class WaveFunctionUCC:
     def __init__(
@@ -80,7 +80,12 @@ class WaveFunctionUCC:
 
     @property
     def UCC_ket(self) -> csr_matrix:
-        return construct_UCC_ket(self.num_spin_orbs, self.num_elec, self.on_vector, self.theta1+self.theta2, 'sd', self.active_occ, self.active_unocc)
+        U = construct_UCC_U(self.num_spin_orbs - self.num_virtual_orbs, self.num_elec, self.theta1+self.theta2, 'sd', self.active_occ, self.active_unocc)
+        return U.dot(on_vector.transpose())
+    
+    @property
+    def UCC_U(self) -> csr_matrix:
+        return construct_UCC_U(self.num_spin_orbs - self.num_virtual_orbs, self.num_elec, self.theta1+self.theta2, 'sd', self.active_occ, self.active_unocc)
 
     def run_HF(self) -> None:
         e_tot = partial(
@@ -228,6 +233,7 @@ def total_energy_UCC(
     else:
         c_trans = c_orthonormal
     
-    UCC_ket = construct_UCC_ket(num_spin_orbs, num_elec, on_vector, theta1+theta2, excitations, active_occ, active_unocc)
+    U = construct_UCC_U(num_spin_orbs, num_elec, theta1+theta2, excitations, active_occ, active_unocc)
+    UCC_ket = U.dot(on_vector.transpose())
     UCC_bra = np.conj(UCC_ket).transpose()
     return UCC_bra.dot(Hamiltonian(h_core, g_eri, c_trans, num_spin_orbs, num_elec).dot(UCC_ket)).toarray()[0,0]

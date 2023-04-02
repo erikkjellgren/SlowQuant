@@ -4,14 +4,92 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 import numpy as np
 from scipy.sparse import csr_matrix
+from functools import lru_cache
 
 Z_mat = np.array([[1, 0], [0, -1]])
 I_mat = np.array([[1, 0], [0, 1]])
 a_mat = np.array([[0, 1], [0, 0]])
 a_mat_dagger = np.array([[0, 0], [1, 0]])
 
+class a_op2:
+    def __init__(
+        self, spinless_idx: int, spin: str, dagger: bool, number_spin_orbitals: int, number_of_electrons: int, bra, ket
+    ) -> None:
+        """Initialize fermionic annihilation operator.
 
-class a_op:
+        Args:
+            spinless_idx: Spatial orbital index.
+            spin: Alpha or beta spin.
+            dagger: If creation operator.
+        """
+        self.spinless_idx = spinless_idx
+        self.idx = 2 * self.spinless_idx
+        self.dagger = dagger
+        self.spin = spin
+        if self.spin == "beta":
+            self.idx += 1
+        self.operators = []
+        for i in range(number_spin_orbitals):
+            if i == self.idx:
+                if self.dagger:
+                    self.operators.append(a_mat_dagger)
+                else:
+                    self.operators.append(a_mat)
+            elif i <= number_of_electrons and i < self.idx:
+                self.operators.append(Z_mat)
+            else:
+                self.operators.append(I_mat)
+        self.matrix_form = kronecker_product2(bra, self.operators, ket)
+
+
+class a_op_spin_:
+    def __init__(self, idx: int, dagger: bool, number_spin_orbitals: int, number_of_electrons: int, bra, ket) -> None:
+        """Initialize fermionic annihilation operator.
+
+        Args:
+            idx: Spin orbital index.
+            dagger: If creation operator.
+        """
+        self.dagger = dagger
+        self.operators = []
+        self.idx = idx
+        for i in range(number_spin_orbitals):
+            if i == self.idx:
+                if self.dagger:
+                    self.operators.append(a_mat_dagger)
+                else:
+                    self.operators.append(a_mat)
+            elif i <= number_of_electrons and i < self.idx:
+                self.operators.append(Z_mat)
+            else:
+                self.operators.append(I_mat)
+        self.matrix_form = kronecker_product2(bra, self.operators, ket)
+
+
+def kronecker_product(A: list[a_op] | list[a_op_spin]) -> np.ndarray:
+    """Does the P x P x P ..."""
+    total = np.kron(A[0], A[1])
+    for operator in A[2:]:
+
+
+def kronecker_product2(bra, A: list[a_op] | list[a_op_spin], ket) -> np.ndarray:
+    """Does the P x P x P ..."""
+    total = np.matmul(bra[0], np.matmul(A[0], ket[0]))
+    for bra_, operator, ket_ in zip(bra[1:], A[1:], ket[1:]):
+        next_term = np.matmul(bra_, np.matmul(operator, ket_)) 
+        total = np.kron(total, next_term)
+    return csr_matrix(total)
+
+
+@lru_cache
+def a_op(spinless_idx: int, spin: str, dagger: bool, number_spin_orbitals: int, number_of_electrons: int):
+    return a_op_(spinless_idx, spin, dagger, number_spin_orbitals, number_of_electrons)
+
+@lru_cache
+def a_op_spin(idx: int, dagger: bool, number_spin_orbitals: int, number_of_electrons: int):
+    return a_op_spin_(idx, dagger, number_spin_orbitals, number_of_electrons)
+
+class a_op_:
     def __init__(
         self, spinless_idx: int, spin: str, dagger: bool, number_spin_orbitals: int, number_of_electrons: int
     ) -> None:
@@ -42,7 +120,7 @@ class a_op:
         self.matrix_form = kronecker_product(self.operators)
 
 
-class a_op_spin:
+class a_op_spin_:
     def __init__(self, idx: int, dagger: bool, number_spin_orbitals: int, number_of_electrons: int) -> None:
         """Initialize fermionic annihilation operator.
 
