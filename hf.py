@@ -1,7 +1,7 @@
 import numpy as np
 
 import slowquant.SlowQuant as sq
-from slowquant.second_quantization_matrix.second_quant_mat_ucc import WaveFunctionUCC
+from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 if True:
     """Test restricted Hartree-Fock through the second quantization module."""
