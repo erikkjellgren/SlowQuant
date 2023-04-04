@@ -11,16 +11,11 @@ Z_mat = np.array([[1, 0], [0, -1]], dtype=float)
 I_mat = np.array([[1, 0], [0, 1]], dtype=float)
 a_mat = np.array([[0, 1], [0, 0]], dtype=float)
 a_mat_dagger = np.array([[0, 0], [1, 0]], dtype=float)
-t_mat = np.array([[1, 0], [0, 0]], dtype=float) 
-d_mat = np.array([[0, 0], [0, 1]], dtype=float)
-zero_mat = np.array([[0, 0], [0, 0]], dtype=float)
-
-int_to_matrix = {0: I_mat, 1: Z_mat, 2: a_mat, 3: a_mat_dagger, 4: t_mat, 5: d_mat, 6: zero_mat}
 
 
-from functools import lru_cache
+from functools import cache
 
-@lru_cache
+@cache
 def a_op_spin(idx: int, dagger: bool, number_spin_orbitals: int, number_of_electrons: int):
     return a_op_spin_(idx, dagger, number_spin_orbitals, number_of_electrons)
 
@@ -47,27 +42,19 @@ class a_op_spin_:
         self.matrix_form = kronecker_product(self.operators)
 
 
-@lru_cache
-def kronecker_product_cached_helper(A: tuple[int]) -> np.ndarray:
-    total = np.kron(int_to_matrix[A[0]], int_to_matrix[A[1]])
-    for operator in A[2:]:
-        total = np.kron(total, int_to_matrix[operator])
-    return total
-
-
-def kronecker_product_cached(A):
+@cache
+def kronecker_product_cached(num_prior, num_after, val00, val01, val10, val11):
     """Does the P x P x P ..."""
-    if len(A) < 2:
-        return A
-    mat_ints = []
-    factor = 1
-    print(A) 
-    for mat in A:
-        print(matrix_to_int(mat), mat)
-        f, idx = matrix_to_int(mat)
-        factor *= f
-        mat_ints.append(idx)
-    return factor*kronecker_product_cached_helper(tuple(mat_ints))
+    I1 = np.identity(int(2**num_prior))
+    I2 = np.identity(int(2**num_after))
+    mat = np.array([[val00, val01], [val10, val11]])
+    return np.kron(I1, np.kron(mat, I2))
+
+def kronecker_product_notcached(num_prior, num_after, operator):
+    """Does the P x P x P ..."""
+    I1 = np.identity(int(2**num_prior))
+    I2 = np.identity(int(2**num_after))
+    return np.kron(I1, np.kron(operator, I2))
 
 
 def kronecker_product(A: list[a_op] | list[a_op_spin]) -> np.ndarray:
@@ -80,55 +67,10 @@ def kronecker_product(A: list[a_op] | list[a_op_spin]) -> np.ndarray:
     return total
 
 
-def matrix_to_int(A: np.ndarray) -> tuple(int, int):
-    """There is seven base operators:
-
-    0: I
-    1: Z
-    2: a (annihilation)
-    3: c (creation)
-    4: t (see below)
-    5: d (see below)
-    6: 0
-
-    t = ((1,0), (0,0))
-    d = ((0,0), (0,1))
-    """
-    if A[0,0] == 1 and A[0,1] == 0 and A[1,0] == 0 and A[1,1] == 1:
-        return 1, 0
-    elif A[0,0] == 1 and A[0,1] == 0 and A[1,0] == 0 and A[1,1] == -1:
-        return 1, 1
-    elif A[0,0] == 0 and A[0,1] == 1 and A[1,0] == 0 and A[1,1] == 0:
-        return 1, 2
-    elif A[0,0] == 0 and A[0,1] == 0 and A[1,0] == 1 and A[1,1] == 0:
-        return 1, 3
-    elif A[0,0] == 1 and A[0,1] == 0 and A[1,0] == 0 and A[1,1] == 0:
-        return 1, 4
-    elif A[0,0] == 0 and A[0,1] == 0 and A[1,0] == 0 and A[1,1] == 1:
-        return 1, 5
-    elif A[0,0] == 0 and A[0,1] == 0 and A[1,0] == 0 and A[1,1] == 0:
-        return 1, 6
-    A *= -1
-    if A[0,0] == 1 and A[0,1] == 0 and A[1,0] == 0 and A[1,1] == 1:
-        return -1, 0
-    elif A[0,0] == 1 and A[0,1] == 0 and A[1,0] == 0 and A[1,1] == -1:
-        return -1, 1
-    elif A[0,0] == 0 and A[0,1] == 1 and A[1,0] == 0 and A[1,1] == 0:
-        return -1, 2
-    elif A[0,0] == 0 and A[0,1] == 0 and A[1,0] == 1 and A[1,1] == 0:
-        return -1, 3
-    elif A[0,0] == 1 and A[0,1] == 0 and A[1,0] == 0 and A[1,1] == 0:
-        return -1, 4
-    elif A[0,0] == 0 and A[0,1] == 0 and A[1,0] == 0 and A[1,1] == 1:
-        return -1, 5
-    else:
-        raise ValueError(f"Cannot index matrix to integer: {-A}")
-        
-
-
 class StateVector:
     def __init__(self, inactive, active) -> None:
         self.inactive = np.transpose(inactive)
+        self._active_onvector = active
         self._active = np.transpose(kronecker_product(active))
 
     @property
@@ -187,9 +129,18 @@ def expectation_value(bra: StateVector, fermiop: FermionicOperator, ket: StateVe
         tmp = 1
         for i in range(len(bra.inactive)):
             tmp *= np.matmul(bra.bra_inactive[i], np.matmul(op[i], ket.ket_inactive[:,i]))
+        number_active_orbitals = len(bra._active_onvector)
         active_start = len(bra.inactive)
-        if len(bra._active) != 0:
-            operator = kronecker_product_cached(op[active_start:])
+        active_end = active_start + number_active_orbitals
+        if number_active_orbitals != 0:
+            operator = np.identity(2**number_active_orbitals)
+            for op_element_idx, op_element in enumerate(op[active_start:active_end]):
+                prior = op_element_idx
+                after = number_active_orbitals - op_element_idx - 1
+                if abs(op_element[0,0]) not in [0, 1] or abs(op_element[0,1]) not in [0, 1] or abs(op_element[1,0]) not in [0, 1] or abs(op_element[1,1]) not in [0, 1]:
+                    operator = np.matmul(operator, kronecker_product_notcached(prior, after, op_element))
+                else:
+                    operator = np.matmul(operator, kronecker_product_cached(prior, after, op_element[0,0], op_element[0,1], op_element[1,0], op_element[1,1]))
             tmp *= np.matmul(bra.active, np.matmul(operator, ket.active))
         total += tmp
     return total
