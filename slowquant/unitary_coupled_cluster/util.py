@@ -13,6 +13,18 @@ def construct_integral_trans_mat(c_orthonormal: np.ndarray, kappa: list[float], 
 def iterate_T1(active_occ: list[int], active_unocc: list[int]) -> tuple[int]:
     for a in active_unocc:
         for i in active_occ:
+            num_alpha = 0
+            num_beta = 0
+            if a%2 == 0:
+                num_alpha += 1
+            else:
+                num_beta += 1
+            if i%2 == 0:
+                num_alpha += 1
+            else:
+                num_beta += 1
+            if num_alpha%2 != 0 or num_beta%2 != 0:
+                continue
             yield a, i
 
 def iterate_T2(active_occ: list[int], active_unocc: list[int]) -> tuple[int]:
@@ -23,6 +35,26 @@ def iterate_T2(active_occ: list[int], active_unocc: list[int]) -> tuple[int]:
             for i in active_occ:
                 for j in active_occ:
                     if i >= j:
+                        continue
+                    num_alpha = 0
+                    num_beta = 0
+                    if a%2 == 0:
+                        num_alpha += 1
+                    else:
+                        num_beta += 1
+                    if b%2 == 0:
+                        num_alpha += 1
+                    else:
+                        num_beta += 1
+                    if i%2 == 0:
+                        num_alpha += 1
+                    else:
+                        num_beta += 1
+                    if j%2 == 0:
+                        num_alpha += 1
+                    else:
+                        num_beta += 1
+                    if num_alpha%2 != 0 or num_beta%2 != 0:
                         continue
                     yield a, i, b, j
 
