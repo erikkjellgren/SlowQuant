@@ -34,12 +34,15 @@ def kronecker_product_cached(num_prior, num_after, val00, val01, val10, val11, i
     """Does the P x P x P ..."""
     if val00 not in [-1,0,1] or val01 not in [-1,0,1] or val10 not in [-1,0,1] or val11 not in [-1,0,1]:
         print(f"WARNING: Unexpected element values in cahced kronecker product: {val00} {val01} {val10} {val11}")
-    I1 = np.identity(int(2**num_prior))
-    I2 = np.identity(int(2**num_after))
-    mat = np.array([[val00, val01], [val10, val11]])
     if is_csr:
-        return ss.csr_matrix(np.kron(I1, np.kron(mat, I2)))
+        I1 = ss.identity(int(2**num_prior))
+        I2 = ss.identity(int(2**num_after))
+        mat = ss.csr_matrix(np.array([[val00, val01], [val10, val11]]))
+        return ss.kron(I1, ss.kron(mat, I2))
     else:
+        I1 = np.identity(int(2**num_prior))
+        I2 = np.identity(int(2**num_after))
+        mat = np.array([[val00, val01], [val10, val11]])
         return np.kron(I1, np.kron(mat, I2))
 
 
@@ -113,12 +116,15 @@ def a_op(
     return operators
 
 
+import time
+
 def expectation_value(bra: StateVector, fermiop: FermionicOperator, ket: StateVector, use_csr: int = 9) -> float:
     if len(bra.inactive) != len(ket.inactive):
         raise ValueError('Bra and Ket does not have same number of inactive orbitals')
     if len(bra._active) != len(ket._active):
         raise ValueError('Bra and Ket does not have same number of active orbitals')
     total = 0
+    start = time.time()
     for op in fermiop.operators:
         tmp = 1
         for i in range(len(bra.inactive)):
@@ -128,7 +134,7 @@ def expectation_value(bra: StateVector, fermiop: FermionicOperator, ket: StateVe
         active_end = active_start + number_active_orbitals
         if number_active_orbitals != 0:
             if number_active_orbitals >= use_csr:
-                operator = ss.csr_matrix(np.identity(2**number_active_orbitals))
+                operator = ss.identity(2**number_active_orbitals)
             else:
                 operator = np.identity(2**number_active_orbitals)
             for op_element_idx, op_element in enumerate(op[active_start:active_end]):
@@ -158,6 +164,7 @@ def expectation_value(bra: StateVector, fermiop: FermionicOperator, ket: StateVe
             else:
                 tmp *= np.matmul(bra.bra_active, np.matmul(operator, ket.ket_active))  
         total += tmp
+    print(time.time() - start)
     return total
 
 
