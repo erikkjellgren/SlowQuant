@@ -6,44 +6,54 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 import numpy as np
 import copy
-import scipy.sparse as ss 
-from functools import cache
 
 Z_mat = np.array([[1, 0], [0, -1]], dtype=float)
 I_mat = np.array([[1, 0], [0, 1]], dtype=float)
 a_mat = np.array([[0, 1], [0, 0]], dtype=float)
 a_mat_dagger = np.array([[0, 0], [1, 0]], dtype=float)
 
-@cache
-def a_op_spin(idx: int, dagger: bool, number_spin_orbitals: int, number_of_electrons: int):
-    operators = []
-    for i in range(number_spin_orbitals):
-        if i == idx:
-            if dagger:
-                operators.append(a_mat_dagger)
-            else:
-                operators.append(a_mat)
-        elif i <= number_of_electrons and i < idx:
-            operators.append(Z_mat)
-        else:
-            operators.append(I_mat)
-    return kronecker_product(operators)
+
+from functools import cache
 
 @cache
-def kronecker_product_cached(num_prior, num_after, val00, val01, val10, val11, is_csr):
+def a_op_spin(idx: int, dagger: bool, number_spin_orbitals: int, number_of_electrons: int):
+    return a_op_spin_(idx, dagger, number_spin_orbitals, number_of_electrons)
+
+class a_op_spin_:
+    def __init__(self, idx: int, dagger: bool, number_spin_orbitals: int, number_of_electrons: int) -> None:
+        """Initialize fermionic annihilation operator.
+        Args:
+            idx: Spin orbital index.
+            dagger: If creation operator.
+        """
+        self.dagger = dagger
+        self.operators = []
+        self.idx = idx
+        for i in range(number_spin_orbitals):
+            if i == self.idx:
+                if self.dagger:
+                    self.operators.append(a_mat_dagger)
+                else:
+                    self.operators.append(a_mat)
+            elif i <= number_of_electrons and i < self.idx:
+                self.operators.append(Z_mat)
+            else:
+                self.operators.append(I_mat)
+        self.matrix_form = kronecker_product(self.operators)
+
+
+@cache
+def kronecker_product_cached(num_prior, num_after, val00, val01, val10, val11):
     """Does the P x P x P ..."""
     if val00 not in [-1,0,1] or val01 not in [-1,0,1] or val10 not in [-1,0,1] or val11 not in [-1,0,1]:
         print(f"WARNING: Unexpected element values in cahced kronecker product: {val00} {val01} {val10} {val11}")
     I1 = np.identity(int(2**num_prior))
     I2 = np.identity(int(2**num_after))
     mat = np.array([[val00, val01], [val10, val11]])
-    if is_csr:
-        return ss.csr_matrix(np.kron(I1, np.kron(mat, I2)))
-    else:
-        return np.kron(I1, np.kron(mat, I2))
+    return np.kron(I1, np.kron(mat, I2))
 
 
-def kronecker_product(A: list[np.ndarray]) -> np.ndarray:
+def kronecker_product(A: list[a_op] | list[a_op_spin]) -> np.ndarray:
     """Does the P x P x P ..."""
     if len(A) < 2:
         return A
@@ -76,14 +86,6 @@ class StateVector:
         return self.active
 
     @property
-    def bra_active_csr(self):
-        return ss.csr_matrix(np.conj(self.active).transpose())
-
-    @property
-    def ket_active_csr(self):
-        return ss.csr_matrix(self.active).transpose()
-
-    @property
     def U(self):
         return self.U_
 
@@ -112,13 +114,15 @@ def a_op(
             operators.append(I_mat)
     return operators
 
+import time
 
-def expectation_value(bra: StateVector, fermiop: FermionicOperator, ket: StateVector, use_csr: int = 9) -> float:
+def expectation_value(bra: StateVector, fermiop: FermionicOperator, ket: StateVector) -> float:
     if len(bra.inactive) != len(ket.inactive):
         raise ValueError('Bra and Ket does not have same number of inactive orbitals')
     if len(bra._active) != len(ket._active):
         raise ValueError('Bra and Ket does not have same number of active orbitals')
     total = 0
+    start = time.time()
     for op in fermiop.operators:
         tmp = 1
         for i in range(len(bra.inactive)):
@@ -127,10 +131,7 @@ def expectation_value(bra: StateVector, fermiop: FermionicOperator, ket: StateVe
         active_start = len(bra.inactive)
         active_end = active_start + number_active_orbitals
         if number_active_orbitals != 0:
-            if number_active_orbitals >= use_csr:
-                operator = ss.csr_matrix(np.identity(2**number_active_orbitals))
-            else:
-                operator = np.identity(2**number_active_orbitals)
+            operator = np.identity(2**number_active_orbitals)
             for op_element_idx, op_element in enumerate(op[active_start:active_end]):
                 prior = op_element_idx
                 after = number_active_orbitals - op_element_idx - 1
@@ -149,15 +150,10 @@ def expectation_value(bra: StateVector, fermiop: FermionicOperator, ket: StateVe
                     op_element = op_element/factor
                 if op_element[0,0] == 1 and op_element[0,1] == 0 and op_element[1,0] == 0 and op_element[1,1] == 1 and factor == 1:
                     continue
-                if number_active_orbitals >= use_csr:
-                    operator = factor*operator.dot(kronecker_product_cached(prior, after, op_element[0,0], op_element[0,1], op_element[1,0], op_element[1,1], True))
-                else:
-                    operator = factor*np.matmul(operator, kronecker_product_cached(prior, after, op_element[0,0], op_element[0,1], op_element[1,0], op_element[1,1], False))
-            if number_active_orbitals >= use_csr: 
-                tmp *= bra.bra_active_csr.dot(operator.dot(ket.ket_active_csr)).toarray()[0,0]
-            else:
-                tmp *= np.matmul(bra.bra_active, np.matmul(operator, ket.ket_active))  
+                operator = factor*np.matmul(operator, kronecker_product_cached(prior, after, op_element[0,0], op_element[0,1], op_element[1,0], op_element[1,1]))
+            tmp *= np.matmul(bra.bra_active, np.matmul(operator, ket.ket_active))
         total += tmp
+    print(time.time() - start)
     return total
 
 

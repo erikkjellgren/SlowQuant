@@ -2,6 +2,7 @@ import numpy as np
 
 import slowquant.SlowQuant as sq
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
+from slowquant.unitary_coupled_cluster.base import expectation_value, Hamiltonian
 
 
 def test_HeH_sto3g_HF() -> None:
@@ -117,6 +118,9 @@ def test_H4_STO3G_OOUCCSD() -> None:
     WF = WaveFunctionUCC(A.molecule.number_bf*2, A.molecule.number_electrons, [2,3,4,5], A.hartree_fock.mo_coeff, h_core, g_eri)
     WF.run_UCC('SD', True)
     assert (abs(WF.ucc_energy- (-5.211066791547))< 10**-8)
+    # Test sparse matrix also works
+    H = Hamiltonian(h_core, g_eri, WF.c_trans, WF.num_inactive_spin_orbs + WF.num_active_spin_orbs, WF.num_elec)
+    assert (abs(WF.ucc_energy - expectation_value(WF.state_vector, H, WF.state_vector, use_csr=0))< 10**-8)
 
 def test_H4_STO3G_OOUCCD() -> None:
     """Test OO-UCCD(2,2) through the second quantization module."""
@@ -137,3 +141,6 @@ def test_H4_STO3G_OOUCCD() -> None:
     WF = WaveFunctionUCC(A.molecule.number_bf*2, A.molecule.number_electrons, [2,3,4,5], A.hartree_fock.mo_coeff, h_core, g_eri, include_active_kappa=True)
     WF.run_UCC('D', True)
     assert (abs(WF.ucc_energy- (-5.211066791547))< 10**-8)
+    # Test sparse matrix also works
+    H = Hamiltonian(h_core, g_eri, WF.c_trans, WF.num_inactive_spin_orbs + WF.num_active_spin_orbs, WF.num_elec)
+    assert (abs(WF.ucc_energy - expectation_value(WF.state_vector, H, WF.state_vector, use_csr=0))< 10**-8)

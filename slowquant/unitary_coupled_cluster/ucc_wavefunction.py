@@ -84,6 +84,15 @@ class WaveFunctionUCC:
         for _ in iterate_T2(self.active_occ, self.active_unocc):
             self.theta2.append(0)
 
+    @property
+    def c_trans(self) -> np.ndarray:
+        kappa_mat = np.zeros_like(self.c_orthonormal)
+        for kappa_val, (p, q) in zip(self.kappa, self.kappa_idx):
+            kappa_mat[p, q] = kappa_val
+            kappa_mat[q, p] = -kappa_val
+        return np.matmul(self.c_orthonormal, scipy.linalg.expm(-kappa_mat))
+        
+
     def run_HF(self) -> None:
         e_tot = partial(
             energy_HF,
