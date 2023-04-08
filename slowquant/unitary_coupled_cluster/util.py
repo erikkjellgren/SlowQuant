@@ -15,9 +15,11 @@ def construct_integral_trans_mat(
     return c_trans
 
 
-def iterate_T1(active_occ: list[int], active_unocc: list[int]) -> tuple[int]:
+def iterate_T1(active_occ: list[int], active_unocc: list[int], is_spin_conserving: bool = False) -> tuple[int]:
+    theta_idx = -1
     for a in active_unocc:
         for i in active_occ:
+            theta_idx += 1
             num_alpha = 0
             num_beta = 0
             if a % 2 == 0:
@@ -28,12 +30,13 @@ def iterate_T1(active_occ: list[int], active_unocc: list[int]) -> tuple[int]:
                 num_alpha += 1
             else:
                 num_beta += 1
-            # if num_alpha%2 != 0 or num_beta%2 != 0:
-            #    continue
-            yield a, i
+            if (num_alpha%2 != 0 or num_beta%2 != 0) and is_spin_conserving:
+                continue
+            yield theta_idx, a, i
 
 
-def iterate_T2(active_occ: list[int], active_unocc: list[int]) -> tuple[int]:
+def iterate_T2(active_occ: list[int], active_unocc: list[int], is_spin_conserving: bool = False) -> tuple[int]:
+    theta_idx = -1
     for a in active_unocc:
         for b in active_unocc:
             if a >= b:
@@ -42,6 +45,7 @@ def iterate_T2(active_occ: list[int], active_unocc: list[int]) -> tuple[int]:
                 for j in active_occ:
                     if i >= j:
                         continue
+                    theta_idx += 1
                     num_alpha = 0
                     num_beta = 0
                     if a % 2 == 0:
@@ -60,9 +64,9 @@ def iterate_T2(active_occ: list[int], active_unocc: list[int]) -> tuple[int]:
                         num_alpha += 1
                     else:
                         num_beta += 1
-                    # if num_alpha%2 != 0 or num_beta%2 != 0:
-                    #    continue
-                    yield a, i, b, j
+                    if (num_alpha%2 != 0 or num_beta%2 != 0) and is_spin_conserving:
+                        continue
+                    yield theta_idx, a, i, b, j
 
 
 import time
@@ -79,7 +83,7 @@ def construct_UCC_U(
     t = np.zeros((2**num_spin_orbs, 2**num_spin_orbs))
     counter = 0
     if "s" in excitations:
-        for (a, i) in iterate_T1(active_occ, active_unocc):
+        for (_, a, i) in iterate_T1(active_occ, active_unocc, is_spin_conserving=True):
             if theta[counter] != 0.0:
                 tmp = a_op_spin_matrix(a, True, num_spin_orbs, num_elec).dot(
                     a_op_spin_matrix(i, False, num_spin_orbs, num_elec)
@@ -88,7 +92,7 @@ def construct_UCC_U(
             counter += 1
 
     if "d" in excitations:
-        for (a, i, b, j) in iterate_T2(active_occ, active_unocc):
+        for (_, a, i, b, j) in iterate_T2(active_occ, active_unocc, is_spin_conserving=True):
             if theta[counter] != 0.0:
                 tmp = a_op_spin_matrix(a, True, num_spin_orbs, num_elec).dot(
                     a_op_spin_matrix(b, True, num_spin_orbs, num_elec)
@@ -101,5 +105,5 @@ def construct_UCC_U(
     T = t - np.conj(t).transpose()
     start = time.time()
     A = scipy.linalg.expm(T)
-    print(f"expm: {time.time() - start}")
+    #print(f"expm: {time.time() - start}")
     return A

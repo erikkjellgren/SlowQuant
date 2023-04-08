@@ -172,9 +172,15 @@ class WaveFunctionUCC:
         if orbital_optimization:
             parameters += self.kappa
         if "s" in excitations:
-            parameters += self.theta1
+            num_theta1 = 0
+            for idx, _, _ in iterate_T1(self.active_occ, self.active_unocc, is_spin_conserving=True):
+                parameters += [self.theta1[idx]]
+                num_theta1 += 1
         if "d" in excitations:
-            parameters += self.theta2
+            num_theta2 = 0
+            for idx, _, _, _, _ in iterate_T2(self.active_occ, self.active_unocc, is_spin_conserving=True): 
+                parameters += [self.theta2[idx]]
+                num_theta2 += 1
         res = scipy.optimize.minimize(e_tot, parameters, tol=1e-6, callback=print_progress)
         self.ucc_energy = res["fun"]
         param_idx = 0
@@ -182,11 +188,19 @@ class WaveFunctionUCC:
             self.kappa = res["x"][param_idx:len(self.kappa)+param_idx].tolist()
             param_idx += len(self.kappa)
         if "s" in excitations:
-            self.theta1 = res["x"][param_idx:len(self.theta1)+param_idx].tolist()
-            param_idx += len(self.theta1)
+            thetas = res["x"][param_idx:num_theta1+param_idx].tolist()
+            param_idx += len(thetas)
+            counter = 0
+            for idx, _, _ in iterate_T1(self.active_occ, self.active_unocc, is_spin_conserving=True): 
+                self.theta1[idx] = thetas[counter]
+                counter += 1
         if "d" in excitations:
-            self.theta2 = res["x"][param_idx:len(self.theta2)+param_idx].tolist()
-            param_idx += len(self.theta2)
+            thetas = res["x"][param_idx:num_theta2+param_idx].tolist()
+            param_idx += len(thetas)
+            counter = 0
+            for idx, _, _, _, _ in iterate_T2(self.active_occ, self.active_unocc, is_spin_conserving=True): 
+                self.theta2[idx] = thetas[counter]
+                counter += 1
 
 def energy_HF(
     kappa: list[float],
@@ -225,11 +239,11 @@ def energy_UCC(
         kappa.append(parameters[idx_counter])
         idx_counter += 1
     if "s" in excitations:
-        for _ in iterate_T1(active_occ, active_unocc):
+        for _ in iterate_T1(active_occ, active_unocc, is_spin_conserving=True):
             theta1.append(parameters[idx_counter])
             idx_counter += 1
     if "d" in excitations:
-        for _ in iterate_T2(active_occ, active_unocc):
+        for _ in iterate_T2(active_occ, active_unocc, is_spin_conserving=True):
             theta2.append(parameters[idx_counter])
             idx_counter += 1
 

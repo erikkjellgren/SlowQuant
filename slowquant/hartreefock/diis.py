@@ -29,6 +29,8 @@ class DIIS:
         Returns:
             Extrapolated Fock matrix.
         """
+        if len(fock_matrix) == 2:
+            return fock_matrix
         self.fock_matrices.append(fock_matrix)
         self.density_matrices.append(density_matrix)
 

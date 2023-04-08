@@ -203,9 +203,11 @@ def expectation_value(
         raise ValueError("Bra and Ket does not have same number of inactive orbitals")
     if len(bra._active) != len(ket._active):
         raise ValueError("Bra and Ket does not have same number of active orbitals")
+    if fermiop.operators == [[]]:
+        return 0
     total = 0
     start = time.time()
-    for op in fermiop.operators:
+    for op in copy.copy(fermiop.operators):
         tmp = 1
         for i in range(len(bra.inactive)):
             tmp *= np.matmul(bra.bra_inactive[i], np.matmul(op[i], ket.ket_inactive[:, i]))
@@ -214,9 +216,9 @@ def expectation_value(
         active_end = active_start + number_active_orbitals
         if number_active_orbitals != 0:
             if number_active_orbitals >= use_csr:
-                operator = ket.ket_active_csr
+                operator = copy.copy(ket.ket_active_csr)
             else:
-                operator = ket.ket_active
+                operator = copy.copy(ket.ket_active)
             for op_element_idx, op_element in enumerate(op[active_start:active_end][::-1]):
                 prior = op_element_idx
                 after = number_active_orbitals - op_element_idx - 1
@@ -271,7 +273,7 @@ def expectation_value(
             else:
                 tmp *= np.matmul(bra.bra_active, operator)
         total += tmp
-    print(f"Expectation value: {time.time() - start}")
+    #print(f"Expectation value: {time.time() - start}")
     return total
 
 
@@ -284,46 +286,53 @@ class FermionicOperator:
 
     def __add__(self, fermiop: FermionicOperator) -> FermionicOperator:
         if self.operators == [[]]:
-            operators_new = copy.copy(fermiop.operators)
+            operators_new = fermiop.operators
         elif fermiop.operators == [[]]:
-            operators_new = copy.copy(self.operators)
+            operators_new = self.operators
         else:
             operators_new = self.operators + fermiop.operators
         return FermionicOperator(operators_new)
 
     def __sub__(self, fermiop: FermionicOperator) -> FermionicOperator:
-        if self.operators == [[]]:
-            operators_new = (-1 * fermiop).operators
+        if self.operators == [[]] and fermiop.operators == [[]]:
+            return FermionicOperator([[]])
+        elif self.operators == [[]]:
+            other_op = copy.deepcopy(fermiop)
+            operators_new = (-1 * other_op).operators
         elif fermiop.operators == [[]]:
-            operators_new = copy.copy(self.operators)
+            operators_new = self.operators
         else:
-            operators_new = self.operators + (-1 * fermiop).operators
+            other_op = copy.deepcopy(fermiop)
+            operators_new = self.operators + (-1 * other_op).operators
         return FermionicOperator(operators_new)
 
-    def __mul__(self, fermop: FermionicOperator) -> FermionicOperator:
+    def __mul__(self, fermiop: FermionicOperator) -> FermionicOperator:
         operators_new = []
         for op1 in self.operators:
             if op1 == []:
                 continue
-            for op2 in fermop.operators:
+            for op2 in fermiop.operators:
                 if op2 == []:
                     continue
-                new_op = copy.copy(op1)
+                new_op = copy.deepcopy(op1)
                 is_zero = False
                 for i in range(len(new_op)):
                     new_op[i] = np.matmul(new_op[i], op2[i])
-                    # if abs(new_op[i][0,0]) < 10**-12 and abs(new_op[i][0,1]) < 10**-12 and abs(new_op[i][1,0]) < 10**-12 and abs(new_op[i][1,1]) < 10**-12:
-                    #    is_zero = True
+                    if abs(new_op[i][0,0]) < 10**-12 and abs(new_op[i][0,1]) < 10**-12 and abs(new_op[i][1,0]) < 10**-12 and abs(new_op[i][1,1]) < 10**-12:
+                        is_zero = True
+                        break
                 if not is_zero:
                     operators_new.append(new_op)
+        if len(operators_new) == 0:
+           return FermionicOperator([[]])  
         return FermionicOperator(operators_new)
 
     def __rmul__(self, number: float) -> FermionicOperator:
         operators_new = []
         for op in self.operators:
-            op_new = copy.copy(op)
+            op_new = copy.deepcopy(op)
             op_new[0] *= number
-            if True:  # if np.sum(np.abs(op_new[0])) > 10**-12:
+            if np.sum(np.abs(op_new[0])) > 10**-12:
                 operators_new.append(op_new)
         if len(operators_new) == 0:
             return FermionicOperator([[]])
@@ -338,6 +347,14 @@ class FermionicOperator:
                 new_op.append(np.conj(mat).transpose())
             operators_new.append(new_op)
         return FermionicOperator(operators_new)
+
+    @property
+    def matrix_form(self):
+        num_spin_orbs = len(self.operators[0])
+        op_matrix = np.zeros((2**num_spin_orbs, 2**num_spin_orbs))
+        for op in self.operators:
+            op_matrix += kronecker_product(op)
+        return op_matrix
 
 
 def Epq(p: int, q: int, num_spin_orbs: int, num_elec: int) -> FermionicOperator:
