@@ -15,7 +15,9 @@ def construct_integral_trans_mat(
     return c_trans
 
 
-def iterate_T1(active_occ: list[int], active_unocc: list[int], is_spin_conserving: bool = False) -> tuple[int]:
+def iterate_T1(
+    active_occ: list[int], active_unocc: list[int], is_spin_conserving: bool = False
+) -> tuple[int]:
     theta_idx = -1
     # Force false, not sure it is correct, but keeping the code for now
     is_spin_conserving = False
@@ -32,12 +34,14 @@ def iterate_T1(active_occ: list[int], active_unocc: list[int], is_spin_conservin
                 num_alpha += 1
             else:
                 num_beta += 1
-            if (num_alpha%2 != 0 or num_beta%2 != 0) and is_spin_conserving:
+            if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
                 continue
             yield theta_idx, a, i
 
 
-def iterate_T2(active_occ: list[int], active_unocc: list[int], is_spin_conserving: bool = False) -> tuple[int]:
+def iterate_T2(
+    active_occ: list[int], active_unocc: list[int], is_spin_conserving: bool = False
+) -> tuple[int]:
     theta_idx = -1
     # Force false, not sure it is correct, but keeping the code for now
     is_spin_conserving = False
@@ -68,7 +72,7 @@ def iterate_T2(active_occ: list[int], active_unocc: list[int], is_spin_conservin
                         num_alpha += 1
                     else:
                         num_beta += 1
-                    if (num_alpha%2 != 0 or num_beta%2 != 0) and is_spin_conserving:
+                    if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
                         continue
                     yield theta_idx, a, i, b, j
 
@@ -86,6 +90,7 @@ def construct_UCC_U(
 ) -> np.ndarray:
     t = np.zeros((2**num_spin_orbs, 2**num_spin_orbs))
     counter = 0
+    start = time.time()
     if "s" in excitations:
         for (_, a, i) in iterate_T1(active_occ, active_unocc, is_spin_conserving=True):
             if theta[counter] != 0.0:
@@ -107,7 +112,6 @@ def construct_UCC_U(
             counter += 1
 
     T = t - np.conj(t).transpose()
-    start = time.time()
     A = scipy.linalg.expm(T)
-    #print(f"expm: {time.time() - start}")
+    print(f"expm: {time.time() - start}")
     return A

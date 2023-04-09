@@ -138,7 +138,6 @@ class StateVector:
             inactive: Kronecker representation of inactive orbitals (reference).
             active: Kronecker representation of active orbitals (refernce).
         """
-        print(inactive)
         self.inactive = np.transpose(inactive)
         self._active_onvector = active
         self._active = np.transpose(kronecker_product(active))
@@ -212,6 +211,8 @@ def expectation_value(
         tmp = 1
         for i in range(len(bra.bra_inactive)):
             tmp *= np.matmul(bra.bra_inactive[i], np.matmul(op[i], ket.ket_inactive[:, i]))
+        if abs(tmp) < 10**-12:
+            continue
         number_active_orbitals = len(bra._active_onvector)
         active_start = len(bra.inactive)
         active_end = active_start + number_active_orbitals
@@ -274,7 +275,7 @@ def expectation_value(
             else:
                 tmp *= np.matmul(bra.bra_active, operator)
         total += tmp
-    #print(f"Expectation value: {time.time() - start}")
+    print(f"Expectation value: {time.time() - start}")
     return total
 
 
@@ -319,13 +320,18 @@ class FermionicOperator:
                 is_zero = False
                 for i in range(len(new_op)):
                     new_op[i] = np.matmul(new_op[i], op2[i])
-                    if abs(new_op[i][0,0]) < 10**-12 and abs(new_op[i][0,1]) < 10**-12 and abs(new_op[i][1,0]) < 10**-12 and abs(new_op[i][1,1]) < 10**-12:
+                    if (
+                        abs(new_op[i][0, 0]) < 10**-12
+                        and abs(new_op[i][0, 1]) < 10**-12
+                        and abs(new_op[i][1, 0]) < 10**-12
+                        and abs(new_op[i][1, 1]) < 10**-12
+                    ):
                         is_zero = True
                         break
                 if not is_zero:
                     operators_new.append(new_op)
         if len(operators_new) == 0:
-           return FermionicOperator([[]])  
+            return FermionicOperator([[]])
         return FermionicOperator(operators_new)
 
     def __rmul__(self, number: float) -> FermionicOperator:

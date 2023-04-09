@@ -1,10 +1,22 @@
+import time
+from functools import partial
+
 import numpy as np
 import scipy
 import scipy.optimize
-from slowquant.unitary_coupled_cluster.base import Hamiltonian, expectation_value, StateVector
-from functools import partial
-import time
-from slowquant.unitary_coupled_cluster.util import construct_integral_trans_mat, iterate_T1, iterate_T2, construct_UCC_U
+
+from slowquant.unitary_coupled_cluster.base import (
+    Hamiltonian,
+    StateVector,
+    expectation_value,
+)
+from slowquant.unitary_coupled_cluster.util import (
+    construct_integral_trans_mat,
+    construct_UCC_U,
+    iterate_T1,
+    iterate_T2,
+)
+
 
 class WaveFunctionUCC:
     def __init__(
@@ -91,7 +103,6 @@ class WaveFunctionUCC:
             kappa_mat[p, q] = kappa_val
             kappa_mat[q, p] = -kappa_val
         return np.matmul(self.c_orthonormal, scipy.linalg.expm(-kappa_mat))
-        
 
     def run_HF(self) -> None:
         e_tot = partial(
@@ -136,8 +147,8 @@ class WaveFunctionUCC:
                 active_occ=self.active_occ,
                 active_unocc=self.active_unocc,
                 excitations=excitations,
-                orbital_optimized = True,
-                kappa_idx=self.kappa_idx
+                orbital_optimized=True,
+                kappa_idx=self.kappa_idx,
             )
         else:
             e_tot = partial(
@@ -153,8 +164,8 @@ class WaveFunctionUCC:
                 active_occ=self.active_occ,
                 active_unocc=self.active_unocc,
                 excitations=excitations,
-                orbital_optimized = False,
-                kappa_idx = []
+                orbital_optimized=False,
+                kappa_idx=[],
             )
         global iteration
         global start
@@ -169,43 +180,46 @@ class WaveFunctionUCC:
             start = time.time()
 
         parameters = []
+        num_kappa = 0
         num_theta1 = 0
         num_theta2 = 0
         if orbital_optimization:
             parameters += self.kappa
+            num_kappa += 1
         if "s" in excitations:
             for idx, _, _ in iterate_T1(self.active_occ, self.active_unocc, is_spin_conserving=True):
                 parameters += [self.theta1[idx]]
                 num_theta1 += 1
         if "d" in excitations:
-            for idx, _, _, _, _ in iterate_T2(self.active_occ, self.active_unocc, is_spin_conserving=True): 
+            for idx, _, _, _, _ in iterate_T2(self.active_occ, self.active_unocc, is_spin_conserving=True):
                 parameters += [self.theta2[idx]]
                 num_theta2 += 1
         print("### Parameters information:")
-        print(f"### Number kappa: {len(self.kappa)}")
+        print(f"### Number kappa: {num_kappa}")
         print(f"### Number theta1: {num_theta1}")
         print(f"### Number theta2: {num_theta2}")
-        print(f"### Total parameters: {len(parameters)}")
+        print(f"### Total parameters: {num_kappa+num_theta1+num_theta2}")
         res = scipy.optimize.minimize(e_tot, parameters, tol=1e-6, callback=print_progress)
         self.ucc_energy = res["fun"]
         param_idx = 0
         if orbital_optimization:
-            self.kappa = res["x"][param_idx:len(self.kappa)+param_idx].tolist()
+            self.kappa = res["x"][param_idx : len(self.kappa) + param_idx].tolist()
             param_idx += len(self.kappa)
         if "s" in excitations:
-            thetas = res["x"][param_idx:num_theta1+param_idx].tolist()
+            thetas = res["x"][param_idx : num_theta1 + param_idx].tolist()
             param_idx += len(thetas)
             counter = 0
-            for idx, _, _ in iterate_T1(self.active_occ, self.active_unocc, is_spin_conserving=True): 
+            for idx, _, _ in iterate_T1(self.active_occ, self.active_unocc, is_spin_conserving=True):
                 self.theta1[idx] = thetas[counter]
                 counter += 1
         if "d" in excitations:
-            thetas = res["x"][param_idx:num_theta2+param_idx].tolist()
+            thetas = res["x"][param_idx : num_theta2 + param_idx].tolist()
             param_idx += len(thetas)
             counter = 0
-            for idx, _, _, _, _ in iterate_T2(self.active_occ, self.active_unocc, is_spin_conserving=True): 
+            for idx, _, _, _, _ in iterate_T2(self.active_occ, self.active_unocc, is_spin_conserving=True):
                 self.theta2[idx] = thetas[counter]
                 counter += 1
+
 
 def energy_HF(
     kappa: list[float],
@@ -218,7 +232,10 @@ def energy_HF(
     g_eri: np.ndarray,
 ) -> float:
     c_trans = construct_integral_trans_mat(c_orthonormal, kappa, kappa_idx)
-    return expectation_value(state_vector, Hamiltonian(h_core, g_eri, c_trans, num_spin_orbs, num_elec), state_vector)
+    return expectation_value(
+        state_vector, Hamiltonian(h_core, g_eri, c_trans, num_spin_orbs, num_elec), state_vector
+    )
+
 
 def energy_UCC(
     parameters: list[float],
@@ -261,6 +278,10 @@ def energy_UCC(
     else:
         c_trans = c_orthonormal
 
-    U = construct_UCC_U(num_active_spin_orbs, num_active_elec, theta1+theta2, excitations, active_occ, active_unocc)
+    U = construct_UCC_U(
+        num_active_spin_orbs, num_active_elec, theta1 + theta2, excitations, active_occ, active_unocc
+    )
     state_vector.U = U
-    return expectation_value(state_vector, Hamiltonian(h_core, g_eri, c_trans, num_spin_orbs, num_elec), state_vector)
+    return expectation_value(
+        state_vector, Hamiltonian(h_core, g_eri, c_trans, num_spin_orbs, num_elec), state_vector
+    )
