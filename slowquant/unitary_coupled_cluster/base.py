@@ -138,6 +138,7 @@ class StateVector:
             inactive: Kronecker representation of inactive orbitals (reference).
             active: Kronecker representation of active orbitals (refernce).
         """
+        print(inactive)
         self.inactive = np.transpose(inactive)
         self._active_onvector = active
         self._active = np.transpose(kronecker_product(active))
@@ -207,9 +208,9 @@ def expectation_value(
         return 0
     total = 0
     start = time.time()
-    for op in copy.copy(fermiop.operators):
+    for op in copy.deepcopy(fermiop.operators):
         tmp = 1
-        for i in range(len(bra.inactive)):
+        for i in range(len(bra.bra_inactive)):
             tmp *= np.matmul(bra.bra_inactive[i], np.matmul(op[i], ket.ket_inactive[:, i]))
         number_active_orbitals = len(bra._active_onvector)
         active_start = len(bra.inactive)
@@ -219,7 +220,7 @@ def expectation_value(
                 operator = copy.copy(ket.ket_active_csr)
             else:
                 operator = copy.copy(ket.ket_active)
-            for op_element_idx, op_element in enumerate(op[active_start:active_end][::-1]):
+            for op_element_idx, op_element in enumerate(op[active_start:active_end]):
                 prior = op_element_idx
                 after = number_active_orbitals - op_element_idx - 1
                 factor = 1

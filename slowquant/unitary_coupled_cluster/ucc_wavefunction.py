@@ -169,18 +169,23 @@ class WaveFunctionUCC:
             start = time.time()
 
         parameters = []
+        num_theta1 = 0
+        num_theta2 = 0
         if orbital_optimization:
             parameters += self.kappa
         if "s" in excitations:
-            num_theta1 = 0
             for idx, _, _ in iterate_T1(self.active_occ, self.active_unocc, is_spin_conserving=True):
                 parameters += [self.theta1[idx]]
                 num_theta1 += 1
         if "d" in excitations:
-            num_theta2 = 0
             for idx, _, _, _, _ in iterate_T2(self.active_occ, self.active_unocc, is_spin_conserving=True): 
                 parameters += [self.theta2[idx]]
                 num_theta2 += 1
+        print("### Parameters information:")
+        print(f"### Number kappa: {len(self.kappa)}")
+        print(f"### Number theta1: {num_theta1}")
+        print(f"### Number theta2: {num_theta2}")
+        print(f"### Total parameters: {len(parameters)}")
         res = scipy.optimize.minimize(e_tot, parameters, tol=1e-6, callback=print_progress)
         self.ucc_energy = res["fun"]
         param_idx = 0

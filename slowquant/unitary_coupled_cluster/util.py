@@ -17,6 +17,8 @@ def construct_integral_trans_mat(
 
 def iterate_T1(active_occ: list[int], active_unocc: list[int], is_spin_conserving: bool = False) -> tuple[int]:
     theta_idx = -1
+    # Force false, not sure it is correct, but keeping the code for now
+    is_spin_conserving = False
     for a in active_unocc:
         for i in active_occ:
             theta_idx += 1
@@ -37,6 +39,8 @@ def iterate_T1(active_occ: list[int], active_unocc: list[int], is_spin_conservin
 
 def iterate_T2(active_occ: list[int], active_unocc: list[int], is_spin_conserving: bool = False) -> tuple[int]:
     theta_idx = -1
+    # Force false, not sure it is correct, but keeping the code for now
+    is_spin_conserving = False
     for a in active_unocc:
         for b in active_unocc:
             if a >= b:
