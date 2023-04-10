@@ -8,8 +8,8 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.unitary_coupled_cluster.base import (
     Epq,
-    FermionicOperator,
     Hamiltonian,
+    PauliOperator,
     a_op_spin,
     commutator,
     expectation_value,
@@ -29,17 +29,17 @@ class LinearResponseUCC:
             self.wf.active_occ, self.wf.active_unocc, is_spin_conserving=is_spin_conserving
         ):
             self.G_ops.append(
-                FermionicOperator(a_op_spin(a, True, num_spin_orbs, num_elec))
-                * FermionicOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
+                PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec))
+                * PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
             )
         for (_, a, i, b, j) in iterate_T2(
             self.wf.active_occ, self.wf.active_unocc, is_spin_conserving=is_spin_conserving
         ):
-            tmp = FermionicOperator(a_op_spin(a, True, num_spin_orbs, num_elec)) * FermionicOperator(
+            tmp = PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec)) * PauliOperator(
                 a_op_spin(b, True, num_spin_orbs, num_elec)
             )
-            tmp = tmp * FermionicOperator(a_op_spin(j, False, num_spin_orbs, num_elec))
-            tmp = tmp * FermionicOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
+            tmp = tmp * PauliOperator(a_op_spin(j, False, num_spin_orbs, num_elec))
+            tmp = tmp * PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
             self.G_ops.append(tmp)
 
         num_parameters = len(self.G_ops)

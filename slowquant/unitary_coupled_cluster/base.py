@@ -49,18 +49,46 @@ def a_op_spin_matrix(idx: int, dagger: bool, number_spin_orbitals: int, number_e
     return kronecker_product(operators)
 
 
+@cache
 def a_op_spin(idx: int, dagger: bool, number_spin_orbitals: int, number_electrons: int) -> np.ndarray:
-    operators = []
+    if idx % 2 == 0:
+        return a_op(idx // 2, "alpha", dagger, number_spin_orbitals, number_electrons)
+    else:
+        return a_op((idx - 1) // 2, "beta", dagger, number_spin_orbitals, number_electrons)
+
+
+@cache
+def a_op(
+    spinless_idx: int, spin: str, dagger: bool, number_spin_orbitals: int, number_of_electrons: int
+) -> list[np.ndarray]:
+    idx = 2 * spinless_idx
+    if spin == "beta":
+        idx += 1
+    operators = {}
+    op1 = ""
+    op2 = ""
+    fac1 = 1
+    fac2 = 1
     for i in range(number_spin_orbitals):
         if i == idx:
             if dagger:
-                operators.append(a_mat_dagger)
+                op1 += "X"
+                fac1 *= 0.5
+                op2 += "Y"
+                fac2 *= -0.5j
             else:
-                operators.append(a_mat)
-        elif i <= number_electrons and i < idx:
-            operators.append(Z_mat)
+                op1 += "X"
+                fac1 *= 0.5
+                op2 += "Y"
+                fac2 *= 0.5j
+        elif i <= number_of_electrons and i < idx:
+            op1 += "Z"
+            op2 += "Z"
         else:
-            operators.append(I_mat)
+            op1 += "I"
+            op2 += "I"
+    operators[op1] = fac1
+    operators[op2] = fac2
     return operators
 
 
@@ -176,24 +204,16 @@ class StateVector:
         self.U_ = u
 
 
-def a_op(
-    spinless_idx: int, spin: str, dagger: bool, number_spin_orbitals: int, number_of_electrons: int
-) -> list[np.ndarray]:
-    idx = 2 * spinless_idx
-    if spin == "beta":
-        idx += 1
-    operators = []
-    for i in range(number_spin_orbitals):
-        if i == idx:
-            if dagger:
-                operators.append(a_mat_dagger)
-            else:
-                operators.append(a_mat)
-        elif i <= number_of_electrons and i < idx:
-            operators.append(Z_mat)
-        else:
-            operators.append(I_mat)
-    return operators
+@cache
+def pauli_to_mat(pauli: str) -> np.ndarray:
+    if pauli == "I":
+        return np.array([[1, 0], [0, 1]], dtype=float)
+    elif pauli == "Z":
+        return np.array([[1, 0], [0, -1]], dtype=float)
+    elif pauli == "X":
+        return np.array([[0, 1], [1, 0]], dtype=float)
+    elif pauli == "Y":
+        return np.array([[0, -1j], [1j, 0]], dtype=complex)
 
 
 def expectation_value(
@@ -203,14 +223,15 @@ def expectation_value(
         raise ValueError("Bra and Ket does not have same number of inactive orbitals")
     if len(bra._active) != len(ket._active):
         raise ValueError("Bra and Ket does not have same number of active orbitals")
-    if fermiop.operators == [[]]:
-        return 0
     total = 0
     start = time.time()
-    for op in copy.deepcopy(fermiop.operators):
+    print(len(fermiop.operators.keys()))
+    for op, fac in fermiop.operators.items():
+        if abs(fac) < 10**-12:
+            continue
         tmp = 1
         for i in range(len(bra.bra_inactive)):
-            tmp *= np.matmul(bra.bra_inactive[i], np.matmul(op[i], ket.ket_inactive[:, i]))
+            tmp *= np.matmul(bra.bra_inactive[i], np.matmul(pauli_to_mat(op[i]), ket.ket_inactive[:, i]))
         if abs(tmp) < 10**-12:
             continue
         number_active_orbitals = len(bra._active_onvector)
@@ -221,51 +242,33 @@ def expectation_value(
                 operator = copy.copy(ket.ket_active_csr)
             else:
                 operator = copy.copy(ket.ket_active)
-            for op_element_idx, op_element in enumerate(op[active_start:active_end]):
-                prior = op_element_idx
-                after = number_active_orbitals - op_element_idx - 1
-                factor = 1
-                if abs(op_element[0, 0]) not in [0, 1]:
-                    factor *= op_element[0, 0]
-                    op_element = op_element / factor
-                elif abs(op_element[0, 1]) not in [0, 1]:
-                    factor *= op_element[0, 1]
-                    op_element = op_element / factor
-                elif abs(op_element[1, 0]) not in [0, 1]:
-                    factor *= op_element[1, 0]
-                    op_element = op_element / factor
-                elif abs(op_element[1, 1]) not in [0, 1]:
-                    factor *= op_element[1, 1]
-                    op_element = op_element / factor
-                if (
-                    op_element[0, 0] == 1
-                    and op_element[0, 1] == 0
-                    and op_element[1, 0] == 0
-                    and op_element[1, 1] == 1
-                    and factor == 1
-                ):
+            for pauli_mat_idx, pauli_mat_symbol in enumerate(op[active_start:active_end]):
+                pauli_mat = pauli_to_mat(pauli_mat_symbol)
+                prior = pauli_mat_idx
+                after = number_active_orbitals - pauli_mat_idx - 1
+                if pauli_mat_symbol == "I":
                     continue
                 if number_active_orbitals >= use_csr:
-                    operator = factor * kronecker_product_cached(
+                    operator = kronecker_product_cached(
                         prior,
                         after,
-                        op_element[0, 0],
-                        op_element[0, 1],
-                        op_element[1, 0],
-                        op_element[1, 1],
+                        pauli_mat[0, 0],
+                        pauli_mat[0, 1],
+                        pauli_mat[1, 0],
+                        pauli_mat[1, 1],
                         True,
                     ).dot(operator)
                     if operator.nnz == 0:
                         break
                 else:
-                    operator = factor * np.matmul(
+                    operator = np.matmul(
                         kronecker_product_cached(
                             prior,
                             after,
-                            op_element[0, 0],
-                            op_element[0, 1],
-                            op_element[1, 0],
-                            op_element[1, 1],
+                            pauli_mat[0, 0],
+                            pauli_mat[0, 1],
+                            pauli_mat[1, 0],
+                            pauli_mat[1, 1],
                             False,
                         ),
                         operator,
@@ -274,101 +277,130 @@ def expectation_value(
                 tmp *= bra.bra_active_csr.dot(operator).toarray()[0, 0]
             else:
                 tmp *= np.matmul(bra.bra_active, operator)
-        total += tmp
+        total += fac * tmp
     print(f"Expectation value: {time.time() - start}")
-    return total
+    return total.real
+
+
+@cache
+def pauli_mul(pauli1: str, pauli2: str) -> tuple[float, str]:
+    if pauli1 == "I":
+        return 1, pauli2
+    elif pauli2 == "I":
+        return 1, pauli1
+    elif pauli1 == pauli2:
+        return 1, "I"
+    elif pauli1 == "X" and pauli2 == "Y":
+        return 1j, "Z"
+    elif pauli1 == "X" and pauli2 == "Z":
+        return -1j, "Y"
+    elif pauli1 == "Y" and pauli2 == "X":
+        return -1j, "Z"
+    elif pauli1 == "Y" and pauli2 == "Z":
+        return 1j, "X"
+    elif pauli1 == "Z" and pauli2 == "X":
+        return 1j, "Y"
+    elif pauli1 == "Z" and pauli2 == "Y":
+        return -1j, "X"
+
+
+class PauliOperator:
+    def __init__(self, operator: dict[str, float]) -> None:
+        self.operators = operator
+        self.screen_zero = True
+
+    def __add__(self, pauliop: PauliOperator) -> PauliOperator:
+        new_operators = self.operators.copy()
+        for op, fac in pauliop.operators.items():
+            if op in new_operators:
+                new_operators[op] += fac
+                if self.screen_zero:
+                    if abs(new_operators[op]) < 10**-12:
+                        del new_operators[op]
+            else:
+                new_operators[op] = fac
+        return PauliOperator(new_operators)
+
+    def __sub__(self, pauliop: PauliOperator) -> PauliOperator:
+        new_operators = self.operators.copy()
+        for op, fac in pauliop.operators.items():
+            if op in new_operators:
+                new_operators[op] -= fac
+                if self.screen_zero:
+                    if abs(new_operators[op]) < 10**-12:
+                        del new_operators[op]
+            else:
+                new_operators[op] = -fac
+        return PauliOperator(new_operators)
+
+    def __mul__(self, pauliop: PauliOperator) -> PauliOperator:
+        new_operators = {}
+        for op1, val1 in self.operators.items():
+            for op2, val2 in pauliop.operators.items():
+                new_op = ""
+                fac = val1 * val2
+                for pauli1, pauli2 in zip(op1, op2):
+                    if pauli1 == "I":
+                        new_op += pauli2
+                    elif pauli2 == "I":
+                        new_op += pauli1
+                    elif pauli1 == pauli2:
+                        new_op += "I"
+                    elif pauli1 == "X" and pauli2 == "Y":
+                        new_op += "Z"
+                        fac *= 1j
+                    elif pauli1 == "X" and pauli2 == "Z":
+                        new_op += "Y"
+                        fac *= -1j
+                    elif pauli1 == "Y" and pauli2 == "X":
+                        new_op += "Z"
+                        fac *= -1j
+                    elif pauli1 == "Y" and pauli2 == "Z":
+                        new_op += "X"
+                        fac *= 1j
+                    elif pauli1 == "Z" and pauli2 == "X":
+                        new_op += "Y"
+                        fac *= 1j
+                    elif pauli1 == "Z" and pauli2 == "Y":
+                        new_op += "X"
+                        fac *= -1j
+                if new_op in new_operators:
+                    new_operators[new_op] += fac
+                else:
+                    new_operators[new_op] = fac
+                if self.screen_zero:
+                    if abs(new_operators[new_op]) < 10**-12:
+                        del new_operators[new_op]
+        return PauliOperator(new_operators)
+
+    def __rmul__(self, number: float) -> PauliOperator:
+        new_operators = self.operators.copy()
+        for op in self.operators:
+            new_operators[op] *= number
+            if self.screen_zero:
+                if abs(new_operators[op]) < 10**-12:
+                    del new_operators[op]
+        return PauliOperator(new_operators)
+
+    @property
+    def dagger(self) -> PauliOperator:
+        new_operators = {}
+        for op, fac in self.operators.items():
+            Y_fac = op.count("Y")
+            new_operators[op] = fac * (-1) ** Y_fac
+        return PauliOperator(new_operators)
 
 
 class FermionicOperator:
-    def __init__(self, operator: list[np.ndarray]) -> None:
-        if not isinstance(operator[0], list):
-            self.operators = [operator]
-        else:
-            self.operators = operator
-
-    def __add__(self, fermiop: FermionicOperator) -> FermionicOperator:
-        if self.operators == [[]]:
-            operators_new = fermiop.operators
-        elif fermiop.operators == [[]]:
-            operators_new = self.operators
-        else:
-            operators_new = self.operators + fermiop.operators
-        return FermionicOperator(operators_new)
-
-    def __sub__(self, fermiop: FermionicOperator) -> FermionicOperator:
-        if self.operators == [[]] and fermiop.operators == [[]]:
-            return FermionicOperator([[]])
-        elif self.operators == [[]]:
-            other_op = copy.deepcopy(fermiop)
-            operators_new = (-1 * other_op).operators
-        elif fermiop.operators == [[]]:
-            operators_new = self.operators
-        else:
-            other_op = copy.deepcopy(fermiop)
-            operators_new = self.operators + (-1 * other_op).operators
-        return FermionicOperator(operators_new)
-
-    def __mul__(self, fermiop: FermionicOperator) -> FermionicOperator:
-        operators_new = []
-        for op1 in self.operators:
-            if op1 == []:
-                continue
-            for op2 in fermiop.operators:
-                if op2 == []:
-                    continue
-                new_op = copy.deepcopy(op1)
-                is_zero = False
-                for i in range(len(new_op)):
-                    new_op[i] = np.matmul(new_op[i], op2[i])
-                    if (
-                        abs(new_op[i][0, 0]) < 10**-12
-                        and abs(new_op[i][0, 1]) < 10**-12
-                        and abs(new_op[i][1, 0]) < 10**-12
-                        and abs(new_op[i][1, 1]) < 10**-12
-                    ):
-                        is_zero = True
-                        break
-                if not is_zero:
-                    operators_new.append(new_op)
-        if len(operators_new) == 0:
-            return FermionicOperator([[]])
-        return FermionicOperator(operators_new)
-
-    def __rmul__(self, number: float) -> FermionicOperator:
-        operators_new = []
-        for op in self.operators:
-            op_new = copy.deepcopy(op)
-            op_new[0] *= number
-            if np.sum(np.abs(op_new[0])) > 10**-12:
-                operators_new.append(op_new)
-        if len(operators_new) == 0:
-            return FermionicOperator([[]])
-        return FermionicOperator(operators_new)
-
-    @property
-    def dagger(self):
-        operators_new = []
-        for op in self.operators:
-            new_op = []
-            for mat in op:
-                new_op.append(np.conj(mat).transpose())
-            operators_new.append(new_op)
-        return FermionicOperator(operators_new)
-
-    @property
-    def matrix_form(self):
-        num_spin_orbs = len(self.operators[0])
-        op_matrix = np.zeros((2**num_spin_orbs, 2**num_spin_orbs))
-        for op in self.operators:
-            op_matrix += kronecker_product(op)
-        return op_matrix
+    def __init__(self, A):
+        None
 
 
 def Epq(p: int, q: int, num_spin_orbs: int, num_elec: int) -> FermionicOperator:
-    E = FermionicOperator(a_op(p, "alpha", True, num_spin_orbs, num_elec)) * FermionicOperator(
+    E = PauliOperator(a_op(p, "alpha", True, num_spin_orbs, num_elec)) * PauliOperator(
         a_op(q, "alpha", False, num_spin_orbs, num_elec)
     )
-    E += FermionicOperator(a_op(p, "beta", True, num_spin_orbs, num_elec)) * FermionicOperator(
+    E += PauliOperator(a_op(p, "beta", True, num_spin_orbs, num_elec)) * PauliOperator(
         a_op(q, "beta", False, num_spin_orbs, num_elec)
     )
     return E

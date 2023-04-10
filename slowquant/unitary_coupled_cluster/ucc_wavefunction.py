@@ -185,7 +185,7 @@ class WaveFunctionUCC:
         num_theta2 = 0
         if orbital_optimization:
             parameters += self.kappa
-            num_kappa += 1
+            num_kappa += len(self.kappa)
         if "s" in excitations:
             for idx, _, _ in iterate_T1(self.active_occ, self.active_unocc, is_spin_conserving=True):
                 parameters += [self.theta1[idx]]
@@ -253,6 +253,7 @@ def energy_UCC(
     orbital_optimized: bool,
     kappa_idx: list[list[int, int]],
 ) -> float:
+    start = time.time()
     kappa = []
     theta1 = []
     theta2 = []
@@ -282,6 +283,8 @@ def energy_UCC(
         num_active_spin_orbs, num_active_elec, theta1 + theta2, excitations, active_occ, active_unocc
     )
     state_vector.U = U
-    return expectation_value(
+    A = expectation_value(
         state_vector, Hamiltonian(h_core, g_eri, c_trans, num_spin_orbs, num_elec), state_vector
     )
+    print(f"step-time: {time.time() - start}")
+    return A
