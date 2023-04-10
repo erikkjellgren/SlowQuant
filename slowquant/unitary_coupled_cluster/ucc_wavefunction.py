@@ -7,6 +7,7 @@ import scipy.optimize
 
 from slowquant.unitary_coupled_cluster.base import (
     Hamiltonian,
+    Hamiltonian_energy_only,
     StateVector,
     expectation_value,
 )
@@ -233,7 +234,9 @@ def energy_HF(
 ) -> float:
     c_trans = construct_integral_trans_mat(c_orthonormal, kappa, kappa_idx)
     return expectation_value(
-        state_vector, Hamiltonian(h_core, g_eri, c_trans, num_spin_orbs, num_elec), state_vector
+        state_vector,
+        Hamiltonian_energy_only(h_core, g_eri, c_trans, num_spin_orbs, 0, num_elec),
+        state_vector,
     )
 
 
@@ -257,6 +260,7 @@ def energy_UCC(
     kappa = []
     theta1 = []
     theta2 = []
+    num_inactive_spin_orbs = num_spin_orbs - num_active_spin_orbs
     idx_counter = 0
     for i in range(len(kappa_idx)):
         kappa.append(parameters[idx_counter])
@@ -284,7 +288,11 @@ def energy_UCC(
     )
     state_vector.U = U
     A = expectation_value(
-        state_vector, Hamiltonian(h_core, g_eri, c_trans, num_spin_orbs, num_elec), state_vector
+        state_vector,
+        Hamiltonian_energy_only(
+            h_core, g_eri, c_trans, num_inactive_spin_orbs, num_active_spin_orbs, num_elec
+        ),
+        state_vector,
     )
     print(f"step-time: {time.time() - start}")
     return A

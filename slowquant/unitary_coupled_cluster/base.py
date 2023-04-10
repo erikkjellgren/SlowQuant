@@ -443,28 +443,51 @@ def commutator(A: FermionicOperator, B: FermionicOperator) -> FermionicOperator:
 
 
 def Hamiltonian_energy_only(
-    h: np.ndarray, g: np.ndarray, c_mo: np.ndarray, num_inactive_spin_orbs: int, num_active_spin_orbs: int, num_active_elec: int
+    h: np.ndarray,
+    g: np.ndarray,
+    c_mo: np.ndarray,
+    num_inactive_spin_orbs: int,
+    num_active_spin_orbs: int,
+    num_elec: int,
 ) -> FermionicOperator:
     h_mo = one_electron_integral_transform(c_mo, h)
     g_mo = two_electron_integral_transform(c_mo, g)
     num_inactive_spatial_orbs = num_inactive_spin_orbs // 2
-    num_inactive_elec = len(num_inactive_spin_orbs)
     num_active_spatial_orbs = num_active_spin_orbs // 2
+    num_spin_orbs = num_inactive_spin_orbs + num_active_spin_orbs
     # Inactive one-electron
-    for p in range(num_inactive_spatial_orbs):
-        if p == 0:
-            H_expectation = h_mo[p, p] * Epq(p, p, num_inactive_spin_orbs, num_inactive_elec)
+    for i in range(num_inactive_spatial_orbs):
+        if i == 0:
+            H_expectation = h_mo[i, i] * Epq(i, i, num_spin_orbs, num_elec)
         else:
-            H_expectation += h_mo[p, p] * Epq(p, p, num_inactive_spin_orbs, num_inactive_elec)
+            H_expectation += h_mo[i, i] * Epq(i, i, num_spin_orbs, num_elec)
     # Active one-electron
     for p in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
-        for q in range(num_spatial_orbs):
-            H_expectation += h_mo[p, q] * Epq(p, q, num_active_spin_orbs, num_active_elec)
+        for q in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
+            if p == 0 and q == 0 and num_inactive_spatial_orbs == 0:
+                H_expectation = h_mo[p, q] * Epq(p, q, num_spin_orbs, num_elec)
+            else:
+                H_expectation += h_mo[p, q] * Epq(p, q, num_spin_orbs, num_elec)
     # Inactive two-electron
-    # 
-    for p in range(num_spatial_orbs):
-        for q in range(num_spatial_orbs):
-            for r in range(num_spatial_orbs):
-                for s in range(num_spatial_orbs):
+    for i in range(num_inactive_spatial_orbs):
+        for j in range(num_inactive_spatial_orbs):
+            H_expectation += 1 / 2 * g_mo[i, i, j, j] * epqrs(i, i, j, j, num_spin_orbs, num_elec)
+            if i != j:
+                H_expectation += 1 / 2 * g_mo[j, i, i, j] * epqrs(j, i, i, j, num_spin_orbs, num_elec)
+    # Inactive-Active two-electron
+    for i in range(num_inactive_spatial_orbs):
+        for p in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
+            for q in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
+                H_expectation += 1 / 2 * g_mo[i, i, p, q] * epqrs(i, i, p, q, num_spin_orbs, num_elec)
+                H_expectation += 1 / 2 * g_mo[p, q, i, i] * epqrs(p, q, i, i, num_spin_orbs, num_elec)
+                H_expectation += 1 / 2 * g_mo[p, i, i, q] * epqrs(p, i, i, q, num_spin_orbs, num_elec)
+                H_expectation += 1 / 2 * g_mo[i, p, q, i] * epqrs(i, p, q, i, num_spin_orbs, num_elec)
+    # Active two-electron
+    for p in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
+        for q in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
+            for r in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
+                for s in range(
+                    num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs
+                ):
                     H_expectation += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s, num_spin_orbs, num_elec)
     return H_expectation
