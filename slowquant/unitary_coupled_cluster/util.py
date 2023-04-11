@@ -87,6 +87,7 @@ def construct_UCC_U(
     excitations: str,
     active_occ: list[int],
     active_unocc: list[int],
+    use_csr: int = 8,
 ) -> np.ndarray:
     t = np.zeros((2**num_spin_orbs, 2**num_spin_orbs))
     counter = 0
@@ -94,8 +95,8 @@ def construct_UCC_U(
     if "s" in excitations:
         for (_, a, i) in iterate_T1(active_occ, active_unocc, is_spin_conserving=True):
             if theta[counter] != 0.0:
-                tmp = a_op_spin_matrix(a, True, num_spin_orbs, num_elec).dot(
-                    a_op_spin_matrix(i, False, num_spin_orbs, num_elec)
+                tmp = a_op_spin_matrix(a, True, num_spin_orbs, num_elec, use_csr=use_csr).dot(
+                    a_op_spin_matrix(i, False, num_spin_orbs, num_elec, use_csr=use_csr)
                 )
                 t += theta[counter] * tmp
             counter += 1
@@ -103,15 +104,19 @@ def construct_UCC_U(
     if "d" in excitations:
         for (_, a, i, b, j) in iterate_T2(active_occ, active_unocc, is_spin_conserving=True):
             if theta[counter] != 0.0:
-                tmp = a_op_spin_matrix(a, True, num_spin_orbs, num_elec).dot(
-                    a_op_spin_matrix(b, True, num_spin_orbs, num_elec)
+                tmp = a_op_spin_matrix(a, True, num_spin_orbs, num_elec, use_csr=use_csr).dot(
+                    a_op_spin_matrix(b, True, num_spin_orbs, num_elec, use_csr=use_csr)
                 )
-                tmp = tmp.dot(a_op_spin_matrix(j, False, num_spin_orbs, num_elec))
-                tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, num_elec))
+                tmp = tmp.dot(a_op_spin_matrix(j, False, num_spin_orbs, num_elec, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, num_elec, use_csr=use_csr))
                 t += theta[counter] * tmp
             counter += 1
-
-    T = t - np.conj(t).transpose()
-    A = scipy.linalg.expm(T)
-    print(f"expm: {time.time() - start}")
+    
+    if num_spin_orbs >= use_csr:
+        T = t - t.conjugate().transpose()
+        A = scipy.sparse.linalg.expm(T)
+    else:
+        T = t - np.conj(t).transpose()
+        A = scipy.linalg.expm(T)
+    #print(f"expm: {time.time() - start}")
     return A

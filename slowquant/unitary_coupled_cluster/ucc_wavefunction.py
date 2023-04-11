@@ -6,7 +6,6 @@ import scipy
 import scipy.optimize
 
 from slowquant.unitary_coupled_cluster.base import (
-    Hamiltonian,
     Hamiltonian_energy_only,
     StateVector,
     expectation_value,
@@ -44,9 +43,11 @@ class WaveFunctionUCC:
         self.num_spin_orbs = number_spin_orbitals
         inactive_on_vector = []
         active_on_vector = []
+        virtual_on_vector = []
         self.num_active_elec = 0
         self.num_active_spin_orbs = 0
         self.num_inactive_spin_orbs = 0
+        self.num_virtual_spin_orbs = 0
         for i in range(number_electrons):
             if i in active_space:
                 self.active.append(i)
@@ -66,13 +67,15 @@ class WaveFunctionUCC:
                 self.num_active_spin_orbs += 1
             else:
                 self.virtual.append(i)
+                virtual_on_vector.append(z)
+                self.num_virtual_spin_orbs += 1
         if len(self.active) != 0:
             active_shift = np.min(self.active)
             for i in range(len(self.active_occ)):
                 self.active_occ[i] -= active_shift
             for i in range(len(self.active_unocc)):
                 self.active_unocc[i] -= active_shift
-        self.state_vector = StateVector(inactive_on_vector, active_on_vector)
+        self.state_vector = StateVector(inactive_on_vector, active_on_vector, virtual_on_vector)
         # Find non-redundant kappas
         self.kappa = []
         self.kappa_idx = []
@@ -105,11 +108,21 @@ class WaveFunctionUCC:
             kappa_mat[q, p] = -kappa_val
         return np.matmul(self.c_orthonormal, scipy.linalg.expm(-kappa_mat))
 
+    @property
+    def update_state_vector(self) -> None:
+        U = construct_UCC_U(
+            self.num_active_spin_orbs, self.num_active_elec, self.theta1 + self.theta2, 'sd', self.active_occ, self.active_unocc
+        )
+        self.state_vector.U = U
+
+    
+
     def run_HF(self) -> None:
         e_tot = partial(
             energy_HF,
             kappa_idx=self.kappa_idx,
-            num_spin_orbs=self.num_inactive_spin_orbs,
+            num_inactive_spin_orbs=self.num_inactive_spin_orbs,
+            num_virtual_spin_orbs=self.num_virtual_spin_orbs,
             num_elec=self.num_elec,
             state_vector=self.state_vector,
             c_orthonormal=self.c_orthonormal,
@@ -137,8 +150,9 @@ class WaveFunctionUCC:
         if orbital_optimization:
             e_tot = partial(
                 energy_UCC,
-                num_spin_orbs=self.num_inactive_spin_orbs + self.num_active_spin_orbs,
+                num_inactive_spin_orbs=self.num_inactive_spin_orbs,
                 num_active_spin_orbs=self.num_active_spin_orbs,
+                num_virtual_spin_orbs=self.num_virtual_spin_orbs,
                 num_elec=self.num_elec,
                 num_active_elec=self.num_active_elec,
                 state_vector=self.state_vector,
@@ -154,8 +168,9 @@ class WaveFunctionUCC:
         else:
             e_tot = partial(
                 energy_UCC,
-                num_spin_orbs=self.num_inactive_spin_orbs + self.num_active_spin_orbs,
+                num_inactive_spin_orbs=self.num_inactive_spin_orbs,
                 num_active_spin_orbs=self.num_active_spin_orbs,
+                num_virtual_spin_orbs=self.num_virtual_spin_orbs,
                 num_elec=self.num_elec,
                 num_active_elec=self.num_active_elec,
                 state_vector=self.state_vector,
@@ -225,7 +240,8 @@ class WaveFunctionUCC:
 def energy_HF(
     kappa: list[float],
     kappa_idx: list[list[int, int]],
-    num_spin_orbs: int,
+    num_inactive_spin_orbs: int,
+    num_virtual_spin_orbs: int,
     num_elec: int,
     state_vector: StateVector,
     c_orthonormal: np.ndarray,
@@ -235,15 +251,16 @@ def energy_HF(
     c_trans = construct_integral_trans_mat(c_orthonormal, kappa, kappa_idx)
     return expectation_value(
         state_vector,
-        Hamiltonian_energy_only(h_core, g_eri, c_trans, num_spin_orbs, 0, num_elec),
+        Hamiltonian_energy_only(h_core, g_eri, c_trans, num_inactive_spin_orbs, 0, num_virtual_spin_orbs, num_elec),
         state_vector,
     )
 
 
 def energy_UCC(
     parameters: list[float],
-    num_spin_orbs: int,
+    num_inactive_spin_orbs: int,
     num_active_spin_orbs: int,
+    num_virtual_spin_orbs: int,
     num_elec: int,
     num_active_elec: int,
     state_vector: StateVector,
@@ -260,7 +277,6 @@ def energy_UCC(
     kappa = []
     theta1 = []
     theta2 = []
-    num_inactive_spin_orbs = num_spin_orbs - num_active_spin_orbs
     idx_counter = 0
     for i in range(len(kappa_idx)):
         kappa.append(parameters[idx_counter])
@@ -290,9 +306,9 @@ def energy_UCC(
     A = expectation_value(
         state_vector,
         Hamiltonian_energy_only(
-            h_core, g_eri, c_trans, num_inactive_spin_orbs, num_active_spin_orbs, num_elec
+            h_core, g_eri, c_trans, num_inactive_spin_orbs, num_active_spin_orbs, num_virtual_spin_orbs, num_elec
         ),
         state_vector,
     )
-    print(f"step-time: {time.time() - start}")
+    #print(f"step-time: {time.time() - start}")
     return A

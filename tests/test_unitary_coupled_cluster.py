@@ -171,7 +171,7 @@ def test_H4_STO3G_OOUCCSD() -> None:
     assert abs(WF.ucc_energy - (-5.211066791547)) < 10**-8
     # Test sparse matrix also works
     H = Hamiltonian(
-        h_core, g_eri, WF.c_trans, WF.num_inactive_spin_orbs + WF.num_active_spin_orbs, WF.num_elec
+        h_core, g_eri, WF.c_trans, WF.num_spin_orbs, WF.num_elec
     )
     assert abs(WF.ucc_energy - expectation_value(WF.state_vector, H, WF.state_vector, use_csr=0)) < 10**-8
 
@@ -205,7 +205,7 @@ def test_H4_STO3G_OOUCCD() -> None:
     assert abs(WF.ucc_energy - (-5.211066791547)) < 10**-8
     # Test sparse matrix also works
     H = Hamiltonian(
-        h_core, g_eri, WF.c_trans, WF.num_inactive_spin_orbs + WF.num_active_spin_orbs, WF.num_elec
+        h_core, g_eri, WF.c_trans, WF.num_spin_orbs, WF.num_elec
     )
     assert abs(WF.ucc_energy - expectation_value(WF.state_vector, H, WF.state_vector, use_csr=0)) < 10**-8
 

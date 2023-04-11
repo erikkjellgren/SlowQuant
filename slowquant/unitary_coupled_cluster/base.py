@@ -12,14 +12,9 @@ from slowquant.molecularintegrals.integralfunctions import (
     two_electron_integral_transform,
 )
 
-Z_mat = np.array([[1, 0], [0, -1]], dtype=float)
-I_mat = np.array([[1, 0], [0, 1]], dtype=float)
-a_mat = np.array([[0, 1], [0, 0]], dtype=float)
-a_mat_dagger = np.array([[0, 0], [1, 0]], dtype=float)
-
 
 @cache
-def a_op_spin_matrix(idx: int, dagger: bool, number_spin_orbitals: int, number_electrons: int) -> np.ndarray:
+def a_op_spin_matrix(idx: int, dagger: bool, number_spin_orbitals: int, number_electrons: int, use_csr: int = 8) -> np.ndarray:
     r"""Get matrix representation of fermionic operator.
     This is the matrix form that depends on number of electrons i.e.:
 
@@ -35,6 +30,10 @@ def a_op_spin_matrix(idx: int, dagger: bool, number_spin_orbitals: int, number_e
     Returns:
         Matrix representation of ferminonic annihilation or creation operator.
     """
+    Z_mat = np.array([[1, 0], [0, -1]], dtype=float)
+    I_mat = np.array([[1, 0], [0, 1]], dtype=float)
+    a_mat = np.array([[0, 1], [0, 0]], dtype=float)
+    a_mat_dagger = np.array([[0, 0], [1, 0]], dtype=float)
     operators = []
     for i in range(number_spin_orbitals):
         if i == idx:
@@ -46,6 +45,8 @@ def a_op_spin_matrix(idx: int, dagger: bool, number_spin_orbitals: int, number_e
             operators.append(Z_mat)
         else:
             operators.append(I_mat)
+    if number_spin_orbitals >= use_csr:
+        return ss.csr_matrix(kronecker_product(operators))
     return kronecker_product(operators)
 
 
@@ -94,7 +95,7 @@ def a_op(
 
 @cache
 def kronecker_product_cached(
-    num_prior: int, num_after: int, val00: int, val01: int, val10: int, val11: int, is_csr: bool
+    num_prior: int, num_after: int, pauli_mat_symbol: str, is_csr: bool
 ) -> np.ndarray | ss.csr_matrix:
     r"""Get operator in matrix form.
     The operator is returned in the form:
@@ -105,33 +106,20 @@ def kronecker_product_cached(
     Args:
        num_prior: Number of left-hand side identity matrices.
        num_after: Number of right-hand side identity matrices.
-       val00: First value of operator matrix.
-       val10: Second value of operator matrix.
-       val01: Third value of operator matrix.
-       val11: Fourth value of operator matrix.
        is_csr: If the resulting matrix representation should be a sparse matrix.
 
     Returns:
        Matrix representation ofi an operator.
     """
-    if (
-        val00 not in [-1, 0, 1]
-        or val01 not in [-1, 0, 1]
-        or val10 not in [-1, 0, 1]
-        or val11 not in [-1, 0, 1]
-    ):
-        print(
-            f"WARNING: Unexpected element values in cahced kronecker product: {val00} {val01} {val10} {val11}"
-        )
+    mat = pauli_to_mat(pauli_mat_symbol)
     if is_csr:
         I1 = ss.identity(int(2**num_prior))
         I2 = ss.identity(int(2**num_after))
-        mat = ss.csr_matrix(np.array([[val00, val01], [val10, val11]]))
+        mat = ss.csr_matrix(mat)
         return ss.kron(I1, ss.kron(mat, I2))
     else:
         I1 = np.identity(int(2**num_prior))
         I2 = np.identity(int(2**num_after))
-        mat = np.array([[val00, val01], [val10, val11]])
         return np.kron(I1, np.kron(mat, I2))
 
 
@@ -159,7 +147,7 @@ def kronecker_product(A: list[np.ndarray]) -> np.ndarray:
 class StateVector:
     """State vector."""
 
-    def __init__(self, inactive: list(np.ndarray), active: list(np.ndarray)) -> None:
+    def __init__(self, inactive: list[np.ndarray], active: list[np.ndarray], virtual: list[np.ndarray]) -> None:
         """Initialize state vector.
 
         Args:
@@ -169,14 +157,23 @@ class StateVector:
         self.inactive = np.transpose(inactive)
         self._active_onvector = active
         self._active = np.transpose(kronecker_product(active))
+        self.virtual = np.transpose(virtual)
 
     @property
-    def bra_inactive(self) -> list(np.ndarray):
+    def bra_inactive(self) -> list[np.ndarray]:
         return np.conj(self.inactive).transpose()
 
     @property
-    def ket_inactive(self) -> list(np.ndarray):
+    def ket_inactive(self) -> list[np.ndarray]:
         return self.inactive
+
+    @property
+    def bra_virtual(self) -> list[np.ndarray]:
+        return np.conj(self.virtual).transpose()
+
+    @property
+    def ket_virtual(self) -> list[np.ndarray]:
+        return self.virtual
 
     @property
     def bra_active(self) -> np.ndarray:
@@ -217,7 +214,7 @@ def pauli_to_mat(pauli: str) -> np.ndarray:
 
 
 def expectation_value(
-    bra: StateVector, fermiop: FermionicOperator, ket: StateVector, use_csr: int = 8
+    bra: StateVector, pauliop: PauliOperator, ket: StateVector, use_csr: int = 8
 ) -> float:
     if len(bra.inactive) != len(ket.inactive):
         raise ValueError("Bra and Ket does not have same number of inactive orbitals")
@@ -225,13 +222,15 @@ def expectation_value(
         raise ValueError("Bra and Ket does not have same number of active orbitals")
     total = 0
     start = time.time()
-    print(len(fermiop.operators.keys()))
-    for op, fac in fermiop.operators.items():
+    for op, fac in pauliop.operators.items():
         if abs(fac) < 10**-12:
             continue
         tmp = 1
         for i in range(len(bra.bra_inactive)):
             tmp *= np.matmul(bra.bra_inactive[i], np.matmul(pauli_to_mat(op[i]), ket.ket_inactive[:, i]))
+        for i in range(len(bra.bra_virtual)):
+            op_idx = i + len(bra.bra_inactive) + len(bra._active_onvector)
+            tmp *= np.matmul(bra.bra_virtual[i], np.matmul(pauli_to_mat(op[op_idx]), ket.ket_virtual[:, i]))
         if abs(tmp) < 10**-12:
             continue
         number_active_orbitals = len(bra._active_onvector)
@@ -239,9 +238,9 @@ def expectation_value(
         active_end = active_start + number_active_orbitals
         if number_active_orbitals != 0:
             if number_active_orbitals >= use_csr:
-                operator = copy.copy(ket.ket_active_csr)
+                operator = copy.deepcopy(ket.ket_active_csr)
             else:
-                operator = copy.copy(ket.ket_active)
+                operator = copy.deepcopy(ket.ket_active)
             for pauli_mat_idx, pauli_mat_symbol in enumerate(op[active_start:active_end]):
                 pauli_mat = pauli_to_mat(pauli_mat_symbol)
                 prior = pauli_mat_idx
@@ -249,36 +248,21 @@ def expectation_value(
                 if pauli_mat_symbol == "I":
                     continue
                 if number_active_orbitals >= use_csr:
-                    operator = kronecker_product_cached(
-                        prior,
-                        after,
-                        pauli_mat[0, 0],
-                        pauli_mat[0, 1],
-                        pauli_mat[1, 0],
-                        pauli_mat[1, 1],
-                        True,
-                    ).dot(operator)
+                    operator = kronecker_product_cached(prior,after,pauli_mat_symbol,True).dot(operator)
                     if operator.nnz == 0:
                         break
                 else:
                     operator = np.matmul(
-                        kronecker_product_cached(
-                            prior,
-                            after,
-                            pauli_mat[0, 0],
-                            pauli_mat[0, 1],
-                            pauli_mat[1, 0],
-                            pauli_mat[1, 1],
-                            False,
-                        ),
-                        operator,
+                        kronecker_product_cached(prior,after,pauli_mat_symbol,False),operator,
                     )
             if number_active_orbitals >= use_csr:
                 tmp *= bra.bra_active_csr.dot(operator).toarray()[0, 0]
             else:
                 tmp *= np.matmul(bra.bra_active, operator)
         total += fac * tmp
-    print(f"Expectation value: {time.time() - start}")
+    #print(f"Expectation value: {time.time() - start}")
+    if abs(total.imag) > 10**-10:
+        print(f"WARNING, imaginary value of {total.imag}")
     return total.real
 
 
@@ -307,7 +291,7 @@ def pauli_mul(pauli1: str, pauli2: str) -> tuple[float, str]:
 class PauliOperator:
     def __init__(self, operator: dict[str, float]) -> None:
         self.operators = operator
-        self.screen_zero = True
+        self.screen_zero = False
 
     def __add__(self, pauliop: PauliOperator) -> PauliOperator:
         new_operators = self.operators.copy()
@@ -390,13 +374,14 @@ class PauliOperator:
             new_operators[op] = fac * (-1) ** Y_fac
         return PauliOperator(new_operators)
 
+    def eval_operators(self, state_vector: StateVector) -> dict[str, float]:
+        op_values = {}
+        for op in self.operators:
+            op_values[op] = expectation_value(state_vector, PauliOperator({op: 1}), state_vector)
+        return op_values
 
-class FermionicOperator:
-    def __init__(self, A):
-        None
 
-
-def Epq(p: int, q: int, num_spin_orbs: int, num_elec: int) -> FermionicOperator:
+def Epq(p: int, q: int, num_spin_orbs: int, num_elec: int) -> PauliOperator:
     E = PauliOperator(a_op(p, "alpha", True, num_spin_orbs, num_elec)) * PauliOperator(
         a_op(q, "alpha", False, num_spin_orbs, num_elec)
     )
@@ -406,7 +391,7 @@ def Epq(p: int, q: int, num_spin_orbs: int, num_elec: int) -> FermionicOperator:
     return E
 
 
-def epqrs(p: int, q: int, r: int, s: int, num_spin_orbs: int, num_elec: int) -> FermionicOperator:
+def epqrs(p: int, q: int, r: int, s: int, num_spin_orbs: int, num_elec: int) -> PauliOperator:
     if q == r:
         return Epq(p, q, num_spin_orbs, num_elec) * Epq(r, s, num_spin_orbs, num_elec) - Epq(
             p, s, num_spin_orbs, num_elec
@@ -414,13 +399,13 @@ def epqrs(p: int, q: int, r: int, s: int, num_spin_orbs: int, num_elec: int) -> 
     return Epq(p, q, num_spin_orbs, num_elec) * Epq(r, s, num_spin_orbs, num_elec)
 
 
-def Eminuspq(p: int, q: int, num_spin_orbs: int, num_elec: int) -> FermionicOperator:
+def Eminuspq(p: int, q: int, num_spin_orbs: int, num_elec: int) -> PauliOperator:
     return Epq(p, q, num_spin_orbs, num_elec) - Epq(q, p, num_spin_orbs, num_elec)
 
 
 def Hamiltonian(
     h: np.ndarray, g: np.ndarray, c_mo: np.ndarray, num_spin_orbs: int, num_elec: int
-) -> FermionicOperator:
+) -> PauliOperator:
     h_mo = one_electron_integral_transform(c_mo, h)
     g_mo = two_electron_integral_transform(c_mo, g)
     num_spatial_orbs = num_spin_orbs // 2
@@ -438,7 +423,7 @@ def Hamiltonian(
     return H_expectation
 
 
-def commutator(A: FermionicOperator, B: FermionicOperator) -> FermionicOperator:
+def commutator(A: PauliOperator, B: PauliOperator) -> PauliOperator:
     return A * B - B * A
 
 
@@ -448,13 +433,14 @@ def Hamiltonian_energy_only(
     c_mo: np.ndarray,
     num_inactive_spin_orbs: int,
     num_active_spin_orbs: int,
+    num_virtual_spin_orbs: int,
     num_elec: int,
-) -> FermionicOperator:
+) -> PauliOperator:
     h_mo = one_electron_integral_transform(c_mo, h)
     g_mo = two_electron_integral_transform(c_mo, g)
     num_inactive_spatial_orbs = num_inactive_spin_orbs // 2
     num_active_spatial_orbs = num_active_spin_orbs // 2
-    num_spin_orbs = num_inactive_spin_orbs + num_active_spin_orbs
+    num_spin_orbs = num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs
     # Inactive one-electron
     for i in range(num_inactive_spatial_orbs):
         if i == 0:
