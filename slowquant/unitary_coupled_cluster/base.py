@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import copy
+import functools
+import itertools
 import time
-from functools import cache
 
 import numpy as np
 import scipy.sparse as ss
@@ -13,8 +14,10 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 
 
-@cache
-def a_op_spin_matrix(idx: int, dagger: bool, number_spin_orbitals: int, number_electrons: int, use_csr: int = 8) -> np.ndarray:
+@functools.cache
+def a_op_spin_matrix(
+    idx: int, dagger: bool, number_spin_orbitals: int, number_electrons: int, use_csr: int = 8
+) -> np.ndarray:
     r"""Get matrix representation of fermionic operator.
     This is the matrix form that depends on number of electrons i.e.:
 
@@ -50,7 +53,7 @@ def a_op_spin_matrix(idx: int, dagger: bool, number_spin_orbitals: int, number_e
     return kronecker_product(operators)
 
 
-@cache
+@functools.cache
 def a_op_spin(idx: int, dagger: bool, number_spin_orbitals: int, number_electrons: int) -> np.ndarray:
     if idx % 2 == 0:
         return a_op(idx // 2, "alpha", dagger, number_spin_orbitals, number_electrons)
@@ -58,7 +61,7 @@ def a_op_spin(idx: int, dagger: bool, number_spin_orbitals: int, number_electron
         return a_op((idx - 1) // 2, "beta", dagger, number_spin_orbitals, number_electrons)
 
 
-@cache
+@functools.cache
 def a_op(
     spinless_idx: int, spin: str, dagger: bool, number_spin_orbitals: int, number_of_electrons: int
 ) -> list[np.ndarray]:
@@ -93,7 +96,7 @@ def a_op(
     return operators
 
 
-@cache
+@functools.cache
 def kronecker_product_cached(
     num_prior: int, num_after: int, pauli_mat_symbol: str, is_csr: bool
 ) -> np.ndarray | ss.csr_matrix:
@@ -147,7 +150,9 @@ def kronecker_product(A: list[np.ndarray]) -> np.ndarray:
 class StateVector:
     """State vector."""
 
-    def __init__(self, inactive: list[np.ndarray], active: list[np.ndarray], virtual: list[np.ndarray]) -> None:
+    def __init__(
+        self, inactive: list[np.ndarray], active: list[np.ndarray], virtual: list[np.ndarray]
+    ) -> None:
         """Initialize state vector.
 
         Args:
@@ -157,7 +162,25 @@ class StateVector:
         self.inactive = np.transpose(inactive)
         self._active_onvector = active
         self._active = np.transpose(kronecker_product(active))
+        self.active = np.transpose(kronecker_product(active)) * 1.0
         self.virtual = np.transpose(virtual)
+        o = np.array([0, 1])
+        z = np.array([1, 0])
+        num_active_elec = 0
+        num_active_spin_orbs = len(self._active_onvector)
+        if num_active_spin_orbs != 0:
+            for vec in self._active_onvector:
+                if vec[0] == 0 and vec[1] == 1:
+                    num_active_elec += 1
+            self.allowed_active_states_number_conserving = np.zeros(len(self._active), dtype=bool)
+            for comb in itertools.product([o, z], repeat=num_active_spin_orbs):
+                num_elec = 0
+                for vec in comb:
+                    if vec[0] == 0 and vec[1] == 1:
+                        num_elec += 1
+                if num_elec == num_active_elec:
+                    idx = np.argmax(kronecker_product(comb))
+                    self.allowed_active_states_number_conserving[idx] = True
 
     @property
     def bra_inactive(self) -> list[np.ndarray]:
@@ -191,17 +214,20 @@ class StateVector:
     def ket_active_csr(self) -> ss.csr_matrix:
         return ss.csr_matrix(self.active).transpose()
 
-    @property
-    def U(self) -> np.ndarray:
-        return self.U_
+    def new_U(self, U: np.ndarray, allowed_states: np.ndarray = None) -> None:
+        if allowed_states is None:
+            self.active = np.matmul(U, self._active)
+            self.U_ = U
+        else:
+            tmp_active = np.matmul(U, self._active[allowed_states])
+            idx = 0
+            for i, allowed in enumerate(allowed_states):
+                if allowed:
+                    self.active[i] = tmp_active[idx]
+                    idx += 1
 
-    @U.setter
-    def U(self, u: np.ndarray) -> None:
-        self.active = np.matmul(u, self._active)
-        self.U_ = u
 
-
-@cache
+@functools.cache
 def pauli_to_mat(pauli: str) -> np.ndarray:
     if pauli == "I":
         return np.array([[1, 0], [0, 1]], dtype=float)
@@ -213,9 +239,7 @@ def pauli_to_mat(pauli: str) -> np.ndarray:
         return np.array([[0, -1j], [1j, 0]], dtype=complex)
 
 
-def expectation_value(
-    bra: StateVector, pauliop: PauliOperator, ket: StateVector, use_csr: int = 8
-) -> float:
+def expectation_value(bra: StateVector, pauliop: PauliOperator, ket: StateVector, use_csr: int = 8) -> float:
     if len(bra.inactive) != len(ket.inactive):
         raise ValueError("Bra and Ket does not have same number of inactive orbitals")
     if len(bra._active) != len(ket._active):
@@ -248,25 +272,26 @@ def expectation_value(
                 if pauli_mat_symbol == "I":
                     continue
                 if number_active_orbitals >= use_csr:
-                    operator = kronecker_product_cached(prior,after,pauli_mat_symbol,True).dot(operator)
+                    operator = kronecker_product_cached(prior, after, pauli_mat_symbol, True).dot(operator)
                     if operator.nnz == 0:
                         break
                 else:
                     operator = np.matmul(
-                        kronecker_product_cached(prior,after,pauli_mat_symbol,False),operator,
+                        kronecker_product_cached(prior, after, pauli_mat_symbol, False),
+                        operator,
                     )
             if number_active_orbitals >= use_csr:
                 tmp *= bra.bra_active_csr.dot(operator).toarray()[0, 0]
             else:
                 tmp *= np.matmul(bra.bra_active, operator)
         total += fac * tmp
-    #print(f"Expectation value: {time.time() - start}")
+    # print(f"Expectation value: {time.time() - start}")
     if abs(total.imag) > 10**-10:
         print(f"WARNING, imaginary value of {total.imag}")
     return total.real
 
 
-@cache
+@functools.cache
 def pauli_mul(pauli1: str, pauli2: str) -> tuple[float, str]:
     if pauli1 == "I":
         return 1, pauli2

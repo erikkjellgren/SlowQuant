@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import scipy.linalg
 
@@ -77,9 +79,6 @@ def iterate_T2(
                     yield theta_idx, a, i, b, j
 
 
-import time
-
-
 def construct_UCC_U(
     num_spin_orbs: int,
     num_elec: int,
@@ -87,6 +86,7 @@ def construct_UCC_U(
     excitations: str,
     active_occ: list[int],
     active_unocc: list[int],
+    allowed_states: np.ndarray = None,
     use_csr: int = 8,
 ) -> np.ndarray:
     t = np.zeros((2**num_spin_orbs, 2**num_spin_orbs))
@@ -111,12 +111,18 @@ def construct_UCC_U(
                 tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, num_elec, use_csr=use_csr))
                 t += theta[counter] * tmp
             counter += 1
-    
+
     if num_spin_orbs >= use_csr:
         T = t - t.conjugate().transpose()
+        if allowed_states is not None:
+            T = T[allowed_states, :]
+            T = T[:, allowed_states]
         A = scipy.sparse.linalg.expm(T)
     else:
         T = t - np.conj(t).transpose()
+        if allowed_states is not None:
+            T = T[allowed_states, :]
+            T = T[:, allowed_states]
         A = scipy.linalg.expm(T)
-    #print(f"expm: {time.time() - start}")
+    print(f"expm: {time.time() - start}")
     return A

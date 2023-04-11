@@ -111,11 +111,14 @@ class WaveFunctionUCC:
     @property
     def update_state_vector(self) -> None:
         U = construct_UCC_U(
-            self.num_active_spin_orbs, self.num_active_elec, self.theta1 + self.theta2, 'sd', self.active_occ, self.active_unocc
+            self.num_active_spin_orbs,
+            self.num_active_elec,
+            self.theta1 + self.theta2,
+            "sd",
+            self.active_occ,
+            self.active_unocc,
         )
         self.state_vector.U = U
-
-    
 
     def run_HF(self) -> None:
         e_tot = partial(
@@ -251,7 +254,9 @@ def energy_HF(
     c_trans = construct_integral_trans_mat(c_orthonormal, kappa, kappa_idx)
     return expectation_value(
         state_vector,
-        Hamiltonian_energy_only(h_core, g_eri, c_trans, num_inactive_spin_orbs, 0, num_virtual_spin_orbs, num_elec),
+        Hamiltonian_energy_only(
+            h_core, g_eri, c_trans, num_inactive_spin_orbs, 0, num_virtual_spin_orbs, num_elec
+        ),
         state_vector,
     )
 
@@ -300,15 +305,27 @@ def energy_UCC(
         c_trans = c_orthonormal
 
     U = construct_UCC_U(
-        num_active_spin_orbs, num_active_elec, theta1 + theta2, excitations, active_occ, active_unocc
+        num_active_spin_orbs,
+        num_active_elec,
+        theta1 + theta2,
+        excitations,
+        active_occ,
+        active_unocc,
+        allowed_states=state_vector.allowed_active_states_number_conserving,
     )
-    state_vector.U = U
+    state_vector.new_U(U, allowed_states=state_vector.allowed_active_states_number_conserving)
     A = expectation_value(
         state_vector,
         Hamiltonian_energy_only(
-            h_core, g_eri, c_trans, num_inactive_spin_orbs, num_active_spin_orbs, num_virtual_spin_orbs, num_elec
+            h_core,
+            g_eri,
+            c_trans,
+            num_inactive_spin_orbs,
+            num_active_spin_orbs,
+            num_virtual_spin_orbs,
+            num_elec,
         ),
         state_vector,
     )
-    #print(f"step-time: {time.time() - start}")
+    # print(f"step-time: {time.time() - start}")
     return A
