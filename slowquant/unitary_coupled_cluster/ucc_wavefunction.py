@@ -118,7 +118,7 @@ class WaveFunctionUCC:
             self.active_occ,
             self.active_unocc,
         )
-        self.state_vector.U = U
+        self.state_vector.new_U(U)
 
     def run_HF(self) -> None:
         e_tot = partial(

@@ -22,7 +22,7 @@ def iterate_T1(
 ) -> tuple[int]:
     theta_idx = -1
     # Force false, not sure it is correct, but keeping the code for now
-    is_spin_conserving = False
+    # is_spin_conserving = False
     for a in active_unocc:
         for i in active_occ:
             theta_idx += 1
@@ -46,7 +46,7 @@ def iterate_T2(
 ) -> tuple[int]:
     theta_idx = -1
     # Force false, not sure it is correct, but keeping the code for now
-    is_spin_conserving = False
+    # is_spin_conserving = False
     for a in active_unocc:
         for b in active_unocc:
             if a >= b:
@@ -124,5 +124,4 @@ def construct_UCC_U(
             T = T[allowed_states, :]
             T = T[:, allowed_states]
         A = scipy.linalg.expm(T)
-    print(f"expm: {time.time() - start}")
     return A

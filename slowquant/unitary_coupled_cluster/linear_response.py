@@ -48,18 +48,19 @@ class LinearResponseUCC:
         self.V = np.zeros((num_parameters, num_parameters))
         self.Q = np.zeros((num_parameters, num_parameters))
         self.W = np.zeros((num_parameters, num_parameters))
-        for i, G1 in enumerate(self.G_ops):
-            for j, G2 in enumerate(self.G_ops):
+        for j, G2 in enumerate(self.G_ops):
+            H_G2 = commutator(H, G2)
+            H_G2_dagger = commutator(H, G2.dagger)
+            print(j)
+            for i, G1 in enumerate(self.G_ops):
                 # Make M
-                operator = commutator(H, G2)
-                operator = commutator(G1.dagger, operator)
+                operator = commutator(G1.dagger, H_G2)
                 self.M[i, j] = expectation_value(self.wf.state_vector, operator, self.wf.state_vector)
                 # Make V
                 operator = commutator(G1.dagger, G2)
                 self.V[i, j] = expectation_value(self.wf.state_vector, operator, self.wf.state_vector)
                 # Make Q
-                operator = commutator(H, G2.dagger)
-                operator = commutator(G1.dagger, operator)
+                operator = commutator(G1.dagger, H_G2_dagger)
                 self.Q[i, j] = -expectation_value(self.wf.state_vector, operator, self.wf.state_vector)
                 # Make W
                 operator = commutator(G1.dagger, G2.dagger)
