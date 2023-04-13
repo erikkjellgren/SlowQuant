@@ -112,7 +112,7 @@ def kronecker_product_cached(
        is_csr: If the resulting matrix representation should be a sparse matrix.
 
     Returns:
-       Matrix representation ofi an operator.
+       Matrix representation of an operator.
     """
     mat = pauli_to_mat(pauli_mat_symbol)
     if is_csr:
@@ -258,7 +258,7 @@ def expectation_value(bra: StateVector, pauliop: PauliOperator, ket: StateVector
         if abs(tmp) < 10**-12:
             continue
         number_active_orbitals = len(bra._active_onvector)
-        active_start = len(bra.inactive)
+        active_start = len(bra.bra_inactive)
         active_end = active_start + number_active_orbitals
         if number_active_orbitals != 0:
             if number_active_orbitals >= use_csr:
@@ -274,6 +274,7 @@ def expectation_value(bra: StateVector, pauliop: PauliOperator, ket: StateVector
                 if number_active_orbitals >= use_csr:
                     operator = kronecker_product_cached(prior, after, pauli_mat_symbol, True).dot(operator)
                     if operator.nnz == 0:
+                        tmp = 0
                         break
                 else:
                     operator = np.matmul(

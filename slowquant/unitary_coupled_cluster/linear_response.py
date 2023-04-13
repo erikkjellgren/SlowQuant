@@ -21,20 +21,18 @@ from slowquant.unitary_coupled_cluster.util import iterate_T1, iterate_T2
 class LinearResponseUCC:
     def __init__(self, wave_function: WaveFunctionUCC, is_spin_conserving: bool = False) -> None:
         self.wf = copy.deepcopy(wave_function)
+        self.theta_picker = copy.deepcopy(self.wf.theta_picker)
+        self.theta_picker.is_spin_conserving = is_spin_conserving
 
         self.G_ops = []
         num_spin_orbs = self.wf.num_spin_orbs
         num_elec = self.wf.num_elec
-        for (_, a, i) in iterate_T1(
-            self.wf.active_occ, self.wf.active_unocc, is_spin_conserving=is_spin_conserving
-        ):
+        for (_, a, i) in self.theta_picker.get_T1_generator():
             self.G_ops.append(
                 PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec))
                 * PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
             )
-        for (_, a, i, b, j) in iterate_T2(
-            self.wf.active_occ, self.wf.active_unocc, is_spin_conserving=is_spin_conserving
-        ):
+        for (_, a, i, b, j) in self.theta_picker.get_T2_generator():
             tmp = PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec)) * PauliOperator(
                 a_op_spin(b, True, num_spin_orbs, num_elec)
             )
