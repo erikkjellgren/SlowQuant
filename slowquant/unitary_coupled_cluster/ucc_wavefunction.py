@@ -358,9 +358,9 @@ def energy_UCC(
         theta1 + theta2 + theta3 + theta4,
         theta_picker,
         excitations,
-        allowed_states=state_vector.allowed_active_states_number_conserving,
+        allowed_states=state_vector.allowed_active_states_number_spin_conserving,
     )
-    state_vector.new_U(U, allowed_states=state_vector.allowed_active_states_number_conserving)
+    state_vector.new_U(U, allowed_states=state_vector.allowed_active_states_number_spin_conserving)
     A = expectation_value(
         state_vector,
         Hamiltonian_energy_only(

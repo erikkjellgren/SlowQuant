@@ -169,20 +169,36 @@ class StateVector:
         o = np.array([0, 1])
         z = np.array([1, 0])
         num_active_elec = 0
+        num_active_alpha_elec = 0
+        num_active_beta_elec = 0
         num_active_spin_orbs = len(self._active_onvector)
         if num_active_spin_orbs != 0:
-            for vec in self._active_onvector:
+            for idx, vec in enumerate(self._active_onvector):
                 if vec[0] == 0 and vec[1] == 1:
                     num_active_elec += 1
+                    if idx%2 == 0:
+                        num_active_alpha_elec += 1
+                    else:
+                        num_active_beta_elec += 1
             self.allowed_active_states_number_conserving = np.zeros(len(self._active), dtype=bool)
+            self.allowed_active_states_number_spin_conserving = np.zeros(len(self._active), dtype=bool)
             for comb in itertools.product([o, z], repeat=num_active_spin_orbs):
                 num_elec = 0
-                for vec in comb:
+                num_alpha_elec = 0
+                num_beta_elec = 0
+                for idx, vec in enumerate(comb):
                     if vec[0] == 0 and vec[1] == 1:
                         num_elec += 1
+                        if idx%2 == 0:
+                            num_alpha_elec += 1
+                        else:
+                            num_beta_elec += 1
                 if num_elec == num_active_elec:
                     idx = np.argmax(kronecker_product(comb))
                     self.allowed_active_states_number_conserving[idx] = True
+                    if num_alpha_elec == num_active_alpha_elec and num_beta_elec == num_active_beta_elec:
+                        self.allowed_active_states_number_spin_conserving[idx] = True
+
 
     @property
     def bra_inactive(self) -> list[np.ndarray]:
