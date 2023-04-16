@@ -15,30 +15,54 @@ from slowquant.unitary_coupled_cluster.base import (
     expectation_value,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
-from slowquant.unitary_coupled_cluster.util import iterate_T1, iterate_T2
+from slowquant.unitary_coupled_cluster.util import iterate_T1, iterate_T2, ThetaPicker, iterate_T3, iterate_T4
 
 
 class LinearResponseUCC:
-    def __init__(self, wave_function: WaveFunctionUCC, is_spin_conserving: bool = False) -> None:
+    def __init__(self, wave_function: WaveFunctionUCC, excitations: str, is_spin_conserving: bool = False, use_TDA: bool = False) -> None:
         self.wf = copy.deepcopy(wave_function)
-        self.theta_picker = copy.deepcopy(self.wf.theta_picker)
-        self.theta_picker.is_spin_conserving = is_spin_conserving
+        self.theta_picker = ThetaPicker(self.wf.active_occ, self.wf.active_unocc, is_spin_conserving=is_spin_conserving)
 
         self.G_ops = []
         num_spin_orbs = self.wf.num_spin_orbs
         num_elec = self.wf.num_elec
-        for (_, a, i) in self.theta_picker.get_T1_generator():
-            self.G_ops.append(
-                PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec))
-                * PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
-            )
-        for (_, a, i, b, j) in self.theta_picker.get_T2_generator():
-            tmp = PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec)) * PauliOperator(
-                a_op_spin(b, True, num_spin_orbs, num_elec)
-            )
-            tmp = tmp * PauliOperator(a_op_spin(j, False, num_spin_orbs, num_elec))
-            tmp = tmp * PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
-            self.G_ops.append(tmp)
+        excitations = excitations.lower()
+        if 's' in excitations:
+            for (_, a, i) in self.theta_picker.get_T1_generator():
+                self.G_ops.append(
+                    PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec))
+                    * PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
+                )
+        if 'd' in excitations:
+            for (_, a, i, b, j) in self.theta_picker.get_T2_generator():
+                tmp = PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec)) * PauliOperator(
+                    a_op_spin(b, True, num_spin_orbs, num_elec)
+                )
+                tmp = tmp * PauliOperator(a_op_spin(j, False, num_spin_orbs, num_elec))
+                tmp = tmp * PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
+                self.G_ops.append(tmp)
+        if 't' in excitations:
+            for (_, a, i, b, j, c, k) in self.theta_picker.get_T3_generator():
+                tmp = PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec)) * PauliOperator(
+                    a_op_spin(b, True, num_spin_orbs, num_elec)
+                )
+                tmp = tmp * PauliOperator(a_op_spin(c, True, num_spin_orbs, num_elec))
+                tmp = tmp * PauliOperator(a_op_spin(k, False, num_spin_orbs, num_elec))
+                tmp = tmp * PauliOperator(a_op_spin(j, False, num_spin_orbs, num_elec))
+                tmp = tmp * PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
+                self.G_ops.append(tmp)
+        if 'q' in excitations:
+            for (_, a, i, b, j, c, k, d, l) in self.theta_picker.get_T4_generator():
+                tmp = PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec)) * PauliOperator(
+                    a_op_spin(b, True, num_spin_orbs, num_elec)
+                )
+                tmp = tmp * PauliOperator(a_op_spin(c, True, num_spin_orbs, num_elec))
+                tmp = tmp * PauliOperator(a_op_spin(d, True, num_spin_orbs, num_elec))
+                tmp = tmp * PauliOperator(a_op_spin(l, False, num_spin_orbs, num_elec))
+                tmp = tmp * PauliOperator(a_op_spin(k, False, num_spin_orbs, num_elec))
+                tmp = tmp * PauliOperator(a_op_spin(j, False, num_spin_orbs, num_elec))
+                tmp = tmp * PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
+                self.G_ops.append(tmp)
 
         num_parameters = len(self.G_ops)
         H = Hamiltonian(self.wf.h_core, self.wf.g_eri, self.wf.c_trans, num_spin_orbs, num_elec)
@@ -48,8 +72,8 @@ class LinearResponseUCC:
         self.W = np.zeros((num_parameters, num_parameters))
         for j, G2 in enumerate(self.G_ops):
             H_G2 = commutator(H, G2)
-            H_G2_dagger = commutator(H, G2.dagger)
-            print(j)
+            if not use_TDA:
+                H_G2_dagger = commutator(H, G2.dagger)
             for i, G1 in enumerate(self.G_ops):
                 # Make M
                 operator = commutator(G1.dagger, H_G2)
@@ -57,12 +81,13 @@ class LinearResponseUCC:
                 # Make V
                 operator = commutator(G1.dagger, G2)
                 self.V[i, j] = expectation_value(self.wf.state_vector, operator, self.wf.state_vector)
-                # Make Q
-                operator = commutator(G1.dagger, H_G2_dagger)
-                self.Q[i, j] = -expectation_value(self.wf.state_vector, operator, self.wf.state_vector)
-                # Make W
-                operator = commutator(G1.dagger, G2.dagger)
-                self.W[i, j] = -expectation_value(self.wf.state_vector, operator, self.wf.state_vector)
+                if not use_TDA:
+                    # Make Q
+                    operator = commutator(G1.dagger, H_G2_dagger)
+                    self.Q[i, j] = -expectation_value(self.wf.state_vector, operator, self.wf.state_vector)
+                    # Make W
+                    operator = commutator(G1.dagger, G2.dagger)
+                    self.W[i, j] = -expectation_value(self.wf.state_vector, operator, self.wf.state_vector)
 
     def calc_excitation_energies(self) -> None:
         size = len(self.M)

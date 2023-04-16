@@ -265,7 +265,7 @@ def test_H2_STO3G_UCCSD_LR() -> None:
         g_eri,
     )
     WF.run_UCC("SD", False)
-    LR = LinearResponseUCC(WF)
+    LR = LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.6577) < 10**-3
     assert abs(LR.excitation_energies[1] - 0.6577) < 10**-3
