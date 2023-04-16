@@ -64,6 +64,42 @@ def test_HeH_sto3g_UCCS() -> None:
     assert abs(WF.ucc_energy - (-4.262632309847)) < 10**-8
 
 
+def test_H10_STO3G_UCCSD() -> None:
+    """Test UCCSD(2,2).
+    Test made after bug found where more than two inactive orbitals would not work.
+    """
+    A = sq.SlowQuant()
+    A.set_molecule(
+        """H  0.0  0.0  0.0;
+           H  1.4  0.0  0.0;
+           H  2.8  0.0  0.0;
+           H  4.2  0.0  0.0;
+           H  5.6  0.0  0.0;
+           H  7.0  0.0  0.0;
+           H  8.4  0.0  0.0;
+           H  9.8  0.0  0.0;
+           H 11.2  0.0  0.0;
+           H 12.6  0.0  0.0;""",
+        distance_unit="bohr",
+    )
+    A.set_basis_set("sto-3g")
+    A.init_hartree_fock()
+    A.hartree_fock.run_restricted_hartree_fock()
+    num_bf = A.molecule.number_bf
+    h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
+    g_eri = A.integral.electron_repulsion_tensor
+    WF = WaveFunctionUCC(
+        A.molecule.number_bf * 2,
+        A.molecule.number_electrons,
+        [8, 9, 10, 11],
+        A.hartree_fock.mo_coeff,
+        h_core,
+        g_eri,
+    )
+    WF.run_UCC("SD", False)
+    assert abs(WF.ucc_energy - (-18.839645894737956)) < 10**-8
+
+
 def test_H2_431G_OOUCCSD() -> None:
     """Test OO-UCCSD(2,2)."""
     A = sq.SlowQuant()
@@ -170,9 +206,7 @@ def test_H4_STO3G_OOUCCSD() -> None:
     WF.run_UCC("SD", True)
     assert abs(WF.ucc_energy - (-5.211066791547)) < 10**-8
     # Test sparse matrix also works
-    H = Hamiltonian(
-        h_core, g_eri, WF.c_trans, WF.num_spin_orbs, WF.num_elec
-    )
+    H = Hamiltonian(h_core, g_eri, WF.c_trans, WF.num_spin_orbs, WF.num_elec)
     assert abs(WF.ucc_energy - expectation_value(WF.state_vector, H, WF.state_vector, use_csr=0)) < 10**-8
 
 
@@ -204,9 +238,7 @@ def test_H4_STO3G_OOUCCD() -> None:
     WF.run_UCC("D", True)
     assert abs(WF.ucc_energy - (-5.211066791547)) < 10**-8
     # Test sparse matrix also works
-    H = Hamiltonian(
-        h_core, g_eri, WF.c_trans, WF.num_spin_orbs, WF.num_elec
-    )
+    H = Hamiltonian(h_core, g_eri, WF.c_trans, WF.num_spin_orbs, WF.num_elec)
     assert abs(WF.ucc_energy - expectation_value(WF.state_vector, H, WF.state_vector, use_csr=0)) < 10**-8
 
 
@@ -251,3 +283,35 @@ def test_H2_STO3G_UCCSD_LR() -> None:
     assert abs(LR.get_transition_dipole(2, dipole_int) - 0.0) < 10**-3
     assert abs(LR.get_transition_dipole(3, dipole_int) - 1.1441) < 10**-3
     assert abs(LR.get_transition_dipole(4, dipole_int) - 0.0) < 10**-3
+
+
+def test_H4_STO3G_UCCDQ() -> None:
+    """Test UCCDQ(4,4).
+    For this particular system only D and Q contributes to the energy.
+    I think :))))
+    """
+    A = sq.SlowQuant()
+    A.set_molecule(
+        """H  0.0  0.0  0.0;
+           H  0.0  1.5  0.0;
+           H  1.8  0.0  0.0;
+           H  1.8  1.5  0.0;""",
+        distance_unit="angstrom",
+    )
+    A.set_basis_set("sto-3g")
+    A.init_hartree_fock()
+    A.hartree_fock.run_restricted_hartree_fock()
+    num_bf = A.molecule.number_bf
+    h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
+    g_eri = A.integral.electron_repulsion_tensor
+    WF = WaveFunctionUCC(
+        A.molecule.number_bf * 2,
+        A.molecule.number_electrons,
+        [0, 1, 2, 3, 4, 5, 6, 7],
+        A.hartree_fock.mo_coeff,
+        h_core,
+        g_eri,
+        include_active_kappa=True,
+    )
+    WF.run_UCC("DQ", False)
+    assert abs(WF.ucc_energy + A.molecule.nuclear_repulsion - (-1.968914822185857)) < 10**-7

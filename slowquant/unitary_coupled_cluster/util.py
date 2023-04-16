@@ -37,6 +37,12 @@ class ThetaPicker:
     def get_T2_generator(self) -> Generator[tuple[int, int, int, int, int], None, None]:
         return iterate_T2(self.active_occ, self.active_unocc, self.is_spin_conserving, self.is_generalized)
 
+    def get_T3_generator(self) -> Generator[tuple[int, int, int, int, int, int, int], None, None]:
+        return iterate_T3(self.active_occ, self.active_unocc, self.is_spin_conserving, self.is_generalized)
+
+    def get_T4_generator(self) -> Generator[tuple[int, int, int, int, int, int, int, int, int], None, None]:
+        return iterate_T4(self.active_occ, self.active_unocc, self.is_spin_conserving, self.is_generalized)
+
 
 def iterate_T1(
     active_occ: list[int], active_unocc: list[int], is_spin_conserving: bool, is_generalized: bool
@@ -313,35 +319,57 @@ def iterate_T4(
                 for c in active_unocc:
                     if b >= c:
                         continue
-                    for i in active_occ:
-                        for j in active_occ:
-                            if i >= j:
-                                continue
-                            for k in active_occ:
-                                if j >= k:
+                    for d in active_unocc:
+                        if c >= d:
+                            continue
+                        for i in active_occ:
+                            for j in active_occ:
+                                if i >= j:
                                     continue
-                                theta_idx += 1
-                                num_alpha = 0
-                                num_beta = 0
-                                if a % 2 == 0:
-                                    num_alpha += 1
-                                else:
-                                    num_beta += 1
-                                if b % 2 == 0:
-                                    num_alpha += 1
-                                else:
-                                    num_beta += 1
-                                if i % 2 == 0:
-                                    num_alpha += 1
-                                else:
-                                    num_beta += 1
-                                if j % 2 == 0:
-                                    num_alpha += 1
-                                else:
-                                    num_beta += 1
-                                if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
-                                    continue
-                                yield theta_idx, a, i, b, j, c, k
+                                for k in active_occ:
+                                    if j >= k:
+                                        continue
+                                    for l in active_occ:
+                                        if k >= l:
+                                            continue
+                                        theta_idx += 1
+                                        num_alpha = 0
+                                        num_beta = 0
+                                        if a % 2 == 0:
+                                            num_alpha += 1
+                                        else:
+                                            num_beta += 1
+                                        if b % 2 == 0:
+                                            num_alpha += 1
+                                        else:
+                                            num_beta += 1
+                                        if c % 2 == 0:
+                                            num_alpha += 1
+                                        else:
+                                            num_beta += 1
+                                        if d % 2 == 0:
+                                            num_alpha += 1
+                                        else:
+                                            num_beta += 1
+                                        if i % 2 == 0:
+                                            num_alpha += 1
+                                        else:
+                                            num_beta += 1
+                                        if j % 2 == 0:
+                                            num_alpha += 1
+                                        else:
+                                            num_beta += 1
+                                        if k % 2 == 0:
+                                            num_alpha += 1
+                                        else:
+                                            num_beta += 1
+                                        if l % 2 == 0:
+                                            num_alpha += 1
+                                        else:
+                                            num_beta += 1
+                                        if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
+                                            continue
+                                        yield theta_idx, a, i, b, j, c, k, d, l
 
 
 def construct_UCC_U(
@@ -375,6 +403,35 @@ def construct_UCC_U(
                 tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, num_elec, use_csr=use_csr))
                 t += theta[counter] * tmp
             counter += 1
+
+    if "t" in excitations:
+        for (_, a, i, b, j, c, k) in theta_picker.get_T3_generator():
+            if theta[counter] != 0.0:
+                tmp = a_op_spin_matrix(a, True, num_spin_orbs, num_elec, use_csr=use_csr).dot(
+                    a_op_spin_matrix(b, True, num_spin_orbs, num_elec, use_csr=use_csr)
+                )
+                tmp = tmp.dot(a_op_spin_matrix(c, True, num_spin_orbs, num_elec, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(k, False, num_spin_orbs, num_elec, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(j, False, num_spin_orbs, num_elec, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, num_elec, use_csr=use_csr))
+                t += theta[counter] * tmp
+            counter += 1
+
+    if "q" in excitations:
+        for (_, a, i, b, j, c, k, d, l) in theta_picker.get_T4_generator():
+            if theta[counter] != 0.0:
+                tmp = a_op_spin_matrix(a, True, num_spin_orbs, num_elec, use_csr=use_csr).dot(
+                    a_op_spin_matrix(b, True, num_spin_orbs, num_elec, use_csr=use_csr)
+                )
+                tmp = tmp.dot(a_op_spin_matrix(c, True, num_spin_orbs, num_elec, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(d, True, num_spin_orbs, num_elec, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(l, False, num_spin_orbs, num_elec, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(k, False, num_spin_orbs, num_elec, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(j, False, num_spin_orbs, num_elec, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, num_elec, use_csr=use_csr))
+                t += theta[counter] * tmp
+            counter += 1
+    assert counter == len(theta)
 
     if num_spin_orbs >= use_csr:
         T = t - t.conjugate().transpose()
