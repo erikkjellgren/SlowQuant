@@ -11,9 +11,9 @@ from slowquant.unitary_coupled_cluster.base import (
     expectation_value,
 )
 from slowquant.unitary_coupled_cluster.util import (
+    ThetaPicker,
     construct_integral_trans_mat,
     construct_UCC_U,
-    ThetaPicker
 )
 
 
@@ -92,8 +92,12 @@ class WaveFunctionUCC:
                 self.kappa.append(0)
                 self.kappa_idx.append([p // 2, q // 2])
         # Construct theta1
-        self.theta_picker = ThetaPicker(self.active_occ, self.active_unocc, is_spin_conserving=True, is_generalized=is_generalized)
-        theta_picker_full = ThetaPicker(self.active_occ, self.active_unocc, is_spin_conserving=False, is_generalized=is_generalized)
+        self.theta_picker = ThetaPicker(
+            self.active_occ, self.active_unocc, is_spin_conserving=True, is_generalized=is_generalized
+        )
+        theta_picker_full = ThetaPicker(
+            self.active_occ, self.active_unocc, is_spin_conserving=False, is_generalized=is_generalized
+        )
         self.theta1 = []
         for _ in theta_picker_full.get_T1_generator():
             self.theta1.append(0)
@@ -101,6 +105,14 @@ class WaveFunctionUCC:
         self.theta2 = []
         for _ in theta_picker_full.get_T2_generator():
             self.theta2.append(0)
+        # Construct theta3
+        self.theta3 = []
+        for _ in theta_picker_full.get_T3_generator():
+            self.theta3.append(0)
+        # Construct theta4
+        self.theta4 = []
+        for _ in theta_picker_full.get_T4_generator():
+            self.theta4.append(0)
 
     @property
     def c_trans(self) -> np.ndarray:
@@ -115,8 +127,8 @@ class WaveFunctionUCC:
         U = construct_UCC_U(
             self.num_active_spin_orbs,
             self.num_active_elec,
-            self.theta1 + self.theta2,
-            "sd",
+            self.theta1 + self.theta2 + self.theta3 + self.theta4,
+            "sdtq",
             self.active_occ,
             self.active_unocc,
         )
@@ -202,6 +214,8 @@ class WaveFunctionUCC:
         num_kappa = 0
         num_theta1 = 0
         num_theta2 = 0
+        num_theta3 = 0
+        num_theta4 = 0
         if orbital_optimization:
             parameters += self.kappa
             num_kappa += len(self.kappa)
@@ -213,11 +227,21 @@ class WaveFunctionUCC:
             for idx, _, _, _, _ in self.theta_picker.get_T2_generator():
                 parameters += [self.theta2[idx]]
                 num_theta2 += 1
+        if "t" in excitations:
+            for idx, _, _, _, _, _, _ in self.theta_picker.get_T3_generator():
+                parameters += [self.theta3[idx]]
+                num_theta3 += 1
+        if "q" in excitations:
+            for idx, _, _, _, _, _, _, _, _ in self.theta_picker.get_T4_generator():
+                parameters += [self.theta4[idx]]
+                num_theta4 += 1
         print("### Parameters information:")
         print(f"### Number kappa: {num_kappa}")
         print(f"### Number theta1: {num_theta1}")
         print(f"### Number theta2: {num_theta2}")
-        print(f"### Total parameters: {num_kappa+num_theta1+num_theta2}")
+        print(f"### Number theta3: {num_theta3}")
+        print(f"### Number theta4: {num_theta4}")
+        print(f"### Total parameters: {num_kappa+num_theta1+num_theta2+num_theta3+num_theta4}")
         res = scipy.optimize.minimize(e_tot, parameters, tol=1e-6, callback=print_progress)
         self.ucc_energy = res["fun"]
         param_idx = 0
@@ -237,6 +261,20 @@ class WaveFunctionUCC:
             counter = 0
             for idx, _, _, _, _ in self.theta_picker.get_T2_generator():
                 self.theta2[idx] = thetas[counter]
+                counter += 1
+        if "t" in excitations:
+            thetas = res["x"][param_idx : num_theta3 + param_idx].tolist()
+            param_idx += len(thetas)
+            counter = 0
+            for idx, _, _, _, _, _, _ in self.theta_picker.get_T3_generator():
+                self.theta3[idx] = thetas[counter]
+                counter += 1
+        if "q" in excitations:
+            thetas = res["x"][param_idx : num_theta4 + param_idx].tolist()
+            param_idx += len(thetas)
+            counter = 0
+            for idx, _, _, _, _, _, _, _, _ in self.theta_picker.get_T4_generator():
+                self.theta4[idx] = thetas[counter]
                 counter += 1
 
 
@@ -281,6 +319,8 @@ def energy_UCC(
     kappa = []
     theta1 = []
     theta2 = []
+    theta3 = []
+    theta4 = []
     idx_counter = 0
     for i in range(len(kappa_idx)):
         kappa.append(parameters[idx_counter])
@@ -293,6 +333,15 @@ def energy_UCC(
         for _ in theta_picker.get_T2_generator():
             theta2.append(parameters[idx_counter])
             idx_counter += 1
+    if "t" in excitations:
+        for _ in theta_picker.get_T3_generator():
+            theta3.append(parameters[idx_counter])
+            idx_counter += 1
+    if "q" in excitations:
+        for _ in theta_picker.get_T4_generator():
+            theta4.append(parameters[idx_counter])
+            idx_counter += 1
+    assert len(parameters) == len(kappa) + len(theta1) + len(theta2) + len(theta3) + len(theta4)
 
     if orbital_optimized:
         kappa_mat = np.zeros_like(c_orthonormal)
@@ -306,12 +355,12 @@ def energy_UCC(
     U = construct_UCC_U(
         num_active_spin_orbs,
         num_active_elec,
-        theta1 + theta2,
+        theta1 + theta2 + theta3 + theta4,
         theta_picker,
         excitations,
-        allowed_states=state_vector.allowed_active_states_number_conserving,
+        allowed_states=state_vector.allowed_active_states_number_spin_conserving,
     )
-    state_vector.new_U(U, allowed_states=state_vector.allowed_active_states_number_conserving)
+    state_vector.new_U(U, allowed_states=state_vector.allowed_active_states_number_spin_conserving)
     A = expectation_value(
         state_vector,
         Hamiltonian_energy_only(

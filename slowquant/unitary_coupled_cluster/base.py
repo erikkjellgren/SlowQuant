@@ -44,7 +44,8 @@ def a_op_spin_matrix(
                 operators.append(a_mat_dagger)
             else:
                 operators.append(a_mat)
-        elif i <= number_electrons and i < idx:
+        # elif i <= number_electrons and i < idx:
+        elif i < idx:
             operators.append(Z_mat)
         else:
             operators.append(I_mat)
@@ -85,7 +86,8 @@ def a_op(
                 fac1 *= 0.5
                 op2 += "Y"
                 fac2 *= 0.5j
-        elif i <= number_of_electrons and i < idx:
+        # elif i <= number_of_electrons and i < idx:
+        elif i < idx:
             op1 += "Z"
             op2 += "Z"
         else:
@@ -167,20 +169,36 @@ class StateVector:
         o = np.array([0, 1])
         z = np.array([1, 0])
         num_active_elec = 0
+        num_active_alpha_elec = 0
+        num_active_beta_elec = 0
         num_active_spin_orbs = len(self._active_onvector)
         if num_active_spin_orbs != 0:
-            for vec in self._active_onvector:
+            for idx, vec in enumerate(self._active_onvector):
                 if vec[0] == 0 and vec[1] == 1:
                     num_active_elec += 1
+                    if idx%2 == 0:
+                        num_active_alpha_elec += 1
+                    else:
+                        num_active_beta_elec += 1
             self.allowed_active_states_number_conserving = np.zeros(len(self._active), dtype=bool)
+            self.allowed_active_states_number_spin_conserving = np.zeros(len(self._active), dtype=bool)
             for comb in itertools.product([o, z], repeat=num_active_spin_orbs):
                 num_elec = 0
-                for vec in comb:
+                num_alpha_elec = 0
+                num_beta_elec = 0
+                for idx, vec in enumerate(comb):
                     if vec[0] == 0 and vec[1] == 1:
                         num_elec += 1
+                        if idx%2 == 0:
+                            num_alpha_elec += 1
+                        else:
+                            num_beta_elec += 1
                 if num_elec == num_active_elec:
                     idx = np.argmax(kronecker_product(comb))
                     self.allowed_active_states_number_conserving[idx] = True
+                    if num_alpha_elec == num_active_alpha_elec and num_beta_elec == num_active_beta_elec:
+                        self.allowed_active_states_number_spin_conserving[idx] = True
+
 
     @property
     def bra_inactive(self) -> list[np.ndarray]:
@@ -290,28 +308,6 @@ def expectation_value(bra: StateVector, pauliop: PauliOperator, ket: StateVector
     if abs(total.imag) > 10**-10:
         print(f"WARNING, imaginary value of {total.imag}")
     return total.real
-
-
-@functools.cache
-def pauli_mul(pauli1: str, pauli2: str) -> tuple[float, str]:
-    if pauli1 == "I":
-        return 1, pauli2
-    elif pauli2 == "I":
-        return 1, pauli1
-    elif pauli1 == pauli2:
-        return 1, "I"
-    elif pauli1 == "X" and pauli2 == "Y":
-        return 1j, "Z"
-    elif pauli1 == "X" and pauli2 == "Z":
-        return -1j, "Y"
-    elif pauli1 == "Y" and pauli2 == "X":
-        return -1j, "Z"
-    elif pauli1 == "Y" and pauli2 == "Z":
-        return 1j, "X"
-    elif pauli1 == "Z" and pauli2 == "X":
-        return 1j, "Y"
-    elif pauli1 == "Z" and pauli2 == "Y":
-        return -1j, "X"
 
 
 class PauliOperator:
