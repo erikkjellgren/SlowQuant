@@ -99,19 +99,19 @@ class WaveFunctionUCC:
             self.active_occ, self.active_unocc, is_spin_conserving=False, is_generalized=is_generalized
         )
         self.theta1 = []
-        for _ in theta_picker_full.get_T1_generator():
+        for _ in theta_picker_full.get_T1_generator(0, 0):
             self.theta1.append(0)
         # Construct theta2
         self.theta2 = []
-        for _ in theta_picker_full.get_T2_generator():
+        for _ in theta_picker_full.get_T2_generator(0, 0):
             self.theta2.append(0)
         # Construct theta3
         self.theta3 = []
-        for _ in theta_picker_full.get_T3_generator():
+        for _ in theta_picker_full.get_T3_generator(0, 0):
             self.theta3.append(0)
         # Construct theta4
         self.theta4 = []
-        for _ in theta_picker_full.get_T4_generator():
+        for _ in theta_picker_full.get_T4_generator(0, 0):
             self.theta4.append(0)
 
     @property
@@ -220,19 +220,19 @@ class WaveFunctionUCC:
             parameters += self.kappa
             num_kappa += len(self.kappa)
         if "s" in excitations:
-            for idx, _, _ in self.theta_picker.get_T1_generator():
+            for idx, _, _, _ in self.theta_picker.get_T1_generator(0, 0):
                 parameters += [self.theta1[idx]]
                 num_theta1 += 1
         if "d" in excitations:
-            for idx, _, _, _, _ in self.theta_picker.get_T2_generator():
+            for idx, _, _, _, _, _ in self.theta_picker.get_T2_generator(0, 0):
                 parameters += [self.theta2[idx]]
                 num_theta2 += 1
         if "t" in excitations:
-            for idx, _, _, _, _, _, _ in self.theta_picker.get_T3_generator():
+            for idx, _, _, _, _, _, _, _ in self.theta_picker.get_T3_generator(0, 0):
                 parameters += [self.theta3[idx]]
                 num_theta3 += 1
         if "q" in excitations:
-            for idx, _, _, _, _, _, _, _, _ in self.theta_picker.get_T4_generator():
+            for idx, _, _, _, _, _, _, _, _, _ in self.theta_picker.get_T4_generator(0, 0):
                 parameters += [self.theta4[idx]]
                 num_theta4 += 1
         print("### Parameters information:")
@@ -252,28 +252,28 @@ class WaveFunctionUCC:
             thetas = res["x"][param_idx : num_theta1 + param_idx].tolist()
             param_idx += len(thetas)
             counter = 0
-            for idx, _, _ in self.theta_picker.get_T1_generator():
+            for idx, _, _, _ in self.theta_picker.get_T1_generator(0, 0):
                 self.theta1[idx] = thetas[counter]
                 counter += 1
         if "d" in excitations:
             thetas = res["x"][param_idx : num_theta2 + param_idx].tolist()
             param_idx += len(thetas)
             counter = 0
-            for idx, _, _, _, _ in self.theta_picker.get_T2_generator():
+            for idx, _, _, _, _, _ in self.theta_picker.get_T2_generator(0, 0):
                 self.theta2[idx] = thetas[counter]
                 counter += 1
         if "t" in excitations:
             thetas = res["x"][param_idx : num_theta3 + param_idx].tolist()
             param_idx += len(thetas)
             counter = 0
-            for idx, _, _, _, _, _, _ in self.theta_picker.get_T3_generator():
+            for idx, _, _, _, _, _, _, _ in self.theta_picker.get_T3_generator(0, 0):
                 self.theta3[idx] = thetas[counter]
                 counter += 1
         if "q" in excitations:
             thetas = res["x"][param_idx : num_theta4 + param_idx].tolist()
             param_idx += len(thetas)
             counter = 0
-            for idx, _, _, _, _, _, _, _, _ in self.theta_picker.get_T4_generator():
+            for idx, _, _, _, _, _, _, _, _, _ in self.theta_picker.get_T4_generator(0, 0):
                 self.theta4[idx] = thetas[counter]
                 counter += 1
 
@@ -326,19 +326,19 @@ def energy_UCC(
         kappa.append(parameters[idx_counter])
         idx_counter += 1
     if "s" in excitations:
-        for _ in theta_picker.get_T1_generator():
+        for _ in theta_picker.get_T1_generator(0, 0):
             theta1.append(parameters[idx_counter])
             idx_counter += 1
     if "d" in excitations:
-        for _ in theta_picker.get_T2_generator():
+        for _ in theta_picker.get_T2_generator(0, 0):
             theta2.append(parameters[idx_counter])
             idx_counter += 1
     if "t" in excitations:
-        for _ in theta_picker.get_T3_generator():
+        for _ in theta_picker.get_T3_generator(0, 0):
             theta3.append(parameters[idx_counter])
             idx_counter += 1
     if "q" in excitations:
-        for _ in theta_picker.get_T4_generator():
+        for _ in theta_picker.get_T4_generator(0, 0):
             theta4.append(parameters[idx_counter])
             idx_counter += 1
     assert len(parameters) == len(kappa) + len(theta1) + len(theta2) + len(theta3) + len(theta4)

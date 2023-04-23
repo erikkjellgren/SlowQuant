@@ -4,7 +4,7 @@ from typing import Generator
 import numpy as np
 import scipy.linalg
 
-from slowquant.unitary_coupled_cluster.base import a_op_spin_matrix
+from slowquant.unitary_coupled_cluster.base import a_op_spin, PauliOperator
 
 
 def construct_integral_trans_mat(
@@ -31,138 +31,179 @@ class ThetaPicker:
         self.is_spin_conserving = is_spin_conserving
         self.is_generalized = is_generalized
 
-    def get_T1_generator(self) -> Generator[tuple[int, int, int], None, None]:
-        return iterate_T1(self.active_occ, self.active_unocc, self.is_spin_conserving, self.is_generalized)
+    def get_T1_generator(self, num_spin_orbs: int, num_elec: int) -> Generator[tuple[int, int, int, PauliOperator], None, None]:
+        return iterate_T1(self.active_occ, self.active_unocc, num_spin_orbs, num_elec, self.is_spin_conserving, self.is_generalized)
 
-    def get_T2_generator(self) -> Generator[tuple[int, int, int, int, int], None, None]:
-        return iterate_T2(self.active_occ, self.active_unocc, self.is_spin_conserving, self.is_generalized)
+    def get_T2_generator(self, num_spin_orbs: int, num_elec: int) -> Generator[tuple[int, int, int, int, int, PauliOperator], None, None]:
+        return iterate_T2(self.active_occ, self.active_unocc, num_spin_orbs, num_elec, self.is_spin_conserving, self.is_generalized)
 
-    def get_T3_generator(self) -> Generator[tuple[int, int, int, int, int, int, int], None, None]:
-        return iterate_T3(self.active_occ, self.active_unocc, self.is_spin_conserving, self.is_generalized)
+    def get_T3_generator(self, num_spin_orbs: int, num_elec: int) -> Generator[tuple[int, int, int, int, int, int, int, PauliOperator], None, None]:
+        return iterate_T3(self.active_occ, self.active_unocc, num_spin_orbs, num_elec, self.is_spin_conserving, self.is_generalized)
 
-    def get_T4_generator(self) -> Generator[tuple[int, int, int, int, int, int, int, int, int], None, None]:
-        return iterate_T4(self.active_occ, self.active_unocc, self.is_spin_conserving, self.is_generalized)
+    def get_T4_generator(self, num_spin_orbs: int, num_elec: int) -> Generator[tuple[int, int, int, int, int, int, int, int, int, PauliOperator], None, None]:
+        return iterate_T4(self.active_occ, self.active_unocc, num_spin_orbs, num_elec, self.is_spin_conserving, self.is_generalized)
 
 
 def iterate_T1(
-    active_occ: list[int], active_unocc: list[int], is_spin_conserving: bool, is_generalized: bool
+    active_occ: list[int], active_unocc: list[int], num_spin_orbs: int, num_elec: int, is_spin_conserving: bool, is_generalized: bool
 ) -> tuple[int]:
     theta_idx = -1
-    if is_generalized:
-        for a in active_occ + active_unocc:
-            for i in active_occ + active_unocc:
-                theta_idx += 1
-                num_alpha = 0
-                num_beta = 0
-                if a % 2 == 0:
-                    num_alpha += 1
-                else:
-                    num_beta += 1
-                if i % 2 == 0:
-                    num_alpha += 1
-                else:
-                    num_beta += 1
-                if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
+    for a in active_occ + active_unocc:
+        for i in active_occ + active_unocc:
+            if not is_generalized:
+                if a in active_occ:
                     continue
-                yield theta_idx, a, i
-    else:
-        for a in active_unocc:
-            for i in active_occ:
-                theta_idx += 1
-                num_alpha = 0
-                num_beta = 0
-                if a % 2 == 0:
-                    num_alpha += 1
-                else:
-                    num_beta += 1
-                if i % 2 == 0:
-                    num_alpha += 1
-                else:
-                    num_beta += 1
-                if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
+                if i in active_unocc:
                     continue
-                yield theta_idx, a, i
+            theta_idx += 1
+            num_alpha = 0
+            num_beta = 0
+            if a % 2 == 0:
+                num_alpha += 1
+            else:
+                num_beta += 1
+            if i % 2 == 0:
+                num_alpha += 1
+            else:
+                num_beta += 1
+            if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
+                continue
+            operator = PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec)) * PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
+            yield theta_idx, a, i, operator
 
 
 def iterate_T2(
-    active_occ: list[int], active_unocc: list[int], is_spin_conserving: bool, is_generalized: bool
+    active_occ: list[int], active_unocc: list[int], num_spin_orbs: int, num_elec: int, is_spin_conserving: bool, is_generalized: bool
 ) -> tuple[int]:
     theta_idx = -1
-    if is_generalized:
-        for a in active_occ + active_unocc:
-            for b in active_occ + active_unocc:
-                if a >= b:
+    for a in active_occ + active_unocc:
+        for b in active_occ + active_unocc:
+            if a >= b:
+                continue
+            for i in active_occ + active_unocc:
+                for j in active_occ + active_unocc:
+                    if i >= j:
+                        continue
+                    if not is_generalized:
+                        if a in active_occ:
+                            continue
+                        if b in active_occ:
+                            continue
+                        if i in active_unocc:
+                            continue
+                        if j in active_unocc:
+                            continue
+                    theta_idx += 1
+                    num_alpha = 0
+                    num_beta = 0
+                    if a % 2 == 0:
+                        num_alpha += 1
+                    else:
+                        num_beta += 1
+                    if b % 2 == 0:
+                        num_alpha += 1
+                    else:
+                        num_beta += 1
+                    if i % 2 == 0:
+                        num_alpha += 1
+                    else:
+                        num_beta += 1
+                    if j % 2 == 0:
+                        num_alpha += 1
+                    else:
+                        num_beta += 1
+                    if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
+                        continue
+                    operator = PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec))
+                    operator = operator * PauliOperator(a_op_spin(b, True, num_spin_orbs, num_elec))
+                    operator = operator * PauliOperator(a_op_spin(j, False, num_spin_orbs, num_elec))
+                    operator = operator * PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
+                    yield theta_idx, a, i, b, j, operator
+
+
+def iterate_T3(
+    active_occ: list[int], active_unocc: list[int], num_spin_orbs: int, num_elec: int, is_spin_conserving: bool, is_generalized: bool
+) -> tuple[int]:
+    theta_idx = -1
+    for a in active_occ + active_unocc:
+        for b in active_occ + active_unocc:
+            if a >= b:
+                continue
+            for c in active_occ + active_unocc:
+                if b >= c:
                     continue
                 for i in active_occ + active_unocc:
                     for j in active_occ + active_unocc:
                         if i >= j:
                             continue
-                        theta_idx += 1
-                        num_alpha = 0
-                        num_beta = 0
-                        if a % 2 == 0:
-                            num_alpha += 1
-                        else:
-                            num_beta += 1
-                        if b % 2 == 0:
-                            num_alpha += 1
-                        else:
-                            num_beta += 1
-                        if i % 2 == 0:
-                            num_alpha += 1
-                        else:
-                            num_beta += 1
-                        if j % 2 == 0:
-                            num_alpha += 1
-                        else:
-                            num_beta += 1
-                        if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
-                            continue
-                        yield theta_idx, a, i, b, j
-    else:
-        for a in active_unocc:
-            for b in active_unocc:
-                if a >= b:
-                    continue
-                for i in active_occ:
-                    for j in active_occ:
-                        if i >= j:
-                            continue
-                        theta_idx += 1
-                        num_alpha = 0
-                        num_beta = 0
-                        if a % 2 == 0:
-                            num_alpha += 1
-                        else:
-                            num_beta += 1
-                        if b % 2 == 0:
-                            num_alpha += 1
-                        else:
-                            num_beta += 1
-                        if i % 2 == 0:
-                            num_alpha += 1
-                        else:
-                            num_beta += 1
-                        if j % 2 == 0:
-                            num_alpha += 1
-                        else:
-                            num_beta += 1
-                        if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
-                            continue
-                        yield theta_idx, a, i, b, j
+                        for k in active_occ + active_unocc:
+                            if j >= k:
+                                continue
+                            if not is_generalized:
+                                if a in active_occ:
+                                    continue
+                                if b in active_occ:
+                                    continue
+                                if c in active_occ:
+                                    continue
+                                if i in active_unocc:
+                                    continue
+                                if j in active_unocc:
+                                    continue
+                                if k in active_unocc:
+                                    continue
+                            theta_idx += 1
+                            num_alpha = 0
+                            num_beta = 0
+                            if a % 2 == 0:
+                                num_alpha += 1
+                            else:
+                                num_beta += 1
+                            if b % 2 == 0:
+                                num_alpha += 1
+                            else:
+                                num_beta += 1
+                            if c % 2 == 0:
+                                num_alpha += 1
+                            else:
+                                num_beta += 1
+                            if i % 2 == 0:
+                                num_alpha += 1
+                            else:
+                                num_beta += 1
+                            if j % 2 == 0:
+                                num_alpha += 1
+                            else:
+                                num_beta += 1
+                            if k % 2 == 0:
+                                num_alpha += 1
+                            else:
+                                num_beta += 1
+                            if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
+                                continue
+                            operator = PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec)) * PauliOperator(
+                                a_op_spin(b, True, num_spin_orbs, num_elec)
+                            )
+                            operator = operator * PauliOperator(a_op_spin(c, True, num_spin_orbs, num_elec))
+                            operator = operator * PauliOperator(a_op_spin(k, False, num_spin_orbs, num_elec))
+                            operator = operator * PauliOperator(a_op_spin(j, False, num_spin_orbs, num_elec))
+                            operator = operator * PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
+                            yield theta_idx, a, i, b, j, c, k, operator
 
 
-def iterate_T3(
-    active_occ: list[int], active_unocc: list[int], is_spin_conserving: bool, is_generalized: bool
+def iterate_T4(
+    active_occ: list[int], active_unocc: list[int], num_spin_orbs: int, num_elec: int, is_spin_conserving: bool, is_generalized: bool
 ) -> tuple[int]:
     theta_idx = -1
-    if is_generalized:
-        for a in active_occ + active_unocc:
-            for b in active_occ + active_unocc:
-                if a >= b:
+    for a in active_occ + active_unocc:
+        for b in active_occ + active_unocc:
+            if a >= b:
+                continue
+            for c in active_occ + active_unocc:
+                if b >= c:
                     continue
-                for c in active_occ + active_unocc:
-                    if b >= c:
+                for d in active_occ + active_unocc:
+                    if c >= d:
                         continue
                     for i in active_occ + active_unocc:
                         for j in active_occ + active_unocc:
@@ -171,205 +212,73 @@ def iterate_T3(
                             for k in active_occ + active_unocc:
                                 if j >= k:
                                     continue
-                                theta_idx += 1
-                                num_alpha = 0
-                                num_beta = 0
-                                if a % 2 == 0:
-                                    num_alpha += 1
-                                else:
-                                    num_beta += 1
-                                if b % 2 == 0:
-                                    num_alpha += 1
-                                else:
-                                    num_beta += 1
-                                if c % 2 == 0:
-                                    num_alpha += 1
-                                else:
-                                    num_beta += 1
-                                if i % 2 == 0:
-                                    num_alpha += 1
-                                else:
-                                    num_beta += 1
-                                if j % 2 == 0:
-                                    num_alpha += 1
-                                else:
-                                    num_beta += 1
-                                if k % 2 == 0:
-                                    num_alpha += 1
-                                else:
-                                    num_beta += 1
-                                if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
-                                    continue
-                                yield theta_idx, a, i, b, j, c, k
-    else:
-        for a in active_unocc:
-            for b in active_unocc:
-                if a >= b:
-                    continue
-                for c in active_unocc:
-                    if b >= c:
-                        continue
-                    for i in active_occ:
-                        for j in active_occ:
-                            if i >= j:
-                                continue
-                            for k in active_occ:
-                                if j >= k:
-                                    continue
-                                theta_idx += 1
-                                num_alpha = 0
-                                num_beta = 0
-                                if a % 2 == 0:
-                                    num_alpha += 1
-                                else:
-                                    num_beta += 1
-                                if b % 2 == 0:
-                                    num_alpha += 1
-                                else:
-                                    num_beta += 1
-                                if c % 2 == 0:
-                                    num_alpha += 1
-                                else:
-                                    num_beta += 1
-                                if i % 2 == 0:
-                                    num_alpha += 1
-                                else:
-                                    num_beta += 1
-                                if j % 2 == 0:
-                                    num_alpha += 1
-                                else:
-                                    num_beta += 1
-                                if k % 2 == 0:
-                                    num_alpha += 1
-                                else:
-                                    num_beta += 1
-                                if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
-                                    continue
-                                yield theta_idx, a, i, b, j, c, k
-
-
-def iterate_T4(
-    active_occ: list[int], active_unocc: list[int], is_spin_conserving: bool, is_generalized: bool
-) -> tuple[int]:
-    theta_idx = -1
-    if is_generalized:
-        for a in active_occ + active_unocc:
-            for b in active_occ + active_unocc:
-                if a >= b:
-                    continue
-                for c in active_occ + active_unocc:
-                    if b >= c:
-                        continue
-                    for d in active_occ + active_unocc:
-                        if c >= d:
-                            continue
-                        for i in active_occ + active_unocc:
-                            for j in active_occ + active_unocc:
-                                if i >= j:
-                                    continue
-                                for k in active_occ + active_unocc:
-                                    if j >= k:
+                                for l in active_occ + active_unocc:
+                                    if k >= l:
                                         continue
-                                    for l in active_occ + active_unocc:
-                                        if k >= l:
+                                    if not is_generalized:
+                                        if a in active_occ:
                                             continue
-                                        theta_idx += 1
-                                        num_alpha = 0
-                                        num_beta = 0
-                                        if a % 2 == 0:
-                                            num_alpha += 1
-                                        else:
-                                            num_beta += 1
-                                        if b % 2 == 0:
-                                            num_alpha += 1
-                                        else:
-                                            num_beta += 1
-                                        if c % 2 == 0:
-                                            num_alpha += 1
-                                        else:
-                                            num_beta += 1
-                                        if d % 2 == 0:
-                                            num_alpha += 1
-                                        else:
-                                            num_beta += 1
-                                        if i % 2 == 0:
-                                            num_alpha += 1
-                                        else:
-                                            num_beta += 1
-                                        if j % 2 == 0:
-                                            num_alpha += 1
-                                        else:
-                                            num_beta += 1
-                                        if k % 2 == 0:
-                                            num_alpha += 1
-                                        else:
-                                            num_beta += 1
-                                        if l % 2 == 0:
-                                            num_alpha += 1
-                                        else:
-                                            num_beta += 1
-                                        if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
+                                        if b in active_occ:
                                             continue
-                                        yield theta_idx, a, i, b, j, c, k, d, l
-    else:
-        for a in active_unocc:
-            for b in active_unocc:
-                if a >= b:
-                    continue
-                for c in active_unocc:
-                    if b >= c:
-                        continue
-                    for d in active_unocc:
-                        if c >= d:
-                            continue
-                        for i in active_occ:
-                            for j in active_occ:
-                                if i >= j:
-                                    continue
-                                for k in active_occ:
-                                    if j >= k:
+                                        if c in active_occ:
+                                            continue
+                                        if d in active_occ:
+                                            continue
+                                        if i in active_unocc:
+                                            continue
+                                        if j in active_unocc:
+                                            continue
+                                        if k in active_unocc:
+                                            continue
+                                        if l in active_unocc:
+                                            continue
+                                    theta_idx += 1
+                                    num_alpha = 0
+                                    num_beta = 0
+                                    if a % 2 == 0:
+                                        num_alpha += 1
+                                    else:
+                                        num_beta += 1
+                                    if b % 2 == 0:
+                                        num_alpha += 1
+                                    else:
+                                        num_beta += 1
+                                    if c % 2 == 0:
+                                        num_alpha += 1
+                                    else:
+                                        num_beta += 1
+                                    if d % 2 == 0:
+                                        num_alpha += 1
+                                    else:
+                                        num_beta += 1
+                                    if i % 2 == 0:
+                                        num_alpha += 1
+                                    else:
+                                        num_beta += 1
+                                    if j % 2 == 0:
+                                        num_alpha += 1
+                                    else:
+                                        num_beta += 1
+                                    if k % 2 == 0:
+                                        num_alpha += 1
+                                    else:
+                                        num_beta += 1
+                                    if l % 2 == 0:
+                                        num_alpha += 1
+                                    else:
+                                        num_beta += 1
+                                    if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
                                         continue
-                                    for l in active_occ:
-                                        if k >= l:
-                                            continue
-                                        theta_idx += 1
-                                        num_alpha = 0
-                                        num_beta = 0
-                                        if a % 2 == 0:
-                                            num_alpha += 1
-                                        else:
-                                            num_beta += 1
-                                        if b % 2 == 0:
-                                            num_alpha += 1
-                                        else:
-                                            num_beta += 1
-                                        if c % 2 == 0:
-                                            num_alpha += 1
-                                        else:
-                                            num_beta += 1
-                                        if d % 2 == 0:
-                                            num_alpha += 1
-                                        else:
-                                            num_beta += 1
-                                        if i % 2 == 0:
-                                            num_alpha += 1
-                                        else:
-                                            num_beta += 1
-                                        if j % 2 == 0:
-                                            num_alpha += 1
-                                        else:
-                                            num_beta += 1
-                                        if k % 2 == 0:
-                                            num_alpha += 1
-                                        else:
-                                            num_beta += 1
-                                        if l % 2 == 0:
-                                            num_alpha += 1
-                                        else:
-                                            num_beta += 1
-                                        if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
-                                            continue
-                                        yield theta_idx, a, i, b, j, c, k, d, l
+                                    operator = PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec)) * PauliOperator(
+                                        a_op_spin(b, True, num_spin_orbs, num_elec)
+                                    )
+                                    operator = operator * PauliOperator(a_op_spin(c, True, num_spin_orbs, num_elec))
+                                    operator = operator * PauliOperator(a_op_spin(d, True, num_spin_orbs, num_elec))
+                                    operator = operator * PauliOperator(a_op_spin(l, False, num_spin_orbs, num_elec))
+                                    operator = operator * PauliOperator(a_op_spin(k, False, num_spin_orbs, num_elec))
+                                    operator = operator * PauliOperator(a_op_spin(j, False, num_spin_orbs, num_elec))
+                                    operator = operator* PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
+                                    yield theta_idx, a, i, b, j, c, k, d, l, operator
 
 
 def construct_UCC_U(
@@ -381,66 +290,40 @@ def construct_UCC_U(
     allowed_states: np.ndarray = None,
     use_csr: int = 8,
 ) -> np.ndarray:
-    t = np.zeros((2**num_spin_orbs, 2**num_spin_orbs))
     counter = 0
-    start = time.time()
+    t = PauliOperator({"I"*num_spin_orbs: 0})
     if "s" in excitations:
-        for (_, a, i) in theta_picker.get_T1_generator():
+        for (_, _, _, op) in theta_picker.get_T1_generator(num_spin_orbs, num_elec):
             if theta[counter] != 0.0:
-                tmp = a_op_spin_matrix(a, True, num_spin_orbs, num_elec, use_csr=use_csr).dot(
-                    a_op_spin_matrix(i, False, num_spin_orbs, num_elec, use_csr=use_csr)
-                )
-                t += theta[counter] * tmp
+                t += theta[counter] * op
             counter += 1
 
     if "d" in excitations:
-        for (_, a, i, b, j) in theta_picker.get_T2_generator():
+        for (_, _, _, _, _, op) in theta_picker.get_T2_generator(num_spin_orbs, num_elec):
             if theta[counter] != 0.0:
-                tmp = a_op_spin_matrix(a, True, num_spin_orbs, num_elec, use_csr=use_csr).dot(
-                    a_op_spin_matrix(b, True, num_spin_orbs, num_elec, use_csr=use_csr)
-                )
-                tmp = tmp.dot(a_op_spin_matrix(j, False, num_spin_orbs, num_elec, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, num_elec, use_csr=use_csr))
-                t += theta[counter] * tmp
+                t += theta[counter] * op
             counter += 1
 
     if "t" in excitations:
-        for (_, a, i, b, j, c, k) in theta_picker.get_T3_generator():
+        for (_, _, _, _, _, _, _, op) in theta_picker.get_T3_generator(num_spin_orbs, num_elec):
             if theta[counter] != 0.0:
-                tmp = a_op_spin_matrix(a, True, num_spin_orbs, num_elec, use_csr=use_csr).dot(
-                    a_op_spin_matrix(b, True, num_spin_orbs, num_elec, use_csr=use_csr)
-                )
-                tmp = tmp.dot(a_op_spin_matrix(c, True, num_spin_orbs, num_elec, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(k, False, num_spin_orbs, num_elec, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(j, False, num_spin_orbs, num_elec, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, num_elec, use_csr=use_csr))
-                t += theta[counter] * tmp
+                t += theta[counter] * op
             counter += 1
 
     if "q" in excitations:
-        for (_, a, i, b, j, c, k, d, l) in theta_picker.get_T4_generator():
+        for (_, _, _, _, _, _, _, _, _, op) in theta_picker.get_T4_generator(num_spin_orbs, num_elec):
             if theta[counter] != 0.0:
-                tmp = a_op_spin_matrix(a, True, num_spin_orbs, num_elec, use_csr=use_csr).dot(
-                    a_op_spin_matrix(b, True, num_spin_orbs, num_elec, use_csr=use_csr)
-                )
-                tmp = tmp.dot(a_op_spin_matrix(c, True, num_spin_orbs, num_elec, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(d, True, num_spin_orbs, num_elec, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(l, False, num_spin_orbs, num_elec, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(k, False, num_spin_orbs, num_elec, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(j, False, num_spin_orbs, num_elec, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, num_elec, use_csr=use_csr))
-                t += theta[counter] * tmp
+                t += theta[counter] * op
             counter += 1
     assert counter == len(theta)
 
+    T = (t - t.dagger).matrix_form(use_csr=use_csr, is_real=True)
     if num_spin_orbs >= use_csr:
-        T = t - t.conjugate().transpose()
         if allowed_states is not None:
             T = T[allowed_states, :]
             T = T[:, allowed_states]
         A = scipy.sparse.linalg.expm(T)
     else:
-        T = t - np.conj(t).transpose()
         if allowed_states is not None:
             T = T[allowed_states, :]
             T = T[:, allowed_states]

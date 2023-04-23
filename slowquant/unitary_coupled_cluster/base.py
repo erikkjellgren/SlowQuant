@@ -15,57 +15,17 @@ from slowquant.molecularintegrals.integralfunctions import (
 
 
 @functools.cache
-def a_op_spin_matrix(
-    idx: int, dagger: bool, number_spin_orbitals: int, number_electrons: int, use_csr: int = 8
-) -> np.ndarray:
-    r"""Get matrix representation of fermionic operator.
-    This is the matrix form that depends on number of electrons i.e.:
-
-    .. math::
-        Z x Z x .. x a x .. I x I
-
-    Args:
-        idx: Spin orbital index.
-        dagger: Creation or annihilation operator.
-        number_spin_orbitals: Total number of spin orbitals.
-        number_electrons: Total number of electrons.
-
-    Returns:
-        Matrix representation of ferminonic annihilation or creation operator.
-    """
-    Z_mat = np.array([[1, 0], [0, -1]], dtype=float)
-    I_mat = np.array([[1, 0], [0, 1]], dtype=float)
-    a_mat = np.array([[0, 1], [0, 0]], dtype=float)
-    a_mat_dagger = np.array([[0, 0], [1, 0]], dtype=float)
-    operators = []
-    for i in range(number_spin_orbitals):
-        if i == idx:
-            if dagger:
-                operators.append(a_mat_dagger)
-            else:
-                operators.append(a_mat)
-        # elif i <= number_electrons and i < idx:
-        elif i < idx:
-            operators.append(Z_mat)
-        else:
-            operators.append(I_mat)
-    if number_spin_orbitals >= use_csr:
-        return ss.csr_matrix(kronecker_product(operators))
-    return kronecker_product(operators)
-
-
-@functools.cache
-def a_op_spin(idx: int, dagger: bool, number_spin_orbitals: int, number_electrons: int) -> np.ndarray:
+def a_op_spin(idx: int, dagger: bool, num_spin_orbs: int, num_elec: int) -> dict[str, complex]:
     if idx % 2 == 0:
-        return a_op(idx // 2, "alpha", dagger, number_spin_orbitals, number_electrons)
+        return a_op(idx // 2, "alpha", dagger, num_spin_orbs, num_elec)
     else:
-        return a_op((idx - 1) // 2, "beta", dagger, number_spin_orbitals, number_electrons)
+        return a_op((idx - 1) // 2, "beta", dagger, num_spin_orbs, num_elec)
 
 
 @functools.cache
 def a_op(
     spinless_idx: int, spin: str, dagger: bool, number_spin_orbitals: int, number_of_electrons: int
-) -> list[np.ndarray]:
+) -> dict[str, complex]:
     idx = 2 * spinless_idx
     if spin == "beta":
         idx += 1
@@ -86,7 +46,6 @@ def a_op(
                 fac1 *= 0.5
                 op2 += "Y"
                 fac2 *= 0.5j
-        # elif i <= number_of_electrons and i < idx:
         elif i < idx:
             op1 += "Z"
             op2 += "Z"
@@ -159,7 +118,8 @@ class StateVector:
 
         Args:
             inactive: Kronecker representation of inactive orbitals (reference).
-            active: Kronecker representation of active orbitals (refernce).
+            active: Kronecker representation of active orbitals (reference).
+            virtual: Kronecker representation of virtual orbitals (reference).
         """
         self.inactive = np.transpose(inactive)
         self._active_onvector = active
@@ -237,7 +197,10 @@ class StateVector:
             self.active = np.matmul(U, self._active)
             self.U_ = U
         else:
-            tmp_active = np.matmul(U, self._active[allowed_states])
+            if isinstance(U, np.ndarray):
+                tmp_active = np.matmul(U, self._active[allowed_states])
+            else:
+                tmp_active = U.dot(ss.csr_matrix(self._active[allowed_states]).transpose()).toarray()
             idx = 0
             for i, allowed in enumerate(allowed_states):
                 if allowed:
@@ -247,6 +210,14 @@ class StateVector:
 
 @functools.cache
 def pauli_to_mat(pauli: str) -> np.ndarray:
+    """Convert Pauli matrix symbol to matrix representation.
+
+    Args:
+        pauli: Pauli matrix symbol.
+
+    Returns:
+        Pauli matrix.
+    """
     if pauli == "I":
         return np.array([[1, 0], [0, 1]], dtype=float)
     elif pauli == "Z":
@@ -291,9 +262,6 @@ def expectation_value(bra: StateVector, pauliop: PauliOperator, ket: StateVector
                     continue
                 if number_active_orbitals >= use_csr:
                     operator = kronecker_product_cached(prior, after, pauli_mat_symbol, True).dot(operator)
-                    if operator.nnz == 0:
-                        tmp = 0
-                        break
                 else:
                     operator = np.matmul(
                         kronecker_product_cached(prior, after, pauli_mat_symbol, False),
@@ -304,7 +272,6 @@ def expectation_value(bra: StateVector, pauliop: PauliOperator, ket: StateVector
             else:
                 tmp *= np.matmul(bra.bra_active, operator)
         total += fac * tmp
-    # print(f"Expectation value: {time.time() - start}")
     if abs(total.imag) > 10**-10:
         print(f"WARNING, imaginary value of {total.imag}")
     return total.real
@@ -401,6 +368,39 @@ class PauliOperator:
         for op in self.operators:
             op_values[op] = expectation_value(state_vector, PauliOperator({op: 1}), state_vector)
         return op_values
+
+    def matrix_form(self, use_csr: int = 8, is_real: bool = False) -> np.ndarray | ss.csr_matrix:
+        num_spin_orbs = len(list(self.operators.keys())[0])
+        if num_spin_orbs >= use_csr:
+            matrix_form = ss.identity(2**num_spin_orbs, dtype=complex) * 0.0
+        else:
+            matrix_form = np.identity(2**num_spin_orbs, dtype=complex) * 0.0
+        for op, fac in self.operators.items():
+            if abs(fac) < 10**-12:
+                continue
+            if num_spin_orbs >= use_csr:
+                tmp = ss.identity(2**num_spin_orbs, dtype=complex)
+            else:
+                tmp = np.identity(2**num_spin_orbs, dtype=complex) 
+            for pauli_mat_idx, pauli_mat_symbol in enumerate(op):
+                pauli_mat = pauli_to_mat(pauli_mat_symbol)
+                prior = pauli_mat_idx
+                after = num_spin_orbs - pauli_mat_idx - 1
+                if pauli_mat_symbol == "I":
+                    continue
+                if num_spin_orbs >= use_csr:
+                    tmp = kronecker_product_cached(prior, after, pauli_mat_symbol, True).dot(tmp)
+                else:
+                    tmp = np.matmul(
+                        kronecker_product_cached(prior, after, pauli_mat_symbol, False), tmp
+                    )
+            matrix_form += fac * tmp
+        if num_spin_orbs >= use_csr:
+            if matrix_form.getformat() != "csr":
+                matrix_form = ss.csr_matrix(matrix_form)
+        if is_real:
+            matrix_form = matrix_form.astype(float)
+        return matrix_form
 
 
 def Epq(p: int, q: int, num_spin_orbs: int, num_elec: int) -> PauliOperator:

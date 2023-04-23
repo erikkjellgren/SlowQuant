@@ -7,16 +7,13 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
 from slowquant.unitary_coupled_cluster.base import (
-    Epq,
     Hamiltonian,
-    PauliOperator,
-    a_op_spin,
     commutator,
     expectation_value,
+    Epq,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
-from slowquant.unitary_coupled_cluster.util import iterate_T1, iterate_T2, ThetaPicker, iterate_T3, iterate_T4
-
+from slowquant.unitary_coupled_cluster.util import ThetaPicker
 
 class LinearResponseUCC:
     def __init__(self, wave_function: WaveFunctionUCC, excitations: str, is_spin_conserving: bool = False, use_TDA: bool = False) -> None:
@@ -28,41 +25,17 @@ class LinearResponseUCC:
         num_elec = self.wf.num_elec
         excitations = excitations.lower()
         if 's' in excitations:
-            for (_, a, i) in self.theta_picker.get_T1_generator():
-                self.G_ops.append(
-                    PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec))
-                    * PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
-                )
+            for (_, _, _, op) in self.theta_picker.get_T1_generator(num_spin_orbs, num_elec):
+                self.G_ops.append(op)
         if 'd' in excitations:
-            for (_, a, i, b, j) in self.theta_picker.get_T2_generator():
-                tmp = PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec)) * PauliOperator(
-                    a_op_spin(b, True, num_spin_orbs, num_elec)
-                )
-                tmp = tmp * PauliOperator(a_op_spin(j, False, num_spin_orbs, num_elec))
-                tmp = tmp * PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
-                self.G_ops.append(tmp)
+            for (_, _, _, _, _, op) in self.theta_picker.get_T2_generator(num_spin_orbs, num_elec):
+                self.G_ops.append(op)
         if 't' in excitations:
-            for (_, a, i, b, j, c, k) in self.theta_picker.get_T3_generator():
-                tmp = PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec)) * PauliOperator(
-                    a_op_spin(b, True, num_spin_orbs, num_elec)
-                )
-                tmp = tmp * PauliOperator(a_op_spin(c, True, num_spin_orbs, num_elec))
-                tmp = tmp * PauliOperator(a_op_spin(k, False, num_spin_orbs, num_elec))
-                tmp = tmp * PauliOperator(a_op_spin(j, False, num_spin_orbs, num_elec))
-                tmp = tmp * PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
-                self.G_ops.append(tmp)
+            for (_, _, _, _, _, _, _, op) in self.theta_picker.get_T3_generator(num_spin_orbs, num_elec):
+                self.G_ops.append(op)
         if 'q' in excitations:
-            for (_, a, i, b, j, c, k, d, l) in self.theta_picker.get_T4_generator():
-                tmp = PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec)) * PauliOperator(
-                    a_op_spin(b, True, num_spin_orbs, num_elec)
-                )
-                tmp = tmp * PauliOperator(a_op_spin(c, True, num_spin_orbs, num_elec))
-                tmp = tmp * PauliOperator(a_op_spin(d, True, num_spin_orbs, num_elec))
-                tmp = tmp * PauliOperator(a_op_spin(l, False, num_spin_orbs, num_elec))
-                tmp = tmp * PauliOperator(a_op_spin(k, False, num_spin_orbs, num_elec))
-                tmp = tmp * PauliOperator(a_op_spin(j, False, num_spin_orbs, num_elec))
-                tmp = tmp * PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
-                self.G_ops.append(tmp)
+            for (_, _, _, _, _, _, _, _, _, op) in self.theta_picker.get_T4_generator(num_spin_orbs, num_elec):
+                self.G_ops.append(op)
 
         num_parameters = len(self.G_ops)
         H = Hamiltonian(self.wf.h_core, self.wf.g_eri, self.wf.c_trans, num_spin_orbs, num_elec)
@@ -91,19 +64,19 @@ class LinearResponseUCC:
 
     def calc_excitation_energies(self) -> None:
         size = len(self.M)
-        self.E2 = np.zeros((size * 2, size * 2))
-        self.E2[:size, :size] = self.M
-        self.E2[:size, size:] = self.Q
-        self.E2[size:, :size] = np.conj(self.Q)
-        self.E2[size:, size:] = np.conj(self.M)
+        E2 = np.zeros((size * 2, size * 2))
+        E2[:size, :size] = self.M
+        E2[:size, size:] = self.Q
+        E2[size:, :size] = np.conj(self.Q)
+        E2[size:, size:] = np.conj(self.M)
 
-        self.S = np.zeros((size * 2, size * 2))
-        self.S[:size, :size] = self.V
-        self.S[:size, size:] = self.W
-        self.S[size:, :size] = -np.conj(self.W)
-        self.S[size:, size:] = -np.conj(self.V)
+        S = np.zeros((size * 2, size * 2))
+        S[:size, :size] = self.V
+        S[:size, size:] = self.W
+        S[size:, :size] = -np.conj(self.W)
+        S[size:, size:] = -np.conj(self.V)
 
-        eigval, eigvec = scipy.linalg.eig(self.E2, self.S)
+        eigval, eigvec = scipy.linalg.eig(E2, S)
         sorting = np.argsort(eigval)
         self.excitation_energies = np.real(eigval[sorting][size:])
         self.response_vectors = np.real(eigvec[:, sorting][:, size:])
