@@ -3,7 +3,6 @@ from __future__ import annotations
 import copy
 import functools
 import itertools
-import time
 
 import numpy as np
 import scipy.sparse as ss
@@ -80,7 +79,7 @@ def kronecker_product_cached(
         I1 = ss.identity(int(2**num_prior))
         I2 = ss.identity(int(2**num_after))
         mat = ss.csr_matrix(mat)
-        return ss.kron(I1, ss.kron(mat, I2))
+        return ss.csr_matrix(ss.kron(I1, ss.kron(mat, I2)))
     else:
         I1 = np.identity(int(2**num_prior))
         I2 = np.identity(int(2**num_after))
@@ -234,7 +233,6 @@ def expectation_value(bra: StateVector, pauliop: PauliOperator, ket: StateVector
     if len(bra._active) != len(ket._active):
         raise ValueError("Bra and Ket does not have same number of active orbitals")
     total = 0
-    start = time.time()
     for op, fac in pauliop.operators.items():
         if abs(fac) < 10**-12:
             continue
@@ -389,7 +387,8 @@ class PauliOperator:
                 if pauli_mat_symbol == "I":
                     continue
                 if num_spin_orbs >= use_csr:
-                    tmp = kronecker_product_cached(prior, after, pauli_mat_symbol, True).dot(tmp)
+                    A = kronecker_product_cached(prior, after, pauli_mat_symbol, True)
+                    tmp = A.dot(tmp)
                 else:
                     tmp = np.matmul(
                         kronecker_product_cached(prior, after, pauli_mat_symbol, False), tmp
@@ -401,7 +400,7 @@ class PauliOperator:
         if is_real:
             matrix_form = matrix_form.astype(float)
         return matrix_form
-
+    
 
 def Epq(p: int, q: int, num_spin_orbs: int, num_elec: int) -> PauliOperator:
     E = PauliOperator(a_op(p, "alpha", True, num_spin_orbs, num_elec)) * PauliOperator(
