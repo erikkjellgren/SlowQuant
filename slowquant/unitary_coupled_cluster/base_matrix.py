@@ -17,6 +17,14 @@ def convert_pauli_to_hybrid_form(pauliop, num_inactive_orbs: int, num_active_orb
         new_inactive = pauli_string[:active_start]
         new_active = pauli_string[active_start:active_end]
         new_virtual = pauli_string[active_end:]
+        active_pauli = PauliOperator({new_active: 1})
+        new_active_matrix = factor * active_pauli.matrix_form()
+        key = new_inactive + new_virtual
+        if key in new_operator:
+            new_operator[key].active_matrix += new_active_matrix
+        else:
+            new_operators[key] = OperatorHybridForm(new_inactive, new_active_matrix, new_virtual)
+    return PauliOperatorHybridForm(new_operators) 
 
 class OperatorHybridForm:
     def __init__(self, inactive_pauli: str, active_matrix: np.ndarray | ss.csr_matrix, virtual_pauli: str) -> None:
