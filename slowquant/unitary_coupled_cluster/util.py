@@ -25,11 +25,17 @@ class ThetaPicker:
         active_unocc: list[int],
         is_spin_conserving: bool = False,
         is_generalized: bool = False,
+        deshift: int = None
     ) -> None:
-        self.active_occ = active_occ
-        self.active_unocc = active_unocc
+        self.active_occ = active_occ.copy()
+        self.active_unocc = active_unocc.copy()
         self.is_spin_conserving = is_spin_conserving
         self.is_generalized = is_generalized
+        if deshift is not None:
+            for i in range(len(self.active_occ)):
+                self.active_occ[i] += deshift
+            for i in range(len(self.active_unocc)):
+                self.active_unocc[i] += deshift
 
     def get_T1_generator(self, num_spin_orbs: int, num_elec: int) -> Generator[tuple[int, int, int, PauliOperator], None, None]:
         return iterate_T1(self.active_occ, self.active_unocc, num_spin_orbs, num_elec, self.is_spin_conserving, self.is_generalized)
@@ -68,7 +74,8 @@ def iterate_T1(
                 num_beta += 1
             if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
                 continue
-            operator = PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec)) * PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
+            operator = PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec))
+            operator *= PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
             yield theta_idx, a, i, operator
 
 

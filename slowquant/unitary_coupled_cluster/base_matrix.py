@@ -7,9 +7,39 @@ import itertools
 import numpy as np
 import scipy.sparse as ss
 
-from slowquant.unitary_coupled_cluster.base import PauliOperator
+from slowquant.unitary_coupled_cluster.base import PauliOperator, pauli_to_mat
 
-def convert_pauli_to_hybrid_form(pauliop, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int) -> PauliOperatorHybridForm:
+
+def expectation_value_hybrid(bra: StateVector, hybridop: PauliOperatorHybridForm, ket: StateVector, use_csr: int = 8) -> float:
+    if len(bra.inactive) != len(ket.inactive):
+        raise ValueError("Bra and Ket does not have same number of inactive orbitals")
+    if len(bra._active) != len(ket._active):
+        raise ValueError("Bra and Ket does not have same number of active orbitals")
+    total = 0
+    for _, op in hybridop.operators.items():
+        tmp = 1
+        for i in range(len(bra.bra_inactive)):
+            tmp *= np.matmul(bra.bra_inactive[i], np.matmul(pauli_to_mat(op.inactive_pauli[i]), ket.ket_inactive[:, i]))
+        for i in range(len(bra.bra_virtual)):
+            tmp *= np.matmul(bra.bra_virtual[i], np.matmul(pauli_to_mat(op.virtual_pauli[i]), ket.ket_virtual[:, i]))
+        if abs(tmp) < 10**-12:
+            continue
+        number_active_orbitals = len(bra._active_onvector)
+        if number_active_orbitals != 0:
+            if number_active_orbitals >= use_csr:
+                operator = copy.deepcopy(ket.ket_active_csr)
+                operator = op.active_matrix.dot(operator)
+                tmp *= bra.bra_active_csr.dot(operator).toarray()[0, 0]
+            else:
+                operator = copy.deepcopy(ket.ket_active)
+                operator = np.matmul(op.active_matrix, operator)
+                tmp *= np.matmul(bra.bra_active, operator)
+        total += tmp
+    if abs(total.imag) > 10**-10:
+        print(f"WARNING, imaginary value of {total.imag}")
+    return total.real
+
+def convert_pauli_to_hybrid_form(pauliop: PauliOperator, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int) -> PauliOperatorHybridForm:
     new_operator = {}
     active_start = num_inactive_orbs
     active_end = num_inactive_orbs+num_active_orbs
@@ -23,8 +53,8 @@ def convert_pauli_to_hybrid_form(pauliop, num_inactive_orbs: int, num_active_orb
         if key in new_operator:
             new_operator[key].active_matrix += new_active_matrix
         else:
-            new_operators[key] = OperatorHybridForm(new_inactive, new_active_matrix, new_virtual)
-    return PauliOperatorHybridForm(new_operators) 
+            new_operator[key] = OperatorHybridForm(new_inactive, new_active_matrix, new_virtual)
+    return PauliOperatorHybridForm(new_operator) 
 
 class OperatorHybridForm:
     def __init__(self, inactive_pauli: str, active_matrix: np.ndarray | ss.csr_matrix, virtual_pauli: str) -> None:
@@ -37,27 +67,27 @@ class PauliOperatorHybridForm:
         """The key is the Pauli-string of inactive + virtual,
         i.e. the active part does not contribute to the key.
         """
-        self.opetarors = operator
+        self.operators = operator
 
     def __add__(self, hybridop: PauliOperatorHybridForm) -> PauliOperatorHybridForm:
-        new_operators = copy.deepcopy(operators)
-        for key, op in hybdirdop.operators.items():
+        new_operators = copy.deepcopy(self.operators)
+        for key, op in hybridop.operators.items():
             if key in new_operators:
-                new_operators.active_matrix += op.active_matrix
+                new_operators[key].active_matrix += op.active_matrix
             else:
                 new_operators[key] = OperatorHybridForm(op.inactive_pauli, op.active_matrix, op.virtual_pauli)
         return PauliOperatorHybridForm(new_operators)
 
     def __sub__(self, hybridop: PauliOperatorHybridForm) -> PauliOperatorHybridForm:
-        new_operators = copy.deepcopy(operators)
-        for key, op in hybdirdop.operators.items():
+        new_operators = copy.deepcopy(self.operators)
+        for key, op in hybridop.operators.items():
             if key in new_operators:
-                new_operators.active_matrix -= op.active_matrix
+                new_operators[key].active_matrix -= op.active_matrix
             else:
                 new_operators[key] = OperatorHybridForm(op.inactive_pauli, -op.active_matrix, op.virtual_pauli)
         return PauliOperatorHybridForm(new_operators)
 
-    def __mul__(self, pauliop: PauliOperator) -> PauliOperator:
+    def __mul__(self, pauliop: PauliOperatorHybridForm) -> PauliOperatorHybridForm:
         new_operators = {}
         for _, op1 in self.operators.items():
             for _, op2 in pauliop.operators.items():
@@ -122,8 +152,29 @@ class PauliOperatorHybridForm:
                     new_operators[key] = OperatorHybridForm(new_inactive, new_active, new_virtual)
         return PauliOperatorHybridForm(new_operators)
 
-    def __rmul__(self, number: float) -> PauliOperator:
+    def __rmul__(self, number: float) -> PauliOperatorHybridForm:
         new_operators = copy.deepcopy(self.operators)
         for key in self.operators.keys():
             new_operators[key].active_matrix *= number
+        return PauliOperatorHybridForm(new_operators)
+
+    @property
+    def dagger(self) -> PauliOperatorHybridForm: 
+        new_operators = {}
+        for key, op in self.operators.items():
+            Y_fac = op.inactive_pauli.count("Y") + op.virtual_pauli.count("Y")
+            new_operators[key] = OperatorHybridForm(op.inactive_pauli, np.conj(op.active_matrix).transpose(), op.virtual_pauli)
+            new_operators[key].active_matrix *= (-1) ** Y_fac 
+        return PauliOperatorHybridForm(new_operators)
+
+    def apply_U_from_right(self, U: np.ndarray | ss.csr_matrix) -> PauliOperatorHybridForm:
+        new_operators = copy.deepcopy(self.operators)
+        for key in self.operators.keys():
+            new_operators[key].active_matrix = np.matmul(new_operators[key].active_matrix, U)
+        return PauliOperatorHybridForm(new_operators)
+
+    def apply_U_from_left(self, U: np.ndarray | ss.csr_matrix) -> PauliOperatorHybridForm:
+        new_operators = copy.deepcopy(self.operators)
+        for key in self.operators.keys():
+            new_operators[key].active_matrix = np.matmul(U, new_operators[key].active_matrix)
         return PauliOperatorHybridForm(new_operators)

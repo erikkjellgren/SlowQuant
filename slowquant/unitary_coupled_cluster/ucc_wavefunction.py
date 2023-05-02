@@ -95,23 +95,23 @@ class WaveFunctionUCC:
         self.theta_picker = ThetaPicker(
             self.active_occ, self.active_unocc, is_spin_conserving=True, is_generalized=is_generalized
         )
-        theta_picker_full = ThetaPicker(
+        self.theta_picker_full = ThetaPicker(
             self.active_occ, self.active_unocc, is_spin_conserving=False, is_generalized=is_generalized
         )
         self.theta1 = []
-        for _ in theta_picker_full.get_T1_generator(0, 0):
+        for _ in self.theta_picker_full.get_T1_generator(0, 0):
             self.theta1.append(0)
         # Construct theta2
         self.theta2 = []
-        for _ in theta_picker_full.get_T2_generator(0, 0):
+        for _ in self.theta_picker_full.get_T2_generator(0, 0):
             self.theta2.append(0)
         # Construct theta3
         self.theta3 = []
-        for _ in theta_picker_full.get_T3_generator(0, 0):
+        for _ in self.theta_picker_full.get_T3_generator(0, 0):
             self.theta3.append(0)
         # Construct theta4
         self.theta4 = []
-        for _ in theta_picker_full.get_T4_generator(0, 0):
+        for _ in self.theta_picker_full.get_T4_generator(0, 0):
             self.theta4.append(0)
 
     @property
@@ -164,6 +164,7 @@ class WaveFunctionUCC:
 
     def run_UCC(self, excitations: str, orbital_optimization: bool = False) -> None:
         excitations = excitations.lower()
+        self._excitations = excitations
         if orbital_optimization:
             e_tot = partial(
                 energy_UCC,
@@ -374,5 +375,4 @@ def energy_UCC(
         ),
         state_vector,
     )
-    # print(f"step-time: {time.time() - start}")
     return A

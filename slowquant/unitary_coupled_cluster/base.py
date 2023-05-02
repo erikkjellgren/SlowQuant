@@ -196,6 +196,7 @@ class StateVector:
             self.active = np.matmul(U, self._active)
             self.U_ = U
         else:
+            self.U_allowed_ = U
             if isinstance(U, np.ndarray):
                 tmp_active = np.matmul(U, self._active[allowed_states])
             else:
