@@ -358,8 +358,8 @@ class PauliOperator:
     def dagger(self) -> PauliOperator:
         new_operators = {}
         for op, fac in self.operators.items():
-            Y_fac = op.count("Y")
-            new_operators[op] = fac * (-1) ** Y_fac
+            #Y_fac = op.count("Y")
+            new_operators[op] = np.conj(fac)# * (-1) ** Y_fac
         return PauliOperator(new_operators)
 
     def eval_operators(self, state_vector: StateVector) -> dict[str, float]:

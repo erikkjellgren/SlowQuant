@@ -14,8 +14,8 @@ from slowquant.unitary_coupled_cluster.base import (
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_UCC_U
-from slowquant.unitary_coupled_cluster.base_matrix import convert_pauli_to_hybrid_form, expectation_value_hybrid
-from slowquant.unitary_coupled_cluster.base import StateVector, PauliOperator, a_op_spin
+from slowquant.unitary_coupled_cluster.base_matrix import convert_pauli_to_hybrid_form, expectation_value_hybrid, expectation_value_hybrid2
+from slowquant.unitary_coupled_cluster.base import StateVector, PauliOperator, a_op
 
 class LinearResponseUCCMatrix:
     def __init__(self, wave_function: WaveFunctionUCC, excitations: str, is_spin_conserving: bool = False, use_TDA: bool = False) -> None:
@@ -59,10 +59,15 @@ class LinearResponseUCCMatrix:
                 op = op.apply_U_from_left(U)
                 self.G_ops.append(op)
         for (p, q) in self.wf.kappa_idx:
-            op = PauliOperator(a_op_spin(p, True, self.wf.num_spin_orbs, self.wf.num_elec))
-            op *= PauliOperator(a_op_spin(q, False, self.wf.num_spin_orbs, self.wf.num_elec))
-            op = convert_pauli_to_hybrid_form(op, self.wf.num_inactive_spin_orbs, self.wf.num_active_spin_orbs, self.wf.num_virtual_spin_orbs)
-            self.q_ops.append(op)
+            #for ab1 in ["alpha", "beta"]:
+            #    for ab2 in ["alpha", "beta"]:
+            #        if ab1 != ab2 or ab1 == "beta":
+            #            continue
+                    #op = PauliOperator(a_op(p, ab1, True, self.wf.num_spin_orbs, self.wf.num_elec))
+                    #op *= PauliOperator(a_op(q, ab2, False, self.wf.num_spin_orbs, self.wf.num_elec))
+                    op = Epq(p, q, self.wf.num_spin_orbs, self.wf.num_elec)
+                    op = convert_pauli_to_hybrid_form(op, self.wf.num_inactive_spin_orbs, self.wf.num_active_spin_orbs, self.wf.num_virtual_spin_orbs)
+                    self.q_ops.append(op)
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.M = np.zeros((num_parameters, num_parameters))
@@ -71,6 +76,7 @@ class LinearResponseUCCMatrix:
         self.W = np.zeros((num_parameters, num_parameters))
         H = Hamiltonian(self.wf.h_core, self.wf.g_eri, self.wf.c_trans, num_spin_orbs, num_elec)
         H = convert_pauli_to_hybrid_form(H, self.wf.num_inactive_spin_orbs, self.wf.num_active_spin_orbs, self.wf.num_virtual_spin_orbs)
+        print(H.operators)
         UHU = H.apply_U_from_right(U)
         UHU = UHU.apply_U_from_left(np.conj(U).transpose())
         ref_state = StateVector(self.wf.state_vector.inactive.transpose(), self.wf.state_vector._active_onvector, self.wf.state_vector.virtual.transpose())
