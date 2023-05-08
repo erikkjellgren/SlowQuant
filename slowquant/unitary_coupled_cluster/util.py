@@ -295,7 +295,7 @@ def construct_UCC_U(
     theta_picker: ThetaPicker,
     excitations: str,
     allowed_states: np.ndarray = None,
-    use_csr: int = 8,
+    use_csr: int = 12,
 ) -> np.ndarray:
     counter = 0
     t = PauliOperator({"I"*num_spin_orbs: 0})

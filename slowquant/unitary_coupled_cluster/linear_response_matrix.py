@@ -24,6 +24,7 @@ class LinearResponseUCCMatrix:
 
         self.G_ops = []
         self.q_ops = []
+        self.q_pauli_ops = []
         num_spin_orbs = self.wf.num_spin_orbs
         num_elec = self.wf.num_elec
         excitations = excitations.lower()
@@ -32,7 +33,7 @@ class LinearResponseUCCMatrix:
             self.wf.num_active_elec,
             self.wf.theta1 + self.wf.theta2 + self.wf.theta3 + self.wf.theta4,
             self.wf.theta_picker_full,
-            self.wf._excitations,
+            "sdtq",#self.wf._excitations,
         )
         if 's' in excitations:
             for (_, _, _, op) in self.theta_picker.get_T1_generator(num_spin_orbs, num_elec):
@@ -59,13 +60,8 @@ class LinearResponseUCCMatrix:
                 op = op.apply_U_from_left(U)
                 self.G_ops.append(op)
         for (p, q) in self.wf.kappa_idx:
-            #for ab1 in ["alpha", "beta"]:
-            #    for ab2 in ["alpha", "beta"]:
-            #        if ab1 != ab2 or ab1 == "beta":
-            #            continue
-                    #op = PauliOperator(a_op(p, ab1, True, self.wf.num_spin_orbs, self.wf.num_elec))
-                    #op *= PauliOperator(a_op(q, ab2, False, self.wf.num_spin_orbs, self.wf.num_elec))
-                    op = Epq(p, q, self.wf.num_spin_orbs, self.wf.num_elec)
+                    op = 2**(-1/2)*Epq(p, q, self.wf.num_spin_orbs, self.wf.num_elec)
+                    self.q_pauli_ops.append(op)
                     op = convert_pauli_to_hybrid_form(op, self.wf.num_inactive_spin_orbs, self.wf.num_active_spin_orbs, self.wf.num_virtual_spin_orbs)
                     self.q_ops.append(op)
 
@@ -74,29 +70,28 @@ class LinearResponseUCCMatrix:
         self.Q = np.zeros((num_parameters, num_parameters))
         self.V = np.zeros((num_parameters, num_parameters))
         self.W = np.zeros((num_parameters, num_parameters))
-        H = Hamiltonian(self.wf.h_core, self.wf.g_eri, self.wf.c_trans, num_spin_orbs, num_elec)
-        H = convert_pauli_to_hybrid_form(H, self.wf.num_inactive_spin_orbs, self.wf.num_active_spin_orbs, self.wf.num_virtual_spin_orbs)
-        print(H.operators)
+        H_pauli = Hamiltonian(self.wf.h_core, self.wf.g_eri, self.wf.c_trans, num_spin_orbs, num_elec)
+        H = convert_pauli_to_hybrid_form(H_pauli, self.wf.num_inactive_spin_orbs, self.wf.num_active_spin_orbs, self.wf.num_virtual_spin_orbs)
         UHU = H.apply_U_from_right(U)
         UHU = UHU.apply_U_from_left(np.conj(U).transpose())
         ref_state = StateVector(self.wf.state_vector.inactive.transpose(), self.wf.state_vector._active_onvector, self.wf.state_vector.virtual.transpose())
         print(expectation_value_hybrid(self.wf.state_vector, H, self.wf.state_vector))
         print(expectation_value_hybrid(ref_state, UHU, ref_state))
-        print(self.wf.state_vector.active)
-        print(np.matmul(U, ref_state.active))
         idx_shift = len(self.q_ops)
-        for j, qJ in enumerate(self.q_ops):
-            H_qJ = commutator(H, qJ)
-            H_qJdagger = commutator(H, qJ.dagger)
-            for i, qI in enumerate(self.q_ops):
+        for j, qJ in enumerate(self.q_pauli_ops):
+            H_qJ = commutator(H_pauli, qJ)
+            H_qJdagger = commutator(H_pauli, qJ.dagger)
+            for i, qI in enumerate(self.q_pauli_ops):
+                if i < j:
+                    continue
                 # Make M
-                self.M[i, j] = expectation_value_hybrid(self.wf.state_vector, commutator(qI.dagger, H_qJ), self.wf.state_vector)
+                self.M[i, j] = self.M[j, i] = expectation_value(self.wf.state_vector, commutator(qI.dagger, H_qJ), self.wf.state_vector)
                 # Make Q
-                self.Q[i, j] = expectation_value_hybrid(self.wf.state_vector, commutator(qI.dagger, H_qJdagger), self.wf.state_vector)
+                self.Q[i, j] = self.Q[j, i] = expectation_value(self.wf.state_vector, commutator(qI.dagger, H_qJdagger), self.wf.state_vector)
                 # Make V
-                self.V[i, j] = expectation_value_hybrid(self.wf.state_vector, commutator(qI.dagger, qJ), self.wf.state_vector)
+                self.V[i, j] = self.V[j, i] = expectation_value(self.wf.state_vector, commutator(qI.dagger, qJ), self.wf.state_vector)
                 # Make W
-                self.W[i, j] = expectation_value_hybrid(self.wf.state_vector, commutator(qI.dagger, qJ.dagger), self.wf.state_vector)
+                self.W[i, j] = self.W[j, i] = expectation_value(self.wf.state_vector, commutator(qI.dagger, qJ.dagger), self.wf.state_vector)
         for j, GJ in enumerate(self.G_ops):
             H_GJ = commutator(H, GJ)
             H_GJdagger = commutator(H, GJ.dagger)
@@ -125,26 +120,36 @@ class LinearResponseUCCMatrix:
             H_GJ = commutator(H, GJ)
             H_GJdagger = commutator(H, GJ.dagger)
             for i, GI in enumerate(self.G_ops):
+                if i < j:
+                    continue
                 # Make M
-                self.M[i+idx_shift, j+idx_shift] = expectation_value_hybrid(self.wf.state_vector, commutator(GI.dagger, H_GJ), self.wf.state_vector)
+                self.M[i+idx_shift, j+idx_shift] = self.M[j+idx_shift, i+idx_shift] = expectation_value_hybrid(self.wf.state_vector, commutator(GI.dagger, H_GJ), self.wf.state_vector)
                 # Make V
-                self.V[i+idx_shift, j+idx_shift] = expectation_value_hybrid(self.wf.state_vector, commutator(GI.dagger, GJ), self.wf.state_vector)
+                self.V[i+idx_shift, j+idx_shift] = self.V[j+idx_shift, i+idx_shift] = expectation_value_hybrid(self.wf.state_vector, commutator(GI.dagger, GJ), self.wf.state_vector)
                 # Make Q
-                self.Q[i+idx_shift, j+idx_shift] = expectation_value_hybrid(self.wf.state_vector, commutator(GI.dagger, H_GJdagger), self.wf.state_vector)
+                self.Q[i+idx_shift, j+idx_shift] = self.Q[j+idx_shift, i+idx_shift] = expectation_value_hybrid(self.wf.state_vector, commutator(GI.dagger, H_GJdagger), self.wf.state_vector)
                 # Make W
-                self.W[i+idx_shift, j+idx_shift] = expectation_value_hybrid(self.wf.state_vector, commutator(GI.dagger, GJ.dagger), self.wf.state_vector)
-        with np.printoptions(precision=3, suppress=True):
-            print("M")
-            print(self.M)
-        with np.printoptions(precision=3, suppress=True):
-            print("Q")
-            print(self.Q)
-        with np.printoptions(precision=3, suppress=True):
-            print("V")
-            print(self.V)
-        with np.printoptions(precision=3, suppress=True):
-            print("W")
-            print(self.W)
+                self.W[i+idx_shift, j+idx_shift] = self.Q[j+idx_shift, i+idx_shift] = expectation_value_hybrid(self.wf.state_vector, commutator(GI.dagger, GJ.dagger), self.wf.state_vector)
+        print("\n M matrix:")
+        for i in range(len(self.M)):
+            for j in range(i, len(self.M)):
+                if abs(self.M[i,j]) > 10**-6:
+                    print("i,j, M[i,j]", i,j, self.M[i,j])
+        print("\n Q matrix:")
+        for i in range(len(self.M)):
+            for j in range(i, len(self.M)):
+                if abs(self.Q[i,j]) > 10**-6:
+                    print("i,j, Q[i,j]", i,j, self.Q[i,j])
+        print("\n V matrix:")
+        for i in range(len(self.M)):
+            for j in range(i, len(self.M)):
+                if abs(self.V[i,j]) > 10**-6:
+                    print("i,j, V[i,j]", i,j, self.V[i,j])
+        print("\n W matrix:")
+        for i in range(len(self.M)):
+            for j in range(i, len(self.M)):
+                if abs(self.W[i,j]) > 10**-6:
+                    print("i,j, W[i,j]", i,j, self.W[i,j])
 
     def calc_excitation_energies(self) -> None:
         size = len(self.M)

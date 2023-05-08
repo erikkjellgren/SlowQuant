@@ -228,7 +228,7 @@ def pauli_to_mat(pauli: str) -> np.ndarray:
         return np.array([[0, -1j], [1j, 0]], dtype=complex)
 
 
-def expectation_value(bra: StateVector, pauliop: PauliOperator, ket: StateVector, use_csr: int = 8) -> float:
+def expectation_value(bra: StateVector, pauliop: PauliOperator, ket: StateVector, use_csr: int = 12) -> float:
     if len(bra.inactive) != len(ket.inactive):
         raise ValueError("Bra and Ket does not have same number of inactive orbitals")
     if len(bra._active) != len(ket._active):
@@ -368,7 +368,7 @@ class PauliOperator:
             op_values[op] = expectation_value(state_vector, PauliOperator({op: 1}), state_vector)
         return op_values
 
-    def matrix_form(self, use_csr: int = 8, is_real: bool = False) -> np.ndarray | ss.csr_matrix:
+    def matrix_form(self, use_csr: int = 12, is_real: bool = False) -> np.ndarray | ss.csr_matrix:
         num_spin_orbs = len(list(self.operators.keys())[0])
         if num_spin_orbs >= use_csr:
             matrix_form = ss.identity(2**num_spin_orbs, dtype=complex) * 0.0
