@@ -4,7 +4,7 @@ from typing import Generator
 import numpy as np
 import scipy.linalg
 
-from slowquant.unitary_coupled_cluster.base import a_op_spin, PauliOperator
+from slowquant.unitary_coupled_cluster.base import a_op_spin, PauliOperator, a_op_spin_matrix
 
 
 def construct_integral_trans_mat(
@@ -288,6 +288,55 @@ def iterate_T4(
                                     yield theta_idx, a, i, b, j, c, k, d, l, operator
 
 
+#def construct_UCC_U(
+#    num_spin_orbs: int,
+#    num_elec: int,
+#    theta: list[float],
+#    theta_picker: ThetaPicker,
+#    excitations: str,
+#    allowed_states: np.ndarray = None,
+#    use_csr: int = 10,
+#) -> np.ndarray:
+#    counter = 0
+#    t = PauliOperator({"I"*num_spin_orbs: 0})
+#    if "s" in excitations:
+#        for (_, _, _, op) in theta_picker.get_T1_generator(num_spin_orbs, num_elec):
+#            if theta[counter] != 0.0:
+#                t += theta[counter] * op
+#            counter += 1
+#
+#    if "d" in excitations:
+#        for (_, _, _, _, _, op) in theta_picker.get_T2_generator(num_spin_orbs, num_elec):
+#            if theta[counter] != 0.0:
+#                t += theta[counter] * op
+#            counter += 1
+#
+#    if "t" in excitations:
+#        for (_, _, _, _, _, _, _, op) in theta_picker.get_T3_generator(num_spin_orbs, num_elec):
+#            if theta[counter] != 0.0:
+#                t += theta[counter] * op
+#            counter += 1
+#
+#    if "q" in excitations:
+#        for (_, _, _, _, _, _, _, _, _, op) in theta_picker.get_T4_generator(num_spin_orbs, num_elec):
+#            if theta[counter] != 0.0:
+#                t += theta[counter] * op
+#            counter += 1
+#    assert counter == len(theta)
+#
+#    T = (t - t.dagger).matrix_form(use_csr=use_csr, is_real=True)
+#    if num_spin_orbs >= use_csr:
+#        if allowed_states is not None:
+#            T = T[allowed_states, :]
+#            T = T[:, allowed_states]
+#        A = scipy.sparse.linalg.expm(T)
+#    else:
+#        if allowed_states is not None:
+#            T = T[allowed_states, :]
+#            T = T[:, allowed_states]
+#        A = scipy.linalg.expm(T)
+#    return A
+
 def construct_UCC_U(
     num_spin_orbs: int,
     num_elec: int,
@@ -295,42 +344,68 @@ def construct_UCC_U(
     theta_picker: ThetaPicker,
     excitations: str,
     allowed_states: np.ndarray = None,
-    use_csr: int = 12,
+    use_csr: int = 10,
 ) -> np.ndarray:
+    t = np.zeros((2**num_spin_orbs, 2**num_spin_orbs))
     counter = 0
-    t = PauliOperator({"I"*num_spin_orbs: 0})
+    start = time.time()
     if "s" in excitations:
-        for (_, _, _, op) in theta_picker.get_T1_generator(num_spin_orbs, num_elec):
+        for (_, a, i, _) in theta_picker.get_T1_generator(0, 0):
             if theta[counter] != 0.0:
-                t += theta[counter] * op
+                tmp = a_op_spin_matrix(a, True, num_spin_orbs, num_elec, use_csr=use_csr).dot(
+                    a_op_spin_matrix(i, False, num_spin_orbs, num_elec, use_csr=use_csr)
+                )
+                t += theta[counter] * tmp
             counter += 1
 
     if "d" in excitations:
-        for (_, _, _, _, _, op) in theta_picker.get_T2_generator(num_spin_orbs, num_elec):
+        for (_, a, i, b, j, _) in theta_picker.get_T2_generator(0, 0):
             if theta[counter] != 0.0:
-                t += theta[counter] * op
+                tmp = a_op_spin_matrix(a, True, num_spin_orbs, num_elec, use_csr=use_csr).dot(
+                    a_op_spin_matrix(b, True, num_spin_orbs, num_elec, use_csr=use_csr)
+                )
+                tmp = tmp.dot(a_op_spin_matrix(j, False, num_spin_orbs, num_elec, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, num_elec, use_csr=use_csr))
+                t += theta[counter] * tmp
             counter += 1
 
     if "t" in excitations:
-        for (_, _, _, _, _, _, _, op) in theta_picker.get_T3_generator(num_spin_orbs, num_elec):
+        for (_, a, i, b, j, c, k, _) in theta_picker.get_T3_generator(0, 0):
             if theta[counter] != 0.0:
-                t += theta[counter] * op
+                tmp = a_op_spin_matrix(a, True, num_spin_orbs, num_elec, use_csr=use_csr).dot(
+                    a_op_spin_matrix(b, True, num_spin_orbs, num_elec, use_csr=use_csr)
+                )
+                tmp = tmp.dot(a_op_spin_matrix(c, True, num_spin_orbs, num_elec, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(k, False, num_spin_orbs, num_elec, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(j, False, num_spin_orbs, num_elec, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, num_elec, use_csr=use_csr))
+                t += theta[counter] * tmp
             counter += 1
 
     if "q" in excitations:
-        for (_, _, _, _, _, _, _, _, _, op) in theta_picker.get_T4_generator(num_spin_orbs, num_elec):
+        for (_, a, i, b, j, c, k, d, l, _) in theta_picker.get_T4_generator(0, 0):
             if theta[counter] != 0.0:
-                t += theta[counter] * op
+                tmp = a_op_spin_matrix(a, True, num_spin_orbs, num_elec, use_csr=use_csr).dot(
+                    a_op_spin_matrix(b, True, num_spin_orbs, num_elec, use_csr=use_csr)
+                )
+                tmp = tmp.dot(a_op_spin_matrix(c, True, num_spin_orbs, num_elec, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(d, True, num_spin_orbs, num_elec, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(l, False, num_spin_orbs, num_elec, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(k, False, num_spin_orbs, num_elec, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(j, False, num_spin_orbs, num_elec, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, num_elec, use_csr=use_csr))
+                t += theta[counter] * tmp
             counter += 1
     assert counter == len(theta)
 
-    T = (t - t.dagger).matrix_form(use_csr=use_csr, is_real=True)
     if num_spin_orbs >= use_csr:
+        T = t - t.conjugate().transpose()
         if allowed_states is not None:
             T = T[allowed_states, :]
             T = T[:, allowed_states]
         A = scipy.sparse.linalg.expm(T)
     else:
+        T = t - np.conj(t).transpose()
         if allowed_states is not None:
             T = T[allowed_states, :]
             T = T[:, allowed_states]

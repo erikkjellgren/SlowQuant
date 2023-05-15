@@ -14,7 +14,7 @@ from slowquant.unitary_coupled_cluster.base import (
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_UCC_U
-from slowquant.unitary_coupled_cluster.base_matrix import convert_pauli_to_hybrid_form, expectation_value_hybrid, expectation_value_hybrid2
+from slowquant.unitary_coupled_cluster.base_matrix import convert_pauli_to_hybrid_form, expectation_value_hybrid
 from slowquant.unitary_coupled_cluster.base import StateVector, PauliOperator, a_op
 
 class LinearResponseUCCMatrix:
@@ -78,24 +78,34 @@ class LinearResponseUCCMatrix:
         print(expectation_value_hybrid(self.wf.state_vector, H, self.wf.state_vector))
         print(expectation_value_hybrid(ref_state, UHU, ref_state))
         idx_shift = len(self.q_ops)
+        active_space_cache = {}
+        print("Gs", len(self.G_ops))
+        print("qs", len(self.q_ops))
         for j, qJ in enumerate(self.q_pauli_ops):
             H_qJ = commutator(H_pauli, qJ)
             H_qJdagger = commutator(H_pauli, qJ.dagger)
             for i, qI in enumerate(self.q_pauli_ops):
                 if i < j:
                     continue
+                print(i, "q,q")
                 # Make M
-                self.M[i, j] = self.M[j, i] = expectation_value(self.wf.state_vector, commutator(qI.dagger, H_qJ), self.wf.state_vector)
+                val, active_space_cache = expectation_value(self.wf.state_vector, commutator(qI.dagger, H_qJ), self.wf.state_vector, active_cache=active_space_cache)
+                self.M[i, j] = self.M[j, i] = val
                 # Make Q
-                self.Q[i, j] = self.Q[j, i] = expectation_value(self.wf.state_vector, commutator(qI.dagger, H_qJdagger), self.wf.state_vector)
+                val, active_space_cache = expectation_value(self.wf.state_vector, commutator(qI.dagger, H_qJdagger), self.wf.state_vector, active_cache=active_space_cache)
+                self.Q[i, j] = self.Q[j, i] = val
                 # Make V
-                self.V[i, j] = self.V[j, i] = expectation_value(self.wf.state_vector, commutator(qI.dagger, qJ), self.wf.state_vector)
+                val, active_space_cache = expectation_value(self.wf.state_vector, commutator(qI.dagger, qJ), self.wf.state_vector, active_cache=active_space_cache)
+                self.V[i, j] = self.V[j, i] = val
                 # Make W
-                self.W[i, j] = self.W[j, i] = expectation_value(self.wf.state_vector, commutator(qI.dagger, qJ.dagger), self.wf.state_vector)
+                val, active_space_cache = expectation_value(self.wf.state_vector, commutator(qI.dagger, qJ.dagger), self.wf.state_vector, active_cache=active_space_cache)
+                self.W[i, j] = self.W[j, i] = val
+        print(active_space_cache)
         for j, GJ in enumerate(self.G_ops):
             H_GJ = commutator(H, GJ)
             H_GJdagger = commutator(H, GJ.dagger)
             for i, qI in enumerate(self.q_ops): 
+                print(i, "q,G")
                 # Make M
                 self.M[i, j+idx_shift] = expectation_value_hybrid(self.wf.state_vector, commutator(qI.dagger, H_GJ), self.wf.state_vector)
                 # Make Q
@@ -108,6 +118,7 @@ class LinearResponseUCCMatrix:
             H_qJ = commutator(H, qJ)
             H_qJdagger = commutator(H, qJ.dagger)
             for i, GI in enumerate(self.G_ops):
+                print(i, "G,q")
                 # Make M
                 self.M[i+idx_shift, j] = expectation_value_hybrid(self.wf.state_vector, commutator(GI.dagger, H_qJ), self.wf.state_vector)
                 # Make Q
@@ -122,6 +133,7 @@ class LinearResponseUCCMatrix:
             for i, GI in enumerate(self.G_ops):
                 if i < j:
                     continue
+                print(i, "G,G")
                 # Make M
                 self.M[i+idx_shift, j+idx_shift] = self.M[j+idx_shift, i+idx_shift] = expectation_value_hybrid(self.wf.state_vector, commutator(GI.dagger, H_GJ), self.wf.state_vector)
                 # Make V

@@ -9,36 +9,7 @@ import scipy.sparse as ss
 
 from slowquant.unitary_coupled_cluster.base import PauliOperator, pauli_to_mat
 
-def expectation_value_hybrid2(bra: StateVector, hybridop: PauliOperatorHybridForm, ket: StateVector, use_csr: int = 12) -> float:
-    if len(bra.inactive) != len(ket.inactive):
-        raise ValueError("Bra and Ket does not have same number of inactive orbitals")
-    if len(bra._active) != len(ket._active):
-        raise ValueError("Bra and Ket does not have same number of active orbitals")
-    total = 0
-    for _, op in hybridop.operators.items():
-        tmp = 1
-        for i in range(len(bra.bra_inactive)):
-            tmp *= np.matmul(bra.bra_inactive[i], np.matmul(pauli_to_mat(op.inactive_pauli[i]), ket.ket_inactive[:, i]))
-        for i in range(len(bra.bra_virtual)):
-            tmp *= np.matmul(bra.bra_virtual[i], np.matmul(pauli_to_mat(op.virtual_pauli[i]), ket.ket_virtual[:, i]))
-        if abs(tmp) < 10**-12:
-            continue
-        number_active_orbitals = len(bra._active_onvector)
-        if number_active_orbitals != 0:
-            if number_active_orbitals >= use_csr:
-                operator = copy.deepcopy(ket.ket_active_csr)
-                operator = op.active_matrix.dot(operator)
-                tmp *= bra.bra_active_csr.dot(operator).toarray()[0, 0]
-            else:
-                operator = copy.deepcopy(ket.ket_active)
-                operator = np.matmul(op.active_matrix, operator)
-                tmp *= np.matmul(bra.bra_active, operator)
-        total += tmp
-    if abs(total.imag) > 10**-10:
-        print(f"WARNING, imaginary value of {total.imag}")
-    return total.real
-
-def expectation_value_hybrid(bra: StateVector, hybridop: PauliOperatorHybridForm, ket: StateVector, use_csr: int = 12) -> float:
+def expectation_value_hybrid(bra: StateVector, hybridop: PauliOperatorHybridForm, ket: StateVector, use_csr: int = 10) -> float:
     if len(bra.inactive) != len(ket.inactive):
         raise ValueError("Bra and Ket does not have same number of inactive orbitals")
     if len(bra._active) != len(ket._active):

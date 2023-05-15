@@ -14,6 +14,44 @@ from slowquant.molecularintegrals.integralfunctions import (
 
 
 @functools.cache
+def a_op_spin_matrix(
+    idx: int, dagger: bool, number_spin_orbitals: int, number_electrons: int, use_csr: int = 10
+) -> np.ndarray:
+    r"""Get matrix representation of fermionic operator.
+    This is the matrix form that depends on number of electrons i.e.:
+
+    .. math::
+        Z x Z x .. x a x .. I x I
+
+    Args:
+        idx: Spin orbital index.
+        dagger: Creation or annihilation operator.
+        number_spin_orbitals: Total number of spin orbitals.
+        number_electrons: Total number of electrons.
+
+    Returns:
+        Matrix representation of ferminonic annihilation or creation operator.
+    """
+    Z_mat = np.array([[1, 0], [0, -1]], dtype=float)
+    I_mat = np.array([[1, 0], [0, 1]], dtype=float)
+    a_mat = np.array([[0, 1], [0, 0]], dtype=float)
+    a_mat_dagger = np.array([[0, 0], [1, 0]], dtype=float)
+    operators = []
+    for i in range(number_spin_orbitals):
+        if i == idx:
+            if dagger:
+                operators.append(a_mat_dagger)
+            else:
+                operators.append(a_mat)
+        elif i < idx:
+            operators.append(Z_mat)
+        else:
+            operators.append(I_mat)
+    if number_spin_orbitals >= use_csr:
+        return ss.csr_matrix(kronecker_product(operators))
+    return kronecker_product(operators)
+
+@functools.cache
 def a_op_spin(idx: int, dagger: bool, num_spin_orbs: int, num_elec: int) -> dict[str, complex]:
     if idx % 2 == 0:
         return a_op(idx // 2, "alpha", dagger, num_spin_orbs, num_elec)
@@ -228,7 +266,7 @@ def pauli_to_mat(pauli: str) -> np.ndarray:
         return np.array([[0, -1j], [1j, 0]], dtype=complex)
 
 
-def expectation_value(bra: StateVector, pauliop: PauliOperator, ket: StateVector, use_csr: int = 12) -> float:
+def expectation_value(bra: StateVector, pauliop: PauliOperator, ket: StateVector, use_csr: int = 10, active_cache: dict[str, float] = None) -> tuple[float, dict[str, float]] | float:
     if len(bra.inactive) != len(ket.inactive):
         raise ValueError("Bra and Ket does not have same number of inactive orbitals")
     if len(bra._active) != len(ket._active):
@@ -248,38 +286,51 @@ def expectation_value(bra: StateVector, pauliop: PauliOperator, ket: StateVector
         number_active_orbitals = len(bra._active_onvector)
         active_start = len(bra.bra_inactive)
         active_end = active_start + number_active_orbitals
+        tmp_active = 1
+        active_pauli_string = op[active_start:active_end]
         if number_active_orbitals != 0:
-            if number_active_orbitals >= use_csr:
-                operator = copy.deepcopy(ket.ket_active_csr)
-            else:
-                operator = copy.deepcopy(ket.ket_active)
-            for pauli_mat_idx, pauli_mat_symbol in enumerate(op[active_start:active_end]):
-                pauli_mat = pauli_to_mat(pauli_mat_symbol)
-                prior = pauli_mat_idx
-                after = number_active_orbitals - pauli_mat_idx - 1
-                if pauli_mat_symbol == "I":
-                    continue
+            do_calculation = True
+            if active_cache is not None:
+                if active_pauli_string in active_cache:
+                    tmp_active *= active_cache[active_pauli_string]
+                    do_calculation = False
+            if do_calculation: 
                 if number_active_orbitals >= use_csr:
-                    operator = kronecker_product_cached(prior, after, pauli_mat_symbol, True).dot(operator)
+                    operator = copy.deepcopy(ket.ket_active_csr)
                 else:
-                    operator = np.matmul(
-                        kronecker_product_cached(prior, after, pauli_mat_symbol, False),
-                        operator,
-                    )
-            if number_active_orbitals >= use_csr:
-                tmp *= bra.bra_active_csr.dot(operator).toarray()[0, 0]
-            else:
-                tmp *= np.matmul(bra.bra_active, operator)
-        total += fac * tmp
+                    operator = copy.deepcopy(ket.ket_active)
+                for pauli_mat_idx, pauli_mat_symbol in enumerate(active_pauli_string):
+                    pauli_mat = pauli_to_mat(pauli_mat_symbol)
+                    prior = pauli_mat_idx
+                    after = number_active_orbitals - pauli_mat_idx - 1
+                    if pauli_mat_symbol == "I":
+                        continue
+                    if number_active_orbitals >= use_csr:
+                        operator = kronecker_product_cached(prior, after, pauli_mat_symbol, True).dot(operator)
+                    else:
+                        operator = np.matmul(
+                            kronecker_product_cached(prior, after, pauli_mat_symbol, False),
+                            operator,
+                        )
+                if number_active_orbitals >= use_csr:
+                    tmp_active *= bra.bra_active_csr.dot(operator).toarray()[0, 0]
+                else:
+                    tmp_active *= np.matmul(bra.bra_active, operator)
+                if active_cache is not None:
+                    active_cache[active_pauli_string] = tmp_active
+        total += fac * tmp * tmp_active
     if abs(total.imag) > 10**-10:
         print(f"WARNING, imaginary value of {total.imag}")
-    return total.real
+    if active_cache is not None:
+        return total.real, active_cache
+    else:
+        return total.real
 
 
 class PauliOperator:
     def __init__(self, operator: dict[str, float]) -> None:
         self.operators = operator
-        self.screen_zero = False
+        self.screen_zero = True
 
     def __add__(self, pauliop: PauliOperator) -> PauliOperator:
         new_operators = self.operators.copy()
@@ -358,8 +409,7 @@ class PauliOperator:
     def dagger(self) -> PauliOperator:
         new_operators = {}
         for op, fac in self.operators.items():
-            #Y_fac = op.count("Y")
-            new_operators[op] = np.conj(fac)# * (-1) ** Y_fac
+            new_operators[op] = np.conj(fac)
         return PauliOperator(new_operators)
 
     def eval_operators(self, state_vector: StateVector) -> dict[str, float]:
@@ -368,7 +418,7 @@ class PauliOperator:
             op_values[op] = expectation_value(state_vector, PauliOperator({op: 1}), state_vector)
         return op_values
 
-    def matrix_form(self, use_csr: int = 12, is_real: bool = False) -> np.ndarray | ss.csr_matrix:
+    def matrix_form(self, use_csr: int = 10, is_real: bool = False) -> np.ndarray | ss.csr_matrix:
         num_spin_orbs = len(list(self.operators.keys())[0])
         if num_spin_orbs >= use_csr:
             matrix_form = ss.identity(2**num_spin_orbs, dtype=complex) * 0.0
