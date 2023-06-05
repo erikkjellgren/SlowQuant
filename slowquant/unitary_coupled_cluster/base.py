@@ -7,6 +7,7 @@ import itertools
 import numpy as np
 import scipy.sparse as ss
 
+import slowquant.unitary_coupled_cluster as lw
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
     two_electron_integral_transform,
@@ -50,6 +51,7 @@ def a_op_spin_matrix(
     if number_spin_orbitals >= use_csr:
         return ss.csr_matrix(kronecker_product(operators))
     return kronecker_product(operators)
+
 
 @functools.cache
 def a_op_spin(idx: int, dagger: bool, num_spin_orbs: int, num_elec: int) -> dict[str, complex]:
@@ -173,7 +175,7 @@ class StateVector:
             for idx, vec in enumerate(self._active_onvector):
                 if vec[0] == 0 and vec[1] == 1:
                     num_active_elec += 1
-                    if idx%2 == 0:
+                    if idx % 2 == 0:
                         num_active_alpha_elec += 1
                     else:
                         num_active_beta_elec += 1
@@ -186,7 +188,7 @@ class StateVector:
                 for idx, vec in enumerate(comb):
                     if vec[0] == 0 and vec[1] == 1:
                         num_elec += 1
-                        if idx%2 == 0:
+                        if idx % 2 == 0:
                             num_alpha_elec += 1
                         else:
                             num_beta_elec += 1
@@ -195,7 +197,6 @@ class StateVector:
                     self.allowed_active_states_number_conserving[idx] = True
                     if num_alpha_elec == num_active_alpha_elec and num_beta_elec == num_active_beta_elec:
                         self.allowed_active_states_number_spin_conserving[idx] = True
-
 
     @property
     def bra_inactive(self) -> list[np.ndarray]:
@@ -266,7 +267,13 @@ def pauli_to_mat(pauli: str) -> np.ndarray:
         return np.array([[0, -1j], [1j, 0]], dtype=complex)
 
 
-def expectation_value(bra: StateVector, pauliop: PauliOperator, ket: StateVector, use_csr: int = 10, active_cache: dict[str, float] = None) -> tuple[float, dict[str, float]] | float:
+def expectation_value(
+    bra: StateVector,
+    pauliop: PauliOperator,
+    ket: StateVector,
+    use_csr: int = 10,
+    active_cache: dict[str, float] = None,
+) -> tuple[float, dict[str, float]] | float:
     if len(bra.inactive) != len(ket.inactive):
         raise ValueError("Bra and Ket does not have same number of inactive orbitals")
     if len(bra._active) != len(ket._active):
@@ -294,7 +301,7 @@ def expectation_value(bra: StateVector, pauliop: PauliOperator, ket: StateVector
                 if active_pauli_string in active_cache:
                     tmp_active *= active_cache[active_pauli_string]
                     do_calculation = False
-            if do_calculation: 
+            if do_calculation:
                 if number_active_orbitals >= use_csr:
                     operator = copy.deepcopy(ket.ket_active_csr)
                 else:
@@ -306,7 +313,9 @@ def expectation_value(bra: StateVector, pauliop: PauliOperator, ket: StateVector
                     if pauli_mat_symbol == "I":
                         continue
                     if number_active_orbitals >= use_csr:
-                        operator = kronecker_product_cached(prior, after, pauli_mat_symbol, True).dot(operator)
+                        operator = kronecker_product_cached(prior, after, pauli_mat_symbol, True).dot(
+                            operator
+                        )
                     else:
                         operator = np.matmul(
                             kronecker_product_cached(prior, after, pauli_mat_symbol, False),
@@ -430,7 +439,7 @@ class PauliOperator:
             if num_spin_orbs >= use_csr:
                 tmp = ss.identity(2**num_spin_orbs, dtype=complex)
             else:
-                tmp = np.identity(2**num_spin_orbs, dtype=complex) 
+                tmp = np.identity(2**num_spin_orbs, dtype=complex)
             for pauli_mat_idx, pauli_mat_symbol in enumerate(op):
                 pauli_mat = pauli_to_mat(pauli_mat_symbol)
                 prior = pauli_mat_idx
@@ -441,9 +450,7 @@ class PauliOperator:
                     A = kronecker_product_cached(prior, after, pauli_mat_symbol, True)
                     tmp = A.dot(tmp)
                 else:
-                    tmp = np.matmul(
-                        kronecker_product_cached(prior, after, pauli_mat_symbol, False), tmp
-                    )
+                    tmp = np.matmul(kronecker_product_cached(prior, after, pauli_mat_symbol, False), tmp)
             matrix_form += fac * tmp
         if num_spin_orbs >= use_csr:
             if matrix_form.getformat() != "csr":
@@ -451,7 +458,7 @@ class PauliOperator:
         if is_real:
             matrix_form = matrix_form.astype(float)
         return matrix_form
-    
+
 
 def Epq(p: int, q: int, num_spin_orbs: int, num_elec: int) -> PauliOperator:
     E = PauliOperator(a_op(p, "alpha", True, num_spin_orbs, num_elec)) * PauliOperator(

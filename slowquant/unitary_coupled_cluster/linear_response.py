@@ -7,34 +7,43 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
 from slowquant.unitary_coupled_cluster.base import (
+    Epq,
     Hamiltonian,
     commutator,
     expectation_value,
-    Epq,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.util import ThetaPicker
 
+
 class LinearResponseUCC:
-    def __init__(self, wave_function: WaveFunctionUCC, excitations: str, is_spin_conserving: bool = False, use_TDA: bool = False) -> None:
+    def __init__(
+        self,
+        wave_function: WaveFunctionUCC,
+        excitations: str,
+        is_spin_conserving: bool = False,
+        use_TDA: bool = False,
+    ) -> None:
         self.wf = copy.deepcopy(wave_function)
-        self.theta_picker = ThetaPicker(self.wf.active_occ, self.wf.active_unocc, is_spin_conserving=is_spin_conserving)
+        self.theta_picker = ThetaPicker(
+            self.wf.active_occ, self.wf.active_unocc, is_spin_conserving=is_spin_conserving
+        )
 
         self.G_ops = []
         num_spin_orbs = self.wf.num_spin_orbs
         num_elec = self.wf.num_elec
         excitations = excitations.lower()
-        if 's' in excitations:
-            for (_, _, _, op) in self.theta_picker.get_T1_generator(num_spin_orbs, num_elec):
+        if "s" in excitations:
+            for _, _, _, op in self.theta_picker.get_T1_generator(num_spin_orbs, num_elec):
                 self.G_ops.append(op)
-        if 'd' in excitations:
-            for (_, _, _, _, _, op) in self.theta_picker.get_T2_generator(num_spin_orbs, num_elec):
+        if "d" in excitations:
+            for _, _, _, _, _, op in self.theta_picker.get_T2_generator(num_spin_orbs, num_elec):
                 self.G_ops.append(op)
-        if 't' in excitations:
-            for (_, _, _, _, _, _, _, op) in self.theta_picker.get_T3_generator(num_spin_orbs, num_elec):
+        if "t" in excitations:
+            for _, _, _, _, _, _, _, op in self.theta_picker.get_T3_generator(num_spin_orbs, num_elec):
                 self.G_ops.append(op)
-        if 'q' in excitations:
-            for (_, _, _, _, _, _, _, _, _, op) in self.theta_picker.get_T4_generator(num_spin_orbs, num_elec):
+        if "q" in excitations:
+            for _, _, _, _, _, _, _, _, _, op in self.theta_picker.get_T4_generator(num_spin_orbs, num_elec):
                 self.G_ops.append(op)
 
         num_parameters = len(self.G_ops)

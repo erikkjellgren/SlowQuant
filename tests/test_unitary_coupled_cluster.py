@@ -3,7 +3,9 @@ import numpy as np
 import slowquant.SlowQuant as sq
 from slowquant.unitary_coupled_cluster.base import Hamiltonian, expectation_value
 from slowquant.unitary_coupled_cluster.linear_response import LinearResponseUCC
-from slowquant.unitary_coupled_cluster.linear_response_matrix import LinearResponseUCCMatrix
+from slowquant.unitary_coupled_cluster.linear_response_matrix import (
+    LinearResponseUCCMatrix,
+)
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 

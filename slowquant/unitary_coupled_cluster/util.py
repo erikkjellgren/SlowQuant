@@ -1,14 +1,19 @@
 import time
-from typing import Generator
+from typing import Generator, Sequence
 
 import numpy as np
 import scipy.linalg
 
-from slowquant.unitary_coupled_cluster.base import a_op_spin, PauliOperator, a_op_spin_matrix
+import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
+from slowquant.unitary_coupled_cluster.base import (
+    PauliOperator,
+    a_op_spin,
+    a_op_spin_matrix,
+)
 
 
 def construct_integral_trans_mat(
-    c_orthonormal: np.ndarray, kappa: list[float], kappa_idx: list[list[int]]
+    c_orthonormal: np.ndarray, kappa: Sequence[float], kappa_idx: Sequence[Sequence[int]]
 ) -> np.ndarray:
     kappa_mat = np.zeros_like(c_orthonormal)
     for kappa_val, (p, q) in zip(kappa, kappa_idx):
@@ -25,7 +30,7 @@ class ThetaPicker:
         active_unocc: list[int],
         is_spin_conserving: bool = False,
         is_generalized: bool = False,
-        deshift: int = None
+        deshift: int = None,
     ) -> None:
         self.active_occ = active_occ.copy()
         self.active_unocc = active_unocc.copy()
@@ -37,21 +42,62 @@ class ThetaPicker:
             for i in range(len(self.active_unocc)):
                 self.active_unocc[i] += deshift
 
-    def get_T1_generator(self, num_spin_orbs: int, num_elec: int) -> Generator[tuple[int, int, int, PauliOperator], None, None]:
-        return iterate_T1(self.active_occ, self.active_unocc, num_spin_orbs, num_elec, self.is_spin_conserving, self.is_generalized)
+    def get_T1_generator(
+        self, num_spin_orbs: int, num_elec: int
+    ) -> Generator[tuple[int, int, int, PauliOperator], None, None]:
+        return iterate_T1(
+            self.active_occ,
+            self.active_unocc,
+            num_spin_orbs,
+            num_elec,
+            self.is_spin_conserving,
+            self.is_generalized,
+        )
 
-    def get_T2_generator(self, num_spin_orbs: int, num_elec: int) -> Generator[tuple[int, int, int, int, int, PauliOperator], None, None]:
-        return iterate_T2(self.active_occ, self.active_unocc, num_spin_orbs, num_elec, self.is_spin_conserving, self.is_generalized)
+    def get_T2_generator(
+        self, num_spin_orbs: int, num_elec: int
+    ) -> Generator[tuple[int, int, int, int, int, PauliOperator], None, None]:
+        return iterate_T2(
+            self.active_occ,
+            self.active_unocc,
+            num_spin_orbs,
+            num_elec,
+            self.is_spin_conserving,
+            self.is_generalized,
+        )
 
-    def get_T3_generator(self, num_spin_orbs: int, num_elec: int) -> Generator[tuple[int, int, int, int, int, int, int, PauliOperator], None, None]:
-        return iterate_T3(self.active_occ, self.active_unocc, num_spin_orbs, num_elec, self.is_spin_conserving, self.is_generalized)
+    def get_T3_generator(
+        self, num_spin_orbs: int, num_elec: int
+    ) -> Generator[tuple[int, int, int, int, int, int, int, PauliOperator], None, None]:
+        return iterate_T3(
+            self.active_occ,
+            self.active_unocc,
+            num_spin_orbs,
+            num_elec,
+            self.is_spin_conserving,
+            self.is_generalized,
+        )
 
-    def get_T4_generator(self, num_spin_orbs: int, num_elec: int) -> Generator[tuple[int, int, int, int, int, int, int, int, int, PauliOperator], None, None]:
-        return iterate_T4(self.active_occ, self.active_unocc, num_spin_orbs, num_elec, self.is_spin_conserving, self.is_generalized)
+    def get_T4_generator(
+        self, num_spin_orbs: int, num_elec: int
+    ) -> Generator[tuple[int, int, int, int, int, int, int, int, int, PauliOperator], None, None]:
+        return iterate_T4(
+            self.active_occ,
+            self.active_unocc,
+            num_spin_orbs,
+            num_elec,
+            self.is_spin_conserving,
+            self.is_generalized,
+        )
 
 
 def iterate_T1(
-    active_occ: list[int], active_unocc: list[int], num_spin_orbs: int, num_elec: int, is_spin_conserving: bool, is_generalized: bool
+    active_occ: list[int],
+    active_unocc: list[int],
+    num_spin_orbs: int,
+    num_elec: int,
+    is_spin_conserving: bool,
+    is_generalized: bool,
 ) -> tuple[int]:
     theta_idx = -1
     for a in active_occ + active_unocc:
@@ -80,7 +126,12 @@ def iterate_T1(
 
 
 def iterate_T2(
-    active_occ: list[int], active_unocc: list[int], num_spin_orbs: int, num_elec: int, is_spin_conserving: bool, is_generalized: bool
+    active_occ: list[int],
+    active_unocc: list[int],
+    num_spin_orbs: int,
+    num_elec: int,
+    is_spin_conserving: bool,
+    is_generalized: bool,
 ) -> tuple[int]:
     theta_idx = -1
     for a in active_occ + active_unocc:
@@ -129,7 +180,12 @@ def iterate_T2(
 
 
 def iterate_T3(
-    active_occ: list[int], active_unocc: list[int], num_spin_orbs: int, num_elec: int, is_spin_conserving: bool, is_generalized: bool
+    active_occ: list[int],
+    active_unocc: list[int],
+    num_spin_orbs: int,
+    num_elec: int,
+    is_spin_conserving: bool,
+    is_generalized: bool,
 ) -> tuple[int]:
     theta_idx = -1
     for a in active_occ + active_unocc:
@@ -188,9 +244,9 @@ def iterate_T3(
                                 num_beta += 1
                             if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
                                 continue
-                            operator = PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec)) * PauliOperator(
-                                a_op_spin(b, True, num_spin_orbs, num_elec)
-                            )
+                            operator = PauliOperator(
+                                a_op_spin(a, True, num_spin_orbs, num_elec)
+                            ) * PauliOperator(a_op_spin(b, True, num_spin_orbs, num_elec))
                             operator = operator * PauliOperator(a_op_spin(c, True, num_spin_orbs, num_elec))
                             operator = operator * PauliOperator(a_op_spin(k, False, num_spin_orbs, num_elec))
                             operator = operator * PauliOperator(a_op_spin(j, False, num_spin_orbs, num_elec))
@@ -199,7 +255,12 @@ def iterate_T3(
 
 
 def iterate_T4(
-    active_occ: list[int], active_unocc: list[int], num_spin_orbs: int, num_elec: int, is_spin_conserving: bool, is_generalized: bool
+    active_occ: list[int],
+    active_unocc: list[int],
+    num_spin_orbs: int,
+    num_elec: int,
+    is_spin_conserving: bool,
+    is_generalized: bool,
 ) -> tuple[int]:
     theta_idx = -1
     for a in active_occ + active_unocc:
@@ -276,81 +337,44 @@ def iterate_T4(
                                         num_beta += 1
                                     if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
                                         continue
-                                    operator = PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec)) * PauliOperator(
-                                        a_op_spin(b, True, num_spin_orbs, num_elec)
+                                    operator = PauliOperator(
+                                        a_op_spin(a, True, num_spin_orbs, num_elec)
+                                    ) * PauliOperator(a_op_spin(b, True, num_spin_orbs, num_elec))
+                                    operator = operator * PauliOperator(
+                                        a_op_spin(c, True, num_spin_orbs, num_elec)
                                     )
-                                    operator = operator * PauliOperator(a_op_spin(c, True, num_spin_orbs, num_elec))
-                                    operator = operator * PauliOperator(a_op_spin(d, True, num_spin_orbs, num_elec))
-                                    operator = operator * PauliOperator(a_op_spin(l, False, num_spin_orbs, num_elec))
-                                    operator = operator * PauliOperator(a_op_spin(k, False, num_spin_orbs, num_elec))
-                                    operator = operator * PauliOperator(a_op_spin(j, False, num_spin_orbs, num_elec))
-                                    operator = operator* PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
+                                    operator = operator * PauliOperator(
+                                        a_op_spin(d, True, num_spin_orbs, num_elec)
+                                    )
+                                    operator = operator * PauliOperator(
+                                        a_op_spin(l, False, num_spin_orbs, num_elec)
+                                    )
+                                    operator = operator * PauliOperator(
+                                        a_op_spin(k, False, num_spin_orbs, num_elec)
+                                    )
+                                    operator = operator * PauliOperator(
+                                        a_op_spin(j, False, num_spin_orbs, num_elec)
+                                    )
+                                    operator = operator * PauliOperator(
+                                        a_op_spin(i, False, num_spin_orbs, num_elec)
+                                    )
                                     yield theta_idx, a, i, b, j, c, k, d, l, operator
 
-
-#def construct_UCC_U(
-#    num_spin_orbs: int,
-#    num_elec: int,
-#    theta: list[float],
-#    theta_picker: ThetaPicker,
-#    excitations: str,
-#    allowed_states: np.ndarray = None,
-#    use_csr: int = 10,
-#) -> np.ndarray:
-#    counter = 0
-#    t = PauliOperator({"I"*num_spin_orbs: 0})
-#    if "s" in excitations:
-#        for (_, _, _, op) in theta_picker.get_T1_generator(num_spin_orbs, num_elec):
-#            if theta[counter] != 0.0:
-#                t += theta[counter] * op
-#            counter += 1
-#
-#    if "d" in excitations:
-#        for (_, _, _, _, _, op) in theta_picker.get_T2_generator(num_spin_orbs, num_elec):
-#            if theta[counter] != 0.0:
-#                t += theta[counter] * op
-#            counter += 1
-#
-#    if "t" in excitations:
-#        for (_, _, _, _, _, _, _, op) in theta_picker.get_T3_generator(num_spin_orbs, num_elec):
-#            if theta[counter] != 0.0:
-#                t += theta[counter] * op
-#            counter += 1
-#
-#    if "q" in excitations:
-#        for (_, _, _, _, _, _, _, _, _, op) in theta_picker.get_T4_generator(num_spin_orbs, num_elec):
-#            if theta[counter] != 0.0:
-#                t += theta[counter] * op
-#            counter += 1
-#    assert counter == len(theta)
-#
-#    T = (t - t.dagger).matrix_form(use_csr=use_csr, is_real=True)
-#    if num_spin_orbs >= use_csr:
-#        if allowed_states is not None:
-#            T = T[allowed_states, :]
-#            T = T[:, allowed_states]
-#        A = scipy.sparse.linalg.expm(T)
-#    else:
-#        if allowed_states is not None:
-#            T = T[allowed_states, :]
-#            T = T[:, allowed_states]
-#        A = scipy.linalg.expm(T)
-#    return A
 
 def construct_UCC_U(
     num_spin_orbs: int,
     num_elec: int,
-    theta: list[float],
+    theta: Sequence[float],
     theta_picker: ThetaPicker,
     excitations: str,
-    allowed_states: np.ndarray = None,
+    allowed_states: np.ndarray | None = None,
     use_csr: int = 10,
 ) -> np.ndarray:
     t = np.zeros((2**num_spin_orbs, 2**num_spin_orbs))
     counter = 0
     start = time.time()
     if "s" in excitations:
-        for (_, a, i, _) in theta_picker.get_T1_generator(0, 0):
+        for _, a, i, _ in theta_picker.get_T1_generator(0, 0):
             if theta[counter] != 0.0:
                 tmp = a_op_spin_matrix(a, True, num_spin_orbs, num_elec, use_csr=use_csr).dot(
                     a_op_spin_matrix(i, False, num_spin_orbs, num_elec, use_csr=use_csr)
@@ -359,7 +383,7 @@ def construct_UCC_U(
             counter += 1
 
     if "d" in excitations:
-        for (_, a, i, b, j, _) in theta_picker.get_T2_generator(0, 0):
+        for _, a, i, b, j, _ in theta_picker.get_T2_generator(0, 0):
             if theta[counter] != 0.0:
                 tmp = a_op_spin_matrix(a, True, num_spin_orbs, num_elec, use_csr=use_csr).dot(
                     a_op_spin_matrix(b, True, num_spin_orbs, num_elec, use_csr=use_csr)
@@ -370,7 +394,7 @@ def construct_UCC_U(
             counter += 1
 
     if "t" in excitations:
-        for (_, a, i, b, j, c, k, _) in theta_picker.get_T3_generator(0, 0):
+        for _, a, i, b, j, c, k, _ in theta_picker.get_T3_generator(0, 0):
             if theta[counter] != 0.0:
                 tmp = a_op_spin_matrix(a, True, num_spin_orbs, num_elec, use_csr=use_csr).dot(
                     a_op_spin_matrix(b, True, num_spin_orbs, num_elec, use_csr=use_csr)
@@ -383,7 +407,7 @@ def construct_UCC_U(
             counter += 1
 
     if "q" in excitations:
-        for (_, a, i, b, j, c, k, d, l, _) in theta_picker.get_T4_generator(0, 0):
+        for _, a, i, b, j, c, k, d, l, _ in theta_picker.get_T4_generator(0, 0):
             if theta[counter] != 0.0:
                 tmp = a_op_spin_matrix(a, True, num_spin_orbs, num_elec, use_csr=use_csr).dot(
                     a_op_spin_matrix(b, True, num_spin_orbs, num_elec, use_csr=use_csr)
@@ -398,16 +422,9 @@ def construct_UCC_U(
             counter += 1
     assert counter == len(theta)
 
-    if num_spin_orbs >= use_csr:
-        T = t - t.conjugate().transpose()
-        if allowed_states is not None:
-            T = T[allowed_states, :]
-            T = T[:, allowed_states]
-        A = scipy.sparse.linalg.expm(T)
-    else:
-        T = t - np.conj(t).transpose()
-        if allowed_states is not None:
-            T = T[allowed_states, :]
-            T = T[:, allowed_states]
-        A = scipy.linalg.expm(T)
+    T = t - t.conjugate().transpose()
+    if allowed_states is not None:
+        T = T[allowed_states, :]
+        T = T[:, allowed_states]
+    A = lw.expm(T)
     return A
