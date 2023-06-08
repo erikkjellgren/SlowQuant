@@ -7,6 +7,7 @@ import itertools
 import numpy as np
 import scipy.sparse as ss
 
+import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
 from slowquant.unitary_coupled_cluster.base import PauliOperator, pauli_to_mat
 
 
@@ -185,11 +186,11 @@ class PauliOperatorHybridForm:
     def apply_U_from_right(self, U: np.ndarray | ss.csr_matrix) -> PauliOperatorHybridForm:
         new_operators = copy.deepcopy(self.operators)
         for key in self.operators.keys():
-            new_operators[key].active_matrix = np.matmul(new_operators[key].active_matrix, U)
+            new_operators[key].active_matrix = lw.matmul(new_operators[key].active_matrix, U)
         return PauliOperatorHybridForm(new_operators)
 
     def apply_U_from_left(self, U: np.ndarray | ss.csr_matrix) -> PauliOperatorHybridForm:
         new_operators = copy.deepcopy(self.operators)
         for key in self.operators.keys():
-            new_operators[key].active_matrix = np.matmul(U, new_operators[key].active_matrix)
+            new_operators[key].active_matrix = lw.matmul(U, new_operators[key].active_matrix)
         return PauliOperatorHybridForm(new_operators)
