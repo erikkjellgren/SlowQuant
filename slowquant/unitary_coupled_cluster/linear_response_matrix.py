@@ -16,6 +16,10 @@ from slowquant.unitary_coupled_cluster.base import (
     commutator,
     expectation_value,
 )
+from slowquant.unitary_coupled_cluster.base_contracted import (
+    commutator_contract,
+    expectation_value_contracted,
+)
 from slowquant.unitary_coupled_cluster.base_matrix import (
     convert_pauli_to_hybrid_form,
     expectation_value_hybrid,
@@ -131,69 +135,63 @@ class LinearResponseUCCMatrix:
         print(expectation_value_hybrid(self.wf.state_vector, H, self.wf.state_vector))
         print(expectation_value_hybrid(ref_state, UHU, ref_state))
         idx_shift = len(self.q_ops)
-        active_space_cache = {}
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
-        for j, qJ in enumerate(self.q_pauli_ops):
-            H_qJ = commutator(H_pauli, qJ)
-            H_qJdagger = commutator(H_pauli, qJ.dagger)
-            for i, qI in enumerate(self.q_pauli_ops):
+        for j, qJ in enumerate(self.q_ops):
+            H_qJ = commutator(H, qJ)
+            H_qJdagger = commutator(H, qJ.dagger)
+            for i, qI in enumerate(self.q_ops):
                 if i < j:
                     continue
                 print(i, "q,q")
                 # Make M
-                val, active_space_cache = expectation_value(
+                val = expectation_value_contracted(
                     self.wf.state_vector,
-                    commutator(qI.dagger, H_qJ),
+                    commutator_contract(qI.dagger, H_qJ),
                     self.wf.state_vector,
-                    active_cache=active_space_cache,
                 )
                 self.M[i, j] = self.M[j, i] = val
                 # Make Q
-                val, active_space_cache = expectation_value(
+                val = expectation_value_contracted(
                     self.wf.state_vector,
-                    commutator(qI.dagger, H_qJdagger),
+                    commutator_contract(qI.dagger, H_qJdagger),
                     self.wf.state_vector,
-                    active_cache=active_space_cache,
                 )
                 self.Q[i, j] = self.Q[j, i] = val
                 # Make V
-                val, active_space_cache = expectation_value(
+                val = expectation_value_contracted(
                     self.wf.state_vector,
-                    commutator(qI.dagger, qJ),
+                    commutator_contract(qI.dagger, qJ),
                     self.wf.state_vector,
-                    active_cache=active_space_cache,
                 )
                 self.V[i, j] = self.V[j, i] = val
                 # Make W
-                val, active_space_cache = expectation_value(
+                val = expectation_value_contracted(
                     self.wf.state_vector,
-                    commutator(qI.dagger, qJ.dagger),
+                    commutator_contract(qI.dagger, qJ.dagger),
                     self.wf.state_vector,
-                    active_cache=active_space_cache,
                 )
                 self.W[i, j] = self.W[j, i] = val
-        print(active_space_cache)
         for j, GJ in enumerate(self.G_ops):
             H_GJ = commutator(H, GJ)
             H_GJdagger = commutator(H, GJ.dagger)
             for i, qI in enumerate(self.q_ops):
                 print(i, "q,G")
                 # Make M
-                self.M[i, j + idx_shift] = expectation_value_hybrid(
-                    self.wf.state_vector, commutator(qI.dagger, H_GJ), self.wf.state_vector
+                self.M[i, j + idx_shift] = expectation_value_contracted(
+                    self.wf.state_vector, commutator_contract(qI.dagger, H_GJ), self.wf.state_vector
                 )
                 # Make Q
-                self.Q[i, j + idx_shift] = expectation_value_hybrid(
-                    self.wf.state_vector, commutator(qI.dagger, H_GJdagger), self.wf.state_vector
+                self.Q[i, j + idx_shift] = expectation_value_contracted(
+                    self.wf.state_vector, commutator_contract(qI.dagger, H_GJdagger), self.wf.state_vector
                 )
                 # Make V
-                self.V[i, j + idx_shift] = expectation_value_hybrid(
-                    self.wf.state_vector, commutator(qI.dagger, GJ), self.wf.state_vector
+                self.V[i, j + idx_shift] = expectation_value_contracted(
+                    self.wf.state_vector, commutator_contract(qI.dagger, GJ), self.wf.state_vector
                 )
                 # Make W
-                self.W[i, j + idx_shift] = expectation_value_hybrid(
-                    self.wf.state_vector, commutator(qI.dagger, GJ.dagger), self.wf.state_vector
+                self.W[i, j + idx_shift] = expectation_value_contracted(
+                    self.wf.state_vector, commutator_contract(qI.dagger, GJ.dagger), self.wf.state_vector
                 )
         for j, qJ in enumerate(self.q_ops):
             H_qJ = commutator(H, qJ)
@@ -201,20 +199,20 @@ class LinearResponseUCCMatrix:
             for i, GI in enumerate(self.G_ops):
                 print(i, "G,q")
                 # Make M
-                self.M[i + idx_shift, j] = expectation_value_hybrid(
-                    self.wf.state_vector, commutator(GI.dagger, H_qJ), self.wf.state_vector
+                self.M[i + idx_shift, j] = expectation_value_contracted(
+                    self.wf.state_vector, commutator_contract(GI.dagger, H_qJ), self.wf.state_vector
                 )
                 # Make Q
-                self.Q[i + idx_shift, j] = expectation_value_hybrid(
-                    self.wf.state_vector, commutator(GI.dagger, H_qJdagger), self.wf.state_vector
+                self.Q[i + idx_shift, j] = expectation_value_contracted(
+                    self.wf.state_vector, commutator_contract(GI.dagger, H_qJdagger), self.wf.state_vector
                 )
                 # Make V
-                self.V[i + idx_shift, j] = expectation_value_hybrid(
-                    self.wf.state_vector, commutator(GI.dagger, qJ), self.wf.state_vector
+                self.V[i + idx_shift, j] = expectation_value_contracted(
+                    self.wf.state_vector, commutator_contract(GI.dagger, qJ), self.wf.state_vector
                 )
                 # Make W
-                self.W[i + idx_shift, j] = expectation_value_hybrid(
-                    self.wf.state_vector, commutator(GI.dagger, qJ.dagger), self.wf.state_vector
+                self.W[i + idx_shift, j] = expectation_value_contracted(
+                    self.wf.state_vector, commutator_contract(GI.dagger, qJ.dagger), self.wf.state_vector
                 )
         for j, GJ in enumerate(self.G_ops):
             H_GJ = commutator(H, GJ)
@@ -226,26 +224,26 @@ class LinearResponseUCCMatrix:
                 # Make M
                 self.M[i + idx_shift, j + idx_shift] = self.M[
                     j + idx_shift, i + idx_shift
-                ] = expectation_value_hybrid(
-                    self.wf.state_vector, commutator(GI.dagger, H_GJ), self.wf.state_vector
+                ] = expectation_value_contracted(
+                    self.wf.state_vector, commutator_contract(GI.dagger, H_GJ), self.wf.state_vector
                 )
                 # Make V
                 self.V[i + idx_shift, j + idx_shift] = self.V[
                     j + idx_shift, i + idx_shift
-                ] = expectation_value_hybrid(
-                    self.wf.state_vector, commutator(GI.dagger, GJ), self.wf.state_vector
+                ] = expectation_value_contracted(
+                    self.wf.state_vector, commutator_contract(GI.dagger, GJ), self.wf.state_vector
                 )
                 # Make Q
                 self.Q[i + idx_shift, j + idx_shift] = self.Q[
                     j + idx_shift, i + idx_shift
-                ] = expectation_value_hybrid(
-                    self.wf.state_vector, commutator(GI.dagger, H_GJdagger), self.wf.state_vector
+                ] = expectation_value_contracted(
+                    self.wf.state_vector, commutator_contract(GI.dagger, H_GJdagger), self.wf.state_vector
                 )
                 # Make W
                 self.W[i + idx_shift, j + idx_shift] = self.Q[
                     j + idx_shift, i + idx_shift
-                ] = expectation_value_hybrid(
-                    self.wf.state_vector, commutator(GI.dagger, GJ.dagger), self.wf.state_vector
+                ] = expectation_value_contracted(
+                    self.wf.state_vector, commutator_contract(GI.dagger, GJ.dagger), self.wf.state_vector
                 )
         print("\n M matrix:")
         for i in range(len(self.M)):

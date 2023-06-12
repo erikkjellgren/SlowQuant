@@ -111,3 +111,9 @@ def operatormul_contract(A: PauliOperatorHybridForm, B: PauliOperatorHybridForm)
 
 def commutator_contract(A: PauliOperatorHybridForm, B: PauliOperatorHybridForm) -> PauliOperatorContracted:
     return operatormul_contract(A, B) - operatormul_contract(B, A)
+
+
+def expectation_value_contracted(
+    bra: StateVector, contracted_op: PauliOperatorContracted, ket: StateVector
+) -> float:
+    return lw.matmul(bra.bra_active, lw.matmul(contracted_op.operators, ket.ket_active)).real
