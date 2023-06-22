@@ -147,7 +147,7 @@ def iterate_T1_SA(
                 continue
             i = i_ // 2
             theta_idx += 1
-            operator = Epq(a, i, num_spin_orbs, num_elec)
+            operator = 2**(-1/2)*Epq(a, i, num_spin_orbs, num_elec)
             yield theta_idx, a, i, operator
 
 
@@ -168,7 +168,7 @@ def iterate_T1_SA_matrix(
                 continue
             i = i_ // 2
             theta_idx += 1
-            operator = Epq_matrix(a, i, num_spin_orbs, num_elec, use_csr=use_csr)
+            operator = 2**(-1/2)*Epq_matrix(a, i, num_spin_orbs, num_elec, use_csr=use_csr)
             yield theta_idx, a, i, operator
 
 
@@ -200,16 +200,21 @@ def iterate_T2_SA(
                         continue
                     j = j_ // 2
                     theta_idx += 1
-                    operator = Epq(a, i, num_spin_orbs, num_elec) * Epq(b, j, num_spin_orbs, num_elec) + Epq(
+                    fac = 1
+                    if a == b:
+                        fac *= 2
+                    if i == j:
+                        fac *= 2
+                    operator = 1/2*(fac)**(-1/2)*(Epq(a, i, num_spin_orbs, num_elec) * Epq(b, j, num_spin_orbs, num_elec) + Epq(
                         a, j, num_spin_orbs, num_elec
-                    ) * Epq(b, i, num_spin_orbs, num_elec)
+                    ) * Epq(b, i, num_spin_orbs, num_elec))
                     yield theta_idx, a, i, b, j, operator
                     if i == j or a == b:
                         continue
                     theta_idx += 1
-                    operator = Epq(a, i, num_spin_orbs, num_elec) * Epq(b, j, num_spin_orbs, num_elec) - Epq(
+                    operator = 1/(2*3**(1/2))*(Epq(a, i, num_spin_orbs, num_elec) * Epq(b, j, num_spin_orbs, num_elec) - Epq(
                         a, j, num_spin_orbs, num_elec
-                    ) * Epq(b, i, num_spin_orbs, num_elec)
+                    ) * Epq(b, i, num_spin_orbs, num_elec))
                     yield theta_idx, a, i, b, j, operator
 
 
@@ -242,24 +247,29 @@ def iterate_T2_SA_matrix(
                         continue
                     j = j_ // 2
                     theta_idx += 1
-                    operator = lw.matmul(
+                    fac = 1
+                    if a == b:
+                        fac *= 2
+                    if i == j:
+                        fac *= 2
+                    operator = 1/2*(fac)**(-1/2)*(lw.matmul(
                         Epq_matrix(a, i, num_spin_orbs, num_elec, use_csr=use_csr),
                         Epq_matrix(b, j, num_spin_orbs, num_elec, use_csr=use_csr),
                     ) + lw.matmul(
                         Epq_matrix(a, j, num_spin_orbs, num_elec, use_csr=use_csr),
                         Epq_matrix(b, i, num_spin_orbs, num_elec, use_csr=use_csr),
-                    )
+                    ))
                     yield theta_idx, a, i, b, j, operator
                     if i == j or a == b:
                         continue
                     theta_idx += 1
-                    operator = lw.matmul(
+                    operator = 1/(2*3**(1/2))*(lw.matmul(
                         Epq_matrix(a, i, num_spin_orbs, num_elec, use_csr=use_csr),
                         Epq_matrix(b, j, num_spin_orbs, num_elec, use_csr=use_csr),
                     ) - lw.matmul(
                         Epq_matrix(a, j, num_spin_orbs, num_elec, use_csr=use_csr),
                         Epq_matrix(b, i, num_spin_orbs, num_elec, use_csr=use_csr),
-                    )
+                    ))
                     yield theta_idx, a, i, b, j, operator
 
 

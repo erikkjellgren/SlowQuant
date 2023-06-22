@@ -61,7 +61,7 @@ class LinearResponseUCCMatrix:
             "sdtq",  # self.wf._excitations,
         )
         if "s" in excitations:
-            for _, _, _, op in self.theta_picker.get_T1_generator(num_spin_orbs, num_elec):
+            for _, _, _, op in self.theta_picker.get_T1_generator_SA(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
                     op,
                     self.wf.num_inactive_spin_orbs,
@@ -72,7 +72,7 @@ class LinearResponseUCCMatrix:
                 op = op.apply_U_from_left(U)
                 self.G_ops.append(op)
         if "d" in excitations:
-            for _, _, _, _, _, op in self.theta_picker.get_T2_generator(num_spin_orbs, num_elec):
+            for _, _, _, _, _, op in self.theta_picker.get_T2_generator_SA(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
                     op,
                     self.wf.num_inactive_spin_orbs,
