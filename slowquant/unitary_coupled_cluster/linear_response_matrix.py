@@ -20,6 +20,8 @@ from slowquant.unitary_coupled_cluster.base_contracted import (
     commutator_contract,
     double_commutator_contract,
     expectation_value_contracted,
+    operatormul3_contract,
+    operatormul_contract,
 )
 from slowquant.unitary_coupled_cluster.base_matrix import (
     convert_pauli_to_hybrid_form,
@@ -144,33 +146,29 @@ class LinearResponseUCCMatrix:
                     continue
                 print(i, "q,q")
                 # Make M
+                operator = operatormul3_contract(qI.dagger, H, qJ) - operatormul3_contract(qI.dagger, qJ, H)
                 val = expectation_value_contracted(
                     self.wf.state_vector,
-                    double_commutator_contract(qI.dagger, H, qJ),
+                    operator,
                     self.wf.state_vector,
                 )
                 self.M[i, j] = self.M[j, i] = val
                 # Make Q
+                operator = -1 * operatormul3_contract(qI.dagger, qJ.dagger, H)
                 val = expectation_value_contracted(
                     self.wf.state_vector,
-                    double_commutator_contract(qI.dagger, H, qJ.dagger),
+                    operator,
                     self.wf.state_vector,
                 )
                 self.Q[i, j] = self.Q[j, i] = val
                 # Make V
                 val = expectation_value_contracted(
                     self.wf.state_vector,
-                    commutator_contract(qI.dagger, qJ),
+                    operatormul_contract(qI.dagger, qJ),
                     self.wf.state_vector,
                 )
                 self.V[i, j] = self.V[j, i] = val
                 # Make W
-                val = expectation_value_contracted(
-                    self.wf.state_vector,
-                    commutator_contract(qI.dagger, qJ.dagger),
-                    self.wf.state_vector,
-                )
-                self.W[i, j] = self.W[j, i] = val
         for j, GJ in enumerate(self.G_ops):
             for i, qI in enumerate(self.q_ops):
                 print(i, "q,G")
@@ -189,9 +187,6 @@ class LinearResponseUCCMatrix:
                     self.wf.state_vector, commutator_contract(qI.dagger, GJ), self.wf.state_vector
                 )
                 # Make W
-                self.W[i, j + idx_shift] = expectation_value_contracted(
-                    self.wf.state_vector, commutator_contract(qI.dagger, GJ.dagger), self.wf.state_vector
-                )
         for j, qJ in enumerate(self.q_ops):
             for i, GI in enumerate(self.G_ops):
                 print(i, "G,q")
@@ -210,9 +205,6 @@ class LinearResponseUCCMatrix:
                     self.wf.state_vector, commutator_contract(GI.dagger, qJ), self.wf.state_vector
                 )
                 # Make W
-                self.W[i + idx_shift, j] = expectation_value_contracted(
-                    self.wf.state_vector, commutator_contract(GI.dagger, qJ.dagger), self.wf.state_vector
-                )
         for j, GJ in enumerate(self.G_ops):
             for i, GI in enumerate(self.G_ops):
                 if i < j:
@@ -239,11 +231,6 @@ class LinearResponseUCCMatrix:
                     self.wf.state_vector,
                 )
                 # Make W
-                self.W[i + idx_shift, j + idx_shift] = self.Q[
-                    j + idx_shift, i + idx_shift
-                ] = expectation_value_contracted(
-                    self.wf.state_vector, commutator_contract(GI.dagger, GJ.dagger), self.wf.state_vector
-                )
         print("\n M matrix:")
         for i in range(len(self.M)):
             for j in range(i, len(self.M)):

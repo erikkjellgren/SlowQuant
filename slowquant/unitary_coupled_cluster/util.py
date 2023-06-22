@@ -6,6 +6,8 @@ import scipy.linalg
 
 import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
 from slowquant.unitary_coupled_cluster.base import (
+    Epq,
+    Epq_matrix,
     PauliOperator,
     a_op_spin,
     a_op_spin_matrix,
@@ -89,6 +91,176 @@ class ThetaPicker:
             self.is_spin_conserving,
             self.is_generalized,
         )
+
+    def get_T1_generator_SA(
+        self, num_spin_orbs: int, num_elec: int
+    ) -> Generator[tuple[int, int, int, PauliOperator], None, None]:
+        if self.is_generalized:
+            raise ValueError("Spin-adapted not implemented for generelized operators")
+        return iterate_T1_SA(self.active_occ, self.active_unocc, num_spin_orbs, num_elec)
+
+    def get_T2_generator_SA(
+        self, num_spin_orbs: int, num_elec: int
+    ) -> Generator[tuple[int, int, int, PauliOperator], None, None]:
+        if self.is_generalized:
+            raise ValueError("Spin-adapted not implemented for generelized operators")
+        return iterate_T2_SA(self.active_occ, self.active_unocc, num_spin_orbs, num_elec)
+
+    def get_T1_generator_SA_matrix(
+        self,
+        num_spin_orbs: int,
+        num_elec: int,
+        use_csr: int = 10,
+    ) -> Generator[tuple[int, int, int, PauliOperator], None, None]:
+        if self.is_generalized:
+            raise ValueError("Spin-adapted not implemented for generelized operators")
+        return iterate_T1_SA_matrix(
+            self.active_occ, self.active_unocc, num_spin_orbs, num_elec, use_csr=use_csr
+        )
+
+    def get_T2_generator_SA_matrix(
+        self,
+        num_spin_orbs: int,
+        num_elec: int,
+        use_csr: int = 10,
+    ) -> Generator[tuple[int, int, int, PauliOperator], None, None]:
+        if self.is_generalized:
+            raise ValueError("Spin-adapted not implemented for generelized operators")
+        return iterate_T2_SA_matrix(
+            self.active_occ, self.active_unocc, num_spin_orbs, num_elec, use_csr=use_csr
+        )
+
+
+def iterate_T1_SA(
+    active_occ: list[int],
+    active_unocc: list[int],
+    num_spin_orbs: int,
+    num_elec: int,
+) -> tuple[int]:
+    theta_idx = -1
+    for a_ in active_occ:
+        if a_ % 2 == 1:
+            continue
+        a = a_ // 2
+        for i_ in active_unocc:
+            if i_ % 2 == 1:
+                continue
+            i = i_ // 2
+            theta_idx += 1
+            operator = Epq(a, i, num_spin_orbs, num_elec)
+            yield theta_idx, a, i, operator
+
+
+def iterate_T1_SA_matrix(
+    active_occ: list[int],
+    active_unocc: list[int],
+    num_spin_orbs: int,
+    num_elec: int,
+    use_csr: int,
+) -> tuple[int]:
+    theta_idx = -1
+    for a_ in active_occ:
+        if a_ % 2 == 1:
+            continue
+        a = a_ // 2
+        for i_ in active_unocc:
+            if i_ % 2 == 1:
+                continue
+            i = i_ // 2
+            theta_idx += 1
+            operator = Epq_matrix(a, i, num_spin_orbs, num_elec, use_csr=use_csr)
+            yield theta_idx, a, i, operator
+
+
+def iterate_T2_SA(
+    active_occ: list[int],
+    active_unocc: list[int],
+    num_spin_orbs: int,
+    num_elec: int,
+) -> tuple[int]:
+    theta_idx = -1
+    for a_ in active_occ:
+        if a_ % 2 == 1:
+            continue
+        a = a_ // 2
+        for b_ in active_occ:
+            if a_ > b_:
+                continue
+            if b_ % 2 == 1:
+                continue
+            b = b_ // 2
+            for i_ in active_unocc:
+                if i_ % 2 == 1:
+                    continue
+                i = i_ // 2
+                for j_ in active_unocc:
+                    if i_ > j_:
+                        continue
+                    if j_ % 2 == 1:
+                        continue
+                    j = j_ // 2
+                    theta_idx += 1
+                    operator = Epq(a, i, num_spin_orbs, num_elec) * Epq(b, j, num_spin_orbs, num_elec) + Epq(
+                        a, j, num_spin_orbs, num_elec
+                    ) * Epq(b, i, num_spin_orbs, num_elec)
+                    yield theta_idx, a, i, b, j, operator
+                    if i == j or a == b:
+                        continue
+                    theta_idx += 1
+                    operator = Epq(a, i, num_spin_orbs, num_elec) * Epq(b, j, num_spin_orbs, num_elec) - Epq(
+                        a, j, num_spin_orbs, num_elec
+                    ) * Epq(b, i, num_spin_orbs, num_elec)
+                    yield theta_idx, a, i, b, j, operator
+
+
+def iterate_T2_SA_matrix(
+    active_occ: list[int],
+    active_unocc: list[int],
+    num_spin_orbs: int,
+    num_elec: int,
+    use_csr: int,
+) -> tuple[int]:
+    theta_idx = -1
+    for a_ in active_occ:
+        if a_ % 2 == 1:
+            continue
+        a = a_ // 2
+        for b_ in active_occ:
+            if a_ > b_:
+                continue
+            if b_ % 2 == 1:
+                continue
+            b = b_ // 2
+            for i_ in active_unocc:
+                if i_ % 2 == 1:
+                    continue
+                i = i_ // 2
+                for j_ in active_unocc:
+                    if i_ > j_:
+                        continue
+                    if j_ % 2 == 1:
+                        continue
+                    j = j_ // 2
+                    theta_idx += 1
+                    operator = lw.matmul(
+                        Epq_matrix(a, i, num_spin_orbs, num_elec, use_csr=use_csr),
+                        Epq_matrix(b, j, num_spin_orbs, num_elec, use_csr=use_csr),
+                    ) + lw.matmul(
+                        Epq_matrix(a, j, num_spin_orbs, num_elec, use_csr=use_csr),
+                        Epq_matrix(b, i, num_spin_orbs, num_elec, use_csr=use_csr),
+                    )
+                    yield theta_idx, a, i, b, j, operator
+                    if i == j or a == b:
+                        continue
+                    theta_idx += 1
+                    operator = lw.matmul(
+                        Epq_matrix(a, i, num_spin_orbs, num_elec, use_csr=use_csr),
+                        Epq_matrix(b, j, num_spin_orbs, num_elec, use_csr=use_csr),
+                    ) - lw.matmul(
+                        Epq_matrix(a, j, num_spin_orbs, num_elec, use_csr=use_csr),
+                        Epq_matrix(b, i, num_spin_orbs, num_elec, use_csr=use_csr),
+                    )
+                    yield theta_idx, a, i, b, j, operator
 
 
 def iterate_T1(
@@ -374,23 +546,15 @@ def construct_UCC_U(
     counter = 0
     start = time.time()
     if "s" in excitations:
-        for _, a, i, _ in theta_picker.get_T1_generator(0, 0):
+        for _, a, i, operator in theta_picker.get_T1_generator_SA_matrix(num_spin_orbs, num_elec):
             if theta[counter] != 0.0:
-                tmp = a_op_spin_matrix(a, True, num_spin_orbs, num_elec, use_csr=use_csr).dot(
-                    a_op_spin_matrix(i, False, num_spin_orbs, num_elec, use_csr=use_csr)
-                )
-                t += theta[counter] * tmp
+                t += theta[counter] * operator
             counter += 1
 
     if "d" in excitations:
-        for _, a, i, b, j, _ in theta_picker.get_T2_generator(0, 0):
+        for _, a, i, b, j, operator in theta_picker.get_T2_generator_SA_matrix(num_spin_orbs, num_elec):
             if theta[counter] != 0.0:
-                tmp = a_op_spin_matrix(a, True, num_spin_orbs, num_elec, use_csr=use_csr).dot(
-                    a_op_spin_matrix(b, True, num_spin_orbs, num_elec, use_csr=use_csr)
-                )
-                tmp = tmp.dot(a_op_spin_matrix(j, False, num_spin_orbs, num_elec, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, num_elec, use_csr=use_csr))
-                t += theta[counter] * tmp
+                t += theta[counter] * operator
             counter += 1
 
     if "t" in excitations:

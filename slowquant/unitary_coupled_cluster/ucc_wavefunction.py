@@ -99,11 +99,11 @@ class WaveFunctionUCC:
             self.active_occ, self.active_unocc, is_spin_conserving=False, is_generalized=is_generalized
         )
         self.theta1 = []
-        for _ in self.theta_picker_full.get_T1_generator(0, 0):
+        for _ in self.theta_picker_full.get_T1_generator_SA(0, 0):
             self.theta1.append(0)
         # Construct theta2
         self.theta2 = []
-        for _ in self.theta_picker_full.get_T2_generator(0, 0):
+        for _ in self.theta_picker_full.get_T2_generator_SA(0, 0):
             self.theta2.append(0)
         # Construct theta3
         self.theta3 = []
@@ -158,7 +158,9 @@ class WaveFunctionUCC:
             iteration += 1
             start = time.time()
 
-        res = scipy.optimize.minimize(e_tot, self.kappa, tol=1e-6, callback=print_progress)
+        res = scipy.optimize.minimize(
+            e_tot, self.kappa, tol=1e-6, callback=print_progress
+        )  # , method='SLSQP')
         self.hf_energy = res["fun"]
         self.kappa = res["x"]
 
@@ -221,11 +223,11 @@ class WaveFunctionUCC:
             parameters += self.kappa
             num_kappa += len(self.kappa)
         if "s" in excitations:
-            for idx, _, _, _ in self.theta_picker.get_T1_generator(0, 0):
+            for idx, _, _, _ in self.theta_picker.get_T1_generator_SA(0, 0):
                 parameters += [self.theta1[idx]]
                 num_theta1 += 1
         if "d" in excitations:
-            for idx, _, _, _, _, _ in self.theta_picker.get_T2_generator(0, 0):
+            for idx, _, _, _, _, _ in self.theta_picker.get_T2_generator_SA(0, 0):
                 parameters += [self.theta2[idx]]
                 num_theta2 += 1
         if "t" in excitations:
@@ -243,7 +245,9 @@ class WaveFunctionUCC:
         print(f"### Number theta3: {num_theta3}")
         print(f"### Number theta4: {num_theta4}")
         print(f"### Total parameters: {num_kappa+num_theta1+num_theta2+num_theta3+num_theta4}")
-        res = scipy.optimize.minimize(e_tot, parameters, tol=1e-6, callback=print_progress)
+        res = scipy.optimize.minimize(
+            e_tot, parameters, tol=1e-6, callback=print_progress
+        )  # , method='SLSQP')
         self.ucc_energy = res["fun"]
         param_idx = 0
         if orbital_optimization:
@@ -253,14 +257,14 @@ class WaveFunctionUCC:
             thetas = res["x"][param_idx : num_theta1 + param_idx].tolist()
             param_idx += len(thetas)
             counter = 0
-            for idx, _, _, _ in self.theta_picker.get_T1_generator(0, 0):
+            for idx, _, _, _ in self.theta_picker.get_T1_generator_SA(0, 0):
                 self.theta1[idx] = thetas[counter]
                 counter += 1
         if "d" in excitations:
             thetas = res["x"][param_idx : num_theta2 + param_idx].tolist()
             param_idx += len(thetas)
             counter = 0
-            for idx, _, _, _, _, _ in self.theta_picker.get_T2_generator(0, 0):
+            for idx, _, _, _, _, _ in self.theta_picker.get_T2_generator_SA(0, 0):
                 self.theta2[idx] = thetas[counter]
                 counter += 1
         if "t" in excitations:
@@ -327,11 +331,13 @@ def energy_UCC(
         kappa.append(parameters[idx_counter])
         idx_counter += 1
     if "s" in excitations:
-        for _ in theta_picker.get_T1_generator(0, 0):
+        for _ in theta_picker.get_T1_generator_SA(0, 0):
             theta1.append(parameters[idx_counter])
             idx_counter += 1
     if "d" in excitations:
-        for _ in theta_picker.get_T2_generator(0, 0):
+        for _ in theta_picker.get_T2_generator_SA(
+            num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs, num_elec
+        ):
             theta2.append(parameters[idx_counter])
             idx_counter += 1
     if "t" in excitations:

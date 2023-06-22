@@ -7,7 +7,7 @@ import itertools
 import numpy as np
 import scipy.sparse as ss
 
-import slowquant.unitary_coupled_cluster as lw
+import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
     two_electron_integral_transform,
@@ -466,6 +466,18 @@ def Epq(p: int, q: int, num_spin_orbs: int, num_elec: int) -> PauliOperator:
     )
     E += PauliOperator(a_op(p, "beta", True, num_spin_orbs, num_elec)) * PauliOperator(
         a_op(q, "beta", False, num_spin_orbs, num_elec)
+    )
+    return E
+
+
+def Epq_matrix(p: int, q: int, num_spin_orbs: int, num_elec: int, use_csr: int = 10) -> PauliOperator:
+    E = lw.matmul(
+        a_op_spin_matrix(p * 2, True, num_spin_orbs, num_elec, use_csr=use_csr),
+        a_op_spin_matrix(q * 2, False, num_spin_orbs, num_elec, use_csr=use_csr),
+    )
+    E += lw.matmul(
+        a_op_spin_matrix(p * 2 + 1, True, num_spin_orbs, num_elec, use_csr=use_csr),
+        a_op_spin_matrix(q * 2 + 1, False, num_spin_orbs, num_elec, use_csr=use_csr),
     )
     return E
 
