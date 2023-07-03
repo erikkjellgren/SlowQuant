@@ -4,6 +4,12 @@ import numpy as np
 import scipy.sparse as ss
 
 import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
+from slowquant.molecularintegrals.integralfunctions import (
+    one_electron_integral_transform,
+    two_electron_integral_transform,
+)
+from slowquant.unitary_coupled_cluster.base import PauliOperator, a_op
+from slowquant.unitary_coupled_cluster.base_matrix import convert_pauli_to_hybrid_form
 
 
 def pauli_mul(pauli1: str, pauli2: str) -> tuple[str, complex]:
@@ -78,9 +84,10 @@ def operatormul_contract(A: PauliOperatorHybridForm, B: PauliOperatorHybridForm)
     for _, op1 in A.operators.items():
         if isinstance(op1.active_matrix, np.ndarray):
             new_operators = np.zeros_like(op1.active_matrix)
+        elif isinstance(op1.active_matrix, ss.csr_matrix) or isinstance(op1.active_matrix, ss.csc_matrix):
+            new_operators = ss.csr_array(op1.active_matrix.shape)
         else:
-            print(f"Unknown type: {type(op1.active_matrix)}")
-            exit()
+            raise TypeError(f"Unknown type: {type(op1.active_matrix)}")
         break
     for _, op1 in A.operators.items():
         for _, op2 in B.operators.items():
@@ -144,7 +151,7 @@ def operatormul_contract(A: PauliOperatorHybridForm, B: PauliOperatorHybridForm)
             # This should depend on state vector.
             # I.e. (-1)**(#Z_occupied)
             fac *= (-1) ** (new_inactive.count("Z"))
-            new_active = fac * np.matmul(op1.active_matrix, op2.active_matrix)
+            new_active = fac * lw.matmul(op1.active_matrix, op2.active_matrix)
             new_operators += new_active
     return PauliOperatorContracted(new_operators)
 
@@ -155,9 +162,10 @@ def operatormul3_contract(
     for _, op1 in A.operators.items():
         if isinstance(op1.active_matrix, np.ndarray):
             new_operators = np.zeros_like(op1.active_matrix)
+        elif isinstance(op1.active_matrix, ss.csr_matrix) or isinstance(op1.active_matrix, ss.csc_matrix):
+            new_operators = ss.csr_array(op1.active_matrix.shape)
         else:
-            print(f"Unknown type: {type(op1.active_matrix)}")
-            exit()
+            raise TypeError(f"Unknown type: {type(op1.active_matrix)}")
         break
     for _, op1 in A.operators.items():
         for _, op2 in B.operators.items():
@@ -180,8 +188,8 @@ def operatormul3_contract(
                 # This should depend on state vector.
                 # I.e. (-1)**(#Z_occupied)
                 fac *= (-1) ** (new_inactive.count("Z"))
-                new_active = fac * np.matmul(
-                    op1.active_matrix, np.matmul(op2.active_matrix, op3.active_matrix)
+                new_active = fac * lw.matmul(
+                    op1.active_matrix, lw.matmul(op2.active_matrix, op3.active_matrix)
                 )
                 new_operators += new_active
     return PauliOperatorContracted(new_operators)
@@ -196,9 +204,10 @@ def operatormul4_contract(
     for _, op1 in A.operators.items():
         if isinstance(op1.active_matrix, np.ndarray):
             new_operators = np.zeros_like(op1.active_matrix)
+        elif isinstance(op1.active_matrix, ss.csr_matrix):
+            new_operators = ss.csr_array(op1.active_matrix.shape)
         else:
-            print(f"Unknown type: {type(op1.active_matrix)}")
-            exit()
+            raise TypeError(f"Unknown type: {type(op1.active_matrix)}")
         break
     for _, op1 in A.operators.items():
         for _, op2 in B.operators.items():
@@ -226,9 +235,9 @@ def operatormul4_contract(
                     # This should depend on state vector.
                     # I.e. (-1)**(#Z_occupied)
                     fac *= (-1) ** (new_inactive.count("Z"))
-                    new_active = fac * np.matmul(
+                    new_active = fac * lw.matmul(
                         op1.active_matrix,
-                        np.matmul(op2.active_matrix, np.matmul(op3.active_matrix, op4.active_matrix)),
+                        lw.matmul(op2.active_matrix, lw.matmul(op3.active_matrix, op4.active_matrix)),
                     )
                     new_operators += new_active
     return PauliOperatorContracted(new_operators)
@@ -253,4 +262,275 @@ def commutator_contract(A: PauliOperatorHybridForm, B: PauliOperatorHybridForm) 
 def expectation_value_contracted(
     bra: StateVector, contracted_op: PauliOperatorContracted, ket: StateVector
 ) -> float:
-    return lw.matmul(bra.bra_active, lw.matmul(contracted_op.operators, ket.ket_active)).real
+    if isinstance(contracted_op.operators, np.ndarray):
+        return lw.matmul(bra.bra_active, lw.matmul(contracted_op.operators, ket.ket_active)).real
+    elif isinstance(contracted_op.operators, ss.csr_matrix):
+        return lw.matmul(
+            bra.bra_active_csr, lw.matmul(contracted_op.operators, ket.ket_active_csr)
+        ).real.toarray()[0, 0]
+    else:
+        raise TypeError(f"Unknown type: {type(op1.active_matrix)}")
+
+
+def Epq_contracted(
+    p: int, q: int, num_spin_orbs: int, num_elec: int, num_inactive_orbs, num_active_orbs, num_virtual_orbs
+) -> PauliOperator:
+    apa = convert_pauli_to_hybrid_form(
+        PauliOperator(a_op(p, "alpha", True, num_spin_orbs, num_elec)),
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+    )
+    aqa = convert_pauli_to_hybrid_form(
+        PauliOperator(a_op(q, "alpha", False, num_spin_orbs, num_elec)),
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+    )
+    apb = convert_pauli_to_hybrid_form(
+        PauliOperator(a_op(p, "beta", True, num_spin_orbs, num_elec)),
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+    )
+    aqb = convert_pauli_to_hybrid_form(
+        PauliOperator(a_op(q, "beta", False, num_spin_orbs, num_elec)),
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+    )
+    return operatormul_contract(apa, aqa) + operatormul_contract(apb, aqb)
+
+
+def epqrs_contracted(
+    p: int,
+    q: int,
+    r: int,
+    s: int,
+    num_spin_orbs: int,
+    num_elec: int,
+    num_inactive_orbs,
+    num_active_orbs,
+    num_virtual_orbs,
+) -> PauliOperator:
+    apa = convert_pauli_to_hybrid_form(
+        PauliOperator(a_op(p, "alpha", True, num_spin_orbs, num_elec)),
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+    )
+    aqa = convert_pauli_to_hybrid_form(
+        PauliOperator(a_op(q, "alpha", False, num_spin_orbs, num_elec)),
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+    )
+    apb = convert_pauli_to_hybrid_form(
+        PauliOperator(a_op(p, "beta", True, num_spin_orbs, num_elec)),
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+    )
+    aqb = convert_pauli_to_hybrid_form(
+        PauliOperator(a_op(q, "beta", False, num_spin_orbs, num_elec)),
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+    )
+    ara = convert_pauli_to_hybrid_form(
+        PauliOperator(a_op(r, "alpha", True, num_spin_orbs, num_elec)),
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+    )
+    asa = convert_pauli_to_hybrid_form(
+        PauliOperator(a_op(s, "alpha", False, num_spin_orbs, num_elec)),
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+    )
+    arb = convert_pauli_to_hybrid_form(
+        PauliOperator(a_op(r, "beta", True, num_spin_orbs, num_elec)),
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+    )
+    asb = convert_pauli_to_hybrid_form(
+        PauliOperator(a_op(s, "beta", False, num_spin_orbs, num_elec)),
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+    )
+    e = (
+        operatormul4_contract(apa, aqa, ara, asa)
+        + operatormul4_contract(apa, aqa, arb, asb)
+        + operatormul4_contract(apb, aqb, ara, asa)
+        + operatormul4_contract(apb, aqb, arb, asb)
+    )
+    if q == r:
+        return e - Epq_contracted(
+            p, s, num_spin_orbs, num_elec, num_inactive_orbs, num_active_orbs, num_virtual_orbs
+        )
+    return e
+
+
+def Hamiltonian_contracted(
+    h: np.ndarray,
+    g: np.ndarray,
+    c_mo: np.ndarray,
+    num_inactive_spin_orbs: int,
+    num_active_spin_orbs: int,
+    num_virtual_spin_orbs: int,
+    num_elec: int,
+) -> PauliOperatorContracted:
+    h_mo = one_electron_integral_transform(c_mo, h)
+    g_mo = two_electron_integral_transform(c_mo, g)
+    num_inactive_spatial_orbs = num_inactive_spin_orbs // 2
+    num_active_spatial_orbs = num_active_spin_orbs // 2
+    num_spin_orbs = num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs
+    num_inactive_orbs, num_active_orbs, num_virtual_orbs = (
+        num_inactive_spin_orbs,
+        num_active_spin_orbs,
+        num_virtual_spin_orbs,
+    )
+    # Inactive one-electron
+    for i in range(num_inactive_spatial_orbs):
+        if i == 0:
+            H_expectation = h_mo[i, i] * Epq_contracted(
+                i, i, num_spin_orbs, num_elec, num_inactive_orbs, num_active_orbs, num_virtual_orbs
+            )
+        else:
+            H_expectation += h_mo[i, i] * Epq_contracted(
+                i, i, num_spin_orbs, num_elec, num_inactive_orbs, num_active_orbs, num_virtual_orbs
+            )
+    # Active one-electron
+    for p in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
+        for q in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
+            if p == 0 and q == 0 and num_inactive_spatial_orbs == 0:
+                H_expectation = h_mo[p, q] * Epq_contracted(
+                    p, q, num_spin_orbs, num_elec, num_inactive_orbs, num_active_orbs, num_virtual_orbs
+                )
+            else:
+                H_expectation += h_mo[p, q] * Epq_contracted(
+                    p, q, num_spin_orbs, num_elec, num_inactive_orbs, num_active_orbs, num_virtual_orbs
+                )
+    # Inactive two-electron
+    for i in range(num_inactive_spatial_orbs):
+        for j in range(num_inactive_spatial_orbs):
+            H_expectation += (
+                1
+                / 2
+                * g_mo[i, i, j, j]
+                * epqrs_contracted(
+                    i, i, j, j, num_spin_orbs, num_elec, num_inactive_orbs, num_active_orbs, num_virtual_orbs
+                )
+            )
+            if i != j:
+                H_expectation += (
+                    1
+                    / 2
+                    * g_mo[j, i, i, j]
+                    * epqrs_contracted(
+                        j,
+                        i,
+                        i,
+                        j,
+                        num_spin_orbs,
+                        num_elec,
+                        num_inactive_orbs,
+                        num_active_orbs,
+                        num_virtual_orbs,
+                    )
+                )
+    # Inactive-Active two-electron
+    for i in range(num_inactive_spatial_orbs):
+        for p in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
+            for q in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
+                H_expectation += (
+                    1
+                    / 2
+                    * g_mo[i, i, p, q]
+                    * epqrs_contracted(
+                        i,
+                        i,
+                        p,
+                        q,
+                        num_spin_orbs,
+                        num_elec,
+                        num_inactive_orbs,
+                        num_active_orbs,
+                        num_virtual_orbs,
+                    )
+                )
+                H_expectation += (
+                    1
+                    / 2
+                    * g_mo[p, q, i, i]
+                    * epqrs_contracted(
+                        p,
+                        q,
+                        i,
+                        i,
+                        num_spin_orbs,
+                        num_elec,
+                        num_inactive_orbs,
+                        num_active_orbs,
+                        num_virtual_orbs,
+                    )
+                )
+                H_expectation += (
+                    1
+                    / 2
+                    * g_mo[p, i, i, q]
+                    * epqrs_contracted(
+                        p,
+                        i,
+                        i,
+                        q,
+                        num_spin_orbs,
+                        num_elec,
+                        num_inactive_orbs,
+                        num_active_orbs,
+                        num_virtual_orbs,
+                    )
+                )
+                H_expectation += (
+                    1
+                    / 2
+                    * g_mo[i, p, q, i]
+                    * epqrs_contracted(
+                        i,
+                        p,
+                        q,
+                        i,
+                        num_spin_orbs,
+                        num_elec,
+                        num_inactive_orbs,
+                        num_active_orbs,
+                        num_virtual_orbs,
+                    )
+                )
+    # Active two-electron
+    for p in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
+        for q in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
+            for r in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
+                for s in range(
+                    num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs
+                ):
+                    H_expectation += (
+                        1
+                        / 2
+                        * g_mo[p, q, r, s]
+                        * epqrs_contracted(
+                            p,
+                            q,
+                            r,
+                            s,
+                            num_spin_orbs,
+                            num_elec,
+                            num_inactive_orbs,
+                            num_active_orbs,
+                            num_virtual_orbs,
+                        )
+                    )
+    return H_expectation

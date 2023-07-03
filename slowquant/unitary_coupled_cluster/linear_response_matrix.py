@@ -206,6 +206,8 @@ class LinearResponseUCCMatrix:
                 )
                 # Make W
         for j, GJ in enumerate(self.G_ops):
+            H_GJ = commutator(H, GJ)
+            H_GJdagger = commutator(H, GJ.dagger)
             for i, GI in enumerate(self.G_ops):
                 if i < j:
                     continue
@@ -231,6 +233,11 @@ class LinearResponseUCCMatrix:
                     self.wf.state_vector,
                 )
                 # Make W
+                self.W[i + idx_shift, j + idx_shift] = self.W[
+                    j + idx_shift, i + idx_shift
+                ] = expectation_value_contracted(
+                    self.wf.state_vector, commutator_contract(GI.dagger, GJ.dagger), self.wf.state_vector
+                )
         print("\n M matrix:")
         for i in range(len(self.M)):
             for j in range(i, len(self.M)):

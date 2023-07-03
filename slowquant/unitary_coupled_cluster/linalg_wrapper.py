@@ -4,18 +4,18 @@ import scipy.sparse as ss
 
 
 def matmul(A: np.ndarray | ss.csr_matrix, B: np.ndarray | ss.csr_matrix) -> np.ndarray | ss.csr_matrix:
-    if not isinstance(A, type(B)):
-        print("A and B are not same matrix type.")
-        print(f"A type: {type(A)}")
-        print(f"B type: {type(B)}")
-        raise TypeError
-    elif isinstance(A, np.ndarray):
+    if isinstance(A, np.ndarray):
+        if not isinstance(B, np.ndarray):
+            raise TypeError(f"A and B are not same matrix type.\nA type: {type(A)}\nB type: {type(B)}")
+    elif isinstance(A, ss.csr_matrix) or isinstance(A, ss.csc_matrix):
+        if not isinstance(B, ss.csr_matrix) and not isinstance(B, ss.csc_matrix):
+            raise TypeError(f"A and B are not same matrix type.\nA type: {type(A)}\nB type: {type(B)}")
+    if isinstance(A, np.ndarray):
         return np.matmul(A, B)
-    elif isinstance(A, ss.csr_matrix):
+    elif isinstance(A, ss.csr_matrix) or isinstance(A, ss.csc_matrix):
         return A.dot(B)
     else:
-        print(f"A got unsupported type: {type(A)}")
-        raise TypeError
+        raise TypeError(f"A got unsupported type: {type(A)}")
 
 
 def expm(A: np.ndarray | ss.csr_matrix) -> np.ndarray | ss.csr_matrix:
@@ -24,5 +24,4 @@ def expm(A: np.ndarray | ss.csr_matrix) -> np.ndarray | ss.csr_matrix:
     elif isinstance(A, ss.csr_matrix):
         return ss.linalg.expm(A)
     else:
-        print(f"A got unsupported type: {type(A)}")
-        raise TypeError
+        raise TypeError(f"A got unsupported type: {type(A)}")

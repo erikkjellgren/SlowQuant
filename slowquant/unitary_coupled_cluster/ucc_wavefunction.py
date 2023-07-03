@@ -10,6 +10,10 @@ from slowquant.unitary_coupled_cluster.base import (
     StateVector,
     expectation_value,
 )
+from slowquant.unitary_coupled_cluster.base_contracted import (
+    Hamiltonian_contracted,
+    expectation_value_contracted,
+)
 from slowquant.unitary_coupled_cluster.util import (
     ThetaPicker,
     construct_integral_trans_mat,
@@ -158,8 +162,7 @@ class WaveFunctionUCC:
             iteration += 1
             start = time.time()
 
-        res = scipy.optimize.minimize(
-            e_tot, self.kappa, tol=1e-10, callback=print_progress, method='SLSQP')
+        res = scipy.optimize.minimize(e_tot, self.kappa, tol=1e-10, callback=print_progress, method="BFGS")
         self.hf_energy = res["fun"]
         self.kappa = res["x"]
 
@@ -244,8 +247,7 @@ class WaveFunctionUCC:
         print(f"### Number theta3: {num_theta3}")
         print(f"### Number theta4: {num_theta4}")
         print(f"### Total parameters: {num_kappa+num_theta1+num_theta2+num_theta3+num_theta4}")
-        res = scipy.optimize.minimize(
-            e_tot, parameters, tol=1e-10, callback=print_progress, method='SLSQP')
+        res = scipy.optimize.minimize(e_tot, parameters, tol=1e-10, callback=print_progress, method="BFGS")
         self.ucc_energy = res["fun"]
         param_idx = 0
         if orbital_optimization:

@@ -160,7 +160,7 @@ class PauliOperatorHybridForm:
                     elif pauli1 == "Z" and pauli2 == "Y":
                         new_virtual += "X"
                         fac *= -1j
-                new_active = fac * np.matmul(op1.active_matrix, op2.active_matrix)
+                new_active = fac * lw.matmul(op1.active_matrix, op2.active_matrix)
                 key = new_inactive + new_virtual
                 if key in new_operators:
                     new_operators[key].active_matrix += new_active

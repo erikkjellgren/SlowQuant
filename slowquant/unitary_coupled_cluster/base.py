@@ -164,6 +164,7 @@ class StateVector:
         self._active_onvector = active
         self._active = np.transpose(kronecker_product(active))
         self.active = np.transpose(kronecker_product(active)) * 1.0
+        self.active_csr = ss.csr_matrix(self.active)
         self.virtual = np.transpose(virtual)
         o = np.array([0, 1])
         z = np.array([1, 0])
@@ -224,15 +225,16 @@ class StateVector:
 
     @property
     def bra_active_csr(self) -> ss.csr_matrix:
-        return ss.csr_matrix(np.conj(self.active).transpose())
+        return self.active_csr
 
     @property
     def ket_active_csr(self) -> ss.csr_matrix:
-        return ss.csr_matrix(self.active).transpose()
+        return self.active_csr.conj().transpose()
 
     def new_U(self, U: np.ndarray, allowed_states: np.ndarray = None) -> None:
         if allowed_states is None:
             self.active = np.matmul(U, self._active)
+            self.active_csr = ss.csr_matrix(self.active)
             self.U_ = U
         else:
             self.U_allowed_ = U
@@ -245,6 +247,7 @@ class StateVector:
                 if allowed:
                     self.active[i] = tmp_active[idx]
                     idx += 1
+            self.active_csr = ss.csr_matrix(self.active)
 
 
 @functools.cache
