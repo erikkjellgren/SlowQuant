@@ -38,6 +38,8 @@ class LinearResponseUCCMatrix:
         excitations: str,
         is_spin_conserving: bool = False,
         use_TDA: bool = False,
+        do_selfconsistent_active_excitations: bool = True,
+        do_selfconsistent_orbital_rotations: bool = True,
     ) -> None:
         self.wf = copy.deepcopy(wave_function)
         self.theta_picker = ThetaPicker(
@@ -68,8 +70,9 @@ class LinearResponseUCCMatrix:
                     self.wf.num_active_spin_orbs,
                     self.wf.num_virtual_spin_orbs,
                 )
-                op = op.apply_U_from_right(np.conj(U).transpose())
-                op = op.apply_U_from_left(U)
+                if do_selfconsistent_active_excitations:
+                    op = op.apply_U_from_right(np.conj(U).transpose())
+                    op = op.apply_U_from_left(U)
                 self.G_ops.append(op)
         if "d" in excitations:
             for _, _, _, _, _, op in self.theta_picker.get_T2_generator_SA(num_spin_orbs, num_elec):
@@ -79,8 +82,9 @@ class LinearResponseUCCMatrix:
                     self.wf.num_active_spin_orbs,
                     self.wf.num_virtual_spin_orbs,
                 )
-                op = op.apply_U_from_right(np.conj(U).transpose())
-                op = op.apply_U_from_left(U)
+                if do_selfconsistent_active_excitations:
+                    op = op.apply_U_from_right(np.conj(U).transpose())
+                    op = op.apply_U_from_left(U)
                 self.G_ops.append(op)
         if "t" in excitations:
             for _, _, _, _, _, _, _, op in self.theta_picker.get_T3_generator(num_spin_orbs, num_elec):
@@ -90,8 +94,9 @@ class LinearResponseUCCMatrix:
                     self.wf.num_active_spin_orbs,
                     self.wf.num_virtual_spin_orbs,
                 )
-                op = op.apply_U_from_right(np.conj(U).transpose())
-                op = op.apply_U_from_left(U)
+                if do_selfconsistent_active_excitations:
+                    op = op.apply_U_from_right(np.conj(U).transpose())
+                    op = op.apply_U_from_left(U)
                 self.G_ops.append(op)
         if "q" in excitations:
             for _, _, _, _, _, _, _, _, _, op in self.theta_picker.get_T4_generator(num_spin_orbs, num_elec):
@@ -101,8 +106,9 @@ class LinearResponseUCCMatrix:
                     self.wf.num_active_spin_orbs,
                     self.wf.num_virtual_spin_orbs,
                 )
-                op = op.apply_U_from_right(np.conj(U).transpose())
-                op = op.apply_U_from_left(U)
+                if do_selfconsistent_active_excitations:
+                    op = op.apply_U_from_right(np.conj(U).transpose())
+                    op = op.apply_U_from_left(U)
                 self.G_ops.append(op)
         for p, q in self.wf.kappa_idx:
             op = 2 ** (-1 / 2) * Epq(p, q, self.wf.num_spin_orbs, self.wf.num_elec)
@@ -113,6 +119,9 @@ class LinearResponseUCCMatrix:
                 self.wf.num_active_spin_orbs,
                 self.wf.num_virtual_spin_orbs,
             )
+            if do_selfconsistent_orbital_rotations:
+                op = op.apply_U_from_right(np.conj(U).transpose())
+                op = op.apply_U_from_left(U)
             self.q_ops.append(op)
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
@@ -129,14 +138,14 @@ class LinearResponseUCCMatrix:
         )
         UHU = H.apply_U_from_right(U)
         UHU = UHU.apply_U_from_left(U.conjugate().transpose())
-        print(len(UHU.operators))
+        #print(len(UHU.operators))
         ref_state = StateVector(
             self.wf.state_vector.inactive.transpose(),
             self.wf.state_vector._active_onvector,
             self.wf.state_vector.virtual.transpose(),
         )
-        print(expectation_value_hybrid(self.wf.state_vector, H, self.wf.state_vector))
-        print(expectation_value_hybrid(ref_state, UHU, ref_state))
+        #print(expectation_value_hybrid(self.wf.state_vector, H, self.wf.state_vector))
+        #print(expectation_value_hybrid(ref_state, UHU, ref_state))
         idx_shift = len(self.q_ops)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
@@ -144,9 +153,11 @@ class LinearResponseUCCMatrix:
             for i, qI in enumerate(self.q_ops):
                 if i < j:
                     continue
-                print(i, "q,q")
+                #print(i, "q,q")
                 # Make M
-                operator = operatormul3_contract(qI.dagger, H, qJ) - operatormul3_contract(qI.dagger, qJ, H)
+                operator = expectation_value_contracted(
+                    self.wf.state_vector, double_commutator_contract(qI.dagger, H, qJ), self.wf.state_vector
+                )
                 val = expectation_value_contracted(
                     self.wf.state_vector,
                     operator,
@@ -154,7 +165,11 @@ class LinearResponseUCCMatrix:
                 )
                 self.M[i, j] = self.M[j, i] = val
                 # Make Q
-                operator = -1 * operatormul3_contract(qI.dagger, qJ.dagger, H)
+                operator = expectation_value_contracted(
+                    self.wf.state_vector,
+                    double_commutator_contract(qI.dagger, H, qJ.dagger),
+                    self.wf.state_vector,
+                )
                 val = expectation_value_contracted(
                     self.wf.state_vector,
                     operator,
@@ -169,9 +184,15 @@ class LinearResponseUCCMatrix:
                 )
                 self.V[i, j] = self.V[j, i] = val
                 # Make W
+                val = expectation_value_contracted(
+                    self.wf.state_vector,
+                    operatormul_contract(qI.dagger, qJ.dagger),
+                    self.wf.state_vector,
+                )
+                self.W[i, j] = self.W[j, i] = val
         for j, GJ in enumerate(self.G_ops):
             for i, qI in enumerate(self.q_ops):
-                print(i, "q,G")
+                #print(i, "q,G")
                 # Make M
                 self.M[i, j + idx_shift] = expectation_value_contracted(
                     self.wf.state_vector, double_commutator_contract(qI.dagger, H, GJ), self.wf.state_vector
@@ -187,9 +208,12 @@ class LinearResponseUCCMatrix:
                     self.wf.state_vector, commutator_contract(qI.dagger, GJ), self.wf.state_vector
                 )
                 # Make W
+                self.W[i, j + idx_shift] = expectation_value_contracted(
+                    self.wf.state_vector, commutator_contract(qI.dagger, GJ.dagger), self.wf.state_vector
+                )
         for j, qJ in enumerate(self.q_ops):
             for i, GI in enumerate(self.G_ops):
-                print(i, "G,q")
+                #print(i, "G,q")
                 # Make M
                 self.M[i + idx_shift, j] = expectation_value_contracted(
                     self.wf.state_vector, double_commutator_contract(GI.dagger, H, qJ), self.wf.state_vector
@@ -205,13 +229,14 @@ class LinearResponseUCCMatrix:
                     self.wf.state_vector, commutator_contract(GI.dagger, qJ), self.wf.state_vector
                 )
                 # Make W
+                self.W[i + idx_shift, j] = expectation_value_contracted(
+                    self.wf.state_vector, commutator_contract(GI.dagger, qJ.dagger), self.wf.state_vector
+                )
         for j, GJ in enumerate(self.G_ops):
-            H_GJ = commutator(H, GJ)
-            H_GJdagger = commutator(H, GJ.dagger)
             for i, GI in enumerate(self.G_ops):
                 if i < j:
                     continue
-                print(i, "G,G")
+                #print(i, "G,G")
                 # Make M
                 self.M[i + idx_shift, j + idx_shift] = self.M[
                     j + idx_shift, i + idx_shift
@@ -238,26 +263,27 @@ class LinearResponseUCCMatrix:
                 ] = expectation_value_contracted(
                     self.wf.state_vector, commutator_contract(GI.dagger, GJ.dagger), self.wf.state_vector
                 )
-        print("\n M matrix:")
-        for i in range(len(self.M)):
-            for j in range(i, len(self.M)):
-                if abs(self.M[i, j]) > 10**-6:
-                    print("i,j, M[i,j]", i, j, self.M[i, j])
-        print("\n Q matrix:")
-        for i in range(len(self.M)):
-            for j in range(i, len(self.M)):
-                if abs(self.Q[i, j]) > 10**-6:
-                    print("i,j, Q[i,j]", i, j, self.Q[i, j])
-        print("\n V matrix:")
-        for i in range(len(self.M)):
-            for j in range(i, len(self.M)):
-                if abs(self.V[i, j]) > 10**-6:
-                    print("i,j, V[i,j]", i, j, self.V[i, j])
-        print("\n W matrix:")
-        for i in range(len(self.M)):
-            for j in range(i, len(self.M)):
-                if abs(self.W[i, j]) > 10**-6:
-                    print("i,j, W[i,j]", i, j, self.W[i, j])
+        if False:
+            print("\n M matrix:")
+            for i in range(len(self.M)):
+                for j in range(i, len(self.M)):
+                    if abs(self.M[i, j]) > 10**-6:
+                        print("i,j, M[i,j]", i, j, self.M[i, j])
+            print("\n Q matrix:")
+            for i in range(len(self.M)):
+                for j in range(i, len(self.M)):
+                    if abs(self.Q[i, j]) > 10**-6:
+                        print("i,j, Q[i,j]", i, j, self.Q[i, j])
+            print("\n V matrix:")
+            for i in range(len(self.M)):
+                for j in range(i, len(self.M)):
+                    if abs(self.V[i, j]) > 10**-6:
+                        print("i,j, V[i,j]", i, j, self.V[i, j])
+            print("\n W matrix:")
+            for i in range(len(self.M)):
+                for j in range(i, len(self.M)):
+                    if abs(self.W[i, j]) > 10**-6:
+                        print("i,j, W[i,j]", i, j, self.W[i, j])
 
     def calc_excitation_energies(self) -> None:
         size = len(self.M)
