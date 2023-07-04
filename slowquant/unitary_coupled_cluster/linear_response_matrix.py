@@ -38,8 +38,7 @@ class LinearResponseUCCMatrix:
         excitations: str,
         is_spin_conserving: bool = False,
         use_TDA: bool = False,
-        do_selfconsistent_active_excitations: bool = True,
-        do_selfconsistent_orbital_rotations: bool = True,
+        do_selfconsistent_operators: bool = True,
     ) -> None:
         self.wf = copy.deepcopy(wave_function)
         self.theta_picker = ThetaPicker(
@@ -70,8 +69,8 @@ class LinearResponseUCCMatrix:
                     self.wf.num_active_spin_orbs,
                     self.wf.num_virtual_spin_orbs,
                 )
-                if do_selfconsistent_active_excitations:
-                    op = op.apply_U_from_right(np.conj(U).transpose())
+                if do_selfconsistent_operators:
+                    op = op.apply_U_from_right(U.conj().transpose())
                     op = op.apply_U_from_left(U)
                 self.G_ops.append(op)
         if "d" in excitations:
@@ -82,8 +81,8 @@ class LinearResponseUCCMatrix:
                     self.wf.num_active_spin_orbs,
                     self.wf.num_virtual_spin_orbs,
                 )
-                if do_selfconsistent_active_excitations:
-                    op = op.apply_U_from_right(np.conj(U).transpose())
+                if do_selfconsistent_operators:
+                    op = op.apply_U_from_right(U.conj().transpose())
                     op = op.apply_U_from_left(U)
                 self.G_ops.append(op)
         if "t" in excitations:
@@ -94,8 +93,8 @@ class LinearResponseUCCMatrix:
                     self.wf.num_active_spin_orbs,
                     self.wf.num_virtual_spin_orbs,
                 )
-                if do_selfconsistent_active_excitations:
-                    op = op.apply_U_from_right(np.conj(U).transpose())
+                if do_selfconsistent_operators:
+                    op = op.apply_U_from_right(U.conj().transpose())
                     op = op.apply_U_from_left(U)
                 self.G_ops.append(op)
         if "q" in excitations:
@@ -106,12 +105,12 @@ class LinearResponseUCCMatrix:
                     self.wf.num_active_spin_orbs,
                     self.wf.num_virtual_spin_orbs,
                 )
-                if do_selfconsistent_active_excitations:
-                    op = op.apply_U_from_right(np.conj(U).transpose())
+                if do_selfconsistent_operators:
+                    op = op.apply_U_from_right(U.conj().transpose())
                     op = op.apply_U_from_left(U)
                 self.G_ops.append(op)
-        for p, q in self.wf.kappa_idx:
-            op = 2 ** (-1 / 2) * Epq(p, q, self.wf.num_spin_orbs, self.wf.num_elec)
+        for i, a in self.wf.kappa_idx:
+            op = 2 ** (-1 / 2) * Epq(a, i, self.wf.num_spin_orbs, self.wf.num_elec)
             self.q_pauli_ops.append(op)
             op = convert_pauli_to_hybrid_form(
                 op,
@@ -119,9 +118,6 @@ class LinearResponseUCCMatrix:
                 self.wf.num_active_spin_orbs,
                 self.wf.num_virtual_spin_orbs,
             )
-            if do_selfconsistent_orbital_rotations:
-                op = op.apply_U_from_right(np.conj(U).transpose())
-                op = op.apply_U_from_left(U)
             self.q_ops.append(op)
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
@@ -136,16 +132,6 @@ class LinearResponseUCCMatrix:
             self.wf.num_active_spin_orbs,
             self.wf.num_virtual_spin_orbs,
         )
-        UHU = H.apply_U_from_right(U)
-        UHU = UHU.apply_U_from_left(U.conjugate().transpose())
-        #print(len(UHU.operators))
-        ref_state = StateVector(
-            self.wf.state_vector.inactive.transpose(),
-            self.wf.state_vector._active_onvector,
-            self.wf.state_vector.virtual.transpose(),
-        )
-        #print(expectation_value_hybrid(self.wf.state_vector, H, self.wf.state_vector))
-        #print(expectation_value_hybrid(ref_state, UHU, ref_state))
         idx_shift = len(self.q_ops)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
@@ -153,46 +139,36 @@ class LinearResponseUCCMatrix:
             for i, qI in enumerate(self.q_ops):
                 if i < j:
                     continue
-                #print(i, "q,q")
+                # print(i, "q,q")
                 # Make M
-                operator = expectation_value_contracted(
-                    self.wf.state_vector, double_commutator_contract(qI.dagger, H, qJ), self.wf.state_vector
-                )
                 val = expectation_value_contracted(
-                    self.wf.state_vector,
-                    operator,
-                    self.wf.state_vector,
+                    self.wf.state_vector, double_commutator_contract(qI.dagger, H, qJ), self.wf.state_vector
                 )
                 self.M[i, j] = self.M[j, i] = val
                 # Make Q
-                operator = expectation_value_contracted(
-                    self.wf.state_vector,
-                    double_commutator_contract(qI.dagger, H, qJ.dagger),
-                    self.wf.state_vector,
-                )
                 val = expectation_value_contracted(
                     self.wf.state_vector,
-                    operator,
+                    double_commutator_contract(qI.dagger, H, qJ.dagger),
                     self.wf.state_vector,
                 )
                 self.Q[i, j] = self.Q[j, i] = val
                 # Make V
                 val = expectation_value_contracted(
                     self.wf.state_vector,
-                    operatormul_contract(qI.dagger, qJ),
+                    commutator_contract(qI.dagger, qJ),
                     self.wf.state_vector,
                 )
                 self.V[i, j] = self.V[j, i] = val
                 # Make W
                 val = expectation_value_contracted(
                     self.wf.state_vector,
-                    operatormul_contract(qI.dagger, qJ.dagger),
+                    commutator_contract(qI.dagger, qJ.dagger),
                     self.wf.state_vector,
                 )
                 self.W[i, j] = self.W[j, i] = val
         for j, GJ in enumerate(self.G_ops):
             for i, qI in enumerate(self.q_ops):
-                #print(i, "q,G")
+                # print(i, "q,G")
                 # Make M
                 self.M[i, j + idx_shift] = expectation_value_contracted(
                     self.wf.state_vector, double_commutator_contract(qI.dagger, H, GJ), self.wf.state_vector
@@ -213,7 +189,7 @@ class LinearResponseUCCMatrix:
                 )
         for j, qJ in enumerate(self.q_ops):
             for i, GI in enumerate(self.G_ops):
-                #print(i, "G,q")
+                # print(i, "G,q")
                 # Make M
                 self.M[i + idx_shift, j] = expectation_value_contracted(
                     self.wf.state_vector, double_commutator_contract(GI.dagger, H, qJ), self.wf.state_vector
@@ -236,7 +212,7 @@ class LinearResponseUCCMatrix:
             for i, GI in enumerate(self.G_ops):
                 if i < j:
                     continue
-                #print(i, "G,G")
+                # print(i, "G,G")
                 # Make M
                 self.M[i + idx_shift, j + idx_shift] = self.M[
                     j + idx_shift, i + idx_shift
