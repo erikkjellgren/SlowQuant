@@ -50,7 +50,6 @@ class LinearResponseUCCMatrix:
 
         self.G_ops = []
         self.q_ops = []
-        self.q_pauli_ops = []
         num_spin_orbs = self.wf.num_spin_orbs
         num_elec = self.wf.num_elec
         excitations = excitations.lower()
@@ -111,7 +110,6 @@ class LinearResponseUCCMatrix:
                 self.G_ops.append(op)
         for i, a in self.wf.kappa_idx:
             op = 2 ** (-1 / 2) * Epq(a, i, self.wf.num_spin_orbs, self.wf.num_elec)
-            self.q_pauli_ops.append(op)
             op = convert_pauli_to_hybrid_form(
                 op,
                 self.wf.num_inactive_spin_orbs,
@@ -282,7 +280,7 @@ class LinearResponseUCCMatrix:
 
     def get_excited_state_overlap(self, state_number: int) -> float:
         number_excitations = len(self.excitation_energies)
-        for i, G in enumerate(self.G_ops):
+        for i, G in enumerate(self.q_ops + self.G_ops):
             if i == 0:
                 transfer_op = (
                     self.response_vectors[i, state_number] * G
@@ -297,7 +295,7 @@ class LinearResponseUCCMatrix:
 
     def get_excited_state_norm(self, state_number: int) -> float:
         number_excitations = len(self.excitation_energies)
-        for i, G in enumerate(self.G_ops):
+        for i, G in enumerate(self.q_ops + self.G_ops):
             if i == 0:
                 transfer_op = (
                     self.response_vectors[i, state_number] * G
@@ -314,7 +312,8 @@ class LinearResponseUCCMatrix:
 
     def get_transition_dipole(self, state_number: int, multipole_integral: np.ndarray) -> float:
         number_excitations = len(self.excitation_energies)
-        for i, G in enumerate(self.G_ops):
+        assert number_excitations == len(self.q_ops) + len(self.G_ops)
+        for i, G in enumerate(self.q_ops + self.G_ops):
             if i == 0:
                 transfer_op = (
                     self.response_vectors[i, state_number] * G
@@ -345,4 +344,15 @@ class LinearResponseUCCMatrix:
                         self.wf.num_active_spin_orbs,
                         self.wf.num_virtual_spin_orbs,
                     )
-        return expectation_value_hybrid(self.wf.state_vector, muz_op * transfer_op, self.wf.state_vector)
+        return expectation_value_hybrid(self.wf.state_vector, muz_op *  transfer_op, self.wf.state_vector)
+
+    def get_nice_output(self, multipole_integrals: np.ndarray) -> str:
+        output = "Excitation # | Excitation energy [eV] | Oscillator strengths\n"
+        for i, exc_energy in enumerate(self.excitation_energies):
+            transition_dipole_x = self.get_transition_dipole(i, multipole_integrals[0])
+            transition_dipole_y = self.get_transition_dipole(i, multipole_integrals[1])
+            transition_dipole_z = self.get_transition_dipole(i, multipole_integrals[2])
+            print(transition_dipole_x, transition_dipole_y, transition_dipole_z, self.get_excited_state_norm(i))
+            osc_strength = 2/3 * exc_energy * (transition_dipole_x**2 +  transition_dipole_y**2 + transition_dipole_z**2)
+            output += f"{i} | {exc_energy*27.2114079527} | {osc_strength}\n"
+        return output

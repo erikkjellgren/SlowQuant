@@ -162,7 +162,7 @@ class WaveFunctionUCC:
             iteration += 1
             start = time.time()
 
-        res = scipy.optimize.minimize(e_tot, self.kappa, tol=1e-10, callback=print_progress, method="BFGS")
+        res = scipy.optimize.minimize(e_tot, self.kappa, tol=1e-8, callback=print_progress, method="BFGS")
         self.hf_energy = res["fun"]
         self.kappa = res["x"]
 
@@ -247,7 +247,7 @@ class WaveFunctionUCC:
         print(f"### Number theta3: {num_theta3}")
         print(f"### Number theta4: {num_theta4}")
         print(f"### Total parameters: {num_kappa+num_theta1+num_theta2+num_theta3+num_theta4}")
-        res = scipy.optimize.minimize(e_tot, parameters, tol=1e-10, callback=print_progress, method="BFGS")
+        res = scipy.optimize.minimize(e_tot, parameters, tol=1e-8, callback=print_progress, method="BFGS")
         self.ucc_energy = res["fun"]
         param_idx = 0
         if orbital_optimization:
