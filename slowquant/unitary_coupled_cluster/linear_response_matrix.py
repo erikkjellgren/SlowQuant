@@ -343,7 +343,7 @@ class LinearResponseUCCMatrix:
                         self.wf.num_active_spin_orbs,
                         self.wf.num_virtual_spin_orbs,
                     )
-        return expectation_value_hybrid(self.wf.state_vector, muz_op *  transfer_op, self.wf.state_vector)
+        return expectation_value_hybrid(self.wf.state_vector, muz_op * transfer_op, self.wf.state_vector)
 
     def get_nice_output(self, multipole_integrals: np.ndarray) -> str:
         output = "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n"

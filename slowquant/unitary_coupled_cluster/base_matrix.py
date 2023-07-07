@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import copy
-import functools
-import itertools
 
 import numpy as np
 import scipy.sparse as ss
 
 import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
-from slowquant.unitary_coupled_cluster.base import PauliOperator, pauli_to_mat
+from slowquant.unitary_coupled_cluster.base import (
+    PauliOperator,
+    StateVector,
+    pauli_to_mat,
+)
 
 
 def expectation_value_hybrid(

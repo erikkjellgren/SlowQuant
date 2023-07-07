@@ -3,7 +3,9 @@ import scipy
 import scipy.sparse as ss
 
 
-def matmul(A: np.ndarray | ss.csr_matrix, B: np.ndarray | ss.csr_matrix) -> np.ndarray | ss.csr_matrix:
+def matmul(
+    A: np.ndarray | ss.csr_matrix | ss.csc_matrix, B: np.ndarray | ss.csr_matrix | ss.csc_matrix
+) -> np.ndarray | ss.csr_matrix | ss.csc_matrix:
     if isinstance(A, np.ndarray):
         if not isinstance(B, np.ndarray):
             raise TypeError(f"A and B are not same matrix type.\nA type: {type(A)}\nB type: {type(B)}")
@@ -18,7 +20,7 @@ def matmul(A: np.ndarray | ss.csr_matrix, B: np.ndarray | ss.csr_matrix) -> np.n
         raise TypeError(f"A got unsupported type: {type(A)}")
 
 
-def expm(A: np.ndarray | ss.csr_matrix) -> np.ndarray | ss.csr_matrix:
+def expm(A: np.ndarray | ss.csr_matrix | ss.csc_matrix) -> np.ndarray | ss.csr_matrix | ss.csc_matrix:
     if isinstance(A, np.ndarray):
         return scipy.linalg.expm(A)
     elif isinstance(A, ss.csr_matrix):
