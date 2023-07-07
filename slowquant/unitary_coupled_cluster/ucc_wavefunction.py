@@ -1,4 +1,5 @@
 import time
+from collections.abc import Sequence
 from functools import partial
 
 import numpy as np
@@ -26,7 +27,7 @@ class WaveFunctionUCC:
         self,
         number_spin_orbitals: int,
         number_electrons: int,
-        active_space: list[int],
+        cas: Sequence[int, int],
         c_orthonormal: np.ndarray,
         h_core: np.ndarray,
         g_eri: np.ndarray,
@@ -52,6 +53,15 @@ class WaveFunctionUCC:
         self.num_active_spin_orbs = 0
         self.num_inactive_spin_orbs = 0
         self.num_virtual_spin_orbs = 0
+        active_space = []
+        orbital_counter = 0
+        print(number_electrons, cas[0])
+        for i in range(number_electrons - cas[0], number_electrons):
+            active_space.append(i)
+            orbital_counter += 1
+        for i in range(number_electrons, number_electrons + 2 * cas[1] - orbital_counter):
+            active_space.append(i)
+        print(active_space)
         for i in range(number_electrons):
             if i in active_space:
                 self.active.append(i)
@@ -137,34 +147,6 @@ class WaveFunctionUCC:
             self.active_unocc,
         )
         self.state_vector.new_U(U)
-
-    def run_HF(self) -> None:
-        e_tot = partial(
-            energy_HF,
-            kappa_idx=self.kappa_idx,
-            num_inactive_spin_orbs=self.num_inactive_spin_orbs,
-            num_virtual_spin_orbs=self.num_virtual_spin_orbs,
-            num_elec=self.num_elec,
-            state_vector=self.state_vector,
-            c_orthonormal=self.c_orthonormal,
-            h_core=self.h_core,
-            g_eri=self.g_eri,
-        )
-        global iteration
-        global start
-        iteration = 0
-        start = time.time()
-
-        def print_progress(X: list[float]) -> None:
-            global iteration
-            global start
-            print(iteration, time.time() - start, e_tot(X))
-            iteration += 1
-            start = time.time()
-
-        res = scipy.optimize.minimize(e_tot, self.kappa, tol=1e-8, callback=print_progress, method="BFGS")
-        self.hf_energy = res["fun"]
-        self.kappa = res["x"]
 
     def run_UCC(self, excitations: str, orbital_optimization: bool = False) -> None:
         excitations = excitations.lower()
@@ -281,27 +263,6 @@ class WaveFunctionUCC:
             for idx, _, _, _, _, _, _, _, _, _ in self.theta_picker.get_T4_generator(0, 0):
                 self.theta4[idx] = thetas[counter]
                 counter += 1
-
-
-def energy_HF(
-    kappa: list[float],
-    kappa_idx: list[list[int, int]],
-    num_inactive_spin_orbs: int,
-    num_virtual_spin_orbs: int,
-    num_elec: int,
-    state_vector: StateVector,
-    c_orthonormal: np.ndarray,
-    h_core: np.ndarray,
-    g_eri: np.ndarray,
-) -> float:
-    c_trans = construct_integral_trans_mat(c_orthonormal, kappa, kappa_idx)
-    return expectation_value(
-        state_vector,
-        Hamiltonian_energy_only(
-            h_core, g_eri, c_trans, num_inactive_spin_orbs, 0, num_virtual_spin_orbs, num_elec
-        ),
-        state_vector,
-    )
 
 
 def energy_UCC(

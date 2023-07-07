@@ -2,7 +2,6 @@ import numpy as np
 
 import slowquant.SlowQuant as sq
 from slowquant.unitary_coupled_cluster.base import Hamiltonian, expectation_value
-from slowquant.unitary_coupled_cluster.linear_response import LinearResponseUCC
 from slowquant.unitary_coupled_cluster.linear_response_matrix import (
     LinearResponseUCCMatrix,
 )
@@ -23,9 +22,9 @@ def test_HeH_sto3g_HF() -> None:
     g_eri = A.integral.electron_repulsion_tensor
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
-    WF = WaveFunctionUCC(A.molecule.number_bf * 2, A.molecule.number_electrons, [], S_sqrt, h_core, g_eri)
-    WF.run_HF()
-    assert abs(WF.hf_energy - (-4.262632309847)) < 10**-8
+    WF = WaveFunctionUCC(A.molecule.number_bf * 2, A.molecule.number_electrons, (2, 1), S_sqrt, h_core, g_eri)
+    WF.run_UCC("S", True)
+    assert abs(WF.ucc_energy - (-4.262632309847)) < 10**-8
 
 
 def test_LiH_sto3g_HF() -> None:
@@ -41,9 +40,9 @@ def test_LiH_sto3g_HF() -> None:
     g_eri = A.integral.electron_repulsion_tensor
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
-    WF = WaveFunctionUCC(A.molecule.number_bf * 2, A.molecule.number_electrons, [], S_sqrt, h_core, g_eri)
-    WF.run_HF()
-    assert abs(WF.hf_energy - (-8.862246324082243)) < 10**-8
+    WF = WaveFunctionUCC(A.molecule.number_bf * 2, A.molecule.number_electrons, (2, 1), S_sqrt, h_core, g_eri)
+    WF.run_UCC("S", True)
+    assert abs(WF.ucc_energy - (-8.862246324082243)) < 10**-8
 
 
 def test_HeH_sto3g_UCCS() -> None:
@@ -60,9 +59,7 @@ def test_HeH_sto3g_UCCS() -> None:
     g_eri = A.integral.electron_repulsion_tensor
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
-    WF = WaveFunctionUCC(
-        A.molecule.number_bf * 2, A.molecule.number_electrons, [0, 1, 2, 3], S_sqrt, h_core, g_eri
-    )
+    WF = WaveFunctionUCC(A.molecule.number_bf * 2, A.molecule.number_electrons, (2, 2), S_sqrt, h_core, g_eri)
     WF.run_UCC("S")
     assert abs(WF.ucc_energy - (-4.262632309847)) < 10**-8
 
@@ -88,13 +85,12 @@ def test_H10_STO3G_UCCSD() -> None:
     A.set_basis_set("sto-3g")
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
-    num_bf = A.molecule.number_bf
     h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
     g_eri = A.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
         A.molecule.number_bf * 2,
         A.molecule.number_electrons,
-        [8, 9, 10, 11],
+        (2, 2),
         A.hartree_fock.mo_coeff,
         h_core,
         g_eri,
@@ -114,13 +110,12 @@ def test_H2_431G_OOUCCSD() -> None:
     A.set_basis_set("4-31G")
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
-    num_bf = A.molecule.number_bf
     h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
     g_eri = A.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
         A.molecule.number_bf * 2,
         A.molecule.number_electrons,
-        [0, 1, 2, 3],
+        (2, 2),
         A.hartree_fock.mo_coeff,
         h_core,
         g_eri,
@@ -140,13 +135,12 @@ def test_H2_431G_OOUCCD() -> None:
     A.set_basis_set("4-31G")
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
-    num_bf = A.molecule.number_bf
     h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
     g_eri = A.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
         A.molecule.number_bf * 2,
         A.molecule.number_electrons,
-        [0, 1, 2, 3],
+        (2, 2),
         A.hartree_fock.mo_coeff,
         h_core,
         g_eri,
@@ -167,13 +161,12 @@ def test_H2_431G_UCCSD() -> None:
     A.set_basis_set("4-31G")
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
-    num_bf = A.molecule.number_bf
     h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
     g_eri = A.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
         A.molecule.number_bf * 2,
         A.molecule.number_electrons,
-        [0, 1, 2, 3],
+        (2, 2),
         A.hartree_fock.mo_coeff,
         h_core,
         g_eri,
@@ -195,13 +188,12 @@ def test_H4_STO3G_OOUCCSD() -> None:
     A.set_basis_set("sto-3g")
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
-    num_bf = A.molecule.number_bf
     h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
     g_eri = A.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
         A.molecule.number_bf * 2,
         A.molecule.number_electrons,
-        [2, 3, 4, 5],
+        (2, 2),
         A.hartree_fock.mo_coeff,
         h_core,
         g_eri,
@@ -226,13 +218,12 @@ def test_H4_STO3G_OOUCCD() -> None:
     A.set_basis_set("sto-3g")
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
-    num_bf = A.molecule.number_bf
     h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
     g_eri = A.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
         A.molecule.number_bf * 2,
         A.molecule.number_electrons,
-        [2, 3, 4, 5],
+        (2, 2),
         A.hartree_fock.mo_coeff,
         h_core,
         g_eri,
@@ -256,13 +247,12 @@ def test_H2_STO3G_UCCSD_LR() -> None:
     SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    num_bf = SQobj.molecule.number_bf
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
         SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
-        [0, 1, 2, 3],
+        (2, 2),
         SQobj.hartree_fock.mo_coeff,
         h_core,
         g_eri,
@@ -305,7 +295,7 @@ def test_H2_STO3G_UCCSD_LR() -> None:
     WF = WaveFunctionUCC(
         SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
-        [0, 1, 2, 3],
+        (2, 2),
         SQobj.hartree_fock.mo_coeff,
         h_core,
         g_eri,
@@ -353,7 +343,7 @@ def test_H4_STO3G_UCCDQ() -> None:
     WF = WaveFunctionUCC(
         A.molecule.number_bf * 2,
         A.molecule.number_electrons,
-        [0, 1, 2, 3, 4, 5, 6, 7],
+        (4, 4),
         A.hartree_fock.mo_coeff,
         h_core,
         g_eri,

@@ -344,7 +344,7 @@ class LinearResponseUCCMatrix:
                         self.wf.num_active_spin_orbs,
                         self.wf.num_virtual_spin_orbs,
                     )
-        return expectation_value_hybrid(self.wf.state_vector, muz_op *  transfer_op, self.wf.state_vector)
+        return expectation_value_hybrid(self.wf.state_vector, muz_op * transfer_op, self.wf.state_vector)
 
     def get_nice_output(self, multipole_integrals: np.ndarray) -> str:
         output = "Excitation # | Excitation energy [eV] | Oscillator strengths\n"
@@ -352,7 +352,14 @@ class LinearResponseUCCMatrix:
             transition_dipole_x = self.get_transition_dipole(i, multipole_integrals[0])
             transition_dipole_y = self.get_transition_dipole(i, multipole_integrals[1])
             transition_dipole_z = self.get_transition_dipole(i, multipole_integrals[2])
-            print(transition_dipole_x, transition_dipole_y, transition_dipole_z, self.get_excited_state_norm(i))
-            osc_strength = 2/3 * exc_energy * (transition_dipole_x**2 +  transition_dipole_y**2 + transition_dipole_z**2)
+            print(
+                transition_dipole_x, transition_dipole_y, transition_dipole_z, self.get_excited_state_norm(i)
+            )
+            osc_strength = (
+                2
+                / 3
+                * exc_energy
+                * (transition_dipole_x**2 + transition_dipole_y**2 + transition_dipole_z**2)
+            )
             output += f"{i} | {exc_energy*27.2114079527} | {osc_strength}\n"
         return output
