@@ -272,7 +272,6 @@ class LinearResponseUCCMatrix:
         S[:size, size:] = self.W
         S[size:, :size] = -np.conj(self.W)
         S[size:, size:] = -np.conj(self.V)
-
         eigval, eigvec = scipy.linalg.eig(E2, S)
         sorting = np.argsort(eigval)
         self.excitation_energies = np.real(eigval[sorting][size:])
@@ -347,12 +346,12 @@ class LinearResponseUCCMatrix:
         return expectation_value_hybrid(self.wf.state_vector, muz_op *  transfer_op, self.wf.state_vector)
 
     def get_nice_output(self, multipole_integrals: np.ndarray) -> str:
-        output = "Excitation # | Excitation energy [eV] | Oscillator strengths\n"
+        output = "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n"
         for i, exc_energy in enumerate(self.excitation_energies):
             transition_dipole_x = self.get_transition_dipole(i, multipole_integrals[0])
             transition_dipole_y = self.get_transition_dipole(i, multipole_integrals[1])
             transition_dipole_z = self.get_transition_dipole(i, multipole_integrals[2])
             print(transition_dipole_x, transition_dipole_y, transition_dipole_z, self.get_excited_state_norm(i))
             osc_strength = 2/3 * exc_energy * (transition_dipole_x**2 +  transition_dipole_y**2 + transition_dipole_z**2)
-            output += f"{i} | {exc_energy*27.2114079527} | {osc_strength}\n"
+            output += f"{i+1} | {exc_energy} | {exc_energy*27.2114079527} | {osc_strength}\n"
         return output
