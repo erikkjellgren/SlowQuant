@@ -51,13 +51,11 @@ class WaveFunctionUCC:
         self.num_virtual_spin_orbs = 0
         active_space = []
         orbital_counter = 0
-        print(number_electrons, cas[0])
         for i in range(number_electrons - cas[0], number_electrons):
             active_space.append(i)
             orbital_counter += 1
         for i in range(number_electrons, number_electrons + 2 * cas[1] - orbital_counter):
             active_space.append(i)
-        print(active_space)
         for i in range(number_electrons):
             if i in active_space:
                 self.active.append(i)
@@ -225,7 +223,7 @@ class WaveFunctionUCC:
         print(f"### Number theta3: {num_theta3}")
         print(f"### Number theta4: {num_theta4}")
         print(f"### Total parameters: {num_kappa+num_theta1+num_theta2+num_theta3+num_theta4}")
-        res = scipy.optimize.minimize(e_tot, parameters, tol=1e-8, callback=print_progress, method="BFGS")
+        res = scipy.optimize.minimize(e_tot, parameters, tol=1e-8, callback=print_progress, method="SLSQP")
         self.ucc_energy = res["fun"]
         param_idx = 0
         if orbital_optimization:

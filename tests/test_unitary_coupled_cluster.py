@@ -303,22 +303,13 @@ def test_H2_STO3G_UCCSD_LR() -> None:
     WF.run_UCC("SD", False)
     LR = LinearResponseUCCMatrix(WF, excitations="SD")
     LR.calc_excitation_energies()
-    assert abs(LR.excitation_energies[0] - 0.6577) < 10**-3
-    assert abs(LR.excitation_energies[1] - 0.6577) < 10**-3
-    assert abs(LR.excitation_energies[2] - 0.6577) < 10**-3
-    assert abs(LR.excitation_energies[3] - 1.0157) < 10**-3
-    assert abs(LR.excitation_energies[4] - 1.7195) < 10**-3
+    assert abs(LR.excitation_energies[0] - 1.0157) < 10**-3
+    assert abs(LR.excitation_energies[1] - 1.7195) < 10**-3
     assert abs(LR.get_excited_state_overlap(0) - 0.0) < 10**-3
     assert abs(LR.get_excited_state_overlap(1) - 0.0) < 10**-3
-    assert abs(LR.get_excited_state_overlap(2) - 0.0) < 10**-3
-    assert abs(LR.get_excited_state_overlap(3) - 0.0) < 10**-3
-    assert abs(LR.get_excited_state_overlap(4) - 0.0) < 10**-3
     dipole_int = SQobj.integral.get_multipole_matrix([0, 0, 1])
-    assert abs(LR.get_transition_dipole(0, dipole_int) - 0.0) < 10**-3
+    assert abs(LR.get_transition_dipole(0, dipole_int) - 1.1441) < 10**-3
     assert abs(LR.get_transition_dipole(1, dipole_int) - 0.0) < 10**-3
-    assert abs(LR.get_transition_dipole(2, dipole_int) - 0.0) < 10**-3
-    assert abs(LR.get_transition_dipole(3, dipole_int) - 1.1441) < 10**-3
-    assert abs(LR.get_transition_dipole(4, dipole_int) - 0.0) < 10**-3
 
 
 def test_H4_STO3G_UCCDQ() -> None:
