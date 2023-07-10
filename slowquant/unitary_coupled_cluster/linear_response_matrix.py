@@ -312,18 +312,26 @@ class LinearResponseUCCMatrix:
     def get_transition_dipole(self, state_number: int, multipole_integral: np.ndarray) -> float:
         number_excitations = len(self.excitation_energies)
         assert number_excitations == len(self.q_ops) + len(self.G_ops)
+        x = self.response_vectors[0:number_excitations, state_number]
+        y = self.response_vectors[number_excitations:, state_number]
+        norm = np.sum(x**2) - np.sum(y**2)
+        norm = (1/norm)**0.5
+        normed_vec = self.response_vectors[:, state_number]*norm
+        print("normed_vec:", normed_vec)
         for i, G in enumerate(self.q_ops + self.G_ops):
             if i == 0:
                 transfer_op = (
-                    self.response_vectors[i, state_number] * G
-                    + self.response_vectors[i + number_excitations, state_number] * G.dagger
+                    normed_vec[i] * G
+                    - normed_vec[i + number_excitations] * G#.dagger
                 )
             else:
                 transfer_op += (
-                    self.response_vectors[i, state_number] * G
-                    + self.response_vectors[i + number_excitations, state_number] * G.dagger
+                    normed_vec[i] * G
+                    - normed_vec[i + number_excitations] * G#.dagger
                 )
+        print("int AO:", multipole_integral)
         muz = one_electron_integral_transform(self.wf.c_trans, multipole_integral)
+        print("int MO:", muz)
         counter = 0
         for p in range(self.wf.num_spin_orbs // 2):
             for q in range(self.wf.num_spin_orbs // 2):
@@ -343,15 +351,18 @@ class LinearResponseUCCMatrix:
                         self.wf.num_active_spin_orbs,
                         self.wf.num_virtual_spin_orbs,
                     )
+            self.muz_op = muz_op
+            self.transfer_op = transfer_op
         return expectation_value_hybrid(self.wf.state_vector, muz_op * transfer_op, self.wf.state_vector)
 
     def get_nice_output(self, multipole_integrals: np.ndarray) -> str:
         output = "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n"
         for i, exc_energy in enumerate(self.excitation_energies):
             transition_dipole_x = self.get_transition_dipole(i, multipole_integrals[0])
-            transition_dipole_y = self.get_transition_dipole(i, multipole_integrals[1])
-            transition_dipole_z = self.get_transition_dipole(i, multipole_integrals[2])
-            print(transition_dipole_x, transition_dipole_y, transition_dipole_z, self.get_excited_state_norm(i))
-            osc_strength = 2/3 * exc_energy * (transition_dipole_x**2 +  transition_dipole_y**2 + transition_dipole_z**2)
+            #transition_dipole_y = self.get_transition_dipole(i, multipole_integrals[1])
+            #transition_dipole_z = self.get_transition_dipole(i, multipole_integrals[2])
+            print("transition dipole:", transition_dipole_x)
+            #osc_strength = 2/3 * exc_energy * (transition_dipole_x**2 +  transition_dipole_y**2 + transition_dipole_z**2)
+            osc_strength = 2/3 * exc_energy * (transition_dipole_x**2)
             output += f"{i+1} | {exc_energy} | {exc_energy*27.2114079527} | {osc_strength}\n"
         return output

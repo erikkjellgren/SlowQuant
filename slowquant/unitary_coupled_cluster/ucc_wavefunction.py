@@ -11,10 +11,6 @@ from slowquant.unitary_coupled_cluster.base import (
     StateVector,
     expectation_value,
 )
-from slowquant.unitary_coupled_cluster.base_contracted import (
-    Hamiltonian_contracted,
-    expectation_value_contracted,
-)
 from slowquant.unitary_coupled_cluster.util import (
     ThetaPicker,
     construct_integral_trans_mat,
