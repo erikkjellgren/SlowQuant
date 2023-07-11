@@ -247,48 +247,6 @@ def test_H2_STO3G_UCCSD_LR() -> None:
     SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
-    WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
-        SQobj.molecule.number_electrons,
-        (2, 2),
-        SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
-    )
-    WF.run_UCC("SD", False)
-    LR = LinearResponseUCC(WF, excitations="SD")
-    LR.calc_excitation_energies()
-    assert abs(LR.excitation_energies[0] - 0.6577) < 10**-3
-    assert abs(LR.excitation_energies[1] - 0.6577) < 10**-3
-    assert abs(LR.excitation_energies[2] - 0.6577) < 10**-3
-    assert abs(LR.excitation_energies[3] - 1.0157) < 10**-3
-    assert abs(LR.excitation_energies[4] - 1.7195) < 10**-3
-    assert abs(LR.get_excited_state_overlap(0) - 0.0) < 10**-3
-    assert abs(LR.get_excited_state_overlap(1) - 0.0) < 10**-3
-    assert abs(LR.get_excited_state_overlap(2) - 0.0) < 10**-3
-    assert abs(LR.get_excited_state_overlap(3) - 0.0) < 10**-3
-    assert abs(abs(LR.get_excited_state_overlap(4)) - abs(0.1029)) < 10**-3
-    dipole_int = SQobj.integral.get_multipole_matrix([0, 0, 1])
-    assert abs(LR.get_transition_dipole(0, dipole_int) - 0.0) < 10**-3
-    assert abs(LR.get_transition_dipole(1, dipole_int) - 0.0) < 10**-3
-    assert abs(LR.get_transition_dipole(2, dipole_int) - 0.0) < 10**-3
-    assert abs(LR.get_transition_dipole(3, dipole_int) - 1.1441) < 10**-3
-    assert abs(LR.get_transition_dipole(4, dipole_int) - 0.0) < 10**-3
-
-
-def test_H2_STO3G_UCCSD_LR() -> None:
-    """Test Linear Response for UCCSD."""
-    SQobj = sq.SlowQuant()
-    SQobj.set_molecule(
-        """H  0.0  0.0  0.0;
-           H  0.0  0.0  0.7;""",
-        distance_unit="angstrom",
-    )
-    SQobj.set_basis_set("sto-3g")
-    SQobj.init_hartree_fock()
-    SQobj.hartree_fock.run_restricted_hartree_fock()
     num_bf = SQobj.molecule.number_bf
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
@@ -308,7 +266,7 @@ def test_H2_STO3G_UCCSD_LR() -> None:
     assert abs(LR.get_excited_state_overlap(0) - 0.0) < 10**-3
     assert abs(LR.get_excited_state_overlap(1) - 0.0) < 10**-3
     dipole_int = SQobj.integral.get_multipole_matrix([0, 0, 1])
-    assert abs(LR.get_transition_dipole(0, dipole_int) - 1.1441) < 10**-3
+    assert abs(-LR.get_transition_dipole(0, dipole_int) - 1.1441) < 10**-3
     assert abs(LR.get_transition_dipole(1, dipole_int) - 0.0) < 10**-3
 
 
@@ -342,3 +300,80 @@ def test_H4_STO3G_UCCDQ() -> None:
     )
     WF.run_UCC("DQ", False)
     assert abs(WF.ucc_energy + A.molecule.nuclear_repulsion - (-1.968914822185857)) < 10**-7
+
+def test_H2_631G_HF_LR() -> None:
+    """Test Linear Response for OO-UCCSD(2,2)."""
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """H  0.0   0.0  0.0;
+           H  0.74  0.0  0.0;""",
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("6-31G")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    num_bf = SQobj.molecule.number_bf
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
+    WF = WaveFunctionUCC(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 1),
+        SQobj.hartree_fock.mo_coeff,
+        h_core,
+        g_eri,
+    )
+    WF.run_UCC("SD", True)
+    LR = LinearResponseUCCMatrix(WF, excitations="SD")
+    LR.calc_excitation_energies()
+    dipole_integrals = [SQobj.integral.get_multipole_matrix([1, 0, 0]),
+                              SQobj.integral.get_multipole_matrix([0, 1, 0]),
+                              SQobj.integral.get_multipole_matrix([0, 0, 1])]
+    assert abs(LR.excitation_energies[0] - 0.551961) < 10**-3
+    assert abs(LR.excitation_energies[1] - 1.051638) < 10**-3
+    assert abs(LR.excitation_energies[2] - 1.603563) < 10**-3
+    assert abs(LR.get_oscillator_strength(0, dipole_integrals) - 0.6509) < 10**-3
+    assert abs(LR.get_oscillator_strength(1, dipole_integrals) - 0.0) < 10**-3
+    assert abs(LR.get_oscillator_strength(2, dipole_integrals) - 0.0635) < 10**-3
+
+
+def test_H2_631G_OOUCCSD_LR() -> None:
+    """Test Linear Response for OO-UCCSD(2,2)."""
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """H  0.0   0.0  0.0;
+           H  0.74  0.0  0.0;""",
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("6-31G")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    num_bf = SQobj.molecule.number_bf
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
+    WF = WaveFunctionUCC(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 2),
+        SQobj.hartree_fock.mo_coeff,
+        h_core,
+        g_eri,
+    )
+    WF.run_UCC("SD", True)
+    LR = LinearResponseUCCMatrix(WF, excitations="SD")
+    LR.calc_excitation_energies()
+    dipole_integrals = [SQobj.integral.get_multipole_matrix([1, 0, 0]),
+                              SQobj.integral.get_multipole_matrix([0, 1, 0]),
+                              SQobj.integral.get_multipole_matrix([0, 0, 1])]
+    assert abs(LR.excitation_energies[0] - 0.574413) < 10**-3
+    assert abs(LR.excitation_energies[1] - 1.043177) < 10**-3
+    assert abs(LR.excitation_energies[2] - 1.139481) < 10**-3
+    assert abs(LR.excitation_energies[3] - 1.365960) < 10**-3
+    assert abs(LR.excitation_energies[4] - 1.831196) < 10**-3
+    assert abs(LR.excitation_energies[5] - 2.581273) < 10**-3
+    assert abs(LR.get_oscillator_strength(0, dipole_integrals) - 0.6338) < 10**-3
+    assert abs(LR.get_oscillator_strength(1, dipole_integrals) - 0.0) < 10**-3
+    assert abs(LR.get_oscillator_strength(2, dipole_integrals) - 0.0) < 10**-3
+    assert abs(LR.get_oscillator_strength(3, dipole_integrals) - 0.0311) < 10**-3
+    assert abs(LR.get_oscillator_strength(4, dipole_integrals) - 0.0421) < 10**-3
+    assert abs(LR.get_oscillator_strength(5, dipole_integrals) - 0.0) < 10**-3

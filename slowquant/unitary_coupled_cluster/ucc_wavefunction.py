@@ -187,7 +187,9 @@ class WaveFunctionUCC:
         def print_progress(X: list[float]) -> None:
             global iteration
             global start
-            print(iteration, time.time() - start, e_tot(X))
+            time_str = f'{time.time() - start:7.2f}'
+            e_str = f'{e_tot(X):3.6f}'
+            print(f'{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}')
             iteration += 1
             start = time.time()
 
@@ -222,7 +224,8 @@ class WaveFunctionUCC:
         print(f"### Number theta2: {num_theta2}")
         print(f"### Number theta3: {num_theta3}")
         print(f"### Number theta4: {num_theta4}")
-        print(f"### Total parameters: {num_kappa+num_theta1+num_theta2+num_theta3+num_theta4}")
+        print(f"### Total parameters: {num_kappa+num_theta1+num_theta2+num_theta3+num_theta4}\n")
+        print('Iteration # | Iteration time [s] | Electronic energy [Hartree]')
         res = scipy.optimize.minimize(e_tot, parameters, tol=1e-8, callback=print_progress, method="SLSQP")
         self.ucc_energy = res["fun"]
         param_idx = 0
