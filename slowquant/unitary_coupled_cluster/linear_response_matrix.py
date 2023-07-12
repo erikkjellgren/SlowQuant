@@ -131,19 +131,42 @@ class LinearResponseUCCMatrix:
         idx_shift = len(self.q_ops)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
-        calculation_type = 'generic'
+        if do_selfconsistent_operators:
+            calculation_type = "selfconsistent"
+        else:
+            calculation_type = "naive"
+        # calculation_type = "generic"
         for j, qJ in enumerate(self.q_ops):
             for i, qI in enumerate(self.q_ops):
                 if i < j:
                     continue
-                if calculation_type == 'selfconsistent':
-                    None
-                elif calculation_type == 'naive':
-                    None
-                elif calculation_type == 'generic':
+                if calculation_type == "selfconsistent" or calculation_type == "naive":
+                    # Make M
+                    operator = operatormul3_contract(qI.dagger, H, qJ) - operatormul3_contract(
+                        qI.dagger, qJ, H
+                    )
+                    self.M[i, j] = self.M[j, i] = expectation_value_contracted(
+                        self.wf.state_vector, operator, self.wf.state_vector
+                    )
+                    # Make Q
+                    self.Q[i, j] = self.Q[j, i] = -expectation_value_contracted(
+                        self.wf.state_vector,
+                        operatormul3_contract(qI.dagger, qJ.dagger, H),
+                        self.wf.state_vector,
+                    )
+                    # Make V
+                    self.V[i, j] = self.V[j, i] = expectation_value_contracted(
+                        self.wf.state_vector,
+                        operatormul_contract(qI.dagger, qJ),
+                        self.wf.state_vector,
+                    )
+                    # Make W
+                elif calculation_type == "generic":
                     # Make M
                     self.M[i, j] = self.M[j, i] = expectation_value_contracted(
-                        self.wf.state_vector, double_commutator_contract(qI.dagger, H, qJ), self.wf.state_vector
+                        self.wf.state_vector,
+                        double_commutator_contract(qI.dagger, H, qJ),
+                        self.wf.state_vector,
                     )
                     # Make Q
                     self.Q[i, j] = self.Q[j, i] = expectation_value_contracted(
@@ -164,17 +187,62 @@ class LinearResponseUCCMatrix:
                         self.wf.state_vector,
                     )
                 else:
-                    raise NameError('Could not determine calculation_type got: {calculation_type}')
+                    raise NameError("Could not determine calculation_type got: {calculation_type}")
         for j, GJ in enumerate(self.G_ops):
             for i, qI in enumerate(self.q_ops):
-                if calculation_type == 'selfconsistent':
-                    None
-                elif calculation_type == 'naive':
-                    None
-                elif calculation_type == 'generic':
+                if calculation_type == "selfconsistent":
+                    # Make M
+                    operator = operatormul3_contract(qI.dagger, H, GJ) - operatormul3_contract(
+                        qI.dagger, GJ, H
+                    )
+                    self.M[i, j + idx_shift] = expectation_value_contracted(
+                        self.wf.state_vector, operator, self.wf.state_vector
+                    )
+                    # Make Q
+                    self.Q[i, j + idx_shift] = expectation_value_contracted(
+                        self.wf.state_vector,
+                        operatormul3_contract(qI.dagger, GJ.dagger, H),
+                        self.wf.state_vector,
+                    )
+                    # Make V
+                    self.V[i, j + idx_shift] = expectation_value_contracted(
+                        self.wf.state_vector, operatormul_contract(qI.dagger, GJ), self.wf.state_vector
+                    )
+                    # Make W
+                    self.W[i, j + idx_shift] = -expectation_value_contracted(
+                        self.wf.state_vector, operatormul_contract(GJ.dagger, qI.dagger), self.wf.state_vector
+                    )
+                elif calculation_type == "naive":
+                    # Make M
+                    operator = operatormul3_contract(qI.dagger, H, GJ) - operatormul3_contract(
+                        qI.dagger, GJ, H
+                    )
+                    self.M[i, j + idx_shift] = expectation_value_contracted(
+                        self.wf.state_vector, operator, self.wf.state_vector
+                    )
+                    # Make Q
+                    operator = operatormul3_contract(qI.dagger, H, GJ.dagger) - operatormul3_contract(
+                        qI.dagger, GJ.dagger, H
+                    )
+                    self.Q[i, j + idx_shift] = expectation_value_contracted(
+                        self.wf.state_vector,
+                        operator,
+                        self.wf.state_vector,
+                    )
+                    # Make V
+                    self.V[i, j + idx_shift] = expectation_value_contracted(
+                        self.wf.state_vector, operatormul_contract(qI.dagger, GJ), self.wf.state_vector
+                    )
+                    # Make W
+                    self.W[i, j + idx_shift] = -expectation_value_contracted(
+                        self.wf.state_vector, operatormul_contract(qI.dagger, GJ.dagger), self.wf.state_vector
+                    )
+                elif calculation_type == "generic":
                     # Make M
                     self.M[i, j + idx_shift] = expectation_value_contracted(
-                        self.wf.state_vector, double_commutator_contract(qI.dagger, H, GJ), self.wf.state_vector
+                        self.wf.state_vector,
+                        double_commutator_contract(qI.dagger, H, GJ),
+                        self.wf.state_vector,
                     )
                     # Make Q
                     self.Q[i, j + idx_shift] = expectation_value_contracted(
@@ -191,17 +259,61 @@ class LinearResponseUCCMatrix:
                         self.wf.state_vector, commutator_contract(qI.dagger, GJ.dagger), self.wf.state_vector
                     )
                 else:
-                    raise NameError('Could not determine calculation_type got: {calculation_type}')
+                    raise NameError("Could not determine calculation_type got: {calculation_type}")
         for j, qJ in enumerate(self.q_ops):
             for i, GI in enumerate(self.G_ops):
-                if calculation_type == 'selfconsistent':
-                    None
-                elif calculation_type == 'naive':
-                    None
-                elif calculation_type == 'generic':
+                if calculation_type == "selfconsistent":
+                    # Make M
+                    operator = operatormul3_contract(GI.dagger, H, qJ) - operatormul3_contract(
+                        GI.dagger, qJ, H
+                    )
+                    self.M[i + idx_shift, j] = expectation_value_contracted(
+                        self.wf.state_vector, operator, self.wf.state_vector
+                    )
+                    # Make Q
+                    self.Q[i + idx_shift, j] = -expectation_value_contracted(
+                        self.wf.state_vector,
+                        operatormul3_contract(GI.dagger, qJ.dagger, H),
+                        self.wf.state_vector,
+                    )
+                    # Make V
+                    self.V[i + idx_shift, j] = expectation_value_contracted(
+                        self.wf.state_vector, operatormul_contract(GI.dagger, qJ), self.wf.state_vector
+                    )
+                    # Make W
+                elif calculation_type == "naive":
+                    # Make M
+                    operator = (
+                        operatormul3_contract(GI.dagger, H, qJ)
+                        - operatormul3_contract(GI.dagger, qJ, H)
+                        - operatormul3_contract(H, qJ, GI.dagger)
+                    )
+                    self.M[i + idx_shift, j] = expectation_value_contracted(
+                        self.wf.state_vector, operator, self.wf.state_vector
+                    )
+                    # Make Q
+                    operator = (
+                        -operatormul3_contract(GI.dagger, qJ.dagger, H)
+                        - operatormul3_contract(H, qJ.dagger, GI.dagger)
+                        + operatormul3_contract(qJ.dagger, H, GI.dagger)
+                    )
+                    self.Q[i + idx_shift, j] = expectation_value_contracted(
+                        self.wf.state_vector, operator, self.wf.state_vector
+                    )
+                    # Make V
+                    self.V[i + idx_shift, j] = expectation_value_contracted(
+                        self.wf.state_vector, operatormul_contract(GI.dagger, qJ), self.wf.state_vector
+                    )
+                    # Make W
+                    self.W[i + idx_shift, j] = -expectation_value_contracted(
+                        self.wf.state_vector, operatormul_contract(qJ.dagger, GI.dagger), self.wf.state_vector
+                    )
+                elif calculation_type == "generic":
                     # Make M
                     self.M[i + idx_shift, j] = expectation_value_contracted(
-                        self.wf.state_vector, double_commutator_contract(GI.dagger, H, qJ), self.wf.state_vector
+                        self.wf.state_vector,
+                        double_commutator_contract(GI.dagger, H, qJ),
+                        self.wf.state_vector,
                     )
                     # Make Q
                     self.Q[i + idx_shift, j] = expectation_value_contracted(
@@ -218,27 +330,39 @@ class LinearResponseUCCMatrix:
                         self.wf.state_vector, commutator_contract(GI.dagger, qJ.dagger), self.wf.state_vector
                     )
                 else:
-                    raise NameError('Could not determine calculation_type got: {calculation_type}')
+                    raise NameError("Could not determine calculation_type got: {calculation_type}")
         for j, GJ in enumerate(self.G_ops):
             for i, GI in enumerate(self.G_ops):
                 if i < j:
                     continue
-                if calculation_type == 'selfconsistent':
-                    None
-                elif calculation_type == 'naive':
-                    None
-                elif calculation_type == 'generic':
+                if calculation_type == "selfconsistent":
+                    # Make M
+                    value = expectation_value_contracted(
+                        self.wf.state_vector, operatormul3_contract(GI.dagger, H, GJ), self.wf.state_vector
+                    )
+                    if i == j:
+                        value -= self.wf.ucc_energy
+                    self.M[i + idx_shift, j + idx_shift] = self.M[j + idx_shift, i + idx_shift] = value
+                    # Make Q
+                    self.Q[i + idx_shift, j + idx_shift] = self.Q[
+                        j + idx_shift, i + idx_shift
+                    ] = -expectation_value_contracted(
+                        self.wf.state_vector,
+                        operatormul3_contract(GI.dagger, GJ.dagger, H),
+                        self.wf.state_vector,
+                    )
+                    # Make V
+                    if i == j:
+                        self.V[i + idx_shift, j + idx_shift] = self.V[j + idx_shift, i + idx_shift] = 1
+                    # Make W
+                elif calculation_type == "generic" or calculation_type == "naive":
                     # Make M
                     self.M[i + idx_shift, j + idx_shift] = self.M[
                         j + idx_shift, i + idx_shift
                     ] = expectation_value_contracted(
-                        self.wf.state_vector, double_commutator_contract(GI.dagger, H, GJ), self.wf.state_vector
-                    )
-                    # Make V
-                    self.V[i + idx_shift, j + idx_shift] = self.V[
-                        j + idx_shift, i + idx_shift
-                    ] = expectation_value_contracted(
-                        self.wf.state_vector, commutator_contract(GI.dagger, GJ), self.wf.state_vector
+                        self.wf.state_vector,
+                        double_commutator_contract(GI.dagger, H, GJ),
+                        self.wf.state_vector,
                     )
                     # Make Q
                     self.Q[i + idx_shift, j + idx_shift] = self.Q[
@@ -248,6 +372,12 @@ class LinearResponseUCCMatrix:
                         double_commutator_contract(GI.dagger, H, GJ.dagger),
                         self.wf.state_vector,
                     )
+                    # Make V
+                    self.V[i + idx_shift, j + idx_shift] = self.V[
+                        j + idx_shift, i + idx_shift
+                    ] = expectation_value_contracted(
+                        self.wf.state_vector, commutator_contract(GI.dagger, GJ), self.wf.state_vector
+                    )
                     # Make W
                     self.W[i + idx_shift, j + idx_shift] = self.W[
                         j + idx_shift, i + idx_shift
@@ -255,7 +385,7 @@ class LinearResponseUCCMatrix:
                         self.wf.state_vector, commutator_contract(GI.dagger, GJ.dagger), self.wf.state_vector
                     )
                 else:
-                    raise NameError('Could not determine calculation_type got: {calculation_type}')
+                    raise NameError("Could not determine calculation_type got: {calculation_type}")
 
     def calc_excitation_energies(self) -> None:
         size = len(self.M)
@@ -323,20 +453,28 @@ class LinearResponseUCCMatrix:
             for q in range(self.wf.num_spin_orbs // 2):
                 Epq_op = Epq(p, q, self.wf.num_spin_orbs, self.wf.num_elec)
                 if counter == 0:
-                    muz_op = muz[p, q] * convert_pauli_to_hybrid_form(
-                        Epq_op,
-                        self.wf.num_inactive_spin_orbs,
-                        self.wf.num_active_spin_orbs,
-                        self.wf.num_virtual_spin_orbs,
-                    )
+                    # muz_op = muz[p, q] * convert_pauli_to_hybrid_form(
+                    #    Epq_op,
+                    #    self.wf.num_inactive_spin_orbs,
+                    #    self.wf.num_active_spin_orbs,
+                    #    self.wf.num_virtual_spin_orbs,
+                    # )
+                    muz_op = muz[p, q] * Epq_op
                     counter += 1
                 else:
-                    muz_op += muz[p, q] * convert_pauli_to_hybrid_form(
-                        Epq_op,
-                        self.wf.num_inactive_spin_orbs,
-                        self.wf.num_active_spin_orbs,
-                        self.wf.num_virtual_spin_orbs,
-                    )
+                    # muz_op += muz[p, q] * convert_pauli_to_hybrid_form(
+                    #    Epq_op,
+                    #    self.wf.num_inactive_spin_orbs,
+                    #    self.wf.num_active_spin_orbs,
+                    #    self.wf.num_virtual_spin_orbs,
+                    # )
+                    muz_op += muz[p, q] * Epq_op
+        muz_op = convert_pauli_to_hybrid_form(
+            muz_op,
+            self.wf.num_inactive_spin_orbs,
+            self.wf.num_active_spin_orbs,
+            self.wf.num_virtual_spin_orbs,
+        )
         return expectation_value_hybrid(
             self.wf.state_vector, muz_op * transfer_op - transfer_op * muz_op, self.wf.state_vector
         )
