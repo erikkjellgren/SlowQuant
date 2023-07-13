@@ -205,13 +205,7 @@ class LinearResponseUCCMatrix:
                         self.wf.state_vector,
                     )
                     # Make V
-                    self.V[i, j + idx_shift] = expectation_value_contracted(
-                        self.wf.state_vector, operatormul_contract(qI.dagger, GJ), self.wf.state_vector
-                    )
                     # Make W
-                    self.W[i, j + idx_shift] = -expectation_value_contracted(
-                        self.wf.state_vector, operatormul_contract(GJ.dagger, qI.dagger), self.wf.state_vector
-                    )
                 elif calculation_type == "naive":
                     # Make M
                     operator = operatormul3_contract(qI.dagger, H, GJ) - operatormul3_contract(
@@ -230,13 +224,7 @@ class LinearResponseUCCMatrix:
                         self.wf.state_vector,
                     )
                     # Make V
-                    self.V[i, j + idx_shift] = expectation_value_contracted(
-                        self.wf.state_vector, operatormul_contract(qI.dagger, GJ), self.wf.state_vector
-                    )
                     # Make W
-                    self.W[i, j + idx_shift] = -expectation_value_contracted(
-                        self.wf.state_vector, operatormul_contract(qI.dagger, GJ.dagger), self.wf.state_vector
-                    )
                 elif calculation_type == "generic":
                     # Make M
                     self.M[i, j + idx_shift] = expectation_value_contracted(
@@ -277,9 +265,6 @@ class LinearResponseUCCMatrix:
                         self.wf.state_vector,
                     )
                     # Make V
-                    self.V[i + idx_shift, j] = expectation_value_contracted(
-                        self.wf.state_vector, operatormul_contract(GI.dagger, qJ), self.wf.state_vector
-                    )
                     # Make W
                 elif calculation_type == "naive":
                     # Make M
@@ -292,22 +277,14 @@ class LinearResponseUCCMatrix:
                         self.wf.state_vector, operator, self.wf.state_vector
                     )
                     # Make Q
-                    operator = (
-                        -operatormul3_contract(GI.dagger, qJ.dagger, H)
-                        - operatormul3_contract(H, qJ.dagger, GI.dagger)
-                        + operatormul3_contract(qJ.dagger, H, GI.dagger)
+                    operator = operatormul3_contract(qJ.dagger, H, GI.dagger) - operatormul3_contract(
+                        GI.dagger, qJ.dagger, H
                     )
                     self.Q[i + idx_shift, j] = expectation_value_contracted(
                         self.wf.state_vector, operator, self.wf.state_vector
                     )
                     # Make V
-                    self.V[i + idx_shift, j] = expectation_value_contracted(
-                        self.wf.state_vector, operatormul_contract(GI.dagger, qJ), self.wf.state_vector
-                    )
                     # Make W
-                    self.W[i + idx_shift, j] = -expectation_value_contracted(
-                        self.wf.state_vector, operatormul_contract(qJ.dagger, GI.dagger), self.wf.state_vector
-                    )
                 elif calculation_type == "generic":
                     # Make M
                     self.M[i + idx_shift, j] = expectation_value_contracted(
