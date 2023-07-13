@@ -128,6 +128,12 @@ class LinearResponseUCCMatrix:
             self.wf.num_active_spin_orbs,
             self.wf.num_virtual_spin_orbs,
         )
+        H_en = convert_pauli_to_hybrid_form(
+            Hamiltonian_energy_only(self.wf.h_core, self.wf.g_eri, self.wf.c_trans, self.wf.num_inactive_spin_orbs, self.wf.num_active_spin_orbs, self.wf.num_virtual_spin_orbs, num_elec),
+            self.wf.num_inactive_spin_orbs,
+            self.wf.num_active_spin_orbs,
+            self.wf.num_virtual_spin_orbs,
+        )
         idx_shift = len(self.q_ops)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
@@ -155,11 +161,12 @@ class LinearResponseUCCMatrix:
                         self.wf.state_vector,
                     )
                     # Make V
-                    self.V[i, j] = self.V[j, i] = expectation_value_contracted(
-                        self.wf.state_vector,
-                        operatormul_contract(qI.dagger, qJ),
-                        self.wf.state_vector,
-                    )
+                    if i == j:
+                        self.V[i, j] = self.V[j, i] = expectation_value_contracted(
+                            self.wf.state_vector,
+                            operatormul_contract(qI.dagger, qJ),
+                            self.wf.state_vector,
+                        )
                     # Make W
                 elif calculation_type == "generic":
                     # Make M
@@ -338,7 +345,7 @@ class LinearResponseUCCMatrix:
                 if calculation_type == "selfconsistent":
                     # Make M
                     value = expectation_value_contracted(
-                        self.wf.state_vector, operatormul3_contract(GI.dagger, H, GJ), self.wf.state_vector
+                        self.wf.state_vector, operatormul3_contract(GI.dagger, H_en, GJ), self.wf.state_vector
                     )
                     if i == j:
                         value -= self.wf.ucc_energy
@@ -348,7 +355,7 @@ class LinearResponseUCCMatrix:
                         j + idx_shift, i + idx_shift
                     ] = -expectation_value_contracted(
                         self.wf.state_vector,
-                        operatormul3_contract(GI.dagger, GJ.dagger, H),
+                        operatormul3_contract(GI.dagger, GJ.dagger, H_en),
                         self.wf.state_vector,
                     )
                     # Make V
@@ -361,7 +368,7 @@ class LinearResponseUCCMatrix:
                         j + idx_shift, i + idx_shift
                     ] = expectation_value_contracted(
                         self.wf.state_vector,
-                        double_commutator_contract(GI.dagger, H, GJ),
+                        double_commutator_contract(GI.dagger, H_en, GJ),
                         self.wf.state_vector,
                     )
                     # Make Q
@@ -369,7 +376,7 @@ class LinearResponseUCCMatrix:
                         j + idx_shift, i + idx_shift
                     ] = expectation_value_contracted(
                         self.wf.state_vector,
-                        double_commutator_contract(GI.dagger, H, GJ.dagger),
+                        double_commutator_contract(GI.dagger, H_en, GJ.dagger),
                         self.wf.state_vector,
                     )
                     # Make V
@@ -453,21 +460,9 @@ class LinearResponseUCCMatrix:
             for q in range(self.wf.num_spin_orbs // 2):
                 Epq_op = Epq(p, q, self.wf.num_spin_orbs, self.wf.num_elec)
                 if counter == 0:
-                    # muz_op = muz[p, q] * convert_pauli_to_hybrid_form(
-                    #    Epq_op,
-                    #    self.wf.num_inactive_spin_orbs,
-                    #    self.wf.num_active_spin_orbs,
-                    #    self.wf.num_virtual_spin_orbs,
-                    # )
                     muz_op = muz[p, q] * Epq_op
                     counter += 1
                 else:
-                    # muz_op += muz[p, q] * convert_pauli_to_hybrid_form(
-                    #    Epq_op,
-                    #    self.wf.num_inactive_spin_orbs,
-                    #    self.wf.num_active_spin_orbs,
-                    #    self.wf.num_virtual_spin_orbs,
-                    # )
                     muz_op += muz[p, q] * Epq_op
         muz_op = convert_pauli_to_hybrid_form(
             muz_op,
