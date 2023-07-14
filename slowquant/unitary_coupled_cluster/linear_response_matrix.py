@@ -1,4 +1,5 @@
 import copy
+from collections.abc import Sequence
 
 import numpy as np
 import scipy
@@ -413,17 +414,21 @@ class LinearResponseUCCMatrix:
         sorting = np.argsort(eigval)
         self.excitation_energies = np.real(eigval[sorting][size:])
         self.response_vectors = np.real(eigvec[:, sorting][:, size:])
+        self.normed_response_vectors = np.zeros_like(self.response_vectors)
+        for state_number in range(size):
+            norm = self.get_excited_state_norm(state_number)
+            if norm < 10**-10:
+                continue
+            self.normed_response_vectors[:, state_number] = self.response_vectors[:, state_number] * (1 / norm) ** 0.5
 
     def get_excited_state_overlap(self, state_number: int) -> float:
         number_excitations = len(self.excitation_energies)
-        norm = self.get_excited_state_norm(state_number)
-        normed_vec = self.response_vectors[:, state_number] * (1 / norm) ** 0.5
         print("WARNING: This function [get_excited_state_overlap] might not be working.")
         for i, G in enumerate(self.q_ops + self.G_ops):
             if i == 0:
-                transfer_op = normed_vec[i] * G.dagger + normed_vec[i + number_excitations] * G
+                transfer_op = self.normed_response_vectors[i, state_number] * G.dagger + self.normed_response_vectors[i + number_excitations, state_number] * G
             else:
-                transfer_op += normed_vec[i] * G.dagger + normed_vec[i + number_excitations] * G
+                transfer_op += self.normed_response_vectors[i, state_number] * G.dagger + self.normed_response_vectors[i + number_excitations, state_number] * G
         return expectation_value_hybrid(self.wf.state_vector, transfer_op, self.wf.state_vector)
 
     def get_excited_state_norm(self, state_number: int) -> float:
@@ -439,60 +444,76 @@ class LinearResponseUCCMatrix:
                     self.response_vectors[i, state_number] * G.dagger
                     + self.response_vectors[i + number_excitations, state_number] * G
                 )
-        return expectation_value_hybrid(
-            self.wf.state_vector,
-            transfer_op * transfer_op.dagger - transfer_op.dagger * transfer_op,
-            self.wf.state_vector,
-        )
+        return expectation_value_contracted(self.wf.state_vector, commutator_contract(transfer_op, transfer_op.dagger), self.wf.state_vector)
 
-    def get_transition_dipole(self, state_number: int, multipole_integral: np.ndarray) -> float:
+    def get_transition_dipole(self, state_number: int, dipole_integrals: Sequence[np.ndarray, np.ndarray, np.ndarray]) -> tuple[float, float, float]:
+        if len(dipole_integrals) != 3:
+            raise ValueError(f'Expected 3 dipole integrals got {len(dipole_integrals)}') 
         number_excitations = len(self.excitation_energies)
-        assert number_excitations == len(self.q_ops) + len(self.G_ops)
-        norm = self.get_excited_state_norm(state_number)
-        normed_vec = self.response_vectors[:, state_number] * (1 / norm) ** 0.5
         for i, G in enumerate(self.q_ops + self.G_ops):
             if i == 0:
-                transfer_op = normed_vec[i] * G.dagger + normed_vec[i + number_excitations] * G
+                transfer_op = self.normed_response_vectors[i, state_number] * G.dagger + self.normed_response_vectors[i + number_excitations, state_number] * G
             else:
-                transfer_op += normed_vec[i] * G.dagger + normed_vec[i + number_excitations] * G
-        muz = one_electron_integral_transform(self.wf.c_trans, multipole_integral)
+                transfer_op += self.normed_response_vectors[i, state_number] * G.dagger + self.normed_response_vectors[i + number_excitations, state_number] * G
+        mux = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[0])
+        muy = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[1])
+        muz = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[2])
         counter = 0
         for p in range(self.wf.num_spin_orbs // 2):
             for q in range(self.wf.num_spin_orbs // 2):
                 Epq_op = Epq(p, q, self.wf.num_spin_orbs, self.wf.num_elec)
                 if counter == 0:
+                    mux_op = mux[p, q] * Epq_op
+                    muy_op = muy[p, q] * Epq_op
                     muz_op = muz[p, q] * Epq_op
                     counter += 1
                 else:
-                    muz_op += muz[p, q] * Epq_op
+                    if abs(mux[p,q]) > 10**-10:
+                        mux_op += mux[p, q] * Epq_op
+                    if abs(muy[p,q]) > 10**-10:
+                        muy_op += muy[p, q] * Epq_op
+                    if abs(muz[p,q]) > 10**-10:
+                        muz_op += muz[p, q] * Epq_op
+        mux_op = convert_pauli_to_hybrid_form(
+            mux_op,
+            self.wf.num_inactive_spin_orbs,
+            self.wf.num_active_spin_orbs,
+            self.wf.num_virtual_spin_orbs,
+        )
+        muy_op = convert_pauli_to_hybrid_form(
+            muy_op,
+            self.wf.num_inactive_spin_orbs,
+            self.wf.num_active_spin_orbs,
+            self.wf.num_virtual_spin_orbs,
+        )
         muz_op = convert_pauli_to_hybrid_form(
             muz_op,
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
             self.wf.num_virtual_spin_orbs,
         )
-        return expectation_value_hybrid(
-            self.wf.state_vector, muz_op * transfer_op - transfer_op * muz_op, self.wf.state_vector
-        )
+        transition_dipole_x = 0
+        transition_dipole_y = 0
+        transition_dipole_z = 0
+        if mux_op.operators != {}:
+            transition_dipole_x = expectation_value_contracted(self.wf.state_vector, commutator_contract(mux_op, transfer_op), self.wf.state_vector)
+        if muy_op.operators != {}:
+            transition_dipole_y = expectation_value_contracted(self.wf.state_vector, commutator_contract(muy_op, transfer_op), self.wf.state_vector)
+        if muz_op.operators != {}:
+            transition_dipole_z = expectation_value_contracted(self.wf.state_vector, commutator_contract(muz_op, transfer_op), self.wf.state_vector)
+        return transition_dipole_x, transition_dipole_y, transition_dipole_z
 
-    def get_oscillator_strength(self, state_number: int, multipole_integrals: np.ndarray) -> float:
-        transition_dipole_x = self.get_transition_dipole(state_number, multipole_integrals[0])
-        transition_dipole_y = self.get_transition_dipole(state_number, multipole_integrals[1])
-        transition_dipole_z = self.get_transition_dipole(state_number, multipole_integrals[2])
+    def get_oscillator_strength(self, state_number: int, dipole_integrals: Sequence[np.ndarray, np.ndarray, np.ndarray]) -> float:
+        transition_dipole_x, transition_dipole_y, transition_dipole_z = self.get_transition_dipole(state_number, dipole_integrals)
         excitation_energy = self.excitation_energies[state_number]
-        return (
-            2
-            / 3
-            * excitation_energy
-            * (transition_dipole_x**2 + transition_dipole_y**2 + transition_dipole_z**2)
-        )
+        return (2 / 3 * excitation_energy * (transition_dipole_x**2 + transition_dipole_y**2 + transition_dipole_z**2))
 
-    def get_nice_output(self, multipole_integrals: np.ndarray) -> str:
+    def get_nice_output(self, dipole_integrals: np.ndarray) -> str:
         output = (
             "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n"
         )
         for i, exc_energy in enumerate(self.excitation_energies):
-            osc_strength = self.get_oscillator_strength(i, multipole_integrals)
+            osc_strength = self.get_oscillator_strength(i, dipole_integrals)
             exc_str = f"{exc_energy:2.6f}"
             exc_str_ev = f"{exc_energy*27.2114079527:3.6f}"
             osc_str = f"{osc_strength:1.6f}"
