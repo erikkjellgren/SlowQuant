@@ -149,7 +149,7 @@ class LinearResponseUCCMatrix:
             calculation_type = "selfconsistent"
         else:
             calculation_type = "naive"
-        # calculation_type = "generic"
+        #calculation_type = "generic"
         for j, qJ in enumerate(self.q_ops):
             for i, qI in enumerate(self.q_ops):
                 if i < j:
@@ -347,7 +347,31 @@ class LinearResponseUCCMatrix:
                     if i == j:
                         self.V[i + idx_shift, j + idx_shift] = self.V[j + idx_shift, i + idx_shift] = 1
                     # Make W
-                elif calculation_type == "generic" or calculation_type == "naive":
+                elif calculation_type == "naive":
+                    # Make M
+                    self.M[i + idx_shift, j + idx_shift] = self.M[
+                        j + idx_shift, i + idx_shift
+                    ] = expectation_value_contracted(
+                        self.wf.state_vector,
+                        double_commutator_contract(GI.dagger, H_en, GJ),
+                        self.wf.state_vector,
+                    )
+                    # Make Q
+                    self.Q[i + idx_shift, j + idx_shift] = self.Q[
+                        j + idx_shift, i + idx_shift
+                    ] = expectation_value_contracted(
+                        self.wf.state_vector,
+                        double_commutator_contract(GI.dagger, H_en, GJ.dagger),
+                        self.wf.state_vector,
+                    )
+                    # Make V
+                    self.V[i + idx_shift, j + idx_shift] = self.V[
+                        j + idx_shift, i + idx_shift
+                    ] = expectation_value_contracted(
+                        self.wf.state_vector, commutator_contract(GI.dagger, GJ), self.wf.state_vector
+                    )
+                    # Make W
+                elif calculation_type == "generic":
                     # Make M
                     self.M[i + idx_shift, j + idx_shift] = self.M[
                         j + idx_shift, i + idx_shift
