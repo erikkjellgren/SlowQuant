@@ -129,7 +129,15 @@ class LinearResponseUCCMatrix:
             self.wf.num_virtual_spin_orbs,
         )
         H_en = convert_pauli_to_hybrid_form(
-            Hamiltonian_energy_only(self.wf.h_core, self.wf.g_eri, self.wf.c_trans, self.wf.num_inactive_spin_orbs, self.wf.num_active_spin_orbs, self.wf.num_virtual_spin_orbs, num_elec),
+            Hamiltonian_energy_only(
+                self.wf.h_core,
+                self.wf.g_eri,
+                self.wf.c_trans,
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.num_virtual_spin_orbs,
+                num_elec,
+            ),
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
             self.wf.num_virtual_spin_orbs,
@@ -321,12 +329,12 @@ class LinearResponseUCCMatrix:
                     continue
                 if calculation_type == "selfconsistent":
                     # Make M
-                    value = expectation_value_contracted(
-                        self.wf.state_vector, operatormul3_contract(GI.dagger, H_en, GJ), self.wf.state_vector
+                    operator = operatormul3_contract(GI.dagger, H_en, GJ) - operatormul3_contract(
+                        GI.dagger, GJ, H_en
                     )
-                    if i == j:
-                        value -= self.wf.ucc_energy
-                    self.M[i + idx_shift, j + idx_shift] = self.M[j + idx_shift, i + idx_shift] = value
+                    self.M[i + idx_shift, j + idx_shift] = self.M[
+                        j + idx_shift, i + idx_shift
+                    ] = expectation_value_contracted(self.wf.state_vector, operator, self.wf.state_vector)
                     # Make Q
                     self.Q[i + idx_shift, j + idx_shift] = self.Q[
                         j + idx_shift, i + idx_shift
