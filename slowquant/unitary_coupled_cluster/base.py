@@ -486,11 +486,78 @@ def Epq_matrix(p: int, q: int, num_spin_orbs: int, num_elec: int, use_csr: int =
 
 
 def epqrs(p: int, q: int, r: int, s: int, num_spin_orbs: int, num_elec: int) -> PauliOperator:
-    if q == r:
-        return Epq(p, q, num_spin_orbs, num_elec) * Epq(r, s, num_spin_orbs, num_elec) - Epq(
-            p, s, num_spin_orbs, num_elec
+    if p == r and q == s:
+        operator = 2 * (
+            PauliOperator(a_op(p, "alpha", True, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(q, "alpha", False, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(p, "beta", True, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(q, "beta", False, num_spin_orbs, num_elec))
         )
-    return Epq(p, q, num_spin_orbs, num_elec) * Epq(r, s, num_spin_orbs, num_elec)
+    elif p == q == r:
+        operator = (
+            PauliOperator(a_op(p, "alpha", True, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(s, "alpha", False, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(p, "beta", True, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(p, "beta", False, num_spin_orbs, num_elec))
+        )
+        operator += (
+            PauliOperator(a_op(p, "alpha", True, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(p, "alpha", False, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(p, "beta", True, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(s, "beta", False, num_spin_orbs, num_elec))
+        )
+    elif p == r == s:
+        operator = (
+            PauliOperator(a_op(p, "alpha", True, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(p, "alpha", False, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(p, "beta", True, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(q, "beta", False, num_spin_orbs, num_elec))
+        )
+        operator += (
+            PauliOperator(a_op(p, "alpha", True, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(q, "alpha", False, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(p, "beta", True, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(p, "beta", False, num_spin_orbs, num_elec))
+        )
+    elif q == s:
+        operator = (
+            PauliOperator(a_op(r, "alpha", True, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(q, "alpha", False, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(p, "beta", True, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(q, "beta", False, num_spin_orbs, num_elec))
+        )
+        operator += (
+            PauliOperator(a_op(p, "alpha", True, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(q, "alpha", False, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(r, "beta", True, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(q, "beta", False, num_spin_orbs, num_elec))
+        )
+    else:
+        operator = (
+            PauliOperator(a_op(r, "alpha", True, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(s, "alpha", False, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(p, "beta", True, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(q, "beta", False, num_spin_orbs, num_elec))
+        )
+        operator += (
+            PauliOperator(a_op(p, "alpha", True, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(q, "alpha", False, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(r, "beta", True, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(s, "beta", False, num_spin_orbs, num_elec))
+        )
+        operator -= (
+            PauliOperator(a_op(p, "beta", True, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(r, "beta", True, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(q, "beta", False, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(s, "beta", False, num_spin_orbs, num_elec))
+        )
+        operator -= (
+            PauliOperator(a_op(p, "alpha", True, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(r, "alpha", True, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(q, "alpha", False, num_spin_orbs, num_elec))
+            * PauliOperator(a_op(s, "alpha", False, num_spin_orbs, num_elec))
+        )
+    return operator
 
 
 def Eminuspq(p: int, q: int, num_spin_orbs: int, num_elec: int) -> PauliOperator:
