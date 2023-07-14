@@ -93,59 +93,24 @@ def operatormul_contract(A: PauliOperatorHybridForm, B: PauliOperatorHybridForm)
             new_inactive = ""
             new_virtual = ""
             fac = 1
+            do_continue = False
             for pauli1, pauli2 in zip(op1.inactive_pauli, op2.inactive_pauli):
-                if pauli1 == "I":
-                    new_inactive += pauli2
-                elif pauli2 == "I":
-                    new_inactive += pauli1
-                elif pauli1 == pauli2:
-                    new_inactive += "I"
-                elif pauli1 == "X" and pauli2 == "Y":
-                    new_inactive += "Z"
-                    fac *= 1j
-                elif pauli1 == "X" and pauli2 == "Z":
-                    new_inactive += "Y"
-                    fac *= -1j
-                elif pauli1 == "Y" and pauli2 == "X":
-                    new_inactive += "Z"
-                    fac *= -1j
-                elif pauli1 == "Y" and pauli2 == "Z":
-                    new_inactive += "X"
-                    fac *= 1j
-                elif pauli1 == "Z" and pauli2 == "X":
-                    new_inactive += "Y"
-                    fac *= 1j
-                elif pauli1 == "Z" and pauli2 == "Y":
-                    new_inactive += "X"
-                    fac *= -1j
-            if "Y" in new_inactive or "X" in new_inactive:
+                new_pauli, new_fac = paulistring_mul((pauli1, pauli2))
+                if new_pauli == "Y" or new_pauli == "X":
+                    do_continue = True
+                    break
+                new_inactive += new_pauli
+                fac *= new_fac
+            if do_continue:
                 continue
             for pauli1, pauli2 in zip(op1.virtual_pauli, op2.virtual_pauli):
-                if pauli1 == "I":
-                    new_virtual += pauli2
-                elif pauli2 == "I":
-                    new_virtual += pauli1
-                elif pauli1 == pauli2:
-                    new_virtual += "I"
-                elif pauli1 == "X" and pauli2 == "Y":
-                    new_virtual += "Z"
-                    fac *= 1j
-                elif pauli1 == "X" and pauli2 == "Z":
-                    new_virtual += "Y"
-                    fac *= -1j
-                elif pauli1 == "Y" and pauli2 == "X":
-                    new_virtual += "Z"
-                    fac *= -1j
-                elif pauli1 == "Y" and pauli2 == "Z":
-                    new_virtual += "X"
-                    fac *= 1j
-                elif pauli1 == "Z" and pauli2 == "X":
-                    new_virtual += "Y"
-                    fac *= 1j
-                elif pauli1 == "Z" and pauli2 == "Y":
-                    new_virtual += "X"
-                    fac *= -1j
-            if "Y" in new_virtual or "X" in new_virtual:
+                new_pauli, new_fac = paulistring_mul((pauli1, pauli2))
+                if new_pauli == "Y" or new_pauli == "X":
+                    do_continue = True
+                    break
+                new_virtual += new_pauli
+                fac *= new_fac
+            if do_continue:
                 continue
             # This should depend on state vector.
             # I.e. (-1)**(#Z_occupied)
@@ -172,17 +137,24 @@ def operatormul3_contract(
                 new_inactive = ""
                 new_virtual = ""
                 fac = 1
+                do_continue = False
                 for pauli1, pauli2, pauli3 in zip(op1.inactive_pauli, op2.inactive_pauli, op3.inactive_pauli):
                     new_pauli, new_fac = paulistring_mul((pauli1, pauli2, pauli3))
+                    if new_pauli == "Y" or new_pauli == "X":
+                        do_continue = True
+                        break
                     new_inactive += new_pauli
                     fac *= new_fac
-                if "Y" in new_inactive or "X" in new_inactive:
+                if do_continue:
                     continue
                 for pauli1, pauli2, pauli3 in zip(op1.virtual_pauli, op2.virtual_pauli, op3.virtual_pauli):
                     new_pauli, new_fac = paulistring_mul((pauli1, pauli2, pauli3))
+                    if new_pauli == "Y" or new_pauli == "X":
+                        do_continue = True
+                        break
                     new_virtual += new_pauli
                     fac *= new_fac
-                if "Y" in new_virtual or "X" in new_virtual:
+                if do_continue:
                     continue
                 # This should depend on state vector.
                 # I.e. (-1)**(#Z_occupied)
@@ -215,21 +187,28 @@ def operatormul4_contract(
                     new_inactive = ""
                     new_virtual = ""
                     fac = 1
+                    do_continue = False
                     for pauli1, pauli2, pauli3, pauli4 in zip(
                         op1.inactive_pauli, op2.inactive_pauli, op3.inactive_pauli, op4.inactive_pauli
                     ):
                         new_pauli, new_fac = paulistring_mul((pauli1, pauli2, pauli3, pauli4))
+                        if new_pauli == "Y" or new_pauli == "X":
+                            do_continue = True
+                            break
                         new_inactive += new_pauli
                         fac *= new_fac
-                    if "Y" in new_inactive or "X" in new_inactive:
+                    if do_continue:
                         continue
                     for pauli1, pauli2, pauli3, pauli4 in zip(
                         op1.virtual_pauli, op2.virtual_pauli, op3.virtual_pauli, op4.virtual_pauli
                     ):
                         new_pauli, new_fac = paulistring_mul((pauli1, pauli2, pauli3, pauli4))
+                        if new_pauli == "Y" or new_pauli == "X":
+                            do_continue = True
+                            break
                         new_virtual += new_pauli
                         fac *= new_fac
-                    if "Y" in new_virtual or "X" in new_virtual:
+                    if do_continue:
                         continue
                     # This should depend on state vector.
                     # I.e. (-1)**(#Z_occupied)
