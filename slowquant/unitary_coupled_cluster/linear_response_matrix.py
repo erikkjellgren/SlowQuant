@@ -24,6 +24,7 @@ from slowquant.unitary_coupled_cluster.base_contracted import (
     operatormul_contract,
 )
 from slowquant.unitary_coupled_cluster.base_matrix import (
+    PauliOperatorHybridForm,
     convert_pauli_to_hybrid_form,
     expectation_value_hybrid,
 )
@@ -47,8 +48,8 @@ class LinearResponseUCCMatrix:
             deshift=self.wf.num_inactive_spin_orbs,
         )
 
-        self.G_ops = []
-        self.q_ops = []
+        self.G_ops: list[list[set, set, PauliOperatorHybridForm]] = []
+        self.q_ops: list[list[set, set, PauliOperatorHybridForm]] = []
         num_spin_orbs = self.wf.num_spin_orbs
         num_elec = self.wf.num_elec
         excitations = excitations.lower()
@@ -60,29 +61,29 @@ class LinearResponseUCCMatrix:
             "sdtq",  # self.wf._excitations,
         )
         if "s" in excitations:
-            for _, _, _, op in self.theta_picker.get_T1_generator_SA(num_spin_orbs, num_elec):
+            for _, a, i, op in self.theta_picker.get_T1_generator_SA(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
                     op,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
                     self.wf.num_virtual_spin_orbs,
-                ).dagger
+                )
                 if do_selfconsistent_operators:
                     op = op.apply_U_from_right(U.conj().transpose())
                     op = op.apply_U_from_left(U)
-                self.G_ops.append(op)
+                self.G_ops.append([{i}, {a}, op])
         if "d" in excitations:
-            for _, _, _, _, _, op in self.theta_picker.get_T2_generator_SA(num_spin_orbs, num_elec):
+            for _, a, i, b, j, op in self.theta_picker.get_T2_generator_SA(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
                     op,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
                     self.wf.num_virtual_spin_orbs,
-                ).dagger
+                )
                 if do_selfconsistent_operators:
                     op = op.apply_U_from_right(U.conj().transpose())
                     op = op.apply_U_from_left(U)
-                self.G_ops.append(op)
+                self.G_ops.append([{i, j}, {a, b}, op])
         if "t" in excitations:
             for _, _, _, _, _, _, _, op in self.theta_picker.get_T3_generator(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
@@ -90,7 +91,7 @@ class LinearResponseUCCMatrix:
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
                     self.wf.num_virtual_spin_orbs,
-                ).dagger
+                )
                 if do_selfconsistent_operators:
                     op = op.apply_U_from_right(U.conj().transpose())
                     op = op.apply_U_from_left(U)
@@ -102,20 +103,20 @@ class LinearResponseUCCMatrix:
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
                     self.wf.num_virtual_spin_orbs,
-                ).dagger
+                )
                 if do_selfconsistent_operators:
                     op = op.apply_U_from_right(U.conj().transpose())
                     op = op.apply_U_from_left(U)
                 self.G_ops.append(op)
-        for a, i in self.wf.kappa_idx:
+        for i, a in self.wf.kappa_idx:
             op = 2 ** (-1 / 2) * Epq(a, i, self.wf.num_spin_orbs, self.wf.num_elec)
             op = convert_pauli_to_hybrid_form(
                 op,
                 self.wf.num_inactive_spin_orbs,
                 self.wf.num_active_spin_orbs,
                 self.wf.num_virtual_spin_orbs,
-            ).dagger
-            self.q_ops.append(op)
+            )
+            self.q_ops.append([{i}, {a}, op])
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.M = np.zeros((num_parameters, num_parameters))
@@ -149,9 +150,9 @@ class LinearResponseUCCMatrix:
             calculation_type = "selfconsistent"
         else:
             calculation_type = "naive"
-        #calculation_type = "generic"
-        for j, qJ in enumerate(self.q_ops):
-            for i, qI in enumerate(self.q_ops):
+        # calculation_type = "generic"
+        for j, (occ_idxs_j, unocc_idxs_i, qJ) in enumerate(self.q_ops):
+            for i, (occ_idx_i, unocc_idx_i, qI) in enumerate(self.q_ops):
                 if i < j:
                     continue
                 if calculation_type == "selfconsistent" or calculation_type == "naive":
@@ -203,8 +204,8 @@ class LinearResponseUCCMatrix:
                     )
                 else:
                     raise NameError("Could not determine calculation_type got: {calculation_type}")
-        for j, GJ in enumerate(self.G_ops):
-            for i, qI in enumerate(self.q_ops):
+        for j, (occ_idxs_j, unocc_idxs_j, GJ) in enumerate(self.G_ops):
+            for i, (occ_idxs_i, unocc_idx_j, qI) in enumerate(self.q_ops):
                 if calculation_type == "selfconsistent":
                     # Make M
                     operator = operatormul3_contract(qI.dagger, H, GJ) - operatormul3_contract(
@@ -263,8 +264,8 @@ class LinearResponseUCCMatrix:
                     )
                 else:
                     raise NameError("Could not determine calculation_type got: {calculation_type}")
-        for j, qJ in enumerate(self.q_ops):
-            for i, GI in enumerate(self.G_ops):
+        for j, (occ_idxs_j, unocc_idx_j, qJ) in enumerate(self.q_ops):
+            for i, (occ_idxs_i, unocc_idxs_j, GI) in enumerate(self.G_ops):
                 if calculation_type == "selfconsistent":
                     # Make M
                     operator = operatormul3_contract(GI.dagger, H, qJ) - operatormul3_contract(
@@ -323,15 +324,19 @@ class LinearResponseUCCMatrix:
                     )
                 else:
                     raise NameError("Could not determine calculation_type got: {calculation_type}")
-        for j, GJ in enumerate(self.G_ops):
-            for i, GI in enumerate(self.G_ops):
+        for j, (occ_idxs_j, unocc_idxs_j, GJ) in enumerate(self.G_ops):
+            for i, (occ_idxs_i, unocc_idxs_i, GI) in enumerate(self.G_ops):
                 if i < j:
                     continue
                 if calculation_type == "selfconsistent":
                     # Make M
-                    operator = operatormul3_contract(GI.dagger, H_en, GJ) - operatormul3_contract(
-                        GI.dagger, GJ, H_en
-                    )
+                    operator = operatormul3_contract(GI.dagger, H_en, GJ)
+                    # Need to check this is valid for double excitations also
+                    if len(occ_idxs_j) == len(occ_idxs_i) == 1:
+                        if occ_idxs_j == occ_idxs_i and occ_idxs_j == occ_idxs_i:
+                            operator -= operatormul3_contract(GI.dagger, GJ, H_en)
+                    else:
+                        operator -= operatormul3_contract(GI.dagger, GJ, H_en)
                     self.M[i + idx_shift, j + idx_shift] = self.M[
                         j + idx_shift, i + idx_shift
                     ] = expectation_value_contracted(self.wf.state_vector, operator, self.wf.state_vector)
@@ -427,7 +432,7 @@ class LinearResponseUCCMatrix:
         norm = self.get_excited_state_norm(state_number)
         normed_vec = self.response_vectors[:, state_number] * (1 / norm) ** 0.5
         print("WARNING: This function [get_excited_state_overlap] might not be working.")
-        for i, G in enumerate(self.q_ops + self.G_ops):
+        for i, (_, _, G) in enumerate(self.q_ops + self.G_ops):
             if i == 0:
                 transfer_op = normed_vec[i] * G.dagger + normed_vec[i + number_excitations] * G
             else:
@@ -436,7 +441,7 @@ class LinearResponseUCCMatrix:
 
     def get_excited_state_norm(self, state_number: int) -> float:
         number_excitations = len(self.excitation_energies)
-        for i, G in enumerate(self.q_ops + self.G_ops):
+        for i, (_, _, G) in enumerate(self.q_ops + self.G_ops):
             if i == 0:
                 transfer_op = (
                     self.response_vectors[i, state_number] * G.dagger
@@ -458,7 +463,7 @@ class LinearResponseUCCMatrix:
         assert number_excitations == len(self.q_ops) + len(self.G_ops)
         norm = self.get_excited_state_norm(state_number)
         normed_vec = self.response_vectors[:, state_number] * (1 / norm) ** 0.5
-        for i, G in enumerate(self.q_ops + self.G_ops):
+        for i, (_, _, G) in enumerate(self.q_ops + self.G_ops):
             if i == 0:
                 transfer_op = normed_vec[i] * G.dagger + normed_vec[i + number_excitations] * G
             else:
