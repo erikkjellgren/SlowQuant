@@ -575,12 +575,14 @@ def Hamiltonian(
             if p == 0 and q == 0:
                 H_expectation = h_mo[p, q] * Epq(p, q, num_spin_orbs, num_elec)
             else:
-                H_expectation += h_mo[p, q] * Epq(p, q, num_spin_orbs, num_elec)
+                if abs(h_mo[p, q]) > 10**-10:
+                    H_expectation += h_mo[p, q] * Epq(p, q, num_spin_orbs, num_elec)
     for p in range(num_spatial_orbs):
         for q in range(num_spatial_orbs):
             for r in range(num_spatial_orbs):
                 for s in range(num_spatial_orbs):
-                    H_expectation += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s, num_spin_orbs, num_elec)
+                    if abs(g_mo[p, q, r, s]) > 10**-10:
+                        H_expectation += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s, num_spin_orbs, num_elec)
     return H_expectation
 
 
@@ -607,28 +609,36 @@ def Hamiltonian_energy_only(
         if i == 0:
             H_expectation = h_mo[i, i] * Epq(i, i, num_spin_orbs, num_elec)
         else:
-            H_expectation += h_mo[i, i] * Epq(i, i, num_spin_orbs, num_elec)
+            if abs(h_mo[i, i]) > 10**-10:
+                H_expectation += h_mo[i, i] * Epq(i, i, num_spin_orbs, num_elec)
     # Active one-electron
     for p in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
         for q in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
             if p == 0 and q == 0 and num_inactive_spatial_orbs == 0:
                 H_expectation = h_mo[p, q] * Epq(p, q, num_spin_orbs, num_elec)
             else:
-                H_expectation += h_mo[p, q] * Epq(p, q, num_spin_orbs, num_elec)
+                if abs(h_mo[p, q]) > 10**-10:
+                    H_expectation += h_mo[p, q] * Epq(p, q, num_spin_orbs, num_elec)
     # Inactive two-electron
     for i in range(num_inactive_spatial_orbs):
         for j in range(num_inactive_spatial_orbs):
-            H_expectation += 1 / 2 * g_mo[i, i, j, j] * epqrs(i, i, j, j, num_spin_orbs, num_elec)
+            if abs(g_mo[i, i, j, j]) > 10**-10:
+                H_expectation += 1 / 2 * g_mo[i, i, j, j] * epqrs(i, i, j, j, num_spin_orbs, num_elec)
             if i != j:
-                H_expectation += 1 / 2 * g_mo[j, i, i, j] * epqrs(j, i, i, j, num_spin_orbs, num_elec)
+                if abs(g_mo[j, i, i, j]) > 10**-10:
+                    H_expectation += 1 / 2 * g_mo[j, i, i, j] * epqrs(j, i, i, j, num_spin_orbs, num_elec)
     # Inactive-Active two-electron
     for i in range(num_inactive_spatial_orbs):
         for p in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
             for q in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
-                H_expectation += 1 / 2 * g_mo[i, i, p, q] * epqrs(i, i, p, q, num_spin_orbs, num_elec)
-                H_expectation += 1 / 2 * g_mo[p, q, i, i] * epqrs(p, q, i, i, num_spin_orbs, num_elec)
-                H_expectation += 1 / 2 * g_mo[p, i, i, q] * epqrs(p, i, i, q, num_spin_orbs, num_elec)
-                H_expectation += 1 / 2 * g_mo[i, p, q, i] * epqrs(i, p, q, i, num_spin_orbs, num_elec)
+                if abs(g_mo[i, i, p, q]) > 10**-10:
+                    H_expectation += 1 / 2 * g_mo[i, i, p, q] * epqrs(i, i, p, q, num_spin_orbs, num_elec)
+                if abs(g_mo[p, q, i, i]) > 10**-10:
+                    H_expectation += 1 / 2 * g_mo[p, q, i, i] * epqrs(p, q, i, i, num_spin_orbs, num_elec)
+                if abs(g_mo[p, i, i, q]) > 10**-10:
+                    H_expectation += 1 / 2 * g_mo[p, i, i, q] * epqrs(p, i, i, q, num_spin_orbs, num_elec)
+                if abs(g_mo[i, p, q, i]) > 10**-10:
+                    H_expectation += 1 / 2 * g_mo[i, p, q, i] * epqrs(i, p, q, i, num_spin_orbs, num_elec)
     # Active two-electron
     for p in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
         for q in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
@@ -636,5 +646,6 @@ def Hamiltonian_energy_only(
                 for s in range(
                     num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs
                 ):
-                    H_expectation += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s, num_spin_orbs, num_elec)
+                    if abs(g_mo[p, q, r, s]) > 10**-10:
+                        H_expectation += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s, num_spin_orbs, num_elec)
     return H_expectation
