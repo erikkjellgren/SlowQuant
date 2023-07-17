@@ -23,7 +23,7 @@ class WaveFunctionUCC:
         self,
         number_spin_orbitals: int,
         number_electrons: int,
-        cas: Sequence[int, int],
+        cas: Sequence[int],
         c_orthonormal: np.ndarray,
         h_core: np.ndarray,
         g_eri: np.ndarray,
@@ -129,18 +129,6 @@ class WaveFunctionUCC:
             kappa_mat[p, q] = kappa_val
             kappa_mat[q, p] = -kappa_val
         return np.matmul(self.c_orthonormal, scipy.linalg.expm(-kappa_mat))
-
-    @property
-    def update_state_vector(self) -> None:
-        U = construct_UCC_U(
-            self.num_active_spin_orbs,
-            self.num_active_elec,
-            self.theta1 + self.theta2 + self.theta3 + self.theta4,
-            "sdtq",
-            self.active_occ,
-            self.active_unocc,
-        )
-        self.state_vector.new_U(U)
 
     def run_UCC(self, excitations: str, orbital_optimization: bool = False) -> None:
         excitations = excitations.lower()
@@ -263,7 +251,7 @@ class WaveFunctionUCC:
 
 
 def energy_UCC(
-    parameters: list[float],
+    parameters: Sequence[float],
     num_inactive_spin_orbs: int,
     num_active_spin_orbs: int,
     num_virtual_spin_orbs: int,
@@ -276,7 +264,7 @@ def energy_UCC(
     theta_picker: ThetaPicker,
     excitations: str,
     orbital_optimized: bool,
-    kappa_idx: list[list[int, int]],
+    kappa_idx: Sequence[Sequence[int]],
 ) -> float:
     kappa = []
     theta1 = []
@@ -284,7 +272,7 @@ def energy_UCC(
     theta3 = []
     theta4 = []
     idx_counter = 0
-    for i in range(len(kappa_idx)):
+    for _ in range(len(kappa_idx)):
         kappa.append(parameters[idx_counter])
         idx_counter += 1
     if "s" in excitations:

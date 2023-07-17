@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import numpy as np
 import scipy.sparse as ss
 
@@ -8,13 +10,16 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
     two_electron_integral_transform,
 )
-from slowquant.unitary_coupled_cluster.base import PauliOperator, a_op
-from slowquant.unitary_coupled_cluster.base_matrix import convert_pauli_to_hybrid_form
+from slowquant.unitary_coupled_cluster.base import PauliOperator, StateVector, a_op
+from slowquant.unitary_coupled_cluster.base_matrix import (
+    PauliOperatorHybridForm,
+    convert_pauli_to_hybrid_form,
+)
 
 
 def pauli_mul(pauli1: str, pauli2: str) -> tuple[str, complex]:
     new_pauli = ""
-    fac = 1
+    fac: complex = 1
     if pauli1 == "I":
         new_pauli = pauli2
     elif pauli2 == "I":
@@ -43,7 +48,7 @@ def pauli_mul(pauli1: str, pauli2: str) -> tuple[str, complex]:
 
 
 def paulistring_mul(paulis: Sequence[str]) -> tuple[str, complex]:
-    fac = 1
+    fac: complex = 1
     current_pauli = paulis[0]
     for pauli in paulis[1:]:
         new_pauli, new_fac = pauli_mul(current_pauli, pauli)
@@ -92,7 +97,7 @@ def operatormul_contract(A: PauliOperatorHybridForm, B: PauliOperatorHybridForm)
         for _, op2 in B.operators.items():
             new_inactive = ""
             new_virtual = ""
-            fac = 1
+            fac: complex = 1
             do_continue = False
             for pauli1, pauli2 in zip(op1.inactive_pauli, op2.inactive_pauli):
                 new_pauli, new_fac = paulistring_mul((pauli1, pauli2))
@@ -136,7 +141,7 @@ def operatormul3_contract(
             for _, op3 in C.operators.items():
                 new_inactive = ""
                 new_virtual = ""
-                fac = 1
+                fac: complex = 1
                 do_continue = False
                 for pauli1, pauli2, pauli3 in zip(op1.inactive_pauli, op2.inactive_pauli, op3.inactive_pauli):
                     new_pauli, new_fac = paulistring_mul((pauli1, pauli2, pauli3))
@@ -186,7 +191,7 @@ def operatormul4_contract(
                 for _, op4 in D.operators.items():
                     new_inactive = ""
                     new_virtual = ""
-                    fac = 1
+                    fac: complex = 1
                     do_continue = False
                     for pauli1, pauli2, pauli3, pauli4 in zip(
                         op1.inactive_pauli, op2.inactive_pauli, op3.inactive_pauli, op4.inactive_pauli
@@ -247,4 +252,4 @@ def expectation_value_contracted(
             bra.bra_active_csr, lw.matmul(contracted_op.operators, ket.ket_active_csr)
         ).real.toarray()[0, 0]
     else:
-        raise TypeError(f"Unknown type: {type(op1.active_matrix)}")
+        raise TypeError(f"Unknown type: {type(contracted_op.operators)}")

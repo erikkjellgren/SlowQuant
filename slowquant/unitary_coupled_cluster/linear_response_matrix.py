@@ -11,11 +11,6 @@ from slowquant.unitary_coupled_cluster.base import (
     Epq,
     Hamiltonian,
     Hamiltonian_energy_only,
-    PauliOperator,
-    StateVector,
-    a_op,
-    commutator,
-    expectation_value,
 )
 from slowquant.unitary_coupled_cluster.base_contracted import (
     commutator_contract,
@@ -49,8 +44,8 @@ class LinearResponseUCCMatrix:
             deshift=self.wf.num_inactive_spin_orbs,
         )
 
-        self.G_ops: list[list[set, set, PauliOperatorHybridForm]] = []
-        self.q_ops: list[list[set, set, PauliOperatorHybridForm]] = []
+        self.G_ops = []
+        self.q_ops = []
         num_spin_orbs = self.wf.num_spin_orbs
         num_elec = self.wf.num_elec
         excitations = excitations.lower()
@@ -62,9 +57,9 @@ class LinearResponseUCCMatrix:
             "sdtq",  # self.wf._excitations,
         )
         if "s" in excitations:
-            for _, a, i, op in self.theta_picker.get_T1_generator_SA(num_spin_orbs, num_elec):
+            for _, a, i, op_ in self.theta_picker.get_T1_generator_SA(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
-                    op,
+                    op_,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
                     self.wf.num_virtual_spin_orbs,
@@ -74,9 +69,9 @@ class LinearResponseUCCMatrix:
                     op = op.apply_U_from_left(U)
                 self.G_ops.append([{i}, {a}, op])
         if "d" in excitations:
-            for _, a, i, b, j, op in self.theta_picker.get_T2_generator_SA(num_spin_orbs, num_elec):
+            for _, a, i, b, j, op_ in self.theta_picker.get_T2_generator_SA(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
-                    op,
+                    op_,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
                     self.wf.num_virtual_spin_orbs,
@@ -86,9 +81,9 @@ class LinearResponseUCCMatrix:
                     op = op.apply_U_from_left(U)
                 self.G_ops.append([{i, j}, {a, b}, op])
         if "t" in excitations:
-            for _, _, _, _, _, _, _, op in self.theta_picker.get_T3_generator(num_spin_orbs, num_elec):
+            for _, _, _, _, _, _, _, op_ in self.theta_picker.get_T3_generator(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
-                    op,
+                    op_,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
                     self.wf.num_virtual_spin_orbs,
@@ -98,9 +93,9 @@ class LinearResponseUCCMatrix:
                     op = op.apply_U_from_left(U)
                 self.G_ops.append(op)
         if "q" in excitations:
-            for _, _, _, _, _, _, _, _, _, op in self.theta_picker.get_T4_generator(num_spin_orbs, num_elec):
+            for _, _, _, _, _, _, _, _, _, op_ in self.theta_picker.get_T4_generator(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
-                    op,
+                    op_,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
                     self.wf.num_virtual_spin_orbs,
@@ -110,9 +105,9 @@ class LinearResponseUCCMatrix:
                     op = op.apply_U_from_left(U)
                 self.G_ops.append(op)
         for i, a in self.wf.kappa_idx:
-            op = 2 ** (-1 / 2) * Epq(a, i, self.wf.num_spin_orbs, self.wf.num_elec)
+            op_ = 2 ** (-1 / 2) * Epq(a, i, self.wf.num_spin_orbs, self.wf.num_elec)
             op = convert_pauli_to_hybrid_form(
-                op,
+                op_,
                 self.wf.num_inactive_spin_orbs,
                 self.wf.num_active_spin_orbs,
                 self.wf.num_virtual_spin_orbs,
@@ -470,7 +465,7 @@ class LinearResponseUCCMatrix:
         )
 
     def get_transition_dipole(
-        self, state_number: int, dipole_integrals: Sequence[np.ndarray, np.ndarray, np.ndarray]
+        self, state_number: int, dipole_integrals: Sequence[np.ndarray]
     ) -> tuple[float, float, float]:
         if len(dipole_integrals) != 3:
             raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
@@ -523,9 +518,9 @@ class LinearResponseUCCMatrix:
             self.wf.num_active_spin_orbs,
             self.wf.num_virtual_spin_orbs,
         )
-        transition_dipole_x = 0
-        transition_dipole_y = 0
-        transition_dipole_z = 0
+        transition_dipole_x = 0.0
+        transition_dipole_y = 0.0
+        transition_dipole_z = 0.0
         if mux_op.operators != {}:
             transition_dipole_x = expectation_value_contracted(
                 self.wf.state_vector, commutator_contract(mux_op, transfer_op), self.wf.state_vector
@@ -540,9 +535,7 @@ class LinearResponseUCCMatrix:
             )
         return transition_dipole_x, transition_dipole_y, transition_dipole_z
 
-    def get_oscillator_strength(
-        self, state_number: int, dipole_integrals: Sequence[np.ndarray, np.ndarray, np.ndarray]
-    ) -> float:
+    def get_oscillator_strength(self, state_number: int, dipole_integrals: Sequence[np.ndarray]) -> float:
         transition_dipole_x, transition_dipole_y, transition_dipole_z = self.get_transition_dipole(
             state_number, dipole_integrals
         )

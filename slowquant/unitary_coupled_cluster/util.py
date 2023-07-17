@@ -1,5 +1,4 @@
-import time
-from typing import Generator, Sequence
+from collections.abc import Generator, Sequence
 
 import numpy as np
 import scipy.linalg
@@ -29,21 +28,20 @@ def construct_integral_trans_mat(
 class ThetaPicker:
     def __init__(
         self,
-        active_occ: list[int],
-        active_unocc: list[int],
+        active_occ: Sequence[int],
+        active_unocc: Sequence[int],
         is_spin_conserving: bool = False,
         is_generalized: bool = False,
-        deshift: int = None,
+        deshift: int = 0,
     ) -> None:
-        self.active_occ = active_occ.copy()
-        self.active_unocc = active_unocc.copy()
+        self.active_occ = []
+        self.active_unocc = []
         self.is_spin_conserving = is_spin_conserving
         self.is_generalized = is_generalized
-        if deshift is not None:
-            for i in range(len(self.active_occ)):
-                self.active_occ[i] += deshift
-            for i in range(len(self.active_unocc)):
-                self.active_unocc[i] += deshift
+        for idx in active_occ:
+            self.active_occ.append(idx + deshift)
+        for idx in active_unocc:
+            self.active_unocc.append(idx + deshift)
 
     def get_T1_generator(
         self, num_spin_orbs: int, num_elec: int
@@ -584,7 +582,6 @@ def construct_UCC_U(
     else:
         t = np.zeros((2**num_spin_orbs, 2**num_spin_orbs))
     counter = 0
-    start = time.time()
     if "s" in excitations:
         for _, a, i, operator in theta_picker.get_T1_generator_SA_matrix(
             num_spin_orbs, num_elec, use_csr=use_csr

@@ -247,7 +247,6 @@ def test_H2_STO3G_UCCSD_LR() -> None:
     SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    num_bf = SQobj.molecule.number_bf
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
@@ -290,7 +289,6 @@ def test_H4_STO3G_UCCDQ() -> None:
     A.set_basis_set("sto-3g")
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
-    num_bf = A.molecule.number_bf
     h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
     g_eri = A.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
@@ -317,7 +315,6 @@ def test_H2_631G_HF_LR() -> None:
     SQobj.set_basis_set("6-31G")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    num_bf = SQobj.molecule.number_bf
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(

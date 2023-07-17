@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import functools
 import itertools
+from collections.abc import Sequence
 
 import numpy as np
 import scipy.sparse as ss
@@ -71,8 +72,8 @@ def a_op(
     operators = {}
     op1 = ""
     op2 = ""
-    fac1 = 1
-    fac2 = 1
+    fac1: complex = 1
+    fac2: complex = 1
     for i in range(number_spin_orbitals):
         if i == idx:
             if dagger:
@@ -126,7 +127,7 @@ def kronecker_product_cached(
         return np.kron(I1, np.kron(mat, I2))
 
 
-def kronecker_product(A: list[np.ndarray]) -> np.ndarray:
+def kronecker_product(A: Sequence[np.ndarray]) -> np.ndarray:
     r"""Get Kronecker product of a list of matricies
     Does:
 
@@ -275,17 +276,17 @@ def expectation_value(
     pauliop: PauliOperator,
     ket: StateVector,
     use_csr: int = 10,
-    active_cache: dict[str, float] = None,
-) -> tuple[float, dict[str, float]] | float:
+    active_cache: dict[str, float] | None = None,
+) -> float:
     if len(bra.inactive) != len(ket.inactive):
         raise ValueError("Bra and Ket does not have same number of inactive orbitals")
     if len(bra._active) != len(ket._active):
         raise ValueError("Bra and Ket does not have same number of active orbitals")
-    total = 0
+    total = 0.0
     for op, fac in pauliop.operators.items():
         if abs(fac) < 10**-12:
             continue
-        tmp = 1
+        tmp = 1.0
         for i in range(len(bra.bra_inactive)):
             tmp *= np.matmul(bra.bra_inactive[i], np.matmul(pauli_to_mat(op[i]), ket.ket_inactive[:, i]))
         for i in range(len(bra.bra_virtual)):
@@ -296,7 +297,7 @@ def expectation_value(
         number_active_orbitals = len(bra._active_onvector)
         active_start = len(bra.bra_inactive)
         active_end = active_start + number_active_orbitals
-        tmp_active = 1
+        tmp_active = 1.0
         active_pauli_string = op[active_start:active_end]
         if number_active_orbitals != 0:
             do_calculation = True
@@ -340,7 +341,7 @@ def expectation_value(
 
 
 class PauliOperator:
-    def __init__(self, operator: dict[str, float]) -> None:
+    def __init__(self, operator: dict[str, complex]) -> None:
         self.operators = operator
         self.screen_zero = True
 
@@ -369,11 +370,11 @@ class PauliOperator:
         return PauliOperator(new_operators)
 
     def __mul__(self, pauliop: PauliOperator) -> PauliOperator:
-        new_operators = {}
+        new_operators: dict[str, complex] = {}
         for op1, val1 in self.operators.items():
             for op2, val2 in pauliop.operators.items():
                 new_op = ""
-                fac = val1 * val2
+                fac: complex = val1 * val2
                 for pauli1, pauli2 in zip(op1, op2):
                     if pauli1 == "I":
                         new_op += pauli2
@@ -444,7 +445,6 @@ class PauliOperator:
             else:
                 tmp = np.identity(2**num_spin_orbs, dtype=complex)
             for pauli_mat_idx, pauli_mat_symbol in enumerate(op):
-                pauli_mat = pauli_to_mat(pauli_mat_symbol)
                 prior = pauli_mat_idx
                 after = num_spin_orbs - pauli_mat_idx - 1
                 if pauli_mat_symbol == "I":

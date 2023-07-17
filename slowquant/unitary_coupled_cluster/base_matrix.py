@@ -52,7 +52,7 @@ def expectation_value_hybrid(
 def convert_pauli_to_hybrid_form(
     pauliop: PauliOperator, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int
 ) -> PauliOperatorHybridForm:
-    new_operator = {}
+    new_operator: dict[str, np.ndarray] = {}
     active_start = num_inactive_orbs
     active_end = num_inactive_orbs + num_active_orbs
     for pauli_string, factor in pauliop.operators.items():
@@ -106,12 +106,12 @@ class PauliOperatorHybridForm:
         return PauliOperatorHybridForm(new_operators)
 
     def __mul__(self, pauliop: PauliOperatorHybridForm) -> PauliOperatorHybridForm:
-        new_operators = {}
+        new_operators: dict[str, np.ndarray] = {}
         for _, op1 in self.operators.items():
             for _, op2 in pauliop.operators.items():
                 new_inactive = ""
                 new_virtual = ""
-                fac = 1
+                fac: complex = 1
                 for pauli1, pauli2 in zip(op1.inactive_pauli, op2.inactive_pauli):
                     if pauli1 == "I":
                         new_inactive += pauli2
