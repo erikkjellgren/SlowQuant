@@ -139,17 +139,17 @@ def iterate_T1_SA(
     num_elec: int,
 ) -> tuple[int]:
     theta_idx = -1
-    for a_ in active_occ:
-        if a_ % 2 == 1:
+    for i_ in active_occ:
+        if i_ % 2 == 1:
             continue
-        a = a_ // 2
-        for i_ in active_unocc:
-            if i_ % 2 == 1:
+        i = i_ // 2
+        for a_ in active_unocc:
+            if a_ % 2 == 1:
                 continue
-            i = i_ // 2
+            a = a_ // 2
             theta_idx += 1
             operator = 2 ** (-1 / 2) * Epq(a, i, num_spin_orbs, num_elec)
-            yield theta_idx, a, i, operator
+            yield theta_idx, i, a, operator
 
 
 def iterate_T1_SA_matrix(
@@ -160,14 +160,14 @@ def iterate_T1_SA_matrix(
     use_csr: int,
 ) -> tuple[int]:
     theta_idx = -1
-    for a_ in active_occ:
-        if a_ % 2 == 1:
+    for i_ in active_occ:
+        if i_ % 2 == 1:
             continue
-        a = a_ // 2
-        for i_ in active_unocc:
-            if i_ % 2 == 1:
+        i = i_ // 2
+        for a_ in active_unocc:
+            if a_ % 2 == 1:
                 continue
-            i = i_ // 2
+            a = a_ // 2
             theta_idx += 1
             operator = 2 ** (-1 / 2) * Epq_matrix(a, i, num_spin_orbs, num_elec, use_csr=use_csr)
             yield theta_idx, a, i, operator
@@ -180,26 +180,26 @@ def iterate_T2_SA(
     num_elec: int,
 ) -> tuple[int]:
     theta_idx = -1
-    for a_ in active_occ:
-        if a_ % 2 == 1:
+    for i_ in active_occ:
+        if i_ % 2 == 1:
             continue
-        a = a_ // 2
-        for b_ in active_occ:
-            if a_ > b_:
+        i = i_ // 2
+        for j_ in active_occ:
+            if i_ > j_:
                 continue
-            if b_ % 2 == 1:
+            if j_ % 2 == 1:
                 continue
-            b = b_ // 2
-            for i_ in active_unocc:
-                if i_ % 2 == 1:
+            j = j_ // 2
+            for a_ in active_unocc:
+                if a_ % 2 == 1:
                     continue
-                i = i_ // 2
-                for j_ in active_unocc:
-                    if i_ > j_:
+                a = a_ // 2
+                for b_ in active_unocc:
+                    if a_ > b_:
                         continue
-                    if j_ % 2 == 1:
+                    if b_ % 2 == 1:
                         continue
-                    j = j_ // 2
+                    b = b_ // 2
                     theta_idx += 1
                     fac = 1
                     if a == b:
@@ -238,26 +238,26 @@ def iterate_T2_SA_matrix(
     use_csr: int,
 ) -> tuple[int]:
     theta_idx = -1
-    for a_ in active_occ:
-        if a_ % 2 == 1:
+    for i_ in active_occ:
+        if i_ % 2 == 1:
             continue
-        a = a_ // 2
-        for b_ in active_occ:
-            if a_ > b_:
+        i = i_ // 2
+        for j_ in active_occ:
+            if i_ > j_:
                 continue
-            if b_ % 2 == 1:
+            if j_ % 2 == 1:
                 continue
-            b = b_ // 2
-            for i_ in active_unocc:
-                if i_ % 2 == 1:
+            j = j_ // 2
+            for a_ in active_unocc:
+                if a_ % 2 == 1:
                     continue
-                i = i_ // 2
-                for j_ in active_unocc:
-                    if i_ > j_:
+                a = a_ // 2
+                for b_ in active_unocc:
+                    if a_ > b_:
                         continue
-                    if j_ % 2 == 1:
+                    if b_ % 2 == 1:
                         continue
-                    j = j_ // 2
+                    b = b_ // 2
                     theta_idx += 1
                     fac = 1
                     if a == b:

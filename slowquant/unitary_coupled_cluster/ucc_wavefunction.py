@@ -278,7 +278,6 @@ def energy_UCC(
     orbital_optimized: bool,
     kappa_idx: list[list[int, int]],
 ) -> float:
-    start = time.time()
     kappa = []
     theta1 = []
     theta2 = []
