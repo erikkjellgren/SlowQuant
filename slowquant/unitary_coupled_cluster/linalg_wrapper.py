@@ -6,6 +6,15 @@ import scipy.sparse as ss
 def matmul(
     A: np.ndarray | ss.csr_matrix | ss.csc_matrix, B: np.ndarray | ss.csr_matrix | ss.csc_matrix
 ) -> np.ndarray | ss.csr_matrix | ss.csc_matrix:
+    """Matrix multiplication that is agnostic to dense (numpy) and sparse (scipy) matrices.
+
+    Args:
+        A: Matrix.
+        B: Matrix.
+
+    Returns:
+        Matrix product.
+    """
     if isinstance(A, np.ndarray):
         if not isinstance(B, np.ndarray):
             raise TypeError(f"A and B are not same matrix type.\nA type: {type(A)}\nB type: {type(B)}")
@@ -21,6 +30,14 @@ def matmul(
 
 
 def expm(A: np.ndarray | ss.csr_matrix | ss.csc_matrix) -> np.ndarray | ss.csr_matrix | ss.csc_matrix:
+    """Matrix exponential that is agnostic to dense (numpy) and sparse (scipy) matrices.
+
+    Args:
+        A: Matrix.
+
+    Returns:
+        Matrix exponential of A.
+    """
     if isinstance(A, np.ndarray):
         return scipy.linalg.expm(A)
     elif isinstance(A, ss.csr_matrix):

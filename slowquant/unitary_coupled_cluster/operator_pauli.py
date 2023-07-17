@@ -2,17 +2,16 @@ from __future__ import annotations
 
 import copy
 import functools
-from collections.abc import Sequence
 
 import numpy as np
 import scipy.sparse as ss
 
-import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
     two_electron_integral_transform,
 )
 from slowquant.unitary_coupled_cluster.base import (
+    StateVector,
     kronecker_product_cached,
     pauli_to_mat,
 )
@@ -72,7 +71,7 @@ def expectation_value(
         raise ValueError("Bra and Ket does not have same number of inactive orbitals")
     if len(bra._active) != len(ket._active):
         raise ValueError("Bra and Ket does not have same number of active orbitals")
-    total = 0.0
+    total: complex = 0.0
     for op, fac in pauliop.operators.items():
         if abs(fac) < 10**-12:
             continue
@@ -101,7 +100,6 @@ def expectation_value(
                 else:
                     operator = copy.deepcopy(ket.ket_active)
                 for pauli_mat_idx, pauli_mat_symbol in enumerate(active_pauli_string):
-                    pauli_mat = pauli_to_mat(pauli_mat_symbol)
                     prior = pauli_mat_idx
                     after = number_active_orbitals - pauli_mat_idx - 1
                     if pauli_mat_symbol == "I":

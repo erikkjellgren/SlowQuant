@@ -6,19 +6,20 @@ import numpy as np
 import scipy.sparse as ss
 
 import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
-from slowquant.molecularintegrals.integralfunctions import (
-    one_electron_integral_transform,
-    two_electron_integral_transform,
-)
-from slowquant.unitary_coupled_cluster.operator_hybrid import (
-    PauliOperatorHybridForm,
-    convert_pauli_to_hybrid_form,
-)
-from slowquant.unitary_coupled_cluster.operator_pauli import PauliOperator
-from slowquant.unitary_coupled_cluster.util import StateVector
+from slowquant.unitary_coupled_cluster.base import StateVector
+from slowquant.unitary_coupled_cluster.operator_hybrid import PauliOperatorHybridForm
 
 
 def pauli_mul(pauli1: str, pauli2: str) -> tuple[str, complex]:
+    """Multiplication of Pauli operators.
+
+    Args:
+        pauli1: Pauli operator.
+        pauli2: Pauli operator.
+
+    Returns:
+        New Pauli operator and factor.
+    """
     new_pauli = ""
     fac: complex = 1
     if pauli1 == "I":
@@ -49,6 +50,14 @@ def pauli_mul(pauli1: str, pauli2: str) -> tuple[str, complex]:
 
 
 def paulistring_mul(paulis: Sequence[str]) -> tuple[str, complex]:
+    """Multiplication of all Pauli operators in Pauli-string.
+
+    Args:
+        Paulis: Pauli-string.
+
+    Returns:
+        New Pauli operator and factor.
+    """
     fac: complex = 1
     current_pauli = paulis[0]
     for pauli in paulis[1:]:
@@ -58,34 +67,89 @@ def paulistring_mul(paulis: Sequence[str]) -> tuple[str, complex]:
     return current_pauli, fac
 
 
-class PauliOperatorContracted:
+class OperatorContracted:
     def __init__(self, operator: np.ndarray | ss.csr_matrix) -> None:
+        """Initialize active-space contracted operator.
+
+        Args:
+            operator: Operator in matrix form.
+        """
         self.operators = operator
 
-    def __add__(self, hybridop: PauliOperatorContracted) -> PauliOperatorContracted:
-        return PauliOperatorContracted(self.operators + hybridop.operators)
+    def __add__(self, contracted_op: OperatorContracted) -> OperatorContracted:
+        """Overload addition operator.
 
-    def __sub__(self, hybridop: PauliOperatorContracted) -> PauliOperatorContracted:
-        return PauliOperatorContracted(self.operators - hybridop.operators)
+        Args:
+            contracted_op: Contracted operator.
 
-    def __mul__(self, pauliop: PauliOperatorContracted) -> None:
-        raise ArithmeticError("Cannot mulitply operators with inactive and virtual orbitals contracted")
+        Returns:
+            New contracted operator.
+        """
+        return OperatorContracted(self.operators + contracted_op.operators)
 
-    def __rmul__(self, number: float) -> PauliOperatorContracted:
-        return PauliOperatorContracted(number * self.operators)
+    def __sub__(self, contracted_op: OperatorContracted) -> OperatorContracted:
+        """Overload subtraction operator.
+
+        Args:
+            contracted_op: Contracted operator.
+
+        Returns:
+            New contracted operator.
+        """
+        return OperatorContracted(self.operators - contracted_op.operators)
+
+    def __mul__(self, pauliop: OperatorContracted) -> None:
+        """Overload multiplication operator.
+
+        Args:
+            contracted_op: Contracted operator.
+        """
+        raise ArithmeticError("Cannot mulitply operators with inactive and virtual orbitals contracted.")
+
+    def __rmul__(self, number: float) -> OperatorContracted:
+        """Overload right multiplication operator.
+
+        Args:
+            number: Scalar value.
+
+        Returns:
+            New contracted operator.
+        """
+        return OperatorContracted(number * self.operators)
 
     @property
-    def dagger(self) -> PauliOperatorContracted:
-        return PauliOperatorContracted(self.operators.conj().transpose())
+    def dagger(self) -> OperatorContracted:
+        """Complex conjugate of operator.
 
-    def apply_U_from_right(self, U: np.ndarray | ss.csr_matrix) -> PauliOperatorContracted:
-        return PauliOperatorContracted(lw.matmul(self.operators, U))
+        Returns:
+            Return complex conjugated operator.
+        """
+        return OperatorContracted(self.operators.conj().transpose())
 
-    def apply_U_from_left(self, U: np.ndarray | ss.csr_matrix) -> PauliOperatorContracted:
-        return PauliOperatorContracted(lw.matmul(U, self.operators))
+    def apply_U_from_right(self, U: np.ndarray | ss.csr_matrix) -> OperatorContracted:
+        """Multiply with transformation matrix from the right side.
+
+        Args:
+            U: Transformation matrix.
+
+        Returns:
+            Transformed operator.
+        """
+        return OperatorContracted(lw.matmul(self.operators, U))
+
+    def apply_U_from_left(self, U: np.ndarray | ss.csr_matrix) -> OperatorContracted:
+        """Multiply with transformation matrix from the left side.
+
+        Args:
+            U: Transformation matrix.
+
+        Returns:
+            Transformed operator.
+        """
+        return OperatorContracted(lw.matmul(U, self.operators))
 
 
-def operatormul_contract(A: PauliOperatorHybridForm, B: PauliOperatorHybridForm) -> PauliOperatorContracted:
+def operatormul_contract(A: PauliOperatorHybridForm, B: PauliOperatorHybridForm) -> OperatorContracted:
     for _, op1 in A.operators.items():
         if isinstance(op1.active_matrix, np.ndarray):
             new_operators = np.zeros_like(op1.active_matrix)
@@ -123,12 +187,12 @@ def operatormul_contract(A: PauliOperatorHybridForm, B: PauliOperatorHybridForm)
             fac *= (-1) ** (new_inactive.count("Z"))
             new_active = fac * lw.matmul(op1.active_matrix, op2.active_matrix)
             new_operators += new_active
-    return PauliOperatorContracted(new_operators)
+    return OperatorContracted(new_operators)
 
 
 def operatormul3_contract(
     A: PauliOperatorHybridForm, B: PauliOperatorHybridForm, C: PauliOperatorHybridForm
-) -> PauliOperatorContracted:
+) -> OperatorContracted:
     for _, op1 in A.operators.items():
         if isinstance(op1.active_matrix, np.ndarray):
             new_operators = np.zeros_like(op1.active_matrix)
@@ -169,7 +233,7 @@ def operatormul3_contract(
                     op1.active_matrix, lw.matmul(op2.active_matrix, op3.active_matrix)
                 )
                 new_operators += new_active
-    return PauliOperatorContracted(new_operators)
+    return OperatorContracted(new_operators)
 
 
 def operatormul4_contract(
@@ -177,7 +241,7 @@ def operatormul4_contract(
     B: PauliOperatorHybridForm,
     C: PauliOperatorHybridForm,
     D: PauliOperatorHybridForm,
-) -> PauliOperatorContracted:
+) -> OperatorContracted:
     for _, op1 in A.operators.items():
         if isinstance(op1.active_matrix, np.ndarray):
             new_operators = np.zeros_like(op1.active_matrix)
@@ -224,12 +288,12 @@ def operatormul4_contract(
                         lw.matmul(op2.active_matrix, lw.matmul(op3.active_matrix, op4.active_matrix)),
                     )
                     new_operators += new_active
-    return PauliOperatorContracted(new_operators)
+    return OperatorContracted(new_operators)
 
 
 def double_commutator_contract(
     A: PauliOperatorHybridForm, B: PauliOperatorHybridForm, C: PauliOperatorHybridForm
-) -> PauliOperatorContracted:
+) -> OperatorContracted:
     """Double commutator of the form [A, [B, C]] = ABC - ACB - BCA + CBA"""
     return (
         operatormul3_contract(A, B, C)
@@ -239,12 +303,12 @@ def double_commutator_contract(
     )
 
 
-def commutator_contract(A: PauliOperatorHybridForm, B: PauliOperatorHybridForm) -> PauliOperatorContracted:
+def commutator_contract(A: PauliOperatorHybridForm, B: PauliOperatorHybridForm) -> OperatorContracted:
     return operatormul_contract(A, B) - operatormul_contract(B, A)
 
 
 def expectation_value_contracted(
-    bra: StateVector, contracted_op: PauliOperatorContracted, ket: StateVector
+    bra: StateVector, contracted_op: OperatorContracted, ket: StateVector
 ) -> float:
     if isinstance(contracted_op.operators, np.ndarray):
         return lw.matmul(bra.bra_active, lw.matmul(contracted_op.operators, ket.ket_active)).real

@@ -6,12 +6,12 @@ import numpy as np
 import scipy
 import scipy.optimize
 
+from slowquant.unitary_coupled_cluster.base import StateVector
 from slowquant.unitary_coupled_cluster.operator_pauli import (
     Hamiltonian_energy_only,
     expectation_value,
 )
 from slowquant.unitary_coupled_cluster.util import (
-    StateVector,
     ThetaPicker,
     construct_integral_trans_mat,
     construct_UCC_U,

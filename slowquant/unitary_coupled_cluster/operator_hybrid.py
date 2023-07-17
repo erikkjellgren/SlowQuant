@@ -6,9 +6,8 @@ import numpy as np
 import scipy.sparse as ss
 
 import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
-from slowquant.unitary_coupled_cluster.base import pauli_to_mat
+from slowquant.unitary_coupled_cluster.base import StateVector, pauli_to_mat
 from slowquant.unitary_coupled_cluster.operator_pauli import PauliOperator
-from slowquant.unitary_coupled_cluster.util import StateVector
 
 
 def expectation_value_hybrid(

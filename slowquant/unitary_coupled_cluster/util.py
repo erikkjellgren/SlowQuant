@@ -1,4 +1,3 @@
-import itertools
 from collections.abc import Generator, Sequence
 
 import numpy as np
@@ -6,7 +5,6 @@ import scipy.linalg
 import scipy.sparse as ss
 
 import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
-from slowquant.unitary_coupled_cluster.base import kronecker_product, pauli_to_mat
 from slowquant.unitary_coupled_cluster.operator_matrix import (
     Epq_matrix,
     a_op_spin_matrix,
@@ -18,112 +16,19 @@ from slowquant.unitary_coupled_cluster.operator_pauli import (
 )
 
 
-class StateVector:
-    """State vector."""
-
-    def __init__(
-        self, inactive: list[np.ndarray], active: list[np.ndarray], virtual: list[np.ndarray]
-    ) -> None:
-        """Initialize state vector.
-
-        Args:
-            inactive: Kronecker representation of inactive orbitals (reference).
-            active: Kronecker representation of active orbitals (reference).
-            virtual: Kronecker representation of virtual orbitals (reference).
-        """
-        self.inactive = np.transpose(inactive)
-        self._active_onvector = active
-        self._active = np.transpose(kronecker_product(active))
-        self.active = np.transpose(kronecker_product(active)) * 1.0
-        self.active_csr = ss.csr_matrix(self.active)
-        self.virtual = np.transpose(virtual)
-        o = np.array([0, 1])
-        z = np.array([1, 0])
-        num_active_elec = 0
-        num_active_alpha_elec = 0
-        num_active_beta_elec = 0
-        num_active_spin_orbs = len(self._active_onvector)
-        if num_active_spin_orbs != 0:
-            for idx, vec in enumerate(self._active_onvector):
-                if vec[0] == 0 and vec[1] == 1:
-                    num_active_elec += 1
-                    if idx % 2 == 0:
-                        num_active_alpha_elec += 1
-                    else:
-                        num_active_beta_elec += 1
-            self.allowed_active_states_number_conserving = np.zeros(len(self._active), dtype=bool)
-            self.allowed_active_states_number_spin_conserving = np.zeros(len(self._active), dtype=bool)
-            for comb in itertools.product([o, z], repeat=num_active_spin_orbs):
-                num_elec = 0
-                num_alpha_elec = 0
-                num_beta_elec = 0
-                for idx, vec in enumerate(comb):
-                    if vec[0] == 0 and vec[1] == 1:
-                        num_elec += 1
-                        if idx % 2 == 0:
-                            num_alpha_elec += 1
-                        else:
-                            num_beta_elec += 1
-                if num_elec == num_active_elec:
-                    idx = np.argmax(kronecker_product(comb))
-                    self.allowed_active_states_number_conserving[idx] = True
-                    if num_alpha_elec == num_active_alpha_elec and num_beta_elec == num_active_beta_elec:
-                        self.allowed_active_states_number_spin_conserving[idx] = True
-
-    @property
-    def bra_inactive(self) -> list[np.ndarray]:
-        return np.conj(self.inactive).transpose()
-
-    @property
-    def ket_inactive(self) -> list[np.ndarray]:
-        return self.inactive
-
-    @property
-    def bra_virtual(self) -> list[np.ndarray]:
-        return np.conj(self.virtual).transpose()
-
-    @property
-    def ket_virtual(self) -> list[np.ndarray]:
-        return self.virtual
-
-    @property
-    def bra_active(self) -> np.ndarray:
-        return np.conj(self.active).transpose()
-
-    @property
-    def ket_active(self) -> np.ndarray:
-        return self.active
-
-    @property
-    def bra_active_csr(self) -> ss.csr_matrix:
-        return self.active_csr
-
-    @property
-    def ket_active_csr(self) -> ss.csr_matrix:
-        return self.active_csr.conj().transpose()
-
-    def new_U(self, U: np.ndarray, allowed_states: np.ndarray = None) -> None:
-        if allowed_states is None:
-            self.active = np.matmul(U, self._active)
-            self.active_csr = ss.csr_matrix(self.active)
-            self.U_ = U
-        else:
-            self.U_allowed_ = U
-            if isinstance(U, np.ndarray):
-                tmp_active = np.matmul(U, self._active[allowed_states])
-            else:
-                tmp_active = U.dot(ss.csr_matrix(self._active[allowed_states]).transpose()).toarray()
-            idx = 0
-            for i, allowed in enumerate(allowed_states):
-                if allowed:
-                    self.active[i] = tmp_active[idx]
-                    idx += 1
-            self.active_csr = ss.csr_matrix(self.active)
-
-
 def construct_integral_trans_mat(
     c_orthonormal: np.ndarray, kappa: Sequence[float], kappa_idx: Sequence[Sequence[int]]
 ) -> np.ndarray:
+    """Contruct orbital transformation matrix.
+
+    Args:
+        c_orthonormal: Initial orbital coefficients.
+        kappa: Orbital rotation parameters.
+        kappa_idx: Non-redundant orbital rotation parameters indices.
+
+    Returns:
+        Orbital transformation matrix.
+    """
     kappa_mat = np.zeros_like(c_orthonormal)
     for kappa_val, (p, q) in zip(kappa, kappa_idx):
         kappa_mat[p, q] = kappa_val

@@ -15,7 +15,6 @@ from slowquant.unitary_coupled_cluster.operator_contracted import (
     operatormul_contract,
 )
 from slowquant.unitary_coupled_cluster.operator_hybrid import (
-    PauliOperatorHybridForm,
     convert_pauli_to_hybrid_form,
     expectation_value_hybrid,
 )
