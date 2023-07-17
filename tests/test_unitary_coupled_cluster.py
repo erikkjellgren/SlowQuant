@@ -1,9 +1,9 @@
 import numpy as np
 
 import slowquant.SlowQuant as sq
-from slowquant.unitary_coupled_cluster.base import Hamiltonian, expectation_value
-from slowquant.unitary_coupled_cluster.linear_response_matrix import (
-    LinearResponseUCCMatrix,
+from slowquant.unitary_coupled_cluster.operator_pauli import Hamiltonian, expectation_value
+from slowquant.unitary_coupled_cluster.linear_response import (
+    LinearResponseUCC,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
@@ -263,7 +263,7 @@ def test_H2_STO3G_UCCSD_LR() -> None:
         SQobj.integral.get_multipole_matrix([0, 0, 1]),
     )
     WF.run_UCC("SD", False)
-    LR = LinearResponseUCCMatrix(WF, excitations="SD")
+    LR = LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 1.0157) < 10**-3
     assert abs(LR.excitation_energies[1] - 1.7195) < 10**-3
@@ -326,7 +326,7 @@ def test_H2_631G_HF_LR() -> None:
         g_eri,
     )
     WF.run_UCC("SD", True)
-    LR = LinearResponseUCCMatrix(WF, excitations="SD")
+    LR = LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
     dipole_integrals = (
         SQobj.integral.get_multipole_matrix([1, 0, 0]),
@@ -363,7 +363,7 @@ def test_H2_631G_OOUCCSD_LR() -> None:
         g_eri,
     )
     WF.run_UCC("SD", True)
-    LR = LinearResponseUCCMatrix(WF, excitations="SD")
+    LR = LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
     dipole_integrals = (
         SQobj.integral.get_multipole_matrix([1, 0, 0]),
@@ -408,7 +408,7 @@ def test_H4_STO3G_UCCSD_LR_naive() -> None:
         g_eri,
     )
     WF.run_UCC("SD", False)
-    LR = LinearResponseUCCMatrix(WF, excitations="SD", do_selfconsistent_operators=False)
+    LR = LinearResponseUCC(WF, excitations="SD", do_selfconsistent_operators=False)
     LR.calc_excitation_energies()
     dipole_integrals = (
         SQobj.integral.get_multipole_matrix([1, 0, 0]),
@@ -443,7 +443,7 @@ def test_H4_STO3G_UCCSD_LR_naive() -> None:
     assert abs(LR.get_oscillator_strength(11, dipole_integrals) - 0.0) < 10**-5
     assert abs(LR.get_oscillator_strength(12, dipole_integrals) - 0.000019) < 10**-5
     assert abs(LR.get_oscillator_strength(13, dipole_integrals) - 0.0) < 10**-5
-    LR = LinearResponseUCCMatrix(WF, excitations="SD")
+    LR = LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.162960) < 10**-5
     assert abs(LR.excitation_energies[1] - 0.385979) < 10**-5
@@ -496,7 +496,7 @@ def test_Be_STO3G_UCCSD_LR_naive() -> None:
         g_eri,
     )
     WF.run_UCC("SD", True)
-    LR = LinearResponseUCCMatrix(WF, excitations="SD")
+    LR = LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
     dipole_integrals = (
         SQobj.integral.get_multipole_matrix([1, 0, 0]),
@@ -523,7 +523,7 @@ def test_Be_STO3G_UCCSD_LR_naive() -> None:
     assert abs(LR.get_oscillator_strength(7, dipole_integrals) - 0.137059) < 10**-5
     assert abs(LR.get_oscillator_strength(8, dipole_integrals) - 0.127297) < 10**-5
     assert abs(LR.get_oscillator_strength(9, dipole_integrals) - 0.0) < 10**-5
-    LR = LinearResponseUCCMatrix(WF, excitations="SD", do_selfconsistent_operators=False)
+    LR = LinearResponseUCC(WF, excitations="SD", do_selfconsistent_operators=False)
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.000000) < 10**-5
     assert abs(LR.excitation_energies[1] - 0.000000) < 10**-5

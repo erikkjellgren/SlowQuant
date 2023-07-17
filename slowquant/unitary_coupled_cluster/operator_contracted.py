@@ -10,11 +10,12 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
     two_electron_integral_transform,
 )
-from slowquant.unitary_coupled_cluster.base import PauliOperator, StateVector, a_op
-from slowquant.unitary_coupled_cluster.base_matrix import (
+from slowquant.unitary_coupled_cluster.operator_hybrid import (
     PauliOperatorHybridForm,
     convert_pauli_to_hybrid_form,
 )
+from slowquant.unitary_coupled_cluster.operator_pauli import PauliOperator
+from slowquant.unitary_coupled_cluster.util import StateVector
 
 
 def pauli_mul(pauli1: str, pauli2: str) -> tuple[str, complex]:

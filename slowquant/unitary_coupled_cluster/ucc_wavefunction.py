@@ -6,12 +6,12 @@ import numpy as np
 import scipy
 import scipy.optimize
 
-from slowquant.unitary_coupled_cluster.base import (
+from slowquant.unitary_coupled_cluster.operator_pauli import (
     Hamiltonian_energy_only,
-    StateVector,
     expectation_value,
 )
 from slowquant.unitary_coupled_cluster.util import (
+    StateVector,
     ThetaPicker,
     construct_integral_trans_mat,
     construct_UCC_U,
@@ -172,7 +172,12 @@ class WaveFunctionUCC:
         iteration = 0
         start = time.time()
 
-        def print_progress(X: list[float]) -> None:
+        def print_progress(X: Sequence[float]) -> None:
+            """Callback for energy minimization of wave function.
+
+            Args:
+                X: Wave function parameters.
+            """
             global iteration
             global start
             time_str = f"{time.time() - start:7.2f}"
@@ -266,6 +271,31 @@ def energy_UCC(
     orbital_optimized: bool,
     kappa_idx: Sequence[Sequence[int]],
 ) -> float:
+    r"""Calculate electronic energy of UCC wave function.
+
+    .. math::
+        E = \left<0\left|\hat{H}\right|0\right>
+
+    Args:
+        parameters: Sequence of all parameters.
+                    Ordered as orbital rotations, active-space singles, active-space doubles, ...
+        num_inactive_spin_orbs: Number of inactive spin orbitals.
+        num_active_spin_orbs: Number of active spin orbitals.
+        num_virtual_spin_orbs: Number of virtual spin orbitals.
+        num_elec: Number of electrons.
+        num_active_elec: Number of electrons in active-space.
+        state_vector: State vector object.
+        c_othonormal: Orbital coefficients.
+        h_core: Core Hamiltonian integrals in AO.
+        g_eri: Two-electron integrals in AO.
+        theta_picker: Cluster operator generator object.
+        excitations: Excitation orders to consider.
+        orbital_optimized: Do orbital optimization.
+        kappa_idx: Indicies of non-redundant orbital rotations.
+
+    Returns:
+        Electronic energy.
+    """
     kappa = []
     theta1 = []
     theta2 = []
@@ -313,7 +343,7 @@ def energy_UCC(
         allowed_states=state_vector.allowed_active_states_number_spin_conserving,
     )
     state_vector.new_U(U, allowed_states=state_vector.allowed_active_states_number_spin_conserving)
-    A = expectation_value(
+    return expectation_value(
         state_vector,
         Hamiltonian_energy_only(
             h_core,
@@ -326,4 +356,3 @@ def energy_UCC(
         ),
         state_vector,
     )
-    return A

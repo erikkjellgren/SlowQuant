@@ -7,28 +7,28 @@ import scipy
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
-from slowquant.unitary_coupled_cluster.base import (
-    Epq,
-    Hamiltonian,
-    Hamiltonian_energy_only,
-)
-from slowquant.unitary_coupled_cluster.base_contracted import (
+from slowquant.unitary_coupled_cluster.operator_contracted import (
     commutator_contract,
     double_commutator_contract,
     expectation_value_contracted,
     operatormul3_contract,
     operatormul_contract,
 )
-from slowquant.unitary_coupled_cluster.base_matrix import (
+from slowquant.unitary_coupled_cluster.operator_hybrid import (
     PauliOperatorHybridForm,
     convert_pauli_to_hybrid_form,
     expectation_value_hybrid,
+)
+from slowquant.unitary_coupled_cluster.operator_pauli import (
+    Epq,
+    Hamiltonian,
+    Hamiltonian_energy_only,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_UCC_U
 
 
-class LinearResponseUCCMatrix:
+class LinearResponseUCC:
     def __init__(
         self,
         wave_function: WaveFunctionUCC,
@@ -536,6 +536,18 @@ class LinearResponseUCCMatrix:
         return transition_dipole_x, transition_dipole_y, transition_dipole_z
 
     def get_oscillator_strength(self, state_number: int, dipole_integrals: Sequence[np.ndarray]) -> float:
+        r"""Calculate oscillator strength.
+
+        .. math::
+            f_n = \frac{2}{3}e_n\left|\left<0\left|\hat{\mu}\right|n\left>\right|^2
+
+        Args:
+            state_number: Target excited state (zero being the first excited state).
+            dipole_integrals: Dipole integrals (x,y,z) in AO basis.
+
+        Rerturns:
+            Oscillator Strength.
+        """
         transition_dipole_x, transition_dipole_y, transition_dipole_z = self.get_transition_dipole(
             state_number, dipole_integrals
         )
@@ -548,6 +560,14 @@ class LinearResponseUCCMatrix:
         )
 
     def get_nice_output(self, dipole_integrals: np.ndarray) -> str:
+        """Create table of excitation energies and oscillator strengths.
+
+        Args:
+            dipole_integrals: Dipole integrals (x,y,z) in AO basis.
+
+        Returns:
+            Nicely formatted table.
+        """
         output = (
             "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n"
         )
