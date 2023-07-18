@@ -165,12 +165,11 @@ class LinearResponseUCC:
                         self.wf.state_vector,
                     )
                     # Make V
-                    if i == j:
-                        self.V[i, j] = self.V[j, i] = expectation_value_contracted(
-                            self.wf.state_vector,
-                            operatormul_contract(qI.dagger, qJ),
-                            self.wf.state_vector,
-                        )
+                    self.V[i, j] = self.V[j, i] = expectation_value_contracted(
+                        self.wf.state_vector,
+                        operatormul_contract(qI.dagger, qJ),
+                        self.wf.state_vector,
+                    )
                     # Make W
                 elif calculation_type == "generic":
                     # Make M
@@ -210,7 +209,7 @@ class LinearResponseUCC:
                         self.wf.state_vector, operator, self.wf.state_vector
                     )
                     # Make Q
-                    self.Q[i, j + idx_shift] = expectation_value_contracted(
+                    self.Q[i, j + idx_shift] = -expectation_value_contracted(
                         self.wf.state_vector,
                         operatormul3_contract(qI.dagger, GJ.dagger, H),
                         self.wf.state_vector,
@@ -326,12 +325,7 @@ class LinearResponseUCC:
                 if calculation_type == "selfconsistent":
                     # Make M
                     operator = operatormul3_contract(GI.dagger, H_en, GJ)
-                    # Need to check this is valid for double excitations also
-                    if len(occ_idxs_j) == len(occ_idxs_i) == 1:
-                        if occ_idxs_j == occ_idxs_i and occ_idxs_j == occ_idxs_i:
-                            operator -= operatormul3_contract(GI.dagger, GJ, H_en)
-                    else:
-                        operator -= operatormul3_contract(GI.dagger, GJ, H_en)
+                    operator -= operatormul3_contract(GI.dagger, GJ, H_en)
                     self.M[i + idx_shift, j + idx_shift] = self.M[
                         j + idx_shift, i + idx_shift
                     ] = expectation_value_contracted(self.wf.state_vector, operator, self.wf.state_vector)
