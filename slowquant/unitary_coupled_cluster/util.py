@@ -12,7 +12,7 @@ from slowquant.unitary_coupled_cluster.operator_matrix import (
 from slowquant.unitary_coupled_cluster.operator_pauli import (
     Epq,
     PauliOperator,
-    a_op_spin,
+    a_spin_pauli,
 )
 
 
@@ -339,8 +339,8 @@ def iterate_T1(
                 num_beta += 1
             if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
                 continue
-            operator = PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec))
-            operator *= PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
+            operator = a_spin_pauli(a, True, num_spin_orbs, num_elec)
+            operator *= a_spin_pauli(i, False, num_spin_orbs, num_elec)
             yield theta_idx, a, i, operator
 
 
@@ -391,10 +391,10 @@ def iterate_T2(
                         num_beta += 1
                     if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
                         continue
-                    operator = PauliOperator(a_op_spin(a, True, num_spin_orbs, num_elec))
-                    operator = operator * PauliOperator(a_op_spin(b, True, num_spin_orbs, num_elec))
-                    operator = operator * PauliOperator(a_op_spin(j, False, num_spin_orbs, num_elec))
-                    operator = operator * PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
+                    operator = a_spin_pauli(a, True, num_spin_orbs, num_elec)
+                    operator = operator * a_spin_pauli(b, True, num_spin_orbs, num_elec)
+                    operator = operator * a_spin_pauli(j, False, num_spin_orbs, num_elec)
+                    operator = operator * a_spin_pauli(i, False, num_spin_orbs, num_elec)
                     yield theta_idx, a, i, b, j, operator
 
 
@@ -463,13 +463,13 @@ def iterate_T3(
                                 num_beta += 1
                             if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
                                 continue
-                            operator = PauliOperator(
-                                a_op_spin(a, True, num_spin_orbs, num_elec)
-                            ) * PauliOperator(a_op_spin(b, True, num_spin_orbs, num_elec))
-                            operator = operator * PauliOperator(a_op_spin(c, True, num_spin_orbs, num_elec))
-                            operator = operator * PauliOperator(a_op_spin(k, False, num_spin_orbs, num_elec))
-                            operator = operator * PauliOperator(a_op_spin(j, False, num_spin_orbs, num_elec))
-                            operator = operator * PauliOperator(a_op_spin(i, False, num_spin_orbs, num_elec))
+                            operator = a_spin_pauli(a, True, num_spin_orbs, num_elec) * a_spin_pauli(
+                                b, True, num_spin_orbs, num_elec
+                            )
+                            operator = operator * a_spin_pauli(c, True, num_spin_orbs, num_elec)
+                            operator = operator * a_spin_pauli(k, False, num_spin_orbs, num_elec)
+                            operator = operator * a_spin_pauli(j, False, num_spin_orbs, num_elec)
+                            operator = operator * a_spin_pauli(i, False, num_spin_orbs, num_elec)
                             yield theta_idx, a, i, b, j, c, k, operator
 
 
@@ -556,27 +556,15 @@ def iterate_T4(
                                         num_beta += 1
                                     if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
                                         continue
-                                    operator = PauliOperator(
-                                        a_op_spin(a, True, num_spin_orbs, num_elec)
-                                    ) * PauliOperator(a_op_spin(b, True, num_spin_orbs, num_elec))
-                                    operator = operator * PauliOperator(
-                                        a_op_spin(c, True, num_spin_orbs, num_elec)
+                                    operator = a_spin_pauli(a, True, num_spin_orbs, num_elec) * a_spin_pauli(
+                                        b, True, num_spin_orbs, num_elec
                                     )
-                                    operator = operator * PauliOperator(
-                                        a_op_spin(d, True, num_spin_orbs, num_elec)
-                                    )
-                                    operator = operator * PauliOperator(
-                                        a_op_spin(l, False, num_spin_orbs, num_elec)
-                                    )
-                                    operator = operator * PauliOperator(
-                                        a_op_spin(k, False, num_spin_orbs, num_elec)
-                                    )
-                                    operator = operator * PauliOperator(
-                                        a_op_spin(j, False, num_spin_orbs, num_elec)
-                                    )
-                                    operator = operator * PauliOperator(
-                                        a_op_spin(i, False, num_spin_orbs, num_elec)
-                                    )
+                                    operator = operator * a_spin_pauli(c, True, num_spin_orbs, num_elec)
+                                    operator = operator * a_spin_pauli(d, True, num_spin_orbs, num_elec)
+                                    operator = operator * a_spin_pauli(l, False, num_spin_orbs, num_elec)
+                                    operator = operator * a_spin_pauli(k, False, num_spin_orbs, num_elec)
+                                    operator = operator * a_spin_pauli(j, False, num_spin_orbs, num_elec)
+                                    operator = operator * a_spin_pauli(i, False, num_spin_orbs, num_elec)
                                     yield theta_idx, a, i, b, j, c, k, d, l, operator
 
 
