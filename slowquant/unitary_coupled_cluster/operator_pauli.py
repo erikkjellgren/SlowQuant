@@ -251,7 +251,7 @@ class PauliOperator:
         return matrix_form
 
 
-def Epq(p: int, q: int, num_spin_orbs: int, num_elec: int) -> PauliOperator:
+def Epq_pauli(p: int, q: int, num_spin_orbs: int, num_elec: int) -> PauliOperator:
     E = a_pauli(p, "alpha", True, num_spin_orbs, num_elec) * a_pauli(
         q, "alpha", False, num_spin_orbs, num_elec
     )
@@ -261,7 +261,7 @@ def Epq(p: int, q: int, num_spin_orbs: int, num_elec: int) -> PauliOperator:
     return E
 
 
-def epqrs(p: int, q: int, r: int, s: int, num_spin_orbs: int, num_elec: int) -> PauliOperator:
+def epqrs_pauli(p: int, q: int, r: int, s: int, num_spin_orbs: int, num_elec: int) -> PauliOperator:
     if p == r and q == s:
         operator = 2 * (
             a_pauli(p, "alpha", True, num_spin_orbs, num_elec)
@@ -336,7 +336,7 @@ def epqrs(p: int, q: int, r: int, s: int, num_spin_orbs: int, num_elec: int) -> 
     return operator
 
 
-def Hamiltonian(
+def Hamiltonian_pauli(
     h: np.ndarray, g: np.ndarray, c_mo: np.ndarray, num_spin_orbs: int, num_elec: int
 ) -> PauliOperator:
     h_mo = one_electron_integral_transform(c_mo, h)
@@ -345,22 +345,22 @@ def Hamiltonian(
     for p in range(num_spatial_orbs):
         for q in range(num_spatial_orbs):
             if p == 0 and q == 0:
-                H_expectation = h_mo[p, q] * Epq(p, q, num_spin_orbs, num_elec)
+                H_expectation = h_mo[p, q] * Epq_pauli(p, q, num_spin_orbs, num_elec)
             else:
-                H_expectation += h_mo[p, q] * Epq(p, q, num_spin_orbs, num_elec)
+                H_expectation += h_mo[p, q] * Epq_pauli(p, q, num_spin_orbs, num_elec)
     for p in range(num_spatial_orbs):
         for q in range(num_spatial_orbs):
             for r in range(num_spatial_orbs):
                 for s in range(num_spatial_orbs):
-                    H_expectation += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s, num_spin_orbs, num_elec)
+                    H_expectation += 1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, num_spin_orbs, num_elec)
     return H_expectation
 
 
-def commutator(A: PauliOperator, B: PauliOperator) -> PauliOperator:
+def commutator_pauli(A: PauliOperator, B: PauliOperator) -> PauliOperator:
     return A * B - B * A
 
 
-def Hamiltonian_energy_only(
+def energy_Hamiltonian_pauli(
     h: np.ndarray,
     g: np.ndarray,
     c_mo: np.ndarray,
@@ -377,30 +377,30 @@ def Hamiltonian_energy_only(
     # Inactive one-electron
     for i in range(num_inactive_spatial_orbs):
         if i == 0:
-            H_expectation = h_mo[i, i] * Epq(i, i, num_spin_orbs, num_elec)
+            H_expectation = h_mo[i, i] * Epq_pauli(i, i, num_spin_orbs, num_elec)
         else:
-            H_expectation += h_mo[i, i] * Epq(i, i, num_spin_orbs, num_elec)
+            H_expectation += h_mo[i, i] * Epq_pauli(i, i, num_spin_orbs, num_elec)
     # Active one-electron
     for p in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
         for q in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
             if p == 0 and q == 0 and num_inactive_spatial_orbs == 0:
-                H_expectation = h_mo[p, q] * Epq(p, q, num_spin_orbs, num_elec)
+                H_expectation = h_mo[p, q] * Epq_pauli(p, q, num_spin_orbs, num_elec)
             else:
-                H_expectation += h_mo[p, q] * Epq(p, q, num_spin_orbs, num_elec)
+                H_expectation += h_mo[p, q] * Epq_pauli(p, q, num_spin_orbs, num_elec)
     # Inactive two-electron
     for i in range(num_inactive_spatial_orbs):
         for j in range(num_inactive_spatial_orbs):
-            H_expectation += 1 / 2 * g_mo[i, i, j, j] * epqrs(i, i, j, j, num_spin_orbs, num_elec)
+            H_expectation += 1 / 2 * g_mo[i, i, j, j] * epqrs_pauli(i, i, j, j, num_spin_orbs, num_elec)
             if i != j:
-                H_expectation += 1 / 2 * g_mo[j, i, i, j] * epqrs(j, i, i, j, num_spin_orbs, num_elec)
+                H_expectation += 1 / 2 * g_mo[j, i, i, j] * epqrs_pauli(j, i, i, j, num_spin_orbs, num_elec)
     # Inactive-Active two-electron
     for i in range(num_inactive_spatial_orbs):
         for p in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
             for q in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
-                H_expectation += 1 / 2 * g_mo[i, i, p, q] * epqrs(i, i, p, q, num_spin_orbs, num_elec)
-                H_expectation += 1 / 2 * g_mo[p, q, i, i] * epqrs(p, q, i, i, num_spin_orbs, num_elec)
-                H_expectation += 1 / 2 * g_mo[p, i, i, q] * epqrs(p, i, i, q, num_spin_orbs, num_elec)
-                H_expectation += 1 / 2 * g_mo[i, p, q, i] * epqrs(i, p, q, i, num_spin_orbs, num_elec)
+                H_expectation += 1 / 2 * g_mo[i, i, p, q] * epqrs_pauli(i, i, p, q, num_spin_orbs, num_elec)
+                H_expectation += 1 / 2 * g_mo[p, q, i, i] * epqrs_pauli(p, q, i, i, num_spin_orbs, num_elec)
+                H_expectation += 1 / 2 * g_mo[p, i, i, q] * epqrs_pauli(p, i, i, q, num_spin_orbs, num_elec)
+                H_expectation += 1 / 2 * g_mo[i, p, q, i] * epqrs_pauli(i, p, q, i, num_spin_orbs, num_elec)
     # Active two-electron
     for p in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
         for q in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
@@ -408,5 +408,5 @@ def Hamiltonian_energy_only(
                 for s in range(
                     num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs
                 ):
-                    H_expectation += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s, num_spin_orbs, num_elec)
+                    H_expectation += 1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, num_spin_orbs, num_elec)
     return H_expectation

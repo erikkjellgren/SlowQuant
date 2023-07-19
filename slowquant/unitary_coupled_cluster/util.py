@@ -10,7 +10,7 @@ from slowquant.unitary_coupled_cluster.operator_matrix import (
     a_op_spin_matrix,
 )
 from slowquant.unitary_coupled_cluster.operator_pauli import (
-    Epq,
+    Epq_pauli,
     PauliOperator,
     a_spin_pauli,
 )
@@ -158,7 +158,7 @@ def iterate_T1_SA(
                 continue
             a = a_ // 2
             theta_idx += 1
-            operator = 2 ** (-1 / 2) * Epq(a, i, num_spin_orbs, num_elec)
+            operator = 2 ** (-1 / 2) * Epq_pauli(a, i, num_spin_orbs, num_elec)
             yield theta_idx, i, a, operator
 
 
@@ -221,8 +221,8 @@ def iterate_T2_SA(
                         / 2
                         * (fac) ** (-1 / 2)
                         * (
-                            Epq(a, i, num_spin_orbs, num_elec) * Epq(b, j, num_spin_orbs, num_elec)
-                            + Epq(a, j, num_spin_orbs, num_elec) * Epq(b, i, num_spin_orbs, num_elec)
+                            Epq_pauli(a, i, num_spin_orbs, num_elec) * Epq_pauli(b, j, num_spin_orbs, num_elec)
+                            + Epq_pauli(a, j, num_spin_orbs, num_elec) * Epq_pauli(b, i, num_spin_orbs, num_elec)
                         )
                     )
                     yield theta_idx, a, i, b, j, operator
@@ -233,8 +233,8 @@ def iterate_T2_SA(
                         1
                         / (2 * 3 ** (1 / 2))
                         * (
-                            Epq(a, i, num_spin_orbs, num_elec) * Epq(b, j, num_spin_orbs, num_elec)
-                            - Epq(a, j, num_spin_orbs, num_elec) * Epq(b, i, num_spin_orbs, num_elec)
+                            Epq_pauli(a, i, num_spin_orbs, num_elec) * Epq_pauli(b, j, num_spin_orbs, num_elec)
+                            - Epq_pauli(a, j, num_spin_orbs, num_elec) * Epq_pauli(b, i, num_spin_orbs, num_elec)
                         )
                     )
                     yield theta_idx, a, i, b, j, operator

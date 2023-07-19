@@ -3,7 +3,7 @@ import numpy as np
 import slowquant.SlowQuant as sq
 from slowquant.unitary_coupled_cluster.linear_response import LinearResponseUCC
 from slowquant.unitary_coupled_cluster.operator_pauli import (
-    Hamiltonian,
+    Hamiltonian_pauli,
     expectation_value,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
@@ -202,7 +202,7 @@ def test_H4_STO3G_OOUCCSD() -> None:
     WF.run_UCC("SD", True)
     assert abs(WF.ucc_energy - (-5.211066791547)) < 10**-8
     # Test sparse matrix also works
-    H = Hamiltonian(h_core, g_eri, WF.c_trans, WF.num_spin_orbs, WF.num_elec)
+    H = Hamiltonian_pauli(h_core, g_eri, WF.c_trans, WF.num_spin_orbs, WF.num_elec)
     assert abs(WF.ucc_energy - expectation_value(WF.state_vector, H, WF.state_vector, use_csr=0)) < 10**-8
 
 
@@ -233,7 +233,7 @@ def test_H4_STO3G_OOUCCD() -> None:
     WF.run_UCC("D", True)
     assert abs(WF.ucc_energy - (-5.211066791547)) < 10**-8
     # Test sparse matrix also works
-    H = Hamiltonian(h_core, g_eri, WF.c_trans, WF.num_spin_orbs, WF.num_elec)
+    H = Hamiltonian_pauli(h_core, g_eri, WF.c_trans, WF.num_spin_orbs, WF.num_elec)
     assert abs(WF.ucc_energy - expectation_value(WF.state_vector, H, WF.state_vector, use_csr=0)) < 10**-8
 
 

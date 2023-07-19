@@ -8,7 +8,7 @@ import scipy.optimize
 
 from slowquant.unitary_coupled_cluster.base import StateVector
 from slowquant.unitary_coupled_cluster.operator_pauli import (
-    Hamiltonian_energy_only,
+    energy_Hamiltonian_pauli,
     expectation_value,
 )
 from slowquant.unitary_coupled_cluster.util import (
@@ -345,7 +345,7 @@ def energy_UCC(
     state_vector.new_U(U, allowed_states=state_vector.allowed_active_states_number_spin_conserving)
     return expectation_value(
         state_vector,
-        Hamiltonian_energy_only(
+        energy_Hamiltonian_pauli(
             h_core,
             g_eri,
             c_trans,

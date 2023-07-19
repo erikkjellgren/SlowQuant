@@ -19,9 +19,9 @@ from slowquant.unitary_coupled_cluster.operator_hybrid import (
     expectation_value_hybrid,
 )
 from slowquant.unitary_coupled_cluster.operator_pauli import (
-    Epq,
-    Hamiltonian,
-    Hamiltonian_energy_only,
+    Epq_pauli,
+    Hamiltonian_pauli,
+    energy_Hamiltonian_pauli,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_UCC_U
@@ -104,7 +104,7 @@ class LinearResponseUCC:
                     op = op.apply_U_from_left(U)
                 self.G_ops.append(op)
         for i, a in self.wf.kappa_idx:
-            op_ = 2 ** (-1 / 2) * Epq(a, i, self.wf.num_spin_orbs, self.wf.num_elec)
+            op_ = 2 ** (-1 / 2) * Epq_pauli(a, i, self.wf.num_spin_orbs, self.wf.num_elec)
             op = convert_pauli_to_hybrid_form(
                 op_,
                 self.wf.num_inactive_spin_orbs,
@@ -119,13 +119,13 @@ class LinearResponseUCC:
         self.V = np.zeros((num_parameters, num_parameters))
         self.W = np.zeros((num_parameters, num_parameters))
         H = convert_pauli_to_hybrid_form(
-            Hamiltonian(self.wf.h_core, self.wf.g_eri, self.wf.c_trans, num_spin_orbs, num_elec),
+            Hamiltonian_pauli(self.wf.h_core, self.wf.g_eri, self.wf.c_trans, num_spin_orbs, num_elec),
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
             self.wf.num_virtual_spin_orbs,
         )
         H_en = convert_pauli_to_hybrid_form(
-            Hamiltonian_energy_only(
+            energy_Hamiltonian_pauli(
                 self.wf.h_core,
                 self.wf.g_eri,
                 self.wf.c_trans,
@@ -480,7 +480,7 @@ class LinearResponseUCC:
         counter = 0
         for p in range(self.wf.num_spin_orbs // 2):
             for q in range(self.wf.num_spin_orbs // 2):
-                Epq_op = Epq(p, q, self.wf.num_spin_orbs, self.wf.num_elec)
+                Epq_op = Epq_pauli(p, q, self.wf.num_spin_orbs, self.wf.num_elec)
                 if counter == 0:
                     mux_op = mux[p, q] * Epq_op
                     muy_op = muy[p, q] * Epq_op
