@@ -11,6 +11,7 @@ def kronecker_product_cached(
     num_prior: int, num_after: int, pauli_mat_symbol: str, is_csr: bool
 ) -> np.ndarray | ss.csr_matrix:
     r"""Get operator in matrix form.
+
     The operator is returned in the form:
 
     .. math::
@@ -30,14 +31,14 @@ def kronecker_product_cached(
         I2 = ss.identity(int(2**num_after))
         mat = ss.csr_matrix(mat)
         return ss.csr_matrix(ss.kron(I1, ss.kron(mat, I2)))
-    else:
-        I1 = np.identity(int(2**num_prior))
-        I2 = np.identity(int(2**num_after))
-        return np.kron(I1, np.kron(mat, I2))
+    I1 = np.identity(int(2**num_prior))
+    I2 = np.identity(int(2**num_after))
+    return np.kron(I1, np.kron(mat, I2))
 
 
 def kronecker_product(A: Sequence[np.ndarray]) -> np.ndarray:
-    r"""Get Kronecker product of a list of matricies
+    r"""Get Kronecker product of a list of matricies.
+
     Does:
 
     .. math::
@@ -69,12 +70,13 @@ def pauli_to_mat(pauli: str) -> np.ndarray:
     """
     if pauli == "I":
         return np.array([[1, 0], [0, 1]], dtype=float)
-    elif pauli == "Z":
+    if pauli == "Z":
         return np.array([[1, 0], [0, -1]], dtype=float)
-    elif pauli == "X":
+    if pauli == "X":
         return np.array([[0, 1], [1, 0]], dtype=float)
-    elif pauli == "Y":
+    if pauli == "Y":
         return np.array([[0, -1j], [1j, 0]], dtype=complex)
+    raise ValueError(f"Got unknown string: {pauli}")
 
 
 class StateVector:
@@ -131,43 +133,55 @@ class StateVector:
 
     @property
     def bra_inactive(self) -> list[np.ndarray]:
+        """Get bra configuration for inactive orbitals."""
         return np.conj(self.inactive).transpose()
 
     @property
     def ket_inactive(self) -> list[np.ndarray]:
+        """Get ket configuration for inactive orbitals."""
         return self.inactive
 
     @property
     def bra_virtual(self) -> list[np.ndarray]:
+        """Get bra configuration for virtual orbitals."""
         return np.conj(self.virtual).transpose()
 
     @property
     def ket_virtual(self) -> list[np.ndarray]:
+        """Get ket configuration for virtual orbitals."""
         return self.virtual
 
     @property
     def bra_active(self) -> np.ndarray:
+        """Get bra state-vector for active orbitals."""
         return np.conj(self.active).transpose()
 
     @property
     def ket_active(self) -> np.ndarray:
+        """Get ket state-vector for inactive orbitals."""
         return self.active
 
     @property
     def bra_active_csr(self) -> ss.csr_matrix:
+        """Get bra state-vector for inactive orbitals."""
         return self.active_csr
 
     @property
     def ket_active_csr(self) -> ss.csr_matrix:
+        """Get ket state-vector for inactive orbitals."""
         return self.active_csr.conj().transpose()
 
-    def new_U(self, U: np.ndarray, allowed_states: np.ndarray = None) -> None:
+    def new_u(self, U: np.ndarray, allowed_states: np.ndarray | None = None) -> None:
+        """Create active state-vector by applying transformation matrix to reference.
+
+        Args:
+            U: Transformation matrix.
+            allowed_states: State to be transformed.
+        """
         if allowed_states is None:
             self.active = np.matmul(U, self._active)
             self.active_csr = ss.csr_matrix(self.active)
-            self.U_ = U
         else:
-            self.U_allowed_ = U
             if isinstance(U, np.ndarray):
                 tmp_active = np.matmul(U, self._active[allowed_states])
             else:

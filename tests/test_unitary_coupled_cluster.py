@@ -3,13 +3,13 @@ import numpy as np
 import slowquant.SlowQuant as sq
 from slowquant.unitary_coupled_cluster.linear_response import LinearResponseUCC
 from slowquant.unitary_coupled_cluster.operator_pauli import (
-    Hamiltonian_pauli,
-    expectation_value,
+    expectation_value_pauli,
+    hamiltonian_pauli,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
-def test_HeH_sto3g_HF() -> None:
+def test_heh_sto3g_hf() -> None:
     """Test restricted Hartree-Fock through the unitary coupled cluster module."""
     A = sq.SlowQuant()
     A.set_molecule(
@@ -24,11 +24,11 @@ def test_HeH_sto3g_HF() -> None:
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
     WF = WaveFunctionUCC(A.molecule.number_bf * 2, A.molecule.number_electrons, (2, 1), S_sqrt, h_core, g_eri)
-    WF.run_UCC("S", True)
-    assert abs(WF.ucc_energy - (-4.262632309847)) < 10**-8
+    WF.run_ucc("S", True)
+    assert abs(WF.energy_elec - (-4.262632309847)) < 10**-8
 
 
-def test_LiH_sto3g_HF() -> None:
+def test_lih_sto3g_hf() -> None:
     """Test restricted Hartree-Fock through the unitary coupled cluster module."""
     A = sq.SlowQuant()
     A.set_molecule(
@@ -42,11 +42,11 @@ def test_LiH_sto3g_HF() -> None:
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
     WF = WaveFunctionUCC(A.molecule.number_bf * 2, A.molecule.number_electrons, (2, 1), S_sqrt, h_core, g_eri)
-    WF.run_UCC("S", True)
-    assert abs(WF.ucc_energy - (-8.862246324082243)) < 10**-8
+    WF.run_ucc("S", True)
+    assert abs(WF.energy_elec - (-8.862246324082243)) < 10**-8
 
 
-def test_HeH_sto3g_UCCS() -> None:
+def test_heh_sto3g_uccs() -> None:
     """Test restricted UCCS."""
     A = sq.SlowQuant()
     A.set_molecule(
@@ -61,11 +61,11 @@ def test_HeH_sto3g_UCCS() -> None:
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
     WF = WaveFunctionUCC(A.molecule.number_bf * 2, A.molecule.number_electrons, (2, 2), S_sqrt, h_core, g_eri)
-    WF.run_UCC("S")
-    assert abs(WF.ucc_energy - (-4.262632309847)) < 10**-8
+    WF.run_ucc("S")
+    assert abs(WF.energy_elec - (-4.262632309847)) < 10**-8
 
 
-def test_H10_STO3G_UCCSD() -> None:
+def test_h10_sto3g_uccsd() -> None:
     """Test UCCSD(2,2).
     Test made after bug found where more than two inactive orbitals would not work.
     """
@@ -96,11 +96,11 @@ def test_H10_STO3G_UCCSD() -> None:
         h_core,
         g_eri,
     )
-    WF.run_UCC("SD", False)
-    assert abs(WF.ucc_energy - (-18.839645894737956)) < 10**-8
+    WF.run_ucc("SD", False)
+    assert abs(WF.energy_elec - (-18.839645894737956)) < 10**-8
 
 
-def test_H2_431G_OOUCCSD() -> None:
+def test_h2_431g_oouccsd() -> None:
     """Test OO-UCCSD(2,2)."""
     A = sq.SlowQuant()
     A.set_molecule(
@@ -121,11 +121,11 @@ def test_H2_431G_OOUCCSD() -> None:
         h_core,
         g_eri,
     )
-    WF.run_UCC("SD", True)
-    assert abs(WF.ucc_energy - (-1.860533598715)) < 10**-8
+    WF.run_ucc("SD", True)
+    assert abs(WF.energy_elec - (-1.860533598715)) < 10**-8
 
 
-def test_H2_431G_OOUCCD() -> None:
+def test_h2_431g_oouccd() -> None:
     """Test OO-UCCD(2,2)."""
     A = sq.SlowQuant()
     A.set_molecule(
@@ -147,11 +147,11 @@ def test_H2_431G_OOUCCD() -> None:
         g_eri,
         include_active_kappa=True,
     )
-    WF.run_UCC("D", True)
-    assert abs(WF.ucc_energy - (-1.860533598715)) < 10**-8
+    WF.run_ucc("D", True)
+    assert abs(WF.energy_elec - (-1.860533598715)) < 10**-8
 
 
-def test_H2_431G_UCCSD() -> None:
+def test_h2_431g_uccsd() -> None:
     """Test UCCSD(2,2)."""
     A = sq.SlowQuant()
     A.set_molecule(
@@ -172,11 +172,11 @@ def test_H2_431G_UCCSD() -> None:
         h_core,
         g_eri,
     )
-    WF.run_UCC("SD", False)
-    assert abs(WF.ucc_energy - (-1.8466833679296024)) < 10**-8
+    WF.run_ucc("SD", False)
+    assert abs(WF.energy_elec - (-1.8466833679296024)) < 10**-8
 
 
-def test_H4_STO3G_OOUCCSD() -> None:
+def test_h4_sto3g_oouccsd() -> None:
     """Test OO-UCCSD(2,2)."""
     A = sq.SlowQuant()
     A.set_molecule(
@@ -199,14 +199,17 @@ def test_H4_STO3G_OOUCCSD() -> None:
         h_core,
         g_eri,
     )
-    WF.run_UCC("SD", True)
-    assert abs(WF.ucc_energy - (-5.211066791547)) < 10**-8
+    WF.run_ucc("SD", True)
+    assert abs(WF.energy_elec - (-5.211066791547)) < 10**-8
     # Test sparse matrix also works
-    H = Hamiltonian_pauli(h_core, g_eri, WF.c_trans, WF.num_spin_orbs, WF.num_elec)
-    assert abs(WF.ucc_energy - expectation_value(WF.state_vector, H, WF.state_vector, use_csr=0)) < 10**-8
+    H = hamiltonian_pauli(h_core, g_eri, WF.c_trans, WF.num_spin_orbs, WF.num_elec)
+    assert (
+        abs(WF.energy_elec - expectation_value_pauli(WF.state_vector, H, WF.state_vector, use_csr=0))
+        < 10**-8
+    )
 
 
-def test_H4_STO3G_OOUCCD() -> None:
+def test_h4_sto3g_oouccd() -> None:
     """Test OO-UCCD(2,2)."""
     A = sq.SlowQuant()
     A.set_molecule(
@@ -230,15 +233,18 @@ def test_H4_STO3G_OOUCCD() -> None:
         g_eri,
         include_active_kappa=True,
     )
-    WF.run_UCC("D", True)
-    assert abs(WF.ucc_energy - (-5.211066791547)) < 10**-8
+    WF.run_ucc("D", True)
+    assert abs(WF.energy_elec - (-5.211066791547)) < 10**-8
     # Test sparse matrix also works
-    H = Hamiltonian_pauli(h_core, g_eri, WF.c_trans, WF.num_spin_orbs, WF.num_elec)
-    assert abs(WF.ucc_energy - expectation_value(WF.state_vector, H, WF.state_vector, use_csr=0)) < 10**-8
+    H = hamiltonian_pauli(h_core, g_eri, WF.c_trans, WF.num_spin_orbs, WF.num_elec)
+    assert (
+        abs(WF.energy_elec - expectation_value_pauli(WF.state_vector, H, WF.state_vector, use_csr=0))
+        < 10**-8
+    )
 
 
-def test_H2_STO3G_UCCSD_LR() -> None:
-    """Test Linear Response for UCCSD."""
+def test_h2_sto3g_uccsd_lr() -> None:
+    """Test Linear Response for uccsd."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """H  0.0  0.0  0.0;
@@ -263,7 +269,7 @@ def test_H2_STO3G_UCCSD_LR() -> None:
         SQobj.integral.get_multipole_matrix([0, 1, 0]),
         SQobj.integral.get_multipole_matrix([0, 0, 1]),
     )
-    WF.run_UCC("SD", False)
+    WF.run_ucc("SD", False)
     LR = LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 1.0157) < 10**-3
@@ -274,7 +280,7 @@ def test_H2_STO3G_UCCSD_LR() -> None:
     assert abs(LR.get_transition_dipole(1, dipole_integrals)[2] - 0.0) < 10**-3
 
 
-def test_H4_STO3G_UCCDQ() -> None:
+def test_h4_sto3g_uccdq() -> None:
     """Test UCCDQ(4,4).
     For this particular system only D and Q contributes to the energy.
     I think :))))
@@ -301,12 +307,12 @@ def test_H4_STO3G_UCCDQ() -> None:
         g_eri,
         include_active_kappa=True,
     )
-    WF.run_UCC("DQ", False)
-    assert abs(WF.ucc_energy + A.molecule.nuclear_repulsion - (-1.968914822185857)) < 10**-7
+    WF.run_ucc("DQ", False)
+    assert abs(WF.energy_elec + A.molecule.nuclear_repulsion - (-1.968914822185857)) < 10**-7
 
 
-def test_H2_631G_HF_LR() -> None:
-    """Test Linear Response for OO-UCCSD(2,2)."""
+def test_h2_631g_hf_lr() -> None:
+    """Test Linear Response for OO-uccsd(2,2)."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """H  0.0   0.0  0.0;
@@ -326,7 +332,7 @@ def test_H2_631G_HF_LR() -> None:
         h_core,
         g_eri,
     )
-    WF.run_UCC("SD", True)
+    WF.run_ucc("SD", True)
     LR = LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
     dipole_integrals = (
@@ -342,8 +348,8 @@ def test_H2_631G_HF_LR() -> None:
     assert abs(LR.get_oscillator_strength(2, dipole_integrals) - 0.0635) < 10**-3
 
 
-def test_H2_631G_OOUCCSD_LR() -> None:
-    """Test Linear Response for OO-UCCSD(2,2)."""
+def test_h2_631g_oouccsd_lr() -> None:
+    """Test Linear Response for OO-uccsd(2,2)."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """H  0.0   0.0  0.0;
@@ -363,7 +369,7 @@ def test_H2_631G_OOUCCSD_LR() -> None:
         h_core,
         g_eri,
     )
-    WF.run_UCC("SD", True)
+    WF.run_ucc("SD", True)
     LR = LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
     dipole_integrals = (
@@ -385,8 +391,8 @@ def test_H2_631G_OOUCCSD_LR() -> None:
     assert abs(LR.get_oscillator_strength(5, dipole_integrals) - 0.0) < 10**-3
 
 
-def test_H4_STO3G_UCCSD_LR_naive() -> None:
-    """Test Linear Response for UCCSD(4,4)."""
+def test_h4_sto3g_uccsd_lr_naive() -> None:  # pylint: disable=R0915
+    """Test Linear Response for uccsd(4,4)."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """H  0.0  0.0  0.0;
@@ -408,7 +414,7 @@ def test_H4_STO3G_UCCSD_LR_naive() -> None:
         h_core,
         g_eri,
     )
-    WF.run_UCC("SD", False)
+    WF.run_ucc("SD", False)
     LR = LinearResponseUCC(WF, excitations="SD", do_selfconsistent_operators=False)
     LR.calc_excitation_energies()
     dipole_integrals = (
@@ -476,8 +482,8 @@ def test_H4_STO3G_UCCSD_LR_naive() -> None:
     assert abs(LR.get_oscillator_strength(13, dipole_integrals) - 0.0) < 10**-5
 
 
-def test_Be_STO3G_UCCSD_LR_naive() -> None:
-    """Test Linear Response for UCCSD(2,2)."""
+def test_be_sto3g_uccsd_lr_naive() -> None:  # pylint: disable=R0915
+    """Test Linear Response for uccsd(2,2)."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """Be  0.0  0.0  0.0;""",
@@ -496,7 +502,7 @@ def test_Be_STO3G_UCCSD_LR_naive() -> None:
         h_core,
         g_eri,
     )
-    WF.run_UCC("SD", True)
+    WF.run_ucc("SD", True)
     LR = LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
     dipole_integrals = (
@@ -548,20 +554,19 @@ def test_Be_STO3G_UCCSD_LR_naive() -> None:
     assert abs(LR.get_oscillator_strength(9, dipole_integrals) - 0.0) < 10**-5
 
 
-def test_LiH_STO3G_UCCSD_LR_naive() -> None:
-    """Test Linear Response for UCCSD.
+def test_lih_sto3g_uccsd_lr_naive() -> None:  # pylint: disable=R0915
+    """Test Linear Response for uccsd.
     This examples was used to find and fix a bug :)
     """
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
-        f"""Li  0.0  0.0  0.0;
-           H {3.343414548/2} 0.0 0.0;""",
+        """Li  0.0  0.0  0.0;
+           H 1.671707274 0.0 0.0;""",
         distance_unit="angstrom",
     )
     SQobj.set_basis_set("STO-3G")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    num_bf = SQobj.molecule.number_bf
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
@@ -577,7 +582,7 @@ def test_LiH_STO3G_UCCSD_LR_naive() -> None:
         SQobj.integral.get_multipole_matrix([0, 1, 0]),
         SQobj.integral.get_multipole_matrix([0, 0, 1]),
     )
-    WF.run_UCC("SD", True)
+    WF.run_ucc("SD", True)
     LR = LinearResponseUCC(WF, excitations="SD", do_selfconsistent_operators=True)
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.129470) < 10**-5

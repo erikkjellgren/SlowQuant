@@ -15,16 +15,31 @@ from slowquant.unitary_coupled_cluster.operator_contracted import (
     operatormul_contract,
 )
 from slowquant.unitary_coupled_cluster.operator_hybrid import (
+    OperatorHybrid,
     convert_pauli_to_hybrid_form,
     expectation_value_hybrid,
 )
 from slowquant.unitary_coupled_cluster.operator_pauli import (
-    Epq_pauli,
-    Hamiltonian_pauli,
-    energy_Hamiltonian_pauli,
+    energy_hamiltonian_pauli,
+    epq_pauli,
+    hamiltonian_pauli,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
-from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_UCC_U
+from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_ucc_u
+
+
+class ResponseOperator:
+    def __init__(self, occ_idx: set[int], unocc_idx: set[int], operator: OperatorHybrid) -> None:
+        """Initialize response excitation operator.
+
+        Args:
+            occ_idx: Index of occupied orbitals.
+            unocc_idx: Index of unoccupied orbitals.
+            operator: Operator.
+        """
+        self.occ_idx = occ_idx
+        self.unocc_idx = unocc_idx
+        self.operator = operator
 
 
 class LinearResponseUCC:
@@ -35,20 +50,27 @@ class LinearResponseUCC:
         is_spin_conserving: bool = False,
         do_selfconsistent_operators: bool = True,
     ) -> None:
+        """Initialize linear response by calculating the needed matrices.
+
+        Args:
+            wave_function: Wave function object.
+            excitations: Which excitation orders to include in response.
+            is_spin_conserving: Use spin-conseving operators.
+            do_selfconsistent_operators: Use self-consistent active space excitation operators.
+        """
         self.wf = copy.deepcopy(wave_function)
         self.theta_picker = ThetaPicker(
-            self.wf.active_occ,
-            self.wf.active_unocc,
+            self.wf.active_occ_spin_idx,
+            self.wf.active_unocc_spin_idx,
             is_spin_conserving=is_spin_conserving,
-            deshift=self.wf.num_inactive_spin_orbs,
         )
 
-        self.G_ops = []
-        self.q_ops = []
+        self.G_ops: list[ResponseOperator] = []
+        self.q_ops: list[ResponseOperator] = []
         num_spin_orbs = self.wf.num_spin_orbs
         num_elec = self.wf.num_elec
         excitations = excitations.lower()
-        U = construct_UCC_U(
+        U = construct_ucc_u(
             self.wf.num_active_spin_orbs,
             self.wf.num_active_elec,
             self.wf.theta1 + self.wf.theta2 + self.wf.theta3 + self.wf.theta4,
@@ -56,7 +78,7 @@ class LinearResponseUCC:
             "sdtq",  # self.wf._excitations,
         )
         if "s" in excitations:
-            for _, a, i, op_ in self.theta_picker.get_T1_generator_SA(num_spin_orbs, num_elec):
+            for _, a, i, op_ in self.theta_picker.get_t1_generator_sa(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
                     op_,
                     self.wf.num_inactive_spin_orbs,
@@ -64,11 +86,11 @@ class LinearResponseUCC:
                     self.wf.num_virtual_spin_orbs,
                 )
                 if do_selfconsistent_operators:
-                    op = op.apply_U_from_right(U.conj().transpose())
-                    op = op.apply_U_from_left(U)
-                self.G_ops.append([{i}, {a}, op])
+                    op = op.apply_u_from_right(U.conj().transpose())
+                    op = op.apply_u_from_left(U)
+                self.G_ops.append(ResponseOperator({i}, {a}, op))
         if "d" in excitations:
-            for _, a, i, b, j, op_ in self.theta_picker.get_T2_generator_SA(num_spin_orbs, num_elec):
+            for _, a, i, b, j, op_ in self.theta_picker.get_t2_generator_sa(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
                     op_,
                     self.wf.num_inactive_spin_orbs,
@@ -76,11 +98,11 @@ class LinearResponseUCC:
                     self.wf.num_virtual_spin_orbs,
                 )
                 if do_selfconsistent_operators:
-                    op = op.apply_U_from_right(U.conj().transpose())
-                    op = op.apply_U_from_left(U)
-                self.G_ops.append([{i, j}, {a, b}, op])
+                    op = op.apply_u_from_right(U.conj().transpose())
+                    op = op.apply_u_from_left(U)
+                self.G_ops.append(ResponseOperator({i, j}, {a, b}, op))
         if "t" in excitations:
-            for _, _, _, _, _, _, _, op_ in self.theta_picker.get_T3_generator(num_spin_orbs, num_elec):
+            for _, a, i, b, j, c, k, op_ in self.theta_picker.get_t3_generator(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
                     op_,
                     self.wf.num_inactive_spin_orbs,
@@ -88,11 +110,11 @@ class LinearResponseUCC:
                     self.wf.num_virtual_spin_orbs,
                 )
                 if do_selfconsistent_operators:
-                    op = op.apply_U_from_right(U.conj().transpose())
-                    op = op.apply_U_from_left(U)
-                self.G_ops.append(op)
+                    op = op.apply_u_from_right(U.conj().transpose())
+                    op = op.apply_u_from_left(U)
+                self.G_ops.append(ResponseOperator({i, j, k}, {a, b, c}, op))
         if "q" in excitations:
-            for _, _, _, _, _, _, _, _, _, op_ in self.theta_picker.get_T4_generator(num_spin_orbs, num_elec):
+            for _, a, i, b, j, c, k, d, l, op_ in self.theta_picker.get_t4_generator(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
                     op_,
                     self.wf.num_inactive_spin_orbs,
@@ -100,18 +122,18 @@ class LinearResponseUCC:
                     self.wf.num_virtual_spin_orbs,
                 )
                 if do_selfconsistent_operators:
-                    op = op.apply_U_from_right(U.conj().transpose())
-                    op = op.apply_U_from_left(U)
-                self.G_ops.append(op)
+                    op = op.apply_u_from_right(U.conj().transpose())
+                    op = op.apply_u_from_left(U)
+                self.G_ops.append(ResponseOperator({i, j, k, l}, {a, b, c, d}, op))
         for i, a in self.wf.kappa_idx:
-            op_ = 2 ** (-1 / 2) * Epq_pauli(a, i, self.wf.num_spin_orbs, self.wf.num_elec)
+            op_ = 2 ** (-1 / 2) * epq_pauli(a, i, self.wf.num_spin_orbs, self.wf.num_elec)
             op = convert_pauli_to_hybrid_form(
                 op_,
                 self.wf.num_inactive_spin_orbs,
                 self.wf.num_active_spin_orbs,
                 self.wf.num_virtual_spin_orbs,
             )
-            self.q_ops.append([{i}, {a}, op])
+            self.q_ops.append(ResponseOperator({i}, {a}, op))
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.M = np.zeros((num_parameters, num_parameters))
@@ -119,13 +141,13 @@ class LinearResponseUCC:
         self.V = np.zeros((num_parameters, num_parameters))
         self.W = np.zeros((num_parameters, num_parameters))
         H = convert_pauli_to_hybrid_form(
-            Hamiltonian_pauli(self.wf.h_core, self.wf.g_eri, self.wf.c_trans, num_spin_orbs, num_elec),
+            hamiltonian_pauli(self.wf.h_core, self.wf.g_eri, self.wf.c_trans, num_spin_orbs, num_elec),
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
             self.wf.num_virtual_spin_orbs,
         )
         H_en = convert_pauli_to_hybrid_form(
-            energy_Hamiltonian_pauli(
+            energy_hamiltonian_pauli(
                 self.wf.h_core,
                 self.wf.g_eri,
                 self.wf.c_trans,
@@ -146,11 +168,13 @@ class LinearResponseUCC:
         else:
             calculation_type = "naive"
         # calculation_type = "generic"
-        for j, (occ_idxs_j, unocc_idxs_i, qJ) in enumerate(self.q_ops):
-            for i, (occ_idx_i, unocc_idx_i, qI) in enumerate(self.q_ops):
+        for j, opJ in enumerate(self.q_ops):
+            qJ = opJ.operator
+            for i, opI in enumerate(self.q_ops):
+                qI = opI.operator
                 if i < j:
                     continue
-                if calculation_type == "selfconsistent" or calculation_type == "naive":
+                if calculation_type in ("selfconsistent", "naive"):
                     # Make M
                     operator = operatormul3_contract(qI.dagger, H, qJ) - operatormul3_contract(
                         qI.dagger, qJ, H
@@ -198,8 +222,10 @@ class LinearResponseUCC:
                     )
                 else:
                     raise NameError("Could not determine calculation_type got: {calculation_type}")
-        for j, (occ_idxs_j, unocc_idxs_j, GJ) in enumerate(self.G_ops):
-            for i, (occ_idxs_i, unocc_idx_j, qI) in enumerate(self.q_ops):
+        for j, opJ in enumerate(self.G_ops):
+            GJ = opJ.operator
+            for i, opI in enumerate(self.q_ops):
+                qI = opI.operator
                 if calculation_type == "selfconsistent":
                     # Make M
                     operator = operatormul3_contract(qI.dagger, H, GJ) - operatormul3_contract(
@@ -258,8 +284,10 @@ class LinearResponseUCC:
                     )
                 else:
                     raise NameError("Could not determine calculation_type got: {calculation_type}")
-        for j, (occ_idxs_j, unocc_idx_j, qJ) in enumerate(self.q_ops):
-            for i, (occ_idxs_i, unocc_idxs_j, GI) in enumerate(self.G_ops):
+        for j, opJ in enumerate(self.q_ops):
+            qJ = opJ.operator
+            for i, opI in enumerate(self.G_ops):
+                GI = opI.operator
                 if calculation_type == "selfconsistent":
                     # Make M
                     operator = operatormul3_contract(GI.dagger, H, qJ) - operatormul3_contract(
@@ -318,8 +346,10 @@ class LinearResponseUCC:
                     )
                 else:
                     raise NameError("Could not determine calculation_type got: {calculation_type}")
-        for j, (occ_idxs_j, unocc_idxs_j, GJ) in enumerate(self.G_ops):
-            for i, (occ_idxs_i, unocc_idxs_i, GI) in enumerate(self.G_ops):
+        for j, opJ in enumerate(self.G_ops):
+            GJ = opJ.operator
+            for i, opI in enumerate(self.G_ops):
+                GI = opI.operator
                 if i < j:
                     continue
                 if calculation_type == "selfconsistent":
@@ -398,6 +428,7 @@ class LinearResponseUCC:
                     raise NameError("Could not determine calculation_type got: {calculation_type}")
 
     def calc_excitation_energies(self) -> None:
+        """Calculate excitation energies."""
         size = len(self.M)
         E2 = np.zeros((size * 2, size * 2))
         E2[:size, :size] = self.M
@@ -425,9 +456,18 @@ class LinearResponseUCC:
             )
 
     def get_excited_state_overlap(self, state_number: int) -> float:
+        """Calculate overlap of excitated state with the ground state.
+
+        Args:
+            state_number: Which excited state, counting from zero.
+
+        Returns:
+            Overlap between ground state and excited state.
+        """
         number_excitations = len(self.excitation_energies)
         print("WARNING: This function [get_excited_state_overlap] might not be working.")
-        for i, (_, _, G) in enumerate(self.q_ops + self.G_ops):
+        for i, op in enumerate(self.q_ops + self.G_ops):
+            G = op.operator
             if i == 0:
                 transfer_op = (
                     self.normed_response_vectors[i, state_number] * G.dagger
@@ -441,8 +481,17 @@ class LinearResponseUCC:
         return expectation_value_hybrid(self.wf.state_vector, transfer_op, self.wf.state_vector)
 
     def get_excited_state_norm(self, state_number: int) -> float:
+        """Calculate the norm of excited state.
+
+        Args:
+            state_number: Which excited state, counting from zero.
+
+        Returns:
+            Norm of excited state.
+        """
         number_excitations = len(self.excitation_energies)
-        for i, (_, _, G) in enumerate(self.q_ops + self.G_ops):
+        for i, op in enumerate(self.q_ops + self.G_ops):
+            G = op.operator
             if i == 0:
                 transfer_op = (
                     self.response_vectors[i, state_number] * G.dagger
@@ -460,10 +509,20 @@ class LinearResponseUCC:
     def get_transition_dipole(
         self, state_number: int, dipole_integrals: Sequence[np.ndarray]
     ) -> tuple[float, float, float]:
+        """Calculate transition dipole moment.
+
+        Args:
+            state_number: Which excited state, counting from zero.
+            dipole_integrals: Dipole integrals ordered as (x,y,z).
+
+        Returns:
+            Transition dipole moment.
+        """
         if len(dipole_integrals) != 3:
             raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
         number_excitations = len(self.excitation_energies)
-        for i, (_, _, G) in enumerate(self.q_ops + self.G_ops):
+        for i, op in enumerate(self.q_ops + self.G_ops):
+            G = op.operator
             if i == 0:
                 transfer_op = (
                     self.normed_response_vectors[i, state_number] * G.dagger
@@ -480,7 +539,7 @@ class LinearResponseUCC:
         counter = 0
         for p in range(self.wf.num_spin_orbs // 2):
             for q in range(self.wf.num_spin_orbs // 2):
-                Epq_op = Epq_pauli(p, q, self.wf.num_spin_orbs, self.wf.num_elec)
+                Epq_op = epq_pauli(p, q, self.wf.num_spin_orbs, self.wf.num_elec)
                 if counter == 0:
                     mux_op = mux[p, q] * Epq_op
                     muy_op = muy[p, q] * Epq_op

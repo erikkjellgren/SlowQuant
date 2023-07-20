@@ -9,9 +9,10 @@ from slowquant.unitary_coupled_cluster.base import kronecker_product
 
 @functools.cache
 def a_op_spin_matrix(
-    idx: int, dagger: bool, number_spin_orbitals: int, number_electrons: int, use_csr: int = 10
+    idx: int, dagger: bool, number_spin_orbitals: int, use_csr: int = 10
 ) -> np.ndarray | ss.csr_matrix:
     r"""Get matrix representation of fermionic operator.
+
     This is the matrix form that depends on number of electrons i.e.:
 
     .. math::
@@ -21,7 +22,6 @@ def a_op_spin_matrix(
         idx: Spin orbital index.
         dagger: Creation or annihilation operator.
         number_spin_orbitals: Total number of spin orbitals.
-        number_electrons: Total number of electrons.
 
     Returns:
         Matrix representation of ferminonic annihilation or creation operator.
@@ -46,15 +46,27 @@ def a_op_spin_matrix(
     return kronecker_product(operators)
 
 
-def Epq_matrix(
+def epq_matrix(
     p: int, q: int, num_spin_orbs: int, num_elec: int, use_csr: int = 10
 ) -> np.ndarray | ss.csr_matrix:
+    """Contruct Epq operator.
+
+    Args:
+        p: Orbital index.
+        q: Orbital index.
+        num_spin_orbs: Number of spin orbitals.
+        num_elec: Number of electrons.
+        use_csr: Size when to use sparse matrices.
+
+    Returns:
+        Epq operator in matrix form.
+    """
     E = lw.matmul(
-        a_op_spin_matrix(p * 2, True, num_spin_orbs, num_elec, use_csr=use_csr),
-        a_op_spin_matrix(q * 2, False, num_spin_orbs, num_elec, use_csr=use_csr),
+        a_op_spin_matrix(p * 2, True, num_spin_orbs, use_csr=use_csr),
+        a_op_spin_matrix(q * 2, False, num_spin_orbs, use_csr=use_csr),
     )
     E += lw.matmul(
-        a_op_spin_matrix(p * 2 + 1, True, num_spin_orbs, num_elec, use_csr=use_csr),
-        a_op_spin_matrix(q * 2 + 1, False, num_spin_orbs, num_elec, use_csr=use_csr),
+        a_op_spin_matrix(p * 2 + 1, True, num_spin_orbs, use_csr=use_csr),
+        a_op_spin_matrix(q * 2 + 1, False, num_spin_orbs, use_csr=use_csr),
     )
     return E

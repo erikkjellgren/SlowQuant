@@ -1,36 +1,29 @@
 from __future__ import annotations
 
 import copy
-import functools
 
 import numpy as np
 import scipy.sparse as ss
 
 import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
 from slowquant.unitary_coupled_cluster.base import StateVector, pauli_to_mat
-from slowquant.unitary_coupled_cluster.operator_pauli import PauliOperator, a_pauli
-
-
-@functools.cache
-def a_hybrid(
-    spinless_idx: int,
-    spin: str,
-    dagger: bool,
-    num_inactive_spin_orbs: int,
-    num_active_spin_orbs: int,
-    num_virtual_spin_orbs: int,
-    num_elec: int,
-) -> PauliOperatorHybridForm:
-    num_spin_orbs = num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs
-    op = a_pauli(spinless_idx, spin, dagger, num_spin_orbs, num_elec)
-    return convert_pauli_to_hybrid_form(
-        op, num_inactive_spin_orbs, num_active_spin_orbs, num_virtual_spin_orbs
-    )
+from slowquant.unitary_coupled_cluster.operator_pauli import OperatorPauli
 
 
 def expectation_value_hybrid(
-    bra: StateVector, hybridop: PauliOperatorHybridForm, ket: StateVector, use_csr: int = 10
+    bra: StateVector, hybridop: OperatorHybrid, ket: StateVector, use_csr: int = 10
 ) -> float:
+    """Calculate expectation value of hybrid operator.
+
+    Args:
+        bra: Bra state-vector.
+        hybridop: Hybrid operator.
+        ket: Ket state-vector.
+        use_csr: Size when to use sparse matrices.
+
+    Returns:
+        Expectation value of hybrid operator.
+    """
     if len(bra.inactive) != len(ket.inactive):
         raise ValueError("Bra and Ket does not have same number of inactive orbitals")
     if len(bra._active) != len(ket._active):
@@ -40,11 +33,11 @@ def expectation_value_hybrid(
         tmp = 1
         for i in range(len(bra.bra_inactive)):
             tmp *= np.matmul(
-                bra.bra_inactive[i], np.matmul(pauli_to_mat(op.inactive_pauli[i]), ket.ket_inactive[:, i])
+                bra.bra_inactive[i], np.matmul(pauli_to_mat(op.inactive_pauli[i]), ket.ket_inactive[:, i])  # type: ignore
             )
         for i in range(len(bra.bra_virtual)):
             tmp *= np.matmul(
-                bra.bra_virtual[i], np.matmul(pauli_to_mat(op.virtual_pauli[i]), ket.ket_virtual[:, i])
+                bra.bra_virtual[i], np.matmul(pauli_to_mat(op.virtual_pauli[i]), ket.ket_virtual[:, i])  # type: ignore
             )
         if abs(tmp) < 10**-12:
             continue
@@ -65,8 +58,19 @@ def expectation_value_hybrid(
 
 
 def convert_pauli_to_hybrid_form(
-    pauliop: PauliOperator, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int
-) -> PauliOperatorHybridForm:
+    pauliop: OperatorPauli, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int
+) -> OperatorHybrid:
+    """Convert Pauli operator to hybrid operator.
+
+    Args:
+        pauliop: Pauli operator.
+        num_inactive_orbs: Number of inactive orbitals.
+        num_active_orbs: Number of active orbitals.
+        num_virtual_orbs: Number of virtual orbitals.
+
+    Returns:
+        Hybrid operator.
+    """
     new_operator: dict[str, np.ndarray] = {}
     active_start = num_inactive_orbs
     active_end = num_inactive_orbs + num_active_orbs
@@ -74,53 +78,89 @@ def convert_pauli_to_hybrid_form(
         new_inactive = pauli_string[:active_start]
         new_active = pauli_string[active_start:active_end]
         new_virtual = pauli_string[active_end:]
-        active_pauli = PauliOperator({new_active: 1})
+        active_pauli = OperatorPauli({new_active: 1})
         new_active_matrix = factor * active_pauli.matrix_form()
         key = new_inactive + new_virtual
         if key in new_operator:
             new_operator[key].active_matrix += new_active_matrix
         else:
-            new_operator[key] = OperatorHybridForm(new_inactive, new_active_matrix, new_virtual)
-    return PauliOperatorHybridForm(new_operator)
+            new_operator[key] = OperatorHybridData(new_inactive, new_active_matrix, new_virtual)
+    return OperatorHybrid(new_operator)
 
 
-class OperatorHybridForm:
+class OperatorHybridData:
     def __init__(
         self, inactive_pauli: str, active_matrix: np.ndarray | ss.csr_matrix, virtual_pauli: str
     ) -> None:
+        """Initialize data structure of hybrid operators.
+
+        Args:
+            inactive_pauli: Pauli string of inactive orbitals.
+            active_matrix: Matrix operator of active orbitals.
+            virtual_pauli: Pauli string of virtual orbitals.
+        """
         self.inactive_pauli = inactive_pauli
         self.active_matrix = active_matrix
         self.virtual_pauli = virtual_pauli
 
 
-class PauliOperatorHybridForm:
-    def __init__(self, operator: dict[str, OperatorHybridForm]) -> None:
-        """The key is the Pauli-string of inactive + virtual,
+class OperatorHybrid:
+    def __init__(self, operator: dict[str, OperatorHybridData]) -> None:
+        """Initialize hybrid operator.
+
+        The key is the Pauli-string of inactive + virtual,
         i.e. the active part does not contribute to the key.
+
+        Args:
+            operator: Dictonary form of hybrid operator.
         """
         self.operators = operator
 
-    def __add__(self, hybridop: PauliOperatorHybridForm) -> PauliOperatorHybridForm:
+    def __add__(self, hybridop: OperatorHybrid) -> OperatorHybrid:
+        """Overload addition operator.
+
+        Args:
+            hybridop: Hybrid operator.
+
+        Returns:
+            New hybrid operator.
+        """
         new_operators = copy.deepcopy(self.operators)
         for key, op in hybridop.operators.items():
             if key in new_operators:
                 new_operators[key].active_matrix += op.active_matrix
             else:
-                new_operators[key] = OperatorHybridForm(op.inactive_pauli, op.active_matrix, op.virtual_pauli)
-        return PauliOperatorHybridForm(new_operators)
+                new_operators[key] = OperatorHybridData(op.inactive_pauli, op.active_matrix, op.virtual_pauli)
+        return OperatorHybrid(new_operators)
 
-    def __sub__(self, hybridop: PauliOperatorHybridForm) -> PauliOperatorHybridForm:
+    def __sub__(self, hybridop: OperatorHybrid) -> OperatorHybrid:
+        """Overload subtraction operator.
+
+        Args:
+            hybridop: Hybrid operator.
+
+        Returns:
+            New hybrid operator.
+        """
         new_operators = copy.deepcopy(self.operators)
         for key, op in hybridop.operators.items():
             if key in new_operators:
                 new_operators[key].active_matrix -= op.active_matrix
             else:
-                new_operators[key] = OperatorHybridForm(
+                new_operators[key] = OperatorHybridData(
                     op.inactive_pauli, -op.active_matrix, op.virtual_pauli
                 )
-        return PauliOperatorHybridForm(new_operators)
+        return OperatorHybrid(new_operators)
 
-    def __mul__(self, pauliop: PauliOperatorHybridForm) -> PauliOperatorHybridForm:
+    def __mul__(self, pauliop: OperatorHybrid) -> OperatorHybrid:
+        """Overload multiplication operator.
+
+        Args:
+            hybridop: Hybrid operator.
+
+        Returns:
+            New hybrid operator.
+        """
         new_operators: dict[str, np.ndarray] = {}
         for _, op1 in self.operators.items():
             for _, op2 in pauliop.operators.items():
@@ -182,32 +222,61 @@ class PauliOperatorHybridForm:
                 if key in new_operators:
                     new_operators[key].active_matrix += new_active
                 else:
-                    new_operators[key] = OperatorHybridForm(new_inactive, new_active, new_virtual)
-        return PauliOperatorHybridForm(new_operators)
+                    new_operators[key] = OperatorHybridData(new_inactive, new_active, new_virtual)
+        return OperatorHybrid(new_operators)
 
-    def __rmul__(self, number: float) -> PauliOperatorHybridForm:
+    def __rmul__(self, number: float) -> OperatorHybrid:
+        """Overload right multiplication operator.
+
+        Args:
+            number: Scalar value.
+
+        Returns:
+            New hybrid operator.
+        """
         new_operators = copy.deepcopy(self.operators)
         for key in self.operators.keys():
             new_operators[key].active_matrix *= number
-        return PauliOperatorHybridForm(new_operators)
+        return OperatorHybrid(new_operators)
 
     @property
-    def dagger(self) -> PauliOperatorHybridForm:
+    def dagger(self) -> OperatorHybrid:
+        """Do complex conjugate of operator.
+
+        Returns:
+            New hybrid operator.
+        """
         new_operators = {}
         for key, op in self.operators.items():
-            new_operators[key] = OperatorHybridForm(
+            new_operators[key] = OperatorHybridData(
                 op.inactive_pauli, np.conj(op.active_matrix).transpose(), op.virtual_pauli
             )
-        return PauliOperatorHybridForm(new_operators)
+        return OperatorHybrid(new_operators)
 
-    def apply_U_from_right(self, U: np.ndarray | ss.csr_matrix) -> PauliOperatorHybridForm:
+    def apply_u_from_right(self, U: np.ndarray | ss.csr_matrix) -> OperatorHybrid:
+        """Matrix multiply with transformation matrix from the right.
+
+        Args:
+            U: Transformation matrix.
+
+        Returns:
+            New hybrid operator.
+        """
         new_operators = copy.deepcopy(self.operators)
         for key in self.operators.keys():
             new_operators[key].active_matrix = lw.matmul(new_operators[key].active_matrix, U)
-        return PauliOperatorHybridForm(new_operators)
+        return OperatorHybrid(new_operators)
 
-    def apply_U_from_left(self, U: np.ndarray | ss.csr_matrix) -> PauliOperatorHybridForm:
+    def apply_u_from_left(self, U: np.ndarray | ss.csr_matrix) -> OperatorHybrid:
+        """Matrix multiply with transformation matrix from the left.
+
+        Args:
+            U: Transformation matrix.
+
+        Returns:
+            New hybrid operator.
+        """
         new_operators = copy.deepcopy(self.operators)
         for key in self.operators.keys():
             new_operators[key].active_matrix = lw.matmul(U, new_operators[key].active_matrix)
-        return PauliOperatorHybridForm(new_operators)
+        return OperatorHybrid(new_operators)

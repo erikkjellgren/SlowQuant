@@ -8,21 +8,21 @@ import scipy.optimize
 
 from slowquant.unitary_coupled_cluster.base import StateVector
 from slowquant.unitary_coupled_cluster.operator_pauli import (
-    energy_Hamiltonian_pauli,
-    expectation_value,
+    energy_hamiltonian_pauli,
+    expectation_value_pauli,
 )
 from slowquant.unitary_coupled_cluster.util import (
     ThetaPicker,
     construct_integral_trans_mat,
-    construct_UCC_U,
+    construct_ucc_u,
 )
 
 
 class WaveFunctionUCC:
     def __init__(
         self,
-        number_spin_orbitals: int,
-        number_electrons: int,
+        num_spin_orbs: int,
+        num_elec: int,
         cas: Sequence[int],
         c_orthonormal: np.ndarray,
         h_core: np.ndarray,
@@ -30,18 +30,34 @@ class WaveFunctionUCC:
         is_generalized: bool = False,
         include_active_kappa: bool = False,
     ) -> None:
+        """Initialize for UCC wave function.
+
+        Args:
+            num_spin_orbs: Number of spin orbitals.
+            num_elec: Number of electrons.
+            cas: CAS(num_active_elec, num_active_orbs),
+                 orbitals are counted in spatial basis.
+            c_orthonormal: Initial orbital coefficients.
+            h_core: One-electron integrals in AO for Hamiltonian.
+            g_eri: Two-electron integrals in AO.
+            is_generalized: Do generalized UCC.
+            include_active_kappa: Include active-active orbital rotations.
+        """
         o = np.array([0, 1])
         z = np.array([1, 0])
         self.c_orthonormal = c_orthonormal
         self.h_core = h_core
         self.g_eri = g_eri
-        self.inactive = []
-        self.virtual = []
-        self.active = []
-        self.active_occ = []
-        self.active_unocc = []
-        self.num_elec = number_electrons
-        self.num_spin_orbs = number_spin_orbitals
+        self.inactive_spin_idx = []
+        self.virtual_spin_idx = []
+        self.active_spin_idx = []
+        self.active_occ_spin_idx = []
+        self.active_unocc_spin_idx = []
+        self.active_spin_idx_shifted = []
+        self.active_occ_spin_idx_shifted = []
+        self.active_unocc_spin_idx_shifted = []
+        self.num_elec = num_elec
+        self.num_spin_orbs = num_spin_orbs
         inactive_on_vector = []
         active_on_vector = []
         virtual_on_vector = []
@@ -51,91 +67,123 @@ class WaveFunctionUCC:
         self.num_virtual_spin_orbs = 0
         active_space = []
         orbital_counter = 0
-        for i in range(number_electrons - cas[0], number_electrons):
+        for i in range(num_elec - cas[0], num_elec):
             active_space.append(i)
             orbital_counter += 1
-        for i in range(number_electrons, number_electrons + 2 * cas[1] - orbital_counter):
+        for i in range(num_elec, num_elec + 2 * cas[1] - orbital_counter):
             active_space.append(i)
-        for i in range(number_electrons):
+        for i in range(num_elec):
             if i in active_space:
-                self.active.append(i)
-                self.active_occ.append(i)
+                self.active_spin_idx.append(i)
+                self.active_occ_spin_idx.append(i)
                 active_on_vector.append(o)
                 self.num_active_spin_orbs += 1
                 self.num_active_elec += 1
             else:
-                self.inactive.append(i)
+                self.inactive_spin_idx.append(i)
                 inactive_on_vector.append(o)
                 self.num_inactive_spin_orbs += 1
-        for i in range(number_electrons, number_spin_orbitals):
+        for i in range(num_elec, num_spin_orbs):
             if i in active_space:
-                self.active.append(i)
-                self.active_unocc.append(i)
+                self.active_spin_idx.append(i)
+                self.active_unocc_spin_idx.append(i)
                 active_on_vector.append(z)
                 self.num_active_spin_orbs += 1
             else:
-                self.virtual.append(i)
+                self.virtual_spin_idx.append(i)
                 virtual_on_vector.append(z)
                 self.num_virtual_spin_orbs += 1
-        if len(self.active) != 0:
-            active_shift = np.min(self.active)
-            for i in range(len(self.active_occ)):
-                self.active_occ[i] -= active_shift
-            for i in range(len(self.active_unocc)):
-                self.active_unocc[i] -= active_shift
+        if len(self.active_spin_idx) != 0:
+            active_shift = np.min(self.active_spin_idx)
+            for active_idx in self.active_spin_idx:
+                self.active_spin_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_occ_spin_idx:
+                self.active_occ_spin_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_unocc_spin_idx:
+                self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
         self.state_vector = StateVector(inactive_on_vector, active_on_vector, virtual_on_vector)
+        # Contruct spatial idx
+        self.inactive_idx: list[int] = []
+        self.virtual_idx: list[int] = []
+        self.active_idx: list[int] = []
+        for idx in self.inactive_spin_idx:
+            if idx // 2 not in self.inactive_idx:
+                self.inactive_idx.append(idx // 2)
+        for idx in self.active_spin_idx:
+            if idx // 2 not in self.active_idx:
+                self.active_idx.append(idx // 2)
+        for idx in self.virtual_spin_idx:
+            if idx // 2 not in self.virtual_idx:
+                self.virtual_idx.append(idx // 2)
         # Find non-redundant kappas
         self.kappa = []
         self.kappa_idx = []
         # kappa can be optimized in spatial basis
-        for p in range(0, self.num_spin_orbs, 2):
-            for q in range(p + 2, self.num_spin_orbs, 2):
-                if p in self.inactive and q in self.inactive:
+        for p in range(0, self.num_spin_orbs // 2):
+            for q in range(p + 1, self.num_spin_orbs // 2):
+                if p in self.inactive_idx and q in self.inactive_idx:
                     continue
-                elif p in self.virtual and q in self.virtual:
+                elif p in self.virtual_idx and q in self.virtual_idx:
                     continue
                 elif not include_active_kappa:
-                    if p in self.active and q in self.active:
+                    if p in self.active_idx and q in self.active_idx:
                         continue
                 self.kappa.append(0)
-                self.kappa_idx.append([p // 2, q // 2])
+                self.kappa_idx.append([p, q])
         # Construct theta1
         self.theta_picker = ThetaPicker(
-            self.active_occ, self.active_unocc, is_spin_conserving=True, is_generalized=is_generalized
+            self.active_occ_spin_idx_shifted,
+            self.active_unocc_spin_idx_shifted,
+            is_spin_conserving=True,
+            is_generalized=is_generalized,
         )
         self.theta_picker_full = ThetaPicker(
-            self.active_occ, self.active_unocc, is_spin_conserving=False, is_generalized=is_generalized
+            self.active_occ_spin_idx_shifted,
+            self.active_unocc_spin_idx_shifted,
+            is_spin_conserving=False,
+            is_generalized=is_generalized,
         )
         self.theta1 = []
-        for _ in self.theta_picker_full.get_T1_generator_SA(0, 0):
+        for _ in self.theta_picker_full.get_t1_generator_sa(0, 0):
             self.theta1.append(0)
         # Construct theta2
         self.theta2 = []
-        for _ in self.theta_picker_full.get_T2_generator_SA(0, 0):
+        for _ in self.theta_picker_full.get_t2_generator_sa(0, 0):
             self.theta2.append(0)
         # Construct theta3
         self.theta3 = []
-        for _ in self.theta_picker_full.get_T3_generator(0, 0):
+        for _ in self.theta_picker_full.get_t3_generator(0, 0):
             self.theta3.append(0)
         # Construct theta4
         self.theta4 = []
-        for _ in self.theta_picker_full.get_T4_generator(0, 0):
+        for _ in self.theta_picker_full.get_t4_generator(0, 0):
             self.theta4.append(0)
 
     @property
     def c_trans(self) -> np.ndarray:
+        """Get orbital coefficients.
+
+        Returns:
+            Orbital coefficients.
+        """
         kappa_mat = np.zeros_like(self.c_orthonormal)
         for kappa_val, (p, q) in zip(self.kappa, self.kappa_idx):
             kappa_mat[p, q] = kappa_val
             kappa_mat[q, p] = -kappa_val
         return np.matmul(self.c_orthonormal, scipy.linalg.expm(-kappa_mat))
 
-    def run_UCC(self, excitations: str, orbital_optimization: bool = False) -> None:
+    def run_ucc(self, excitations: str, orbital_optimization: bool = False) -> None:
+        """Run optimization of UCC wave function.
+
+        Args:
+            excitations: Excitation orders to include.
+            orbital_optimization: Do orbital optimization.
+        """
         excitations = excitations.lower()
         self._excitations = excitations
         if orbital_optimization:
             e_tot = partial(
-                energy_UCC,
+                energy_ucc,
                 num_inactive_spin_orbs=self.num_inactive_spin_orbs,
                 num_active_spin_orbs=self.num_active_spin_orbs,
                 num_virtual_spin_orbs=self.num_virtual_spin_orbs,
@@ -152,7 +200,7 @@ class WaveFunctionUCC:
             )
         else:
             e_tot = partial(
-                energy_UCC,
+                energy_ucc,
                 num_inactive_spin_orbs=self.num_inactive_spin_orbs,
                 num_active_spin_orbs=self.num_active_spin_orbs,
                 num_virtual_spin_orbs=self.num_virtual_spin_orbs,
@@ -169,22 +217,22 @@ class WaveFunctionUCC:
             )
         global iteration
         global start
-        iteration = 0
-        start = time.time()
+        iteration = 0  # type: ignore
+        start = time.time()  # type: ignore
 
         def print_progress(X: Sequence[float]) -> None:
-            """Callback for energy minimization of wave function.
+            """Print progress during energy minimization of wave function.
 
             Args:
                 X: Wave function parameters.
             """
             global iteration
             global start
-            time_str = f"{time.time() - start:7.2f}"
+            time_str = f"{time.time() - start:7.2f}"  # type: ignore
             e_str = f"{e_tot(X):3.6f}"
-            print(f"{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")
-            iteration += 1
-            start = time.time()
+            print(f"{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+            iteration += 1  # type: ignore
+            start = time.time()  # type: ignore
 
         parameters = []
         num_kappa = 0
@@ -196,19 +244,19 @@ class WaveFunctionUCC:
             parameters += self.kappa
             num_kappa += len(self.kappa)
         if "s" in excitations:
-            for idx, _, _, _ in self.theta_picker.get_T1_generator_SA(0, 0):
+            for idx, _, _, _ in self.theta_picker.get_t1_generator_sa(0, 0):
                 parameters += [self.theta1[idx]]
                 num_theta1 += 1
         if "d" in excitations:
-            for idx, _, _, _, _, _ in self.theta_picker.get_T2_generator_SA(0, 0):
+            for idx, _, _, _, _, _ in self.theta_picker.get_t2_generator_sa(0, 0):
                 parameters += [self.theta2[idx]]
                 num_theta2 += 1
         if "t" in excitations:
-            for idx, _, _, _, _, _, _, _ in self.theta_picker.get_T3_generator(0, 0):
+            for idx, _, _, _, _, _, _, _ in self.theta_picker.get_t3_generator(0, 0):
                 parameters += [self.theta3[idx]]
                 num_theta3 += 1
         if "q" in excitations:
-            for idx, _, _, _, _, _, _, _, _, _ in self.theta_picker.get_T4_generator(0, 0):
+            for idx, _, _, _, _, _, _, _, _, _ in self.theta_picker.get_t4_generator(0, 0):
                 parameters += [self.theta4[idx]]
                 num_theta4 += 1
         print("### Parameters information:")
@@ -220,7 +268,7 @@ class WaveFunctionUCC:
         print(f"### Total parameters: {num_kappa+num_theta1+num_theta2+num_theta3+num_theta4}\n")
         print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
         res = scipy.optimize.minimize(e_tot, parameters, tol=1e-8, callback=print_progress, method="SLSQP")
-        self.ucc_energy = res["fun"]
+        self.energy_elec = res["fun"]
         param_idx = 0
         if orbital_optimization:
             self.kappa = res["x"][param_idx : len(self.kappa) + param_idx].tolist()
@@ -229,33 +277,33 @@ class WaveFunctionUCC:
             thetas = res["x"][param_idx : num_theta1 + param_idx].tolist()
             param_idx += len(thetas)
             counter = 0
-            for idx, _, _, _ in self.theta_picker.get_T1_generator_SA(0, 0):
+            for idx, _, _, _ in self.theta_picker.get_t1_generator_sa(0, 0):
                 self.theta1[idx] = thetas[counter]
                 counter += 1
         if "d" in excitations:
             thetas = res["x"][param_idx : num_theta2 + param_idx].tolist()
             param_idx += len(thetas)
             counter = 0
-            for idx, _, _, _, _, _ in self.theta_picker.get_T2_generator_SA(0, 0):
+            for idx, _, _, _, _, _ in self.theta_picker.get_t2_generator_sa(0, 0):
                 self.theta2[idx] = thetas[counter]
                 counter += 1
         if "t" in excitations:
             thetas = res["x"][param_idx : num_theta3 + param_idx].tolist()
             param_idx += len(thetas)
             counter = 0
-            for idx, _, _, _, _, _, _, _ in self.theta_picker.get_T3_generator(0, 0):
+            for idx, _, _, _, _, _, _, _ in self.theta_picker.get_t3_generator(0, 0):
                 self.theta3[idx] = thetas[counter]
                 counter += 1
         if "q" in excitations:
             thetas = res["x"][param_idx : num_theta4 + param_idx].tolist()
             param_idx += len(thetas)
             counter = 0
-            for idx, _, _, _, _, _, _, _, _, _ in self.theta_picker.get_T4_generator(0, 0):
+            for idx, _, _, _, _, _, _, _, _, _ in self.theta_picker.get_t4_generator(0, 0):
                 self.theta4[idx] = thetas[counter]
                 counter += 1
 
 
-def energy_UCC(
+def energy_ucc(
     parameters: Sequence[float],
     num_inactive_spin_orbs: int,
     num_active_spin_orbs: int,
@@ -306,21 +354,21 @@ def energy_UCC(
         kappa.append(parameters[idx_counter])
         idx_counter += 1
     if "s" in excitations:
-        for _ in theta_picker.get_T1_generator_SA(0, 0):
+        for _ in theta_picker.get_t1_generator_sa(0, 0):
             theta1.append(parameters[idx_counter])
             idx_counter += 1
     if "d" in excitations:
-        for _ in theta_picker.get_T2_generator_SA(
+        for _ in theta_picker.get_t2_generator_sa(
             num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs, num_elec
         ):
             theta2.append(parameters[idx_counter])
             idx_counter += 1
     if "t" in excitations:
-        for _ in theta_picker.get_T3_generator(0, 0):
+        for _ in theta_picker.get_t3_generator(0, 0):
             theta3.append(parameters[idx_counter])
             idx_counter += 1
     if "q" in excitations:
-        for _ in theta_picker.get_T4_generator(0, 0):
+        for _ in theta_picker.get_t4_generator(0, 0):
             theta4.append(parameters[idx_counter])
             idx_counter += 1
     assert len(parameters) == len(kappa) + len(theta1) + len(theta2) + len(theta3) + len(theta4)
@@ -334,7 +382,7 @@ def energy_UCC(
     else:
         c_trans = c_orthonormal
 
-    U = construct_UCC_U(
+    U = construct_ucc_u(
         num_active_spin_orbs,
         num_active_elec,
         theta1 + theta2 + theta3 + theta4,
@@ -342,10 +390,10 @@ def energy_UCC(
         excitations,
         allowed_states=state_vector.allowed_active_states_number_spin_conserving,
     )
-    state_vector.new_U(U, allowed_states=state_vector.allowed_active_states_number_spin_conserving)
-    return expectation_value(
+    state_vector.new_u(U, allowed_states=state_vector.allowed_active_states_number_spin_conserving)
+    return expectation_value_pauli(
         state_vector,
-        energy_Hamiltonian_pauli(
+        energy_hamiltonian_pauli(
             h_core,
             g_eri,
             c_trans,

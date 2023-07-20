@@ -7,7 +7,7 @@ import scipy.sparse as ss
 
 import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
 from slowquant.unitary_coupled_cluster.base import StateVector
-from slowquant.unitary_coupled_cluster.operator_hybrid import PauliOperatorHybridForm
+from slowquant.unitary_coupled_cluster.operator_hybrid import OperatorHybrid
 
 
 def pauli_mul(pauli1: str, pauli2: str) -> tuple[str, complex]:
@@ -98,7 +98,7 @@ class OperatorContracted:
         """
         return OperatorContracted(self.operators - contracted_op.operators)
 
-    def __mul__(self, pauliop: OperatorContracted) -> None:
+    def __mul__(self, contracted_op: OperatorContracted) -> None:
         """Overload multiplication operator.
 
         Args:
@@ -126,7 +126,7 @@ class OperatorContracted:
         """
         return OperatorContracted(self.operators.conj().transpose())
 
-    def apply_U_from_right(self, U: np.ndarray | ss.csr_matrix) -> OperatorContracted:
+    def apply_u_from_right(self, U: np.ndarray | ss.csr_matrix) -> OperatorContracted:
         """Multiply with transformation matrix from the right side.
 
         Args:
@@ -137,7 +137,7 @@ class OperatorContracted:
         """
         return OperatorContracted(lw.matmul(self.operators, U))
 
-    def apply_U_from_left(self, U: np.ndarray | ss.csr_matrix) -> OperatorContracted:
+    def apply_u_from_left(self, U: np.ndarray | ss.csr_matrix) -> OperatorContracted:
         """Multiply with transformation matrix from the left side.
 
         Args:
@@ -149,11 +149,20 @@ class OperatorContracted:
         return OperatorContracted(lw.matmul(U, self.operators))
 
 
-def operatormul_contract(A: PauliOperatorHybridForm, B: PauliOperatorHybridForm) -> OperatorContracted:
+def operatormul_contract(A: OperatorHybrid, B: OperatorHybrid) -> OperatorContracted:
+    """Multiply two operators and contract the inactive and virtual orbitals.
+
+    Args:
+        A: Uncontracted operator.
+        B: Uncontracted operator.
+
+    Returns:
+        Contracted operator.
+    """
     for _, op1 in A.operators.items():
         if isinstance(op1.active_matrix, np.ndarray):
             new_operators = np.zeros_like(op1.active_matrix)
-        elif isinstance(op1.active_matrix, ss.csr_matrix) or isinstance(op1.active_matrix, ss.csc_matrix):
+        elif isinstance(op1.active_matrix, (ss.csr_matrix, ss.csc_matrix)):
             new_operators = ss.csr_array(op1.active_matrix.shape)
         else:
             raise TypeError(f"Unknown type: {type(op1.active_matrix)}")
@@ -166,7 +175,7 @@ def operatormul_contract(A: PauliOperatorHybridForm, B: PauliOperatorHybridForm)
             do_continue = False
             for pauli1, pauli2 in zip(op1.inactive_pauli, op2.inactive_pauli):
                 new_pauli, new_fac = paulistring_mul((pauli1, pauli2))
-                if new_pauli == "Y" or new_pauli == "X":
+                if new_pauli in ("Y", "X"):
                     do_continue = True
                     break
                 new_inactive += new_pauli
@@ -175,7 +184,7 @@ def operatormul_contract(A: PauliOperatorHybridForm, B: PauliOperatorHybridForm)
                 continue
             for pauli1, pauli2 in zip(op1.virtual_pauli, op2.virtual_pauli):
                 new_pauli, new_fac = paulistring_mul((pauli1, pauli2))
-                if new_pauli == "Y" or new_pauli == "X":
+                if new_pauli in ("Y", "X"):
                     do_continue = True
                     break
                 new_virtual += new_pauli
@@ -190,13 +199,21 @@ def operatormul_contract(A: PauliOperatorHybridForm, B: PauliOperatorHybridForm)
     return OperatorContracted(new_operators)
 
 
-def operatormul3_contract(
-    A: PauliOperatorHybridForm, B: PauliOperatorHybridForm, C: PauliOperatorHybridForm
-) -> OperatorContracted:
+def operatormul3_contract(A: OperatorHybrid, B: OperatorHybrid, C: OperatorHybrid) -> OperatorContracted:
+    """Multiply three operators and contract the inactive and virtual orbitals.
+
+    Args:
+        A: Uncontracted operator.
+        B: Uncontracted operator.
+        C: Uncontracted operator.
+
+    Returns:
+        Contracted operator.
+    """
     for _, op1 in A.operators.items():
         if isinstance(op1.active_matrix, np.ndarray):
             new_operators = np.zeros_like(op1.active_matrix)
-        elif isinstance(op1.active_matrix, ss.csr_matrix) or isinstance(op1.active_matrix, ss.csc_matrix):
+        elif isinstance(op1.active_matrix, (ss.csr_matrix, ss.csc_matrix)):
             new_operators = ss.csr_array(op1.active_matrix.shape)
         else:
             raise TypeError(f"Unknown type: {type(op1.active_matrix)}")
@@ -210,7 +227,7 @@ def operatormul3_contract(
                 do_continue = False
                 for pauli1, pauli2, pauli3 in zip(op1.inactive_pauli, op2.inactive_pauli, op3.inactive_pauli):
                     new_pauli, new_fac = paulistring_mul((pauli1, pauli2, pauli3))
-                    if new_pauli == "Y" or new_pauli == "X":
+                    if new_pauli in ("X", "Y"):
                         do_continue = True
                         break
                     new_inactive += new_pauli
@@ -219,7 +236,7 @@ def operatormul3_contract(
                     continue
                 for pauli1, pauli2, pauli3 in zip(op1.virtual_pauli, op2.virtual_pauli, op3.virtual_pauli):
                     new_pauli, new_fac = paulistring_mul((pauli1, pauli2, pauli3))
-                    if new_pauli == "Y" or new_pauli == "X":
+                    if new_pauli in ("X", "Y"):
                         do_continue = True
                         break
                     new_virtual += new_pauli
@@ -237,15 +254,26 @@ def operatormul3_contract(
 
 
 def operatormul4_contract(
-    A: PauliOperatorHybridForm,
-    B: PauliOperatorHybridForm,
-    C: PauliOperatorHybridForm,
-    D: PauliOperatorHybridForm,
+    A: OperatorHybrid,
+    B: OperatorHybrid,
+    C: OperatorHybrid,
+    D: OperatorHybrid,
 ) -> OperatorContracted:
+    """Multiply four operators and contract the inactive and virtual orbitals.
+
+    Args:
+        A: Uncontracted operator.
+        B: Uncontracted operator.
+        C: Uncontracted operator.
+        D: Uncontracted operator.
+
+    Returns:
+        Contracted operator.
+    """
     for _, op1 in A.operators.items():
         if isinstance(op1.active_matrix, np.ndarray):
             new_operators = np.zeros_like(op1.active_matrix)
-        elif isinstance(op1.active_matrix, ss.csr_matrix):
+        elif isinstance(op1.active_matrix, (ss.csr_matrix, ss.csc_matrix)):
             new_operators = ss.csr_array(op1.active_matrix.shape)
         else:
             raise TypeError(f"Unknown type: {type(op1.active_matrix)}")
@@ -262,7 +290,7 @@ def operatormul4_contract(
                         op1.inactive_pauli, op2.inactive_pauli, op3.inactive_pauli, op4.inactive_pauli
                     ):
                         new_pauli, new_fac = paulistring_mul((pauli1, pauli2, pauli3, pauli4))
-                        if new_pauli == "Y" or new_pauli == "X":
+                        if new_pauli in ("X", "Y"):
                             do_continue = True
                             break
                         new_inactive += new_pauli
@@ -273,7 +301,7 @@ def operatormul4_contract(
                         op1.virtual_pauli, op2.virtual_pauli, op3.virtual_pauli, op4.virtual_pauli
                     ):
                         new_pauli, new_fac = paulistring_mul((pauli1, pauli2, pauli3, pauli4))
-                        if new_pauli == "Y" or new_pauli == "X":
+                        if new_pauli in ("X", "Y"):
                             do_continue = True
                             break
                         new_virtual += new_pauli
@@ -291,30 +319,57 @@ def operatormul4_contract(
     return OperatorContracted(new_operators)
 
 
-def double_commutator_contract(
-    A: PauliOperatorHybridForm, B: PauliOperatorHybridForm, C: PauliOperatorHybridForm
-) -> OperatorContracted:
-    """Double commutator of the form [A, [B, C]] = ABC - ACB - BCA + CBA"""
+def double_commutator_contract(A: OperatorHybrid, B: OperatorHybrid, C: OperatorHybrid) -> OperatorContracted:
+    """Make double commutator and contract the inactive and virtual orbitals.
+
+    Double commutator of the form [A, [B, C]] = ABC - ACB - BCA + CBA
+
+    Args:
+        A: Uncontracted operator.
+        B: Uncontracted operator.
+        C: Uncontracted operator.
+
+    Returns:
+        Contracted operator.
+    """
     return (
-        operatormul3_contract(A, B, C)
-        - operatormul3_contract(A, C, B)
-        - operatormul3_contract(B, C, A)
-        + operatormul3_contract(C, B, A)
+        operatormul3_contract(A, B, C)  # pylint: disable=W1114
+        - operatormul3_contract(A, C, B)  # pylint: disable=W1114
+        - operatormul3_contract(B, C, A)  # pylint: disable=W1114
+        + operatormul3_contract(C, B, A)  # pylint: disable=W1114
     )
 
 
-def commutator_contract(A: PauliOperatorHybridForm, B: PauliOperatorHybridForm) -> OperatorContracted:
+def commutator_contract(A: OperatorHybrid, B: OperatorHybrid) -> OperatorContracted:
+    """Make commutator and contract the inactive and virtual orbitals.
+
+    Args:
+        A: Uncontracted operator.
+        B: Uncontracted operator.
+
+    Returns:
+        Contracted operator.
+    """
     return operatormul_contract(A, B) - operatormul_contract(B, A)
 
 
 def expectation_value_contracted(
     bra: StateVector, contracted_op: OperatorContracted, ket: StateVector
 ) -> float:
+    """Calculate expectation value of contracted operator.
+
+    Args:
+        bra: Bra state-vector.
+        contracted_op: Contracted operator.
+        ket: Ket state-vector.
+
+    Returns:
+        Expectation value of contracted operator.
+    """
     if isinstance(contracted_op.operators, np.ndarray):
         return lw.matmul(bra.bra_active, lw.matmul(contracted_op.operators, ket.ket_active)).real
-    elif isinstance(contracted_op.operators, ss.csr_matrix):
+    if isinstance(contracted_op.operators, ss.csr_matrix):
         return lw.matmul(
             bra.bra_active_csr, lw.matmul(contracted_op.operators, ket.ket_active_csr)
         ).real.toarray()[0, 0]
-    else:
-        raise TypeError(f"Unknown type: {type(contracted_op.operators)}")
+    raise TypeError(f"Unknown type: {type(contracted_op.operators)}")
