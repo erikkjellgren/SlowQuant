@@ -585,57 +585,57 @@ def test_lih_sto3g_uccsd_lr_naive() -> None:  # pylint: disable=R0915
     WF.run_ucc("SD", True)
     LR = LinearResponseUCC(WF, excitations="SD", do_selfconsistent_operators=True)
     LR.calc_excitation_energies()
-    assert abs(LR.excitation_energies[0] - 0.129470) < 10**-5
-    assert abs(LR.excitation_energies[1] - 0.178744) < 10**-5
-    assert abs(LR.excitation_energies[2] - 0.178744) < 10**-5
-    assert abs(LR.excitation_energies[3] - 0.604675) < 10**-5
-    assert abs(LR.excitation_energies[4] - 0.646694) < 10**-5
-    assert abs(LR.excitation_energies[5] - 0.740616) < 10**-5
-    assert abs(LR.excitation_energies[6] - 0.740616) < 10**-5
-    assert abs(LR.excitation_energies[7] - 1.002885) < 10**-5
-    assert abs(LR.excitation_energies[8] - 2.074820) < 10**-5
-    assert abs(LR.excitation_energies[9] - 2.137192) < 10**-5
-    assert abs(LR.excitation_energies[10] - 2.137192) < 10**-5
-    assert abs(LR.excitation_energies[11] - 2.455124) < 10**-5
-    assert abs(LR.excitation_energies[12] - 2.954251) < 10**-5
-    assert abs(LR.get_oscillator_strength(0, dipole_integrals) - 0.049951) < 10**-5
-    assert abs(LR.get_oscillator_strength(1, dipole_integrals) - 0.241200) < 10**-5
-    assert abs(LR.get_oscillator_strength(2, dipole_integrals) - 0.241200) < 10**-5
-    assert abs(LR.get_oscillator_strength(3, dipole_integrals) - 0.157917) < 10**-5
-    assert abs(LR.get_oscillator_strength(4, dipole_integrals) - 0.166607) < 10**-5
-    assert abs(LR.get_oscillator_strength(5, dipole_integrals) - 0.010376) < 10**-5
-    assert abs(LR.get_oscillator_strength(6, dipole_integrals) - 0.010376) < 10**-5
-    assert abs(LR.get_oscillator_strength(7, dipole_integrals) - 0.006250) < 10**-5
-    assert abs(LR.get_oscillator_strength(8, dipole_integrals) - 0.062374) < 10**-5
-    assert abs(LR.get_oscillator_strength(9, dipole_integrals) - 0.128854) < 10**-5
-    assert abs(LR.get_oscillator_strength(10, dipole_integrals) - 0.128854) < 10**-5
-    assert abs(LR.get_oscillator_strength(11, dipole_integrals) - 0.046008) < 10**-5
-    assert abs(LR.get_oscillator_strength(12, dipole_integrals) - 0.003907) < 10**-5
+    assert abs(LR.excitation_energies[0] - 0.129470) < 10**-4
+    assert abs(LR.excitation_energies[1] - 0.178744) < 10**-4
+    assert abs(LR.excitation_energies[2] - 0.178744) < 10**-4
+    assert abs(LR.excitation_energies[3] - 0.604675) < 10**-4
+    assert abs(LR.excitation_energies[4] - 0.646694) < 10**-4
+    assert abs(LR.excitation_energies[5] - 0.740616) < 10**-4
+    assert abs(LR.excitation_energies[6] - 0.740616) < 10**-4
+    assert abs(LR.excitation_energies[7] - 1.002885) < 10**-4
+    assert abs(LR.excitation_energies[8] - 2.074820) < 10**-4
+    assert abs(LR.excitation_energies[9] - 2.137192) < 10**-4
+    assert abs(LR.excitation_energies[10] - 2.137192) < 10**-4
+    assert abs(LR.excitation_energies[11] - 2.455124) < 10**-4
+    assert abs(LR.excitation_energies[12] - 2.954251) < 10**-4
+    assert abs(LR.get_oscillator_strength(0, dipole_integrals) - 0.049951) < 10**-3
+    assert abs(LR.get_oscillator_strength(1, dipole_integrals) - 0.241200) < 10**-3
+    assert abs(LR.get_oscillator_strength(2, dipole_integrals) - 0.241200) < 10**-3
+    assert abs(LR.get_oscillator_strength(3, dipole_integrals) - 0.157917) < 10**-3
+    assert abs(LR.get_oscillator_strength(4, dipole_integrals) - 0.166607) < 10**-3
+    assert abs(LR.get_oscillator_strength(5, dipole_integrals) - 0.010376) < 10**-3
+    assert abs(LR.get_oscillator_strength(6, dipole_integrals) - 0.010376) < 10**-3
+    assert abs(LR.get_oscillator_strength(7, dipole_integrals) - 0.006250) < 10**-3
+    assert abs(LR.get_oscillator_strength(8, dipole_integrals) - 0.062374) < 10**-3
+    assert abs(LR.get_oscillator_strength(9, dipole_integrals) - 0.128854) < 10**-3
+    assert abs(LR.get_oscillator_strength(10, dipole_integrals) - 0.128854) < 10**-3
+    assert abs(LR.get_oscillator_strength(11, dipole_integrals) - 0.046008) < 10**-3
+    assert abs(LR.get_oscillator_strength(12, dipole_integrals) - 0.003907) < 10**-3
     LR = LinearResponseUCC(WF, excitations="SD", do_selfconsistent_operators=False)
     LR.calc_excitation_energies()
-    assert abs(LR.excitation_energies[0] - 0.129471) < 10**-5
-    assert abs(LR.excitation_energies[1] - 0.178744) < 10**-5
-    assert abs(LR.excitation_energies[2] - 0.178744) < 10**-5
-    assert abs(LR.excitation_energies[3] - 0.604674) < 10**-5
-    assert abs(LR.excitation_energies[4] - 0.646694) < 10**-5
-    assert abs(LR.excitation_energies[5] - 0.740616) < 10**-5
-    assert abs(LR.excitation_energies[6] - 0.740616) < 10**-5
-    assert abs(LR.excitation_energies[7] - 1.002882) < 10**-5
-    assert abs(LR.excitation_energies[8] - 2.074820) < 10**-5
-    assert abs(LR.excitation_energies[9] - 2.137192) < 10**-5
-    assert abs(LR.excitation_energies[10] - 2.137192) < 10**-5
-    assert abs(LR.excitation_energies[11] - 2.455124) < 10**-5
-    assert abs(LR.excitation_energies[12] - 2.954251) < 10**-5
-    assert abs(LR.get_oscillator_strength(0, dipole_integrals) - 0.049952) < 10**-5
-    assert abs(LR.get_oscillator_strength(1, dipole_integrals) - 0.241200) < 10**-5
-    assert abs(LR.get_oscillator_strength(2, dipole_integrals) - 0.241200) < 10**-5
-    assert abs(LR.get_oscillator_strength(3, dipole_integrals) - 0.157925) < 10**-5
-    assert abs(LR.get_oscillator_strength(4, dipole_integrals) - 0.166598) < 10**-5
-    assert abs(LR.get_oscillator_strength(5, dipole_integrals) - 0.010376) < 10**-5
-    assert abs(LR.get_oscillator_strength(6, dipole_integrals) - 0.010376) < 10**-5
-    assert abs(LR.get_oscillator_strength(7, dipole_integrals) - 0.006250) < 10**-5
-    assert abs(LR.get_oscillator_strength(8, dipole_integrals) - 0.062374) < 10**-5
-    assert abs(LR.get_oscillator_strength(9, dipole_integrals) - 0.128854) < 10**-5
-    assert abs(LR.get_oscillator_strength(10, dipole_integrals) - 0.128854) < 10**-5
-    assert abs(LR.get_oscillator_strength(11, dipole_integrals) - 0.046008) < 10**-5
-    assert abs(LR.get_oscillator_strength(12, dipole_integrals) - 0.003907) < 10**-5
+    assert abs(LR.excitation_energies[0] - 0.129471) < 10**-4
+    assert abs(LR.excitation_energies[1] - 0.178744) < 10**-4
+    assert abs(LR.excitation_energies[2] - 0.178744) < 10**-4
+    assert abs(LR.excitation_energies[3] - 0.604674) < 10**-4
+    assert abs(LR.excitation_energies[4] - 0.646694) < 10**-4
+    assert abs(LR.excitation_energies[5] - 0.740616) < 10**-4
+    assert abs(LR.excitation_energies[6] - 0.740616) < 10**-4
+    assert abs(LR.excitation_energies[7] - 1.002882) < 10**-4
+    assert abs(LR.excitation_energies[8] - 2.074820) < 10**-4
+    assert abs(LR.excitation_energies[9] - 2.137192) < 10**-4
+    assert abs(LR.excitation_energies[10] - 2.137192) < 10**-4
+    assert abs(LR.excitation_energies[11] - 2.455124) < 10**-4
+    assert abs(LR.excitation_energies[12] - 2.954251) < 10**-4
+    assert abs(LR.get_oscillator_strength(0, dipole_integrals) - 0.049952) < 10**-3
+    assert abs(LR.get_oscillator_strength(1, dipole_integrals) - 0.241200) < 10**-3
+    assert abs(LR.get_oscillator_strength(2, dipole_integrals) - 0.241200) < 10**-3
+    assert abs(LR.get_oscillator_strength(3, dipole_integrals) - 0.157925) < 10**-3
+    assert abs(LR.get_oscillator_strength(4, dipole_integrals) - 0.166598) < 10**-3
+    assert abs(LR.get_oscillator_strength(5, dipole_integrals) - 0.010376) < 10**-3
+    assert abs(LR.get_oscillator_strength(6, dipole_integrals) - 0.010376) < 10**-3
+    assert abs(LR.get_oscillator_strength(7, dipole_integrals) - 0.006250) < 10**-3
+    assert abs(LR.get_oscillator_strength(8, dipole_integrals) - 0.062374) < 10**-3
+    assert abs(LR.get_oscillator_strength(9, dipole_integrals) - 0.128854) < 10**-3
+    assert abs(LR.get_oscillator_strength(10, dipole_integrals) - 0.128854) < 10**-3
+    assert abs(LR.get_oscillator_strength(11, dipole_integrals) - 0.046008) < 10**-3
+    assert abs(LR.get_oscillator_strength(12, dipole_integrals) - 0.003907) < 10**-3

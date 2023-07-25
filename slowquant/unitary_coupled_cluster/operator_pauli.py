@@ -455,19 +455,19 @@ def hamiltonian_pauli(
     h_mo = one_electron_integral_transform(c_mo, h)
     g_mo = two_electron_integral_transform(c_mo, g)
     num_spatial_orbs = num_spin_orbs // 2
+    H_expectation = OperatorPauli({})
     for p in range(num_spatial_orbs):
         for q in range(num_spatial_orbs):
-            if p == 0 and q == 0:
-                H_expectation = h_mo[p, q] * epq_pauli(p, q, num_spin_orbs, num_elec)
-            else:
+            if abs(h_mo[p, q]) > 10**-12:
                 H_expectation += h_mo[p, q] * epq_pauli(p, q, num_spin_orbs, num_elec)
     for p in range(num_spatial_orbs):
         for q in range(num_spatial_orbs):
             for r in range(num_spatial_orbs):
                 for s in range(num_spatial_orbs):
-                    H_expectation += (
-                        1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, num_spin_orbs, num_elec)
-                    )
+                    if abs(g_mo[p, q, r, s]) > 10**-12:
+                        H_expectation += (
+                            1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, num_spin_orbs, num_elec)
+                        )
     return H_expectation
 
 
@@ -512,33 +512,43 @@ def energy_hamiltonian_pauli(
     num_inactive_spatial_orbs = num_inactive_spin_orbs // 2
     num_active_spatial_orbs = num_active_spin_orbs // 2
     num_spin_orbs = num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs
+    H_expectation = OperatorPauli({})
     # Inactive one-electron
     for i in range(num_inactive_spatial_orbs):
-        if i == 0:
-            H_expectation = h_mo[i, i] * epq_pauli(i, i, num_spin_orbs, num_elec)
-        else:
+        if abs(h_mo[i, i]) > 10**-12:
             H_expectation += h_mo[i, i] * epq_pauli(i, i, num_spin_orbs, num_elec)
     # Active one-electron
     for p in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
         for q in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
-            if p == 0 and q == 0 and num_inactive_spatial_orbs == 0:
-                H_expectation = h_mo[p, q] * epq_pauli(p, q, num_spin_orbs, num_elec)
-            else:
+            if abs(h_mo[p, q]) > 10**-12:
                 H_expectation += h_mo[p, q] * epq_pauli(p, q, num_spin_orbs, num_elec)
     # Inactive two-electron
     for i in range(num_inactive_spatial_orbs):
         for j in range(num_inactive_spatial_orbs):
-            H_expectation += 1 / 2 * g_mo[i, i, j, j] * epqrs_pauli(i, i, j, j, num_spin_orbs, num_elec)
-            if i != j:
+            if abs(g_mo[i, i, j, j]) > 10**-12:
+                H_expectation += 1 / 2 * g_mo[i, i, j, j] * epqrs_pauli(i, i, j, j, num_spin_orbs, num_elec)
+            if i != j and abs(g_mo[j, i, i, j]) > 10**-12:
                 H_expectation += 1 / 2 * g_mo[j, i, i, j] * epqrs_pauli(j, i, i, j, num_spin_orbs, num_elec)
     # Inactive-Active two-electron
     for i in range(num_inactive_spatial_orbs):
         for p in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
             for q in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
-                H_expectation += 1 / 2 * g_mo[i, i, p, q] * epqrs_pauli(i, i, p, q, num_spin_orbs, num_elec)
-                H_expectation += 1 / 2 * g_mo[p, q, i, i] * epqrs_pauli(p, q, i, i, num_spin_orbs, num_elec)
-                H_expectation += 1 / 2 * g_mo[p, i, i, q] * epqrs_pauli(p, i, i, q, num_spin_orbs, num_elec)
-                H_expectation += 1 / 2 * g_mo[i, p, q, i] * epqrs_pauli(i, p, q, i, num_spin_orbs, num_elec)
+                if abs(g_mo[i, i, p, q]) > 10**-12:
+                    H_expectation += (
+                        1 / 2 * g_mo[i, i, p, q] * epqrs_pauli(i, i, p, q, num_spin_orbs, num_elec)
+                    )
+                if abs(g_mo[p, q, i, i]) > 10**-12:
+                    H_expectation += (
+                        1 / 2 * g_mo[p, q, i, i] * epqrs_pauli(p, q, i, i, num_spin_orbs, num_elec)
+                    )
+                if abs(g_mo[p, i, i, q]) > 10**-12:
+                    H_expectation += (
+                        1 / 2 * g_mo[p, i, i, q] * epqrs_pauli(p, i, i, q, num_spin_orbs, num_elec)
+                    )
+                if abs(g_mo[i, p, q, i]) > 10**-12:
+                    H_expectation += (
+                        1 / 2 * g_mo[i, p, q, i] * epqrs_pauli(i, p, q, i, num_spin_orbs, num_elec)
+                    )
     # Active two-electron
     for p in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
         for q in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
@@ -546,7 +556,8 @@ def energy_hamiltonian_pauli(
                 for s in range(
                     num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs
                 ):
-                    H_expectation += (
-                        1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, num_spin_orbs, num_elec)
-                    )
+                    if abs(g_mo[p, q, r, s]) > 10**-12:
+                        H_expectation += (
+                            1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, num_spin_orbs, num_elec)
+                        )
     return H_expectation

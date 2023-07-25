@@ -88,7 +88,7 @@ class LinearResponseUCC:
                 if do_selfconsistent_operators:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
-                self.G_ops.append(ResponseOperator({i}, {a}, op))
+                self.G_ops.append(ResponseOperator((i), (a), op))
         if "d" in excitations:
             for _, a, i, b, j, op_ in self.theta_picker.get_t2_generator_sa(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
@@ -100,7 +100,7 @@ class LinearResponseUCC:
                 if do_selfconsistent_operators:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
-                self.G_ops.append(ResponseOperator({i, j}, {a, b}, op))
+                self.G_ops.append(ResponseOperator((i, j), (a, b), op))
         if "t" in excitations:
             for _, a, i, b, j, c, k, op_ in self.theta_picker.get_t3_generator(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
@@ -112,7 +112,7 @@ class LinearResponseUCC:
                 if do_selfconsistent_operators:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
-                self.G_ops.append(ResponseOperator({i, j, k}, {a, b, c}, op))
+                self.G_ops.append(ResponseOperator((i, j, k), (a, b, c), op))
         if "q" in excitations:
             for _, a, i, b, j, c, k, d, l, op_ in self.theta_picker.get_t4_generator(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
@@ -124,7 +124,7 @@ class LinearResponseUCC:
                 if do_selfconsistent_operators:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
-                self.G_ops.append(ResponseOperator({i, j, k, l}, {a, b, c, d}, op))
+                self.G_ops.append(ResponseOperator((i, j, k, l), (a, b, c, d), op))
         for i, a in self.wf.kappa_idx:
             op_ = 2 ** (-1 / 2) * epq_pauli(a, i, self.wf.num_spin_orbs, self.wf.num_elec)
             op = convert_pauli_to_hybrid_form(
@@ -133,7 +133,7 @@ class LinearResponseUCC:
                 self.wf.num_active_spin_orbs,
                 self.wf.num_virtual_spin_orbs,
             )
-            self.q_ops.append(ResponseOperator({i}, {a}, op))
+            self.q_ops.append(ResponseOperator((i), (a), op))
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.M = np.zeros((num_parameters, num_parameters))
@@ -454,6 +454,44 @@ class LinearResponseUCC:
             self.normed_response_vectors[:, state_number] = (
                 self.response_vectors[:, state_number] * (1 / norm) ** 0.5
             )
+
+    def analyse_response_vector(self, state_number: int, threshold: float = 0.05) -> str:
+        """Analyse the response vector.
+
+        Args:
+            state_number: Excitation index counting from zero.
+            threshold: Only print response vector elements that are larger than threshold*max(response vector element).
+
+        Returns:
+            Tabulized excitation assignment.
+        """
+        output = f"Response vector analysis for excitation {state_number+1}\n"
+        output += (
+            "Occupied idxs | Unoccupied idxs | Response vector element | Normalized response vector element\n"
+        )
+        excitations = len(self.q_ops) + len(self.G_ops)
+        skip_threshold = threshold * np.max(np.abs(self.response_vectors[:, state_number]))
+        for resp_val, normed_resp_val, operator in zip(
+            self.response_vectors[:excitations, state_number],
+            self.normed_response_vectors[:excitations, state_number],
+            self.q_ops + self.G_ops,
+        ):
+            if abs(resp_val) < skip_threshold:
+                continue
+            resp_val_str = f"{resp_val:1.6f}"
+            normed_resp_val_str = f"{normed_resp_val:1.6f}"
+            output += f"{str(operator.occ_idx).center(13)} | {str(operator.unocc_idx).center(15)} | {resp_val_str.center(23)} | {normed_resp_val_str.center(34)}\n"
+        for resp_val, normed_resp_val, operator in zip(
+            self.response_vectors[excitations:, state_number],
+            self.normed_response_vectors[excitations:, state_number],
+            self.q_ops + self.G_ops,
+        ):
+            if abs(resp_val) < skip_threshold:
+                continue
+            resp_val_str = f"{resp_val:1.6f}"
+            normed_resp_val_str = f"{normed_resp_val:1.6f}"
+            output += f"{str(operator.unocc_idx).center(13)} | {str(operator.occ_idx).center(15)} | {resp_val_str.center(23)} | {normed_resp_val_str.center(34)}\n"
+        return output
 
     def get_excited_state_overlap(self, state_number: int) -> float:
         """Calculate overlap of excitated state with the ground state.

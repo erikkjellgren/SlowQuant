@@ -118,15 +118,23 @@ class WaveFunctionUCC:
         # Find non-redundant kappas
         self.kappa = []
         self.kappa_idx = []
+        self.kappa_redundant = []
+        self.kappa_redundant_idx = []
         # kappa can be optimized in spatial basis
         for p in range(0, self.num_spin_orbs // 2):
             for q in range(p + 1, self.num_spin_orbs // 2):
                 if p in self.inactive_idx and q in self.inactive_idx:
+                    self.kappa_redundant.append(0)
+                    self.kappa_redundant_idx.append([p, q])
                     continue
                 elif p in self.virtual_idx and q in self.virtual_idx:
+                    self.kappa_redundant.append(0)
+                    self.kappa_redundant_idx.append([p, q])
                     continue
                 elif not include_active_kappa:
                     if p in self.active_idx and q in self.active_idx:
+                        self.kappa_redundant.append(0)
+                        self.kappa_redundant_idx.append([p, q])
                         continue
                 self.kappa.append(0)
                 self.kappa_idx.append([p, q])
@@ -167,9 +175,14 @@ class WaveFunctionUCC:
             Orbital coefficients.
         """
         kappa_mat = np.zeros_like(self.c_orthonormal)
-        for kappa_val, (p, q) in zip(self.kappa, self.kappa_idx):
-            kappa_mat[p, q] = kappa_val
-            kappa_mat[q, p] = -kappa_val
+        if np.max(np.abs(self.kappa)) > 0.0:
+            for kappa_val, (p, q) in zip(self.kappa, self.kappa_idx):
+                kappa_mat[p, q] = kappa_val
+                kappa_mat[q, p] = -kappa_val
+        if np.max(np.abs(self.kappa_redundant)) > 0.0:
+            for kappa_val, (p, q) in zip(self.kappa_redundant, self.kappa_redundant_idx):
+                kappa_mat[p, q] = kappa_val
+                kappa_mat[q, p] = -kappa_val
         return np.matmul(self.c_orthonormal, scipy.linalg.expm(-kappa_mat))
 
     def run_ucc(self, excitations: str, orbital_optimization: bool = False) -> None:
@@ -197,6 +210,8 @@ class WaveFunctionUCC:
                 excitations=excitations,
                 orbital_optimized=True,
                 kappa_idx=self.kappa_idx,
+                kappa_redundant=self.kappa_redundant,
+                kappa_redundant_idx=self.kappa_redundant_idx,
             )
         else:
             e_tot = partial(
@@ -214,6 +229,8 @@ class WaveFunctionUCC:
                 excitations=excitations,
                 orbital_optimized=False,
                 kappa_idx=[],
+                kappa_redundant=self.kappa_redundant,
+                kappa_redundant_idx=self.kappa_redundant_idx,
             )
         global iteration
         global start
@@ -230,7 +247,7 @@ class WaveFunctionUCC:
             global start
             time_str = f"{time.time() - start:7.2f}"  # type: ignore
             e_str = f"{e_tot(X):3.6f}"
-            print(f"{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+            # print(f"{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
             iteration += 1  # type: ignore
             start = time.time()  # type: ignore
 
@@ -259,14 +276,14 @@ class WaveFunctionUCC:
             for idx, _, _, _, _, _, _, _, _, _ in self.theta_picker.get_t4_generator(0, 0):
                 parameters += [self.theta4[idx]]
                 num_theta4 += 1
-        print("### Parameters information:")
-        print(f"### Number kappa: {num_kappa}")
-        print(f"### Number theta1: {num_theta1}")
-        print(f"### Number theta2: {num_theta2}")
-        print(f"### Number theta3: {num_theta3}")
-        print(f"### Number theta4: {num_theta4}")
-        print(f"### Total parameters: {num_kappa+num_theta1+num_theta2+num_theta3+num_theta4}\n")
-        print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+        # print("### Parameters information:")
+        # print(f"### Number kappa: {num_kappa}")
+        # print(f"### Number theta1: {num_theta1}")
+        # print(f"### Number theta2: {num_theta2}")
+        # print(f"### Number theta3: {num_theta3}")
+        # print(f"### Number theta4: {num_theta4}")
+        # print(f"### Total parameters: {num_kappa+num_theta1+num_theta2+num_theta3+num_theta4}\n")
+        # print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
         res = scipy.optimize.minimize(e_tot, parameters, tol=1e-8, callback=print_progress, method="SLSQP")
         self.energy_elec = res["fun"]
         param_idx = 0
@@ -303,6 +320,60 @@ class WaveFunctionUCC:
                 counter += 1
 
 
+def run_compactify_wf(wf: WaveFunctionUCC, excitations: str) -> None:
+    global iteration2
+    global start2
+    iteration2 = 0  # type: ignore
+    start2 = time.time()  # type: ignore
+
+    def print_progress2(X: Sequence[float]) -> None:
+        """Print progress during energy minimization of wave function.
+
+        Args:
+            X: Wave function parameters.
+        """
+        global iteration2
+        global start2
+        time_str = f"{time.time() - start2:7.2f}"  # type: ignore
+        e_str = f"{entropy_tot(X):3.6f}"
+        print(f"{str(iteration2+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+        iteration2 += 1  # type: ignore
+        start2 = time.time()  # type: ignore
+
+    print(wf.theta1)
+    print(wf.theta2)
+
+    print("Iteration # | Iteration time [s] | Shanon Entropy")
+    entropy_tot = partial(entropy_ucc, wf=wf, excitations=excitations)
+    res = scipy.optimize.minimize(
+        entropy_tot,
+        np.zeros(len(wf.kappa_redundant)),
+        tol=1e-8,
+        callback=print_progress2,
+        method="SLSQP",
+        options={"eps": 10**-5},
+    )
+    print(wf.theta1)
+    print(wf.theta2)
+    print(res)
+
+
+def entropy_ucc(parameters: Sequence[float], wf: WaveFunctionUCC, excitations: str) -> float:
+    for i, kappa in enumerate(parameters):
+        wf.kappa_redundant[i] = kappa
+    wf.run_ucc(excitations, False)
+    entropy = 0
+    for state in wf.state_vector.active:
+        if state == 0:
+            continue
+        entropy += state**2 * np.log(state**2)
+    # print(parameters, -entropy)
+    # print(wf.theta1)
+    # print(wf.theta2)
+    # print("")
+    return -entropy
+
+
 def energy_ucc(
     parameters: Sequence[float],
     num_inactive_spin_orbs: int,
@@ -318,6 +389,8 @@ def energy_ucc(
     excitations: str,
     orbital_optimized: bool,
     kappa_idx: Sequence[Sequence[int]],
+    kappa_redundant: Sequence[float],
+    kappa_redundant_idx: Sequence[Sequence[int]],
 ) -> float:
     r"""Calculate electronic energy of UCC wave function.
 
@@ -380,7 +453,12 @@ def energy_ucc(
             kappa_mat[q, p] = -kappa_val
         c_trans = np.matmul(c_orthonormal, scipy.linalg.expm(-kappa_mat))
     else:
-        c_trans = c_orthonormal
+        kappa_mat = np.zeros_like(c_orthonormal)
+        if np.max(np.abs(kappa_redundant)) > 0.0:
+            for kappa_val, (p, q) in zip(kappa_redundant, kappa_redundant_idx):
+                kappa_mat[p, q] = kappa_val
+                kappa_mat[q, p] = -kappa_val
+        c_trans = np.matmul(c_orthonormal, scipy.linalg.expm(-kappa_mat))
 
     U = construct_ucc_u(
         num_active_spin_orbs,

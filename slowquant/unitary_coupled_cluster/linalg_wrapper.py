@@ -42,3 +42,19 @@ def expm(A: np.ndarray | ss.csr_matrix | ss.csc_matrix) -> np.ndarray | ss.csr_m
     if isinstance(A, ss.csr_matrix):
         return ss.linalg.expm(A)
     raise TypeError(f"A got unsupported type: {type(A)}")
+
+
+def zeros_like(A: np.ndarray | ss.csr_matrix | ss.csc_matrix) -> np.ndarray | ss.csr_matrix | ss.csc_matrix:
+    """Create zero array of same shape as input array.
+
+    Args:
+        A: Array to take shape from.
+
+    Returns:
+        Zero array.
+    """
+    if isinstance(A, np.ndarray):
+        return np.zeros_like(A)
+    if isinstance(A, (ss.csr_matrix, ss.csc_matrix)):
+        return ss.csr_array(A.shape)
+    raise TypeError(f"A got unsupported type: {type(A)}")
