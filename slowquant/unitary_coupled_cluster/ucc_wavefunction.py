@@ -175,14 +175,16 @@ class WaveFunctionUCC:
             Orbital coefficients.
         """
         kappa_mat = np.zeros_like(self.c_orthonormal)
-        if np.max(np.abs(self.kappa)) > 0.0:
-            for kappa_val, (p, q) in zip(self.kappa, self.kappa_idx):
-                kappa_mat[p, q] = kappa_val
-                kappa_mat[q, p] = -kappa_val
-        if np.max(np.abs(self.kappa_redundant)) > 0.0:
-            for kappa_val, (p, q) in zip(self.kappa_redundant, self.kappa_redundant_idx):
-                kappa_mat[p, q] = kappa_val
-                kappa_mat[q, p] = -kappa_val
+        if len(self.kappa) != 0:
+            if np.max(np.abs(self.kappa)) > 0.0:
+                for kappa_val, (p, q) in zip(self.kappa, self.kappa_idx):
+                    kappa_mat[p, q] = kappa_val
+                    kappa_mat[q, p] = -kappa_val
+        if len(self.kappa_redundant) != 0:
+            if np.max(np.abs(self.kappa_redundant)) > 0.0:
+                for kappa_val, (p, q) in zip(self.kappa_redundant, self.kappa_redundant_idx):
+                    kappa_mat[p, q] = kappa_val
+                    kappa_mat[q, p] = -kappa_val
         return np.matmul(self.c_orthonormal, scipy.linalg.expm(-kappa_mat))
 
     def run_ucc(self, excitations: str, orbital_optimization: bool = False) -> None:
@@ -350,8 +352,8 @@ def run_compactify_wf(wf: WaveFunctionUCC, excitations: str) -> None:
         np.zeros(len(wf.kappa_redundant)),
         tol=1e-8,
         callback=print_progress2,
-        method="SLSQP",
-        options={"eps": 10**-5},
+        method="BFGS",
+        options={"eps": 10**-4},
     )
     print(wf.theta1)
     print(wf.theta2)
@@ -363,10 +365,11 @@ def entropy_ucc(parameters: Sequence[float], wf: WaveFunctionUCC, excitations: s
         wf.kappa_redundant[i] = kappa
     wf.run_ucc(excitations, False)
     entropy = 0
-    for state in wf.state_vector.active:
-        if state == 0:
+    for state in wf.theta1 + wf.theta2:
+        if abs(state) < 10**-6:
+            entropy += 10**6
             continue
-        entropy += state**2 * np.log(state**2)
+        entropy += 1/abs(state)#state**2 * np.log(state**2)
     # print(parameters, -entropy)
     # print(wf.theta1)
     # print(wf.theta2)
@@ -446,19 +449,17 @@ def energy_ucc(
             idx_counter += 1
     assert len(parameters) == len(kappa) + len(theta1) + len(theta2) + len(theta3) + len(theta4)
 
+    kappa_mat = np.zeros_like(c_orthonormal)
     if orbital_optimized:
-        kappa_mat = np.zeros_like(c_orthonormal)
         for kappa_val, (p, q) in zip(kappa, kappa_idx):
             kappa_mat[p, q] = kappa_val
             kappa_mat[q, p] = -kappa_val
-        c_trans = np.matmul(c_orthonormal, scipy.linalg.expm(-kappa_mat))
-    else:
-        kappa_mat = np.zeros_like(c_orthonormal)
+    if len(kappa_redundant) != 0:
         if np.max(np.abs(kappa_redundant)) > 0.0:
             for kappa_val, (p, q) in zip(kappa_redundant, kappa_redundant_idx):
                 kappa_mat[p, q] = kappa_val
                 kappa_mat[q, p] = -kappa_val
-        c_trans = np.matmul(c_orthonormal, scipy.linalg.expm(-kappa_mat))
+    c_trans = np.matmul(c_orthonormal, scipy.linalg.expm(-kappa_mat))
 
     U = construct_ucc_u(
         num_active_spin_orbs,
