@@ -29,6 +29,8 @@ class WaveFunctionUCC:
         g_eri: np.ndarray,
         is_generalized: bool = False,
         include_active_kappa: bool = False,
+        convergence_threshold: float = 10**-8,
+        silent_run: bool = False,
     ) -> None:
         """Initialize for UCC wave function.
 
@@ -43,6 +45,8 @@ class WaveFunctionUCC:
             is_generalized: Do generalized UCC.
             include_active_kappa: Include active-active orbital rotations.
         """
+        self.convergence_threshold = convergence_threshold
+        self.slient_run = silent_run
         o = np.array([0, 1])
         z = np.array([1, 0])
         self.c_orthonormal = c_orthonormal
@@ -106,6 +110,8 @@ class WaveFunctionUCC:
         self.inactive_idx: list[int] = []
         self.virtual_idx: list[int] = []
         self.active_idx: list[int] = []
+        self.active_occ_idx: list[int] = []
+        self.active_unocc_idx: list[int] = []
         for idx in self.inactive_spin_idx:
             if idx // 2 not in self.inactive_idx:
                 self.inactive_idx.append(idx // 2)
@@ -115,6 +121,12 @@ class WaveFunctionUCC:
         for idx in self.virtual_spin_idx:
             if idx // 2 not in self.virtual_idx:
                 self.virtual_idx.append(idx // 2)
+        for idx in self.active_occ_spin_idx:
+            if idx // 2 not in self.active_occ_idx:
+                self.active_occ_idx.append(idx // 2)
+        for idx in self.active_unocc_spin_idx:
+            if idx // 2 not in self.active_unocc_idx:
+                self.active_unocc_idx.append(idx // 2)
         # Find non-redundant kappas
         self.kappa = []
         self.kappa_idx = []
@@ -127,12 +139,21 @@ class WaveFunctionUCC:
                     self.kappa_redundant.append(0)
                     self.kappa_redundant_idx.append([p, q])
                     continue
-                elif p in self.virtual_idx and q in self.virtual_idx:
+                if p in self.virtual_idx and q in self.virtual_idx:
                     self.kappa_redundant.append(0)
                     self.kappa_redundant_idx.append([p, q])
                     continue
-                elif not include_active_kappa:
+                if not include_active_kappa:
                     if p in self.active_idx and q in self.active_idx:
+                        self.kappa_redundant.append(0)
+                        self.kappa_redundant_idx.append([p, q])
+                        continue
+                if include_active_kappa:
+                    if p in self.active_occ_idx and q in self.active_occ_idx:
+                        self.kappa_redundant.append(0)
+                        self.kappa_redundant_idx.append([p, q])
+                        continue
+                    if p in self.active_unocc_idx and q in self.active_unocc_idx:
                         self.kappa_redundant.append(0)
                         self.kappa_redundant_idx.append([p, q])
                         continue
@@ -249,7 +270,7 @@ class WaveFunctionUCC:
             global start
             time_str = f"{time.time() - start:7.2f}"  # type: ignore
             e_str = f"{e_tot(X):3.6f}"
-            # print(f"{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+            print(f"{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
             iteration += 1  # type: ignore
             start = time.time()  # type: ignore
 
@@ -278,15 +299,15 @@ class WaveFunctionUCC:
             for idx, _, _, _, _, _, _, _, _, _ in self.theta_picker.get_t4_generator(0, 0):
                 parameters += [self.theta4[idx]]
                 num_theta4 += 1
-        # print("### Parameters information:")
-        # print(f"### Number kappa: {num_kappa}")
-        # print(f"### Number theta1: {num_theta1}")
-        # print(f"### Number theta2: {num_theta2}")
-        # print(f"### Number theta3: {num_theta3}")
-        # print(f"### Number theta4: {num_theta4}")
-        # print(f"### Total parameters: {num_kappa+num_theta1+num_theta2+num_theta3+num_theta4}\n")
-        # print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
-        res = scipy.optimize.minimize(e_tot, parameters, tol=1e-8, callback=print_progress, method="SLSQP")
+        print("### Parameters information:")
+        print(f"### Number kappa: {num_kappa}")
+        print(f"### Number theta1: {num_theta1}")
+        print(f"### Number theta2: {num_theta2}")
+        print(f"### Number theta3: {num_theta3}")
+        print(f"### Number theta4: {num_theta4}")
+        print(f"### Total parameters: {num_kappa+num_theta1+num_theta2+num_theta3+num_theta4}\n")
+        print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+        res = scipy.optimize.minimize(e_tot, parameters, tol=1e-6, callback=print_progress, method="SLSQP")
         self.energy_elec = res["fun"]
         param_idx = 0
         if orbital_optimization:
@@ -366,15 +387,13 @@ def entropy_ucc(parameters: Sequence[float], wf: WaveFunctionUCC, excitations: s
     wf.run_ucc(excitations, False)
     entropy = 0
     for state in wf.theta1 + wf.theta2:
-        if abs(state) < 10**-6:
-            entropy += 10**6
-            continue
-        entropy += 1/abs(state)#state**2 * np.log(state**2)
+        entropy += state**2  # state**2 * np.log(state**2)
     # print(parameters, -entropy)
     # print(wf.theta1)
     # print(wf.theta2)
     # print("")
-    return -entropy
+    print(entropy)
+    return entropy
 
 
 def energy_ucc(
