@@ -29,8 +29,6 @@ class WaveFunctionUCC:
         g_eri: np.ndarray,
         is_generalized: bool = False,
         include_active_kappa: bool = False,
-        convergence_threshold: float = 10**-8,
-        silent_run: bool = False,
     ) -> None:
         """Initialize for UCC wave function.
 
@@ -45,8 +43,6 @@ class WaveFunctionUCC:
             is_generalized: Do generalized UCC.
             include_active_kappa: Include active-active orbital rotations.
         """
-        self.convergence_threshold = convergence_threshold
-        self.slient_run = silent_run
         o = np.array([0, 1])
         z = np.array([1, 0])
         self.c_orthonormal = c_orthonormal
@@ -208,7 +204,7 @@ class WaveFunctionUCC:
                     kappa_mat[q, p] = -kappa_val
         return np.matmul(self.c_orthonormal, scipy.linalg.expm(-kappa_mat))
 
-    def run_ucc(self, excitations: str, orbital_optimization: bool = False) -> None:
+    def run_ucc(self, excitations: str, orbital_optimization: bool = False, is_silent: bool = False, convergence_threshold: float = 10**-8) -> None:
         """Run optimization of UCC wave function.
 
         Args:
@@ -272,7 +268,20 @@ class WaveFunctionUCC:
             e_str = f"{e_tot(X):3.6f}"
             print(f"{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
             iteration += 1  # type: ignore
+            if iteration > 100:
+                raise ValueError('Did not converge in 100 iterations in energy minimization.')
             start = time.time()  # type: ignore
+
+        def silent_progress(X: Sequence[float]) -> None:
+            """Print progress during energy minimization of wave function.
+
+            Args:
+                X: Wave function parameters.
+            """
+            global iteration
+            iteration += 1  # type: ignore
+            if iteration > 100:
+                raise ValueError('Did not converge in 100 iterations in energy minimization.')
 
         parameters = []
         num_kappa = 0
@@ -299,15 +308,18 @@ class WaveFunctionUCC:
             for idx, _, _, _, _, _, _, _, _, _ in self.theta_picker.get_t4_generator(0, 0):
                 parameters += [self.theta4[idx]]
                 num_theta4 += 1
-        print("### Parameters information:")
-        print(f"### Number kappa: {num_kappa}")
-        print(f"### Number theta1: {num_theta1}")
-        print(f"### Number theta2: {num_theta2}")
-        print(f"### Number theta3: {num_theta3}")
-        print(f"### Number theta4: {num_theta4}")
-        print(f"### Total parameters: {num_kappa+num_theta1+num_theta2+num_theta3+num_theta4}\n")
-        print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
-        res = scipy.optimize.minimize(e_tot, parameters, tol=1e-6, callback=print_progress, method="SLSQP")
+        if is_silent:
+            res = scipy.optimize.minimize(e_tot, parameters, tol=convergence_threshold, callback=silent_progress, method="SLSQP")
+        else:
+            print("### Parameters information:")
+            print(f"### Number kappa: {num_kappa}")
+            print(f"### Number theta1: {num_theta1}")
+            print(f"### Number theta2: {num_theta2}")
+            print(f"### Number theta3: {num_theta3}")
+            print(f"### Number theta4: {num_theta4}")
+            print(f"### Total parameters: {num_kappa+num_theta1+num_theta2+num_theta3+num_theta4}\n")
+            print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+            res = scipy.optimize.minimize(e_tot, parameters, tol=convergence_threshold, callback=print_progress, method="SLSQP")
         self.energy_elec = res["fun"]
         param_idx = 0
         if orbital_optimization:
@@ -358,15 +370,16 @@ def run_compactify_wf(wf: WaveFunctionUCC, excitations: str) -> None:
         global iteration2
         global start2
         time_str = f"{time.time() - start2:7.2f}"  # type: ignore
-        e_str = f"{entropy_tot(X):3.6f}"
-        print(f"{str(iteration2+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+        e_str = f"{entropy_tot(X):1.8f}"
+        print(f"{str(iteration2+1).center(11)} | {time_str.center(18)} | {e_str.center(13)}")  # type: ignore
         iteration2 += 1  # type: ignore
         start2 = time.time()  # type: ignore
 
     print(wf.theta1)
     print(wf.theta2)
+    print(f'Initial cost function value: {entropy_ucc(wf.kappa_redundant, wf=wf, excitations=excitations)}')
 
-    print("Iteration # | Iteration time [s] | Shanon Entropy")
+    print("Iteration # | Iteration time [s] | Cost function")
     entropy_tot = partial(entropy_ucc, wf=wf, excitations=excitations)
     res = scipy.optimize.minimize(
         entropy_tot,
@@ -374,7 +387,7 @@ def run_compactify_wf(wf: WaveFunctionUCC, excitations: str) -> None:
         tol=1e-8,
         callback=print_progress2,
         method="BFGS",
-        options={"eps": 10**-4},
+        options={"eps": 10**-6},
     )
     print(wf.theta1)
     print(wf.theta2)
@@ -383,17 +396,14 @@ def run_compactify_wf(wf: WaveFunctionUCC, excitations: str) -> None:
 
 def entropy_ucc(parameters: Sequence[float], wf: WaveFunctionUCC, excitations: str) -> float:
     for i, kappa in enumerate(parameters):
+        if abs(kappa) > 2*np.pi:
+            raise ValueError(f'kappa {i} is uncontrolled, value of {kappa}')
         wf.kappa_redundant[i] = kappa
-    wf.run_ucc(excitations, False)
+    wf.run_ucc(excitations, False, is_silent=True, convergence_threshold=10**-12)
     entropy = 0
     for state in wf.theta1 + wf.theta2:
-        entropy += state**2  # state**2 * np.log(state**2)
-    # print(parameters, -entropy)
-    # print(wf.theta1)
-    # print(wf.theta2)
-    # print("")
-    print(entropy)
-    return entropy
+        entropy += np.log(1/(1e-16 + state**2))
+    return -entropy
 
 
 def energy_ucc(
