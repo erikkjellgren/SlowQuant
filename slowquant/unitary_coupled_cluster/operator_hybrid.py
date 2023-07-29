@@ -25,9 +25,9 @@ def expectation_value_hybrid(
         Expectation value of hybrid operator.
     """
     if len(bra.inactive) != len(ket.inactive):
-        raise ValueError("Bra and Ket does not have same number of inactive orbitals")
+        raise ValueError('Bra and Ket does not have same number of inactive orbitals')
     if len(bra._active) != len(ket._active):
-        raise ValueError("Bra and Ket does not have same number of active orbitals")
+        raise ValueError('Bra and Ket does not have same number of active orbitals')
     total = 0
     for _, op in hybridop.operators.items():
         tmp = 1
@@ -53,7 +53,7 @@ def expectation_value_hybrid(
                 tmp *= np.matmul(bra.bra_active, operator)
         total += tmp
     if abs(total.imag) > 10**-10:
-        print(f"WARNING, imaginary value of {total.imag}")
+        print(f'WARNING, imaginary value of {total.imag}')
     return total.real
 
 
@@ -164,58 +164,58 @@ class OperatorHybrid:
         new_operators: dict[str, np.ndarray] = {}
         for _, op1 in self.operators.items():
             for _, op2 in pauliop.operators.items():
-                new_inactive = ""
-                new_virtual = ""
+                new_inactive = ''
+                new_virtual = ''
                 fac: complex = 1
                 for pauli1, pauli2 in zip(op1.inactive_pauli, op2.inactive_pauli):
-                    if pauli1 == "I":
+                    if pauli1 == 'I':
                         new_inactive += pauli2
-                    elif pauli2 == "I":
+                    elif pauli2 == 'I':
                         new_inactive += pauli1
                     elif pauli1 == pauli2:
-                        new_inactive += "I"
-                    elif pauli1 == "X" and pauli2 == "Y":
-                        new_inactive += "Z"
+                        new_inactive += 'I'
+                    elif pauli1 == 'X' and pauli2 == 'Y':
+                        new_inactive += 'Z'
                         fac *= 1j
-                    elif pauli1 == "X" and pauli2 == "Z":
-                        new_inactive += "Y"
+                    elif pauli1 == 'X' and pauli2 == 'Z':
+                        new_inactive += 'Y'
                         fac *= -1j
-                    elif pauli1 == "Y" and pauli2 == "X":
-                        new_inactive += "Z"
+                    elif pauli1 == 'Y' and pauli2 == 'X':
+                        new_inactive += 'Z'
                         fac *= -1j
-                    elif pauli1 == "Y" and pauli2 == "Z":
-                        new_inactive += "X"
+                    elif pauli1 == 'Y' and pauli2 == 'Z':
+                        new_inactive += 'X'
                         fac *= 1j
-                    elif pauli1 == "Z" and pauli2 == "X":
-                        new_inactive += "Y"
+                    elif pauli1 == 'Z' and pauli2 == 'X':
+                        new_inactive += 'Y'
                         fac *= 1j
-                    elif pauli1 == "Z" and pauli2 == "Y":
-                        new_inactive += "X"
+                    elif pauli1 == 'Z' and pauli2 == 'Y':
+                        new_inactive += 'X'
                         fac *= -1j
                 for pauli1, pauli2 in zip(op1.virtual_pauli, op2.virtual_pauli):
-                    if pauli1 == "I":
+                    if pauli1 == 'I':
                         new_virtual += pauli2
-                    elif pauli2 == "I":
+                    elif pauli2 == 'I':
                         new_virtual += pauli1
                     elif pauli1 == pauli2:
-                        new_virtual += "I"
-                    elif pauli1 == "X" and pauli2 == "Y":
-                        new_virtual += "Z"
+                        new_virtual += 'I'
+                    elif pauli1 == 'X' and pauli2 == 'Y':
+                        new_virtual += 'Z'
                         fac *= 1j
-                    elif pauli1 == "X" and pauli2 == "Z":
-                        new_virtual += "Y"
+                    elif pauli1 == 'X' and pauli2 == 'Z':
+                        new_virtual += 'Y'
                         fac *= -1j
-                    elif pauli1 == "Y" and pauli2 == "X":
-                        new_virtual += "Z"
+                    elif pauli1 == 'Y' and pauli2 == 'X':
+                        new_virtual += 'Z'
                         fac *= -1j
-                    elif pauli1 == "Y" and pauli2 == "Z":
-                        new_virtual += "X"
+                    elif pauli1 == 'Y' and pauli2 == 'Z':
+                        new_virtual += 'X'
                         fac *= 1j
-                    elif pauli1 == "Z" and pauli2 == "X":
-                        new_virtual += "Y"
+                    elif pauli1 == 'Z' and pauli2 == 'X':
+                        new_virtual += 'Y'
                         fac *= 1j
-                    elif pauli1 == "Z" and pauli2 == "Y":
-                        new_virtual += "X"
+                    elif pauli1 == 'Z' and pauli2 == 'Y':
+                        new_virtual += 'X'
                         fac *= -1j
                 new_active = fac * lw.matmul(op1.active_matrix, op2.active_matrix)
                 key = new_inactive + new_virtual

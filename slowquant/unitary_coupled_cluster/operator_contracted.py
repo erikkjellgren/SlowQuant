@@ -20,31 +20,31 @@ def pauli_mul(pauli1: str, pauli2: str) -> tuple[str, complex]:
     Returns:
         New Pauli operator and factor.
     """
-    new_pauli = ""
+    new_pauli = ''
     fac: complex = 1
-    if pauli1 == "I":
+    if pauli1 == 'I':
         new_pauli = pauli2
-    elif pauli2 == "I":
+    elif pauli2 == 'I':
         new_pauli = pauli1
     elif pauli1 == pauli2:
-        new_pauli = "I"
-    elif pauli1 == "X" and pauli2 == "Y":
-        new_pauli = "Z"
+        new_pauli = 'I'
+    elif pauli1 == 'X' and pauli2 == 'Y':
+        new_pauli = 'Z'
         fac *= 1j
-    elif pauli1 == "X" and pauli2 == "Z":
-        new_pauli = "Y"
+    elif pauli1 == 'X' and pauli2 == 'Z':
+        new_pauli = 'Y'
         fac *= -1j
-    elif pauli1 == "Y" and pauli2 == "X":
-        new_pauli = "Z"
+    elif pauli1 == 'Y' and pauli2 == 'X':
+        new_pauli = 'Z'
         fac *= -1j
-    elif pauli1 == "Y" and pauli2 == "Z":
-        new_pauli = "X"
+    elif pauli1 == 'Y' and pauli2 == 'Z':
+        new_pauli = 'X'
         fac *= 1j
-    elif pauli1 == "Z" and pauli2 == "X":
-        new_pauli = "Y"
+    elif pauli1 == 'Z' and pauli2 == 'X':
+        new_pauli = 'Y'
         fac *= 1j
-    elif pauli1 == "Z" and pauli2 == "Y":
-        new_pauli = "X"
+    elif pauli1 == 'Z' and pauli2 == 'Y':
+        new_pauli = 'X'
         fac *= -1j
     return new_pauli, fac
 
@@ -104,7 +104,7 @@ class OperatorContracted:
         Args:
             contracted_op: Contracted operator.
         """
-        raise ArithmeticError("Cannot mulitply operators with inactive and virtual orbitals contracted.")
+        raise ArithmeticError('Cannot mulitply operators with inactive and virtual orbitals contracted.')
 
     def __rmul__(self, number: float) -> OperatorContracted:
         """Overload right multiplication operator.
@@ -161,17 +161,17 @@ def operatormul_contract(A: OperatorHybrid, B: OperatorHybrid) -> OperatorContra
     """
     key = list(A.operators.keys())[0]
     if not isinstance(A.operators[key].active_matrix, (np.ndarray, ss.csr_matrix, ss.csc_matrix)):
-        raise TypeError(f"Unknown type: {type(A.operators[key].active_matrix)}")
+        raise TypeError(f'Unknown type: {type(A.operators[key].active_matrix)}')
     new_operators = lw.zeros_like(A.operators[key].active_matrix)
     for _, op1 in A.operators.items():
         for _, op2 in B.operators.items():
-            new_inactive = ""
-            new_virtual = ""
+            new_inactive = ''
+            new_virtual = ''
             fac: complex = 1
             is_zero = False
             for pauli1, pauli2 in zip(op1.inactive_pauli, op2.inactive_pauli):
                 new_pauli, new_fac = paulistring_mul((pauli1, pauli2))
-                if new_pauli in ("Y", "X"):
+                if new_pauli in ('Y', 'X'):
                     is_zero = True
                     break
                 new_inactive += new_pauli
@@ -180,7 +180,7 @@ def operatormul_contract(A: OperatorHybrid, B: OperatorHybrid) -> OperatorContra
                 continue
             for pauli1, pauli2 in zip(op1.virtual_pauli, op2.virtual_pauli):
                 new_pauli, new_fac = paulistring_mul((pauli1, pauli2))
-                if new_pauli in ("Y", "X"):
+                if new_pauli in ('Y', 'X'):
                     is_zero = True
                     break
                 new_virtual += new_pauli
@@ -189,7 +189,7 @@ def operatormul_contract(A: OperatorHybrid, B: OperatorHybrid) -> OperatorContra
                 continue
             # This should depend on state vector.
             # I.e. (-1)**(#Z_occupied)
-            fac *= (-1) ** (new_inactive.count("Z"))
+            fac *= (-1) ** (new_inactive.count('Z'))
             new_operators += fac * lw.matmul(op1.active_matrix, op2.active_matrix)
     return OperatorContracted(new_operators)
 
@@ -207,18 +207,18 @@ def operatormul3_contract(A: OperatorHybrid, B: OperatorHybrid, C: OperatorHybri
     """
     key = list(A.operators.keys())[0]
     if not isinstance(A.operators[key].active_matrix, (np.ndarray, ss.csr_matrix, ss.csc_matrix)):
-        raise TypeError(f"Unknown type: {type(A.operators[key].active_matrix)}")
+        raise TypeError(f'Unknown type: {type(A.operators[key].active_matrix)}')
     new_operators = lw.zeros_like(A.operators[key].active_matrix)
     for _, op1 in A.operators.items():
         for _, op2 in B.operators.items():
             for _, op3 in C.operators.items():
-                new_inactive = ""
-                new_virtual = ""
+                new_inactive = ''
+                new_virtual = ''
                 fac: complex = 1
                 is_zero = False
                 for pauli1, pauli2, pauli3 in zip(op1.inactive_pauli, op2.inactive_pauli, op3.inactive_pauli):
                     new_pauli, new_fac = paulistring_mul((pauli1, pauli2, pauli3))
-                    if new_pauli in ("X", "Y"):
+                    if new_pauli in ('X', 'Y'):
                         is_zero = True
                         break
                     new_inactive += new_pauli
@@ -227,7 +227,7 @@ def operatormul3_contract(A: OperatorHybrid, B: OperatorHybrid, C: OperatorHybri
                     continue
                 for pauli1, pauli2, pauli3 in zip(op1.virtual_pauli, op2.virtual_pauli, op3.virtual_pauli):
                     new_pauli, new_fac = paulistring_mul((pauli1, pauli2, pauli3))
-                    if new_pauli in ("X", "Y"):
+                    if new_pauli in ('X', 'Y'):
                         is_zero = True
                         break
                     new_virtual += new_pauli
@@ -236,7 +236,7 @@ def operatormul3_contract(A: OperatorHybrid, B: OperatorHybrid, C: OperatorHybri
                     continue
                 # This should depend on state vector.
                 # I.e. (-1)**(#Z_occupied)
-                fac *= (-1) ** (new_inactive.count("Z"))
+                fac *= (-1) ** (new_inactive.count('Z'))
                 new_operators += fac * lw.matmul(
                     op1.active_matrix, lw.matmul(op2.active_matrix, op3.active_matrix)
                 )
@@ -262,21 +262,21 @@ def operatormul4_contract(
     """
     key = list(A.operators.keys())[0]
     if not isinstance(A.operators[key].active_matrix, (np.ndarray, ss.csr_matrix, ss.csc_matrix)):
-        raise TypeError(f"Unknown type: {type(A.operators[key].active_matrix)}")
+        raise TypeError(f'Unknown type: {type(A.operators[key].active_matrix)}')
     new_operators = lw.zeros_like(A.operators[key].active_matrix)
     for _, op1 in A.operators.items():
         for _, op2 in B.operators.items():
             for _, op3 in C.operators.items():
                 for _, op4 in D.operators.items():
-                    new_inactive = ""
-                    new_virtual = ""
+                    new_inactive = ''
+                    new_virtual = ''
                     fac: complex = 1
                     is_zero = False
                     for pauli1, pauli2, pauli3, pauli4 in zip(
                         op1.inactive_pauli, op2.inactive_pauli, op3.inactive_pauli, op4.inactive_pauli
                     ):
                         new_pauli, new_fac = paulistring_mul((pauli1, pauli2, pauli3, pauli4))
-                        if new_pauli in ("X", "Y"):
+                        if new_pauli in ('X', 'Y'):
                             is_zero = True
                             break
                         new_inactive += new_pauli
@@ -287,7 +287,7 @@ def operatormul4_contract(
                         op1.virtual_pauli, op2.virtual_pauli, op3.virtual_pauli, op4.virtual_pauli
                     ):
                         new_pauli, new_fac = paulistring_mul((pauli1, pauli2, pauli3, pauli4))
-                        if new_pauli in ("X", "Y"):
+                        if new_pauli in ('X', 'Y'):
                             is_zero = True
                             break
                         new_virtual += new_pauli
@@ -296,7 +296,7 @@ def operatormul4_contract(
                         continue
                     # This should depend on state vector.
                     # I.e. (-1)**(#Z_occupied)
-                    fac *= (-1) ** (new_inactive.count("Z"))
+                    fac *= (-1) ** (new_inactive.count('Z'))
                     new_operators += fac * lw.matmul(
                         op1.active_matrix,
                         lw.matmul(op2.active_matrix, lw.matmul(op3.active_matrix, op4.active_matrix)),
@@ -357,4 +357,4 @@ def expectation_value_contracted(
         return lw.matmul(
             bra.bra_active_csr, lw.matmul(contracted_op.operators, ket.ket_active_csr)
         ).real.toarray()[0, 0]
-    raise TypeError(f"Unknown type: {type(contracted_op.operators)}")
+    raise TypeError(f'Unknown type: {type(contracted_op.operators)}')

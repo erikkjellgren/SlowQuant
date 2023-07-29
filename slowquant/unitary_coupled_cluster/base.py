@@ -68,15 +68,15 @@ def pauli_to_mat(pauli: str) -> np.ndarray:
     Returns:
         Pauli matrix.
     """
-    if pauli == "I":
+    if pauli == 'I':
         return np.array([[1, 0], [0, 1]], dtype=float)
-    if pauli == "Z":
+    if pauli == 'Z':
         return np.array([[1, 0], [0, -1]], dtype=float)
-    if pauli == "X":
+    if pauli == 'X':
         return np.array([[0, 1], [1, 0]], dtype=float)
-    if pauli == "Y":
+    if pauli == 'Y':
         return np.array([[0, -1j], [1j, 0]], dtype=complex)
-    raise ValueError(f"Got unknown string: {pauli}")
+    raise ValueError(f'Got unknown string: {pauli}')
 
 
 class StateVector:

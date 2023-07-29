@@ -121,7 +121,7 @@ class _HartreeFock:
         """
         spin_contamination = 0.0
         S_alpha_beta = np.einsum(
-            "ai,bj,ab->ij", self.mo_coeff_alpha, self.mo_coeff_beta, self.int_obj.overlap_matrix
+            'ai,bj,ab->ij', self.mo_coeff_alpha, self.mo_coeff_beta, self.int_obj.overlap_matrix
         )
         for i in range(self.mol_obj.number_electrons_alpha):
             for j in range(self.mol_obj.number_electrons_beta):

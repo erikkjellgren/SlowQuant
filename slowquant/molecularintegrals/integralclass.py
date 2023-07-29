@@ -26,7 +26,7 @@ class _Integral:
         self.logger = _Logger()
         if (self.molecule_object.number_bf) ** 4 * 8 / 10**9 > 6:
             self.logger.add_to_log(
-                f"Storing 2-electron integrals in memory will use approx {self.molecule_object.number_bf**4*8/10**9:3.1f} GB",
+                f'Storing 2-electron integrals in memory will use approx {self.molecule_object.number_bf**4*8/10**9:3.1f} GB',
                 is_warning=True,
             )
         self.force_recompute = False

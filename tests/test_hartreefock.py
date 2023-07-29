@@ -11,9 +11,9 @@ def test_restricted_hartree_fock_h2o_sto3g() -> None:
         """O 0.000000000000  -0.143225816552   0.000000000000;
            H 1.638036840407   1.136548822547  -0.000000000000;
            H -1.638036840407   1.136548822547  -0.000000000000;""",
-        distance_unit="bohr",
+        distance_unit='bohr',
     )
-    A.set_basis_set("sto-3g")
+    A.set_basis_set('sto-3g')
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
     assert abs(A.molecule.nuclear_repulsion - 8.0023670618) < 10**-6
@@ -30,9 +30,9 @@ def test_restricted_hartree_fock_h2o_dz() -> None:
         """O 0.000000000000  -0.143225816552   0.000000000000;
            H 1.638036840407   1.136548822547  -0.000000000000;
            H -1.638036840407   1.136548822547  -0.000000000000;""",
-        distance_unit="bohr",
+        distance_unit='bohr',
     )
-    A.set_basis_set("dz")
+    A.set_basis_set('dz')
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
     assert abs(A.molecule.nuclear_repulsion - 8.0023670618) < 10**-6
@@ -50,9 +50,9 @@ def test_restricted_hartree_fock_h2o_dzp() -> None:
         """O 0.000000000000  -0.143225816552   0.000000000000;
            H 1.638036840407   1.136548822547  -0.000000000000;
            H -1.638036840407   1.136548822547  -0.000000000000;""",
-        distance_unit="bohr",
+        distance_unit='bohr',
     )
-    A.set_basis_set("dzp")
+    A.set_basis_set('dzp')
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
     assert abs(A.molecule.nuclear_repulsion - 8.0023670618) < 10**-6
@@ -71,9 +71,9 @@ def test_restricted_hartree_fock_ch4_sto3g() -> None:
            H   1.183771681898   1.183771681898   1.183771681898;
            H  -1.183771681898   1.183771681898  -1.183771681898;
            H  -1.183771681898  -1.183771681898   1.183771681898""",
-        distance_unit="bohr",
+        distance_unit='bohr',
     )
-    A.set_basis_set("sto-3g")
+    A.set_basis_set('sto-3g')
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
     assert abs(A.molecule.nuclear_repulsion - 13.4973044620) < 10**-6

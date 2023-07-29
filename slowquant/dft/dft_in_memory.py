@@ -53,7 +53,7 @@ def run_ksdft(
     D0 = 2 * np.dot(np.transpose(C0), C0)
 
     # Initial Energy
-    E0 = np.einsum("ij,ij->", D0, Hcore)
+    E0 = np.einsum('ij,ij->', D0, Hcore)
 
     # Init DIIS
     if use_diis:
@@ -63,12 +63,12 @@ def run_ksdft(
     # SCF iterations
     for iteration in range(1, max_scf_iterations + 1):
         # New Fock Matrix
-        J = np.einsum("pqrs,sr->pq", ERI, D0)
+        J = np.einsum('pqrs,sr->pq', ERI, D0)
 
-        rho = density = np.einsum("kp,kq,pq->k", bf_amplitudes, bf_amplitudes, D0)
+        rho = density = np.einsum('kp,kq,pq->k', bf_amplitudes, bf_amplitudes, D0)
         e_xc, v_xc = functional(rho)
-        E_xc = np.einsum("k,k,k->", e_xc, rho, grid_weights)
-        V_xc = np.einsum("kp,kq,k,k->pq", bf_amplitudes, bf_amplitudes, v_xc, grid_weights)
+        E_xc = np.einsum('k,k,k->', e_xc, rho, grid_weights)
+        V_xc = np.einsum('kp,kq,k,k->pq', bf_amplitudes, bf_amplitudes, v_xc, grid_weights)
 
         F = Hcore + J + V_xc
 
@@ -88,14 +88,14 @@ def run_ksdft(
         D = 2 * np.dot(Cocc, CTocc)
 
         # New SCF Energy
-        E = 0.5 * np.einsum("ij,ij->", D, 2 * Hcore + J) + E_xc
+        E = 0.5 * np.einsum('ij,ij->', D, 2 * Hcore + J) + E_xc
 
         # Convergance
         dE = E - E0
-        rmsd = np.einsum("ij->", (D - D0) ** 2) ** 0.5
+        rmsd = np.einsum('ij->', (D - D0) ** 2) ** 0.5
 
         # Logging
-        log.add_to_log(f"{iteration:>4}    {E: 18.12f}    {dE: 1.6e}    {rmsd:1.6e}")
+        log.add_to_log(f'{iteration:>4}    {E: 18.12f}    {dE: 1.6e}    {rmsd:1.6e}')
 
         D0 = D
         E0 = E
@@ -103,7 +103,7 @@ def run_ksdft(
             break
     else:
         log.add_to_log(
-            f"Restricted Hartree-Fock did not meet convergence requirements in {max_scf_iterations} iterations",
+            f'Restricted Hartree-Fock did not meet convergence requirements in {max_scf_iterations} iterations',
             is_warning=True,
         )
 

@@ -130,5 +130,5 @@ def multipole_integral(
                                 )
                     S_primitive[bf_i, bf_j, i, j] *= temp * norm2[bf_j, j]
 
-    S_slice = np.einsum("i,j,klij->kl", contra_coeff1, contra_coeff2, S_primitive)
+    S_slice = np.einsum('i,j,klij->kl', contra_coeff1, contra_coeff2, S_primitive)
     return S_slice

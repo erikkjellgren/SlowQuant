@@ -23,6 +23,6 @@ def dipole_moment(
     Returns:
         Molecular dipolemoment (x, y, z).
     """
-    return -np.einsum("ij,kij->k", rdm1, dipole_integrals) + np.einsum(
-        "i,ik->k", atom_charges, atom_coordinates - dipole_origin
+    return -np.einsum('ij,kij->k', rdm1, dipole_integrals) + np.einsum(
+        'i,ik->k', atom_charges, atom_coordinates - dipole_origin
     )

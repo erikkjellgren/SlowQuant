@@ -1,7 +1,7 @@
 class _Logger:
     def __init__(self) -> None:
         """Initialize logger."""
-        self.log = ""
+        self.log = ''
         self.print_output = True
         self.print_warnings = True
 
@@ -12,13 +12,13 @@ class _Logger:
             content: Content to add to log.
             is_warning: Log is a warning.
         """
-        content += "\n"
+        content += '\n'
         if is_warning:
-            content = f"WARNING: {content}"
+            content = f'WARNING: {content}'
         if self.print_output:
-            print(content, end="")
+            print(content, end='')
             self.log.join(content)
         elif is_warning and self.print_warnings:
-            print(content, end="")
+            print(content, end='')
             self.log.join(content)
         self.log.join(content)

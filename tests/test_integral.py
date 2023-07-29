@@ -19,9 +19,9 @@ def test_cauchy_schwarz_inequality() -> None:
                         H   3.000000000000   0.000000000000   0.000000000000;
                         H   4.000000000000   0.000000000000   0.000000000000;
                         H   5.000000000000   0.000000000000   0.000000000000""",
-        distance_unit="bohr",
+        distance_unit='bohr',
     )
-    ref.set_basis_set("dzp")
+    ref.set_basis_set('dzp')
     ref.integral.cauchy_schwarz_threshold = 10**-20
     ref_eri = ref.integral.electron_repulsion_tensor
 
@@ -33,9 +33,9 @@ def test_cauchy_schwarz_inequality() -> None:
                       H   3.000000000000   0.000000000000   0.000000000000;
                       H   4.000000000000   0.000000000000   0.000000000000;
                       H   5.000000000000   0.000000000000   0.000000000000""",
-        distance_unit="bohr",
+        distance_unit='bohr',
     )
-    A.set_basis_set("dzp")
+    A.set_basis_set('dzp')
     A.integral.cauchy_schwarz_threshold = 10**-8
     assert_allclose(A.integral.electron_repulsion_tensor, ref_eri, atol=10**-8)
 
@@ -47,9 +47,9 @@ def test_cauchy_schwarz_inequality() -> None:
                       H   3.000000000000   0.000000000000   0.000000000000;
                       H   4.000000000000   0.000000000000   0.000000000000;
                       H   5.000000000000   0.000000000000   0.000000000000""",
-        distance_unit="bohr",
+        distance_unit='bohr',
     )
-    A.set_basis_set("dzp")
+    A.set_basis_set('dzp')
     A.integral.cauchy_schwarz_threshold = 10**-3
     assert_allclose(A.integral.electron_repulsion_tensor, ref_eri, atol=10**-3)
 
@@ -61,8 +61,8 @@ def test_cauchy_schwarz_inequality() -> None:
                       H   3.000000000000   0.000000000000   0.000000000000;
                       H   4.000000000000   0.000000000000   0.000000000000;
                       H   5.000000000000   0.000000000000   0.000000000000""",
-        distance_unit="bohr",
+        distance_unit='bohr',
     )
-    A.set_basis_set("dzp")
+    A.set_basis_set('dzp')
     A.integral.cauchy_schwarz_threshold = 10**10
     assert_allclose(A.integral.electron_repulsion_tensor, np.zeros(np.shape(ref_eri)), atol=10**-8)

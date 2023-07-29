@@ -1,14 +1,5 @@
-# Files made by program
-
-# Files made by python
-__pycache__/
 .cache/
-.pytest_cache/
-
-# Editing documentation
-local_documentation/
-
-# Files made from setup
-
-# Using Jupyter
 .ipynb_checkpoints/
+.pytest_cache/
+__pycache__/
+local_documentation/

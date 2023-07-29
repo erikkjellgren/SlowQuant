@@ -75,9 +75,9 @@ class LinearResponseUCC:
             self.wf.num_active_elec,
             self.wf.theta1 + self.wf.theta2 + self.wf.theta3 + self.wf.theta4,
             self.wf.theta_picker_full,
-            "sdtq",  # self.wf._excitations,
+            'sdtq',  # self.wf._excitations,
         )
-        if "s" in excitations:
+        if 's' in excitations:
             for _, a, i, op_ in self.theta_picker.get_t1_generator_sa(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
                     op_,
@@ -89,7 +89,7 @@ class LinearResponseUCC:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                 self.G_ops.append(ResponseOperator((i), (a), op))
-        if "d" in excitations:
+        if 'd' in excitations:
             for _, a, i, b, j, op_ in self.theta_picker.get_t2_generator_sa(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
                     op_,
@@ -101,7 +101,7 @@ class LinearResponseUCC:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                 self.G_ops.append(ResponseOperator((i, j), (a, b), op))
-        if "t" in excitations:
+        if 't' in excitations:
             for _, a, i, b, j, c, k, op_ in self.theta_picker.get_t3_generator(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
                     op_,
@@ -113,7 +113,7 @@ class LinearResponseUCC:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                 self.G_ops.append(ResponseOperator((i, j, k), (a, b, c), op))
-        if "q" in excitations:
+        if 'q' in excitations:
             for _, a, i, b, j, c, k, d, l, op_ in self.theta_picker.get_t4_generator(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
                     op_,
@@ -161,12 +161,12 @@ class LinearResponseUCC:
             self.wf.num_virtual_spin_orbs,
         )
         idx_shift = len(self.q_ops)
-        print("Gs", len(self.G_ops))
-        print("qs", len(self.q_ops))
+        print('Gs', len(self.G_ops))
+        print('qs', len(self.q_ops))
         if do_selfconsistent_operators:
-            calculation_type = "selfconsistent"
+            calculation_type = 'selfconsistent'
         else:
-            calculation_type = "naive"
+            calculation_type = 'naive'
         # calculation_type = "generic"
         for j, opJ in enumerate(self.q_ops):
             qJ = opJ.operator
@@ -174,7 +174,7 @@ class LinearResponseUCC:
                 qI = opI.operator
                 if i < j:
                     continue
-                if calculation_type in ("selfconsistent", "naive"):
+                if calculation_type in ('selfconsistent', 'naive'):
                     # Make M
                     operator = operatormul3_contract(qI.dagger, H, qJ) - operatormul3_contract(
                         qI.dagger, qJ, H
@@ -195,7 +195,7 @@ class LinearResponseUCC:
                         self.wf.state_vector,
                     )
                     # Make W
-                elif calculation_type == "generic":
+                elif calculation_type == 'generic':
                     # Make M
                     self.M[i, j] = self.M[j, i] = expectation_value_contracted(
                         self.wf.state_vector,
@@ -221,12 +221,12 @@ class LinearResponseUCC:
                         self.wf.state_vector,
                     )
                 else:
-                    raise NameError("Could not determine calculation_type got: {calculation_type}")
+                    raise NameError('Could not determine calculation_type got: {calculation_type}')
         for j, opJ in enumerate(self.G_ops):
             GJ = opJ.operator
             for i, opI in enumerate(self.q_ops):
                 qI = opI.operator
-                if calculation_type == "selfconsistent":
+                if calculation_type == 'selfconsistent':
                     # Make M
                     operator = operatormul3_contract(qI.dagger, H, GJ) - operatormul3_contract(
                         qI.dagger, GJ, H
@@ -242,7 +242,7 @@ class LinearResponseUCC:
                     )
                     # Make V
                     # Make W
-                elif calculation_type == "naive":
+                elif calculation_type == 'naive':
                     # Make M
                     operator = operatormul3_contract(qI.dagger, H, GJ) - operatormul3_contract(
                         qI.dagger, GJ, H
@@ -261,7 +261,7 @@ class LinearResponseUCC:
                     )
                     # Make V
                     # Make W
-                elif calculation_type == "generic":
+                elif calculation_type == 'generic':
                     # Make M
                     self.M[i, j + idx_shift] = expectation_value_contracted(
                         self.wf.state_vector,
@@ -283,12 +283,12 @@ class LinearResponseUCC:
                         self.wf.state_vector, commutator_contract(qI.dagger, GJ.dagger), self.wf.state_vector
                     )
                 else:
-                    raise NameError("Could not determine calculation_type got: {calculation_type}")
+                    raise NameError('Could not determine calculation_type got: {calculation_type}')
         for j, opJ in enumerate(self.q_ops):
             qJ = opJ.operator
             for i, opI in enumerate(self.G_ops):
                 GI = opI.operator
-                if calculation_type == "selfconsistent":
+                if calculation_type == 'selfconsistent':
                     # Make M
                     operator = operatormul3_contract(GI.dagger, H, qJ) - operatormul3_contract(
                         GI.dagger, qJ, H
@@ -304,7 +304,7 @@ class LinearResponseUCC:
                     )
                     # Make V
                     # Make W
-                elif calculation_type == "naive":
+                elif calculation_type == 'naive':
                     # Make M
                     operator = (
                         operatormul3_contract(GI.dagger, H, qJ)
@@ -323,7 +323,7 @@ class LinearResponseUCC:
                     )
                     # Make V
                     # Make W
-                elif calculation_type == "generic":
+                elif calculation_type == 'generic':
                     # Make M
                     self.M[i + idx_shift, j] = expectation_value_contracted(
                         self.wf.state_vector,
@@ -345,14 +345,14 @@ class LinearResponseUCC:
                         self.wf.state_vector, commutator_contract(GI.dagger, qJ.dagger), self.wf.state_vector
                     )
                 else:
-                    raise NameError("Could not determine calculation_type got: {calculation_type}")
+                    raise NameError('Could not determine calculation_type got: {calculation_type}')
         for j, opJ in enumerate(self.G_ops):
             GJ = opJ.operator
             for i, opI in enumerate(self.G_ops):
                 GI = opI.operator
                 if i < j:
                     continue
-                if calculation_type == "selfconsistent":
+                if calculation_type == 'selfconsistent':
                     # Make M
                     operator = operatormul3_contract(GI.dagger, H_en, GJ)
                     operator -= operatormul3_contract(GI.dagger, GJ, H_en)
@@ -371,7 +371,7 @@ class LinearResponseUCC:
                     if i == j:
                         self.V[i + idx_shift, j + idx_shift] = self.V[j + idx_shift, i + idx_shift] = 1
                     # Make W
-                elif calculation_type == "naive":
+                elif calculation_type == 'naive':
                     # Make M
                     self.M[i + idx_shift, j + idx_shift] = self.M[
                         j + idx_shift, i + idx_shift
@@ -395,7 +395,7 @@ class LinearResponseUCC:
                         self.wf.state_vector, commutator_contract(GI.dagger, GJ), self.wf.state_vector
                     )
                     # Make W
-                elif calculation_type == "generic":
+                elif calculation_type == 'generic':
                     # Make M
                     self.M[i + idx_shift, j + idx_shift] = self.M[
                         j + idx_shift, i + idx_shift
@@ -425,7 +425,7 @@ class LinearResponseUCC:
                         self.wf.state_vector, commutator_contract(GI.dagger, GJ.dagger), self.wf.state_vector
                     )
                 else:
-                    raise NameError("Could not determine calculation_type got: {calculation_type}")
+                    raise NameError('Could not determine calculation_type got: {calculation_type}')
 
     def calc_excitation_energies(self) -> None:
         """Calculate excitation energies."""
@@ -465,9 +465,9 @@ class LinearResponseUCC:
         Returns:
             Tabulized excitation assignment.
         """
-        output = f"Response vector analysis for excitation {state_number+1}\n"
+        output = f'Response vector analysis for excitation {state_number+1}\n'
         output += (
-            "Occupied idxs | Unoccupied idxs | Response vector element | Normalized response vector element\n"
+            'Occupied idxs | Unoccupied idxs | Response vector element | Normalized response vector element\n'
         )
         excitations = len(self.q_ops) + len(self.G_ops)
         skip_threshold = threshold * np.max(np.abs(self.response_vectors[:, state_number]))
@@ -478,9 +478,9 @@ class LinearResponseUCC:
         ):
             if abs(resp_val) < skip_threshold:
                 continue
-            resp_val_str = f"{resp_val:1.6f}"
-            normed_resp_val_str = f"{normed_resp_val:1.6f}"
-            output += f"{str(operator.occ_idx).center(13)} | {str(operator.unocc_idx).center(15)} | {resp_val_str.center(23)} | {normed_resp_val_str.center(34)}\n"
+            resp_val_str = f'{resp_val:1.6f}'
+            normed_resp_val_str = f'{normed_resp_val:1.6f}'
+            output += f'{str(operator.occ_idx).center(13)} | {str(operator.unocc_idx).center(15)} | {resp_val_str.center(23)} | {normed_resp_val_str.center(34)}\n'
         for resp_val, normed_resp_val, operator in zip(
             self.response_vectors[excitations:, state_number],
             self.normed_response_vectors[excitations:, state_number],
@@ -488,9 +488,9 @@ class LinearResponseUCC:
         ):
             if abs(resp_val) < skip_threshold:
                 continue
-            resp_val_str = f"{resp_val:1.6f}"
-            normed_resp_val_str = f"{normed_resp_val:1.6f}"
-            output += f"{str(operator.unocc_idx).center(13)} | {str(operator.occ_idx).center(15)} | {resp_val_str.center(23)} | {normed_resp_val_str.center(34)}\n"
+            resp_val_str = f'{resp_val:1.6f}'
+            normed_resp_val_str = f'{normed_resp_val:1.6f}'
+            output += f'{str(operator.unocc_idx).center(13)} | {str(operator.occ_idx).center(15)} | {resp_val_str.center(23)} | {normed_resp_val_str.center(34)}\n'
         return output
 
     def get_excited_state_overlap(self, state_number: int) -> float:
@@ -503,7 +503,7 @@ class LinearResponseUCC:
             Overlap between ground state and excited state.
         """
         number_excitations = len(self.excitation_energies)
-        print("WARNING: This function [get_excited_state_overlap] might not be working.")
+        print('WARNING: This function [get_excited_state_overlap] might not be working.')
         for i, op in enumerate(self.q_ops + self.G_ops):
             G = op.operator
             if i == 0:
@@ -557,7 +557,7 @@ class LinearResponseUCC:
             Transition dipole moment.
         """
         if len(dipole_integrals) != 3:
-            raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
+            raise ValueError(f'Expected 3 dipole integrals got {len(dipole_integrals)}')
         number_excitations = len(self.excitation_energies)
         for i, op in enumerate(self.q_ops + self.G_ops):
             G = op.operator
@@ -649,7 +649,7 @@ class LinearResponseUCC:
             * (transition_dipole_x**2 + transition_dipole_y**2 + transition_dipole_z**2)
         )
 
-    def get_nice_output(self, dipole_integrals: np.ndarray) -> str:
+    def get_nice_output(self, dipole_integrals: Sequence[np.ndarray]) -> str:
         """Create table of excitation energies and oscillator strengths.
 
         Args:
@@ -659,12 +659,12 @@ class LinearResponseUCC:
             Nicely formatted table.
         """
         output = (
-            "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n"
+            'Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n'
         )
         for i, exc_energy in enumerate(self.excitation_energies):
             osc_strength = self.get_oscillator_strength(i, dipole_integrals)
-            exc_str = f"{exc_energy:2.6f}"
-            exc_str_ev = f"{exc_energy*27.2114079527:3.6f}"
-            osc_str = f"{osc_strength:1.6f}"
-            output += f"{str(i+1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
+            exc_str = f'{exc_energy:2.6f}'
+            exc_str_ev = f'{exc_energy*27.2114079527:3.6f}'
+            osc_str = f'{osc_strength:1.6f}'
+            output += f'{str(i+1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n'
         return output

@@ -55,7 +55,7 @@ def run_unrestricted_hartree_fock(
     D0_beta = np.dot(np.transpose(C0_beta), C0_beta)
 
     # Initial Energy
-    E0 = np.einsum("ij,ij->", D0_alpha, Hcore) + np.einsum("ij,ij->", D0_beta, Hcore)
+    E0 = np.einsum('ij,ij->', D0_alpha, Hcore) + np.einsum('ij,ij->', D0_beta, Hcore)
 
     # Init DIIS
     if use_diis:
@@ -66,10 +66,10 @@ def run_unrestricted_hartree_fock(
     # SCF iterations
     for iteration in range(1, max_scf_iterations + 1):
         # New Fock Matrix
-        J_alpha = np.einsum("pqrs,sr->pq", ERI, D0_alpha)
-        K_alpha = np.einsum("psqr,sr->pq", ERI, D0_alpha)
-        J_beta = np.einsum("pqrs,sr->pq", ERI, D0_beta)
-        K_beta = np.einsum("psqr,sr->pq", ERI, D0_beta)
+        J_alpha = np.einsum('pqrs,sr->pq', ERI, D0_alpha)
+        K_alpha = np.einsum('psqr,sr->pq', ERI, D0_alpha)
+        J_beta = np.einsum('pqrs,sr->pq', ERI, D0_beta)
+        K_beta = np.einsum('psqr,sr->pq', ERI, D0_beta)
         F_alpha = Hcore + J_alpha + J_beta - K_alpha
         F_beta = Hcore + J_beta + J_alpha - K_beta
 
@@ -97,18 +97,18 @@ def run_unrestricted_hartree_fock(
         D_beta = np.dot(Cocc_beta, CTocc_beta)
 
         # New SCF Energy
-        E = 0.5 * np.einsum("ij,ij->", D_alpha, Hcore + F_alpha) + 0.5 * np.einsum(
-            "ij,ij->", D_beta, Hcore + F_beta
+        E = 0.5 * np.einsum('ij,ij->', D_alpha, Hcore + F_alpha) + 0.5 * np.einsum(
+            'ij,ij->', D_beta, Hcore + F_beta
         )
 
         # Convergance
         dE = E - E0
-        rmsd_alpha = np.einsum("ij->", (D_alpha - D0_alpha) ** 2) ** 0.5
-        rmsd_beta = np.einsum("ij->", (D_beta - D0_beta) ** 2) ** 0.5
+        rmsd_alpha = np.einsum('ij->', (D_alpha - D0_alpha) ** 2) ** 0.5
+        rmsd_beta = np.einsum('ij->', (D_beta - D0_beta) ** 2) ** 0.5
 
         # Logging
         log.add_to_log(
-            f"{iteration:>4}    {E: 18.12f}    {dE: 1.6e}    {rmsd_alpha:1.6e}     {rmsd_beta:1.6e}"
+            f'{iteration:>4}    {E: 18.12f}    {dE: 1.6e}    {rmsd_alpha:1.6e}     {rmsd_beta:1.6e}'
         )
 
         D0_alpha = D_alpha
@@ -118,7 +118,7 @@ def run_unrestricted_hartree_fock(
             break
     else:
         log.add_to_log(
-            f"Unrestricted Hartree-Fock did not meet convergence requirements in {max_scf_iterations} iterations",
+            f'Unrestricted Hartree-Fock did not meet convergence requirements in {max_scf_iterations} iterations',
             is_warning=True,
         )
 

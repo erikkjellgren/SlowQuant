@@ -16,3 +16,4 @@ SlowQuant
    autodoc/molecularintegrals.rst
    autodoc/hartreefock.rst
    autodoc/properties.rst
+   autodoc/unitary_coupled_cluster.rst

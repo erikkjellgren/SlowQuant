@@ -12,9 +12,9 @@ def test_unrestricted_hartree_fock_h2o_sto3g() -> None:
         """O 0.000000000000  -0.143225816552   0.000000000000;
            H 1.638036840407   1.136548822547  -0.000000000000;
            H -1.638036840407   1.136548822547  -0.000000000000;""",
-        distance_unit="bohr",
+        distance_unit='bohr',
     )
-    A.set_basis_set("sto-3g")
+    A.set_basis_set('sto-3g')
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
     A.hartree_fock.uhf_lumo_homo_mix_coeff = 0.0
@@ -32,9 +32,9 @@ def test_unrestricted_hartree_fock_n2_631gs() -> None:
     A.set_molecule(
         """N   0.000000000000  0.000000000000   0.000000000000;
                       N  2.074000000000   0.000000000000  -0.000000000000""",
-        distance_unit="bohr",
+        distance_unit='bohr',
     )
-    A.set_basis_set("6-31G*")
+    A.set_basis_set('6-31G*')
     A.init_hartree_fock()
     A.hartree_fock.run_unrestricted_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
@@ -46,9 +46,9 @@ def test_unrestricted_hartree_fock_n2_631gs() -> None:
     A.set_molecule(
         """N   0.000000000000  0.000000000000   0.000000000000;
                       N  2.074000000000   0.000000000000  -0.000000000000""",
-        distance_unit="bohr",
+        distance_unit='bohr',
     )
-    A.set_basis_set("6-31G*")
+    A.set_basis_set('6-31G*')
     A.molecule.molecular_charge = 1
     A.init_hartree_fock()
     A.hartree_fock.run_unrestricted_hartree_fock()
@@ -61,8 +61,8 @@ def test_unrestricted_hartree_fock_li_631gss() -> None:
     Reference: https://github.com/rpmuller/pyquante2/blob/master/pyquante2/scf/hamiltonians.py
     """
     A = sq.SlowQuant()
-    A.set_molecule("""Li   0.000000000000  0.000000000000   0.000000000000;""", distance_unit="bohr")
-    A.set_basis_set("6-31G**")
+    A.set_molecule("""Li   0.000000000000  0.000000000000   0.000000000000;""", distance_unit='bohr')
+    A.set_basis_set('6-31G**')
     A.init_hartree_fock()
     A.hartree_fock.run_unrestricted_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
