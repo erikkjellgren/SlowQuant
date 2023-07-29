@@ -327,6 +327,42 @@ class OperatorPauli:
             matrix_form = matrix_form.astype(float)
         return matrix_form
 
+    def screen_terms(
+        self, max_xy_inactive: int, max_xy_virtual: int, num_inactive_spin_orbs: int, num_virtual_spin_orbs
+    ) -> OperatorPauli:
+        """Remove terms from the operator that has too many X or Y Pauli operators.
+
+        If it is known that a maximum number of Pauli operators can be changed before
+        the expectation value of the operator is taken.
+        Then terms with too many X and Y operators can be removed because they will always evaluate to zero.
+
+        Args:
+            max_xy_inactive: Maximum number of X and Y Pauli operators in the inactive orbitals.
+            max_xy_virtual: Maximum number of X and Y Pauli operators in the virtual orbitals.
+            num_inactive_spin_orbs: Number of inactive orbitals.
+            num_virtual_spin_orbs: Number of virtual orbitals.
+
+        Returns:
+            Screened Pauli operator.
+        """
+        new_operators = {}
+        for op, fac in self.operators.items():
+            if (
+                op[:num_inactive_spin_orbs].count('X') + op[:num_inactive_spin_orbs].count('Y')
+                > max_xy_inactive
+            ):
+                continue
+            # Only check if number of virtual are more than zero.
+            # Indexing with -0 returns the entire string; 'XYZ'[-0:] = 'XYZ'
+            if num_virtual_spin_orbs > 0:
+                if (
+                    op[-num_virtual_spin_orbs:].count('X') + op[-num_virtual_spin_orbs:].count('Y')
+                    > max_xy_virtual
+                ):
+                    continue
+            new_operators[op] = fac
+        return OperatorPauli(new_operators)
+
 
 def epq_pauli(p: int, q: int, num_spin_orbs: int, num_elec: int) -> OperatorPauli:
     """Get Epq operator.
@@ -560,4 +596,4 @@ def energy_hamiltonian_pauli(
                         H_expectation += (
                             1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, num_spin_orbs, num_elec)
                         )
-    return H_expectation
+    return H_expectation.screen_terms(0, 0, num_inactive_spin_orbs, num_virtual_spin_orbs)
