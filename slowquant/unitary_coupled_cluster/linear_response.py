@@ -143,14 +143,14 @@ class LinearResponseUCC:
         self.V = np.zeros((num_parameters, num_parameters))
         self.W = np.zeros((num_parameters, num_parameters))
         H_pauli = hamiltonian_pauli(self.wf.h_core, self.wf.g_eri, self.wf.c_trans, num_spin_orbs, num_elec)
-        H_2i_2a = convert_pauli_to_hybrid_form(
-            H_pauli.screen_terms(2, 2, self.wf.num_inactive_spin_orbs, self.wf.num_virtual_spin_orbs),
+        H_1i_1a = convert_pauli_to_hybrid_form(
+            H_pauli.screen_terms(1, 1, self.wf.num_inactive_spin_orbs, self.wf.num_virtual_spin_orbs),
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
             self.wf.num_virtual_spin_orbs,
         )
-        H_4i_4a = convert_pauli_to_hybrid_form(
-            H_pauli.screen_terms(4, 4, self.wf.num_inactive_spin_orbs, self.wf.num_virtual_spin_orbs),
+        H_2i_2a = convert_pauli_to_hybrid_form(
+            H_pauli.screen_terms(2, 2, self.wf.num_inactive_spin_orbs, self.wf.num_virtual_spin_orbs),
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
             self.wf.num_virtual_spin_orbs,
@@ -185,8 +185,8 @@ class LinearResponseUCC:
                     continue
                 if calculation_type in ('selfconsistent', 'naive'):
                     # Make M
-                    operator = operatormul3_contract(qI.dagger, H_4i_4a, qJ) - operatormul3_contract(
-                        qI.dagger, qJ, H_4i_4a
+                    operator = operatormul3_contract(qI.dagger, H_2i_2a, qJ) - operatormul3_contract(
+                        qI.dagger, qJ, H_2i_2a
                     )
                     self.M[i, j] = self.M[j, i] = expectation_value_contracted(
                         self.wf.state_vector, operator, self.wf.state_vector
@@ -194,7 +194,7 @@ class LinearResponseUCC:
                     # Make Q
                     self.Q[i, j] = self.Q[j, i] = -expectation_value_contracted(
                         self.wf.state_vector,
-                        operatormul3_contract(qI.dagger, qJ.dagger, H_4i_4a),
+                        operatormul3_contract(qI.dagger, qJ.dagger, H_2i_2a),
                         self.wf.state_vector,
                     )
                     # Make V
@@ -208,13 +208,13 @@ class LinearResponseUCC:
                     # Make M
                     self.M[i, j] = self.M[j, i] = expectation_value_contracted(
                         self.wf.state_vector,
-                        double_commutator_contract(qI.dagger, H_4i_4a, qJ),
+                        double_commutator_contract(qI.dagger, H_2i_2a, qJ),
                         self.wf.state_vector,
                     )
                     # Make Q
                     self.Q[i, j] = self.Q[j, i] = expectation_value_contracted(
                         self.wf.state_vector,
-                        double_commutator_contract(qI.dagger, H_4i_4a, qJ.dagger),
+                        double_commutator_contract(qI.dagger, H_2i_2a, qJ.dagger),
                         self.wf.state_vector,
                     )
                     # Make V
@@ -237,8 +237,8 @@ class LinearResponseUCC:
                 qI = opI.operator
                 if calculation_type == 'selfconsistent':
                     # Make M
-                    operator = operatormul3_contract(qI.dagger, H_2i_2a, GJ) - operatormul3_contract(
-                        qI.dagger, GJ, H_2i_2a
+                    operator = operatormul3_contract(qI.dagger, H_1i_1a, GJ) - operatormul3_contract(
+                        qI.dagger, GJ, H_1i_1a
                     )
                     self.M[i, j + idx_shift] = expectation_value_contracted(
                         self.wf.state_vector, operator, self.wf.state_vector
@@ -246,22 +246,22 @@ class LinearResponseUCC:
                     # Make Q
                     self.Q[i, j + idx_shift] = -expectation_value_contracted(
                         self.wf.state_vector,
-                        operatormul3_contract(qI.dagger, GJ.dagger, H_2i_2a),
+                        operatormul3_contract(qI.dagger, GJ.dagger, H_1i_1a),
                         self.wf.state_vector,
                     )
                     # Make V
                     # Make W
                 elif calculation_type == 'naive':
                     # Make M
-                    operator = operatormul3_contract(qI.dagger, H_2i_2a, GJ) - operatormul3_contract(
-                        qI.dagger, GJ, H_2i_2a
+                    operator = operatormul3_contract(qI.dagger, H_1i_1a, GJ) - operatormul3_contract(
+                        qI.dagger, GJ, H_1i_1a
                     )
                     self.M[i, j + idx_shift] = expectation_value_contracted(
                         self.wf.state_vector, operator, self.wf.state_vector
                     )
                     # Make Q
-                    operator = operatormul3_contract(qI.dagger, H_2i_2a, GJ.dagger) - operatormul3_contract(
-                        qI.dagger, GJ.dagger, H_2i_2a
+                    operator = operatormul3_contract(qI.dagger, H_1i_1a, GJ.dagger) - operatormul3_contract(
+                        qI.dagger, GJ.dagger, H_1i_1a
                     )
                     self.Q[i, j + idx_shift] = expectation_value_contracted(
                         self.wf.state_vector,
@@ -274,13 +274,13 @@ class LinearResponseUCC:
                     # Make M
                     self.M[i, j + idx_shift] = expectation_value_contracted(
                         self.wf.state_vector,
-                        double_commutator_contract(qI.dagger, H_2i_2a, GJ),
+                        double_commutator_contract(qI.dagger, H_1i_1a, GJ),
                         self.wf.state_vector,
                     )
                     # Make Q
                     self.Q[i, j + idx_shift] = expectation_value_contracted(
                         self.wf.state_vector,
-                        double_commutator_contract(qI.dagger, H_2i_2a, GJ.dagger),
+                        double_commutator_contract(qI.dagger, H_1i_1a, GJ.dagger),
                         self.wf.state_vector,
                     )
                     # Make V
@@ -299,8 +299,8 @@ class LinearResponseUCC:
                 GI = opI.operator
                 if calculation_type == 'selfconsistent':
                     # Make M
-                    operator = operatormul3_contract(GI.dagger, H_2i_2a, qJ) - operatormul3_contract(
-                        GI.dagger, qJ, H_2i_2a
+                    operator = operatormul3_contract(GI.dagger, H_1i_1a, qJ) - operatormul3_contract(
+                        GI.dagger, qJ, H_1i_1a
                     )
                     self.M[i + idx_shift, j] = expectation_value_contracted(
                         self.wf.state_vector, operator, self.wf.state_vector
@@ -308,7 +308,7 @@ class LinearResponseUCC:
                     # Make Q
                     self.Q[i + idx_shift, j] = -expectation_value_contracted(
                         self.wf.state_vector,
-                        operatormul3_contract(GI.dagger, qJ.dagger, H_2i_2a),
+                        operatormul3_contract(GI.dagger, qJ.dagger, H_1i_1a),
                         self.wf.state_vector,
                     )
                     # Make V
@@ -316,16 +316,16 @@ class LinearResponseUCC:
                 elif calculation_type == 'naive':
                     # Make M
                     operator = (
-                        operatormul3_contract(GI.dagger, H_2i_2a, qJ)
-                        - operatormul3_contract(GI.dagger, qJ, H_2i_2a)
-                        - operatormul3_contract(H_2i_2a, qJ, GI.dagger)
+                        operatormul3_contract(GI.dagger, H_1i_1a, qJ)
+                        - operatormul3_contract(GI.dagger, qJ, H_1i_1a)
+                        - operatormul3_contract(H_1i_1a, qJ, GI.dagger)
                     )
                     self.M[i + idx_shift, j] = expectation_value_contracted(
                         self.wf.state_vector, operator, self.wf.state_vector
                     )
                     # Make Q
-                    operator = operatormul3_contract(qJ.dagger, H_2i_2a, GI.dagger) - operatormul3_contract(
-                        GI.dagger, qJ.dagger, H_2i_2a
+                    operator = operatormul3_contract(qJ.dagger, H_1i_1a, GI.dagger) - operatormul3_contract(
+                        GI.dagger, qJ.dagger, H_1i_1a
                     )
                     self.Q[i + idx_shift, j] = expectation_value_contracted(
                         self.wf.state_vector, operator, self.wf.state_vector
@@ -336,13 +336,13 @@ class LinearResponseUCC:
                     # Make M
                     self.M[i + idx_shift, j] = expectation_value_contracted(
                         self.wf.state_vector,
-                        double_commutator_contract(GI.dagger, H_2i_2a, qJ),
+                        double_commutator_contract(GI.dagger, H_1i_1a, qJ),
                         self.wf.state_vector,
                     )
                     # Make Q
                     self.Q[i + idx_shift, j] = expectation_value_contracted(
                         self.wf.state_vector,
-                        double_commutator_contract(GI.dagger, H_2i_2a, qJ.dagger),
+                        double_commutator_contract(GI.dagger, H_1i_1a, qJ.dagger),
                         self.wf.state_vector,
                     )
                     # Make V
