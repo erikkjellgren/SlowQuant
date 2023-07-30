@@ -172,6 +172,13 @@ class LinearResponseUCC:
         idx_shift = len(self.q_ops)
         print('Gs', len(self.G_ops))
         print('qs', len(self.q_ops))
+        grad = np.zeros(len(self.q_ops)+len(self.G_ops))
+        for i, op in enumerate(self.q_ops):
+            grad[i] = expectation_value_contracted(self.wf.state_vector, commutator_contract(op.operator, H_1i_1a), self.wf.state_vector)
+        for i, op in enumerate(self.G_ops):
+            grad[i+idx_shift] = expectation_value_contracted(self.wf.state_vector, commutator_contract(op.operator, H_en), self.wf.state_vector)
+        for i, val in enumerate(grad):
+            print(i, val)
         if do_selfconsistent_operators:
             calculation_type = 'selfconsistent'
         else:

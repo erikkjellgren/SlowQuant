@@ -696,7 +696,7 @@ def orbital_rotation_gradient(
     )
     state_vector.new_u(U, allowed_states=state_vector.allowed_active_states_number_spin_conserving)
 
-    step_size = 10**-10
+    step_size = 10**-8
     gradient_kappa = np.zeros_like(kappa)
     for i, _ in enumerate(kappa):
         kappa[i] += step_size
@@ -833,7 +833,7 @@ def active_space_parameter_gradient(
 
     theta_params = theta1 + theta2 + theta3 + theta4
     gradient_theta = np.zeros_like(theta_params)
-    step_size = 10**-10
+    step_size = 10**-8
     for i, _ in enumerate(theta_params):
         theta_params[i] += step_size
         U = construct_ucc_u(
