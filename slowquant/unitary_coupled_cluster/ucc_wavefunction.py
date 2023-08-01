@@ -363,7 +363,7 @@ class WaveFunctionUCC:
                 tol=convergence_threshold,
                 callback=silent_progress,
                 method='SLSQP',
-                jac=parameter_gradient,
+                #jac=parameter_gradient,
             )
         else:
             print('### Parameters information:')
@@ -380,7 +380,7 @@ class WaveFunctionUCC:
                 tol=convergence_threshold,
                 callback=print_progress,
                 method='SLSQP',
-                jac=parameter_gradient,
+                #jac=parameter_gradient,
             )
         self.energy_elec = res['fun']
         param_idx = 0
