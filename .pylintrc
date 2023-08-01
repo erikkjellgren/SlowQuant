@@ -1,0 +1,13 @@
+[MASTER]
+disable=duplicate-code,
+        import-error,
+        invalid-name,
+        line-too-long,
+        missing-class-docstring,
+        missing-module-docstring,
+        too-few-public-methods,
+        too-many-arguments,
+        too-many-branches,
+        too-many-instance-attributes,
+        too-many-locals,
+        too-many-nested-blocks

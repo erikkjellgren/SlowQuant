@@ -1,23 +1,5 @@
-# Files made by program
-/slowquant/temp/*npy
-out.txt
-potential.pdb
-traj.xyz
-.hypothesis/
-
-# Files made by python
-__pycache__/
 .cache/
-.pytest_cache/
-
-# Editing documentation
-*~
-
-# Files made from setup
-build/
-*.c
-*.so
-
-# Using Jupyter
 .ipynb_checkpoints/
-data/notebooks/*.png
+.pytest_cache/
+__pycache__/
+local_documentation/

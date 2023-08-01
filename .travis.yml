@@ -1,16 +1,8 @@
 language: python
 python:
-  - 3.5
-  - 3.6
-  - 3.7
-  - 3.8
-  - 3.9
-  
+  - 3.10
+
 os: linux
-addons:
-  apt:
-    packages:
-      - gcc
 
 install:
   - sudo apt-get update
@@ -21,22 +13,21 @@ install:
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
   - conda info -a
-  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy scipy pytest numba cython
+  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy scipy pytest numba
   - source activate test-environment
   - pip install python-coveralls pytest-cov
-  - python setup.py build_ext --inplace
-  
+
 script:
-  - if [[ $TRAVIS_PYTHON_VERSION == 3.9 ]];
+  - if [[ $TRAVIS_PYTHON_VERSION == 3.10 ]];
     then py.test -vv tests.py --cov .;
     else py.test -vv tests.py;
     fi
 
 after_success:
-  - if [[ $TRAVIS_PYTHON_VERSION == 3.9 ]];
+  - if [[ $TRAVIS_PYTHON_VERSION == 3.10 ]];
     then coveralls;
     fi
-  - if [[ $TRAVIS_PYTHON_VERSION == 3.9 ]];
+  - if [[ $TRAVIS_PYTHON_VERSION == 3.10 ]];
     then codecov;
     fi
 
