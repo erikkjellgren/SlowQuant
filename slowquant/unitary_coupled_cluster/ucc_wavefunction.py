@@ -14,6 +14,7 @@ from slowquant.unitary_coupled_cluster.operator_hybrid import (
 from slowquant.unitary_coupled_cluster.operator_pauli import (
     energy_hamiltonian_pauli,
     expectation_value_pauli,
+    epq_pauli,
 )
 from slowquant.unitary_coupled_cluster.util import (
     ThetaPicker,
@@ -861,3 +862,11 @@ def active_space_parameter_gradient(
         E_minus = expectation_value_hybrid(state_vector, Hamiltonian, state_vector)
         gradient_theta[i] = (E_plus - E_minus) / (2 * step_size)
     return gradient_theta
+
+
+def construct_one_rdm(wf: WaveFunctionUCC) -> np.ndarray:
+    one_rdm = np.zeros((wf.num_spin_orbs // 2, wf.num_spin_orbs // 2))
+    for p in range(wf.num_spin_orbs // 2):
+        for q in range(wf.num_spin_orbs // 2):
+            one_rdm[p,q] = expectation_value_pauli(wf.state_vector, epq_pauli(p, q, wf.num_spin_orbs, wf.num_elec), wf.state_vector)
+    return one_rdm
