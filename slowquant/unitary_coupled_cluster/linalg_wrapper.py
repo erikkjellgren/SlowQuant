@@ -58,3 +58,26 @@ def zeros_like(A: np.ndarray | ss.csr_matrix | ss.csc_matrix) -> np.ndarray | ss
     if isinstance(A, (ss.csr_matrix, ss.csc_matrix)):
         return ss.csr_array(A.shape)
     raise TypeError(f'A got unsupported type: {type(A)}')
+
+
+def outer(
+    A: np.ndarray | ss.csr_matrix | ss.csc_matrix, B: np.ndarray | ss.csr_matrix | ss.csc_matrix
+) -> np.ndarray | ss.csr_matrix | ss.csc_matrix:
+    """Outerp product between two vectors.
+
+    Args:
+        A: Vector.
+        B: Vector.
+
+    Returns:
+        Outer product matrix.
+    """
+    if isinstance(A, np.ndarray):
+        return np.outer(A, B)
+    if isinstance(A, ss.csr_matrix):
+        if A.tranpose().get_shape() != B.get_shape():
+            raise ValueError(
+                'Shape mismatch between A and B, got A: {A.get_shape()}, and, B: {B.get_shape()}'
+            )
+        return A.dot(B)
+    raise TypeError(f'A got unsupported type: {type(A)}')

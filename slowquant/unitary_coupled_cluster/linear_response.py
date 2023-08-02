@@ -4,6 +4,7 @@ from collections.abc import Sequence
 import numpy as np
 import scipy
 
+import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
@@ -20,18 +21,17 @@ from slowquant.unitary_coupled_cluster.operator_hybrid import (
     expectation_value_hybrid,
 )
 from slowquant.unitary_coupled_cluster.operator_pauli import (
+    OperatorPauli,
     energy_hamiltonian_pauli,
     epq_pauli,
     hamiltonian_pauli,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_ucc_u
-from slowquant.unitary_coupled_cluster.operator_pauli import OperatorPauli
+
 
 class ResponseOperator:
-    def __init__(
-        self, occ_idx: tuple[int, ...], unocc_idx: tuple[int, ...], operator: OperatorHybrid
-    ) -> None:
+    def __init__(self, occ_idx: Sequence[int], unocc_idx: Sequence[int], operator: OperatorHybrid) -> None:
         """Initialize response excitation operator.
 
         Args:
@@ -51,7 +51,7 @@ class LinearResponseUCC:
         excitations: str,
         is_spin_conserving: bool = False,
         do_selfconsistent_operators: bool = True,
-        do_projected_operators: bool = False
+        do_projected_operators: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
@@ -60,6 +60,7 @@ class LinearResponseUCC:
             excitations: Which excitation orders to include in response.
             is_spin_conserving: Use spin-conseving operators.
             do_selfconsistent_operators: Use self-consistent active space excitation operators.
+            do_projected_operators: Use projected active space excitation opreators.
         """
         if do_selfconsistent_operators and do_projected_operators:
             raise ValueError('do_selfconsistent_operators and do_projected_operators cannot both be True.')
@@ -82,6 +83,8 @@ class LinearResponseUCC:
             self.wf.theta_picker_full,
             'sdtq',  # self.wf._excitations,
         )
+        if do_projected_operators:
+            projection = lw.outer(self.wf.state_vector.ket_active, self.wf.state_vector.bra_active)
         if 's' in excitations:
             for _, a, i, op_ in self.theta_picker.get_t1_generator_sa(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
@@ -94,8 +97,9 @@ class LinearResponseUCC:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                 if do_projected_operators:
+                    op = op.apply_u_from_right(projection)
                     fac = expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector)
-                    op_diff_ = OperatorPauli({"I"*self.wf.num_spin_orbs: fac})
+                    op_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
                     op_diff = convert_pauli_to_hybrid_form(
                         op_diff_,
                         self.wf.num_inactive_spin_orbs,
@@ -103,8 +107,7 @@ class LinearResponseUCC:
                         self.wf.num_virtual_spin_orbs,
                     )
                     op = op - op_diff
-                    print('fac:', fac, expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector))
-                self.G_ops.append(ResponseOperator((i), (a), op))
+                self.G_ops.append(ResponseOperator((i,), (a,), op))
         if 'd' in excitations:
             for _, a, i, b, j, op_ in self.theta_picker.get_t2_generator_sa(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
@@ -117,8 +120,9 @@ class LinearResponseUCC:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                 if do_projected_operators:
+                    op = op.apply_u_from_right(projection)
                     fac = expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector)
-                    op_diff_ = OperatorPauli({"I"*self.wf.num_spin_orbs: fac})
+                    op_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
                     op_diff = convert_pauli_to_hybrid_form(
                         op_diff_,
                         self.wf.num_inactive_spin_orbs,
@@ -126,7 +130,6 @@ class LinearResponseUCC:
                         self.wf.num_virtual_spin_orbs,
                     )
                     op = op - op_diff
-                    print('fac:', fac, expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector))
                 self.G_ops.append(ResponseOperator((i, j), (a, b), op))
         if 't' in excitations:
             for _, a, i, b, j, c, k, op_ in self.theta_picker.get_t3_generator(num_spin_orbs, num_elec):
@@ -140,8 +143,9 @@ class LinearResponseUCC:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                 if do_projected_operators:
+                    op = op.apply_u_from_right(projection)
                     fac = expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector)
-                    op_diff_ = OperatorPauli({"I"*self.wf.num_spin_orbs: fac})
+                    op_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
                     op_diff = convert_pauli_to_hybrid_form(
                         op_diff_,
                         self.wf.num_inactive_spin_orbs,
@@ -162,8 +166,9 @@ class LinearResponseUCC:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                 if do_projected_operators:
+                    op = op.apply_u_from_right(projection)
                     fac = expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector)
-                    op_diff_ = OperatorPauli({"I"*self.wf.num_spin_orbs: fac})
+                    op_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
                     op_diff = convert_pauli_to_hybrid_form(
                         op_diff_,
                         self.wf.num_inactive_spin_orbs,
@@ -217,20 +222,23 @@ class LinearResponseUCC:
         idx_shift = len(self.q_ops)
         print('Gs', len(self.G_ops))
         print('qs', len(self.q_ops))
-        grad = np.zeros(len(self.q_ops)+len(self.G_ops))
+        grad = np.zeros(len(self.q_ops) + len(self.G_ops))
         for i, op in enumerate(self.q_ops):
-            grad[i] = expectation_value_contracted(self.wf.state_vector, commutator_contract(op.operator, H_1i_1a), self.wf.state_vector)
+            grad[i] = expectation_value_contracted(
+                self.wf.state_vector, commutator_contract(op.operator, H_1i_1a), self.wf.state_vector
+            )
         for i, op in enumerate(self.G_ops):
-            grad[i+idx_shift] = expectation_value_contracted(self.wf.state_vector, commutator_contract(op.operator, H_en), self.wf.state_vector)
-        for i, val in enumerate(grad):
-            print(i, val)
+            grad[i + idx_shift] = expectation_value_contracted(
+                self.wf.state_vector, commutator_contract(op.operator, H_en), self.wf.state_vector
+            )
+        print('max(abs(grad)):', np.max(np.abs(grad)))
         if do_selfconsistent_operators:
             calculation_type = 'selfconsistent'
         elif do_projected_operators:
             calculation_type = 'generic'
         else:
             calculation_type = 'naive'
-        # calculation_type = "generic"
+        calculation_type = 'generic'
         for j, opJ in enumerate(self.q_ops):
             qJ = opJ.operator
             for i, opI in enumerate(self.q_ops):
