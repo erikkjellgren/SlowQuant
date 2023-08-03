@@ -1,3 +1,4 @@
+import copy
 import time
 from collections.abc import Sequence
 from functools import partial
@@ -13,8 +14,8 @@ from slowquant.unitary_coupled_cluster.operator_hybrid import (
 )
 from slowquant.unitary_coupled_cluster.operator_pauli import (
     energy_hamiltonian_pauli,
-    expectation_value_pauli,
     epq_pauli,
+    expectation_value_pauli,
 )
 from slowquant.unitary_coupled_cluster.util import (
     ThetaPicker,
@@ -216,7 +217,7 @@ class WaveFunctionUCC:
         excitations: str,
         orbital_optimization: bool = False,
         is_silent: bool = False,
-        convergence_threshold: float = 10**-8,
+        convergence_threshold: float = 10**-5,
     ) -> None:
         """Run optimization of UCC wave function.
 
@@ -314,7 +315,7 @@ class WaveFunctionUCC:
             global iteration
             global start
             time_str = f'{time.time() - start:7.2f}'  # type: ignore
-            e_str = f'{e_tot(X):3.6f}'
+            e_str = f'{e_tot(X):3.12f}'
             print(f'{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}')  # type: ignore
             iteration += 1  # type: ignore
             if iteration > 100:
@@ -363,7 +364,7 @@ class WaveFunctionUCC:
                 parameters,
                 tol=convergence_threshold,
                 callback=silent_progress,
-                method='SLSQP',
+                method='BFGS',
                 jac=parameter_gradient,
             )
         else:
@@ -380,7 +381,7 @@ class WaveFunctionUCC:
                 parameters,
                 tol=convergence_threshold,
                 callback=print_progress,
-                method='SLSQP',
+                method='BFGS',
                 jac=parameter_gradient,
             )
         self.energy_elec = res['fun']
@@ -418,55 +419,21 @@ class WaveFunctionUCC:
                 counter += 1
 
 
-def run_compactify_wf(wf: WaveFunctionUCC, excitations: str) -> None:
-    global iteration2
-    global start2
-    iteration2 = 0  # type: ignore
-    start2 = time.time()  # type: ignore
-
-    def print_progress2(X: Sequence[float]) -> None:
-        """Print progress during energy minimization of wave function.
-
-        Args:
-            X: Wave function parameters.
-        """
-        global iteration2
-        global start2
-        time_str = f'{time.time() - start2:7.2f}'  # type: ignore
-        e_str = f'{entropy_tot(X):1.8f}'
-        print(f'{str(iteration2+1).center(11)} | {time_str.center(18)} | {e_str.center(13)}')  # type: ignore
-        iteration2 += 1  # type: ignore
-        start2 = time.time()  # type: ignore
-
-    print(wf.theta1)
-    print(wf.theta2)
-    print(f'Initial cost function value: {entropy_ucc(wf.kappa_redundant, wf=wf, excitations=excitations)}')
-
-    print('Iteration # | Iteration time [s] | Cost function')
-    entropy_tot = partial(entropy_ucc, wf=wf, excitations=excitations)
-    res = scipy.optimize.minimize(
-        entropy_tot,
-        np.zeros(len(wf.kappa_redundant)),
-        tol=1e-8,
-        callback=print_progress2,
-        method='BFGS',
-        options={'eps': 10**-6},
-    )
-    print(wf.theta1)
-    print(wf.theta2)
-    print(res)
-
-
-def entropy_ucc(parameters: Sequence[float], wf: WaveFunctionUCC, excitations: str) -> float:
-    for i, kappa in enumerate(parameters):
-        if abs(kappa) > 2 * np.pi:
-            raise ValueError(f'kappa {i} is uncontrolled, value of {kappa}')
-        wf.kappa_redundant[i] = kappa
-    wf.run_ucc(excitations, False, is_silent=True, convergence_threshold=10**-12)
-    entropy = 0
-    for state in wf.theta1 + wf.theta2:
-        entropy += np.log(1 / (1e-16 + state**2))
-    return -entropy
+def run_compactify_wf(wf: WaveFunctionUCC, excitations: str) -> WaveFunctionUCC:
+    one_rdm = construct_one_rdm(wf)
+    natural_occupations, natural_orbitals = np.linalg.eig(one_rdm)
+    sorting = np.argsort(natural_occupations)[::-1]
+    natural_occupations = natural_occupations[sorting]
+    natural_orbitals = natural_orbitals[:, sorting]
+    new_wf = copy.deepcopy(wf)
+    new_wf.kappa = [0] * len(wf.kappa)
+    new_wf.theta1 = [0] * len(wf.theta1)
+    new_wf.theta2 = [0] * len(wf.theta2)
+    new_wf.theta3 = [0] * len(wf.theta3)
+    new_wf.theta4 = [0] * len(wf.theta4)
+    new_wf.c_orthonormal = np.matmul(wf.c_trans, natural_orbitals)
+    new_wf.run_ucc(excitations, False)
+    return new_wf
 
 
 def energy_ucc(
@@ -656,8 +623,11 @@ def orbital_rotation_gradient(
     kappa_idx: Sequence[Sequence[int]],
     kappa_redundant: Sequence[float],
     kappa_redundant_idx: Sequence[Sequence[int]],
+    finite_diff_type: str = 'forward',
 ) -> np.ndarray:
     """ """
+    if finite_diff_type not in ('central', 'forward'):
+        raise ValueError(f'finite_diff_type must be central or forward, got {finite_diff_type}')
     kappa = []
     theta1 = []
     theta2 = []
@@ -697,9 +667,37 @@ def orbital_rotation_gradient(
     )
     state_vector.new_u(U, allowed_states=state_vector.allowed_active_states_number_spin_conserving)
 
-    step_size = 10**-8
     gradient_kappa = np.zeros_like(kappa)
+    if finite_diff_type == 'central':
+        eps = np.finfo(np.float64).eps ** (1 / 3)
+    if finite_diff_type == 'forward':
+        eps = np.finfo(np.float64).eps ** (1 / 2)
+        kappa_mat = np.zeros_like(c_orthonormal)
+        if orbital_optimized:
+            for kappa_val, (p, q) in zip(kappa, kappa_idx):
+                kappa_mat[p, q] = kappa_val
+                kappa_mat[q, p] = -kappa_val
+        if len(kappa_redundant) != 0:
+            if np.max(np.abs(kappa_redundant)) > 0.0:
+                for kappa_val, (p, q) in zip(kappa_redundant, kappa_redundant_idx):
+                    kappa_mat[p, q] = kappa_val
+                    kappa_mat[q, p] = -kappa_val
+        c_trans = np.matmul(c_orthonormal, scipy.linalg.expm(-kappa_mat))
+        E = expectation_value_pauli(
+            state_vector,
+            energy_hamiltonian_pauli(
+                h_core,
+                g_eri,
+                c_trans,
+                num_inactive_spin_orbs,
+                num_active_spin_orbs,
+                num_virtual_spin_orbs,
+                num_elec,
+            ),
+            state_vector,
+        )
     for i, _ in enumerate(kappa):
+        step_size = eps * max(1, abs(kappa[i]))
         kappa[i] += step_size
         kappa_mat = np.zeros_like(c_orthonormal)
         if orbital_optimized:
@@ -726,34 +724,37 @@ def orbital_rotation_gradient(
             state_vector,
         )
         kappa[i] -= step_size
-        kappa[i] -= step_size
-        kappa_mat = np.zeros_like(c_orthonormal)
-        if len(kappa) != 0:
-            if np.max(np.abs(kappa)) > 0.0:
-                for kappa_val, (p, q) in zip(kappa, kappa_idx):
-                    kappa_mat[p, q] = kappa_val
-                    kappa_mat[q, p] = -kappa_val
-        if len(kappa_redundant) != 0:
-            if np.max(np.abs(kappa_redundant)) > 0.0:
-                for kappa_val, (p, q) in zip(kappa_redundant, kappa_redundant_idx):
-                    kappa_mat[p, q] = kappa_val
-                    kappa_mat[q, p] = -kappa_val
-        c_trans = np.matmul(c_orthonormal, scipy.linalg.expm(-kappa_mat))
-        E_minus = expectation_value_pauli(
-            state_vector,
-            energy_hamiltonian_pauli(
-                h_core,
-                g_eri,
-                c_trans,
-                num_inactive_spin_orbs,
-                num_active_spin_orbs,
-                num_virtual_spin_orbs,
-                num_elec,
-            ),
-            state_vector,
-        )
-        kappa[i] += step_size
-        gradient_kappa[i] = (E_plus - E_minus) / (2 * step_size)
+        if finite_diff_type == 'central':
+            kappa[i] -= step_size
+            kappa_mat = np.zeros_like(c_orthonormal)
+            if len(kappa) != 0:
+                if np.max(np.abs(kappa)) > 0.0:
+                    for kappa_val, (p, q) in zip(kappa, kappa_idx):
+                        kappa_mat[p, q] = kappa_val
+                        kappa_mat[q, p] = -kappa_val
+            if len(kappa_redundant) != 0:
+                if np.max(np.abs(kappa_redundant)) > 0.0:
+                    for kappa_val, (p, q) in zip(kappa_redundant, kappa_redundant_idx):
+                        kappa_mat[p, q] = kappa_val
+                        kappa_mat[q, p] = -kappa_val
+            c_trans = np.matmul(c_orthonormal, scipy.linalg.expm(-kappa_mat))
+            E_minus = expectation_value_pauli(
+                state_vector,
+                energy_hamiltonian_pauli(
+                    h_core,
+                    g_eri,
+                    c_trans,
+                    num_inactive_spin_orbs,
+                    num_active_spin_orbs,
+                    num_virtual_spin_orbs,
+                    num_elec,
+                ),
+                state_vector,
+            )
+            kappa[i] += step_size
+            gradient_kappa[i] = (E_plus - E_minus) / (2 * step_size)
+        if finite_diff_type == 'forward':
+            gradient_kappa[i] = (E_plus - E) / step_size
     return gradient_kappa
 
 
@@ -773,8 +774,11 @@ def active_space_parameter_gradient(
     kappa_idx: Sequence[Sequence[int]],
     kappa_redundant: Sequence[float],
     kappa_redundant_idx: Sequence[Sequence[int]],
+    finite_diff_type: str = 'forward',
 ) -> np.ndarray:
     """ """
+    if finite_diff_type not in ('central', 'forward'):
+        raise ValueError(f'finite_diff_type must be central or forward, got {finite_diff_type}')
     kappa = []
     theta1 = []
     theta2 = []
@@ -834,8 +838,22 @@ def active_space_parameter_gradient(
 
     theta_params = theta1 + theta2 + theta3 + theta4
     gradient_theta = np.zeros_like(theta_params)
-    step_size = 10**-8
+    if finite_diff_type == 'central':
+        eps = np.finfo(np.float64).eps ** (1 / 3)
+    if finite_diff_type == 'forward':
+        eps = np.finfo(np.float64).eps ** (1 / 2)
+        U = construct_ucc_u(
+            num_active_spin_orbs,
+            num_active_elec,
+            theta_params,
+            theta_picker,
+            excitations,
+            allowed_states=state_vector.allowed_active_states_number_spin_conserving,
+        )
+        state_vector.new_u(U, allowed_states=state_vector.allowed_active_states_number_spin_conserving)
+        E = expectation_value_hybrid(state_vector, Hamiltonian, state_vector)
     for i, _ in enumerate(theta_params):
+        step_size = eps * max(1, abs(theta_params[i]))
         theta_params[i] += step_size
         U = construct_ucc_u(
             num_active_spin_orbs,
@@ -848,19 +866,22 @@ def active_space_parameter_gradient(
         state_vector.new_u(U, allowed_states=state_vector.allowed_active_states_number_spin_conserving)
         E_plus = expectation_value_hybrid(state_vector, Hamiltonian, state_vector)
         theta_params[i] -= step_size
-        theta_params[i] -= step_size
-        U = construct_ucc_u(
-            num_active_spin_orbs,
-            num_active_elec,
-            theta1 + theta2 + theta3 + theta4,
-            theta_picker,
-            excitations,
-            allowed_states=state_vector.allowed_active_states_number_spin_conserving,
-        )
-        state_vector.new_u(U, allowed_states=state_vector.allowed_active_states_number_spin_conserving)
-        theta_params[i] += step_size
-        E_minus = expectation_value_hybrid(state_vector, Hamiltonian, state_vector)
-        gradient_theta[i] = (E_plus - E_minus) / (2 * step_size)
+        if finite_diff_type == 'central':
+            theta_params[i] -= step_size
+            U = construct_ucc_u(
+                num_active_spin_orbs,
+                num_active_elec,
+                theta1 + theta2 + theta3 + theta4,
+                theta_picker,
+                excitations,
+                allowed_states=state_vector.allowed_active_states_number_spin_conserving,
+            )
+            state_vector.new_u(U, allowed_states=state_vector.allowed_active_states_number_spin_conserving)
+            theta_params[i] += step_size
+            E_minus = expectation_value_hybrid(state_vector, Hamiltonian, state_vector)
+            gradient_theta[i] = (E_plus - E_minus) / (2 * step_size)
+        if finite_diff_type == 'forward':
+            gradient_theta[i] = (E_plus - E) / step_size
     return gradient_theta
 
 
@@ -868,5 +889,7 @@ def construct_one_rdm(wf: WaveFunctionUCC) -> np.ndarray:
     one_rdm = np.zeros((wf.num_spin_orbs // 2, wf.num_spin_orbs // 2))
     for p in range(wf.num_spin_orbs // 2):
         for q in range(wf.num_spin_orbs // 2):
-            one_rdm[p,q] = expectation_value_pauli(wf.state_vector, epq_pauli(p, q, wf.num_spin_orbs, wf.num_elec), wf.state_vector)
+            one_rdm[p, q] = expectation_value_pauli(
+                wf.state_vector, epq_pauli(p, q, wf.num_spin_orbs, wf.num_elec), wf.state_vector
+            )
     return one_rdm
