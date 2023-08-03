@@ -512,7 +512,7 @@ class LinearResponseUCC:
         S[:size, size:] = self.W
         S[size:, :size] = -np.conj(self.W)
         S[size:, size:] = -np.conj(self.V)
-        print(f'Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal()))}')
+        print(f'Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.V)))}')
 
         eigval, eigvec = scipy.linalg.eig(E2, S)
         sorting = np.argsort(eigval)
