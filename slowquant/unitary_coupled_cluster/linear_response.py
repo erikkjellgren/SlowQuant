@@ -85,7 +85,9 @@ class LinearResponseUCC:
         )
         if do_projected_operators:
             if self.wf.num_active_spin_orbs >= 10:
-                projection = lw.outer(self.wf.state_vector.ket_active_csr, self.wf.state_vector.bra_active_csr)
+                projection = lw.outer(
+                    self.wf.state_vector.ket_active_csr, self.wf.state_vector.bra_active_csr
+                )
             else:
                 projection = lw.outer(self.wf.state_vector.ket_active, self.wf.state_vector.bra_active)
         if 's' in excitations:
