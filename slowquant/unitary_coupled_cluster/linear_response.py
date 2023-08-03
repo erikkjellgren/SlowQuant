@@ -238,7 +238,7 @@ class LinearResponseUCC:
             calculation_type = 'generic'
         else:
             calculation_type = 'naive'
-        calculation_type = 'generic'
+        # calculation_type = 'generic'
         for j, opJ in enumerate(self.q_ops):
             qJ = opJ.operator
             for i, opI in enumerate(self.q_ops):
@@ -512,6 +512,7 @@ class LinearResponseUCC:
         S[:size, size:] = self.W
         S[size:, :size] = -np.conj(self.W)
         S[size:, size:] = -np.conj(self.V)
+        print(f'Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal()))}')
 
         eigval, eigvec = scipy.linalg.eig(E2, S)
         sorting = np.argsort(eigval)
