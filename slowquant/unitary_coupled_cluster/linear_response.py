@@ -84,7 +84,10 @@ class LinearResponseUCC:
             'sdtq',  # self.wf._excitations,
         )
         if do_projected_operators:
-            projection = lw.outer(self.wf.state_vector.ket_active, self.wf.state_vector.bra_active)
+            if self.wf.num_active_spin_orbs >= 10:
+                projection = lw.outer(self.wf.state_vector.ket_active_csr, self.wf.state_vector.bra_active_csr)
+            else:
+                projection = lw.outer(self.wf.state_vector.ket_active, self.wf.state_vector.bra_active)
         if 's' in excitations:
             for _, a, i, op_ in self.theta_picker.get_t1_generator_sa(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
