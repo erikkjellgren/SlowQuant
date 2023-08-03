@@ -318,8 +318,8 @@ class WaveFunctionUCC:
             e_str = f'{e_tot(X):3.12f}'
             print(f'{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}')  # type: ignore
             iteration += 1  # type: ignore
-            if iteration > 100:
-                raise ValueError('Did not converge in 100 iterations in energy minimization.')
+            if iteration > 500:
+                raise ValueError('Did not converge in 500 iterations in energy minimization.')
             start = time.time()  # type: ignore
 
         def silent_progress(X: Sequence[float]) -> None:
@@ -330,8 +330,8 @@ class WaveFunctionUCC:
             """
             global iteration
             iteration += 1  # type: ignore
-            if iteration > 100:
-                raise ValueError('Did not converge in 100 iterations in energy minimization.')
+            if iteration > 500:
+                raise ValueError('Did not converge in 500 iterations in energy minimization.')
 
         parameters = []
         num_kappa = 0
@@ -364,7 +364,7 @@ class WaveFunctionUCC:
                 parameters,
                 tol=convergence_threshold,
                 callback=silent_progress,
-                method='BFGS',
+                method='SLSQP',
                 jac=parameter_gradient,
             )
         else:
@@ -381,7 +381,7 @@ class WaveFunctionUCC:
                 parameters,
                 tol=convergence_threshold,
                 callback=print_progress,
-                method='BFGS',
+                method='SLSQP',
                 jac=parameter_gradient,
             )
         self.energy_elec = res['fun']
