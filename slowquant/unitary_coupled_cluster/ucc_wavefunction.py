@@ -189,6 +189,14 @@ class WaveFunctionUCC:
         self.theta4 = []
         for _ in self.theta_picker_full.get_t4_generator(0, 0):
             self.theta4.append(0)
+        # Construct theta5
+        self.theta5 = []
+        for _ in self.theta_picker_full.get_t5_generator(0, 0):
+            self.theta5.append(0)
+        # Construct theta6
+        self.theta6 = []
+        for _ in self.theta_picker_full.get_t6_generator(0, 0):
+            self.theta6.append(0)
 
     @property
     def c_trans(self) -> np.ndarray:
@@ -337,6 +345,8 @@ class WaveFunctionUCC:
         num_theta2 = 0
         num_theta3 = 0
         num_theta4 = 0
+        num_theta5 = 0
+        num_theta6 = 0
         if orbital_optimization:
             parameters += self.kappa
             num_kappa += len(self.kappa)
@@ -356,6 +366,14 @@ class WaveFunctionUCC:
             for idx, _, _, _, _, _, _, _, _, _ in self.theta_picker.get_t4_generator(0, 0):
                 parameters += [self.theta4[idx]]
                 num_theta4 += 1
+        if '5' in excitations:
+            for idx, _, _, _, _, _, _, _, _, _, _, _ in self.theta_picker.get_t5_generator(0, 0):
+                parameters += [self.theta5[idx]]
+                num_theta5 += 1
+        if '6' in excitations:
+            for idx, _, _, _, _, _, _, _, _, _, _, _, _, _ in self.theta_picker.get_t6_generator(0, 0):
+                parameters += [self.theta6[idx]]
+                num_theta6 += 1
         if is_silent:
             res = scipy.optimize.minimize(
                 e_tot,
@@ -372,7 +390,11 @@ class WaveFunctionUCC:
             print(f'### Number theta2: {num_theta2}')
             print(f'### Number theta3: {num_theta3}')
             print(f'### Number theta4: {num_theta4}')
-            print(f'### Total parameters: {num_kappa+num_theta1+num_theta2+num_theta3+num_theta4}\n')
+            print(f'### Number theta5: {num_theta5}')
+            print(f'### Number theta6: {num_theta6}')
+            print(
+                f'### Total parameters: {num_kappa+num_theta1+num_theta2+num_theta3+num_theta4+num_theta5+num_theta6}\n'
+            )
             print('Iteration # | Iteration time [s] | Electronic energy [Hartree]')
             res = scipy.optimize.minimize(
                 e_tot,
@@ -414,6 +436,20 @@ class WaveFunctionUCC:
             counter = 0
             for idx, _, _, _, _, _, _, _, _, _ in self.theta_picker.get_t4_generator(0, 0):
                 self.theta4[idx] = thetas[counter]
+                counter += 1
+        if '5' in excitations:
+            thetas = res['x'][param_idx : num_theta5 + param_idx].tolist()
+            param_idx += len(thetas)
+            counter = 0
+            for idx, _, _, _, _, _, _, _, _, _, _, _ in self.theta_picker.get_t5_generator(0, 0):
+                self.theta5[idx] = thetas[counter]
+                counter += 1
+        if '6' in excitations:
+            thetas = res['x'][param_idx : num_theta6 + param_idx].tolist()
+            param_idx += len(thetas)
+            counter = 0
+            for idx, _, _, _, _, _, _, _, _, _, _, _, _, _ in self.theta_picker.get_t6_generator(0, 0):
+                self.theta6[idx] = thetas[counter]
                 counter += 1
 
 
@@ -516,6 +552,8 @@ def energy_ucc(
     theta2 = []
     theta3 = []
     theta4 = []
+    theta5 = []
+    theta6 = []
     idx_counter = 0
     for _ in range(len(kappa_idx)):
         kappa.append(parameters[idx_counter])
@@ -538,7 +576,17 @@ def energy_ucc(
         for _ in theta_picker.get_t4_generator(0, 0):
             theta4.append(parameters[idx_counter])
             idx_counter += 1
-    assert len(parameters) == len(kappa) + len(theta1) + len(theta2) + len(theta3) + len(theta4)
+    if '5' in excitations:
+        for _ in theta_picker.get_t5_generator(0, 0):
+            theta5.append(parameters[idx_counter])
+            idx_counter += 1
+    if '6' in excitations:
+        for _ in theta_picker.get_t6_generator(0, 0):
+            theta6.append(parameters[idx_counter])
+            idx_counter += 1
+    assert len(parameters) == len(kappa) + len(theta1) + len(theta2) + len(theta3) + len(theta4) + len(
+        theta5
+    ) + len(theta6)
 
     kappa_mat = np.zeros_like(c_orthonormal)
     if orbital_optimized:
@@ -555,7 +603,7 @@ def energy_ucc(
     U = construct_ucc_u(
         num_active_spin_orbs,
         num_active_elec,
-        theta1 + theta2 + theta3 + theta4,
+        theta1 + theta2 + theta3 + theta4 + theta5 + theta6,
         theta_picker,
         excitations,
         allowed_states=state_vector.allowed_active_states_number_spin_conserving,
@@ -662,6 +710,8 @@ def orbital_rotation_gradient(
     theta2 = []
     theta3 = []
     theta4 = []
+    theta5 = []
+    theta6 = []
     idx_counter = 0
     for _ in range(len(kappa_idx)):
         kappa.append(parameters[idx_counter])
@@ -684,12 +734,22 @@ def orbital_rotation_gradient(
         for _ in theta_picker.get_t4_generator(0, 0):
             theta4.append(parameters[idx_counter])
             idx_counter += 1
-    assert len(parameters) == len(kappa) + len(theta1) + len(theta2) + len(theta3) + len(theta4)
+    if '5' in excitations:
+        for _ in theta_picker.get_t5_generator(0, 0):
+            theta5.append(parameters[idx_counter])
+            idx_counter += 1
+    if '6' in excitations:
+        for _ in theta_picker.get_t6_generator(0, 0):
+            theta6.append(parameters[idx_counter])
+            idx_counter += 1
+    assert len(parameters) == len(kappa) + len(theta1) + len(theta2) + len(theta3) + len(theta4) + len(
+        theta5
+    ) + len(theta6)
 
     U = construct_ucc_u(
         num_active_spin_orbs,
         num_active_elec,
-        theta1 + theta2 + theta3 + theta4,
+        theta1 + theta2 + theta3 + theta4 + theta5 + theta6,
         theta_picker,
         excitations,
         allowed_states=state_vector.allowed_active_states_number_spin_conserving,
@@ -779,6 +839,8 @@ def active_space_parameter_gradient(
     theta2 = []
     theta3 = []
     theta4 = []
+    theta5 = []
+    theta6 = []
     idx_counter = 0
     for _ in range(len(kappa_idx)):
         kappa.append(parameters[idx_counter])
@@ -801,7 +863,17 @@ def active_space_parameter_gradient(
         for _ in theta_picker.get_t4_generator(0, 0):
             theta4.append(parameters[idx_counter])
             idx_counter += 1
-    assert len(parameters) == len(kappa) + len(theta1) + len(theta2) + len(theta3) + len(theta4)
+    if '5' in excitations:
+        for _ in theta_picker.get_t5_generator(0, 0):
+            theta5.append(parameters[idx_counter])
+            idx_counter += 1
+    if '6' in excitations:
+        for _ in theta_picker.get_t6_generator(0, 0):
+            theta6.append(parameters[idx_counter])
+            idx_counter += 1
+    assert len(parameters) == len(kappa) + len(theta1) + len(theta2) + len(theta3) + len(theta4) + len(
+        theta5
+    ) + len(theta6)
 
     kappa_mat = np.zeros_like(c_orthonormal)
     if len(kappa) != 0:
@@ -831,7 +903,7 @@ def active_space_parameter_gradient(
         num_virtual_spin_orbs,
     )
 
-    theta_params = theta1 + theta2 + theta3 + theta4
+    theta_params = theta1 + theta2 + theta3 + theta4 + theta5 + theta6
     gradient_theta = np.zeros_like(theta_params)
     step_size = 10**-8
     for i, _ in enumerate(theta_params):
@@ -851,7 +923,7 @@ def active_space_parameter_gradient(
         U = construct_ucc_u(
             num_active_spin_orbs,
             num_active_elec,
-            theta1 + theta2 + theta3 + theta4,
+            theta1 + theta2 + theta3 + theta4 + theta5 + theta6,
             theta_picker,
             excitations,
             allowed_states=state_vector.allowed_active_states_number_spin_conserving,

@@ -152,6 +152,50 @@ class ThetaPicker:
             self.is_generalized,
         )
 
+    def get_t5_generator(
+        self, num_spin_orbs: int, num_elec: int
+    ) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int, int, OperatorPauli], None, None]:
+        """Get generate over T5 operators.
+
+        Args:
+            num_spin_orbs: Number of spin orbitals.
+            num_elec: Number of electrons.
+
+        Returns:
+            T5 operator generator.
+        """
+        return iterate_t5(
+            self.active_occ_spin_idx,
+            self.active_unocc_spin_idx,
+            num_spin_orbs,
+            num_elec,
+            self.is_spin_conserving,
+            self.is_generalized,
+        )
+
+    def get_t6_generator(
+        self, num_spin_orbs: int, num_elec: int
+    ) -> Generator[
+        tuple[int, int, int, int, int, int, int, int, int, int, int, int, int, OperatorPauli], None, None
+    ]:
+        """Get generate over T6 operators.
+
+        Args:
+            num_spin_orbs: Number of spin orbitals.
+            num_elec: Number of electrons.
+
+        Returns:
+            T6 operator generator.
+        """
+        return iterate_t6(
+            self.active_occ_spin_idx,
+            self.active_unocc_spin_idx,
+            num_spin_orbs,
+            num_elec,
+            self.is_spin_conserving,
+            self.is_generalized,
+        )
+
     def get_t1_generator_sa(
         self, num_spin_orbs: int, num_elec: int
     ) -> Generator[tuple[int, int, int, OperatorPauli], None, None]:
@@ -725,6 +769,326 @@ def iterate_t4(
                                     yield theta_idx, a, i, b, j, c, k, d, l, operator
 
 
+def iterate_t5(
+    active_occ_spin_idx: list[int],
+    active_unocc_spin_idx: list[int],
+    num_spin_orbs: int,
+    num_elec: int,
+    is_spin_conserving: bool,
+    is_generalized: bool,
+) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int, int, OperatorPauli], None, None]:
+    """Iterate over T5 operators.
+
+    Args:
+        active_occ_idx: Spin indices of strongly occupied orbitals.
+        active_unocc_idx: Spin indices of weakly occupied orbitals.
+        num_spin_orbs: Number of spin orbitals.
+        num_elec: Number of electrons.
+        is_spin_conserving: Make spin conserving operators.
+        is_generalized: Make generalized operators.
+
+    Returns:
+        T5 operator iteration.
+    """
+    theta_idx = -1
+    active_spin_idx = active_occ_spin_idx + active_unocc_spin_idx
+    for a in active_spin_idx:
+        for b in active_spin_idx:
+            if a >= b:
+                continue
+            for c in active_spin_idx:
+                if b >= c:
+                    continue
+                for d in active_spin_idx:
+                    if c >= d:
+                        continue
+                    for e in active_spin_idx:
+                        if d >= e:
+                            continue
+                        for i in active_spin_idx:
+                            for j in active_spin_idx:
+                                if i >= j:
+                                    continue
+                                for k in active_spin_idx:
+                                    if j >= k:
+                                        continue
+                                    for l in active_spin_idx:
+                                        if k >= l:
+                                            continue
+                                        for m in active_spin_idx:
+                                            if l >= m:
+                                                continue
+                                            if not is_generalized:
+                                                if a in active_occ_spin_idx:
+                                                    continue
+                                                if b in active_occ_spin_idx:
+                                                    continue
+                                                if c in active_occ_spin_idx:
+                                                    continue
+                                                if d in active_occ_spin_idx:
+                                                    continue
+                                                if e in active_occ_spin_idx:
+                                                    continue
+                                                if i in active_unocc_spin_idx:
+                                                    continue
+                                                if j in active_unocc_spin_idx:
+                                                    continue
+                                                if k in active_unocc_spin_idx:
+                                                    continue
+                                                if l in active_unocc_spin_idx:
+                                                    continue
+                                                if m in active_unocc_spin_idx:
+                                                    continue
+                                            theta_idx += 1
+                                            num_alpha = 0
+                                            num_beta = 0
+                                            if a % 2 == 0:
+                                                num_alpha += 1
+                                            else:
+                                                num_beta += 1
+                                            if b % 2 == 0:
+                                                num_alpha += 1
+                                            else:
+                                                num_beta += 1
+                                            if c % 2 == 0:
+                                                num_alpha += 1
+                                            else:
+                                                num_beta += 1
+                                            if d % 2 == 0:
+                                                num_alpha += 1
+                                            else:
+                                                num_beta += 1
+                                            if e % 2 == 0:
+                                                num_alpha += 1
+                                            else:
+                                                num_beta += 1
+                                            if i % 2 == 0:
+                                                num_alpha += 1
+                                            else:
+                                                num_beta += 1
+                                            if j % 2 == 0:
+                                                num_alpha += 1
+                                            else:
+                                                num_beta += 1
+                                            if k % 2 == 0:
+                                                num_alpha += 1
+                                            else:
+                                                num_beta += 1
+                                            if l % 2 == 0:
+                                                num_alpha += 1
+                                            else:
+                                                num_beta += 1
+                                            if m % 2 == 0:
+                                                num_alpha += 1
+                                            else:
+                                                num_beta += 1
+                                            if (
+                                                num_alpha % 2 != 0 or num_beta % 2 != 0
+                                            ) and is_spin_conserving:
+                                                continue
+                                            operator = a_spin_pauli(
+                                                a, True, num_spin_orbs, num_elec
+                                            ) * a_spin_pauli(b, True, num_spin_orbs, num_elec)
+                                            operator = operator * a_spin_pauli(
+                                                c, True, num_spin_orbs, num_elec
+                                            )
+                                            operator = operator * a_spin_pauli(
+                                                d, True, num_spin_orbs, num_elec
+                                            )
+                                            operator = operator * a_spin_pauli(
+                                                e, True, num_spin_orbs, num_elec
+                                            )
+                                            operator = operator * a_spin_pauli(
+                                                l, False, num_spin_orbs, num_elec
+                                            )
+                                            operator = operator * a_spin_pauli(
+                                                k, False, num_spin_orbs, num_elec
+                                            )
+                                            operator = operator * a_spin_pauli(
+                                                j, False, num_spin_orbs, num_elec
+                                            )
+                                            operator = operator * a_spin_pauli(
+                                                i, False, num_spin_orbs, num_elec
+                                            )
+                                            operator = operator * a_spin_pauli(
+                                                m, False, num_spin_orbs, num_elec
+                                            )
+                                            yield theta_idx, a, i, b, j, c, k, d, l, e, m, operator
+
+
+def iterate_t6(
+    active_occ_spin_idx: list[int],
+    active_unocc_spin_idx: list[int],
+    num_spin_orbs: int,
+    num_elec: int,
+    is_spin_conserving: bool,
+    is_generalized: bool,
+) -> Generator[
+    tuple[int, int, int, int, int, int, int, int, int, int, int, int, int, OperatorPauli], None, None
+]:
+    """Iterate over T6 operators.
+
+    Args:
+        active_occ_idx: Spin indices of strongly occupied orbitals.
+        active_unocc_idx: Spin indices of weakly occupied orbitals.
+        num_spin_orbs: Number of spin orbitals.
+        num_elec: Number of electrons.
+        is_spin_conserving: Make spin conserving operators.
+        is_generalized: Make generalized operators.
+
+    Returns:
+        T6 operator iteration.
+    """
+    theta_idx = -1
+    active_spin_idx = active_occ_spin_idx + active_unocc_spin_idx
+    for a in active_spin_idx:
+        for b in active_spin_idx:
+            if a >= b:
+                continue
+            for c in active_spin_idx:
+                if b >= c:
+                    continue
+                for d in active_spin_idx:
+                    if c >= d:
+                        continue
+                    for e in active_spin_idx:
+                        if d >= e:
+                            continue
+                        for f in active_spin_idx:
+                            if e >= f:
+                                continue
+                            for i in active_spin_idx:
+                                for j in active_spin_idx:
+                                    if i >= j:
+                                        continue
+                                    for k in active_spin_idx:
+                                        if j >= k:
+                                            continue
+                                        for l in active_spin_idx:
+                                            if k >= l:
+                                                continue
+                                            for m in active_spin_idx:
+                                                if l >= m:
+                                                    continue
+                                                for n in active_spin_idx:
+                                                    if m >= n:
+                                                        continue
+                                                    if not is_generalized:
+                                                        if a in active_occ_spin_idx:
+                                                            continue
+                                                        if b in active_occ_spin_idx:
+                                                            continue
+                                                        if c in active_occ_spin_idx:
+                                                            continue
+                                                        if d in active_occ_spin_idx:
+                                                            continue
+                                                        if e in active_occ_spin_idx:
+                                                            continue
+                                                        if f in active_occ_spin_idx:
+                                                            continue
+                                                        if i in active_unocc_spin_idx:
+                                                            continue
+                                                        if j in active_unocc_spin_idx:
+                                                            continue
+                                                        if k in active_unocc_spin_idx:
+                                                            continue
+                                                        if l in active_unocc_spin_idx:
+                                                            continue
+                                                        if m in active_unocc_spin_idx:
+                                                            continue
+                                                        if n in active_unocc_spin_idx:
+                                                            continue
+                                                    theta_idx += 1
+                                                    num_alpha = 0
+                                                    num_beta = 0
+                                                    if a % 2 == 0:
+                                                        num_alpha += 1
+                                                    else:
+                                                        num_beta += 1
+                                                    if b % 2 == 0:
+                                                        num_alpha += 1
+                                                    else:
+                                                        num_beta += 1
+                                                    if c % 2 == 0:
+                                                        num_alpha += 1
+                                                    else:
+                                                        num_beta += 1
+                                                    if d % 2 == 0:
+                                                        num_alpha += 1
+                                                    else:
+                                                        num_beta += 1
+                                                    if e % 2 == 0:
+                                                        num_alpha += 1
+                                                    else:
+                                                        num_beta += 1
+                                                    if f % 2 == 0:
+                                                        num_alpha += 1
+                                                    else:
+                                                        num_beta += 1
+                                                    if i % 2 == 0:
+                                                        num_alpha += 1
+                                                    else:
+                                                        num_beta += 1
+                                                    if j % 2 == 0:
+                                                        num_alpha += 1
+                                                    else:
+                                                        num_beta += 1
+                                                    if k % 2 == 0:
+                                                        num_alpha += 1
+                                                    else:
+                                                        num_beta += 1
+                                                    if l % 2 == 0:
+                                                        num_alpha += 1
+                                                    else:
+                                                        num_beta += 1
+                                                    if m % 2 == 0:
+                                                        num_alpha += 1
+                                                    else:
+                                                        num_beta += 1
+                                                    if n % 2 == 0:
+                                                        num_alpha += 1
+                                                    else:
+                                                        num_beta += 1
+                                                    if (
+                                                        num_alpha % 2 != 0 or num_beta % 2 != 0
+                                                    ) and is_spin_conserving:
+                                                        continue
+                                                    operator = a_spin_pauli(
+                                                        a, True, num_spin_orbs, num_elec
+                                                    ) * a_spin_pauli(b, True, num_spin_orbs, num_elec)
+                                                    operator = operator * a_spin_pauli(
+                                                        c, True, num_spin_orbs, num_elec
+                                                    )
+                                                    operator = operator * a_spin_pauli(
+                                                        d, True, num_spin_orbs, num_elec
+                                                    )
+                                                    operator = operator * a_spin_pauli(
+                                                        e, True, num_spin_orbs, num_elec
+                                                    )
+                                                    operator = operator * a_spin_pauli(
+                                                        f, True, num_spin_orbs, num_elec
+                                                    )
+                                                    operator = operator * a_spin_pauli(
+                                                        l, False, num_spin_orbs, num_elec
+                                                    )
+                                                    operator = operator * a_spin_pauli(
+                                                        k, False, num_spin_orbs, num_elec
+                                                    )
+                                                    operator = operator * a_spin_pauli(
+                                                        j, False, num_spin_orbs, num_elec
+                                                    )
+                                                    operator = operator * a_spin_pauli(
+                                                        i, False, num_spin_orbs, num_elec
+                                                    )
+                                                    operator = operator * a_spin_pauli(
+                                                        m, False, num_spin_orbs, num_elec
+                                                    )
+                                                    operator = operator * a_spin_pauli(
+                                                        n, False, num_spin_orbs, num_elec
+                                                    )
+                                                    yield theta_idx, a, i, b, j, c, k, d, l, e, m, f, n, operator
+
+
 def construct_ucc_u(
     num_spin_orbs: int,
     num_elec: int,
@@ -795,6 +1159,40 @@ def construct_ucc_u(
                 tmp = tmp.dot(a_op_spin_matrix(k, False, num_spin_orbs, use_csr=use_csr))
                 tmp = tmp.dot(a_op_spin_matrix(j, False, num_spin_orbs, use_csr=use_csr))
                 tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, use_csr=use_csr))
+                t += theta[counter] * tmp
+            counter += 1
+    if '5' in excitations:
+        for _, a, i, b, j, c, k, d, l, e, m, _ in theta_picker.get_t4_generator(0, 0):
+            if theta[counter] != 0.0:
+                tmp = a_op_spin_matrix(a, True, num_spin_orbs, use_csr=use_csr).dot(
+                    a_op_spin_matrix(b, True, num_spin_orbs, use_csr=use_csr)
+                )
+                tmp = tmp.dot(a_op_spin_matrix(c, True, num_spin_orbs, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(d, True, num_spin_orbs, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(e, True, num_spin_orbs, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(l, False, num_spin_orbs, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(k, False, num_spin_orbs, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(j, False, num_spin_orbs, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(m, False, num_spin_orbs, use_csr=use_csr))
+                t += theta[counter] * tmp
+            counter += 1
+    if '6' in excitations:
+        for _, a, i, b, j, c, k, d, l, e, m, f, n, _ in theta_picker.get_t4_generator(0, 0):
+            if theta[counter] != 0.0:
+                tmp = a_op_spin_matrix(a, True, num_spin_orbs, use_csr=use_csr).dot(
+                    a_op_spin_matrix(b, True, num_spin_orbs, use_csr=use_csr)
+                )
+                tmp = tmp.dot(a_op_spin_matrix(c, True, num_spin_orbs, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(d, True, num_spin_orbs, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(e, True, num_spin_orbs, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(f, True, num_spin_orbs, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(l, False, num_spin_orbs, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(k, False, num_spin_orbs, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(j, False, num_spin_orbs, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(m, False, num_spin_orbs, use_csr=use_csr))
+                tmp = tmp.dot(a_op_spin_matrix(n, False, num_spin_orbs, use_csr=use_csr))
                 t += theta[counter] * tmp
             counter += 1
     assert counter == len(theta)
