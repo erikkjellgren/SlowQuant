@@ -7,6 +7,9 @@ import numpy as np
 import scipy
 import scipy.optimize
 
+from slowquant.molecularintegrals.integralfunctions import (
+    one_electron_integral_transform,
+)
 from slowquant.unitary_coupled_cluster.base import StateVector
 from slowquant.unitary_coupled_cluster.operator_hybrid import (
     convert_pauli_to_hybrid_form,
@@ -211,6 +214,12 @@ class WaveFunctionUCC:
                     kappa_mat[p, q] = kappa_val
                     kappa_mat[q, p] = -kappa_val
         return np.matmul(self.c_orthonormal, scipy.linalg.expm(-kappa_mat))
+
+    def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
+        S_ortho = one_electron_integral_transform(self.c_trans, overlap_integral)
+        one = np.identity(len(S_ortho))
+        diff = np.abs(S_ortho - one)
+        print('Max ortho-normal diff:', np.max(diff))
 
     def run_ucc(
         self,
@@ -419,7 +428,9 @@ class WaveFunctionUCC:
                 counter += 1
 
 
-def run_compactify_wf(wf: WaveFunctionUCC, excitations: str) -> WaveFunctionUCC:
+def run_compactify_wf(
+    wf: WaveFunctionUCC, excitations: str, overlap_integral: np.ndarray | None = None
+) -> WaveFunctionUCC:
     one_rdm = construct_one_rdm(wf)
     natural_occupations, natural_orbitals = np.linalg.eig(one_rdm)
     sorting = np.argsort(natural_occupations)[::-1]
@@ -432,6 +443,8 @@ def run_compactify_wf(wf: WaveFunctionUCC, excitations: str) -> WaveFunctionUCC:
     new_wf.theta3 = [0] * len(wf.theta3)
     new_wf.theta4 = [0] * len(wf.theta4)
     new_wf.c_orthonormal = np.matmul(wf.c_trans, natural_orbitals)
+    if overlap_integral is not None:
+        new_wf.check_orthonormality(overlap_integral)
     new_wf.run_ucc(excitations, False)
     return new_wf
 
