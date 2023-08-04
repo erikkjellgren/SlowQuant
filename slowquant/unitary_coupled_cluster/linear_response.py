@@ -89,7 +89,12 @@ class LinearResponseUCC:
             'sdtq56',  # self.wf._excitations,
         )
         if do_projected_operators:
-            projection = lw.outer(self.wf.state_vector.ket_active, self.wf.state_vector.bra_active)
+            if self.wf.num_active_spin_orbs >= 10:
+                projection = lw.outer(
+                    self.wf.state_vector.ket_active_csr, self.wf.state_vector.bra_active_csr
+                )
+            else:
+                projection = lw.outer(self.wf.state_vector.ket_active, self.wf.state_vector.bra_active)
         if 's' in excitations:
             for _, a, i, op_ in self.theta_picker.get_t1_generator_sa(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
@@ -277,16 +282,20 @@ class LinearResponseUCC:
         idx_shift = len(self.q_ops)
         print('Gs', len(self.G_ops))
         print('qs', len(self.q_ops))
-        grad = np.zeros(len(self.q_ops) + len(self.G_ops))
+        grad = np.zeros(len(self.q_ops))
         for i, op in enumerate(self.q_ops):
             grad[i] = expectation_value_contracted(
                 self.wf.state_vector, commutator_contract(op.operator, H_1i_1a), self.wf.state_vector
             )
+        if len(grad) != 0:
+            print('idx, max(abs(grad orb)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+        grad = np.zeros(len(self.G_ops))
         for i, op in enumerate(self.G_ops):
-            grad[i + idx_shift] = expectation_value_contracted(
+            grad[i] = expectation_value_contracted(
                 self.wf.state_vector, commutator_contract(op.operator, H_en), self.wf.state_vector
             )
-        print('max(abs(grad)):', np.max(np.abs(grad)))
+        if len(grad) != 0:
+            print('idx, max(abs(grad active)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
         if do_selfconsistent_operators:
             calculation_type = 'selfconsistent'
         elif do_projected_operators:
@@ -561,6 +570,11 @@ class LinearResponseUCC:
         E2[:size, size:] = self.Q
         E2[size:, :size] = np.conj(self.Q)
         E2[size:, size:] = np.conj(self.M)
+        (
+            hess_eigval,
+            _,
+        ) = np.linalg.eig(E2)
+        print(f'Smallest Hessian eigenvalue: {np.min(hess_eigval)}')
 
         S = np.zeros((size * 2, size * 2))
         S[:size, :size] = self.V

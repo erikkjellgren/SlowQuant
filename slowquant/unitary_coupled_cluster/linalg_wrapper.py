@@ -74,8 +74,8 @@ def outer(
     """
     if isinstance(A, np.ndarray):
         return np.outer(A, B)
-    if isinstance(A, ss.csr_matrix):
-        if A.tranpose().get_shape() != B.get_shape():
+    if isinstance(A, (ss.csr_matrix, ss.csc_matrix)):
+        if A.transpose().get_shape() != B.get_shape():
             raise ValueError(
                 'Shape mismatch between A and B, got A: {A.get_shape()}, and, B: {B.get_shape()}'
             )
