@@ -227,16 +227,18 @@ class LinearResponseUCC:
         idx_shift = len(self.q_ops)
         print('Gs', len(self.G_ops))
         print('qs', len(self.q_ops))
-        grad = np.zeros(len(self.q_ops) + len(self.G_ops))
+        grad = np.zeros(len(self.q_ops))
         for i, op in enumerate(self.q_ops):
             grad[i] = expectation_value_contracted(
                 self.wf.state_vector, commutator_contract(op.operator, H_1i_1a), self.wf.state_vector
             )
+        print('idx, max(abs(grad orb)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+        grad = np.zeros(len(self.G_ops))
         for i, op in enumerate(self.G_ops):
-            grad[i + idx_shift] = expectation_value_contracted(
+            grad[i] = expectation_value_contracted(
                 self.wf.state_vector, commutator_contract(op.operator, H_en), self.wf.state_vector
             )
-        print('max(abs(grad)):', np.max(np.abs(grad)))
+        print('idx, max(abs(grad active)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
         if do_selfconsistent_operators:
             calculation_type = 'selfconsistent'
         elif do_projected_operators:
@@ -511,6 +513,8 @@ class LinearResponseUCC:
         E2[:size, size:] = self.Q
         E2[size:, :size] = np.conj(self.Q)
         E2[size:, size:] = np.conj(self.M)
+        hess_eigval, _, = np.linalg.eig(E2)
+        print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
 
         S = np.zeros((size * 2, size * 2))
         S[:size, :size] = self.V

@@ -40,3 +40,8 @@ Just use [PySCF](https://github.com/pyscf/pyscf) instead.
 | CCSD                  | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
 | CCSD(T)               | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
 | BOMD                  | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
+
+## Cited in
+
+- Lehtola, S. and Karttunen, A.J., 2022. Free and open source software for computational chemistry education. Wiley Interdisciplinary Reviews: Computational Molecular Science, 12(5), p.e1610.
+- CHAVES, Beatriz de Paiva Grillo. Desenvolvimentos em phython aplicados ao ensino da química quântica. 2022. 32 f. Trabalho de Conclusão de Curso (Graduação em Química)- Instituto de Química, Universidade Federal Fluminense, Niterói, 2022.
