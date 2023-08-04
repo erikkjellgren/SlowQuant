@@ -226,7 +226,7 @@ class WaveFunctionUCC:
         excitations: str,
         orbital_optimization: bool = False,
         is_silent: bool = False,
-        convergence_threshold: float = 10**-5,
+        convergence_threshold: float = 10**-10,
     ) -> None:
         """Run optimization of UCC wave function.
 
@@ -710,7 +710,8 @@ def orbital_rotation_gradient(
             state_vector,
         )
     for i, _ in enumerate(kappa):
-        step_size = eps * max(1, abs(kappa[i]))
+        sign_step = (kappa[i] >= 0).astype(float) * 2 - 1
+        step_size = eps * sign_step * max(1, abs(kappa[i]))
         kappa[i] += step_size
         kappa_mat = np.zeros_like(c_orthonormal)
         if orbital_optimized:
@@ -866,7 +867,8 @@ def active_space_parameter_gradient(
         state_vector.new_u(U, allowed_states=state_vector.allowed_active_states_number_spin_conserving)
         E = expectation_value_hybrid(state_vector, Hamiltonian, state_vector)
     for i, _ in enumerate(theta_params):
-        step_size = eps * max(1, abs(theta_params[i]))
+        sign_step = (theta_params[i] >= 0).astype(float) * 2 - 1
+        step_size = eps * sign_step * max(1, abs(theta_params[i]))
         theta_params[i] += step_size
         U = construct_ucc_u(
             num_active_spin_orbs,
