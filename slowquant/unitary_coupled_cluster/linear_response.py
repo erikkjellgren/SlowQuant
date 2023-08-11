@@ -62,8 +62,6 @@ class LinearResponseUCC:
             do_selfconsistent_operators: Use self-consistent active space excitation operators.
             do_projected_operators: Use projected active space excitation opreators.
         """
-        if do_selfconsistent_operators and do_projected_operators:
-            raise ValueError('do_selfconsistent_operators and do_projected_operators cannot both be True.')
         self.wf = copy.deepcopy(wave_function)
         self.theta_picker = ThetaPicker(
             self.wf.active_occ_spin_idx,
