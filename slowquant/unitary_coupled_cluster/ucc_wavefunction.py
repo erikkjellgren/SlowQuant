@@ -170,9 +170,11 @@ class WaveFunctionUCC:
         self.kappa_hf_like_idx = []
         for p in range(0, self.num_spin_orbs // 2):
             for q in range(p + 1, self.num_spin_orbs // 2):
-                if p in (self.inactive_idx + self.active_occ_idx) and q in (
-                    self.virtual_idx + self.active_unocc_idx
-                ):
+                if p in self.inactive_idx and q in self.virtual_idx:
+                    self.kappa_hf_like_idx.append([p, q])
+                elif p in self.inactive_idx and q in self.active_unocc_idx:
+                    self.kappa_hf_like_idx.append([p, q])
+                elif p in self.active_occ_idx and q in self.virtual_idx:
                     self.kappa_hf_like_idx.append([p, q])
         # Construct theta1
         self.theta_picker = ThetaPicker(
