@@ -215,7 +215,7 @@ class LinearResponseUCC:
         #Note: For generic implementation (for debugging) we also implement Q in sc and st way.
         #Using the derived work equations, we can use the naive operators q. 
         
-        for i, a in self.wf.kappa_idx: #To Do: loop over self.kappa_hf_like_idx
+        for i, a in self.kappa_hf_like_idx:
             op_ = 2 ** (-1 / 2) * epq_pauli(a, i, self.wf.num_spin_orbs, self.wf.num_elec)
             op = convert_pauli_to_hybrid_form(
                 op_,
