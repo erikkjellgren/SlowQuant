@@ -44,11 +44,11 @@ def test_h2_sto3g_uccsd_lr() -> None:
     )
     LR.calc_excitation_energies()
     print(LR.excitation_energies)
-    assert abs(LR.excitation_energies[0] - 1.0157) < 10**-3
-    assert abs(LR.excitation_energies[1] - 1.7195) < 10**-3
+    assert abs(LR.excitation_energies[0] - 1.0157376) < 10**-3
+    assert abs(LR.excitation_energies[1] - 1.71950367) < 10**-3
     assert abs(LR.get_excited_state_overlap(0) - 0.0) < 10**-3
     assert abs(LR.get_excited_state_overlap(1) - 0.0) < 10**-3
-    assert abs(abs(LR.get_transition_dipole(0, dipole_integrals)[2]) - 1.1441) < 10**-3
+    assert abs(abs(LR.get_transition_dipole(0, dipole_integrals)[2]) - 1.1440534325663108) < 10**-3
     assert abs(LR.get_transition_dipole(1, dipole_integrals)[2] - 0.0) < 10**-3
     # ST
     LR = LinearResponseUCC(
@@ -60,11 +60,11 @@ def test_h2_sto3g_uccsd_lr() -> None:
     )
     LR.calc_excitation_energies()
     print(LR.excitation_energies)
-    assert abs(LR.excitation_energies[0] - 1.0157) < 10**-3
-    assert abs(LR.excitation_energies[1] - 1.7195) < 10**-3
+    assert abs(LR.excitation_energies[0] - 1.0157376) < 10**-3
+    assert abs(LR.excitation_energies[1] - 1.71950367) < 10**-3
     assert abs(LR.get_excited_state_overlap(0) - 0.0) < 10**-3
     assert abs(LR.get_excited_state_overlap(1) - 0.0) < 10**-3
-    assert abs(abs(LR.get_transition_dipole(0, dipole_integrals)[2]) - 1.1441) < 10**-3
+    assert abs(abs(LR.get_transition_dipole(0, dipole_integrals)[2]) - 1.144053440679731) < 10**-3
     assert abs(LR.get_transition_dipole(1, dipole_integrals)[2] - 0.0) < 10**-3
 
 

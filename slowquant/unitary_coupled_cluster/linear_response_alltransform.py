@@ -317,6 +317,7 @@ class LinearResponseUCC:
                 if (
                     calculation_type == 'naive' and do_selfconsistent_operators
                 ):  # Implementation via work equation with G and q, transformed H, acting on |CSF>
+                    print("naive and sc")
                     # Make M (A)
                     operator = operatormul3_contract(qI.dagger, H_2i_2a, qJ) - operatormul3_contract(
                         qI.dagger, qJ, H_2i_2a
@@ -333,9 +334,10 @@ class LinearResponseUCC:
                         self.V[i, j] = self.V[j, i] = 1
                     # Make W (\Delta)  = 0
                 # Statetransfer work equations
-                if (
+                elif (
                     calculation_type == 'naive' and do_statetransfer_operators
                 ):  # Implementation via work equation with G and q, transformed H, acting on |CSF>
+                    print("naive and st")
                     # Make M (A)
                     if i == j:
                         self.M[i, j] = self.M[j, i] = (
@@ -355,6 +357,7 @@ class LinearResponseUCC:
                 elif (
                     calculation_type == 'generic'
                 ):  # Implementation for debugging with R and Q, acting on |0>
+                    print("generic")
                     # Make M (A)
                     self.M[i, j] = self.M[j, i] = expectation_value_contracted(
                         self.wf.state_vector,
@@ -406,7 +409,7 @@ class LinearResponseUCC:
                     # Make V (\Sigma) = 0
                     # Make W (\Delta) = 0
                 # Statetransfer work equations
-                if (
+                elif (
                     calculation_type == 'naive' and do_statetransfer_operators
                 ):  # Implementation via work equation with G and q, transformed H, acting on |CSF>
                     # Make M (A)
@@ -461,7 +464,7 @@ class LinearResponseUCC:
                     # Make V (\Sigma) = 0
                     # Make W (\Delta) = 0
                 # Statetransfer work equations
-                if (
+                elif (
                     calculation_type == 'naive' and do_statetransfer_operators
                 ):  # Implementation via work equation with G and q, transformed H, acting on |CSF>
                     # Make M (A)
