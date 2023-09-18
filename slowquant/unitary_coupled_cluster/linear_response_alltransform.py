@@ -277,6 +277,8 @@ class LinearResponseUCC:
             )
         if len(grad) != 0:
             print('idx, max(abs(grad orb)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+            if np.max(np.abs(grad)) > 10**-4:
+                raise ValueError("Gradient of Hessian is real bad")
         grad = np.zeros(len(self.G_ops))
         for i, op in enumerate(self.G_ops):
             grad[i] = expectation_value_contracted(
@@ -284,6 +286,8 @@ class LinearResponseUCC:
             )
         if len(grad) != 0:
             print('idx, max(abs(grad active)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+            if np.max(np.abs(grad)) > 10**-4:
+                raise ValueError("Gradient of Hessian is real bad")
 
         # Transform Hamiltonian if we choose naive implementation, i.e. via work equations: \tilde H = U^dHU
         if calculation_type == 'naive':  # != debugging
@@ -317,7 +321,6 @@ class LinearResponseUCC:
                 if (
                     calculation_type == 'naive' and do_selfconsistent_operators
                 ):  # Implementation via work equation with G and q, transformed H, acting on |CSF>
-                    print("naive and sc")
                     # Make M (A)
                     operator = operatormul3_contract(qI.dagger, H_2i_2a, qJ) - operatormul3_contract(
                         qI.dagger, qJ, H_2i_2a
@@ -337,7 +340,6 @@ class LinearResponseUCC:
                 elif (
                     calculation_type == 'naive' and do_statetransfer_operators
                 ):  # Implementation via work equation with G and q, transformed H, acting on |CSF>
-                    print("naive and st")
                     # Make M (A)
                     if i == j:
                         self.M[i, j] = self.M[j, i] = (
@@ -357,7 +359,6 @@ class LinearResponseUCC:
                 elif (
                     calculation_type == 'generic'
                 ):  # Implementation for debugging with R and Q, acting on |0>
-                    print("generic")
                     # Make M (A)
                     self.M[i, j] = self.M[j, i] = expectation_value_contracted(
                         self.wf.state_vector,
