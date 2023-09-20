@@ -52,6 +52,7 @@ class LinearResponseUCC:
         is_spin_conserving: bool = False,
         do_selfconsistent_operators: bool = True,
         do_projected_operators: bool = False,
+        do_debugging: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
@@ -71,6 +72,7 @@ class LinearResponseUCC:
 
         self.G_ops: list[ResponseOperator] = []
         self.q_ops: list[ResponseOperator] = []
+        self.do_debugging = do_debugging
         num_spin_orbs = self.wf.num_spin_orbs
         num_elec = self.wf.num_elec
         excitations = excitations.lower()
@@ -300,7 +302,9 @@ class LinearResponseUCC:
             calculation_type = 'generic'
         else:
             calculation_type = 'naive'
-        # calculation_type = 'generic'
+        if self.do_debugging is True:
+            calculation_type = 'generic'
+        print("Calculation type: ", calculation_type)
         for j, opJ in enumerate(self.q_ops):
             qJ = opJ.operator
             for i, opI in enumerate(self.q_ops):
