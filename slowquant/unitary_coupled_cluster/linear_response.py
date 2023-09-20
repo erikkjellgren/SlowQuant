@@ -52,6 +52,7 @@ class LinearResponseUCC:
         is_spin_conserving: bool = False,
         do_selfconsistent_operators: bool = True,
         do_projected_operators: bool = False,
+        do_statetransfer_operators: bool = False,
         do_debugging: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
@@ -63,6 +64,8 @@ class LinearResponseUCC:
             do_selfconsistent_operators: Use self-consistent active space excitation operators.
             do_projected_operators: Use projected active space excitation opreators.
         """
+        if sum([do_projected_operators, do_selfconsistent_operators, do_statetransfer_operators]) >= 2:
+            raise ValueError('You set more than one method flag to True.')
         self.wf = copy.deepcopy(wave_function)
         self.theta_picker = ThetaPicker(
             self.wf.active_occ_spin_idx,
@@ -88,7 +91,7 @@ class LinearResponseUCC:
             self.wf.theta_picker_full,
             'sdtq56',  # self.wf._excitations,
         )
-        if do_projected_operators:
+        if do_projected_operators or do_statetransfer_operators:
             if self.wf.num_active_spin_orbs >= 10:
                 projection = lw.outer(
                     self.wf.state_vector.ket_active_csr, self.wf.state_vector.bra_active_csr
@@ -117,6 +120,10 @@ class LinearResponseUCC:
                         self.wf.num_virtual_spin_orbs,
                     )
                     op = op - op_diff
+                if do_statetransfer_operators:
+                    op = op.apply_u_from_right(U.conj().transpose())
+                    op = op.apply_u_from_left(U)
+                    op = op.apply_u_from_right(projection)
                 self.G_ops.append(ResponseOperator((i,), (a,), op))
         if 'd' in excitations:
             for _, a, i, b, j, op_ in self.theta_picker.get_t2_generator_sa(num_spin_orbs, num_elec):
@@ -140,6 +147,10 @@ class LinearResponseUCC:
                         self.wf.num_virtual_spin_orbs,
                     )
                     op = op - op_diff
+                if do_statetransfer_operators:
+                    op = op.apply_u_from_right(U.conj().transpose())
+                    op = op.apply_u_from_left(U)
+                    op = op.apply_u_from_right(projection)
                 self.G_ops.append(ResponseOperator((i, j), (a, b), op))
         if 't' in excitations:
             for _, a, i, b, j, c, k, op_ in self.theta_picker.get_t3_generator(num_spin_orbs, num_elec):
@@ -163,6 +174,10 @@ class LinearResponseUCC:
                         self.wf.num_virtual_spin_orbs,
                     )
                     op = op - op_diff
+                if do_statetransfer_operators:
+                    op = op.apply_u_from_right(U.conj().transpose())
+                    op = op.apply_u_from_left(U)
+                    op = op.apply_u_from_right(projection)
                 self.G_ops.append(ResponseOperator((i, j, k), (a, b, c), op))
         if 'q' in excitations:
             for _, a, i, b, j, c, k, d, l, op_ in self.theta_picker.get_t4_generator(num_spin_orbs, num_elec):
@@ -186,6 +201,10 @@ class LinearResponseUCC:
                         self.wf.num_virtual_spin_orbs,
                     )
                     op = op - op_diff
+                if do_statetransfer_operators:
+                    op = op.apply_u_from_right(U.conj().transpose())
+                    op = op.apply_u_from_left(U)
+                    op = op.apply_u_from_right(projection)
                 self.G_ops.append(ResponseOperator((i, j, k, l), (a, b, c, d), op))
         if '5' in excitations:
             for _, a, i, b, j, c, k, d, l, e, m, op_ in self.theta_picker.get_t5_generator(
@@ -211,6 +230,10 @@ class LinearResponseUCC:
                         self.wf.num_virtual_spin_orbs,
                     )
                     op = op - op_diff
+                if do_statetransfer_operators:
+                    op = op.apply_u_from_right(U.conj().transpose())
+                    op = op.apply_u_from_left(U)
+                    op = op.apply_u_from_right(projection)
                 self.G_ops.append(ResponseOperator((i, j, k, l, m), (a, b, c, d, e), op))
         if '6' in excitations:
             for _, a, i, b, j, c, k, d, l, e, m, f, n, op_ in self.theta_picker.get_t6_generator(
@@ -236,6 +259,10 @@ class LinearResponseUCC:
                         self.wf.num_virtual_spin_orbs,
                     )
                     op = op - op_diff
+                if do_statetransfer_operators:
+                    op = op.apply_u_from_right(U.conj().transpose())
+                    op = op.apply_u_from_left(U)
+                    op = op.apply_u_from_right(projection)
                 self.G_ops.append(ResponseOperator((i, j, k, l, m, n), (a, b, c, d, e, f), op))
         for i, a in self.wf.kappa_idx:
             op_ = 2 ** (-1 / 2) * epq_pauli(a, i, self.wf.num_spin_orbs, self.wf.num_elec)
@@ -300,11 +327,13 @@ class LinearResponseUCC:
             calculation_type = 'selfconsistent'
         elif do_projected_operators:
             calculation_type = 'generic'
+        elif do_statetransfer_operators:
+            calculation_type = 'generic'
         else:
             calculation_type = 'naive'
         if self.do_debugging is True:
             calculation_type = 'generic'
-        print("Calculation type: ", calculation_type)
+        print('Calculation type: ', calculation_type)
         for j, opJ in enumerate(self.q_ops):
             qJ = opJ.operator
             for i, opI in enumerate(self.q_ops):
