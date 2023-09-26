@@ -385,7 +385,7 @@ class LinearResponseUCC:
                     )
                 else:
                     raise NameError('Could not determine calculation_type got: {calculation_type}')
-        # qG/QR matrices
+        # qG/QR matrices !!!This one might need to be changed !!!
         for j, opJ in enumerate(self.G_ops):
             GJ = opJ.operator
             for i, opI in enumerate(self.q_ops):
@@ -424,13 +424,15 @@ class LinearResponseUCC:
                     # Make M (A)
                     self.M[i, j + idx_shift] = expectation_value_contracted(
                         self.wf.state_vector,
-                        double_commutator_contract(qI.dagger, H_1i_1a, GJ),
+                        #double_commutator_contract(qI.dagger, H_1i_1a, GJ),
+                        double_commutator_contract(GJ, H_1i_1a, qI.dagger),
                         self.wf.state_vector,
                     )
                     # Make Q (B)
                     self.Q[i, j + idx_shift] = expectation_value_contracted(
                         self.wf.state_vector,
-                        double_commutator_contract(qI.dagger, H_1i_1a, GJ.dagger),
+                        #double_commutator_contract(qI.dagger, H_1i_1a, GJ.dagger),
+                        double_commutator_contract(GJ.dagger, H_1i_1a, qI.dagger),
                         self.wf.state_vector,
                     )
                     # Make V (\Sigma)
