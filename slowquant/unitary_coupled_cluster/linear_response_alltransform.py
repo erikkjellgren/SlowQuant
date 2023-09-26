@@ -278,7 +278,7 @@ class LinearResponseUCC:
         if len(grad) != 0:
             print('idx, max(abs(grad orb)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-4:
-                raise ValueError("Gradient of Hessian is real bad")
+                raise ValueError('Gradient of Hessian is real bad')
         grad = np.zeros(len(self.G_ops))
         for i, op in enumerate(self.G_ops):
             grad[i] = expectation_value_contracted(
@@ -287,7 +287,7 @@ class LinearResponseUCC:
         if len(grad) != 0:
             print('idx, max(abs(grad active)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-4:
-                raise ValueError("Gradient of Hessian is real bad")
+                raise ValueError('Gradient of Hessian is real bad')
 
         # Transform Hamiltonian if we choose naive implementation, i.e. via work equations: \tilde H = U^dHU
         if calculation_type == 'naive':  # != debugging
@@ -424,14 +424,14 @@ class LinearResponseUCC:
                     # Make M (A)
                     self.M[i, j + idx_shift] = expectation_value_contracted(
                         self.wf.state_vector,
-                        #double_commutator_contract(qI.dagger, H_1i_1a, GJ),
+                        # double_commutator_contract(qI.dagger, H_1i_1a, GJ),
                         double_commutator_contract(GJ, H_1i_1a, qI.dagger),
                         self.wf.state_vector,
                     )
                     # Make Q (B)
                     self.Q[i, j + idx_shift] = expectation_value_contracted(
                         self.wf.state_vector,
-                        #double_commutator_contract(qI.dagger, H_1i_1a, GJ.dagger),
+                        # double_commutator_contract(qI.dagger, H_1i_1a, GJ.dagger),
                         double_commutator_contract(GJ.dagger, H_1i_1a, qI.dagger),
                         self.wf.state_vector,
                     )
