@@ -235,6 +235,7 @@ class LinearResponseUCC:
                     )
                     self.Delta[j, i] = -self.Delta[i, j]
             # This one has been changed to reflect literature parametrization
+            # If one would change back to the equations in the comments, one would obtain the results for an initial parametrization opposite literature, i.e. exp(s)exp(kappa)
             for j, GJ in enumerate(self.G_ops):
                 for i, qI in enumerate(self.q_ops):
                     # Make A
@@ -320,7 +321,8 @@ class LinearResponseUCC:
                         commutator_contract(qI.dagger, qJ.dagger),
                         self.wf.state_vector,
                     )
-            # This one has been changed to reflect literature parametrization
+            # This one has been changed to reflect literature parametrization.
+            # If one would change back to the equations in the comments, one would obtain the results for an initial parametrization opposite literature, i.e. exp(s)exp(kappa)
             for j, GJ in enumerate(self.G_ops):
                 for i, qI in enumerate(self.q_ops):
                     # Make A

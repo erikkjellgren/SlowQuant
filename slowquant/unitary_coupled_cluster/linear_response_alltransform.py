@@ -378,14 +378,16 @@ class LinearResponseUCC:
                         self.wf.state_vector,
                     )
                     # Make W (\Delta)
-                    self.W[i, j] = self.W[j, i] = expectation_value_contracted(
+                    self.W[i, j] = expectation_value_contracted(
                         self.wf.state_vector,
                         commutator_contract(qI.dagger, qJ.dagger),
                         self.wf.state_vector,
                     )
+                    self.W[j, i] = -self.W[i, j]
                 else:
                     raise NameError('Could not determine calculation_type got: {calculation_type}')
-        # qG/QR matrices. Changed to literature parametrization
+        # qG/QR matrices. Changed to literature parametrization for generic
+        # If one would change back to the equations in the comments, one would obtain the results for an initial parametrization opposite literature, i.e. exp(s)exp(kappa)
         for j, opJ in enumerate(self.G_ops):
             GJ = opJ.operator
             for i, opI in enumerate(self.q_ops):
@@ -571,11 +573,10 @@ class LinearResponseUCC:
                         self.wf.state_vector, commutator_contract(GI.dagger, GJ), self.wf.state_vector
                     )
                     # Make W (\Delta)
-                    self.W[i + idx_shift, j + idx_shift] = self.W[
-                        j + idx_shift, i + idx_shift
-                    ] = expectation_value_contracted(
+                    self.W[i + idx_shift, j + idx_shift] = expectation_value_contracted(
                         self.wf.state_vector, commutator_contract(GI.dagger, GJ.dagger), self.wf.state_vector
                     )
+                    self.W[j + idx_shift, i + idx_shift] = -self.W[i + idx_shift, j + idx_shift]
                 else:
                     raise NameError('Could not determine calculation_type got: {calculation_type}')
 
