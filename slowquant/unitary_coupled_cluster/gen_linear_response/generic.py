@@ -248,7 +248,7 @@ class LinearResponseUCC:
                     # Make B
                     self.B[i, j + idx_shift] = self.B[j + idx_shift, i] = expectation_value_contracted(
                         self.wf.state_vector,
-                        # double_commutator_contract(qI.dagger, H_1i_1a, GJ.dagger),
+                        # double_commutator_contract(qI.dagger, H_1i_1a, GJ.dagger), #wrong parametrization
                         double_commutator_contract(GJ.dagger, H_1i_1a, qI.dagger),
                         self.wf.state_vector,
                     )
