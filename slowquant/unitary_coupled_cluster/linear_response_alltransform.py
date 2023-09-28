@@ -385,7 +385,7 @@ class LinearResponseUCC:
                     )
                 else:
                     raise NameError('Could not determine calculation_type got: {calculation_type}')
-        # qG/QR matrices !!!This one might need to be changed !!!
+        # qG/QR matrices. Changed to literature parametrization
         for j, opJ in enumerate(self.G_ops):
             GJ = opJ.operator
             for i, opI in enumerate(self.q_ops):

@@ -234,7 +234,7 @@ class LinearResponseUCC:
                         self.wf.state_vector,
                     )
                     self.Delta[j, i] = -self.Delta[i, j]
-            # This one has been changed!
+            # This one has been changed to reflect literature parametrization
             for j, GJ in enumerate(self.G_ops):
                 for i, qI in enumerate(self.q_ops):
                     # Make A
@@ -320,7 +320,7 @@ class LinearResponseUCC:
                         commutator_contract(qI.dagger, qJ.dagger),
                         self.wf.state_vector,
                     )
-            # Changed to literature version
+            # This one has been changed to reflect literature parametrization
             for j, GJ in enumerate(self.G_ops):
                 for i, qI in enumerate(self.q_ops):
                     # Make A
