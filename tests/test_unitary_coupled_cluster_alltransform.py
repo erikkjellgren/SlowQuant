@@ -1,6 +1,9 @@
 import numpy as np
 
 import slowquant.SlowQuant as sq
+from slowquant.unitary_coupled_cluster.linear_response import (
+    LinearResponseUCC as LinearResponseUCCRef,
+)
 from slowquant.unitary_coupled_cluster.linear_response_alltransform import (
     LinearResponseUCC,
 )
@@ -273,3 +276,160 @@ def test_h2_631g_oouccsd_lr_matrices() -> None:
     assert (np.allclose(LR_naive.Q, LR_native.Q, atol=threshold)) is True
     assert (np.allclose(LR_naive.V, LR_native.V, atol=threshold)) is True
     assert (np.allclose(LR_naive.W, LR_native.W, atol=threshold)) is True
+
+
+def test_LiH_allmethods_matrices() -> None:
+    """Test LiH all matrices and their properties for all LR methods."""
+
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """Li   0.0           0.0  0.0;
+        H   1.67  0.0  0.0;""",
+        distance_unit='angstrom',
+    )
+    SQobj.set_basis_set('sto-3g')
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
+    WF = WaveFunctionUCC(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 2),
+        SQobj.hartree_fock.mo_coeff,
+        h_core,
+        g_eri,
+    )
+    WF.run_ucc('SD', True)
+
+    threshold = 10 ** (-10)
+
+    # atSC
+    print('\nMethod: at-SC')
+    LR_naive = LinearResponseUCC(
+        WF,
+        excitations='SD',
+        do_selfconsistent_operators=True,
+        do_statetransfer_operators=False,
+        do_debugging=False,
+    )
+    LR_generic = LinearResponseUCC(
+        WF,
+        excitations='SD',
+        do_selfconsistent_operators=True,
+        do_statetransfer_operators=False,
+        do_debugging=True,
+    )
+
+    print(
+        'Check if implementation via work equation and generic are the same with a threshold of: ', threshold
+    )
+    assert (np.allclose(LR_naive.M, LR_generic.M, atol=threshold)) == True
+    assert (np.allclose(LR_naive.Q, LR_generic.Q, atol=threshold)) is True
+    assert (np.allclose(LR_naive.V, LR_generic.V, atol=threshold)) is True
+    assert (np.allclose(LR_naive.W, LR_generic.W, atol=threshold)) is True
+
+    print('Check if matrices fullfill their expected property:')
+    assert (np.all(np.abs(LR_naive.M - LR_naive.M.T) < threshold)) == True
+    assert (np.all(np.abs(LR_naive.Q - LR_naive.Q.T) < threshold)) == True
+    assert (np.all(np.abs(LR_naive.V - np.eye(LR_naive.V.shape[0])) < threshold)) == True
+    assert (np.all(np.abs(LR_naive.W) < threshold)) == True
+
+    # atST
+    print('\nMethod: at-ST')
+    LR_naive = LinearResponseUCC(
+        WF,
+        excitations='SD',
+        do_selfconsistent_operators=False,
+        do_statetransfer_operators=True,
+        do_debugging=False,
+    )
+    LR_generic = LinearResponseUCC(
+        WF,
+        excitations='SD',
+        do_selfconsistent_operators=False,
+        do_statetransfer_operators=True,
+        do_debugging=True,
+    )
+
+    print(
+        'Check if implementation via work equation and generic are the same with a threshold of: ', threshold
+    )
+    assert (np.allclose(LR_naive.M, LR_generic.M, atol=threshold)) is True
+    # assert(np.allclose(LR_naive.Q,LR_generic.Q,atol=threshold)) is True
+    assert (np.allclose(LR_naive.V, LR_generic.V, atol=threshold)) is True
+    assert (np.allclose(LR_naive.W, LR_generic.W, atol=threshold)) is True
+
+    print('Check if matrices fullfill their expected property:')
+    assert (np.all(np.abs(LR_naive.M - LR_naive.M.T) < threshold)) == True
+    assert (np.all(np.abs(LR_naive.Q - LR_naive.Q.T) < threshold)) == True
+    assert (np.all(np.abs(LR_naive.V - np.eye(LR_naive.V.shape[0])) < threshold)) == True
+    assert (np.all(np.abs(LR_naive.W) < threshold)) == True
+
+    # naive
+    print('\nMethod: naive')
+    LR_naive = LinearResponseUCCRef(
+        WF, excitations='SD', do_projected_operators=False, do_selfconsistent_operators=False
+    )
+    LR_generic = LinearResponseUCCRef(
+        WF,
+        excitations='SD',
+        do_projected_operators=False,
+        do_selfconsistent_operators=False,
+        do_debugging=True,
+    )
+
+    print(
+        'Check if implementation via work equation and generic are the same with a threshold of: ', threshold
+    )
+    assert (np.allclose(LR_naive.M, LR_generic.M, atol=threshold)) is True
+    assert (np.allclose(LR_naive.Q, LR_generic.Q, atol=threshold)) is True
+    assert (np.allclose(LR_naive.V, LR_generic.V, atol=threshold)) is True
+    assert (np.allclose(LR_naive.W, LR_generic.W, atol=threshold)) is True
+
+    print('Check if matrices fullfill their expected property:')
+    assert (np.all(np.abs(LR_naive.M - LR_naive.M.T) < threshold)) == True
+    assert (np.all(np.abs(LR_naive.Q - LR_naive.Q.T) < threshold)) == True
+    assert (np.all(np.abs(LR_naive.W) < threshold)) == True
+
+    print('Check if generic matrices fullfill their expected property:')
+    assert (np.all(np.abs(LR_generic.M - LR_generic.M.T) < threshold)) == True
+    assert (np.all(np.abs(LR_generic.Q - LR_generic.Q.T) < threshold)) == True
+    assert (np.all(np.abs(LR_generic.W) < threshold)) == True
+
+    # SC
+    print('\nMethod: SC')
+    LR_naive = LinearResponseUCCRef(
+        WF, excitations='SD', do_projected_operators=False, do_selfconsistent_operators=True
+    )
+
+    print('Check if matrices fullfill their expected property:')
+    assert (np.all(np.abs(LR_naive.M - LR_naive.M.T) < threshold)) == True
+    assert (np.all(np.abs(LR_naive.Q - LR_naive.Q.T) < threshold)) == True
+    assert (np.all(np.abs(LR_naive.W) < threshold)) == True
+
+    # projected
+    print('\nMethod: projected')
+    LR_naive = LinearResponseUCCRef(
+        WF, excitations='SD', do_projected_operators=True, do_selfconsistent_operators=False
+    )
+
+    print('Check if matrices fullfill their expected property:')
+    assert (np.all(np.abs(LR_naive.M - LR_naive.M.T) < threshold)) == True
+    assert (np.all(np.abs(LR_naive.Q - LR_naive.Q.T) < threshold)) == True
+    assert (np.all(np.abs(LR_naive.W) < threshold)) == True
+
+    # ST
+    print('\nMethod: ST')
+    LR_naive = LinearResponseUCCRef(
+        WF,
+        excitations='SD',
+        do_projected_operators=False,
+        do_selfconsistent_operators=False,
+        do_statetransfer_operators=True,
+    )
+
+    print('Check if matrices fullfill their expected property:')
+    assert (np.all(np.abs(LR_naive.M - LR_naive.M.T) < threshold)) == True
+    assert (np.all(np.abs(LR_naive.Q - LR_naive.Q.T) < threshold)) == True
+    assert (np.all(np.abs(LR_naive.W) < threshold)) == True
