@@ -321,21 +321,23 @@ class LinearResponseUCC:
                         commutator_contract(qI.dagger, qJ.dagger),
                         self.wf.state_vector,
                     )
-            # This one has been changed to reflect literature parametrization.
-            # If one would change back to the equations in the comments, one would obtain the results for an initial parametrization opposite literature, i.e. exp(s)exp(kappa)
+            # This one has been changed to reflect parametrization the other way around to literature
+            # If one would change back to the equations in the comments, one would obtain the results for an initial parametrization in the literature, i.e. exp(kappa)exp(s)
             for j, GJ in enumerate(self.G_ops):
                 for i, qI in enumerate(self.q_ops):
                     # Make A
                     self.A[i, j + idx_shift] = expectation_value_contracted(
                         self.wf.state_vector,
-                        double_commutator_contract(qI.dagger, H_1i_1a, GJ),  # wrong parametrization
+                        double_commutator_contract(qI.dagger, H_1i_1a, GJ),  # non-literature parametrization
                         # double_commutator_contract(GJ, H_1i_1a, qI.dagger),
                         self.wf.state_vector,
                     )
                     # Make B
                     self.B[i, j + idx_shift] = expectation_value_contracted(
                         self.wf.state_vector,
-                        double_commutator_contract(qI.dagger, H_1i_1a, GJ.dagger),  # wrong parametrization
+                        double_commutator_contract(
+                            qI.dagger, H_1i_1a, GJ.dagger
+                        ),  # non-literature parametrization
                         # double_commutator_contract(GJ.dagger, H_1i_1a, qI.dagger),
                         self.wf.state_vector,
                     )
