@@ -64,12 +64,18 @@ class LinearResponseUCC:
             do_selfconsistent_operators: Use self-consistent active space excitation operators.
             do_projected_operators: Use projected active space excitation opreators.
         """
+        self.do_debugging = do_debugging
         if sum([do_projected_operators, do_selfconsistent_operators, do_statetransfer_operators]) >= 2:
             raise ValueError('You set more than one method flag to True.')
-        if not self.do_debugging and do_projected_operators:
-            raise ValueError(
-                'Projected operator work equations are not yet implemented! Use generic implementation with caution'
-            )
+        if not self.do_debugging:
+            if do_projected_operators:
+                raise ValueError(
+                    'Projected operator work equations are not yet implemented! Use generic implementation with caution'
+                )
+            if do_statetransfer_operators:
+                raise ValueError(
+                    'Projected operator work equations are not yet implemented! Use generic implementation with caution'
+                )
         self.wf = copy.deepcopy(wave_function)
         self.theta_picker = ThetaPicker(
             self.wf.active_occ_spin_idx,
