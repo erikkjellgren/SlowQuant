@@ -55,6 +55,8 @@ class LinearResponseUCC:
         do_projected_operators: bool = False,
         do_debugging: bool = False,
         do_statetransfer_operators: bool = False,
+        do_hermitian_statetransfer_operators: bool = False,
+        track_hermitian_statetransfer: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
@@ -73,6 +75,10 @@ class LinearResponseUCC:
                 raise ValueError(
                     'Projected operator work equations are not yet implemented! Use generic implementation with caution'
                 )
+        else:
+            if do_hermitian_statetransfer_operators:
+                raise ValueError('Hermitian State-transfer operator is only implemented as work equations.')
+
         self.wf = copy.deepcopy(wave_function)
         self.theta_picker = ThetaPicker(
             self.wf.active_occ_spin_idx,
@@ -297,6 +303,8 @@ class LinearResponseUCC:
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.M = np.zeros((num_parameters, num_parameters))
         self.Q = np.zeros((num_parameters, num_parameters))
+        if track_hermitian_statetransfer:
+            self.trackedQ = np.zeros((num_parameters, num_parameters))
         self.V = np.zeros((num_parameters, num_parameters))
         self.W = np.zeros((num_parameters, num_parameters))
         # Set up Hamiltonian(s)
@@ -349,7 +357,6 @@ class LinearResponseUCC:
         ### Construct matrices
         #######
 
-        # MAYBE BS:
         # Transform Hamiltonian if we choose statetransfer via work equations
         if do_statetransfer_operators and not self.do_debugging:
             # For ARR!
@@ -362,6 +369,18 @@ class LinearResponseUCC:
             csf.active = csf._active
             csf.active_csr = ss.csr_matrix(csf._active)
 
+        # Transform Hamiltonian if we choose statetransfer via work equations
+        if do_hermitian_statetransfer_operators and not self.do_debugging:
+            # For ARR!
+            H_en = H_en.apply_u_from_right(U)
+            H_en = H_en.apply_u_from_left(U.conj().transpose())
+
+        # Obtain |CSF> for naive implementation via work equations
+        if do_hermitian_statetransfer_operators and not self.do_debugging:
+            csf = copy.deepcopy(self.wf.state_vector)
+            csf.active = csf._active
+            csf.active_csr = ss.csr_matrix(csf._active)
+
         # Work equation implementation
         if do_selfconsistent_operators:
             calculation_type = 'sc'
@@ -369,6 +388,11 @@ class LinearResponseUCC:
             calculation_type = 'proj'
         elif do_statetransfer_operators:
             calculation_type = 'st'
+        elif do_hermitian_statetransfer_operators:
+            if track_hermitian_statetransfer:
+                calculation_type = 'tracked-hst'
+            else:
+                calculation_type = 'hst'
         else:
             calculation_type = 'naive'
 
@@ -383,7 +407,7 @@ class LinearResponseUCC:
                 qI = opI.operator
                 if i < j:
                     continue
-                if calculation_type in ('sc', 'naive', 'st', 'proj'):
+                if calculation_type in ('sc', 'naive', 'st', 'proj', 'hst', 'tracked-hst'):
                     # Make M
                     operator = operatormul3_contract(qI.dagger, H_2i_2a, qJ) - operatormul3_contract(
                         qI.dagger, qJ, H_2i_2a
@@ -470,7 +494,7 @@ class LinearResponseUCC:
                     )
                     # Make V = 0
                     # Make W = 0
-                elif calculation_type == 'st':  # Changes needed
+                elif calculation_type == 'st':
                     # Make M
                     operator = operatormul3_contract(
                         GI.dagger, H_1i_1a.apply_u_from_left(U.conj().transpose()), qJ
@@ -481,6 +505,43 @@ class LinearResponseUCC:
                     )
                     # Make Q
                     self.Q[j, i + idx_shift] = self.Q[i + idx_shift, j] = -expectation_value_contracted(
+                        csf,
+                        operatormul3_contract(
+                            GI.dagger, qJ.dagger.apply_u_from_left(U.conj().transpose()), H_1i_1a
+                        ),
+                        self.wf.state_vector,
+                    )
+                    # Make V = 0
+                    # Make W = 0
+                elif calculation_type == 'hst':
+                    # Make M
+                    operator = operatormul3_contract(
+                        GI.dagger.apply_u_from_right(U.conj().transpose()), H_1i_1a, qJ
+                    ) + operatormul3_contract(
+                        GI.dagger.apply_u_from_right(U.conj().transpose()), qJ.dagger, H_1i_1a
+                    )  # added an assumed zero (approximation)
+
+                    self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_contracted(
+                        csf, operator, self.wf.state_vector
+                    )
+                    # Make Q = 0 # assumed zero (approximation!)
+                    # Make V = 0
+                    # Make W = 0
+                elif calculation_type == 'tracked-hst':
+                    # Make M
+                    operator = operatormul3_contract(
+                        GI.dagger.apply_u_from_right(U.conj().transpose()), H_1i_1a, qJ
+                    ) + operatormul3_contract(
+                        GI.dagger.apply_u_from_right(U.conj().transpose()), qJ.dagger, H_1i_1a
+                    )  # added an assumed zero (approximation)
+
+                    self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_contracted(
+                        csf, operator, self.wf.state_vector
+                    )
+                    # Make Q for tracking error!
+                    self.trackedQ[j, i + idx_shift] = self.trackedQ[
+                        i + idx_shift, j
+                    ] = -expectation_value_contracted(
                         csf,
                         operatormul3_contract(
                             GI.dagger, qJ.dagger.apply_u_from_left(U.conj().transpose()), H_1i_1a
@@ -564,7 +625,7 @@ class LinearResponseUCC:
                         self.wf.state_vector, commutator_contract(GI.dagger, GJ), self.wf.state_vector
                     )
                     # Make W = 0
-                elif calculation_type == 'st':
+                elif calculation_type in ('st', 'hst', 'tracked-hst'):
                     # Make M (A)
                     if i == j:
                         self.M[i + idx_shift, j + idx_shift] = self.M[j + idx_shift, i + idx_shift] = (
