@@ -356,7 +356,7 @@ def test_LiH_allmethods_matrices() -> None:
         'Check if implementation via work equation and generic are the same with a threshold of: ', threshold
     )
     assert (np.allclose(LR_naive.M, LR_generic.M, atol=threshold)) is True
-    # assert(np.allclose(LR_naive.Q,LR_generic.Q,atol=threshold)) is True
+    # assert(np.allclose(LR_naive.Q,LR_generic.Q,atol=threshold)) is True  #BUg in generic implementation!
     assert (np.allclose(LR_naive.V, LR_generic.V, atol=threshold)) is True
     assert (np.allclose(LR_naive.W, LR_generic.W, atol=threshold)) is True
 
@@ -433,3 +433,188 @@ def test_LiH_allmethods_matrices() -> None:
     assert (np.all(np.abs(LR_naive.M - LR_naive.M.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.Q - LR_naive.Q.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.W) < threshold)) == True
+
+
+def test_LiH_allmethods_energies() -> None:
+    """Test LiH all matrices and their properties for all LR methods."""
+
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """Li   0.0           0.0  0.0;
+        H   1.67  0.0  0.0;""",
+        distance_unit='angstrom',
+    )
+    SQobj.set_basis_set('sto-3g')
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
+    WF = WaveFunctionUCC(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 2),
+        SQobj.hartree_fock.mo_coeff,
+        h_core,
+        g_eri,
+    )
+    WF.run_ucc('SD', True)
+
+    threshold = 10 ** (-10)
+
+    # atSC
+    print('\nMethod: at-SC')
+    LR_naive = LinearResponseUCC(
+        WF,
+        excitations='SD',
+        do_selfconsistent_operators=True,
+        do_statetransfer_operators=False,
+        do_debugging=False,
+    )
+    LR_generic = LinearResponseUCC(
+        WF,
+        excitations='SD',
+        do_selfconsistent_operators=True,
+        do_statetransfer_operators=False,
+        do_debugging=True,
+    )
+
+    threshold = 10 ** (-5)
+
+    # atSC
+    print('\nMethod: at-SC')
+    LR_naive = LinearResponseUCC(
+        WF,
+        excitations='SD',
+        do_selfconsistent_operators=True,
+        do_statetransfer_operators=False,
+        do_debugging=False,
+    )
+    LR_naive.calc_excitation_energies()
+    print(LR_naive.excitation_energies)
+
+    solutions = np.array(
+        [
+            0.1850601,
+            0.24646229,
+            0.24646229,
+            0.62305832,
+            0.85960246,
+            2.07742277,
+            2.13715343,
+            2.13715343,
+            2.551118,
+        ]
+    )
+    assert (np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)) is True
+
+    # atST
+    print('\nMethod: at-ST')
+    LR_naive = LinearResponseUCC(
+        WF,
+        excitations='SD',
+        do_selfconsistent_operators=False,
+        do_statetransfer_operators=True,
+        do_debugging=False,
+    )
+    LR_naive.calc_excitation_energies()
+    print(LR_naive.excitation_energies)
+
+    solutions = np.array(
+        [
+            0.1851181,
+            0.24715136,
+            0.24715136,
+            0.6230648,
+            0.85960395,
+            2.07752209,
+            2.13720198,
+            2.13720198,
+            2.55113802,
+        ]
+    )
+    assert (np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)) is True
+
+    # naive
+    print('\nMethod: naive')
+    LR_naive = LinearResponseUCCRef(
+        WF, excitations='SD', do_projected_operators=False, do_selfconsistent_operators=False
+    )
+    LR_naive.calc_excitation_energies()
+    print(LR_naive.excitation_energies)
+
+    solutions = np.array(
+        [
+            0.12957563,
+            0.17886086,
+            0.17886086,
+            0.60514579,
+            0.64715988,
+            0.74104045,
+            0.74104045,
+            1.00396876,
+            2.0747935,
+            2.13715595,
+            2.13715595,
+            2.45575825,
+            2.95516593,
+        ]
+    )
+    assert (np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)) is True
+
+    # SC
+    print('\nMethod: SC')
+    LR_naive = LinearResponseUCCRef(
+        WF, excitations='SD', do_projected_operators=False, do_selfconsistent_operators=True
+    )
+    LR_naive.calc_excitation_energies()
+    print(LR_naive.excitation_energies)
+
+    solutions = np.array(
+        [
+            0.12957564,
+            0.17886086,
+            0.17886086,
+            0.60514581,
+            0.64715989,
+            0.74104045,
+            0.74104045,
+            1.00396876,
+            2.0747935,
+            2.13715595,
+            2.13715595,
+            2.45575825,
+            2.95516593,
+        ]
+    )
+    assert (np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)) is True
+
+    # ST
+    print('\nMethod: ST')
+    LR_naive = LinearResponseUCCRef(
+        WF,
+        excitations='SD',
+        do_projected_operators=False,
+        do_selfconsistent_operators=False,
+        do_statetransfer_operators=True,
+    )
+    LR_naive.calc_excitation_energies()
+    print(LR_naive.excitation_energies)
+
+    solutions = np.array(
+        [
+            0.12957561,
+            0.17886086,
+            0.17886086,
+            0.60514593,
+            0.64715981,
+            0.74104045,
+            0.74104045,
+            1.00396874,
+            2.0747935,
+            2.13715595,
+            2.13715595,
+            2.45575825,
+            2.95516593,
+        ]
+    )
+    assert (np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)) is True
