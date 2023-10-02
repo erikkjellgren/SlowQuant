@@ -54,7 +54,6 @@ class LinearResponseUCC:
         do_projected_operators: bool = False,
         do_debugging: bool = False,
         do_statetransfer_operators: bool = False,
-        do_projected_selfconsistent_operators: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
@@ -67,13 +66,9 @@ class LinearResponseUCC:
         """
         if sum([do_projected_operators, do_selfconsistent_operators, do_statetransfer_operators]) >= 2:
             raise ValueError('You set more than one method flag to True.')
-        if do_projected_selfconsistent_operators and do_projected_operators:
+        if not self.do_debugging and do_projected_operators:
             raise ValueError(
-                'do_projected_selfconsistent_operators and do_projected_operators cannot both be True.'
-            )
-        if do_selfconsistent_operators and do_projected_selfconsistent_operators:
-            raise ValueError(
-                'do_selfconsistent_operators and do_projected_selfconsistent_operators cannot both be True.'
+                'Projected operator work equations are not yet implemented! Use generic implementation with caution'
             )
         self.wf = copy.deepcopy(wave_function)
         self.theta_picker = ThetaPicker(
@@ -88,6 +83,7 @@ class LinearResponseUCC:
         num_spin_orbs = self.wf.num_spin_orbs
         num_elec = self.wf.num_elec
         excitations = excitations.lower()
+        # Construct unitary matrix, input from VQE
         U = construct_ucc_u(
             self.wf.num_active_spin_orbs,
             self.wf.num_active_elec,
@@ -100,6 +96,12 @@ class LinearResponseUCC:
             self.wf.theta_picker_full,
             'sdtq56',  # self.wf._excitations,
         )
+
+        #######
+        ### Construct G / R based on excitation specified in excitations
+        #######
+
+        # Projection for statetransfer Ansatz. #Bug possible use with caution! Better use work equations!
         if do_projected_operators or do_statetransfer_operators:
             if self.wf.num_active_spin_orbs >= 10:
                 projection = lw.outer(
@@ -115,10 +117,10 @@ class LinearResponseUCC:
                     self.wf.num_active_spin_orbs,
                     self.wf.num_virtual_spin_orbs,
                 )
-                if do_selfconsistent_operators or do_projected_selfconsistent_operators:
+                if do_selfconsistent_operators:  # OK: use for generic and work equation via naive
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
-                if do_projected_operators:
+                if do_projected_operators and self.do_debugging:  # Bug danger
                     op = op.apply_u_from_right(projection)
                     fac = expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector)
                     op_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
@@ -129,7 +131,7 @@ class LinearResponseUCC:
                         self.wf.num_virtual_spin_orbs,
                     )
                     op = op - op_diff
-                if do_statetransfer_operators:
+                if do_statetransfer_operators and self.do_debugging:  # Bug danger
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                     op = op.apply_u_from_right(projection)
@@ -142,10 +144,10 @@ class LinearResponseUCC:
                     self.wf.num_active_spin_orbs,
                     self.wf.num_virtual_spin_orbs,
                 )
-                if do_selfconsistent_operators or do_projected_selfconsistent_operators:
+                if do_selfconsistent_operators:  # OK: use for generic and work equation via naive
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
-                if do_projected_operators:
+                if do_projected_operators and self.do_debugging:  # Bug danger
                     op = op.apply_u_from_right(projection)
                     fac = expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector)
                     op_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
@@ -156,7 +158,7 @@ class LinearResponseUCC:
                         self.wf.num_virtual_spin_orbs,
                     )
                     op = op - op_diff
-                if do_statetransfer_operators:
+                if do_statetransfer_operators and self.do_debugging:  # Bug danger
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                     op = op.apply_u_from_right(projection)
@@ -169,10 +171,10 @@ class LinearResponseUCC:
                     self.wf.num_active_spin_orbs,
                     self.wf.num_virtual_spin_orbs,
                 )
-                if do_selfconsistent_operators or do_projected_selfconsistent_operators:
+                if do_selfconsistent_operators:  # OK: use for generic and work equation via naive
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
-                if do_projected_operators:
+                if do_projected_operators and self.do_debugging:  # Bug danger
                     op = op.apply_u_from_right(projection)
                     fac = expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector)
                     op_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
@@ -183,7 +185,7 @@ class LinearResponseUCC:
                         self.wf.num_virtual_spin_orbs,
                     )
                     op = op - op_diff
-                if do_statetransfer_operators:
+                if do_statetransfer_operators and self.do_debugging:  # Bug danger
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                     op = op.apply_u_from_right(projection)
@@ -196,10 +198,10 @@ class LinearResponseUCC:
                     self.wf.num_active_spin_orbs,
                     self.wf.num_virtual_spin_orbs,
                 )
-                if do_selfconsistent_operators or do_projected_selfconsistent_operators:
+                if do_selfconsistent_operators:  # OK: use for generic and work equation via naive
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
-                if do_projected_operators:
+                if do_projected_operators and self.do_debugging:  # Bug danger
                     op = op.apply_u_from_right(projection)
                     fac = expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector)
                     op_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
@@ -210,7 +212,7 @@ class LinearResponseUCC:
                         self.wf.num_virtual_spin_orbs,
                     )
                     op = op - op_diff
-                if do_statetransfer_operators:
+                if do_statetransfer_operators and self.do_debugging:  # Bug danger
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                     op = op.apply_u_from_right(projection)
@@ -225,10 +227,10 @@ class LinearResponseUCC:
                     self.wf.num_active_spin_orbs,
                     self.wf.num_virtual_spin_orbs,
                 )
-                if do_selfconsistent_operators or do_projected_selfconsistent_operators:
+                if do_selfconsistent_operators:  # OK: use for generic and work equation via naive
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
-                if do_projected_operators:
+                if do_projected_operators and self.do_debugging:  # Bug danger
                     op = op.apply_u_from_right(projection)
                     fac = expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector)
                     op_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
@@ -239,7 +241,7 @@ class LinearResponseUCC:
                         self.wf.num_virtual_spin_orbs,
                     )
                     op = op - op_diff
-                if do_statetransfer_operators:
+                if do_statetransfer_operators and self.do_debugging:  # Bug danger
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                     op = op.apply_u_from_right(projection)
@@ -254,10 +256,10 @@ class LinearResponseUCC:
                     self.wf.num_active_spin_orbs,
                     self.wf.num_virtual_spin_orbs,
                 )
-                if do_selfconsistent_operators or do_projected_selfconsistent_operators:
+                if do_selfconsistent_operators:  # OK: use for generic and work equation via naive
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
-                if do_projected_operators:
+                if do_projected_operators and self.do_debugging:  # Bug danger
                     op = op.apply_u_from_right(projection)
                     fac = expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector)
                     op_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
@@ -268,11 +270,16 @@ class LinearResponseUCC:
                         self.wf.num_virtual_spin_orbs,
                     )
                     op = op - op_diff
-                if do_statetransfer_operators:
+                if do_statetransfer_operators and self.do_debugging:  # Bug danger
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                     op = op.apply_u_from_right(projection)
                 self.G_ops.append(ResponseOperator((i, j, k, l, m, n), (a, b, c, d, e, f), op))
+
+        #######
+        ### Construct q/Q
+        #######
+
         for i, a in self.wf.kappa_idx:
             op_ = 2 ** (-1 / 2) * epq_pauli(a, i, self.wf.num_spin_orbs, self.wf.num_elec)
             op = convert_pauli_to_hybrid_form(
@@ -283,11 +290,13 @@ class LinearResponseUCC:
             )
             self.q_ops.append(ResponseOperator((i), (a), op))
 
+        # Initiate matrices for linear response
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.M = np.zeros((num_parameters, num_parameters))
         self.Q = np.zeros((num_parameters, num_parameters))
         self.V = np.zeros((num_parameters, num_parameters))
         self.W = np.zeros((num_parameters, num_parameters))
+        # Set up Hamiltonian(s)
         H_pauli = hamiltonian_pauli(self.wf.h_core, self.wf.g_eri, self.wf.c_trans, num_spin_orbs, num_elec)
         H_1i_1a = convert_pauli_to_hybrid_form(
             H_pauli.screen_terms(1, 1, self.wf.num_inactive_spin_orbs, self.wf.num_virtual_spin_orbs),
@@ -332,18 +341,24 @@ class LinearResponseUCC:
             )
         if len(grad) != 0:
             print('idx, max(abs(grad active)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+
+        #######
+        ### Construct matrices
+        #######
+
+        # Work equation implementation
         if do_selfconsistent_operators:
-            calculation_type = 'selfconsistent'
-        elif do_projected_operators:
-            calculation_type = 'generic'
+            calculation_type = 'sc'
+        elif do_projected_operators:  # not implemented yet
+            calculation_type = 'proj'
         elif do_statetransfer_operators:
-            calculation_type = 'generic'
-        elif do_projected_selfconsistent_operators:
-            calculation_type = 'projected_selfconsistent'
+            calculation_type = 'st'
         else:
             calculation_type = 'naive'
-        if self.do_debugging is True:
+
+        if self.do_debugging is True:  # no matter what operators
             calculation_type = 'generic'
+
         print('Calculation type: ', calculation_type)
         # QQ/qq
         for j, opJ in enumerate(self.q_ops):
@@ -352,7 +367,7 @@ class LinearResponseUCC:
                 qI = opI.operator
                 if i < j:
                     continue
-                if calculation_type in ('selfconsistent', 'naive', 'projected_selfconsistent'):
+                if calculation_type in ('sc', 'naive', 'st', 'proj'):
                     # Make M
                     operator = operatormul3_contract(qI.dagger, H_2i_2a, qJ) - operatormul3_contract(
                         qI.dagger, qJ, H_2i_2a
@@ -372,7 +387,7 @@ class LinearResponseUCC:
                         operatormul_contract(qI.dagger, qJ),
                         self.wf.state_vector,
                     )
-                    # Make W
+                    # Make W = 0
                 elif calculation_type == 'generic':
                     # Make M
                     self.M[i, j] = self.M[j, i] = expectation_value_contracted(
@@ -407,11 +422,10 @@ class LinearResponseUCC:
             qJ = opJ.operator
             for i, opI in enumerate(self.G_ops):
                 GI = opI.operator
-                if calculation_type == 'selfconsistent':
+                if calculation_type == 'sc':
                     # Make M
-                    operator = operatormul3_contract(GI.dagger, H_1i_1a, qJ) - operatormul3_contract(
-                        GI.dagger, qJ, H_1i_1a
-                    )
+                    operator = operatormul3_contract(GI.dagger, H_1i_1a, qJ)
+
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_contracted(
                         self.wf.state_vector, operator, self.wf.state_vector
                     )
@@ -421,14 +435,12 @@ class LinearResponseUCC:
                         operatormul3_contract(GI.dagger, qJ.dagger, H_1i_1a),
                         self.wf.state_vector,
                     )
-                    # Make V
-                    # Make W
+                    # Make V = 0
+                    # Make W = 0
                 elif calculation_type == 'naive':
                     # Make M
-                    operator = (
-                        operatormul3_contract(GI.dagger, H_1i_1a, qJ)
-                        - operatormul3_contract(GI.dagger, qJ, H_1i_1a)
-                        - operatormul3_contract(H_1i_1a, qJ, GI.dagger)
+                    operator = operatormul3_contract(GI.dagger, H_1i_1a, qJ) - operatormul3_contract(
+                        H_1i_1a, qJ, GI.dagger
                     )
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_contracted(
                         self.wf.state_vector, operator, self.wf.state_vector
@@ -440,22 +452,8 @@ class LinearResponseUCC:
                     self.Q[j, i + idx_shift] = self.Q[i + idx_shift, j] = expectation_value_contracted(
                         self.wf.state_vector, operator, self.wf.state_vector
                     )
-                    # Make V
-                    # Make W
-                elif calculation_type == 'projected_selfconsistent':
-                    # Make M
-                    operator = operatormul3_contract(GI.dagger, H_1i_1a, qJ)
-                    self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_contracted(
-                        self.wf.state_vector, operator, self.wf.state_vector
-                    )
-                    # Make Q
-                    self.Q[j, i + idx_shift] = self.Q[i + idx_shift, j] = -expectation_value_contracted(
-                        self.wf.state_vector,
-                        operatormul3_contract(GI.dagger, qJ.dagger, H_1i_1a),
-                        self.wf.state_vector,
-                    )
-                    # Make V
-                    # Make W
+                    # Make V = 0
+                    # Make W = 0
                 elif calculation_type == 'generic':
                     # Make M
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_contracted(
@@ -488,7 +486,7 @@ class LinearResponseUCC:
                 GI = opI.operator
                 if i < j:
                     continue
-                if calculation_type == 'selfconsistent':
+                if calculation_type == 'sc':
                     # Make M
                     operator = operatormul3_contract(GI.dagger, H_en, GJ)
                     operator -= operatormul3_contract(GI.dagger, GJ, H_en)
@@ -506,14 +504,14 @@ class LinearResponseUCC:
                     # Make V
                     if i == j:
                         self.V[i + idx_shift, j + idx_shift] = self.V[j + idx_shift, i + idx_shift] = 1
-                    # Make W
+                    # Make W = 0
                 elif calculation_type == 'naive':
                     # Make M
                     self.M[i + idx_shift, j + idx_shift] = self.M[
                         j + idx_shift, i + idx_shift
                     ] = expectation_value_contracted(
                         self.wf.state_vector,
-                        double_commutator_contract(GI.dagger, H_en, GJ),
+                        double_commutator_contract(GI.dagger, H_en, GJ),  # no simplification possible
                         self.wf.state_vector,
                     )
                     # Make Q
@@ -521,7 +519,7 @@ class LinearResponseUCC:
                         j + idx_shift, i + idx_shift
                     ] = expectation_value_contracted(
                         self.wf.state_vector,
-                        double_commutator_contract(GI.dagger, H_en, GJ.dagger),
+                        double_commutator_contract(GI.dagger, H_en, GJ.dagger),  # no simplification possible
                         self.wf.state_vector,
                     )
                     # Make V
@@ -530,20 +528,7 @@ class LinearResponseUCC:
                     ] = expectation_value_contracted(
                         self.wf.state_vector, commutator_contract(GI.dagger, GJ), self.wf.state_vector
                     )
-                    # Make W
-                elif calculation_type == 'projected_selfconsistent':
-                    # Make M
-                    operator = operatormul3_contract(GI.dagger, H_en, GJ)
-                    self.M[i + idx_shift, j + idx_shift] = self.M[
-                        j + idx_shift, i + idx_shift
-                    ] = expectation_value_contracted(self.wf.state_vector, operator, self.wf.state_vector)
-                    if i == j:
-                        self.M[i + idx_shift, i + idx_shift] += -self.wf.energy_elec
-                    # Make Q
-                    # Make V
-                    if i == j:
-                        self.V[i + idx_shift, i + idx_shift] = 1
-                    # Make W
+                    # Make W = 0
                 elif calculation_type == 'generic':
                     # Make M
                     self.M[i + idx_shift, j + idx_shift] = self.M[
