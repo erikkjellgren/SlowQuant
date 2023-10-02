@@ -438,8 +438,15 @@ def test_LiH_allmethods_matrices() -> None:
     assert (np.all(np.abs(LR_generic.Q - LR_generic.Q.T) < threshold)) == True
     assert (np.all(np.abs(LR_generic.W) < threshold)) == True
 
-    # ST: only generic is implemented atm
+    # ST
     print('\nMethod: ST')
+    LR_naive = LinearResponseUCCRef(
+        WF,
+        excitations='SD',
+        do_projected_operators=False,
+        do_selfconsistent_operators=False,
+        do_statetransfer_operators=True,
+    )
     LR_generic = LinearResponseUCCRef(
         WF,
         excitations='SD',
@@ -449,10 +456,18 @@ def test_LiH_allmethods_matrices() -> None:
         do_debugging=True,
     )
 
+    print(
+        'Check if implementation via work equation and generic are the same with a threshold of: ', threshold
+    )
+    print(np.allclose(LR_naive.M, LR_generic.M, atol=threshold))
+    print(np.allclose(LR_naive.Q, LR_generic.Q, atol=threshold))
+    print(np.allclose(LR_naive.V, LR_generic.V, atol=threshold))
+    print(np.allclose(LR_naive.W, LR_generic.W, atol=threshold))
+
     print('Check if matrices fullfill their expected property:')
-    assert (np.all(np.abs(LR_generic.M - LR_generic.M.T) < threshold)) == True
-    assert (np.all(np.abs(LR_generic.Q - LR_generic.Q.T) < threshold)) == True
-    assert (np.all(np.abs(LR_generic.W) < threshold)) == True
+    assert (np.all(np.abs(LR_naive.M - LR_naive.M.T) < threshold)) == True
+    assert (np.all(np.abs(LR_naive.Q - LR_naive.Q.T) < threshold)) == True
+    assert (np.all(np.abs(LR_naive.W) < threshold)) == True
 
 
 def test_LiH_allmethods_energies() -> None:
@@ -478,25 +493,6 @@ def test_LiH_allmethods_energies() -> None:
         g_eri,
     )
     WF.run_ucc('SD', True)
-
-    threshold = 10 ** (-10)
-
-    # atSC
-    print('\nMethod: at-SC')
-    LR_naive = LinearResponseUCC(
-        WF,
-        excitations='SD',
-        do_selfconsistent_operators=True,
-        do_statetransfer_operators=False,
-        do_debugging=False,
-    )
-    LR_generic = LinearResponseUCC(
-        WF,
-        excitations='SD',
-        do_selfconsistent_operators=True,
-        do_statetransfer_operators=False,
-        do_debugging=True,
-    )
 
     threshold = 10 ** (-5)
 
@@ -639,7 +635,7 @@ def test_LiH_allmethods_energies() -> None:
     )
     assert (np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)) is True
 
-    # ST: only generic implemented atm
+    # ST
     print('\nMethod: ST')
     LR_naive = LinearResponseUCCRef(
         WF,
@@ -647,7 +643,6 @@ def test_LiH_allmethods_energies() -> None:
         do_projected_operators=False,
         do_selfconsistent_operators=False,
         do_statetransfer_operators=True,
-        do_debugging=True,
     )
     LR_naive.calc_excitation_energies()
     print(LR_naive.excitation_energies)

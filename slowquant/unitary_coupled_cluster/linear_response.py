@@ -3,6 +3,7 @@ from collections.abc import Sequence
 
 import numpy as np
 import scipy
+import scipy.sparse as ss
 
 import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
 from slowquant.molecularintegrals.integralfunctions import (
@@ -69,10 +70,6 @@ class LinearResponseUCC:
             raise ValueError('You set more than one method flag to True.')
         if not self.do_debugging:
             if do_projected_operators:
-                raise ValueError(
-                    'Projected operator work equations are not yet implemented! Use generic implementation with caution'
-                )
-            if do_statetransfer_operators:
                 raise ValueError(
                     'Projected operator work equations are not yet implemented! Use generic implementation with caution'
                 )
@@ -352,6 +349,19 @@ class LinearResponseUCC:
         ### Construct matrices
         #######
 
+        # MAYBE BS:
+        # Transform Hamiltonian if we choose statetransfer via work equations
+        if do_statetransfer_operators and not self.do_debugging:
+            # For ARR!
+            H_en = H_en.apply_u_from_right(U)
+            H_en = H_en.apply_u_from_left(U.conj().transpose())
+
+        # Obtain |CSF> for naive implementation via work equations
+        if do_statetransfer_operators and not self.do_debugging:
+            csf = copy.deepcopy(self.wf.state_vector)
+            csf.active = csf._active
+            csf.active_csr = ss.csr_matrix(csf._active)
+
         # Work equation implementation
         if do_selfconsistent_operators:
             calculation_type = 'sc'
@@ -460,6 +470,25 @@ class LinearResponseUCC:
                     )
                     # Make V = 0
                     # Make W = 0
+                elif calculation_type == 'st':  # Changes needed
+                    # Make M
+                    operator = operatormul3_contract(
+                        GI.dagger, H_1i_1a.apply_u_from_left(U.conj().transpose()), qJ
+                    )
+
+                    self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_contracted(
+                        csf, operator, self.wf.state_vector
+                    )
+                    # Make Q
+                    self.Q[j, i + idx_shift] = self.Q[i + idx_shift, j] = -expectation_value_contracted(
+                        csf,
+                        operatormul3_contract(
+                            GI.dagger, qJ.dagger.apply_u_from_left(U.conj().transpose()), H_1i_1a
+                        ),
+                        self.wf.state_vector,
+                    )
+                    # Make V = 0
+                    # Make W = 0
                 elif calculation_type == 'generic':
                     # Make M
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_contracted(
@@ -535,6 +564,21 @@ class LinearResponseUCC:
                         self.wf.state_vector, commutator_contract(GI.dagger, GJ), self.wf.state_vector
                     )
                     # Make W = 0
+                elif calculation_type == 'st':
+                    # Make M (A)
+                    if i == j:
+                        self.M[i + idx_shift, j + idx_shift] = self.M[j + idx_shift, i + idx_shift] = (
+                            expectation_value_contracted(csf, operatormul3_contract(GI.dagger, H_en, GJ), csf)
+                            - self.wf.energy_elec
+                        )
+                        self.V[i + idx_shift, j + idx_shift] = self.V[j + idx_shift, i + idx_shift] = 1
+                    else:
+                        self.M[i + idx_shift, j + idx_shift] = self.M[
+                            j + idx_shift, i + idx_shift
+                        ] = expectation_value_contracted(csf, operatormul3_contract(GI.dagger, H_en, GJ), csf)
+                    # Make Q (B)= 0
+                    # Make V (\Sigma) = \delta_ij (see above)
+                    # Make W (\Delta) = 0
                 elif calculation_type == 'generic':
                     # Make M
                     self.M[i + idx_shift, j + idx_shift] = self.M[
