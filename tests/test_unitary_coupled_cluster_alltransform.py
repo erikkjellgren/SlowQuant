@@ -459,15 +459,49 @@ def test_LiH_allmethods_matrices() -> None:
     print(
         'Check if implementation via work equation and generic are the same with a threshold of: ', threshold
     )
-    print(np.allclose(LR_naive.M, LR_generic.M, atol=threshold))
-    print(np.allclose(LR_naive.Q, LR_generic.Q, atol=threshold))
-    print(np.allclose(LR_naive.V, LR_generic.V, atol=threshold))
-    print(np.allclose(LR_naive.W, LR_generic.W, atol=threshold))
+    assert (np.allclose(LR_naive.M, LR_generic.M, atol=threshold)) is True
+    assert (np.allclose(LR_naive.Q, LR_generic.Q, atol=threshold)) is True
+    assert (np.allclose(LR_naive.V, LR_generic.V, atol=threshold)) is True
+    assert (np.allclose(LR_naive.W, LR_generic.W, atol=threshold)) is True
 
     print('Check if matrices fullfill their expected property:')
     assert (np.all(np.abs(LR_naive.M - LR_naive.M.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.Q - LR_naive.Q.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.W) < threshold)) == True
+
+    # HST
+    print('\nMethod: ST')
+    LR_HST_naive = LinearResponseUCCRef(
+        WF,
+        excitations='SD',
+        do_projected_operators=False,
+        do_selfconsistent_operators=False,
+        do_statetransfer_operators=False,
+        do_hermitian_statetransfer_operators=True,
+    )
+    LR_HST_tracked = LinearResponseUCCRef(
+        WF,
+        excitations='SD',
+        do_projected_operators=False,
+        do_selfconsistent_operators=False,
+        do_statetransfer_operators=False,
+        do_hermitian_statetransfer_operators=True,
+        track_hermitian_statetransfer=True,
+    )
+
+    print('Check if matrices fullfill their expected property:')
+    assert ('Is A symmetric: ', np.all(np.abs(LR_HST_naive.M - LR_HST_naive.M.T) < threshold)) is True
+    assert ('Is B symmetric: ', np.all(np.abs(LR_HST_naive.Q - LR_HST_naive.Q.T) < threshold)) is True
+
+    print('Check if matrices fullfill their expected property:')
+    assert ('Is A symmetric: ', np.all(np.abs(LR_HST_tracked.M - LR_HST_tracked.M.T) < threshold)) is True
+    assert ('Is B symmetric: ', np.all(np.abs(LR_HST_tracked.Q - LR_HST_tracked.Q.T) < threshold)) is True
+
+    print('Compare HST implementations:')
+    assert (np.allclose(LR_HST_naive.M, LR_HST_tracked.M, atol=threshold)) is True
+    assert (np.allclose(LR_HST_naive.Q, LR_HST_tracked.Q, atol=threshold)) is True
+    assert (np.allclose(LR_HST_naive.V, LR_HST_tracked.V, atol=threshold)) is True
+    assert (np.allclose(LR_HST_naive.W, LR_HST_tracked.W, atol=threshold)) is True
 
 
 def test_LiH_allmethods_energies() -> None:
@@ -665,3 +699,36 @@ def test_LiH_allmethods_energies() -> None:
         ]
     )
     assert (np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)) is True
+
+    # HST
+    print('\nMethod: ST')
+    LR_HST_naive = LinearResponseUCCRef(
+        WF,
+        excitations='SD',
+        do_projected_operators=False,
+        do_selfconsistent_operators=False,
+        do_statetransfer_operators=False,
+        do_hermitian_statetransfer_operators=True,
+    )
+    LR_HST_naive.calc_excitation_energies()
+    print(LR_HST_naive.excitation_energies)
+
+    solutions = np.array(
+        [
+            0.12957234,
+            0.17886086,
+            0.17886086,
+            0.60515489,
+            0.64717441,
+            0.74104045,
+            0.74104045,
+            1.003942,
+            2.07479277,
+            2.13715595,
+            2.13715595,
+            2.45576414,
+            2.95517029,
+        ]
+    )
+
+    assert (np.allclose(LR_HST_naive.excitation_energies, solutions, atol=threshold)) is True
