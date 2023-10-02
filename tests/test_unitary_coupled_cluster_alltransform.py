@@ -490,12 +490,12 @@ def test_LiH_allmethods_matrices() -> None:
     )
 
     print('Check if matrices fullfill their expected property:')
-    assert ('Is A symmetric: ', np.all(np.abs(LR_HST_naive.M - LR_HST_naive.M.T) < threshold)) is True
-    assert ('Is B symmetric: ', np.all(np.abs(LR_HST_naive.Q - LR_HST_naive.Q.T) < threshold)) is True
+    assert (np.all(np.abs(LR_HST_naive.M - LR_HST_naive.M.T) < threshold)) == True
+    assert (np.all(np.abs(LR_HST_naive.Q - LR_HST_naive.Q.T) < threshold)) == True
 
     print('Check if matrices fullfill their expected property:')
-    assert ('Is A symmetric: ', np.all(np.abs(LR_HST_tracked.M - LR_HST_tracked.M.T) < threshold)) is True
-    assert ('Is B symmetric: ', np.all(np.abs(LR_HST_tracked.Q - LR_HST_tracked.Q.T) < threshold)) is True
+    assert (np.all(np.abs(LR_HST_tracked.M - LR_HST_tracked.M.T) < threshold)) == True
+    assert (np.all(np.abs(LR_HST_tracked.Q - LR_HST_tracked.Q.T) < threshold)) == True
 
     print('Compare HST implementations:')
     assert (np.allclose(LR_HST_naive.M, LR_HST_tracked.M, atol=threshold)) is True
