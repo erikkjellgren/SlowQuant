@@ -338,20 +338,30 @@ class LinearResponseUCC:
         idx_shift = len(self.q_ops)
         print('Gs', len(self.G_ops))
         print('qs', len(self.q_ops))
-        grad = np.zeros(len(self.q_ops))
+        grad = np.zeros(2 * len(self.q_ops))
         for i, op in enumerate(self.q_ops):
             grad[i] = expectation_value_contracted(
                 self.wf.state_vector, commutator_contract(op.operator, H_1i_1a), self.wf.state_vector
             )
+            grad[i + len(self.q_ops)] = expectation_value_contracted(
+                self.wf.state_vector, commutator_contract(H_1i_1a, op.operator.dagger), self.wf.state_vector
+            )
         if len(grad) != 0:
             print('idx, max(abs(grad orb)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-        grad = np.zeros(len(self.G_ops))
+        if np.max(np.abs(grad)) > 10**-4:
+            raise ValueError('Large Hessian gradient detected.')
+        grad = np.zeros(2 * len(self.G_ops))
         for i, op in enumerate(self.G_ops):
             grad[i] = expectation_value_contracted(
                 self.wf.state_vector, commutator_contract(op.operator, H_en), self.wf.state_vector
             )
+            grad[i + len(self.G_ops)] = expectation_value_contracted(
+                self.wf.state_vector, commutator_contract(H_en, op.operator.dagger), self.wf.state_vector
+            )
         if len(grad) != 0:
             print('idx, max(abs(grad active)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+        if np.max(np.abs(grad)) > 10**-4:
+            raise ValueError('Large Hessian gradient detected.')
 
         #######
         ### Construct matrices
@@ -691,6 +701,8 @@ class LinearResponseUCC:
         S[size:, :size] = -np.conj(self.W)
         S[size:, size:] = -np.conj(self.V)
         print(f'Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.V)))}')
+        if np.min(np.abs(np.diagonal(self.V))) < 0:
+            raise ValueError('This value is bad. Abort.')
 
         eigval, eigvec = scipy.linalg.eig(E2, S)
         sorting = np.argsort(eigval)
