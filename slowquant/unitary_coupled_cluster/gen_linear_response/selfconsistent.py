@@ -85,11 +85,13 @@ class LinearResponseUCC:
             self.wf.theta_picker_full,
             'sdtq56',  # self.wf._excitations,
         )
+        ### NEW
         inactive_str = 'I' * self.wf.num_inactive_spin_orbs
         virtual_str = 'I' * self.wf.num_virtual_spin_orbs
         U = OperatorHybrid(
             {inactive_str + virtual_str: OperatorHybridData(inactive_str, U_matrix, virtual_str)}
-        )
+        )  # U is now an operator
+        ### NEW
         if 's' in excitations:
             for _, a, i, op_ in self.theta_picker.get_t1_generator_sa(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
@@ -197,6 +199,7 @@ class LinearResponseUCC:
         print('Gs', len(self.G_ops))
         print('qs', len(self.q_ops))
         grad = np.zeros(2 * len(self.q_ops))
+        ### NEW
         for i, op in enumerate(self.q_ops):
             grad[i] = -expectation_value_hybrid_flow(
                 self.wf.state_vector, [H_1i_1a, op.operator], self.wf.state_vector
@@ -207,6 +210,7 @@ class LinearResponseUCC:
         if len(grad) != 0:
             print('idx, max(abs(grad orb)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
         grad = np.zeros(2 * len(self.G_ops))
+        ### NEW
         for i, op in enumerate(self.G_ops):
             grad[i] = -expectation_value_hybrid_flow(self.wf.state_vector, [H_1i_1a, U, op.operator], csf)
             grad[i + len(self.G_ops)] = expectation_value_hybrid_flow(
@@ -214,6 +218,7 @@ class LinearResponseUCC:
             )
         if len(grad) != 0:
             print('idx, max(abs(grad active)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+        # QQ
         for j, opJ in enumerate(self.q_ops):
             qJ = opJ.operator
             for i, opI in enumerate(self.q_ops):
@@ -221,6 +226,7 @@ class LinearResponseUCC:
                 if i < j:
                     continue
                 # Make M
+                ### NEW
                 val = expectation_value_hybrid_flow(
                     self.wf.state_vector, [qI.dagger, H_2i_2a, qJ], self.wf.state_vector
                 ) - expectation_value_hybrid_flow(
@@ -235,11 +241,13 @@ class LinearResponseUCC:
                 self.V[i, j] = self.V[j, i] = expectation_value_hybrid_flow(
                     self.wf.state_vector, [qI.dagger, qJ], self.wf.state_vector
                 )
+        # GQ
         for j, opJ in enumerate(self.q_ops):
             qJ = opJ.operator
             for i, opI in enumerate(self.G_ops):
                 GI = opI.operator
                 # Make M
+                ### NEW
                 val = expectation_value_hybrid_flow(
                     csf, [GI.dagger, U.dagger, H_1i_1a, qJ], self.wf.state_vector
                 ) - expectation_value_hybrid_flow(
@@ -250,6 +258,7 @@ class LinearResponseUCC:
                 self.Q[i + idx_shift, j] = self.Q[j, i + idx_shift] = -expectation_value_hybrid_flow(
                     csf, [GI.dagger, U.dagger, qJ.dagger, H_1i_1a], self.wf.state_vector
                 )
+        # GG
         for j, opJ in enumerate(self.G_ops):
             GJ = opJ.operator
             for i, opI in enumerate(self.G_ops):
@@ -257,6 +266,7 @@ class LinearResponseUCC:
                 if i < j:
                     continue
                 # Make M
+                ### NEW
                 val = expectation_value_hybrid_flow(
                     csf, [GI.dagger, U.dagger, H_en, U, GJ], csf
                 ) - expectation_value_hybrid_flow(csf, [GI.dagger, GJ, U.dagger, H_en], self.wf.state_vector)
