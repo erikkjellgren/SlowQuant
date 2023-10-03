@@ -198,8 +198,8 @@ class LinearResponseUCC:
         csf.active_csr = ss.csr_matrix(csf._active)
         print('Gs', len(self.G_ops))
         print('qs', len(self.q_ops))
-        grad = np.zeros(2 * len(self.q_ops))
         ### NEW
+        grad = np.zeros(2 * len(self.q_ops))
         for i, op in enumerate(self.q_ops):
             grad[i] = -expectation_value_hybrid_flow(
                 self.wf.state_vector, [H_1i_1a, op.operator], self.wf.state_vector
@@ -210,7 +210,6 @@ class LinearResponseUCC:
         if len(grad) != 0:
             print('idx, max(abs(grad orb)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
         grad = np.zeros(2 * len(self.G_ops))
-        ### NEW
         for i, op in enumerate(self.G_ops):
             grad[i] = -expectation_value_hybrid_flow(self.wf.state_vector, [H_1i_1a, U, op.operator], csf)
             grad[i + len(self.G_ops)] = expectation_value_hybrid_flow(
@@ -218,6 +217,7 @@ class LinearResponseUCC:
             )
         if len(grad) != 0:
             print('idx, max(abs(grad active)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+        ### NEW
         # QQ
         for j, opJ in enumerate(self.q_ops):
             qJ = opJ.operator
