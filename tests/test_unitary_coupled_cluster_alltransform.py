@@ -1,3 +1,5 @@
+import sys
+
 import numpy as np
 
 import slowquant.SlowQuant as sq
@@ -790,14 +792,14 @@ def test_LiH_allmethods_energies_fast() -> None:
     )
     assert (np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)) is True
 
-    # proj: only generic implemented atm
+    # proj:
     print('\nMethod: proj')
     LR_naive = LinearResponseUCCFast(
         WF,
         excitations='SD',
         do_projected_operators=True,
         do_selfconsistent_operators=False,
-        do_debugging=True,
+        # do_debugging=True,
     )
     LR_naive.calc_excitation_energies()
     print(LR_naive.excitation_energies)
@@ -996,8 +998,17 @@ def test_LiH_allmethods_matrices_fast() -> None:
     assert (np.all(np.abs(LR_naive.Q - LR_naive.Q.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.W) < threshold)) == True
 
-    # projected: only generic is implemented atm
+    # projected:
+    threshold = 10 ** (
+        -7
+    )  # Change threshold to gradient since in projected work equations, we remove terms that are just the gradient. Thus, the error is minimum the gradient's deviation from zero
     print('\nMethod: projected')
+    LR_naive = LinearResponseUCCFast(
+        WF,
+        excitations='SD',
+        do_projected_operators=True,
+        do_selfconsistent_operators=False,
+    )
     LR_generic = LinearResponseUCCFast(
         WF,
         excitations='SD',
@@ -1006,10 +1017,20 @@ def test_LiH_allmethods_matrices_fast() -> None:
         do_debugging=True,
     )
 
+    print(
+        'Check if implementation via work equation and generic are the same with a threshold of: ', threshold
+    )
+
+    assert (np.allclose(LR_naive.M, LR_generic.M, atol=threshold)) is True
+    assert (np.allclose(LR_naive.Q, LR_generic.Q, atol=threshold)) is True
+    assert (np.allclose(LR_naive.V, LR_generic.V, atol=threshold)) is True
+    assert (np.allclose(LR_naive.W, LR_generic.W, atol=threshold)) is True
+
+    threshold = 10 ** (-10)
     print('Check if matrices fullfill their expected property:')
-    assert (np.all(np.abs(LR_generic.M - LR_generic.M.T) < threshold)) == True
-    assert (np.all(np.abs(LR_generic.Q - LR_generic.Q.T) < threshold)) == True
-    assert (np.all(np.abs(LR_generic.W) < threshold)) == True
+    assert (np.all(np.abs(LR_naive.M - LR_naive.M.T) < threshold)) == True
+    assert (np.all(np.abs(LR_naive.Q - LR_naive.Q.T) < threshold)) == True
+    assert (np.all(np.abs(LR_naive.W) < threshold)) == True
 
     # ST
     print('\nMethod: ST')

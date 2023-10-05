@@ -74,7 +74,7 @@ class LinearResponseUCC:
         self.do_debugging = do_debugging
         if sum([do_projected_operators, do_selfconsistent_operators, do_statetransfer_operators]) >= 2:
             raise ValueError('You set more than one method flag to True.')
-        if not self.do_debugging:
+        if self.do_debugging:
             if do_hermitian_statetransfer_operators:
                 raise ValueError('Hermitian State-transfer operator is only implemented as work equations.')
 
@@ -503,11 +503,19 @@ class LinearResponseUCC:
                     # Make M
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
                         self.wf.state_vector, [GI.dagger, H_1i_1a, qJ], self.wf.state_vector
-                    )
+                    )  # - (expectation_value_hybrid_flow(  # Just the gradient
+                    #    self.wf.state_vector, [GI.dagger], self.wf.state_vector
+                    # ) * expectation_value_hybrid_flow(
+                    #    self.wf.state_vector, [H_1i_1a, qJ], self.wf.state_vector
+                    # ))
                     # Make Q
                     self.Q[j, i + idx_shift] = self.Q[i + idx_shift, j] = -expectation_value_hybrid_flow(
                         self.wf.state_vector, [GI.dagger, qJ.dagger, H_1i_1a], self.wf.state_vector
-                    )
+                    )  # + (expectation_value_hybrid_flow(   # Just the gradient
+                    #    self.wf.state_vector, [GI.dagger], self.wf.state_vector
+                    # ) * expectation_value_hybrid_flow(
+                    #    self.wf.state_vector, [qJ.dagger,H_1i_1a], self.wf.state_vector
+                    # ))
                     # Make V = 0
                     # Make W = 0
                 elif calculation_type == 'st':
