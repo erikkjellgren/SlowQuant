@@ -75,11 +75,6 @@ class LinearResponseUCC:
         if sum([do_projected_operators, do_selfconsistent_operators, do_statetransfer_operators]) >= 2:
             raise ValueError('You set more than one method flag to True.')
         if not self.do_debugging:
-            if do_projected_operators:
-                raise ValueError(
-                    'Projected operator work equations are not yet implemented! Use generic implementation with caution'
-                )
-        else:
             if do_hermitian_statetransfer_operators:
                 raise ValueError('Hermitian State-transfer operator is only implemented as work equations.')
 
@@ -504,6 +499,17 @@ class LinearResponseUCC:
                     )
                     # Make V = 0
                     # Make W = 0
+                elif calculation_type == 'proj':
+                    # Make M
+                    self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
+                        self.wf.state_vector, [GI.dagger, H_1i_1a, qJ], self.wf.state_vector
+                    )
+                    # Make Q
+                    self.Q[j, i + idx_shift] = self.Q[i + idx_shift, j] = -expectation_value_hybrid_flow(
+                        self.wf.state_vector, [GI.dagger, qJ.dagger, H_1i_1a], self.wf.state_vector
+                    )
+                    # Make V = 0
+                    # Make W = 0
                 elif calculation_type == 'st':
                     # Make M
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
@@ -636,6 +642,63 @@ class LinearResponseUCC:
                         self.wf.state_vector, [GI.dagger, GJ], self.wf.state_vector
                     ) - expectation_value_hybrid_flow(
                         self.wf.state_vector, [GJ, GI.dagger], self.wf.state_vector
+                    )
+                    # Make W = 0
+                elif calculation_type == 'proj':
+                    # Make M
+                    val = (
+                        expectation_value_hybrid_flow(
+                            self.wf.state_vector, [GI.dagger, H_en, GJ], self.wf.state_vector
+                        )
+                        - (
+                            expectation_value_hybrid_flow(
+                                self.wf.state_vector, [GI.dagger, GJ], self.wf.state_vector
+                            )
+                            * self.wf.energy_elec
+                        )
+                        - (
+                            expectation_value_hybrid_flow(
+                                self.wf.state_vector, [GI.dagger], self.wf.state_vector
+                            )
+                            * expectation_value_hybrid_flow(
+                                self.wf.state_vector, [H_en, GJ], self.wf.state_vector
+                            )
+                        )
+                        + (
+                            expectation_value_hybrid_flow(
+                                self.wf.state_vector, [GI.dagger], self.wf.state_vector
+                            )
+                            * expectation_value_hybrid_flow(  # ToDo: this can be done more efficiently by calculating once and storing in WF object
+                                self.wf.state_vector, [GJ], self.wf.state_vector
+                            )
+                            * self.wf.energy_elec
+                        )
+                    )
+                    self.M[i + idx_shift, j + idx_shift] = self.M[j + idx_shift, i + idx_shift] = val
+                    # Make Q
+                    val = (
+                        expectation_value_hybrid_flow(
+                            self.wf.state_vector, [GI.dagger, H_en], self.wf.state_vector
+                        )
+                        * expectation_value_hybrid_flow(
+                            self.wf.state_vector, [GJ.dagger], self.wf.state_vector
+                        )
+                    ) - (
+                        expectation_value_hybrid_flow(self.wf.state_vector, [GI.dagger], self.wf.state_vector)
+                        * expectation_value_hybrid_flow(
+                            self.wf.state_vector, [GJ.dagger], self.wf.state_vector
+                        )
+                        * self.wf.energy_elec
+                    )
+                    self.Q[i + idx_shift, j + idx_shift] = self.Q[j + idx_shift, i + idx_shift] = val
+                    # Make V
+                    self.V[i + idx_shift, j + idx_shift] = self.V[
+                        j + idx_shift, i + idx_shift
+                    ] = expectation_value_hybrid_flow(
+                        self.wf.state_vector, [GI.dagger, GJ], self.wf.state_vector
+                    ) - (
+                        expectation_value_hybrid_flow(self.wf.state_vector, [GI.dagger], self.wf.state_vector)
+                        * expectation_value_hybrid_flow(self.wf.state_vector, [GJ], self.wf.state_vector)
                     )
                     # Make W = 0
                 elif calculation_type in ('st', 'hst', 'tracked-hst'):
