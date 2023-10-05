@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import itertools
 
 import numpy as np
 import scipy.sparse as ss
@@ -280,3 +281,42 @@ class OperatorHybrid:
         for key in self.operators.keys():
             new_operators[key].active_matrix = lw.matmul(U, new_operators[key].active_matrix)
         return OperatorHybrid(new_operators)
+
+
+def make_projection_operator(state_vector: StateVector, use_csr: int = 10) -> OperatorHybrid:
+    """Create a projection operator, |0><0|, from a state vector.
+
+    Args:
+        state_vector: State vector class.
+
+    Returns:
+        Projection operator in hybrid form.
+    """
+    new_operator = {}
+    if len(state_vector.inactive) != 0:
+        num_inactive_orbs = len(state_vector.inactive[0])
+    else:
+        num_inactive_orbs = 0
+    if len(state_vector.virtual) != 0:
+        num_virtual_orbs = len(state_vector.virtual[0])
+    else:
+        num_virtual_orbs = 0
+    if len(state_vector._active_onvector) > use_csr:
+        active_matrix = (
+            lw.outer(state_vector.ket_active_csr, state_vector.bra_active_csr)
+            * 1
+            / (2 ** (num_inactive_orbs + num_virtual_orbs))
+        )
+    else:
+        active_matrix = (
+            lw.outer(state_vector.ket_active, state_vector.bra_active)
+            * 1
+            / (2 ** (num_inactive_orbs + num_virtual_orbs))
+        )
+    for pauli in itertools.product(['Z', 'I'], repeat=num_inactive_orbs + num_virtual_orbs):
+        active = active_matrix * (-1) ** (pauli[:num_inactive_orbs].count('Z'))
+        hybridop = OperatorHybridData(
+            ''.join(pauli[:num_inactive_orbs]), active, ''.join(pauli[num_inactive_orbs:])
+        )
+        new_operator[''.join(pauli)] = hybridop
+    return OperatorHybrid(new_operator)
