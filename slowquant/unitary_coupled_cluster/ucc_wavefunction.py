@@ -18,6 +18,7 @@ from slowquant.unitary_coupled_cluster.operator_hybrid import (
 from slowquant.unitary_coupled_cluster.operator_pauli import (
     energy_hamiltonian_pauli,
     epq_pauli,
+    epqrs_pauli,
     expectation_value_pauli,
 )
 from slowquant.unitary_coupled_cluster.util import (
@@ -25,6 +26,7 @@ from slowquant.unitary_coupled_cluster.util import (
     construct_integral_trans_mat,
     construct_ucc_u,
 )
+from slowquant.unitary_coupled_cluster.density_matrix import get_orbital_gradient
 
 
 class WaveFunctionUCC:
@@ -254,80 +256,18 @@ class WaveFunctionUCC:
         """
         excitations = excitations.lower()
         self._excitations = excitations
-        if orbital_optimization:
-            e_tot = partial(
-                energy_ucc,
-                num_inactive_spin_orbs=self.num_inactive_spin_orbs,
-                num_active_spin_orbs=self.num_active_spin_orbs,
-                num_virtual_spin_orbs=self.num_virtual_spin_orbs,
-                num_elec=self.num_elec,
-                num_active_elec=self.num_active_elec,
-                state_vector=self.state_vector,
-                c_orthonormal=self.c_orthonormal,
-                h_core=self.h_core,
-                g_eri=self.g_eri,
-                theta_picker=self.theta_picker,
-                excitations=excitations,
-                orbital_optimized=True,
-                kappa_idx=self.kappa_idx,
-                kappa_redundant=self.kappa_redundant,
-                kappa_redundant_idx=self.kappa_redundant_idx,
-            )
-            parameter_gradient = partial(
-                gradient_ucc,
-                num_inactive_spin_orbs=self.num_inactive_spin_orbs,
-                num_active_spin_orbs=self.num_active_spin_orbs,
-                num_virtual_spin_orbs=self.num_virtual_spin_orbs,
-                num_elec=self.num_elec,
-                num_active_elec=self.num_active_elec,
-                state_vector=self.state_vector,
-                c_orthonormal=self.c_orthonormal,
-                h_core=self.h_core,
-                g_eri=self.g_eri,
-                theta_picker=self.theta_picker,
-                excitations=excitations,
-                orbital_optimized=True,
-                kappa_idx=self.kappa_idx,
-                kappa_redundant=self.kappa_redundant,
-                kappa_redundant_idx=self.kappa_redundant_idx,
-            )
-        else:
-            e_tot = partial(
-                energy_ucc,
-                num_inactive_spin_orbs=self.num_inactive_spin_orbs,
-                num_active_spin_orbs=self.num_active_spin_orbs,
-                num_virtual_spin_orbs=self.num_virtual_spin_orbs,
-                num_elec=self.num_elec,
-                num_active_elec=self.num_active_elec,
-                state_vector=self.state_vector,
-                c_orthonormal=construct_integral_trans_mat(self.c_orthonormal, self.kappa, self.kappa_idx),
-                h_core=self.h_core,
-                g_eri=self.g_eri,
-                theta_picker=self.theta_picker,
-                excitations=excitations,
-                orbital_optimized=False,
-                kappa_idx=[],
-                kappa_redundant=self.kappa_redundant,
-                kappa_redundant_idx=self.kappa_redundant_idx,
-            )
-            parameter_gradient = partial(
-                gradient_ucc,
-                num_inactive_spin_orbs=self.num_inactive_spin_orbs,
-                num_active_spin_orbs=self.num_active_spin_orbs,
-                num_virtual_spin_orbs=self.num_virtual_spin_orbs,
-                num_elec=self.num_elec,
-                num_active_elec=self.num_active_elec,
-                state_vector=self.state_vector,
-                c_orthonormal=construct_integral_trans_mat(self.c_orthonormal, self.kappa, self.kappa_idx),
-                h_core=self.h_core,
-                g_eri=self.g_eri,
-                theta_picker=self.theta_picker,
-                excitations=excitations,
-                orbital_optimized=False,
-                kappa_idx=[],
-                kappa_redundant=self.kappa_redundant,
-                kappa_redundant_idx=self.kappa_redundant_idx,
-            )
+        e_tot = partial(
+            energy_ucc,
+            excitations=excitations,
+            orbital_optimized=orbital_optimization,
+            wf=self,
+        )
+        parameter_gradient = partial(
+            gradient_ucc,
+            excitations=excitations,
+            orbital_optimized=orbital_optimization,
+            wf=self,
+        )
         global iteration
         global start
         iteration = 0  # type: ignore
@@ -497,21 +437,9 @@ def run_compactify_wf(
 
 def energy_ucc(
     parameters: Sequence[float],
-    num_inactive_spin_orbs: int,
-    num_active_spin_orbs: int,
-    num_virtual_spin_orbs: int,
-    num_elec: int,
-    num_active_elec: int,
-    state_vector: StateVector,
-    c_orthonormal: np.ndarray,
-    h_core: np.ndarray,
-    g_eri: np.ndarray,
-    theta_picker: ThetaPicker,
     excitations: str,
     orbital_optimized: bool,
-    kappa_idx: Sequence[Sequence[int]],
-    kappa_redundant: Sequence[float],
-    kappa_redundant_idx: Sequence[Sequence[int]],
+    wf: WaveFunctionUCC,
 ) -> float:
     r"""Calculate electronic energy of UCC wave function.
 
@@ -546,133 +474,126 @@ def energy_ucc(
     theta5 = []
     theta6 = []
     idx_counter = 0
-    for _ in range(len(kappa_idx)):
-        kappa.append(parameters[idx_counter])
-        idx_counter += 1
+    if orbital_optimized:
+        for _ in range(len(wf.kappa_idx)):
+            kappa.append(parameters[idx_counter])
+            idx_counter += 1
     if 's' in excitations:
-        for _ in theta_picker.get_t1_generator_sa(0, 0):
+        for _ in wf.theta_picker.get_t1_generator_sa(0, 0):
             theta1.append(parameters[idx_counter])
             idx_counter += 1
     if 'd' in excitations:
-        for _ in theta_picker.get_t2_generator_sa(
-            num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs, num_elec
+        for _ in wf.theta_picker.get_t2_generator_sa(
+            wf.num_inactive_spin_orbs + wf.num_active_spin_orbs + wf.num_virtual_spin_orbs, wf.num_elec
         ):
             theta2.append(parameters[idx_counter])
             idx_counter += 1
     if 't' in excitations:
-        for _ in theta_picker.get_t3_generator(0, 0):
+        for _ in wf.theta_picker.get_t3_generator(0, 0):
             theta3.append(parameters[idx_counter])
             idx_counter += 1
     if 'q' in excitations:
-        for _ in theta_picker.get_t4_generator(0, 0):
+        for _ in wf.theta_picker.get_t4_generator(0, 0):
             theta4.append(parameters[idx_counter])
             idx_counter += 1
     if '5' in excitations:
-        for _ in theta_picker.get_t5_generator(0, 0):
+        for _ in wf.theta_picker.get_t5_generator(0, 0):
             theta5.append(parameters[idx_counter])
             idx_counter += 1
     if '6' in excitations:
-        for _ in theta_picker.get_t6_generator(0, 0):
+        for _ in wf.theta_picker.get_t6_generator(0, 0):
             theta6.append(parameters[idx_counter])
             idx_counter += 1
     assert len(parameters) == len(kappa) + len(theta1) + len(theta2) + len(theta3) + len(theta4) + len(
         theta5
     ) + len(theta6)
 
-    kappa_mat = np.zeros_like(c_orthonormal)
+    kappa_mat = np.zeros_like(wf.c_orthonormal)
     if orbital_optimized:
-        for kappa_val, (p, q) in zip(kappa, kappa_idx):
+        for kappa_val, (p, q) in zip(kappa, wf.kappa_idx):
             kappa_mat[p, q] = kappa_val
             kappa_mat[q, p] = -kappa_val
-    if len(kappa_redundant) != 0:
-        if np.max(np.abs(kappa_redundant)) > 0.0:
-            for kappa_val, (p, q) in zip(kappa_redundant, kappa_redundant_idx):
+    if len(wf.kappa_redundant) != 0:
+        if np.max(np.abs(wf.kappa_redundant)) > 0.0:
+            for kappa_val, (p, q) in zip(wf.kappa_redundant, wf.kappa_redundant_idx):
                 kappa_mat[p, q] = kappa_val
                 kappa_mat[q, p] = -kappa_val
-    c_trans = np.matmul(c_orthonormal, scipy.linalg.expm(-kappa_mat))
+    c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
+    # Moving expansion point of kappa
+    wf.c_orthonormal = c_trans
+    print(wf.c_orthonormal)
 
     U = construct_ucc_u(
-        num_active_spin_orbs,
-        num_active_elec,
+        wf.num_active_spin_orbs,
+        wf.num_active_elec,
         theta1 + theta2 + theta3 + theta4 + theta5 + theta6,
-        theta_picker,
+        wf.theta_picker,
         excitations,
-        allowed_states=state_vector.allowed_active_states_number_spin_conserving,
+        allowed_states=wf.state_vector.allowed_active_states_number_spin_conserving,
     )
-    state_vector.new_u(U, allowed_states=state_vector.allowed_active_states_number_spin_conserving)
+    wf.state_vector.new_u(U, allowed_states=wf.state_vector.allowed_active_states_number_spin_conserving)
     return expectation_value_pauli(
-        state_vector,
+        wf.state_vector,
         energy_hamiltonian_pauli(
-            h_core,
-            g_eri,
+            wf.h_core,
+            wf.g_eri,
             c_trans,
-            num_inactive_spin_orbs,
-            num_active_spin_orbs,
-            num_virtual_spin_orbs,
-            num_elec,
+            wf.num_inactive_spin_orbs,
+            wf.num_active_spin_orbs,
+            wf.num_virtual_spin_orbs,
+            wf.num_elec,
         ),
-        state_vector,
+        wf.state_vector,
     )
 
 
 def gradient_ucc(
     parameters: Sequence[float],
-    num_inactive_spin_orbs: int,
-    num_active_spin_orbs: int,
-    num_virtual_spin_orbs: int,
-    num_elec: int,
-    num_active_elec: int,
-    state_vector: StateVector,
-    c_orthonormal: np.ndarray,
-    h_core: np.ndarray,
-    g_eri: np.ndarray,
-    theta_picker: ThetaPicker,
     excitations: str,
     orbital_optimized: bool,
-    kappa_idx: Sequence[Sequence[int]],
-    kappa_redundant: Sequence[float],
-    kappa_redundant_idx: Sequence[Sequence[int]],
+    wf: WaveFunctionUCC,
 ) -> np.ndarray:
     """ """
     number_kappas = 0
     if orbital_optimized:
-        number_kappas = len(kappa_idx)
+        number_kappas = len(wf.kappa_idx)
     gradient = np.zeros_like(parameters)
     if orbital_optimized:
         gradient[:number_kappas] = orbital_rotation_gradient(
             parameters,
-            num_inactive_spin_orbs,
-            num_active_spin_orbs,
-            num_virtual_spin_orbs,
-            num_elec,
-            num_active_elec,
-            state_vector,
-            c_orthonormal,
-            h_core,
-            g_eri,
-            theta_picker,
+            wf.num_inactive_spin_orbs,
+            wf.num_active_spin_orbs,
+            wf.num_virtual_spin_orbs,
+            wf.num_elec,
+            wf.num_active_elec,
+            wf.state_vector,
+            wf.c_orthonormal,
+            wf.h_core,
+            wf.g_eri,
+            wf.theta_picker,
             excitations,
             orbital_optimized,
-            kappa_idx,
-            kappa_redundant,
-            kappa_redundant_idx,
+            wf.kappa_idx,
+            wf.kappa_redundant,
+            wf.kappa_redundant_idx,
         )
     gradient[number_kappas:] = active_space_parameter_gradient(
         parameters,
-        num_inactive_spin_orbs,
-        num_active_spin_orbs,
-        num_virtual_spin_orbs,
-        num_elec,
-        num_active_elec,
-        state_vector,
-        c_orthonormal,
-        h_core,
-        g_eri,
-        theta_picker,
+        wf.num_inactive_spin_orbs,
+        wf.num_active_spin_orbs,
+        wf.num_virtual_spin_orbs,
+        wf.num_elec,
+        wf.num_active_elec,
+        wf.state_vector,
+        wf.c_orthonormal,
+        wf.h_core,
+        wf.g_eri,
+        wf.theta_picker,
         excitations,
-        kappa_idx,
-        kappa_redundant,
-        kappa_redundant_idx,
+        orbital_optimized,
+        wf.kappa_idx,
+        wf.kappa_redundant,
+        wf.kappa_redundant_idx,
     )
     return gradient
 
@@ -707,9 +628,10 @@ def orbital_rotation_gradient(
     theta5 = []
     theta6 = []
     idx_counter = 0
-    for _ in range(len(kappa_idx)):
-        kappa.append(parameters[idx_counter])
-        idx_counter += 1
+    if orbital_optimized:
+        for _ in range(len(kappa_idx)):
+            kappa.append(parameters[idx_counter])
+            idx_counter += 1
     if 's' in excitations:
         for _ in theta_picker.get_t1_generator_sa(0, 0):
             theta1.append(parameters[idx_counter])
@@ -765,6 +687,7 @@ def orbital_rotation_gradient(
                 for kappa_val, (p, q) in zip(kappa_redundant, kappa_redundant_idx):
                     kappa_mat[p, q] = kappa_val
                     kappa_mat[q, p] = -kappa_val
+        print(c_orthonormal)
         c_trans = np.matmul(c_orthonormal, scipy.linalg.expm(-kappa_mat))
         E = expectation_value_pauli(
             state_vector,
@@ -855,6 +778,7 @@ def active_space_parameter_gradient(
     g_eri: np.ndarray,
     theta_picker: ThetaPicker,
     excitations: str,
+    orbital_optimized: bool,
     kappa_idx: Sequence[Sequence[int]],
     kappa_redundant: Sequence[float],
     kappa_redundant_idx: Sequence[Sequence[int]],
@@ -871,9 +795,10 @@ def active_space_parameter_gradient(
     theta5 = []
     theta6 = []
     idx_counter = 0
-    for _ in range(len(kappa_idx)):
-        kappa.append(parameters[idx_counter])
-        idx_counter += 1
+    if orbital_optimized:
+        for _ in range(len(kappa_idx)):
+            kappa.append(parameters[idx_counter])
+            idx_counter += 1
     if 's' in excitations:
         for _ in theta_picker.get_t1_generator_sa(0, 0):
             theta1.append(parameters[idx_counter])
@@ -990,3 +915,19 @@ def construct_one_rdm(wf: WaveFunctionUCC) -> np.ndarray:
                 wf.state_vector, epq_pauli(p, q, wf.num_spin_orbs, wf.num_elec), wf.state_vector
             )
     return one_rdm
+
+
+def construct_two_rdm(wf: WaveFunctionUCC) -> np.ndarray:
+    two_rdm = np.zeros(
+        (wf.num_spin_orbs // 2, wf.num_spin_orbs // 2, wf.num_spin_orbs // 2, wf.num_spin_orbs // 2)
+    )
+    for p in range(wf.num_spin_orbs // 2):
+        for q in range(wf.num_spin_orbs // 2):
+            for r in range(wf.num_spin_orbs // 2):
+                for s in range(wf.num_spin_orbs // 2):
+                    two_rdm[p, q, r, s] = expectation_value_pauli(
+                        wf.state_vector,
+                        epqrs_pauli(p, q, r, s, wf.num_spin_orbs, wf.num_elec),
+                        wf.state_vector,
+                    )
+    return two_rdm
