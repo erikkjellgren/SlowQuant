@@ -3,6 +3,7 @@ from collections.abc import Sequence
 
 import numpy as np
 import scipy
+import scipy.sparse as ss
 
 import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
 from slowquant.molecularintegrals.integralfunctions import (
