@@ -283,8 +283,8 @@ def test_h2_631g_oouccsd_lr_matrices() -> None:
     assert (np.allclose(LR_naive.W, LR_native.W, atol=threshold)) is True
 
 
-def test_LiH_allmethods_matrices() -> None:
-    """Test LiH all matrices and their properties for all LR methods."""
+def test_LiH_atmethods_matrices() -> None:
+    """Test LiH all matrices and their properties for at methods."""
 
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -361,7 +361,7 @@ def test_LiH_allmethods_matrices() -> None:
         'Check if implementation via work equation and generic are the same with a threshold of: ', threshold
     )
     assert (np.allclose(LR_naive.M, LR_generic.M, atol=threshold)) is True
-    # assert(np.allclose(LR_naive.Q,LR_generic.Q,atol=threshold)) is True  #BUg in generic implementation!
+    assert (np.allclose(LR_naive.Q, LR_generic.Q, atol=threshold)) is True  # BUg in generic implementation?
     assert (np.allclose(LR_naive.V, LR_generic.V, atol=threshold)) is True
     assert (np.allclose(LR_naive.W, LR_generic.W, atol=threshold)) is True
 
@@ -370,6 +370,33 @@ def test_LiH_allmethods_matrices() -> None:
     assert (np.all(np.abs(LR_naive.Q - LR_naive.Q.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.V - np.eye(LR_naive.V.shape[0])) < threshold)) == True
     assert (np.all(np.abs(LR_naive.W) < threshold)) == True
+
+
+def test_LiH_allmethods_matrices() -> None:
+    """Test LiH all matrices and their properties for all LR methods."""
+
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """Li   0.0           0.0  0.0;
+        H   1.67  0.0  0.0;""",
+        distance_unit='angstrom',
+    )
+    SQobj.set_basis_set('sto-3g')
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
+    WF = WaveFunctionUCC(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 2),
+        SQobj.hartree_fock.mo_coeff,
+        h_core,
+        g_eri,
+    )
+    WF.run_ucc('SD', True)
+
+    threshold = 10 ** (-10)
 
     # naive
     print('\nMethod: naive')

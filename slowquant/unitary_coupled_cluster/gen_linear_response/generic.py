@@ -14,9 +14,11 @@ from slowquant.unitary_coupled_cluster.operator_contracted import (
     expectation_value_contracted,
 )
 from slowquant.unitary_coupled_cluster.operator_hybrid import (
+    make_projection_operator,  # NEW
+)
+from slowquant.unitary_coupled_cluster.operator_hybrid import (
     convert_pauli_to_hybrid_form,
     expectation_value_hybrid,
-    make_projection_operator,
 )
 from slowquant.unitary_coupled_cluster.operator_pauli import (
     OperatorPauli,
@@ -65,6 +67,7 @@ class LinearResponseUCC:
             'sdtq56',  # self.wf._excitations,
         )
         if operator_type.lower() in ('projected', 'statetransfer'):
+            # NEW
             projection = make_projection_operator(self.wf.state_vector)
             self.projection = projection
         if 's' in excitations:
@@ -104,7 +107,7 @@ class LinearResponseUCC:
             if operator_type.lower() == 'naive':
                 self.G_ops.append(G)
             elif operator_type.lower() == 'projected':
-                G = G * projection
+                G = G * projection  # NEW
                 fac = expectation_value_hybrid(self.wf.state_vector, G, self.wf.state_vector)
                 G_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
                 G_diff = convert_pauli_to_hybrid_form(
@@ -121,14 +124,14 @@ class LinearResponseUCC:
             elif operator_type.lower() == 'statetransfer':
                 G = G.apply_u_from_right(U.conj().transpose())
                 G = G.apply_u_from_left(U)
-                G = G * projection
+                G = G * projection  # NEW
                 self.G_ops.append(G)
         for q in q_ops_tmp:
             if do_transform_orbital_rotations:
                 if operator_type.lower() == 'naive':
                     self.q_ops.append(q)
                 if operator_type.lower() == 'projected':
-                    q = q * projection
+                    q = q * projection  # NEW
                     fac = expectation_value_hybrid(self.wf.state_vector, q, self.wf.state_vector)
                     q_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
                     q_diff = convert_pauli_to_hybrid_form(
@@ -145,7 +148,7 @@ class LinearResponseUCC:
                 elif operator_type.lower() == 'statetransfer':
                     q = q.apply_u_from_right(U.conj().transpose())
                     q = q.apply_u_from_left(U)
-                    q = q * projection
+                    q = q * projection  # NEW
                     self.q_ops.append(q)
             else:
                 self.q_ops.append(q)

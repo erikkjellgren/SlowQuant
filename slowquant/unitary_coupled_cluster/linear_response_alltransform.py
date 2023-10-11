@@ -19,6 +19,7 @@ from slowquant.unitary_coupled_cluster.operator_hybrid import (
     OperatorHybrid,
     convert_pauli_to_hybrid_form,
     expectation_value_hybrid,
+    make_projection_operator,
 )
 from slowquant.unitary_coupled_cluster.operator_pauli import (
     energy_hamiltonian_pauli,
@@ -114,12 +115,15 @@ class LinearResponseUCC:
 
         # Projection for statetransfer Ansatz
         if do_statetransfer_operators:
-            if self.wf.num_active_spin_orbs >= 10:
-                projection = lw.outer(
-                    self.wf.state_vector.ket_active_csr, self.wf.state_vector.bra_active_csr
-                )
-            else:
-                projection = lw.outer(self.wf.state_vector.ket_active, self.wf.state_vector.bra_active)
+            projection = make_projection_operator(self.wf.state_vector)
+            self.projection = projection
+            # Old version with some bugs but much faster:
+            # if self.wf.num_active_spin_orbs >= 10:
+            #    projection = lw.outer(
+            #        self.wf.state_vector.ket_active_csr, self.wf.state_vector.bra_active_csr
+            #    )
+            # else:
+            #    projection = lw.outer(self.wf.state_vector.ket_active, self.wf.state_vector.bra_active)
         if 's' in excitations:
             for _, a, i, op_ in self.theta_picker.get_t1_generator_sa(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
@@ -132,7 +136,7 @@ class LinearResponseUCC:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                     if do_statetransfer_operators:  # R = UGU^d |0><0|
-                        op = op.apply_u_from_right(projection)
+                        op = op * projection
                 self.G_ops.append(ResponseOperator((i,), (a,), op))
         if 'd' in excitations:
             for _, a, i, b, j, op_ in self.theta_picker.get_t2_generator_sa(num_spin_orbs, num_elec):
@@ -146,7 +150,7 @@ class LinearResponseUCC:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                     if do_statetransfer_operators:  # R = UGU^d |0><0|
-                        op = op.apply_u_from_right(projection)
+                        op = op * projection
                 self.G_ops.append(ResponseOperator((i, j), (a, b), op))
         if 't' in excitations:
             for _, a, i, b, j, c, k, op_ in self.theta_picker.get_t3_generator(num_spin_orbs, num_elec):
@@ -160,7 +164,7 @@ class LinearResponseUCC:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                     if do_statetransfer_operators:  # R = UGU^d |0><0|
-                        op = op.apply_u_from_right(projection)
+                        op = op * projection
                 self.G_ops.append(ResponseOperator((i, j, k), (a, b, c), op))
         if 'q' in excitations:
             for _, a, i, b, j, c, k, d, l, op_ in self.theta_picker.get_t4_generator(num_spin_orbs, num_elec):
@@ -174,7 +178,7 @@ class LinearResponseUCC:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                     if do_statetransfer_operators:  # R = UGU^d |0><0|
-                        op = op.apply_u_from_right(projection)
+                        op = op * projection
                 self.G_ops.append(ResponseOperator((i, j, k, l), (a, b, c, d), op))
         if '5' in excitations:
             for _, a, i, b, j, c, k, d, l, e, m, op_ in self.theta_picker.get_t5_generator(
@@ -190,7 +194,7 @@ class LinearResponseUCC:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                     if do_statetransfer_operators:  # R = UGU^d |0><0|
-                        op = op.apply_u_from_right(projection)
+                        op = op * projection
                 self.G_ops.append(ResponseOperator((i, j, k, l, m), (a, b, c, d, e), op))
         if '6' in excitations:
             for _, a, i, b, j, c, k, d, l, e, m, f, n, op_ in self.theta_picker.get_t6_generator(
@@ -206,7 +210,7 @@ class LinearResponseUCC:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                     if do_statetransfer_operators:  # R = UGU^d |0><0|
-                        op = op.apply_u_from_right(projection)
+                        op = op * projection
                 self.G_ops.append(ResponseOperator((i, j, k, l, m, n), (a, b, c, d, e, f), op))
 
         #######
@@ -227,7 +231,7 @@ class LinearResponseUCC:
                 op = op.apply_u_from_right(U.conj().transpose())
                 op = op.apply_u_from_left(U)
                 if do_statetransfer_operators:  # Q = UqU^d |0><0|
-                    op = op.apply_u_from_right(projection)
+                    op = op * projection
             self.q_ops.append(ResponseOperator((i), (a), op))
 
         # Initiate matrices for linear response
