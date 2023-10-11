@@ -58,6 +58,7 @@ class LinearResponseUCC:
         do_statetransfer_operators: bool = False,
         do_hermitian_statetransfer_operators: bool = False,
         track_hermitian_statetransfer: bool = False,
+        do_buggy_projection: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
@@ -68,6 +69,13 @@ class LinearResponseUCC:
             do_selfconsistent_operators: Use self-consistent active space excitation operators.
             do_projected_operators: Use projected active space excitation opreators.
         """
+        if do_buggy_projection:
+            if do_debugging:
+                print('WARNING: This implementation of the projection might lead to errors.')
+            else:
+                print(
+                    'WARNING: Using the do_buggy_projection flag without defining do_debugging does not have any influence.'
+                )
         self.do_debugging = do_debugging
         if sum([do_projected_operators, do_selfconsistent_operators, do_statetransfer_operators]) >= 2:
             raise ValueError('You set more than one method flag to True.')
@@ -112,16 +120,18 @@ class LinearResponseUCC:
         #######
 
         # Projection for statetransfer Ansatz.
-        if do_projected_operators or do_statetransfer_operators:  # New projection
-            projection = make_projection_operator(self.wf.state_vector)
-            self.projection = projection
-            # Old version with some bugs but much faster:
-            # if self.wf.num_active_spin_orbs >= 10:
-            #    projection = lw.outer(
-            #        self.wf.state_vector.ket_active_csr, self.wf.state_vector.bra_active_csr
-            #    )
-            # else:
-            #    projection = lw.outer(self.wf.state_vector.ket_active, self.wf.state_vector.bra_active)
+        if do_projected_operators or do_statetransfer_operators:
+            if do_buggy_projection:
+                # Old version with some bugs but much faster:
+                if self.wf.num_active_spin_orbs >= 10:
+                    projection = lw.outer(
+                        self.wf.state_vector.ket_active_csr, self.wf.state_vector.bra_active_csr
+                    )
+                else:
+                    projection = lw.outer(self.wf.state_vector.ket_active, self.wf.state_vector.bra_active)
+            else:  # New projection
+                projection = make_projection_operator(self.wf.state_vector)
+                self.projection = projection
         if 's' in excitations:
             for _, a, i, op_ in self.theta_picker.get_t1_generator_sa(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
@@ -134,7 +144,10 @@ class LinearResponseUCC:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                 if do_projected_operators and self.do_debugging:
-                    op = op * projection
+                    if do_buggy_projection:
+                        op = op.apply_u_from_right(projection)
+                    else:
+                        op = op * projection
                     fac = expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector)
                     op_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
                     op_diff = convert_pauli_to_hybrid_form(
@@ -147,7 +160,10 @@ class LinearResponseUCC:
                 if do_statetransfer_operators and self.do_debugging:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
-                    op = op * projection
+                    if do_buggy_projection:
+                        op = op.apply_u_from_right(projection)
+                    else:
+                        op = op * projection
                 self.G_ops.append(ResponseOperator((i,), (a,), op))
         if 'd' in excitations:
             for _, a, i, b, j, op_ in self.theta_picker.get_t2_generator_sa(num_spin_orbs, num_elec):
@@ -161,7 +177,10 @@ class LinearResponseUCC:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                 if do_projected_operators and self.do_debugging:
-                    op = op * projection
+                    if do_buggy_projection:
+                        op = op.apply_u_from_right(projection)
+                    else:
+                        op = op * projection
                     fac = expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector)
                     op_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
                     op_diff = convert_pauli_to_hybrid_form(
@@ -174,7 +193,10 @@ class LinearResponseUCC:
                 if do_statetransfer_operators and self.do_debugging:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
-                    op = op * projection
+                    if do_buggy_projection:
+                        op = op.apply_u_from_right(projection)
+                    else:
+                        op = op * projection
                 self.G_ops.append(ResponseOperator((i, j), (a, b), op))
         if 't' in excitations:
             for _, a, i, b, j, c, k, op_ in self.theta_picker.get_t3_generator(num_spin_orbs, num_elec):
@@ -188,7 +210,10 @@ class LinearResponseUCC:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                 if do_projected_operators and self.do_debugging:
-                    op = op * projection
+                    if do_buggy_projection:
+                        op = op.apply_u_from_right(projection)
+                    else:
+                        op = op * projection
                     fac = expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector)
                     op_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
                     op_diff = convert_pauli_to_hybrid_form(
@@ -201,7 +226,10 @@ class LinearResponseUCC:
                 if do_statetransfer_operators and self.do_debugging:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
-                    op = op * projection
+                    if do_buggy_projection:
+                        op = op.apply_u_from_right(projection)
+                    else:
+                        op = op * projection
                 self.G_ops.append(ResponseOperator((i, j, k), (a, b, c), op))
         if 'q' in excitations:
             for _, a, i, b, j, c, k, d, l, op_ in self.theta_picker.get_t4_generator(num_spin_orbs, num_elec):
@@ -215,7 +243,10 @@ class LinearResponseUCC:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                 if do_projected_operators and self.do_debugging:
-                    op = op * projection
+                    if do_buggy_projection:
+                        op = op.apply_u_from_right(projection)
+                    else:
+                        op = op * projection
                     fac = expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector)
                     op_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
                     op_diff = convert_pauli_to_hybrid_form(
@@ -228,7 +259,10 @@ class LinearResponseUCC:
                 if do_statetransfer_operators and self.do_debugging:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
-                    op = op * projection
+                    if do_buggy_projection:
+                        op = op.apply_u_from_right(projection)
+                    else:
+                        op = op * projection
                 self.G_ops.append(ResponseOperator((i, j, k, l), (a, b, c, d), op))
         if '5' in excitations:
             for _, a, i, b, j, c, k, d, l, e, m, op_ in self.theta_picker.get_t5_generator(
@@ -244,7 +278,10 @@ class LinearResponseUCC:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                 if do_projected_operators and self.do_debugging:
-                    op = op * projection
+                    if do_buggy_projection:
+                        op = op.apply_u_from_right(projection)
+                    else:
+                        op = op * projection
                     fac = expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector)
                     op_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
                     op_diff = convert_pauli_to_hybrid_form(
@@ -257,7 +294,10 @@ class LinearResponseUCC:
                 if do_statetransfer_operators and self.do_debugging:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
-                    op = op * projection
+                    if do_buggy_projection:
+                        op = op.apply_u_from_right(projection)
+                    else:
+                        op = op * projection
                 self.G_ops.append(ResponseOperator((i, j, k, l, m), (a, b, c, d, e), op))
         if '6' in excitations:
             for _, a, i, b, j, c, k, d, l, e, m, f, n, op_ in self.theta_picker.get_t6_generator(
@@ -273,7 +313,10 @@ class LinearResponseUCC:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
                 if do_projected_operators and self.do_debugging:
-                    op = op * projection
+                    if do_buggy_projection:
+                        op = op.apply_u_from_right(projection)
+                    else:
+                        op = op * projection
                     fac = expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector)
                     op_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
                     op_diff = convert_pauli_to_hybrid_form(
@@ -286,7 +329,10 @@ class LinearResponseUCC:
                 if do_statetransfer_operators and self.do_debugging:
                     op = op.apply_u_from_right(U.conj().transpose())
                     op = op.apply_u_from_left(U)
-                    op = op * projection
+                    if do_buggy_projection:
+                        op = op.apply_u_from_right(projection)
+                    else:
+                        op = op * projection
                 self.G_ops.append(ResponseOperator((i, j, k, l, m, n), (a, b, c, d, e, f), op))
 
         #######
