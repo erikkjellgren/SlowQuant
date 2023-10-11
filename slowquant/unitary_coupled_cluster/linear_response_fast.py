@@ -59,6 +59,7 @@ class LinearResponseUCC:
         do_hermitian_statetransfer_operators: bool = False,
         track_hermitian_statetransfer: bool = False,
         do_buggy_projection: bool = False,
+        do_all_projected_operators: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
@@ -77,11 +78,24 @@ class LinearResponseUCC:
                     'WARNING: Using the do_buggy_projection flag without defining do_debugging does not have any influence.'
                 )
         self.do_debugging = do_debugging
-        if sum([do_projected_operators, do_selfconsistent_operators, do_statetransfer_operators]) >= 2:
+        if (
+            sum(
+                [
+                    do_projected_operators,
+                    do_selfconsistent_operators,
+                    do_statetransfer_operators,
+                    do_hermitian_statetransfer_operators,
+                    do_all_projected_operators,
+                ]
+            )
+            >= 2
+        ):
             raise ValueError('You set more than one method flag to True.')
         if self.do_debugging:
             if do_hermitian_statetransfer_operators:
                 raise ValueError('Hermitian State-transfer operator is only implemented as work equations.')
+            if do_all_projected_operators:
+                raise ValueError('All projected operator is only implemented as work equations.')
 
         self.wf = copy.deepcopy(wave_function)
         self.theta_picker = ThetaPicker(
@@ -440,8 +454,10 @@ class LinearResponseUCC:
         # Work equation implementation
         if do_selfconsistent_operators:
             calculation_type = 'sc'
-        elif do_projected_operators:  # not implemented yet
+        elif do_projected_operators:
             calculation_type = 'proj'
+        elif do_all_projected_operators:
+            calculation_type = 'all_proj'
         elif do_statetransfer_operators:
             calculation_type = 'st'
         elif do_hermitian_statetransfer_operators:
@@ -463,7 +479,6 @@ class LinearResponseUCC:
                 qI = opI.operator
                 if i < j:
                     continue
-                ### NEW
                 if calculation_type in ('sc', 'naive', 'st', 'proj', 'hst', 'tracked-hst'):
                     # Make M
                     val = expectation_value_hybrid_flow(
@@ -481,7 +496,24 @@ class LinearResponseUCC:
                         self.wf.state_vector, [qI.dagger, qJ], self.wf.state_vector
                     )
                     # Make W = 0
-                ### NEW End
+                elif calculation_type == 'all_proj':
+                    # Make M
+                    val = (
+                        expectation_value_hybrid_flow(
+                            self.wf.state_vector, [qI.dagger, H_2i_2a, qJ], self.wf.state_vector
+                        )
+                        - expectation_value_hybrid_flow(
+                            self.wf.state_vector, [qI.dagger, qJ], self.wf.state_vector
+                        )
+                        * self.wf.energy_elec
+                    )
+                    self.M[i, j] = self.M[j, i] = val
+                    # Make Q (B) = 0
+                    # Make V
+                    self.V[i, j] = self.V[j, i] = expectation_value_hybrid_flow(
+                        self.wf.state_vector, [qI.dagger, qJ], self.wf.state_vector
+                    )
+                    # Make W = 0
                 elif calculation_type == 'generic':
                     # Make M
                     self.M[i, j] = self.M[j, i] = expectation_value_contracted(
@@ -516,7 +548,6 @@ class LinearResponseUCC:
             qJ = opJ.operator
             for i, opI in enumerate(self.G_ops):
                 GI = opI.operator
-                ### NEW
                 if calculation_type == 'sc':
                     # Make M
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
@@ -564,6 +595,14 @@ class LinearResponseUCC:
                     # ))
                     # Make V = 0
                     # Make W = 0
+                elif calculation_type == 'all_proj':
+                    # Make M
+                    self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
+                        self.wf.state_vector, [GI.dagger, H_1i_1a, qJ], self.wf.state_vector
+                    )
+                    # Make Q (B) = 0
+                    # Make V = 0
+                    # Make W = 0
                 elif calculation_type == 'st':
                     # Make M
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
@@ -604,7 +643,6 @@ class LinearResponseUCC:
                     )
                     # Make V = 0
                     # Make W = 0
-                ### NEW End
                 elif calculation_type == 'generic':
                     # Make M
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_contracted(
@@ -637,7 +675,6 @@ class LinearResponseUCC:
                 GI = opI.operator
                 if i < j:
                     continue
-                ### NEW
                 if calculation_type == 'sc':
                     # Make M
                     val = expectation_value_hybrid_flow(
@@ -698,7 +735,7 @@ class LinearResponseUCC:
                         self.wf.state_vector, [GJ, GI.dagger], self.wf.state_vector
                     )
                     # Make W = 0
-                elif calculation_type == 'proj':
+                elif calculation_type in ('proj', 'all_proj'):
                     # Make M
                     val = (
                         expectation_value_hybrid_flow(
@@ -770,7 +807,6 @@ class LinearResponseUCC:
                     # Make Q (B)= 0
                     # Make V (\Sigma) = \delta_ij (see above)
                     # Make W (\Delta) = 0
-                ### NEW End
                 elif calculation_type == 'generic':
                     # Make M
                     self.M[i + idx_shift, j + idx_shift] = self.M[
