@@ -498,11 +498,10 @@ class LinearResponseUCC:
                     # Make W = 0
                 elif calculation_type == 'all_proj':
                     # Make M
-                    val = (
+                    val = expectation_value_hybrid_flow(
+                        self.wf.state_vector, [qI.dagger, H_2i_2a, qJ], self.wf.state_vector
+                    ) - (
                         expectation_value_hybrid_flow(
-                            self.wf.state_vector, [qI.dagger, H_2i_2a, qJ], self.wf.state_vector
-                        )
-                        - expectation_value_hybrid_flow(
                             self.wf.state_vector, [qI.dagger, qJ], self.wf.state_vector
                         )
                         * self.wf.energy_elec
@@ -601,13 +600,6 @@ class LinearResponseUCC:
                         self.wf.state_vector, [GI.dagger, H_1i_1a, qJ], self.wf.state_vector
                     )
                     # Make Q (B) = 0
-                    # Add it back for now
-                    self.Q[j, i + idx_shift] = self.Q[i + idx_shift, j] = -(
-                        expectation_value_hybrid_flow(self.wf.state_vector, [GI.dagger], self.wf.state_vector)
-                        * expectation_value_hybrid_flow(
-                            self.wf.state_vector, [qJ.dagger, H_1i_1a], self.wf.state_vector
-                        )
-                    )
                     # Make V = 0
                     # Make W = 0
                 elif calculation_type == 'st':
