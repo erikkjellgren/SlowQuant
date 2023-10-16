@@ -286,6 +286,8 @@ def test_h2_631g_oouccsd_lr_matrices() -> None:
 def test_LiH_atmethods_matrices() -> None:
     """Test LiH all matrices and their properties for at methods."""
 
+    print('Are you sure you want to run this test? It takes ages...')
+
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """Li   0.0           0.0  0.0;
@@ -1123,3 +1125,60 @@ def test_LiH_allmethods_matrices_fast() -> None:
     assert (np.allclose(LR_HST_naive.Q, LR_HST_tracked.Q, atol=threshold)) is True
     assert (np.allclose(LR_HST_naive.V, LR_HST_tracked.V, atol=threshold)) is True
     assert (np.allclose(LR_HST_naive.W, LR_HST_tracked.W, atol=threshold)) is True
+
+
+def test_LiH_allproj_energies_fast() -> None:
+    """Test LiH for all-proj LR method."""
+
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """Li   0.0           0.0  0.0;
+        H   1.67  0.0  0.0;""",
+        distance_unit='angstrom',
+    )
+    SQobj.set_basis_set('sto-3g')
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
+    WF = WaveFunctionUCC(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 2),
+        SQobj.hartree_fock.mo_coeff,
+        h_core,
+        g_eri,
+    )
+    WF.run_ucc('SD', True)
+
+    threshold = 10 ** (-5)
+
+    print('\nMethod: all-projected')
+    LR_naive = LinearResponseUCCFast(
+        WF,
+        excitations='SD',
+        do_projected_operators=False,
+        do_selfconsistent_operators=False,
+        do_all_projected_operators=True,
+    )
+    LR_naive.calc_excitation_energies()
+    print(LR_naive.excitation_energies)
+
+    solutions = np.array(
+        [
+            0.12973291,
+            0.18092743,
+            0.18092743,
+            0.60537541,
+            0.64747353,
+            0.74982411,
+            0.74982411,
+            1.00424384,
+            2.07489665,
+            2.13720665,
+            2.13720665,
+            2.45601484,
+            2.95606043,
+        ]
+    )
+    assert (np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)) is True
