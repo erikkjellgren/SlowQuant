@@ -60,6 +60,7 @@ class LinearResponseUCC:
         track_hermitian_statetransfer: bool = False,
         do_buggy_projection: bool = False,
         do_all_projected_operators: bool = False,
+        do_ST_projected_operators: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
@@ -86,6 +87,7 @@ class LinearResponseUCC:
                     do_statetransfer_operators,
                     do_hermitian_statetransfer_operators,
                     do_all_projected_operators,
+                    do_ST_projected_operators,
                 ]
             )
             >= 2
@@ -96,6 +98,8 @@ class LinearResponseUCC:
                 raise ValueError('Hermitian State-transfer operator is only implemented as work equations.')
             if do_all_projected_operators:
                 raise ValueError('All projected operator is only implemented as work equations.')
+            if do_ST_projected_operators:
+                raise ValueError('ST/projected operator is only implemented as work equations.')
 
         self.wf = copy.deepcopy(wave_function)
         self.theta_picker = ThetaPicker(
@@ -446,6 +450,12 @@ class LinearResponseUCC:
             csf.active_csr = ss.csr_matrix(csf._active)
 
         # Obtain |CSF> for naive implementation via work equations
+        if do_ST_projected_operators:
+            csf = copy.deepcopy(self.wf.state_vector)
+            csf.active = csf._active
+            csf.active_csr = ss.csr_matrix(csf._active)
+
+        # Obtain |CSF> for naive implementation via work equations
         if do_hermitian_statetransfer_operators and not self.do_debugging:
             csf = copy.deepcopy(self.wf.state_vector)
             csf.active = csf._active
@@ -458,6 +468,8 @@ class LinearResponseUCC:
             calculation_type = 'proj'
         elif do_all_projected_operators:
             calculation_type = 'all_proj'
+        elif do_ST_projected_operators:
+            calculation_type = 'ST_proj'
         elif do_statetransfer_operators:
             calculation_type = 'st'
         elif do_hermitian_statetransfer_operators:
@@ -496,7 +508,7 @@ class LinearResponseUCC:
                         self.wf.state_vector, [qI.dagger, qJ], self.wf.state_vector
                     )
                     # Make W = 0
-                elif calculation_type == 'all_proj':
+                elif calculation_type in ('all_proj', 'ST_proj'):
                     # Make M
                     val = expectation_value_hybrid_flow(
                         self.wf.state_vector, [qI.dagger, H_2i_2a, qJ], self.wf.state_vector
@@ -613,6 +625,14 @@ class LinearResponseUCC:
                         [GI.dagger, U.dagger, qJ.dagger, H_1i_1a],
                         self.wf.state_vector,
                     )
+                    # Make V = 0
+                    # Make W = 0
+                elif calculation_type == 'ST_proj':
+                    # Make M
+                    self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
+                        csf, [GI.dagger, U.dagger, H_1i_1a, qJ], self.wf.state_vector
+                    )
+                    # Make Q = 0
                     # Make V = 0
                     # Make W = 0
                 elif calculation_type == 'hst':
@@ -791,7 +811,7 @@ class LinearResponseUCC:
                         * expectation_value_hybrid_flow(self.wf.state_vector, [GJ], self.wf.state_vector)
                     )
                     # Make W = 0
-                elif calculation_type in ('st', 'hst', 'tracked-hst'):
+                elif calculation_type in ('st', 'hst', 'tracked-hst', 'ST_proj'):
                     # Make M (A)
                     if i == j:
                         val = (
