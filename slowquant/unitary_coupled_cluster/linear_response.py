@@ -398,8 +398,8 @@ class LinearResponseUCC:
             )
         if len(grad) != 0:
             print('idx, max(abs(grad orb)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-        if np.max(np.abs(grad)) > 10**-4:
-            raise ValueError('Large Hessian gradient detected.')
+            if np.max(np.abs(grad)) > 10**-4:
+                raise ValueError('Large Hessian gradient detected.')
         grad = np.zeros(2 * len(self.G_ops))
         for i, op in enumerate(self.G_ops):
             grad[i] = expectation_value_contracted(
@@ -410,8 +410,8 @@ class LinearResponseUCC:
             )
         if len(grad) != 0:
             print('idx, max(abs(grad active)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-        if np.max(np.abs(grad)) > 10**-4:
-            raise ValueError('Large Hessian gradient detected.')
+            if np.max(np.abs(grad)) > 10**-4:
+                raise ValueError('Large Hessian gradient detected.')
 
         #######
         ### Construct matrices
