@@ -1073,13 +1073,15 @@ class LinearResponseUCC:
             state_number: Target excited state (zero being the first excited state).
             dipole_integrals: Dipole integrals (x,y,z) in AO basis.
 
-        Rerturns:
+        Returns:
             Oscillator Strength.
         """
+
         transition_dipole_x, transition_dipole_y, transition_dipole_z = self.get_transition_dipole(
             state_number, dipole_integrals
         )
         excitation_energy = self.excitation_energies[state_number]
+
         return (
             2
             / 3

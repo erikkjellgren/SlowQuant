@@ -77,7 +77,21 @@ class LinearResponseUCC:
                     'WARNING: Using the do_buggy_projection flag without defining do_debugging does not have any influence.'
                 )
         self.do_debugging = do_debugging
-        if sum([do_projected_operators, do_selfconsistent_operators, do_statetransfer_operators]) >= 2:
+        self.do_selfconsistent_operators = do_selfconsistent_operators
+        self.do_projected_operators = do_projected_operators
+        self.do_statetransfer_operators = do_statetransfer_operators
+        self.do_hermitian_statetransfer_operators = do_hermitian_statetransfer_operators
+        if (
+            sum(
+                [
+                    do_projected_operators,
+                    do_selfconsistent_operators,
+                    do_statetransfer_operators,
+                    do_hermitian_statetransfer_operators,
+                ]
+            )
+            >= 2
+        ):
             raise ValueError('You set more than one method flag to True.')
         if not self.do_debugging:
             if do_projected_operators:
@@ -734,6 +748,7 @@ class LinearResponseUCC:
     def calc_excitation_energies(self) -> None:
         """Calculate excitation energies."""
         size = len(self.M)
+        # Make Hessian
         E2 = np.zeros((size * 2, size * 2))
         E2[:size, :size] = self.M
         E2[:size, size:] = self.Q
@@ -758,7 +773,7 @@ class LinearResponseUCC:
         sorting = np.argsort(eigval)
         self.excitation_energies = np.real(eigval[sorting][size:])
         self.response_vectors = np.real(eigvec[:, sorting][:, size:])
-        self.normed_response_vectors = np.zeros_like(self.response_vectors)
+        self.normed_response_vectors = np.zeros_like(self.response_vectors)  # response_vector / <n|n>**1/2
         for state_number in range(size):
             norm = self.get_excited_state_norm(state_number)
             if norm < 10**-10:
@@ -832,6 +847,8 @@ class LinearResponseUCC:
 
     def get_excited_state_norm(self, state_number: int) -> float:
         """Calculate the norm of excited state.
+            <n|n> = <0|[Q,Q^<dagger]|0> with Q = \sum_k ( Z_k X_k^\dagger + Y_k X_k )
+            Only for naive G and q!
 
         Args:
             state_number: Which excited state, counting from zero.
@@ -839,6 +856,20 @@ class LinearResponseUCC:
         Returns:
             Norm of excited state.
         """
+        if (
+            sum(
+                [
+                    self.do_projected_operators,
+                    self.do_selfconsistent_operators,
+                    self.do_statetransfer_operators,
+                    self.do_hermitian_statetransfer_operators,
+                ]
+            )
+            >= 1
+        ):
+            print(
+                'WARNING: Calculation of excited state norm only possible for naive operators. Only energies and response vectors are valid.'
+            )
         number_excitations = len(self.excitation_energies)
         for i, op in enumerate(self.q_ops + self.G_ops):
             G = op.operator
@@ -859,7 +890,8 @@ class LinearResponseUCC:
     def get_transition_dipole(
         self, state_number: int, dipole_integrals: Sequence[np.ndarray]
     ) -> tuple[float, float, float]:
-        """Calculate transition dipole moment.
+        """Calculate transition dipole moment: <0|\mu|n>
+        Only for naive G and q!
 
         Args:
             state_number: Which excited state, counting from zero.
@@ -868,9 +900,13 @@ class LinearResponseUCC:
         Returns:
             Transition dipole moment.
         """
+
         if len(dipole_integrals) != 3:
             raise ValueError(f'Expected 3 dipole integrals got {len(dipole_integrals)}')
         number_excitations = len(self.excitation_energies)
+
+        # Get transfer operator: O = \sum_k ( Z_k X_k^\dagger + Y_k X_k ) with X \elementof {G,q}
+        # Using normed response vectors
         for i, op in enumerate(self.q_ops + self.G_ops):
             G = op.operator
             if i == 0:
@@ -883,10 +919,16 @@ class LinearResponseUCC:
                     self.normed_response_vectors[i, state_number] * G.dagger
                     + self.normed_response_vectors[i + number_excitations, state_number] * G
                 )
+
+        # Transform Integrals from AO to MO basis
         mux = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[0])
         muy = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[1])
         muz = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[2])
+
         counter = 0
+        # mux_op \sum_pq ( x_pq E_pq )
+        # muy_op \sum_pq ( y_pq E_pq )
+        # muz_op \sum_pq ( z_pq E_pq )
         for p in range(self.wf.num_spin_orbs // 2):
             for q in range(self.wf.num_spin_orbs // 2):
                 Epq_op = epq_pauli(p, q, self.wf.num_spin_orbs, self.wf.num_elec)
@@ -902,6 +944,7 @@ class LinearResponseUCC:
                         muy_op += muy[p, q] * Epq_op
                     if abs(muz[p, q]) > 10**-10:
                         muz_op += muz[p, q] * Epq_op
+
         mux_op = convert_pauli_to_hybrid_form(
             mux_op,
             self.wf.num_inactive_spin_orbs,
@@ -923,14 +966,18 @@ class LinearResponseUCC:
         transition_dipole_x = 0.0
         transition_dipole_y = 0.0
         transition_dipole_z = 0.0
+
+        # <0|\mu_x|n> = <0|[\sum_pq x_pq E_pq, O]|0>
         if mux_op.operators != {}:
             transition_dipole_x = expectation_value_contracted(
                 self.wf.state_vector, commutator_contract(mux_op, transfer_op), self.wf.state_vector
             )
+        # <0|\mu_y|n> = <0|[\sum_pq y_pq E_pq, O]|0>
         if muy_op.operators != {}:
             transition_dipole_y = expectation_value_contracted(
                 self.wf.state_vector, commutator_contract(muy_op, transfer_op), self.wf.state_vector
             )
+        # <0|\mu_z|n> = <0|[\sum_pq z_pq E_pq, O]|0>
         if muz_op.operators != {}:
             transition_dipole_z = expectation_value_contracted(
                 self.wf.state_vector, commutator_contract(muz_op, transfer_op), self.wf.state_vector
@@ -947,13 +994,28 @@ class LinearResponseUCC:
             state_number: Target excited state (zero being the first excited state).
             dipole_integrals: Dipole integrals (x,y,z) in AO basis.
 
-        Rerturns:
+        Returns:
             Oscillator Strength.
         """
+        if (
+            sum(
+                [
+                    self.do_projected_operators,
+                    self.do_selfconsistent_operators,
+                    self.do_statetransfer_operators,
+                    self.do_hermitian_statetransfer_operators,
+                ]
+            )
+            >= 1
+        ):
+            raise ValueError('Calculation of oscillator strength is only possible for naive operators.')
+
+        # Get <0|<mu_{x,y,z}|n>
         transition_dipole_x, transition_dipole_y, transition_dipole_z = self.get_transition_dipole(
             state_number, dipole_integrals
         )
         excitation_energy = self.excitation_energies[state_number]
+
         return (
             2
             / 3
