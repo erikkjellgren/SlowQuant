@@ -23,7 +23,6 @@ from slowquant.unitary_coupled_cluster.operator_pauli import (
 )
 from slowquant.unitary_coupled_cluster.util import (
     ThetaPicker,
-    construct_integral_trans_mat,
     construct_ucc_u,
 )
 from slowquant.unitary_coupled_cluster.density_matrix import get_orbital_gradient
@@ -141,32 +140,40 @@ class WaveFunctionUCC:
         self.kappa_idx = []
         self.kappa_redundant = []
         self.kappa_redundant_idx = []
+        self._kappa_old = []
+        self._kappa_redundant_old = []
         # kappa can be optimized in spatial basis
         for p in range(0, self.num_spin_orbs // 2):
             for q in range(p + 1, self.num_spin_orbs // 2):
                 if p in self.inactive_idx and q in self.inactive_idx:
                     self.kappa_redundant.append(0)
+                    self._kappa_redundant_old.append(0)
                     self.kappa_redundant_idx.append([p, q])
                     continue
                 if p in self.virtual_idx and q in self.virtual_idx:
                     self.kappa_redundant.append(0)
+                    self._kappa_redundant_old.append(0)
                     self.kappa_redundant_idx.append([p, q])
                     continue
                 if not include_active_kappa:
                     if p in self.active_idx and q in self.active_idx:
                         self.kappa_redundant.append(0)
+                        self._kappa_redundant_old.append(0)
                         self.kappa_redundant_idx.append([p, q])
                         continue
                 if include_active_kappa:
                     if p in self.active_occ_idx and q in self.active_occ_idx:
                         self.kappa_redundant.append(0)
+                        self._kappa_redundant_old.append(0)
                         self.kappa_redundant_idx.append([p, q])
                         continue
                     if p in self.active_unocc_idx and q in self.active_unocc_idx:
                         self.kappa_redundant.append(0)
+                        self._kappa_redundant_old.append(0)
                         self.kappa_redundant_idx.append([p, q])
                         continue
                 self.kappa.append(0)
+                self._kappa_old.append(0)
                 self.kappa_idx.append([p, q])
         # HF like orbital rotation indecies
         self.kappa_hf_like_idx = []
@@ -368,8 +375,13 @@ class WaveFunctionUCC:
         self.energy_elec = res['fun']
         param_idx = 0
         if orbital_optimization:
-            self.kappa = res['x'][param_idx : len(self.kappa) + param_idx].tolist()
             param_idx += len(self.kappa)
+            for i in range(len(self.kappa)):
+                self.kappa[i] = 0
+                self._kappa_old[i] = 0
+            for i in range(len(self.kappa_redundant)):
+                self.kappa_redundant[i] = 0
+                self._kappa_redundant_old[i] = 0
         if 's' in excitations:
             thetas = res['x'][param_idx : num_theta1 + param_idx].tolist()
             param_idx += len(thetas)
@@ -510,18 +522,19 @@ def energy_ucc(
 
     kappa_mat = np.zeros_like(wf.c_orthonormal)
     if orbital_optimized:
-        for kappa_val, (p, q) in zip(kappa, wf.kappa_idx):
+        for kappa_val, (p, q) in zip(np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx):
             kappa_mat[p, q] = kappa_val
             kappa_mat[q, p] = -kappa_val
     if len(wf.kappa_redundant) != 0:
         if np.max(np.abs(wf.kappa_redundant)) > 0.0:
-            for kappa_val, (p, q) in zip(wf.kappa_redundant, wf.kappa_redundant_idx):
+            for kappa_val, (p, q) in zip(np.array(wf.kappa_redundant) - np.array(wf._kappa_redundant_old), wf.kappa_redundant_idx):
                 kappa_mat[p, q] = kappa_val
                 kappa_mat[q, p] = -kappa_val
     c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
+    wf._kappa_old = kappa.copy()
+    wf._kappa_redundant_old = wf.kappa_redundant.copy()
     # Moving expansion point of kappa
     wf.c_orthonormal = c_trans
-    print(wf.c_orthonormal)
 
     U = construct_ucc_u(
         wf.num_active_spin_orbs,
@@ -561,21 +574,9 @@ def gradient_ucc(
     if orbital_optimized:
         gradient[:number_kappas] = orbital_rotation_gradient(
             parameters,
-            wf.num_inactive_spin_orbs,
-            wf.num_active_spin_orbs,
-            wf.num_virtual_spin_orbs,
-            wf.num_elec,
-            wf.num_active_elec,
-            wf.state_vector,
-            wf.c_orthonormal,
-            wf.h_core,
-            wf.g_eri,
-            wf.theta_picker,
             excitations,
             orbital_optimized,
-            wf.kappa_idx,
-            wf.kappa_redundant,
-            wf.kappa_redundant_idx,
+            wf,
         )
     gradient[number_kappas:] = active_space_parameter_gradient(
         parameters,
@@ -600,21 +601,9 @@ def gradient_ucc(
 
 def orbital_rotation_gradient(
     parameters: Sequence[float],
-    num_inactive_spin_orbs: int,
-    num_active_spin_orbs: int,
-    num_virtual_spin_orbs: int,
-    num_elec: int,
-    num_active_elec: int,
-    state_vector: StateVector,
-    c_orthonormal: np.ndarray,
-    h_core: np.ndarray,
-    g_eri: np.ndarray,
-    theta_picker: ThetaPicker,
     excitations: str,
     orbital_optimized: bool,
-    kappa_idx: Sequence[Sequence[int]],
-    kappa_redundant: Sequence[float],
-    kappa_redundant_idx: Sequence[Sequence[int]],
+    wf: WaveFunctionUCC,
     finite_diff_type: str = 'forward',
 ) -> np.ndarray:
     """ """
@@ -629,139 +618,136 @@ def orbital_rotation_gradient(
     theta6 = []
     idx_counter = 0
     if orbital_optimized:
-        for _ in range(len(kappa_idx)):
-            kappa.append(parameters[idx_counter])
+        for _ in range(len(wf.kappa_idx)):
+            kappa.append(0*parameters[idx_counter])
             idx_counter += 1
     if 's' in excitations:
-        for _ in theta_picker.get_t1_generator_sa(0, 0):
+        for _ in wf.theta_picker.get_t1_generator_sa(0, 0):
             theta1.append(parameters[idx_counter])
             idx_counter += 1
     if 'd' in excitations:
-        for _ in theta_picker.get_t2_generator_sa(
-            num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs, num_elec
+        for _ in wf.theta_picker.get_t2_generator_sa(
+            wf.num_inactive_spin_orbs + wf.num_active_spin_orbs + wf.num_virtual_spin_orbs, wf.num_elec
         ):
             theta2.append(parameters[idx_counter])
             idx_counter += 1
     if 't' in excitations:
-        for _ in theta_picker.get_t3_generator(0, 0):
+        for _ in wf.theta_picker.get_t3_generator(0, 0):
             theta3.append(parameters[idx_counter])
             idx_counter += 1
     if 'q' in excitations:
-        for _ in theta_picker.get_t4_generator(0, 0):
+        for _ in wf.theta_picker.get_t4_generator(0, 0):
             theta4.append(parameters[idx_counter])
             idx_counter += 1
     if '5' in excitations:
-        for _ in theta_picker.get_t5_generator(0, 0):
+        for _ in wf.theta_picker.get_t5_generator(0, 0):
             theta5.append(parameters[idx_counter])
             idx_counter += 1
     if '6' in excitations:
-        for _ in theta_picker.get_t6_generator(0, 0):
+        for _ in wf.theta_picker.get_t6_generator(0, 0):
             theta6.append(parameters[idx_counter])
             idx_counter += 1
     assert len(parameters) == len(kappa) + len(theta1) + len(theta2) + len(theta3) + len(theta4) + len(
         theta5
     ) + len(theta6)
 
-    U = construct_ucc_u(
-        num_active_spin_orbs,
-        num_active_elec,
-        theta1 + theta2 + theta3 + theta4 + theta5 + theta6,
-        theta_picker,
-        excitations,
-        allowed_states=state_vector.allowed_active_states_number_spin_conserving,
-    )
-    state_vector.new_u(U, allowed_states=state_vector.allowed_active_states_number_spin_conserving)
-
     gradient_kappa = np.zeros_like(kappa)
     if finite_diff_type == 'central':
         eps = np.finfo(np.float64).eps ** (1 / 3)
     if finite_diff_type == 'forward':
         eps = np.finfo(np.float64).eps ** (1 / 2)
-        kappa_mat = np.zeros_like(c_orthonormal)
+        kappa_mat = np.zeros_like(wf.c_orthonormal)
         if orbital_optimized:
-            for kappa_val, (p, q) in zip(kappa, kappa_idx):
+            for kappa_val, (p, q) in zip(kappa, wf.kappa_idx):
                 kappa_mat[p, q] = kappa_val
                 kappa_mat[q, p] = -kappa_val
-        if len(kappa_redundant) != 0:
-            if np.max(np.abs(kappa_redundant)) > 0.0:
-                for kappa_val, (p, q) in zip(kappa_redundant, kappa_redundant_idx):
+        if len(wf.kappa_redundant) != 0:
+            if np.max(np.abs(wf.kappa_redundant)) > 0.0:
+                for kappa_val, (p, q) in zip(wf.kappa_redundant, wf.kappa_redundant_idx):
                     kappa_mat[p, q] = kappa_val
                     kappa_mat[q, p] = -kappa_val
-        print(c_orthonormal)
-        c_trans = np.matmul(c_orthonormal, scipy.linalg.expm(-kappa_mat))
+        c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
         E = expectation_value_pauli(
-            state_vector,
+            wf.state_vector,
             energy_hamiltonian_pauli(
-                h_core,
-                g_eri,
+                wf.h_core,
+                wf.g_eri,
                 c_trans,
-                num_inactive_spin_orbs,
-                num_active_spin_orbs,
-                num_virtual_spin_orbs,
-                num_elec,
+                wf.num_inactive_spin_orbs,
+                wf.num_active_spin_orbs,
+                wf.num_virtual_spin_orbs,
+                wf.num_elec,
             ),
-            state_vector,
+            wf.state_vector,
         )
     for i, _ in enumerate(kappa):
         sign_step = (kappa[i] >= 0).astype(float) * 2 - 1
         step_size = eps * sign_step * max(1, abs(kappa[i]))
         kappa[i] += step_size
-        kappa_mat = np.zeros_like(c_orthonormal)
+        kappa_mat = np.zeros_like(wf.c_orthonormal)
         if orbital_optimized:
-            for kappa_val, (p, q) in zip(kappa, kappa_idx):
+            for kappa_val, (p, q) in zip(kappa, wf.kappa_idx):
                 kappa_mat[p, q] = kappa_val
                 kappa_mat[q, p] = -kappa_val
-        if len(kappa_redundant) != 0:
-            if np.max(np.abs(kappa_redundant)) > 0.0:
-                for kappa_val, (p, q) in zip(kappa_redundant, kappa_redundant_idx):
+        if len(wf.kappa_redundant) != 0:
+            if np.max(np.abs(wf.kappa_redundant)) > 0.0:
+                for kappa_val, (p, q) in zip(wf.kappa_redundant, wf.kappa_redundant_idx):
                     kappa_mat[p, q] = kappa_val
                     kappa_mat[q, p] = -kappa_val
-        c_trans = np.matmul(c_orthonormal, scipy.linalg.expm(-kappa_mat))
+        c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
         E_plus = expectation_value_pauli(
-            state_vector,
+            wf.state_vector,
             energy_hamiltonian_pauli(
-                h_core,
-                g_eri,
+                wf.h_core,
+                wf.g_eri,
                 c_trans,
-                num_inactive_spin_orbs,
-                num_active_spin_orbs,
-                num_virtual_spin_orbs,
-                num_elec,
+                wf.num_inactive_spin_orbs,
+                wf.num_active_spin_orbs,
+                wf.num_virtual_spin_orbs,
+                wf.num_elec,
             ),
-            state_vector,
+            wf.state_vector,
         )
         kappa[i] -= step_size
         if finite_diff_type == 'central':
             kappa[i] -= step_size
-            kappa_mat = np.zeros_like(c_orthonormal)
+            kappa_mat = np.zeros_like(wf.c_orthonormal)
             if len(kappa) != 0:
                 if np.max(np.abs(kappa)) > 0.0:
-                    for kappa_val, (p, q) in zip(kappa, kappa_idx):
+                    for kappa_val, (p, q) in zip(kappa, wf.kappa_idx):
                         kappa_mat[p, q] = kappa_val
                         kappa_mat[q, p] = -kappa_val
-            if len(kappa_redundant) != 0:
-                if np.max(np.abs(kappa_redundant)) > 0.0:
-                    for kappa_val, (p, q) in zip(kappa_redundant, kappa_redundant_idx):
+            if len(wf.kappa_redundant) != 0:
+                if np.max(np.abs(wf.kappa_redundant)) > 0.0:
+                    for kappa_val, (p, q) in zip(wf.kappa_redundant, wf.kappa_redundant_idx):
                         kappa_mat[p, q] = kappa_val
                         kappa_mat[q, p] = -kappa_val
-            c_trans = np.matmul(c_orthonormal, scipy.linalg.expm(-kappa_mat))
+            c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
             E_minus = expectation_value_pauli(
-                state_vector,
+                wf.state_vector,
                 energy_hamiltonian_pauli(
-                    h_core,
-                    g_eri,
+                    wf.h_core,
+                    wf.g_eri,
                     c_trans,
-                    num_inactive_spin_orbs,
-                    num_active_spin_orbs,
-                    num_virtual_spin_orbs,
-                    num_elec,
+                    wf.num_inactive_spin_orbs,
+                    wf.num_active_spin_orbs,
+                    wf.num_virtual_spin_orbs,
+                    wf.num_elec,
                 ),
-                state_vector,
+                wf.state_vector,
             )
             kappa[i] += step_size
             gradient_kappa[i] = (E_plus - E_minus) / (2 * step_size)
         if finite_diff_type == 'forward':
             gradient_kappa[i] = (E_plus - E) / step_size
+    rdm1 = construct_one_rdm(wf)
+    rdm2 = construct_two_rdm(wf)
+    print("rdm1", rdm1)
+    print("rdm2", rdm2)
+    gradient = get_orbital_gradient(rdm1, rdm2, wf.h_core, wf.g_eri, wf.c_trans, wf.kappa_idx)
+    print("RDM_grad=",gradient)
+    print("Finite_grad=",gradient_kappa)
+    print("Ratio", np.array(gradient)/np.array(gradient_kappa))
     return gradient_kappa
 
 
@@ -797,7 +783,7 @@ def active_space_parameter_gradient(
     idx_counter = 0
     if orbital_optimized:
         for _ in range(len(kappa_idx)):
-            kappa.append(parameters[idx_counter])
+            kappa.append(0 * parameters[idx_counter])
             idx_counter += 1
     if 's' in excitations:
         for _ in theta_picker.get_t1_generator_sa(0, 0):
