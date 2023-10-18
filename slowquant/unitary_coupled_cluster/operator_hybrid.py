@@ -57,7 +57,7 @@ def expectation_value_hybrid(
     return total.real
 
 class StateVectorOperatorData:
-    def __init__(self, inactive_orbs: str, active_space: np.ndarray, virtual_orbs: str) -> None:
+    def __init__(self, inactive_orbs: str, active_space: np.ndarray | ss.csr_matrix, virtual_orbs: str) -> None:
         self.inactive_orbs = inactive_orbs
         self.virtual_orbs = virtual_orbs
         self.active_space = active_space
@@ -126,7 +126,10 @@ class StateVectorOperator:
                 if vec1.virtual_orbs != vec2.virtual_orbs:
                     continue
                 for val1, val2 in zip(vec1.active_space, vec2.active_space):
-                    overlap += val1*val2
+                    if isinstance(val1, (ss.csr_matrix, ss.csc_matrix)):
+                        overlap += (val1*val2.T).todense()[0]
+                    else:
+                        overlap += val1*val2
         return np.real(overlap)
 
 def expectation_value_hybrid_flow(state_vec: StateVector, operators: list[OperatorHybrid], ref_vec: StateVector) -> float:
@@ -138,8 +141,12 @@ def expectation_value_hybrid_flow(state_vec: StateVector, operators: list[Operat
         num_virtual_spin_orbs = len(state_vec.virtual[0])
     else:
         num_virtual_spin_orbs = 0
-    state_vector = StateVectorOperator({"o"*num_inactive_spin_orbs + "z"*num_virtual_spin_orbs: StateVectorOperatorData("o"*num_inactive_spin_orbs, state_vec.ket_active, "z"*num_virtual_spin_orbs)})
-    ref_vector = StateVectorOperator({"o"*num_inactive_spin_orbs + "z"*num_virtual_spin_orbs: StateVectorOperatorData("o"*num_inactive_spin_orbs, ref_vec.ket_active, "z"*num_virtual_spin_orbs)})
+    if len(state_vec.active) >= 10:
+        state_vector = StateVectorOperator({"o"*num_inactive_spin_orbs + "z"*num_virtual_spin_orbs: StateVectorOperatorData("o"*num_inactive_spin_orbs, state_vec.bra_active_csr, "z"*num_virtual_spin_orbs)})
+        ref_vector = StateVectorOperator({"o"*num_inactive_spin_orbs + "z"*num_virtual_spin_orbs: StateVectorOperatorData("o"*num_inactive_spin_orbs, ref_vec.bra_active_csr, "z"*num_virtual_spin_orbs)})
+    else:
+        state_vector = StateVectorOperator({"o"*num_inactive_spin_orbs + "z"*num_virtual_spin_orbs: StateVectorOperatorData("o"*num_inactive_spin_orbs, state_vec.ket_active, "z"*num_virtual_spin_orbs)})
+        ref_vector = StateVectorOperator({"o"*num_inactive_spin_orbs + "z"*num_virtual_spin_orbs: StateVectorOperatorData("o"*num_inactive_spin_orbs, ref_vec.ket_active, "z"*num_virtual_spin_orbs)})
     for operator in operators:
         state_vector = state_vector*operator
     return state_vector*ref_vector

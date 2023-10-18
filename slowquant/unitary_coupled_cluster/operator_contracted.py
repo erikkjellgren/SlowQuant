@@ -353,7 +353,7 @@ def expectation_value_contracted(
     """
     if isinstance(contracted_op.operators, np.ndarray):
         return lw.matmul(bra.bra_active, lw.matmul(contracted_op.operators, ket.ket_active)).real
-    if isinstance(contracted_op.operators, ss.csr_matrix):
+    if isinstance(contracted_op.operators, (ss.csr_matrix, ss.csc_matrix)):
         return lw.matmul(
             bra.bra_active_csr, lw.matmul(contracted_op.operators, ket.ket_active_csr)
         ).real.toarray()[0, 0]
