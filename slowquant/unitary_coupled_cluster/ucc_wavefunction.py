@@ -573,9 +573,6 @@ def gradient_ucc(
     gradient = np.zeros_like(parameters)
     if orbital_optimized:
         gradient[:number_kappas] = orbital_rotation_gradient(
-            parameters,
-            excitations,
-            orbital_optimized,
             wf,
         )
     gradient[number_kappas:] = active_space_parameter_gradient(
@@ -600,155 +597,13 @@ def gradient_ucc(
 
 
 def orbital_rotation_gradient(
-    parameters: Sequence[float],
-    excitations: str,
-    orbital_optimized: bool,
     wf: WaveFunctionUCC,
-    finite_diff_type: str = 'forward',
 ) -> np.ndarray:
     """ """
-    if finite_diff_type not in ('central', 'forward'):
-        raise ValueError(f'finite_diff_type must be central or forward, got {finite_diff_type}')
-    kappa = []
-    theta1 = []
-    theta2 = []
-    theta3 = []
-    theta4 = []
-    theta5 = []
-    theta6 = []
-    idx_counter = 0
-    if orbital_optimized:
-        for _ in range(len(wf.kappa_idx)):
-            kappa.append(0*parameters[idx_counter])
-            idx_counter += 1
-    if 's' in excitations:
-        for _ in wf.theta_picker.get_t1_generator_sa(0, 0):
-            theta1.append(parameters[idx_counter])
-            idx_counter += 1
-    if 'd' in excitations:
-        for _ in wf.theta_picker.get_t2_generator_sa(
-            wf.num_inactive_spin_orbs + wf.num_active_spin_orbs + wf.num_virtual_spin_orbs, wf.num_elec
-        ):
-            theta2.append(parameters[idx_counter])
-            idx_counter += 1
-    if 't' in excitations:
-        for _ in wf.theta_picker.get_t3_generator(0, 0):
-            theta3.append(parameters[idx_counter])
-            idx_counter += 1
-    if 'q' in excitations:
-        for _ in wf.theta_picker.get_t4_generator(0, 0):
-            theta4.append(parameters[idx_counter])
-            idx_counter += 1
-    if '5' in excitations:
-        for _ in wf.theta_picker.get_t5_generator(0, 0):
-            theta5.append(parameters[idx_counter])
-            idx_counter += 1
-    if '6' in excitations:
-        for _ in wf.theta_picker.get_t6_generator(0, 0):
-            theta6.append(parameters[idx_counter])
-            idx_counter += 1
-    assert len(parameters) == len(kappa) + len(theta1) + len(theta2) + len(theta3) + len(theta4) + len(
-        theta5
-    ) + len(theta6)
-
-    gradient_kappa = np.zeros_like(kappa)
-    if finite_diff_type == 'central':
-        eps = np.finfo(np.float64).eps ** (1 / 3)
-    if finite_diff_type == 'forward':
-        eps = np.finfo(np.float64).eps ** (1 / 2)
-        kappa_mat = np.zeros_like(wf.c_orthonormal)
-        if orbital_optimized:
-            for kappa_val, (p, q) in zip(kappa, wf.kappa_idx):
-                kappa_mat[p, q] = kappa_val
-                kappa_mat[q, p] = -kappa_val
-        if len(wf.kappa_redundant) != 0:
-            if np.max(np.abs(wf.kappa_redundant)) > 0.0:
-                for kappa_val, (p, q) in zip(wf.kappa_redundant, wf.kappa_redundant_idx):
-                    kappa_mat[p, q] = kappa_val
-                    kappa_mat[q, p] = -kappa_val
-        c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
-        E = expectation_value_pauli(
-            wf.state_vector,
-            energy_hamiltonian_pauli(
-                wf.h_core,
-                wf.g_eri,
-                c_trans,
-                wf.num_inactive_spin_orbs,
-                wf.num_active_spin_orbs,
-                wf.num_virtual_spin_orbs,
-                wf.num_elec,
-            ),
-            wf.state_vector,
-        )
-    for i, _ in enumerate(kappa):
-        sign_step = (kappa[i] >= 0).astype(float) * 2 - 1
-        step_size = eps * sign_step * max(1, abs(kappa[i]))
-        kappa[i] += step_size
-        kappa_mat = np.zeros_like(wf.c_orthonormal)
-        if orbital_optimized:
-            for kappa_val, (p, q) in zip(kappa, wf.kappa_idx):
-                kappa_mat[p, q] = kappa_val
-                kappa_mat[q, p] = -kappa_val
-        if len(wf.kappa_redundant) != 0:
-            if np.max(np.abs(wf.kappa_redundant)) > 0.0:
-                for kappa_val, (p, q) in zip(wf.kappa_redundant, wf.kappa_redundant_idx):
-                    kappa_mat[p, q] = kappa_val
-                    kappa_mat[q, p] = -kappa_val
-        c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
-        E_plus = expectation_value_pauli(
-            wf.state_vector,
-            energy_hamiltonian_pauli(
-                wf.h_core,
-                wf.g_eri,
-                c_trans,
-                wf.num_inactive_spin_orbs,
-                wf.num_active_spin_orbs,
-                wf.num_virtual_spin_orbs,
-                wf.num_elec,
-            ),
-            wf.state_vector,
-        )
-        kappa[i] -= step_size
-        if finite_diff_type == 'central':
-            kappa[i] -= step_size
-            kappa_mat = np.zeros_like(wf.c_orthonormal)
-            if len(kappa) != 0:
-                if np.max(np.abs(kappa)) > 0.0:
-                    for kappa_val, (p, q) in zip(kappa, wf.kappa_idx):
-                        kappa_mat[p, q] = kappa_val
-                        kappa_mat[q, p] = -kappa_val
-            if len(wf.kappa_redundant) != 0:
-                if np.max(np.abs(wf.kappa_redundant)) > 0.0:
-                    for kappa_val, (p, q) in zip(wf.kappa_redundant, wf.kappa_redundant_idx):
-                        kappa_mat[p, q] = kappa_val
-                        kappa_mat[q, p] = -kappa_val
-            c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
-            E_minus = expectation_value_pauli(
-                wf.state_vector,
-                energy_hamiltonian_pauli(
-                    wf.h_core,
-                    wf.g_eri,
-                    c_trans,
-                    wf.num_inactive_spin_orbs,
-                    wf.num_active_spin_orbs,
-                    wf.num_virtual_spin_orbs,
-                    wf.num_elec,
-                ),
-                wf.state_vector,
-            )
-            kappa[i] += step_size
-            gradient_kappa[i] = (E_plus - E_minus) / (2 * step_size)
-        if finite_diff_type == 'forward':
-            gradient_kappa[i] = (E_plus - E) / step_size
     rdm1 = construct_one_rdm(wf)
     rdm2 = construct_two_rdm(wf)
-    print("rdm1", rdm1)
-    print("rdm2", rdm2)
     gradient = get_orbital_gradient(rdm1, rdm2, wf.h_core, wf.g_eri, wf.c_trans, wf.kappa_idx)
-    print("RDM_grad=",gradient)
-    print("Finite_grad=",gradient_kappa)
-    print("Ratio", np.array(gradient)/np.array(gradient_kappa))
-    return gradient_kappa
+    return gradient
 
 
 def active_space_parameter_gradient(
