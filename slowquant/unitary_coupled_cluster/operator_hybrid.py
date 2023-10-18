@@ -10,7 +10,6 @@ import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
 from slowquant.unitary_coupled_cluster.base import StateVector, pauli_to_mat
 from slowquant.unitary_coupled_cluster.operator_pauli import OperatorPauli
 
-
 def expectation_value_hybrid(
     bra: StateVector, hybridop: OperatorHybrid, ket: StateVector, use_csr: int = 10
 ) -> float:
@@ -57,6 +56,93 @@ def expectation_value_hybrid(
         print(f'WARNING, imaginary value of {total.imag}')
     return total.real
 
+class StateVectorOperatorData:
+    def __init__(self, inactive_orbs: str, active_space: np.ndarray, virtual_orbs: str) -> None:
+        self.inactive_orbs = inactive_orbs
+        self.virtual_orbs = virtual_orbs
+        self.active_space = active_space
+
+
+class StateVectorOperator:
+    def __init__(self, state_vector: dict[str, StateVectorOperatorData]) -> None:
+        self.state_vector = state_vector
+
+    def __mul__(self, hybridop: OperatorHybrid) -> StateVectorOperator:
+        if isinstance(hybridop, OperatorHybrid):
+            new_state_vector = {}
+            for _, vec in self.state_vector.items():
+                for _, op in hybridop.operators.items():
+                    new_inactive = ''
+                    new_virtual = ''
+                    fac: complex = 1
+                    for pauli, orb in zip(op.inactive_pauli, vec.inactive_orbs):
+                        if pauli == 'I':
+                            new_inactive += orb
+                        elif orb == 'o' and pauli == 'X':
+                            new_inactive += "z"
+                        elif orb == 'o' and pauli == 'Y':
+                            new_inactive += "z"
+                            fac *= 1j
+                        elif orb == 'o' and pauli == 'Z':
+                            new_inactive += "o"
+                            fac *= -1
+                        elif orb == 'z' and pauli == 'X':
+                            new_inactive += "o"
+                        elif orb == 'z' and pauli == 'Y':
+                            new_inactive += "o"
+                            fac *= -1j
+                        elif orb == 'z' and pauli == 'Z':
+                            new_inactive += "z"
+                    for pauli, orb in zip(op.virtual_pauli, vec.virtual_orbs):
+                        if pauli == 'I':
+                            new_virtual += orb
+                        elif orb == 'o' and pauli == 'X':
+                            new_virtual += "z"
+                        elif orb == 'o' and pauli == 'Y':
+                            new_virtual += "z"
+                            fac *= 1j
+                        elif orb == 'o' and pauli == 'Z':
+                            new_virtual += "o"
+                            fac *= -1
+                        elif orb == 'z' and pauli == 'X':
+                            new_virtual += "o"
+                        elif orb == 'z' and pauli == 'Y':
+                            new_virtual += "o"
+                            fac *= -1j
+                        elif orb == 'z' and pauli == 'Z':
+                            new_virtual += "z"
+                    new_active = fac * lw.matmul(vec.active_space, op.active_matrix)
+                    key = new_inactive + new_virtual
+                    if key in new_state_vector:
+                        new_state_vector[key].active_space += new_active
+                    else:
+                        new_state_vector[key] = StateVectorOperatorData(new_inactive, new_active, new_virtual)
+            return StateVectorOperator(new_state_vector)
+        overlap = 0
+        for _, vec1 in self.state_vector.items():
+            for _, vec2 in hybridop.state_vector.items():
+                if vec1.inactive_orbs != vec2.inactive_orbs:
+                    continue
+                if vec1.virtual_orbs != vec2.virtual_orbs:
+                    continue
+                for val1, val2 in zip(vec1.active_space, vec2.active_space):
+                    overlap += val1*val2
+        return np.real(overlap)
+
+def expectation_value_hybrid_flow(state_vec: StateVector, operators: list[OperatorHybrid], ref_vec: StateVector) -> float:
+    if len(state_vec.inactive) != 0:
+        num_inactive_spin_orbs = len(state_vec.inactive[0])
+    else:
+        num_inactive_spin_orbs = 0
+    if len(state_vec.virtual) != 0:
+        num_virtual_spin_orbs = len(state_vec.virtual[0])
+    else:
+        num_virtual_spin_orbs = 0
+    state_vector = StateVectorOperator({"o"*num_inactive_spin_orbs + "z"*num_virtual_spin_orbs: StateVectorOperatorData("o"*num_inactive_spin_orbs, state_vec.ket_active, "z"*num_virtual_spin_orbs)})
+    ref_vector = StateVectorOperator({"o"*num_inactive_spin_orbs + "z"*num_virtual_spin_orbs: StateVectorOperatorData("o"*num_inactive_spin_orbs, ref_vec.ket_active, "z"*num_virtual_spin_orbs)})
+    for operator in operators:
+        state_vector = state_vector*operator
+    return state_vector*ref_vector
 
 def convert_pauli_to_hybrid_form(
     pauliop: OperatorPauli, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int

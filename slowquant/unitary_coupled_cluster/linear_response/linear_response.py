@@ -369,6 +369,7 @@ class LinearResponseUCC:
         for j, opJ in enumerate(self.G_ops):
             GJ = opJ.operator
             for i, opI in enumerate(self.q_ops):
+                continue
                 qI = opI.operator
                 if calculation_type == 'selfconsistent':
                     # Make M
@@ -446,11 +447,11 @@ class LinearResponseUCC:
                     operator = operatormul3_contract(GI.dagger, H_1i_1a, qJ) - operatormul3_contract(
                         GI.dagger, qJ, H_1i_1a
                     )
-                    self.M[i + idx_shift, j] = expectation_value_contracted(
+                    self.M[i + idx_shift, j] = self.M[j, i + idx_shift] = expectation_value_contracted(
                         self.wf.state_vector, operator, self.wf.state_vector
                     )
                     # Make Q
-                    self.Q[i + idx_shift, j] = -expectation_value_contracted(
+                    self.Q[i + idx_shift, j] = self.Q[j, i + idx_shift] = -expectation_value_contracted(
                         self.wf.state_vector,
                         operatormul3_contract(GI.dagger, qJ.dagger, H_1i_1a),
                         self.wf.state_vector,
