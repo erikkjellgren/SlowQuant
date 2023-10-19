@@ -141,7 +141,7 @@ def expectation_value_hybrid_flow(state_vec: StateVector, operators: list[Operat
         num_virtual_spin_orbs = len(state_vec.virtual[0])
     else:
         num_virtual_spin_orbs = 0
-    if len(state_vec.active) >= 10:
+    if len(state_vec._active_onvector) >= 10:
         state_vector = StateVectorOperator({"o"*num_inactive_spin_orbs + "z"*num_virtual_spin_orbs: StateVectorOperatorData("o"*num_inactive_spin_orbs, state_vec.bra_active_csr, "z"*num_virtual_spin_orbs)})
         ref_vector = StateVectorOperator({"o"*num_inactive_spin_orbs + "z"*num_virtual_spin_orbs: StateVectorOperatorData("o"*num_inactive_spin_orbs, ref_vec.bra_active_csr, "z"*num_virtual_spin_orbs)})
     else:
