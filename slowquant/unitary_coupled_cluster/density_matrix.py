@@ -55,7 +55,7 @@ class ReducedDenstiyMatrix:
             val = 0
             if p == q and r == s:
                 val += 4
-            if q == r:
+            if q == r and p == s:
                 val -= 2
             return val
         return 0
