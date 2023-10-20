@@ -966,9 +966,13 @@ class LinearResponseUCC:
         return expectation_value_hybrid(self.wf.state_vector, transfer_op, self.wf.state_vector)
 
     def get_excited_state_norm(self, state_number: int, do_working_equations: bool = False) -> float:
-        """Calculate the norm of excited state.
+        r"""
+        Calculate the norm of excited state
+        
+        Only for naive G and q!
+
+        .. math::
             <n|n> = <0|[Q,Q^<dagger]|0> with Q = \sum_k ( Z_k X_k^\dagger + Y_k X_k )
-            Only for naive G and q!
 
         Args:
             state_number: Which excited state, counting from zero.
@@ -1063,9 +1067,12 @@ class LinearResponseUCC:
     def get_transition_dipole(
         self, state_number: int, dipole_integrals: Sequence[np.ndarray], do_working_equations: bool = False
     ) -> tuple[float, float, float]:
-        """Calculate transition dipole moment: <0|\mu|n>
+        r"""Calculate transition dipole moment
         Only for naive G and q!
 
+        .. math::
+            <0|\mu|n>
+        
         Args:
             state_number: Which excited state, counting from zero.
             dipole_integrals: Dipole integrals ordered as (x,y,z).

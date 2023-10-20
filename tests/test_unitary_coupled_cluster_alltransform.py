@@ -911,7 +911,7 @@ def test_LiH_allmethods_energies_fast() -> None:
     assert (np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)) is True
 
     # HST
-    print('\nMethod: ST')
+    print('\nMethod: HST')
     LR_HST_naive = LinearResponseUCCFast(
         WF,
         excitations='SD',
