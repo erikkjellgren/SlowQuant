@@ -131,7 +131,7 @@ class StateVectorOperator:
                     continue
                 for val1, val2 in zip(vec1.active_space, vec2.active_space):
                     if isinstance(val1, (ss.csr_matrix, ss.csc_matrix)):
-                        overlap += (val1 * val2.T).todense()[0]
+                        overlap += (val1 * val2.T).todense()[0, 0]
                     else:
                         overlap += val1 * val2
         return np.real(overlap)
