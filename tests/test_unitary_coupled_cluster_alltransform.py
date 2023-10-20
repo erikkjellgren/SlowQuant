@@ -3,14 +3,14 @@ import sys
 import numpy as np
 
 import slowquant.SlowQuant as sq
-from slowquant.unitary_coupled_cluster.linear_response import (
-    LinearResponseUCC as LinearResponseUCCRef,
-)
 from slowquant.unitary_coupled_cluster.linear_response_alltransform import (
     LinearResponseUCC,
 )
 from slowquant.unitary_coupled_cluster.linear_response_fast import (
     LinearResponseUCC as LinearResponseUCCFast,
+)
+from slowquant.unitary_coupled_cluster.linear_response_old import (
+    LinearResponseUCC as LinearResponseUCCRef,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
