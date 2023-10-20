@@ -8,6 +8,11 @@ import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
+from slowquant.unitary_coupled_cluster.density_matrix import (
+    ReducedDenstiyMatrix,
+    get_orbital_gradient,
+    get_orbital_hessian_A,
+)
 from slowquant.unitary_coupled_cluster.operator_contracted import (
     commutator_contract,
     double_commutator_contract,
@@ -23,8 +28,14 @@ from slowquant.unitary_coupled_cluster.operator_pauli import (
     energy_hamiltonian_pauli,
     epq_pauli,
     hamiltonian_pauli,
+    hamiltonian_pauli_1e,
+    hamiltonian_pauli_2e,
 )
-from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
+from slowquant.unitary_coupled_cluster.ucc_wavefunction import (
+    WaveFunctionUCC,
+    construct_one_rdm,
+    construct_two_rdm,
+)
 from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_ucc_u
 
 
@@ -191,6 +202,11 @@ class LinearResponseUCC:
             grad[i] = expectation_value_contracted(
                 self.wf.state_vector, commutator_contract(op, H_1i_1a), self.wf.state_vector
             )
+        # print(grad)
+        # rdm1 = construct_one_rdm(self.wf)
+        # rdm2 = construct_two_rdm(self.wf)
+        # rdms = ReducedDenstiyMatrix(self.wf.num_inactive_spin_orbs//2, self.wf.num_active_spin_orbs//2, self.wf.num_virtual_spin_orbs//2, rdm1, rdm2=rdm2)
+        # print(get_orbital_gradient(rdms, self.wf.h_core, self.wf.g_eri, self.wf.c_trans, self.wf.kappa_idx, self.wf.num_inactive_spin_orbs//2, self.wf.num_active_spin_orbs//2))
         if len(grad) != 0:
             print('idx, max(abs(grad orb)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
         grad = np.zeros(len(self.G_ops))
@@ -385,6 +401,15 @@ class LinearResponseUCC:
         """Calculate excitation energies."""
         size = len(self.A)
         E2 = np.zeros((size * 2, size * 2))
+        # self.A[abs(self.A) < 10**-6] = 0
+        # print(self.A[:len(self.q_ops), :len(self.q_ops)])
+        # rdm1 = construct_one_rdm(self.wf)
+        # rdm2 = construct_two_rdm(self.wf)
+        # rdms = ReducedDenstiyMatrix(self.wf.num_inactive_spin_orbs//2, self.wf.num_active_spin_orbs//2, self.wf.num_virtual_spin_orbs//2, rdm1, rdm2=rdm2)
+        # Aqq = get_orbital_hessian_A(rdms, self.wf.h_core, self.wf.g_eri, self.wf.c_trans, self.wf.kappa_idx, self.wf.num_inactive_spin_orbs//2, self.wf.num_active_spin_orbs//2)
+        # Aqq[abs(Aqq) < 10**-6] = 0
+        # print(Aqq)
+        # print(self.A[:len(self.q_ops), :len(self.q_ops)]/Aqq)
         E2[:size, :size] = self.A
         E2[:size, size:] = self.B
         E2[size:, :size] = self.B

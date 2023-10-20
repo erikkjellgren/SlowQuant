@@ -507,6 +507,62 @@ def hamiltonian_pauli(
     return H_expectation
 
 
+def hamiltonian_pauli_2e(
+    h: np.ndarray, g: np.ndarray, c_mo: np.ndarray, num_spin_orbs: int, num_elec: int
+) -> OperatorPauli:
+    """Get full Hamiltonian operator.
+
+    Args:
+        h: One-electron Hamiltonian integrals in AO.
+        g: Two-electron Hamiltonian integrals in AO.
+        c_mo: Orbital coefficients.
+        num_spin_orbs: Number of spin orbitals.
+        num_elec: Number of electrons.
+
+    Returns:
+        Full Hamilonian Pauli operator.
+    """
+    h_mo = one_electron_integral_transform(c_mo, h)
+    g_mo = two_electron_integral_transform(c_mo, g)
+    num_spatial_orbs = num_spin_orbs // 2
+    H_expectation = OperatorPauli({})
+    for p in range(num_spatial_orbs):
+        for q in range(num_spatial_orbs):
+            for r in range(num_spatial_orbs):
+                for s in range(num_spatial_orbs):
+                    if abs(g_mo[p, q, r, s]) > 10**-12:
+                        H_expectation += (
+                            1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, num_spin_orbs, num_elec)
+                        )
+    return H_expectation
+
+
+def hamiltonian_pauli_1e(
+    h: np.ndarray, g: np.ndarray, c_mo: np.ndarray, num_spin_orbs: int, num_elec: int
+) -> OperatorPauli:
+    """Get full Hamiltonian operator.
+
+    Args:
+        h: One-electron Hamiltonian integrals in AO.
+        g: Two-electron Hamiltonian integrals in AO.
+        c_mo: Orbital coefficients.
+        num_spin_orbs: Number of spin orbitals.
+        num_elec: Number of electrons.
+
+    Returns:
+        Full Hamilonian Pauli operator.
+    """
+    h_mo = one_electron_integral_transform(c_mo, h)
+    g_mo = two_electron_integral_transform(c_mo, g)
+    num_spatial_orbs = num_spin_orbs // 2
+    H_expectation = OperatorPauli({})
+    for p in range(num_spatial_orbs):
+        for q in range(num_spatial_orbs):
+            if abs(h_mo[p, q]) > 10**-12:
+                H_expectation += h_mo[p, q] * epq_pauli(p, q, num_spin_orbs, num_elec)
+    return H_expectation
+
+
 def commutator_pauli(A: OperatorPauli, B: OperatorPauli) -> OperatorPauli:
     """Calculate commutator of two Pauli operators.
 
