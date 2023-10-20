@@ -1,7 +1,7 @@
 import numpy as np
 
 import slowquant.SlowQuant as sq
-from slowquant.unitary_coupled_cluster.linear_response import LinearResponseUCC
+from slowquant.unitary_coupled_cluster.linear_response.linear_response import LinearResponseUCC
 from slowquant.unitary_coupled_cluster.operator_pauli import (
     expectation_value_pauli,
     hamiltonian_pauli,
