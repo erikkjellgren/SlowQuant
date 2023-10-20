@@ -144,6 +144,7 @@ def test_h2_sto3g_uccsd_lr_matrices() -> None:
     assert np.allclose(LR_naive.V, LR_native.V, atol=threshold) is True
     assert np.allclose(LR_naive.W, LR_native.W, atol=threshold) is True
 
+### START Tests for old linear response class. should still work, but are not that useful.
 
 def test_h2_631g_oouccsd_lr() -> None:
     """Test Linear Response for OO-uccsd(2,2)."""
@@ -766,6 +767,8 @@ def test_LiH_allmethods_energies() -> None:
     )
 
     assert (np.allclose(LR_HST_naive.excitation_energies, solutions, atol=threshold)) is True
+
+### END OLD TESTS
 
 def test_LiH_atmethods_energies() -> None:
     """Test LiH at LR methods."""
