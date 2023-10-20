@@ -426,27 +426,6 @@ class WaveFunctionUCC:
                 counter += 1
 
 
-def run_compactify_wf(
-    wf: WaveFunctionUCC, excitations: str, overlap_integral: np.ndarray | None = None
-) -> WaveFunctionUCC:
-    one_rdm = construct_one_rdm(wf)
-    natural_occupations, natural_orbitals = np.linalg.eig(one_rdm)
-    sorting = np.argsort(natural_occupations)[::-1]
-    natural_occupations = natural_occupations[sorting]
-    natural_orbitals = natural_orbitals[:, sorting]
-    new_wf = copy.deepcopy(wf)
-    new_wf.kappa = [0] * len(wf.kappa)
-    new_wf.theta1 = [0] * len(wf.theta1)
-    new_wf.theta2 = [0] * len(wf.theta2)
-    new_wf.theta3 = [0] * len(wf.theta3)
-    new_wf.theta4 = [0] * len(wf.theta4)
-    new_wf.c_orthonormal = np.matmul(wf.c_trans, natural_orbitals)
-    if overlap_integral is not None:
-        new_wf.check_orthonormality(overlap_integral)
-    new_wf.run_ucc(excitations, False)
-    return new_wf
-
-
 def energy_ucc(
     parameters: Sequence[float],
     excitations: str,
@@ -611,13 +590,6 @@ def orbital_rotation_gradient(
         rdm1=rdm1,
         rdm2=rdm2,
     )
-    # rdm2 = construct_two_rdm_full(wf)
-    # for p in range(0, wf.num_spin_orbs//2):
-    #    for q in range(0, wf.num_spin_orbs//2):
-    #        for r in range(0, wf.num_spin_orbs//2):
-    #            for s in range(0, wf.num_spin_orbs//2):
-    #                if abs(rdm2[p,q,r,s] - rdms.RDM2(p,q,r,s)) > 10**-10:
-    #                    print(p,q,r,s,rdm2[p,q,r,s],rdms.RDM2(p,q,r,s))
     gradient = get_orbital_gradient(
         rdms,
         wf.h_core,
@@ -812,23 +784,6 @@ def construct_two_rdm(wf: WaveFunctionUCC) -> np.ndarray:
                     two_rdm[
                         p - num_inactive, q - num_inactive, r - num_inactive, s - num_inactive
                     ] = expectation_value_pauli(
-                        wf.state_vector,
-                        epqrs_pauli(p, q, r, s, wf.num_spin_orbs, wf.num_elec),
-                        wf.state_vector,
-                    )
-    return two_rdm
-
-
-def construct_two_rdm_full(wf: WaveFunctionUCC) -> np.ndarray:
-    two_rdm = np.zeros(
-        (wf.num_spin_orbs // 2, wf.num_spin_orbs // 2, wf.num_spin_orbs // 2, wf.num_spin_orbs // 2)
-    )
-    num_inactive = wf.num_inactive_spin_orbs // 2
-    for p in range(0, wf.num_spin_orbs // 2):
-        for q in range(0, wf.num_spin_orbs // 2):
-            for r in range(0, wf.num_spin_orbs // 2):
-                for s in range(0, wf.num_spin_orbs // 2):
-                    two_rdm[p, q, r, s] = expectation_value_pauli(
                         wf.state_vector,
                         epqrs_pauli(p, q, r, s, wf.num_spin_orbs, wf.num_elec),
                         wf.state_vector,
