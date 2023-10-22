@@ -19,7 +19,8 @@ from slowquant.unitary_coupled_cluster.operator_pauli import (
     OperatorPauli,
     energy_hamiltonian_pauli,
     epq_pauli,
-    hamiltonian_pauli,
+    hamiltonian_pauli_1i_1a,
+    hamiltonian_pauli_2i_2a,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_ucc_u
@@ -152,15 +153,30 @@ class LinearResponseUCC:
         self.B = np.zeros((num_parameters, num_parameters))
         self.Sigma = np.zeros((num_parameters, num_parameters))
         self.Delta = np.zeros((num_parameters, num_parameters))
-        H_pauli = hamiltonian_pauli(self.wf.h_core, self.wf.g_eri, self.wf.c_trans, num_spin_orbs, num_elec)
         H_1i_1a = convert_pauli_to_hybrid_form(
-            H_pauli.screen_terms(1, 1, self.wf.num_inactive_spin_orbs, self.wf.num_virtual_spin_orbs),
+            hamiltonian_pauli_1i_1a(
+                self.wf.h_core,
+                self.wf.g_eri,
+                self.wf.c_trans,
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.num_virtual_spin_orbs,
+                num_elec,
+            ),
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
             self.wf.num_virtual_spin_orbs,
         )
         H_2i_2a = convert_pauli_to_hybrid_form(
-            H_pauli.screen_terms(2, 2, self.wf.num_inactive_spin_orbs, self.wf.num_virtual_spin_orbs),
+            hamiltonian_pauli_2i_2a(
+                self.wf.h_core,
+                self.wf.g_eri,
+                self.wf.c_trans,
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.num_virtual_spin_orbs,
+                num_elec,
+            ),
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
             self.wf.num_virtual_spin_orbs,
