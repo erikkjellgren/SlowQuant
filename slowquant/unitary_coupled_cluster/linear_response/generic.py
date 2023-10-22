@@ -8,11 +8,12 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
 from slowquant.unitary_coupled_cluster.operator_hybrid import (
+    OperatorHybrid,
     convert_pauli_to_hybrid_form,
     expectation_value_hybrid,
-    make_projection_operator,
     expectation_value_hybrid_flow_commutator,
     expectation_value_hybrid_flow_double_commutator,
+    make_projection_operator,
 )
 from slowquant.unitary_coupled_cluster.operator_pauli import (
     OperatorPauli,
@@ -22,7 +23,6 @@ from slowquant.unitary_coupled_cluster.operator_pauli import (
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_ucc_u
-from slowquant.unitary_coupled_cluster.operator_hybrid import OperatorHybrid
 
 
 class LinearResponseUCC:
@@ -35,8 +35,8 @@ class LinearResponseUCC:
         use_matrix_symmetry: bool = True,
         is_spin_conserving: bool = True,
     ) -> None:
-        if operator_type.lower() not in ('naive', 'projected', 'selfconsistent', 'statetransfer'):
-            raise ValueError(f'Got unknown operator_type: {operator_type}')
+        if operator_type.lower() not in ("naive", "projected", "selfconsistent", "statetransfer"):
+            raise ValueError(f"Got unknown operator_type: {operator_type}")
         self.wf = copy.deepcopy(wave_function)
         self.theta_picker = ThetaPicker(
             self.wf.active_occ_spin_idx,
@@ -59,12 +59,12 @@ class LinearResponseUCC:
             + self.wf.theta5
             + self.wf.theta6,
             self.wf.theta_picker_full,
-            'sdtq56',  # self.wf._excitations,
+            "sdtq56",  # self.wf._excitations,
         )
-        if operator_type.lower() in ('projected', 'statetransfer'):
+        if operator_type.lower() in ("projected", "statetransfer"):
             projection = make_projection_operator(self.wf.state_vector)
             self.projection = projection
-        if 's' in excitations:
+        if "s" in excitations:
             for _, _, _, op_ in self.theta_picker.get_t1_generator_sa(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
                     op_,
@@ -73,7 +73,7 @@ class LinearResponseUCC:
                     self.wf.num_virtual_spin_orbs,
                 )
                 G_ops_tmp.append(op)
-        if 'd' in excitations:
+        if "d" in excitations:
             for _, _, _, _, _, op_ in self.theta_picker.get_t2_generator_sa(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
                     op_,
@@ -82,7 +82,7 @@ class LinearResponseUCC:
                     self.wf.num_virtual_spin_orbs,
                 )
                 G_ops_tmp.append(op)
-        if do_transform_orbital_rotations and operator_type.lower() in ('statetransfer', 'selfconsistent'):
+        if do_transform_orbital_rotations and operator_type.lower() in ("statetransfer", "selfconsistent"):
             valid_kappa_idx = self.wf.kappa_hf_like_idx
         else:
             valid_kappa_idx = self.wf.kappa_idx
@@ -98,12 +98,12 @@ class LinearResponseUCC:
         self.G_ops = []
         self.q_ops = []
         for G in G_ops_tmp:
-            if operator_type.lower() == 'naive':
+            if operator_type.lower() == "naive":
                 self.G_ops.append(G)
-            elif operator_type.lower() == 'projected':
+            elif operator_type.lower() == "projected":
                 G = G * projection
                 fac = expectation_value_hybrid(self.wf.state_vector, G, self.wf.state_vector)
-                G_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
+                G_diff_ = OperatorPauli({"I" * self.wf.num_spin_orbs: fac})
                 G_diff = convert_pauli_to_hybrid_form(
                     G_diff_,
                     self.wf.num_inactive_spin_orbs,
@@ -111,23 +111,23 @@ class LinearResponseUCC:
                     self.wf.num_virtual_spin_orbs,
                 )
                 self.G_ops.append(G - G_diff)
-            elif operator_type.lower() == 'selfconsistent':
+            elif operator_type.lower() == "selfconsistent":
                 G = G.apply_u_from_right(U.conj().transpose())
                 G = G.apply_u_from_left(U)
                 self.G_ops.append(G)
-            elif operator_type.lower() == 'statetransfer':
+            elif operator_type.lower() == "statetransfer":
                 G = G.apply_u_from_right(U.conj().transpose())
                 G = G.apply_u_from_left(U)
                 G = G * projection
                 self.G_ops.append(G)
         for q in q_ops_tmp:
             if do_transform_orbital_rotations:
-                if operator_type.lower() == 'naive':
+                if operator_type.lower() == "naive":
                     self.q_ops.append(q)
-                if operator_type.lower() == 'projected':
+                if operator_type.lower() == "projected":
                     q = q * projection
                     fac = expectation_value_hybrid(self.wf.state_vector, q, self.wf.state_vector)
-                    q_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
+                    q_diff_ = OperatorPauli({"I" * self.wf.num_spin_orbs: fac})
                     q_diff = convert_pauli_to_hybrid_form(
                         q_diff_,
                         self.wf.num_inactive_spin_orbs,
@@ -135,11 +135,11 @@ class LinearResponseUCC:
                         self.wf.num_virtual_spin_orbs,
                     )
                     self.q_ops.append(q - q_diff)
-                elif operator_type.lower() == 'selfconsistent':
+                elif operator_type.lower() == "selfconsistent":
                     q = q.apply_u_from_right(U.conj().transpose())
                     q = q.apply_u_from_left(U)
                     self.q_ops.append(q)
-                elif operator_type.lower() == 'statetransfer':
+                elif operator_type.lower() == "statetransfer":
                     q = q.apply_u_from_right(U.conj().transpose())
                     q = q.apply_u_from_left(U)
                     q = q * projection
@@ -180,23 +180,23 @@ class LinearResponseUCC:
             self.wf.num_virtual_spin_orbs,
         )
         idx_shift = len(self.q_ops)
-        print('')
-        print(f'Number active-space parameters: {len(self.G_ops)}')
-        print(f'Number orbital-rotation parameters: {len(self.q_ops)}')
+        print("")
+        print(f"Number active-space parameters: {len(self.G_ops)}")
+        print(f"Number orbital-rotation parameters: {len(self.q_ops)}")
         grad = np.zeros(len(self.q_ops))
         for i, op in enumerate(self.q_ops):
             grad[i] = expectation_value_hybrid_flow_commutator(
                 self.wf.state_vector, op, H_1i_1a, self.wf.state_vector
             )
         if len(grad) != 0:
-            print('idx, max(abs(grad orb)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+            print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
         grad = np.zeros(len(self.G_ops))
         for i, op in enumerate(self.G_ops):
             grad[i] = expectation_value_hybrid_flow_commutator(
                 self.wf.state_vector, op, H_en, self.wf.state_vector
             )
         if len(grad) != 0:
-            print('idx, max(abs(grad active)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+            print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
 
         if use_matrix_symmetry:
             for j, qJ in enumerate(self.q_ops):
@@ -426,14 +426,14 @@ class LinearResponseUCC:
             hess_eigval,
             _,
         ) = np.linalg.eig(E2)
-        print(f'Smallest Hessian eigenvalue: {np.min(hess_eigval)}')
+        print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
 
         S = np.zeros((size * 2, size * 2))
         S[:size, :size] = self.Sigma
         S[:size, size:] = self.Delta
         S[size:, :size] = -self.Delta
         S[size:, size:] = -self.Sigma
-        print(f'Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma)))}')
+        print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma)))}")
 
         eigval, eigvec = scipy.linalg.eig(E2, S)
         sorting = np.argsort(eigval)
@@ -481,7 +481,7 @@ class LinearResponseUCC:
             Transition dipole moment.
         """
         if len(dipole_integrals) != 3:
-            raise ValueError(f'Expected 3 dipole integrals got {len(dipole_integrals)}')
+            raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
         number_excitations = len(self.excitation_energies)
         transfer_op = OperatorHybrid({})
         for i, G in enumerate(self.q_ops + self.G_ops):
@@ -573,12 +573,12 @@ class LinearResponseUCC:
             Nicely formatted table.
         """
         output = (
-            'Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n'
+            "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n"
         )
         for i, exc_energy in enumerate(self.excitation_energies):
             osc_strength = self.get_oscillator_strength(i, dipole_integrals)
-            exc_str = f'{exc_energy:2.6f}'
-            exc_str_ev = f'{exc_energy*27.2114079527:3.6f}'
-            osc_str = f'{osc_strength:1.6f}'
-            output += f'{str(i+1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n'
+            exc_str = f"{exc_energy:2.6f}"
+            exc_str_ev = f"{exc_energy*27.2114079527:3.6f}"
+            osc_str = f"{osc_strength:1.6f}"
+            output += f"{str(i+1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
         return output

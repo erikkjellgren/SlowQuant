@@ -41,7 +41,7 @@ class ReducedDenstiyMatrix:
 
     def RDM2(self, p: int, q: int, r: int, s: int) -> float:
         if self.rdm2 is None:
-            raise ValueError('RDM2 is not given.')
+            raise ValueError("RDM2 is not given.")
         if (
             p in self.actitve_idx
             and q in self.actitve_idx

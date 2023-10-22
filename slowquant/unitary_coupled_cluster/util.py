@@ -209,7 +209,7 @@ class ThetaPicker:
             T1 operator generator.
         """
         if self.is_generalized:
-            raise ValueError('Spin-adapted not implemented for generelized operators')
+            raise ValueError("Spin-adapted not implemented for generelized operators")
         return iterate_t1_sa(self.active_occ_idx, self.active_unocc_idx, num_spin_orbs, num_elec)
 
     def get_t2_generator_sa(
@@ -225,7 +225,7 @@ class ThetaPicker:
             T2 operator generator.
         """
         if self.is_generalized:
-            raise ValueError('Spin-adapted not implemented for generelized operators')
+            raise ValueError("Spin-adapted not implemented for generelized operators")
         return iterate_t2_sa(self.active_occ_idx, self.active_unocc_idx, num_spin_orbs, num_elec)
 
     def get_t1_generator_sa_matrix(
@@ -245,7 +245,7 @@ class ThetaPicker:
             T1 operator generator.
         """
         if self.is_generalized:
-            raise ValueError('Spin-adapted not implemented for generelized operators')
+            raise ValueError("Spin-adapted not implemented for generelized operators")
         return iterate_t1_sa_matrix(
             self.active_occ_idx, self.active_unocc_idx, num_spin_orbs, num_elec, use_csr=use_csr
         )
@@ -267,7 +267,7 @@ class ThetaPicker:
             T2 operator generator.
         """
         if self.is_generalized:
-            raise ValueError('Spin-adapted not implemented for generelized operators')
+            raise ValueError("Spin-adapted not implemented for generelized operators")
         return iterate_t2_sa_matrix(
             self.active_occ_idx, self.active_unocc_idx, num_spin_orbs, num_elec, use_csr=use_csr
         )
@@ -1118,7 +1118,7 @@ def construct_ucc_u(
     else:
         t = np.zeros((2**num_spin_orbs, 2**num_spin_orbs))
     counter = 0
-    if 's' in excitations:
+    if "s" in excitations:
         for _, a, i, operator in theta_picker.get_t1_generator_sa_matrix(
             num_spin_orbs, num_elec, use_csr=use_csr
         ):
@@ -1126,7 +1126,7 @@ def construct_ucc_u(
                 t += theta[counter] * operator
             counter += 1
 
-    if 'd' in excitations:
+    if "d" in excitations:
         for _, a, i, b, j, operator in theta_picker.get_t2_generator_sa_matrix(
             num_spin_orbs, num_elec, use_csr=use_csr
         ):
@@ -1134,7 +1134,7 @@ def construct_ucc_u(
                 t += theta[counter] * operator
             counter += 1
 
-    if 't' in excitations:
+    if "t" in excitations:
         for _, a, i, b, j, c, k, _ in theta_picker.get_t3_generator(0, 0):
             if theta[counter] != 0.0:
                 tmp = a_op_spin_matrix(a, True, num_spin_orbs, use_csr=use_csr).dot(
@@ -1147,7 +1147,7 @@ def construct_ucc_u(
                 t += theta[counter] * tmp
             counter += 1
 
-    if 'q' in excitations:
+    if "q" in excitations:
         for _, a, i, b, j, c, k, d, l, _ in theta_picker.get_t4_generator(0, 0):
             if theta[counter] != 0.0:
                 tmp = a_op_spin_matrix(a, True, num_spin_orbs, use_csr=use_csr).dot(
@@ -1161,7 +1161,7 @@ def construct_ucc_u(
                 tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, use_csr=use_csr))
                 t += theta[counter] * tmp
             counter += 1
-    if '5' in excitations:
+    if "5" in excitations:
         for _, a, i, b, j, c, k, d, l, e, m, _ in theta_picker.get_t5_generator(0, 0):
             if theta[counter] != 0.0:
                 tmp = a_op_spin_matrix(a, True, num_spin_orbs, use_csr=use_csr).dot(
@@ -1177,7 +1177,7 @@ def construct_ucc_u(
                 tmp = tmp.dot(a_op_spin_matrix(m, False, num_spin_orbs, use_csr=use_csr))
                 t += theta[counter] * tmp
             counter += 1
-    if '6' in excitations:
+    if "6" in excitations:
         for _, a, i, b, j, c, k, d, l, e, m, f, n, _ in theta_picker.get_t6_generator(0, 0):
             if theta[counter] != 0.0:
                 tmp = a_op_spin_matrix(a, True, num_spin_orbs, use_csr=use_csr).dot(

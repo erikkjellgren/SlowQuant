@@ -13,9 +13,9 @@ def test_properties_h2o_sto3g() -> None:
         """O 0.000000000000  -0.143225816552   0.000000000000;
            H 1.638036840407   1.136548822547  -0.000000000000;
            H -1.638036840407   1.136548822547  -0.000000000000;""",
-        distance_unit='bohr',
+        distance_unit="bohr",
     )
-    A.set_basis_set('sto-3g')
+    A.set_basis_set("sto-3g")
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
     A.init_properties()
@@ -34,9 +34,9 @@ def test_properties_h2o_dz() -> None:
         """O 0.000000000000  -0.143225816552   0.000000000000;
            H 1.638036840407   1.136548822547  -0.000000000000;
            H -1.638036840407   1.136548822547  -0.000000000000;""",
-        distance_unit='bohr',
+        distance_unit="bohr",
     )
-    A.set_basis_set('dz')
+    A.set_basis_set("dz")
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
     A.init_properties()
@@ -56,9 +56,9 @@ def test_properties_h2o_dzp() -> None:
         """O 0.000000000000  -0.143225816552   0.000000000000;
            H 1.638036840407   1.136548822547  -0.000000000000;
            H -1.638036840407   1.136548822547  -0.000000000000;""",
-        distance_unit='bohr',
+        distance_unit="bohr",
     )
-    A.set_basis_set('dzp')
+    A.set_basis_set("dzp")
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
     A.init_properties()
@@ -77,9 +77,9 @@ def test_properties_ch4_sto3g() -> None:
            H   1.183771681898   1.183771681898   1.183771681898;
            H  -1.183771681898   1.183771681898  -1.183771681898;
            H  -1.183771681898  -1.183771681898   1.183771681898""",
-        distance_unit='bohr',
+        distance_unit="bohr",
     )
-    A.set_basis_set('sto-3g')
+    A.set_basis_set("sto-3g")
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
     A.init_properties()
@@ -97,9 +97,9 @@ def test_properties_ch3_sto3g() -> None:
            H   2.039000000000  0.000000000000   0.000000000000;
            H  -1.019500000000  1.765825798316   0.000000000000;
            H  -1.019500000000 -1.765825798316   0.000000000000""",
-        distance_unit='bohr',
+        distance_unit="bohr",
     )
-    A.set_basis_set('sto-3g')
+    A.set_basis_set("sto-3g")
     A.init_hartree_fock()
     A.hartree_fock.de_threshold = 10**-6
     A.hartree_fock.rmsd_threshold = 10**-6
@@ -119,9 +119,9 @@ def test_properties_ch3_431g() -> None:
            H   2.039000000000  0.000000000000   0.000000000000;
            H  -1.019500000000  1.765825798316   0.000000000000;
            H  -1.019500000000 -1.765825798316   0.000000000000""",
-        distance_unit='bohr',
+        distance_unit="bohr",
     )
-    A.set_basis_set('4-31g')
+    A.set_basis_set("4-31g")
     A.init_hartree_fock()
     A.hartree_fock.de_threshold = 10**-6
     A.hartree_fock.rmsd_threshold = 10**-6
@@ -141,9 +141,9 @@ def test_properties_ch3_631gs() -> None:
            H   2.039000000000  0.000000000000   0.000000000000;
            H  -1.019500000000  1.765825798316   0.000000000000;
            H  -1.019500000000 -1.765825798316   0.000000000000""",
-        distance_unit='bohr',
+        distance_unit="bohr",
     )
-    A.set_basis_set('6-31g*')
+    A.set_basis_set("6-31g*")
     A.init_hartree_fock()
     A.hartree_fock.de_threshold = 10**-7
     A.hartree_fock.rmsd_threshold = 10**-7
@@ -164,9 +164,9 @@ def test_properties_ch3_631gss() -> None:
            H   2.039000000000  0.000000000000   0.000000000000;
            H  -1.019500000000  1.765825798316   0.000000000000;
            H  -1.019500000000 -1.765825798316   0.000000000000""",
-        distance_unit='bohr',
+        distance_unit="bohr",
     )
-    A.set_basis_set('6-31g**')
+    A.set_basis_set("6-31g**")
     A.init_hartree_fock()
     A.hartree_fock.de_threshold = 10**-6
     A.hartree_fock.rmsd_threshold = 10**-6

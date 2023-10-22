@@ -22,7 +22,7 @@ class SlowQuant:
         self,
         molecule_file: str,
         molecular_charge: int = 0,
-        distance_unit: str = 'bohr',
+        distance_unit: str = "bohr",
         basis_set: str | None = None,
     ) -> None:
         """Initialize molecule instance.
@@ -49,7 +49,7 @@ class SlowQuant:
             self.integral = _Integral(self.molecule)
             self.grid = _Grid(self.molecule)
         else:
-            self.logger.add_to_log('Cannot set basis set, molecule is not defined.', is_warning=True)
+            self.logger.add_to_log("Cannot set basis set, molecule is not defined.", is_warning=True)
 
     def init_hartree_fock(self) -> None:
         """Initialize Hartree-Fock module."""

@@ -17,15 +17,15 @@ def matmul(
     """
     if isinstance(A, np.ndarray):
         if not isinstance(B, np.ndarray):
-            raise TypeError(f'A and B are not same matrix type.\nA type: {type(A)}\nB type: {type(B)}')
+            raise TypeError(f"A and B are not same matrix type.\nA type: {type(A)}\nB type: {type(B)}")
     elif isinstance(A, (ss.csr_matrix, ss.csc_matrix)):
         if not isinstance(B, ss.csr_matrix) and not isinstance(B, ss.csc_matrix):
-            raise TypeError(f'A and B are not same matrix type.\nA type: {type(A)}\nB type: {type(B)}')
+            raise TypeError(f"A and B are not same matrix type.\nA type: {type(A)}\nB type: {type(B)}")
     if isinstance(A, np.ndarray):
         return np.matmul(A, B)
     if isinstance(A, (ss.csr_matrix, ss.csc_matrix)):
         return A.dot(B)
-    raise TypeError(f'A got unsupported type: {type(A)}')
+    raise TypeError(f"A got unsupported type: {type(A)}")
 
 
 def expm(A: np.ndarray | ss.csr_matrix | ss.csc_matrix) -> np.ndarray | ss.csr_matrix | ss.csc_matrix:
@@ -41,7 +41,7 @@ def expm(A: np.ndarray | ss.csr_matrix | ss.csc_matrix) -> np.ndarray | ss.csr_m
         return scipy.linalg.expm(A)
     if isinstance(A, ss.csr_matrix):
         return ss.linalg.expm(A)
-    raise TypeError(f'A got unsupported type: {type(A)}')
+    raise TypeError(f"A got unsupported type: {type(A)}")
 
 
 def zeros_like(A: np.ndarray | ss.csr_matrix | ss.csc_matrix) -> np.ndarray | ss.csr_matrix | ss.csc_matrix:
@@ -57,7 +57,7 @@ def zeros_like(A: np.ndarray | ss.csr_matrix | ss.csc_matrix) -> np.ndarray | ss
         return np.zeros_like(A)
     if isinstance(A, (ss.csr_matrix, ss.csc_matrix)):
         return ss.csr_array(A.shape)
-    raise TypeError(f'A got unsupported type: {type(A)}')
+    raise TypeError(f"A got unsupported type: {type(A)}")
 
 
 def outer(
@@ -77,7 +77,7 @@ def outer(
     if isinstance(A, (ss.csr_matrix, ss.csc_matrix)):
         if A.transpose().get_shape() != B.get_shape():
             raise ValueError(
-                'Shape mismatch between A and B, got A: {A.get_shape()}, and, B: {B.get_shape()}'
+                "Shape mismatch between A and B, got A: {A.get_shape()}, and, B: {B.get_shape()}"
             )
         return A.dot(B)
-    raise TypeError(f'A got unsupported type: {type(A)}')
+    raise TypeError(f"A got unsupported type: {type(A)}")

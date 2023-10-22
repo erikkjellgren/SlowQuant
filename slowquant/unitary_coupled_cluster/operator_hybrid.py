@@ -191,15 +191,23 @@ def expectation_value_hybrid_flow(
     return state_vector * ref_vector
 
 
-def expectation_value_hybrid_flow_commutator(state_vec: StateVector, A: OperatorHybrid, B: OperatorHybrid, ref_vec: StateVector) -> float:
-    return (expectation_value_hybrid_flow(state_vec, [A, B], ref_vec)
-            - expectation_value_hybrid_flow(state_vec, [B, A], ref_vec))
+def expectation_value_hybrid_flow_commutator(
+    state_vec: StateVector, A: OperatorHybrid, B: OperatorHybrid, ref_vec: StateVector
+) -> float:
+    return expectation_value_hybrid_flow(state_vec, [A, B], ref_vec) - expectation_value_hybrid_flow(
+        state_vec, [B, A], ref_vec
+    )
 
-def expectation_value_hybrid_flow_double_commutator(state_vec: StateVector, A: OperatorHybrid, B: OperatorHybrid, C: OperatorHybrid, ref_vec: StateVector) -> float:
-    return (expectation_value_hybrid_flow(state_vec, [A, B, C], ref_vec)
-            - expectation_value_hybrid_flow(state_vec, [A, C, B], ref_vec)
-            - expectation_value_hybrid_flow(state_vec, [B, C, A], ref_vec)
-            + expectation_value_hybrid_flow(state_vec, [C, B, A], ref_vec))
+
+def expectation_value_hybrid_flow_double_commutator(
+    state_vec: StateVector, A: OperatorHybrid, B: OperatorHybrid, C: OperatorHybrid, ref_vec: StateVector
+) -> float:
+    return (
+        expectation_value_hybrid_flow(state_vec, [A, B, C], ref_vec)
+        - expectation_value_hybrid_flow(state_vec, [A, C, B], ref_vec)
+        - expectation_value_hybrid_flow(state_vec, [B, C, A], ref_vec)
+        + expectation_value_hybrid_flow(state_vec, [C, B, A], ref_vec)
+    )
 
 
 def convert_pauli_to_hybrid_form(

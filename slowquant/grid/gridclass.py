@@ -11,7 +11,7 @@ class _Grid:
         self._mol_obj = molecule_object
         self.number_radial_points = number_radial_points
         if not number_angular_points in [0, 6, 14, 26, 38, 50, 74, 86, 110, 146, 170, 194]:
-            raise ValueError(f'Number of angular points: {number_angular_points}; is not available.')
+            raise ValueError(f"Number of angular points: {number_angular_points}; is not available.")
         self.number_angular_points = number_angular_points
         self._sg1_grid: np.ndarray | None = None
 

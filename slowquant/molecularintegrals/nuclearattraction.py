@@ -122,7 +122,7 @@ def nuclear_attraction_integral(
                             temp
                             * norm2[bf_j, j]
                             * np.einsum(
-                                't,u,v,tuv->',
+                                "t,u,v,tuv->",
                                 E_x[x1, x2, : x1 + x2 + 1],
                                 E_y[y1, y2, : y1 + y2 + 1],
                                 E_z[z1, z2, : z1 + z2 + 1],
@@ -131,5 +131,5 @@ def nuclear_attraction_integral(
                         )
             V_primitive[:, :, i, j] *= -2 * np.pi / p
 
-    V_slice = np.einsum('i,j,klij->kl', contra_coeff1, contra_coeff2, V_primitive)
+    V_slice = np.einsum("i,j,klij->kl", contra_coeff1, contra_coeff2, V_primitive)
     return V_slice

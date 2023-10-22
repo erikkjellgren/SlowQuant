@@ -77,7 +77,7 @@ class LinearResponseUCC:
         num_spin_orbs = self.wf.num_spin_orbs
         num_elec = self.wf.num_elec
         excitations = excitations.lower()
-        if 's' in excitations:
+        if "s" in excitations:
             for _, a, i, op_ in self.theta_picker.get_t1_generator_sa(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
                     op_,
@@ -86,7 +86,7 @@ class LinearResponseUCC:
                     self.wf.num_virtual_spin_orbs,
                 )
                 self.G_ops.append(ResponseOperator((i,), (a,), op))
-        if 'd' in excitations:
+        if "d" in excitations:
             for _, a, i, b, j, op_ in self.theta_picker.get_t2_generator_sa(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
                     op_,
@@ -95,7 +95,7 @@ class LinearResponseUCC:
                     self.wf.num_virtual_spin_orbs,
                 )
                 self.G_ops.append(ResponseOperator((i, j), (a, b), op))
-        if 't' in excitations:
+        if "t" in excitations:
             for _, a, i, b, j, c, k, op_ in self.theta_picker.get_t3_generator(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
                     op_,
@@ -104,7 +104,7 @@ class LinearResponseUCC:
                     self.wf.num_virtual_spin_orbs,
                 )
                 self.G_ops.append(ResponseOperator((i, j, k), (a, b, c), op))
-        if 'q' in excitations:
+        if "q" in excitations:
             for _, a, i, b, j, c, k, d, l, op_ in self.theta_picker.get_t4_generator(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
                     op_,
@@ -113,7 +113,7 @@ class LinearResponseUCC:
                     self.wf.num_virtual_spin_orbs,
                 )
                 self.G_ops.append(ResponseOperator((i, j, k, l), (a, b, c, d), op))
-        if '5' in excitations:
+        if "5" in excitations:
             for _, a, i, b, j, c, k, d, l, e, m, op_ in self.theta_picker.get_t5_generator(
                 num_spin_orbs, num_elec
             ):
@@ -124,7 +124,7 @@ class LinearResponseUCC:
                     self.wf.num_virtual_spin_orbs,
                 )
                 self.G_ops.append(ResponseOperator((i, j, k, l, m), (a, b, c, d, e), op))
-        if '6' in excitations:
+        if "6" in excitations:
             for _, a, i, b, j, c, k, d, l, e, m, f, n, op_ in self.theta_picker.get_t6_generator(
                 num_spin_orbs, num_elec
             ):
@@ -188,8 +188,8 @@ class LinearResponseUCC:
             rdm2=rdm2,
         )
         idx_shift = len(self.q_ops)
-        print('Gs', len(self.G_ops))
-        print('qs', len(self.q_ops))
+        print("Gs", len(self.G_ops))
+        print("qs", len(self.q_ops))
         grad = get_orbital_gradient_response(
             rdms,
             self.wf.h_core,
@@ -200,7 +200,7 @@ class LinearResponseUCC:
             self.wf.num_active_spin_orbs // 2,
         )
         if len(grad) != 0:
-            print('idx, max(abs(grad orb)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+            print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
         grad = np.zeros(2 * len(self.G_ops))
         for i, op in enumerate(self.G_ops):
             grad[i] = expectation_value_hybrid_flow_commutator(
@@ -210,7 +210,7 @@ class LinearResponseUCC:
                 self.wf.state_vector, op.operator.dagger, H_1i_1a, self.wf.state_vector
             )
         if len(grad) != 0:
-            print('idx, max(abs(grad active)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+            print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
         # Do orbital-orbital blocks
         self.M[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_A(
             rdms,
@@ -288,14 +288,14 @@ class LinearResponseUCC:
             hess_eigval,
             _,
         ) = np.linalg.eig(E2)
-        print(f'Smallest Hessian eigenvalue: {np.min(hess_eigval)}')
+        print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
 
         S = np.zeros((size * 2, size * 2))
         S[:size, :size] = self.V
         S[:size, size:] = self.W
         S[size:, :size] = -np.conj(self.W)
         S[size:, size:] = -np.conj(self.V)
-        print(f'Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.V)))}')
+        print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.V)))}")
 
         eigval, eigvec = scipy.linalg.eig(E2, S)
         sorting = np.argsort(eigval)
@@ -357,7 +357,7 @@ class LinearResponseUCC:
             Transition dipole moment.
         """
         if len(dipole_integrals) != 3:
-            raise ValueError(f'Expected 3 dipole integrals got {len(dipole_integrals)}')
+            raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
         number_excitations = len(self.excitation_energies)
         rdm1 = construct_one_rdm(self.wf)
         rdm2 = construct_two_rdm(self.wf)
@@ -490,12 +490,12 @@ class LinearResponseUCC:
             Nicely formatted table.
         """
         output = (
-            'Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n'
+            "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n"
         )
         for i, exc_energy in enumerate(self.excitation_energies):
             osc_strength = self.get_oscillator_strength(i, dipole_integrals)
-            exc_str = f'{exc_energy:2.6f}'
-            exc_str_ev = f'{exc_energy*27.2114079527:3.6f}'
-            osc_str = f'{osc_strength:1.6f}'
-            output += f'{str(i+1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n'
+            exc_str = f"{exc_energy:2.6f}"
+            exc_str_ev = f"{exc_energy*27.2114079527:3.6f}"
+            osc_str = f"{osc_strength:1.6f}"
+            output += f"{str(i+1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
         return output

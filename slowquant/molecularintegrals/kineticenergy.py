@@ -129,5 +129,5 @@ def kinetic_energy_integral(
             p = exponents1[i] + exponents2[j]
             T_primitive[:, :, i, j] *= -1 / 2 * (np.pi / p) ** (3 / 2)
 
-    T_slice = np.einsum('i,j,klij->kl', contra_coeff1, contra_coeff2, T_primitive)
+    T_slice = np.einsum("i,j,klij->kl", contra_coeff1, contra_coeff2, T_primitive)
     return T_slice
