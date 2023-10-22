@@ -129,6 +129,49 @@ def get_orbital_gradient(
     return gradient
 
 
+def get_orbital_gradient_response(
+    rdms: ReducedDenstiyMatrix,
+    h_ao: np.ndarray,
+    g_ao: np.ndarray,
+    c_mo: np.ndarray,
+    kappa_idx: list[list[int]],
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+) -> np.ndarray:
+    """ """
+    gradient = np.zeros(2 * len(kappa_idx))
+    h_int = one_electron_integral_transform(c_mo, h_ao)
+    g_int = two_electron_integral_transform(c_mo, g_ao)
+    for idx, (m, n) in enumerate(kappa_idx):
+        # 1e contribution
+        for p in range(num_inactive_orbs + num_active_orbs):
+            gradient[idx] += h_int[n, p] * rdms.RDM1(m, p)
+            gradient[idx] -= h_int[p, m] * rdms.RDM1(p, n)
+        # 2e contribution
+        for p in range(num_inactive_orbs + num_active_orbs):
+            for q in range(num_inactive_orbs + num_active_orbs):
+                for r in range(num_inactive_orbs + num_active_orbs):
+                    gradient[idx] += 1 / 2 * g_int[n, p, q, r] * rdms.RDM2(m, p, q, r)
+                    gradient[idx] -= 1 / 2 * g_int[p, m, q, r] * rdms.RDM2(p, n, q, r)
+                    gradient[idx] -= 1 / 2 * g_int[m, p, q, r] * rdms.RDM2(n, p, q, r)
+                    gradient[idx] += 1 / 2 * g_int[p, n, q, r] * rdms.RDM2(p, m, q, r)
+    shift = len(kappa_idx)
+    for idx, (n, m) in enumerate(kappa_idx):
+        # 1e contribution
+        for p in range(num_inactive_orbs + num_active_orbs):
+            gradient[idx + shift] += h_int[n, p] * rdms.RDM1(m, p)
+            gradient[idx + shift] -= h_int[p, m] * rdms.RDM1(p, n)
+        # 2e contribution
+        for p in range(num_inactive_orbs + num_active_orbs):
+            for q in range(num_inactive_orbs + num_active_orbs):
+                for r in range(num_inactive_orbs + num_active_orbs):
+                    gradient[idx + shift] += 1 / 2 * g_int[n, p, q, r] * rdms.RDM2(m, p, q, r)
+                    gradient[idx + shift] -= 1 / 2 * g_int[p, m, q, r] * rdms.RDM2(p, n, q, r)
+                    gradient[idx + shift] -= 1 / 2 * g_int[m, p, q, r] * rdms.RDM2(n, p, q, r)
+                    gradient[idx + shift] += 1 / 2 * g_int[p, n, q, r] * rdms.RDM2(p, m, q, r)
+    return 2 ** (-1 / 2) * gradient
+
+
 def get_orbital_response_metric_sgima(rdms: ReducedDenstiyMatrix, kappa_idx: list[list[int]]) -> np.ndarray:
     sigma = np.zeros((len(kappa_idx), len(kappa_idx)))
     for idx1, (n, m) in enumerate(kappa_idx):
@@ -137,7 +180,54 @@ def get_orbital_response_metric_sgima(rdms: ReducedDenstiyMatrix, kappa_idx: lis
                 sigma[idx1, idx2] += rdms.RDM1(m, q)
             if m == q:
                 sigma[idx1, idx2] -= rdms.RDM1(p, n)
-    return 1 / 2 * sigma
+    return -1 / 2 * sigma
+
+
+def get_orbital_response_vector_norm(
+    rdms: ReducedDenstiyMatrix,
+    kappa_idx: list[list[int]],
+    response_vectors: np.ndarray,
+    state_number: int,
+    number_excitations: int,
+) -> float:
+    norm = 0
+    for i, (m, n) in enumerate(kappa_idx):
+        norm += (
+            response_vectors[i, state_number] ** 2
+            - response_vectors[i + number_excitations, state_number] ** 2
+        ) * rdms.RDM1(m, m)
+        norm += (
+            response_vectors[i + number_excitations, state_number] ** 2
+            - response_vectors[i, state_number] ** 2
+        ) * rdms.RDM1(n, n)
+    return 1 / 2 * norm
+
+
+def get_orbital_response_property_gradient(
+    rdms: ReducedDenstiyMatrix,
+    x_mo: np.ndarray,
+    kappa_idx: list[list[int]],
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    response_vectors: np.ndarray,
+    state_number: int,
+    number_excitations: int,
+) -> float:
+    """ """
+    prop_grad = 0
+    for i, (m, n) in enumerate(kappa_idx):
+        for p in range(num_inactive_orbs + num_active_orbs):
+            prop_grad += (
+                (response_vectors[i + number_excitations, state_number] - response_vectors[i, state_number])
+                * x_mo[n, p]
+                * rdms.RDM1(m, p)
+            )
+            prop_grad += (
+                (response_vectors[i, state_number] - response_vectors[i + number_excitations, state_number])
+                * x_mo[m, p]
+                * rdms.RDM1(n, p)
+            )
+    return 2 ** (-1 / 2) * prop_grad
 
 
 def get_orbital_response_hessian_A(
@@ -149,7 +239,6 @@ def get_orbital_response_hessian_A(
     num_inactive_orbs: int,
     num_active_orbs: int,
 ) -> np.ndarray:
-    print(kappa_idx)
     A1e = np.zeros((len(kappa_idx), len(kappa_idx)))
     A2e = np.zeros((len(kappa_idx), len(kappa_idx)))
     h = one_electron_integral_transform(c_mo, h_ao)
@@ -168,12 +257,12 @@ def get_orbital_response_hessian_A(
             for p in range(num_inactive_orbs + num_active_orbs):
                 for q in range(num_inactive_orbs + num_active_orbs):
                     A2e[idx1, idx2] += g[n, t, p, q] * rdms.RDM2(m, u, p, q)
-                    A2e[idx1, idx2] -= g[n, p, u, q] * rdms.RDM2(m, t, p, q)
+                    A2e[idx1, idx2] -= g[n, p, u, q] * rdms.RDM2(m, p, t, q)
                     A2e[idx1, idx2] += g[n, p, q, t] * rdms.RDM2(m, p, q, u)
                     A2e[idx1, idx2] += g[u, m, p, q] * rdms.RDM2(t, n, p, q)
                     A2e[idx1, idx2] += g[p, m, u, q] * rdms.RDM2(p, n, t, q)
                     A2e[idx1, idx2] -= g[p, m, q, t] * rdms.RDM2(p, n, q, u)
-                    A2e[idx1, idx2] -= g[u, p, n, t] * rdms.RDM2(t, p, m, q)
+                    A2e[idx1, idx2] -= g[u, p, n, q] * rdms.RDM2(t, p, m, q)
                     A2e[idx1, idx2] += g[p, t, n, q] * rdms.RDM2(p, u, m, q)
                     A2e[idx1, idx2] += g[p, q, n, t] * rdms.RDM2(p, q, m, u)
                     A2e[idx1, idx2] += g[u, p, q, m] * rdms.RDM2(t, p, q, n)
@@ -190,7 +279,7 @@ def get_orbital_response_hessian_A(
                             A2e[idx1, idx2] -= g[p, q, n, r] * rdms.RDM2(p, q, t, r)
                         if t == n:
                             A2e[idx1, idx2] -= g[p, q, r, m] * rdms.RDM2(p, q, r, u)
-    return 1 / 2 * A1e  # + 1 / 4 * A2e
+    return 1 / 2 * A1e + 1 / 4 * A2e
 
 
 def get_orbital_response_hessian_B(
@@ -220,12 +309,12 @@ def get_orbital_response_hessian_B(
             for p in range(num_inactive_orbs + num_active_orbs):
                 for q in range(num_inactive_orbs + num_active_orbs):
                     A2e[idx1, idx2] += g[n, t, p, q] * rdms.RDM2(m, u, p, q)
-                    A2e[idx1, idx2] -= g[n, p, u, q] * rdms.RDM2(m, t, p, q)
+                    A2e[idx1, idx2] -= g[n, p, u, q] * rdms.RDM2(m, p, t, q)
                     A2e[idx1, idx2] += g[n, p, q, t] * rdms.RDM2(m, p, q, u)
                     A2e[idx1, idx2] += g[u, m, p, q] * rdms.RDM2(t, n, p, q)
                     A2e[idx1, idx2] += g[p, m, u, q] * rdms.RDM2(p, n, t, q)
                     A2e[idx1, idx2] -= g[p, m, q, t] * rdms.RDM2(p, n, q, u)
-                    A2e[idx1, idx2] -= g[u, p, n, t] * rdms.RDM2(t, p, m, q)
+                    A2e[idx1, idx2] -= g[u, p, n, q] * rdms.RDM2(t, p, m, q)
                     A2e[idx1, idx2] += g[p, t, n, q] * rdms.RDM2(p, u, m, q)
                     A2e[idx1, idx2] += g[p, q, n, t] * rdms.RDM2(p, q, m, u)
                     A2e[idx1, idx2] += g[u, p, q, m] * rdms.RDM2(t, p, q, n)

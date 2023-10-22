@@ -507,10 +507,16 @@ def hamiltonian_pauli(
     return H_expectation
 
 
-def hamiltonian_pauli_2e(
-    h: np.ndarray, g: np.ndarray, c_mo: np.ndarray, num_spin_orbs: int, num_elec: int
+def hamiltonian_pauli_1i_1a(
+    h: np.ndarray,
+    g: np.ndarray,
+    c_mo: np.ndarray,
+    num_inactive_spin_orbs: int,
+    num_active_spin_orbs: int,
+    num_virtual_spin_orbs: int,
+    num_elec: int,
 ) -> OperatorPauli:
-    """Get full Hamiltonian operator.
+    """Get Hamiltonian operator that works includes an extra inactive and an extra virtual index.
 
     Args:
         h: One-electron Hamiltonian integrals in AO.
@@ -520,25 +526,56 @@ def hamiltonian_pauli_2e(
         num_elec: Number of electrons.
 
     Returns:
-        Full Hamilonian Pauli operator.
+        Modified Hamilonian Pauli operator.
     """
+    num_inactive_spatial_orbs = num_inactive_spin_orbs // 2
+    num_active_spatial_orbs = num_active_spin_orbs // 2
+    num_virtual_spatial_orbs = num_virtual_spin_orbs // 2
     h_mo = one_electron_integral_transform(c_mo, h)
     g_mo = two_electron_integral_transform(c_mo, g)
-    num_spatial_orbs = num_spin_orbs // 2
+    num_spatial_orbs = num_inactive_spatial_orbs + num_active_spatial_orbs + num_virtual_spatial_orbs
     H_expectation = OperatorPauli({})
+    virtual_start = num_inactive_spatial_orbs + num_active_spatial_orbs
+    for p in range(num_spatial_orbs):
+        for q in range(num_spatial_orbs):
+            if p >= virtual_start and q >= virtual_start:
+                continue
+            if abs(h_mo[p, q]) > 10**-12:
+                H_expectation += h_mo[p, q] * epq_pauli(p, q, 2 * num_spatial_orbs, num_elec)
     for p in range(num_spatial_orbs):
         for q in range(num_spatial_orbs):
             for r in range(num_spatial_orbs):
                 for s in range(num_spatial_orbs):
+                    num_virt = 0
+                    if p >= virtual_start:
+                        num_virt += 1
+                    if q >= virtual_start:
+                        num_virt += 1
+                    if r >= virtual_start:
+                        num_virt += 1
+                    if s >= virtual_start:
+                        num_virt += 1
+                    if num_virt > 1:
+                        continue
+                    if (q < num_inactive_spatial_orbs and s < num_inactive_spatial_orbs) and (
+                        p >= num_inactive_spatial_orbs and s >= num_inactive_spatial_orbs
+                    ):
+                        continue
                     if abs(g_mo[p, q, r, s]) > 10**-12:
                         H_expectation += (
-                            1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, num_spin_orbs, num_elec)
+                            1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, 2 * num_spatial_orbs, num_elec)
                         )
     return H_expectation
 
 
-def hamiltonian_pauli_1e(
-    h: np.ndarray, g: np.ndarray, c_mo: np.ndarray, num_spin_orbs: int, num_elec: int
+def hamiltonian_pauli_2i_2a(
+    h: np.ndarray,
+    g: np.ndarray,
+    c_mo: np.ndarray,
+    num_inactive_spin_orbs: int,
+    num_active_spin_orbs: int,
+    num_virtual_spin_orbs: int,
+    num_elec: int,
 ) -> OperatorPauli:
     """Get full Hamiltonian operator.
 
@@ -552,14 +589,37 @@ def hamiltonian_pauli_1e(
     Returns:
         Full Hamilonian Pauli operator.
     """
+    num_inactive_spatial_orbs = num_inactive_spin_orbs // 2
+    num_active_spatial_orbs = num_active_spin_orbs // 2
+    num_virtual_spatial_orbs = num_virtual_spin_orbs // 2
     h_mo = one_electron_integral_transform(c_mo, h)
     g_mo = two_electron_integral_transform(c_mo, g)
-    num_spatial_orbs = num_spin_orbs // 2
+    num_spatial_orbs = num_inactive_spatial_orbs + num_active_spatial_orbs + num_virtual_spatial_orbs
     H_expectation = OperatorPauli({})
+    virtual_start = num_inactive_spatial_orbs + num_active_spatial_orbs
     for p in range(num_spatial_orbs):
         for q in range(num_spatial_orbs):
             if abs(h_mo[p, q]) > 10**-12:
-                H_expectation += h_mo[p, q] * epq_pauli(p, q, num_spin_orbs, num_elec)
+                H_expectation += h_mo[p, q] * epq_pauli(p, q, 2 * num_spatial_orbs, num_elec)
+    for p in range(num_spatial_orbs):
+        for q in range(num_spatial_orbs):
+            for r in range(num_spatial_orbs):
+                for s in range(num_spatial_orbs):
+                    num_virt = 0
+                    if p >= virtual_start:
+                        num_virt += 1
+                    if q >= virtual_start:
+                        num_virt += 1
+                    if r >= virtual_start:
+                        num_virt += 1
+                    if s >= virtual_start:
+                        num_virt += 1
+                    if num_virt > 2:
+                        continue
+                    if abs(g_mo[p, q, r, s]) > 10**-12:
+                        H_expectation += (
+                            1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, 2 * num_spatial_orbs, num_elec)
+                        )
     return H_expectation
 
 
