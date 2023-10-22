@@ -376,7 +376,6 @@ class LinearResponseUCC:
             rdm1,
             rdm2=rdm2,
         )
-        shift = len(self.q_ops)
         mux = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[0])
         muy = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[1])
         muz = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[2])
