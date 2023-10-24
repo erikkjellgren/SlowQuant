@@ -1003,10 +1003,6 @@ class LinearResponseUCC:
             print(
                 'WARNING: Calculation of excited state norm only possible for naive operators. Only energies and response vectors are valid. Try do_working_equation or do_debugging.'
             )
-        if do_working_equations and self.do_selfconsistent_operators:
-            raise ValueError(
-                'Working equation for excited state norm for self-consistent LR not implemented.'
-            )
 
         number_excitations = len(self.excitation_energies)
         if not do_working_equations:
@@ -1034,6 +1030,8 @@ class LinearResponseUCC:
             # t_ZG_op = \sum_i Z_i G_i^\dagger
             # t_YG_op = \sum_i Y_i G_i
             idx_shift = len(self.q_ops)
+            t_Zq_op = OperatorHybrid({})
+            t_Yq_op = OperatorHybrid({})
             for i, op in enumerate(self.q_ops):
                 if i == 0:
                     t_Zq_op = self.response_vectors[i, state_number] * op.operator.dagger
@@ -1089,6 +1087,7 @@ class LinearResponseUCC:
                 self.do_statetransfer_operators
                 or self.do_hermitian_statetransfer_operators
                 or self.do_ST_projected_operators
+                or self.do_selfconsistent_operators
             ):
                 norm = (
                     # t_Zq_op = \sum_i Z_i q_i^\dagger
@@ -1172,6 +1171,8 @@ class LinearResponseUCC:
             # t_ZG_op = \sum_i Z_i G_i^\dagger
             # t_YG_op = \sum_i Y_i G_i
             idx_shift = len(self.q_ops)
+            t_Zq_op = OperatorHybrid({})
+            t_Yq_op = OperatorHybrid({})
             for i, op in enumerate(self.q_ops):
                 if i == 0:
                     t_Zq_op = self.normed_response_vectors[i, state_number] * op.operator.dagger
@@ -1365,6 +1366,7 @@ class LinearResponseUCC:
                 self.do_statetransfer_operators
                 or self.do_ST_projected_operators
                 or self.do_hermitian_statetransfer_operators
+                or self.do_selfconsistent_operators
             ):
                 if mux_op.operators != {}:
                     transition_dipole_x = (
@@ -1513,21 +1515,6 @@ class LinearResponseUCC:
         Returns:
             Oscillator Strength.
         """
-        if (
-            sum(
-                [
-                    # self.do_projected_operators,
-                    self.do_selfconsistent_operators,
-                    # self.do_statetransfer_operators,
-                    # self.do_hermitian_statetransfer_operators,
-                    # self.do_all_projected_operators,
-                    # self.do_ST_projected_operators,
-                ]
-            )
-            >= 1
-            and not self.do_debugging
-        ):
-            raise ValueError('Calculation of oscillator strength is not implemented for slef-consistent LR.')
 
         # Get <0|<mu_{x,y,z}|n>
         transition_dipole_x, transition_dipole_y, transition_dipole_z = self.get_transition_dipole(
