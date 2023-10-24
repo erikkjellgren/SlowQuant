@@ -140,6 +140,7 @@ class LinearResponseUCC:
         U = OperatorHybrid(
             {inactive_str + virtual_str: OperatorHybridData(inactive_str, U_matrix, virtual_str)}
         )  # U is now an operator
+        self.U = U
         ### NEW
 
         #######
@@ -449,24 +450,28 @@ class LinearResponseUCC:
             csf = copy.deepcopy(self.wf.state_vector)
             csf.active = csf._active
             csf.active_csr = ss.csr_matrix(csf._active)
+            self.csf = csf
 
         # Obtain |CSF> for naive implementation via work equations
         if do_statetransfer_operators and not self.do_debugging:
             csf = copy.deepcopy(self.wf.state_vector)
             csf.active = csf._active
             csf.active_csr = ss.csr_matrix(csf._active)
+            self.csf = csf
 
         # Obtain |CSF> for naive implementation via work equations
         if do_ST_projected_operators:
             csf = copy.deepcopy(self.wf.state_vector)
             csf.active = csf._active
             csf.active_csr = ss.csr_matrix(csf._active)
+            self.csf = csf
 
         # Obtain |CSF> for naive implementation via work equations
         if do_hermitian_statetransfer_operators and not self.do_debugging:
             csf = copy.deepcopy(self.wf.state_vector)
             csf.active = csf._active
             csf.active_csr = ss.csr_matrix(csf._active)
+            self.csf = csf
 
         # Work equation implementation
         if do_selfconsistent_operators:
@@ -968,7 +973,7 @@ class LinearResponseUCC:
     def get_excited_state_norm(self, state_number: int, do_working_equations: bool = False) -> float:
         r"""
         Calculate the norm of excited state
-        
+
         Only for naive G and q!
 
         .. math::
@@ -993,10 +998,16 @@ class LinearResponseUCC:
             )
             >= 1
             and not self.do_debugging
+            and not do_working_equations
         ):
             print(
-                'WARNING: Calculation of excited state norm only possible for naive operators. Only energies and response vectors are valid.'
+                'WARNING: Calculation of excited state norm only possible for naive operators. Only energies and response vectors are valid. Try do_working_equation or do_debugging.'
             )
+        if do_working_equations and self.do_selfconsistent_operators:
+            raise ValueError(
+                'Working equation for excited state norm for self-consistent LR not implemented.'
+            )
+
         number_excitations = len(self.excitation_energies)
         if not do_working_equations:
             for i, op in enumerate(self.q_ops + self.G_ops):
@@ -1041,26 +1052,80 @@ class LinearResponseUCC:
                     t_YG_op += (
                         self.response_vectors[i + idx_shift + number_excitations, state_number] * op.operator
                     )
-            norm = (
-                expectation_value_hybrid_flow(
-                    self.wf.state_vector, [t_Zq_op, t_Zq_op.dagger], self.wf.state_vector
+            # projected and all-projected
+            if self.do_projected_operators or self.do_all_projected_operators:
+                norm = (
+                    # t_Zq_op = \sum_i Z_i q_i^\dagger
+                    expectation_value_hybrid_flow(
+                        self.wf.state_vector, [t_Zq_op, t_Zq_op.dagger], self.wf.state_vector
+                    )
+                    # t_Yq_op = \sum_i Y_i q_i
+                    - expectation_value_hybrid_flow(
+                        self.wf.state_vector, [t_Yq_op.dagger, t_Yq_op], self.wf.state_vector
+                    )
+                    # t_ZG_op = \sum_i Z_i G_i^\dagger
+                    + expectation_value_hybrid_flow(
+                        self.wf.state_vector, [t_ZG_op, t_ZG_op.dagger], self.wf.state_vector
+                    )
+                    - (
+                        expectation_value_hybrid_flow(
+                            self.wf.state_vector, [t_ZG_op.dagger], self.wf.state_vector
+                        )
+                        * expectation_value_hybrid_flow(self.wf.state_vector, [t_ZG_op], self.wf.state_vector)
+                    )
+                    # t_YG_op = \sum_i Y_i G_i
+                    + (
+                        expectation_value_hybrid_flow(self.wf.state_vector, [t_YG_op], self.wf.state_vector)
+                        * expectation_value_hybrid_flow(
+                            self.wf.state_vector, [t_YG_op.dagger], self.wf.state_vector
+                        )
+                    )
+                    - expectation_value_hybrid_flow(
+                        self.wf.state_vector, [t_YG_op.dagger, t_YG_op], self.wf.state_vector
+                    )
                 )
-                - expectation_value_hybrid_flow(
-                    self.wf.state_vector, [t_Yq_op.dagger, t_Yq_op], self.wf.state_vector
+            # ST, HST, and ST/projected
+            elif (
+                self.do_statetransfer_operators
+                or self.do_hermitian_statetransfer_operators
+                or self.do_ST_projected_operators
+            ):
+                norm = (
+                    # t_Zq_op = \sum_i Z_i q_i^\dagger
+                    expectation_value_hybrid_flow(
+                        self.wf.state_vector, [t_Zq_op, t_Zq_op.dagger], self.wf.state_vector
+                    )
+                    # t_Yq_op = \sum_i Y_i q_i
+                    - expectation_value_hybrid_flow(
+                        self.wf.state_vector, [t_Yq_op.dagger, t_Yq_op], self.wf.state_vector
+                    )
+                    # t_ZG_op = \sum_i Z_i G_i^\dagger
+                    + expectation_value_hybrid_flow(self.csf, [t_ZG_op, t_ZG_op.dagger], self.csf)
+                    # t_YG_op = \sum_i Y_i G_i
+                    - expectation_value_hybrid_flow(self.csf, [t_YG_op.dagger, t_YG_op], self.csf)
                 )
-                + expectation_value_hybrid_flow(
-                    self.wf.state_vector, [t_ZG_op, t_ZG_op.dagger], self.wf.state_vector
+            # naive
+            else:
+                norm = (
+                    expectation_value_hybrid_flow(
+                        self.wf.state_vector, [t_Zq_op, t_Zq_op.dagger], self.wf.state_vector
+                    )
+                    - expectation_value_hybrid_flow(
+                        self.wf.state_vector, [t_Yq_op.dagger, t_Yq_op], self.wf.state_vector
+                    )
+                    + expectation_value_hybrid_flow(
+                        self.wf.state_vector, [t_ZG_op, t_ZG_op.dagger], self.wf.state_vector
+                    )
+                    - expectation_value_hybrid_flow(
+                        self.wf.state_vector, [t_ZG_op.dagger, t_ZG_op], self.wf.state_vector
+                    )
+                    + expectation_value_hybrid_flow(
+                        self.wf.state_vector, [t_YG_op, t_YG_op.dagger], self.wf.state_vector
+                    )
+                    - expectation_value_hybrid_flow(
+                        self.wf.state_vector, [t_YG_op.dagger, t_YG_op], self.wf.state_vector
+                    )
                 )
-                - expectation_value_hybrid_flow(
-                    self.wf.state_vector, [t_ZG_op.dagger, t_ZG_op], self.wf.state_vector
-                )
-                + expectation_value_hybrid_flow(
-                    self.wf.state_vector, [t_YG_op, t_YG_op.dagger], self.wf.state_vector
-                )
-                - expectation_value_hybrid_flow(
-                    self.wf.state_vector, [t_YG_op.dagger, t_YG_op], self.wf.state_vector
-                )
-            )
 
         return norm
 
@@ -1072,7 +1137,7 @@ class LinearResponseUCC:
 
         .. math::
             <0|\mu|n>
-        
+
         Args:
             state_number: Which excited state, counting from zero.
             dipole_integrals: Dipole integrals ordered as (x,y,z).
@@ -1194,80 +1259,242 @@ class LinearResponseUCC:
                     self.wf.state_vector, commutator_contract(muz_op, transfer_op), self.wf.state_vector
                 )
         else:
-            # <0|\mu_x|n> =
-            # - <0|t_Zq (\sum_pq x_pq E_pq)|0> + <0|(\sum_pq x_pq E_pq) t_ZG |0> - <0|t_ZG (\sum_pq x_pq E_pq)|0>
-            # + <0|(\sum_pq x_pq E_pq) t_Yq|0> + <0|(\sum_pq x_pq E_pq) t_YG |0> - <0|t_YG (\sum_pq x_pq E_pq)|0>
-            if mux_op.operators != {}:
-                transition_dipole_x = (
-                    -expectation_value_hybrid_flow(
-                        self.wf.state_vector, [t_Zq_op, mux_op], self.wf.state_vector
+            if self.do_projected_operators or self.do_all_projected_operators:
+                if mux_op.operators != {}:
+                    transition_dipole_x = (
+                        -expectation_value_hybrid_flow(
+                            self.wf.state_vector, [t_Zq_op, mux_op], self.wf.state_vector
+                        )
+                        + (
+                            expectation_value_hybrid_flow(
+                                self.wf.state_vector, [mux_op], self.wf.state_vector
+                            )
+                            * expectation_value_hybrid_flow(
+                                self.wf.state_vector, [t_ZG_op], self.wf.state_vector
+                            )
+                        )
+                        - expectation_value_hybrid_flow(
+                            self.wf.state_vector, [t_ZG_op, mux_op], self.wf.state_vector
+                        )
+                        + expectation_value_hybrid_flow(
+                            self.wf.state_vector, [mux_op, t_Yq_op], self.wf.state_vector
+                        )
+                        + expectation_value_hybrid_flow(
+                            self.wf.state_vector, [mux_op, t_YG_op], self.wf.state_vector
+                        )
+                        - (
+                            expectation_value_hybrid_flow(
+                                self.wf.state_vector, [t_YG_op], self.wf.state_vector
+                            )
+                            * expectation_value_hybrid_flow(
+                                self.wf.state_vector, [mux_op], self.wf.state_vector
+                            )
+                        )
                     )
-                    + expectation_value_hybrid_flow(
-                        self.wf.state_vector, [mux_op, t_ZG_op], self.wf.state_vector
-                    )
-                    - expectation_value_hybrid_flow(
-                        self.wf.state_vector, [t_ZG_op, mux_op], self.wf.state_vector
-                    )
-                    + expectation_value_hybrid_flow(
-                        self.wf.state_vector, [mux_op, t_Yq_op], self.wf.state_vector
-                    )
-                    + expectation_value_hybrid_flow(
-                        self.wf.state_vector, [mux_op, t_YG_op], self.wf.state_vector
-                    )
-                    - expectation_value_hybrid_flow(
-                        self.wf.state_vector, [t_YG_op, mux_op], self.wf.state_vector
-                    )
-                )
 
-            # <0|\mu_y|n> =
-            # - <0|t_Zq (\sum_pq y_pq E_pq)|0> + <0|(\sum_pq y_pq E_pq) t_ZG |0> - <0|t_ZG (\sum_pq y_pq E_pq)|0>
-            # + <0|(\sum_pq y_pq E_pq) t_Yq|0> + <0|(\sum_pq y_pq E_pq) t_YG |0> - <0|t_YG (\sum_pq y_pq E_pq)|0>
-            if muy_op.operators != {}:
-                transition_dipole_y = (
-                    -expectation_value_hybrid_flow(
-                        self.wf.state_vector, [t_Zq_op, muy_op], self.wf.state_vector
+                # <0|\mu_y|n> =
+                # - <0|t_Zq (\sum_pq y_pq E_pq)|0> + <0|(\sum_pq y_pq E_pq) t_ZG |0> - <0|t_ZG (\sum_pq y_pq E_pq)|0>
+                # + <0|(\sum_pq y_pq E_pq) t_Yq|0> + <0|(\sum_pq y_pq E_pq) t_YG |0> - <0|t_YG (\sum_pq y_pq E_pq)|0>
+                if muy_op.operators != {}:
+                    transition_dipole_y = (
+                        -expectation_value_hybrid_flow(
+                            self.wf.state_vector, [t_Zq_op, muy_op], self.wf.state_vector
+                        )
+                        + (
+                            expectation_value_hybrid_flow(
+                                self.wf.state_vector, [muy_op], self.wf.state_vector
+                            )
+                            * expectation_value_hybrid_flow(
+                                self.wf.state_vector, [t_ZG_op], self.wf.state_vector
+                            )
+                        )
+                        - expectation_value_hybrid_flow(
+                            self.wf.state_vector, [t_ZG_op, muy_op], self.wf.state_vector
+                        )
+                        + expectation_value_hybrid_flow(
+                            self.wf.state_vector, [muy_op, t_Yq_op], self.wf.state_vector
+                        )
+                        + expectation_value_hybrid_flow(
+                            self.wf.state_vector, [muy_op, t_YG_op], self.wf.state_vector
+                        )
+                        - (
+                            expectation_value_hybrid_flow(
+                                self.wf.state_vector, [t_YG_op], self.wf.state_vector
+                            )
+                            * expectation_value_hybrid_flow(
+                                self.wf.state_vector, [muy_op], self.wf.state_vector
+                            )
+                        )
                     )
-                    + expectation_value_hybrid_flow(
-                        self.wf.state_vector, [muy_op, t_ZG_op], self.wf.state_vector
-                    )
-                    - expectation_value_hybrid_flow(
-                        self.wf.state_vector, [t_ZG_op, muy_op], self.wf.state_vector
-                    )
-                    + expectation_value_hybrid_flow(
-                        self.wf.state_vector, [muy_op, t_Yq_op], self.wf.state_vector
-                    )
-                    + expectation_value_hybrid_flow(
-                        self.wf.state_vector, [muy_op, t_YG_op], self.wf.state_vector
-                    )
-                    - expectation_value_hybrid_flow(
-                        self.wf.state_vector, [t_YG_op, muy_op], self.wf.state_vector
-                    )
-                )
 
-            # <0|\mu_z|n> =
-            # - <0|t_Zq (\sum_pq z_pq E_pq)|0> + <0|(\sum_pq z_pq E_pq) t_ZG |0> - <0|t_ZG (\sum_pq z_pq E_pq)|0>
-            # + <0|(\sum_pq z_pq E_pq) t_Yq|0> + <0|(\sum_pq z_pq E_pq) t_YG |0> - <0|t_YG (\sum_pq z_pq E_pq)|0>
-            if muz_op.operators != {}:
-                transition_dipole_z = (
-                    -expectation_value_hybrid_flow(
-                        self.wf.state_vector, [t_Zq_op, muz_op], self.wf.state_vector
+                # <0|\mu_z|n> =
+                # - <0|t_Zq (\sum_pq z_pq E_pq)|0> + <0|(\sum_pq z_pq E_pq) t_ZG |0> - <0|t_ZG (\sum_pq z_pq E_pq)|0>
+                # + <0|(\sum_pq z_pq E_pq) t_Yq|0> + <0|(\sum_pq z_pq E_pq) t_YG |0> - <0|t_YG (\sum_pq z_pq E_pq)|0>
+                if muz_op.operators != {}:
+                    transition_dipole_z = (
+                        -expectation_value_hybrid_flow(
+                            self.wf.state_vector, [t_Zq_op, muz_op], self.wf.state_vector
+                        )
+                        + (
+                            expectation_value_hybrid_flow(
+                                self.wf.state_vector, [muz_op], self.wf.state_vector
+                            )
+                            * expectation_value_hybrid_flow(
+                                self.wf.state_vector, [t_ZG_op], self.wf.state_vector
+                            )
+                        )
+                        - expectation_value_hybrid_flow(
+                            self.wf.state_vector, [t_ZG_op, muz_op], self.wf.state_vector
+                        )
+                        + expectation_value_hybrid_flow(
+                            self.wf.state_vector, [muz_op, t_Yq_op], self.wf.state_vector
+                        )
+                        + expectation_value_hybrid_flow(
+                            self.wf.state_vector, [muz_op, t_YG_op], self.wf.state_vector
+                        )
+                        - (
+                            expectation_value_hybrid_flow(
+                                self.wf.state_vector, [t_YG_op], self.wf.state_vector
+                            )
+                            * expectation_value_hybrid_flow(
+                                self.wf.state_vector, [muz_op], self.wf.state_vector
+                            )
+                        )
                     )
-                    + expectation_value_hybrid_flow(
-                        self.wf.state_vector, [muz_op, t_ZG_op], self.wf.state_vector
+            elif (
+                self.do_statetransfer_operators
+                or self.do_ST_projected_operators
+                or self.do_hermitian_statetransfer_operators
+            ):
+                if mux_op.operators != {}:
+                    transition_dipole_x = (
+                        -expectation_value_hybrid_flow(
+                            self.wf.state_vector, [t_Zq_op, mux_op], self.wf.state_vector
+                        )
+                        - expectation_value_hybrid_flow(
+                            self.csf, [t_ZG_op, self.U.dagger, mux_op], self.wf.state_vector
+                        )
+                        + expectation_value_hybrid_flow(
+                            self.wf.state_vector, [mux_op, t_Yq_op], self.wf.state_vector
+                        )
+                        + expectation_value_hybrid_flow(
+                            self.wf.state_vector, [mux_op, self.U, t_YG_op], self.csf
+                        )
                     )
-                    - expectation_value_hybrid_flow(
-                        self.wf.state_vector, [t_ZG_op, muz_op], self.wf.state_vector
+
+                # <0|\mu_y|n> =
+                # - <0|t_Zq (\sum_pq y_pq E_pq)|0> + <0|(\sum_pq y_pq E_pq) t_ZG |0> - <0|t_ZG (\sum_pq y_pq E_pq)|0>
+                # + <0|(\sum_pq y_pq E_pq) t_Yq|0> + <0|(\sum_pq y_pq E_pq) t_YG |0> - <0|t_YG (\sum_pq y_pq E_pq)|0>
+                if muy_op.operators != {}:
+                    transition_dipole_y = (
+                        -expectation_value_hybrid_flow(
+                            self.wf.state_vector, [t_Zq_op, muy_op], self.wf.state_vector
+                        )
+                        - expectation_value_hybrid_flow(
+                            self.csf, [t_ZG_op, self.U.dagger, muy_op], self.wf.state_vector
+                        )
+                        + expectation_value_hybrid_flow(
+                            self.wf.state_vector, [muy_op, t_Yq_op], self.wf.state_vector
+                        )
+                        + expectation_value_hybrid_flow(
+                            self.wf.state_vector, [muy_op, self.U, t_YG_op], self.csf
+                        )
                     )
-                    + expectation_value_hybrid_flow(
-                        self.wf.state_vector, [muz_op, t_Yq_op], self.wf.state_vector
+
+                # <0|\mu_z|n> =
+                # - <0|t_Zq (\sum_pq z_pq E_pq)|0> + <0|(\sum_pq z_pq E_pq) t_ZG |0> - <0|t_ZG (\sum_pq z_pq E_pq)|0>
+                # + <0|(\sum_pq z_pq E_pq) t_Yq|0> + <0|(\sum_pq z_pq E_pq) t_YG |0> - <0|t_YG (\sum_pq z_pq E_pq)|0>
+                if muz_op.operators != {}:
+                    transition_dipole_z = (
+                        -expectation_value_hybrid_flow(
+                            self.wf.state_vector, [t_Zq_op, muz_op], self.wf.state_vector
+                        )
+                        - expectation_value_hybrid_flow(
+                            self.csf, [t_ZG_op, self.U.dagger, muz_op], self.wf.state_vector
+                        )
+                        + expectation_value_hybrid_flow(
+                            self.wf.state_vector, [muz_op, t_Yq_op], self.wf.state_vector
+                        )
+                        + expectation_value_hybrid_flow(
+                            self.wf.state_vector, [muz_op, self.U, t_YG_op], self.csf
+                        )
                     )
-                    + expectation_value_hybrid_flow(
-                        self.wf.state_vector, [muz_op, t_YG_op], self.wf.state_vector
+            # naive
+            else:
+                # <0|\mu_x|n> =
+                # - <0|t_Zq (\sum_pq x_pq E_pq)|0> + <0|(\sum_pq x_pq E_pq) t_ZG |0> - <0|t_ZG (\sum_pq x_pq E_pq)|0>
+                # + <0|(\sum_pq x_pq E_pq) t_Yq|0> + <0|(\sum_pq x_pq E_pq) t_YG |0> - <0|t_YG (\sum_pq x_pq E_pq)|0>
+                if mux_op.operators != {}:
+                    transition_dipole_x = (
+                        -expectation_value_hybrid_flow(
+                            self.wf.state_vector, [t_Zq_op, mux_op], self.wf.state_vector
+                        )
+                        + expectation_value_hybrid_flow(
+                            self.wf.state_vector, [mux_op, t_ZG_op], self.wf.state_vector
+                        )
+                        - expectation_value_hybrid_flow(
+                            self.wf.state_vector, [t_ZG_op, mux_op], self.wf.state_vector
+                        )
+                        + expectation_value_hybrid_flow(
+                            self.wf.state_vector, [mux_op, t_Yq_op], self.wf.state_vector
+                        )
+                        + expectation_value_hybrid_flow(
+                            self.wf.state_vector, [mux_op, t_YG_op], self.wf.state_vector
+                        )
+                        - expectation_value_hybrid_flow(
+                            self.wf.state_vector, [t_YG_op, mux_op], self.wf.state_vector
+                        )
                     )
-                    - expectation_value_hybrid_flow(
-                        self.wf.state_vector, [t_YG_op, muz_op], self.wf.state_vector
+
+                # <0|\mu_y|n> =
+                # - <0|t_Zq (\sum_pq y_pq E_pq)|0> + <0|(\sum_pq y_pq E_pq) t_ZG |0> - <0|t_ZG (\sum_pq y_pq E_pq)|0>
+                # + <0|(\sum_pq y_pq E_pq) t_Yq|0> + <0|(\sum_pq y_pq E_pq) t_YG |0> - <0|t_YG (\sum_pq y_pq E_pq)|0>
+                if muy_op.operators != {}:
+                    transition_dipole_y = (
+                        -expectation_value_hybrid_flow(
+                            self.wf.state_vector, [t_Zq_op, muy_op], self.wf.state_vector
+                        )
+                        + expectation_value_hybrid_flow(
+                            self.wf.state_vector, [muy_op, t_ZG_op], self.wf.state_vector
+                        )
+                        - expectation_value_hybrid_flow(
+                            self.wf.state_vector, [t_ZG_op, muy_op], self.wf.state_vector
+                        )
+                        + expectation_value_hybrid_flow(
+                            self.wf.state_vector, [muy_op, t_Yq_op], self.wf.state_vector
+                        )
+                        + expectation_value_hybrid_flow(
+                            self.wf.state_vector, [muy_op, t_YG_op], self.wf.state_vector
+                        )
+                        - expectation_value_hybrid_flow(
+                            self.wf.state_vector, [t_YG_op, muy_op], self.wf.state_vector
+                        )
                     )
-                )
+
+                # <0|\mu_z|n> =
+                # - <0|t_Zq (\sum_pq z_pq E_pq)|0> + <0|(\sum_pq z_pq E_pq) t_ZG |0> - <0|t_ZG (\sum_pq z_pq E_pq)|0>
+                # + <0|(\sum_pq z_pq E_pq) t_Yq|0> + <0|(\sum_pq z_pq E_pq) t_YG |0> - <0|t_YG (\sum_pq z_pq E_pq)|0>
+                if muz_op.operators != {}:
+                    transition_dipole_z = (
+                        -expectation_value_hybrid_flow(
+                            self.wf.state_vector, [t_Zq_op, muz_op], self.wf.state_vector
+                        )
+                        + expectation_value_hybrid_flow(
+                            self.wf.state_vector, [muz_op, t_ZG_op], self.wf.state_vector
+                        )
+                        - expectation_value_hybrid_flow(
+                            self.wf.state_vector, [t_ZG_op, muz_op], self.wf.state_vector
+                        )
+                        + expectation_value_hybrid_flow(
+                            self.wf.state_vector, [muz_op, t_Yq_op], self.wf.state_vector
+                        )
+                        + expectation_value_hybrid_flow(
+                            self.wf.state_vector, [muz_op, t_YG_op], self.wf.state_vector
+                        )
+                        - expectation_value_hybrid_flow(
+                            self.wf.state_vector, [t_YG_op, muz_op], self.wf.state_vector
+                        )
+                    )
 
         return transition_dipole_x, transition_dipole_y, transition_dipole_z
 
@@ -1289,18 +1516,18 @@ class LinearResponseUCC:
         if (
             sum(
                 [
-                    self.do_projected_operators,
+                    # self.do_projected_operators,
                     self.do_selfconsistent_operators,
-                    self.do_statetransfer_operators,
-                    self.do_hermitian_statetransfer_operators,
-                    self.do_all_projected_operators,
-                    self.do_ST_projected_operators,
+                    # self.do_statetransfer_operators,
+                    # self.do_hermitian_statetransfer_operators,
+                    # self.do_all_projected_operators,
+                    # self.do_ST_projected_operators,
                 ]
             )
             >= 1
             and not self.do_debugging
         ):
-            raise ValueError('Calculation of oscillator strength is only possible for naive operators.')
+            raise ValueError('Calculation of oscillator strength is not implemented for slef-consistent LR.')
 
         # Get <0|<mu_{x,y,z}|n>
         transition_dipole_x, transition_dipole_y, transition_dipole_z = self.get_transition_dipole(
