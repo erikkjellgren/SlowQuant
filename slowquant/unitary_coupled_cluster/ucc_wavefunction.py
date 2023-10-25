@@ -11,6 +11,10 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
 from slowquant.unitary_coupled_cluster.base import StateVector
+from slowquant.unitary_coupled_cluster.density_matrix import (
+    ReducedDenstiyMatrix,
+    get_orbital_gradient,
+)
 from slowquant.unitary_coupled_cluster.operator_hybrid import (
     convert_pauli_to_hybrid_form,
     expectation_value_hybrid,
@@ -21,11 +25,7 @@ from slowquant.unitary_coupled_cluster.operator_pauli import (
     epqrs_pauli,
     expectation_value_pauli,
 )
-from slowquant.unitary_coupled_cluster.util import (
-    ThetaPicker,
-    construct_ucc_u,
-)
-from slowquant.unitary_coupled_cluster.density_matrix import get_orbital_gradient, ReducedDenstiyMatrix
+from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_ucc_u
 
 
 class WaveFunctionUCC:
@@ -527,12 +527,15 @@ def energy_ucc(
             kappa_mat[q, p] = -kappa_val
     if len(wf.kappa_redundant) != 0:
         if np.max(np.abs(wf.kappa_redundant)) > 0.0:
-            for kappa_val, (p, q) in zip(np.array(wf.kappa_redundant) - np.array(wf._kappa_redundant_old), wf.kappa_redundant_idx):
+            for kappa_val, (p, q) in zip(
+                np.array(wf.kappa_redundant) - np.array(wf._kappa_redundant_old), wf.kappa_redundant_idx
+            ):
                 kappa_mat[p, q] = kappa_val
                 kappa_mat[q, p] = -kappa_val
     c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
-    wf._kappa_old = kappa.copy()
-    wf._kappa_redundant_old = wf.kappa_redundant.copy()
+    if orbital_optimized:
+        wf._kappa_old = kappa.copy()
+        wf._kappa_redundant_old = wf.kappa_redundant.copy()
     # Moving expansion point of kappa
     wf.c_orthonormal = c_trans
 
@@ -602,8 +605,22 @@ def orbital_rotation_gradient(
     """ """
     rdm1 = construct_one_rdm(wf)
     rdm2 = construct_two_rdm(wf)
-    rdms = ReducedDenstiyMatrix(wf.num_inactive_spin_orbs//2, wf.num_active_spin_orbs//2, wf.num_active_spin_orbs//2,rdm1=rdm1, rdm2=rdm2)
-    gradient = get_orbital_gradient(rdms, wf.h_core, wf.g_eri, wf.c_trans, wf.kappa_idx, wf.num_inactive_spin_orbs//2, wf.num_active_spin_orbs//2)
+    rdms = ReducedDenstiyMatrix(
+        wf.num_inactive_spin_orbs // 2,
+        wf.num_active_spin_orbs // 2,
+        wf.num_active_spin_orbs // 2,
+        rdm1=rdm1,
+        rdm2=rdm2,
+    )
+    gradient = get_orbital_gradient(
+        rdms,
+        wf.h_core,
+        wf.g_eri,
+        wf.c_trans,
+        wf.kappa_idx,
+        wf.num_inactive_spin_orbs // 2,
+        wf.num_active_spin_orbs // 2,
+    )
     return gradient
 
 
@@ -752,9 +769,13 @@ def active_space_parameter_gradient(
 def construct_one_rdm(wf: WaveFunctionUCC) -> np.ndarray:
     one_rdm = np.zeros((wf.num_active_spin_orbs // 2, wf.num_active_spin_orbs // 2))
     num_inactive = wf.num_inactive_spin_orbs // 2
-    for p in range(wf.num_inactive_spin_orbs // 2, (wf.num_inactive_spin_orbs + wf.num_active_spin_orbs) // 2):
-        for q in range(wf.num_inactive_spin_orbs // 2, (wf.num_inactive_spin_orbs + wf.num_active_spin_orbs) // 2):
-            one_rdm[p-num_inactive, q-num_inactive] = expectation_value_pauli(
+    for p in range(
+        wf.num_inactive_spin_orbs // 2, (wf.num_inactive_spin_orbs + wf.num_active_spin_orbs) // 2
+    ):
+        for q in range(
+            wf.num_inactive_spin_orbs // 2, (wf.num_inactive_spin_orbs + wf.num_active_spin_orbs) // 2
+        ):
+            one_rdm[p - num_inactive, q - num_inactive] = expectation_value_pauli(
                 wf.state_vector, epq_pauli(p, q, wf.num_spin_orbs, wf.num_elec), wf.state_vector
             )
     return one_rdm
@@ -762,14 +783,29 @@ def construct_one_rdm(wf: WaveFunctionUCC) -> np.ndarray:
 
 def construct_two_rdm(wf: WaveFunctionUCC) -> np.ndarray:
     two_rdm = np.zeros(
-        (wf.num_active_spin_orbs // 2, wf.num_active_spin_orbs // 2, wf.num_active_spin_orbs // 2, wf.num_active_spin_orbs // 2)
+        (
+            wf.num_active_spin_orbs // 2,
+            wf.num_active_spin_orbs // 2,
+            wf.num_active_spin_orbs // 2,
+            wf.num_active_spin_orbs // 2,
+        )
     )
     num_inactive = wf.num_inactive_spin_orbs // 2
-    for p in range(wf.num_inactive_spin_orbs //2, (wf.num_inactive_spin_orbs + wf.num_active_spin_orbs) // 2):
-        for q in range(wf.num_inactive_spin_orbs//2, (wf.num_inactive_spin_orbs + wf.num_active_spin_orbs) // 2):
-            for r in range(wf.num_inactive_spin_orbs//2, (wf.num_inactive_spin_orbs + wf.num_active_spin_orbs) // 2):
-                for s in range(wf.num_inactive_spin_orbs//2, (wf.num_inactive_spin_orbs + wf.num_active_spin_orbs) // 2):
-                    two_rdm[p-num_inactive, q-num_inactive, r-num_inactive, s-num_inactive] = expectation_value_pauli(
+    for p in range(
+        wf.num_inactive_spin_orbs // 2, (wf.num_inactive_spin_orbs + wf.num_active_spin_orbs) // 2
+    ):
+        for q in range(
+            wf.num_inactive_spin_orbs // 2, (wf.num_inactive_spin_orbs + wf.num_active_spin_orbs) // 2
+        ):
+            for r in range(
+                wf.num_inactive_spin_orbs // 2, (wf.num_inactive_spin_orbs + wf.num_active_spin_orbs) // 2
+            ):
+                for s in range(
+                    wf.num_inactive_spin_orbs // 2, (wf.num_inactive_spin_orbs + wf.num_active_spin_orbs) // 2
+                ):
+                    two_rdm[
+                        p - num_inactive, q - num_inactive, r - num_inactive, s - num_inactive
+                    ] = expectation_value_pauli(
                         wf.state_vector,
                         epqrs_pauli(p, q, r, s, wf.num_spin_orbs, wf.num_elec),
                         wf.state_vector,
