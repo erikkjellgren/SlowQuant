@@ -3,7 +3,6 @@ from collections.abc import Sequence
 
 import numpy as np
 import scipy
-import scipy.sparse as ss
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
@@ -19,9 +18,10 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
 )
 from slowquant.unitary_coupled_cluster.operator_hybrid import (
     OperatorHybrid,
-    OperatorHybridData,
     convert_pauli_to_hybrid_form,
     expectation_value_hybrid_flow,
+    expectation_value_hybrid_flow_commutator,
+    expectation_value_hybrid_flow_double_commutator,
 )
 from slowquant.unitary_coupled_cluster.operator_pauli import (
     OperatorPauli,
@@ -34,7 +34,7 @@ from slowquant.unitary_coupled_cluster.ucc_wavefunction import (
     construct_one_rdm,
     construct_two_rdm,
 )
-from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_ucc_u
+from slowquant.unitary_coupled_cluster.util import ThetaPicker
 
 
 class ResponseOperator:
@@ -77,23 +77,6 @@ class LinearResponseUCC:
         num_spin_orbs = self.wf.num_spin_orbs
         num_elec = self.wf.num_elec
         excitations = excitations.lower()
-        U_matrix = construct_ucc_u(
-            self.wf.num_active_spin_orbs,
-            self.wf.num_active_elec,
-            self.wf.theta1
-            + self.wf.theta2
-            + self.wf.theta3
-            + self.wf.theta4
-            + self.wf.theta5
-            + self.wf.theta6,
-            self.wf.theta_picker_full,
-            "sdtq56",  # self.wf._excitations,
-        )
-        inactive_str = "I" * self.wf.num_inactive_spin_orbs
-        virtual_str = "I" * self.wf.num_virtual_spin_orbs
-        U = OperatorHybrid(
-            {inactive_str + virtual_str: OperatorHybridData(inactive_str, U_matrix, virtual_str)}
-        )
         if "s" in excitations:
             for _, a, i, op_ in self.theta_picker.get_t1_generator_sa(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
@@ -205,9 +188,6 @@ class LinearResponseUCC:
             rdm2=rdm2,
         )
         idx_shift = len(self.q_ops)
-        csf = copy.deepcopy(self.wf.state_vector)
-        csf.active = csf._active
-        csf.active_csr = ss.csr_matrix(csf._active)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
         grad = get_orbital_gradient_response(
@@ -223,9 +203,11 @@ class LinearResponseUCC:
             print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
         grad = np.zeros(2 * len(self.G_ops))
         for i, op in enumerate(self.G_ops):
-            grad[i] = -expectation_value_hybrid_flow(self.wf.state_vector, [H_1i_1a, U, op.operator], csf)
-            grad[i + len(self.G_ops)] = expectation_value_hybrid_flow(
-                csf, [op.operator.dagger, U.dagger, H_1i_1a], self.wf.state_vector
+            grad[i] = expectation_value_hybrid_flow_commutator(
+                self.wf.state_vector, H_1i_1a, op.operator, self.wf.state_vector
+            )
+            grad[i + len(self.G_ops)] = expectation_value_hybrid_flow_commutator(
+                self.wf.state_vector, op.operator.dagger, H_1i_1a, self.wf.state_vector
             )
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
@@ -257,13 +239,18 @@ class LinearResponseUCC:
                 GI = opI.operator
                 # Make M
                 val = expectation_value_hybrid_flow(
-                    csf, [GI.dagger, U.dagger, H_1i_1a, qJ], self.wf.state_vector
+                    self.wf.state_vector, [GI.dagger, H_1i_1a, qJ], self.wf.state_vector
+                ) - expectation_value_hybrid_flow(
+                    self.wf.state_vector, [H_1i_1a, qJ, GI.dagger], self.wf.state_vector
                 )
                 self.M[i + idx_shift, j] = self.M[j, i + idx_shift] = val
                 # Make Q
-                self.Q[i + idx_shift, j] = self.Q[j, i + idx_shift] = -expectation_value_hybrid_flow(
-                    csf, [GI.dagger, U.dagger, qJ.dagger, H_1i_1a], self.wf.state_vector
+                val = expectation_value_hybrid_flow(
+                    self.wf.state_vector, [qJ.dagger, H_1i_1a, GI.dagger], self.wf.state_vector
+                ) - expectation_value_hybrid_flow(
+                    self.wf.state_vector, [GI.dagger, qJ.dagger, H_1i_1a], self.wf.state_vector
                 )
+                self.Q[i + idx_shift, j] = self.Q[j, i + idx_shift] = val
         for j, opJ in enumerate(self.G_ops):
             GJ = opJ.operator
             for i, opI in enumerate(self.G_ops):
@@ -271,19 +258,23 @@ class LinearResponseUCC:
                 if i < j:
                     continue
                 # Make M
-                val = expectation_value_hybrid_flow(
-                    csf, [GI.dagger, U.dagger, H_en, U, GJ], csf
-                ) - expectation_value_hybrid_flow(csf, [GI.dagger, GJ, U.dagger, H_en], self.wf.state_vector)
-                self.M[i + idx_shift, j + idx_shift] = self.M[j + idx_shift, i + idx_shift] = val
+                self.M[i + idx_shift, j + idx_shift] = self.M[
+                    j + idx_shift, i + idx_shift
+                ] = expectation_value_hybrid_flow_double_commutator(
+                    self.wf.state_vector, GI.dagger, H_en, GJ, self.wf.state_vector
+                )
                 # Make Q
                 self.Q[i + idx_shift, j + idx_shift] = self.Q[
                     j + idx_shift, i + idx_shift
-                ] = -expectation_value_hybrid_flow(
-                    csf, [GI.dagger, GJ.dagger, U.dagger, H_en], self.wf.state_vector
+                ] = expectation_value_hybrid_flow_double_commutator(
+                    self.wf.state_vector, GI.dagger, H_en, GJ.dagger, self.wf.state_vector
                 )
                 # Make V
-                if i == j:
-                    self.V[i + idx_shift, j + idx_shift] = 1
+                self.V[i + idx_shift, j + idx_shift] = self.V[
+                    j + idx_shift, i + idx_shift
+                ] = expectation_value_hybrid_flow_commutator(
+                    self.wf.state_vector, GI.dagger, GJ, self.wf.state_vector
+                )
 
     def calc_excitation_energies(self) -> None:
         """Calculate excitation energies."""
@@ -342,13 +333,16 @@ class LinearResponseUCC:
             rdms, self.wf.kappa_idx, self.response_vectors, state_number, number_excitations
         )
         shift = len(self.q_ops)
-        g_part = 0
-        for i, _ in enumerate(self.G_ops):
-            g_part += (
-                self.response_vectors[i + shift, state_number] ** 2
-                - self.response_vectors[i + shift + number_excitations, state_number] ** 2
+        transfer_op = OperatorHybrid({})
+        for i, op in enumerate(self.G_ops):
+            G = op.operator
+            transfer_op += (
+                self.response_vectors[i + shift, state_number] * G.dagger
+                + self.response_vectors[i + shift + number_excitations, state_number] * G
             )
-        return q_part + g_part
+        return q_part + expectation_value_hybrid_flow_commutator(
+            self.wf.state_vector, transfer_op, transfer_op.dagger, self.wf.state_vector
+        )
 
     def get_transition_dipole(
         self, state_number: int, dipole_integrals: Sequence[np.ndarray]
@@ -374,6 +368,14 @@ class LinearResponseUCC:
             rdm1,
             rdm2=rdm2,
         )
+        shift = len(self.q_ops)
+        transfer_op = OperatorHybrid({})
+        for i, op in enumerate(self.G_ops):
+            G = op.operator
+            transfer_op += (
+                self.normed_response_vectors[i + shift, state_number] * G.dagger
+                + self.normed_response_vectors[i + shift + number_excitations, state_number] * G
+            )
         mux = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[0])
         muy = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[1])
         muz = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[2])
@@ -407,6 +409,9 @@ class LinearResponseUCC:
             self.wf.num_active_spin_orbs,
             self.wf.num_virtual_spin_orbs,
         )
+        transition_dipole_x = 0.0
+        transition_dipole_y = 0.0
+        transition_dipole_z = 0.0
         q_part_x = get_orbital_response_property_gradient(
             rdms,
             mux,
@@ -437,49 +442,19 @@ class LinearResponseUCC:
             state_number,
             number_excitations,
         )
-        csf = copy.deepcopy(self.wf.state_vector)
-        csf.active = csf._active
-        U_matrix = construct_ucc_u(
-            self.wf.num_active_spin_orbs,
-            self.wf.num_active_elec,
-            self.wf.theta1
-            + self.wf.theta2
-            + self.wf.theta3
-            + self.wf.theta4
-            + self.wf.theta5
-            + self.wf.theta6,
-            self.wf.theta_picker_full,
-            "sdtq56",  # self.wf._excitations,
-        )
-        inactive_str = "I" * self.wf.num_inactive_spin_orbs
-        virtual_str = "I" * self.wf.num_virtual_spin_orbs
-        U = OperatorHybrid(
-            {inactive_str + virtual_str: OperatorHybridData(inactive_str, U_matrix, virtual_str)}
-        )
-        g_part_x = 0.0
-        g_part_y = 0.0
-        g_part_z = 0.0
-        for i, op in enumerate(self.G_ops):
-            G = op.operator
-            g_part_x -= self.normed_response_vectors[
-                i + len(self.q_ops), state_number
-            ] * expectation_value_hybrid_flow(self.wf.state_vector, [mux_op, U, G], csf)
-            g_part_x += self.normed_response_vectors[
-                i + len(self.q_ops) + number_excitations, state_number
-            ] * expectation_value_hybrid_flow(csf, [G.dagger, U.dagger, mux_op], self.wf.state_vector)
-            g_part_y -= self.normed_response_vectors[
-                i + len(self.q_ops), state_number
-            ] * expectation_value_hybrid_flow(self.wf.state_vector, [muy_op, U, G], csf)
-            g_part_y += self.normed_response_vectors[
-                i + len(self.q_ops) + number_excitations, state_number
-            ] * expectation_value_hybrid_flow(csf, [G.dagger, U.dagger, muy_op], self.wf.state_vector)
-            g_part_z -= self.normed_response_vectors[
-                i + len(self.q_ops), state_number
-            ] * expectation_value_hybrid_flow(self.wf.state_vector, [muz_op, U, G], csf)
-            g_part_z += self.normed_response_vectors[
-                i + len(self.q_ops) + number_excitations, state_number
-            ] * expectation_value_hybrid_flow(csf, [G.dagger, U.dagger, muz_op], self.wf.state_vector)
-        return q_part_x + g_part_x, q_part_y + g_part_y, q_part_z + g_part_z
+        if mux_op.operators != {}:
+            transition_dipole_x = expectation_value_hybrid_flow_commutator(
+                self.wf.state_vector, mux_op, transfer_op, self.wf.state_vector
+            )
+        if muy_op.operators != {}:
+            transition_dipole_y = expectation_value_hybrid_flow_commutator(
+                self.wf.state_vector, muy_op, transfer_op, self.wf.state_vector
+            )
+        if muz_op.operators != {}:
+            transition_dipole_z = expectation_value_hybrid_flow_commutator(
+                self.wf.state_vector, muz_op, transfer_op, self.wf.state_vector
+            )
+        return q_part_x + transition_dipole_x, q_part_y + transition_dipole_y, q_part_z + transition_dipole_z
 
     def get_oscillator_strength(self, state_number: int, dipole_integrals: Sequence[np.ndarray]) -> float:
         r"""Calculate oscillator strength.
