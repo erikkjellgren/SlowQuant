@@ -86,10 +86,10 @@ class LinearResponseUCC:
         """
         if do_buggy_projection:
             if do_debugging:
-                print('WARNING: This implementation of the projection might lead to errors.')
+                print("WARNING: This implementation of the projection might lead to errors.")
             else:
                 print(
-                    'WARNING: Using the do_buggy_projection flag without defining do_debugging does not have any influence.'
+                    "WARNING: Using the do_buggy_projection flag without defining do_debugging does not have any influence."
                 )
         self.do_debugging = do_debugging
         self.do_selfconsistent_operators = do_selfconsistent_operators
@@ -111,14 +111,14 @@ class LinearResponseUCC:
             )
             >= 2
         ):
-            raise ValueError('You set more than one method flag to True.')
+            raise ValueError("You set more than one method flag to True.")
         if self.do_debugging:
             if do_hermitian_statetransfer_operators:
-                raise ValueError('Hermitian State-transfer operator is only implemented as work equations.')
+                raise ValueError("Hermitian State-transfer operator is only implemented as work equations.")
             if do_all_projected_operators:
-                raise ValueError('All projected operator is only implemented as work equations.')
+                raise ValueError("All projected operator is only implemented as work equations.")
             if do_ST_projected_operators:
-                raise ValueError('ST/projected operator is only implemented as work equations.')
+                raise ValueError("ST/projected operator is only implemented as work equations.")
 
         self.wf = copy.deepcopy(wave_function)
         self.theta_picker = ThetaPicker(
@@ -144,11 +144,11 @@ class LinearResponseUCC:
             + self.wf.theta5
             + self.wf.theta6,
             self.wf.theta_picker_full,
-            'sdtq56',  # self.wf._excitations,
+            "sdtq56",  # self.wf._excitations,
         )
         ### NEW
-        inactive_str = 'I' * self.wf.num_inactive_spin_orbs
-        virtual_str = 'I' * self.wf.num_virtual_spin_orbs
+        inactive_str = "I" * self.wf.num_inactive_spin_orbs
+        virtual_str = "I" * self.wf.num_virtual_spin_orbs
         U = OperatorHybrid(
             {inactive_str + virtual_str: OperatorHybridData(inactive_str, U_matrix, virtual_str)}
         )  # U is now an operator
@@ -172,7 +172,7 @@ class LinearResponseUCC:
             else:  # New projection
                 projection = make_projection_operator(self.wf.state_vector)
                 self.projection = projection
-        if 's' in excitations:
+        if "s" in excitations:
             for _, a, i, op_ in self.theta_picker.get_t1_generator_sa(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
                     op_,
@@ -189,7 +189,7 @@ class LinearResponseUCC:
                     else:
                         op = op * projection
                     fac = expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector)
-                    op_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
+                    op_diff_ = OperatorPauli({"I" * self.wf.num_spin_orbs: fac})
                     op_diff = convert_pauli_to_hybrid_form(
                         op_diff_,
                         self.wf.num_inactive_spin_orbs,
@@ -205,7 +205,7 @@ class LinearResponseUCC:
                     else:
                         op = op * projection
                 self.G_ops.append(ResponseOperator((i,), (a,), op))
-        if 'd' in excitations:
+        if "d" in excitations:
             for _, a, i, b, j, op_ in self.theta_picker.get_t2_generator_sa(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
                     op_,
@@ -222,7 +222,7 @@ class LinearResponseUCC:
                     else:
                         op = op * projection
                     fac = expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector)
-                    op_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
+                    op_diff_ = OperatorPauli({"I" * self.wf.num_spin_orbs: fac})
                     op_diff = convert_pauli_to_hybrid_form(
                         op_diff_,
                         self.wf.num_inactive_spin_orbs,
@@ -238,7 +238,7 @@ class LinearResponseUCC:
                     else:
                         op = op * projection
                 self.G_ops.append(ResponseOperator((i, j), (a, b), op))
-        if 't' in excitations:
+        if "t" in excitations:
             for _, a, i, b, j, c, k, op_ in self.theta_picker.get_t3_generator(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
                     op_,
@@ -255,7 +255,7 @@ class LinearResponseUCC:
                     else:
                         op = op * projection
                     fac = expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector)
-                    op_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
+                    op_diff_ = OperatorPauli({"I" * self.wf.num_spin_orbs: fac})
                     op_diff = convert_pauli_to_hybrid_form(
                         op_diff_,
                         self.wf.num_inactive_spin_orbs,
@@ -271,7 +271,7 @@ class LinearResponseUCC:
                     else:
                         op = op * projection
                 self.G_ops.append(ResponseOperator((i, j, k), (a, b, c), op))
-        if 'q' in excitations:
+        if "q" in excitations:
             for _, a, i, b, j, c, k, d, l, op_ in self.theta_picker.get_t4_generator(num_spin_orbs, num_elec):
                 op = convert_pauli_to_hybrid_form(
                     op_,
@@ -288,7 +288,7 @@ class LinearResponseUCC:
                     else:
                         op = op * projection
                     fac = expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector)
-                    op_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
+                    op_diff_ = OperatorPauli({"I" * self.wf.num_spin_orbs: fac})
                     op_diff = convert_pauli_to_hybrid_form(
                         op_diff_,
                         self.wf.num_inactive_spin_orbs,
@@ -304,7 +304,7 @@ class LinearResponseUCC:
                     else:
                         op = op * projection
                 self.G_ops.append(ResponseOperator((i, j, k, l), (a, b, c, d), op))
-        if '5' in excitations:
+        if "5" in excitations:
             for _, a, i, b, j, c, k, d, l, e, m, op_ in self.theta_picker.get_t5_generator(
                 num_spin_orbs, num_elec
             ):
@@ -323,7 +323,7 @@ class LinearResponseUCC:
                     else:
                         op = op * projection
                     fac = expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector)
-                    op_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
+                    op_diff_ = OperatorPauli({"I" * self.wf.num_spin_orbs: fac})
                     op_diff = convert_pauli_to_hybrid_form(
                         op_diff_,
                         self.wf.num_inactive_spin_orbs,
@@ -339,7 +339,7 @@ class LinearResponseUCC:
                     else:
                         op = op * projection
                 self.G_ops.append(ResponseOperator((i, j, k, l, m), (a, b, c, d, e), op))
-        if '6' in excitations:
+        if "6" in excitations:
             for _, a, i, b, j, c, k, d, l, e, m, f, n, op_ in self.theta_picker.get_t6_generator(
                 num_spin_orbs, num_elec
             ):
@@ -358,7 +358,7 @@ class LinearResponseUCC:
                     else:
                         op = op * projection
                     fac = expectation_value_hybrid(self.wf.state_vector, op, self.wf.state_vector)
-                    op_diff_ = OperatorPauli({'I' * self.wf.num_spin_orbs: fac})
+                    op_diff_ = OperatorPauli({"I" * self.wf.num_spin_orbs: fac})
                     op_diff = convert_pauli_to_hybrid_form(
                         op_diff_,
                         self.wf.num_inactive_spin_orbs,
@@ -435,8 +435,8 @@ class LinearResponseUCC:
             rdm2=rdm2,
         )
         idx_shift = len(self.q_ops)
-        print('Gs', len(self.G_ops))
-        print('qs', len(self.q_ops))
+        print("Gs", len(self.G_ops))
+        print("qs", len(self.q_ops))
         grad = get_orbital_gradient_response(
             rdms,
             self.wf.h_core,
@@ -457,9 +457,9 @@ class LinearResponseUCC:
             )
         """
         if len(grad) != 0:
-            print('idx, max(abs(grad orb)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+            print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
-                raise ValueError('Large Hessian gradient detected in q of ', np.max(np.abs(grad)))
+                raise ValueError("Large Hessian gradient detected in q of ", np.max(np.abs(grad)))
         grad = np.zeros(2 * len(self.G_ops))
         for i, op in enumerate(self.G_ops):
             grad[i] = expectation_value_contracted(
@@ -469,10 +469,10 @@ class LinearResponseUCC:
                 self.wf.state_vector, commutator_contract(H_en, op.operator.dagger), self.wf.state_vector
             )
         if len(grad) != 0:
-            print('idx, max(abs(grad active)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+            print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
-                raise ValueError('Large Hessian gradient detected in G of ', np.max(np.abs(grad)))
-        
+                raise ValueError("Large Hessian gradient detected in G of ", np.max(np.abs(grad)))
+
         #######
         ### Construct matrices
         #######
@@ -507,29 +507,29 @@ class LinearResponseUCC:
 
         # Work equation implementation
         if do_selfconsistent_operators:
-            calculation_type = 'sc'
+            calculation_type = "sc"
         elif do_projected_operators:
-            calculation_type = 'proj'
+            calculation_type = "proj"
         elif do_all_projected_operators:
-            calculation_type = 'all_proj'
+            calculation_type = "all_proj"
         elif do_ST_projected_operators:
-            calculation_type = 'ST_proj'
+            calculation_type = "ST_proj"
         elif do_statetransfer_operators:
-            calculation_type = 'st'
+            calculation_type = "st"
         elif do_hermitian_statetransfer_operators:
             if track_hermitian_statetransfer:
-                calculation_type = 'tracked-hst'
+                calculation_type = "tracked-hst"
             else:
-                calculation_type = 'hst'
+                calculation_type = "hst"
         else:
-            calculation_type = 'naive'
+            calculation_type = "naive"
 
         if self.do_debugging is True:  # no matter what operators
-            calculation_type = 'generic'
+            calculation_type = "generic"
 
-        print('Calculation type: ', calculation_type)
+        print("Calculation type: ", calculation_type)
         # QQ/qq
-        if calculation_type in ('sc', 'naive', 'st', 'proj', 'hst', 'tracked-hst'):
+        if calculation_type in ("sc", "naive", "st", "proj", "hst", "tracked-hst"):
             self.M[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_A(
                 rdms,
                 self.wf.h_core,
@@ -578,7 +578,7 @@ class LinearResponseUCC:
                         # Make W = 0
                     elif calculation_type in ('all_proj', 'ST_proj'):
                     """
-                    if calculation_type in ('all_proj', 'ST_proj'):
+                    if calculation_type in ("all_proj", "ST_proj"):
                         # Make M (A)
                         val = expectation_value_hybrid_flow(
                             self.wf.state_vector, [qI.dagger, H_2i_2a, qJ], self.wf.state_vector
@@ -595,7 +595,7 @@ class LinearResponseUCC:
                             self.wf.state_vector, [qI.dagger, qJ], self.wf.state_vector
                         )
                         # Make W = 0
-                    elif calculation_type == 'generic':
+                    elif calculation_type == "generic":
                         # Make M (A)
                         self.M[i, j] = self.M[j, i] = expectation_value_contracted(
                             self.wf.state_vector,
@@ -622,14 +622,14 @@ class LinearResponseUCC:
                         )
                         self.W[j, i] = -self.W[i, j]
                     else:
-                        raise NameError('Could not determine calculation_type got: {calculation_type}')
+                        raise NameError("Could not determine calculation_type got: {calculation_type}")
         # Gq/RQ and qG/QR
         # Remember: [G_i^d,[H,q_j]] = [[q_i^d,H],G_j] = [G_j,[H,q_i^d]]
         for j, opJ in enumerate(self.q_ops):
             qJ = opJ.operator
             for i, opI in enumerate(self.G_ops):
                 GI = opI.operator
-                if calculation_type == 'sc':
+                if calculation_type == "sc":
                     # Make M (A)
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
                         csf, [GI.dagger, U.dagger, H_1i_1a, qJ], self.wf.state_vector
@@ -642,7 +642,7 @@ class LinearResponseUCC:
                     )
                     # Make V = 0
                     # Make W = 0
-                elif calculation_type == 'naive':
+                elif calculation_type == "naive":
                     # Make M (A)
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
                         self.wf.state_vector, [GI.dagger, H_1i_1a, qJ], self.wf.state_vector
@@ -657,7 +657,7 @@ class LinearResponseUCC:
                     )
                     # Make V = 0
                     # Make W = 0
-                elif calculation_type == 'proj':
+                elif calculation_type == "proj":
                     # Make M (A)
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
                         self.wf.state_vector, [GI.dagger, H_1i_1a, qJ], self.wf.state_vector
@@ -676,7 +676,7 @@ class LinearResponseUCC:
                     # ))
                     # Make V = 0
                     # Make W = 0
-                elif calculation_type == 'all_proj':
+                elif calculation_type == "all_proj":
                     # Make M (A)
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
                         self.wf.state_vector, [GI.dagger, H_1i_1a, qJ], self.wf.state_vector
@@ -684,7 +684,7 @@ class LinearResponseUCC:
                     # Make Q (B) = 0
                     # Make V = 0
                     # Make W = 0
-                elif calculation_type == 'st':
+                elif calculation_type == "st":
                     # Make M (A)
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
                         csf, [GI.dagger, U.dagger, H_1i_1a, qJ], self.wf.state_vector
@@ -697,7 +697,7 @@ class LinearResponseUCC:
                     )
                     # Make V = 0
                     # Make W = 0
-                elif calculation_type == 'ST_proj':
+                elif calculation_type == "ST_proj":
                     # Make M (A)
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
                         csf, [GI.dagger, U.dagger, H_1i_1a, qJ], self.wf.state_vector
@@ -705,7 +705,7 @@ class LinearResponseUCC:
                     # Make Q (B) = 0
                     # Make V = 0
                     # Make W = 0
-                elif calculation_type == 'hst':
+                elif calculation_type == "hst":
                     # Make M (A)
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
                         csf, [GI.dagger, U.dagger, H_1i_1a, qJ], self.wf.state_vector
@@ -715,7 +715,7 @@ class LinearResponseUCC:
                     # Make Q (B) = 0 # assumed zero (approximation!)
                     # Make V = 0
                     # Make W = 0
-                elif calculation_type == 'tracked-hst':
+                elif calculation_type == "tracked-hst":
                     # Make M (A)
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
                         csf, [GI.dagger, U.dagger, H_1i_1a, qJ], self.wf.state_vector
@@ -732,7 +732,7 @@ class LinearResponseUCC:
                     )
                     # Make V = 0
                     # Make W = 0
-                elif calculation_type == 'generic':
+                elif calculation_type == "generic":
                     # Make M (A)
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_contracted(
                         self.wf.state_vector,
@@ -756,7 +756,7 @@ class LinearResponseUCC:
                     )
                     self.W[i + idx_shift, j] = -self.W[j, i + idx_shift]
                 else:
-                    raise NameError('Could not determine calculation_type got: {calculation_type}')
+                    raise NameError("Could not determine calculation_type got: {calculation_type}")
         # GG/RR
         for j, opJ in enumerate(self.G_ops):
             GJ = opJ.operator
@@ -764,7 +764,7 @@ class LinearResponseUCC:
                 GI = opI.operator
                 if i < j:
                     continue
-                if calculation_type == 'sc':
+                if calculation_type == "sc":
                     # Make M (A)
                     val = expectation_value_hybrid_flow(
                         csf, [GI.dagger, U.dagger, H_en, U, GJ], csf
@@ -782,7 +782,7 @@ class LinearResponseUCC:
                     if i == j:
                         self.V[i + idx_shift, j + idx_shift] = self.V[j + idx_shift, i + idx_shift] = 1
                     # Make W = 0
-                elif calculation_type == 'naive':
+                elif calculation_type == "naive":
                     # Make M (A)
                     val = (
                         expectation_value_hybrid_flow(
@@ -824,7 +824,7 @@ class LinearResponseUCC:
                         self.wf.state_vector, [GJ, GI.dagger], self.wf.state_vector
                     )
                     # Make W = 0
-                elif calculation_type in ('proj', 'all_proj'):
+                elif calculation_type in ("proj", "all_proj"):
                     # Make M (A)
                     val = (
                         expectation_value_hybrid_flow(
@@ -881,7 +881,7 @@ class LinearResponseUCC:
                         * expectation_value_hybrid_flow(self.wf.state_vector, [GJ], self.wf.state_vector)
                     )
                     # Make W = 0
-                elif calculation_type in ('st', 'hst', 'tracked-hst', 'ST_proj'):
+                elif calculation_type in ("st", "hst", "tracked-hst", "ST_proj"):
                     # Make M (A)
                     if i == j:
                         val = (
@@ -896,7 +896,7 @@ class LinearResponseUCC:
                     # Make Q (B)= 0
                     # Make V (\Sigma) = \delta_ij (see above)
                     # Make W (\Delta) = 0
-                elif calculation_type == 'generic':
+                elif calculation_type == "generic":
                     # Make M (A)
                     self.M[i + idx_shift, j + idx_shift] = self.M[
                         j + idx_shift, i + idx_shift
@@ -925,7 +925,7 @@ class LinearResponseUCC:
                     )
                     self.W[j + idx_shift, i + idx_shift] = -self.W[i + idx_shift, j + idx_shift]
                 else:
-                    raise NameError('Could not determine calculation_type got: {calculation_type}')
+                    raise NameError("Could not determine calculation_type got: {calculation_type}")
 
     def calc_excitation_energies(self, do_working_equations: bool = False) -> None:
         """Calculate excitation energies."""
@@ -940,16 +940,16 @@ class LinearResponseUCC:
             hess_eigval,
             _,
         ) = np.linalg.eig(E2)
-        print(f'Smallest Hessian eigenvalue: {np.min(hess_eigval)}')
+        print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
 
         S = np.zeros((size * 2, size * 2))
         S[:size, :size] = self.V
         S[:size, size:] = self.W
         S[size:, :size] = -np.conj(self.W)
         S[size:, size:] = -np.conj(self.V)
-        print(f'Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.V)))}')
+        print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.V)))}")
         if np.min(np.abs(np.diagonal(self.V))) < 0:
-            raise ValueError('This value is bad. Abort.')
+            raise ValueError("This value is bad. Abort.")
 
         eigval, eigvec = scipy.linalg.eig(E2, S)
         sorting = np.argsort(eigval)
@@ -974,9 +974,9 @@ class LinearResponseUCC:
         Returns:
             Tabulized excitation assignment.
         """
-        output = f'Response vector analysis for excitation {state_number+1}\n'
+        output = f"Response vector analysis for excitation {state_number+1}\n"
         output += (
-            'Occupied idxs | Unoccupied idxs | Response vector element | Normalized response vector element\n'
+            "Occupied idxs | Unoccupied idxs | Response vector element | Normalized response vector element\n"
         )
         excitations = len(self.q_ops) + len(self.G_ops)
         skip_threshold = threshold * np.max(np.abs(self.response_vectors[:, state_number]))
@@ -987,9 +987,9 @@ class LinearResponseUCC:
         ):
             if abs(resp_val) < skip_threshold:
                 continue
-            resp_val_str = f'{resp_val:1.6f}'
-            normed_resp_val_str = f'{normed_resp_val:1.6f}'
-            output += f'{str(operator.occ_idx).center(13)} | {str(operator.unocc_idx).center(15)} | {resp_val_str.center(23)} | {normed_resp_val_str.center(34)}\n'
+            resp_val_str = f"{resp_val:1.6f}"
+            normed_resp_val_str = f"{normed_resp_val:1.6f}"
+            output += f"{str(operator.occ_idx).center(13)} | {str(operator.unocc_idx).center(15)} | {resp_val_str.center(23)} | {normed_resp_val_str.center(34)}\n"
         for resp_val, normed_resp_val, operator in zip(
             self.response_vectors[excitations:, state_number],
             self.normed_response_vectors[excitations:, state_number],
@@ -997,9 +997,9 @@ class LinearResponseUCC:
         ):
             if abs(resp_val) < skip_threshold:
                 continue
-            resp_val_str = f'{resp_val:1.6f}'
-            normed_resp_val_str = f'{normed_resp_val:1.6f}'
-            output += f'{str(operator.unocc_idx).center(13)} | {str(operator.occ_idx).center(15)} | {resp_val_str.center(23)} | {normed_resp_val_str.center(34)}\n'
+            resp_val_str = f"{resp_val:1.6f}"
+            normed_resp_val_str = f"{normed_resp_val:1.6f}"
+            output += f"{str(operator.unocc_idx).center(13)} | {str(operator.occ_idx).center(15)} | {resp_val_str.center(23)} | {normed_resp_val_str.center(34)}\n"
         return output
 
     def get_excited_state_overlap(self, state_number: int) -> float:
@@ -1012,7 +1012,7 @@ class LinearResponseUCC:
             Overlap between ground state and excited state.
         """
         number_excitations = len(self.excitation_energies)
-        print('WARNING: This function [get_excited_state_overlap] might not be working.')
+        print("WARNING: This function [get_excited_state_overlap] might not be working.")
 
         for i, op in enumerate(self.q_ops + self.G_ops):
             G = op.operator
@@ -1059,7 +1059,7 @@ class LinearResponseUCC:
             and not do_working_equations
         ):
             print(
-                'WARNING: Calculation of excited state norm only possible for naive operators. Only energies and response vectors are valid. Try do_working_equation or do_debugging.'
+                "WARNING: Calculation of excited state norm only possible for naive operators. Only energies and response vectors are valid. Try do_working_equation or do_debugging."
             )
 
         number_excitations = len(self.excitation_energies)
@@ -1204,7 +1204,7 @@ class LinearResponseUCC:
         """
 
         if len(dipole_integrals) != 3:
-            raise ValueError(f'Expected 3 dipole integrals got {len(dipole_integrals)}')
+            raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
         number_excitations = len(self.excitation_energies)
 
         if not do_working_equations:
@@ -1597,12 +1597,12 @@ class LinearResponseUCC:
             Nicely formatted table.
         """
         output = (
-            'Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n'
+            "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n"
         )
         for i, exc_energy in enumerate(self.excitation_energies):
             osc_strength = self.get_oscillator_strength(i, dipole_integrals)
-            exc_str = f'{exc_energy:2.6f}'
-            exc_str_ev = f'{exc_energy*27.2114079527:3.6f}'
-            osc_str = f'{osc_strength:1.6f}'
-            output += f'{str(i+1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n'
+            exc_str = f"{exc_energy:2.6f}"
+            exc_str_ev = f"{exc_energy*27.2114079527:3.6f}"
+            osc_str = f"{osc_strength:1.6f}"
+            output += f"{str(i+1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
         return output
