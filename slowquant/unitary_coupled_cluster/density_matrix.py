@@ -202,13 +202,13 @@ def get_orbital_response_vector_norm(
                     response_vectors[i, state_number] * response_vectors[j, state_number] * rdms.RDM1(n, np)
                 )
             if m == mp:
-                norm -= (
+                norm += (
                     response_vectors[i + number_excitations, state_number]
                     * response_vectors[j + number_excitations, state_number]
                     * rdms.RDM1(n, np)
                 )
             if n == np:
-                norm += (
+                norm -= (
                     response_vectors[i + number_excitations, state_number]
                     * response_vectors[j + number_excitations, state_number]
                     * rdms.RDM1(m, mp)
