@@ -192,14 +192,27 @@ def get_orbital_response_vector_norm(
 ) -> float:
     norm = 0
     for i, (m, n) in enumerate(kappa_idx):
-        norm += (
-            response_vectors[i, state_number] ** 2
-            - response_vectors[i + number_excitations, state_number] ** 2
-        ) * rdms.RDM1(m, m)
-        norm += (
-            response_vectors[i + number_excitations, state_number] ** 2
-            - response_vectors[i, state_number] ** 2
-        ) * rdms.RDM1(n, n)
+        for j, (mp, np) in enumerate(kappa_idx):
+            if n == np:
+                norm += (
+                    response_vectors[i, state_number] * response_vectors[j, state_number] * rdms.RDM1(m, mp)
+                )
+            if m == mp:
+                norm -= (
+                    response_vectors[i, state_number] * response_vectors[j, state_number] * rdms.RDM1(n, np)
+                )
+            if m == mp:
+                norm -= (
+                    response_vectors[i + number_excitations, state_number]
+                    * response_vectors[j + number_excitations, state_number]
+                    * rdms.RDM1(n, np)
+                )
+            if n == np:
+                norm += (
+                    response_vectors[i + number_excitations, state_number]
+                    * response_vectors[j + number_excitations, state_number]
+                    * rdms.RDM1(m, mp)
+                )
     return 1 / 2 * norm
 
 
