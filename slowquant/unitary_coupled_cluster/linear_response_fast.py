@@ -9,6 +9,14 @@ import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
+from slowquant.unitary_coupled_cluster.density_matrix import (
+    ReducedDenstiyMatrix,
+    get_orbital_gradient_response,
+    get_orbital_response_hessian_A,
+    get_orbital_response_hessian_B,
+    get_orbital_response_metric_sgima,
+    get_orbital_response_property_gradient,
+)
 from slowquant.unitary_coupled_cluster.operator_contracted import (
     commutator_contract,
     double_commutator_contract,
@@ -29,7 +37,11 @@ from slowquant.unitary_coupled_cluster.operator_pauli import (
     epq_pauli,
     hamiltonian_pauli,
 )
-from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
+from slowquant.unitary_coupled_cluster.ucc_wavefunction import (
+    WaveFunctionUCC,
+    construct_one_rdm,
+    construct_two_rdm,
+)
 from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_ucc_u
 
 
@@ -413,9 +425,28 @@ class LinearResponseUCC:
             self.wf.num_active_spin_orbs,
             self.wf.num_virtual_spin_orbs,
         )
+        rdm1 = construct_one_rdm(self.wf)
+        rdm2 = construct_two_rdm(self.wf)
+        rdms = ReducedDenstiyMatrix(
+            self.wf.num_inactive_spin_orbs // 2,
+            self.wf.num_active_spin_orbs // 2,
+            self.wf.num_virtual_spin_orbs // 2,
+            rdm1,
+            rdm2=rdm2,
+        )
         idx_shift = len(self.q_ops)
         print('Gs', len(self.G_ops))
         print('qs', len(self.q_ops))
+        grad = get_orbital_gradient_response(
+            rdms,
+            self.wf.h_core,
+            self.wf.g_eri,
+            self.wf.c_trans,
+            self.wf.kappa_idx,
+            self.wf.num_inactive_spin_orbs // 2,
+            self.wf.num_active_spin_orbs // 2,
+        )
+        """ OLD
         grad = np.zeros(2 * len(self.q_ops))
         for i, op in enumerate(self.q_ops):
             grad[i] = expectation_value_contracted(
@@ -424,6 +455,7 @@ class LinearResponseUCC:
             grad[i + len(self.q_ops)] = expectation_value_contracted(
                 self.wf.state_vector, commutator_contract(H_1i_1a, op.operator.dagger), self.wf.state_vector
             )
+        """
         if len(grad) != 0:
             print('idx, max(abs(grad orb)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
@@ -440,7 +472,7 @@ class LinearResponseUCC:
             print('idx, max(abs(grad active)):', np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
                 raise ValueError('Large Hessian gradient detected in G of ', np.max(np.abs(grad)))
-
+        
         #######
         ### Construct matrices
         #######
@@ -497,74 +529,100 @@ class LinearResponseUCC:
 
         print('Calculation type: ', calculation_type)
         # QQ/qq
-        for j, opJ in enumerate(self.q_ops):
-            qJ = opJ.operator
-            for i, opI in enumerate(self.q_ops):
-                qI = opI.operator
-                if i < j:
-                    continue
-                if calculation_type in ('sc', 'naive', 'st', 'proj', 'hst', 'tracked-hst'):
-                    # Make M
-                    val = expectation_value_hybrid_flow(
-                        self.wf.state_vector, [qI.dagger, H_2i_2a, qJ], self.wf.state_vector
-                    ) - expectation_value_hybrid_flow(
-                        self.wf.state_vector, [qI.dagger, qJ, H_2i_2a], self.wf.state_vector
-                    )
-                    self.M[i, j] = self.M[j, i] = val
-                    # Make Q
-                    self.Q[i, j] = self.Q[j, i] = -expectation_value_hybrid_flow(
-                        self.wf.state_vector, [qI.dagger, qJ.dagger, H_2i_2a], self.wf.state_vector
-                    )
-                    # Make V
-                    self.V[i, j] = self.V[j, i] = expectation_value_hybrid_flow(
-                        self.wf.state_vector, [qI.dagger, qJ], self.wf.state_vector
-                    )
-                    # Make W = 0
-                elif calculation_type in ('all_proj', 'ST_proj'):
-                    # Make M
-                    val = expectation_value_hybrid_flow(
-                        self.wf.state_vector, [qI.dagger, H_2i_2a, qJ], self.wf.state_vector
-                    ) - (
-                        expectation_value_hybrid_flow(
+        if calculation_type in ('sc', 'naive', 'st', 'proj', 'hst', 'tracked-hst'):
+            self.M[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_A(
+                rdms,
+                self.wf.h_core,
+                self.wf.g_eri,
+                self.wf.c_trans,
+                self.wf.kappa_idx,
+                self.wf.num_inactive_spin_orbs // 2,
+                self.wf.num_active_spin_orbs // 2,
+            )
+            self.Q[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_B(
+                rdms,
+                self.wf.h_core,
+                self.wf.g_eri,
+                self.wf.c_trans,
+                self.wf.kappa_idx,
+                self.wf.num_inactive_spin_orbs // 2,
+                self.wf.num_active_spin_orbs // 2,
+            )
+            self.V[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sgima(
+                rdms, self.wf.kappa_idx
+            )
+        else:
+            for j, opJ in enumerate(self.q_ops):
+                qJ = opJ.operator
+                for i, opI in enumerate(self.q_ops):
+                    qI = opI.operator
+                    if i < j:
+                        continue
+                    """ OLD
+                    if calculation_type in ('sc', 'naive', 'st', 'proj', 'hst', 'tracked-hst'):
+                        # Make M (A)
+                        val = expectation_value_hybrid_flow(
+                            self.wf.state_vector, [qI.dagger, H_2i_2a, qJ], self.wf.state_vector
+                        ) - expectation_value_hybrid_flow(
+                            self.wf.state_vector, [qI.dagger, qJ, H_2i_2a], self.wf.state_vector
+                        )
+                        self.M[i, j] = self.M[j, i] = val
+                        # Make Q (B)
+                        self.Q[i, j] = self.Q[j, i] = -expectation_value_hybrid_flow(
+                            self.wf.state_vector, [qI.dagger, qJ.dagger, H_2i_2a], self.wf.state_vector
+                        )
+                        # Make V
+                        self.V[i, j] = self.V[j, i] = expectation_value_hybrid_flow(
                             self.wf.state_vector, [qI.dagger, qJ], self.wf.state_vector
                         )
-                        * self.wf.energy_elec
-                    )
-                    self.M[i, j] = self.M[j, i] = val
-                    # Make Q (B) = 0
-                    # Make V
-                    self.V[i, j] = self.V[j, i] = expectation_value_hybrid_flow(
-                        self.wf.state_vector, [qI.dagger, qJ], self.wf.state_vector
-                    )
-                    # Make W = 0
-                elif calculation_type == 'generic':
-                    # Make M
-                    self.M[i, j] = self.M[j, i] = expectation_value_contracted(
-                        self.wf.state_vector,
-                        double_commutator_contract(qI.dagger, H_2i_2a, qJ),
-                        self.wf.state_vector,
-                    )
-                    # Make Q
-                    self.Q[i, j] = self.Q[j, i] = expectation_value_contracted(
-                        self.wf.state_vector,
-                        double_commutator_contract(qI.dagger, H_2i_2a, qJ.dagger),
-                        self.wf.state_vector,
-                    )
-                    # Make V
-                    self.V[i, j] = self.V[j, i] = expectation_value_contracted(
-                        self.wf.state_vector,
-                        commutator_contract(qI.dagger, qJ),
-                        self.wf.state_vector,
-                    )
-                    # Make W
-                    self.W[i, j] = expectation_value_contracted(
-                        self.wf.state_vector,
-                        commutator_contract(qI.dagger, qJ.dagger),
-                        self.wf.state_vector,
-                    )
-                    self.W[j, i] = -self.W[i, j]
-                else:
-                    raise NameError('Could not determine calculation_type got: {calculation_type}')
+                        # Make W = 0
+                    elif calculation_type in ('all_proj', 'ST_proj'):
+                    """
+                    if calculation_type in ('all_proj', 'ST_proj'):
+                        # Make M (A)
+                        val = expectation_value_hybrid_flow(
+                            self.wf.state_vector, [qI.dagger, H_2i_2a, qJ], self.wf.state_vector
+                        ) - (
+                            expectation_value_hybrid_flow(
+                                self.wf.state_vector, [qI.dagger, qJ], self.wf.state_vector
+                            )
+                            * self.wf.energy_elec
+                        )
+                        self.M[i, j] = self.M[j, i] = val
+                        # Make Q (B) = 0
+                        # Make V
+                        self.V[i, j] = self.V[j, i] = expectation_value_hybrid_flow(
+                            self.wf.state_vector, [qI.dagger, qJ], self.wf.state_vector
+                        )
+                        # Make W = 0
+                    elif calculation_type == 'generic':
+                        # Make M (A)
+                        self.M[i, j] = self.M[j, i] = expectation_value_contracted(
+                            self.wf.state_vector,
+                            double_commutator_contract(qI.dagger, H_2i_2a, qJ),
+                            self.wf.state_vector,
+                        )
+                        # Make Q (B)
+                        self.Q[i, j] = self.Q[j, i] = expectation_value_contracted(
+                            self.wf.state_vector,
+                            double_commutator_contract(qI.dagger, H_2i_2a, qJ.dagger),
+                            self.wf.state_vector,
+                        )
+                        # Make V
+                        self.V[i, j] = self.V[j, i] = expectation_value_contracted(
+                            self.wf.state_vector,
+                            commutator_contract(qI.dagger, qJ),
+                            self.wf.state_vector,
+                        )
+                        # Make W
+                        self.W[i, j] = expectation_value_contracted(
+                            self.wf.state_vector,
+                            commutator_contract(qI.dagger, qJ.dagger),
+                            self.wf.state_vector,
+                        )
+                        self.W[j, i] = -self.W[i, j]
+                    else:
+                        raise NameError('Could not determine calculation_type got: {calculation_type}')
         # Gq/RQ and qG/QR
         # Remember: [G_i^d,[H,q_j]] = [[q_i^d,H],G_j] = [G_j,[H,q_i^d]]
         for j, opJ in enumerate(self.q_ops):
@@ -572,11 +630,11 @@ class LinearResponseUCC:
             for i, opI in enumerate(self.G_ops):
                 GI = opI.operator
                 if calculation_type == 'sc':
-                    # Make M
+                    # Make M (A)
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
                         csf, [GI.dagger, U.dagger, H_1i_1a, qJ], self.wf.state_vector
                     )
-                    # Make Q
+                    # Make Q (B)
                     self.Q[j, i + idx_shift] = self.Q[i + idx_shift, j] = -expectation_value_hybrid_flow(
                         csf,
                         [GI.dagger, U.dagger, qJ.dagger, H_1i_1a],
@@ -585,13 +643,13 @@ class LinearResponseUCC:
                     # Make V = 0
                     # Make W = 0
                 elif calculation_type == 'naive':
-                    # Make M
+                    # Make M (A)
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
                         self.wf.state_vector, [GI.dagger, H_1i_1a, qJ], self.wf.state_vector
                     ) - expectation_value_hybrid_flow(
                         self.wf.state_vector, [H_1i_1a, qJ, GI.dagger], self.wf.state_vector
                     )
-                    # Make Q
+                    # Make Q (B)
                     self.Q[j, i + idx_shift] = self.Q[i + idx_shift, j] = expectation_value_hybrid_flow(
                         self.wf.state_vector, [qJ.dagger, H_1i_1a, GI.dagger], self.wf.state_vector
                     ) - expectation_value_hybrid_flow(
@@ -600,7 +658,7 @@ class LinearResponseUCC:
                     # Make V = 0
                     # Make W = 0
                 elif calculation_type == 'proj':
-                    # Make M
+                    # Make M (A)
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
                         self.wf.state_vector, [GI.dagger, H_1i_1a, qJ], self.wf.state_vector
                     )  # - (expectation_value_hybrid_flow(  # Just the gradient
@@ -608,7 +666,7 @@ class LinearResponseUCC:
                     # ) * expectation_value_hybrid_flow(
                     #    self.wf.state_vector, [H_1i_1a, qJ], self.wf.state_vector
                     # ))
-                    # Make Q
+                    # Make Q (B)
                     self.Q[j, i + idx_shift] = self.Q[i + idx_shift, j] = -expectation_value_hybrid_flow(
                         self.wf.state_vector, [GI.dagger, qJ.dagger, H_1i_1a], self.wf.state_vector
                     )  # + (expectation_value_hybrid_flow(   # Just the gradient
@@ -619,7 +677,7 @@ class LinearResponseUCC:
                     # Make V = 0
                     # Make W = 0
                 elif calculation_type == 'all_proj':
-                    # Make M
+                    # Make M (A)
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
                         self.wf.state_vector, [GI.dagger, H_1i_1a, qJ], self.wf.state_vector
                     )
@@ -627,11 +685,11 @@ class LinearResponseUCC:
                     # Make V = 0
                     # Make W = 0
                 elif calculation_type == 'st':
-                    # Make M
+                    # Make M (A)
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
                         csf, [GI.dagger, U.dagger, H_1i_1a, qJ], self.wf.state_vector
                     )
-                    # Make Q
+                    # Make Q (B)
                     self.Q[j, i + idx_shift] = self.Q[i + idx_shift, j] = -expectation_value_hybrid_flow(
                         csf,
                         [GI.dagger, U.dagger, qJ.dagger, H_1i_1a],
@@ -640,31 +698,31 @@ class LinearResponseUCC:
                     # Make V = 0
                     # Make W = 0
                 elif calculation_type == 'ST_proj':
-                    # Make M
+                    # Make M (A)
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
                         csf, [GI.dagger, U.dagger, H_1i_1a, qJ], self.wf.state_vector
                     )
-                    # Make Q = 0
+                    # Make Q (B) = 0
                     # Make V = 0
                     # Make W = 0
                 elif calculation_type == 'hst':
-                    # Make M
+                    # Make M (A)
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
                         csf, [GI.dagger, U.dagger, H_1i_1a, qJ], self.wf.state_vector
                     ) + expectation_value_hybrid_flow(
                         csf, [GI.dagger, U.dagger, qJ.dagger, H_1i_1a], self.wf.state_vector
                     )  # added an assumed zero (approximation)
-                    # Make Q = 0 # assumed zero (approximation!)
+                    # Make Q (B) = 0 # assumed zero (approximation!)
                     # Make V = 0
                     # Make W = 0
                 elif calculation_type == 'tracked-hst':
-                    # Make M
+                    # Make M (A)
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
                         csf, [GI.dagger, U.dagger, H_1i_1a, qJ], self.wf.state_vector
                     ) + expectation_value_hybrid_flow(
                         csf, [GI.dagger, U.dagger, qJ.dagger, H_1i_1a], self.wf.state_vector
                     )  # added an assumed zero (approximation)
-                    # Make Q for tracking error!
+                    # Make Q (B) for tracking error!
                     self.trackedQ[j, i + idx_shift] = self.trackedQ[
                         i + idx_shift, j
                     ] = -expectation_value_hybrid_flow(
@@ -675,13 +733,13 @@ class LinearResponseUCC:
                     # Make V = 0
                     # Make W = 0
                 elif calculation_type == 'generic':
-                    # Make M
+                    # Make M (A)
                     self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_contracted(
                         self.wf.state_vector,
                         double_commutator_contract(GI.dagger, H_1i_1a, qJ),
                         self.wf.state_vector,
                     )
-                    # Make Q
+                    # Make Q (B)
                     self.Q[j, i + idx_shift] = self.Q[i + idx_shift, j] = expectation_value_contracted(
                         self.wf.state_vector,
                         double_commutator_contract(GI.dagger, H_1i_1a, qJ.dagger),
@@ -707,14 +765,14 @@ class LinearResponseUCC:
                 if i < j:
                     continue
                 if calculation_type == 'sc':
-                    # Make M
+                    # Make M (A)
                     val = expectation_value_hybrid_flow(
                         csf, [GI.dagger, U.dagger, H_en, U, GJ], csf
                     ) - expectation_value_hybrid_flow(
                         csf, [GI.dagger, GJ, U.dagger, H_en], self.wf.state_vector
                     )
                     self.M[i + idx_shift, j + idx_shift] = self.M[j + idx_shift, i + idx_shift] = val
-                    # Make Q
+                    # Make Q (B)
                     self.Q[i + idx_shift, j + idx_shift] = self.Q[
                         j + idx_shift, i + idx_shift
                     ] = -expectation_value_hybrid_flow(
@@ -725,7 +783,7 @@ class LinearResponseUCC:
                         self.V[i + idx_shift, j + idx_shift] = self.V[j + idx_shift, i + idx_shift] = 1
                     # Make W = 0
                 elif calculation_type == 'naive':
-                    # Make M
+                    # Make M (A)
                     val = (
                         expectation_value_hybrid_flow(
                             self.wf.state_vector, [GI.dagger, H_en, GJ], self.wf.state_vector
@@ -741,7 +799,7 @@ class LinearResponseUCC:
                         )
                     )
                     self.M[i + idx_shift, j + idx_shift] = self.M[j + idx_shift, i + idx_shift] = val
-                    # Make Q
+                    # Make Q (B)
                     val = (
                         expectation_value_hybrid_flow(
                             self.wf.state_vector, [GI.dagger, H_en, GJ.dagger], self.wf.state_vector
@@ -767,7 +825,7 @@ class LinearResponseUCC:
                     )
                     # Make W = 0
                 elif calculation_type in ('proj', 'all_proj'):
-                    # Make M
+                    # Make M (A)
                     val = (
                         expectation_value_hybrid_flow(
                             self.wf.state_vector, [GI.dagger, H_en, GJ], self.wf.state_vector
@@ -797,7 +855,7 @@ class LinearResponseUCC:
                         )
                     )
                     self.M[i + idx_shift, j + idx_shift] = self.M[j + idx_shift, i + idx_shift] = val
-                    # Make Q
+                    # Make Q (B)
                     val = (
                         expectation_value_hybrid_flow(
                             self.wf.state_vector, [GI.dagger, H_en], self.wf.state_vector
@@ -839,7 +897,7 @@ class LinearResponseUCC:
                     # Make V (\Sigma) = \delta_ij (see above)
                     # Make W (\Delta) = 0
                 elif calculation_type == 'generic':
-                    # Make M
+                    # Make M (A)
                     self.M[i + idx_shift, j + idx_shift] = self.M[
                         j + idx_shift, i + idx_shift
                     ] = expectation_value_contracted(
@@ -847,7 +905,7 @@ class LinearResponseUCC:
                         double_commutator_contract(GI.dagger, H_en, GJ),
                         self.wf.state_vector,
                     )
-                    # Make Q
+                    # Make Q (B)
                     self.Q[i + idx_shift, j + idx_shift] = self.Q[
                         j + idx_shift, i + idx_shift
                     ] = expectation_value_contracted(
