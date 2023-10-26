@@ -241,15 +241,17 @@ class LinearResponseUCC:
                     # Make A
                     self.A[i, j + idx_shift] = self.A[j + idx_shift, i] = expectation_value_contracted(
                         self.wf.state_vector,
-                        # double_commutator_contract(qI.dagger, H_1i_1a, GJ),
-                        double_commutator_contract(GJ, H_1i_1a, qI.dagger),
+                        GJ,
+                        H_1i_1a,
+                        qI.dagger,
                         self.wf.state_vector,
                     )
                     # Make B
                     self.B[i, j + idx_shift] = self.B[j + idx_shift, i] = expectation_value_contracted(
                         self.wf.state_vector,
-                        # double_commutator_contract(qI.dagger, H_1i_1a, GJ.dagger), #wrong parametrization
-                        double_commutator_contract(GJ.dagger, H_1i_1a, qI.dagger),
+                        GJ.dagger,
+                        H_1i_1a,
+                        qI.dagger,
                         self.wf.state_vector,
                     )
                     # Make Sigma
@@ -328,17 +330,17 @@ class LinearResponseUCC:
                     # Make A
                     self.A[i, j + idx_shift] = expectation_value_contracted(
                         self.wf.state_vector,
-                        double_commutator_contract(qI.dagger, H_1i_1a, GJ),  # non-literature parametrization
-                        # double_commutator_contract(GJ, H_1i_1a, qI.dagger),
+                        GJ,
+                        H_1i_1a,
+                        qI.dagger,
                         self.wf.state_vector,
                     )
                     # Make B
                     self.B[i, j + idx_shift] = expectation_value_contracted(
                         self.wf.state_vector,
-                        double_commutator_contract(
-                            qI.dagger, H_1i_1a, GJ.dagger
-                        ),  # non-literature parametrization
-                        # double_commutator_contract(GJ.dagger, H_1i_1a, qI.dagger),
+                        GJ.dagger,
+                        H_1i_1a,
+                        qI.dagger,
                         self.wf.state_vector,
                     )
                     # Make Sigma
