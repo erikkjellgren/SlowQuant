@@ -745,47 +745,56 @@ def active_space_parameter_gradient(
 
 
 def construct_one_rdm(wf: WaveFunctionUCC) -> np.ndarray:
-    one_rdm = np.zeros((wf.num_active_spin_orbs // 2, wf.num_active_spin_orbs // 2))
-    num_inactive = wf.num_inactive_spin_orbs // 2
-    for p in range(
-        wf.num_inactive_spin_orbs // 2, (wf.num_inactive_spin_orbs + wf.num_active_spin_orbs) // 2
-    ):
-        for q in range(
+    if hasattr(wf, "rmd1"):
+        one_rdm = wf.rdm1
+    else:
+        one_rdm = np.zeros((wf.num_active_spin_orbs // 2, wf.num_active_spin_orbs // 2))
+        num_inactive = wf.num_inactive_spin_orbs // 2
+        for p in range(
             wf.num_inactive_spin_orbs // 2, (wf.num_inactive_spin_orbs + wf.num_active_spin_orbs) // 2
         ):
-            one_rdm[p - num_inactive, q - num_inactive] = expectation_value_pauli(
-                wf.state_vector, epq_pauli(p, q, wf.num_spin_orbs, wf.num_elec), wf.state_vector
-            )
+            for q in range(
+                wf.num_inactive_spin_orbs // 2, (wf.num_inactive_spin_orbs + wf.num_active_spin_orbs) // 2
+            ):
+                one_rdm[p - num_inactive, q - num_inactive] = expectation_value_pauli(
+                    wf.state_vector, epq_pauli(p, q, wf.num_spin_orbs, wf.num_elec), wf.state_vector
+                )
+        wf.rdm1 = one_rdm
     return one_rdm
 
 
 def construct_two_rdm(wf: WaveFunctionUCC) -> np.ndarray:
-    two_rdm = np.zeros(
-        (
-            wf.num_active_spin_orbs // 2,
-            wf.num_active_spin_orbs // 2,
-            wf.num_active_spin_orbs // 2,
-            wf.num_active_spin_orbs // 2,
+    if hasattr(wf, "rmd2"):
+        two_rdm = wf.rdm2
+    else:
+        two_rdm = np.zeros(
+            (
+                wf.num_active_spin_orbs // 2,
+                wf.num_active_spin_orbs // 2,
+                wf.num_active_spin_orbs // 2,
+                wf.num_active_spin_orbs // 2,
+            )
         )
-    )
-    num_inactive = wf.num_inactive_spin_orbs // 2
-    for p in range(
-        wf.num_inactive_spin_orbs // 2, (wf.num_inactive_spin_orbs + wf.num_active_spin_orbs) // 2
-    ):
-        for q in range(
+        num_inactive = wf.num_inactive_spin_orbs // 2
+        for p in range(
             wf.num_inactive_spin_orbs // 2, (wf.num_inactive_spin_orbs + wf.num_active_spin_orbs) // 2
         ):
-            for r in range(
+            for q in range(
                 wf.num_inactive_spin_orbs // 2, (wf.num_inactive_spin_orbs + wf.num_active_spin_orbs) // 2
             ):
-                for s in range(
+                for r in range(
                     wf.num_inactive_spin_orbs // 2, (wf.num_inactive_spin_orbs + wf.num_active_spin_orbs) // 2
                 ):
-                    two_rdm[
-                        p - num_inactive, q - num_inactive, r - num_inactive, s - num_inactive
-                    ] = expectation_value_pauli(
-                        wf.state_vector,
-                        epqrs_pauli(p, q, r, s, wf.num_spin_orbs, wf.num_elec),
-                        wf.state_vector,
-                    )
+                    for s in range(
+                        wf.num_inactive_spin_orbs // 2,
+                        (wf.num_inactive_spin_orbs + wf.num_active_spin_orbs) // 2,
+                    ):
+                        two_rdm[
+                            p - num_inactive, q - num_inactive, r - num_inactive, s - num_inactive
+                        ] = expectation_value_pauli(
+                            wf.state_vector,
+                            epqrs_pauli(p, q, r, s, wf.num_spin_orbs, wf.num_elec),
+                            wf.state_vector,
+                        )
+        wf.rdm2 = two_rdm
     return two_rdm

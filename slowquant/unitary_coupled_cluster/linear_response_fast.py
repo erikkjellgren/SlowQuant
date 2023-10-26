@@ -16,6 +16,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_response_hessian_B,
     get_orbital_response_metric_sgima,
     get_orbital_response_property_gradient,
+    get_orbital_response_vector_norm,
 )
 from slowquant.unitary_coupled_cluster.operator_contracted import (
     commutator_contract,
@@ -434,6 +435,7 @@ class LinearResponseUCC:
             rdm1,
             rdm2=rdm2,
         )
+        self.wf.rdms = rdms
         idx_shift = len(self.q_ops)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
@@ -1088,6 +1090,7 @@ class LinearResponseUCC:
             # t_ZG_op = \sum_i Z_i G_i^\dagger
             # t_YG_op = \sum_i Y_i G_i
             idx_shift = len(self.q_ops)
+            """ OLD
             t_Zq_op = OperatorHybrid({})
             t_Yq_op = OperatorHybrid({})
             for i, op in enumerate(self.q_ops):
@@ -1097,6 +1100,10 @@ class LinearResponseUCC:
                 else:
                     t_Zq_op += self.response_vectors[i, state_number] * op.operator.dagger
                     t_Yq_op += self.response_vectors[i + number_excitations, state_number] * op.operator
+            """
+            q_part = get_orbital_response_vector_norm(
+                self.wf.rdms, self.wf.kappa_idx, self.response_vectors, state_number, number_excitations
+            )
             for i, op in enumerate(self.G_ops):
                 if i == 0:
                     t_ZG_op = self.response_vectors[i + idx_shift, state_number] * op.operator.dagger
@@ -1110,6 +1117,7 @@ class LinearResponseUCC:
                     )
             # projected and all-projected
             if self.do_projected_operators or self.do_all_projected_operators:
+                """OLD
                 norm = (
                     # t_Zq_op = \sum_i Z_i q_i^\dagger
                     expectation_value_hybrid_flow(
@@ -1119,6 +1127,9 @@ class LinearResponseUCC:
                     - expectation_value_hybrid_flow(
                         self.wf.state_vector, [t_Yq_op.dagger, t_Yq_op], self.wf.state_vector
                     )
+                """
+                norm = (
+                    q_part
                     # t_ZG_op = \sum_i Z_i G_i^\dagger
                     + expectation_value_hybrid_flow(
                         self.wf.state_vector, [t_ZG_op, t_ZG_op.dagger], self.wf.state_vector
@@ -1147,6 +1158,7 @@ class LinearResponseUCC:
                 or self.do_ST_projected_operators
                 or self.do_selfconsistent_operators
             ):
+                """OLD
                 norm = (
                     # t_Zq_op = \sum_i Z_i q_i^\dagger
                     expectation_value_hybrid_flow(
@@ -1156,6 +1168,9 @@ class LinearResponseUCC:
                     - expectation_value_hybrid_flow(
                         self.wf.state_vector, [t_Yq_op.dagger, t_Yq_op], self.wf.state_vector
                     )
+                """
+                norm = (
+                    q_part
                     # t_ZG_op = \sum_i Z_i G_i^\dagger
                     + expectation_value_hybrid_flow(self.csf, [t_ZG_op, t_ZG_op.dagger], self.csf)
                     # t_YG_op = \sum_i Y_i G_i
@@ -1163,6 +1178,7 @@ class LinearResponseUCC:
                 )
             # naive
             else:
+                """OLD
                 norm = (
                     expectation_value_hybrid_flow(
                         self.wf.state_vector, [t_Zq_op, t_Zq_op.dagger], self.wf.state_vector
@@ -1170,6 +1186,9 @@ class LinearResponseUCC:
                     - expectation_value_hybrid_flow(
                         self.wf.state_vector, [t_Yq_op.dagger, t_Yq_op], self.wf.state_vector
                     )
+                """
+                norm = (
+                    q_part
                     + expectation_value_hybrid_flow(
                         self.wf.state_vector, [t_ZG_op, t_ZG_op.dagger], self.wf.state_vector
                     )
