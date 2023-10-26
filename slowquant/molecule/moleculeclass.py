@@ -10,7 +10,7 @@ from slowquant.molecule.moleculefunctions import (
 
 
 class _Molecule:
-    def __init__(self, molecule_file: str, molecular_charge_: int = 0, distance_unit: str = 'bohr') -> None:
+    def __init__(self, molecule_file: str, molecular_charge_: int = 0, distance_unit: str = "bohr") -> None:
         """Initialize molecule instance.
 
         Args:
@@ -23,17 +23,17 @@ class _Molecule:
         self.molecular_charge = molecular_charge_
         self.shells: list[Shell]
         self.number_bf = 0
-        if distance_unit.lower() == 'angstrom':
+        if distance_unit.lower() == "angstrom":
             unit_factor = 1.889725989
-        elif distance_unit.lower() == 'au' or distance_unit.lower() == 'bohr':
+        elif distance_unit.lower() == "au" or distance_unit.lower() == "bohr":
             unit_factor = 1.0
         else:
             raise ValueError(
                 "distance_unit not valid can be 'angstrom' or 'bohr'. Was given: {distance_unit}"
             )
 
-        if '.xyz' in molecule_file:
-            with open(molecule_file, 'r', encoding='UTF-8') as file:
+        if ".xyz" in molecule_file:
+            with open(molecule_file, "r", encoding="UTF-8") as file:
                 self.atoms = []
                 for i, line in enumerate(file):
                     if i < 2:
@@ -48,12 +48,12 @@ class _Molecule:
                                     float(line.split()[3]) * unit_factor,
                                 ]
                             ),
-                            int(atom_to_properties(line.split()[0], 'charge')),
-                            atom_to_properties(line.split()[0], 'mass'),
+                            int(atom_to_properties(line.split()[0], "charge")),
+                            atom_to_properties(line.split()[0], "mass"),
                         )
                     )
-        elif ';' in molecule_file:
-            lines = molecule_file.split(';')
+        elif ";" in molecule_file:
+            lines = molecule_file.split(";")
             self.atoms = []
             for line in lines:
                 if len(line.strip()) == 0:
@@ -70,13 +70,13 @@ class _Molecule:
                                 float(line.split()[3]) * unit_factor,
                             ]
                         ),
-                        int(atom_to_properties(line.split()[0], 'charge')),
-                        atom_to_properties(line.split()[0], 'mass'),
+                        int(atom_to_properties(line.split()[0], "charge")),
+                        atom_to_properties(line.split()[0], "mass"),
                     )
                 )
         else:
             raise ValueError(
-                'Does only support:\n    .xyz files for molecule coordinates.\n    A string with the elements and coordinates (; delimited).'
+                "Does only support:\n    .xyz files for molecule coordinates.\n    A string with the elements and coordinates (; delimited)."
             )
 
     def _set_basis_set(self, basis_set: str) -> None:
@@ -180,7 +180,7 @@ class _Molecule:
             for j, (Z_j, R_j) in enumerate(zip(Z, R)):
                 if i >= j:
                     continue
-                V += Z_i * Z_j / np.einsum('k->', (R_i - R_j) ** 2) ** 0.5
+                V += Z_i * Z_j / np.einsum("k->", (R_i - R_j) ** 2) ** 0.5
         return V
 
     @property
@@ -193,7 +193,7 @@ class _Molecule:
         masses = np.zeros(len(self.atoms))
         for i, atom in enumerate(self.atoms):
             masses[i] = atom.mass
-        return np.einsum('ij,i->j', self.atom_coordinates, masses) / np.einsum('i->', masses)
+        return np.einsum("ij,i->j", self.atom_coordinates, masses) / np.einsum("i->", masses)
 
     @property
     def basis_function_labels(self) -> list[str]:
@@ -205,7 +205,7 @@ class _Molecule:
         bf_labels = []
         for shell in self.shells:
             for angular_moment in shell.angular_moments:
-                bf_labels.append(f'{shell.origin_atom.atom_name} {angular_moment}')
+                bf_labels.append(f"{shell.origin_atom.atom_name} {angular_moment}")
         return bf_labels
 
     @property

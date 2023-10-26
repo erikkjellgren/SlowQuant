@@ -26,9 +26,9 @@ def expectation_value_hybrid(
         Expectation value of hybrid operator.
     """
     if len(bra.inactive) != len(ket.inactive):
-        raise ValueError('Bra and Ket does not have same number of inactive orbitals')
+        raise ValueError("Bra and Ket does not have same number of inactive orbitals")
     if len(bra._active) != len(ket._active):
-        raise ValueError('Bra and Ket does not have same number of active orbitals')
+        raise ValueError("Bra and Ket does not have same number of active orbitals")
     total = 0
     for _, op in hybridop.operators.items():
         tmp = 1
@@ -54,7 +54,7 @@ def expectation_value_hybrid(
                 tmp *= np.matmul(bra.bra_active, operator)
         total += tmp
     if abs(total.imag) > 10**-10:
-        print(f'WARNING, imaginary value of {total.imag}')
+        print(f"WARNING, imaginary value of {total.imag}")
     return total.real
 
 
@@ -73,48 +73,48 @@ class StateVectorOperator:
 
     def __mul__(self, hybridop: OperatorHybrid) -> StateVectorOperator:
         if isinstance(hybridop, OperatorHybrid):
-            new_state_vector = {}
+            new_state_vector: dict[str, StateVectorOperatorData] = {}
             for _, vec in self.state_vector.items():
                 for _, op in hybridop.operators.items():
-                    new_inactive = ''
-                    new_virtual = ''
+                    new_inactive = ""
+                    new_virtual = ""
                     fac: complex = 1
                     for pauli, orb in zip(op.inactive_pauli, vec.inactive_orbs):
-                        if pauli == 'I':
+                        if pauli == "I":
                             new_inactive += orb
-                        elif orb == 'o' and pauli == 'X':
-                            new_inactive += 'z'
-                        elif orb == 'o' and pauli == 'Y':
-                            new_inactive += 'z'
+                        elif orb == "o" and pauli == "X":
+                            new_inactive += "z"
+                        elif orb == "o" and pauli == "Y":
+                            new_inactive += "z"
                             fac *= 1j
-                        elif orb == 'o' and pauli == 'Z':
-                            new_inactive += 'o'
+                        elif orb == "o" and pauli == "Z":
+                            new_inactive += "o"
                             fac *= -1
-                        elif orb == 'z' and pauli == 'X':
-                            new_inactive += 'o'
-                        elif orb == 'z' and pauli == 'Y':
-                            new_inactive += 'o'
+                        elif orb == "z" and pauli == "X":
+                            new_inactive += "o"
+                        elif orb == "z" and pauli == "Y":
+                            new_inactive += "o"
                             fac *= -1j
-                        elif orb == 'z' and pauli == 'Z':
-                            new_inactive += 'z'
+                        elif orb == "z" and pauli == "Z":
+                            new_inactive += "z"
                     for pauli, orb in zip(op.virtual_pauli, vec.virtual_orbs):
-                        if pauli == 'I':
+                        if pauli == "I":
                             new_virtual += orb
-                        elif orb == 'o' and pauli == 'X':
-                            new_virtual += 'z'
-                        elif orb == 'o' and pauli == 'Y':
-                            new_virtual += 'z'
+                        elif orb == "o" and pauli == "X":
+                            new_virtual += "z"
+                        elif orb == "o" and pauli == "Y":
+                            new_virtual += "z"
                             fac *= 1j
-                        elif orb == 'o' and pauli == 'Z':
-                            new_virtual += 'o'
+                        elif orb == "o" and pauli == "Z":
+                            new_virtual += "o"
                             fac *= -1
-                        elif orb == 'z' and pauli == 'X':
-                            new_virtual += 'o'
-                        elif orb == 'z' and pauli == 'Y':
-                            new_virtual += 'o'
+                        elif orb == "z" and pauli == "X":
+                            new_virtual += "o"
+                        elif orb == "z" and pauli == "Y":
+                            new_virtual += "o"
                             fac *= -1j
-                        elif orb == 'z' and pauli == 'Z':
-                            new_virtual += 'z'
+                        elif orb == "z" and pauli == "Z":
+                            new_virtual += "z"
                     new_active = fac * lw.matmul(vec.active_space, op.active_matrix)
                     key = new_inactive + new_virtual
                     if key in new_state_vector:
@@ -151,44 +151,63 @@ def expectation_value_hybrid_flow(
     if len(state_vec._active_onvector) >= 10:
         state_vector = StateVectorOperator(
             {
-                'o' * num_inactive_spin_orbs
-                + 'z'
+                "o" * num_inactive_spin_orbs
+                + "z"
                 * num_virtual_spin_orbs: StateVectorOperatorData(
-                    'o' * num_inactive_spin_orbs, state_vec.bra_active_csr, 'z' * num_virtual_spin_orbs
+                    "o" * num_inactive_spin_orbs, state_vec.bra_active_csr, "z" * num_virtual_spin_orbs
                 )
             }
         )
         ref_vector = StateVectorOperator(
             {
-                'o' * num_inactive_spin_orbs
-                + 'z'
+                "o" * num_inactive_spin_orbs
+                + "z"
                 * num_virtual_spin_orbs: StateVectorOperatorData(
-                    'o' * num_inactive_spin_orbs, ref_vec.bra_active_csr, 'z' * num_virtual_spin_orbs
+                    "o" * num_inactive_spin_orbs, ref_vec.bra_active_csr, "z" * num_virtual_spin_orbs
                 )
             }
         )
     else:
         state_vector = StateVectorOperator(
             {
-                'o' * num_inactive_spin_orbs
-                + 'z'
+                "o" * num_inactive_spin_orbs
+                + "z"
                 * num_virtual_spin_orbs: StateVectorOperatorData(
-                    'o' * num_inactive_spin_orbs, state_vec.ket_active, 'z' * num_virtual_spin_orbs
+                    "o" * num_inactive_spin_orbs, state_vec.ket_active, "z" * num_virtual_spin_orbs
                 )
             }
         )
         ref_vector = StateVectorOperator(
             {
-                'o' * num_inactive_spin_orbs
-                + 'z'
+                "o" * num_inactive_spin_orbs
+                + "z"
                 * num_virtual_spin_orbs: StateVectorOperatorData(
-                    'o' * num_inactive_spin_orbs, ref_vec.ket_active, 'z' * num_virtual_spin_orbs
+                    "o" * num_inactive_spin_orbs, ref_vec.ket_active, "z" * num_virtual_spin_orbs
                 )
             }
         )
     for operator in operators:
         state_vector = state_vector * operator
     return state_vector * ref_vector
+
+
+def expectation_value_hybrid_flow_commutator(
+    state_vec: StateVector, A: OperatorHybrid, B: OperatorHybrid, ref_vec: StateVector
+) -> float:
+    return expectation_value_hybrid_flow(state_vec, [A, B], ref_vec) - expectation_value_hybrid_flow(
+        state_vec, [B, A], ref_vec
+    )
+
+
+def expectation_value_hybrid_flow_double_commutator(
+    state_vec: StateVector, A: OperatorHybrid, B: OperatorHybrid, C: OperatorHybrid, ref_vec: StateVector
+) -> float:
+    return (
+        expectation_value_hybrid_flow(state_vec, [A, B, C], ref_vec)
+        - expectation_value_hybrid_flow(state_vec, [A, C, B], ref_vec)
+        - expectation_value_hybrid_flow(state_vec, [B, C, A], ref_vec)
+        + expectation_value_hybrid_flow(state_vec, [C, B, A], ref_vec)
+    )
 
 
 def convert_pauli_to_hybrid_form(
@@ -298,58 +317,58 @@ class OperatorHybrid:
         new_operators: dict[str, np.ndarray] = {}
         for _, op1 in self.operators.items():
             for _, op2 in pauliop.operators.items():
-                new_inactive = ''
-                new_virtual = ''
+                new_inactive = ""
+                new_virtual = ""
                 fac: complex = 1
                 for pauli1, pauli2 in zip(op1.inactive_pauli, op2.inactive_pauli):
-                    if pauli1 == 'I':
+                    if pauli1 == "I":
                         new_inactive += pauli2
-                    elif pauli2 == 'I':
+                    elif pauli2 == "I":
                         new_inactive += pauli1
                     elif pauli1 == pauli2:
-                        new_inactive += 'I'
-                    elif pauli1 == 'X' and pauli2 == 'Y':
-                        new_inactive += 'Z'
+                        new_inactive += "I"
+                    elif pauli1 == "X" and pauli2 == "Y":
+                        new_inactive += "Z"
                         fac *= 1j
-                    elif pauli1 == 'X' and pauli2 == 'Z':
-                        new_inactive += 'Y'
+                    elif pauli1 == "X" and pauli2 == "Z":
+                        new_inactive += "Y"
                         fac *= -1j
-                    elif pauli1 == 'Y' and pauli2 == 'X':
-                        new_inactive += 'Z'
+                    elif pauli1 == "Y" and pauli2 == "X":
+                        new_inactive += "Z"
                         fac *= -1j
-                    elif pauli1 == 'Y' and pauli2 == 'Z':
-                        new_inactive += 'X'
+                    elif pauli1 == "Y" and pauli2 == "Z":
+                        new_inactive += "X"
                         fac *= 1j
-                    elif pauli1 == 'Z' and pauli2 == 'X':
-                        new_inactive += 'Y'
+                    elif pauli1 == "Z" and pauli2 == "X":
+                        new_inactive += "Y"
                         fac *= 1j
-                    elif pauli1 == 'Z' and pauli2 == 'Y':
-                        new_inactive += 'X'
+                    elif pauli1 == "Z" and pauli2 == "Y":
+                        new_inactive += "X"
                         fac *= -1j
                 for pauli1, pauli2 in zip(op1.virtual_pauli, op2.virtual_pauli):
-                    if pauli1 == 'I':
+                    if pauli1 == "I":
                         new_virtual += pauli2
-                    elif pauli2 == 'I':
+                    elif pauli2 == "I":
                         new_virtual += pauli1
                     elif pauli1 == pauli2:
-                        new_virtual += 'I'
-                    elif pauli1 == 'X' and pauli2 == 'Y':
-                        new_virtual += 'Z'
+                        new_virtual += "I"
+                    elif pauli1 == "X" and pauli2 == "Y":
+                        new_virtual += "Z"
                         fac *= 1j
-                    elif pauli1 == 'X' and pauli2 == 'Z':
-                        new_virtual += 'Y'
+                    elif pauli1 == "X" and pauli2 == "Z":
+                        new_virtual += "Y"
                         fac *= -1j
-                    elif pauli1 == 'Y' and pauli2 == 'X':
-                        new_virtual += 'Z'
+                    elif pauli1 == "Y" and pauli2 == "X":
+                        new_virtual += "Z"
                         fac *= -1j
-                    elif pauli1 == 'Y' and pauli2 == 'Z':
-                        new_virtual += 'X'
+                    elif pauli1 == "Y" and pauli2 == "Z":
+                        new_virtual += "X"
                         fac *= 1j
-                    elif pauli1 == 'Z' and pauli2 == 'X':
-                        new_virtual += 'Y'
+                    elif pauli1 == "Z" and pauli2 == "X":
+                        new_virtual += "Y"
                         fac *= 1j
-                    elif pauli1 == 'Z' and pauli2 == 'Y':
-                        new_virtual += 'X'
+                    elif pauli1 == "Z" and pauli2 == "Y":
+                        new_virtual += "X"
                         fac *= -1j
                 new_active = fac * lw.matmul(op1.active_matrix, op2.active_matrix)
                 key = new_inactive + new_virtual
@@ -446,10 +465,10 @@ def make_projection_operator(state_vector: StateVector, use_csr: int = 10) -> Op
             * 1
             / (2 ** (num_inactive_orbs + num_virtual_orbs))
         )
-    for pauli in itertools.product(['Z', 'I'], repeat=num_inactive_orbs + num_virtual_orbs):
-        active = active_matrix * (-1) ** (pauli[:num_inactive_orbs].count('Z'))
+    for pauli in itertools.product(["Z", "I"], repeat=num_inactive_orbs + num_virtual_orbs):
+        active = active_matrix * (-1) ** (pauli[:num_inactive_orbs].count("Z"))
         hybridop = OperatorHybridData(
-            ''.join(pauli[:num_inactive_orbs]), active, ''.join(pauli[num_inactive_orbs:])
+            "".join(pauli[:num_inactive_orbs]), active, "".join(pauli[num_inactive_orbs:])
         )
-        new_operator[''.join(pauli)] = hybridop
+        new_operator["".join(pauli)] = hybridop
     return OperatorHybrid(new_operator)
