@@ -258,8 +258,6 @@ class LinearResponseUCC:
                 # Make M
                 val = expectation_value_hybrid_flow(
                     csf, [GI.dagger, U.dagger, H_1i_1a, qJ], self.wf.state_vector
-                ) - expectation_value_hybrid_flow(
-                    csf, [GI.dagger, U.dagger, qJ, H_1i_1a], self.wf.state_vector
                 )
                 self.M[i + idx_shift, j] = self.M[j, i + idx_shift] = val
                 # Make Q

@@ -511,8 +511,9 @@ def energy_ucc(
                 kappa_mat[p, q] = kappa_val
                 kappa_mat[q, p] = -kappa_val
     c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
-    wf._kappa_old = kappa.copy()
-    wf._kappa_redundant_old = wf.kappa_redundant.copy()
+    if orbital_optimized:
+        wf._kappa_old = kappa.copy()
+        wf._kappa_redundant_old = wf.kappa_redundant.copy()
     # Moving expansion point of kappa
     wf.c_orthonormal = c_trans
 

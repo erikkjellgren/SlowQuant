@@ -257,9 +257,9 @@ class LinearResponseUCC:
                         j + idx_shift, i
                     ] = expectation_value_hybrid_flow_double_commutator(
                         self.wf.state_vector,
-                        qI.dagger,
-                        H_1i_1a,
                         GJ,
+                        H_1i_1a,
+                        qI.dagger,
                         self.wf.state_vector,
                     )
                     # Make B
@@ -267,9 +267,9 @@ class LinearResponseUCC:
                         j + idx_shift, i
                     ] = expectation_value_hybrid_flow_double_commutator(
                         self.wf.state_vector,
-                        qI.dagger,
-                        H_1i_1a,
                         GJ.dagger,
+                        H_1i_1a,
+                        qI.dagger,
                         self.wf.state_vector,
                     )
                     # Make Sigma
@@ -356,17 +356,17 @@ class LinearResponseUCC:
                     # Make A
                     self.A[i, j + idx_shift] = expectation_value_hybrid_flow_double_commutator(
                         self.wf.state_vector,
-                        qI.dagger,
-                        H_1i_1a,
                         GJ,
+                        H_1i_1a,
+                        qI.dagger,
                         self.wf.state_vector,
                     )
                     # Make B
                     self.B[i, j + idx_shift] = expectation_value_hybrid_flow_double_commutator(
                         self.wf.state_vector,
-                        qI.dagger,
-                        H_1i_1a,
                         GJ.dagger,
+                        H_1i_1a,
+                        qI.dagger,
                         self.wf.state_vector,
                     )
                     # Make Sigma
