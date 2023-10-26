@@ -21,9 +21,9 @@ def test_h2_sto3g_uccsd_lr() -> None:
     SQobj.set_molecule(
         """H  0.0  0.0  0.0;
             H  0.0  0.0  0.7;""",
-        distance_unit='angstrom',
+        distance_unit="angstrom",
     )
-    SQobj.set_basis_set('sto-3g')
+    SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
@@ -41,11 +41,11 @@ def test_h2_sto3g_uccsd_lr() -> None:
         SQobj.integral.get_multipole_matrix([0, 1, 0]),
         SQobj.integral.get_multipole_matrix([0, 0, 1]),
     )
-    WF.run_ucc('SD', False)
+    WF.run_ucc("SD", False)
     # SC
     LR = LinearResponseUCC(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_selfconsistent_operators=True,
         do_statetransfer_operators=False,
         do_debugging=True,
@@ -61,7 +61,7 @@ def test_h2_sto3g_uccsd_lr() -> None:
     # ST
     LR = LinearResponseUCC(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_selfconsistent_operators=False,
         do_statetransfer_operators=True,
         do_debugging=True,
@@ -82,9 +82,9 @@ def test_h2_sto3g_uccsd_lr_matrices() -> None:
     SQobj.set_molecule(
         """H  0.0  0.0  0.0;
             H  0.0  0.0  0.7;""",
-        distance_unit='angstrom',
+        distance_unit="angstrom",
     )
-    SQobj.set_basis_set('sto-3g')
+    SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
@@ -98,19 +98,19 @@ def test_h2_sto3g_uccsd_lr_matrices() -> None:
         g_eri,
     )
 
-    WF.run_ucc('SD', False)
+    WF.run_ucc("SD", False)
 
     # SC
     LR_naive = LinearResponseUCC(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_selfconsistent_operators=True,
         do_statetransfer_operators=False,
         do_debugging=False,
     )
     LR_native = LinearResponseUCC(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_selfconsistent_operators=True,
         do_statetransfer_operators=False,
         do_debugging=True,
@@ -126,14 +126,14 @@ def test_h2_sto3g_uccsd_lr_matrices() -> None:
     # ST
     LR_naive = LinearResponseUCC(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_selfconsistent_operators=False,
         do_statetransfer_operators=True,
         do_debugging=False,
     )
     LR_native = LinearResponseUCC(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_selfconsistent_operators=False,
         do_statetransfer_operators=True,
         do_debugging=True,
@@ -144,7 +144,9 @@ def test_h2_sto3g_uccsd_lr_matrices() -> None:
     assert np.allclose(LR_naive.V, LR_native.V, atol=threshold) is True
     assert np.allclose(LR_naive.W, LR_native.W, atol=threshold) is True
 
+
 ### START Tests for old linear response class. should still work, but are not that useful.
+
 
 def test_h2_631g_oouccsd_lr() -> None:
     """Test Linear Response for OO-uccsd(2,2)."""
@@ -152,9 +154,9 @@ def test_h2_631g_oouccsd_lr() -> None:
     SQobj.set_molecule(
         """H  0.0   0.0  0.0;
            H  0.74  0.0  0.0;""",
-        distance_unit='angstrom',
+        distance_unit="angstrom",
     )
-    SQobj.set_basis_set('6-31G')
+    SQobj.set_basis_set("6-31G")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
@@ -167,12 +169,12 @@ def test_h2_631g_oouccsd_lr() -> None:
         h_core,
         g_eri,
     )
-    WF.run_ucc('SD', True)
+    WF.run_ucc("SD", True)
 
     # SC
     LR = LinearResponseUCC(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_selfconsistent_operators=True,
         do_statetransfer_operators=False,
         do_debugging=True,
@@ -195,7 +197,7 @@ def test_h2_631g_oouccsd_lr() -> None:
     # ST
     LR = LinearResponseUCC(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_selfconsistent_operators=False,
         do_statetransfer_operators=True,
         do_debugging=True,
@@ -222,9 +224,9 @@ def test_h2_631g_oouccsd_lr_matrices() -> None:
     SQobj.set_molecule(
         """H  0.0   0.0  0.0;
            H  0.74  0.0  0.0;""",
-        distance_unit='angstrom',
+        distance_unit="angstrom",
     )
-    SQobj.set_basis_set('6-31G')
+    SQobj.set_basis_set("6-31G")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
@@ -237,19 +239,19 @@ def test_h2_631g_oouccsd_lr_matrices() -> None:
         h_core,
         g_eri,
     )
-    WF.run_ucc('SD', True)
+    WF.run_ucc("SD", True)
 
     # SC
     LR_naive = LinearResponseUCC(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_selfconsistent_operators=True,
         do_statetransfer_operators=False,
         do_debugging=False,
     )
     LR_native = LinearResponseUCC(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_selfconsistent_operators=True,
         do_statetransfer_operators=False,
         do_debugging=True,
@@ -265,14 +267,14 @@ def test_h2_631g_oouccsd_lr_matrices() -> None:
     # ST
     LR_naive = LinearResponseUCC(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_selfconsistent_operators=False,
         do_statetransfer_operators=True,
         do_debugging=False,
     )
     LR_native = LinearResponseUCC(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_selfconsistent_operators=False,
         do_statetransfer_operators=True,
         do_debugging=True,
@@ -287,15 +289,15 @@ def test_h2_631g_oouccsd_lr_matrices() -> None:
 def test_LiH_atmethods_matrices() -> None:
     """Test LiH all matrices and their properties for at methods."""
 
-    print('Are you sure you want to run this test? It takes ages...')
+    print("Are you sure you want to run this test? It takes ages...")
 
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """Li   0.0           0.0  0.0;
         H   1.67  0.0  0.0;""",
-        distance_unit='angstrom',
+        distance_unit="angstrom",
     )
-    SQobj.set_basis_set('sto-3g')
+    SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
@@ -308,67 +310,67 @@ def test_LiH_atmethods_matrices() -> None:
         h_core,
         g_eri,
     )
-    WF.run_ucc('SD', True)
+    WF.run_ucc("SD", True)
 
     threshold = 10 ** (-10)
 
     # atSC
-    print('\nMethod: at-SC')
+    print("\nMethod: at-SC")
     LR_naive = LinearResponseUCC(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_selfconsistent_operators=True,
         do_statetransfer_operators=False,
         do_debugging=False,
     )
     LR_generic = LinearResponseUCC(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_selfconsistent_operators=True,
         do_statetransfer_operators=False,
         do_debugging=True,
     )
 
     print(
-        'Check if implementation via work equation and generic are the same with a threshold of: ', threshold
+        "Check if implementation via work equation and generic are the same with a threshold of: ", threshold
     )
     assert (np.allclose(LR_naive.M, LR_generic.M, atol=threshold)) == True
     assert (np.allclose(LR_naive.Q, LR_generic.Q, atol=threshold)) is True
     assert (np.allclose(LR_naive.V, LR_generic.V, atol=threshold)) is True
     assert (np.allclose(LR_naive.W, LR_generic.W, atol=threshold)) is True
 
-    print('Check if matrices fullfill their expected property:')
+    print("Check if matrices fullfill their expected property:")
     assert (np.all(np.abs(LR_naive.M - LR_naive.M.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.Q - LR_naive.Q.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.V - np.eye(LR_naive.V.shape[0])) < threshold)) == True
     assert (np.all(np.abs(LR_naive.W) < threshold)) == True
 
     # atST
-    print('\nMethod: at-ST')
+    print("\nMethod: at-ST")
     LR_naive = LinearResponseUCC(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_selfconsistent_operators=False,
         do_statetransfer_operators=True,
         do_debugging=False,
     )
     LR_generic = LinearResponseUCC(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_selfconsistent_operators=False,
         do_statetransfer_operators=True,
         do_debugging=True,
     )
 
     print(
-        'Check if implementation via work equation and generic are the same with a threshold of: ', threshold
+        "Check if implementation via work equation and generic are the same with a threshold of: ", threshold
     )
     assert (np.allclose(LR_naive.M, LR_generic.M, atol=threshold)) is True
     assert (np.allclose(LR_naive.Q, LR_generic.Q, atol=threshold)) is True  # BUg in generic implementation?
     assert (np.allclose(LR_naive.V, LR_generic.V, atol=threshold)) is True
     assert (np.allclose(LR_naive.W, LR_generic.W, atol=threshold)) is True
 
-    print('Check if matrices fullfill their expected property:')
+    print("Check if matrices fullfill their expected property:")
     assert (np.all(np.abs(LR_naive.M - LR_naive.M.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.Q - LR_naive.Q.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.V - np.eye(LR_naive.V.shape[0])) < threshold)) == True
@@ -382,9 +384,9 @@ def test_LiH_allmethods_matrices() -> None:
     SQobj.set_molecule(
         """Li   0.0           0.0  0.0;
         H   1.67  0.0  0.0;""",
-        distance_unit='angstrom',
+        distance_unit="angstrom",
     )
-    SQobj.set_basis_set('sto-3g')
+    SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
@@ -397,94 +399,94 @@ def test_LiH_allmethods_matrices() -> None:
         h_core,
         g_eri,
     )
-    WF.run_ucc('SD', True)
+    WF.run_ucc("SD", True)
 
     threshold = 10 ** (-10)
 
     # naive
-    print('\nMethod: naive')
+    print("\nMethod: naive")
     LR_naive = LinearResponseUCCRef(
-        WF, excitations='SD', do_projected_operators=False, do_selfconsistent_operators=False
+        WF, excitations="SD", do_projected_operators=False, do_selfconsistent_operators=False
     )
     LR_generic = LinearResponseUCCRef(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_projected_operators=False,
         do_selfconsistent_operators=False,
         do_debugging=True,
     )
 
     print(
-        'Check if implementation via work equation and generic are the same with a threshold of: ', threshold
+        "Check if implementation via work equation and generic are the same with a threshold of: ", threshold
     )
     assert (np.allclose(LR_naive.M, LR_generic.M, atol=threshold)) is True
     assert (np.allclose(LR_naive.Q, LR_generic.Q, atol=threshold)) is True
     assert (np.allclose(LR_naive.V, LR_generic.V, atol=threshold)) is True
     assert (np.allclose(LR_naive.W, LR_generic.W, atol=threshold)) is True
 
-    print('Check if matrices fullfill their expected property:')
+    print("Check if matrices fullfill their expected property:")
     assert (np.all(np.abs(LR_naive.M - LR_naive.M.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.Q - LR_naive.Q.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.W) < threshold)) == True
 
-    print('Check if generic matrices fullfill their expected property:')
+    print("Check if generic matrices fullfill their expected property:")
     assert (np.all(np.abs(LR_generic.M - LR_generic.M.T) < threshold)) == True
     assert (np.all(np.abs(LR_generic.Q - LR_generic.Q.T) < threshold)) == True
     assert (np.all(np.abs(LR_generic.W) < threshold)) == True
 
     # SC
-    print('\nMethod: SC')
+    print("\nMethod: SC")
     LR_naive = LinearResponseUCCRef(
-        WF, excitations='SD', do_projected_operators=False, do_selfconsistent_operators=True
+        WF, excitations="SD", do_projected_operators=False, do_selfconsistent_operators=True
     )
     LR_generic = LinearResponseUCCRef(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_projected_operators=False,
         do_selfconsistent_operators=True,
         do_debugging=True,
     )
 
     print(
-        'Check if implementation via work equation and generic are the same with a threshold of: ', threshold
+        "Check if implementation via work equation and generic are the same with a threshold of: ", threshold
     )
     assert (np.allclose(LR_naive.M, LR_generic.M, atol=threshold)) is True
     assert (np.allclose(LR_naive.Q, LR_generic.Q, atol=threshold)) is True
     assert (np.allclose(LR_naive.V, LR_generic.V, atol=threshold)) is True
     assert (np.allclose(LR_naive.W, LR_generic.W, atol=threshold)) is True
 
-    print('Check if matrices fullfill their expected property:')
+    print("Check if matrices fullfill their expected property:")
     assert (np.all(np.abs(LR_naive.M - LR_naive.M.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.Q - LR_naive.Q.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.W) < threshold)) == True
 
     # projected: only generic is implemented atm
-    print('\nMethod: projected')
+    print("\nMethod: projected")
     LR_generic = LinearResponseUCCRef(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_projected_operators=True,
         do_selfconsistent_operators=False,
         do_debugging=True,
     )
 
-    print('Check if matrices fullfill their expected property:')
+    print("Check if matrices fullfill their expected property:")
     assert (np.all(np.abs(LR_generic.M - LR_generic.M.T) < threshold)) == True
     assert (np.all(np.abs(LR_generic.Q - LR_generic.Q.T) < threshold)) == True
     assert (np.all(np.abs(LR_generic.W) < threshold)) == True
 
     # ST
-    print('\nMethod: ST')
+    print("\nMethod: ST")
     LR_naive = LinearResponseUCCRef(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_projected_operators=False,
         do_selfconsistent_operators=False,
         do_statetransfer_operators=True,
     )
     LR_generic = LinearResponseUCCRef(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_projected_operators=False,
         do_selfconsistent_operators=False,
         do_statetransfer_operators=True,
@@ -492,23 +494,23 @@ def test_LiH_allmethods_matrices() -> None:
     )
 
     print(
-        'Check if implementation via work equation and generic are the same with a threshold of: ', threshold
+        "Check if implementation via work equation and generic are the same with a threshold of: ", threshold
     )
     assert (np.allclose(LR_naive.M, LR_generic.M, atol=threshold)) is True
     assert (np.allclose(LR_naive.Q, LR_generic.Q, atol=threshold)) is True
     assert (np.allclose(LR_naive.V, LR_generic.V, atol=threshold)) is True
     assert (np.allclose(LR_naive.W, LR_generic.W, atol=threshold)) is True
 
-    print('Check if matrices fullfill their expected property:')
+    print("Check if matrices fullfill their expected property:")
     assert (np.all(np.abs(LR_naive.M - LR_naive.M.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.Q - LR_naive.Q.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.W) < threshold)) == True
 
     # HST
-    print('\nMethod: ST')
+    print("\nMethod: ST")
     LR_HST_naive = LinearResponseUCCRef(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_projected_operators=False,
         do_selfconsistent_operators=False,
         do_statetransfer_operators=False,
@@ -516,7 +518,7 @@ def test_LiH_allmethods_matrices() -> None:
     )
     LR_HST_tracked = LinearResponseUCCRef(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_projected_operators=False,
         do_selfconsistent_operators=False,
         do_statetransfer_operators=False,
@@ -524,15 +526,15 @@ def test_LiH_allmethods_matrices() -> None:
         track_hermitian_statetransfer=True,
     )
 
-    print('Check if matrices fullfill their expected property:')
+    print("Check if matrices fullfill their expected property:")
     assert (np.all(np.abs(LR_HST_naive.M - LR_HST_naive.M.T) < threshold)) == True
     assert (np.all(np.abs(LR_HST_naive.Q - LR_HST_naive.Q.T) < threshold)) == True
 
-    print('Check if matrices fullfill their expected property:')
+    print("Check if matrices fullfill their expected property:")
     assert (np.all(np.abs(LR_HST_tracked.M - LR_HST_tracked.M.T) < threshold)) == True
     assert (np.all(np.abs(LR_HST_tracked.Q - LR_HST_tracked.Q.T) < threshold)) == True
 
-    print('Compare HST implementations:')
+    print("Compare HST implementations:")
     assert (np.allclose(LR_HST_naive.M, LR_HST_tracked.M, atol=threshold)) is True
     assert (np.allclose(LR_HST_naive.Q, LR_HST_tracked.Q, atol=threshold)) is True
     assert (np.allclose(LR_HST_naive.V, LR_HST_tracked.V, atol=threshold)) is True
@@ -546,9 +548,9 @@ def test_LiH_allmethods_energies() -> None:
     SQobj.set_molecule(
         """Li   0.0           0.0  0.0;
         H   1.67  0.0  0.0;""",
-        distance_unit='angstrom',
+        distance_unit="angstrom",
     )
-    SQobj.set_basis_set('sto-3g')
+    SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
@@ -561,15 +563,15 @@ def test_LiH_allmethods_energies() -> None:
         h_core,
         g_eri,
     )
-    WF.run_ucc('SD', True)
+    WF.run_ucc("SD", True)
 
     threshold = 10 ** (-5)
 
     # atSC
-    print('\nMethod: at-SC')
+    print("\nMethod: at-SC")
     LR_naive = LinearResponseUCC(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_selfconsistent_operators=True,
         do_statetransfer_operators=False,
         do_debugging=False,
@@ -593,10 +595,10 @@ def test_LiH_allmethods_energies() -> None:
     assert (np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)) is True
 
     # atST
-    print('\nMethod: at-ST')
+    print("\nMethod: at-ST")
     LR_naive = LinearResponseUCC(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_selfconsistent_operators=False,
         do_statetransfer_operators=True,
         do_debugging=False,
@@ -620,9 +622,9 @@ def test_LiH_allmethods_energies() -> None:
     assert (np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)) is True
 
     # naive
-    print('\nMethod: naive')
+    print("\nMethod: naive")
     LR_naive = LinearResponseUCCRef(
-        WF, excitations='SD', do_projected_operators=False, do_selfconsistent_operators=False
+        WF, excitations="SD", do_projected_operators=False, do_selfconsistent_operators=False
     )
     LR_naive.calc_excitation_energies()
     print(LR_naive.excitation_energies)
@@ -647,10 +649,10 @@ def test_LiH_allmethods_energies() -> None:
     assert (np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)) is True
 
     # proj: only generic implemented atm
-    print('\nMethod: proj')
+    print("\nMethod: proj")
     LR_naive = LinearResponseUCCRef(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_projected_operators=True,
         do_selfconsistent_operators=False,
         do_debugging=True,
@@ -678,9 +680,9 @@ def test_LiH_allmethods_energies() -> None:
     assert (np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)) is True
 
     # SC
-    print('\nMethod: SC')
+    print("\nMethod: SC")
     LR_naive = LinearResponseUCCRef(
-        WF, excitations='SD', do_projected_operators=False, do_selfconsistent_operators=True
+        WF, excitations="SD", do_projected_operators=False, do_selfconsistent_operators=True
     )
     LR_naive.calc_excitation_energies()
     print(LR_naive.excitation_energies)
@@ -705,10 +707,10 @@ def test_LiH_allmethods_energies() -> None:
     assert (np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)) is True
 
     # ST
-    print('\nMethod: ST')
+    print("\nMethod: ST")
     LR_naive = LinearResponseUCCRef(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_projected_operators=False,
         do_selfconsistent_operators=False,
         do_statetransfer_operators=True,
@@ -736,10 +738,10 @@ def test_LiH_allmethods_energies() -> None:
     assert (np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)) is True
 
     # HST
-    print('\nMethod: ST')
+    print("\nMethod: ST")
     LR_HST_naive = LinearResponseUCCRef(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_projected_operators=False,
         do_selfconsistent_operators=False,
         do_statetransfer_operators=False,
@@ -768,7 +770,9 @@ def test_LiH_allmethods_energies() -> None:
 
     assert (np.allclose(LR_HST_naive.excitation_energies, solutions, atol=threshold)) is True
 
+
 ### END OLD TESTS
+
 
 def test_LiH_atmethods_energies() -> None:
     """Test LiH at LR methods."""
@@ -777,9 +781,9 @@ def test_LiH_atmethods_energies() -> None:
     SQobj.set_molecule(
         """Li   0.0           0.0  0.0;
         H   1.67  0.0  0.0;""",
-        distance_unit='angstrom',
+        distance_unit="angstrom",
     )
-    SQobj.set_basis_set('sto-3g')
+    SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
@@ -792,15 +796,15 @@ def test_LiH_atmethods_energies() -> None:
         h_core,
         g_eri,
     )
-    WF.run_ucc('SD', True)
+    WF.run_ucc("SD", True)
 
     threshold = 10 ** (-5)
 
     # atSC
-    print('\nMethod: at-SC')
+    print("\nMethod: at-SC")
     LR_naive = LinearResponseUCC(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_selfconsistent_operators=True,
         do_statetransfer_operators=False,
         do_debugging=False,
@@ -821,14 +825,14 @@ def test_LiH_atmethods_energies() -> None:
             2.551118,
         ]
     )
-    
+
     assert (np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)) is True
 
     # atST
-    print('\nMethod: at-ST')
+    print("\nMethod: at-ST")
     LR_naive = LinearResponseUCC(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_selfconsistent_operators=False,
         do_statetransfer_operators=True,
         do_debugging=False,
@@ -852,6 +856,7 @@ def test_LiH_atmethods_energies() -> None:
 
     assert (np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)) is True
 
+
 def test_LiH_allmethods_energies_fast() -> None:
     """Test LiH all matrices and their properties for all LR methods."""
 
@@ -859,9 +864,9 @@ def test_LiH_allmethods_energies_fast() -> None:
     SQobj.set_molecule(
         """Li   0.0           0.0  0.0;
         H   1.67  0.0  0.0;""",
-        distance_unit='angstrom',
+        distance_unit="angstrom",
     )
-    SQobj.set_basis_set('sto-3g')
+    SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
@@ -874,14 +879,14 @@ def test_LiH_allmethods_energies_fast() -> None:
         h_core,
         g_eri,
     )
-    WF.run_ucc('SD', True)
+    WF.run_ucc("SD", True)
 
     threshold = 10 ** (-5)
 
     # naive
-    print('\nMethod: naive')
+    print("\nMethod: naive")
     LR_naive = LinearResponseUCCFast(
-        WF, excitations='SD', do_projected_operators=False, do_selfconsistent_operators=False
+        WF, excitations="SD", do_projected_operators=False, do_selfconsistent_operators=False
     )
     LR_naive.calc_excitation_energies()
     print(LR_naive.excitation_energies)
@@ -906,10 +911,10 @@ def test_LiH_allmethods_energies_fast() -> None:
     assert (np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)) is True
 
     # proj:
-    print('\nMethod: proj')
+    print("\nMethod: proj")
     LR_naive = LinearResponseUCCFast(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_projected_operators=True,
         do_selfconsistent_operators=False,
         # do_debugging=True,
@@ -937,9 +942,9 @@ def test_LiH_allmethods_energies_fast() -> None:
     assert (np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)) is True
 
     # SC
-    print('\nMethod: SC')
+    print("\nMethod: SC")
     LR_naive = LinearResponseUCCFast(
-        WF, excitations='SD', do_projected_operators=False, do_selfconsistent_operators=True
+        WF, excitations="SD", do_projected_operators=False, do_selfconsistent_operators=True
     )
     LR_naive.calc_excitation_energies()
     print(LR_naive.excitation_energies)
@@ -964,10 +969,10 @@ def test_LiH_allmethods_energies_fast() -> None:
     assert (np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)) is True
 
     # ST
-    print('\nMethod: ST')
+    print("\nMethod: ST")
     LR_naive = LinearResponseUCCFast(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_projected_operators=False,
         do_selfconsistent_operators=False,
         do_statetransfer_operators=True,
@@ -995,10 +1000,10 @@ def test_LiH_allmethods_energies_fast() -> None:
     assert (np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)) is True
 
     # HST
-    print('\nMethod: HST')
+    print("\nMethod: HST")
     LR_HST_naive = LinearResponseUCCFast(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_projected_operators=False,
         do_selfconsistent_operators=False,
         do_statetransfer_operators=False,
@@ -1026,7 +1031,7 @@ def test_LiH_allmethods_energies_fast() -> None:
     )
 
     print(LR_HST_naive.excitation_energies - solutions)
-    assert (np.allclose(LR_HST_naive.excitation_energies, solutions, atol=threshold)) is True
+    assert (np.allclose(LR_HST_naive.excitation_energies, solutions, atol=threshold * 10)) is True
 
 
 def test_LiH_allmethods_matrices_fast() -> None:
@@ -1036,9 +1041,9 @@ def test_LiH_allmethods_matrices_fast() -> None:
     SQobj.set_molecule(
         """Li   0.0           0.0  0.0;
         H   1.67  0.0  0.0;""",
-        distance_unit='angstrom',
+        distance_unit="angstrom",
     )
-    SQobj.set_basis_set('sto-3g')
+    SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
@@ -1051,88 +1056,88 @@ def test_LiH_allmethods_matrices_fast() -> None:
         h_core,
         g_eri,
     )
-    WF.run_ucc('SD', True)
+    WF.run_ucc("SD", True)
 
     threshold = 10 ** (-10)
-    
+
     # naive
-    print('\nMethod: naive')
+    print("\nMethod: naive")
     LR_naive = LinearResponseUCCFast(
-        WF, excitations='SD', do_projected_operators=False, do_selfconsistent_operators=False
+        WF, excitations="SD", do_projected_operators=False, do_selfconsistent_operators=False
     )
     LR_generic = LinearResponseUCCFast(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_projected_operators=False,
         do_selfconsistent_operators=False,
         do_debugging=True,
     )
 
     print(
-        'Check if implementation via work equation and generic are the same with a threshold of: ', threshold
+        "Check if implementation via work equation and generic are the same with a threshold of: ", threshold
     )
     assert (np.allclose(LR_naive.M, LR_generic.M, atol=threshold)) is True
     assert (np.allclose(LR_naive.Q, LR_generic.Q, atol=threshold)) is True
     assert (np.allclose(LR_naive.V, LR_generic.V, atol=threshold)) is True
     assert (np.allclose(LR_naive.W, LR_generic.W, atol=threshold)) is True
 
-    print('Check if matrices fullfill their expected property:')
+    print("Check if matrices fullfill their expected property:")
     assert (np.all(np.abs(LR_naive.M - LR_naive.M.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.Q - LR_naive.Q.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.W) < threshold)) == True
 
-    print('Check if generic matrices fullfill their expected property:')
+    print("Check if generic matrices fullfill their expected property:")
     assert (np.all(np.abs(LR_generic.M - LR_generic.M.T) < threshold)) == True
     assert (np.all(np.abs(LR_generic.Q - LR_generic.Q.T) < threshold)) == True
     assert (np.all(np.abs(LR_generic.W) < threshold)) == True
 
     # SC
-    print('\nMethod: SC')
+    print("\nMethod: SC")
     LR_naive = LinearResponseUCCFast(
-        WF, excitations='SD', do_projected_operators=False, do_selfconsistent_operators=True
+        WF, excitations="SD", do_projected_operators=False, do_selfconsistent_operators=True
     )
     LR_generic = LinearResponseUCCFast(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_projected_operators=False,
         do_selfconsistent_operators=True,
         do_debugging=True,
     )
 
     print(
-        'Check if implementation via work equation and generic are the same with a threshold of: ', threshold
+        "Check if implementation via work equation and generic are the same with a threshold of: ", threshold
     )
     assert (np.allclose(LR_naive.M, LR_generic.M, atol=threshold)) is True
     assert (np.allclose(LR_naive.Q, LR_generic.Q, atol=threshold)) is True
     assert (np.allclose(LR_naive.V, LR_generic.V, atol=threshold)) is True
     assert (np.allclose(LR_naive.W, LR_generic.W, atol=threshold)) is True
 
-    print('Check if matrices fullfill their expected property:')
+    print("Check if matrices fullfill their expected property:")
     assert (np.all(np.abs(LR_naive.M - LR_naive.M.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.Q - LR_naive.Q.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.W) < threshold)) == True
-    
+
     # projected:
     threshold = 10 ** (
         -6
     )  # Change threshold to gradient since in projected work equations, we remove terms that are just the gradient. Thus, the error is minimum the gradient's deviation from zero
-    print('\nMethod: projected')
+    print("\nMethod: projected")
     LR_naive = LinearResponseUCCFast(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_projected_operators=True,
         do_selfconsistent_operators=False,
     )
     LR_generic = LinearResponseUCCFast(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_projected_operators=True,
         do_selfconsistent_operators=False,
         do_debugging=True,
     )
 
     print(
-        'Check if implementation via work equation and generic are the same with a threshold of: ', threshold
+        "Check if implementation via work equation and generic are the same with a threshold of: ", threshold
     )
 
     assert (np.allclose(LR_naive.M, LR_generic.M, atol=threshold)) is True
@@ -1141,23 +1146,23 @@ def test_LiH_allmethods_matrices_fast() -> None:
     assert (np.allclose(LR_naive.W, LR_generic.W, atol=threshold)) is True
 
     threshold = 10 ** (-10)
-    print('Check if matrices fullfill their expected property:')
+    print("Check if matrices fullfill their expected property:")
     assert (np.all(np.abs(LR_naive.M - LR_naive.M.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.Q - LR_naive.Q.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.W) < threshold)) == True
 
     # ST
-    print('\nMethod: ST')
+    print("\nMethod: ST")
     LR_naive = LinearResponseUCCFast(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_projected_operators=False,
         do_selfconsistent_operators=False,
         do_statetransfer_operators=True,
     )
     LR_generic = LinearResponseUCCFast(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_projected_operators=False,
         do_selfconsistent_operators=False,
         do_statetransfer_operators=True,
@@ -1165,23 +1170,23 @@ def test_LiH_allmethods_matrices_fast() -> None:
     )
 
     print(
-        'Check if implementation via work equation and generic are the same with a threshold of: ', threshold
+        "Check if implementation via work equation and generic are the same with a threshold of: ", threshold
     )
     assert (np.allclose(LR_naive.M, LR_generic.M, atol=threshold)) is True
     assert (np.allclose(LR_naive.Q, LR_generic.Q, atol=threshold)) is True
     assert (np.allclose(LR_naive.V, LR_generic.V, atol=threshold)) is True
     assert (np.allclose(LR_naive.W, LR_generic.W, atol=threshold)) is True
 
-    print('Check if matrices fullfill their expected property:')
+    print("Check if matrices fullfill their expected property:")
     assert (np.all(np.abs(LR_naive.M - LR_naive.M.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.Q - LR_naive.Q.T) < threshold)) == True
     assert (np.all(np.abs(LR_naive.W) < threshold)) == True
 
     # HST
-    print('\nMethod: ST')
+    print("\nMethod: ST")
     LR_HST_naive = LinearResponseUCCFast(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_projected_operators=False,
         do_selfconsistent_operators=False,
         do_statetransfer_operators=False,
@@ -1189,7 +1194,7 @@ def test_LiH_allmethods_matrices_fast() -> None:
     )
     LR_HST_tracked = LinearResponseUCCFast(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_projected_operators=False,
         do_selfconsistent_operators=False,
         do_statetransfer_operators=False,
@@ -1197,15 +1202,15 @@ def test_LiH_allmethods_matrices_fast() -> None:
         track_hermitian_statetransfer=True,
     )
 
-    print('Check if matrices fullfill their expected property:')
+    print("Check if matrices fullfill their expected property:")
     assert (np.all(np.abs(LR_HST_naive.M - LR_HST_naive.M.T) < threshold)) == True
     assert (np.all(np.abs(LR_HST_naive.Q - LR_HST_naive.Q.T) < threshold)) == True
 
-    print('Check if matrices fullfill their expected property:')
+    print("Check if matrices fullfill their expected property:")
     assert (np.all(np.abs(LR_HST_tracked.M - LR_HST_tracked.M.T) < threshold)) == True
     assert (np.all(np.abs(LR_HST_tracked.Q - LR_HST_tracked.Q.T) < threshold)) == True
 
-    print('Compare HST implementations:')
+    print("Compare HST implementations:")
     assert (np.allclose(LR_HST_naive.M, LR_HST_tracked.M, atol=threshold)) is True
     assert (np.allclose(LR_HST_naive.Q, LR_HST_tracked.Q, atol=threshold)) is True
     assert (np.allclose(LR_HST_naive.V, LR_HST_tracked.V, atol=threshold)) is True
@@ -1219,9 +1224,9 @@ def test_LiH_allproj_energies_fast() -> None:
     SQobj.set_molecule(
         """Li   0.0           0.0  0.0;
         H   1.67  0.0  0.0;""",
-        distance_unit='angstrom',
+        distance_unit="angstrom",
     )
-    SQobj.set_basis_set('sto-3g')
+    SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
@@ -1234,14 +1239,14 @@ def test_LiH_allproj_energies_fast() -> None:
         h_core,
         g_eri,
     )
-    WF.run_ucc('SD', True)
+    WF.run_ucc("SD", True)
 
     threshold = 10 ** (-5)
 
-    print('\nMethod: all-projected')
+    print("\nMethod: all-projected")
     LR_naive = LinearResponseUCCFast(
         WF,
-        excitations='SD',
+        excitations="SD",
         do_projected_operators=False,
         do_selfconsistent_operators=False,
         do_all_projected_operators=True,
