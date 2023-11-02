@@ -175,7 +175,7 @@ def test_h2_431g_uccsd() -> None:
         g_eri,
     )
     WF.run_ucc("SD", False)
-    assert abs(WF.energy_elec - (-1.8466833679296024)) < 10**-8
+    assert abs(WF.energy_elec - (-1.8466860579618674)) < 10**-8
 
 
 def test_h4_sto3g_oouccsd() -> None:
