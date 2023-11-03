@@ -17,10 +17,8 @@ from slowquant.unitary_coupled_cluster.operator_contracted import (
 )
 from slowquant.unitary_coupled_cluster.operator_hybrid import (
     OperatorHybrid,
-    OperatorHybridData,
     convert_pauli_to_hybrid_form,
     expectation_value_hybrid,
-    expectation_value_hybrid_flow,
     make_projection_operator,
 )
 from slowquant.unitary_coupled_cluster.operator_pauli import (
@@ -94,7 +92,7 @@ class LinearResponseUCC:
         # excitation order in lower case
         excitations = excitations.lower()
         # Construct unitary matrix, input from VQE
-        U_matrix = construct_ucc_u(
+        U = construct_ucc_u(
             self.wf.num_active_spin_orbs,
             self.wf.num_active_elec,
             self.wf.theta1
@@ -106,15 +104,6 @@ class LinearResponseUCC:
             self.wf.theta_picker_full,
             "sdtq56",  # self.wf._excitations,
         )
-        ### NEW
-        inactive_str = "I" * self.wf.num_inactive_spin_orbs
-        virtual_str = "I" * self.wf.num_virtual_spin_orbs
-        U = OperatorHybrid(
-            {inactive_str + virtual_str: OperatorHybridData(inactive_str, U_matrix, virtual_str)}
-        )  # U is now an operator
-        self.U = U
-        ### NEW
-
         # Setup calculation type
         if do_debugging:
             calculation_type = "generic"  # Implementation for debugging with R and Q, acting on |0>
@@ -154,8 +143,8 @@ class LinearResponseUCC:
                     self.wf.num_virtual_spin_orbs,
                 )
                 if do_debugging:  # R = UGU^d
-                    op = op.apply_u_from_right(U_matrix.conj().transpose())
-                    op = op.apply_u_from_left(U_matrix)
+                    op = op.apply_u_from_right(U.conj().transpose())
+                    op = op.apply_u_from_left(U)
                     if do_statetransfer_operators:  # R = UGU^d |0><0|
                         if do_buggy_projection:
                             op = op.apply_u_from_right(projection)
@@ -171,8 +160,8 @@ class LinearResponseUCC:
                     self.wf.num_virtual_spin_orbs,
                 )
                 if do_debugging:  # R = UGU^d
-                    op = op.apply_u_from_right(U_matrix.conj().transpose())
-                    op = op.apply_u_from_left(U_matrix)
+                    op = op.apply_u_from_right(U.conj().transpose())
+                    op = op.apply_u_from_left(U)
                     if do_statetransfer_operators:  # R = UGU^d |0><0|
                         if do_buggy_projection:
                             op = op.apply_u_from_right(projection)
@@ -188,8 +177,8 @@ class LinearResponseUCC:
                     self.wf.num_virtual_spin_orbs,
                 )
                 if do_debugging:  # R = UGU^d
-                    op = op.apply_u_from_right(U_matrix.conj().transpose())
-                    op = op.apply_u_from_left(U_matrix)
+                    op = op.apply_u_from_right(U.conj().transpose())
+                    op = op.apply_u_from_left(U)
                     if do_statetransfer_operators:  # R = UGU^d |0><0|
                         if do_buggy_projection:
                             op = op.apply_u_from_right(projection)
@@ -205,8 +194,8 @@ class LinearResponseUCC:
                     self.wf.num_virtual_spin_orbs,
                 )
                 if do_debugging:  # R = UGU^d
-                    op = op.apply_u_from_right(U_matrix.conj().transpose())
-                    op = op.apply_u_from_left(U_matrix)
+                    op = op.apply_u_from_right(U.conj().transpose())
+                    op = op.apply_u_from_left(U)
                     if do_statetransfer_operators:  # R = UGU^d |0><0|
                         if do_buggy_projection:
                             op = op.apply_u_from_right(projection)
@@ -224,8 +213,8 @@ class LinearResponseUCC:
                     self.wf.num_virtual_spin_orbs,
                 )
                 if do_debugging:  # R = UGU^d
-                    op = op.apply_u_from_right(U_matrix.conj().transpose())
-                    op = op.apply_u_from_left(U_matrix)
+                    op = op.apply_u_from_right(U.conj().transpose())
+                    op = op.apply_u_from_left(U)
                     if do_statetransfer_operators:  # R = UGU^d |0><0|
                         if do_buggy_projection:
                             op = op.apply_u_from_right(projection)
@@ -243,8 +232,8 @@ class LinearResponseUCC:
                     self.wf.num_virtual_spin_orbs,
                 )
                 if do_debugging:  # R = UGU^d
-                    op = op.apply_u_from_right(U_matrix.conj().transpose())
-                    op = op.apply_u_from_left(U_matrix)
+                    op = op.apply_u_from_right(U.conj().transpose())
+                    op = op.apply_u_from_left(U)
                     if do_statetransfer_operators:  # R = UGU^d |0><0|
                         if do_buggy_projection:
                             op = op.apply_u_from_right(projection)
@@ -267,8 +256,8 @@ class LinearResponseUCC:
                 self.wf.num_virtual_spin_orbs,
             )
             if do_debugging:  # Q = UqU^d
-                op = op.apply_u_from_right(U_matrix.conj().transpose())
-                op = op.apply_u_from_left(U_matrix)
+                op = op.apply_u_from_right(U.conj().transpose())
+                op = op.apply_u_from_left(U)
                 if do_statetransfer_operators:  # Q = UqU^d |0><0|
                     if do_buggy_projection:
                         op = op.apply_u_from_right(projection)
@@ -335,9 +324,8 @@ class LinearResponseUCC:
             if np.max(np.abs(grad)) > 10**-4:
                 raise ValueError("Gradient of Hessian is real bad")
 
-        """ OLD
         # Transform Hamiltonian if we choose naive implementation, i.e. via work equations: \tilde H = U^dHU
-        if calculation_type == 'naive':  # != debugging
+        if calculation_type == "naive":  # != debugging
             H_1i_1a = H_1i_1a.apply_u_from_right(U)
             H_1i_1a = H_1i_1a.apply_u_from_left(U.conj().transpose())
 
@@ -346,7 +334,6 @@ class LinearResponseUCC:
 
             H_en = H_en.apply_u_from_right(U)
             H_en = H_en.apply_u_from_left(U.conj().transpose())
-        """
 
         #######
         ### Construct matrices
@@ -373,14 +360,12 @@ class LinearResponseUCC:
                     operator = operatormul3_contract(qI.dagger, H_2i_2a, qJ) - operatormul3_contract(
                         qI.dagger, qJ, H_2i_2a
                     )
-                    self.M[i, j] = self.M[j, i] = expectation_value_hybrid_flow(
-                        csf, [qI.dagger, U.dagger, H_2i_2a, U, qJ], csf
-                    ) - expectation_value_hybrid_flow(
-                        csf, [qI.dagger, qJ, U.dagger, H_2i_2a], self.wf.state_vector
-                    )
+                    self.M[i, j] = self.M[j, i] = expectation_value_contracted(csf, operator, csf)
                     # Make Q (B)
-                    self.Q[i, j] = self.Q[j, i] = -expectation_value_hybrid_flow(
-                        csf, [qI.dagger, qJ.dagger, U.dagger, H_2i_2a], self.wf.state_vector
+                    self.Q[i, j] = self.Q[j, i] = -expectation_value_contracted(
+                        csf,
+                        operatormul3_contract(qI.dagger, qJ.dagger, H_2i_2a),
+                        csf,
                     )
                     # Make V (\Sigma)
                     if i == j:
@@ -393,13 +378,15 @@ class LinearResponseUCC:
                     # Make M (A)
                     if i == j:
                         self.M[i, j] = self.M[j, i] = (
-                            expectation_value_hybrid_flow(csf, [qI.dagger, U.dagger, H_2i_2a, U, qJ], csf)
+                            expectation_value_contracted(
+                                csf, operatormul3_contract(qI.dagger, H_2i_2a, qJ), csf
+                            )
                             - self.wf.energy_elec
                         )
                         self.V[i, j] = self.V[j, i] = 1  # save one if
                     else:
-                        self.M[i, j] = self.M[j, i] = expectation_value_hybrid_flow(
-                            csf, [qI.dagger, U.dagger, H_2i_2a, U, qJ], csf
+                        self.M[i, j] = self.M[j, i] = expectation_value_contracted(
+                            csf, operatormul3_contract(qI.dagger, H_2i_2a, qJ), csf
                         )
                     # Make Q (B) = 0
                     # Make V (\Sigma) = \delta_ij (see above)
@@ -434,6 +421,67 @@ class LinearResponseUCC:
                     self.W[j, i] = -self.W[i, j]
                 else:
                     raise NameError("Could not determine calculation_type got: {calculation_type}")
+        # qG/QR matrices. Changed to literature parametrization for generic
+        # If one would change back to the equations in the comments, one would obtain the results for an initial parametrization opposite literature, i.e. exp(s)exp(kappa)
+        for j, opJ in enumerate(self.G_ops):
+            GJ = opJ.operator
+            for i, opI in enumerate(self.q_ops):
+                qI = opI.operator
+                # Selfconsistent work equations
+                if (
+                    calculation_type == "naive" and do_selfconsistent_operators
+                ):  # Implementation via work equation with G and q, transformed H, acting on |CSF>
+                    # Make M (A)
+                    operator = operatormul3_contract(
+                        qI.dagger, H_1i_1a, GJ
+                    )  # - operatormul3_contract(  ##Note: maybe needed
+                    # qI.dagger, GJ, H_1i_1a
+                    # )
+                    self.M[i, j + idx_shift] = expectation_value_contracted(csf, operator, csf)
+                    # Make Q (B)
+                    self.Q[i, j + idx_shift] = -expectation_value_contracted(
+                        csf,
+                        operatormul3_contract(qI.dagger, GJ.dagger, H_1i_1a),
+                        csf,
+                    )
+                    # Make V (\Sigma) = 0
+                    # Make W (\Delta) = 0
+                # Statetransfer work equations
+                elif (
+                    calculation_type == "naive" and do_statetransfer_operators
+                ):  # Implementation via work equation with G and q, transformed H, acting on |CSF>
+                    # Make M (A)
+                    self.M[i, j + idx_shift] = expectation_value_contracted(
+                        csf, operatormul3_contract(qI.dagger, H_1i_1a, GJ), csf
+                    )
+                    # Make Q (B) = 0
+                    # Make V (\Sigma) = 0
+                    # Make W (\Delta) = 0
+                elif calculation_type == "generic":
+                    # Make M (A)
+                    self.M[i, j + idx_shift] = expectation_value_contracted(
+                        self.wf.state_vector,
+                        # double_commutator_contract(qI.dagger, H_1i_1a, GJ),
+                        double_commutator_contract(GJ, H_1i_1a, qI.dagger),
+                        self.wf.state_vector,
+                    )
+                    # Make Q (B)
+                    self.Q[i, j + idx_shift] = expectation_value_contracted(
+                        self.wf.state_vector,
+                        # double_commutator_contract(qI.dagger, H_1i_1a, GJ.dagger),
+                        double_commutator_contract(GJ.dagger, H_1i_1a, qI.dagger),
+                        self.wf.state_vector,
+                    )
+                    # Make V (\Sigma)
+                    self.V[i, j + idx_shift] = expectation_value_contracted(
+                        self.wf.state_vector, commutator_contract(qI.dagger, GJ), self.wf.state_vector
+                    )
+                    # Make W (\Delta)
+                    self.W[i, j + idx_shift] = expectation_value_contracted(
+                        self.wf.state_vector, commutator_contract(qI.dagger, GJ.dagger), self.wf.state_vector
+                    )
+                else:
+                    raise NameError("Could not determine calculation_type got: {calculation_type}")
         # Gq/RQ matrices
         for j, opJ in enumerate(self.q_ops):
             qJ = opJ.operator
@@ -444,14 +492,14 @@ class LinearResponseUCC:
                     calculation_type == "naive" and do_selfconsistent_operators
                 ):  # Implementation via work equation with G and q, transformed H, acting on |CSF>
                     # Make M (A)
-                    self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
-                        csf, [GI.dagger, U.dagger, H_1i_1a, U, qJ], csf
+                    self.M[i + idx_shift, j] = expectation_value_contracted(
+                        csf, operatormul3_contract(GI.dagger, H_1i_1a, qJ), csf
                     )
                     # Make Q (B)
-                    self.Q[j, i + idx_shift] = self.Q[i + idx_shift, j] = -expectation_value_hybrid_flow(
+                    self.Q[i + idx_shift, j] = -expectation_value_contracted(
                         csf,
-                        [GI.dagger, qJ.dagger, U.dagger, H_1i_1a],
-                        self.wf.state_vector,
+                        operatormul3_contract(GI.dagger, qJ.dagger, H_1i_1a),
+                        csf,
                     )
                     # Make V (\Sigma) = 0
                     # Make W (\Delta) = 0
@@ -460,34 +508,33 @@ class LinearResponseUCC:
                     calculation_type == "naive" and do_statetransfer_operators
                 ):  # Implementation via work equation with G and q, transformed H, acting on |CSF>
                     # Make M (A)
-                    self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_hybrid_flow(
-                        csf, [GI.dagger, U.dagger, H_1i_1a, U, qJ], csf
+                    self.M[i + idx_shift, j] = expectation_value_contracted(
+                        csf, operatormul3_contract(GI.dagger, H_1i_1a, qJ), csf
                     )
                     # Make Q (B) = 0
                     # Make V (\Sigma) = 0
                     # Make W (\Delta) = 0
                 elif calculation_type == "generic":
                     # Make M (A)
-                    self.M[j, i + idx_shift] = self.M[i + idx_shift, j] = expectation_value_contracted(
+                    self.M[i + idx_shift, j] = expectation_value_contracted(
                         self.wf.state_vector,
                         double_commutator_contract(GI.dagger, H_1i_1a, qJ),
                         self.wf.state_vector,
                     )
                     # Make Q (B)
-                    self.Q[j, i + idx_shift] = self.Q[i + idx_shift, j] = expectation_value_contracted(
+                    self.Q[i + idx_shift, j] = expectation_value_contracted(
                         self.wf.state_vector,
                         double_commutator_contract(GI.dagger, H_1i_1a, qJ.dagger),
                         self.wf.state_vector,
                     )
                     # Make V (\Sigma)
-                    self.V[j, i + idx_shift] = self.V[i + idx_shift, j] = expectation_value_contracted(
+                    self.V[i + idx_shift, j] = expectation_value_contracted(
                         self.wf.state_vector, commutator_contract(GI.dagger, qJ), self.wf.state_vector
                     )
                     # Make W (\Delta)
-                    self.W[j, i + idx_shift] = expectation_value_contracted(
+                    self.W[i + idx_shift, j] = expectation_value_contracted(
                         self.wf.state_vector, commutator_contract(GI.dagger, qJ.dagger), self.wf.state_vector
                     )
-                    self.W[i + idx_shift, j] = -self.W[j, i + idx_shift]
                 else:
                     raise NameError("Could not determine calculation_type got: {calculation_type}")
         # GG/RR matrices
@@ -502,37 +549,38 @@ class LinearResponseUCC:
                     calculation_type == "naive" and do_selfconsistent_operators
                 ):  # Implementation via work equation with G and q, transformed H, acting on |CSF>
                     # Make M (A)
-                    val = expectation_value_hybrid_flow(
-                        csf, [GI.dagger, U.dagger, H_en, U, GJ], csf
-                    ) - expectation_value_hybrid_flow(
-                        csf, [GI.dagger, GJ, U.dagger, H_en], self.wf.state_vector
-                    )
-                    self.M[i + idx_shift, j + idx_shift] = self.M[j + idx_shift, i + idx_shift] = val
+                    operator = operatormul3_contract(GI.dagger, H_en, GJ)
+                    operator -= operatormul3_contract(GI.dagger, GJ, H_en)
+                    self.M[i + idx_shift, j + idx_shift] = self.M[
+                        j + idx_shift, i + idx_shift
+                    ] = expectation_value_contracted(csf, operator, csf)
                     # Make Q (B)
                     self.Q[i + idx_shift, j + idx_shift] = self.Q[
                         j + idx_shift, i + idx_shift
-                    ] = -expectation_value_hybrid_flow(
-                        csf, [GI.dagger, GJ.dagger, U.dagger, H_en], self.wf.state_vector
+                    ] = -expectation_value_contracted(
+                        csf,
+                        operatormul3_contract(GI.dagger, GJ.dagger, H_en),
+                        csf,
                     )
-                    # Make V
+                    # Make V (\Sigma) = \delta_ij
                     if i == j:
                         self.V[i + idx_shift, j + idx_shift] = self.V[j + idx_shift, i + idx_shift] = 1
-                    # Make W = 0
+                    # Make W (\Delta) = 0
                 # Statetransfer work equations
                 elif (
                     calculation_type == "naive" and do_statetransfer_operators
                 ):  # Implementation via work equation with G and q, transformed H, acting on |CSF>
                     # Make M (A)
                     if i == j:
-                        val = (
-                            expectation_value_hybrid_flow(csf, [GI.dagger, U.dagger, H_en, U, GJ], csf)
+                        self.M[i + idx_shift, j + idx_shift] = self.M[j + idx_shift, i + idx_shift] = (
+                            expectation_value_contracted(csf, operatormul3_contract(GI.dagger, H_en, GJ), csf)
                             - self.wf.energy_elec
                         )
-                        self.M[i + idx_shift, j + idx_shift] = self.M[j + idx_shift, i + idx_shift] = val
                         self.V[i + idx_shift, j + idx_shift] = self.V[j + idx_shift, i + idx_shift] = 1
                     else:
-                        val = expectation_value_hybrid_flow(csf, [GI.dagger, U.dagger, H_en, U, GJ], csf)
-                        self.M[i + idx_shift, j + idx_shift] = self.M[j + idx_shift, i + idx_shift] = val
+                        self.M[i + idx_shift, j + idx_shift] = self.M[
+                            j + idx_shift, i + idx_shift
+                        ] = expectation_value_contracted(csf, operatormul3_contract(GI.dagger, H_en, GJ), csf)
                     # Make Q (B)= 0
                     # Make V (\Sigma) = \delta_ij (see above)
                     # Make W (\Delta) = 0

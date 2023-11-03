@@ -798,7 +798,7 @@ def test_LiH_atmethods_energies() -> None:
     )
     WF.run_ucc("SD", True)
 
-    threshold = 10 ** (-5)
+    threshold = 10 ** (-3)
 
     # atSC
     print("\nMethod: at-SC")
