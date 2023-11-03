@@ -39,45 +39,44 @@ class LinearResponseBaseClass:
         self.excitation_energies = np.real(eigval[sorting][size:])
         self.response_vectors = np.real(eigvec[:, sorting][:, size:])
         self.normed_response_vectors = np.zeros_like(self.response_vectors)
-        for state_number in range(size):
-            norm = self.get_excited_state_norm(state_number)
+        norms = self.get_excited_state_norm()
+        for state_number, norm in enumerate(norms):
             if norm < 10**-10:
                 continue
             self.normed_response_vectors[:, state_number] = (
                 self.response_vectors[:, state_number] * (1 / norm) ** 0.5
             )
 
-    def get_excited_state_norm(self, state_number: int) -> float:
+    def get_excited_state_norm(self) -> np.ndarray:
         raise NotImplementedError
 
-    def get_transition_dipole(
-        self, state_number: int, dipole_integrals: Sequence[np.ndarray]
-    ) -> tuple[float, float, float]:
+    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         raise NotImplementedError
 
-    def get_oscillator_strength(self, state_number: int, dipole_integrals: Sequence[np.ndarray]) -> float:
+    def get_oscillator_strength(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         r"""Calculate oscillator strength.
 
         .. math::
             f_n = \frac{2}{3}e_n\left|\left<0\left|\hat{\mu}\right|n\left>\right|^2
 
         Args:
-            state_number: Target excited state (zero being the first excited state).
             dipole_integrals: Dipole integrals (x,y,z) in AO basis.
 
         Rerturns:
             Oscillator Strength.
         """
-        transition_dipole_x, transition_dipole_y, transition_dipole_z = self.get_transition_dipole(
-            state_number, dipole_integrals
-        )
-        excitation_energy = self.excitation_energies[state_number]
-        return (
-            2
-            / 3
-            * excitation_energy
-            * (transition_dipole_x**2 + transition_dipole_y**2 + transition_dipole_z**2)
-        )
+        transition_dipoles = self.get_transition_dipole(dipole_integrals)
+        osc_strs = np.zeros(len(transition_dipoles))
+        for idx, (excitation_energy, transition_dipole) in enumerate(
+            zip(self.excitation_energies, transition_dipoles)
+        ):
+            osc_strs[idx] = (
+                2
+                / 3
+                * excitation_energy
+                * (transition_dipole[0] ** 2 + transition_dipole[1] ** 2 + transition_dipole[2] ** 2)
+            )
+        return osc_strs
 
     def get_nice_output(self, dipole_integrals: Sequence[np.ndarray]) -> str:
         """Create table of excitation energies and oscillator strengths.
@@ -91,8 +90,8 @@ class LinearResponseBaseClass:
         output = (
             "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n"
         )
-        for i, exc_energy in enumerate(self.excitation_energies):
-            osc_strength = self.get_oscillator_strength(i, dipole_integrals)
+        osc_strs = self.get_oscillator_strength(dipole_integrals)
+        for i, (exc_energy, osc_strength) in enumerate(zip(self.excitation_energies, osc_strs)):
             exc_str = f"{exc_energy:2.6f}"
             exc_str_ev = f"{exc_energy*27.2114079527:3.6f}"
             osc_str = f"{osc_strength:1.6f}"

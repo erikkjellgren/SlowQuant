@@ -196,40 +196,34 @@ class WaveFunctionUCC:
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     self.kappa_hf_like_idx.append([p, q])
         # Construct theta1
-        self.theta_picker = ThetaPicker(
+        self.singlet_excitation_operator_generator = ThetaPicker(
             self.active_occ_spin_idx_shifted,
             self.active_unocc_spin_idx_shifted,
             is_spin_conserving=True,
             is_generalized=is_generalized,
         )
-        self.theta_picker_full = ThetaPicker(
-            self.active_occ_spin_idx_shifted,
-            self.active_unocc_spin_idx_shifted,
-            is_spin_conserving=False,
-            is_generalized=is_generalized,
-        )
         self._theta1 = []
-        for _ in self.theta_picker_full.get_t1_generator_sa(0, 0):
+        for _ in self.singlet_excitation_operator_generator.get_t1_generator_sa(0, 0):
             self._theta1.append(0)
         # Construct theta2
         self._theta2 = []
-        for _ in self.theta_picker_full.get_t2_generator_sa(0, 0):
+        for _ in self.singlet_excitation_operator_generator.get_t2_generator_sa(0, 0):
             self._theta2.append(0)
         # Construct theta3
         self._theta3 = []
-        for _ in self.theta_picker_full.get_t3_generator(0, 0):
+        for _ in self.singlet_excitation_operator_generator.get_t3_generator(0, 0):
             self._theta3.append(0)
         # Construct theta4
         self._theta4 = []
-        for _ in self.theta_picker_full.get_t4_generator(0, 0):
+        for _ in self.singlet_excitation_operator_generator.get_t4_generator(0, 0):
             self._theta4.append(0)
         # Construct theta5
         self._theta5 = []
-        for _ in self.theta_picker_full.get_t5_generator(0, 0):
+        for _ in self.singlet_excitation_operator_generator.get_t5_generator(0, 0):
             self._theta5.append(0)
         # Construct theta6
         self._theta6 = []
-        for _ in self.theta_picker_full.get_t6_generator(0, 0):
+        for _ in self.singlet_excitation_operator_generator.get_t6_generator(0, 0):
             self._theta6.append(0)
 
     @property
@@ -259,7 +253,7 @@ class WaveFunctionUCC:
             self.num_active_spin_orbs,
             self.num_active_elec,
             self.theta1 + self.theta2 + self.theta3 + self.theta4 + self.theta5 + self.theta6,
-            self.theta_picker,
+            self.singlet_excitation_operator_generator,
             "sdtq56",  # self._excitations,
             allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
         )
@@ -284,7 +278,7 @@ class WaveFunctionUCC:
             self.num_active_spin_orbs,
             self.num_active_elec,
             self.theta1 + self.theta2 + self.theta3 + self.theta4 + self.theta5 + self.theta6,
-            self.theta_picker,
+            self.singlet_excitation_operator_generator,
             "sdtq56",  # self._excitations,
             allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
         )
@@ -309,7 +303,7 @@ class WaveFunctionUCC:
             self.num_active_spin_orbs,
             self.num_active_elec,
             self.theta1 + self.theta2 + self.theta3 + self.theta4 + self.theta5 + self.theta6,
-            self.theta_picker,
+            self.singlet_excitation_operator_generator,
             "sdtq56",  # self._excitations,
             allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
         )
@@ -334,7 +328,7 @@ class WaveFunctionUCC:
             self.num_active_spin_orbs,
             self.num_active_elec,
             self.theta1 + self.theta2 + self.theta3 + self.theta4 + self.theta5 + self.theta6,
-            self.theta_picker,
+            self.singlet_excitation_operator_generator,
             "sdtq56",  # self._excitations,
             allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
         )
@@ -359,7 +353,7 @@ class WaveFunctionUCC:
             self.num_active_spin_orbs,
             self.num_active_elec,
             self.theta1 + self.theta2 + self.theta3 + self.theta4 + self.theta5 + self.theta6,
-            self.theta_picker,
+            self.singlet_excitation_operator_generator,
             "sdtq56",  # self._excitations,
             allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
         )
@@ -384,7 +378,7 @@ class WaveFunctionUCC:
             self.num_active_spin_orbs,
             self.num_active_elec,
             self.theta1 + self.theta2 + self.theta3 + self.theta4 + self.theta5 + self.theta6,
-            self.theta_picker_full,
+            self.singlet_excitation_operator_generator,
             "sdtq56",  # self._excitations,
             allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
         )
@@ -413,7 +407,7 @@ class WaveFunctionUCC:
             self.num_active_spin_orbs,
             self.num_active_elec,
             self.theta1 + self.theta2 + self.theta3 + self.theta4 + self.theta5 + self.theta6,
-            self.theta_picker_full,
+            self.singlet_excitation_operator_generator,
             "sdtq56",  # self._excitations,
             allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
         )
@@ -572,27 +566,57 @@ class WaveFunctionUCC:
             parameters += self.kappa
             num_kappa += len(self.kappa)
         if "s" in excitations:
-            for idx, _, _, _ in self.theta_picker.get_t1_generator_sa(0, 0):
+            for idx, _, _, _ in self.singlet_excitation_operator_generator.get_t1_generator_sa(0, 0):
                 parameters += [self.theta1[idx]]
                 num_theta1 += 1
         if "d" in excitations:
-            for idx, _, _, _, _, _ in self.theta_picker.get_t2_generator_sa(0, 0):
+            for idx, _, _, _, _, _ in self.singlet_excitation_operator_generator.get_t2_generator_sa(0, 0):
                 parameters += [self.theta2[idx]]
                 num_theta2 += 1
         if "t" in excitations:
-            for idx, _, _, _, _, _, _, _ in self.theta_picker.get_t3_generator(0, 0):
+            for idx, _, _, _, _, _, _, _ in self.singlet_excitation_operator_generator.get_t3_generator(0, 0):
                 parameters += [self.theta3[idx]]
                 num_theta3 += 1
         if "q" in excitations:
-            for idx, _, _, _, _, _, _, _, _, _ in self.theta_picker.get_t4_generator(0, 0):
+            for idx, _, _, _, _, _, _, _, _, _ in self.singlet_excitation_operator_generator.get_t4_generator(
+                0, 0
+            ):
                 parameters += [self.theta4[idx]]
                 num_theta4 += 1
         if "5" in excitations:
-            for idx, _, _, _, _, _, _, _, _, _, _, _ in self.theta_picker.get_t5_generator(0, 0):
+            for (
+                idx,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+            ) in self.singlet_excitation_operator_generator.get_t5_generator(0, 0):
                 parameters += [self.theta5[idx]]
                 num_theta5 += 1
         if "6" in excitations:
-            for idx, _, _, _, _, _, _, _, _, _, _, _, _, _ in self.theta_picker.get_t6_generator(0, 0):
+            for (
+                idx,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+            ) in self.singlet_excitation_operator_generator.get_t6_generator(0, 0):
                 parameters += [self.theta6[idx]]
                 num_theta6 += 1
         if is_silent:
@@ -639,42 +663,72 @@ class WaveFunctionUCC:
             thetas = res["x"][param_idx : num_theta1 + param_idx].tolist()
             param_idx += len(thetas)
             counter = 0
-            for idx, _, _, _ in self.theta_picker.get_t1_generator_sa(0, 0):
+            for idx, _, _, _ in self.singlet_excitation_operator_generator.get_t1_generator_sa(0, 0):
                 self.theta1[idx] = thetas[counter]
                 counter += 1
         if "d" in excitations:
             thetas = res["x"][param_idx : num_theta2 + param_idx].tolist()
             param_idx += len(thetas)
             counter = 0
-            for idx, _, _, _, _, _ in self.theta_picker.get_t2_generator_sa(0, 0):
+            for idx, _, _, _, _, _ in self.singlet_excitation_operator_generator.get_t2_generator_sa(0, 0):
                 self.theta2[idx] = thetas[counter]
                 counter += 1
         if "t" in excitations:
             thetas = res["x"][param_idx : num_theta3 + param_idx].tolist()
             param_idx += len(thetas)
             counter = 0
-            for idx, _, _, _, _, _, _, _ in self.theta_picker.get_t3_generator(0, 0):
+            for idx, _, _, _, _, _, _, _ in self.singlet_excitation_operator_generator.get_t3_generator(0, 0):
                 self.theta3[idx] = thetas[counter]
                 counter += 1
         if "q" in excitations:
             thetas = res["x"][param_idx : num_theta4 + param_idx].tolist()
             param_idx += len(thetas)
             counter = 0
-            for idx, _, _, _, _, _, _, _, _, _ in self.theta_picker.get_t4_generator(0, 0):
+            for idx, _, _, _, _, _, _, _, _, _ in self.singlet_excitation_operator_generator.get_t4_generator(
+                0, 0
+            ):
                 self.theta4[idx] = thetas[counter]
                 counter += 1
         if "5" in excitations:
             thetas = res["x"][param_idx : num_theta5 + param_idx].tolist()
             param_idx += len(thetas)
             counter = 0
-            for idx, _, _, _, _, _, _, _, _, _, _, _ in self.theta_picker.get_t5_generator(0, 0):
+            for (
+                idx,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+            ) in self.singlet_excitation_operator_generator.get_t5_generator(0, 0):
                 self.theta5[idx] = thetas[counter]
                 counter += 1
         if "6" in excitations:
             thetas = res["x"][param_idx : num_theta6 + param_idx].tolist()
             param_idx += len(thetas)
             counter = 0
-            for idx, _, _, _, _, _, _, _, _, _, _, _, _, _ in self.theta_picker.get_t6_generator(0, 0):
+            for (
+                idx,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+            ) in self.singlet_excitation_operator_generator.get_t6_generator(0, 0):
                 self.theta6[idx] = thetas[counter]
                 counter += 1
 
@@ -723,29 +777,29 @@ def energy_ucc(
             kappa.append(parameters[idx_counter])
             idx_counter += 1
     if "s" in excitations:
-        for _ in wf.theta_picker.get_t1_generator_sa(0, 0):
+        for _ in wf.singlet_excitation_operator_generator.get_t1_generator_sa(0, 0):
             theta1.append(parameters[idx_counter])
             idx_counter += 1
     if "d" in excitations:
-        for _ in wf.theta_picker.get_t2_generator_sa(
+        for _ in wf.singlet_excitation_operator_generator.get_t2_generator_sa(
             wf.num_inactive_spin_orbs + wf.num_active_spin_orbs + wf.num_virtual_spin_orbs, wf.num_elec
         ):
             theta2.append(parameters[idx_counter])
             idx_counter += 1
     if "t" in excitations:
-        for _ in wf.theta_picker.get_t3_generator(0, 0):
+        for _ in wf.singlet_excitation_operator_generator.get_t3_generator(0, 0):
             theta3.append(parameters[idx_counter])
             idx_counter += 1
     if "q" in excitations:
-        for _ in wf.theta_picker.get_t4_generator(0, 0):
+        for _ in wf.singlet_excitation_operator_generator.get_t4_generator(0, 0):
             theta4.append(parameters[idx_counter])
             idx_counter += 1
     if "5" in excitations:
-        for _ in wf.theta_picker.get_t5_generator(0, 0):
+        for _ in wf.singlet_excitation_operator_generator.get_t5_generator(0, 0):
             theta5.append(parameters[idx_counter])
             idx_counter += 1
     if "6" in excitations:
-        for _ in wf.theta_picker.get_t6_generator(0, 0):
+        for _ in wf.singlet_excitation_operator_generator.get_t6_generator(0, 0):
             theta6.append(parameters[idx_counter])
             idx_counter += 1
     assert len(parameters) == len(kappa) + len(theta1) + len(theta2) + len(theta3) + len(theta4) + len(
@@ -870,29 +924,29 @@ def active_space_parameter_gradient(
             kappa.append(0 * parameters[idx_counter])
             idx_counter += 1
     if "s" in excitations:
-        for _ in wf.theta_picker.get_t1_generator_sa(0, 0):
+        for _ in wf.singlet_excitation_operator_generator.get_t1_generator_sa(0, 0):
             theta1.append(parameters[idx_counter])
             idx_counter += 1
     if "d" in excitations:
-        for _ in wf.theta_picker.get_t2_generator_sa(
+        for _ in wf.singlet_excitation_operator_generator.get_t2_generator_sa(
             wf.num_inactive_spin_orbs + wf.num_active_spin_orbs + wf.num_virtual_spin_orbs, wf.num_elec
         ):
             theta2.append(parameters[idx_counter])
             idx_counter += 1
     if "t" in excitations:
-        for _ in wf.theta_picker.get_t3_generator(0, 0):
+        for _ in wf.singlet_excitation_operator_generator.get_t3_generator(0, 0):
             theta3.append(parameters[idx_counter])
             idx_counter += 1
     if "q" in excitations:
-        for _ in wf.theta_picker.get_t4_generator(0, 0):
+        for _ in wf.singlet_excitation_operator_generator.get_t4_generator(0, 0):
             theta4.append(parameters[idx_counter])
             idx_counter += 1
     if "5" in excitations:
-        for _ in wf.theta_picker.get_t5_generator(0, 0):
+        for _ in wf.singlet_excitation_operator_generator.get_t5_generator(0, 0):
             theta5.append(parameters[idx_counter])
             idx_counter += 1
     if "6" in excitations:
-        for _ in wf.theta_picker.get_t6_generator(0, 0):
+        for _ in wf.singlet_excitation_operator_generator.get_t6_generator(0, 0):
             theta6.append(parameters[idx_counter])
             idx_counter += 1
     assert len(parameters) == len(kappa) + len(theta1) + len(theta2) + len(theta3) + len(theta4) + len(

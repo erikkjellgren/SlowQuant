@@ -272,14 +272,11 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     self.wf.state_vector, GI.dagger, GJ, self.wf.state_vector
                 )
 
-    def get_excited_state_norm(self, state_number: int) -> float:
-        """Calculate the norm of excited state.
-
-        Args:
-            state_number: Which excited state, counting from zero.
+    def get_excited_state_norm(self) -> np.ndarray:
+        """Calculate the norm of excited states.
 
         Returns:
-            Norm of excited state.
+            Norm of excited states.
         """
         number_excitations = len(self.excitation_energies)
         rdms = ReducedDenstiyMatrix(
@@ -289,28 +286,28 @@ class LinearResponseUCC(LinearResponseBaseClass):
             self.wf.rdm1,
             rdm2=self.wf.rdm2,
         )
-        q_part = get_orbital_response_vector_norm(
-            rdms, self.wf.kappa_idx, self.response_vectors, state_number, number_excitations
-        )
-        shift = len(self.q_ops)
-        transfer_op = OperatorHybrid({})
-        for i, op in enumerate(self.G_ops):
-            G = op.operator
-            transfer_op += (
-                self.response_vectors[i + shift, state_number] * G.dagger
-                + self.response_vectors[i + shift + number_excitations, state_number] * G
+        norms = np.zeros(len(self.response_vectors[0]))
+        for state_number in range(len(self.response_vectors[0])):
+            q_part = get_orbital_response_vector_norm(
+                rdms, self.wf.kappa_idx, self.response_vectors, state_number, number_excitations
             )
-        return q_part + expectation_value_hybrid_flow_commutator(
-            self.wf.state_vector, transfer_op, transfer_op.dagger, self.wf.state_vector
-        )
+            shift = len(self.q_ops)
+            transfer_op = OperatorHybrid({})
+            for i, op in enumerate(self.G_ops):
+                G = op.operator
+                transfer_op += (
+                    self.response_vectors[i + shift, state_number] * G.dagger
+                    + self.response_vectors[i + shift + number_excitations, state_number] * G
+                )
+            norms[state_number] = q_part + expectation_value_hybrid_flow_commutator(
+                self.wf.state_vector, transfer_op, transfer_op.dagger, self.wf.state_vector
+            )
+        return norms
 
-    def get_transition_dipole(
-        self, state_number: int, dipole_integrals: Sequence[np.ndarray]
-    ) -> tuple[float, float, float]:
+    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.
 
         Args:
-            state_number: Which excited state, counting from zero.
             dipole_integrals: Dipole integrals ordered as (x,y,z).
 
         Returns:
@@ -326,22 +323,14 @@ class LinearResponseUCC(LinearResponseBaseClass):
             self.wf.rdm1,
             rdm2=self.wf.rdm2,
         )
-        shift = len(self.q_ops)
-        transfer_op = OperatorHybrid({})
-        for i, op in enumerate(self.G_ops):
-            G = op.operator
-            transfer_op += (
-                self.normed_response_vectors[i + shift, state_number] * G.dagger
-                + self.normed_response_vectors[i + shift + number_excitations, state_number] * G
-            )
         mux = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[0])
         muy = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[1])
         muz = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[2])
         mux_op = OperatorPauli({})
         muy_op = OperatorPauli({})
         muz_op = OperatorPauli({})
-        for p in range(self.wf.num_spin_orbs // 2):
-            for q in range(self.wf.num_spin_orbs // 2):
+        for p in range(self.wf.num_orbs):
+            for q in range(self.wf.num_orbs):
                 Epq_op = epq_pauli(p, q, self.wf.num_spin_orbs, self.wf.num_elec)
                 if abs(mux[p, q]) > 10**-10:
                     mux_op += mux[p, q] * Epq_op
@@ -370,46 +359,59 @@ class LinearResponseUCC(LinearResponseBaseClass):
         transition_dipole_x = 0.0
         transition_dipole_y = 0.0
         transition_dipole_z = 0.0
-        q_part_x = get_orbital_response_property_gradient(
-            rdms,
-            mux,
-            self.wf.kappa_idx,
-            self.wf.num_inactive_spin_orbs // 2,
-            self.wf.num_active_spin_orbs // 2,
-            self.normed_response_vectors,
-            state_number,
-            number_excitations,
-        )
-        q_part_y = get_orbital_response_property_gradient(
-            rdms,
-            muy,
-            self.wf.kappa_idx,
-            self.wf.num_inactive_spin_orbs // 2,
-            self.wf.num_active_spin_orbs // 2,
-            self.normed_response_vectors,
-            state_number,
-            number_excitations,
-        )
-        q_part_z = get_orbital_response_property_gradient(
-            rdms,
-            muz,
-            self.wf.kappa_idx,
-            self.wf.num_inactive_spin_orbs // 2,
-            self.wf.num_active_spin_orbs // 2,
-            self.normed_response_vectors,
-            state_number,
-            number_excitations,
-        )
-        if mux_op.operators != {}:
-            transition_dipole_x = expectation_value_hybrid_flow_commutator(
-                self.wf.state_vector, mux_op, transfer_op, self.wf.state_vector
+        shift = len(self.q_ops)
+        transition_dipoles = np.zeros((len(self.normed_response_vectors[0]), 3))
+        for state_number in range(len(self.normed_response_vectors[0])):
+            transfer_op = OperatorHybrid({})
+            for i, op in enumerate(self.G_ops):
+                G = op.operator
+                transfer_op += (
+                    self.normed_response_vectors[i + shift, state_number] * G.dagger
+                    + self.normed_response_vectors[i + shift + number_excitations, state_number] * G
+                )
+            q_part_x = get_orbital_response_property_gradient(
+                rdms,
+                mux,
+                self.wf.kappa_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.normed_response_vectors,
+                state_number,
+                number_excitations,
             )
-        if muy_op.operators != {}:
-            transition_dipole_y = expectation_value_hybrid_flow_commutator(
-                self.wf.state_vector, muy_op, transfer_op, self.wf.state_vector
+            q_part_y = get_orbital_response_property_gradient(
+                rdms,
+                muy,
+                self.wf.kappa_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.normed_response_vectors,
+                state_number,
+                number_excitations,
             )
-        if muz_op.operators != {}:
-            transition_dipole_z = expectation_value_hybrid_flow_commutator(
-                self.wf.state_vector, muz_op, transfer_op, self.wf.state_vector
+            q_part_z = get_orbital_response_property_gradient(
+                rdms,
+                muz,
+                self.wf.kappa_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.normed_response_vectors,
+                state_number,
+                number_excitations,
             )
-        return q_part_x + transition_dipole_x, q_part_y + transition_dipole_y, q_part_z + transition_dipole_z
+            if mux_op.operators != {}:
+                transition_dipole_x = expectation_value_hybrid_flow_commutator(
+                    self.wf.state_vector, mux_op, transfer_op, self.wf.state_vector
+                )
+            if muy_op.operators != {}:
+                transition_dipole_y = expectation_value_hybrid_flow_commutator(
+                    self.wf.state_vector, muy_op, transfer_op, self.wf.state_vector
+                )
+            if muz_op.operators != {}:
+                transition_dipole_z = expectation_value_hybrid_flow_commutator(
+                    self.wf.state_vector, muz_op, transfer_op, self.wf.state_vector
+                )
+            transition_dipoles[state_number, 0] = q_part_x + transition_dipole_x
+            transition_dipoles[state_number, 1] = q_part_y + transition_dipole_y
+            transition_dipoles[state_number, 2] = q_part_z + transition_dipole_z
+        return transition_dipoles
