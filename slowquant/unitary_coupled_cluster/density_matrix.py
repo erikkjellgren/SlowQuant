@@ -1,10 +1,5 @@
 import numpy as np
 
-from slowquant.molecularintegrals.integralfunctions import (
-    one_electron_integral_transform,
-    two_electron_integral_transform,
-)
-
 
 class ReducedDenstiyMatrix:
     def __init__(
@@ -23,7 +18,8 @@ class ReducedDenstiyMatrix:
         for idx in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
             self.actitve_idx.append(idx)
         for idx in range(
-            num_inactive_orbs + num_active_orbs, num_inactive_orbs + num_active_orbs + num_virtual_orbs
+            num_inactive_orbs + num_active_orbs,
+            num_inactive_orbs + num_active_orbs + num_virtual_orbs,
         ):
             self.virtual_idx.append(idx)
         self.idx_shift = num_inactive_orbs
@@ -48,7 +44,12 @@ class ReducedDenstiyMatrix:
             and r in self.actitve_idx
             and s in self.actitve_idx
         ):
-            return self.rdm2[p - self.idx_shift, q - self.idx_shift, r - self.idx_shift, s - self.idx_shift]
+            return self.rdm2[
+                p - self.idx_shift,
+                q - self.idx_shift,
+                r - self.idx_shift,
+                s - self.idx_shift,
+            ]
         if (
             p in self.inactive_idx
             and q in self.actitve_idx
@@ -102,17 +103,14 @@ class ReducedDenstiyMatrix:
 
 def get_orbital_gradient(
     rdms: ReducedDenstiyMatrix,
-    h_ao: np.ndarray,
-    g_ao: np.ndarray,
-    c_mo: np.ndarray,
+    h_int: np.ndarray,
+    g_int: np.ndarray,
     kappa_idx: list[list[int]],
     num_inactive_orbs: int,
     num_active_orbs: int,
 ) -> np.ndarray:
     """ """
     gradient = np.zeros(len(kappa_idx))
-    h_int = one_electron_integral_transform(c_mo, h_ao)
-    g_int = two_electron_integral_transform(c_mo, g_ao)
     for idx, (m, n) in enumerate(kappa_idx):
         # 1e contribution
         for p in range(num_inactive_orbs + num_active_orbs):
@@ -131,17 +129,14 @@ def get_orbital_gradient(
 
 def get_orbital_gradient_response(
     rdms: ReducedDenstiyMatrix,
-    h_ao: np.ndarray,
-    g_ao: np.ndarray,
-    c_mo: np.ndarray,
+    h_int: np.ndarray,
+    g_int: np.ndarray,
     kappa_idx: list[list[int]],
     num_inactive_orbs: int,
     num_active_orbs: int,
 ) -> np.ndarray:
     """ """
     gradient = np.zeros(2 * len(kappa_idx))
-    h_int = one_electron_integral_transform(c_mo, h_ao)
-    g_int = two_electron_integral_transform(c_mo, g_ao)
     for idx, (m, n) in enumerate(kappa_idx):
         # 1e contribution
         for p in range(num_inactive_orbs + num_active_orbs):
@@ -243,73 +238,19 @@ def get_orbital_response_property_gradient(
     return 2 ** (-1 / 2) * prop_grad
 
 
-def get_orbital_response_hessian_A(
+def get_orbital_response_hessian_block(
     rdms: ReducedDenstiyMatrix,
-    h_ao: np.ndarray,
-    g_ao: np.ndarray,
-    c_mo: np.ndarray,
-    kappa_idx: list[list[int]],
+    h: np.ndarray,
+    g: np.ndarray,
+    kappa_idx1: list[list[int]],
+    kappa_idx2: list[list[int]],
     num_inactive_orbs: int,
     num_active_orbs: int,
 ) -> np.ndarray:
-    A1e = np.zeros((len(kappa_idx), len(kappa_idx)))
-    A2e = np.zeros((len(kappa_idx), len(kappa_idx)))
-    h = one_electron_integral_transform(c_mo, h_ao)
-    g = two_electron_integral_transform(c_mo, g_ao)
-    for idx1, (u, t) in enumerate(kappa_idx):
-        for idx2, (m, n) in enumerate(kappa_idx):
-            # 1e contribution
-            A1e[idx1, idx2] += h[n, t] * rdms.RDM1(m, u)
-            A1e[idx1, idx2] += h[u, m] * rdms.RDM1(t, n)
-            for p in range(num_inactive_orbs + num_active_orbs):
-                if m == u:
-                    A1e[idx1, idx2] -= h[n, p] * rdms.RDM1(t, p)
-                if t == n:
-                    A1e[idx1, idx2] -= h[p, m] * rdms.RDM1(p, u)
-            # 2e contribution
-            for p in range(num_inactive_orbs + num_active_orbs):
-                for q in range(num_inactive_orbs + num_active_orbs):
-                    A2e[idx1, idx2] += g[n, t, p, q] * rdms.RDM2(m, u, p, q)
-                    A2e[idx1, idx2] -= g[n, p, u, q] * rdms.RDM2(m, p, t, q)
-                    A2e[idx1, idx2] += g[n, p, q, t] * rdms.RDM2(m, p, q, u)
-                    A2e[idx1, idx2] += g[u, m, p, q] * rdms.RDM2(t, n, p, q)
-                    A2e[idx1, idx2] += g[p, m, u, q] * rdms.RDM2(p, n, t, q)
-                    A2e[idx1, idx2] -= g[p, m, q, t] * rdms.RDM2(p, n, q, u)
-                    A2e[idx1, idx2] -= g[u, p, n, q] * rdms.RDM2(t, p, m, q)
-                    A2e[idx1, idx2] += g[p, t, n, q] * rdms.RDM2(p, u, m, q)
-                    A2e[idx1, idx2] += g[p, q, n, t] * rdms.RDM2(p, q, m, u)
-                    A2e[idx1, idx2] += g[u, p, q, m] * rdms.RDM2(t, p, q, n)
-                    A2e[idx1, idx2] -= g[p, t, q, m] * rdms.RDM2(p, u, q, n)
-                    A2e[idx1, idx2] += g[p, q, u, m] * rdms.RDM2(p, q, t, n)
-            for p in range(num_inactive_orbs + num_active_orbs):
-                for q in range(num_inactive_orbs + num_active_orbs):
-                    for r in range(num_inactive_orbs + num_active_orbs):
-                        if m == u:
-                            A2e[idx1, idx2] -= g[n, p, q, r] * rdms.RDM2(t, p, q, r)
-                        if t == n:
-                            A2e[idx1, idx2] -= g[p, m, q, r] * rdms.RDM2(p, u, q, r)
-                        if m == u:
-                            A2e[idx1, idx2] -= g[p, q, n, r] * rdms.RDM2(p, q, t, r)
-                        if t == n:
-                            A2e[idx1, idx2] -= g[p, q, r, m] * rdms.RDM2(p, q, r, u)
-    return 1 / 2 * A1e + 1 / 4 * A2e
-
-
-def get_orbital_response_hessian_B(
-    rdms: ReducedDenstiyMatrix,
-    h_ao: np.ndarray,
-    g_ao: np.ndarray,
-    c_mo: np.ndarray,
-    kappa_idx: list[list[int]],
-    num_inactive_orbs: int,
-    num_active_orbs: int,
-) -> np.ndarray:
-    A1e = np.zeros((len(kappa_idx), len(kappa_idx)))
-    A2e = np.zeros((len(kappa_idx), len(kappa_idx)))
-    h = one_electron_integral_transform(c_mo, h_ao)
-    g = two_electron_integral_transform(c_mo, g_ao)
-    for idx1, (u, t) in enumerate(kappa_idx):
-        for idx2, (n, m) in enumerate(kappa_idx):
+    A1e = np.zeros((len(kappa_idx1), len(kappa_idx1)))
+    A2e = np.zeros((len(kappa_idx1), len(kappa_idx1)))
+    for idx1, (t, u) in enumerate(kappa_idx1):
+        for idx2, (m, n) in enumerate(kappa_idx2):
             # 1e contribution
             A1e[idx1, idx2] += h[n, t] * rdms.RDM1(m, u)
             A1e[idx1, idx2] += h[u, m] * rdms.RDM1(t, n)

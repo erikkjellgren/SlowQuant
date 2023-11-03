@@ -148,6 +148,7 @@ class WaveFunctionUCC:
         # Find non-redundant kappas
         self.kappa = []
         self.kappa_idx = []
+        self.kappa_idx_dagger = []
         self.kappa_redundant = []
         self.kappa_redundant_idx = []
         self._kappa_old = []
@@ -185,6 +186,7 @@ class WaveFunctionUCC:
                 self.kappa.append(0)
                 self._kappa_old.append(0)
                 self.kappa_idx.append([p, q])
+                self.kappa_idx_dagger.append([q, p])
         # HF like orbital rotation indecies
         self.kappa_hf_like_idx = []
         for p in range(0, self.num_spin_orbs // 2):
@@ -890,13 +892,7 @@ def orbital_rotation_gradient(
         rdm2=wf.rdm2,
     )
     gradient = get_orbital_gradient(
-        rdms,
-        wf.h_ao,
-        wf.g_ao,
-        wf.c_trans,
-        wf.kappa_idx,
-        wf.num_inactive_orbs,
-        wf.num_active_orbs,
+        rdms, wf.h_mo, wf.g_mo, wf.kappa_idx, wf.num_inactive_orbs, wf.num_active_orbs
     )
     return gradient
 

@@ -10,8 +10,7 @@ from slowquant.molecularintegrals.integralfunctions import (
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_orbital_gradient_response,
-    get_orbital_response_hessian_A,
-    get_orbital_response_hessian_B,
+    get_orbital_response_hessian_block,
     get_orbital_response_metric_sgima,
     get_orbital_response_property_gradient,
     get_orbital_response_vector_norm,
@@ -208,9 +207,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
         print("qs", len(self.q_ops))
         grad = get_orbital_gradient_response(
             rdms,
-            self.wf.h_ao,
-            self.wf.g_ao,
-            self.wf.c_trans,
+            self.wf.h_mo,
+            self.wf.g_mo,
             self.wf.kappa_idx,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
@@ -228,21 +226,21 @@ class LinearResponseUCC(LinearResponseBaseClass):
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
         # Do orbital-orbital blocks
-        self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_A(
+        self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
             rdms,
-            self.wf.h_ao,
-            self.wf.g_ao,
-            self.wf.c_trans,
+            self.wf.h_mo,
+            self.wf.g_mo,
+            self.wf.kappa_idx_dagger,
             self.wf.kappa_idx,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
         )
-        self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_B(
+        self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
             rdms,
-            self.wf.h_ao,
-            self.wf.g_ao,
-            self.wf.c_trans,
-            self.wf.kappa_idx,
+            self.wf.h_mo,
+            self.wf.g_mo,
+            self.wf.kappa_idx_dagger,
+            self.wf.kappa_idx_dagger,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
         )
