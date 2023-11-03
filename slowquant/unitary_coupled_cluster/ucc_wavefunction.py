@@ -70,7 +70,7 @@ class WaveFunctionUCC:
         self.active_unocc_spin_idx_shifted = []
         self.num_elec = num_elec
         self.num_spin_orbs = num_spin_orbs
-        self.num_orbs = num_spin_orbs//2
+        self.num_orbs = num_spin_orbs // 2
         inactive_on_vector = []
         active_on_vector = []
         virtual_on_vector = []
@@ -121,9 +121,9 @@ class WaveFunctionUCC:
             for active_idx in self.active_unocc_spin_idx:
                 self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
         self.state_vector = StateVector(inactive_on_vector, active_on_vector, virtual_on_vector)
-        self.num_inactive_orbs = self.num_inactive_spin_orbs//2
-        self.num_active_orbs = self.num_active_spin_orbs//2
-        self.num_virtual_orbs = self.num_virtual_spin_orbs//2
+        self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
+        self.num_active_orbs = self.num_active_spin_orbs // 2
+        self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
         # Contruct spatial idx
         self.inactive_idx: list[int] = []
         self.virtual_idx: list[int] = []
@@ -249,7 +249,7 @@ class WaveFunctionUCC:
     @theta1.setter
     def theta1(self, theta: list[float]) -> None:
         if len(theta) != len(self._theta1):
-            raise ValueError(f'Expected {len(self._theta1)} theta1 values got {len(theta)}')
+            raise ValueError(f"Expected {len(self._theta1)} theta1 values got {len(theta)}")
         self._rdm1 = None
         self._rdm2 = None
         self._rdm3 = None
@@ -260,10 +260,12 @@ class WaveFunctionUCC:
             self.num_active_elec,
             self.theta1 + self.theta2 + self.theta3 + self.theta4 + self.theta5 + self.theta6,
             self.theta_picker,
-            self._excitations,
+            "sdtq56",  # self._excitations,
             allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
         )
-        self.state_vector.new_u(U, allowed_states=self.state_vector.allowed_active_states_number_spin_conserving)
+        self.state_vector.new_u(
+            U, allowed_states=self.state_vector.allowed_active_states_number_spin_conserving
+        )
 
     @property
     def theta2(self) -> list[float]:
@@ -272,7 +274,7 @@ class WaveFunctionUCC:
     @theta2.setter
     def theta2(self, theta: list[float]) -> None:
         if len(theta) != len(self._theta2):
-            raise ValueError(f'Expected {len(self._theta2)} theta2 values got {len(theta)}')
+            raise ValueError(f"Expected {len(self._theta2)} theta2 values got {len(theta)}")
         self._rdm1 = None
         self._rdm2 = None
         self._rdm3 = None
@@ -283,10 +285,12 @@ class WaveFunctionUCC:
             self.num_active_elec,
             self.theta1 + self.theta2 + self.theta3 + self.theta4 + self.theta5 + self.theta6,
             self.theta_picker,
-            self._excitations,
+            "sdtq56",  # self._excitations,
             allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
         )
-        self.state_vector.new_u(U, allowed_states=self.state_vector.allowed_active_states_number_spin_conserving)
+        self.state_vector.new_u(
+            U, allowed_states=self.state_vector.allowed_active_states_number_spin_conserving
+        )
 
     @property
     def theta3(self) -> list[float]:
@@ -295,7 +299,7 @@ class WaveFunctionUCC:
     @theta3.setter
     def theta3(self, theta: list[float]) -> None:
         if len(theta) != len(self._theta3):
-            raise ValueError(f'Expected {len(self._theta3)} theta3 values got {len(theta)}')
+            raise ValueError(f"Expected {len(self._theta3)} theta3 values got {len(theta)}")
         self._rdm1 = None
         self._rdm2 = None
         self._rdm3 = None
@@ -306,10 +310,12 @@ class WaveFunctionUCC:
             self.num_active_elec,
             self.theta1 + self.theta2 + self.theta3 + self.theta4 + self.theta5 + self.theta6,
             self.theta_picker,
-            self._excitations,
+            "sdtq56",  # self._excitations,
             allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
         )
-        self.state_vector.new_u(U, allowed_states=self.state_vector.allowed_active_states_number_spin_conserving)
+        self.state_vector.new_u(
+            U, allowed_states=self.state_vector.allowed_active_states_number_spin_conserving
+        )
 
     @property
     def theta4(self) -> list[float]:
@@ -318,7 +324,7 @@ class WaveFunctionUCC:
     @theta4.setter
     def theta4(self, theta: list[float]) -> None:
         if len(theta) != len(self._theta4):
-            raise ValueError(f'Expected {len(self._theta4)} theta4 values got {len(theta)}')
+            raise ValueError(f"Expected {len(self._theta4)} theta4 values got {len(theta)}")
         self._rdm1 = None
         self._rdm2 = None
         self._rdm3 = None
@@ -329,10 +335,12 @@ class WaveFunctionUCC:
             self.num_active_elec,
             self.theta1 + self.theta2 + self.theta3 + self.theta4 + self.theta5 + self.theta6,
             self.theta_picker,
-            self._excitations,
+            "sdtq56",  # self._excitations,
             allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
         )
-        self.state_vector.new_u(U, allowed_states=self.state_vector.allowed_active_states_number_spin_conserving)
+        self.state_vector.new_u(
+            U, allowed_states=self.state_vector.allowed_active_states_number_spin_conserving
+        )
 
     @property
     def theta5(self) -> list[float]:
@@ -341,7 +349,7 @@ class WaveFunctionUCC:
     @theta5.setter
     def theta5(self, theta: list[float]) -> None:
         if len(theta) != len(self._theta5):
-            raise ValueError(f'Expected {len(self._theta5)} theta5 values got {len(theta)}')
+            raise ValueError(f"Expected {len(self._theta5)} theta5 values got {len(theta)}")
         self._rdm1 = None
         self._rdm2 = None
         self._rdm3 = None
@@ -352,10 +360,12 @@ class WaveFunctionUCC:
             self.num_active_elec,
             self.theta1 + self.theta2 + self.theta3 + self.theta4 + self.theta5 + self.theta6,
             self.theta_picker,
-            self._excitations,
+            "sdtq56",  # self._excitations,
             allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
         )
-        self.state_vector.new_u(U, allowed_states=self.state_vector.allowed_active_states_number_spin_conserving)
+        self.state_vector.new_u(
+            U, allowed_states=self.state_vector.allowed_active_states_number_spin_conserving
+        )
 
     @property
     def theta6(self) -> list[float]:
@@ -364,7 +374,7 @@ class WaveFunctionUCC:
     @theta6.setter
     def theta6(self, theta: list[float]) -> None:
         if len(theta) != len(self._theta6):
-            raise ValueError(f'Expected {len(self._theta6)} theta6 values got {len(theta)}')
+            raise ValueError(f"Expected {len(self._theta6)} theta6 values got {len(theta)}")
         self._rdm1 = None
         self._rdm2 = None
         self._rdm3 = None
@@ -374,25 +384,27 @@ class WaveFunctionUCC:
             self.num_active_spin_orbs,
             self.num_active_elec,
             self.theta1 + self.theta2 + self.theta3 + self.theta4 + self.theta5 + self.theta6,
-            self.theta_picker,
-            self._excitations,
+            self.theta_picker_full,
+            "sdtq56",  # self._excitations,
             allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
         )
-        self.state_vector.new_u(U, allowed_states=self.state_vector.allowed_active_states_number_spin_conserving)
+        self.state_vector.new_u(
+            U, allowed_states=self.state_vector.allowed_active_states_number_spin_conserving
+        )
 
     def add_multiple_theta(self, theta: dict[str, list[float]], excitations: str) -> None:
-        if 's' in excitations:
-            self._theta1 = theta['theta1'].copy()
-        if 'd' in excitations:
-            self._theta2 = theta['theta2'].copy()
-        if 't' in excitations:
-            self._theta3 = theta['theta3'].copy()
-        if 'q' in excitations:
-            self._theta4 = theta['theta4'].copy()
-        if '5' in excitations:
-            self._theta5 = theta['theta5'].copy()
-        if '6' in excitations:
-            self._theta6 = theta['theta6'].copy()
+        if "s" in excitations:
+            self._theta1 = theta["theta1"].copy()
+        if "d" in excitations:
+            self._theta2 = theta["theta2"].copy()
+        if "t" in excitations:
+            self._theta3 = theta["theta3"].copy()
+        if "q" in excitations:
+            self._theta4 = theta["theta4"].copy()
+        if "5" in excitations:
+            self._theta5 = theta["theta5"].copy()
+        if "6" in excitations:
+            self._theta6 = theta["theta6"].copy()
         self._rdm1 = None
         self._rdm2 = None
         self._rdm3 = None
@@ -401,11 +413,13 @@ class WaveFunctionUCC:
             self.num_active_spin_orbs,
             self.num_active_elec,
             self.theta1 + self.theta2 + self.theta3 + self.theta4 + self.theta5 + self.theta6,
-            self.theta_picker,
-            self._excitations,
+            self.theta_picker_full,
+            "sdtq56",  # self._excitations,
             allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
         )
-        self.state_vector.new_u(U, allowed_states=self.state_vector.allowed_active_states_number_spin_conserving)
+        self.state_vector.new_u(
+            U, allowed_states=self.state_vector.allowed_active_states_number_spin_conserving
+        )
 
     @property
     def c_trans(self) -> np.ndarray:
@@ -443,17 +457,17 @@ class WaveFunctionUCC:
     def rdm1(self) -> np.ndarray:
         if self._rdm1 is None:
             self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs))
-            for p in range(
-                self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_spin_orbs
-            ):
-                for q in range(
-                    self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs
-                ):
-                    self._rdm1[p - self.num_inactive_orbs, q - self.num_inactive_orbs] = expectation_value_pauli(
-                        self.state_vector, epq_pauli(p, q, self.num_spin_orbs, self.num_elec), self.state_vector
+            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                for q in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                    self._rdm1[
+                        p - self.num_inactive_orbs, q - self.num_inactive_orbs
+                    ] = expectation_value_pauli(
+                        self.state_vector,
+                        epq_pauli(p, q, self.num_spin_orbs, self.num_elec),
+                        self.state_vector,
                     )
         return self._rdm1
-    
+
     @property
     def rdm2(self) -> np.ndarray:
         if self._rdm2 is None:
@@ -465,24 +479,20 @@ class WaveFunctionUCC:
                     self.num_active_orbs,
                 )
             )
-            for p in range(
-                self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_spin_orbs
-            ):
-                for q in range(
-                    self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_spin_orbs
-                ):
-                    for r in range(
-                        self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_spin_orbs
-                    ):
-                        for s in range(
-                            self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_spin_orbs
-                        ):
+            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                for q in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                    for r in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                        for s in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                             self._rdm2[
-                                p - self.num_inactive_orbs, q - self.num_inactive_orbs, r - self.num_inactive_orbs, s - self.num_inactive_orbs
+                                p - self.num_inactive_orbs,
+                                q - self.num_inactive_orbs,
+                                r - self.num_inactive_orbs,
+                                s - self.num_inactive_orbs,
                             ] = expectation_value_pauli(
                                 self.state_vector,
                                 epqrs_pauli(p, q, r, s, self.num_spin_orbs, self.num_elec),
-                                self.state_vector)
+                                self.state_vector,
+                            )
         return self._rdm2
 
     def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
@@ -762,18 +772,18 @@ def energy_ucc(
     wf.c_orthonormal = c_trans
     # Add thetas
     theta_dict = {}
-    if 's' in excitations:
-        theta_dict['theta1'] = theta1
-    if 'd' in excitations:
-        theta_dict['theta2'] = theta2
-    if 't' in excitations:
-        theta_dict['theta3'] = theta3
-    if 'q' in excitations:
-        theta_dict['theta4'] = theta4
-    if '5' in excitations:
-        theta_dict['theta5'] = theta5
-    if '6' in excitations:
-        theta_dict['theta6'] = theta6
+    if "s" in excitations:
+        theta_dict["theta1"] = theta1
+    if "d" in excitations:
+        theta_dict["theta2"] = theta2
+    if "t" in excitations:
+        theta_dict["theta3"] = theta3
+    if "q" in excitations:
+        theta_dict["theta4"] = theta4
+    if "5" in excitations:
+        theta_dict["theta5"] = theta5
+    if "6" in excitations:
+        theta_dict["theta6"] = theta6
     wf.add_multiple_theta(theta_dict, excitations)
     return expectation_value_pauli(
         wf.state_vector,
@@ -838,7 +848,7 @@ def orbital_rotation_gradient(
 
 
 def active_space_parameter_gradient(
-    wf: WaveFunctionUCC, 
+    wf: WaveFunctionUCC,
     parameters: Sequence[float],
     excitations: str,
     orbital_optimized: bool,
@@ -930,91 +940,91 @@ def active_space_parameter_gradient(
         theta_params[i] += step_size
         theta_dict = {}
         idx = 0
-        if 's' in excitations:
-            theta_dict['theta1'] = theta_params[idx:idx+len(theta1)]
+        if "s" in excitations:
+            theta_dict["theta1"] = theta_params[idx : idx + len(theta1)]
             idx += len(theta1)
-        if 'd' in excitations:
-            theta_dict['theta2'] = theta_params[idx:idx+len(theta2)]
+        if "d" in excitations:
+            theta_dict["theta2"] = theta_params[idx : idx + len(theta2)]
             idx += len(theta2)
-        if 't' in excitations:
-            theta_dict['theta3'] = theta_params[idx:idx+len(theta3)]
+        if "t" in excitations:
+            theta_dict["theta3"] = theta_params[idx : idx + len(theta3)]
             idx += len(theta3)
-        if 'q' in excitations:
-            theta_dict['theta4'] = theta_params[idx:idx+len(theta4)]
+        if "q" in excitations:
+            theta_dict["theta4"] = theta_params[idx : idx + len(theta4)]
             idx += len(theta4)
-        if '5' in excitations:
-            theta_dict['theta5'] = theta_params[idx:idx+len(theta5)]
+        if "5" in excitations:
+            theta_dict["theta5"] = theta_params[idx : idx + len(theta5)]
             idx += len(theta5)
-        if '6' in excitations:
-            theta_dict['theta6'] = theta_params[idx:idx+len(theta6)]
+        if "6" in excitations:
+            theta_dict["theta6"] = theta_params[idx : idx + len(theta6)]
             idx += len(theta6)
         wf.add_multiple_theta(theta_dict, excitations)
         E_plus = expectation_value_hybrid(wf.state_vector, Hamiltonian, wf.state_vector)
         theta_params[i] -= step_size
         theta_dict = {}
         idx = 0
-        if 's' in excitations:
-            theta_dict['theta1'] = theta_params[idx:idx+len(theta1)]
+        if "s" in excitations:
+            theta_dict["theta1"] = theta_params[idx : idx + len(theta1)]
             idx += len(theta1)
-        if 'd' in excitations:
-            theta_dict['theta2'] = theta_params[idx:idx+len(theta2)]
+        if "d" in excitations:
+            theta_dict["theta2"] = theta_params[idx : idx + len(theta2)]
             idx += len(theta2)
-        if 't' in excitations:
-            theta_dict['theta3'] = theta_params[idx:idx+len(theta3)]
+        if "t" in excitations:
+            theta_dict["theta3"] = theta_params[idx : idx + len(theta3)]
             idx += len(theta3)
-        if 'q' in excitations:
-            theta_dict['theta4'] = theta_params[idx:idx+len(theta4)]
+        if "q" in excitations:
+            theta_dict["theta4"] = theta_params[idx : idx + len(theta4)]
             idx += len(theta4)
-        if '5' in excitations:
-            theta_dict['theta5'] = theta_params[idx:idx+len(theta5)]
+        if "5" in excitations:
+            theta_dict["theta5"] = theta_params[idx : idx + len(theta5)]
             idx += len(theta5)
-        if '6' in excitations:
-            theta_dict['theta6'] = theta_params[idx:idx+len(theta6)]
+        if "6" in excitations:
+            theta_dict["theta6"] = theta_params[idx : idx + len(theta6)]
             idx += len(theta6)
         if finite_diff_type == "central":
             theta_params[i] -= step_size
             theta_dict = {}
             idx = 0
-            if 's' in excitations:
-                theta_dict['theta1'] = theta_params[idx:idx+len(theta1)]
+            if "s" in excitations:
+                theta_dict["theta1"] = theta_params[idx : idx + len(theta1)]
                 idx += len(theta1)
-            if 'd' in excitations:
-                theta_dict['theta2'] = theta_params[idx:idx+len(theta2)]
+            if "d" in excitations:
+                theta_dict["theta2"] = theta_params[idx : idx + len(theta2)]
                 idx += len(theta2)
-            if 't' in excitations:
-                theta_dict['theta3'] = theta_params[idx:idx+len(theta3)]
+            if "t" in excitations:
+                theta_dict["theta3"] = theta_params[idx : idx + len(theta3)]
                 idx += len(theta3)
-            if 'q' in excitations:
-                theta_dict['theta4'] = theta_params[idx:idx+len(theta4)]
+            if "q" in excitations:
+                theta_dict["theta4"] = theta_params[idx : idx + len(theta4)]
                 idx += len(theta4)
-            if '5' in excitations:
-                theta_dict['theta5'] = theta_params[idx:idx+len(theta5)]
+            if "5" in excitations:
+                theta_dict["theta5"] = theta_params[idx : idx + len(theta5)]
                 idx += len(theta5)
-            if '6' in excitations:
-                theta_dict['theta6'] = theta_params[idx:idx+len(theta6)]
+            if "6" in excitations:
+                theta_dict["theta6"] = theta_params[idx : idx + len(theta6)]
                 idx += len(theta6)
             E_minus = expectation_value_hybrid(wf.state_vector, Hamiltonian, wf.state_vector)
             gradient_theta[i] = (E_plus - E_minus) / (2 * step_size)
             theta_params[i] += step_size
             theta_dict = {}
             idx = 0
-            if 's' in excitations:
-                theta_dict['theta1'] = theta_params[idx:idx+len(theta1)]
+            if "s" in excitations:
+                theta_dict["theta1"] = theta_params[idx : idx + len(theta1)]
                 idx += len(theta1)
-            if 'd' in excitations:
-                theta_dict['theta2'] = theta_params[idx:idx+len(theta2)]
+            if "d" in excitations:
+                theta_dict["theta2"] = theta_params[idx : idx + len(theta2)]
                 idx += len(theta2)
-            if 't' in excitations:
-                theta_dict['theta3'] = theta_params[idx:idx+len(theta3)]
+            if "t" in excitations:
+                theta_dict["theta3"] = theta_params[idx : idx + len(theta3)]
                 idx += len(theta3)
-            if 'q' in excitations:
-                theta_dict['theta4'] = theta_params[idx:idx+len(theta4)]
+            if "q" in excitations:
+                theta_dict["theta4"] = theta_params[idx : idx + len(theta4)]
                 idx += len(theta4)
-            if '5' in excitations:
-                theta_dict['theta5'] = theta_params[idx:idx+len(theta5)]
+            if "5" in excitations:
+                theta_dict["theta5"] = theta_params[idx : idx + len(theta5)]
                 idx += len(theta5)
-            if '6' in excitations:
-                theta_dict['theta6'] = theta_params[idx:idx+len(theta6)]
+            if "6" in excitations:
+                theta_dict["theta6"] = theta_params[idx : idx + len(theta6)]
                 idx += len(theta6)
         if finite_diff_type == "forward":
             gradient_theta[i] = (E_plus - E) / step_size

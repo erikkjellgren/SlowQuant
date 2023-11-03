@@ -1125,7 +1125,6 @@ def construct_ucc_u(
             if theta[counter] != 0.0:
                 t += theta[counter] * operator
             counter += 1
-
     if "d" in excitations:
         for _, a, i, b, j, operator in theta_picker.get_t2_generator_sa_matrix(
             num_spin_orbs, num_elec, use_csr=use_csr
@@ -1133,7 +1132,6 @@ def construct_ucc_u(
             if theta[counter] != 0.0:
                 t += theta[counter] * operator
             counter += 1
-
     if "t" in excitations:
         for _, a, i, b, j, c, k, _ in theta_picker.get_t3_generator(0, 0):
             if theta[counter] != 0.0:
@@ -1146,7 +1144,6 @@ def construct_ucc_u(
                 tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, use_csr=use_csr))
                 t += theta[counter] * tmp
             counter += 1
-
     if "q" in excitations:
         for _, a, i, b, j, c, k, d, l, _ in theta_picker.get_t4_generator(0, 0):
             if theta[counter] != 0.0:
