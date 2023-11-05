@@ -9,9 +9,6 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
-    get_orbital_gradient_response,
-    get_orbital_response_hessian_block,
-    get_orbital_response_metric_sgima,
     get_orbital_response_property_gradient,
     get_orbital_response_vector_norm,
 )
@@ -29,6 +26,7 @@ from slowquant.unitary_coupled_cluster.operator_pauli import (
     energy_hamiltonian_pauli,
     epq_pauli,
     hamiltonian_pauli_1i_1a,
+    hamiltonian_pauli_2i_2a,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_ucc_u
@@ -164,6 +162,20 @@ class LinearResponseUCC(LinearResponseBaseClass):
         self.B = np.zeros((num_parameters, num_parameters))
         self.Sigma = np.zeros((num_parameters, num_parameters))
         self.Delta = np.zeros((num_parameters, num_parameters))
+        H_2i_2a = convert_pauli_to_hybrid_form(
+            hamiltonian_pauli_2i_2a(
+                self.wf.h_ao,
+                self.wf.g_ao,
+                self.wf.c_trans,
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.num_virtual_spin_orbs,
+                num_elec,
+            ),
+            self.wf.num_inactive_spin_orbs,
+            self.wf.num_active_spin_orbs,
+            self.wf.num_virtual_spin_orbs,
+        )
         H_1i_1a = convert_pauli_to_hybrid_form(
             hamiltonian_pauli_1i_1a(
                 self.wf.h_ao,
@@ -192,27 +204,15 @@ class LinearResponseUCC(LinearResponseBaseClass):
             self.wf.num_active_spin_orbs,
             self.wf.num_virtual_spin_orbs,
         )
-        rdms = ReducedDenstiyMatrix(
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-            self.wf.rdm1,
-            rdm2=self.wf.rdm2,
-        )
         idx_shift = len(self.q_ops)
         self.csf = copy.deepcopy(self.wf.state_vector)
         self.csf.active = self.csf._active
         self.csf.active_csr = ss.csr_matrix(self.csf._active)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
-        grad = get_orbital_gradient_response(
-            rdms,
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.kappa_idx,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
+        grad = np.zeros(2 * len(self.q_ops))
+        print("WARNING!")
+        print("Gradient working equations not implemented for projected q operators")
         if len(grad) != 0:
             print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
         grad = np.zeros(2 * len(self.G_ops))
@@ -222,28 +222,25 @@ class LinearResponseUCC(LinearResponseBaseClass):
             break
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-        # Do orbital-orbital blocks
-        self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
-            rdms,
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.kappa_idx_dagger,
-            self.wf.kappa_idx,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
-            rdms,
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.kappa_idx_dagger,
-            self.wf.kappa_idx_dagger,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sgima(
-            rdms, self.wf.kappa_idx
-        )
+        for j, opJ in enumerate(self.q_ops):
+            qJ = opJ.operator
+            for i, opI in enumerate(self.q_ops):
+                qI = opI.operator
+                if i < j:
+                    continue
+                # Make A
+                val = expectation_value_hybrid_flow(
+                    self.wf.state_vector, [qI.dagger, H_2i_2a, qJ], self.wf.state_vector
+                )
+                val -= (
+                    expectation_value_hybrid_flow(self.wf.state_vector, [qI.dagger, qJ], self.wf.state_vector)
+                    * self.wf.energy_elec
+                )
+                self.A[i, j] = self.A[j, i] = val
+                # Make Sigma
+                self.Sigma[i, j] = self.Sigma[j, i] = expectation_value_hybrid_flow(
+                    self.wf.state_vector, [qI.dagger, qJ], self.wf.state_vector
+                )
         for j, opJ in enumerate(self.q_ops):
             qJ = opJ.operator
             for i, opI in enumerate(self.G_ops):

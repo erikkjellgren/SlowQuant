@@ -3,12 +3,15 @@ from collections.abc import Sequence
 import numpy as np
 import scipy
 
+from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
+
 
 class LinearResponseBaseClass:
     A: np.ndarray
     B: np.ndarray
     Sigma: np.ndarray
     Delta: np.ndarray
+    wf: WaveFunctionUCC
 
     def __init__(self) -> None:
         raise NotImplementedError
@@ -39,10 +42,25 @@ class LinearResponseBaseClass:
         self.excitation_energies = np.real(eigval[sorting][size:])
         self.response_vectors = np.real(eigvec[:, sorting][:, size:])
         self.normed_response_vectors = np.zeros_like(self.response_vectors)
+        num_q = len(self.wf.kappa_idx)
+        num_G = size - num_q
+        self.Z_q = self.response_vectors[:num_q, :]
+        self.Z_G = self.response_vectors[num_q : num_q + num_G, :]
+        self.Y_q = self.response_vectors[num_q + num_G : 2 * num_q + num_G]
+        self.Y_G = self.response_vectors[2 * num_q + num_G :]
+        self.Z_q_normed = np.zeros_like(self.Z_q)
+        self.Z_G_normed = np.zeros_like(self.Z_G)
+        self.Y_q_normed = np.zeros_like(self.Y_q)
+        self.Y_G_normed = np.zeros_like(self.Y_G)
         norms = self.get_excited_state_norm()
         for state_number, norm in enumerate(norms):
             if norm < 10**-10:
+                print(f"WARNING: State number {state_number} could not be normalized. Norm of {norm}.")
                 continue
+            self.Z_q_normed[:, state_number] = self.Z_q[:, state_number] * (1 / norm) ** 0.5
+            self.Z_G_normed[:, state_number] = self.Z_G[:, state_number] * (1 / norm) ** 0.5
+            self.Y_q_normed[:, state_number] = self.Y_q[:, state_number] * (1 / norm) ** 0.5
+            self.Y_G_normed[:, state_number] = self.Y_G[:, state_number] * (1 / norm) ** 0.5
             self.normed_response_vectors[:, state_number] = (
                 self.response_vectors[:, state_number] * (1 / norm) ** 0.5
             )

@@ -9,9 +9,6 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
-    get_orbital_gradient_response,
-    get_orbital_response_hessian_block,
-    get_orbital_response_metric_sgima,
     get_orbital_response_property_gradient,
     get_orbital_response_vector_norm,
 )
@@ -29,6 +26,7 @@ from slowquant.unitary_coupled_cluster.operator_pauli import (
     energy_hamiltonian_pauli,
     epq_pauli,
     hamiltonian_pauli_1i_1a,
+    hamiltonian_pauli_2i_2a,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_ucc_u
@@ -54,6 +52,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
         wave_function: WaveFunctionUCC,
         excitations: str,
         is_spin_conserving: bool = False,
+        do_approximate_hermitification: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
@@ -162,8 +161,24 @@ class LinearResponseUCC(LinearResponseBaseClass):
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters))
         self.B = np.zeros((num_parameters, num_parameters))
+        if do_approximate_hermitification:
+            self.B_tracked = np.zeros((num_parameters, num_parameters))
         self.Sigma = np.zeros((num_parameters, num_parameters))
         self.Delta = np.zeros((num_parameters, num_parameters))
+        H_2i_2a = convert_pauli_to_hybrid_form(
+            hamiltonian_pauli_2i_2a(
+                self.wf.h_ao,
+                self.wf.g_ao,
+                self.wf.c_trans,
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.num_virtual_spin_orbs,
+                num_elec,
+            ),
+            self.wf.num_inactive_spin_orbs,
+            self.wf.num_active_spin_orbs,
+            self.wf.num_virtual_spin_orbs,
+        )
         H_1i_1a = convert_pauli_to_hybrid_form(
             hamiltonian_pauli_1i_1a(
                 self.wf.h_ao,
@@ -192,70 +207,76 @@ class LinearResponseUCC(LinearResponseBaseClass):
             self.wf.num_active_spin_orbs,
             self.wf.num_virtual_spin_orbs,
         )
-        rdms = ReducedDenstiyMatrix(
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-            self.wf.rdm1,
-            rdm2=self.wf.rdm2,
-        )
         idx_shift = len(self.q_ops)
         self.csf = copy.deepcopy(self.wf.state_vector)
         self.csf.active = self.csf._active
         self.csf.active_csr = ss.csr_matrix(self.csf._active)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
-        grad = get_orbital_gradient_response(
-            rdms,
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.kappa_idx,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
+        grad = np.zeros(2 * len(self.q_ops))
+        print("WARNING!")
+        print("Gradient working equations not implemented for projected q operators")
         if len(grad) != 0:
             print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
         grad = np.zeros(2 * len(self.G_ops))
         for i, op in enumerate(self.G_ops):
-            print("WARNING!")
-            print("Gradient working equations not implemented for projected G operators")
-            break
+            grad[i] = -expectation_value_hybrid_flow(
+                self.wf.state_vector, [H_1i_1a, self.U, op.operator], self.csf
+            )
+            grad[i + len(self.G_ops)] = expectation_value_hybrid_flow(
+                self.csf, [op.operator.dagger, self.U.dagger, H_1i_1a], self.wf.state_vector
+            )
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-        # Do orbital-orbital blocks
-        self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
-            rdms,
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.kappa_idx_dagger,
-            self.wf.kappa_idx,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
-            rdms,
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.kappa_idx_dagger,
-            self.wf.kappa_idx_dagger,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sgima(
-            rdms, self.wf.kappa_idx
-        )
+        for j, opJ in enumerate(self.q_ops):
+            qJ = opJ.operator
+            for i, opI in enumerate(self.q_ops):
+                qI = opI.operator
+                if i < j:
+                    continue
+                # Make A
+                val = expectation_value_hybrid_flow(
+                    self.wf.state_vector, [qI.dagger, H_2i_2a, qJ], self.wf.state_vector
+                )
+                val -= (
+                    expectation_value_hybrid_flow(self.wf.state_vector, [qI.dagger, qJ], self.wf.state_vector)
+                    * self.wf.energy_elec
+                )
+                self.A[i, j] = self.A[j, i] = val
+                # Make Sigma
+                self.Sigma[i, j] = self.Sigma[j, i] = expectation_value_hybrid_flow(
+                    self.wf.state_vector, [qI.dagger, qJ], self.wf.state_vector
+                )
         for j, opJ in enumerate(self.q_ops):
             qJ = opJ.operator
             for i, opI in enumerate(self.G_ops):
                 GI = opI.operator
-                # Make A
-                self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = expectation_value_hybrid_flow(
-                    self.wf.state_vector, [GI.dagger, H_1i_1a, qJ], self.wf.state_vector
-                )
-                # Make B
-                self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = -expectation_value_hybrid_flow(
-                    self.wf.state_vector, [GI.dagger, qJ.dagger, H_1i_1a], self.wf.state_vector
-                )
+                if do_approximate_hermitification:
+                    # Make A
+                    self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = expectation_value_hybrid_flow(
+                        self.csf, [GI.dagger, self.U.dagger, H_1i_1a, qJ], self.wf.state_vector
+                    ) + expectation_value_hybrid_flow(
+                        self.csf, [GI.dagger, self.U.dagger, qJ.dagger, H_1i_1a], self.wf.state_vector
+                    )  # added an assumed zero (approximation)
+                    # Make B
+                    self.B_tracked[j, i + idx_shift] = self.B_tracked[
+                        i + idx_shift, j
+                    ] = -expectation_value_hybrid_flow(
+                        self.csf,
+                        [GI.dagger, self.U.dagger, qJ.dagger, H_1i_1a],
+                        self.wf.state_vector,
+                    )
+                else:
+                    # Make A
+                    self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = expectation_value_hybrid_flow(
+                        self.csf, [GI.dagger, self.U.dagger, H_1i_1a, qJ], self.wf.state_vector
+                    )
+                    # Make B
+                    self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = -expectation_value_hybrid_flow(
+                        self.csf,
+                        [GI.dagger, self.U.dagger, qJ.dagger, H_1i_1a],
+                        self.wf.state_vector,
+                    )
         for j, opJ in enumerate(self.G_ops):
             GJ = opJ.operator
             for i, opI in enumerate(self.G_ops):
@@ -264,40 +285,14 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     continue
                 # Make A
                 val = expectation_value_hybrid_flow(
-                    self.wf.state_vector, [GI.dagger, H_en, GJ], self.wf.state_vector
+                    self.csf, [GI.dagger, self.U.dagger, H_en, self.U, GJ], self.csf
                 )
-                val -= (
-                    expectation_value_hybrid_flow(self.wf.state_vector, [GI.dagger, GJ], self.wf.state_vector)
-                    * self.wf.energy_elec
-                )
-                val -= expectation_value_hybrid_flow(
-                    self.wf.state_vector, [GI.dagger], self.wf.state_vector
-                ) * expectation_value_hybrid_flow(self.wf.state_vector, [H_en, GJ], self.wf.state_vector)
-                val += (
-                    expectation_value_hybrid_flow(self.wf.state_vector, [GI.dagger], self.wf.state_vector)
-                    * expectation_value_hybrid_flow(self.wf.state_vector, [GJ], self.wf.state_vector)
-                    * self.wf.energy_elec
-                )
+                if i == j:
+                    val -= self.wf.energy_elec
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
-                # Make B
-                val = expectation_value_hybrid_flow(
-                    self.wf.state_vector, [GI.dagger, H_en], self.wf.state_vector
-                ) * expectation_value_hybrid_flow(self.wf.state_vector, [GJ.dagger], self.wf.state_vector)
-                val -= (
-                    expectation_value_hybrid_flow(self.wf.state_vector, [GI.dagger], self.wf.state_vector)
-                    * expectation_value_hybrid_flow(self.wf.state_vector, [GJ.dagger], self.wf.state_vector)
-                    * self.wf.energy_elec
-                )
-                self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
                 # Make Sigma
-                self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[
-                    j + idx_shift, i + idx_shift
-                ] = expectation_value_hybrid_flow(
-                    self.wf.state_vector, [GI.dagger, GJ], self.wf.state_vector
-                ) - (
-                    expectation_value_hybrid_flow(self.wf.state_vector, [GI.dagger], self.wf.state_vector)
-                    * expectation_value_hybrid_flow(self.wf.state_vector, [GJ], self.wf.state_vector)
-                )
+                if i == j:
+                    self.Sigma[i + idx_shift, j + idx_shift] = 1
 
     def get_excited_state_norm(self) -> np.ndarray:
         """Calculate the norm of excited state.
@@ -318,43 +313,13 @@ class LinearResponseUCC(LinearResponseBaseClass):
             q_part = get_orbital_response_vector_norm(
                 rdms, self.wf.kappa_idx, self.response_vectors, state_number, number_excitations
             )
+            shift = len(self.q_ops)
             g_part = 0
-            for i, op in enumerate(self.G_ops):
-                GI = op.operator
-                for j, op2 in enumerate(self.G_ops):
-                    GJ = op2.operator
-
-                    g_part += (
-                        self.Z_G[i, state_number]
-                        * self.Z_G[j, state_number]
-                        * expectation_value_hybrid_flow(
-                            self.wf.state_vector, [GI.dagger, GJ], self.wf.state_vector
-                        )
-                    )
-                    g_part -= (
-                        self.Y_G[i, state_number]
-                        * self.Y_G[j, state_number]
-                        * expectation_value_hybrid_flow(
-                            self.wf.state_vector, [GJ.dagger, GI], self.wf.state_vector
-                        )
-                    )
-                    g_part -= (
-                        self.Z_G[i, state_number]
-                        * self.Z_G[j, state_number]
-                        * expectation_value_hybrid_flow(self.wf.state_vector, [GJ], self.wf.state_vector)
-                        * expectation_value_hybrid_flow(
-                            self.wf.state_vector, [GI.dagger], self.wf.state_vector
-                        )
-                    )
-                    g_part += (
-                        self.Y_G[i, state_number]
-                        * self.Y_G[j, state_number]
-                        * expectation_value_hybrid_flow(
-                            self.wf.state_vector, [GJ.dagger], self.wf.state_vector
-                        )
-                        * expectation_value_hybrid_flow(self.wf.state_vector, [GI], self.wf.state_vector)
-                    )
-
+            for i, _ in enumerate(self.G_ops):
+                g_part += (
+                    self.response_vectors[i + shift, state_number] ** 2
+                    - self.response_vectors[i + shift + number_excitations, state_number] ** 2
+                )
             norms[state_number] = q_part + g_part
         return norms
 
@@ -447,57 +412,29 @@ class LinearResponseUCC(LinearResponseBaseClass):
             g_part_z = 0.0
             for i, op in enumerate(self.G_ops):
                 G = op.operator
-                exp_G = expectation_value_hybrid_flow(self.wf.state_vector, [G], self.wf.state_vector)
-                exp_G_dagger = expectation_value_hybrid_flow(
-                    self.wf.state_vector, [G.dagger], self.wf.state_vector
+                g_part_x -= self.normed_response_vectors[
+                    i + len(self.q_ops), state_number
+                ] * expectation_value_hybrid_flow(self.wf.state_vector, [mux_op, self.U, G], self.csf)
+                g_part_x += self.normed_response_vectors[
+                    i + len(self.q_ops) + number_excitations, state_number
+                ] * expectation_value_hybrid_flow(
+                    self.csf, [G.dagger, self.U.dagger, mux_op], self.wf.state_vector
                 )
-                g_part_x += (
-                    self.Z_G_normed[i, state_number]
-                    * exp_G_dagger
-                    * expectation_value_hybrid_flow(self.wf.state_vector, [mux_op], self.wf.state_vector)
+                g_part_y -= self.normed_response_vectors[
+                    i + len(self.q_ops), state_number
+                ] * expectation_value_hybrid_flow(self.wf.state_vector, [muy_op, self.U, G], self.csf)
+                g_part_y += self.normed_response_vectors[
+                    i + len(self.q_ops) + number_excitations, state_number
+                ] * expectation_value_hybrid_flow(
+                    self.csf, [G.dagger, self.U.dagger, muy_op], self.wf.state_vector
                 )
-                g_part_x -= self.Z_G_normed[i, state_number] * expectation_value_hybrid_flow(
-                    self.wf.state_vector, [G.dagger, mux_op], self.wf.state_vector
-                )
-                g_part_x -= (
-                    self.Y_G_normed[i, state_number]
-                    * exp_G
-                    * expectation_value_hybrid_flow(self.wf.state_vector, [mux_op], self.wf.state_vector)
-                )
-                g_part_x += self.Y_G_normed[i, state_number] * expectation_value_hybrid_flow(
-                    self.wf.state_vector, [mux_op, G], self.wf.state_vector
-                )
-                g_part_y += (
-                    self.Z_G_normed[i, state_number]
-                    * exp_G_dagger
-                    * expectation_value_hybrid_flow(self.wf.state_vector, [muy_op], self.wf.state_vector)
-                )
-                g_part_y -= self.Z_G_normed[i, state_number] * expectation_value_hybrid_flow(
-                    self.wf.state_vector, [G.dagger, muy_op], self.wf.state_vector
-                )
-                g_part_y -= (
-                    self.Y_G_normed[i, state_number]
-                    * exp_G
-                    * expectation_value_hybrid_flow(self.wf.state_vector, [muy_op], self.wf.state_vector)
-                )
-                g_part_y += self.Y_G_normed[i, state_number] * expectation_value_hybrid_flow(
-                    self.wf.state_vector, [muy_op, G], self.wf.state_vector
-                )
-                g_part_z += (
-                    self.Z_G_normed[i, state_number]
-                    * exp_G_dagger
-                    * expectation_value_hybrid_flow(self.wf.state_vector, [muz_op], self.wf.state_vector)
-                )
-                g_part_z -= self.Z_G_normed[i, state_number] * expectation_value_hybrid_flow(
-                    self.wf.state_vector, [G.dagger, muz_op], self.wf.state_vector
-                )
-                g_part_z -= (
-                    self.Y_G_normed[i, state_number]
-                    * exp_G
-                    * expectation_value_hybrid_flow(self.wf.state_vector, [muz_op], self.wf.state_vector)
-                )
-                g_part_z += self.Y_G_normed[i, state_number] * expectation_value_hybrid_flow(
-                    self.wf.state_vector, [muz_op, G], self.wf.state_vector
+                g_part_z -= self.normed_response_vectors[
+                    i + len(self.q_ops), state_number
+                ] * expectation_value_hybrid_flow(self.wf.state_vector, [muz_op, self.U, G], self.csf)
+                g_part_z += self.normed_response_vectors[
+                    i + len(self.q_ops) + number_excitations, state_number
+                ] * expectation_value_hybrid_flow(
+                    self.csf, [G.dagger, self.U.dagger, muz_op], self.wf.state_vector
                 )
             transition_dipoles[state_number, 0] = q_part_x + g_part_x
             transition_dipoles[state_number, 1] = q_part_y + g_part_y

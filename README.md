@@ -18,9 +18,9 @@ http://slowquant.readthedocs.io/en/latest/
 Current implementation supports:
 
 - UCCSD, spin-adapted operators
-- UCCSDTQ
+- UCCSDTQ56
 - Linear Response SD, spin-adapted operators
-- Linear Respinse SDTQ
+- Linear Respinse SDTQ56
 
 These features are also implemented with the active-space approximation and orbital-optimization.
 

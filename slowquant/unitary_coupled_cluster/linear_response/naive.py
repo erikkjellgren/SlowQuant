@@ -276,7 +276,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
         Returns:
             Norm of excited states.
         """
-        number_excitations = len(self.excitation_energies)
         rdms = ReducedDenstiyMatrix(
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
@@ -284,19 +283,15 @@ class LinearResponseUCC(LinearResponseBaseClass):
             self.wf.rdm1,
             rdm2=self.wf.rdm2,
         )
-        norms = np.zeros(len(self.response_vectors[0]))
-        for state_number in range(len(self.response_vectors[0])):
+        norms = np.zeros(len(self.Z_G[0]))
+        for state_number in range(len(self.Z_G[0])):
             q_part = get_orbital_response_vector_norm(
-                rdms, self.wf.kappa_idx, self.response_vectors, state_number, number_excitations
+                rdms, self.wf.kappa_idx, self.response_vectors, state_number, len(self.excitation_energies)
             )
-            shift = len(self.q_ops)
             transfer_op = OperatorHybrid({})
             for i, op in enumerate(self.G_ops):
                 G = op.operator
-                transfer_op += (
-                    self.response_vectors[i + shift, state_number] * G.dagger
-                    + self.response_vectors[i + shift + number_excitations, state_number] * G
-                )
+                transfer_op += self.Z_G[i, state_number] * G.dagger + self.Y_G[i, state_number] * G
             norms[state_number] = q_part + expectation_value_hybrid_flow_commutator(
                 self.wf.state_vector, transfer_op, transfer_op.dagger, self.wf.state_vector
             )
@@ -357,15 +352,13 @@ class LinearResponseUCC(LinearResponseBaseClass):
         transition_dipole_x = 0.0
         transition_dipole_y = 0.0
         transition_dipole_z = 0.0
-        shift = len(self.q_ops)
-        transition_dipoles = np.zeros((len(self.normed_response_vectors[0]), 3))
-        for state_number in range(len(self.normed_response_vectors[0])):
+        transition_dipoles = np.zeros((len(self.Z_G_normed[0]), 3))
+        for state_number in range(len(self.Z_G_normed[0])):
             transfer_op = OperatorHybrid({})
             for i, op in enumerate(self.G_ops):
                 G = op.operator
                 transfer_op += (
-                    self.normed_response_vectors[i + shift, state_number] * G.dagger
-                    + self.normed_response_vectors[i + shift + number_excitations, state_number] * G
+                    self.Z_G_normed[i, state_number] * G.dagger + self.Y_G_normed[i, state_number] * G
                 )
             q_part_x = get_orbital_response_property_gradient(
                 rdms,
