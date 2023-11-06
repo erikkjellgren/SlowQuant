@@ -233,10 +233,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     self.wf.state_vector, [op.operator.dagger], self.wf.state_vector
                 )
             )
-        for i, op in enumerate(self.G_ops):
-            print("WARNING!")
-            print("Gradient working equations not implemented for projected G operators")
-            break
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
