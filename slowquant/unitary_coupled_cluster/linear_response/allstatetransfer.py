@@ -15,7 +15,10 @@ from slowquant.unitary_coupled_cluster.operator_hybrid import (
     convert_pauli_to_hybrid_form,
     expectation_value_hybrid_flow,
 )
-from slowquant.unitary_coupled_cluster.operator_pauli import epq_pauli
+from slowquant.unitary_coupled_cluster.operator_pauli import (
+    epq_pauli,
+    hamiltonian_pauli_2i_2a,
+)
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.util import construct_ucc_u
 
@@ -72,6 +75,21 @@ class LinearResponseUCC(LinearResponseBaseClass):
             {inactive_str + virtual_str: OperatorHybridData(inactive_str, U_matrix, virtual_str)}
         )
 
+        H_2i_2a = convert_pauli_to_hybrid_form(
+            hamiltonian_pauli_2i_2a(
+                self.wf.h_ao,
+                self.wf.g_ao,
+                self.wf.c_trans,
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.num_virtual_spin_orbs,
+                self.wf.num_elec,
+            ),
+            self.wf.num_inactive_spin_orbs,
+            self.wf.num_active_spin_orbs,
+            self.wf.num_virtual_spin_orbs,
+        )
+
         idx_shift = len(self.q_ops)
         self.csf = copy.deepcopy(self.wf.state_vector)
         self.csf.active = self.csf._active
@@ -105,7 +123,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     continue
                 # Make A
                 val = expectation_value_hybrid_flow(
-                    self.csf, [qI.dagger, self.U.dagger, self.H_2i_2a, self.U, qJ], self.csf
+                    self.csf, [qI.dagger, self.U.dagger, H_2i_2a, self.U, qJ], self.csf
                 )
                 if i == j:
                     val -= self.wf.energy_elec

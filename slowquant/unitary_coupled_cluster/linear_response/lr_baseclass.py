@@ -12,7 +12,6 @@ from slowquant.unitary_coupled_cluster.operator_pauli import (
     energy_hamiltonian_pauli,
     epq_pauli,
     hamiltonian_pauli_1i_1a,
-    hamiltonian_pauli_2i_2a,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_ucc_u
@@ -138,20 +137,6 @@ class LinearResponseBaseClass:
         self.B = np.zeros((num_parameters, num_parameters))
         self.Sigma = np.zeros((num_parameters, num_parameters))
         self.Delta = np.zeros((num_parameters, num_parameters))
-        self.H_2i_2a = convert_pauli_to_hybrid_form(
-            hamiltonian_pauli_2i_2a(
-                self.wf.h_ao,
-                self.wf.g_ao,
-                self.wf.c_trans,
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.num_virtual_spin_orbs,
-                num_elec,
-            ),
-            self.wf.num_inactive_spin_orbs,
-            self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
-        )
         self.H_1i_1a = convert_pauli_to_hybrid_form(
             hamiltonian_pauli_1i_1a(
                 self.wf.h_ao,

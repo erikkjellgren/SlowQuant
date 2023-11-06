@@ -20,7 +20,11 @@ from slowquant.unitary_coupled_cluster.operator_hybrid import (
     convert_pauli_to_hybrid_form,
     expectation_value_hybrid_flow,
 )
-from slowquant.unitary_coupled_cluster.operator_pauli import OperatorPauli, epq_pauli
+from slowquant.unitary_coupled_cluster.operator_pauli import (
+    OperatorPauli,
+    epq_pauli,
+    hamiltonian_pauli_2i_2a,
+)
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
@@ -39,6 +43,21 @@ class LinearResponseUCC(LinearResponseBaseClass):
             is_spin_conserving: Use spin-conseving operators.
         """
         super().__init__(wave_function, excitations, is_spin_conserving)
+
+        H_2i_2a = convert_pauli_to_hybrid_form(
+            hamiltonian_pauli_2i_2a(
+                self.wf.h_ao,
+                self.wf.g_ao,
+                self.wf.c_trans,
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.num_virtual_spin_orbs,
+                self.wf.num_elec,
+            ),
+            self.wf.num_inactive_spin_orbs,
+            self.wf.num_active_spin_orbs,
+            self.wf.num_virtual_spin_orbs,
+        )
 
         rdms = ReducedDenstiyMatrix(
             self.wf.num_inactive_orbs,
@@ -93,7 +112,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     continue
                 # Make A
                 val = expectation_value_hybrid_flow(
-                    self.wf.state_vector, [qI.dagger, self.H_2i_2a, qJ], self.wf.state_vector
+                    self.wf.state_vector, [qI.dagger, H_2i_2a, qJ], self.wf.state_vector
                 )
                 val -= (
                     expectation_value_hybrid_flow(self.wf.state_vector, [qI.dagger, qJ], self.wf.state_vector)

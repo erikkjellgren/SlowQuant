@@ -15,7 +15,10 @@ from slowquant.unitary_coupled_cluster.operator_hybrid import (
     convert_pauli_to_hybrid_form,
     expectation_value_hybrid_flow,
 )
-from slowquant.unitary_coupled_cluster.operator_pauli import epq_pauli
+from slowquant.unitary_coupled_cluster.operator_pauli import (
+    epq_pauli,
+    hamiltonian_pauli_2i_2a,
+)
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.util import construct_ucc_u
 
@@ -53,6 +56,21 @@ class LinearResponseUCC(LinearResponseBaseClass):
         self.B = np.zeros((num_parameters, num_parameters))
         self.Sigma = np.zeros((num_parameters, num_parameters))
         self.Delta = np.zeros((num_parameters, num_parameters))
+
+        H_2i_2a = convert_pauli_to_hybrid_form(
+            hamiltonian_pauli_2i_2a(
+                self.wf.h_ao,
+                self.wf.g_ao,
+                self.wf.c_trans,
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.num_virtual_spin_orbs,
+                self.wf.num_elec,
+            ),
+            self.wf.num_inactive_spin_orbs,
+            self.wf.num_active_spin_orbs,
+            self.wf.num_virtual_spin_orbs,
+        )
 
         U_matrix = construct_ucc_u(
             self.wf.num_active_spin_orbs,
@@ -105,15 +123,15 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     continue
                 # Make A
                 val = expectation_value_hybrid_flow(
-                    self.csf, [qI.dagger, self.U.dagger, self.H_2i_2a, self.U, qJ], self.csf
+                    self.csf, [qI.dagger, self.U.dagger, H_2i_2a, self.U, qJ], self.csf
                 )
                 val -= expectation_value_hybrid_flow(
-                    self.csf, [qI.dagger, qJ, self.U.dagger, self.H_2i_2a], self.wf.state_vector
+                    self.csf, [qI.dagger, qJ, self.U.dagger, H_2i_2a], self.wf.state_vector
                 )
                 self.A[i, j] = self.A[j, i] = val
                 # Make B
                 self.B[i, j] = self.B[j, i] = -expectation_value_hybrid_flow(
-                    self.csf, [qI.dagger, qJ.dagger, self.U.dagger, self.H_2i_2a], self.wf.state_vector
+                    self.csf, [qI.dagger, qJ.dagger, self.U.dagger, H_2i_2a], self.wf.state_vector
                 )
                 # Make Sigma
                 if i == j:
