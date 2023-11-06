@@ -7,6 +7,7 @@ import slowquant.unitary_coupled_cluster.linear_response.allstatetransfer as all
 import slowquant.unitary_coupled_cluster.linear_response.generic as generic
 import slowquant.unitary_coupled_cluster.linear_response.naive as naive
 import slowquant.unitary_coupled_cluster.linear_response.projected as projected
+import slowquant.unitary_coupled_cluster.linear_response.projected_statetransfer as projected_statetransfer
 import slowquant.unitary_coupled_cluster.linear_response.selfconsistent as selfconsistent
 import slowquant.unitary_coupled_cluster.linear_response.statetransfer as statetransfer
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
@@ -186,8 +187,8 @@ def test_LiH_atmethods_energies() -> None:
     assert np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)
 
 
-def test_LiH_allmethods_energies_fast() -> None:
-    """Test LiH all matrices and their properties for all LR methods."""
+def test_LiH_naiveq_methods_energies() -> None:
+    """Test LiH energies for naive q LR methods."""
 
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -342,8 +343,8 @@ def test_LiH_allmethods_energies_fast() -> None:
     assert np.allclose(LR_HST_naive.excitation_energies, solutions, atol=threshold * 10)
 
 
-def test_LiH_allmethods_matrices_fast() -> None:
-    """Test LiH all matrices and their properties for all LR methods."""
+def test_LiH_naiveq_methods_matrices() -> None:
+    """Test LiH all matrices and their properties for naive q LR methods."""
 
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -465,7 +466,7 @@ def test_LiH_allmethods_matrices_fast() -> None:
     assert np.allclose(LR_HST_naive.B, LR_HST_naive.B.T, atol=threshold)
 
 
-def test_LiH_allproj_energies_fast() -> None:
+def test_LiH_allproj_energies() -> None:
     """Test LiH for all-proj LR method."""
 
     SQobj = sq.SlowQuant()
@@ -514,4 +515,57 @@ def test_LiH_allproj_energies_fast() -> None:
             2.95606043,
         ]
     )
+    assert np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)
+
+
+def test_LiH_STproj_energies() -> None:
+    """Test LiH for ST-proj LR method."""
+
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """Li   0.0           0.0  0.0;
+        H   1.67  0.0  0.0;""",
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("sto-3g")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
+    WF = WaveFunctionUCC(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 2),
+        SQobj.hartree_fock.mo_coeff,
+        h_core,
+        g_eri,
+    )
+    WF.run_ucc("SD", True)
+
+    threshold = 10 ** (-5)
+
+    LR_naive = projected_statetransfer.LinearResponseUCC(
+        WF,
+        excitations="SD",
+    )
+    LR_naive.calc_excitation_energies()
+
+    solutions = np.array(
+        [
+            0.12973291,
+            0.18092743,
+            0.18092743,
+            0.60537541,
+            0.64747353,
+            0.74982411,
+            0.74982411,
+            1.00424384,
+            2.07489665,
+            2.13720665,
+            2.13720665,
+            2.45601484,
+            2.95606043,
+        ]
+    )
+
     assert np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)
