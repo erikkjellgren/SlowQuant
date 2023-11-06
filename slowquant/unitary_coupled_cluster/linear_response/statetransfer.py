@@ -218,6 +218,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
         )
         if len(grad) != 0:
             print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+            if np.max(np.abs(grad)) > 10**-3:
+                raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
         grad = np.zeros(2 * len(self.G_ops))
         for i, op in enumerate(self.G_ops):
             grad[i] = -expectation_value_hybrid_flow(
@@ -228,6 +230,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
             )
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+            if np.max(np.abs(grad)) > 10**-3:
+                raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
         # Do orbital-orbital blocks
         self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
             rdms,
@@ -272,13 +276,13 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 else:
                     # Make A
                     self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = expectation_value_hybrid_flow(
-                            self.csf, [GI.dagger, self.U.dagger, H_1i_1a, qJ], self.wf.state_vector
+                        self.csf, [GI.dagger, self.U.dagger, H_1i_1a, qJ], self.wf.state_vector
                     )
                     # Make B
                     self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = -expectation_value_hybrid_flow(
-                            self.csf,
-                            [GI.dagger, self.U.dagger, qJ.dagger, H_1i_1a],
-                            self.wf.state_vector,
+                        self.csf,
+                        [GI.dagger, self.U.dagger, qJ.dagger, H_1i_1a],
+                        self.wf.state_vector,
                     )
         for j, opJ in enumerate(self.G_ops):
             GJ = opJ.operator
@@ -287,7 +291,9 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 if i < j:
                     continue
                 # Make A
-                val = expectation_value_hybrid_flow(self.csf, [GI.dagger, self.U.dagger, H_en, self.U, GJ], self.csf)
+                val = expectation_value_hybrid_flow(
+                    self.csf, [GI.dagger, self.U.dagger, H_en, self.U, GJ], self.csf
+                )
                 if i == j:
                     val -= self.wf.energy_elec
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val

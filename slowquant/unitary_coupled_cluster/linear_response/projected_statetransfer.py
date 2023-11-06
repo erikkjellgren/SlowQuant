@@ -220,6 +220,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
         print("Gradient working equations not implemented for projected q operators")
         if len(grad) != 0:
             print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+            if np.max(np.abs(grad)) > 10**-3:
+                raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
         grad = np.zeros(2 * len(self.G_ops))
         for i, op in enumerate(self.G_ops):
             grad[i] = -expectation_value_hybrid_flow(
@@ -230,6 +232,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
             )
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+            if np.max(np.abs(grad)) > 10**-3:
+                raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
         for j, opJ in enumerate(self.q_ops):
             qJ = opJ.operator
             for i, opI in enumerate(self.q_ops):
