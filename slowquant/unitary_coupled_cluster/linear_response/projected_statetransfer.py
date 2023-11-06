@@ -61,6 +61,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
             excitations: Which excitation orders to include in response.
             is_spin_conserving: Use spin-conseving operators.
         """
+        print("WARNING!")
+        print("The projected-q st-G is untested!")
         self.wf = copy.deepcopy(wave_function)
         self.theta_picker = ThetaPicker(
             self.wf.active_occ_spin_idx,
@@ -251,32 +253,10 @@ class LinearResponseUCC(LinearResponseBaseClass):
             qJ = opJ.operator
             for i, opI in enumerate(self.G_ops):
                 GI = opI.operator
-                if do_approximate_hermitification:
-                    # Make A
-                    self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = expectation_value_hybrid_flow(
-                        self.csf, [GI.dagger, self.U.dagger, H_1i_1a, qJ], self.wf.state_vector
-                    ) + expectation_value_hybrid_flow(
-                        self.csf, [GI.dagger, self.U.dagger, qJ.dagger, H_1i_1a], self.wf.state_vector
-                    )  # added an assumed zero (approximation)
-                    # Make B
-                    self.B_tracked[j, i + idx_shift] = self.B_tracked[
-                        i + idx_shift, j
-                    ] = -expectation_value_hybrid_flow(
-                        self.csf,
-                        [GI.dagger, self.U.dagger, qJ.dagger, H_1i_1a],
-                        self.wf.state_vector,
-                    )
-                else:
-                    # Make A
-                    self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = expectation_value_hybrid_flow(
-                        self.csf, [GI.dagger, self.U.dagger, H_1i_1a, qJ], self.wf.state_vector
-                    )
-                    # Make B
-                    self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = -expectation_value_hybrid_flow(
-                        self.csf,
-                        [GI.dagger, self.U.dagger, qJ.dagger, H_1i_1a],
-                        self.wf.state_vector,
-                    )
+                # Make A
+                self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = expectation_value_hybrid_flow(
+                    self.csf, [GI.dagger, self.U.dagger, H_1i_1a, qJ.dagger], self.wf.state_vector
+                )
         for j, opJ in enumerate(self.G_ops):
             GJ = opJ.operator
             for i, opI in enumerate(self.G_ops):

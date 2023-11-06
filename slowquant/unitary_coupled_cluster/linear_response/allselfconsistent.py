@@ -139,7 +139,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     self.wf.num_virtual_spin_orbs,
                 )
                 self.G_ops.append(ResponseOperator((i, j, k, l, m, n), (a, b, c, d, e, f), op))
-        for i, a in self.wf.kappa_idx:
+        for i, a in self.wf.kappa_hf_like_idx:
             op_ = 2 ** (-1 / 2) * epq_pauli(a, i, self.wf.num_spin_orbs, self.wf.num_elec)
             op = convert_pauli_to_hybrid_form(
                 op_,
@@ -244,12 +244,14 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 GI = opI.operator
                 # Make A
                 val = expectation_value_hybrid_flow(
-                    self.csf, [GI.dagger, self.U.dagger, H_1i_1a, qJ], self.wf.state_vector
+                    self.csf, [GI.dagger, self.U.dagger, H_1i_1a, self.U, qJ], self.csf
                 )
                 self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
                 # Make B
                 self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = -expectation_value_hybrid_flow(
-                    self.csf, [GI.dagger, self.U.dagger, qJ.dagger, H_1i_1a], self.wf.state_vector
+                    self.csf,
+                    [GI.dagger, qJ.dagger, self.U.dagger, H_1i_1a],
+                    self.wf.state_vector,
                 )
         for j, opJ in enumerate(self.G_ops):
             GJ = opJ.operator
