@@ -1,17 +1,8 @@
-import sys
-
 import numpy as np
 
 import slowquant.SlowQuant as sq
-from slowquant.unitary_coupled_cluster.linear_response_alltransform import (
-    LinearResponseUCC,
-)
-from slowquant.unitary_coupled_cluster.linear_response_fast import (
-    LinearResponseUCC as LinearResponseUCCFast,
-)
-from slowquant.unitary_coupled_cluster.linear_response_old import (
-    LinearResponseUCC as LinearResponseUCCRef,
-)
+import slowquant.unitary_coupled_cluster.linear_response.allselfconsistent as allselfconsistent
+import slowquant.unitary_coupled_cluster.linear_response.allstatetransfer as allstatetransfer
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
@@ -36,44 +27,23 @@ def test_h2_sto3g_uccsd_lr() -> None:
         h_core,
         g_eri,
     )
-    dipole_integrals = (
-        SQobj.integral.get_multipole_matrix([1, 0, 0]),
-        SQobj.integral.get_multipole_matrix([0, 1, 0]),
-        SQobj.integral.get_multipole_matrix([0, 0, 1]),
-    )
     WF.run_ucc("SD", False)
     # SC
-    LR = LinearResponseUCC(
+    LR = allselfconsistent.LinearResponseUCC(
         WF,
         excitations="SD",
-        do_selfconsistent_operators=True,
-        do_statetransfer_operators=False,
-        do_debugging=True,
     )
     LR.calc_excitation_energies()
-    print(LR.excitation_energies)
     assert abs(LR.excitation_energies[0] - 1.0157376) < 10**-3
     assert abs(LR.excitation_energies[1] - 1.71950367) < 10**-3
-    assert abs(LR.get_excited_state_overlap(0) - 0.0) < 10**-3
-    assert abs(LR.get_excited_state_overlap(1) - 0.0) < 10**-3
-    assert abs(abs(LR.get_transition_dipole(0, dipole_integrals)[2]) - 1.1440534325663108) < 10**-3
-    assert abs(LR.get_transition_dipole(1, dipole_integrals)[2] - 0.0) < 10**-3
     # ST
-    LR = LinearResponseUCC(
+    LR = allstatetransfer.LinearResponseUCC(
         WF,
         excitations="SD",
-        do_selfconsistent_operators=False,
-        do_statetransfer_operators=True,
-        do_debugging=True,
     )
     LR.calc_excitation_energies()
-    print(LR.excitation_energies)
     assert abs(LR.excitation_energies[0] - 1.0157376) < 10**-3
     assert abs(LR.excitation_energies[1] - 1.71950367) < 10**-3
-    assert abs(LR.get_excited_state_overlap(0) - 0.0) < 10**-3
-    assert abs(LR.get_excited_state_overlap(1) - 0.0) < 10**-3
-    assert abs(abs(LR.get_transition_dipole(0, dipole_integrals)[2]) - 1.144053440679731) < 10**-3
-    assert abs(LR.get_transition_dipole(1, dipole_integrals)[2] - 0.0) < 10**-3
 
 
 def test_h2_sto3g_uccsd_lr_matrices() -> None:

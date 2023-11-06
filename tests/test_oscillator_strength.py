@@ -1,9 +1,10 @@
-import copy
-
 import numpy as np
 
 import slowquant.SlowQuant as sq
-from slowquant.unitary_coupled_cluster.linear_response_fast import LinearResponseUCC
+import slowquant.unitary_coupled_cluster.linear_response.generic as generic
+import slowquant.unitary_coupled_cluster.linear_response.naive as naive
+import slowquant.unitary_coupled_cluster.linear_response.projected as projected
+import slowquant.unitary_coupled_cluster.linear_response.statetransfer as statetransfer
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
@@ -16,9 +17,9 @@ def test_H2_631g_naive():
     SQobj.set_molecule(
         """H  0.0   0.0  0.0;
             H  0.74  0.0  0.0;""",
-        distance_unit='angstrom',
+        distance_unit="angstrom",
     )
-    SQobj.set_basis_set('6-31G')
+    SQobj.set_basis_set("6-31G")
     # HF
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
@@ -33,17 +34,17 @@ def test_H2_631g_naive():
         h_core,
         g_eri,
     )
-    WF.run_ucc('SD', True)
+    WF.run_ucc("SD", True)
 
     # Linear Response
-    LR = LinearResponseUCC(WF, excitations='SD', do_selfconsistent_operators=False)  # naive
-    LR_nn = copy.deepcopy(LR)
+    LR = naive.LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
+    genericLR = generic.LinearResponseUCC(WF, excitations="SD", operator_type="naive")
+    genericLR.calc_excitation_energies()
 
     thresh = 10**-4
 
     # Check excitation energies
-    print('Check excitation energies')
     assert abs(LR.excitation_energies[0] - 0.574413) < thresh
     assert abs(LR.excitation_energies[1] - 1.043177) < thresh
     assert abs(LR.excitation_energies[2] - 1.139481) < thresh
@@ -59,108 +60,17 @@ def test_H2_631g_naive():
     )
 
     # Get oscillator strength for each excited state
-    print('Check oscillator strength')
-    assert abs(LR.get_oscillator_strength(0, dipole_integrals) - 0.6338) < thresh
-    assert abs(LR.get_oscillator_strength(1, dipole_integrals) - 0.0) < thresh
-    assert abs(LR.get_oscillator_strength(2, dipole_integrals) - 0.0) < thresh
-    assert abs(LR.get_oscillator_strength(3, dipole_integrals) - 0.0311) < thresh
-    assert abs(LR.get_oscillator_strength(4, dipole_integrals) - 0.0421) < thresh
-    assert abs(LR.get_oscillator_strength(5, dipole_integrals) - 0.0) < thresh
+    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    assert abs(osc_strengths[0] - 0.6338) < thresh
+    assert abs(osc_strengths[1] - 0.0) < thresh
+    assert abs(osc_strengths[2] - 0.0) < thresh
+    assert abs(osc_strengths[3] - 0.0311) < thresh
+    assert abs(osc_strengths[4] - 0.0421) < thresh
+    assert abs(osc_strengths[5] - 0.0) < thresh
 
     # Compare generic and working equation implementation
-    print('Difference generic vs. working equations')
-    assert (
-        abs(
-            LR.get_oscillator_strength(0, dipole_integrals, do_working_equations=True)
-            - LR.get_oscillator_strength(0, dipole_integrals)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(1, dipole_integrals, do_working_equations=True)
-            - LR.get_oscillator_strength(1, dipole_integrals)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(2, dipole_integrals, do_working_equations=True)
-            - LR.get_oscillator_strength(2, dipole_integrals)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(3, dipole_integrals, do_working_equations=True)
-            - LR.get_oscillator_strength(3, dipole_integrals)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(4, dipole_integrals, do_working_equations=True)
-            - LR.get_oscillator_strength(4, dipole_integrals)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(5, dipole_integrals, do_working_equations=True)
-            - LR.get_oscillator_strength(5, dipole_integrals)
-        )
-        < thresh
-    )
-
-    # Check working equations of excited state norm
-    LR_nn.calc_excitation_energies(do_working_equations=True)
-    print('Norm via working equations')
-    print('Difference generic vs. working equations')
-    assert (
-        abs(
-            LR.get_oscillator_strength(0, dipole_integrals, do_working_equations=True)
-            - LR_nn.get_oscillator_strength(0, dipole_integrals, do_working_equations=True)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(1, dipole_integrals, do_working_equations=True)
-            - LR_nn.get_oscillator_strength(1, dipole_integrals, do_working_equations=True)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(2, dipole_integrals, do_working_equations=True)
-            - LR_nn.get_oscillator_strength(2, dipole_integrals, do_working_equations=True)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(3, dipole_integrals, do_working_equations=True)
-            - LR_nn.get_oscillator_strength(3, dipole_integrals, do_working_equations=True)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(4, dipole_integrals, do_working_equations=True)
-            - LR_nn.get_oscillator_strength(4, dipole_integrals, do_working_equations=True)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(5, dipole_integrals, do_working_equations=True)
-            - LR_nn.get_oscillator_strength(5, dipole_integrals, do_working_equations=True)
-        )
-        < thresh
-    )
-
-    print('Compare normed response vectors')
-    assert np.allclose(LR.normed_response_vectors, LR_nn.normed_response_vectors, atol=10**-20) is True
+    osc_strengths_generic = genericLR.get_oscillator_strength(dipole_integrals)
+    assert np.allclose(osc_strengths, osc_strengths_generic, atol=thresh)
 
 
 def test_LiH_sto3g_naive():
@@ -172,9 +82,9 @@ def test_LiH_sto3g_naive():
     SQobj.set_molecule(
         """Li  0.0  0.0  0.0;
             H 1.671707274 0.0 0.0;""",
-        distance_unit='angstrom',
+        distance_unit="angstrom",
     )
-    SQobj.set_basis_set('sto-3g')
+    SQobj.set_basis_set("sto-3g")
     # HF
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
@@ -189,17 +99,17 @@ def test_LiH_sto3g_naive():
         h_core,
         g_eri,
     )
-    WF.run_ucc('SD', True)
+    WF.run_ucc("SD", True)
 
     # Linear Response
-    LR = LinearResponseUCC(WF, excitations='SD', do_selfconsistent_operators=False)  # naive
-    LR_nn = copy.deepcopy(LR)
+    LR = naive.LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
+    genericLR = generic.LinearResponseUCC(WF, excitations="SD", operator_type="naive")
+    genericLR.calc_excitation_energies()
 
     thresh = 10**-4
 
     # Check excitation energies
-    print('Check excitation energies')
     assert abs(LR.excitation_energies[0] - 0.129471) < thresh
     assert abs(LR.excitation_energies[1] - 0.178744) < thresh
     assert abs(LR.excitation_energies[2] - 0.178744) < thresh
@@ -222,213 +132,24 @@ def test_LiH_sto3g_naive():
     )
 
     # Get oscillator strength for each excited state
-    print('Check oscillator strength')
-    assert abs(LR.get_oscillator_strength(0, dipole_integrals) - 0.049952) < thresh
-    assert abs(LR.get_oscillator_strength(1, dipole_integrals) - 0.241200) < thresh
-    assert abs(LR.get_oscillator_strength(2, dipole_integrals) - 0.241200) < thresh
-    assert abs(LR.get_oscillator_strength(3, dipole_integrals) - 0.1580497) < thresh
-    assert abs(LR.get_oscillator_strength(4, dipole_integrals) - 0.166598) < thresh
-    assert abs(LR.get_oscillator_strength(5, dipole_integrals) - 0.010376) < thresh
-    assert abs(LR.get_oscillator_strength(6, dipole_integrals) - 0.010376) < thresh
-    assert abs(LR.get_oscillator_strength(7, dipole_integrals) - 0.006250) < thresh
-    assert abs(LR.get_oscillator_strength(8, dipole_integrals) - 0.062374) < thresh
-    assert abs(LR.get_oscillator_strength(9, dipole_integrals) - 0.128854) < thresh
-    assert abs(LR.get_oscillator_strength(10, dipole_integrals) - 0.128854) < thresh
-    assert abs(LR.get_oscillator_strength(11, dipole_integrals) - 0.046008) < thresh
-    assert abs(LR.get_oscillator_strength(12, dipole_integrals) - 0.003907) < thresh
+    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    assert abs(osc_strengths[0] - 0.049952) < thresh
+    assert abs(osc_strengths[1] - 0.241200) < thresh
+    assert abs(osc_strengths[2] - 0.241200) < thresh
+    assert abs(osc_strengths[3] - 0.1580497) < thresh
+    assert abs(osc_strengths[4] - 0.166598) < thresh
+    assert abs(osc_strengths[5] - 0.010376) < thresh
+    assert abs(osc_strengths[6] - 0.010376) < thresh
+    assert abs(osc_strengths[7] - 0.006250) < thresh
+    assert abs(osc_strengths[8] - 0.062374) < thresh
+    assert abs(osc_strengths[9] - 0.128854) < thresh
+    assert abs(osc_strengths[10] - 0.128854) < thresh
+    assert abs(osc_strengths[11] - 0.046008) < thresh
+    assert abs(osc_strengths[12] - 0.003907) < thresh
 
     # Compare generic and working equation implementation
-    print('Difference generic vs. working equations')
-    assert (
-        abs(
-            LR.get_oscillator_strength(0, dipole_integrals, do_working_equations=True)
-            - LR.get_oscillator_strength(0, dipole_integrals)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(1, dipole_integrals, do_working_equations=True)
-            - LR.get_oscillator_strength(1, dipole_integrals)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(2, dipole_integrals, do_working_equations=True)
-            - LR.get_oscillator_strength(2, dipole_integrals)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(3, dipole_integrals, do_working_equations=True)
-            - LR.get_oscillator_strength(3, dipole_integrals)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(4, dipole_integrals, do_working_equations=True)
-            - LR.get_oscillator_strength(4, dipole_integrals)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(5, dipole_integrals, do_working_equations=True)
-            - LR.get_oscillator_strength(5, dipole_integrals)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(6, dipole_integrals, do_working_equations=True)
-            - LR.get_oscillator_strength(6, dipole_integrals)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(7, dipole_integrals, do_working_equations=True)
-            - LR.get_oscillator_strength(7, dipole_integrals)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(8, dipole_integrals, do_working_equations=True)
-            - LR.get_oscillator_strength(8, dipole_integrals)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(9, dipole_integrals, do_working_equations=True)
-            - LR.get_oscillator_strength(9, dipole_integrals)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(10, dipole_integrals, do_working_equations=True)
-            - LR.get_oscillator_strength(10, dipole_integrals)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(11, dipole_integrals, do_working_equations=True)
-            - LR.get_oscillator_strength(11, dipole_integrals)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(12, dipole_integrals, do_working_equations=True)
-            - LR.get_oscillator_strength(12, dipole_integrals)
-        )
-        < thresh
-    )
-
-    # Check working equations of excited state norm
-    LR_nn.calc_excitation_energies(do_working_equations=True)
-    print('Norm via working equations')
-    print('Difference generic vs. working equations')
-    assert (
-        abs(
-            LR.get_oscillator_strength(0, dipole_integrals, do_working_equations=True)
-            - LR_nn.get_oscillator_strength(0, dipole_integrals, do_working_equations=True)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(1, dipole_integrals, do_working_equations=True)
-            - LR_nn.get_oscillator_strength(1, dipole_integrals, do_working_equations=True)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(2, dipole_integrals, do_working_equations=True)
-            - LR_nn.get_oscillator_strength(2, dipole_integrals, do_working_equations=True)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(3, dipole_integrals, do_working_equations=True)
-            - LR_nn.get_oscillator_strength(3, dipole_integrals, do_working_equations=True)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(4, dipole_integrals, do_working_equations=True)
-            - LR_nn.get_oscillator_strength(4, dipole_integrals, do_working_equations=True)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(5, dipole_integrals, do_working_equations=True)
-            - LR_nn.get_oscillator_strength(5, dipole_integrals, do_working_equations=True)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(6, dipole_integrals, do_working_equations=True)
-            - LR_nn.get_oscillator_strength(6, dipole_integrals, do_working_equations=True)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(7, dipole_integrals, do_working_equations=True)
-            - LR_nn.get_oscillator_strength(7, dipole_integrals, do_working_equations=True)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(8, dipole_integrals, do_working_equations=True)
-            - LR_nn.get_oscillator_strength(8, dipole_integrals, do_working_equations=True)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(9, dipole_integrals, do_working_equations=True)
-            - LR_nn.get_oscillator_strength(9, dipole_integrals, do_working_equations=True)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(10, dipole_integrals, do_working_equations=True)
-            - LR_nn.get_oscillator_strength(10, dipole_integrals, do_working_equations=True)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(11, dipole_integrals, do_working_equations=True)
-            - LR_nn.get_oscillator_strength(11, dipole_integrals, do_working_equations=True)
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(12, dipole_integrals, do_working_equations=True)
-            - LR_nn.get_oscillator_strength(12, dipole_integrals, do_working_equations=True)
-        )
-        < thresh
-    )
-
-    print('Compare normed response vectors')
-    assert np.allclose(LR.normed_response_vectors, LR_nn.normed_response_vectors, atol=10**-20) is True
+    osc_strengths_generic = genericLR.get_oscillator_strength(dipole_integrals)
+    assert np.allclose(osc_strengths, osc_strengths_generic, atol=thresh)
 
 
 def test_H2_631g_projLR():
@@ -440,9 +161,9 @@ def test_H2_631g_projLR():
     SQobj.set_molecule(
         """H  0.0   0.0  0.0;
             H  0.74  0.0  0.0;""",
-        distance_unit='angstrom',
+        distance_unit="angstrom",
     )
-    SQobj.set_basis_set('6-31G')
+    SQobj.set_basis_set("6-31G")
     # HF
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
@@ -457,18 +178,16 @@ def test_H2_631g_projLR():
         h_core,
         g_eri,
     )
-    WF.run_ucc('SD', True)
+    WF.run_ucc("SD", True)
 
     # Linear Response
-    LR = LinearResponseUCC(
-        WF, excitations='SD', do_selfconsistent_operators=False, do_projected_operators=True
-    )  # naive
-    LR.calc_excitation_energies(do_working_equations=True)
+    LR = projected.LinearResponseUCC(WF, excitations="SD")
+    LR.calc_excitation_energies()
 
     thresh = 10**-4
 
     # Check excitation energies
-    print('Check excitation energies')
+    print("Check excitation energies")
     assert abs(LR.excitation_energies[0] - 0.574413) < thresh
     assert abs(LR.excitation_energies[1] - 1.043177) < thresh
     assert abs(LR.excitation_energies[2] - 1.139481) < thresh
@@ -484,22 +203,13 @@ def test_H2_631g_projLR():
     )
 
     # Get oscillator strength for each excited state
-    print('Check oscillator strength')
-    assert (
-        abs(LR.get_oscillator_strength(0, dipole_integrals, do_working_equations=True) - 0.6338231953094923)
-        < thresh
-    )
-    assert abs(LR.get_oscillator_strength(1, dipole_integrals, do_working_equations=True) - 0.0) < thresh
-    assert abs(LR.get_oscillator_strength(2, dipole_integrals, do_working_equations=True) - 0.0) < thresh
-    assert (
-        abs(LR.get_oscillator_strength(3, dipole_integrals, do_working_equations=True) - 0.031089763125846485)
-        < thresh
-    )
-    assert (
-        abs(LR.get_oscillator_strength(4, dipole_integrals, do_working_equations=True) - 0.04212982876590235)
-        < thresh
-    )
-    assert abs(LR.get_oscillator_strength(5, dipole_integrals, do_working_equations=True) - 0.0) < thresh
+    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    assert abs(osc_strengths[0] - 0.6338231953094923) < thresh
+    assert abs(osc_strengths[1] - 0.0) < thresh
+    assert abs(osc_strengths[2] - 0.0) < thresh
+    assert abs(osc_strengths[3] - 0.031089763125846485) < thresh
+    assert abs(osc_strengths[4] - 0.04212982876590235) < thresh
+    assert abs(osc_strengths[5] - 0.0) < thresh
 
 
 def test_LiH_sto3g_proj():
@@ -511,9 +221,9 @@ def test_LiH_sto3g_proj():
     SQobj.set_molecule(
         """Li  0.0  0.0  0.0;
             H 1.671707274 0.0 0.0;""",
-        distance_unit='angstrom',
+        distance_unit="angstrom",
     )
-    SQobj.set_basis_set('sto-3g')
+    SQobj.set_basis_set("sto-3g")
     # HF
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
@@ -528,18 +238,14 @@ def test_LiH_sto3g_proj():
         h_core,
         g_eri,
     )
-    WF.run_ucc('SD', True)
+    WF.run_ucc("SD", True)
 
-    # Linear Response
-    LR = LinearResponseUCC(
-        WF, excitations='SD', do_selfconsistent_operators=False, do_projected_operators=True
-    )
-    LR.calc_excitation_energies(do_working_equations=True)
+    LR = projected.LinearResponseUCC(WF, excitations="SD")
+    LR.calc_excitation_energies()
 
     thresh = 10**-4
 
     # Check excitation energies
-    print('Check excitation energies')
     assert abs(LR.excitation_energies[0] - 0.129471) < thresh
     assert abs(LR.excitation_energies[1] - 0.178744) < thresh
     assert abs(LR.excitation_energies[2] - 0.178744) < thresh
@@ -562,64 +268,20 @@ def test_LiH_sto3g_proj():
     )
 
     # Get oscillator strength for each excited state
-    print('Check oscillator strength')
-    assert (
-        abs(LR.get_oscillator_strength(0, dipole_integrals, do_working_equations=True) - 0.049919878841153974)
-        < thresh
-    )
-    assert (
-        abs(LR.get_oscillator_strength(1, dipole_integrals, do_working_equations=True) - 0.24118483531266577)
-        < thresh
-    )
-    assert (
-        abs(LR.get_oscillator_strength(2, dipole_integrals, do_working_equations=True) - 0.24118483534591598)
-        < thresh
-    )
-    assert (
-        abs(LR.get_oscillator_strength(3, dipole_integrals, do_working_equations=True) - 0.15804974985474457)
-        < thresh
-    )
-    assert (
-        abs(LR.get_oscillator_strength(4, dipole_integrals, do_working_equations=True) - 0.16653189079808411)
-        < thresh
-    )
-    assert (
-        abs(LR.get_oscillator_strength(5, dipole_integrals, do_working_equations=True) - 0.010379091370812886)
-        < thresh
-    )
-    assert (
-        abs(LR.get_oscillator_strength(6, dipole_integrals, do_working_equations=True) - 0.010379091373763447)
-        < thresh
-    )
-    assert (
-        abs(LR.get_oscillator_strength(7, dipole_integrals, do_working_equations=True) - 0.006256710161922168)
-        < thresh
-    )
-    assert (
-        abs(LR.get_oscillator_strength(8, dipole_integrals, do_working_equations=True) - 0.0623868647774392)
-        < thresh
-    )
-    assert (
-        abs(LR.get_oscillator_strength(9, dipole_integrals, do_working_equations=True) - 0.12886225822034553)
-        < thresh
-    )
-    assert (
-        abs(LR.get_oscillator_strength(10, dipole_integrals, do_working_equations=True) - 0.12886225822019629)
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(11, dipole_integrals, do_working_equations=True) - 0.046007031170702296
-        )
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(12, dipole_integrals, do_working_equations=True)
-            - 0.0039034101562325234
-        )
-        < thresh
-    )
+    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    assert abs(osc_strengths[0] - 0.049919878841153974) < thresh
+    assert abs(osc_strengths[1] - 0.24118483531266577) < thresh
+    assert abs(osc_strengths[2] - 0.24118483534591598) < thresh
+    assert abs(osc_strengths[3] - 0.15804974985474457) < thresh
+    assert abs(osc_strengths[4] - 0.16653189079808411) < thresh
+    assert abs(osc_strengths[5] - 0.010379091370812886) < thresh
+    assert abs(osc_strengths[6] - 0.010379091373763447) < thresh
+    assert abs(osc_strengths[7] - 0.006256710161922168) < thresh
+    assert abs(osc_strengths[8] - 0.0623868647774392) < thresh
+    assert abs(osc_strengths[9] - 0.12886225822034553) < thresh
+    assert abs(osc_strengths[10] - 0.12886225822019629) < thresh
+    assert abs(osc_strengths[11] - 0.046007031170702296) < thresh
+    assert abs(osc_strengths[12] - 0.0039034101562325234) < thresh
 
 
 def test_H2_631g_STLR():
@@ -631,9 +293,9 @@ def test_H2_631g_STLR():
     SQobj.set_molecule(
         """H  0.0   0.0  0.0;
             H  0.74  0.0  0.0;""",
-        distance_unit='angstrom',
+        distance_unit="angstrom",
     )
-    SQobj.set_basis_set('6-31G')
+    SQobj.set_basis_set("6-31G")
     # HF
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
@@ -648,22 +310,18 @@ def test_H2_631g_STLR():
         h_core,
         g_eri,
     )
-    WF.run_ucc('SD', True)
+    WF.run_ucc("SD", True)
 
     # Linear Response
-    LR = LinearResponseUCC(
+    LR = statetransfer.LinearResponseUCC(
         WF,
-        excitations='SD',
-        do_selfconsistent_operators=False,
-        do_projected_operators=False,
-        do_statetransfer_operators=True,
+        excitations="SD",
     )
-    LR.calc_excitation_energies(do_working_equations=True)
+    LR.calc_excitation_energies()
 
     thresh = 10**-4
 
     # Check excitation energies
-    print('Check excitation energies')
     assert abs(LR.excitation_energies[0] - 0.574413) < thresh
     assert abs(LR.excitation_energies[1] - 1.043177) < thresh
     assert abs(LR.excitation_energies[2] - 1.139481) < thresh
@@ -679,22 +337,13 @@ def test_H2_631g_STLR():
     )
 
     # Get oscillator strength for each excited state
-    print('Check oscillator strength')
-    assert (
-        abs(LR.get_oscillator_strength(0, dipole_integrals, do_working_equations=True) - 0.6338231953094933)
-        < thresh
-    )
-    assert abs(LR.get_oscillator_strength(1, dipole_integrals, do_working_equations=True) - 0.0) < thresh
-    assert abs(LR.get_oscillator_strength(2, dipole_integrals, do_working_equations=True) - 0.0) < thresh
-    assert (
-        abs(LR.get_oscillator_strength(3, dipole_integrals, do_working_equations=True) - 0.03108976312584539)
-        < thresh
-    )
-    assert (
-        abs(LR.get_oscillator_strength(4, dipole_integrals, do_working_equations=True) - 0.042129828765903814)
-        < thresh
-    )
-    assert abs(LR.get_oscillator_strength(5, dipole_integrals, do_working_equations=True) - 0.0) < thresh
+    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    assert abs(osc_strengths[0] - 0.6338231953094933) < thresh
+    assert abs(osc_strengths[1] - 0.0) < thresh
+    assert abs(osc_strengths[2] - 0.0) < thresh
+    assert abs(osc_strengths[3] - 0.03108976312584539) < thresh
+    assert abs(osc_strengths[4] - 0.042129828765903814) < thresh
+    assert abs(osc_strengths[5] - 0.0) < thresh
 
 
 def test_LiH_sto3g_st():
@@ -706,9 +355,9 @@ def test_LiH_sto3g_st():
     SQobj.set_molecule(
         """Li  0.0  0.0  0.0;
             H 1.671707274 0.0 0.0;""",
-        distance_unit='angstrom',
+        distance_unit="angstrom",
     )
-    SQobj.set_basis_set('sto-3g')
+    SQobj.set_basis_set("sto-3g")
     # HF
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
@@ -723,22 +372,18 @@ def test_LiH_sto3g_st():
         h_core,
         g_eri,
     )
-    WF.run_ucc('SD', True)
+    WF.run_ucc("SD", True)
 
     # Linear Response
-    LR = LinearResponseUCC(
+    LR = statetransfer.LinearResponseUCC(
         WF,
-        excitations='SD',
-        do_selfconsistent_operators=False,
-        do_projected_operators=False,
-        do_statetransfer_operators=True,
+        excitations="SD",
     )
-    LR.calc_excitation_energies(do_working_equations=True)
+    LR.calc_excitation_energies()
 
     thresh = 10**-4
 
     # Check excitation energies
-    print('Check excitation energies')
     assert abs(LR.excitation_energies[0] - 0.129471) < thresh
     assert abs(LR.excitation_energies[1] - 0.178744) < thresh
     assert abs(LR.excitation_energies[2] - 0.178744) < thresh
@@ -761,61 +406,17 @@ def test_LiH_sto3g_st():
     )
 
     # Get oscillator strength for each excited state
-    print('Check oscillator strength')
-    assert (
-        abs(LR.get_oscillator_strength(0, dipole_integrals, do_working_equations=True) - 0.0499198684945157)
-        < thresh
-    )
-    assert (
-        abs(LR.get_oscillator_strength(1, dipole_integrals, do_working_equations=True) - 0.2411848353126639)
-        < thresh
-    )
-    assert (
-        abs(LR.get_oscillator_strength(2, dipole_integrals, do_working_equations=True) - 0.24118483534591595)
-        < thresh
-    )
-    assert (
-        abs(LR.get_oscillator_strength(3, dipole_integrals, do_working_equations=True) - 0.15805070049553024)
-        < thresh
-    )
-    assert (
-        abs(LR.get_oscillator_strength(4, dipole_integrals, do_working_equations=True) - 0.16653094112270908)
-        < thresh
-    )
-    assert (
-        abs(LR.get_oscillator_strength(5, dipole_integrals, do_working_equations=True) - 0.010379091370809963)
-        < thresh
-    )
-    assert (
-        abs(LR.get_oscillator_strength(6, dipole_integrals, do_working_equations=True) - 0.010379091373763017)
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(7, dipole_integrals, do_working_equations=True) - 0.0062567030068973305
-        )
-        < thresh
-    )
-    assert (
-        abs(LR.get_oscillator_strength(8, dipole_integrals, do_working_equations=True) - 0.06238684901394572)
-        < thresh
-    )
-    assert (
-        abs(LR.get_oscillator_strength(9, dipole_integrals, do_working_equations=True) - 0.12886225822029365)
-        < thresh
-    )
-    assert (
-        abs(LR.get_oscillator_strength(10, dipole_integrals, do_working_equations=True) - 0.12886225822018843)
-        < thresh
-    )
-    assert (
-        abs(LR.get_oscillator_strength(11, dipole_integrals, do_working_equations=True) - 0.04600702378157588)
-        < thresh
-    )
-    assert (
-        abs(
-            LR.get_oscillator_strength(12, dipole_integrals, do_working_equations=True)
-            - 0.0039034084421841943
-        )
-        < thresh
-    )
+    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
+    assert abs(osc_strengths[0] - 0.0499198684945157) < thresh
+    assert abs(osc_strengths[1] - 0.2411848353126639) < thresh
+    assert abs(osc_strengths[2] - 0.24118483534591595) < thresh
+    assert abs(osc_strengths[3] - 0.15805070049553024) < thresh
+    assert abs(osc_strengths[4] - 0.16653094112270908) < thresh
+    assert abs(osc_strengths[5] - 0.010379091370809963) < thresh
+    assert abs(osc_strengths[6] - 0.010379091373763017) < thresh
+    assert abs(osc_strengths[7] - 0.0062567030068973305) < thresh
+    assert abs(osc_strengths[8] - 0.06238684901394572) < thresh
+    assert abs(osc_strengths[9] - 0.12886225822029365) < thresh
+    assert abs(osc_strengths[10] - 0.12886225822018843) < thresh
+    assert abs(osc_strengths[11] - 0.04600702378157588) < thresh
+    assert abs(osc_strengths[12] - 0.0039034084421841943) < thresh
