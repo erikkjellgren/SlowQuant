@@ -813,3 +813,31 @@ def test_LiH_sto3g_uccsd_lr() -> None:  # pylint: disable=R0915
     assert abs(osc_strengths[10] - 0.128862) < 10**-3
     assert abs(osc_strengths[11] - 0.046007) < 10**-3
     assert abs(osc_strengths[12] - 0.003903) < 10**-3
+
+
+def test_H4_sto3g_uccsdtq() -> None:  # pylint: disable=R0915
+    """Test if SDTQ works, had a bug where T didnt work"""
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """H  0.0  0.0  0.0;
+           H  0.0  1.8  0.0;
+           H  1.5  0.0  0.0;
+           H  1.5  1.8  0.0;""",
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("STO-3G")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
+    WF = WaveFunctionUCC(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (4, 4),
+        SQobj.hartree_fock.mo_coeff,
+        h_core,
+        g_eri,
+    )
+
+    WF.run_ucc("SDTQ", False)
+    assert abs(WF.energy_elec - (-3.714153922167)) < 10**-8
