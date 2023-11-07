@@ -14,7 +14,7 @@ from slowquant.unitary_coupled_cluster.operator_pauli import (
     hamiltonian_pauli_1i_1a,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
-from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_ucc_u
+from slowquant.unitary_coupled_cluster.util import ThetaPicker
 
 
 class ResponseOperator:
@@ -218,11 +218,11 @@ class LinearResponseBaseClass:
     def get_excited_state_norm(self) -> np.ndarray:
         raise NotImplementedError
 
-    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_property_gradient(self, property_integrals: Sequence[np.ndarray]) -> np.ndarray:
         raise NotImplementedError
 
-    def get_oscillator_strength(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
-        r"""Calculate oscillator strength.
+    def get_oscillator_strengths(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+        r"""Calculate oscillator strengths.
 
         .. math::
             f_n = \frac{2}{3}e_n\left|\left<0\left|\hat{\mu}\right|n\left>\right|^2
@@ -231,9 +231,9 @@ class LinearResponseBaseClass:
             dipole_integrals: Dipole integrals (x,y,z) in AO basis.
 
         Rerturns:
-            Oscillator Strength.
+            Oscillator strengths.
         """
-        transition_dipoles = self.get_transition_dipole(dipole_integrals)
+        transition_dipoles = self.get_property_gradient(dipole_integrals)
         osc_strs = np.zeros(len(transition_dipoles))
         for idx, (excitation_energy, transition_dipole) in enumerate(
             zip(self.excitation_energies, transition_dipoles)
@@ -246,7 +246,35 @@ class LinearResponseBaseClass:
             )
         return osc_strs
 
-    def get_nice_output(self, dipole_integrals: Sequence[np.ndarray]) -> str:
+    def get_rotational_strengths(
+        self, dipole_integrals: Sequence[np.ndarray], magnetic_moment_integrals: Sequence[np.ndarray]
+    ) -> np.ndarray:
+        r"""Calculate rotational strengths.
+
+        .. math::
+            R_n = e_n\left<0\left|\hat{\mu}\right|n\left>\cdot\left<n\left|\hat{m}\right|0\left>
+
+        Args:
+            dipole_integrals: Dipole integrals (x,y,z) in AO basis.
+            magnetic_moment_integrals: Magnetic moment integrals (x,y,z) in AO basis.
+
+        Rerturns:
+            Rotational strengths.
+        """
+        transition_electric_dipoles = self.get_property_gradient(dipole_integrals)
+        transition_magnetic_dipoles = self.get_property_gradient(magnetic_moment_integrals)
+        rot_strengths = np.zeros(len(transition_electric_dipoles))
+        for idx, (excitation_energy, transition_electric_dipole, transition_magnetic_dipole) in enumerate(
+            zip(self.excitation_energies, transition_electric_dipoles, transition_magnetic_dipoles)
+        ):
+            rot_strengths[idx] = excitation_energy * (
+                transition_electric_dipole[0] * transition_magnetic_dipole[0]
+                + transition_electric_dipole[1] * transition_magnetic_dipole[1]
+                + transition_electric_dipole[2] * transition_magnetic_dipole[2]
+            )
+        return rot_strengths
+
+    def get_uvvis_output(self, dipole_integrals: Sequence[np.ndarray]) -> str:
         """Create table of excitation energies and oscillator strengths.
 
         Args:
@@ -258,10 +286,33 @@ class LinearResponseBaseClass:
         output = (
             "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n"
         )
-        osc_strs = self.get_oscillator_strength(dipole_integrals)
-        for i, (exc_energy, osc_strength) in enumerate(zip(self.excitation_energies, osc_strs)):
+        osc_strengths = self.get_oscillator_strengths(dipole_integrals)
+        for i, (exc_energy, osc_strength) in enumerate(zip(self.excitation_energies, osc_strengths)):
             exc_str = f"{exc_energy:2.6f}"
             exc_str_ev = f"{exc_energy*27.2114079527:3.6f}"
             osc_str = f"{osc_strength:1.6f}"
             output += f"{str(i+1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
+        return output
+
+    def get_ecd_output(
+        self, dipole_integrals: Sequence[np.ndarray], magnetic_moment_integrals: Sequence[np.ndarray]
+    ) -> str:
+        """Create table of excitation energies and rotational strengths.
+
+        Args:
+            dipole_integrals: Dipole integrals (x,y,z) in AO basis.
+            magnetic_moment_integrals: Magnetic moment integrals (x,y,z) in AO basis.
+
+        Returns:
+            Nicely formatted table.
+        """
+        output = (
+            "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Rotational strengths\n"
+        )
+        rot_strengths = self.get_rotational_strengths(dipole_integrals, magnetic_moment_integrals)
+        for i, (exc_energy, rot_strength) in enumerate(zip(self.excitation_energies, rot_strengths)):
+            exc_str = f"{exc_energy:2.6f}"
+            exc_str_ev = f"{exc_energy*27.2114079527:3.6f}"
+            rot_str = f"{rot_strength:1.6f}"
+            output += f"{str(i+1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {rot_str.center(20)}\n"
         return output

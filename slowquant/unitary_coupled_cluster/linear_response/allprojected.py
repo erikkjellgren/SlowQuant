@@ -237,7 +237,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
             norms[state_number] = q_part + g_part
         return norms
 
-    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_property_gradient(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.
 
         Args:
