@@ -485,7 +485,6 @@ def iterate_t1(
                     continue
                 if i in active_unocc_spin_idx:
                     continue
-            theta_idx += 1
             num_alpha = 0
             num_beta = 0
             if a % 2 == 0:
@@ -498,6 +497,7 @@ def iterate_t1(
                 num_beta += 1
             if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
                 continue
+            theta_idx += 1
             operator = a_spin_pauli(a, True, num_spin_orbs, num_elec)
             operator *= a_spin_pauli(i, False, num_spin_orbs, num_elec)
             yield theta_idx, a, i, operator
@@ -543,7 +543,6 @@ def iterate_t2(
                             continue
                         if j in active_unocc_spin_idx:
                             continue
-                    theta_idx += 1
                     num_alpha = 0
                     num_beta = 0
                     if a % 2 == 0:
@@ -564,6 +563,7 @@ def iterate_t2(
                         num_beta += 1
                     if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
                         continue
+                    theta_idx += 1
                     operator = a_spin_pauli(a, True, num_spin_orbs, num_elec)
                     operator = operator * a_spin_pauli(b, True, num_spin_orbs, num_elec)
                     operator = operator * a_spin_pauli(j, False, num_spin_orbs, num_elec)
@@ -621,7 +621,6 @@ def iterate_t3(
                                     continue
                                 if k in active_unocc_spin_idx:
                                     continue
-                            theta_idx += 1
                             num_alpha = 0
                             num_beta = 0
                             if a % 2 == 0:
@@ -650,6 +649,7 @@ def iterate_t3(
                                 num_beta += 1
                             if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
                                 continue
+                            theta_idx += 1
                             operator = a_spin_pauli(a, True, num_spin_orbs, num_elec) * a_spin_pauli(
                                 b, True, num_spin_orbs, num_elec
                             )
@@ -720,7 +720,6 @@ def iterate_t4(
                                             continue
                                         if l in active_unocc_spin_idx:
                                             continue
-                                    theta_idx += 1
                                     num_alpha = 0
                                     num_beta = 0
                                     if a % 2 == 0:
@@ -757,6 +756,7 @@ def iterate_t4(
                                         num_beta += 1
                                     if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
                                         continue
+                                    theta_idx += 1
                                     operator = a_spin_pauli(a, True, num_spin_orbs, num_elec) * a_spin_pauli(
                                         b, True, num_spin_orbs, num_elec
                                     )
@@ -839,7 +839,6 @@ def iterate_t5(
                                                     continue
                                                 if m in active_unocc_spin_idx:
                                                     continue
-                                            theta_idx += 1
                                             num_alpha = 0
                                             num_beta = 0
                                             if a % 2 == 0:
@@ -886,6 +885,7 @@ def iterate_t5(
                                                 num_alpha % 2 != 0 or num_beta % 2 != 0
                                             ) and is_spin_conserving:
                                                 continue
+                                            theta_idx += 1
                                             operator = a_spin_pauli(
                                                 a, True, num_spin_orbs, num_elec
                                             ) * a_spin_pauli(b, True, num_spin_orbs, num_elec)
@@ -998,7 +998,6 @@ def iterate_t6(
                                                             continue
                                                         if n in active_unocc_spin_idx:
                                                             continue
-                                                    theta_idx += 1
                                                     num_alpha = 0
                                                     num_beta = 0
                                                     if a % 2 == 0:
@@ -1053,6 +1052,7 @@ def iterate_t6(
                                                         num_alpha % 2 != 0 or num_beta % 2 != 0
                                                     ) and is_spin_conserving:
                                                         continue
+                                                    theta_idx += 1
                                                     operator = a_spin_pauli(
                                                         a, True, num_spin_orbs, num_elec
                                                     ) * a_spin_pauli(b, True, num_spin_orbs, num_elec)

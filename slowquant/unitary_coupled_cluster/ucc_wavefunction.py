@@ -197,13 +197,13 @@ class WaveFunctionUCC:
                     self.kappa_hf_like_idx.append([p, q])
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     self.kappa_hf_like_idx.append([p, q])
-        # Construct theta1
         self.singlet_excitation_operator_generator = ThetaPicker(
             self.active_occ_spin_idx_shifted,
             self.active_unocc_spin_idx_shifted,
             is_spin_conserving=True,
             is_generalized=is_generalized,
         )
+        # Construct theta1
         self._theta1 = []
         for _ in self.singlet_excitation_operator_generator.get_t1_generator_sa(0, 0):
             self._theta1.append(0)
