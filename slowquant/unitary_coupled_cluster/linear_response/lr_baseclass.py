@@ -203,6 +203,7 @@ class LinearResponseBaseClass:
         self.Y_q_normed = np.zeros_like(self.Y_q)
         self.Y_G_normed = np.zeros_like(self.Y_G)
         norms = self.get_excited_state_norm()
+        print(norms)
         for state_number, norm in enumerate(norms):
             if norm < 10**-10:
                 print(f"WARNING: State number {state_number} could not be normalized. Norm of {norm}.")
@@ -267,6 +268,7 @@ class LinearResponseBaseClass:
         for idx, (excitation_energy, transition_electric_dipole, transition_magnetic_dipole) in enumerate(
             zip(self.excitation_energies, transition_electric_dipoles, transition_magnetic_dipoles)
         ):
+            print(idx, transition_magnetic_dipole, transition_electric_dipole)
             rot_strengths[idx] = excitation_energy * (
                 transition_electric_dipole[0] * transition_magnetic_dipole[0]
                 + transition_electric_dipole[1] * transition_magnetic_dipole[1]

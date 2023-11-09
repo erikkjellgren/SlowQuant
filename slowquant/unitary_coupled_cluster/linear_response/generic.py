@@ -85,6 +85,46 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     self.wf.num_virtual_spin_orbs,
                 )
                 G_ops_tmp.append(op)
+        if "t" in excitations:
+            for _, _, _, _, _, _, _, op_ in self.theta_picker.get_t3_generator(num_spin_orbs, num_elec):
+                op = convert_pauli_to_hybrid_form(
+                    op_,
+                    self.wf.num_inactive_spin_orbs,
+                    self.wf.num_active_spin_orbs,
+                    self.wf.num_virtual_spin_orbs,
+                )
+                G_ops_tmp.append(op)
+        if "q" in excitations:
+            for _, _, _, _, _, _, _, _, _, op_ in self.theta_picker.get_t4_generator(num_spin_orbs, num_elec):
+                op = convert_pauli_to_hybrid_form(
+                    op_,
+                    self.wf.num_inactive_spin_orbs,
+                    self.wf.num_active_spin_orbs,
+                    self.wf.num_virtual_spin_orbs,
+                )
+                G_ops_tmp.append(op)
+        if "5" in excitations:
+            for _, _, _, _, _, _, _, _, _, _, _, op_ in self.theta_picker.get_t5_generator(
+                num_spin_orbs, num_elec
+            ):
+                op = convert_pauli_to_hybrid_form(
+                    op_,
+                    self.wf.num_inactive_spin_orbs,
+                    self.wf.num_active_spin_orbs,
+                    self.wf.num_virtual_spin_orbs,
+                )
+                G_ops_tmp.append(op)
+        if "6" in excitations:
+            for _, _, _, _, _, _, _, _, _, _, _, _, _, op_ in self.theta_picker.get_t6_generator(
+                num_spin_orbs, num_elec
+            ):
+                op = convert_pauli_to_hybrid_form(
+                    op_,
+                    self.wf.num_inactive_spin_orbs,
+                    self.wf.num_active_spin_orbs,
+                    self.wf.num_virtual_spin_orbs,
+                )
+                G_ops_tmp.append(op)
         if do_transform_orbital_rotations and operator_type.lower() in ("statetransfer", "selfconsistent"):
             valid_kappa_idx = self.wf.kappa_hf_like_idx
         else:
