@@ -7,7 +7,7 @@ import numpy as np
 import scipy.sparse as ss
 
 import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
-from slowquant.unitary_coupled_cluster.base import StateVector, pauli_to_mat
+from slowquant.unitary_coupled_cluster.base import StateVector, symbol_to_mat
 from slowquant.unitary_coupled_cluster.operator_pauli import OperatorPauli
 
 
@@ -34,11 +34,11 @@ def expectation_value_hybrid(
         tmp = 1
         for i in range(len(bra.bra_inactive)):
             tmp *= np.matmul(
-                bra.bra_inactive[i], np.matmul(pauli_to_mat(op.inactive_pauli[i]), ket.ket_inactive[:, i])  # type: ignore
+                bra.bra_inactive[i], np.matmul(symbol_to_mat(op.inactive_pauli[i]), ket.ket_inactive[:, i])  # type: ignore
             )
         for i in range(len(bra.bra_virtual)):
             tmp *= np.matmul(
-                bra.bra_virtual[i], np.matmul(pauli_to_mat(op.virtual_pauli[i]), ket.ket_virtual[:, i])  # type: ignore
+                bra.bra_virtual[i], np.matmul(symbol_to_mat(op.virtual_pauli[i]), ket.ket_virtual[:, i])  # type: ignore
             )
         if abs(tmp) < 10**-12:
             continue
