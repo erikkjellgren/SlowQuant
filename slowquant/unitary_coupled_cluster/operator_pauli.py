@@ -13,7 +13,7 @@ from slowquant.molecularintegrals.integralfunctions import (
 from slowquant.unitary_coupled_cluster.base import (
     StateVector,
     kronecker_product_cached,
-    pauli_to_mat,
+    symbol_to_mat,
 )
 
 
@@ -108,10 +108,10 @@ def expectation_value_pauli(
             continue
         tmp = 1.0
         for i in range(len(bra.bra_inactive)):
-            tmp *= np.matmul(bra.bra_inactive[i], np.matmul(pauli_to_mat(op[i]), ket.ket_inactive[:, i]))  # type: ignore
+            tmp *= np.matmul(bra.bra_inactive[i], np.matmul(symbol_to_mat(op[i]), ket.ket_inactive[:, i]))  # type: ignore
         for i in range(len(bra.bra_virtual)):
             op_idx = i + len(bra.bra_inactive) + len(bra._active_onvector)
-            tmp *= np.matmul(bra.bra_virtual[i], np.matmul(pauli_to_mat(op[op_idx]), ket.ket_virtual[:, i]))  # type: ignore
+            tmp *= np.matmul(bra.bra_virtual[i], np.matmul(symbol_to_mat(op[op_idx]), ket.ket_virtual[:, i]))  # type: ignore
         if abs(tmp) < 10**-12:
             continue
         number_active_orbitals = len(bra._active_onvector)

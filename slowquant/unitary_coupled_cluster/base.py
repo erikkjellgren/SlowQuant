@@ -21,15 +21,21 @@ def kronecker_product_cached(
     .. math::
         I x I x .. o .. x I x I
 
+    or
+
+    .. math::
+        Z x Z x .. o .. x I x I
+
     Args:
        num_prior: Number of left-hand side identity matrices.
        num_after: Number of right-hand side identity matrices.
        is_csr: If the resulting matrix representation should be a sparse matrix.
+       is_z_prior: Use the Z operator instead of identiy operator as the prior matricies.
 
     Returns:
        Matrix representation of an operator.
     """
-    mat = pauli_to_mat(pauli_mat_symbol)
+    mat = symbol_to_mat(pauli_mat_symbol)
     if is_csr:
         if is_z_prior and num_prior != 0:
             z_vec = kronecker_product(num_prior * [np.array([1, -1])])
@@ -63,36 +69,37 @@ def kronecker_product(A: Sequence[np.ndarray]) -> np.ndarray:
        Kronecker product of matrices.
     """
     if len(A) < 2:
-        return A
+        return A[0]
     total = np.kron(A[0], A[1])
     for operator in A[2:]:
         total = np.kron(total, operator)
     return total
 
 
-@functools.cache
-def pauli_to_mat(pauli: str) -> np.ndarray:
-    """Convert Pauli matrix symbol to matrix representation.
+def symbol_to_mat(symbol: str) -> np.ndarray:
+    """Convert operator matrix symbol to matrix representation.
+
+    The symbol needs to be representable by a 2x2 matrix.
 
     Args:
-        pauli: Pauli matrix symbol.
+        symbol: Symbol matrix symbol.
 
     Returns:
-        Pauli matrix.
+        Matrix representation of symbol.
     """
-    if pauli == "I":
+    if symbol == "I":
         return np.array([[1, 0], [0, 1]], dtype=float)
-    if pauli == "Z":
+    if symbol == "Z":
         return np.array([[1, 0], [0, -1]], dtype=float)
-    if pauli == "X":
+    if symbol == "X":
         return np.array([[0, 1], [1, 0]], dtype=float)
-    if pauli == "Y":
+    if symbol == "Y":
         return np.array([[0, -1j], [1j, 0]], dtype=complex)
-    if pauli == "a":
+    if symbol == "a":
         return np.array([[0, 1], [0, 0]], dtype=float)
-    if pauli == "a_dagger":
+    if symbol == "a_dagger":
         return np.array([[0, 0], [1, 0]], dtype=float)
-    raise ValueError(f"Got unknown string: {pauli}")
+    raise ValueError(f"Got unknown string: {symbol}")
 
 
 class StateVector:
