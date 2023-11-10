@@ -8,7 +8,11 @@ import scipy.sparse as ss
 
 @functools.cache
 def kronecker_product_cached(
-    num_prior: int, num_after: int, pauli_mat_symbol: str, is_csr: bool
+    num_prior: int,
+    num_after: int,
+    pauli_mat_symbol: str,
+    is_csr: bool,
+    is_z_prior: bool = False,
 ) -> np.ndarray | ss.csr_matrix:
     r"""Get operator in matrix form.
 
@@ -27,11 +31,19 @@ def kronecker_product_cached(
     """
     mat = pauli_to_mat(pauli_mat_symbol)
     if is_csr:
-        I1 = ss.identity(int(2**num_prior))
+        if is_z_prior and num_prior != 0:
+            z_vec = kronecker_product(num_prior * [np.array([1, -1])])
+            I1 = ss.eye(z_vec)
+        else:
+            I1 = ss.identity(int(2**num_prior))
         I2 = ss.identity(int(2**num_after))
         mat = ss.csr_matrix(mat)
         return ss.csr_matrix(ss.kron(I1, ss.kron(mat, I2)))
-    I1 = np.identity(int(2**num_prior))
+    if is_z_prior and num_prior != 0:
+        z_vec = kronecker_product(num_prior * [np.array([1, -1])])
+        I1 = np.diag(z_vec)
+    else:
+        I1 = np.identity(int(2**num_prior))
     I2 = np.identity(int(2**num_after))
     return np.kron(I1, np.kron(mat, I2))
 
@@ -68,15 +80,19 @@ def pauli_to_mat(pauli: str) -> np.ndarray:
     Returns:
         Pauli matrix.
     """
-    if pauli == 'I':
+    if pauli == "I":
         return np.array([[1, 0], [0, 1]], dtype=float)
-    if pauli == 'Z':
+    if pauli == "Z":
         return np.array([[1, 0], [0, -1]], dtype=float)
-    if pauli == 'X':
+    if pauli == "X":
         return np.array([[0, 1], [1, 0]], dtype=float)
-    if pauli == 'Y':
+    if pauli == "Y":
         return np.array([[0, -1j], [1j, 0]], dtype=complex)
-    raise ValueError(f'Got unknown string: {pauli}')
+    if pauli == "a":
+        return np.array([[0, 1], [0, 0]], dtype=float)
+    if pauli == "a_dagger":
+        return np.array([[0, 0], [1, 0]], dtype=float)
+    raise ValueError(f"Got unknown string: {pauli}")
 
 
 class StateVector:
