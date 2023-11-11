@@ -35,6 +35,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
         wave_function: WaveFunctionUCC,
         excitations: str,
         is_spin_conserving: bool = False,
+        do_approximate_hermitification: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
@@ -42,6 +43,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
             is_spin_conserving: Use spin-conseving operators.
+            do_approximate_hermitification: approximated method with BqG = 0 and AqG made Hermitian
         """
         super().__init__(wave_function, excitations, is_spin_conserving)
 
@@ -62,6 +64,10 @@ class LinearResponseUCC(LinearResponseBaseClass):
         self.U = OperatorHybrid(
             {inactive_str + virtual_str: OperatorHybridData(inactive_str, U_matrix, virtual_str)}
         )
+
+        num_parameters = len(self.G_ops) + len(self.q_ops)
+        if do_approximate_hermitification:
+            self.B_tracked = np.zeros((num_parameters, num_parameters))
 
         rdms = ReducedDenstiyMatrix(
             self.wf.num_inactive_orbs,
@@ -126,15 +132,30 @@ class LinearResponseUCC(LinearResponseBaseClass):
             qJ = opJ.operator
             for i, opI in enumerate(self.G_ops):
                 GI = opI.operator
-                # Make A
-                val = expectation_value_hybrid_flow(
-                    self.csf, [GI.dagger, self.U.dagger, self.H_1i_1a, qJ], self.wf.state_vector
-                )
-                self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
-                # Make B
-                self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = -expectation_value_hybrid_flow(
-                    self.csf, [GI.dagger, self.U.dagger, qJ.dagger, self.H_1i_1a], self.wf.state_vector
-                )
+                if do_approximate_hermitification:
+                    # Make A
+                    self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = expectation_value_hybrid_flow(
+                        self.csf, [GI.dagger, self.U.dagger, self.H_1i_1a, qJ], self.wf.state_vector
+                    ) + expectation_value_hybrid_flow(
+                        self.csf, [GI.dagger, self.U.dagger, qJ.dagger, self.H_1i_1a], self.wf.state_vector
+                    )  # added an assumed zero (approximation)
+                    # Make B
+                    self.B_tracked[j, i + idx_shift] = self.B_tracked[
+                        i + idx_shift, j
+                    ] = -expectation_value_hybrid_flow(
+                        self.csf,
+                        [GI.dagger, self.U.dagger, qJ.dagger, self.H_1i_1a],
+                        self.wf.state_vector,
+                    )
+                else:
+                    # Make A
+                    self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = expectation_value_hybrid_flow(
+                        self.csf, [GI.dagger, self.U.dagger, self.H_1i_1a, qJ], self.wf.state_vector
+                    )
+                    # Make B
+                    self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = -expectation_value_hybrid_flow(
+                        self.csf, [GI.dagger, self.U.dagger, qJ.dagger, self.H_1i_1a], self.wf.state_vector
+                    )
         for j, opJ in enumerate(self.G_ops):
             GJ = opJ.operator
             for i, opI in enumerate(self.G_ops):

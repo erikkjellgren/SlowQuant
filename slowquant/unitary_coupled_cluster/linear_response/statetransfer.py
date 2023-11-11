@@ -43,6 +43,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
             is_spin_conserving: Use spin-conseving operators.
+            do_approximate_hermitification: approximated method with BqG = 0 and AqG made Hermitian
         """
         super().__init__(wave_function, excitations, is_spin_conserving)
 
