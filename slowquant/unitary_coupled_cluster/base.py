@@ -39,7 +39,7 @@ def kronecker_product_cached(
     if is_csr:
         if is_z_prior and num_prior != 0:
             z_vec = kronecker_product(num_prior * [np.array([1, -1])])
-            I1 = ss.eye(z_vec)
+            I1 = ss.diags(z_vec)
         else:
             I1 = ss.identity(int(2**num_prior))
         I2 = ss.identity(int(2**num_after))
