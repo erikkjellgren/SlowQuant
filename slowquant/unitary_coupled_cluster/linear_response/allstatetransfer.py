@@ -2,9 +2,11 @@ import copy
 from collections.abc import Sequence
 
 import numpy as np
-import scipy
 import scipy.sparse as ss
 
+from slowquant.molecularintegrals.integralfunctions import (
+    one_electron_integral_transform,
+)
 from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
     LinearResponseBaseClass,
     ResponseOperator,
@@ -16,11 +18,13 @@ from slowquant.unitary_coupled_cluster.operator_hybrid import (
     expectation_value_hybrid_flow,
 )
 from slowquant.unitary_coupled_cluster.operator_pauli import (
+    OperatorPauli,
     epq_pauli,
     hamiltonian_pauli_2i_2a,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.util import construct_ucc_u
+
 
 
 class LinearResponseUCC(LinearResponseBaseClass):
