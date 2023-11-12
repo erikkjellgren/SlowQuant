@@ -299,20 +299,16 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 g_part_x += self.Y_G_normed[i, state_number] * expectation_value_hybrid_flow(
                     self.csf, [G.dagger, self.U.dagger, mux_op], self.wf.state_vector
                 )
-                g_part_y -= self.normed_response_vectors[
-                    i + len(self.q_ops), state_number
-                ] * expectation_value_hybrid_flow(self.wf.state_vector, [muy_op, self.U, G], self.csf)
-                g_part_y += self.normed_response_vectors[
-                    i + len(self.q_ops) + number_excitations, state_number
-                ] * expectation_value_hybrid_flow(
+                g_part_y -= self.Z_G_normed[i, state_number] * expectation_value_hybrid_flow(
+                    self.wf.state_vector, [muy_op, self.U, G], self.csf
+                )
+                g_part_y += self.Y_G_normed[i, state_number] * expectation_value_hybrid_flow(
                     self.csf, [G.dagger, self.U.dagger, muy_op], self.wf.state_vector
                 )
-                g_part_z -= self.normed_response_vectors[
-                    i + len(self.q_ops), state_number
-                ] * expectation_value_hybrid_flow(self.wf.state_vector, [muz_op, self.U, G], self.csf)
-                g_part_z += self.normed_response_vectors[
-                    i + len(self.q_ops) + number_excitations, state_number
-                ] * expectation_value_hybrid_flow(
+                g_part_z -= self.Z_G_normed[i, state_number] * expectation_value_hybrid_flow(
+                    self.wf.state_vector, [muz_op, self.U, G], self.csf
+                )
+                g_part_z += self.Y_G_normed[i, state_number] * expectation_value_hybrid_flow(
                     self.csf, [G.dagger, self.U.dagger, muz_op], self.wf.state_vector
                 )
             transition_dipoles[state_number, 0] = q_part_x + g_part_x
