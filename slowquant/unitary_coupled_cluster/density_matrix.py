@@ -2,6 +2,8 @@ import numpy as np
 
 
 class ReducedDenstiyMatrix:
+    """Reduced density matrix class."""
+
     def __init__(
         self,
         num_inactive_orbs: int,
@@ -10,6 +12,15 @@ class ReducedDenstiyMatrix:
         rdm1: np.ndarray,
         rdm2: np.ndarray | None = None,
     ) -> None:
+        """Initialize reduced density matrix class.
+
+        Args:
+            num_inactive_orbs: Number of inactive orbitals in spatial basis.
+            num_active_orbs: Number of active orbitals in spatial basis.
+            num_virtual_orbs: Number of virtual orbitals in spatial basis.
+            rdm1: One-electron reduced density matrix in the active space.
+            rdm2: Two-electron reduced density matrix in the active space.
+        """
         self.inactive_idx = []
         self.actitve_idx = []
         self.virtual_idx = []
@@ -27,6 +38,26 @@ class ReducedDenstiyMatrix:
         self.rdm2 = rdm2
 
     def RDM1(self, p: int, q: int) -> float:
+        r"""Get one-electron reduced density matrix element.
+
+        The only non-zero elements are:
+
+        .. math::
+            \Gamma^{[1]}_{pq} = \left\{\begin{array}{ll}
+                                2\delta_{ij} & pq = ij\\
+                                \left<0\left|\hat{E}_{vw}\right|0\right> & pq = vw\\
+                                0 & \text{otherwise} \\
+                                \end{array} \right.
+
+        and the symmetry `\Gamma^{[1]}_{pq}=\Gamma^{[1]}_{qp}`:math:.
+
+        Args:
+            p: Spatial orbital index.
+            q: Spatial orbital index.
+
+        Returns:
+            One-electron reduved density matrix element.
+        """
         if p in self.actitve_idx and q in self.actitve_idx:
             return self.rdm1[p - self.idx_shift, q - self.idx_shift]
         if p in self.inactive_idx and q in self.inactive_idx:
@@ -35,7 +66,29 @@ class ReducedDenstiyMatrix:
             return 0
         return 0
 
-    def RDM2(self, p: int, q: int, r: int, s: int) -> float:
+    def RDM2(self, p: int, q: int, r: int, s: int) -> float:  # pylint: disable=R0911
+        r"""Get two-electron reduced density matrix element.
+
+        .. math::
+            \Gamma^{[2]}_{pqrs} = \left\{\begin{array}{ll}
+                                  4\delta_{ij}\delta_{kl} - 2\delta_{jk}\delta_{il} & pqrs = ijkl\\
+                                  2\delta_{ij} \Gamma^{[1]}_{vw} & pqrs = vwij\\
+                                  - \delta_{ij}\Gamma^{[1]}_{vw} & pqrs = ivwj\\
+                                  \left<0\left|\hat{e}_{vwxy}\right|0\right> & pqrs = vwxy\\
+                                  0 & \text{otherwise} \\
+                                  \end{array} \right.
+
+        and the symmetry `\Gamma^{[2]}_{pqrs}=\Gamma^{[2]}_{rspq}=\Gamma^{[2]}_{qpsr}=\Gamma^{[2]}_{srqp}`:math:.
+
+        Args:
+            p: Spatial orbital index.
+            q: Spatial orbital index.
+            r: Spatial orbital index.
+            s: Spatial orbital index.
+
+        Returns:
+            Two-electron reduved density matrix element.
+        """
         if self.rdm2 is None:
             raise ValueError("RDM2 is not given.")
         if (
@@ -109,7 +162,22 @@ def get_orbital_gradient(
     num_inactive_orbs: int,
     num_active_orbs: int,
 ) -> np.ndarray:
-    """ """
+    r"""Calculate the orbital gradient.
+
+    .. math::
+        g_{pq}^{\hat{\kappa}} = \left<0\left|\left[\hat{\kappa}_{pq},\hat{H}\right]\right|0\right>
+
+    Args:
+       rdms: Reduced density matrix class.
+       h_int: One-electron integrals in MO in Hamiltonian.
+       g_int: Two-electron integrals in MO in Hamiltonian.
+       kappa_idx: Orbital parameter indicies in spatial basis.
+       num_inactive_orbs: Number of inactive orbitals in spatial basis.
+       num_active_orbs: Number of active orbitals in spatial basis.
+
+    Returns:
+        Orbital gradient.
+    """
     gradient = np.zeros(len(kappa_idx))
     for idx, (m, n) in enumerate(kappa_idx):
         # 1e contribution
@@ -135,7 +203,22 @@ def get_orbital_gradient_response(
     num_inactive_orbs: int,
     num_active_orbs: int,
 ) -> np.ndarray:
-    """ """
+    r"""Calculate the response orbital parameter gradient.
+
+    .. math::
+        g_{pq}^{\hat{q}} = \left<0\left|\left[\hat{q}_{pq},\hat{H}\right]\right|0\right>
+
+    Args:
+       rdms: Reduced density matrix class.
+       h_int: One-electron integrals in MO in Hamiltonian.
+       g_int: Two-electron integrals in MO in Hamiltonian.
+       kappa_idx: Orbital parameter indicies in spatial basis.
+       num_inactive_orbs: Number of inactive orbitals in spatial basis.
+       num_active_orbs: Number of active orbitals in spatial basis.
+
+    Returns:
+        Orbital response parameter gradient.
+    """
     gradient = np.zeros(2 * len(kappa_idx))
     for idx, (m, n) in enumerate(kappa_idx):
         # 1e contribution
@@ -167,7 +250,19 @@ def get_orbital_gradient_response(
     return 2 ** (-1 / 2) * gradient
 
 
-def get_orbital_response_metric_sgima(rdms: ReducedDenstiyMatrix, kappa_idx: list[list[int]]) -> np.ndarray:
+def get_orbital_response_metric_sigma(rdms: ReducedDenstiyMatrix, kappa_idx: list[list[int]]) -> np.ndarray:
+    r"""Calculate the Sigma matrix orbital-orbital block.
+
+    .. math::
+        \Sigma_{pq,pq}^{\hat{q},\hat{q}} = \left<0\left|\left[\hat{q}_{pq}^\dagger,\hat{q}_{pq}\right]\right|0\right>
+
+    Args:
+       rdms: Reduced density matrix class.
+       kappa_idx: Orbital parameter indicies in spatial basis.
+
+    Returns:
+        Sigma matrix orbital-orbital block.
+    """
     sigma = np.zeros((len(kappa_idx), len(kappa_idx)))
     for idx1, (n, m) in enumerate(kappa_idx):
         for idx2, (p, q) in enumerate(kappa_idx):
@@ -185,28 +280,43 @@ def get_orbital_response_vector_norm(
     state_number: int,
     number_excitations: int,
 ) -> float:
+    r"""Calculate the orbital part of excited state norm.
+
+    .. math::
+        N^{\hat{q}} = \sum_k\left<0\left|\left[\hat{O}_{k},\hat{O}_{k}^\dagger\right]\right|0\right>
+
+    Args:
+       rdms: Reduced density matrix class.
+       kappa_idx: Orbital parameter indicies in spatial basis.
+       response_vectors: Response vectors.
+       state_number: State number counting from zero.
+       number_excitations: Total number of excitations.
+
+    Returns:
+        Orbital part of excited state norm.
+    """
     norm = 0
     for i, (m, n) in enumerate(kappa_idx):
-        for j, (mp, np) in enumerate(kappa_idx):
-            if n == np:
+        for j, (t, u) in enumerate(kappa_idx):
+            if n == u:
                 norm += (
-                    response_vectors[i, state_number] * response_vectors[j, state_number] * rdms.RDM1(m, mp)
+                    response_vectors[i, state_number] * response_vectors[j, state_number] * rdms.RDM1(m, t)
                 )
-            if m == mp:
+            if m == t:
                 norm -= (
-                    response_vectors[i, state_number] * response_vectors[j, state_number] * rdms.RDM1(n, np)
+                    response_vectors[i, state_number] * response_vectors[j, state_number] * rdms.RDM1(n, u)
                 )
-            if m == mp:
+            if m == t:
                 norm += (
                     response_vectors[i + number_excitations, state_number]
                     * response_vectors[j + number_excitations, state_number]
-                    * rdms.RDM1(n, np)
+                    * rdms.RDM1(n, u)
                 )
-            if n == np:
+            if n == u:
                 norm -= (
                     response_vectors[i + number_excitations, state_number]
                     * response_vectors[j + number_excitations, state_number]
-                    * rdms.RDM1(m, mp)
+                    * rdms.RDM1(m, t)
                 )
     return 1 / 2 * norm
 
@@ -221,7 +331,24 @@ def get_orbital_response_property_gradient(
     state_number: int,
     number_excitations: int,
 ) -> float:
-    """ """
+    r"""Calculate the orbital part of property gradient.
+
+    .. math::
+        P^{\hat{q}} = \sum_k\left<0\left|\left[\hat{O}_{k},\hat{X}\right]\right|0\right>
+
+    Args:
+       rdms: Reduced density matrix class.
+       x_mo: Property integral in MO basis.
+       kappa_idx: Orbital parameter indicies in spatial basis.
+       num_inactive_orbs: Number of inactive orbitals in spatial basis.
+       num_active_orbs: Number of active orbitals in spatial basis.
+       response_vectors: Response vectors.
+       state_number: State number counting from zero.
+       number_excitations: Total number of excitations.
+
+    Returns:
+        Orbital part of property gradient.
+    """
     prop_grad = 0
     for i, (m, n) in enumerate(kappa_idx):
         for p in range(num_inactive_orbs + num_active_orbs):
@@ -247,6 +374,21 @@ def get_orbital_response_hessian_block(
     num_inactive_orbs: int,
     num_active_orbs: int,
 ) -> np.ndarray:
+    r"""Calculate Hessian-like orbital-orbital block.
+
+    .. math::
+        H^{\hat{q},\hat{q}}_{tu,mn} = \left<0\left|\left[\hat{q}_{tu},\left[\hat{H},\hat{q}_{mn}\right]\right]\right|0\right>
+
+    Args:
+       rdms: Reduced density matrix class.
+       kappa_idx1: Orbital parameter indicies in spatial basis.
+       kappa_idx1: Orbital parameter indicies in spatial basis.
+       num_inactive_orbs: Number of inactive orbitals in spatial basis.
+       num_active_orbs: Number of active orbitals in spatial basis.
+
+    Returns:
+        Hessian-like orbital-orbital block.
+    """
     A1e = np.zeros((len(kappa_idx1), len(kappa_idx1)))
     A2e = np.zeros((len(kappa_idx1), len(kappa_idx1)))
     for idx1, (t, u) in enumerate(kappa_idx1):

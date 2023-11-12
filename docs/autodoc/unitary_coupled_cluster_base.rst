@@ -1,5 +1,5 @@
-Unitary Coupled Cluster
-=======================
+Unitary Coupled Cluster Base
+============================
 
 .. automodule:: slowquant.unitary_coupled_cluster.base
     :members:
@@ -7,7 +7,7 @@ Unitary Coupled Cluster
 .. automodule:: slowquant.unitary_coupled_cluster.linalg_wrapper
     :members:
 
-.. automodule:: slowquant.unitary_coupled_cluster.operator_contracted
+.. automodule:: slowquant.unitary_coupled_cluster.density_matrix
     :members:
 
 .. automodule:: slowquant.unitary_coupled_cluster.operator_hybrid
@@ -17,9 +17,6 @@ Unitary Coupled Cluster
     :members:
 
 .. automodule:: slowquant.unitary_coupled_cluster.operator_pauli
-    :members:
-
-.. automodule:: slowquant.unitary_coupled_cluster.ucc_wavefunction
     :members:
 
 .. automodule:: slowquant.unitary_coupled_cluster.util

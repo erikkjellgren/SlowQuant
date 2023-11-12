@@ -1,4 +1,3 @@
-import copy
 from collections.abc import Sequence
 
 import numpy as np
@@ -10,7 +9,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_orbital_gradient_response,
     get_orbital_response_hessian_block,
-    get_orbital_response_metric_sgima,
+    get_orbital_response_metric_sigma,
     get_orbital_response_property_gradient,
     get_orbital_response_vector_norm,
 )
@@ -98,7 +97,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
         )
-        self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sgima(
+        self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
             rdms, self.wf.kappa_idx
         )
         for j, opJ in enumerate(self.q_ops):
