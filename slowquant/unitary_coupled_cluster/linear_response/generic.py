@@ -73,7 +73,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     op_,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
-                    self.wf.num_virtual_spin_orbs,
                 )
                 G_ops_tmp.append(op)
         if "d" in excitations:
@@ -82,7 +81,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     op_,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
-                    self.wf.num_virtual_spin_orbs,
                 )
                 G_ops_tmp.append(op)
         if do_transform_orbital_rotations and operator_type.lower() in ("statetransfer", "selfconsistent"):
@@ -95,7 +93,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 op_,
                 self.wf.num_inactive_spin_orbs,
                 self.wf.num_active_spin_orbs,
-                self.wf.num_virtual_spin_orbs,
             )
             q_ops_tmp.append(op)
         self.G_ops = []
@@ -111,7 +108,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     G_diff_,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
-                    self.wf.num_virtual_spin_orbs,
                 )
                 self.G_ops.append(G - G_diff)
             elif operator_type.lower() == "selfconsistent":
@@ -135,7 +131,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                         q_diff_,
                         self.wf.num_inactive_spin_orbs,
                         self.wf.num_active_spin_orbs,
-                        self.wf.num_virtual_spin_orbs,
                     )
                     self.q_ops.append(q - q_diff)
                 elif operator_type.lower() == "selfconsistent":
@@ -167,7 +162,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
             ),
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
         H_2i_2a = convert_pauli_to_hybrid_form(
             hamiltonian_pauli_2i_2a(
@@ -181,7 +175,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
             ),
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
         H_en = convert_pauli_to_hybrid_form(
             energy_hamiltonian_pauli(
@@ -195,7 +188,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
             ),
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
         idx_shift = len(self.q_ops)
         print("")
@@ -487,19 +479,16 @@ class LinearResponseUCC(LinearResponseBaseClass):
             mux_op,
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
         muy_op = convert_pauli_to_hybrid_form(
             muy_op,
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
         muz_op = convert_pauli_to_hybrid_form(
             muz_op,
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
         transition_dipole_x = 0.0
         transition_dipole_y = 0.0

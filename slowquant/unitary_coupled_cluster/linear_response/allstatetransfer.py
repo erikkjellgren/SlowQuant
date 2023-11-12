@@ -1,5 +1,4 @@
 import copy
-from collections.abc import Sequence
 
 import numpy as np
 import scipy
@@ -47,7 +46,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 op_,
                 self.wf.num_inactive_spin_orbs,
                 self.wf.num_active_spin_orbs,
-                self.wf.num_virtual_spin_orbs,
             )
             self.q_ops.append(ResponseOperator((i), (a), op))
 
@@ -87,7 +85,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
             ),
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
 
         idx_shift = len(self.q_ops)

@@ -79,7 +79,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
             ),
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
@@ -256,19 +255,16 @@ class LinearResponseUCC(LinearResponseBaseClass):
             mux_op,
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
         muy_op = convert_pauli_to_hybrid_form(
             muy_op,
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
         muz_op = convert_pauli_to_hybrid_form(
             muz_op,
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
         transition_dipoles = np.zeros((len(self.normed_response_vectors[0]), 3))
         for state_number in range(len(self.normed_response_vectors[0])):

@@ -974,7 +974,6 @@ def active_space_parameter_gradient(
         ),
         wf.num_inactive_spin_orbs,
         wf.num_active_spin_orbs,
-        wf.num_virtual_spin_orbs,
     )
 
     theta_params = theta1 + theta2 + theta3 + theta4 + theta5 + theta6

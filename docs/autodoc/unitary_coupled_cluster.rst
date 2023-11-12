@@ -7,9 +7,6 @@ Unitary Coupled Cluster
 .. automodule:: slowquant.unitary_coupled_cluster.linalg_wrapper
     :members:
 
-.. automodule:: slowquant.unitary_coupled_cluster.linear_response
-    :members:
-
 .. automodule:: slowquant.unitary_coupled_cluster.operator_contracted
     :members:
 

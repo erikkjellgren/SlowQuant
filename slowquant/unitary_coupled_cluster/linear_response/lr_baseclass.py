@@ -14,7 +14,7 @@ from slowquant.unitary_coupled_cluster.operator_pauli import (
     hamiltonian_pauli_1i_1a,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
-from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_ucc_u
+from slowquant.unitary_coupled_cluster.util import ThetaPicker
 
 
 class ResponseOperator:
@@ -70,7 +70,6 @@ class LinearResponseBaseClass:
                     op_,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
-                    self.wf.num_virtual_spin_orbs,
                 )
                 self.G_ops.append(ResponseOperator((i,), (a,), op))
         if "d" in excitations:
@@ -79,7 +78,6 @@ class LinearResponseBaseClass:
                     op_,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
-                    self.wf.num_virtual_spin_orbs,
                 )
                 self.G_ops.append(ResponseOperator((i, j), (a, b), op))
         if "t" in excitations:
@@ -88,7 +86,6 @@ class LinearResponseBaseClass:
                     op_,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
-                    self.wf.num_virtual_spin_orbs,
                 )
                 self.G_ops.append(ResponseOperator((i, j, k), (a, b, c), op))
         if "q" in excitations:
@@ -97,7 +94,6 @@ class LinearResponseBaseClass:
                     op_,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
-                    self.wf.num_virtual_spin_orbs,
                 )
                 self.G_ops.append(ResponseOperator((i, j, k, l), (a, b, c, d), op))
         if "5" in excitations:
@@ -108,7 +104,6 @@ class LinearResponseBaseClass:
                     op_,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
-                    self.wf.num_virtual_spin_orbs,
                 )
                 self.G_ops.append(ResponseOperator((i, j, k, l, m), (a, b, c, d, e), op))
         if "6" in excitations:
@@ -119,7 +114,6 @@ class LinearResponseBaseClass:
                     op_,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
-                    self.wf.num_virtual_spin_orbs,
                 )
                 self.G_ops.append(ResponseOperator((i, j, k, l, m, n), (a, b, c, d, e, f), op))
         for i, a in self.wf.kappa_idx:
@@ -128,7 +122,6 @@ class LinearResponseBaseClass:
                 op_,
                 self.wf.num_inactive_spin_orbs,
                 self.wf.num_active_spin_orbs,
-                self.wf.num_virtual_spin_orbs,
             )
             self.q_ops.append(ResponseOperator((i), (a), op))
 
@@ -149,7 +142,6 @@ class LinearResponseBaseClass:
             ),
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
         self.H_en = convert_pauli_to_hybrid_form(
             energy_hamiltonian_pauli(
@@ -163,7 +155,6 @@ class LinearResponseBaseClass:
             ),
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
 
     def calc_excitation_energies(self) -> None:

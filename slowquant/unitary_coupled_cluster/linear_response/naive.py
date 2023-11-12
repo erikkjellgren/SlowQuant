@@ -209,19 +209,16 @@ class LinearResponseUCC(LinearResponseBaseClass):
             mux_op,
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
         muy_op = convert_pauli_to_hybrid_form(
             muy_op,
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
         muz_op = convert_pauli_to_hybrid_form(
             muz_op,
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
         transition_dipole_x = 0.0
         transition_dipole_y = 0.0
