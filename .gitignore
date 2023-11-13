@@ -3,3 +3,4 @@
 .pytest_cache/
 __pycache__/
 local_documentation/
+test_h2_save.npz
