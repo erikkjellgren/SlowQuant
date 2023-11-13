@@ -179,6 +179,8 @@ class LinearResponseBaseClass:
             _,
         ) = np.linalg.eig(E2)
         print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
+        if np.min(hess_eigval) < 0:
+            raise ValueError("Negative eigenvalue in Hessian.")
 
         S = np.zeros((size * 2, size * 2))
         S[:size, :size] = self.Sigma
@@ -192,7 +194,7 @@ class LinearResponseBaseClass:
         self.excitation_energies = np.real(eigval[sorting][size:])
         self.response_vectors = np.real(eigvec[:, sorting][:, size:])
         self.normed_response_vectors = np.zeros_like(self.response_vectors)
-        num_q = len(self.wf.kappa_idx)
+        num_q = len(self.q_ops)
         num_G = size - num_q
         self.Z_q = self.response_vectors[:num_q, :]
         self.Z_G = self.response_vectors[num_q : num_q + num_G, :]
