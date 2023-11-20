@@ -844,12 +844,11 @@ def energy_ucc(
     return expectation_value_pauli(
         wf.state_vector,
         energy_hamiltonian_pauli(
-            wf.h_ao,
-            wf.g_ao,
-            c_trans,
-            wf.num_inactive_spin_orbs,
-            wf.num_active_spin_orbs,
-            wf.num_virtual_spin_orbs,
+            wf.h_mo,
+            wf.g_mo,
+            wf.num_inactive_orbs,
+            wf.num_active_orbs,
+            wf.num_virtual_orbs,
             wf.num_elec,
         ),
         wf.state_vector,
@@ -949,27 +948,13 @@ def active_space_parameter_gradient(
         theta5
     ) + len(theta6)
 
-    kappa_mat = np.zeros_like(wf.c_orthonormal)
-    if len(kappa) != 0:
-        if np.max(np.abs(kappa)) > 0.0:
-            for kappa_val, (p, q) in zip(kappa, wf.kappa_idx):
-                kappa_mat[p, q] = kappa_val
-                kappa_mat[q, p] = -kappa_val
-    if len(wf.kappa_redundant) != 0:
-        if np.max(np.abs(wf.kappa_redundant)) > 0.0:
-            for kappa_val, (p, q) in zip(wf.kappa_redundant, wf.kappa_redundant_idx):
-                kappa_mat[p, q] = kappa_val
-                kappa_mat[q, p] = -kappa_val
-
-    c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
     Hamiltonian = convert_pauli_to_hybrid_form(
         energy_hamiltonian_pauli(
-            wf.h_ao,
-            wf.g_ao,
-            c_trans,
-            wf.num_inactive_spin_orbs,
-            wf.num_active_spin_orbs,
-            wf.num_virtual_spin_orbs,
+            wf.h_mo,
+            wf.g_mo,
+            wf.num_inactive_orbs,
+            wf.num_active_orbs,
+            wf.num_virtual_orbs,
             wf.num_elec,
         ),
         wf.num_inactive_spin_orbs,

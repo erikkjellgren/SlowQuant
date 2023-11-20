@@ -75,12 +75,11 @@ class LinearResponseUCC(LinearResponseBaseClass):
 
         H_2i_2a = convert_pauli_to_hybrid_form(
             hamiltonian_pauli_2i_2a(
-                self.wf.h_ao,
-                self.wf.g_ao,
-                self.wf.c_trans,
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.num_virtual_spin_orbs,
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.num_virtual_orbs,
                 self.wf.num_elec,
             ),
             self.wf.num_inactive_spin_orbs,

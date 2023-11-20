@@ -1,4 +1,3 @@
-import copy
 from collections.abc import Sequence
 
 import numpy as np
@@ -51,7 +50,7 @@ class LinearResponseBaseClass:
             excitations: Which excitation orders to include in response.
             is_spin_conserving: Use spin-conseving operators.
         """
-        self.wf = copy.deepcopy(wave_function)
+        self.wf = wave_function
         self.theta_picker = ThetaPicker(
             self.wf.active_occ_spin_idx,
             self.wf.active_unocc_spin_idx,
@@ -132,12 +131,11 @@ class LinearResponseBaseClass:
         self.Delta = np.zeros((num_parameters, num_parameters))
         self.H_1i_1a = convert_pauli_to_hybrid_form(
             hamiltonian_pauli_1i_1a(
-                self.wf.h_ao,
-                self.wf.g_ao,
-                self.wf.c_trans,
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.num_virtual_spin_orbs,
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.num_virtual_orbs,
                 num_elec,
             ),
             self.wf.num_inactive_spin_orbs,
@@ -145,12 +143,11 @@ class LinearResponseBaseClass:
         )
         self.H_en = convert_pauli_to_hybrid_form(
             energy_hamiltonian_pauli(
-                self.wf.h_ao,
-                self.wf.g_ao,
-                self.wf.c_trans,
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.num_virtual_spin_orbs,
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.num_virtual_orbs,
                 num_elec,
             ),
             self.wf.num_inactive_spin_orbs,
