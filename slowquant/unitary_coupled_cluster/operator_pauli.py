@@ -538,6 +538,8 @@ def hamiltonian_pauli_1i_1a(
                         hamiltonian_operator += (
                             1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, 2 * num_orbs)
                         )
+    print(len(hamiltonian_operator.operators.keys()))
+    print(len((hamiltonian_operator.screen_terms(1, 1, 2 * num_inactive_orbs, 2 * num_virtual_orbs)).operators.keys()))
     return hamiltonian_operator
 
 
@@ -586,6 +588,8 @@ def hamiltonian_pauli_2i_2a(
                         hamiltonian_operator += (
                             1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, 2 * num_orbs)
                         )
+    print(len(hamiltonian_operator.operators.keys()))
+    print(len((hamiltonian_operator.screen_terms(2, 2, 2 * num_inactive_orbs, 2 * num_virtual_orbs)).operators.keys()))
     return hamiltonian_operator
 
 
@@ -660,4 +664,6 @@ def energy_hamiltonian_pauli(
                         hamiltonian_operator += (
                             1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, 2 * num_orbs)
                         )
+    print(len(hamiltonian_operator.operators.keys()))
+    print(len((hamiltonian_operator.screen_terms(0, 0, 2 * num_inactive_orbs, 2 * num_virtual_orbs)).operators.keys()))
     return hamiltonian_operator.screen_terms(0, 0, 2 * num_inactive_orbs, 2 * num_virtual_orbs)
