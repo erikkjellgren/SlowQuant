@@ -227,6 +227,20 @@ def expectation_value_hybrid_flow(
 def expectation_value_hybrid_flow_commutator(
     state_vec: StateVector, A: OperatorHybrid, B: OperatorHybrid, ref_vec: StateVector
 ) -> float:
+    r"""Calculate expectation value of commutator.
+
+    .. math::
+        E = \left<n\left|\left[A,B\right]\right|m\right>
+
+    Args:
+        state_vec: Bra state vector.
+        A: First operator in commutator.
+        B: Second operator in commutator.
+        ref_vec: Ket state vector.
+
+    Returns:
+        Expectation value of commutator.
+    """
     return expectation_value_hybrid_flow(state_vec, [A, B], ref_vec) - expectation_value_hybrid_flow(
         state_vec, [B, A], ref_vec
     )
@@ -235,6 +249,21 @@ def expectation_value_hybrid_flow_commutator(
 def expectation_value_hybrid_flow_double_commutator(
     state_vec: StateVector, A: OperatorHybrid, B: OperatorHybrid, C: OperatorHybrid, ref_vec: StateVector
 ) -> float:
+    r"""Calculate expectation value of double commutator.
+
+    .. math::
+        E = \left<n\left|\left[A,\left[B,C\right]\right]\right|m\right>
+
+    Args:
+        state_vec: Bra state vector.
+        A: First operator in commutator.
+        B: Second operator in commutator.
+        C: Third operator in commutator.
+        ref_vec: Ket state vector.
+
+    Returns:
+        Expectation value of double commutator.
+    """
     return (
         expectation_value_hybrid_flow(state_vec, [A, B, C], ref_vec)
         - expectation_value_hybrid_flow(state_vec, [A, C, B], ref_vec)

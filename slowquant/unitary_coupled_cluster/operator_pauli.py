@@ -27,8 +27,7 @@ def a_spin_pauli(idx: int, dagger: bool, num_spin_orbs: int) -> OperatorPauli:
     """
     if idx % 2 == 0:
         return a_pauli(idx // 2, "alpha", dagger, num_spin_orbs)
-    else:
-        return a_pauli((idx - 1) // 2, "beta", dagger, num_spin_orbs)
+    return a_pauli((idx - 1) // 2, "beta", dagger, num_spin_orbs)
 
 
 @functools.cache

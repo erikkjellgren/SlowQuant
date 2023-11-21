@@ -31,7 +31,7 @@ def a_op_spin_matrix(
     for i in range(number_spin_orbitals):
         if i == idx:
             continue
-        elif i < idx:
+        if i < idx:
             prior += 1
         else:
             after += 1
