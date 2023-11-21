@@ -248,8 +248,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
         mux_op = OperatorPauli({})
         muy_op = OperatorPauli({})
         muz_op = OperatorPauli({})
-        for p in range(self.wf.num_spin_orbs // 2):
-            for q in range(self.wf.num_spin_orbs // 2):
+        for p in range(self.wf.num_orbs):
+            for q in range(self.wf.num_orbs):
                 Epq_op = epq_pauli(p, q, self.wf.num_spin_orbs)
                 if abs(mux[p, q]) > 10**-10:
                     mux_op += mux[p, q] * Epq_op

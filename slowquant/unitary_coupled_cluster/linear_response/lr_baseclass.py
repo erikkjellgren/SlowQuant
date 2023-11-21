@@ -119,7 +119,7 @@ class LinearResponseBaseClass:
                 self.wf.num_inactive_spin_orbs,
                 self.wf.num_active_spin_orbs,
             )
-            self.q_ops.append(ResponseOperator((i), (a), op))
+            self.q_ops.append(ResponseOperator((i,), (a,), op))
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters))
