@@ -1,3 +1,4 @@
+import os
 import time
 from collections.abc import Sequence
 from functools import partial
@@ -71,6 +72,8 @@ class WaveFunctionUCC:
         self.num_elec = num_elec
         self.num_spin_orbs = num_spin_orbs
         self.num_orbs = num_spin_orbs // 2
+        self._is_generalized = is_generalized
+        self._include_active_kappa = include_active_kappa
         inactive_on_vector = []
         active_on_vector = []
         virtual_on_vector = []
@@ -227,6 +230,36 @@ class WaveFunctionUCC:
         self._theta6 = []
         for _ in self.singlet_excitation_operator_generator.get_t6_generator(0):
             self._theta6.append(0.0)
+
+    def save_wavefunction(self, filename: str, force_overwrite: bool = False) -> None:
+        """Save the wave function to a compressed NumPy object.
+
+        Args:
+            filename: Filename of compressed NumPy object without file extension.
+            force_overwrite: Overwrite file if it already exists.
+        """
+        if os.path.exists(f"{filename}.npz") and not force_overwrite:
+            raise ValueError(f"{filename}.npz already exists and force_overwrite is False.")
+        np.savez_compressed(
+            f"{filename}.npz",
+            theta1=self.theta1,
+            theta2=self.theta2,
+            theta3=self.theta3,
+            theta4=self.theta4,
+            theta5=self.theta5,
+            theta6=self.theta6,
+            c_trans=self.c_trans,
+            h_ao=self.h_ao,
+            g_ao=self.g_ao,
+            num_spin_orbs=self.num_spin_orbs,
+            num_elec=self.num_elec,
+            num_active_elec=self.num_active_elec,
+            num_active_orbs=self.num_active_orbs,
+            is_generalized=self._is_generalized,
+            include_active_kappa=self._include_active_kappa,
+            energy_elec=self.energy_elec,
+            excitations=self._excitations,
+        )
 
     @property
     def c_orthonormal(self) -> np.ndarray:
@@ -1180,3 +1213,45 @@ def active_space_parameter_gradient(
         if finite_diff_type == "forward":
             gradient_theta[i] = (E_plus - E) / step_size
     return gradient_theta
+
+
+def load_wavefunction(filename: str) -> WaveFunctionUCC:
+    """Load wave function from a compressed NumPy object.
+
+    Args:
+        filename: Filename of compressed NumPy object without file extension.
+
+    Returns:
+        Wave function object.
+    """
+    dat = np.load(f"{filename}.npz")
+    wf = WaveFunctionUCC(
+        int(dat["num_spin_orbs"]),
+        int(dat["num_elec"]),
+        (int(dat["num_active_elec"]), int(dat["num_active_orbs"])),
+        dat["c_trans"],
+        dat["h_ao"],
+        dat["g_ao"],
+        bool(dat["is_generalized"]),
+        bool(dat["include_active_kappa"]),
+    )
+    wf.add_multiple_theta(
+        {
+            "theta1": list(dat["theta1"]),
+            "theta2": list(dat["theta2"]),
+            "theta3": list(dat["theta3"]),
+            "theta4": list(dat["theta4"]),
+            "theta5": list(dat["theta5"]),
+            "theta6": list(dat["theta6"]),
+        },
+        str(dat["excitations"]),
+    )
+    energy = energy_ucc(
+        wf.theta1 + wf.theta2 + wf.theta3 + wf.theta4 + wf.theta5 + wf.theta6, "sdtq56", False, wf
+    )
+    if abs(energy - float(dat["energy_elec"])) > 10**-6:
+        raise ValueError(
+            f'Calculate energy is different from saved energy: {energy} and {float(dat["energy_elec"])}.'
+        )
+    wf.energy_elec = energy
+    return wf
