@@ -6,10 +6,6 @@ import functools
 import numpy as np
 import scipy.sparse as ss
 
-from slowquant.molecularintegrals.integralfunctions import (
-    one_electron_integral_transform,
-    two_electron_integral_transform,
-)
 from slowquant.unitary_coupled_cluster.base import (
     StateVector,
     kronecker_product_cached,
@@ -18,26 +14,24 @@ from slowquant.unitary_coupled_cluster.base import (
 
 
 @functools.cache
-def a_spin_pauli(idx: int, dagger: bool, num_spin_orbs: int, num_elec: int) -> OperatorPauli:
+def a_spin_pauli(idx: int, dagger: bool, num_spin_orbs: int) -> OperatorPauli:
     """Annihilation operator with spin orbital index.
 
     Args:
         idx: Spin orbital index.
         dagger: If complex conjugated.
         num_spin_orbs: Number of spin orbitals.
-        num_elec: Number of electrons.
 
     Returns:
         Pauli operator.
     """
     if idx % 2 == 0:
-        return a_pauli(idx // 2, "alpha", dagger, num_spin_orbs, num_elec)
-    else:
-        return a_pauli((idx - 1) // 2, "beta", dagger, num_spin_orbs, num_elec)
+        return a_pauli(idx // 2, "alpha", dagger, num_spin_orbs)
+    return a_pauli((idx - 1) // 2, "beta", dagger, num_spin_orbs)
 
 
 @functools.cache
-def a_pauli(spinless_idx: int, spin: str, dagger: bool, num_spin_orbs: int, num_elec: int) -> OperatorPauli:
+def a_pauli(spinless_idx: int, spin: str, dagger: bool, num_spin_orbs: int) -> OperatorPauli:
     """Annihilation operator.
 
     Args:
@@ -45,7 +39,6 @@ def a_pauli(spinless_idx: int, spin: str, dagger: bool, num_spin_orbs: int, num_
         spin: alpha or beta spin.
         dagger: If complex conjugated.
         num_spin_orbs: Number of spin orbitals.
-        num_elec: Number of electrons.
 
     Returns:
         Pauli operator.
@@ -364,28 +357,23 @@ class OperatorPauli:
         return OperatorPauli(new_operators)
 
 
-def epq_pauli(p: int, q: int, num_spin_orbs: int, num_elec: int) -> OperatorPauli:
+def epq_pauli(p: int, q: int, num_spin_orbs: int) -> OperatorPauli:
     """Get Epq operator.
 
     Args:
         p: Orbital index.
         q: Orbital index.
         num_spin_orbs: Number of spin orbitals.
-        num_elec: Number of electrons.
 
     Returns:
         Epq Pauli operator.
     """
-    E = a_pauli(p, "alpha", True, num_spin_orbs, num_elec) * a_pauli(
-        q, "alpha", False, num_spin_orbs, num_elec
-    )
-    E += a_pauli(p, "beta", True, num_spin_orbs, num_elec) * a_pauli(
-        q, "beta", False, num_spin_orbs, num_elec
-    )
+    E = a_pauli(p, "alpha", True, num_spin_orbs) * a_pauli(q, "alpha", False, num_spin_orbs)
+    E += a_pauli(p, "beta", True, num_spin_orbs) * a_pauli(q, "beta", False, num_spin_orbs)
     return E
 
 
-def epqrs_pauli(p: int, q: int, r: int, s: int, num_spin_orbs: int, num_elec: int) -> OperatorPauli:
+def epqrs_pauli(p: int, q: int, r: int, s: int, num_spin_orbs: int) -> OperatorPauli:
     """Get epqrs operator.
 
     Args:
@@ -394,158 +382,143 @@ def epqrs_pauli(p: int, q: int, r: int, s: int, num_spin_orbs: int, num_elec: in
         r: Orbital index.
         s: Orbital index.
         num_spin_orbs: Number of spin orbitals.
-        num_elec: Number of electrons.
 
     Returns:
         epqrs Pauli operator.
     """
     if p == r and q == s:
         operator = 2 * (
-            a_pauli(p, "alpha", True, num_spin_orbs, num_elec)
-            * a_pauli(q, "alpha", False, num_spin_orbs, num_elec)
-            * a_pauli(p, "beta", True, num_spin_orbs, num_elec)
-            * a_pauli(q, "beta", False, num_spin_orbs, num_elec)
+            a_pauli(p, "alpha", True, num_spin_orbs)
+            * a_pauli(q, "alpha", False, num_spin_orbs)
+            * a_pauli(p, "beta", True, num_spin_orbs)
+            * a_pauli(q, "beta", False, num_spin_orbs)
         )
     elif p == q == r:
         operator = (
-            a_pauli(p, "alpha", True, num_spin_orbs, num_elec)
-            * a_pauli(s, "alpha", False, num_spin_orbs, num_elec)
-            * a_pauli(p, "beta", True, num_spin_orbs, num_elec)
-            * a_pauli(p, "beta", False, num_spin_orbs, num_elec)
+            a_pauli(p, "alpha", True, num_spin_orbs)
+            * a_pauli(s, "alpha", False, num_spin_orbs)
+            * a_pauli(p, "beta", True, num_spin_orbs)
+            * a_pauli(p, "beta", False, num_spin_orbs)
         )
         operator += (
-            a_pauli(p, "alpha", True, num_spin_orbs, num_elec)
-            * a_pauli(p, "alpha", False, num_spin_orbs, num_elec)
-            * a_pauli(p, "beta", True, num_spin_orbs, num_elec)
-            * a_pauli(s, "beta", False, num_spin_orbs, num_elec)
+            a_pauli(p, "alpha", True, num_spin_orbs)
+            * a_pauli(p, "alpha", False, num_spin_orbs)
+            * a_pauli(p, "beta", True, num_spin_orbs)
+            * a_pauli(s, "beta", False, num_spin_orbs)
         )
     elif p == r == s:
         operator = (
-            a_pauli(p, "alpha", True, num_spin_orbs, num_elec)
-            * a_pauli(p, "alpha", False, num_spin_orbs, num_elec)
-            * a_pauli(p, "beta", True, num_spin_orbs, num_elec)
-            * a_pauli(q, "beta", False, num_spin_orbs, num_elec)
+            a_pauli(p, "alpha", True, num_spin_orbs)
+            * a_pauli(p, "alpha", False, num_spin_orbs)
+            * a_pauli(p, "beta", True, num_spin_orbs)
+            * a_pauli(q, "beta", False, num_spin_orbs)
         )
         operator += (
-            a_pauli(p, "alpha", True, num_spin_orbs, num_elec)
-            * a_pauli(q, "alpha", False, num_spin_orbs, num_elec)
-            * a_pauli(p, "beta", True, num_spin_orbs, num_elec)
-            * a_pauli(p, "beta", False, num_spin_orbs, num_elec)
+            a_pauli(p, "alpha", True, num_spin_orbs)
+            * a_pauli(q, "alpha", False, num_spin_orbs)
+            * a_pauli(p, "beta", True, num_spin_orbs)
+            * a_pauli(p, "beta", False, num_spin_orbs)
         )
     elif q == s:
         operator = (
-            a_pauli(r, "alpha", True, num_spin_orbs, num_elec)
-            * a_pauli(q, "alpha", False, num_spin_orbs, num_elec)
-            * a_pauli(p, "beta", True, num_spin_orbs, num_elec)
-            * a_pauli(q, "beta", False, num_spin_orbs, num_elec)
+            a_pauli(r, "alpha", True, num_spin_orbs)
+            * a_pauli(q, "alpha", False, num_spin_orbs)
+            * a_pauli(p, "beta", True, num_spin_orbs)
+            * a_pauli(q, "beta", False, num_spin_orbs)
         )
         operator += (
-            a_pauli(p, "alpha", True, num_spin_orbs, num_elec)
-            * a_pauli(q, "alpha", False, num_spin_orbs, num_elec)
-            * a_pauli(r, "beta", True, num_spin_orbs, num_elec)
-            * a_pauli(q, "beta", False, num_spin_orbs, num_elec)
+            a_pauli(p, "alpha", True, num_spin_orbs)
+            * a_pauli(q, "alpha", False, num_spin_orbs)
+            * a_pauli(r, "beta", True, num_spin_orbs)
+            * a_pauli(q, "beta", False, num_spin_orbs)
         )
     else:
         operator = (
-            a_pauli(r, "alpha", True, num_spin_orbs, num_elec)
-            * a_pauli(s, "alpha", False, num_spin_orbs, num_elec)
-            * a_pauli(p, "beta", True, num_spin_orbs, num_elec)
-            * a_pauli(q, "beta", False, num_spin_orbs, num_elec)
+            a_pauli(r, "alpha", True, num_spin_orbs)
+            * a_pauli(s, "alpha", False, num_spin_orbs)
+            * a_pauli(p, "beta", True, num_spin_orbs)
+            * a_pauli(q, "beta", False, num_spin_orbs)
         )
         operator += (
-            a_pauli(p, "alpha", True, num_spin_orbs, num_elec)
-            * a_pauli(q, "alpha", False, num_spin_orbs, num_elec)
-            * a_pauli(r, "beta", True, num_spin_orbs, num_elec)
-            * a_pauli(s, "beta", False, num_spin_orbs, num_elec)
+            a_pauli(p, "alpha", True, num_spin_orbs)
+            * a_pauli(q, "alpha", False, num_spin_orbs)
+            * a_pauli(r, "beta", True, num_spin_orbs)
+            * a_pauli(s, "beta", False, num_spin_orbs)
         )
         operator -= (
-            a_pauli(p, "beta", True, num_spin_orbs, num_elec)
-            * a_pauli(r, "beta", True, num_spin_orbs, num_elec)
-            * a_pauli(q, "beta", False, num_spin_orbs, num_elec)
-            * a_pauli(s, "beta", False, num_spin_orbs, num_elec)
+            a_pauli(p, "beta", True, num_spin_orbs)
+            * a_pauli(r, "beta", True, num_spin_orbs)
+            * a_pauli(q, "beta", False, num_spin_orbs)
+            * a_pauli(s, "beta", False, num_spin_orbs)
         )
         operator -= (
-            a_pauli(p, "alpha", True, num_spin_orbs, num_elec)
-            * a_pauli(r, "alpha", True, num_spin_orbs, num_elec)
-            * a_pauli(q, "alpha", False, num_spin_orbs, num_elec)
-            * a_pauli(s, "alpha", False, num_spin_orbs, num_elec)
+            a_pauli(p, "alpha", True, num_spin_orbs)
+            * a_pauli(r, "alpha", True, num_spin_orbs)
+            * a_pauli(q, "alpha", False, num_spin_orbs)
+            * a_pauli(s, "alpha", False, num_spin_orbs)
         )
     return operator
 
 
-def hamiltonian_pauli(
-    h: np.ndarray, g: np.ndarray, c_mo: np.ndarray, num_spin_orbs: int, num_elec: int
-) -> OperatorPauli:
+def hamiltonian_pauli(h_mo: np.ndarray, g_mo: np.ndarray, num_orbs: int) -> OperatorPauli:
     """Get full Hamiltonian operator.
 
     Args:
-        h: One-electron Hamiltonian integrals in AO.
-        g: Two-electron Hamiltonian integrals in AO.
-        c_mo: Orbital coefficients.
-        num_spin_orbs: Number of spin orbitals.
-        num_elec: Number of electrons.
+        h_mo: One-electron Hamiltonian integrals in MO.
+        g_mo: Two-electron Hamiltonian integrals in MO.
+        num_orbs: Number of spatial orbitals.
 
     Returns:
         Full Hamilonian Pauli operator.
     """
-    h_mo = one_electron_integral_transform(c_mo, h)
-    g_mo = two_electron_integral_transform(c_mo, g)
-    num_spatial_orbs = num_spin_orbs // 2
-    H_expectation = OperatorPauli({})
-    for p in range(num_spatial_orbs):
-        for q in range(num_spatial_orbs):
+    hamiltonian_operator = OperatorPauli({})
+    for p in range(num_orbs):
+        for q in range(num_orbs):
             if abs(h_mo[p, q]) > 10**-12:
-                H_expectation += h_mo[p, q] * epq_pauli(p, q, num_spin_orbs, num_elec)
-    for p in range(num_spatial_orbs):
-        for q in range(num_spatial_orbs):
-            for r in range(num_spatial_orbs):
-                for s in range(num_spatial_orbs):
+                hamiltonian_operator += h_mo[p, q] * epq_pauli(p, q, 2 * num_orbs)
+    for p in range(num_orbs):
+        for q in range(num_orbs):
+            for r in range(num_orbs):
+                for s in range(num_orbs):
                     if abs(g_mo[p, q, r, s]) > 10**-12:
-                        H_expectation += (
-                            1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, num_spin_orbs, num_elec)
+                        hamiltonian_operator += (
+                            1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, 2 * num_orbs)
                         )
-    return H_expectation
+    return hamiltonian_operator
 
 
 def hamiltonian_pauli_1i_1a(
-    h: np.ndarray,
-    g: np.ndarray,
-    c_mo: np.ndarray,
-    num_inactive_spin_orbs: int,
-    num_active_spin_orbs: int,
-    num_virtual_spin_orbs: int,
-    num_elec: int,
+    h_mo: np.ndarray,
+    g_mo: np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
 ) -> OperatorPauli:
-    """Get Hamiltonian operator that works includes an extra inactive and an extra virtual index.
+    """Get Hamiltonian operator that works together with an extra inactive and an extra virtual index.
 
     Args:
-        h: One-electron Hamiltonian integrals in AO.
-        g: Two-electron Hamiltonian integrals in AO.
-        c_mo: Orbital coefficients.
-        num_spin_orbs: Number of spin orbitals.
-        num_elec: Number of electrons.
+        h_mo: One-electron Hamiltonian integrals in MO.
+        g_mo: Two-electron Hamiltonian integrals in MO.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
 
     Returns:
         Modified Hamilonian Pauli operator.
     """
-    num_inactive_spatial_orbs = num_inactive_spin_orbs // 2
-    num_active_spatial_orbs = num_active_spin_orbs // 2
-    num_virtual_spatial_orbs = num_virtual_spin_orbs // 2
-    h_mo = one_electron_integral_transform(c_mo, h)
-    g_mo = two_electron_integral_transform(c_mo, g)
-    num_spatial_orbs = num_inactive_spatial_orbs + num_active_spatial_orbs + num_virtual_spatial_orbs
-    H_expectation = OperatorPauli({})
-    virtual_start = num_inactive_spatial_orbs + num_active_spatial_orbs
-    for p in range(num_spatial_orbs):
-        for q in range(num_spatial_orbs):
+    num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
+    hamiltonian_operator = OperatorPauli({})
+    virtual_start = num_inactive_orbs + num_active_orbs
+    for p in range(num_orbs):
+        for q in range(num_orbs):
             if p >= virtual_start and q >= virtual_start:
                 continue
             if abs(h_mo[p, q]) > 10**-12:
-                H_expectation += h_mo[p, q] * epq_pauli(p, q, 2 * num_spatial_orbs, num_elec)
-    for p in range(num_spatial_orbs):
-        for q in range(num_spatial_orbs):
-            for r in range(num_spatial_orbs):
-                for s in range(num_spatial_orbs):
+                hamiltonian_operator += h_mo[p, q] * epq_pauli(p, q, 2 * num_orbs)
+    for p in range(num_orbs):
+        for q in range(num_orbs):
+            for r in range(num_orbs):
+                for s in range(num_orbs):
                     num_virt = 0
                     if p >= virtual_start:
                         num_virt += 1
@@ -557,54 +530,47 @@ def hamiltonian_pauli_1i_1a(
                         num_virt += 1
                     if num_virt > 1:
                         continue
-                    if (q < num_inactive_spatial_orbs and s < num_inactive_spatial_orbs) and (
-                        p >= num_inactive_spatial_orbs and s >= num_inactive_spatial_orbs
+                    if (q < num_inactive_orbs and s < num_inactive_orbs) and (
+                        p >= num_inactive_orbs and s >= num_inactive_orbs
                     ):
                         continue
                     if abs(g_mo[p, q, r, s]) > 10**-12:
-                        H_expectation += (
-                            1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, 2 * num_spatial_orbs, num_elec)
+                        hamiltonian_operator += (
+                            1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, 2 * num_orbs)
                         )
-    return H_expectation
+    return hamiltonian_operator
 
 
 def hamiltonian_pauli_2i_2a(
-    h: np.ndarray,
-    g: np.ndarray,
-    c_mo: np.ndarray,
-    num_inactive_spin_orbs: int,
-    num_active_spin_orbs: int,
-    num_virtual_spin_orbs: int,
-    num_elec: int,
+    h_mo: np.ndarray,
+    g_mo: np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
 ) -> OperatorPauli:
-    """Get full Hamiltonian operator.
+    """Get Hamiltonian operator that works together with two extra inactive and two extra virtual index.
 
     Args:
-        h: One-electron Hamiltonian integrals in AO.
-        g: Two-electron Hamiltonian integrals in AO.
-        c_mo: Orbital coefficients.
-        num_spin_orbs: Number of spin orbitals.
-        num_elec: Number of electrons.
+        h_mo: One-electron Hamiltonian integrals in MO.
+        g_mo: Two-electron Hamiltonian integrals in MO.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
 
     Returns:
-        Full Hamilonian Pauli operator.
+        Modified Hamilonian Pauli operator.
     """
-    num_inactive_spatial_orbs = num_inactive_spin_orbs // 2
-    num_active_spatial_orbs = num_active_spin_orbs // 2
-    num_virtual_spatial_orbs = num_virtual_spin_orbs // 2
-    h_mo = one_electron_integral_transform(c_mo, h)
-    g_mo = two_electron_integral_transform(c_mo, g)
-    num_spatial_orbs = num_inactive_spatial_orbs + num_active_spatial_orbs + num_virtual_spatial_orbs
-    H_expectation = OperatorPauli({})
-    virtual_start = num_inactive_spatial_orbs + num_active_spatial_orbs
-    for p in range(num_spatial_orbs):
-        for q in range(num_spatial_orbs):
+    num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
+    hamiltonian_operator = OperatorPauli({})
+    virtual_start = num_inactive_orbs + num_active_orbs
+    for p in range(num_orbs):
+        for q in range(num_orbs):
             if abs(h_mo[p, q]) > 10**-12:
-                H_expectation += h_mo[p, q] * epq_pauli(p, q, 2 * num_spatial_orbs, num_elec)
-    for p in range(num_spatial_orbs):
-        for q in range(num_spatial_orbs):
-            for r in range(num_spatial_orbs):
-                for s in range(num_spatial_orbs):
+                hamiltonian_operator += h_mo[p, q] * epq_pauli(p, q, 2 * num_orbs)
+    for p in range(num_orbs):
+        for q in range(num_orbs):
+            for r in range(num_orbs):
+                for s in range(num_orbs):
                     num_virt = 0
                     if p >= virtual_start:
                         num_virt += 1
@@ -617,10 +583,10 @@ def hamiltonian_pauli_2i_2a(
                     if num_virt > 2:
                         continue
                     if abs(g_mo[p, q, r, s]) > 10**-12:
-                        H_expectation += (
-                            1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, 2 * num_spatial_orbs, num_elec)
+                        hamiltonian_operator += (
+                            1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, 2 * num_orbs)
                         )
-    return H_expectation
+    return hamiltonian_operator
 
 
 def commutator_pauli(A: OperatorPauli, B: OperatorPauli) -> OperatorPauli:
@@ -637,79 +603,61 @@ def commutator_pauli(A: OperatorPauli, B: OperatorPauli) -> OperatorPauli:
 
 
 def energy_hamiltonian_pauli(
-    h: np.ndarray,
-    g: np.ndarray,
-    c_mo: np.ndarray,
-    num_inactive_spin_orbs: int,
-    num_active_spin_orbs: int,
-    num_virtual_spin_orbs: int,
-    num_elec: int,
+    h_mo: np.ndarray,
+    g_mo: np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
 ) -> OperatorPauli:
     """Get energy Hamiltonian operator.
 
     Args:
-        h: One-electron Hamiltonian integrals in AO.
-        g: Two-electron Hamiltonian integrals in AO.
-        c_mo: Orbital coefficients.
-        num_inactive_spin_orbs: Number of inactive spin orbitals.
-        num_active_spin_orbs: Number active spin orbitals.
-        num_virtual_spin_orbs: Number of virtual spin orbitals.
-        num_elec: Number of electrons.
+        h_mo: One-electron Hamiltonian integrals in MO.
+        g_mo: Two-electron Hamiltonian integrals in MO.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
 
     Returns:
         Energy Hamilonian Pauli operator.
     """
-    h_mo = one_electron_integral_transform(c_mo, h)
-    g_mo = two_electron_integral_transform(c_mo, g)
-    num_inactive_spatial_orbs = num_inactive_spin_orbs // 2
-    num_active_spatial_orbs = num_active_spin_orbs // 2
-    num_spin_orbs = num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs
-    H_expectation = OperatorPauli({})
+    num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
+    hamiltonian_operator = OperatorPauli({})
     # Inactive one-electron
-    for i in range(num_inactive_spatial_orbs):
+    for i in range(num_inactive_orbs):
         if abs(h_mo[i, i]) > 10**-12:
-            H_expectation += h_mo[i, i] * epq_pauli(i, i, num_spin_orbs, num_elec)
+            hamiltonian_operator += h_mo[i, i] * epq_pauli(i, i, 2 * num_orbs)
     # Active one-electron
-    for p in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
-        for q in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
+    for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+        for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
             if abs(h_mo[p, q]) > 10**-12:
-                H_expectation += h_mo[p, q] * epq_pauli(p, q, num_spin_orbs, num_elec)
+                hamiltonian_operator += h_mo[p, q] * epq_pauli(p, q, 2 * num_orbs)
     # Inactive two-electron
-    for i in range(num_inactive_spatial_orbs):
-        for j in range(num_inactive_spatial_orbs):
+    for i in range(num_inactive_orbs):
+        for j in range(num_inactive_orbs):
             if abs(g_mo[i, i, j, j]) > 10**-12:
-                H_expectation += 1 / 2 * g_mo[i, i, j, j] * epqrs_pauli(i, i, j, j, num_spin_orbs, num_elec)
+                hamiltonian_operator += 1 / 2 * g_mo[i, i, j, j] * epqrs_pauli(i, i, j, j, 2 * num_orbs)
             if i != j and abs(g_mo[j, i, i, j]) > 10**-12:
-                H_expectation += 1 / 2 * g_mo[j, i, i, j] * epqrs_pauli(j, i, i, j, num_spin_orbs, num_elec)
+                hamiltonian_operator += 1 / 2 * g_mo[j, i, i, j] * epqrs_pauli(j, i, i, j, 2 * num_orbs)
     # Inactive-Active two-electron
-    for i in range(num_inactive_spatial_orbs):
-        for p in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
-            for q in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
+    for i in range(num_inactive_orbs):
+        for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+            for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
                 if abs(g_mo[i, i, p, q]) > 10**-12:
-                    H_expectation += (
-                        1 / 2 * g_mo[i, i, p, q] * epqrs_pauli(i, i, p, q, num_spin_orbs, num_elec)
-                    )
+                    hamiltonian_operator += 1 / 2 * g_mo[i, i, p, q] * epqrs_pauli(i, i, p, q, 2 * num_orbs)
                 if abs(g_mo[p, q, i, i]) > 10**-12:
-                    H_expectation += (
-                        1 / 2 * g_mo[p, q, i, i] * epqrs_pauli(p, q, i, i, num_spin_orbs, num_elec)
-                    )
+                    hamiltonian_operator += 1 / 2 * g_mo[p, q, i, i] * epqrs_pauli(p, q, i, i, 2 * num_orbs)
                 if abs(g_mo[p, i, i, q]) > 10**-12:
-                    H_expectation += (
-                        1 / 2 * g_mo[p, i, i, q] * epqrs_pauli(p, i, i, q, num_spin_orbs, num_elec)
-                    )
+                    hamiltonian_operator += 1 / 2 * g_mo[p, i, i, q] * epqrs_pauli(p, i, i, q, 2 * num_orbs)
                 if abs(g_mo[i, p, q, i]) > 10**-12:
-                    H_expectation += (
-                        1 / 2 * g_mo[i, p, q, i] * epqrs_pauli(i, p, q, i, num_spin_orbs, num_elec)
-                    )
+                    hamiltonian_operator += 1 / 2 * g_mo[i, p, q, i] * epqrs_pauli(i, p, q, i, 2 * num_orbs)
     # Active two-electron
-    for p in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
-        for q in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
-            for r in range(num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs):
-                for s in range(
-                    num_inactive_spatial_orbs, num_inactive_spatial_orbs + num_active_spatial_orbs
-                ):
+    for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+        for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+            for r in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+                for s in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
                     if abs(g_mo[p, q, r, s]) > 10**-12:
-                        H_expectation += (
-                            1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, num_spin_orbs, num_elec)
+                        hamiltonian_operator += (
+                            1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, 2 * num_orbs)
                         )
-    return H_expectation.screen_terms(0, 0, num_inactive_spin_orbs, num_virtual_spin_orbs)
+    return hamiltonian_operator.screen_terms(0, 0, 2 * num_inactive_orbs, 2 * num_virtual_orbs)

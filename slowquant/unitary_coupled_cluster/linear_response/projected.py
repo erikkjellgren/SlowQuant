@@ -11,7 +11,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_orbital_gradient_response,
     get_orbital_response_hessian_block,
-    get_orbital_response_metric_sgima,
+    get_orbital_response_metric_sigma,
     get_orbital_response_property_gradient,
     get_orbital_response_vector_norm,
 )
@@ -106,7 +106,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
         )
-        self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sgima(
+        self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
             rdms, self.wf.kappa_idx
         )
         for j, opJ in enumerate(self.q_ops):
@@ -248,9 +248,9 @@ class LinearResponseUCC(LinearResponseBaseClass):
         mux_op = OperatorPauli({})
         muy_op = OperatorPauli({})
         muz_op = OperatorPauli({})
-        for p in range(self.wf.num_spin_orbs // 2):
-            for q in range(self.wf.num_spin_orbs // 2):
-                Epq_op = epq_pauli(p, q, self.wf.num_spin_orbs, self.wf.num_elec)
+        for p in range(self.wf.num_orbs):
+            for q in range(self.wf.num_orbs):
+                Epq_op = epq_pauli(p, q, self.wf.num_spin_orbs)
                 if abs(mux[p, q]) > 10**-10:
                     mux_op += mux[p, q] * Epq_op
                 if abs(muy[p, q]) > 10**-10:
@@ -261,19 +261,16 @@ class LinearResponseUCC(LinearResponseBaseClass):
             mux_op,
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
         muy_op = convert_pauli_to_hybrid_form(
             muy_op,
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
         muz_op = convert_pauli_to_hybrid_form(
             muz_op,
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
         transition_dipoles = np.zeros((len(self.normed_response_vectors[0]), 3))
         for state_number in range(len(self.normed_response_vectors[0])):

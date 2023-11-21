@@ -62,6 +62,15 @@ class StateVectorOperatorData:
     def __init__(
         self, inactive_orbs: str, active_space: np.ndarray | ss.csr_matrix, virtual_orbs: str
     ) -> None:
+        """Initialize data class for state vector.
+
+        Args:
+            inactive_orbs: String representation of inactive orbitals occupation.
+                           o (one) meaning occupied and z (zero) meaning unoccupoed.
+            active_space: Active space part of state state vector.
+            virtual_orbs: String representation of virtual orbitals occupation.
+                           o (one) meaning occupied and z (zero) meaning unoccupoed.
+        """
         self.inactive_orbs = inactive_orbs
         self.virtual_orbs = virtual_orbs
         self.active_space = active_space
@@ -69,9 +78,23 @@ class StateVectorOperatorData:
 
 class StateVectorOperator:
     def __init__(self, state_vector: dict[str, StateVectorOperatorData]) -> None:
+        """Initialize 'operator' form of state vector.
+
+        Args:
+            state_vector: Data class representation of the state vector.
+        """
         self.state_vector = state_vector
 
-    def __mul__(self, hybridop: OperatorHybrid) -> StateVectorOperator:
+    def __mul__(self, hybridop: OperatorHybrid | StateVectorOperator) -> StateVectorOperator | float:
+        """Overload multiplication operator.
+
+        Args:
+            hybridop: Hybrid representation of operator, or state vector 'operator'.
+
+        Returns:
+            State vector 'operator' in case of multiplication with operator,
+            or float in case of multiplication with another state vector.
+        """
         if isinstance(hybridop, OperatorHybrid):
             new_state_vector: dict[str, StateVectorOperatorData] = {}
             for _, vec in self.state_vector.items():
@@ -140,6 +163,16 @@ class StateVectorOperator:
 def expectation_value_hybrid_flow(
     state_vec: StateVector, operators: list[OperatorHybrid], ref_vec: StateVector
 ) -> float:
+    """Calculate expectation value of operator.
+
+    Args:
+        state_vec: Bra state vector.
+        operators: List of operators.
+        ref_vec: Ket state vector.
+
+    Returns:
+        Expectation value of operator.
+    """
     if len(state_vec.inactive) != 0:
         num_inactive_spin_orbs = len(state_vec.inactive[0])
     else:
@@ -194,6 +227,20 @@ def expectation_value_hybrid_flow(
 def expectation_value_hybrid_flow_commutator(
     state_vec: StateVector, A: OperatorHybrid, B: OperatorHybrid, ref_vec: StateVector
 ) -> float:
+    r"""Calculate expectation value of commutator.
+
+    .. math::
+        E = \left<n\left|\left[A,B\right]\right|m\right>
+
+    Args:
+        state_vec: Bra state vector.
+        A: First operator in commutator.
+        B: Second operator in commutator.
+        ref_vec: Ket state vector.
+
+    Returns:
+        Expectation value of commutator.
+    """
     return expectation_value_hybrid_flow(state_vec, [A, B], ref_vec) - expectation_value_hybrid_flow(
         state_vec, [B, A], ref_vec
     )
@@ -202,6 +249,21 @@ def expectation_value_hybrid_flow_commutator(
 def expectation_value_hybrid_flow_double_commutator(
     state_vec: StateVector, A: OperatorHybrid, B: OperatorHybrid, C: OperatorHybrid, ref_vec: StateVector
 ) -> float:
+    r"""Calculate expectation value of double commutator.
+
+    .. math::
+        E = \left<n\left|\left[A,\left[B,C\right]\right]\right|m\right>
+
+    Args:
+        state_vec: Bra state vector.
+        A: First operator in commutator.
+        B: Second operator in commutator.
+        C: Third operator in commutator.
+        ref_vec: Ket state vector.
+
+    Returns:
+        Expectation value of double commutator.
+    """
     return (
         expectation_value_hybrid_flow(state_vec, [A, B, C], ref_vec)
         - expectation_value_hybrid_flow(state_vec, [A, C, B], ref_vec)
@@ -211,7 +273,9 @@ def expectation_value_hybrid_flow_double_commutator(
 
 
 def convert_pauli_to_hybrid_form(
-    pauliop: OperatorPauli, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int
+    pauliop: OperatorPauli,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
 ) -> OperatorHybrid:
     """Convert Pauli operator to hybrid operator.
 
@@ -219,7 +283,6 @@ def convert_pauli_to_hybrid_form(
         pauliop: Pauli operator.
         num_inactive_orbs: Number of inactive orbitals.
         num_active_orbs: Number of active orbitals.
-        num_virtual_orbs: Number of virtual orbitals.
 
     Returns:
         Hybrid operator.

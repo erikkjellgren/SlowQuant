@@ -1,4 +1,3 @@
-import copy
 from collections.abc import Sequence
 
 import numpy as np
@@ -40,7 +39,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
     ) -> None:
         if operator_type.lower() not in ("naive", "projected", "selfconsistent", "statetransfer"):
             raise ValueError(f"Got unknown operator_type: {operator_type}")
-        self.wf = copy.deepcopy(wave_function)
+        self.wf = wave_function
         self.theta_picker = ThetaPicker(
             self.wf.active_occ_spin_idx,
             self.wf.active_unocc_spin_idx,
@@ -50,11 +49,9 @@ class LinearResponseUCC(LinearResponseBaseClass):
         G_ops_tmp = []
         q_ops_tmp = []
         num_spin_orbs = self.wf.num_spin_orbs
-        num_elec = self.wf.num_elec
         excitations = excitations.lower()
         U = construct_ucc_u(
             self.wf.num_active_spin_orbs,
-            self.wf.num_active_elec,
             self.wf.theta1
             + self.wf.theta2
             + self.wf.theta3
@@ -68,21 +65,19 @@ class LinearResponseUCC(LinearResponseBaseClass):
             projection = make_projection_operator(self.wf.state_vector)
             self.projection = projection
         if "s" in excitations:
-            for _, _, _, op_ in self.theta_picker.get_t1_generator_sa(num_spin_orbs, num_elec):
+            for _, _, _, op_ in self.theta_picker.get_t1_generator_sa(num_spin_orbs):
                 op = convert_pauli_to_hybrid_form(
                     op_,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
-                    self.wf.num_virtual_spin_orbs,
                 )
                 G_ops_tmp.append(op)
         if "d" in excitations:
-            for _, _, _, _, _, op_ in self.theta_picker.get_t2_generator_sa(num_spin_orbs, num_elec):
+            for _, _, _, _, _, op_ in self.theta_picker.get_t2_generator_sa(num_spin_orbs):
                 op = convert_pauli_to_hybrid_form(
                     op_,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
-                    self.wf.num_virtual_spin_orbs,
                 )
                 G_ops_tmp.append(op)
         if do_transform_orbital_rotations and operator_type.lower() in ("statetransfer", "selfconsistent"):
@@ -90,12 +85,11 @@ class LinearResponseUCC(LinearResponseBaseClass):
         else:
             valid_kappa_idx = self.wf.kappa_idx
         for i, a in valid_kappa_idx:
-            op_ = 2 ** (-1 / 2) * epq_pauli(a, i, self.wf.num_spin_orbs, self.wf.num_elec)
+            op_ = 2 ** (-1 / 2) * epq_pauli(a, i, self.wf.num_spin_orbs)
             op = convert_pauli_to_hybrid_form(
                 op_,
                 self.wf.num_inactive_spin_orbs,
                 self.wf.num_active_spin_orbs,
-                self.wf.num_virtual_spin_orbs,
             )
             q_ops_tmp.append(op)
         self.G_ops = []
@@ -111,7 +105,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     G_diff_,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
-                    self.wf.num_virtual_spin_orbs,
                 )
                 self.G_ops.append(G - G_diff)
             elif operator_type.lower() == "selfconsistent":
@@ -135,7 +128,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                         q_diff_,
                         self.wf.num_inactive_spin_orbs,
                         self.wf.num_active_spin_orbs,
-                        self.wf.num_virtual_spin_orbs,
                     )
                     self.q_ops.append(q - q_diff)
                 elif operator_type.lower() == "selfconsistent":
@@ -157,45 +149,36 @@ class LinearResponseUCC(LinearResponseBaseClass):
         self.Delta = np.zeros((num_parameters, num_parameters))
         H_1i_1a = convert_pauli_to_hybrid_form(
             hamiltonian_pauli_1i_1a(
-                self.wf.h_ao,
-                self.wf.g_ao,
-                self.wf.c_trans,
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.num_virtual_spin_orbs,
-                num_elec,
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.num_virtual_orbs,
             ),
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
         H_2i_2a = convert_pauli_to_hybrid_form(
             hamiltonian_pauli_2i_2a(
-                self.wf.h_ao,
-                self.wf.g_ao,
-                self.wf.c_trans,
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.num_virtual_spin_orbs,
-                num_elec,
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.num_virtual_orbs,
             ),
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
         H_en = convert_pauli_to_hybrid_form(
             energy_hamiltonian_pauli(
-                self.wf.h_ao,
-                self.wf.g_ao,
-                self.wf.c_trans,
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.num_virtual_spin_orbs,
-                num_elec,
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.num_virtual_orbs,
             ),
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
         idx_shift = len(self.q_ops)
         print("")
@@ -474,9 +457,9 @@ class LinearResponseUCC(LinearResponseBaseClass):
         mux_op = OperatorPauli({})
         muy_op = OperatorPauli({})
         muz_op = OperatorPauli({})
-        for p in range(self.wf.num_spin_orbs // 2):
-            for q in range(self.wf.num_spin_orbs // 2):
-                Epq_op = epq_pauli(p, q, self.wf.num_spin_orbs, self.wf.num_elec)
+        for p in range(self.wf.num_orbs):
+            for q in range(self.wf.num_orbs):
+                Epq_op = epq_pauli(p, q, self.wf.num_spin_orbs)
                 if abs(mux[p, q]) > 10**-10:
                     mux_op += mux[p, q] * Epq_op
                 if abs(muy[p, q]) > 10**-10:
@@ -487,19 +470,16 @@ class LinearResponseUCC(LinearResponseBaseClass):
             mux_op,
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
         muy_op = convert_pauli_to_hybrid_form(
             muy_op,
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
         muz_op = convert_pauli_to_hybrid_form(
             muz_op,
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
-            self.wf.num_virtual_spin_orbs,
         )
         transition_dipole_x = 0.0
         transition_dipole_y = 0.0
