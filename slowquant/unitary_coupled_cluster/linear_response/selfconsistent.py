@@ -49,7 +49,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
 
         U_matrix = construct_ucc_u(
             self.wf.num_active_spin_orbs,
-            self.wf.num_active_elec,
             self.wf.theta1
             + self.wf.theta2
             + self.wf.theta3
@@ -231,7 +230,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
         muz_op = OperatorPauli({})
         for p in range(self.wf.num_spin_orbs // 2):
             for q in range(self.wf.num_spin_orbs // 2):
-                Epq_op = epq_pauli(p, q, self.wf.num_spin_orbs, self.wf.num_elec)
+                Epq_op = epq_pauli(p, q, self.wf.num_spin_orbs)
                 if abs(mux[p, q]) > 10**-10:
                     mux_op += mux[p, q] * Epq_op
                 if abs(muy[p, q]) > 10**-10:

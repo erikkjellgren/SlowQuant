@@ -49,11 +49,9 @@ class LinearResponseUCC(LinearResponseBaseClass):
         G_ops_tmp = []
         q_ops_tmp = []
         num_spin_orbs = self.wf.num_spin_orbs
-        num_elec = self.wf.num_elec
         excitations = excitations.lower()
         U = construct_ucc_u(
             self.wf.num_active_spin_orbs,
-            self.wf.num_active_elec,
             self.wf.theta1
             + self.wf.theta2
             + self.wf.theta3
@@ -67,7 +65,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
             projection = make_projection_operator(self.wf.state_vector)
             self.projection = projection
         if "s" in excitations:
-            for _, _, _, op_ in self.theta_picker.get_t1_generator_sa(num_spin_orbs, num_elec):
+            for _, _, _, op_ in self.theta_picker.get_t1_generator_sa(num_spin_orbs):
                 op = convert_pauli_to_hybrid_form(
                     op_,
                     self.wf.num_inactive_spin_orbs,
@@ -75,7 +73,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 )
                 G_ops_tmp.append(op)
         if "d" in excitations:
-            for _, _, _, _, _, op_ in self.theta_picker.get_t2_generator_sa(num_spin_orbs, num_elec):
+            for _, _, _, _, _, op_ in self.theta_picker.get_t2_generator_sa(num_spin_orbs):
                 op = convert_pauli_to_hybrid_form(
                     op_,
                     self.wf.num_inactive_spin_orbs,
@@ -87,7 +85,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
         else:
             valid_kappa_idx = self.wf.kappa_idx
         for i, a in valid_kappa_idx:
-            op_ = 2 ** (-1 / 2) * epq_pauli(a, i, self.wf.num_spin_orbs, self.wf.num_elec)
+            op_ = 2 ** (-1 / 2) * epq_pauli(a, i, self.wf.num_spin_orbs)
             op = convert_pauli_to_hybrid_form(
                 op_,
                 self.wf.num_inactive_spin_orbs,
@@ -156,7 +154,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.wf.num_inactive_orbs,
                 self.wf.num_active_orbs,
                 self.wf.num_virtual_orbs,
-                num_elec,
             ),
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
@@ -168,7 +165,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.wf.num_inactive_orbs,
                 self.wf.num_active_orbs,
                 self.wf.num_virtual_orbs,
-                num_elec,
             ),
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
@@ -180,7 +176,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.wf.num_inactive_orbs,
                 self.wf.num_active_orbs,
                 self.wf.num_virtual_orbs,
-                num_elec,
             ),
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
@@ -464,7 +459,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
         muz_op = OperatorPauli({})
         for p in range(self.wf.num_spin_orbs // 2):
             for q in range(self.wf.num_spin_orbs // 2):
-                Epq_op = epq_pauli(p, q, self.wf.num_spin_orbs, self.wf.num_elec)
+                Epq_op = epq_pauli(p, q, self.wf.num_spin_orbs)
                 if abs(mux[p, q]) > 10**-10:
                     mux_op += mux[p, q] * Epq_op
                 if abs(muy[p, q]) > 10**-10:

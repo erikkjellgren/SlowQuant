@@ -41,7 +41,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
         # Overwrite Superclass
         self.q_ops: list[ResponseOperator] = []
         for i, a in self.wf.kappa_hf_like_idx:
-            op_ = 2 ** (-1 / 2) * epq_pauli(a, i, self.wf.num_spin_orbs, self.wf.num_elec)
+            op_ = 2 ** (-1 / 2) * epq_pauli(a, i, self.wf.num_spin_orbs)
             op = convert_pauli_to_hybrid_form(
                 op_,
                 self.wf.num_inactive_spin_orbs,
@@ -62,7 +62,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.wf.num_inactive_orbs,
                 self.wf.num_active_orbs,
                 self.wf.num_virtual_orbs,
-                self.wf.num_elec,
             ),
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
@@ -70,7 +69,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
 
         U_matrix = construct_ucc_u(
             self.wf.num_active_spin_orbs,
-            self.wf.num_active_elec,
             self.wf.theta1
             + self.wf.theta2
             + self.wf.theta3

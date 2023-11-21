@@ -51,7 +51,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.wf.num_inactive_orbs,
                 self.wf.num_active_orbs,
                 self.wf.num_virtual_orbs,
-                self.wf.num_elec,
             ),
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
@@ -262,7 +261,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
         muz_op = OperatorPauli({})
         for p in range(self.wf.num_spin_orbs // 2):
             for q in range(self.wf.num_spin_orbs // 2):
-                Epq_op = epq_pauli(p, q, self.wf.num_spin_orbs, self.wf.num_elec)
+                Epq_op = epq_pauli(p, q, self.wf.num_spin_orbs)
                 if abs(mux[p, q]) > 10**-10:
                     mux_op += mux[p, q] * Epq_op
                 if abs(muy[p, q]) > 10**-10:

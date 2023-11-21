@@ -44,16 +44,13 @@ def a_op_spin_matrix(
     return kronecker_product_cached(prior, after, "a", False, True)
 
 
-def epq_matrix(
-    p: int, q: int, num_spin_orbs: int, num_elec: int, use_csr: int = 10
-) -> np.ndarray | ss.csr_matrix:
+def epq_matrix(p: int, q: int, num_spin_orbs: int, use_csr: int = 10) -> np.ndarray | ss.csr_matrix:
     """Contruct Epq operator.
 
     Args:
         p: Orbital index.
         q: Orbital index.
         num_spin_orbs: Number of spin orbitals.
-        num_elec: Number of electrons.
         use_csr: Size when to use sparse matrices.
 
     Returns:

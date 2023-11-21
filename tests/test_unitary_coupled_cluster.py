@@ -204,7 +204,7 @@ def test_h4_sto3g_oouccsd() -> None:
     WF.run_ucc("SD", True)
     assert abs(WF.energy_elec - (-5.211066791547)) < 10**-8
     # Test sparse matrix also works
-    H = hamiltonian_pauli(WF.h_mo, WF.g_mo, WF.num_orbs, WF.num_elec)
+    H = hamiltonian_pauli(WF.h_mo, WF.g_mo, WF.num_orbs)
     assert (
         abs(WF.energy_elec - expectation_value_pauli(WF.state_vector, H, WF.state_vector, use_csr=0))
         < 10**-8
@@ -238,7 +238,7 @@ def test_h4_sto3g_oouccd() -> None:
     WF.run_ucc("D", True)
     assert abs(WF.energy_elec - (-5.211066791547)) < 10**-8
     # Test sparse matrix also works
-    H = hamiltonian_pauli(WF.h_mo, WF.g_mo, WF.num_orbs, WF.num_elec)
+    H = hamiltonian_pauli(WF.h_mo, WF.g_mo, WF.num_orbs)
     assert (
         abs(WF.energy_elec - expectation_value_pauli(WF.state_vector, H, WF.state_vector, use_csr=0))
         < 10**-8
