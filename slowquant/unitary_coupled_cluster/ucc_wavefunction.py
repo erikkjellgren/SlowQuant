@@ -642,7 +642,7 @@ class WaveFunctionUCC:
             orbital_optimization: Do orbital optimization.
             is_silent: Do not print any output.
             convergence_threshold: Energy threshold for convergence.
-            maxiter: maximum number of iterations
+            maxiter: Maximum number of iterations.
         """
         excitations = excitations.lower()
         self._excitations = excitations
