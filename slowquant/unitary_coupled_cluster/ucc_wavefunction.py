@@ -1273,6 +1273,7 @@ def load_wavefunction(filename: str) -> WaveFunctionUCC:
         bool(dat["is_generalized"]),
         bool(dat["include_active_kappa"]),
     )
+    wf._excitations = str(dat["excitations"])
     wf.add_multiple_theta(
         {
             "theta1": list(dat["theta1"]),
@@ -1282,11 +1283,22 @@ def load_wavefunction(filename: str) -> WaveFunctionUCC:
             "theta5": list(dat["theta5"]),
             "theta6": list(dat["theta6"]),
         },
-        str(dat["excitations"]),
+        wf._excitations,
     )
-    energy = energy_ucc(
-        wf.theta1 + wf.theta2 + wf.theta3 + wf.theta4 + wf.theta5 + wf.theta6, "sdtq56", False, wf
-    )
+    thetas = []
+    if "s" in wf._excitations:
+        thetas += wf.theta1
+    if "d" in wf._excitations:
+        thetas += wf.theta2
+    if "t" in wf._excitations:
+        thetas += wf.theta3
+    if "q" in wf._excitations:
+        thetas += wf.theta4
+    if "5" in wf._excitations:
+        thetas += wf.theta5
+    if "6" in wf._excitations:
+        thetas += wf.theta6
+    energy = energy_ucc(thetas, wf._excitations, False, wf)
     if abs(energy - float(dat["energy_elec"])) > 10**-6:
         raise ValueError(
             f'Calculate energy is different from saved energy: {energy} and {float(dat["energy_elec"])}.'
