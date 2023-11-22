@@ -633,6 +633,7 @@ class WaveFunctionUCC:
         orbital_optimization: bool = False,
         is_silent: bool = False,
         convergence_threshold: float = 10**-10,
+        maxiter: int = 100,
     ) -> None:
         """Run optimization of UCC wave function.
 
@@ -641,6 +642,7 @@ class WaveFunctionUCC:
             orbital_optimization: Do orbital optimization.
             is_silent: Do not print any output.
             convergence_threshold: Energy threshold for convergence.
+            maxiter: maximum number of iterations
         """
         excitations = excitations.lower()
         self._excitations = excitations
@@ -782,6 +784,7 @@ class WaveFunctionUCC:
                 callback=print_progress,
                 method="SLSQP",
                 jac=parameter_gradient,
+                options={"maxiter": maxiter},
             )
         self.energy_elec = res["fun"]
         param_idx = 0
