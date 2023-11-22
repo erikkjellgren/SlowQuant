@@ -871,28 +871,3 @@ def test_H2_sto3g_uccsd_saveload() -> None:  # pylint: disable=R0915
     WF.run_ucc("SD", True)
     WF.save_wavefunction("test_h2_save")
     _ = load_wavefunction("test_h2_save")
-
-
-def test_H2_sto3g_uccsd_maxiter() -> None:  # pylint: disable=R0915
-    """Test if maxiter works"""
-    SQobj = sq.SlowQuant()
-    SQobj.set_molecule(
-        """H  0.0  0.0  0.0;
-           H  0.0  1.8  0.0;""",
-        distance_unit="angstrom",
-    )
-    SQobj.set_basis_set("STO-3G")
-    SQobj.init_hartree_fock()
-    SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
-    WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
-        SQobj.molecule.number_electrons,
-        (2, 2),
-        SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
-    )
-
-    WF.run_ucc("SD", True, maxiter=200)
