@@ -513,6 +513,8 @@ def hamiltonian_pauli_1i_1a(
         for q in range(num_orbs):
             if p >= virtual_start and q >= virtual_start:
                 continue
+            if p < num_inactive_orbs and q < num_inactive_orbs and p != q:
+                continue
             if abs(h_mo[p, q]) > 10**-12:
                 hamiltonian_operator += h_mo[p, q] * epq_pauli(p, q, 2 * num_orbs)
     for p in range(num_orbs):
@@ -530,15 +532,30 @@ def hamiltonian_pauli_1i_1a(
                         num_virt += 1
                     if num_virt > 1:
                         continue
-                    if (q < num_inactive_orbs and s < num_inactive_orbs) and (
-                        p >= num_inactive_orbs and s >= num_inactive_orbs
-                    ):
+                    num_act = 0
+                    if p < num_inactive_orbs:
+                        num_act += 1
+                    if q < num_inactive_orbs:
+                        num_act += 1
+                    if r < num_inactive_orbs:
+                        num_act += 1
+                    if s < num_inactive_orbs:
+                        num_act += 1
+                    if p < num_inactive_orbs and q < num_inactive_orbs and p == q:
+                        num_act -= 2
+                    if r < num_inactive_orbs and s < num_inactive_orbs and r == s:
+                        num_act -= 2
+                    if p < num_inactive_orbs and s < num_inactive_orbs and p == s:
+                        num_act -= 2
+                    if q < num_inactive_orbs and r < num_inactive_orbs and q == r:
+                        num_act -= 2
+                    if num_act > 1:
                         continue
                     if abs(g_mo[p, q, r, s]) > 10**-12:
                         hamiltonian_operator += (
                             1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, 2 * num_orbs)
                         )
-    return hamiltonian_operator
+    return hamiltonian_operator.screen_terms(1, 1, 2 * num_inactive_orbs, 2 * num_virtual_orbs)
 
 
 def hamiltonian_pauli_2i_2a(
@@ -582,11 +599,30 @@ def hamiltonian_pauli_2i_2a(
                         num_virt += 1
                     if num_virt > 2:
                         continue
+                    num_act = 0
+                    if p < num_inactive_orbs:
+                        num_act += 1
+                    if q < num_inactive_orbs:
+                        num_act += 1
+                    if r < num_inactive_orbs:
+                        num_act += 1
+                    if s < num_inactive_orbs:
+                        num_act += 1
+                    if p < num_inactive_orbs and q < num_inactive_orbs and p == q:
+                        num_act -= 2
+                    if r < num_inactive_orbs and s < num_inactive_orbs and r == s:
+                        num_act -= 2
+                    if p < num_inactive_orbs and s < num_inactive_orbs and p == s:
+                        num_act -= 2
+                    if q < num_inactive_orbs and r < num_inactive_orbs and q == r:
+                        num_act -= 2
+                    if num_act > 2:
+                        continue
                     if abs(g_mo[p, q, r, s]) > 10**-12:
                         hamiltonian_operator += (
                             1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, 2 * num_orbs)
                         )
-    return hamiltonian_operator
+    return hamiltonian_operator.screen_terms(2, 2, 2 * num_inactive_orbs, 2 * num_virtual_orbs)
 
 
 def commutator_pauli(A: OperatorPauli, B: OperatorPauli) -> OperatorPauli:
