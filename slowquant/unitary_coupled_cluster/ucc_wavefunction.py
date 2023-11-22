@@ -19,6 +19,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
 from slowquant.unitary_coupled_cluster.operator_hybrid import (
     convert_pauli_to_hybrid_form,
     expectation_value_hybrid,
+    expectation_value_hybrid_flow,
 )
 from slowquant.unitary_coupled_cluster.operator_pauli import (
     energy_hamiltonian_pauli,
@@ -1117,7 +1118,7 @@ def active_space_parameter_gradient(
         eps = np.finfo(np.float64).eps ** (1 / 3)
     if finite_diff_type == "forward":
         eps = np.finfo(np.float64).eps ** (1 / 2)
-        E = expectation_value_hybrid(wf.state_vector, Hamiltonian, wf.state_vector)
+        E = expectation_value_hybrid_flow(wf.state_vector, [Hamiltonian], wf.state_vector, is_folded=True)
     for i, _ in enumerate(theta_params):
         sign_step = (theta_params[i] >= 0).astype(float) * 2 - 1
         step_size = eps * sign_step * max(1, abs(theta_params[i]))
@@ -1143,7 +1144,9 @@ def active_space_parameter_gradient(
             theta_dict["theta6"] = theta_params[idx : idx + len(theta6)]
             idx += len(theta6)
         wf.add_multiple_theta(theta_dict, excitations)
-        E_plus = expectation_value_hybrid(wf.state_vector, Hamiltonian, wf.state_vector)
+        E_plus = expectation_value_hybrid_flow(
+            wf.state_vector, [Hamiltonian], wf.state_vector, is_folded=True
+        )
         theta_params[i] -= step_size
         theta_dict = {}
         idx = 0
@@ -1187,7 +1190,9 @@ def active_space_parameter_gradient(
             if "6" in excitations:
                 theta_dict["theta6"] = theta_params[idx : idx + len(theta6)]
                 idx += len(theta6)
-            E_minus = expectation_value_hybrid(wf.state_vector, Hamiltonian, wf.state_vector)
+            E_minus = expectation_value_hybrid_flow(
+                wf.state_vector, [Hamiltonian], wf.state_vector, is_folded=True
+            )
             gradient_theta[i] = (E_plus - E_minus) / (2 * step_size)
             theta_params[i] += step_size
             theta_dict = {}

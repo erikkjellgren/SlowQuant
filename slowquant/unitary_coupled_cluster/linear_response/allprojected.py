@@ -140,28 +140,42 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     continue
                 # Make A
                 val = expectation_value_hybrid_flow(
-                    self.wf.state_vector, [GI.dagger, self.H_en, GJ], self.wf.state_vector
+                    self.wf.state_vector, [GI.dagger, self.H_en, GJ], self.wf.state_vector, is_folded=True
                 )
                 val -= (
-                    expectation_value_hybrid_flow(self.wf.state_vector, [GI.dagger, GJ], self.wf.state_vector)
+                    expectation_value_hybrid_flow(
+                        self.wf.state_vector, [GI.dagger, GJ], self.wf.state_vector, is_folded=True
+                    )
                     * self.wf.energy_elec
                 )
                 val -= expectation_value_hybrid_flow(
-                    self.wf.state_vector, [GI.dagger], self.wf.state_vector
-                ) * expectation_value_hybrid_flow(self.wf.state_vector, [self.H_en, GJ], self.wf.state_vector)
+                    self.wf.state_vector, [GI.dagger], self.wf.state_vector, is_folded=True
+                ) * expectation_value_hybrid_flow(
+                    self.wf.state_vector, [self.H_en, GJ], self.wf.state_vector, is_folded=True
+                )
                 val += (
-                    expectation_value_hybrid_flow(self.wf.state_vector, [GI.dagger], self.wf.state_vector)
-                    * expectation_value_hybrid_flow(self.wf.state_vector, [GJ], self.wf.state_vector)
+                    expectation_value_hybrid_flow(
+                        self.wf.state_vector, [GI.dagger], self.wf.state_vector, is_folded=True
+                    )
+                    * expectation_value_hybrid_flow(
+                        self.wf.state_vector, [GJ], self.wf.state_vector, is_folded=True
+                    )
                     * self.wf.energy_elec
                 )
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
                 # Make B
                 val = expectation_value_hybrid_flow(
                     self.wf.state_vector, [GI.dagger, self.H_en], self.wf.state_vector
-                ) * expectation_value_hybrid_flow(self.wf.state_vector, [GJ.dagger], self.wf.state_vector)
+                ) * expectation_value_hybrid_flow(
+                    self.wf.state_vector, [GJ.dagger], self.wf.state_vector, is_folded=True
+                )
                 val -= (
-                    expectation_value_hybrid_flow(self.wf.state_vector, [GI.dagger], self.wf.state_vector)
-                    * expectation_value_hybrid_flow(self.wf.state_vector, [GJ.dagger], self.wf.state_vector)
+                    expectation_value_hybrid_flow(
+                        self.wf.state_vector, [GI.dagger], self.wf.state_vector, is_folded=True
+                    )
+                    * expectation_value_hybrid_flow(
+                        self.wf.state_vector, [GJ.dagger], self.wf.state_vector, is_folded=True
+                    )
                     * self.wf.energy_elec
                 )
                 self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
@@ -169,10 +183,14 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[
                     j + idx_shift, i + idx_shift
                 ] = expectation_value_hybrid_flow(
-                    self.wf.state_vector, [GI.dagger, GJ], self.wf.state_vector
+                    self.wf.state_vector, [GI.dagger, GJ], self.wf.state_vector, is_folded=True
                 ) - (
-                    expectation_value_hybrid_flow(self.wf.state_vector, [GI.dagger], self.wf.state_vector)
-                    * expectation_value_hybrid_flow(self.wf.state_vector, [GJ], self.wf.state_vector)
+                    expectation_value_hybrid_flow(
+                        self.wf.state_vector, [GI.dagger], self.wf.state_vector, is_folded=True
+                    )
+                    * expectation_value_hybrid_flow(
+                        self.wf.state_vector, [GJ], self.wf.state_vector, is_folded=True
+                    )
                 )
 
     def get_excited_state_norm(self) -> np.ndarray:

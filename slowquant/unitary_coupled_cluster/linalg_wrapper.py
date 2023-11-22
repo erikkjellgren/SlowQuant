@@ -19,7 +19,9 @@ def matmul(
         if not isinstance(B, np.ndarray):
             raise TypeError(f"A and B are not same matrix type.\nA type: {type(A)}\nB type: {type(B)}")
     elif isinstance(A, (ss.csr_matrix, ss.csc_matrix)):
-        if not isinstance(B, ss.csr_matrix) and not isinstance(B, ss.csc_matrix):
+        if not isinstance(B, (ss.csr_matrix, ss.csc_matrix, ss.csr_array)) and not isinstance(
+            B, (ss.csr_matrix, ss.csc_matrix, ss.csr_array)
+        ):
             raise TypeError(f"A and B are not same matrix type.\nA type: {type(A)}\nB type: {type(B)}")
     if isinstance(A, np.ndarray):
         return np.matmul(A, B)

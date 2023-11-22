@@ -161,7 +161,11 @@ class StateVectorOperator:
 
 
 def expectation_value_hybrid_flow(
-    state_vec: StateVector, operators: list[OperatorHybrid], ref_vec: StateVector
+    state_vec: StateVector,
+    operators: list[OperatorHybrid],
+    ref_vec: StateVector,
+    use_csr: int = 10,
+    is_folded: bool = False,
 ) -> float:
     """Calculate expectation value of operator.
 
@@ -169,63 +173,84 @@ def expectation_value_hybrid_flow(
         state_vec: Bra state vector.
         operators: List of operators.
         ref_vec: Ket state vector.
+        use_csr: Number of spin orbitals for which csr is used.
+        is_folded: Use folded operators.
 
     Returns:
         Expectation value of operator.
     """
-    if len(state_vec.inactive) != 0:
-        num_inactive_spin_orbs = len(state_vec.inactive[0])
+    if is_folded:
+        if len(state_vec._active_onvector) >= use_csr:
+            bra = state_vec.active_csr
+            ket = ref_vec.active_csr
+        else:
+            bra = state_vec.active
+            ket = ref_vec.active
+        for operator in operators:
+            bra = lw.matmul(bra, operator.folded_operator)
+        if isinstance(bra, (ss.csr_matrix, ss.csc_matrix)):
+            val = (bra.dot(ket.T)).todense()[0, 0]
+        else:
+            val = bra.dot(ket)
+        return np.real(val)
     else:
-        num_inactive_spin_orbs = 0
-    if len(state_vec.virtual) != 0:
-        num_virtual_spin_orbs = len(state_vec.virtual[0])
-    else:
-        num_virtual_spin_orbs = 0
-    if len(state_vec._active_onvector) >= 10:
-        state_vector = StateVectorOperator(
-            {
-                "o" * num_inactive_spin_orbs
-                + "z"
-                * num_virtual_spin_orbs: StateVectorOperatorData(
-                    "o" * num_inactive_spin_orbs, state_vec.bra_active_csr, "z" * num_virtual_spin_orbs
-                )
-            }
-        )
-        ref_vector = StateVectorOperator(
-            {
-                "o" * num_inactive_spin_orbs
-                + "z"
-                * num_virtual_spin_orbs: StateVectorOperatorData(
-                    "o" * num_inactive_spin_orbs, ref_vec.bra_active_csr, "z" * num_virtual_spin_orbs
-                )
-            }
-        )
-    else:
-        state_vector = StateVectorOperator(
-            {
-                "o" * num_inactive_spin_orbs
-                + "z"
-                * num_virtual_spin_orbs: StateVectorOperatorData(
-                    "o" * num_inactive_spin_orbs, state_vec.ket_active, "z" * num_virtual_spin_orbs
-                )
-            }
-        )
-        ref_vector = StateVectorOperator(
-            {
-                "o" * num_inactive_spin_orbs
-                + "z"
-                * num_virtual_spin_orbs: StateVectorOperatorData(
-                    "o" * num_inactive_spin_orbs, ref_vec.ket_active, "z" * num_virtual_spin_orbs
-                )
-            }
-        )
-    for operator in operators:
-        state_vector = state_vector * operator
-    return state_vector * ref_vector
+        if len(state_vec.inactive) != 0:
+            num_inactive_spin_orbs = len(state_vec.inactive[0])
+        else:
+            num_inactive_spin_orbs = 0
+        if len(state_vec.virtual) != 0:
+            num_virtual_spin_orbs = len(state_vec.virtual[0])
+        else:
+            num_virtual_spin_orbs = 0
+        if len(state_vec._active_onvector) >= use_csr:
+            state_vector = StateVectorOperator(
+                {
+                    "o" * num_inactive_spin_orbs
+                    + "z"
+                    * num_virtual_spin_orbs: StateVectorOperatorData(
+                        "o" * num_inactive_spin_orbs, state_vec.bra_active_csr, "z" * num_virtual_spin_orbs
+                    )
+                }
+            )
+            ref_vector = StateVectorOperator(
+                {
+                    "o" * num_inactive_spin_orbs
+                    + "z"
+                    * num_virtual_spin_orbs: StateVectorOperatorData(
+                        "o" * num_inactive_spin_orbs, ref_vec.bra_active_csr, "z" * num_virtual_spin_orbs
+                    )
+                }
+            )
+        else:
+            state_vector = StateVectorOperator(
+                {
+                    "o" * num_inactive_spin_orbs
+                    + "z"
+                    * num_virtual_spin_orbs: StateVectorOperatorData(
+                        "o" * num_inactive_spin_orbs, state_vec.ket_active, "z" * num_virtual_spin_orbs
+                    )
+                }
+            )
+            ref_vector = StateVectorOperator(
+                {
+                    "o" * num_inactive_spin_orbs
+                    + "z"
+                    * num_virtual_spin_orbs: StateVectorOperatorData(
+                        "o" * num_inactive_spin_orbs, ref_vec.ket_active, "z" * num_virtual_spin_orbs
+                    )
+                }
+            )
+        for operator in operators:
+            state_vector = state_vector * operator
+        return state_vector * ref_vector
 
 
 def expectation_value_hybrid_flow_commutator(
-    state_vec: StateVector, A: OperatorHybrid, B: OperatorHybrid, ref_vec: StateVector
+    state_vec: StateVector,
+    A: OperatorHybrid,
+    B: OperatorHybrid,
+    ref_vec: StateVector,
+    is_folded: bool = False,
 ) -> float:
     r"""Calculate expectation value of commutator.
 
@@ -237,17 +262,23 @@ def expectation_value_hybrid_flow_commutator(
         A: First operator in commutator.
         B: Second operator in commutator.
         ref_vec: Ket state vector.
+        is_folded: Use folded operators.
 
     Returns:
         Expectation value of commutator.
     """
-    return expectation_value_hybrid_flow(state_vec, [A, B], ref_vec) - expectation_value_hybrid_flow(
-        state_vec, [B, A], ref_vec
-    )
+    return expectation_value_hybrid_flow(
+        state_vec, [A, B], ref_vec, is_folded=is_folded
+    ) - expectation_value_hybrid_flow(state_vec, [B, A], ref_vec, is_folded=is_folded)
 
 
 def expectation_value_hybrid_flow_double_commutator(
-    state_vec: StateVector, A: OperatorHybrid, B: OperatorHybrid, C: OperatorHybrid, ref_vec: StateVector
+    state_vec: StateVector,
+    A: OperatorHybrid,
+    B: OperatorHybrid,
+    C: OperatorHybrid,
+    ref_vec: StateVector,
+    is_folded: bool = False,
 ) -> float:
     r"""Calculate expectation value of double commutator.
 
@@ -260,15 +291,16 @@ def expectation_value_hybrid_flow_double_commutator(
         B: Second operator in commutator.
         C: Third operator in commutator.
         ref_vec: Ket state vector.
+        is_folded: Use folded operators.
 
     Returns:
         Expectation value of double commutator.
     """
     return (
-        expectation_value_hybrid_flow(state_vec, [A, B, C], ref_vec)
-        - expectation_value_hybrid_flow(state_vec, [A, C, B], ref_vec)
-        - expectation_value_hybrid_flow(state_vec, [B, C, A], ref_vec)
-        + expectation_value_hybrid_flow(state_vec, [C, B, A], ref_vec)
+        expectation_value_hybrid_flow(state_vec, [A, B, C], ref_vec, is_folded=is_folded)
+        - expectation_value_hybrid_flow(state_vec, [A, C, B], ref_vec, is_folded=is_folded)
+        - expectation_value_hybrid_flow(state_vec, [B, C, A], ref_vec, is_folded=is_folded)
+        + expectation_value_hybrid_flow(state_vec, [C, B, A], ref_vec, is_folded=is_folded)
     )
 
 
@@ -331,6 +363,23 @@ class OperatorHybrid:
             operator: Dictonary form of hybrid operator.
         """
         self.operators = operator
+        self._folded_operator = None
+
+    @property
+    def folded_operator(self) -> np.ndarray:
+        """Create a form of the operator where the inactive and virtual part has been evaluated."""
+        if self._folded_operator is None:
+            key = list(self.operators.keys())[0]
+            self._folded_operator = lw.zeros_like(self.operators[key].active_matrix)
+            for key in self.operators.keys():
+                if "X" in key or "Y" in key:
+                    raise ValueError(
+                        f"Cannot fold an operator that has X or Y in the inactive or virtual space. Inactive space: {self.operators[key].inactive_pauli}. Virtual space: {self.operators[key].virtual_pauli}"
+                    )
+                self._folded_operator += self.operators[key].active_matrix * (-1) ** self.operators[
+                    key
+                ].inactive_pauli.count("Z")
+        return self._folded_operator
 
     def __add__(self, hybridop: OperatorHybrid) -> OperatorHybrid:
         """Overload addition operator.

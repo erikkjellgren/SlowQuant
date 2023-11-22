@@ -69,10 +69,10 @@ class LinearResponseUCC(LinearResponseBaseClass):
         grad = np.zeros(2 * len(self.G_ops))
         for i, op in enumerate(self.G_ops):
             grad[i] = expectation_value_hybrid_flow_commutator(
-                self.wf.state_vector, self.H_1i_1a, op.operator, self.wf.state_vector
+                self.wf.state_vector, self.H_en, op.operator, self.wf.state_vector, is_folded=True
             )
             grad[i + len(self.G_ops)] = expectation_value_hybrid_flow_commutator(
-                self.wf.state_vector, op.operator.dagger, self.H_1i_1a, self.wf.state_vector
+                self.wf.state_vector, op.operator.dagger, self.H_en, self.wf.state_vector, is_folded=True
             )
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
@@ -128,19 +128,24 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.A[i + idx_shift, j + idx_shift] = self.A[
                     j + idx_shift, i + idx_shift
                 ] = expectation_value_hybrid_flow_double_commutator(
-                    self.wf.state_vector, GI.dagger, self.H_en, GJ, self.wf.state_vector
+                    self.wf.state_vector, GI.dagger, self.H_en, GJ, self.wf.state_vector, is_folded=True
                 )
                 # Make B
                 self.B[i + idx_shift, j + idx_shift] = self.B[
                     j + idx_shift, i + idx_shift
                 ] = expectation_value_hybrid_flow_double_commutator(
-                    self.wf.state_vector, GI.dagger, self.H_en, GJ.dagger, self.wf.state_vector
+                    self.wf.state_vector,
+                    GI.dagger,
+                    self.H_en,
+                    GJ.dagger,
+                    self.wf.state_vector,
+                    is_folded=True,
                 )
                 # Make Sigma
                 self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[
                     j + idx_shift, i + idx_shift
                 ] = expectation_value_hybrid_flow_commutator(
-                    self.wf.state_vector, GI.dagger, GJ, self.wf.state_vector
+                    self.wf.state_vector, GI.dagger, GJ, self.wf.state_vector, is_folded=True
                 )
 
     def get_excited_state_norm(self) -> np.ndarray:

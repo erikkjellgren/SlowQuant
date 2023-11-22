@@ -104,10 +104,10 @@ class LinearResponseUCC(LinearResponseBaseClass):
         grad = np.zeros(2 * len(self.G_ops))
         for i, op in enumerate(self.G_ops):
             grad[i] = -expectation_value_hybrid_flow(
-                self.wf.state_vector, [self.H_1i_1a, self.U, op.operator], self.csf
+                self.wf.state_vector, [self.H_en, self.U, op.operator], self.csf, is_folded=True
             )
             grad[i + len(self.G_ops)] = expectation_value_hybrid_flow(
-                self.csf, [op.operator.dagger, self.U.dagger, self.H_1i_1a], self.wf.state_vector
+                self.csf, [op.operator.dagger, self.U.dagger, self.H_en], self.wf.state_vector, is_folded=True
             )
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
@@ -145,7 +145,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     continue
                 # Make A
                 val = expectation_value_hybrid_flow(
-                    self.csf, [GI.dagger, self.U.dagger, self.H_en, self.U, GJ], self.csf
+                    self.csf, [GI.dagger, self.U.dagger, self.H_en, self.U, GJ], self.csf, is_folded=True
                 )
                 if i == j:
                     val -= self.wf.energy_elec
