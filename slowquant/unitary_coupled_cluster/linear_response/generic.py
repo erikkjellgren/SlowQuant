@@ -24,7 +24,7 @@ from slowquant.unitary_coupled_cluster.operator_pauli import (
     hamiltonian_pauli_2i_2a,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
-from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_ucc_u
+from slowquant.unitary_coupled_cluster.util import ThetaPicker
 
 
 class LinearResponseUCC(LinearResponseBaseClass):
@@ -50,17 +50,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
         q_ops_tmp = []
         num_spin_orbs = self.wf.num_spin_orbs
         excitations = excitations.lower()
-        U = construct_ucc_u(
-            self.wf.num_active_spin_orbs,
-            self.wf.theta1
-            + self.wf.theta2
-            + self.wf.theta3
-            + self.wf.theta4
-            + self.wf.theta5
-            + self.wf.theta6,
-            self.wf.singlet_excitation_operator_generator,
-            "sdtq56",  # self.wf._excitations,
-        )
         if operator_type.lower() in ("projected", "statetransfer"):
             projection = make_projection_operator(self.wf.state_vector)
             self.projection = projection
@@ -108,12 +97,12 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 )
                 self.G_ops.append(G - G_diff)
             elif operator_type.lower() == "selfconsistent":
-                G = G.apply_u_from_right(U.conj().transpose())
-                G = G.apply_u_from_left(U)
+                G = G.apply_u_from_right(self.wf.u.conj().transpose())
+                G = G.apply_u_from_left(self.wf.u)
                 self.G_ops.append(G)
             elif operator_type.lower() == "statetransfer":
-                G = G.apply_u_from_right(U.conj().transpose())
-                G = G.apply_u_from_left(U)
+                G = G.apply_u_from_right(self.wf.u.conj().transpose())
+                G = G.apply_u_from_left(self.wf.u)
                 G = G * projection
                 self.G_ops.append(G)
         for q in q_ops_tmp:

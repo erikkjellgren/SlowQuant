@@ -87,6 +87,8 @@ class WaveFunctionUCC:
         self._rdm4 = None
         self._h_mo = None
         self._g_mo = None
+        self._u_number_spin_conserving = None
+        self._u = None
         active_space = []
         orbital_counter = 0
         for i in range(num_elec - cas[0], num_elec):
@@ -282,6 +284,65 @@ class WaveFunctionUCC:
         self._c_orthonormal = c
 
     @property
+    def u_number_spin_conserving(self) -> np.ndarray:
+        """Get unitary that only work on number and spin conserving states.
+
+        Return:
+            Unitary that only works on number and spin conserving states.
+        """
+        if self._u_number_spin_conserving is None:
+            thetas = []
+            if "s" in self._excitations:
+                thetas += self.theta1
+            if "d" in self._excitations:
+                thetas += self.theta2
+            if "t" in self._excitations:
+                thetas += self.theta3
+            if "q" in self._excitations:
+                thetas += self.theta4
+            if "5" in self._excitations:
+                thetas += self.theta5
+            if "6" in self._excitations:
+                thetas += self.theta6
+            self._u_number_spin_conserving = construct_ucc_u(
+                self.num_active_spin_orbs,
+                thetas,
+                self.singlet_excitation_operator_generator,
+                self._excitations,
+                allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
+            )
+        return self._u_number_spin_conserving
+
+    @property
+    def u(self) -> np.ndarray:
+        """Get unitary ansatz.
+
+        Return:
+            Unitary ansatz.
+        """
+        if self._u is None:
+            thetas = []
+            if "s" in self._excitations:
+                thetas += self.theta1
+            if "d" in self._excitations:
+                thetas += self.theta2
+            if "t" in self._excitations:
+                thetas += self.theta3
+            if "q" in self._excitations:
+                thetas += self.theta4
+            if "5" in self._excitations:
+                thetas += self.theta5
+            if "6" in self._excitations:
+                thetas += self.theta6
+            self._u = construct_ucc_u(
+                self.num_active_spin_orbs,
+                thetas,
+                self.singlet_excitation_operator_generator,
+                self._excitations,
+            )
+        return self._u
+
+    @property
     def theta1(self) -> list[float]:
         """Get theta1 values.
 
@@ -303,16 +364,12 @@ class WaveFunctionUCC:
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
+        self._u_number_spin_conserving = None
+        self._u = None
         self._theta1 = theta.copy()
-        U = construct_ucc_u(
-            self.num_active_spin_orbs,
-            self.theta1 + self.theta2 + self.theta3 + self.theta4 + self.theta5 + self.theta6,
-            self.singlet_excitation_operator_generator,
-            "sdtq56",  # self._excitations,
-            allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
-        )
         self.state_vector.new_u(
-            U, allowed_states=self.state_vector.allowed_active_states_number_spin_conserving
+            self.u_number_spin_conserving,
+            allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
         )
 
     @property
@@ -337,16 +394,12 @@ class WaveFunctionUCC:
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
+        self._u_number_spin_conserving = None
+        self._u = None
         self._theta2 = theta.copy()
-        U = construct_ucc_u(
-            self.num_active_spin_orbs,
-            self.theta1 + self.theta2 + self.theta3 + self.theta4 + self.theta5 + self.theta6,
-            self.singlet_excitation_operator_generator,
-            "sdtq56",  # self._excitations,
-            allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
-        )
         self.state_vector.new_u(
-            U, allowed_states=self.state_vector.allowed_active_states_number_spin_conserving
+            self.u_number_spin_conserving,
+            allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
         )
 
     @property
@@ -371,16 +424,12 @@ class WaveFunctionUCC:
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
+        self._u_number_spin_conserving = None
+        self._u = None
         self._theta3 = theta.copy()
-        U = construct_ucc_u(
-            self.num_active_spin_orbs,
-            self.theta1 + self.theta2 + self.theta3 + self.theta4 + self.theta5 + self.theta6,
-            self.singlet_excitation_operator_generator,
-            "sdtq56",  # self._excitations,
-            allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
-        )
         self.state_vector.new_u(
-            U, allowed_states=self.state_vector.allowed_active_states_number_spin_conserving
+            self.u_number_spin_conserving,
+            allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
         )
 
     @property
@@ -405,16 +454,12 @@ class WaveFunctionUCC:
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
+        self._u_number_spin_conserving = None
+        self._u = None
         self._theta4 = theta.copy()
-        U = construct_ucc_u(
-            self.num_active_spin_orbs,
-            self.theta1 + self.theta2 + self.theta3 + self.theta4 + self.theta5 + self.theta6,
-            self.singlet_excitation_operator_generator,
-            "sdtq56",  # self._excitations,
-            allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
-        )
         self.state_vector.new_u(
-            U, allowed_states=self.state_vector.allowed_active_states_number_spin_conserving
+            self.u_number_spin_conserving,
+            allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
         )
 
     @property
@@ -439,16 +484,12 @@ class WaveFunctionUCC:
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
+        self._u_number_spin_conserving = None
+        self._u = None
         self._theta5 = theta.copy()
-        U = construct_ucc_u(
-            self.num_active_spin_orbs,
-            self.theta1 + self.theta2 + self.theta3 + self.theta4 + self.theta5 + self.theta6,
-            self.singlet_excitation_operator_generator,
-            "sdtq56",  # self._excitations,
-            allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
-        )
         self.state_vector.new_u(
-            U, allowed_states=self.state_vector.allowed_active_states_number_spin_conserving
+            self.u_number_spin_conserving,
+            allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
         )
 
     @property
@@ -473,16 +514,12 @@ class WaveFunctionUCC:
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
+        self._u_number_spin_conserving = None
+        self._u = None
         self._theta6 = theta.copy()
-        U = construct_ucc_u(
-            self.num_active_spin_orbs,
-            self.theta1 + self.theta2 + self.theta3 + self.theta4 + self.theta5 + self.theta6,
-            self.singlet_excitation_operator_generator,
-            "sdtq56",  # self._excitations,
-            allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
-        )
         self.state_vector.new_u(
-            U, allowed_states=self.state_vector.allowed_active_states_number_spin_conserving
+            self.u_number_spin_conserving,
+            allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
         )
 
     def add_multiple_theta(self, theta: dict[str, list[float]], excitations: str) -> None:
@@ -508,15 +545,11 @@ class WaveFunctionUCC:
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
-        U = construct_ucc_u(
-            self.num_active_spin_orbs,
-            self.theta1 + self.theta2 + self.theta3 + self.theta4 + self.theta5 + self.theta6,
-            self.singlet_excitation_operator_generator,
-            "sdtq56",  # self._excitations,
-            allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
-        )
+        self._u_number_spin_conserving = None
+        self._u = None
         self.state_vector.new_u(
-            U, allowed_states=self.state_vector.allowed_active_states_number_spin_conserving
+            self.u_number_spin_conserving,
+            allowed_states=self.state_vector.allowed_active_states_number_spin_conserving,
         )
 
     @property
@@ -571,14 +604,16 @@ class WaveFunctionUCC:
         if self._rdm1 is None:
             self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs))
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                for q in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                    self._rdm1[
-                        p - self.num_inactive_orbs, q - self.num_inactive_orbs
-                    ] = expectation_value_pauli(
+                p_idx = p - self.num_inactive_orbs
+                for q in range(self.num_inactive_orbs, p + 1):
+                    q_idx = q - self.num_inactive_orbs
+                    val = expectation_value_pauli(
                         self.state_vector,
                         epq_pauli(p, q, self.num_spin_orbs),
                         self.state_vector,
                     )
+                    self._rdm1[p_idx, q_idx] = val
+                    self._rdm1[q_idx, p_idx] = val
         return self._rdm1
 
     @property
