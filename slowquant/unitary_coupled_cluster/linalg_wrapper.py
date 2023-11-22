@@ -56,7 +56,7 @@ def zeros_like(A: np.ndarray | ss.csr_matrix | ss.csc_matrix) -> np.ndarray | ss
     if isinstance(A, np.ndarray):
         return np.zeros_like(A)
     if isinstance(A, (ss.csr_matrix, ss.csc_matrix)):
-        return ss.csr_array(A.shape)
+        return ss.csr_matrix(A.shape)
     raise TypeError(f"A got unsupported type: {type(A)}")
 
 

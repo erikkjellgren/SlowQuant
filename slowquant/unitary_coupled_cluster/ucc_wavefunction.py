@@ -17,7 +17,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_gradient,
 )
 from slowquant.unitary_coupled_cluster.operator_hybrid import (
-    convert_pauli_to_hybrid_form,
+    energy_hamiltonian_hybrid,
     expectation_value_hybrid,
 )
 from slowquant.unitary_coupled_cluster.operator_pauli import (
@@ -1102,16 +1102,12 @@ def active_space_parameter_gradient(
         theta5
     ) + len(theta6)
 
-    Hamiltonian = convert_pauli_to_hybrid_form(
-        energy_hamiltonian_pauli(
-            wf.h_mo,
-            wf.g_mo,
-            wf.num_inactive_orbs,
-            wf.num_active_orbs,
-            wf.num_virtual_orbs,
-        ),
-        wf.num_inactive_spin_orbs,
-        wf.num_active_spin_orbs,
+    Hamiltonian = energy_hamiltonian_hybrid(
+        wf.h_mo,
+        wf.g_mo,
+        wf.num_inactive_orbs,
+        wf.num_active_orbs,
+        wf.num_virtual_orbs,
     )
 
     theta_params = theta1 + theta2 + theta3 + theta4 + theta5 + theta6
