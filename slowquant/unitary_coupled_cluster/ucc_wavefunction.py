@@ -39,7 +39,6 @@ class WaveFunctionUCC:
         c_orthonormal: np.ndarray,
         h_ao: np.ndarray,
         g_ao: np.ndarray,
-        is_generalized: bool = False,
         include_active_kappa: bool = False,
     ) -> None:
         """Initialize for UCC wave function.
@@ -52,7 +51,6 @@ class WaveFunctionUCC:
             c_orthonormal: Initial orbital coefficients.
             h_ao: One-electron integrals in AO for Hamiltonian.
             g_ao: Two-electron integrals in AO.
-            is_generalized: Do generalized UCC.
             include_active_kappa: Include active-active orbital rotations.
         """
         if len(cas) != 2:
@@ -73,7 +71,6 @@ class WaveFunctionUCC:
         self.num_elec = num_elec
         self.num_spin_orbs = num_spin_orbs
         self.num_orbs = num_spin_orbs // 2
-        self._is_generalized = is_generalized
         self._include_active_kappa = include_active_kappa
         inactive_on_vector = []
         active_on_vector = []
@@ -207,7 +204,6 @@ class WaveFunctionUCC:
             self.active_occ_spin_idx_shifted,
             self.active_unocc_spin_idx_shifted,
             is_spin_conserving=True,
-            is_generalized=is_generalized,
         )
         # Construct theta1
         self._theta1 = []
@@ -258,7 +254,6 @@ class WaveFunctionUCC:
             num_elec=self.num_elec,
             num_active_elec=self.num_active_elec,
             num_active_orbs=self.num_active_orbs,
-            is_generalized=self._is_generalized,
             include_active_kappa=self._include_active_kappa,
             energy_elec=self.energy_elec,
         )
@@ -1289,7 +1284,6 @@ def load_wavefunction(filename: str) -> WaveFunctionUCC:
         dat["c_trans"],
         dat["h_ao"],
         dat["g_ao"],
-        bool(dat["is_generalized"]),
         bool(dat["include_active_kappa"]),
     )
     excitations = ""

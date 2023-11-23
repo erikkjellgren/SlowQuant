@@ -43,7 +43,6 @@ class ThetaPicker:
         active_occ_spin_idx: Sequence[int],
         active_unocc_spin_idx: Sequence[int],
         is_spin_conserving: bool = False,
-        is_generalized: bool = False,
     ) -> None:
         """Initialize helper class to iterate over active space parameters.
 
@@ -51,14 +50,12 @@ class ThetaPicker:
             active_occ_spin_idx: Spin index of strongly occupied orbitals.
             active_unocc_spin_idx: Spin index of weakly occupied orbitals.
             is_spin_conserving: Generate spin conserving operators.
-            is_generalized: Generate generalized operators.
         """
         self.active_occ_spin_idx: list[int] = []
         self.active_unocc_spin_idx: list[int] = []
         self.active_occ_idx: list[int] = []
         self.active_unocc_idx: list[int] = []
         self.is_spin_conserving = is_spin_conserving
-        self.is_generalized = is_generalized
         for idx in active_occ_spin_idx:
             self.active_occ_spin_idx.append(idx)
             if idx // 2 not in self.active_occ_idx:
@@ -84,7 +81,6 @@ class ThetaPicker:
             self.active_unocc_spin_idx,
             num_spin_orbs,
             self.is_spin_conserving,
-            self.is_generalized,
         )
 
     def get_t2_generator(
@@ -103,7 +99,6 @@ class ThetaPicker:
             self.active_unocc_spin_idx,
             num_spin_orbs,
             self.is_spin_conserving,
-            self.is_generalized,
         )
 
     def get_t3_generator(
@@ -122,7 +117,6 @@ class ThetaPicker:
             self.active_unocc_spin_idx,
             num_spin_orbs,
             self.is_spin_conserving,
-            self.is_generalized,
         )
 
     def get_t4_generator(
@@ -141,7 +135,6 @@ class ThetaPicker:
             self.active_unocc_spin_idx,
             num_spin_orbs,
             self.is_spin_conserving,
-            self.is_generalized,
         )
 
     def get_t5_generator(
@@ -160,7 +153,6 @@ class ThetaPicker:
             self.active_unocc_spin_idx,
             num_spin_orbs,
             self.is_spin_conserving,
-            self.is_generalized,
         )
 
     def get_t6_generator(
@@ -181,7 +173,6 @@ class ThetaPicker:
             self.active_unocc_spin_idx,
             num_spin_orbs,
             self.is_spin_conserving,
-            self.is_generalized,
         )
 
     def get_t1_generator_sa(
@@ -195,8 +186,6 @@ class ThetaPicker:
         Returns:
             T1 operator generator.
         """
-        if self.is_generalized:
-            raise ValueError("Spin-adapted not implemented for generelized operators")
         return iterate_t1_sa(self.active_occ_idx, self.active_unocc_idx, num_spin_orbs)
 
     def get_t2_generator_sa(
@@ -210,8 +199,6 @@ class ThetaPicker:
         Returns:
             T2 operator generator.
         """
-        if self.is_generalized:
-            raise ValueError("Spin-adapted not implemented for generelized operators")
         return iterate_t2_sa(self.active_occ_idx, self.active_unocc_idx, num_spin_orbs)
 
     def get_t1_generator_sa_matrix(
@@ -228,8 +215,6 @@ class ThetaPicker:
         Returns:
             T1 operator generator.
         """
-        if self.is_generalized:
-            raise ValueError("Spin-adapted not implemented for generelized operators")
         return iterate_t1_sa_matrix(
             self.active_occ_idx, self.active_unocc_idx, num_spin_orbs, use_csr=use_csr
         )
@@ -248,8 +233,6 @@ class ThetaPicker:
         Returns:
             T2 operator generator.
         """
-        if self.is_generalized:
-            raise ValueError("Spin-adapted not implemented for generelized operators")
         return iterate_t2_sa_matrix(
             self.active_occ_idx, self.active_unocc_idx, num_spin_orbs, use_csr=use_csr
         )
@@ -319,14 +302,10 @@ def iterate_t2_sa(
         T2 operator iteration.
     """
     theta_idx = -1
-    for i in active_occ_idx:
-        for j in active_occ_idx:
-            if i > j:
-                continue
-            for a in active_unocc_idx:
-                for b in active_unocc_idx:
-                    if a > b:
-                        continue
+    for idx_i, i in enumerate(active_occ_idx):
+        for j in active_occ_idx[idx_i:]:
+            for idx_a, a in enumerate(active_unocc_idx):
+                for b in active_unocc_idx[idx_a:]:
                     theta_idx += 1
                     fac = 1
                     if a == b:
@@ -375,14 +354,10 @@ def iterate_t2_sa_matrix(
         T2 operator iteration.
     """
     theta_idx = -1
-    for i in active_occ_idx:
-        for j in active_occ_idx:
-            if i > j:
-                continue
-            for a in active_unocc_idx:
-                for b in active_unocc_idx:
-                    if a > b:
-                        continue
+    for idx_i, i in enumerate(active_occ_idx):
+        for j in active_occ_idx[idx_i:]:
+            for idx_a, a in enumerate(active_unocc_idx):
+                for b in active_unocc_idx[idx_a:]:
                     theta_idx += 1
                     fac = 1
                     if a == b:
@@ -430,7 +405,6 @@ def iterate_t1(
     active_unocc_spin_idx: list[int],
     num_spin_orbs: int,
     is_spin_conserving: bool,
-    is_generalized: bool,
 ) -> Generator[tuple[int, int, int, OperatorPauli], None, None]:
     """Iterate over T1 operators.
 
@@ -439,20 +413,13 @@ def iterate_t1(
         active_unocc_idx: Spin indices of weakly occupied orbitals.
         num_spin_orbs: Number of spin orbitals.
         is_spin_conserving: Make spin conserving operators.
-        is_generalized: Make generalized operators.
 
     Returns:
         T1 operator iteration.
     """
     theta_idx = -1
-    active_spin_idx = active_occ_spin_idx + active_unocc_spin_idx
-    for a in active_spin_idx:
-        for i in active_spin_idx:
-            if not is_generalized:
-                if a in active_occ_spin_idx:
-                    continue
-                if i in active_unocc_spin_idx:
-                    continue
+    for a in active_unocc_spin_idx:
+        for i in active_occ_spin_idx:
             num_alpha = 0
             num_beta = 0
             if a % 2 == 0:
@@ -476,7 +443,6 @@ def iterate_t2(
     active_unocc_spin_idx: list[int],
     num_spin_orbs: int,
     is_spin_conserving: bool,
-    is_generalized: bool,
 ) -> Generator[tuple[int, int, int, int, int, OperatorPauli], None, None]:
     """Iterate over T2 operators.
 
@@ -485,30 +451,15 @@ def iterate_t2(
         active_unocc_idx: Spin indices of weakly occupied orbitals.
         num_spin_orbs: Number of spin orbitals.
         is_spin_conserving: Make spin conserving operators.
-        is_generalized: Make generalized operators.
 
     Returns:
         T2 operator iteration.
     """
     theta_idx = -1
-    active_spin_idx = active_occ_spin_idx + active_unocc_spin_idx
-    for a in active_spin_idx:
-        for b in active_spin_idx:
-            if a >= b:
-                continue
-            for i in active_spin_idx:
-                for j in active_spin_idx:
-                    if i >= j:
-                        continue
-                    if not is_generalized:
-                        if a in active_occ_spin_idx:
-                            continue
-                        if b in active_occ_spin_idx:
-                            continue
-                        if i in active_unocc_spin_idx:
-                            continue
-                        if j in active_unocc_spin_idx:
-                            continue
+    for idx_a, a in enumerate(active_unocc_spin_idx):
+        for b in active_unocc_spin_idx[idx_a + 1 :]:
+            for idx_i, i in enumerate(active_occ_spin_idx):
+                for j in active_occ_spin_idx[idx_i + 1 :]:
                     num_alpha = 0
                     num_beta = 0
                     if a % 2 == 0:
@@ -542,7 +493,6 @@ def iterate_t3(
     active_unocc_spin_idx: list[int],
     num_spin_orbs: int,
     is_spin_conserving: bool,
-    is_generalized: bool,
 ) -> Generator[tuple[int, int, int, int, int, int, int, OperatorPauli], None, None]:
     """Iterate over T3 operators.
 
@@ -551,40 +501,17 @@ def iterate_t3(
         active_unocc_idx: Spin indices of weakly occupied orbitals.
         num_spin_orbs: Number of spin orbitals.
         is_spin_conserving: Make spin conserving operators.
-        is_generalized: Make generalized operators.
 
     Returns:
         T3 operator iteration.
     """
     theta_idx = -1
-    active_spin_idx = active_occ_spin_idx + active_unocc_spin_idx
-    for a in active_spin_idx:
-        for b in active_spin_idx:
-            if a >= b:
-                continue
-            for c in active_spin_idx:
-                if b >= c:
-                    continue
-                for i in active_spin_idx:
-                    for j in active_spin_idx:
-                        if i >= j:
-                            continue
-                        for k in active_spin_idx:
-                            if j >= k:
-                                continue
-                            if not is_generalized:
-                                if a in active_occ_spin_idx:
-                                    continue
-                                if b in active_occ_spin_idx:
-                                    continue
-                                if c in active_occ_spin_idx:
-                                    continue
-                                if i in active_unocc_spin_idx:
-                                    continue
-                                if j in active_unocc_spin_idx:
-                                    continue
-                                if k in active_unocc_spin_idx:
-                                    continue
+    for idx_a, a in enumerate(active_unocc_spin_idx):
+        for idx_b, b in enumerate(active_unocc_spin_idx[idx_a + 1 :], idx_a + 1):
+            for c in active_unocc_spin_idx[idx_b + 1 :]:
+                for idx_i, i in enumerate(active_unocc_spin_idx):
+                    for idx_j, j in enumerate(active_unocc_spin_idx[idx_i + 1 :], idx_i + 1):
+                        for k in active_unocc_spin_idx[idx_j + 1 :]:
                             num_alpha = 0
                             num_beta = 0
                             if a % 2 == 0:
@@ -629,7 +556,6 @@ def iterate_t4(
     active_unocc_spin_idx: list[int],
     num_spin_orbs: int,
     is_spin_conserving: bool,
-    is_generalized: bool,
 ) -> Generator[tuple[int, int, int, int, int, int, int, int, int, OperatorPauli], None, None]:
     """Iterate over T4 operators.
 
@@ -638,50 +564,19 @@ def iterate_t4(
         active_unocc_idx: Spin indices of weakly occupied orbitals.
         num_spin_orbs: Number of spin orbitals.
         is_spin_conserving: Make spin conserving operators.
-        is_generalized: Make generalized operators.
 
     Returns:
         T4 operator iteration.
     """
     theta_idx = -1
-    active_spin_idx = active_occ_spin_idx + active_unocc_spin_idx
-    for a in active_spin_idx:
-        for b in active_spin_idx:
-            if a >= b:
-                continue
-            for c in active_spin_idx:
-                if b >= c:
-                    continue
-                for d in active_spin_idx:
-                    if c >= d:
-                        continue
-                    for i in active_spin_idx:
-                        for j in active_spin_idx:
-                            if i >= j:
-                                continue
-                            for k in active_spin_idx:
-                                if j >= k:
-                                    continue
-                                for l in active_spin_idx:
-                                    if k >= l:
-                                        continue
-                                    if not is_generalized:
-                                        if a in active_occ_spin_idx:
-                                            continue
-                                        if b in active_occ_spin_idx:
-                                            continue
-                                        if c in active_occ_spin_idx:
-                                            continue
-                                        if d in active_occ_spin_idx:
-                                            continue
-                                        if i in active_unocc_spin_idx:
-                                            continue
-                                        if j in active_unocc_spin_idx:
-                                            continue
-                                        if k in active_unocc_spin_idx:
-                                            continue
-                                        if l in active_unocc_spin_idx:
-                                            continue
+    for idx_a, a in enumerate(active_unocc_spin_idx):
+        for idx_b, b in enumerate(active_unocc_spin_idx[idx_a + 1 :], idx_a + 1):
+            for idx_c, c in enumerate(active_unocc_spin_idx[idx_b + 1 :], idx_b + 1):
+                for d in active_unocc_spin_idx[idx_c + 1 :]:
+                    for idx_i, i in enumerate(active_occ_spin_idx):
+                        for idx_j, j in enumerate(active_occ_spin_idx[idx_i + 1 :], idx_i + 1):
+                            for idx_k, k in enumerate(active_occ_spin_idx[idx_j + 1 :], idx_j + 1):
+                                for l in active_occ_spin_idx[idx_k + 1 :]:
                                     num_alpha = 0
                                     num_beta = 0
                                     if a % 2 == 0:
@@ -736,7 +631,6 @@ def iterate_t5(
     active_unocc_spin_idx: list[int],
     num_spin_orbs: int,
     is_spin_conserving: bool,
-    is_generalized: bool,
 ) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int, int, OperatorPauli], None, None]:
     """Iterate over T5 operators.
 
@@ -745,60 +639,21 @@ def iterate_t5(
         active_unocc_idx: Spin indices of weakly occupied orbitals.
         num_spin_orbs: Number of spin orbitals.
         is_spin_conserving: Make spin conserving operators.
-        is_generalized: Make generalized operators.
 
     Returns:
         T5 operator iteration.
     """
     theta_idx = -1
-    active_spin_idx = active_occ_spin_idx + active_unocc_spin_idx
-    for a in active_spin_idx:
-        for b in active_spin_idx:
-            if a >= b:
-                continue
-            for c in active_spin_idx:
-                if b >= c:
-                    continue
-                for d in active_spin_idx:
-                    if c >= d:
-                        continue
-                    for e in active_spin_idx:
-                        if d >= e:
-                            continue
-                        for i in active_spin_idx:
-                            for j in active_spin_idx:
-                                if i >= j:
-                                    continue
-                                for k in active_spin_idx:
-                                    if j >= k:
-                                        continue
-                                    for l in active_spin_idx:
-                                        if k >= l:
-                                            continue
-                                        for m in active_spin_idx:
-                                            if l >= m:
-                                                continue
-                                            if not is_generalized:
-                                                if a in active_occ_spin_idx:
-                                                    continue
-                                                if b in active_occ_spin_idx:
-                                                    continue
-                                                if c in active_occ_spin_idx:
-                                                    continue
-                                                if d in active_occ_spin_idx:
-                                                    continue
-                                                if e in active_occ_spin_idx:
-                                                    continue
-                                                if i in active_unocc_spin_idx:
-                                                    continue
-                                                if j in active_unocc_spin_idx:
-                                                    continue
-                                                if k in active_unocc_spin_idx:
-                                                    continue
-                                                if l in active_unocc_spin_idx:
-                                                    continue
-                                                if m in active_unocc_spin_idx:
-                                                    continue
+    for idx_a, a in enumerate(active_unocc_spin_idx):
+        for idx_b, b in enumerate(active_unocc_spin_idx[idx_a + 1 :], idx_a + 1):
+            for idx_c, c in enumerate(active_unocc_spin_idx[idx_b + 1 :], idx_b + 1):
+                for idx_d, d in enumerate(active_unocc_spin_idx[idx_c + 1 :], idx_c + 1):
+                    for e in active_unocc_spin_idx[idx_d + 1 :]:
+                        for idx_i, i in enumerate(active_occ_spin_idx):
+                            for idx_j, j in enumerate(active_occ_spin_idx[idx_i + 1 :], idx_i + 1):
+                                for idx_k, k in enumerate(active_occ_spin_idx[idx_j + 1 :], idx_j + 1):
+                                    for idx_l, l in enumerate(active_occ_spin_idx[idx_k + 1 :], idx_k + 1):
+                                        for m in active_occ_spin_idx[idx_l + 1 :]:
                                             num_alpha = 0
                                             num_beta = 0
                                             if a % 2 == 0:
@@ -865,7 +720,6 @@ def iterate_t6(
     active_unocc_spin_idx: list[int],
     num_spin_orbs: int,
     is_spin_conserving: bool,
-    is_generalized: bool,
 ) -> Generator[
     tuple[int, int, int, int, int, int, int, int, int, int, int, int, int, OperatorPauli], None, None
 ]:
@@ -876,70 +730,27 @@ def iterate_t6(
         active_unocc_idx: Spin indices of weakly occupied orbitals.
         num_spin_orbs: Number of spin orbitals.
         is_spin_conserving: Make spin conserving operators.
-        is_generalized: Make generalized operators.
 
     Returns:
         T6 operator iteration.
     """
     theta_idx = -1
-    active_spin_idx = active_occ_spin_idx + active_unocc_spin_idx
-    for a in active_spin_idx:
-        for b in active_spin_idx:
-            if a >= b:
-                continue
-            for c in active_spin_idx:
-                if b >= c:
-                    continue
-                for d in active_spin_idx:
-                    if c >= d:
-                        continue
-                    for e in active_spin_idx:
-                        if d >= e:
-                            continue
-                        for f in active_spin_idx:
-                            if e >= f:
-                                continue
-                            for i in active_spin_idx:
-                                for j in active_spin_idx:
-                                    if i >= j:
-                                        continue
-                                    for k in active_spin_idx:
-                                        if j >= k:
-                                            continue
-                                        for l in active_spin_idx:
-                                            if k >= l:
-                                                continue
-                                            for m in active_spin_idx:
-                                                if l >= m:
-                                                    continue
-                                                for n in active_spin_idx:
-                                                    if m >= n:
-                                                        continue
-                                                    if not is_generalized:
-                                                        if a in active_occ_spin_idx:
-                                                            continue
-                                                        if b in active_occ_spin_idx:
-                                                            continue
-                                                        if c in active_occ_spin_idx:
-                                                            continue
-                                                        if d in active_occ_spin_idx:
-                                                            continue
-                                                        if e in active_occ_spin_idx:
-                                                            continue
-                                                        if f in active_occ_spin_idx:
-                                                            continue
-                                                        if i in active_unocc_spin_idx:
-                                                            continue
-                                                        if j in active_unocc_spin_idx:
-                                                            continue
-                                                        if k in active_unocc_spin_idx:
-                                                            continue
-                                                        if l in active_unocc_spin_idx:
-                                                            continue
-                                                        if m in active_unocc_spin_idx:
-                                                            continue
-                                                        if n in active_unocc_spin_idx:
-                                                            continue
+    for idx_a, a in enumerate(active_unocc_spin_idx):
+        for idx_b, b in enumerate(active_unocc_spin_idx[idx_a + 1 :], idx_a + 1):
+            for idx_c, c in enumerate(active_unocc_spin_idx[idx_b + 1 :], idx_b + 1):
+                for idx_d, d in enumerate(active_unocc_spin_idx[idx_c + 1 :], idx_c + 1):
+                    for idx_e, e in enumerate(active_unocc_spin_idx[idx_d + 1 :], idx_d + 1):
+                        for f in active_unocc_spin_idx[idx_e + 1 :]:
+                            for idx_i, i in enumerate(active_occ_spin_idx):
+                                for idx_j, j in enumerate(active_occ_spin_idx[idx_i + 1 :], idx_i + 1):
+                                    for idx_k, k in enumerate(active_occ_spin_idx[idx_j + 1 :], idx_j + 1):
+                                        for idx_l, l in enumerate(
+                                            active_occ_spin_idx[idx_k + 1 :], idx_k + 1
+                                        ):
+                                            for idx_m, m in enumerate(
+                                                active_occ_spin_idx[idx_l + 1 :], idx_l + 1
+                                            ):
+                                                for n in active_occ_spin_idx[idx_m + 1 :]:
                                                     num_alpha = 0
                                                     num_beta = 0
                                                     if a % 2 == 0:

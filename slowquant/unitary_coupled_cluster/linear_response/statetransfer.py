@@ -83,10 +83,10 @@ class LinearResponseUCC(LinearResponseBaseClass):
         grad = np.zeros(2 * len(self.G_ops))
         for i, op in enumerate(self.G_ops):
             grad[i] = -expectation_value_hybrid_flow(
-                self.wf.state_vector, [self.H_0i_0a, self.U, op.operator], self.csf
+                self.wf.state_vector, [self.H_0i_0a, self.U, op], self.csf
             )
             grad[i + len(self.G_ops)] = expectation_value_hybrid_flow(
-                self.csf, [op.operator.dagger, self.U.dagger, self.H_0i_0a], self.wf.state_vector
+                self.csf, [op.dagger, self.U.dagger, self.H_0i_0a], self.wf.state_vector
             )
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
@@ -114,10 +114,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
         self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
             rdms, self.wf.kappa_idx
         )
-        for j, opJ in enumerate(self.q_ops):
-            qJ = opJ.operator
-            for i, opI in enumerate(self.G_ops):
-                GI = opI.operator
+        for j, qJ in enumerate(self.q_ops):
+            for i, GI in enumerate(self.G_ops):
                 if do_approximate_hermitification:
                     # Make A
                     self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = expectation_value_hybrid_flow(
@@ -144,12 +142,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
                         [GI.dagger, self.U.dagger, qJ.dagger, self.H_1i_1a],
                         self.wf.state_vector,
                     )
-        for j, opJ in enumerate(self.G_ops):
-            GJ = opJ.operator
-            for i, opI in enumerate(self.G_ops):
-                GI = opI.operator
-                if i < j:
-                    continue
+        for j, GJ in enumerate(self.G_ops):
+            for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
                 val = expectation_value_hybrid_flow(
                     self.csf, [GI.dagger, self.U.dagger, self.H_0i_0a, self.U, GJ], self.csf
@@ -256,8 +250,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
             g_part_x = 0.0
             g_part_y = 0.0
             g_part_z = 0.0
-            for i, op in enumerate(self.G_ops):
-                G = op.operator
+            for i, G in enumerate(self.G_ops):
                 g_part_x -= self.Z_G_normed[i, state_number] * expectation_value_hybrid_flow(
                     self.wf.state_vector, [mux_op, self.U, G], self.csf
                 )
