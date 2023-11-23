@@ -15,8 +15,6 @@ from slowquant.unitary_coupled_cluster.operator_hybrid import (
     expectation_value_hybrid,
     expectation_value_hybrid_flow_commutator,
     expectation_value_hybrid_flow_double_commutator,
-    hamiltonian_hybrid_0i_0a,
-    hamiltonian_hybrid_1i_1a,
     hamiltonian_hybrid_2i_2a,
     make_projection_operator,
     one_elec_op_hybrid_1i_1a,
@@ -35,6 +33,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
         do_transform_orbital_rotations: bool = False,
         is_spin_conserving: bool = True,
     ) -> None:
+        super().__init__(wave_function, excitations, is_spin_conserving)
+
         if operator_type.lower() not in ("naive", "projected", "selfconsistent", "statetransfer"):
             raise ValueError(f"Got unknown operator_type: {operator_type}")
         self.wf = wave_function
@@ -44,10 +44,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
             is_spin_conserving=is_spin_conserving,
         )
 
-        G_ops_tmp = []
-        q_ops_tmp = []
-        num_spin_orbs = self.wf.num_spin_orbs
-        excitations = excitations.lower()
         if operator_type.lower() in ("projected", "statetransfer"):
             projection = make_projection_operator(self.wf.state_vector)
             self.projection = projection
@@ -57,26 +53,12 @@ class LinearResponseUCC(LinearResponseBaseClass):
             U = OperatorHybrid(
                 {inactive_str + virtual_str: OperatorHybridData(inactive_str, self.wf.u, virtual_str)}
             )
-        if "s" in excitations:
-            for _, _, _, op_ in self.theta_picker.get_t1_generator_sa(num_spin_orbs):
-                op = convert_pauli_to_hybrid_form(
-                    op_,
-                    self.wf.num_inactive_spin_orbs,
-                    self.wf.num_active_spin_orbs,
-                )
-                G_ops_tmp.append(op)
-        if "d" in excitations:
-            for _, _, _, _, _, op_ in self.theta_picker.get_t2_generator_sa(num_spin_orbs):
-                op = convert_pauli_to_hybrid_form(
-                    op_,
-                    self.wf.num_inactive_spin_orbs,
-                    self.wf.num_active_spin_orbs,
-                )
-                G_ops_tmp.append(op)
         if do_transform_orbital_rotations and operator_type.lower() in ("statetransfer", "selfconsistent"):
             valid_kappa_idx = self.wf.kappa_hf_like_idx
         else:
             valid_kappa_idx = self.wf.kappa_idx
+        G_ops_tmp = self.G_ops.copy()
+        q_ops_tmp = []
         for i, a in valid_kappa_idx:
             op_ = 2 ** (-1 / 2) * epq_pauli(a, i, self.wf.num_spin_orbs)
             op = convert_pauli_to_hybrid_form(
@@ -131,26 +113,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
             else:
                 self.q_ops.append(q)
 
-        num_parameters = len(self.G_ops) + len(self.q_ops)
-        self.A = np.zeros((num_parameters, num_parameters))
-        self.B = np.zeros((num_parameters, num_parameters))
-        self.Sigma = np.zeros((num_parameters, num_parameters))
-        self.Delta = np.zeros((num_parameters, num_parameters))
-        H_1i_1a = hamiltonian_hybrid_1i_1a(
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-        )
-        H_2i_2a = hamiltonian_hybrid_2i_2a(
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-        )
-        H_0i_0a = hamiltonian_hybrid_0i_0a(
+        self.H_2i_2a = hamiltonian_hybrid_2i_2a(
             self.wf.h_mo,
             self.wf.g_mo,
             self.wf.num_inactive_orbs,
@@ -164,10 +127,10 @@ class LinearResponseUCC(LinearResponseBaseClass):
         grad = np.zeros(2 * len(self.q_ops))
         for i, op in enumerate(self.q_ops):
             grad[i] = expectation_value_hybrid_flow_commutator(
-                self.wf.state_vector, op, H_1i_1a, self.wf.state_vector
+                self.wf.state_vector, op, self.H_1i_1a, self.wf.state_vector
             )
             grad[i + len(self.q_ops)] = expectation_value_hybrid_flow_commutator(
-                self.wf.state_vector, op.dagger, H_1i_1a, self.wf.state_vector
+                self.wf.state_vector, op.dagger, self.H_1i_1a, self.wf.state_vector
             )
         if len(grad) != 0:
             print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
@@ -176,10 +139,10 @@ class LinearResponseUCC(LinearResponseBaseClass):
         grad = np.zeros(2 * len(self.G_ops))
         for i, op in enumerate(self.G_ops):
             grad[i] = expectation_value_hybrid_flow_commutator(
-                self.wf.state_vector, op, H_0i_0a, self.wf.state_vector
+                self.wf.state_vector, op, self.H_0i_0a, self.wf.state_vector
             )
             grad[i + len(self.G_ops)] = expectation_value_hybrid_flow_commutator(
-                self.wf.state_vector, op.dagger, H_0i_0a, self.wf.state_vector
+                self.wf.state_vector, op.dagger, self.H_0i_0a, self.wf.state_vector
             )
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
@@ -192,7 +155,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.A[i, j] = self.A[j, i] = expectation_value_hybrid_flow_double_commutator(
                     self.wf.state_vector,
                     qI.dagger,
-                    H_2i_2a,
+                    self.H_2i_2a,
                     qJ,
                     self.wf.state_vector,
                 )
@@ -200,7 +163,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.B[i, j] = self.B[j, i] = expectation_value_hybrid_flow_double_commutator(
                     self.wf.state_vector,
                     qI.dagger,
-                    H_2i_2a,
+                    self.H_2i_2a,
                     qJ.dagger,
                     self.wf.state_vector,
                 )
@@ -227,7 +190,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 ] = expectation_value_hybrid_flow_double_commutator(
                     self.wf.state_vector,
                     GJ,
-                    H_1i_1a,
+                    self.H_1i_1a,
                     qI.dagger,
                     self.wf.state_vector,
                 )
@@ -237,7 +200,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 ] = expectation_value_hybrid_flow_double_commutator(
                     self.wf.state_vector,
                     GJ.dagger,
-                    H_1i_1a,
+                    self.H_1i_1a,
                     qI.dagger,
                     self.wf.state_vector,
                 )
@@ -260,7 +223,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 ] = expectation_value_hybrid_flow_double_commutator(
                     self.wf.state_vector,
                     GI.dagger,
-                    H_0i_0a,
+                    self.H_0i_0a,
                     GJ,
                     self.wf.state_vector,
                 )
@@ -270,7 +233,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 ] = expectation_value_hybrid_flow_double_commutator(
                     self.wf.state_vector,
                     GI.dagger,
-                    H_0i_0a,
+                    self.H_0i_0a,
                     GJ.dagger,
                     self.wf.state_vector,
                 )
