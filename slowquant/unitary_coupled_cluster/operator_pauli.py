@@ -356,6 +356,42 @@ class OperatorPauli:
             new_operators[op] = fac
         return OperatorPauli(new_operators)
 
+    def make_folded_operator(self, num_inactive_spin_orbs: int, num_virtual_spin_orbs: int) -> OperatorPauli:
+        """Make a folded version of the operator.
+        A folded operator means that the inactive and virtual part is evaluted.
+        This type of operator should not be used with operators that modify the inactive and virtual space.
+
+        Args:
+            num_inactive_spin_orbs: Number of inactive orbitals.
+            num_virtual_spin_orbs: Number of virtual orbitals.
+
+        Returns:
+            Folded operator.
+        """
+        new_operators = {}
+        for op, fac in self.operators.items():
+            if "X" in op[:num_inactive_spin_orbs] or "Y" in op[:num_inactive_spin_orbs]:
+                raise ValueError(
+                    f"Cannot fold an operator that has X or Y in the inactive space. Inactive space: {op[:num_inactive_spin_orbs]}."
+                )
+            if num_virtual_spin_orbs > 0:
+                if "X" in op[-num_virtual_spin_orbs:] or "Y" in op[-num_virtual_spin_orbs:]:
+                    raise ValueError(
+                        f"Cannot fold an operator that has X or Y in the virtual space. Virtual space: {op[-num_virtual_spin_orbs:]}."
+                    )
+                new_op = (
+                    "I" * num_inactive_spin_orbs
+                    + op[num_inactive_spin_orbs:-num_virtual_spin_orbs]
+                    + "I" * num_virtual_spin_orbs
+                )
+            else:
+                new_op = "I" * num_inactive_spin_orbs + op[num_inactive_spin_orbs:]
+            if new_op in new_operators:
+                new_operators[new_op] += fac * (-1) ** op[:num_inactive_spin_orbs].count("Z")
+            else:
+                new_operators[new_op] = fac * (-1) ** op[:num_inactive_spin_orbs].count("Z")
+        return OperatorPauli(new_operators)
+
 
 def epq_pauli(p: int, q: int, num_spin_orbs: int) -> OperatorPauli:
     """Get Epq operator.
@@ -696,4 +732,6 @@ def energy_hamiltonian_pauli(
                         hamiltonian_operator += (
                             1 / 2 * g_mo[p, q, r, s] * epqrs_pauli(p, q, r, s, 2 * num_orbs)
                         )
-    return hamiltonian_operator.screen_terms(0, 0, 2 * num_inactive_orbs, 2 * num_virtual_orbs)
+    return (
+        hamiltonian_operator.screen_terms(0, 0, 2 * num_inactive_orbs, 2 * num_virtual_orbs)
+    ).make_folded_operator(2 * num_inactive_orbs, 2 * num_virtual_orbs)

@@ -16,12 +16,9 @@ from slowquant.unitary_coupled_cluster.operator_hybrid import (
     OperatorHybridData,
     convert_pauli_to_hybrid_form,
     expectation_value_hybrid_flow,
+    hamiltonian_hybrid_2i_2a,
 )
-from slowquant.unitary_coupled_cluster.operator_pauli import (
-    OperatorPauli,
-    epq_pauli,
-    hamiltonian_pauli_2i_2a,
-)
+from slowquant.unitary_coupled_cluster.operator_pauli import OperatorPauli, epq_pauli
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
@@ -58,16 +55,12 @@ class LinearResponseUCC(LinearResponseBaseClass):
         self.Sigma = np.zeros((num_parameters, num_parameters))
         self.Delta = np.zeros((num_parameters, num_parameters))
 
-        H_2i_2a = convert_pauli_to_hybrid_form(
-            hamiltonian_pauli_2i_2a(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.num_virtual_orbs,
-            ),
-            self.wf.num_inactive_spin_orbs,
-            self.wf.num_active_spin_orbs,
+        H_2i_2a = hamiltonian_hybrid_2i_2a(
+            self.wf.h_mo,
+            self.wf.g_mo,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
 
         inactive_str = "I" * self.wf.num_inactive_spin_orbs

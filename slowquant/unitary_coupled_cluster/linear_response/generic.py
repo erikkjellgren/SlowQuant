@@ -11,18 +11,15 @@ from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
 from slowquant.unitary_coupled_cluster.operator_hybrid import (
     OperatorHybrid,
     convert_pauli_to_hybrid_form,
+    energy_hamiltonian_hybrid,
     expectation_value_hybrid,
     expectation_value_hybrid_flow_commutator,
     expectation_value_hybrid_flow_double_commutator,
+    hamiltonian_hybrid_1i_1a,
+    hamiltonian_hybrid_2i_2a,
     make_projection_operator,
 )
-from slowquant.unitary_coupled_cluster.operator_pauli import (
-    OperatorPauli,
-    energy_hamiltonian_pauli,
-    epq_pauli,
-    hamiltonian_pauli_1i_1a,
-    hamiltonian_pauli_2i_2a,
-)
+from slowquant.unitary_coupled_cluster.operator_pauli import OperatorPauli, epq_pauli
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.util import ThetaPicker
 
@@ -136,38 +133,26 @@ class LinearResponseUCC(LinearResponseBaseClass):
         self.B = np.zeros((num_parameters, num_parameters))
         self.Sigma = np.zeros((num_parameters, num_parameters))
         self.Delta = np.zeros((num_parameters, num_parameters))
-        H_1i_1a = convert_pauli_to_hybrid_form(
-            hamiltonian_pauli_1i_1a(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.num_virtual_orbs,
-            ),
-            self.wf.num_inactive_spin_orbs,
-            self.wf.num_active_spin_orbs,
+        H_1i_1a = hamiltonian_hybrid_1i_1a(
+            self.wf.h_mo,
+            self.wf.g_mo,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
-        H_2i_2a = convert_pauli_to_hybrid_form(
-            hamiltonian_pauli_2i_2a(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.num_virtual_orbs,
-            ),
-            self.wf.num_inactive_spin_orbs,
-            self.wf.num_active_spin_orbs,
+        H_2i_2a = hamiltonian_hybrid_2i_2a(
+            self.wf.h_mo,
+            self.wf.g_mo,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
-        H_en = convert_pauli_to_hybrid_form(
-            energy_hamiltonian_pauli(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.num_virtual_orbs,
-            ),
-            self.wf.num_inactive_spin_orbs,
-            self.wf.num_active_spin_orbs,
+        H_en = energy_hamiltonian_hybrid(
+            self.wf.h_mo,
+            self.wf.g_mo,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
         idx_shift = len(self.q_ops)
         print("")
