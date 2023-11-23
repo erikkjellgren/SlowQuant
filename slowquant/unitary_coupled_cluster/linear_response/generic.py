@@ -132,6 +132,9 @@ class LinearResponseUCC(LinearResponseBaseClass):
             grad[i + len(self.q_ops)] = expectation_value_hybrid_flow_commutator(
                 self.wf.state_vector, op.dagger, self.H_1i_1a, self.wf.state_vector
             )
+            grad[i + len(self.q_ops)] = expectation_value_hybrid_flow_commutator(
+                self.wf.state_vector, op.dagger, self.H_1i_1a, self.wf.state_vector
+            )
         if len(grad) != 0:
             print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
