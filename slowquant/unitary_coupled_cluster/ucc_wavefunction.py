@@ -1287,18 +1287,24 @@ def load_wavefunction(filename: str) -> WaveFunctionUCC:
         bool(dat["include_active_kappa"]),
     )
     excitations = ""
-    if np.max(np.abs(dat["theta1"])) > 10**-6:
-        excitations += "s"
-    if np.max(np.abs(dat["theta2"])) > 10**-6:
-        excitations += "d"
-    if np.max(np.abs(dat["theta3"])) > 10**-6:
-        excitations += "t"
-    if np.max(np.abs(dat["theta4"])) > 10**-6:
-        excitations += "q"
-    if np.max(np.abs(dat["theta5"])) > 10**-6:
-        excitations += "5"
-    if np.max(np.abs(dat["theta6"])) > 10**-6:
-        excitations += "6"
+    if len(dat["theta1"]) > 0:
+        if np.max(np.abs(dat["theta1"])) > 10**-6:
+            excitations += "s"
+    if len(dat["theta2"]) > 0:
+        if np.max(np.abs(dat["theta2"])) > 10**-6:
+            excitations += "d"
+    if len(dat["theta3"]) > 0:
+        if np.max(np.abs(dat["theta3"])) > 10**-6:
+            excitations += "t"
+    if len(dat["theta4"]) > 0:
+        if np.max(np.abs(dat["theta4"])) > 10**-6:
+            excitations += "q"
+    if len(dat["theta5"]) > 0:
+        if np.max(np.abs(dat["theta5"])) > 10**-6:
+            excitations += "5"
+    if len(dat["theta6"]) > 0:
+        if np.max(np.abs(dat["theta6"])) > 10**-6:
+            excitations += "6"
     wf._excitations = excitations
     wf.add_multiple_theta(
         {
