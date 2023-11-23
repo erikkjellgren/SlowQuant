@@ -502,30 +502,6 @@ class OperatorHybrid:
             new_operators[key].active_matrix = lw.matmul(U, new_operators[key].active_matrix)
         return OperatorHybrid(new_operators)
 
-    def make_folded_operator(self) -> OperatorHybrid:
-        """Make a folded version of the operator.
-        A folded operator means that the inactive and virtual part is evaluted.
-        This type of operator should not be used with operators that modify the inactive and virtual space.
-
-        Returns:
-            Folded operator.
-        """
-        key = list(self.operators.keys())[0]
-        folded_operator = lw.zeros_like(self.operators[key].active_matrix)
-        i_inactive = "I" * len(self.operators[key].inactive_pauli)
-        i_virtual = "I" * len(self.operators[key].virtual_pauli)
-        for key in self.operators.keys():
-            if "X" in key or "Y" in key:
-                raise ValueError(
-                    f"Cannot fold an operator that has X or Y in the inactive or virtual space. Inactive space: {self.operators[key].inactive_pauli}. Virtual space: {self.operators[key].virtual_pauli}"
-                )
-            folded_operator += self.operators[key].active_matrix * (-1) ** self.operators[
-                key
-            ].inactive_pauli.count("Z")
-        return OperatorHybrid(
-            {f"{i_inactive+i_virtual}": OperatorHybridData(i_inactive, folded_operator, i_virtual)}
-        )
-
 
 def make_projection_operator(state_vector: StateVector, use_csr: int = 10) -> OperatorHybrid:
     """Create a projection operator, |0><0|, from a state vector.
@@ -585,7 +561,7 @@ def energy_hamiltonian_hybrid(
     Returns:
         Energy Hamilonian Pauli operator.
     """
-    H = convert_pauli_to_hybrid_form(
+    return convert_pauli_to_hybrid_form(
         energy_hamiltonian_pauli(
             h_mo,
             g_mo,
@@ -596,7 +572,6 @@ def energy_hamiltonian_hybrid(
         2 * num_inactive_orbs,
         2 * num_active_orbs,
     )
-    return H.make_folded_operator()
 
 
 def hamiltonian_hybrid_1i_1a(
