@@ -8,7 +8,12 @@ import scipy.sparse as ss
 
 import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
 from slowquant.unitary_coupled_cluster.base import StateVector, symbol_to_mat
-from slowquant.unitary_coupled_cluster.operator_pauli import OperatorPauli
+from slowquant.unitary_coupled_cluster.operator_pauli import (
+    OperatorPauli,
+    energy_hamiltonian_pauli,
+    hamiltonian_pauli_1i_1a,
+    hamiltonian_pauli_2i_2a,
+)
 
 
 def expectation_value_hybrid(
@@ -535,3 +540,99 @@ def make_projection_operator(state_vector: StateVector, use_csr: int = 10) -> Op
         )
         new_operator["".join(pauli)] = hybridop
     return OperatorHybrid(new_operator)
+
+
+def energy_hamiltonian_hybrid(
+    h_mo: np.ndarray,
+    g_mo: np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+) -> OperatorHybrid:
+    """Get energy Hamiltonian operator.
+
+    Args:
+        h_mo: One-electron Hamiltonian integrals in MO.
+        g_mo: Two-electron Hamiltonian integrals in MO.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
+
+    Returns:
+        Energy Hamilonian Pauli operator.
+    """
+    return convert_pauli_to_hybrid_form(
+        energy_hamiltonian_pauli(
+            h_mo,
+            g_mo,
+            num_inactive_orbs,
+            num_active_orbs,
+            num_virtual_orbs,
+        ),
+        2 * num_inactive_orbs,
+        2 * num_active_orbs,
+    )
+
+
+def hamiltonian_hybrid_1i_1a(
+    h_mo: np.ndarray,
+    g_mo: np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+) -> OperatorHybrid:
+    """Get Hamiltonian operator that works together with an extra inactive and an extra virtual index.
+
+    Args:
+        h_mo: One-electron Hamiltonian integrals in MO.
+        g_mo: Two-electron Hamiltonian integrals in MO.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
+
+    Returns:
+        Modified Hamilonian Pauli operator.
+    """
+    return convert_pauli_to_hybrid_form(
+        hamiltonian_pauli_1i_1a(
+            h_mo,
+            g_mo,
+            num_inactive_orbs,
+            num_active_orbs,
+            num_virtual_orbs,
+        ),
+        2 * num_inactive_orbs,
+        2 * num_active_orbs,
+    )
+
+
+def hamiltonian_hybrid_2i_2a(
+    h_mo: np.ndarray,
+    g_mo: np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+) -> OperatorHybrid:
+    """Get Hamiltonian operator that works together with two extra inactive and two extra virtual index.
+
+    Args:
+        h_mo: One-electron Hamiltonian integrals in MO.
+        g_mo: Two-electron Hamiltonian integrals in MO.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
+
+    Returns:
+        Modified Hamilonian Pauli operator.
+    """
+    return convert_pauli_to_hybrid_form(
+        hamiltonian_pauli_2i_2a(
+            h_mo,
+            g_mo,
+            num_inactive_orbs,
+            num_active_orbs,
+            num_virtual_orbs,
+        ),
+        2 * num_inactive_orbs,
+        2 * num_active_orbs,
+    )

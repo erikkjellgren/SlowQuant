@@ -6,12 +6,10 @@ import scipy
 from slowquant.unitary_coupled_cluster.operator_hybrid import (
     OperatorHybrid,
     convert_pauli_to_hybrid_form,
+    energy_hamiltonian_hybrid,
+    hamiltonian_hybrid_1i_1a,
 )
-from slowquant.unitary_coupled_cluster.operator_pauli import (
-    energy_hamiltonian_pauli,
-    epq_pauli,
-    hamiltonian_pauli_1i_1a,
-)
+from slowquant.unitary_coupled_cluster.operator_pauli import epq_pauli
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.util import ThetaPicker
 
@@ -126,27 +124,19 @@ class LinearResponseBaseClass:
         self.B = np.zeros((num_parameters, num_parameters))
         self.Sigma = np.zeros((num_parameters, num_parameters))
         self.Delta = np.zeros((num_parameters, num_parameters))
-        self.H_1i_1a = convert_pauli_to_hybrid_form(
-            hamiltonian_pauli_1i_1a(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.num_virtual_orbs,
-            ),
-            self.wf.num_inactive_spin_orbs,
-            self.wf.num_active_spin_orbs,
+        self.H_1i_1a = hamiltonian_hybrid_1i_1a(
+            self.wf.h_mo,
+            self.wf.g_mo,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
-        self.H_en = convert_pauli_to_hybrid_form(
-            energy_hamiltonian_pauli(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.num_virtual_orbs,
-            ),
-            self.wf.num_inactive_spin_orbs,
-            self.wf.num_active_spin_orbs,
+        self.H_en = energy_hamiltonian_hybrid(
+            self.wf.h_mo,
+            self.wf.g_mo,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
 
     def calc_excitation_energies(self) -> None:
