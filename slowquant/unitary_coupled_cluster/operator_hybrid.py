@@ -477,34 +477,6 @@ class OperatorHybrid:
             )
         return OperatorHybrid(new_operators)
 
-    def apply_u_from_right(self, U: np.ndarray | ss.csr_matrix) -> OperatorHybrid:
-        """Matrix multiply with transformation matrix from the right.
-
-        Args:
-            U: Transformation matrix.
-
-        Returns:
-            New hybrid operator.
-        """
-        new_operators = copy.deepcopy(self.operators)
-        for key in self.operators.keys():
-            new_operators[key].active_matrix = lw.matmul(new_operators[key].active_matrix, U)
-        return OperatorHybrid(new_operators)
-
-    def apply_u_from_left(self, U: np.ndarray | ss.csr_matrix) -> OperatorHybrid:
-        """Matrix multiply with transformation matrix from the left.
-
-        Args:
-            U: Transformation matrix.
-
-        Returns:
-            New hybrid operator.
-        """
-        new_operators = copy.deepcopy(self.operators)
-        for key in self.operators.keys():
-            new_operators[key].active_matrix = lw.matmul(U, new_operators[key].active_matrix)
-        return OperatorHybrid(new_operators)
-
 
 def make_projection_operator(state_vector: StateVector, use_csr: int = 10) -> OperatorHybrid:
     """Create a projection operator, |0><0|, from a state vector.

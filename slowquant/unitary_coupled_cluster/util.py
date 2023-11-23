@@ -509,9 +509,9 @@ def iterate_t3(
     for idx_a, a in enumerate(active_unocc_spin_idx):
         for idx_b, b in enumerate(active_unocc_spin_idx[idx_a + 1 :], idx_a + 1):
             for c in active_unocc_spin_idx[idx_b + 1 :]:
-                for idx_i, i in enumerate(active_unocc_spin_idx):
-                    for idx_j, j in enumerate(active_unocc_spin_idx[idx_i + 1 :], idx_i + 1):
-                        for k in active_unocc_spin_idx[idx_j + 1 :]:
+                for idx_i, i in enumerate(active_occ_spin_idx):
+                    for idx_j, j in enumerate(active_occ_spin_idx[idx_i + 1 :], idx_i + 1):
+                        for k in active_occ_spin_idx[idx_j + 1 :]:
                             num_alpha = 0
                             num_beta = 0
                             if a % 2 == 0:

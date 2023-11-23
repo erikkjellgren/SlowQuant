@@ -732,11 +732,11 @@ class WaveFunctionUCC:
                 raise ValueError("Did not converge in 500 iterations in energy minimization.")
             start = time.time()  # type: ignore
 
-        def silent_progress(X: Sequence[float]) -> None:
+        def silent_progress(x: Sequence[float]) -> None:
             """Print progress during energy minimization of wave function.
 
             Args:
-                X: Wave function parameters.
+                x: Wave function parameters.
             """
             global iteration
             iteration += 1  # type: ignore
@@ -1096,7 +1096,6 @@ def active_space_parameter_gradient(
     parameters: Sequence[float],
     excitations: str,
     orbital_optimized: bool,
-    finite_diff_type: str = "forward",
 ) -> np.ndarray:
     """Calcuate electronic gradient with respect to active space parameters.
 
@@ -1106,13 +1105,10 @@ def active_space_parameter_gradient(
                     Ordered as orbital rotations, active-space singles, active-space doubles, ...
         excitations: Excitation orders to consider.
         orbital_optimized: Do orbital optimization.
-        finite_diff_type: Type of finite-differnce (forward or central).
 
     Returns:
         Electronic gradient with respect to active spae parameters.
     """
-    if finite_diff_type not in ("central", "forward"):
-        raise ValueError(f"finite_diff_type must be central or forward, got {finite_diff_type}")
     kappa = []
     theta1 = []
     theta2 = []
@@ -1165,11 +1161,8 @@ def active_space_parameter_gradient(
 
     theta_params = theta1 + theta2 + theta3 + theta4 + theta5 + theta6
     gradient_theta = np.zeros_like(theta_params)
-    if finite_diff_type == "central":
-        eps = np.finfo(np.float64).eps ** (1 / 3)
-    if finite_diff_type == "forward":
-        eps = np.finfo(np.float64).eps ** (1 / 2)
-        E = expectation_value_hybrid(wf.state_vector, Hamiltonian, wf.state_vector)
+    eps = np.finfo(np.float64).eps ** (1 / 2)
+    E = expectation_value_hybrid(wf.state_vector, Hamiltonian, wf.state_vector)
     for i, _ in enumerate(theta_params):
         sign_step = (theta_params[i] >= 0).astype(float) * 2 - 1
         step_size = eps * sign_step * max(1, abs(theta_params[i]))
@@ -1217,53 +1210,7 @@ def active_space_parameter_gradient(
         if "6" in excitations:
             theta_dict["theta6"] = theta_params[idx : idx + len(theta6)]
             idx += len(theta6)
-        if finite_diff_type == "central":
-            theta_params[i] -= step_size
-            theta_dict = {}
-            idx = 0
-            if "s" in excitations:
-                theta_dict["theta1"] = theta_params[idx : idx + len(theta1)]
-                idx += len(theta1)
-            if "d" in excitations:
-                theta_dict["theta2"] = theta_params[idx : idx + len(theta2)]
-                idx += len(theta2)
-            if "t" in excitations:
-                theta_dict["theta3"] = theta_params[idx : idx + len(theta3)]
-                idx += len(theta3)
-            if "q" in excitations:
-                theta_dict["theta4"] = theta_params[idx : idx + len(theta4)]
-                idx += len(theta4)
-            if "5" in excitations:
-                theta_dict["theta5"] = theta_params[idx : idx + len(theta5)]
-                idx += len(theta5)
-            if "6" in excitations:
-                theta_dict["theta6"] = theta_params[idx : idx + len(theta6)]
-                idx += len(theta6)
-            E_minus = expectation_value_hybrid(wf.state_vector, Hamiltonian, wf.state_vector)
-            gradient_theta[i] = (E_plus - E_minus) / (2 * step_size)
-            theta_params[i] += step_size
-            theta_dict = {}
-            idx = 0
-            if "s" in excitations:
-                theta_dict["theta1"] = theta_params[idx : idx + len(theta1)]
-                idx += len(theta1)
-            if "d" in excitations:
-                theta_dict["theta2"] = theta_params[idx : idx + len(theta2)]
-                idx += len(theta2)
-            if "t" in excitations:
-                theta_dict["theta3"] = theta_params[idx : idx + len(theta3)]
-                idx += len(theta3)
-            if "q" in excitations:
-                theta_dict["theta4"] = theta_params[idx : idx + len(theta4)]
-                idx += len(theta4)
-            if "5" in excitations:
-                theta_dict["theta5"] = theta_params[idx : idx + len(theta5)]
-                idx += len(theta5)
-            if "6" in excitations:
-                theta_dict["theta6"] = theta_params[idx : idx + len(theta6)]
-                idx += len(theta6)
-        if finite_diff_type == "forward":
-            gradient_theta[i] = (E_plus - E) / step_size
+        gradient_theta[i] = (E_plus - E) / step_size
     return gradient_theta
 
 

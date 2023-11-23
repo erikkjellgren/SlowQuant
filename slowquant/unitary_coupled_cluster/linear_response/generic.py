@@ -10,6 +10,7 @@ from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
 )
 from slowquant.unitary_coupled_cluster.operator_hybrid import (
     OperatorHybrid,
+    OperatorHybridData,
     convert_pauli_to_hybrid_form,
     expectation_value_hybrid,
     expectation_value_hybrid_flow_commutator,
@@ -50,6 +51,12 @@ class LinearResponseUCC(LinearResponseBaseClass):
         if operator_type.lower() in ("projected", "statetransfer"):
             projection = make_projection_operator(self.wf.state_vector)
             self.projection = projection
+        if operator_type.lower() in ("selfconsistent", "statetransfer"):
+            inactive_str = "I" * self.wf.num_inactive_spin_orbs
+            virtual_str = "I" * self.wf.num_virtual_spin_orbs
+            U = OperatorHybrid(
+                {inactive_str + virtual_str: OperatorHybridData(inactive_str, self.wf.u, virtual_str)}
+            )
         if "s" in excitations:
             for _, _, _, op_ in self.theta_picker.get_t1_generator_sa(num_spin_orbs):
                 op = convert_pauli_to_hybrid_form(
@@ -94,12 +101,10 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 )
                 self.G_ops.append(G - G_diff)
             elif operator_type.lower() == "selfconsistent":
-                G = G.apply_u_from_right(self.wf.u.conj().transpose())
-                G = G.apply_u_from_left(self.wf.u)
+                G = U * G * U.dagger
                 self.G_ops.append(G)
             elif operator_type.lower() == "statetransfer":
-                G = G.apply_u_from_right(self.wf.u.conj().transpose())
-                G = G.apply_u_from_left(self.wf.u)
+                G = U * G * U.dagger
                 G = G * projection
                 self.G_ops.append(G)
         for q in q_ops_tmp:
@@ -117,12 +122,10 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     )
                     self.q_ops.append(q - q_diff)
                 elif operator_type.lower() == "selfconsistent":
-                    q = q.apply_u_from_right(U.conj().transpose())
-                    q = q.apply_u_from_left(U)
+                    q = U * q * U.dagger
                     self.q_ops.append(q)
                 elif operator_type.lower() == "statetransfer":
-                    q = q.apply_u_from_right(U.conj().transpose())
-                    q = q.apply_u_from_left(U)
+                    q = U * q * U.dagger
                     q = q * projection
                     self.q_ops.append(q)
             else:
