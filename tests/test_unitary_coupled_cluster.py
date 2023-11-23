@@ -869,5 +869,9 @@ def test_H2_sto3g_uccsd_saveload() -> None:  # pylint: disable=R0915
     )
 
     WF.run_ucc("SD", True)
-    WF.save_wavefunction("test_h2_save")
-    _ = load_wavefunction("test_h2_save")
+    WF.save_wavefunction("test_h2_save", force_overwrite=True)
+    WF2 = load_wavefunction("test_h2_save")
+    LR = naiveLR.LinearResponseUCC(WF2, "SD")
+    LR.calc_excitation_energies()
+    assert abs(LR.excitation_energies[0] - 0.54127603) < 10**-5
+    assert abs(LR.excitation_energies[1] - 0.59557678) < 10**-5
