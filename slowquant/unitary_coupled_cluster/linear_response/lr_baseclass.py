@@ -6,7 +6,7 @@ import scipy
 from slowquant.unitary_coupled_cluster.operator_hybrid import (
     OperatorHybrid,
     convert_pauli_to_hybrid_form,
-    energy_hamiltonian_hybrid,
+    hamiltonian_hybrid_0i_0a,
     hamiltonian_hybrid_1i_1a,
 )
 from slowquant.unitary_coupled_cluster.operator_pauli import epq_pauli
@@ -131,7 +131,7 @@ class LinearResponseBaseClass:
             self.wf.num_active_orbs,
             self.wf.num_virtual_orbs,
         )
-        self.H_en = energy_hamiltonian_hybrid(
+        self.H_0i_0a = hamiltonian_hybrid_0i_0a(
             self.wf.h_mo,
             self.wf.g_mo,
             self.wf.num_inactive_orbs,

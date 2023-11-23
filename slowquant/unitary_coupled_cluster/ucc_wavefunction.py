@@ -17,16 +17,15 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_gradient,
 )
 from slowquant.unitary_coupled_cluster.operator_hybrid import (
-    energy_hamiltonian_hybrid,
     epq_hybrid,
     expectation_value_hybrid,
     expectation_value_hybrid_flow,
+    hamiltonian_hybrid_0i_0a,
 )
 from slowquant.unitary_coupled_cluster.operator_pauli import (
-    energy_hamiltonian_pauli,
     epq_pauli,
-    epqrs_pauli,
     expectation_value_pauli,
+    hamiltonian_pauli_0i_0a,
 )
 from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_ucc_u
 
@@ -1027,7 +1026,7 @@ def energy_ucc(
     wf.add_multiple_theta(theta_dict, excitations)
     return expectation_value_pauli(
         wf.state_vector,
-        energy_hamiltonian_pauli(
+        hamiltonian_pauli_0i_0a(
             wf.h_mo,
             wf.g_mo,
             wf.num_inactive_orbs,
@@ -1161,7 +1160,7 @@ def active_space_parameter_gradient(
         theta5
     ) + len(theta6)
 
-    Hamiltonian = energy_hamiltonian_hybrid(
+    Hamiltonian = hamiltonian_hybrid_0i_0a(
         wf.h_mo,
         wf.g_mo,
         wf.num_inactive_orbs,

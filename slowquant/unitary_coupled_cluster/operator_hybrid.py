@@ -10,10 +10,12 @@ import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
 from slowquant.unitary_coupled_cluster.base import StateVector, symbol_to_mat
 from slowquant.unitary_coupled_cluster.operator_pauli import (
     OperatorPauli,
-    energy_hamiltonian_pauli,
+    epq_pauli,
+    hamiltonian_pauli_0i_0a,
     hamiltonian_pauli_1i_1a,
     hamiltonian_pauli_2i_2a,
-    epq_pauli,
+    one_elec_op_pauli_0i_0a,
+    one_elec_op_pauli_1i_1a,
 )
 
 
@@ -573,7 +575,7 @@ def epq_hybrid(
     )
 
 
-def energy_hamiltonian_hybrid(
+def hamiltonian_hybrid_0i_0a(
     h_mo: np.ndarray,
     g_mo: np.ndarray,
     num_inactive_orbs: int,
@@ -593,7 +595,7 @@ def energy_hamiltonian_hybrid(
         Energy Hamilonian Pauli operator.
     """
     return convert_pauli_to_hybrid_form(
-        energy_hamiltonian_pauli(
+        hamiltonian_pauli_0i_0a(
             h_mo,
             g_mo,
             num_inactive_orbs,
@@ -660,6 +662,58 @@ def hamiltonian_hybrid_2i_2a(
         hamiltonian_pauli_2i_2a(
             h_mo,
             g_mo,
+            num_inactive_orbs,
+            num_active_orbs,
+            num_virtual_orbs,
+        ),
+        2 * num_inactive_orbs,
+        2 * num_active_orbs,
+    )
+
+
+def one_elec_op_hybrid_0i_0a(
+    ints_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int
+) -> OperatorHybrid:
+    """Create one-electron operator that makes no changes in the inactive and virtual orbitals.
+
+    Args:
+        ints_mo: One-electron integrals for operator in MO basis.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
+
+    Returns:
+        One-electron operator for active-space.
+    """
+    return convert_pauli_to_hybrid_form(
+        one_elec_op_pauli_0i_0a(
+            ints_mo,
+            num_inactive_orbs,
+            num_active_orbs,
+            num_virtual_orbs,
+        ),
+        2 * num_inactive_orbs,
+        2 * num_active_orbs,
+    )
+
+
+def one_elec_op_hybrid_1i_1a(
+    ints_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int
+) -> OperatorHybrid:
+    """Create one-electron operator that makes no changes in the inactive and virtual orbitals.
+
+    Args:
+        ints_mo: One-electron integrals for operator in MO basis.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
+
+    Returns:
+        One-electron operator for active-space.
+    """
+    return convert_pauli_to_hybrid_form(
+        one_elec_op_pauli_1i_1a(
+            ints_mo,
             num_inactive_orbs,
             num_active_orbs,
             num_virtual_orbs,

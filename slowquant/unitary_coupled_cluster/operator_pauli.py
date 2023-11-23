@@ -674,7 +674,7 @@ def commutator_pauli(A: OperatorPauli, B: OperatorPauli) -> OperatorPauli:
     return A * B - B * A
 
 
-def energy_hamiltonian_pauli(
+def hamiltonian_pauli_0i_0a(
     h_mo: np.ndarray,
     g_mo: np.ndarray,
     num_inactive_orbs: int,
@@ -735,3 +735,61 @@ def energy_hamiltonian_pauli(
     return (
         hamiltonian_operator.screen_terms(0, 0, 2 * num_inactive_orbs, 2 * num_virtual_orbs)
     ).make_folded_operator(2 * num_inactive_orbs, 2 * num_virtual_orbs)
+
+
+def one_elec_op_pauli_0i_0a(
+    ints_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int
+) -> OperatorPauli:
+    """Create one-electron operator that makes no changes in the inactive and virtual orbitals.
+
+    Args:
+        ints_mo: One-electron integrals for operator in MO basis.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
+
+    Returns:
+        One-electron operator for active-space.
+    """
+    num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
+    one_elec_op = OperatorPauli({})
+    # Inactive one-electron
+    for i in range(num_inactive_orbs):
+        if abs(ints_mo[i, i]) > 10**-12:
+            one_elec_op += ints_mo[i, i] * epq_pauli(i, i, 2 * num_orbs)
+    # Active one-electron
+    for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+        for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+            if abs(ints_mo[p, q]) > 10**-12:
+                one_elec_op += ints_mo[p, q] * epq_pauli(p, q, 2 * num_orbs)
+    return (one_elec_op.screen_terms(0, 0, 2 * num_inactive_orbs, 2 * num_virtual_orbs)).make_folded_operator(
+        2 * num_inactive_orbs, 2 * num_virtual_orbs
+    )
+
+
+def one_elec_op_pauli_1i_1a(
+    ints_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int
+) -> OperatorPauli:
+    """Create one-electron operator that makes up to one change in the inactive and virtual orbitals.
+
+    Args:
+        ints_mo: One-electron integrals for operator in MO basis.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
+
+    Returns:
+        Modified one-electron operator.
+    """
+    num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
+    one_elec_op = OperatorPauli({})
+    virtual_start = num_inactive_orbs + num_active_orbs
+    for p in range(num_orbs):
+        for q in range(num_orbs):
+            if p >= virtual_start and q >= virtual_start:
+                continue
+            if p < num_inactive_orbs and q < num_inactive_orbs and p != q:
+                continue
+            if abs(ints_mo[p, q]) > 10**-12:
+                one_elec_op += ints_mo[p, q] * epq_pauli(p, q, 2 * num_orbs)
+    return one_elec_op.screen_terms(1, 1, 2 * num_inactive_orbs, 2 * num_virtual_orbs)

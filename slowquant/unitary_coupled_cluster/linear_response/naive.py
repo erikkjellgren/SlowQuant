@@ -18,12 +18,11 @@ from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
 )
 from slowquant.unitary_coupled_cluster.operator_hybrid import (
     OperatorHybrid,
-    convert_pauli_to_hybrid_form,
     expectation_value_hybrid_flow,
     expectation_value_hybrid_flow_commutator,
     expectation_value_hybrid_flow_double_commutator,
+    one_elec_op_hybrid_0i_0a,
 )
-from slowquant.unitary_coupled_cluster.operator_pauli import OperatorPauli, epq_pauli
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
@@ -128,13 +127,13 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.A[i + idx_shift, j + idx_shift] = self.A[
                     j + idx_shift, i + idx_shift
                 ] = expectation_value_hybrid_flow_double_commutator(
-                    self.wf.state_vector, GI.dagger, self.H_en, GJ, self.wf.state_vector
+                    self.wf.state_vector, GI.dagger, self.H_0i_0a, GJ, self.wf.state_vector
                 )
                 # Make B
                 self.B[i + idx_shift, j + idx_shift] = self.B[
                     j + idx_shift, i + idx_shift
                 ] = expectation_value_hybrid_flow_double_commutator(
-                    self.wf.state_vector, GI.dagger, self.H_en, GJ.dagger, self.wf.state_vector
+                    self.wf.state_vector, GI.dagger, self.H_0i_0a, GJ.dagger, self.wf.state_vector
                 )
                 # Make Sigma
                 self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[
@@ -192,32 +191,14 @@ class LinearResponseUCC(LinearResponseBaseClass):
         mux = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[0])
         muy = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[1])
         muz = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[2])
-        mux_op = OperatorPauli({})
-        muy_op = OperatorPauli({})
-        muz_op = OperatorPauli({})
-        for p in range(self.wf.num_orbs):
-            for q in range(self.wf.num_orbs):
-                Epq_op = epq_pauli(p, q, self.wf.num_spin_orbs)
-                if abs(mux[p, q]) > 10**-10:
-                    mux_op += mux[p, q] * Epq_op
-                if abs(muy[p, q]) > 10**-10:
-                    muy_op += muy[p, q] * Epq_op
-                if abs(muz[p, q]) > 10**-10:
-                    muz_op += muz[p, q] * Epq_op
-        mux_op = convert_pauli_to_hybrid_form(
-            mux_op,
-            self.wf.num_inactive_spin_orbs,
-            self.wf.num_active_spin_orbs,
+        mux_op = one_elec_op_hybrid_0i_0a(
+            mux, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.num_virtual_orbs
         )
-        muy_op = convert_pauli_to_hybrid_form(
-            muy_op,
-            self.wf.num_inactive_spin_orbs,
-            self.wf.num_active_spin_orbs,
+        muy_op = one_elec_op_hybrid_0i_0a(
+            muy, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.num_virtual_orbs
         )
-        muz_op = convert_pauli_to_hybrid_form(
-            muz_op,
-            self.wf.num_inactive_spin_orbs,
-            self.wf.num_active_spin_orbs,
+        muz_op = one_elec_op_hybrid_0i_0a(
+            muz, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.num_virtual_orbs
         )
         transition_dipole_x = 0.0
         transition_dipole_y = 0.0
