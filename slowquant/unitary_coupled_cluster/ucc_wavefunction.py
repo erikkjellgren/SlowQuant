@@ -19,6 +19,8 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
 from slowquant.unitary_coupled_cluster.operator_hybrid import (
     convert_pauli_to_hybrid_form,
     expectation_value_hybrid,
+    expectation_value_hybrid_flow,
+    epq_hybrid,
 )
 from slowquant.unitary_coupled_cluster.operator_pauli import (
     energy_hamiltonian_pauli,
@@ -260,7 +262,6 @@ class WaveFunctionUCC:
             is_generalized=self._is_generalized,
             include_active_kappa=self._include_active_kappa,
             energy_elec=self.energy_elec,
-            excitations=self._excitations,
         )
 
     @property
@@ -632,20 +633,43 @@ class WaveFunctionUCC:
                     self.num_active_orbs,
                 )
             )
+            E = {}
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 for q in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                    for r in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                        for s in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                            self._rdm2[
-                                p - self.num_inactive_orbs,
-                                q - self.num_inactive_orbs,
-                                r - self.num_inactive_orbs,
-                                s - self.num_inactive_orbs,
-                            ] = expectation_value_pauli(
+                    E[(p, q)] = epq_hybrid(
+                        p,
+                        q,
+                        self.num_inactive_spin_orbs,
+                        self.num_active_spin_orbs,
+                        self.num_virtual_spin_orbs,
+                    )
+            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                p_idx = p - self.num_inactive_orbs
+                for q in range(self.num_inactive_orbs, p + 1):
+                    q_idx = q - self.num_inactive_orbs
+                    for r in range(self.num_inactive_orbs, p + 1):
+                        r_idx = r - self.num_inactive_orbs
+                        if p == q:
+                            s_lim = r + 1
+                        elif p == r:
+                            s_lim = q + 1
+                        elif q < r:
+                            s_lim = p
+                        else:
+                            s_lim = p + 1
+                        for s in range(self.num_inactive_orbs, s_lim):
+                            s_idx = s - self.num_inactive_orbs
+                            val = expectation_value_hybrid_flow(
                                 self.state_vector,
-                                epqrs_pauli(p, q, r, s, self.num_spin_orbs),
+                                [E[(p, q)], E[(r, s)]],
                                 self.state_vector,
                             )
+                            if q == r:
+                                val -= self.rdm1[p_idx, s_idx]
+                            self._rdm2[p_idx, q_idx, r_idx, s_idx] = val
+                            self._rdm2[r_idx, s_idx, p_idx, q_idx] = val
+                            self._rdm2[q_idx, p_idx, s_idx, r_idx] = val
+                            self._rdm2[s_idx, r_idx, q_idx, p_idx] = val
         return self._rdm2
 
     def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
@@ -1273,7 +1297,20 @@ def load_wavefunction(filename: str) -> WaveFunctionUCC:
         bool(dat["is_generalized"]),
         bool(dat["include_active_kappa"]),
     )
-    wf._excitations = str(dat["excitations"])
+    excitations = ""
+    if np.max(np.abs(dat["theta1"])) > 10**-6:
+        excitations += "s"
+    if np.max(np.abs(dat["theta2"])) > 10**-6:
+        excitations += "d"
+    if np.max(np.abs(dat["theta3"])) > 10**-6:
+        excitations += "t"
+    if np.max(np.abs(dat["theta4"])) > 10**-6:
+        excitations += "q"
+    if np.max(np.abs(dat["theta5"])) > 10**-6:
+        excitations += "5"
+    if np.max(np.abs(dat["theta6"])) > 10**-6:
+        excitations += "6"
+    wf._excitations = excitations
     wf.add_multiple_theta(
         {
             "theta1": list(dat["theta1"]),
