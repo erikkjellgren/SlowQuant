@@ -76,29 +76,23 @@ class LinearResponseUCC(LinearResponseBaseClass):
         grad = np.zeros(2 * len(self.G_ops))
         for i, op in enumerate(self.G_ops):
             grad[i] = expectation_value_hybrid_flow(
-                self.wf.state_vector, [self.H_0i_0a, op.operator], self.wf.state_vector
+                self.wf.state_vector, [self.H_0i_0a, op], self.wf.state_vector
             ) - (
                 self.wf.energy_elec
-                * expectation_value_hybrid_flow(self.wf.state_vector, [op.operator], self.wf.state_vector)
+                * expectation_value_hybrid_flow(self.wf.state_vector, [op], self.wf.state_vector)
             )
             grad[i + len(self.G_ops)] = expectation_value_hybrid_flow(
-                self.wf.state_vector, [op.operator.dagger, self.H_0i_0a], self.wf.state_vector
+                self.wf.state_vector, [op.dagger, self.H_0i_0a], self.wf.state_vector
             ) - (
                 self.wf.energy_elec
-                * expectation_value_hybrid_flow(
-                    self.wf.state_vector, [op.operator.dagger], self.wf.state_vector
-                )
+                * expectation_value_hybrid_flow(self.wf.state_vector, [op.dagger], self.wf.state_vector)
             )
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
                 raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
-        for j, opJ in enumerate(self.q_ops):
-            qJ = opJ.operator
-            for i, opI in enumerate(self.q_ops):
-                qI = opI.operator
-                if i < j:
-                    continue
+        for j, qJ in enumerate(self.q_ops):
+            for i, qI in enumerate(self.q_ops[j:], j):
                 # Make A
                 val = expectation_value_hybrid_flow(
                     self.wf.state_vector, [qI.dagger, H_2i_2a, qJ], self.wf.state_vector
@@ -112,10 +106,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.Sigma[i, j] = self.Sigma[j, i] = expectation_value_hybrid_flow(
                     self.wf.state_vector, [qI.dagger, qJ], self.wf.state_vector
                 )
-        for j, opJ in enumerate(self.q_ops):
-            qJ = opJ.operator
-            for i, opI in enumerate(self.G_ops):
-                GI = opI.operator
+        for j, qJ in enumerate(self.q_ops):
+            for i, GI in enumerate(self.G_ops):
                 # Make A
                 self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = expectation_value_hybrid_flow(
                     self.wf.state_vector, [GI.dagger, self.H_1i_1a, qJ], self.wf.state_vector
@@ -124,12 +116,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = -expectation_value_hybrid_flow(
                     self.wf.state_vector, [GI.dagger, qJ.dagger, self.H_1i_1a], self.wf.state_vector
                 )
-        for j, opJ in enumerate(self.G_ops):
-            GJ = opJ.operator
-            for i, opI in enumerate(self.G_ops):
-                GI = opI.operator
-                if i < j:
-                    continue
+        for j, GJ in enumerate(self.G_ops):
+            for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
                 val = expectation_value_hybrid_flow(
                     self.wf.state_vector, [GI.dagger, self.H_0i_0a, GJ], self.wf.state_vector
@@ -189,11 +177,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 rdms, self.wf.kappa_idx, self.response_vectors, state_number, number_excitations
             )
             g_part = 0
-            for i, op in enumerate(self.G_ops):
-                GI = op.operator
-                for j, op2 in enumerate(self.G_ops):
-                    GJ = op2.operator
-
+            for i, GI in enumerate(self.G_ops):
+                for j, GJ in enumerate(self.G_ops):
                     g_part += (
                         self.Z_G[i, state_number]
                         * self.Z_G[j, state_number]
@@ -294,8 +279,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
             g_part_x = 0.0
             g_part_y = 0.0
             g_part_z = 0.0
-            for i, op in enumerate(self.G_ops):
-                G = op.operator
+            for i, G in enumerate(self.G_ops):
                 exp_G = expectation_value_hybrid_flow(self.wf.state_vector, [G], self.wf.state_vector)
                 exp_G_dagger = expectation_value_hybrid_flow(
                     self.wf.state_vector, [G.dagger], self.wf.state_vector

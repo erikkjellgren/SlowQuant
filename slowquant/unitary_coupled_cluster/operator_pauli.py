@@ -358,6 +358,7 @@ class OperatorPauli:
 
     def make_folded_operator(self, num_inactive_spin_orbs: int, num_virtual_spin_orbs: int) -> OperatorPauli:
         """Make a folded version of the operator.
+
         A folded operator means that the inactive and virtual part is evaluted.
         This type of operator should not be used with operators that modify the inactive and virtual space.
 
@@ -368,7 +369,7 @@ class OperatorPauli:
         Returns:
             Folded operator.
         """
-        new_operators = {}
+        new_operators: dict[str, complex] = {}
         for op, fac in self.operators.items():
             if "X" in op[:num_inactive_spin_orbs] or "Y" in op[:num_inactive_spin_orbs]:
                 raise ValueError(

@@ -26,15 +26,8 @@ def a_op_spin_matrix(
     Returns:
         Matrix representation of ferminonic annihilation or creation operator.
     """
-    prior = 0
-    after = 0
-    for i in range(number_spin_orbitals):
-        if i == idx:
-            continue
-        if i < idx:
-            prior += 1
-        else:
-            after += 1
+    prior = idx
+    after = number_spin_orbitals - prior - 1
     if number_spin_orbitals >= use_csr:
         if dagger:
             return kronecker_product_cached(prior, after, "a_dagger", True, True)
