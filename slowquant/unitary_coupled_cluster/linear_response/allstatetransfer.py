@@ -22,7 +22,6 @@ from slowquant.unitary_coupled_cluster.operator_hybrid import (
 )
 from slowquant.unitary_coupled_cluster.operator_pauli import epq_pauli
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
-from slowquant.unitary_coupled_cluster.util import construct_ucc_u
 
 
 class LinearResponseUCC(LinearResponseBaseClass):
@@ -58,21 +57,10 @@ class LinearResponseUCC(LinearResponseBaseClass):
         self.Sigma = np.zeros((num_parameters, num_parameters))
         self.Delta = np.zeros((num_parameters, num_parameters))
 
-        U_matrix = construct_ucc_u(
-            self.wf.num_active_spin_orbs,
-            self.wf.theta1
-            + self.wf.theta2
-            + self.wf.theta3
-            + self.wf.theta4
-            + self.wf.theta5
-            + self.wf.theta6,
-            self.wf.singlet_excitation_operator_generator,
-            "sdtq56",  # self.wf._excitations,
-        )
         inactive_str = "I" * self.wf.num_inactive_spin_orbs
         virtual_str = "I" * self.wf.num_virtual_spin_orbs
         self.U = OperatorHybrid(
-            {inactive_str + virtual_str: OperatorHybridData(inactive_str, U_matrix, virtual_str)}
+            {inactive_str + virtual_str: OperatorHybridData(inactive_str, self.wf.u, virtual_str)}
         )
 
         H_2i_2a = hamiltonian_hybrid_2i_2a(

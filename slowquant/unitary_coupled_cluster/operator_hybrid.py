@@ -10,6 +10,7 @@ import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
 from slowquant.unitary_coupled_cluster.base import StateVector, symbol_to_mat
 from slowquant.unitary_coupled_cluster.operator_pauli import (
     OperatorPauli,
+    epq_pauli,
     hamiltonian_pauli_0i_0a,
     hamiltonian_pauli_1i_1a,
     hamiltonian_pauli_2i_2a,
@@ -542,6 +543,36 @@ def make_projection_operator(state_vector: StateVector, use_csr: int = 10) -> Op
         )
         new_operator["".join(pauli)] = hybridop
     return OperatorHybrid(new_operator)
+
+
+def epq_hybrid(
+    p: int,
+    q: int,
+    num_inactive_spin_orbs: int,
+    num_active_spin_orbs: int,
+    num_virtual_spin_orbs: int,
+) -> OperatorHybrid:
+    """Get Epq operator.
+
+    Args:
+        p: Orbital index spatial basis.
+        q: Orbital index spatial basis.
+        num_inactive_spin_orbs: Number of inactive orbitals in spin basis.
+        num_active_spin_orbs: Number of active orbitals in spin basis.
+        num_virtual_spin_orbs: Number of virtual orbitals in spin basis.
+
+    Returns:
+        Epq hybrid operator.
+    """
+    return convert_pauli_to_hybrid_form(
+        epq_pauli(
+            p,
+            q,
+            num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs,
+        ),
+        num_inactive_spin_orbs,
+        num_active_spin_orbs,
+    )
 
 
 def hamiltonian_hybrid_0i_0a(
