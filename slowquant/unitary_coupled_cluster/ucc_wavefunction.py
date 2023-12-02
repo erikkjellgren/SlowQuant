@@ -686,7 +686,7 @@ class WaveFunctionUCC:
         orbital_optimization: bool = False,
         is_silent: bool = False,
         convergence_threshold: float = 10**-10,
-        maxiter: int = 100,
+        maxiter: int = 10000,
     ) -> None:
         """Run optimization of UCC wave function.
 
