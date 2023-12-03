@@ -237,6 +237,40 @@ class ThetaPicker:
             self.active_occ_idx, self.active_unocc_idx, num_spin_orbs, use_csr=use_csr
         )
 
+    def get_t1_generator_sf(
+        self, num_spin_orbs: int
+    ) -> Generator[tuple[int, int, int, OperatorPauli], None, None]:
+        """Get generate over T1 operators.
+
+        Args:
+            num_spin_orbs: Number of spin orbitals.
+
+        Returns:
+            T1 operator generator.
+        """
+        return iterate_t1_sf(
+            self.active_occ_spin_idx,
+            self.active_unocc_spin_idx,
+            num_spin_orbs,
+        )
+
+    def get_t2_generator_sf(
+        self, num_spin_orbs: int
+    ) -> Generator[tuple[int, int, int, int, int, OperatorPauli], None, None]:
+        """Get generate over T2 operators.
+
+        Args:
+            num_spin_orbs: Number of spin orbitals.
+
+        Returns:
+            T2 operator generator.
+        """
+        return iterate_t2_sf(
+            self.active_occ_spin_idx,
+            self.active_unocc_spin_idx,
+            num_spin_orbs,
+        )
+
 
 def iterate_t1_sa(
     active_occ_idx: Sequence[int],
@@ -839,6 +873,7 @@ def construct_ucc_u(
     theta: Sequence[float],
     theta_picker: ThetaPicker,
     excitations: str,
+    spin: int,
     allowed_states: np.ndarray | None = None,
     use_csr: int = 10,
 ) -> np.ndarray:
@@ -850,6 +885,7 @@ def construct_ucc_u(
               Ordered as (S, D, T, ...).
        theta_picker: Helper class to pick the parameters in the right order.
        excitations: Excitation orders to include.
+       spin: Total electronic spin.
        allowed_states: Allowed states to consider in the state-vector.
        use_csr: Use sparse matrices after n spin orbitals.
 
@@ -861,18 +897,38 @@ def construct_ucc_u(
     else:
         t = np.zeros((2**num_spin_orbs, 2**num_spin_orbs))
     counter = 0
-    if "s" in excitations:
-        for _, a, i, operator in theta_picker.get_t1_generator_sa_matrix(num_spin_orbs, use_csr=use_csr):
-            if theta[counter] != 0.0:
-                t += theta[counter] * operator
-            counter += 1
-    if "d" in excitations:
-        for _, a, i, b, j, operator in theta_picker.get_t2_generator_sa_matrix(
-            num_spin_orbs, use_csr=use_csr
-        ):
-            if theta[counter] != 0.0:
-                t += theta[counter] * operator
-            counter += 1
+    if spin == 0:
+        if "s" in excitations:
+            for _, a, i, operator in theta_picker.get_t1_generator_sa_matrix(num_spin_orbs, use_csr=use_csr):
+                if theta[counter] != 0.0:
+                    t += theta[counter] * operator
+                counter += 1
+        if "d" in excitations:
+            for _, a, i, b, j, operator in theta_picker.get_t2_generator_sa_matrix(
+                num_spin_orbs, use_csr=use_csr
+            ):
+                if theta[counter] != 0.0:
+                    t += theta[counter] * operator
+                counter += 1
+    if spin == 1:
+        if "s" in excitations:
+            for _, a, i, _ in theta_picker.get_t1_generator(0):
+                if theta[counter] != 0.0:
+                    tmp = a_op_spin_matrix(a, True, num_spin_orbs, use_csr=use_csr).dot(
+                        a_op_spin_matrix(i, False, num_spin_orbs, use_csr=use_csr)
+                    )
+                    t += theta[counter] * tmp
+                counter += 1
+        if "d" in excitations:
+            for _, a, i, b, j, _ in theta_picker.get_t2_generator(0):
+                if theta[counter] != 0.0:
+                    tmp = a_op_spin_matrix(a, True, num_spin_orbs, use_csr=use_csr).dot(
+                        a_op_spin_matrix(b, True, num_spin_orbs, use_csr=use_csr)
+                    )
+                    tmp = tmp.dot(a_op_spin_matrix(j, False, num_spin_orbs, use_csr=use_csr))
+                    tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, use_csr=use_csr))
+                    t += theta[counter] * tmp
+                counter += 1
     if "t" in excitations:
         for _, a, i, b, j, c, k, _ in theta_picker.get_t3_generator(0):
             if theta[counter] != 0.0:
@@ -941,3 +997,67 @@ def construct_ucc_u(
         T = T[:, allowed_states]
     A = lw.expm(T)
     return A
+
+
+def iterate_t1_sf(
+    active_occ_spin_idx: list[int],
+    active_unocc_spin_idx: list[int],
+    num_spin_orbs: int,
+) -> Generator[tuple[int, int, int, OperatorPauli], None, None]:
+    """Iterate over T1 operators.
+
+    Args:
+        active_occ_idx: Spin indices of strongly occupied orbitals.
+        active_unocc_idx: Spin indices of weakly occupied orbitals.
+        num_spin_orbs: Number of spin orbitals.
+
+    Returns:
+        T1 operator iteration.
+    """
+    theta_idx = -1
+    for a in active_unocc_spin_idx:
+        for i in active_occ_spin_idx:
+            if i % 2 == 1:  # i is beta
+                continue
+            if a % 2 == 0:  # a is alpha
+                continue
+            theta_idx += 1
+            operator = a_spin_pauli(a, True, num_spin_orbs)
+            operator *= a_spin_pauli(i, False, num_spin_orbs)
+            yield theta_idx, a, i, operator
+
+
+def iterate_t2_sf(
+    active_occ_spin_idx: list[int],
+    active_unocc_spin_idx: list[int],
+    num_spin_orbs: int,
+) -> Generator[tuple[int, int, int, int, int, OperatorPauli], None, None]:
+    """Iterate over T2 operators.
+
+    Args:
+        active_occ_idx: Spin indices of strongly occupied orbitals.
+        active_unocc_idx: Spin indices of weakly occupied orbitals.
+        num_spin_orbs: Number of spin orbitals.
+
+    Returns:
+        T2 operator iteration.
+    """
+    theta_idx = -1
+    for idx_a, a in enumerate(active_unocc_spin_idx):
+        for b in active_unocc_spin_idx[idx_a + 1 :]:
+            for idx_i, i in enumerate(active_occ_spin_idx):
+                for j in active_occ_spin_idx[idx_i + 1 :]:
+                    if i % 2 == 1 and j % 2 == 1:
+                        continue
+                    if i % 2 == j % 2:
+                        if a % 2 == b % 2:
+                            continue
+                    if i % 2 != j % 2:
+                        if a % 2 != b % 2:
+                            continue
+                    theta_idx += 1
+                    operator = a_spin_pauli(a, True, num_spin_orbs)
+                    operator = operator * a_spin_pauli(b, True, num_spin_orbs)
+                    operator = operator * a_spin_pauli(j, False, num_spin_orbs)
+                    operator = operator * a_spin_pauli(i, False, num_spin_orbs)
+                    yield theta_idx, a, i, b, j, operator
