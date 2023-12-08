@@ -229,12 +229,18 @@ class LinearResponseBaseClass:
         for idx, (excitation_energy, transition_electric_dipole, transition_magnetic_dipole) in enumerate(
             zip(self.excitation_energies, transition_electric_dipoles, transition_magnetic_dipoles)
         ):
-            print(idx, transition_magnetic_dipole, transition_electric_dipole)
             rot_strengths[idx] = excitation_energy * (
                 transition_electric_dipole[0] * transition_magnetic_dipole[0]
                 + transition_electric_dipole[1] * transition_magnetic_dipole[1]
                 + transition_electric_dipole[2] * transition_magnetic_dipole[2]
             )
+        print("rot str")
+        with np.printoptions(precision=4, suppress=True):
+            print(transition_magnetic_dipoles)
+        print("osc str")
+        with np.printoptions(precision=4, suppress=True):
+            print(transition_electric_dipoles)
+
         return rot_strengths
 
     def get_uvvis_output(self, dipole_integrals: Sequence[np.ndarray]) -> str:
