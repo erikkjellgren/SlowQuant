@@ -21,7 +21,7 @@ master_doc = "index"
 
 # General information about the project.
 project = "SLOWQUANT"
-copyright = "2017, Erik Kjellgren"  # pylint: disable=W0622
+copyright = "2023, Erik Kjellgren"  # pylint: disable=W0622
 author = "Erik Kjellgren"
 
 # -- Options for HTML output ----------------------------------------------
@@ -31,7 +31,7 @@ html_theme_path = [
 ]
 html_static_path = ["_static"]
 html_logo = "_static/slowquant.png"
-
+autoclass_content = "both"
 
 # -- Options for LaTeX output ---------------------------------------------
 latex_elements = {"preamble": r"\pdfimageresolution=144"}
@@ -40,10 +40,8 @@ latex_documents = [
     (master_doc, "sphinx-example.tex", "sphinx-example Documentation", "Firstname Lastname", "manual"),
 ]
 
-
 # -- Options for manual page output ---------------------------------------
 man_pages = [(master_doc, "sphinx-example", "sphinx-example Documentation", [author], 1)]
-
 
 # -- Options for Texinfo output -------------------------------------------
 texinfo_documents = [

@@ -8,7 +8,11 @@ import scipy.sparse as ss
 
 @functools.cache
 def kronecker_product_cached(
-    num_prior: int, num_after: int, pauli_mat_symbol: str, is_csr: bool
+    num_prior: int,
+    num_after: int,
+    pauli_mat_symbol: str,
+    is_csr: bool,
+    is_z_prior: bool = False,
 ) -> np.ndarray | ss.csr_matrix:
     r"""Get operator in matrix form.
 
@@ -17,21 +21,35 @@ def kronecker_product_cached(
     .. math::
         I x I x .. o .. x I x I
 
+    or
+
+    .. math::
+        Z x Z x .. o .. x I x I
+
     Args:
        num_prior: Number of left-hand side identity matrices.
        num_after: Number of right-hand side identity matrices.
        is_csr: If the resulting matrix representation should be a sparse matrix.
+       is_z_prior: Use the Z operator instead of identiy operator as the prior matricies.
 
     Returns:
        Matrix representation of an operator.
     """
-    mat = pauli_to_mat(pauli_mat_symbol)
+    mat = symbol_to_mat(pauli_mat_symbol)
     if is_csr:
-        I1 = ss.identity(int(2**num_prior))
+        if is_z_prior and num_prior != 0:
+            z_vec = kronecker_product(num_prior * [np.array([1, -1])])
+            I1 = ss.diags(z_vec)
+        else:
+            I1 = ss.identity(int(2**num_prior))
         I2 = ss.identity(int(2**num_after))
         mat = ss.csr_matrix(mat)
         return ss.csr_matrix(ss.kron(I1, ss.kron(mat, I2)))
-    I1 = np.identity(int(2**num_prior))
+    if is_z_prior and num_prior != 0:
+        z_vec = kronecker_product(num_prior * [np.array([1, -1])])
+        I1 = np.diag(z_vec)
+    else:
+        I1 = np.identity(int(2**num_prior))
     I2 = np.identity(int(2**num_after))
     return np.kron(I1, np.kron(mat, I2))
 
@@ -51,32 +69,37 @@ def kronecker_product(A: Sequence[np.ndarray]) -> np.ndarray:
        Kronecker product of matrices.
     """
     if len(A) < 2:
-        return A
+        return A[0]
     total = np.kron(A[0], A[1])
     for operator in A[2:]:
         total = np.kron(total, operator)
     return total
 
 
-@functools.cache
-def pauli_to_mat(pauli: str) -> np.ndarray:
-    """Convert Pauli matrix symbol to matrix representation.
+def symbol_to_mat(symbol: str) -> np.ndarray:
+    """Convert operator matrix symbol to matrix representation.
+
+    The symbol needs to be representable by a 2x2 matrix.
 
     Args:
-        pauli: Pauli matrix symbol.
+        symbol: Symbol matrix symbol.
 
     Returns:
-        Pauli matrix.
+        Matrix representation of symbol.
     """
-    if pauli == 'I':
+    if symbol == "I":
         return np.array([[1, 0], [0, 1]], dtype=float)
-    if pauli == 'Z':
+    if symbol == "Z":
         return np.array([[1, 0], [0, -1]], dtype=float)
-    if pauli == 'X':
+    if symbol == "X":
         return np.array([[0, 1], [1, 0]], dtype=float)
-    if pauli == 'Y':
+    if symbol == "Y":
         return np.array([[0, -1j], [1j, 0]], dtype=complex)
-    raise ValueError(f'Got unknown string: {pauli}')
+    if symbol == "a":
+        return np.array([[0, 1], [0, 0]], dtype=float)
+    if symbol == "a_dagger":
+        return np.array([[0, 0], [1, 0]], dtype=float)
+    raise ValueError(f"Got unknown string: {symbol}")
 
 
 class StateVector:

@@ -7,8 +7,16 @@ import numpy as np
 import scipy.sparse as ss
 
 import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
-from slowquant.unitary_coupled_cluster.base import StateVector, pauli_to_mat
-from slowquant.unitary_coupled_cluster.operator_pauli import OperatorPauli
+from slowquant.unitary_coupled_cluster.base import StateVector, symbol_to_mat
+from slowquant.unitary_coupled_cluster.operator_pauli import (
+    OperatorPauli,
+    epq_pauli,
+    hamiltonian_pauli_0i_0a,
+    hamiltonian_pauli_1i_1a,
+    hamiltonian_pauli_2i_2a,
+    one_elec_op_pauli_0i_0a,
+    one_elec_op_pauli_1i_1a,
+)
 
 
 def expectation_value_hybrid(
@@ -34,11 +42,11 @@ def expectation_value_hybrid(
         tmp = 1
         for i in range(len(bra.bra_inactive)):
             tmp *= np.matmul(
-                bra.bra_inactive[i], np.matmul(pauli_to_mat(op.inactive_pauli[i]), ket.ket_inactive[:, i])  # type: ignore
+                bra.bra_inactive[i], np.matmul(symbol_to_mat(op.inactive_pauli[i]), ket.ket_inactive[:, i])  # type: ignore
             )
         for i in range(len(bra.bra_virtual)):
             tmp *= np.matmul(
-                bra.bra_virtual[i], np.matmul(pauli_to_mat(op.virtual_pauli[i]), ket.ket_virtual[:, i])  # type: ignore
+                bra.bra_virtual[i], np.matmul(symbol_to_mat(op.virtual_pauli[i]), ket.ket_virtual[:, i])  # type: ignore
             )
         if abs(tmp) < 10**-12:
             continue
@@ -62,6 +70,15 @@ class StateVectorOperatorData:
     def __init__(
         self, inactive_orbs: str, active_space: np.ndarray | ss.csr_matrix, virtual_orbs: str
     ) -> None:
+        """Initialize data class for state vector.
+
+        Args:
+            inactive_orbs: String representation of inactive orbitals occupation.
+                           o (one) meaning occupied and z (zero) meaning unoccupoed.
+            active_space: Active space part of state state vector.
+            virtual_orbs: String representation of virtual orbitals occupation.
+                           o (one) meaning occupied and z (zero) meaning unoccupoed.
+        """
         self.inactive_orbs = inactive_orbs
         self.virtual_orbs = virtual_orbs
         self.active_space = active_space
@@ -69,9 +86,23 @@ class StateVectorOperatorData:
 
 class StateVectorOperator:
     def __init__(self, state_vector: dict[str, StateVectorOperatorData]) -> None:
+        """Initialize 'operator' form of state vector.
+
+        Args:
+            state_vector: Data class representation of the state vector.
+        """
         self.state_vector = state_vector
 
-    def __mul__(self, hybridop: OperatorHybrid) -> StateVectorOperator:
+    def __mul__(self, hybridop: OperatorHybrid | StateVectorOperator) -> StateVectorOperator | float:
+        """Overload multiplication operator.
+
+        Args:
+            hybridop: Hybrid representation of operator, or state vector 'operator'.
+
+        Returns:
+            State vector 'operator' in case of multiplication with operator,
+            or float in case of multiplication with another state vector.
+        """
         if isinstance(hybridop, OperatorHybrid):
             new_state_vector: dict[str, StateVectorOperatorData] = {}
             for _, vec in self.state_vector.items():
@@ -140,6 +171,16 @@ class StateVectorOperator:
 def expectation_value_hybrid_flow(
     state_vec: StateVector, operators: list[OperatorHybrid], ref_vec: StateVector
 ) -> float:
+    """Calculate expectation value of operator.
+
+    Args:
+        state_vec: Bra state vector.
+        operators: List of operators.
+        ref_vec: Ket state vector.
+
+    Returns:
+        Expectation value of operator.
+    """
     if len(state_vec.inactive) != 0:
         num_inactive_spin_orbs = len(state_vec.inactive[0])
     else:
@@ -194,6 +235,20 @@ def expectation_value_hybrid_flow(
 def expectation_value_hybrid_flow_commutator(
     state_vec: StateVector, A: OperatorHybrid, B: OperatorHybrid, ref_vec: StateVector
 ) -> float:
+    r"""Calculate expectation value of commutator.
+
+    .. math::
+        E = \left<n\left|\left[A,B\right]\right|m\right>
+
+    Args:
+        state_vec: Bra state vector.
+        A: First operator in commutator.
+        B: Second operator in commutator.
+        ref_vec: Ket state vector.
+
+    Returns:
+        Expectation value of commutator.
+    """
     return expectation_value_hybrid_flow(state_vec, [A, B], ref_vec) - expectation_value_hybrid_flow(
         state_vec, [B, A], ref_vec
     )
@@ -202,6 +257,21 @@ def expectation_value_hybrid_flow_commutator(
 def expectation_value_hybrid_flow_double_commutator(
     state_vec: StateVector, A: OperatorHybrid, B: OperatorHybrid, C: OperatorHybrid, ref_vec: StateVector
 ) -> float:
+    r"""Calculate expectation value of double commutator.
+
+    .. math::
+        E = \left<n\left|\left[A,\left[B,C\right]\right]\right|m\right>
+
+    Args:
+        state_vec: Bra state vector.
+        A: First operator in commutator.
+        B: Second operator in commutator.
+        C: Third operator in commutator.
+        ref_vec: Ket state vector.
+
+    Returns:
+        Expectation value of double commutator.
+    """
     return (
         expectation_value_hybrid_flow(state_vec, [A, B, C], ref_vec)
         - expectation_value_hybrid_flow(state_vec, [A, C, B], ref_vec)
@@ -211,7 +281,9 @@ def expectation_value_hybrid_flow_double_commutator(
 
 
 def convert_pauli_to_hybrid_form(
-    pauliop: OperatorPauli, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int
+    pauliop: OperatorPauli,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
 ) -> OperatorHybrid:
     """Convert Pauli operator to hybrid operator.
 
@@ -219,7 +291,6 @@ def convert_pauli_to_hybrid_form(
         pauliop: Pauli operator.
         num_inactive_orbs: Number of inactive orbitals.
         num_active_orbs: Number of active orbitals.
-        num_virtual_orbs: Number of virtual orbitals.
 
     Returns:
         Hybrid operator.
@@ -406,34 +477,6 @@ class OperatorHybrid:
             )
         return OperatorHybrid(new_operators)
 
-    def apply_u_from_right(self, U: np.ndarray | ss.csr_matrix) -> OperatorHybrid:
-        """Matrix multiply with transformation matrix from the right.
-
-        Args:
-            U: Transformation matrix.
-
-        Returns:
-            New hybrid operator.
-        """
-        new_operators = copy.deepcopy(self.operators)
-        for key in self.operators.keys():
-            new_operators[key].active_matrix = lw.matmul(new_operators[key].active_matrix, U)
-        return OperatorHybrid(new_operators)
-
-    def apply_u_from_left(self, U: np.ndarray | ss.csr_matrix) -> OperatorHybrid:
-        """Matrix multiply with transformation matrix from the left.
-
-        Args:
-            U: Transformation matrix.
-
-        Returns:
-            New hybrid operator.
-        """
-        new_operators = copy.deepcopy(self.operators)
-        for key in self.operators.keys():
-            new_operators[key].active_matrix = lw.matmul(U, new_operators[key].active_matrix)
-        return OperatorHybrid(new_operators)
-
 
 def make_projection_operator(state_vector: StateVector, use_csr: int = 10) -> OperatorHybrid:
     """Create a projection operator, |0><0|, from a state vector.
@@ -472,3 +515,181 @@ def make_projection_operator(state_vector: StateVector, use_csr: int = 10) -> Op
         )
         new_operator["".join(pauli)] = hybridop
     return OperatorHybrid(new_operator)
+
+
+def epq_hybrid(
+    p: int,
+    q: int,
+    num_inactive_spin_orbs: int,
+    num_active_spin_orbs: int,
+    num_virtual_spin_orbs: int,
+) -> OperatorHybrid:
+    """Get Epq operator.
+
+    Args:
+        p: Orbital index spatial basis.
+        q: Orbital index spatial basis.
+        num_inactive_spin_orbs: Number of inactive orbitals in spin basis.
+        num_active_spin_orbs: Number of active orbitals in spin basis.
+        num_virtual_spin_orbs: Number of virtual orbitals in spin basis.
+
+    Returns:
+        Epq hybrid operator.
+    """
+    return convert_pauli_to_hybrid_form(
+        epq_pauli(
+            p,
+            q,
+            num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs,
+        ),
+        num_inactive_spin_orbs,
+        num_active_spin_orbs,
+    )
+
+
+def hamiltonian_hybrid_0i_0a(
+    h_mo: np.ndarray,
+    g_mo: np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+) -> OperatorHybrid:
+    """Get energy Hamiltonian operator.
+
+    Args:
+        h_mo: One-electron Hamiltonian integrals in MO.
+        g_mo: Two-electron Hamiltonian integrals in MO.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
+
+    Returns:
+        Energy Hamilonian Pauli operator.
+    """
+    return convert_pauli_to_hybrid_form(
+        hamiltonian_pauli_0i_0a(
+            h_mo,
+            g_mo,
+            num_inactive_orbs,
+            num_active_orbs,
+            num_virtual_orbs,
+        ),
+        2 * num_inactive_orbs,
+        2 * num_active_orbs,
+    )
+
+
+def hamiltonian_hybrid_1i_1a(
+    h_mo: np.ndarray,
+    g_mo: np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+) -> OperatorHybrid:
+    """Get Hamiltonian operator that works together with an extra inactive and an extra virtual index.
+
+    Args:
+        h_mo: One-electron Hamiltonian integrals in MO.
+        g_mo: Two-electron Hamiltonian integrals in MO.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
+
+    Returns:
+        Modified Hamilonian Pauli operator.
+    """
+    return convert_pauli_to_hybrid_form(
+        hamiltonian_pauli_1i_1a(
+            h_mo,
+            g_mo,
+            num_inactive_orbs,
+            num_active_orbs,
+            num_virtual_orbs,
+        ),
+        2 * num_inactive_orbs,
+        2 * num_active_orbs,
+    )
+
+
+def hamiltonian_hybrid_2i_2a(
+    h_mo: np.ndarray,
+    g_mo: np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+) -> OperatorHybrid:
+    """Get Hamiltonian operator that works together with two extra inactive and two extra virtual index.
+
+    Args:
+        h_mo: One-electron Hamiltonian integrals in MO.
+        g_mo: Two-electron Hamiltonian integrals in MO.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
+
+    Returns:
+        Modified Hamilonian Pauli operator.
+    """
+    return convert_pauli_to_hybrid_form(
+        hamiltonian_pauli_2i_2a(
+            h_mo,
+            g_mo,
+            num_inactive_orbs,
+            num_active_orbs,
+            num_virtual_orbs,
+        ),
+        2 * num_inactive_orbs,
+        2 * num_active_orbs,
+    )
+
+
+def one_elec_op_hybrid_0i_0a(
+    ints_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int
+) -> OperatorHybrid:
+    """Create one-electron operator that makes no changes in the inactive and virtual orbitals.
+
+    Args:
+        ints_mo: One-electron integrals for operator in MO basis.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
+
+    Returns:
+        One-electron operator for active-space.
+    """
+    return convert_pauli_to_hybrid_form(
+        one_elec_op_pauli_0i_0a(
+            ints_mo,
+            num_inactive_orbs,
+            num_active_orbs,
+            num_virtual_orbs,
+        ),
+        2 * num_inactive_orbs,
+        2 * num_active_orbs,
+    )
+
+
+def one_elec_op_hybrid_1i_1a(
+    ints_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int
+) -> OperatorHybrid:
+    """Create one-electron operator that makes no changes in the inactive and virtual orbitals.
+
+    Args:
+        ints_mo: One-electron integrals for operator in MO basis.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
+
+    Returns:
+        One-electron operator for active-space.
+    """
+    return convert_pauli_to_hybrid_form(
+        one_elec_op_pauli_1i_1a(
+            ints_mo,
+            num_inactive_orbs,
+            num_active_orbs,
+            num_virtual_orbs,
+        ),
+        2 * num_inactive_orbs,
+        2 * num_active_orbs,
+    )

@@ -8,7 +8,10 @@ from slowquant.unitary_coupled_cluster.operator_pauli import (
     expectation_value_pauli,
     hamiltonian_pauli,
 )
-from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
+from slowquant.unitary_coupled_cluster.ucc_wavefunction import (
+    WaveFunctionUCC,
+    load_wavefunction,
+)
 
 
 def test_heh_sto3g_hf() -> None:
@@ -204,7 +207,7 @@ def test_h4_sto3g_oouccsd() -> None:
     WF.run_ucc("SD", True)
     assert abs(WF.energy_elec - (-5.211066791547)) < 10**-8
     # Test sparse matrix also works
-    H = hamiltonian_pauli(h_core, g_eri, WF.c_trans, WF.num_spin_orbs, WF.num_elec)
+    H = hamiltonian_pauli(WF.h_mo, WF.g_mo, WF.num_orbs)
     assert (
         abs(WF.energy_elec - expectation_value_pauli(WF.state_vector, H, WF.state_vector, use_csr=0))
         < 10**-8
@@ -238,7 +241,7 @@ def test_h4_sto3g_oouccd() -> None:
     WF.run_ucc("D", True)
     assert abs(WF.energy_elec - (-5.211066791547)) < 10**-8
     # Test sparse matrix also works
-    H = hamiltonian_pauli(h_core, g_eri, WF.c_trans, WF.num_spin_orbs, WF.num_elec)
+    H = hamiltonian_pauli(WF.h_mo, WF.g_mo, WF.num_orbs)
     assert (
         abs(WF.energy_elec - expectation_value_pauli(WF.state_vector, H, WF.state_vector, use_csr=0))
         < 10**-8
@@ -841,3 +844,34 @@ def test_H4_sto3g_uccsdtq() -> None:  # pylint: disable=R0915
 
     WF.run_ucc("SDTQ", False)
     assert abs(WF.energy_elec - (-3.714153922167)) < 10**-8
+
+
+def test_H2_sto3g_uccsd_saveload() -> None:  # pylint: disable=R0915
+    """Test if saving and loading of wave function works"""
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """H  0.0  0.0  0.0;
+           H  0.0  1.8  0.0;""",
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("STO-3G")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
+    WF = WaveFunctionUCC(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 2),
+        SQobj.hartree_fock.mo_coeff,
+        h_core,
+        g_eri,
+    )
+
+    WF.run_ucc("SD", True)
+    WF.save_wavefunction("test_h2_save", force_overwrite=True)
+    WF2 = load_wavefunction("test_h2_save")
+    LR = naiveLR.LinearResponseUCC(WF2, "SD")
+    LR.calc_excitation_energies()
+    assert abs(LR.excitation_energies[0] - 0.54127603) < 10**-5
+    assert abs(LR.excitation_energies[1] - 0.59557678) < 10**-5

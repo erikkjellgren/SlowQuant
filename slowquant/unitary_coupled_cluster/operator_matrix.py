@@ -4,7 +4,7 @@ import numpy as np
 import scipy.sparse as ss
 
 import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
-from slowquant.unitary_coupled_cluster.base import kronecker_product
+from slowquant.unitary_coupled_cluster.base import kronecker_product_cached
 
 
 @functools.cache
@@ -26,36 +26,24 @@ def a_op_spin_matrix(
     Returns:
         Matrix representation of ferminonic annihilation or creation operator.
     """
-    Z_mat = np.array([[1, 0], [0, -1]], dtype=float)
-    I_mat = np.array([[1, 0], [0, 1]], dtype=float)
-    a_mat = np.array([[0, 1], [0, 0]], dtype=float)
-    a_mat_dagger = np.array([[0, 0], [1, 0]], dtype=float)
-    operators = []
-    for i in range(number_spin_orbitals):
-        if i == idx:
-            if dagger:
-                operators.append(a_mat_dagger)
-            else:
-                operators.append(a_mat)
-        elif i < idx:
-            operators.append(Z_mat)
-        else:
-            operators.append(I_mat)
+    prior = idx
+    after = number_spin_orbitals - prior - 1
     if number_spin_orbitals >= use_csr:
-        return ss.csr_matrix(kronecker_product(operators))
-    return kronecker_product(operators)
+        if dagger:
+            return kronecker_product_cached(prior, after, "a_dagger", True, True)
+        return kronecker_product_cached(prior, after, "a", True, True)
+    if dagger:
+        return kronecker_product_cached(prior, after, "a_dagger", False, True)
+    return kronecker_product_cached(prior, after, "a", False, True)
 
 
-def epq_matrix(
-    p: int, q: int, num_spin_orbs: int, num_elec: int, use_csr: int = 10
-) -> np.ndarray | ss.csr_matrix:
+def epq_matrix(p: int, q: int, num_spin_orbs: int, use_csr: int = 10) -> np.ndarray | ss.csr_matrix:
     """Contruct Epq operator.
 
     Args:
         p: Orbital index.
         q: Orbital index.
         num_spin_orbs: Number of spin orbitals.
-        num_elec: Number of electrons.
         use_csr: Size when to use sparse matrices.
 
     Returns:
