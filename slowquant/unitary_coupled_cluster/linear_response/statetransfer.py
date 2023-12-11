@@ -184,7 +184,9 @@ class LinearResponseUCC(LinearResponseBaseClass):
             norms[state_number] = q_part + g_part
         return norms
 
-    def get_property_gradient(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_property_gradient(
+        self, dipole_integrals: Sequence[np.ndarray], is_imag_op: bool = False
+    ) -> np.ndarray:
         """Calculate transition dipole moment.
 
         Args:
@@ -226,6 +228,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.normed_response_vectors,
                 state_number,
                 number_excitations,
+                is_imag_op=is_imag_op,
             )
             q_part_y = get_orbital_response_property_gradient(
                 rdms,
@@ -236,6 +239,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.normed_response_vectors,
                 state_number,
                 number_excitations,
+                is_imag_op=is_imag_op,
             )
             q_part_z = get_orbital_response_property_gradient(
                 rdms,
@@ -246,6 +250,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.normed_response_vectors,
                 state_number,
                 number_excitations,
+                is_imag_op=is_imag_op,
             )
             g_part_x = 0.0
             g_part_y = 0.0

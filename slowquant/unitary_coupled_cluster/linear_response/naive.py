@@ -162,7 +162,9 @@ class LinearResponseUCC(LinearResponseBaseClass):
             )
         return norms
 
-    def get_property_gradient(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_property_gradient(
+        self, dipole_integrals: Sequence[np.ndarray], is_imag_op: bool = False
+    ) -> np.ndarray:
         """Calculate transition dipole moment.
 
         Args:
@@ -197,6 +199,10 @@ class LinearResponseUCC(LinearResponseBaseClass):
         transition_dipole_y = 0.0
         transition_dipole_z = 0.0
         transition_dipoles = np.zeros((len(self.Z_G_normed[0]), 3))
+        if is_imag_op:
+            im_fac = -1
+        else:
+            im_fac = 1
         for state_number in range(len(self.Z_G_normed[0])):
             transfer_op = OperatorHybrid({})
             for i, G in enumerate(self.G_ops):
@@ -212,6 +218,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.normed_response_vectors,
                 state_number,
                 number_excitations,
+                is_imag_op=is_imag_op,
             )
             q_part_y = get_orbital_response_property_gradient(
                 rdms,
@@ -222,6 +229,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.normed_response_vectors,
                 state_number,
                 number_excitations,
+                is_imag_op=is_imag_op,
             )
             q_part_z = get_orbital_response_property_gradient(
                 rdms,
@@ -232,6 +240,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.normed_response_vectors,
                 state_number,
                 number_excitations,
+                is_imag_op=is_imag_op,
             )
             if mux_op.operators != {}:
                 transition_dipole_x = expectation_value_hybrid_flow_commutator(

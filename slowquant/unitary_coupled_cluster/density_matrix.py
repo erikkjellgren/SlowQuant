@@ -330,6 +330,7 @@ def get_orbital_response_property_gradient(
     response_vectors: np.ndarray,
     state_number: int,
     number_excitations: int,
+    is_imag_op: bool = False,
 ) -> float:
     r"""Calculate the orbital part of property gradient.
 
@@ -350,15 +351,25 @@ def get_orbital_response_property_gradient(
         Orbital part of property gradient.
     """
     prop_grad = 0
+    if is_imag_op:
+        im_fac = -1
+    else:
+        im_fac = 1
     for i, (m, n) in enumerate(kappa_idx):
         for p in range(num_inactive_orbs + num_active_orbs):
             prop_grad += (
-                (response_vectors[i + number_excitations, state_number] - response_vectors[i, state_number])
+                (
+                    response_vectors[i + number_excitations, state_number]
+                    - im_fac * response_vectors[i, state_number]
+                )
                 * x_mo[n, p]
                 * rdms.RDM1(m, p)
             )
             prop_grad += (
-                (response_vectors[i, state_number] - response_vectors[i + number_excitations, state_number])
+                (
+                    response_vectors[i, state_number]
+                    - im_fac * response_vectors[i + number_excitations, state_number]
+                )
                 * x_mo[m, p]
                 * rdms.RDM1(n, p)
             )

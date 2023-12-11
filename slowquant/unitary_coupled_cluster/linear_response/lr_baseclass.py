@@ -224,19 +224,19 @@ class LinearResponseBaseClass:
             Rotational strengths.
         """
         transition_electric_dipoles = self.get_property_gradient(dipole_integrals)
-        transition_magnetic_dipoles = self.get_property_gradient(magnetic_moment_integrals)
+        transition_magnetic_dipoles = self.get_property_gradient(magnetic_moment_integrals, is_imag_op=True)
         rot_strengths = np.zeros(len(transition_electric_dipoles))
         for idx, (excitation_energy, transition_electric_dipole, transition_magnetic_dipole) in enumerate(
             zip(self.excitation_energies, transition_electric_dipoles, transition_magnetic_dipoles)
         ):
-            rot_strengths[idx] = excitation_energy * (
+            rot_strengths[idx] = (
                 transition_electric_dipole[0] * transition_magnetic_dipole[0]
                 + transition_electric_dipole[1] * transition_magnetic_dipole[1]
                 + transition_electric_dipole[2] * transition_magnetic_dipole[2]
             )
         print("rot str")
         with np.printoptions(precision=4, suppress=True):
-            print(transition_magnetic_dipoles)
+            print(0.5 * transition_magnetic_dipoles)
         print("osc str")
         with np.printoptions(precision=4, suppress=True):
             print(transition_electric_dipoles)
