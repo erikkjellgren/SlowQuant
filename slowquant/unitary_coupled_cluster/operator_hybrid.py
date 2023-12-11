@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 import copy
 import itertools
 
@@ -461,6 +462,29 @@ class OperatorHybrid:
         new_operators = copy.deepcopy(self.operators)
         for key in self.operators.keys():
             new_operators[key].active_matrix *= number
+        return OperatorHybrid(new_operators)
+
+    def make_screened_operator(
+        self, indicies: Sequence[int], num_inactive_orbs: int, num_active_orbs: int
+    ) -> OperatorHybrid:
+        remapped_indicies = []
+        for idx in indicies:
+            if 2 * idx < num_inactive_orbs:
+                remapped_indicies.append(2 * idx)
+                remapped_indicies.append(2 * idx + 1)
+            elif 2 * idx < num_inactive_orbs + num_active_orbs:
+                continue
+            else:
+                remapped_indicies.append(2 * idx - num_active_orbs)
+                remapped_indicies.append(2 * idx + 1 - num_active_orbs)
+        new_operators = {}
+        for key, op in self.operators.items():
+            num_xy = 0
+            for idx in remapped_indicies:
+                if key[idx] in ("X", "Y"):
+                    num_xy += 1
+            if key.count("X") + key.count("Y") <= num_xy:
+                new_operators[key] = copy.deepcopy(op)
         return OperatorHybrid(new_operators)
 
     @property

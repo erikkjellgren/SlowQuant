@@ -43,6 +43,7 @@ class LinearResponseBaseClass:
 
         self.G_ops: list[OperatorHybrid] = []
         self.q_ops: list[OperatorHybrid] = []
+        self.q_idx = []
         num_spin_orbs = self.wf.num_spin_orbs
         excitations = excitations.lower()
 
@@ -104,6 +105,7 @@ class LinearResponseBaseClass:
                 self.wf.num_active_spin_orbs,
             )
             self.q_ops.append(op)
+            self.q_idx.append((a, i))
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters))

@@ -115,6 +115,9 @@ class LinearResponseUCC(LinearResponseBaseClass):
             rdms, self.wf.kappa_idx
         )
         for j, qJ in enumerate(self.q_ops):
+            H_screen = self.H_1i_1a.make_screened_operator(
+                self.q_idx[j], self.wf.num_inactive_spin_orbs, self.wf.num_active_spin_orbs
+            )
             for i, GI in enumerate(self.G_ops):
                 if do_approximate_hermitification:
                     # Make A
@@ -134,11 +137,11 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 else:
                     # Make A
                     self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = expectation_value_hybrid_flow(
-                        self.csf, [GI.dagger, self.U.dagger, self.H_1i_1a, qJ], self.wf.state_vector
+                        self.csf, [GI.dagger, self.U.dagger, H_screen, qJ], self.wf.state_vector
                     )
                     # Make B
                     self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = -expectation_value_hybrid_flow(
-                        self.csf, [GI.dagger, self.U.dagger, qJ.dagger, self.H_1i_1a], self.wf.state_vector
+                        self.csf, [GI.dagger, self.U.dagger, qJ.dagger, H_screen], self.wf.state_vector
                     )
         for j, GJ in enumerate(self.G_ops):
             for i, GI in enumerate(self.G_ops[j:], j):
