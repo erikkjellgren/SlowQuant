@@ -258,7 +258,7 @@ def iterate_t1_sa(
         for a in active_unocc_idx:
             theta_idx += 1
             operator = 2 ** (-1 / 2) * epq_pauli(a, i, num_spin_orbs)
-            yield theta_idx, i, a, operator
+            yield theta_idx, a, i, operator
 
 
 def iterate_t1_sa_matrix(
