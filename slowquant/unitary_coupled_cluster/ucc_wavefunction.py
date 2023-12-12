@@ -831,8 +831,7 @@ class WaveFunctionUCC:
                                             if r == q and m == u:
                                                 val += eEE(self, E, p, s, t, n)
                                             if r == q and t == s:
-                                                # val += eEE(self, E, p, u, m, n) this is wrong?
-                                                val += eEE(self, E, m, u, p, n)
+                                                val += eEE(self, E, p, u, m, n)
                                             if r == q and t == s and m == u:
                                                 val -= eE(self, E, p, n)
                                             if r == q and m == s:
