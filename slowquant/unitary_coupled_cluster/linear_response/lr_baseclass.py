@@ -179,9 +179,6 @@ class LinearResponseBaseClass:
     def get_excited_state_norm(self) -> np.ndarray:
         raise NotImplementedError
 
-    def get_excited_state_overlap(self) -> np.ndarray:
-        raise NotImplementedError
-
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         raise NotImplementedError
 

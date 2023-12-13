@@ -17,7 +17,6 @@ from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
     LinearResponseBaseClass,
 )
 from slowquant.unitary_coupled_cluster.operator_hybrid import (
-    OperatorHybrid,
     expectation_value_hybrid_flow,
     hamiltonian_hybrid_2i_2a,
     one_elec_op_hybrid_0i_0a,
@@ -213,23 +212,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
 
             norms[state_number] = q_part + g_part
         return norms
-
-    def get_excited_state_overlap(self) -> np.ndarray:
-        """Calculate the overlap of excited states with the ground state
-
-        Returns:
-            Overlap of excited states with ground state
-        """
-
-        overlaps = np.zeros(len(self.Z_G[0]))
-        for state_number in range(len(self.Z_G[0])):
-            transfer_op = OperatorHybrid({})
-            for i, G in enumerate(self.G_ops):
-                transfer_op += self.Z_G[i, state_number] * G.dagger + self.Y_G[i, state_number] * G
-            overlaps[state_number] = expectation_value_hybrid_flow(
-                self.wf.state_vector, [transfer_op], self.wf.state_vector
-            )
-        return overlaps
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.
