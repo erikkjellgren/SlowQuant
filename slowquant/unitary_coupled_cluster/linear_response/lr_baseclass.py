@@ -180,7 +180,9 @@ class LinearResponseBaseClass:
     def get_excited_state_norm(self) -> np.ndarray:
         raise NotImplementedError
 
-    def get_property_gradient(self, property_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_property_gradient(
+        self, property_integrals: Sequence[np.ndarray], is_imag_op: bool = False
+    ) -> np.ndarray:
         raise NotImplementedError
 
     def get_oscillator_strengths(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:

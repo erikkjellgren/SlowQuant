@@ -255,24 +255,50 @@ class LinearResponseUCC(LinearResponseBaseClass):
             g_part_x = 0.0
             g_part_y = 0.0
             g_part_z = 0.0
+            if is_imag_op:
+                im_fac = -1
+                im_fac2 = -1
+            else:
+                im_fac = 1
+                im_fac2 = 1
+            im_fac = 1
+            im_fac2 = 1
             for i, G in enumerate(self.G_ops):
-                g_part_x -= self.Z_G_normed[i, state_number] * expectation_value_hybrid_flow(
-                    self.wf.state_vector, [mux_op, self.U, G], self.csf
+                g_part_x -= (
+                    im_fac2
+                    * self.Z_G_normed[i, state_number]
+                    * expectation_value_hybrid_flow(self.wf.state_vector, [mux_op, self.U, G], self.csf)
                 )
-                g_part_x += self.Y_G_normed[i, state_number] * expectation_value_hybrid_flow(
-                    self.csf, [G.dagger, self.U.dagger, mux_op], self.wf.state_vector
+                g_part_x += (
+                    im_fac
+                    * self.Y_G_normed[i, state_number]
+                    * expectation_value_hybrid_flow(
+                        self.csf, [G.dagger, self.U.dagger, mux_op], self.wf.state_vector
+                    )
                 )
-                g_part_y -= self.Z_G_normed[i, state_number] * expectation_value_hybrid_flow(
-                    self.wf.state_vector, [muy_op, self.U, G], self.csf
+                g_part_y -= (
+                    im_fac2
+                    * self.Z_G_normed[i, state_number]
+                    * expectation_value_hybrid_flow(self.wf.state_vector, [muy_op, self.U, G], self.csf)
                 )
-                g_part_y += self.Y_G_normed[i, state_number] * expectation_value_hybrid_flow(
-                    self.csf, [G.dagger, self.U.dagger, muy_op], self.wf.state_vector
+                g_part_y += (
+                    im_fac
+                    * self.Y_G_normed[i, state_number]
+                    * expectation_value_hybrid_flow(
+                        self.csf, [G.dagger, self.U.dagger, muy_op], self.wf.state_vector
+                    )
                 )
-                g_part_z -= self.Z_G_normed[i, state_number] * expectation_value_hybrid_flow(
-                    self.wf.state_vector, [muz_op, self.U, G], self.csf
+                g_part_z -= (
+                    im_fac2
+                    * self.Z_G_normed[i, state_number]
+                    * expectation_value_hybrid_flow(self.wf.state_vector, [muz_op, self.U, G], self.csf)
                 )
-                g_part_z += self.Y_G_normed[i, state_number] * expectation_value_hybrid_flow(
-                    self.csf, [G.dagger, self.U.dagger, muz_op], self.wf.state_vector
+                g_part_z += (
+                    im_fac
+                    * self.Y_G_normed[i, state_number]
+                    * expectation_value_hybrid_flow(
+                        self.csf, [G.dagger, self.U.dagger, muz_op], self.wf.state_vector
+                    )
                 )
             transition_dipoles[state_number, 0] = q_part_x + g_part_x
             transition_dipoles[state_number, 1] = q_part_y + g_part_y

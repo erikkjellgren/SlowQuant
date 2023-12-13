@@ -201,13 +201,18 @@ class LinearResponseUCC(LinearResponseBaseClass):
         transition_dipoles = np.zeros((len(self.Z_G_normed[0]), 3))
         if is_imag_op:
             im_fac = -1
+            im_fac2 = -1
         else:
             im_fac = 1
+            im_fac2 = 1
+        # im_fac = 1
+        # im_fac2 = 1
         for state_number in range(len(self.Z_G_normed[0])):
             transfer_op = OperatorHybrid({})
             for i, G in enumerate(self.G_ops):
                 transfer_op += (
-                    self.Z_G_normed[i, state_number] * G.dagger + self.Y_G_normed[i, state_number] * G
+                    im_fac2 * self.Z_G_normed[i, state_number] * G.dagger
+                    + im_fac * self.Y_G_normed[i, state_number] * G
                 )
             q_part_x = get_orbital_response_property_gradient(
                 rdms,
