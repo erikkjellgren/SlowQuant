@@ -143,6 +143,18 @@ class LinearResponseUCC(LinearResponseBaseClass):
             norms[state_number] = q_part + g_part
         return norms
 
+    def get_excited_state_overlap(self) -> np.ndarray:
+        """Calculate the overlap of excited states with the ground state
+
+        Returns:
+            Overlap of excited states with ground state
+        """
+
+        overlaps = np.zeros(len(self.Z_G[0]))
+        print("Calculations of excited state overlaps is superfluous as they are zero by design.")
+
+        return overlaps
+
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.
 
