@@ -169,11 +169,13 @@ class LinearResponseUCC(LinearResponseBaseClass):
             Overlap of excited states with ground state
         """
 
-        overlaps = np.zeros(len(self.Z_G[0]))
-        for state_number in range(len(self.Z_G[0])):
+        overlaps = np.zeros(len(self.Z_G_normed[0]))
+        for state_number in range(len(self.Z_G_normed[0])):
             transfer_op = OperatorHybrid({})
             for i, G in enumerate(self.G_ops):
-                transfer_op += self.Z_G[i, state_number] * G.dagger + self.Y_G[i, state_number] * G
+                transfer_op += (
+                    self.Z_G_normed[i, state_number] * G.dagger + self.Y_G_normed[i, state_number] * G
+                )
             overlaps[state_number] = expectation_value_hybrid_flow(
                 self.wf.state_vector, [transfer_op], self.wf.state_vector
             )
