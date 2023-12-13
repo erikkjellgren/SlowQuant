@@ -162,6 +162,25 @@ class LinearResponseUCC(LinearResponseBaseClass):
             )
         return norms
 
+    def get_excited_state_overlap(self) -> np.ndarray:
+        """Calculate the overlap of excited states with the ground state
+
+        Returns:
+            Overlap of excited states with ground state
+        """
+
+        overlaps = np.zeros(len(self.Z_G_normed[0]))
+        for state_number in range(len(self.Z_G_normed[0])):
+            transfer_op = OperatorHybrid({})
+            for i, G in enumerate(self.G_ops):
+                transfer_op += (
+                    self.Z_G_normed[i, state_number] * G.dagger + self.Y_G_normed[i, state_number] * G
+                )
+            overlaps[state_number] = expectation_value_hybrid_flow(
+                self.wf.state_vector, [transfer_op], self.wf.state_vector
+            )
+        return overlaps
+
     def get_property_gradient(
         self, dipole_integrals: Sequence[np.ndarray], is_imag_op: bool = False
     ) -> np.ndarray:

@@ -180,6 +180,9 @@ class LinearResponseBaseClass:
     def get_excited_state_norm(self) -> np.ndarray:
         raise NotImplementedError
 
+    def get_excited_state_overlap(self) -> np.ndarray:
+        raise NotImplementedError
+
     def get_property_gradient(
         self, property_integrals: Sequence[np.ndarray], is_imag_op: bool = False
     ) -> np.ndarray:
