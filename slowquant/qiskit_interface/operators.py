@@ -4,7 +4,7 @@ from slowquant.qiskit_interface.base import FermionicOperator, a_op
 
 
 def Epq(p: int, q: int) -> FermionicOperator:
-    """Contruct the singlet one-electron excitation operator.
+    """Construct the singlet one-electron excitation operator.
 
     .. math::
         \\hat{E}_{pq} = \\hat{a}^\\dagger_{p,\\alpha}\\hat{a}_{q,\\alpha} + \\hat{a}^\\dagger_{p,\\beta}\\hat{a}_{q,\\beta}
@@ -26,10 +26,10 @@ def Epq(p: int, q: int) -> FermionicOperator:
 
 
 def epqrs(p: int, q: int, r: int, s: int) -> FermionicOperator:
-    """Contruct the singlet two-electron excitation operator.
+    """Construct the singlet two-electron excitation operator.
 
     .. math::
-        \hat{e}_{pqrs} = \hat{E}_{pq}\hat{E}_{rs} - \delta_{qr}\hat{E}_{ps}
+        \\hat{e}_{pqrs} = \\hat{E}_{pq}\\hat{E}_{rs} - \\delta_{qr}\\hat{E}_{ps}
 
     Args:
         p: Spatial orbital index.
@@ -46,10 +46,10 @@ def epqrs(p: int, q: int, r: int, s: int) -> FermionicOperator:
 
 
 def Eminuspq(p: int, q: int) -> FermionicOperator:
-    """Contruct Hermitian singlet one-electron excitation operator.
+    """Construct Hermitian singlet one-electron excitation operator.
 
     .. math::
-        \hat{E}^-_{pq} = \hat{E}_{pq} - \hat{E}_{qp}
+        \\hat{E}^-_{pq} = \\hat{E}_{pq} - \\hat{E}_{qp}
 
     Args:
         p: Spatial orbital index.
@@ -62,10 +62,10 @@ def Eminuspq(p: int, q: int) -> FermionicOperator:
 
 
 def hamiltonian_full_space(h_mo: np.ndarray, g_mo: np.ndarray, num_orbs: int) -> FermionicOperator:
-    """Contruct full-space electronic Hamiltonian.
+    """Construct full-space electronic Hamiltonian.
 
     .. math::
-        \hat{H} = \sum_{pq}h_{pq}\hat{E}_{pq} + \\frac{1}{2}\sum_{pqrs}g_{pqrs}\hat{e}_{pqrs}
+        \\hat{H} = \\sum_{pq}h_{pq}\\hat{E}_{pq} + \\frac{1}{2}\\sum_{pqrs}g_{pqrs}\\hat{e}_{pqrs}
 
     Args:
         h_mo: Core one-electron integrals in MO basis.
@@ -92,10 +92,10 @@ def hamiltonian_full_space(h_mo: np.ndarray, g_mo: np.ndarray, num_orbs: int) ->
 
 
 def commutator(A: FermionicOperator, B: FermionicOperator) -> FermionicOperator:
-    """Contruct operator commutator.
+    """Construct operator commutator.
 
     .. math::
-        \left[\hat{A},\hat{B}\\right] = \hat{A}\hat{B} - \hat{B}\hat{A}
+        \\left[\\hat{A},\\hat{B}\\right] = \\hat{A}\\hat{B} - \\hat{B}\\hat{A}
 
     Args:
         A: Fermionic operator.
@@ -105,3 +105,57 @@ def commutator(A: FermionicOperator, B: FermionicOperator) -> FermionicOperator:
         Operator from commutator.
     """
     return A * B - B * A
+
+
+def G1(a: int, i: int) -> FermionicOperator:
+    """Construct singlet one-electron spin-adapted excitation operator.
+
+    .. math::
+        \\hat{G}^{[1]}_{ai} = \\frac{1}{\\sqrt{2}}\\hat{E}_{ai}
+
+    Args:
+        a: Spatial orbital index.
+        i: Spatial orbital index.
+
+    Returns singlet one-elecetron spin-adapted exciation operator.
+    """
+    return 2 ** (-1 / 2) * Epq(a, i)
+
+
+def G2_1(a: int, i: int, b: int, j: int) -> FermionicOperator:
+    """Construct first singlet two-electron spin-adapted excitation operator.
+
+    .. math::
+        \\hat{G}^{[1]}_{aibj} = \\frac{1}{2\\sqrt{\\left(1+\\delta_{ab}\\right)\\left(1+\\delta_{ij}\\right)}}\\left(\\hat{E}_{ai}\\hat{E}_{bj} + \\hat{E}_{aj}\\hat{E}_{bi}\\right)
+
+    Args:
+        a: Spatial orbital index.
+        i: Spatial orbital index.
+        b: Spatial orbital index.
+        j: Spatial orbital index.
+
+    Returns first singlet two-elecetron spin-adapted exciation operator.
+    """
+    fac = 1
+    if a == b:
+        fac *= 2
+    if i == j:
+        fac *= 2
+    return 1 / 2 * (fac) ** (-1 / 2) * (Epq(a, i) * Epq(b, j) + Epq(a, j) * Epq(b, i))
+
+
+def G2_2(a: int, i: int, b: int, j: int) -> FermionicOperator:
+    """Construct second singlet two-electron spin-adapted excitation operator.
+
+    .. math::
+        \\hat{G}^{[2]}_{aibj} = \\frac{1}{2\\sqrt{3}}\\left(\\hat{E}_{ai}\\hat{E}_{bj} - \\hat{E}_{aj}\\hat{E}_{bi}\\right)
+
+    Args:
+        a: Spatial orbital index.
+        i: Spatial orbital index.
+        b: Spatial orbital index.
+        j: Spatial orbital index.
+
+    Returns second singlet two-elecetron spin-adapted exciation operator.
+    """
+    return 1 / (2 * 3 ** (1 / 2)) * (Epq(a, i) * Epq(b, j) - Epq(a, j) * Epq(b, i))
