@@ -9,6 +9,12 @@ SlowQuant
 
 .. toctree::
    :maxdepth: 2
+   :caption: Code Documentation Qiskit Interface:
+
+   autodoc/qiskit_interface.rst
+
+.. toctree::
+   :maxdepth: 2
    :caption: Code Documentation Unitary Coupled Cluster:
 
    autodoc/unitary_coupled_cluster_wf.rst
