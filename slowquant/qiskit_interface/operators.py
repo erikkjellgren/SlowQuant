@@ -107,32 +107,49 @@ def commutator(A: FermionicOperator, B: FermionicOperator) -> FermionicOperator:
     return A * B - B * A
 
 
-def G1(a: int, i: int) -> FermionicOperator:
+def double_commutator(A: FermionicOperator, B: FermionicOperator, C: FermionicOperator) -> FermionicOperator:
+    """Construct operator double commutator.
+
+    .. math::
+        \\left[\\hat{A},\\left[\\hat{B},\\hat{C}\\right]\\right] = \\hat{A}\\hat{B}\\hat{C} - \\hat{A}\\hat{C}\\hat{B} - \\hat{B}\\hat{C}\\hat{A} + \\hat{C}\\hat{B}\\hat{A}
+
+    Args:
+        A: Fermionic operator.
+        B: Fermionic operator.
+        C: Fermionic operator.
+
+    Returns:
+        Operator from double commutator.
+    """
+    return A * B * C - A * C * B - B * C * A + C * B * A
+
+
+def G1(i: int, a: int) -> FermionicOperator:
     """Construct singlet one-electron spin-adapted excitation operator.
 
     .. math::
-        \\hat{G}^{[1]}_{ai} = \\frac{1}{\\sqrt{2}}\\hat{E}_{ai}
+        \\hat{G}^{[1]}_{ia} = \\frac{1}{\\sqrt{2}}\\hat{E}_{ai}
 
     Args:
-        a: Spatial orbital index.
         i: Spatial orbital index.
+        a: Spatial orbital index.
 
     Returns singlet one-elecetron spin-adapted exciation operator.
     """
     return 2 ** (-1 / 2) * Epq(a, i)
 
 
-def G2_1(a: int, i: int, b: int, j: int) -> FermionicOperator:
+def G2_1(i: int, j: int, a: int, b: int) -> FermionicOperator:
     """Construct first singlet two-electron spin-adapted excitation operator.
 
     .. math::
         \\hat{G}^{[1]}_{aibj} = \\frac{1}{2\\sqrt{\\left(1+\\delta_{ab}\\right)\\left(1+\\delta_{ij}\\right)}}\\left(\\hat{E}_{ai}\\hat{E}_{bj} + \\hat{E}_{aj}\\hat{E}_{bi}\\right)
 
     Args:
-        a: Spatial orbital index.
         i: Spatial orbital index.
-        b: Spatial orbital index.
         j: Spatial orbital index.
+        a: Spatial orbital index.
+        b: Spatial orbital index.
 
     Returns first singlet two-elecetron spin-adapted exciation operator.
     """
@@ -144,17 +161,17 @@ def G2_1(a: int, i: int, b: int, j: int) -> FermionicOperator:
     return 1 / 2 * (fac) ** (-1 / 2) * (Epq(a, i) * Epq(b, j) + Epq(a, j) * Epq(b, i))
 
 
-def G2_2(a: int, i: int, b: int, j: int) -> FermionicOperator:
+def G2_2(i: int, j: int, a: int, b: int) -> FermionicOperator:
     """Construct second singlet two-electron spin-adapted excitation operator.
 
     .. math::
         \\hat{G}^{[2]}_{aibj} = \\frac{1}{2\\sqrt{3}}\\left(\\hat{E}_{ai}\\hat{E}_{bj} - \\hat{E}_{aj}\\hat{E}_{bi}\\right)
 
     Args:
-        a: Spatial orbital index.
         i: Spatial orbital index.
-        b: Spatial orbital index.
         j: Spatial orbital index.
+        a: Spatial orbital index.
+        b: Spatial orbital index.
 
     Returns second singlet two-elecetron spin-adapted exciation operator.
     """

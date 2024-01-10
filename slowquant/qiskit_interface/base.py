@@ -226,6 +226,22 @@ class FermionicOperator:
         return FermionicOperator(operators, factors)
 
     @property
+    def dagger(self) -> FermionicOperator:
+        operators = {}
+        factors = {}
+        for key_string in self.operators.keys():
+            new_op = []
+            for op in reversed(self.operators[key_string]):
+                if op.dagger:
+                    new_op.append(a_op(op.spinless_idx, op.spin, False))
+                else:
+                    new_op.append(a_op(op.spinless_idx, op.spin, True))
+            new_string_key = operator_string_to_key(new_op)
+            operators[new_string_key] = new_op
+            factors[new_string_key] = self.factors[key_string]
+        return FermionicOperator(operators, factors)
+
+    @property
     def operator_count(self) -> dict[int, int]:
         """Count number of operators of different lengths.
 
