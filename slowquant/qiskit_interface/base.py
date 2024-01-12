@@ -277,3 +277,96 @@ class FermionicOperator:
             qiskit_str = operator_to_qiskit_key(self.operators[key_string], remapping)
             qiskit_form[qiskit_str] = self.factors[key_string]
         return qiskit_form
+
+    def get_folded_operator(
+        self, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int
+    ) -> FermionicOperator:
+        """Get folded operator.
+
+        Warning, multiplication of folded operators, might give wrong operators.
+        (I have not quite figured out a good programming structure that will not allow multiplication after folding)
+
+        Note, that the indicies of the folded operator is remapped, such that idx=0 is the first index in the active space.
+
+        Args:
+            num_inactive_orbs: Number of spatial inactive orbitals.
+            num_active_orbs: Number of spatial active orbitals.
+            num_virtual_orbs: Number of spatial virtual orbitals.
+
+        Returns:
+           Folded fermionic operator.
+        """
+        operators = {}
+        factors = {}
+        inactive_idx = []
+        active_idx = []
+        virtual_idx = []
+        for i in range(2 * num_inactive_orbs + 2 * num_active_orbs + 2 * num_virtual_orbs):
+            if i < 2 * num_inactive_orbs:
+                inactive_idx.append(i)
+            elif i < 2 * num_inactive_orbs + 2 * num_active_orbs:
+                active_idx.append(i)
+            else:
+                virtual_idx.append(i)
+        for key_string in self.operators.keys():
+            virtual = []
+            virtual_dagger = []
+            inactive = []
+            inactive_dagger = []
+            active = []
+            active_dagger = []
+            fac = 1
+            for anni in self.operators[key_string]:
+                if anni.dagger:
+                    if anni.idx in inactive_idx:
+                        inactive_dagger.append(anni.idx)
+                    elif anni.idx in active_idx:
+                        active_dagger.append(
+                            a_op(anni.spinless_idx - num_inactive_orbs, anni.spin, anni.dagger)
+                        )
+                    elif anni.idx in virtual_idx:
+                        virtual_dagger.append(anni.idx)
+                else:
+                    if anni.idx in inactive_idx:
+                        inactive.append(anni.idx)
+                    elif anni.idx in active_idx:
+                        active.append(a_op(anni.spinless_idx - num_inactive_orbs, anni.spin, anni.dagger))
+                    elif anni.idx in virtual_idx:
+                        virtual.append(anni.idx)
+            active_op = active_dagger + active
+            bra_side = virtual_dagger + inactive_dagger
+            ket_side = virtual + inactive
+            if len(bra_side) != len(ket_side):
+                continue
+            is_zero = False
+            for i in bra_side:
+                if i not in inactive_idx:
+                    is_zero = True
+                    break
+            if is_zero:
+                continue
+            if len(inactive_dagger) % 2 == 1 and len(active_dagger) % 2 == 1:
+                fac *= -1
+            ket_side = virtual + inactive
+            if len(virtual) % 2 == 1 and len(active) % 2 == 1:
+                fac *= -1
+            ket_side = ket_side[::-1]
+            ket_flip_fac = 1
+            for i in range(1, len(ket_side) + 1):
+                if i % 2 == 0:
+                    ket_flip_fac *= -1
+            fac *= ket_flip_fac
+            is_zero = False
+            for i, j in zip(bra_side, ket_side[::-1]):
+                if i != j:
+                    is_zero = True
+                break
+            if is_zero:
+                continue
+            new_key = operator_string_to_key(active_op)
+            if new_key in factors:
+                factors[new_key] += fac * self.factors[key_string]
+            else:
+                factors[new_key] = fac * self.factors[key_string]
+                operators[new_key] = active_op
+        return FermionicOperator(operators, factors)
