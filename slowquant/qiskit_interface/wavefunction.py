@@ -17,6 +17,11 @@ from slowquant.molecularintegrals.integralfunctions import (
     two_electron_integral_transform,
 )
 from slowquant.qiskit_interface.operators import Epq, hamiltonian_full_space
+from slowquant.unitary_coupled_cluster.density_matrix import (
+    ReducedDenstiyMatrix,
+    get_electronic_energy,
+    get_orbital_gradient,
+)
 
 
 class WaveFunction:
@@ -388,26 +393,13 @@ class WaveFunction:
 
     def run_vqe(
         self,
+        orbital_optimization: bool = False,
     ) -> None:
         """Run VQE of wave function."""
-        H = hamiltonian_full_space(self.h_mo, self.g_mo, self.num_orbs)
-        energy = partial(
-            calc_energy,
-            operator=(
-                H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-            ).get_qiskit_form(self.num_active_orbs),
-            ansatz=self.qiskit_ansatz,
-            mapper=self.qiskit_mapper,
-            reg=2 * self.num_active_orbs,
-            estimator=self.qiskit_estimator,
-        )
-
         global iteration
         global start
-        iteration = 0  # type: ignore
-        start = time.time()  # type: ignore
 
-        def print_progress(x) -> None:
+        def print_progress(x, energy_func) -> None:
             """Print progress during energy minimization of wave function.
 
             Args:
@@ -416,12 +408,18 @@ class WaveFunction:
             global iteration
             global start
             time_str = f"{time.time() - start:7.2f}"  # type: ignore
-            e_str = f"{energy(x):3.12f}"
-            print(f"{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+            e_str = f"{energy_func(x):3.12f}"
+            print(f"--------{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
             iteration += 1  # type: ignore
             start = time.time()  # type: ignore
 
-        def print_progress_SPSA(___, theta, f_val, _, __) -> None:
+        def print_progress_SPSA(
+            ___,
+            theta,
+            f_val,
+            _,
+            __,
+        ) -> None:
             """Print progress during energy minimization of wave function.
 
             Args:
@@ -431,18 +429,126 @@ class WaveFunction:
             global start
             time_str = f"{time.time() - start:7.2f}"  # type: ignore
             e_str = f"{f_val:3.12f}"
-            print(f"{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+            print(f"--------{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
             iteration += 1  # type: ignore
             start = time.time()  # type: ignore
 
-        optimizer = SLSQP(callback=print_progress)
-        res = optimizer.minimize(energy, self.ansatz_parameters)
-        self.ansatz_parameters = res.x.tolist()
+        e_old = 1e12
+        print("Full optimization")
+        print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+        for full_iter in range(0, 100):
+            full_start = time.time()
+            iteration = 0  # type: ignore
+            start = time.time()  # type: ignore
+
+            # Do ansatz optimization
+            print("--------Ansatz optimization")
+            print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+            H = hamiltonian_full_space(self.h_mo, self.g_mo, self.num_orbs)
+            energy_theta = partial(
+                calc_energy,
+                operator=(
+                    H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+                ).get_qiskit_form(self.num_active_orbs),
+                ansatz=self.qiskit_ansatz,
+                mapper=self.qiskit_mapper,
+                reg=2 * self.num_active_orbs,
+                estimator=self.qiskit_estimator,
+            )
+            print_progress_ = partial(print_progress, energy_func=energy_theta)
+            optimizer = SLSQP(callback=print_progress_)
+            res = optimizer.minimize(energy_theta, self.ansatz_parameters)
+            self.ansatz_parameters = res.x.tolist()
+
+            if orbital_optimization:
+                iteration = 0  # type: ignore
+                start = time.time()  # type: ignore
+                print("--------Orbital optimization")
+                print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+                energy_oo = partial(
+                    calc_energy_oo,
+                    wf=self,
+                )
+                gradiet_oo = partial(
+                    orbital_rotation_gradient,
+                    wf=self,
+                )
+
+                print_progress_ = partial(print_progress, energy_func=energy_oo)
+                optimizer = SLSQP(callback=print_progress_)
+                res = optimizer.minimize(energy_oo, [0.0] * len(self.kappa_idx), jac=gradiet_oo)
+                for i in range(len(self.kappa)):
+                    self.kappa[i] = 0.0
+                    self._kappa_old[i] = 0.0
+                for i in range(len(self.kappa_redundant)):
+                    self.kappa_redundant[i] = 0.0
+                    self._kappa_redundant_old[i] = 0.0
+
+            e_new = res.fun
+            time_str = f"{time.time() - full_start:7.2f}"  # type: ignore
+            e_str = f"{e_new:3.12f}"
+            print(f"{str(full_iter+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+            if abs(e_new - e_old) < 1e-4:
+                break
+            e_old = e_new
 
 
-def calc_energy(parameters, operator, ansatz, mapper, reg, estimator):
+def calc_energy(parameters, operator, ansatz, mapper, reg, estimator) -> float:
     job = estimator.run(
         circuits=ansatz, parameter_values=parameters, observables=mapper.map(FermionicOp(operator, reg))
     )
     result = job.result()
     return result.values[0]
+
+
+def calc_energy_oo(kappa, wf) -> float:
+    kappa_mat = np.zeros_like(wf.c_orthonormal)
+    for kappa_val, (p, q) in zip(np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx):
+        kappa_mat[p, q] = kappa_val
+        kappa_mat[q, p] = -kappa_val
+    if len(wf.kappa_redundant) != 0:
+        if np.max(np.abs(wf.kappa_redundant)) > 0.0:
+            for kappa_val, (p, q) in zip(
+                np.array(wf.kappa_redundant) - np.array(wf._kappa_redundant_old), wf.kappa_redundant_idx
+            ):
+                kappa_mat[p, q] = kappa_val
+                kappa_mat[q, p] = -kappa_val
+    c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
+    wf._kappa_old = kappa.copy()
+    wf._kappa_redundant_old = wf.kappa_redundant.copy()
+    # Moving expansion point of kappa
+    wf.c_orthonormal = c_trans
+    rdms = ReducedDenstiyMatrix(
+        wf.num_inactive_orbs,
+        wf.num_active_orbs,
+        wf.num_active_orbs,
+        rdm1=wf.rdm1,
+        rdm2=wf.rdm2,
+    )
+    energy = get_electronic_energy(rdms, wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs)
+    return energy
+
+
+def orbital_rotation_gradient(
+    placeholder,
+    wf,
+) -> np.ndarray:
+    """Calcuate electronic gradient with respect to orbital rotations.
+
+    Args:
+        wf: Wave function object.
+
+    Return:
+        Electronic gradient with respect to orbital rotations.
+    """
+    rdms = ReducedDenstiyMatrix(
+        wf.num_inactive_orbs,
+        wf.num_active_orbs,
+        wf.num_active_orbs,
+        rdm1=wf.rdm1,
+        rdm2=wf.rdm2,
+    )
+    gradient = get_orbital_gradient(
+        rdms, wf.h_mo, wf.g_mo, wf.kappa_idx, wf.num_inactive_orbs, wf.num_active_orbs
+    )
+    return gradient

@@ -154,6 +154,25 @@ class ReducedDenstiyMatrix:
         return 0
 
 
+def get_electronic_energy(
+    rdms: ReducedDenstiyMatrix,
+    h_int: np.ndarray,
+    g_int: np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+) -> float:
+    energy = 0
+    for p in range(num_inactive_orbs + num_active_orbs):
+        for q in range(num_inactive_orbs + num_active_orbs):
+            energy += h_int[p, q] * rdms.RDM1(p, q)
+    for p in range(num_inactive_orbs + num_active_orbs):
+        for q in range(num_inactive_orbs + num_active_orbs):
+            for r in range(num_inactive_orbs + num_active_orbs):
+                for s in range(num_inactive_orbs + num_active_orbs):
+                    energy += 1 / 2 * g_int[p, q, r, s] * rdms.RDM2(p, q, r, s)
+    return energy
+
+
 def get_orbital_gradient(
     rdms: ReducedDenstiyMatrix,
     h_int: np.ndarray,
