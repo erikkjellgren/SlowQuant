@@ -16,7 +16,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
     two_electron_integral_transform,
 )
-from slowquant.qiskit_interface.operators import hamiltonian_full_space
+from slowquant.qiskit_interface.operators import Epq, hamiltonian_full_space
 
 
 class WaveFunction:
@@ -205,6 +205,7 @@ class WaveFunction:
                 self.qiskit_mapper,
             ),
         )
+        self._ansatz_parameters = [0.0] * self.qiskit_ansatz.num_parameters
         if self.qiskit_backend == "noiseless":
             self.qiskit_estimator = EstimatorNoNoise()
         else:
@@ -275,6 +276,18 @@ class WaveFunction:
         return self._g_mo
 
     @property
+    def ansatz_parameters(self) -> list[float]:
+        return self._ansatz_parameters
+
+    @ansatz_parameters.setter
+    def ansatz_parameters(self, parameters: list[float]) -> None:
+        self._rdm1 = None
+        self._rdm2 = None
+        self._rdm3 = None
+        self._rdm4 = None
+        self._ansatz_parameters = parameters.copy()
+
+    @property
     def rdm1(self) -> np.ndarray:
         """Calcuate one-electron reduced density matrix.
 
@@ -287,11 +300,19 @@ class WaveFunction:
                 p_idx = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
                     q_idx = q - self.num_inactive_orbs
-                    val = expectation_value_pauli(
-                        self.state_vector,
-                        epq_pauli(p, q, self.num_spin_orbs),
-                        self.state_vector,
+                    rdm1_op = (
+                        Epq(p, q)
+                        .get_folded_operator(
+                            self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+                        )
+                        .get_qiskit_form(self.num_active_orbs)
                     )
+                    job = self.qiskit_estimator.run(
+                        circuits=self.qiskit_ansatz,
+                        parameter_values=self.ansatz_parameters,
+                        observables=self.qiskit_mapper.map(FermionicOp(rdm1_op, 2 * self.num_active_orbs)),
+                    )
+                    val = job.result().values[0]
                     self._rdm1[p_idx, q_idx] = val
                     self._rdm1[q_idx, p_idx] = val
         return self._rdm1
@@ -312,16 +333,6 @@ class WaveFunction:
                     self.num_active_orbs,
                 )
             )
-            E = {}
-            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                for q in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                    E[(p, q)] = epq_hybrid(
-                        p,
-                        q,
-                        self.num_inactive_spin_orbs,
-                        self.num_active_spin_orbs,
-                        self.num_virtual_spin_orbs,
-                    )
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_idx = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
@@ -338,11 +349,21 @@ class WaveFunction:
                             s_lim = p + 1
                         for s in range(self.num_inactive_orbs, s_lim):
                             s_idx = s - self.num_inactive_orbs
-                            val = expectation_value_hybrid_flow(
-                                self.state_vector,
-                                [E[(p, q)], E[(r, s)]],
-                                self.state_vector,
+                            pdm2_op = (
+                                (Epq(p, q) * Epq(r, s))
+                                .get_folded_operator(
+                                    self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+                                )
+                                .get_qiskit_form(self.num_active_orbs)
                             )
+                            job = self.qiskit_estimator.run(
+                                circuits=self.qiskit_ansatz,
+                                parameter_values=self.ansatz_parameters,
+                                observables=self.qiskit_mapper.map(
+                                    FermionicOp(pdm2_op, 2 * self.num_active_orbs)
+                                ),
+                            )
+                            val = job.result().values[0]
                             if q == r:
                                 val -= self.rdm1[p_idx, s_idx]
                             self._rdm2[p_idx, q_idx, r_idx, s_idx] = val
@@ -415,7 +436,8 @@ class WaveFunction:
             start = time.time()  # type: ignore
 
         optimizer = SLSQP(callback=print_progress)
-        self.res = optimizer.minimize(energy, [0.0] * self.qiskit_ansatz.num_parameters)
+        res = optimizer.minimize(energy, self.ansatz_parameters)
+        self.ansatz_parameters = res.x.tolist()
 
 
 def calc_energy(parameters, operator, ansatz, mapper, reg, estimator):
