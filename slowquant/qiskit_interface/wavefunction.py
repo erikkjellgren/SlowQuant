@@ -8,7 +8,7 @@ from qiskit.primitives import Estimator
 from qiskit.primitives import Estimator as EstimatorNoNoise
 from qiskit_algorithms.optimizers import COBYLA, L_BFGS_B, SLSQP, SPSA
 from qiskit_ibm_runtime import Estimator
-from qiskit_nature.second_q.circuit.library import UCCSD, HartreeFock
+from qiskit_nature.second_q.circuit.library import UCCSD, HartreeFock, PUCCD
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
@@ -37,6 +37,7 @@ class WaveFunction:
         qiskit_options,
         qiskit_backend,
         qiskit_session,
+        wavefunction_type: str,
         qiskit_mapper: str = "parity",
         include_active_kappa: bool = False,
     ) -> None:
@@ -200,16 +201,30 @@ class WaveFunction:
             self.qiskit_mapper = JordanWignerMapper()
         else:
             raise ValueError(f"Unknown mapper; {qiskit_mapper}")
-        self.qiskit_ansatz = UCCSD(
-            self.num_active_orbs,
-            (self.num_active_elec // 2, self.num_active_elec // 2),
-            self.qiskit_mapper,
-            initial_state=HartreeFock(
+        if wavefunction_type.lower() == "puccd":
+            self.qiskit_ansatz = PUCCD(
                 self.num_active_orbs,
                 (self.num_active_elec // 2, self.num_active_elec // 2),
                 self.qiskit_mapper,
-            ),
-        )
+                initial_state=HartreeFock(
+                    self.num_active_orbs,
+                    (self.num_active_elec // 2, self.num_active_elec // 2),
+                    self.qiskit_mapper,
+                ),
+            )
+        elif wavefunction_type.lower() == "uccsd":
+            self.qiskit_ansatz = UCCSD(
+                self.num_active_orbs,
+                (self.num_active_elec // 2, self.num_active_elec // 2),
+                self.qiskit_mapper,
+                initial_state=HartreeFock(
+                    self.num_active_orbs,
+                    (self.num_active_elec // 2, self.num_active_elec // 2),
+                    self.qiskit_mapper,
+                ),
+            )
+        else:
+            raise ValueError(f"Got unknown wavefunction type: {wavefunction_type}")
         self._ansatz_parameters = [0.0] * self.qiskit_ansatz.num_parameters
         if self.qiskit_backend == "noiseless":
             self.qiskit_estimator = EstimatorNoNoise()
@@ -455,9 +470,19 @@ class WaveFunction:
                 reg=2 * self.num_active_orbs,
                 estimator=self.qiskit_estimator,
             )
+            gradient_theta = partial(
+                ansatz_parameters_gradient,
+                operator=(
+                    H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+                ).get_qiskit_form(self.num_active_orbs),
+                ansatz=self.qiskit_ansatz,
+                mapper=self.qiskit_mapper,
+                reg=2 * self.num_active_orbs,
+                estimator=self.qiskit_estimator,
+            )
             print_progress_ = partial(print_progress, energy_func=energy_theta)
             optimizer = SLSQP(callback=print_progress_)
-            res = optimizer.minimize(energy_theta, self.ansatz_parameters)
+            res = optimizer.minimize(energy_theta, self.ansatz_parameters, jac=gradient_theta)
             self.ansatz_parameters = res.x.tolist()
 
             if orbital_optimization:
@@ -551,4 +576,23 @@ def orbital_rotation_gradient(
     gradient = get_orbital_gradient(
         rdms, wf.h_mo, wf.g_mo, wf.kappa_idx, wf.num_inactive_orbs, wf.num_active_orbs
     )
+    return gradient
+
+
+def ansatz_parameters_gradient(parameters, operator, ansatz, mapper, reg, estimator) -> np.ndarray:
+    gradient = np.zeros(len(parameters))
+    for i in range(len(parameters)):
+        parameters[i] += np.pi / 4
+        job = estimator.run(
+            circuits=ansatz, parameter_values=parameters, observables=mapper.map(FermionicOp(operator, reg))
+        )
+        Ep = job.result().values[0]
+        parameters[i] -= np.pi / 4
+        parameters[i] -= np.pi / 4
+        job = estimator.run(
+            circuits=ansatz, parameter_values=parameters, observables=mapper.map(FermionicOp(operator, reg))
+        )
+        Em = job.result().values[0]
+        parameters[i] += np.pi / 4
+        gradient[i] = 1 / 2 * (Ep - Em)
     return gradient
