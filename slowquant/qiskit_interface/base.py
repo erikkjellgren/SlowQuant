@@ -270,9 +270,9 @@ class FermionicOperator:
         remapping = {}
         for i in range(2 * num_orbs):
             if i < num_orbs:
-                remapping[i] = 2 * i
+                remapping[2 * i] = i
             else:
-                remapping[i] = 2 * i + 1 - 2 * num_orbs
+                remapping[2 * i + 1 - 2 * num_orbs] = i
         for key_string in self.operators:
             qiskit_str = operator_to_qiskit_key(self.operators[key_string], remapping)
             qiskit_form[qiskit_str] = self.factors[key_string]
