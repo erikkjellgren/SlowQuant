@@ -270,9 +270,9 @@ class FermionicOperator:
         remapping = {}
         for i in range(2 * num_orbs):
             if i < num_orbs:
-                remapping[i] = 2 * i
+                remapping[2 * i] = i
             else:
-                remapping[i] = 2 * i + 1 - 2 * num_orbs
+                remapping[2 * i + 1 - 2 * num_orbs] = i
         for key_string in self.operators:
             qiskit_str = operator_to_qiskit_key(self.operators[key_string], remapping)
             qiskit_form[qiskit_str] = self.factors[key_string]
@@ -308,6 +308,7 @@ class FermionicOperator:
                 active_idx.append(i)
             else:
                 virtual_idx.append(i)
+
         for key_string in self.operators.keys():
             virtual = []
             virtual_dagger = []
@@ -333,36 +334,25 @@ class FermionicOperator:
                         active.append(a_op(anni.spinless_idx - num_inactive_orbs, anni.spin, anni.dagger))
                     elif anni.idx in virtual_idx:
                         virtual.append(anni.idx)
-            active_op = active_dagger + active
-            bra_side = virtual_dagger + inactive_dagger
-            ket_side = virtual + inactive
-            if len(bra_side) != len(ket_side):
+            # Any virtual indices will make the operator evaulate to zero.
+            if len(virtual) != 0 or len(virtual_dagger) != 0:
                 continue
-            is_zero = False
-            for i in bra_side:
-                if i not in inactive_idx:
-                    is_zero = True
-                    break
-            if is_zero:
+            active_op = active_dagger + active
+            bra_side = inactive_dagger
+            ket_side = inactive
+            # The virtual + inactive bra and ket side must end up giving
+            # identical state vectors outside of the active space.
+            if bra_side != ket_side:
                 continue
             if len(inactive_dagger) % 2 == 1 and len(active_dagger) % 2 == 1:
                 fac *= -1
-            ket_side = virtual + inactive
-            if len(virtual) % 2 == 1 and len(active) % 2 == 1:
-                fac *= -1
-            ket_side = ket_side[::-1]
+            # Calculate sign coming from flipping the order of the ket side.
+            # It has to be "flipped" to match the order on the bra side.
             ket_flip_fac = 1
             for i in range(1, len(ket_side) + 1):
                 if i % 2 == 0:
                     ket_flip_fac *= -1
             fac *= ket_flip_fac
-            is_zero = False
-            for i, j in zip(bra_side, ket_side[::-1]):
-                if i != j:
-                    is_zero = True
-                break
-            if is_zero:
-                continue
             new_key = operator_string_to_key(active_op)
             if new_key in factors:
                 factors[new_key] += fac * self.factors[key_string]
