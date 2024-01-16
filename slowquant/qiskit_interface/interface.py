@@ -1,5 +1,4 @@
 import qiskit_nature.second_q.mappers as Mappers
-from qiskit_ibm_runtime import Estimator
 from qiskit_nature.second_q.operators import FermionicOp
 from qiskit_nature.second_q.problems import ElectronicStructureResult
 
@@ -7,8 +6,8 @@ from qiskit_nature.second_q.problems import ElectronicStructureResult
 class QuantumInterface:
     def __init__(
         self,
-        estimator: Estimator,
-        vqe: ElectronicStructureResult,
+        estimator,
+        vqe: ElectronicStructureResult,  # ansatz: string
         mapper: Mappers,
     ) -> None:
         """
@@ -18,6 +17,10 @@ class QuantumInterface:
         self.vqe = vqe
         self.mapper = mapper
         self.num_orbs = vqe.raw_result.optimal_circuit.num_qubits
+
+    # construct circuit: args: ansatz string, num_spatial orbitals, num_particle
+
+    # update parameter: parameter: list of floats
 
     def op_to_qbit(self, op):
         """
@@ -31,8 +34,8 @@ class QuantumInterface:
         """
 
         job = self.estimator.run(
-            circuits=self.vqe.raw_result.optimal_circuit,
-            parameter_values=self.vqe.raw_result.optimal_point,
+            circuits=self.vqe.raw_result.optimal_circuit,  # constructed circuit self
+            parameter_values=self.vqe.raw_result.optimal_point,  # parameter self
             observables=self.op_to_qbit(op),
         )
         result = job.result()
@@ -40,7 +43,7 @@ class QuantumInterface:
 
         if isinstance(values, complex):
             if abs(values.imag) > 0:
-                print("Warning: Complex number detected with Im = ", values.imag)
+                print("Warning: Complex number detected with Im = ", values.imag)  # threshold 10**-2
 
         return values.real
 
