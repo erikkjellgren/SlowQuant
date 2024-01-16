@@ -11,18 +11,20 @@ from slowquant.qiskit_interface.operators import (
     double_commutator,
     hamiltonian_full_space,
 )
+from slowquant.qiskit_interface.wavefunction import WaveFunction
 
 
 class quantumLR:
     def __init__(
-        self,  # pass WF
-        H: FermionicOperator,
-        G_ops: FermionicOperator,
+        self,
+        WF: WaveFunction,
     ) -> None:
         """
         Initialize linear response by calculating the needed matrices.
         """
         # create out of WF obj
+        # TBD
+
         self.H = H
         self.G_ops = G_ops
 
