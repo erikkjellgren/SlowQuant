@@ -4,21 +4,21 @@ from functools import partial
 
 import numpy as np
 import scipy
-from qiskit_algorithms.optimizers import COBYLA, L_BFGS_B, SLSQP, SPSA, QNSPSA
+from qiskit_algorithms.optimizers import COBYLA, L_BFGS_B, QNSPSA, SLSQP, SPSA
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
     two_electron_integral_transform,
 )
+from slowquant.qiskit_interface.base import FermionicOperator
+from slowquant.qiskit_interface.interface import QuantumInterface
 from slowquant.qiskit_interface.operators import Epq, hamiltonian_full_space
+from slowquant.qiskit_interface.optimizers import RotaSolve
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_electronic_energy,
     get_orbital_gradient,
 )
-from slowquant.qiskit_interface.optimizers import RotaSolve
-from slowquant.qiskit_interface.interface import QuantumInterface
-from slowquant.qiskit_interface.base import FermionicOperator
 
 
 class WaveFunction:
@@ -434,7 +434,8 @@ class WaveFunction:
                 print_progress_ = partial(print_progress, energy_func=energy_theta)
                 optimizer = COBYLA(callback=print_progress_)
             elif ansatz_optimizer.lower() == "rotasolve":
-                optimizer = RotaSolve()
+                print_progress_ = partial(print_progress, energy_func=energy_theta)
+                optimizer = RotaSolve(callback=print_progress_)
             elif ansatz_optimizer.lower() == "spsa":
                 optimizer = SPSA(callback=print_progress_SPSA)
             elif ansatz_optimizer.lower() == "qnspsa":
@@ -554,7 +555,12 @@ class WaveFunction:
             print_progress_ = partial(print_progress, energy_func=energy_both)
             optimizer = COBYLA(callback=print_progress_)
         elif optimizer_name.lower() == "rotasolve":
-            optimizer = RotaSolve()
+            if orbital_optimization and len(self.kappa) != 0:
+                raise ValueError(
+                    "Cannot use rotasolve together with orbital optimization in the one-step solver."
+                )
+            print_progress_ = partial(print_progress, energy_func=energy_both)
+            optimizer = RotaSolve(callback=print_progress_)
         elif optimizer_name.lower() == "spsa":
             optimizer = SPSA(callback=print_progress_SPSA)
         else:
