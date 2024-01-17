@@ -280,11 +280,11 @@ class WaveFunction:
                     val = self.QI.quantum_expectation_value(rdm1_op)
                     self._rdm1[p_idx, q_idx] = val
                     self._rdm1[q_idx, p_idx] = val
-            trace = 0
-            for i in range(self.num_active_orbs):
-                trace += self._rdm1[i, i]
-            for i in range(self.num_active_orbs):
-                self._rdm1[i, i] = self._rdm1[i, i] * self.num_active_elec / trace
+            #trace = 0
+            #for i in range(self.num_active_orbs):
+            #    trace += self._rdm1[i, i]
+            #for i in range(self.num_active_orbs):
+            #    self._rdm1[i, i] = self._rdm1[i, i] * self.num_active_elec / trace
         return self._rdm1
 
     @property
@@ -329,15 +329,15 @@ class WaveFunction:
                             self._rdm2[r_idx, s_idx, p_idx, q_idx] = val
                             self._rdm2[q_idx, p_idx, s_idx, r_idx] = val
                             self._rdm2[s_idx, r_idx, q_idx, p_idx] = val
-            trace = 0
-            for i in range(self.num_active_elec):
-                for j in range(self.num_active_elec):
-                    trace += self._rdm2[i, i, j, j]
-            for i in range(self.num_active_elec):
-                for j in range(self.num_active_elec):
-                    self._rdm2[i, i, j, j] = (
-                        self._rdm2[i, i, j, j] * self.num_active_elec * (self.num_active_elec - 1) / trace
-                    )
+            #trace = 0
+            #for i in range(self.num_active_orbs):
+            #    for j in range(self.num_active_orbs):
+            #        trace += self._rdm2[i, i, j, j]
+            #for i in range(self.num_active_orbs):
+            #    for j in range(self.num_active_orbs):
+            #        self._rdm2[i, i, j, j] = (
+            #            self._rdm2[i, i, j, j] * self.num_active_elec * (self.num_active_elec - 1) / trace
+            #        )
         return self._rdm2
 
     def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
