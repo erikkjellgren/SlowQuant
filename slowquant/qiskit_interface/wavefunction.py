@@ -472,6 +472,7 @@ class WaveFunction:
                     self._kappa_redundant_old[i] = 0.0
             else:
                 # If theres is no orbital optimization, then the algorithm is already converged.
+                e_new = res.fun
                 break
 
             e_new = res.fun
