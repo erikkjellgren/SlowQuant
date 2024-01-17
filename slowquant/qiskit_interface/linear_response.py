@@ -1,5 +1,6 @@
 import numpy as np
 import scipy
+from dmdm.util import iterate_t1_sa, iterate_t2_sa  # temporary solution
 
 from slowquant.qiskit_interface.base import FermionicOperator
 from slowquant.qiskit_interface.interface import QuantumInterface
@@ -22,14 +23,24 @@ class quantumLR:
         """
         Initialize linear response by calculating the needed matrices.
         """
-        # create out of WF obj
-        # TBD
 
-        self.H = H
-        # theta picker: use DMDM
-        self.G_ops = G_ops
+        # Create operators
+        self.H = hamiltonian_full_space(WF.h_mo, WF.g_mo, WF.num_orbs)
 
-        num_parameters = len(G_ops)
+        self.G_ops = []
+        # G1
+        for a, i, _, _, _ in iterate_t1_sa(WF.active_occ_idx, WF.active_unocc_idx):
+            self.G_ops.append(G1(a, i))
+        # G2
+        for a, i, b, j, _, _, id in iterate_t2_sa(WF.active_occ_idx, WF.active_unocc_idx):
+            if id > 0:
+                # G2_1
+                self.G_ops.append(G2_1(a, b, i, j))
+            else:
+                # G2_2
+                self.G_ops.append(G2_2(a, b, i, j))
+
+        num_parameters = len(self.G_ops)
         self.A = np.zeros((num_parameters, num_parameters))
         self.B = np.zeros((num_parameters, num_parameters))
         self.Sigma = np.zeros((num_parameters, num_parameters))
