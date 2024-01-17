@@ -4,10 +4,11 @@ from functools import partial
 
 import numpy as np
 import scipy
-from qiskit.primitives import Estimator
+from qiskit_aer.primitives import Estimator as EstimatorShotNoise
 from qiskit.primitives import Estimator as EstimatorNoNoise
-from qiskit_algorithms.optimizers import COBYLA, L_BFGS_B, SLSQP, SPSA
-from qiskit_ibm_runtime import Estimator
+from qiskit.primitives import Sampler as SamplerNoNoise
+from qiskit_algorithms.optimizers import COBYLA, L_BFGS_B, SLSQP, SPSA, QNSPSA
+from qiskit_ibm_runtime import Estimator, Sampler
 from qiskit_nature.second_q.circuit.library import UCCSD, HartreeFock, PUCCD
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.operators import FermionicOp
@@ -22,7 +23,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_electronic_energy,
     get_orbital_gradient,
 )
-
+from slowquant.qiskit_interface.optimizers import RotaSolve
 
 class WaveFunction:
     def __init__(
@@ -228,8 +229,14 @@ class WaveFunction:
         self._ansatz_parameters = [0.0] * self.qiskit_ansatz.num_parameters
         if self.qiskit_backend == "noiseless":
             self.qiskit_estimator = EstimatorNoNoise()
+            self.qiskit_sampler = SamplerNoNoise()
+        elif self.qiskit_backend == "qasm":
+            self.qiskit_estimator = EstimatorShotNoise(run_options={'shots': 10000})
         else:
             self.qiskit_estimator = Estimator(
+                backend=self.qiskit_backend, options=self.qiskit_options, session=self.qiskit_session
+            )
+            self.qiskit_sampler = Sampler(
                 backend=self.qiskit_backend, options=self.qiskit_options, session=self.qiskit_session
             )
 
@@ -422,6 +429,7 @@ class WaveFunction:
 
     def run_vqe_2step(
         self,
+        ansatz_optimizer: str,
         orbital_optimization: bool = False,
     ) -> None:
         """Run VQE of wave function."""
@@ -494,8 +502,23 @@ class WaveFunction:
                 reg=2 * self.num_active_orbs,
                 estimator=self.qiskit_estimator,
             )
-            print_progress_ = partial(print_progress, energy_func=energy_theta)
-            optimizer = SLSQP(callback=print_progress_)
+            if ansatz_optimizer.lower() == "slsqp":
+                print_progress_ = partial(print_progress, energy_func=energy_theta)
+                optimizer = SLSQP(callback=print_progress_)
+            elif ansatz_optimizer.lower() == "l_bfgs_b":
+                print_progress_ = partial(print_progress, energy_func=energy_theta)
+                optimizer = L_BFGS_B(callback=print_progress_)
+            elif ansatz_optimizer.lower() == "cobyla":
+                print_progress_ = partial(print_progress, energy_func=energy_theta)
+                optimizer = COBYLA(callback=print_progress_)
+            elif ansatz_optimizer.lower() == "rotasolve":
+                optimizer = RotaSolve()
+            elif ansatz_optimizer.lower() == "spsa":
+                optimizer = SPSA(callback=print_progress_SPSA)
+            elif ansatz_optimizer.lower() == "qnspsa":
+                optimizer = QNSPSA(QNSPSA.get_fidelity(self.qiskit_ansatz, sampler=self.qiskit_sampler), callback=print_progress_SPSA)
+            else:
+                raise ValueError(f"Unknown optimizer: {ansatz_optimizer}")
             res = optimizer.minimize(energy_theta, self.ansatz_parameters, jac=gradient_theta)
             self.ansatz_parameters = res.x.tolist()
 
@@ -607,10 +630,12 @@ class WaveFunction:
         elif optimizer_name.lower() == "cobyla":
             print_progress_ = partial(print_progress, energy_func=energy_both)
             optimizer = COBYLA(callback=print_progress_)
+        elif optimizer_name.lower() == "rotasolve":
+            optimizer = RotaSolve()
         elif optimizer_name.lower() == "spsa":
             optimizer = SPSA(callback=print_progress_SPSA)
         else:
-            raise ValueError(f"Unknown optimizer: {optimizer}")
+            raise ValueError(f"Unknown optimizer: {optimizer_name}")
         parameters = self.kappa + self.ansatz_parameters
         res = optimizer.minimize(energy_both, parameters, jac=gradient_both)
         self.ansatz_parameters = res.x[len(self.kappa) :].tolist()
