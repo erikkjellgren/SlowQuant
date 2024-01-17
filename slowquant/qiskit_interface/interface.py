@@ -1,6 +1,6 @@
 import numpy as np
 import qiskit_nature.second_q.mappers as Mappers
-from qiskit_nature.second_q.circuit.library import PUCCD, UCCSD, HartreeFock
+from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFock
 from qiskit_nature.second_q.operators import FermionicOp
 
 from slowquant.qiskit_interface.base import FermionicOperator
@@ -18,10 +18,10 @@ class QuantumInterface:
 
         Args:
             estimator: Qiskit Estimator object
-            ansatz: Name of qiskit ansatz to be used. Currenly supported: UCCSD and PUCCD
+            ansatz: Name of qiskit ansatz to be used. Currenly supported: UCCSD, UCCD, and PUCCD
             mapper: Qiskit mapper object, e.g. JW or Parity
         """
-        allowed_ansatz = ["UCCSD", "PUCCD"]
+        allowed_ansatz = ["UCCSD", "PUCCD", "UCCD"]
         if not ansatz in allowed_ansatz:
             raise ValueError("The chosen Ansatz is not availbale. Choose from: ", allowed_ansatz)
         self.ansatz = ansatz
@@ -44,11 +44,11 @@ class QuantumInterface:
         if self.ansatz == "UCCSD":
             self.circuit = UCCSD(
                 num_orbs,
-                [num_parts, num_parts],
+                (num_parts, num_parts),
                 self.mapper,
                 initial_state=HartreeFock(
                     num_orbs,
-                    [num_parts, num_parts],
+                    (num_parts, num_parts),
                     self.mapper,
                 ),
             )
@@ -60,6 +60,18 @@ class QuantumInterface:
                 initial_state=HartreeFock(
                     num_orbs,
                     num_parts,
+                    self.mapper,
+                ),
+            )
+        elif self.ansatz == "UCCD":
+            self.circuit = UCC(
+                num_orbs,
+                (num_parts, num_parts),
+                "d",
+                self.mapper,
+                initial_state=HartreeFock(
+                    num_orbs,
+                    (num_parts, num_parts),
                     self.mapper,
                 ),
             )

@@ -26,6 +26,7 @@ class quantumLR:
         # TBD
 
         self.H = H
+        # theta picker: use DMDM
         self.G_ops = G_ops
 
         num_parameters = len(G_ops)
@@ -33,6 +34,8 @@ class quantumLR:
         self.B = np.zeros((num_parameters, num_parameters))
         self.Sigma = np.zeros((num_parameters, num_parameters))
         self.Delta = np.zeros((num_parameters, num_parameters))
+
+        self.orbs = [self.WF.num_inactive_orbs, self.WF.num_active_orbs, self.WF.num_virtual_orbs]
 
     def run_naive(
         self,
@@ -43,7 +46,9 @@ class quantumLR:
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
                 self.A[i, j] = self.A[j, i] = QI.quantum_expectation_value(
-                    double_commutator(GI.dagger, self.H, GJ)
+                    double_commutator(GI.dagger, self.H, GJ).get_folded_operator(
+                        self.WF.num_inactive_orbs, self.WF.num_active_orbs, self.WF.num_virtual_orbs
+                    )
                 )
                 # Make B
                 self.B[i, j] = self.B[j, i] = QI.quantum_expectation_value(
@@ -67,7 +72,11 @@ class quantumLR:
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
                 val = QI.quantum_expectation_value(GI.dagger * self.H * GJ)
-                GG_exp = QI.quantum_expectation_value(GI.dagger * GJ)
+                GG_exp = QI.quantum_expectation_value(
+                    (GI.dagger * GJ).get_folded_operator(
+                        self.WF.num_inactive_orbs, self.WF.num_active_orbs, self.WF.num_virtual_orbs
+                    )
+                )
                 val -= GG_exp * QI.vqe.electronic_energies[0]  # WF
                 val -= G_exp[i] * HG_exp[j]
                 val += G_exp[i] * G_exp[j] * QI.vqe.electronic_energies[0]
