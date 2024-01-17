@@ -203,6 +203,7 @@ class WaveFunction:
         """
         self._h_mo = None
         self._g_mo = None
+        self._energy_elec = None
         self._c_orthonormal = c
 
     @property
@@ -257,6 +258,7 @@ class WaveFunction:
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
+        self._energy_elec = None
         self.QI.parameters = parameters
 
     @property
