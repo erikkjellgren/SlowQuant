@@ -447,7 +447,7 @@ class WaveFunction:
             res = optimizer.minimize(energy_theta, self.ansatz_parameters, jac=gradient_theta)
             self.ansatz_parameters = res.x.tolist()
 
-            if orbital_optimization:
+            if orbital_optimization and len(self.kappa) != 0:
                 iteration = 0  # type: ignore
                 start = time.time()  # type: ignore
                 print("--------Orbital optimization")
@@ -473,6 +473,10 @@ class WaveFunction:
             else:
                 # If theres is no orbital optimization, then the algorithm is already converged.
                 e_new = res.fun
+                if len(self.kappa) == 0:
+                    print(
+                        "WARNING: No orbital optimization performed, because there is no non-redundant orbital parameters"
+                    )
                 break
 
             e_new = res.fun
