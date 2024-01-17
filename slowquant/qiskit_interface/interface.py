@@ -1,4 +1,3 @@
-import numpy as np
 import qiskit_nature.second_q.mappers as Mappers
 from qiskit_nature.second_q.circuit.library import PUCCD, UCCSD, HartreeFock
 from qiskit_nature.second_q.operators import FermionicOp
@@ -44,47 +43,44 @@ class QuantumInterface:
         if self.ansatz == "UCCSD":
             self.circuit = UCCSD(
                 num_orbs,
-                [num_parts, num_parts],
+                (num_parts // 2, num_parts // 2),
                 self.mapper,
                 initial_state=HartreeFock(
                     num_orbs,
-                    [num_parts, num_parts],
+                    (num_parts // 2, num_parts // 2),
                     self.mapper,
                 ),
             )
         elif self.ansatz == "PUCCD":
             self.circuit = PUCCD(
                 num_orbs,
-                num_parts,
+                (num_parts // 2, num_parts // 2),
                 self.mapper,
                 initial_state=HartreeFock(
                     num_orbs,
-                    num_parts,
+                    (num_parts // 2, num_parts // 2),
                     self.mapper,
                 ),
             )
 
         # Set parameter to HarteeFock
-        self.parameters = [0] * self.circuit.num_parameters
+        self._parameters = [0.0] * self.circuit.num_parameters
 
-    def update_parameters(
+    @property
+    def parameters(self) -> list[float]:
+        return self._parameters
+
+    @parameters.setter
+    def parameters(
         self,
-        parameters: np.ndarray,
+        parameters: list[float],
     ) -> None:
-        """
-        Construct qiskit circuit
-
-        Args:
-            parameters: list of parameters for quanutm circuit
-        """
-
         if len(parameters) != self.circuit.num_parameters:
             raise ValueError(
                 "The length of the parameter list does not fit the chosen circuit for the Ansatz ",
                 self.ansatz,
             )
-
-        self.parameters = parameters
+        self._parameters = parameters.copy()
 
     def op_to_qbit(self, op: FermionicOperator):
         """
@@ -93,20 +89,24 @@ class QuantumInterface:
         Args:
             op: Operator as SlowQuant's FermionicOperator object
         """
+        return self.mapper.map(FermionicOp(op.get_qiskit_form(self.num_orbs), 2 * self.num_orbs))
 
-        return self.mapper.map(FermionicOp(op.get_qiskit_form(self.num_orbs)))
-
-    def quantum_expectation_value(self, op: FermionicOperator) -> float:
+    def quantum_expectation_value(
+        self, op: FermionicOperator, custom_parameters: list[float] | None = None
+    ) -> float:
         """
         Calculate expectation value of circuit from vqe result  with op operator
 
         Args:
             op: Operator as SlowQuant's FermionicOperator object
         """
-
+        if custom_parameters is None:
+            run_parameters = self.parameters
+        else:
+            run_parameters = custom_parameters
         job = self.estimator.run(
             circuits=self.circuit,
-            parameter_values=self.parameters,
+            parameter_values=run_parameters,
             observables=self.op_to_qbit(op),
         )
         result = job.result()
@@ -117,7 +117,3 @@ class QuantumInterface:
                 print("Warning: Complex number detected with Im = ", values.imag)
 
         return values.real
-
-
-def to_qbit(op, mapper, num_orbs):
-    return mapper.map(FermionicOp(op.get_qiskit_form(num_orbs)))

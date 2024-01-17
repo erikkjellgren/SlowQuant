@@ -4,14 +4,7 @@ from functools import partial
 
 import numpy as np
 import scipy
-from qiskit_aer.primitives import Estimator as EstimatorShotNoise
-from qiskit.primitives import Estimator as EstimatorNoNoise
-from qiskit.primitives import Sampler as SamplerNoNoise
 from qiskit_algorithms.optimizers import COBYLA, L_BFGS_B, SLSQP, SPSA, QNSPSA
-from qiskit_ibm_runtime import Estimator, Sampler
-from qiskit_nature.second_q.circuit.library import UCCSD, HartreeFock, PUCCD
-from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
-from qiskit_nature.second_q.operators import FermionicOp
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
@@ -24,6 +17,9 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_gradient,
 )
 from slowquant.qiskit_interface.optimizers import RotaSolve
+from slowquant.qiskit_interface.interface import QuantumInterface
+from slowquant.qiskit_interface.base import FermionicOperator
+
 
 class WaveFunction:
     def __init__(
@@ -34,12 +30,7 @@ class WaveFunction:
         c_orthonormal: np.ndarray,
         h_ao: np.ndarray,
         g_ao: np.ndarray,
-        qiskit_service,
-        qiskit_options,
-        qiskit_backend,
-        qiskit_session,
-        wavefunction_type: str,
-        qiskit_mapper: str = "parity",
+        qiskit_interface: QuantumInterface,
         include_active_kappa: bool = False,
     ) -> None:
         """Initialize for UCC wave function.
@@ -190,55 +181,8 @@ class WaveFunction:
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     self.kappa_hf_like_idx.append([p, q])
         # Setup Qiskit stuff
-        self.qiskit_options = qiskit_options
-        self.qiskit_service = qiskit_service
-        self.qiskit_backend = qiskit_backend.lower()
-        self.qiskit_session = qiskit_session
-        if qiskit_mapper.lower() == "parity":
-            self.qiskit_mapper = ParityMapper(
-                num_particles=(self.num_active_elec // 2, self.num_active_elec // 2)
-            )
-        elif qiskit_mapper.lower() in ("jordanwigner", "jw"):
-            self.qiskit_mapper = JordanWignerMapper()
-        else:
-            raise ValueError(f"Unknown mapper; {qiskit_mapper}")
-        if wavefunction_type.lower() == "puccd":
-            self.qiskit_ansatz = PUCCD(
-                self.num_active_orbs,
-                (self.num_active_elec // 2, self.num_active_elec // 2),
-                self.qiskit_mapper,
-                initial_state=HartreeFock(
-                    self.num_active_orbs,
-                    (self.num_active_elec // 2, self.num_active_elec // 2),
-                    self.qiskit_mapper,
-                ),
-            )
-        elif wavefunction_type.lower() == "uccsd":
-            self.qiskit_ansatz = UCCSD(
-                self.num_active_orbs,
-                (self.num_active_elec // 2, self.num_active_elec // 2),
-                self.qiskit_mapper,
-                initial_state=HartreeFock(
-                    self.num_active_orbs,
-                    (self.num_active_elec // 2, self.num_active_elec // 2),
-                    self.qiskit_mapper,
-                ),
-            )
-        else:
-            raise ValueError(f"Got unknown wavefunction type: {wavefunction_type}")
-        self._ansatz_parameters = [0.0] * self.qiskit_ansatz.num_parameters
-        if self.qiskit_backend == "noiseless":
-            self.qiskit_estimator = EstimatorNoNoise()
-            self.qiskit_sampler = SamplerNoNoise()
-        elif self.qiskit_backend == "qasm":
-            self.qiskit_estimator = EstimatorShotNoise(run_options={'shots': 10000})
-        else:
-            self.qiskit_estimator = Estimator(
-                backend=self.qiskit_backend, options=self.qiskit_options, session=self.qiskit_session
-            )
-            self.qiskit_sampler = Sampler(
-                backend=self.qiskit_backend, options=self.qiskit_options, session=self.qiskit_session
-            )
+        self.qiskit_interface = qiskit_interface
+        self.qiskit_interface.construct_circuit(self.num_active_orbs, self.num_active_elec)
 
     @property
     def c_orthonormal(self) -> np.ndarray:
@@ -304,7 +248,7 @@ class WaveFunction:
 
     @property
     def ansatz_parameters(self) -> list[float]:
-        return self._ansatz_parameters
+        return self.qiskit_interface.parameters
 
     @ansatz_parameters.setter
     def ansatz_parameters(self, parameters: list[float]) -> None:
@@ -312,7 +256,7 @@ class WaveFunction:
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
-        self._ansatz_parameters = parameters.copy()
+        self.qiskit_interface.parameters = parameters
 
     @property
     def rdm1(self) -> np.ndarray:
@@ -327,19 +271,10 @@ class WaveFunction:
                 p_idx = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
                     q_idx = q - self.num_inactive_orbs
-                    rdm1_op = (
-                        Epq(p, q)
-                        .get_folded_operator(
-                            self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
-                        )
-                        .get_qiskit_form(self.num_active_orbs)
+                    rdm1_op = Epq(p, q).get_folded_operator(
+                        self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                     )
-                    job = self.qiskit_estimator.run(
-                        circuits=self.qiskit_ansatz,
-                        parameter_values=self.ansatz_parameters,
-                        observables=self.qiskit_mapper.map(FermionicOp(rdm1_op, 2 * self.num_active_orbs)),
-                    )
-                    val = job.result().values[0]
+                    val = self.qiskit_interface.quantum_expectation_value(rdm1_op)
                     self._rdm1[p_idx, q_idx] = val
                     self._rdm1[q_idx, p_idx] = val
             trace = 0
@@ -381,21 +316,10 @@ class WaveFunction:
                             s_lim = p + 1
                         for s in range(self.num_inactive_orbs, s_lim):
                             s_idx = s - self.num_inactive_orbs
-                            pdm2_op = (
-                                (Epq(p, q) * Epq(r, s))
-                                .get_folded_operator(
-                                    self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
-                                )
-                                .get_qiskit_form(self.num_active_orbs)
+                            pdm2_op = (Epq(p, q) * Epq(r, s)).get_folded_operator(
+                                self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                             )
-                            job = self.qiskit_estimator.run(
-                                circuits=self.qiskit_ansatz,
-                                parameter_values=self.ansatz_parameters,
-                                observables=self.qiskit_mapper.map(
-                                    FermionicOp(pdm2_op, 2 * self.num_active_orbs)
-                                ),
-                            )
-                            val = job.result().values[0]
+                            val = self.qiskit_interface.quantum_expectation_value(pdm2_op)
                             if q == r:
                                 val -= self.rdm1[p_idx, s_idx]
                             self._rdm2[p_idx, q_idx, r_idx, s_idx] = val
@@ -482,25 +406,14 @@ class WaveFunction:
             print("--------Ansatz optimization")
             print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
             H = hamiltonian_full_space(self.h_mo, self.g_mo, self.num_orbs)
+            H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             energy_theta = partial(
                 calc_energy_theta,
-                operator=(
-                    H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-                ).get_qiskit_form(self.num_active_orbs),
-                ansatz=self.qiskit_ansatz,
-                mapper=self.qiskit_mapper,
-                reg=2 * self.num_active_orbs,
-                estimator=self.qiskit_estimator,
+                operator=H,
+                qiskit_interface=self.qiskit_interface,
             )
             gradient_theta = partial(
-                ansatz_parameters_gradient,
-                operator=(
-                    H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-                ).get_qiskit_form(self.num_active_orbs),
-                ansatz=self.qiskit_ansatz,
-                mapper=self.qiskit_mapper,
-                reg=2 * self.num_active_orbs,
-                estimator=self.qiskit_estimator,
+                ansatz_parameters_gradient, operator=H, qiskit_interface=self.qiskit_interface
             )
             if ansatz_optimizer.lower() == "slsqp":
                 print_progress_ = partial(print_progress, energy_func=energy_theta)
@@ -516,7 +429,10 @@ class WaveFunction:
             elif ansatz_optimizer.lower() == "spsa":
                 optimizer = SPSA(callback=print_progress_SPSA)
             elif ansatz_optimizer.lower() == "qnspsa":
-                optimizer = QNSPSA(QNSPSA.get_fidelity(self.qiskit_ansatz, sampler=self.qiskit_sampler), callback=print_progress_SPSA)
+                optimizer = QNSPSA(
+                    QNSPSA.get_fidelity(self.qiskit_interface.ansatz, sampler=self.qiskit_sampler),
+                    callback=print_progress_SPSA,
+                )
             else:
                 raise ValueError(f"Unknown optimizer: {ansatz_optimizer}")
             res = optimizer.minimize(energy_theta, self.ansatz_parameters, jac=gradient_theta)
@@ -556,6 +472,7 @@ class WaveFunction:
             if abs(e_new - e_old) < 1e-4:
                 break
             e_old = e_new
+        self.energy_elec = e_old
 
     def run_vqe_1step(
         self,
@@ -608,18 +525,10 @@ class WaveFunction:
         energy_both = partial(
             calc_energy_both,
             wf=self,
-            ansatz=self.qiskit_ansatz,
-            mapper=self.qiskit_mapper,
-            reg=2 * self.num_active_orbs,
-            estimator=self.qiskit_estimator,
         )
         gradient_both = partial(
             calc_gradient_both,
             wf=self,
-            ansatz=self.qiskit_ansatz,
-            mapper=self.qiskit_mapper,
-            reg=2 * self.num_active_orbs,
-            estimator=self.qiskit_estimator,
         )
         if optimizer_name.lower() == "slsqp":
             print_progress_ = partial(print_progress, energy_func=energy_both)
@@ -645,14 +554,12 @@ class WaveFunction:
         for i in range(len(self.kappa_redundant)):
             self.kappa_redundant[i] = 0.0
             self._kappa_redundant_old[i] = 0.0
+        self.energy_elec = res["fun"]
 
 
-def calc_energy_theta(parameters, operator, ansatz, mapper, reg, estimator) -> float:
-    job = estimator.run(
-        circuits=ansatz, parameter_values=parameters, observables=mapper.map(FermionicOp(operator, reg))
-    )
-    result = job.result()
-    return result.values[0]
+def calc_energy_theta(parameters, operator: FermionicOperator, qiskit_interface: QuantumInterface) -> float:
+    qiskit_interface.parameters = parameters
+    return qiskit_interface.quantum_expectation_value(operator)
 
 
 def calc_energy_oo(kappa, wf) -> float:
@@ -683,7 +590,7 @@ def calc_energy_oo(kappa, wf) -> float:
     return energy
 
 
-def calc_energy_both(parameters, wf, ansatz, mapper, reg, estimator) -> float:
+def calc_energy_both(parameters, wf) -> float:
     kappa = parameters[: len(wf.kappa)]
     theta = parameters[len(wf.kappa) :]
     assert len(theta) == len(wf.ansatz_parameters)
@@ -707,12 +614,8 @@ def calc_energy_both(parameters, wf, ansatz, mapper, reg, estimator) -> float:
     # Build operator
     wf.ansatz_parameters = theta.copy()  # Reset rdms
     H = hamiltonian_full_space(wf.h_mo, wf.g_mo, wf.num_orbs)
-    H = (
-        H.get_folded_operator(wf.num_inactive_orbs, wf.num_active_orbs, wf.num_virtual_orbs)
-    ).get_qiskit_form(wf.num_active_orbs)
-    job = estimator.run(circuits=ansatz, parameter_values=theta, observables=mapper.map(FermionicOp(H, reg)))
-    result = job.result()
-    return result.values[0]
+    H = H.get_folded_operator(wf.num_inactive_orbs, wf.num_active_orbs, wf.num_virtual_orbs)
+    return wf.qiskit_interface.quantum_expectation_value(H)
 
 
 def orbital_rotation_gradient(
@@ -740,35 +643,29 @@ def orbital_rotation_gradient(
     return gradient
 
 
-def ansatz_parameters_gradient(parameters, operator, ansatz, mapper, reg, estimator) -> np.ndarray:
+def ansatz_parameters_gradient(
+    parameters: list[float], operator, qiskit_interface: QuantumInterface
+) -> np.ndarray:
     gradient = np.zeros(len(parameters))
     for i in range(len(parameters)):
         parameters[i] += np.pi / 4
-        job = estimator.run(
-            circuits=ansatz, parameter_values=parameters, observables=mapper.map(FermionicOp(operator, reg))
-        )
-        Ep = job.result().values[0]
+        Ep = qiskit_interface.quantum_expectation_value(operator, custom_parameters=parameters)
         parameters[i] -= np.pi / 4
         parameters[i] -= np.pi / 4
-        job = estimator.run(
-            circuits=ansatz, parameter_values=parameters, observables=mapper.map(FermionicOp(operator, reg))
-        )
-        Em = job.result().values[0]
+        Em = qiskit_interface.quantum_expectation_value(operator, custom_parameters=parameters)
         parameters[i] += np.pi / 4
         gradient[i] = 1 / 2 * (Ep - Em)
     return gradient
 
 
-def calc_gradient_both(parameters, wf, ansatz, mapper, reg, estimator) -> np.ndarray:
+def calc_gradient_both(parameters, wf) -> np.ndarray:
     gradient = np.zeros(len(parameters))
     theta = parameters[len(wf.kappa) :]
     assert len(theta) == len(wf.ansatz_parameters)
     kappa_grad = orbital_rotation_gradient(0, wf)
     gradient[: len(wf.kappa)] = kappa_grad
     H = hamiltonian_full_space(wf.h_mo, wf.g_mo, wf.num_orbs)
-    H = (
-        H.get_folded_operator(wf.num_inactive_orbs, wf.num_active_orbs, wf.num_virtual_orbs)
-    ).get_qiskit_form(wf.num_active_orbs)
-    theta_grad = ansatz_parameters_gradient(theta, H, ansatz, mapper, reg, estimator)
+    H = H.get_folded_operator(wf.num_inactive_orbs, wf.num_active_orbs, wf.num_virtual_orbs)
+    theta_grad = ansatz_parameters_gradient(theta, H, wf.qiskit_interface)
     gradient[len(wf.kappa) :] = theta_grad
     return gradient
