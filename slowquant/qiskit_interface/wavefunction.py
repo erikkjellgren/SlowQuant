@@ -473,7 +473,7 @@ class WaveFunction:
             else:
                 # If theres is no orbital optimization, then the algorithm is already converged.
                 e_new = res.fun
-                if len(self.kappa) == 0:
+                if orbital_optimization and len(self.kappa) == 0:
                     print(
                         "WARNING: No orbital optimization performed, because there is no non-redundant orbital parameters"
                     )
