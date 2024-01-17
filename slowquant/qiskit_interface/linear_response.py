@@ -72,11 +72,11 @@ class quantumLR:
                     double_commutator(GI.dagger, self.H, GJ).get_folded_operator(*self.orbs)
                 )
                 # Make B
-                self.B[i, j] = self.B[j, i] = self.WF.QIquantum_expectation_value(
+                self.B[i, j] = self.B[j, i] = self.WF.QI.quantum_expectation_value(
                     double_commutator(GI.dagger, self.H, GJ.dagger).get_folded_operator(*self.orbs)
                 )
                 # Make Sigma
-                self.Sigma[i, j] = self.Sigma[j, i] = self.WF.QIquantum_expectation_value(
+                self.Sigma[i, j] = self.Sigma[j, i] = self.WF.QI.quantum_expectation_value(
                     commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)
                 )
 
@@ -88,15 +88,17 @@ class quantumLR:
         G_exp = []
         HG_exp = []
         for j, GJ in enumerate(self.G_ops):
-            G_exp.append(self.WF.QIquantum_expectation_value(GJ.get_folded_operator(*self.orbs)))
-            HG_exp.append(self.WF.QIquantum_expectation_value((self.H * GJ).get_folded_operator(*self.orbs)))
+            G_exp.append(self.WF.QI.quantum_expectation_value(GJ.get_folded_operator(*self.orbs)))
+            HG_exp.append(self.WF.QI.quantum_expectation_value((self.H * GJ).get_folded_operator(*self.orbs)))
         for j, GJ in enumerate(self.G_ops):
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
-                val = self.WF.QIquantum_expectation_value(
+                val = self.WF.QI.quantum_expectation_value(
                     (GI.dagger * self.H * GJ).get_folded_operator(*self.orbs)
                 )
-                GG_exp = self.WF.QIquantum_expectation_value((GI.dagger * GJ).get_folded_operator(*self.orbs))
+                GG_exp = self.WF.QI.quantum_expectation_value(
+                    (GI.dagger * GJ).get_folded_operator(*self.orbs)
+                )
                 val -= GG_exp * self.WF.energy_elec
                 val -= G_exp[i] * HG_exp[j]
                 val += G_exp[i] * G_exp[j] * self.WF.energy_elec
