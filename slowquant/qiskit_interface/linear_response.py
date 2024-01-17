@@ -51,15 +51,8 @@ class quantumLR:
 
         # q
         self.q_ops = []
-        for p in range(0, wf.num_orbs):
-            for q in range(p + 1, wf.num_orbs):
-                if p in wf.inactive_idx and q in wf.inactive_idx:
-                    continue
-                if p in wf.virtual_idx and q in wf.virtual_idx:
-                    continue
-                if p in wf.active_idx and q in wf.active_idx:
-                    continue
-                self.q_ops.append(G1(p, q))
+        for (p,q) in wf.kappa_idx:
+            self.q_ops.append(G1(p, q))
 
         num_parameters = len(self.q_ops) + len(self.G_ops)
         self.A = np.zeros((num_parameters, num_parameters))
@@ -101,9 +94,9 @@ class quantumLR:
 
         grad = np.zeros(2 * len(self.G_ops))
         for i, op in enumerate(self.G_ops):
-            grad[i] = self.wf.QI.quantum_expectation_value((self.H * op).get_folded_operator(*self.orbs))
+            grad[i] = self.wf.QI.quantum_expectation_value(commutator(self.H , op).get_folded_operator(*self.orbs))
             grad[i + len(self.G_ops)] = self.wf.QI.quantum_expectation_value(
-                (op.dagger * self.H).get_folded_operator(*self.orbs)
+                commutator(op.dagger , self.H).get_folded_operator(*self.orbs)
             )
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
