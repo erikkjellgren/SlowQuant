@@ -24,6 +24,7 @@ class quantumLR:
         Initialize linear response by calculating the needed matrices.
         """
 
+        self.WF = WF
         # Create operators
         self.H = hamiltonian_full_space(WF.h_mo, WF.g_mo, WF.num_orbs)
 
@@ -62,47 +63,47 @@ class quantumLR:
 
     def run_naive(
         self,
-        QI: QuantumInterface,
     ) -> None:
         # Calculate Matrices
         for j, GJ in enumerate(self.G_ops):
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
-                self.A[i, j] = self.A[j, i] = QI.quantum_expectation_value(
+                self.A[i, j] = self.A[j, i] = self.WF.QI.quantum_expectation_value(
                     double_commutator(GI.dagger, self.H, GJ).get_folded_operator(*self.orbs)
                 )
                 # Make B
-                self.B[i, j] = self.B[j, i] = QI.quantum_expectation_value(
+                self.B[i, j] = self.B[j, i] = self.WF.QIquantum_expectation_value(
                     double_commutator(GI.dagger, self.H, GJ.dagger).get_folded_operator(*self.orbs)
                 )
                 # Make Sigma
-                self.Sigma[i, j] = self.Sigma[j, i] = QI.quantum_expectation_value(
+                self.Sigma[i, j] = self.Sigma[j, i] = self.WF.QIquantum_expectation_value(
                     commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)
                 )
 
     def run_projected(
         self,
-        QI: QuantumInterface,
     ) -> None:
         # Calculate Matrices
         # pre-calculate <0|G|0> and <0|HG|0>
         G_exp = []
         HG_exp = []
         for j, GJ in enumerate(self.G_ops):
-            G_exp.append(QI.quantum_expectation_value(GJ.get_folded_operator(*self.orbs)))
-            HG_exp.append(QI.quantum_expectation_value((self.H * GJ).get_folded_operator(*self.orbs)))
+            G_exp.append(self.WF.QIquantum_expectation_value(GJ.get_folded_operator(*self.orbs)))
+            HG_exp.append(self.WF.QIquantum_expectation_value((self.H * GJ).get_folded_operator(*self.orbs)))
         for j, GJ in enumerate(self.G_ops):
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
-                val = QI.quantum_expectation_value((GI.dagger * self.H * GJ).get_folded_operator(*self.orbs))
-                GG_exp = QI.quantum_expectation_value((GI.dagger * GJ).get_folded_operator(*self.orbs))
-                val -= GG_exp * WF.elec_energy
+                val = self.WF.QIquantum_expectation_value(
+                    (GI.dagger * self.H * GJ).get_folded_operator(*self.orbs)
+                )
+                GG_exp = self.WF.QIquantum_expectation_value((GI.dagger * GJ).get_folded_operator(*self.orbs))
+                val -= GG_exp * self.WF.elec_energy
                 val -= G_exp[i] * HG_exp[j]
-                val += G_exp[i] * G_exp[j] * WF.elec_energy
+                val += G_exp[i] * G_exp[j] * self.WF.elec_energy
                 self.A[i, j] = self.A[j, i] = val
                 # Make B
                 val = HG_exp[i] * G_exp[j]
-                val -= G_exp[i] * G_exp[j] * WF.elec_energy
+                val -= G_exp[i] * G_exp[j] * self.WF.elec_energy
                 self.B[i, j] = self.B[j, i] = val
                 # Make Sigma
                 self.Sigma[i, j] = self.Sigma[j, i] = GG_exp - (G_exp[i] * G_exp[j])
