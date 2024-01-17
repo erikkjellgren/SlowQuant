@@ -97,13 +97,13 @@ class quantumLR:
                     (GI.dagger * self.H * GJ).get_folded_operator(*self.orbs)
                 )
                 GG_exp = self.WF.QIquantum_expectation_value((GI.dagger * GJ).get_folded_operator(*self.orbs))
-                val -= GG_exp * self.WF.elec_energy
+                val -= GG_exp * self.WF.energy_elec
                 val -= G_exp[i] * HG_exp[j]
-                val += G_exp[i] * G_exp[j] * self.WF.elec_energy
+                val += G_exp[i] * G_exp[j] * self.WF.energy_elec
                 self.A[i, j] = self.A[j, i] = val
                 # Make B
                 val = HG_exp[i] * G_exp[j]
-                val -= G_exp[i] * G_exp[j] * self.WF.elec_energy
+                val -= G_exp[i] * G_exp[j] * self.WF.energy_elec
                 self.B[i, j] = self.B[j, i] = val
                 # Make Sigma
                 self.Sigma[i, j] = self.Sigma[j, i] = GG_exp - (G_exp[i] * G_exp[j])
