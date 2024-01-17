@@ -30,7 +30,7 @@ class WaveFunction:
         c_orthonormal: np.ndarray,
         h_ao: np.ndarray,
         g_ao: np.ndarray,
-        qiskit_interface: QuantumInterface,
+        quantum_interface: QuantumInterface,
         include_active_kappa: bool = False,
     ) -> None:
         """Initialize for UCC wave function.
@@ -180,9 +180,10 @@ class WaveFunction:
                     self.kappa_hf_like_idx.append([p, q])
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     self.kappa_hf_like_idx.append([p, q])
+        self._energy_elec = None
         # Setup Qiskit stuff
-        self.qiskit_interface = qiskit_interface
-        self.qiskit_interface.construct_circuit(self.num_active_orbs, self.num_active_elec)
+        self.QI = quantum_interface
+        self.QI.construct_circuit(self.num_active_orbs, self.num_active_elec)
 
     @property
     def c_orthonormal(self) -> np.ndarray:
@@ -248,7 +249,7 @@ class WaveFunction:
 
     @property
     def ansatz_parameters(self) -> list[float]:
-        return self.qiskit_interface.parameters
+        return self.QI.parameters
 
     @ansatz_parameters.setter
     def ansatz_parameters(self, parameters: list[float]) -> None:
@@ -256,7 +257,7 @@ class WaveFunction:
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
-        self.qiskit_interface.parameters = parameters
+        self.QI.parameters = parameters
 
     @property
     def rdm1(self) -> np.ndarray:
@@ -274,7 +275,7 @@ class WaveFunction:
                     rdm1_op = Epq(p, q).get_folded_operator(
                         self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                     )
-                    val = self.qiskit_interface.quantum_expectation_value(rdm1_op)
+                    val = self.QI.quantum_expectation_value(rdm1_op)
                     self._rdm1[p_idx, q_idx] = val
                     self._rdm1[q_idx, p_idx] = val
             trace = 0
@@ -319,7 +320,7 @@ class WaveFunction:
                             pdm2_op = (Epq(p, q) * Epq(r, s)).get_folded_operator(
                                 self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                             )
-                            val = self.qiskit_interface.quantum_expectation_value(pdm2_op)
+                            val = self.QI.quantum_expectation_value(pdm2_op)
                             if q == r:
                                 val -= self.rdm1[p_idx, s_idx]
                             self._rdm2[p_idx, q_idx, r_idx, s_idx] = val
@@ -350,6 +351,14 @@ class WaveFunction:
         one = np.identity(len(S_ortho))
         diff = np.abs(S_ortho - one)
         print("Max ortho-normal diff:", np.max(diff))
+
+    @property
+    def energy_elec(self) -> float:
+        if self._energy_elec is None:
+            H = hamiltonian_full_space(self.h_mo, self.g_mo, self.num_orbs)
+            H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+            self._energy_elec = calc_energy_theta(self.ansatz_parameters, H, self.QI)
+        return self._energy_elec
 
     def run_vqe_2step(
         self,
@@ -410,11 +419,9 @@ class WaveFunction:
             energy_theta = partial(
                 calc_energy_theta,
                 operator=H,
-                qiskit_interface=self.qiskit_interface,
+                quantum_interface=self.QI,
             )
-            gradient_theta = partial(
-                ansatz_parameters_gradient, operator=H, qiskit_interface=self.qiskit_interface
-            )
+            gradient_theta = partial(ansatz_parameters_gradient, operator=H, quantum_interface=self.QI)
             if ansatz_optimizer.lower() == "slsqp":
                 print_progress_ = partial(print_progress, energy_func=energy_theta)
                 optimizer = SLSQP(callback=print_progress_)
@@ -430,7 +437,7 @@ class WaveFunction:
                 optimizer = SPSA(callback=print_progress_SPSA)
             elif ansatz_optimizer.lower() == "qnspsa":
                 optimizer = QNSPSA(
-                    QNSPSA.get_fidelity(self.qiskit_interface.ansatz, sampler=self.qiskit_sampler),
+                    QNSPSA.get_fidelity(self.QI.ansatz, sampler=self.qiskit_sampler),
                     callback=print_progress_SPSA,
                 )
             else:
@@ -472,7 +479,7 @@ class WaveFunction:
             if abs(e_new - e_old) < 1e-4:
                 break
             e_old = e_new
-        self.energy_elec = e_old
+        self._energy_elec = e_new
 
     def run_vqe_1step(
         self,
@@ -554,12 +561,12 @@ class WaveFunction:
         for i in range(len(self.kappa_redundant)):
             self.kappa_redundant[i] = 0.0
             self._kappa_redundant_old[i] = 0.0
-        self.energy_elec = res["fun"]
+        self._energy_elec = res["fun"]
 
 
-def calc_energy_theta(parameters, operator: FermionicOperator, qiskit_interface: QuantumInterface) -> float:
-    qiskit_interface.parameters = parameters
-    return qiskit_interface.quantum_expectation_value(operator)
+def calc_energy_theta(parameters, operator: FermionicOperator, quantum_interface: QuantumInterface) -> float:
+    quantum_interface.parameters = parameters
+    return quantum_interface.quantum_expectation_value(operator)
 
 
 def calc_energy_oo(kappa, wf) -> float:
@@ -615,7 +622,7 @@ def calc_energy_both(parameters, wf) -> float:
     wf.ansatz_parameters = theta.copy()  # Reset rdms
     H = hamiltonian_full_space(wf.h_mo, wf.g_mo, wf.num_orbs)
     H = H.get_folded_operator(wf.num_inactive_orbs, wf.num_active_orbs, wf.num_virtual_orbs)
-    return wf.qiskit_interface.quantum_expectation_value(H)
+    return wf.QI.quantum_expectation_value(H)
 
 
 def orbital_rotation_gradient(
@@ -644,15 +651,15 @@ def orbital_rotation_gradient(
 
 
 def ansatz_parameters_gradient(
-    parameters: list[float], operator, qiskit_interface: QuantumInterface
+    parameters: list[float], operator, quantum_interface: QuantumInterface
 ) -> np.ndarray:
     gradient = np.zeros(len(parameters))
     for i in range(len(parameters)):
         parameters[i] += np.pi / 4
-        Ep = qiskit_interface.quantum_expectation_value(operator, custom_parameters=parameters)
+        Ep = quantum_interface.quantum_expectation_value(operator, custom_parameters=parameters)
         parameters[i] -= np.pi / 4
         parameters[i] -= np.pi / 4
-        Em = qiskit_interface.quantum_expectation_value(operator, custom_parameters=parameters)
+        Em = quantum_interface.quantum_expectation_value(operator, custom_parameters=parameters)
         parameters[i] += np.pi / 4
         gradient[i] = 1 / 2 * (Ep - Em)
     return gradient
@@ -666,6 +673,6 @@ def calc_gradient_both(parameters, wf) -> np.ndarray:
     gradient[: len(wf.kappa)] = kappa_grad
     H = hamiltonian_full_space(wf.h_mo, wf.g_mo, wf.num_orbs)
     H = H.get_folded_operator(wf.num_inactive_orbs, wf.num_active_orbs, wf.num_virtual_orbs)
-    theta_grad = ansatz_parameters_gradient(theta, H, wf.qiskit_interface)
+    theta_grad = ansatz_parameters_gradient(theta, H, wf.QI)
     gradient[len(wf.kappa) :] = theta_grad
     return gradient
