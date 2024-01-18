@@ -599,7 +599,7 @@ class WaveFunction:
         for i in range(len(self.kappa_redundant)):
             self.kappa_redundant[i] = 0.0
             self._kappa_redundant_old[i] = 0.0
-        self._energy_elec = res["fun"]
+        self._energy_elec = res.fun
 
 
 def calc_energy_theta(parameters, operator: FermionicOperator, quantum_interface: QuantumInterface) -> float:
