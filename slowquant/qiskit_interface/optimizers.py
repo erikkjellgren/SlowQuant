@@ -42,6 +42,9 @@ class RotaSolve:
                 break
             if (f_new - f_best) > 0.0:
                 fails += 1
+            else:
+                f_best = f_new
+                x_best = x.copy()
             if fails == self.max_fail:
                 break
             if self._callback is not None:
