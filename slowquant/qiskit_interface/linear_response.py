@@ -51,10 +51,13 @@ class quantumLR:
 
         # q
         self.q_ops = []
-        for (p,q) in wf.kappa_idx:
+        for p, q in wf.kappa_idx:
             self.q_ops.append(G1(p, q))
 
         num_parameters = len(self.q_ops) + len(self.G_ops)
+        self.num_params = num_parameters
+        self.num_q = len(self.q_ops)
+        self.num_G = len(self.G_ops)
         self.A = np.zeros((num_parameters, num_parameters))
         self.B = np.zeros((num_parameters, num_parameters))
         self.Sigma = np.zeros((num_parameters, num_parameters))
@@ -94,9 +97,11 @@ class quantumLR:
 
         grad = np.zeros(2 * len(self.G_ops))
         for i, op in enumerate(self.G_ops):
-            grad[i] = self.wf.QI.quantum_expectation_value(commutator(self.H , op).get_folded_operator(*self.orbs))
+            grad[i] = self.wf.QI.quantum_expectation_value(
+                commutator(self.H, op).get_folded_operator(*self.orbs)
+            )
             grad[i + len(self.G_ops)] = self.wf.QI.quantum_expectation_value(
-                commutator(op.dagger , self.H).get_folded_operator(*self.orbs)
+                commutator(op.dagger, self.H).get_folded_operator(*self.orbs)
             )
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
@@ -165,6 +170,51 @@ class quantumLR:
                 ] = self.wf.QI.quantum_expectation_value(
                     commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)
                 )
+
+    def _run_naive_qbitmap(
+        self,
+    ) -> None:
+        idx_shift = len(self.q_ops)
+        print("Gs", len(self.G_ops))
+        print("qs", len(self.q_ops))
+
+        ## qq block not possible (yet) as per RDMs
+
+        A = [[0] * self.num_params for _ in range(self.num_params)]
+        B = [[0] * self.num_params for _ in range(self.num_params)]
+        Sigma = [[0] * self.num_params for _ in range(self.num_params)]
+
+        # Gq
+        for j, qJ in enumerate(self.q_ops):
+            for i, GI in enumerate(self.G_ops):
+                # Make A
+                val = self.wf.QI.op_to_qbit(
+                    (GI.dagger * self.H * qJ).get_folded_operator(*self.orbs)
+                ) - self.wf.QI.op_to_qbit((self.H * qJ * GI.dagger).get_folded_operator(*self.orbs))
+                A[i + idx_shift][j] = A[j][i + idx_shift] = val
+                # Make B
+                val = self.wf.QI.op_to_qbit(
+                    (qJ.dagger * self.H * GI.dagger).get_folded_operator(*self.orbs)
+                ) - self.wf.QI.op_to_qbit((GI.dagger * qJ.dagger * self.H).get_folded_operator(*self.orbs))
+                B[i + idx_shift][j] = B[j][i + idx_shift] = val
+
+        # GG
+        for j, GJ in enumerate(self.G_ops):
+            for i, GI in enumerate(self.G_ops[j:], j):
+                # Make A
+                A[i + idx_shift][j + idx_shift] = A[j + idx_shift][i + idx_shift] = self.wf.QI.op_to_qbit(
+                    double_commutator(GI.dagger, self.H, GJ).get_folded_operator(*self.orbs)
+                )
+                # Make B
+                B[i + idx_shift][j + idx_shift] = B[j + idx_shift][i + idx_shift] = self.wf.QI.op_to_qbit(
+                    double_commutator(GI.dagger, self.H, GJ.dagger).get_folded_operator(*self.orbs)
+                )
+                # Make Sigma
+                Sigma[i + idx_shift][j + idx_shift] = Sigma[j + idx_shift][
+                    i + idx_shift
+                ] = self.wf.QI.op_to_qbit(commutator(GI.dagger, GJ).get_folded_operator(*self.orbs))
+
+        return A, B, Sigma
 
     def run_projected(
         self,
