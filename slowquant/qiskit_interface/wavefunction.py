@@ -280,10 +280,10 @@ class WaveFunction:
                     val = self.QI.quantum_expectation_value(rdm1_op)
                     self._rdm1[p_idx, q_idx] = val
                     self._rdm1[q_idx, p_idx] = val
-            #trace = 0
-            #for i in range(self.num_active_orbs):
+            # trace = 0
+            # for i in range(self.num_active_orbs):
             #    trace += self._rdm1[i, i]
-            #for i in range(self.num_active_orbs):
+            # for i in range(self.num_active_orbs):
             #    self._rdm1[i, i] = self._rdm1[i, i] * self.num_active_elec / trace
         return self._rdm1
 
@@ -329,11 +329,11 @@ class WaveFunction:
                             self._rdm2[r_idx, s_idx, p_idx, q_idx] = val
                             self._rdm2[q_idx, p_idx, s_idx, r_idx] = val
                             self._rdm2[s_idx, r_idx, q_idx, p_idx] = val
-            #trace = 0
-            #for i in range(self.num_active_orbs):
+            # trace = 0
+            # for i in range(self.num_active_orbs):
             #    for j in range(self.num_active_orbs):
             #        trace += self._rdm2[i, i, j, j]
-            #for i in range(self.num_active_orbs):
+            # for i in range(self.num_active_orbs):
             #    for j in range(self.num_active_orbs):
             #        self._rdm2[i, i, j, j] = (
             #            self._rdm2[i, i, j, j] * self.num_active_elec * (self.num_active_elec - 1) / trace
@@ -426,13 +426,13 @@ class WaveFunction:
             gradient_theta = partial(ansatz_parameters_gradient, operator=H, quantum_interface=self.QI)
             if ansatz_optimizer.lower() == "slsqp":
                 print_progress_ = partial(print_progress, energy_func=energy_theta)
-                optimizer = SLSQP(tol=10**-10,callback=print_progress_)
+                optimizer = SLSQP(tol=10**-10, callback=print_progress_)
             elif ansatz_optimizer.lower() == "l_bfgs_b":
                 print_progress_ = partial(print_progress, energy_func=energy_theta)
                 optimizer = L_BFGS_B(callback=print_progress_)
             elif ansatz_optimizer.lower() == "cobyla":
                 print_progress_ = partial(print_progress, energy_func=energy_theta)
-                optimizer = COBYLA(maxiter=500, tol=0.00001,callback=print_progress_)
+                optimizer = COBYLA(maxiter=500, tol=0.00001, callback=print_progress_)
             elif ansatz_optimizer.lower() == "rotasolve":
                 print_progress_ = partial(print_progress, energy_func=energy_theta)
                 optimizer = RotaSolve(callback=print_progress_)
@@ -463,7 +463,7 @@ class WaveFunction:
                 )
 
                 print_progress_ = partial(print_progress, energy_func=energy_oo)
-                optimizer = SLSQP(tol=10**-10,callback=print_progress_)
+                optimizer = L_BFGS_B(tol=10**-12, callback=print_progress_)
                 res = optimizer.minimize(energy_oo, [0.0] * len(self.kappa_idx), jac=gradiet_oo)
                 for i in range(len(self.kappa)):
                     self.kappa[i] = 0.0
@@ -484,7 +484,7 @@ class WaveFunction:
             time_str = f"{time.time() - full_start:7.2f}"  # type: ignore
             e_str = f"{e_new:3.12f}"
             print(f"{str(full_iter+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
-            if abs(e_new - e_old) < 1e-4:
+            if abs(e_new - e_old) < 1e-10:
                 break
             e_old = e_new
         self._energy_elec = e_new
