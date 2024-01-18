@@ -368,7 +368,7 @@ class WaveFunction:
         orbital_optimization: bool = False,
         tol: float = 1e-10,
         maxiter: int = 1000,
-        is_silent_subiterations: bool = True,
+        is_silent_subiterations: bool = False,
     ) -> None:
         """Run VQE of wave function."""
         global iteration
