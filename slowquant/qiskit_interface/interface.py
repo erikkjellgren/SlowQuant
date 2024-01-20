@@ -1,8 +1,15 @@
-import qiskit_nature.second_q.mappers as Mappers
 from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFock
+from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
+from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
 from slowquant.qiskit_interface.base import FermionicOperator
+from slowquant.qiskit_interface.custom_ansatz import (
+    ErikD_JW,
+    ErikD_Parity,
+    ErikSD_JW,
+    ErikSD_Parity,
+)
 
 
 class QuantumInterface:
@@ -10,7 +17,7 @@ class QuantumInterface:
         self,
         estimator,
         ansatz: str,
-        mapper: Mappers,
+        mapper: FermionicMapper,
     ) -> None:
         """
         Interface to Qiskit to use IBM quantum hardware or simulator.
@@ -20,7 +27,7 @@ class QuantumInterface:
             ansatz: Name of qiskit ansatz to be used. Currenly supported: UCCSD, UCCD, and PUCCD
             mapper: Qiskit mapper object, e.g. JW or Parity
         """
-        allowed_ansatz = ["UCCSD", "PUCCD", "UCCD"]
+        allowed_ansatz = ["UCCSD", "PUCCD", "UCCD", "ErikD", "ErikSD"]
         if not ansatz in allowed_ansatz:
             raise ValueError("The chosen Ansatz is not availbale. Choose from: ", allowed_ansatz)
         self.ansatz = ansatz
@@ -74,6 +81,24 @@ class QuantumInterface:
                     self.mapper,
                 ),
             )
+        elif self.ansatz == "ErikD":
+            if num_orbs != 2 or num_parts != 2:
+                raise ValueError(f"Chosen ansatz, {self.ansatz}, only works for (2,2)")
+            if isinstance(self.mapper, JordanWignerMapper):
+                self.circuit = ErikD_JW()
+            elif isinstance(self.mapper, ParityMapper):
+                self.circuit = ErikD_Parity()
+            else:
+                raise ValueError(f"Unsupported mapper, {type(self.mapper)}, for ansatz {self.ansatz}")
+        elif self.ansatz == "ErikSD":
+            if num_orbs != 2 or num_parts != 2:
+                raise ValueError(f"Chosen ansatz, {self.ansatz}, only works for (2,2)")
+            if isinstance(self.mapper, JordanWignerMapper):
+                self.circuit = ErikSD_JW()
+            elif isinstance(self.mapper, ParityMapper):
+                self.circuit = ErikSD_Parity()
+            else:
+                raise ValueError(f"Unsupported mapper, {type(self.mapper)}, for ansatz {self.ansatz}")
 
         # Set parameter to HarteeFock
         self._parameters = [0.0] * self.circuit.num_parameters
