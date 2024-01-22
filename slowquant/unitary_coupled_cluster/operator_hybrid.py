@@ -479,7 +479,7 @@ class OperatorHybrid:
 
 
 def make_projection_operator(state_vector: StateVector, use_csr: int = 10) -> OperatorHybrid:
-    """Create a projection operator, |0><0|, from a state vector.
+    """Create a projection operator, :math:`|0><0|`, from a state vector.
 
     Args:
         state_vector: State vector class.

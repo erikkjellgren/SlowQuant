@@ -13,7 +13,7 @@ from slowquant.molecularintegrals.integralfunctions import (
 from slowquant.qiskit_interface.base import FermionicOperator
 from slowquant.qiskit_interface.interface import QuantumInterface
 from slowquant.qiskit_interface.operators import Epq, hamiltonian_full_space
-from slowquant.qiskit_interface.optimizers import RotaSolve
+from slowquant.qiskit_interface.optimizers import RotoSolve
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_electronic_energy,
@@ -366,7 +366,7 @@ class WaveFunction:
         self,
         ansatz_optimizer: str,
         orbital_optimization: bool = False,
-        tol: float = 1e-10,
+        tol: float = 1e-8,
         maxiter: int = 1000,
         is_silent_subiterations: bool = False,
     ) -> None:
@@ -384,7 +384,7 @@ class WaveFunction:
             global start
             time_str = f"{time.time() - start:7.2f}"  # type: ignore
             if not silent:
-                e_str = f"{energy_func(x):3.12f}"
+                e_str = f"{energy_func(x):3.16f}"
                 print(f"--------{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
             iteration += 1  # type: ignore
             start = time.time()  # type: ignore
@@ -414,7 +414,7 @@ class WaveFunction:
         e_old = 1e12
         print("Full optimization")
         print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
-        for full_iter in range(0, maxiter):
+        for full_iter in range(0, int(maxiter)):
             full_start = time.time()
             iteration = 0  # type: ignore
             start = time.time()  # type: ignore
@@ -435,7 +435,7 @@ class WaveFunction:
                 print_progress_ = partial(
                     print_progress, energy_func=energy_theta, silent=is_silent_subiterations
                 )
-                optimizer = SLSQP(maxiter=maxiter, tol=tol, callback=print_progress_)
+                optimizer = SLSQP(maxiter=maxiter, ftol=tol, callback=print_progress_)
             elif ansatz_optimizer.lower() == "l_bfgs_b":
                 print_progress_ = partial(
                     print_progress, energy_func=energy_theta, silent=is_silent_subiterations
@@ -446,11 +446,11 @@ class WaveFunction:
                     print_progress, energy_func=energy_theta, silent=is_silent_subiterations
                 )
                 optimizer = COBYLA(maxiter=maxiter, tol=tol, callback=print_progress_)
-            elif ansatz_optimizer.lower() == "rotasolve":
+            elif ansatz_optimizer.lower() == "rotosolve":
                 print_progress_ = partial(
                     print_progress, energy_func=energy_theta, silent=is_silent_subiterations
                 )
-                optimizer = RotaSolve(maxiter=maxiter, tol=tol, callback=print_progress_)
+                optimizer = RotoSolve(maxiter=maxiter, tol=tol, callback=print_progress_)
             elif ansatz_optimizer.lower() == "spsa":
                 print("WARNING: Convergence tolerence cannot be set for SPSA; using qiskit default")
                 print_progress_SPSA_ = partial(print_progress_SPSA, silent=is_silent_subiterations)
@@ -515,7 +515,7 @@ class WaveFunction:
         self,
         optimizer_name: str,
         orbital_optimization: bool = False,
-        tol: float = 1e-10,
+        tol: float = 1e-8,
         maxiter: int = 1000,
     ) -> None:
         """Run VQE of wave function."""
@@ -571,20 +571,20 @@ class WaveFunction:
         )
         if optimizer_name.lower() == "slsqp":
             print_progress_ = partial(print_progress, energy_func=energy_both)
-            optimizer = SLSQP(maxiter=maxiter, tol=tol, callback=print_progress_)
+            optimizer = SLSQP(maxiter=maxiter, ftol=tol, callback=print_progress_)
         elif optimizer_name.lower() == "l_bfgs_b":
             print_progress_ = partial(print_progress, energy_func=energy_both)
             optimizer = L_BFGS_B(maxiter=maxiter, tol=tol, callback=print_progress_)
         elif optimizer_name.lower() == "cobyla":
             print_progress_ = partial(print_progress, energy_func=energy_both)
             optimizer = COBYLA(maxiter=maxiter, tol=tol, callback=print_progress_)
-        elif optimizer_name.lower() == "rotasolve":
+        elif optimizer_name.lower() == "rotosolve":
             if orbital_optimization and len(self.kappa) != 0:
                 raise ValueError(
-                    "Cannot use rotasolve together with orbital optimization in the one-step solver."
+                    "Cannot use rotosolve together with orbital optimization in the one-step solver."
                 )
             print_progress_ = partial(print_progress, energy_func=energy_both)
-            optimizer = RotaSolve(maxiter=maxiter, tol=tol, callback=print_progress_)
+            optimizer = RotoSolve(maxiter=maxiter, tol=tol, callback=print_progress_)
         elif optimizer_name.lower() == "spsa":
             print("WARNING: Convergence tolerence cannot be set for SPSA; using qiskit default")
             optimizer = SPSA(maxiter=maxiter, callback=print_progress_SPSA)
@@ -691,15 +691,59 @@ def orbital_rotation_gradient(
 def ansatz_parameters_gradient(
     parameters: list[float], operator, quantum_interface: QuantumInterface
 ) -> np.ndarray:
+    """Calculate gradient with respect to ansatz parameters.
+
+    The gradient is calculated using parameter-shift assuming three eigenvalues of the generators.
+    This works for fermionic generators of the type:
+
+    .. math::
+        \\hat{G}_{pq} = \\hat{a}^\\dagger_p \\hat{a}_q - \\hat{a}_q^\\dagger \\hat{a}_p
+
+    and,
+
+    .. math::
+        \\hat{G}_{pqrs} = \\hat{a}^\\dagger_p \\hat{a}^\\dagger_q \\hat{a}_r \\hat{a}_s - \\hat{a}^\\dagger_s \\hat{a}^\\dagger_r \\hat{a}_p \\hat{a}_q
+
+    The parameter-shift rule is implemented as:
+
+    .. math::
+        \\begin{align}
+        \\frac{\\partial E(\\boldsymbol{\\theta})}{\\partial \\theta_i} &=
+        \\frac{\\sqrt{2}+1}{2\\sqrt{2}}\\left(E\\left(\\theta_i += \\frac{\\pi}{2} - \\frac{\\pi}{4}\\right) - E\\left(\\theta_i += -\\frac{\\pi}{2} + \\frac{\\pi}{4}\\right)\\right)\\\\
+        &- \\frac{\\sqrt{2}-1}{2\\sqrt{2}}\\left(E\\left(\\theta_i += \\frac{\\pi}{2} + \\frac{\\pi}{4}\\right) - E\\left(\\theta_i += -\\frac{\\pi}{2} - \\frac{\\pi}{4}\\right)\\right)
+        \\end{align}
+
+
+    #. 10.1088/1367-2630/ac2cb3: Eq. (F14)
+    #. 10.22331/q-2022-03-30-677: Eq. (8)
+
+    Args:
+        parameters: Ansatz parameters.
+        operator: Operator which the derivative is with respect to.
+        quantum_interface: Interface to call quantum device.
+
+    Returns:
+        Gradient with repsect to ansatz parameters.
+    """
     gradient = np.zeros(len(parameters))
+    h = np.pi / 2 - np.pi / 4
+    h2 = np.pi / 2 + np.pi / 4
     for i in range(len(parameters)):
-        parameters[i] += np.pi / 4
+        parameters[i] += h
         Ep = quantum_interface.quantum_expectation_value(operator, custom_parameters=parameters)
-        parameters[i] -= np.pi / 4
-        parameters[i] -= np.pi / 4
+        parameters[i] -= h
+        parameters[i] += h2
+        Ep2 = quantum_interface.quantum_expectation_value(operator, custom_parameters=parameters)
+        parameters[i] -= h2
+        parameters[i] -= h
         Em = quantum_interface.quantum_expectation_value(operator, custom_parameters=parameters)
-        parameters[i] += np.pi / 4
-        gradient[i] = 1 / 2 * (Ep - Em)
+        parameters[i] += h
+        parameters[i] -= h2
+        Em2 = quantum_interface.quantum_expectation_value(operator, custom_parameters=parameters)
+        parameters[i] += h2
+        gradient[i] = (2 ** (1 / 2) + 1) / (2 * 2 ** (1 / 2)) * (Ep - Em) - (2 ** (1 / 2) - 1) / (
+            2 * 2 ** (1 / 2)
+        ) * (Ep2 - Em2)
     return gradient
 
 

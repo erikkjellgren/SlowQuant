@@ -9,13 +9,15 @@ SlowQuant
 
 .. toctree::
    :maxdepth: 2
-   :caption: Code Documentation Qiskit Interface:
+   :caption: Qiskit Interface:
 
-   autodoc/qiskit_interface.rst
+   autodoc/qiskit_base.rst
+   autodoc/qiskit_operators.rst
+   autodoc/qiskit_wavefunction.rst
 
 .. toctree::
    :maxdepth: 2
-   :caption: Code Documentation Unitary Coupled Cluster:
+   :caption: Classical Unitary Coupled Cluster:
 
    autodoc/unitary_coupled_cluster_wf.rst
    autodoc/unitary_coupled_cluster_lr.rst
@@ -23,7 +25,7 @@ SlowQuant
 
 .. toctree::
    :maxdepth: 2
-   :caption: Code Documentation Conventional:
+   :caption: Conventional Methods:
 
    autodoc/slowquant.rst
    autodoc/molecule.rst

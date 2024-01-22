@@ -1,6 +1,8 @@
 from collections.abc import Callable
+from functools import partial
 
 import numpy as np
+import scipy
 
 
 class Result:
@@ -9,7 +11,7 @@ class Result:
         self.fun: float | None = None
 
 
-class RotaSolve:
+class RotoSolve:
     def __init__(self, maxiter: int = 30, tol: float = 1e-6, callback: Callable | None = None) -> None:
         self._callback = callback
         self.max_iterations = maxiter
@@ -22,15 +24,15 @@ class RotaSolve:
         fails = 0
         res = Result()
         for _ in range(self.max_iterations):
-            phi = 0.0
             for i in range(len(x)):
-                x[i] = phi
-                f0 = f(x)
-                x[i] = phi + np.pi / 4
-                fp = f(x)
-                x[i] = phi - np.pi / 4
-                fm = f(x)
-                x[i] = phi - np.pi / 4 - np.arctan2(2 * f0 - fp - fm, fp - fm) / 2
+                e_vals = get_energy_evals(f, x, i)
+                f_reconstructed = partial(reconstructed_f, energy_vals=e_vals)
+                vecf = np.vectorize(f_reconstructed)
+                values = vecf(np.linspace(-np.pi, np.pi, int(1e4)))
+                minidx = np.argmin(values)
+                theta = np.linspace(-np.pi, np.pi, int(1e4))[minidx]
+                res = scipy.optimize.minimize(f_reconstructed, x0=[theta], method="BFGS", tol=1e-12)
+                x[i] = res.x[0]
                 while x[i] < np.pi:
                     x[i] += 2 * np.pi
                 while x[i] > np.pi:
@@ -52,3 +54,23 @@ class RotaSolve:
         res.x = np.array(x_best)
         res.fun = f_best
         return res
+
+
+def get_energy_evals(f, x, idx) -> list[float]:
+    e_vals = []
+    x = x.copy()
+    R = 2
+    for mu in [-2, -1, 0, 1, 2]:
+        x_mu = 2 * mu / (2 * R + 1) * np.pi
+        x[idx] = x_mu
+        e_vals.append(f(x))
+    return e_vals
+
+
+def reconstructed_f(x: float, energy_vals: list[float]) -> float:
+    R = 2
+    e = 0
+    for i, mu in enumerate([-2, -1, 0, 1, 2]):
+        x_mu = 2 * mu / (2 * R + 1) * np.pi
+        e += energy_vals[i] * (-1) ** mu / np.sin(x / 2 - x_mu / 2)
+    return np.sin((2 * R + 1) / 2 * x) / (2 * R + 1) * e
