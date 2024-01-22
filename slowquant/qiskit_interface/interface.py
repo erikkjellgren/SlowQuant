@@ -1,5 +1,6 @@
-import qiskit_nature.second_q.mappers as Mappers
+from qiskit.primitives import BaseEstimator
 from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFock
+from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
 from slowquant.qiskit_interface.base import FermionicOperator
@@ -8,9 +9,9 @@ from slowquant.qiskit_interface.base import FermionicOperator
 class QuantumInterface:
     def __init__(
         self,
-        estimator,
+        estimator: BaseEstimator,
         ansatz: str,
-        mapper: Mappers,
+        mapper: FermionicMapper,
     ) -> None:
         """
         Interface to Qiskit to use IBM quantum hardware or simulator.
@@ -35,7 +36,6 @@ class QuantumInterface:
             num_orbs: number of orbitals
             num_parts: number of particles/electrons
         """
-
         self.num_orbs = (
             num_orbs  # that might be a dirty and stupid solution for the num_orbs problem. revisit it!
         )

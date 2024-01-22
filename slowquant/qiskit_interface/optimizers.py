@@ -5,8 +5,8 @@ import numpy as np
 
 class Result:
     def __init__(self):
-        self.x = None
-        self.fun = None
+        self.x: np.ndarray | None = None
+        self.fun: float | None = None
 
 
 class RotaSolve:
