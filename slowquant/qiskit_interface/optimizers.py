@@ -10,10 +10,10 @@ class Result:
 
 
 class RotaSolve:
-    def __init__(self, callback: Callable | None = None) -> None:
+    def __init__(self, maxiter: int = 30, tol: float = 1e-6, callback: Callable | None = None) -> None:
         self._callback = callback
-        self.max_iterations = 30
-        self.threshold = 10**-6
+        self.max_iterations = maxiter
+        self.threshold = tol
         self.max_fail = 3
 
     def minimize(self, f: Callable[[list[float]], float], x: list[float], jac=None):
