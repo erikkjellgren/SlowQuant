@@ -314,11 +314,10 @@ class quantumLR:
                 self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[
                     j + idx_shift, i + idx_shift
                 ] = GG_exp - (G_exp[i] * G_exp[j])
-    
+
     def run_all_projected(
         self,
     ) -> None:
-
         rdms = ReducedDenstiyMatrix(
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
@@ -368,11 +367,10 @@ class quantumLR:
                 val = self.wf.QI.quantum_expectation_value(
                     (qI.dagger * self.H * qJ).get_folded_operator(*self.orbs)
                 )
-                qq_exp = self.wf.QI.quantum_expectation_value((qI.dagger * qJ).get_folded_operator(*self.orbs))
-                val -= (
-                    qq_exp
-                    * self.wf.energy_elec
+                qq_exp = self.wf.QI.quantum_expectation_value(
+                    (qI.dagger * qJ).get_folded_operator(*self.orbs)
                 )
+                val -= qq_exp * self.wf.energy_elec
                 self.A[i, j] = self.A[j, i] = val
                 # Make Sigma
                 self.Sigma[i, j] = self.Sigma[j, i] = qq_exp
