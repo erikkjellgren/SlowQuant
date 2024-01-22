@@ -14,6 +14,7 @@ SlowQuant
    autodoc/qiskit_base.rst
    autodoc/qiskit_operators.rst
    autodoc/qiskit_wavefunction.rst
+   autodoc/qiskit_optimizers.rst
 
 .. toctree::
    :maxdepth: 2
