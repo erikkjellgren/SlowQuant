@@ -146,9 +146,9 @@ class QuantumInterface:
 
         # Check if estimator or sampler
         if isinstance(self.primitive, BaseEstimator):
-            return _estimator_quantum_expectation_value(op, run_parameters)
+            return self._estimator_quantum_expectation_value(op, run_parameters)
         elif isinstance(self.primitive, BaseSampler):
-            return _sampler_quantum_expectation_value(op, run_parameters)
+            return self._sampler_quantum_expectation_value(op, run_parameters)
         else:
             raise ValueError("The Quantum Interface was initiated with an unknown Qiskit primitive.")
 
@@ -183,7 +183,7 @@ class QuantumInterface:
 
         # Loop over all qubit-mapped Paul strings and get Sampler distributions
         for pauli, coeff in zip(observables.paulis, observables.coeffs):
-            values += result_from_distr(pauli, run_parameters) * coeff
+            values += self._sampler_distributions(pauli, run_parameters) * coeff
 
         if isinstance(values, complex):
             if abs(values.imag) > 10**-2:
@@ -200,7 +200,7 @@ class QuantumInterface:
         ansatz_w_obs.measure_all()
 
         # Run sampler
-        self.primitive.run(ansatz_w_obs, parameter_values=run_parameters)
+        job = self.primitive.run(ansatz_w_obs, parameter_values=run_parameters)
 
         # Get quasi-distribution in binary probabilities
         distr = job.result().quasi_dists[0].binary_probabilities()
@@ -208,7 +208,7 @@ class QuantumInterface:
         result = 0.0
         for nr, (key, value) in enumerate(distr.items()):
             # Here we could check if we want a given key (bitstring) in the result distribution
-            result += value * get_bitstring_sign(observable, key)
+            result += value * get_bitstring_sign(pauli, key)
         return result
 
 
