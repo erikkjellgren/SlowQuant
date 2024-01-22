@@ -1,4 +1,6 @@
-from qiskit.primitives import BaseEstimator
+from qiskit import QuantumCircuit, primitives
+from qiskit.primitives import BaseEstimator, BaseSampler
+from qiskit.quantum_info import Pauli
 from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFock
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
@@ -16,7 +18,7 @@ from slowquant.qiskit_interface.custom_ansatz import (
 class QuantumInterface:
     def __init__(
         self,
-        estimator: BaseEstimator,
+        primitive: primitives,
         ansatz: str,
         mapper: FermionicMapper,
     ) -> None:
@@ -32,7 +34,7 @@ class QuantumInterface:
         if not ansatz in allowed_ansatz:
             raise ValueError("The chosen Ansatz is not availbale. Choose from: ", allowed_ansatz)
         self.ansatz = ansatz
-        self.estimator = estimator
+        self.primitive = primitive
         self.mapper = mapper
 
     def construct_circuit(self, num_orbs: int, num_parts: int) -> None:
@@ -132,7 +134,7 @@ class QuantumInterface:
         self, op: FermionicOperator, custom_parameters: list[float] | None = None
     ) -> float:
         """
-        Calculate expectation value of circuit from vqe result  with op operator
+        Calculate expectation value of circuit and observables
 
         Args:
             op: Operator as SlowQuant's FermionicOperator object
@@ -141,7 +143,23 @@ class QuantumInterface:
             run_parameters = self.parameters
         else:
             run_parameters = custom_parameters
-        job = self.estimator.run(
+
+        # Check if estimator or sampler
+        if isinstance(self.primitive, BaseEstimator):
+            return _estimator_quantum_expectation_value(op, run_parameters)
+        elif isinstance(self.primitive, BaseSampler):
+            return _sampler_quantum_expectation_value(op, run_parameters)
+        else:
+            raise ValueError("The Quantum Interface was initiated with an unknown Qiskit primitive.")
+
+    def _estimator_quantum_expectation_value(
+        self, op: FermionicOperator, run_parameters: list[float]
+    ) -> float:
+        """
+        Calculate expectation value of circuit and observables via Estimator
+        """
+
+        job = self.primitive.run(
             circuits=self.circuit,
             parameter_values=run_parameters,
             observables=self.op_to_qbit(op),
@@ -154,3 +172,72 @@ class QuantumInterface:
                 print("Warning: Complex number detected with Im = ", values.imag)
 
         return values.real
+
+    def _sampler_quantum_expectation_value(self, op: FermionicOperator, run_parameters: list[float]) -> float:
+        """
+        Calculate expectation value of circuit and observables via Sampler
+        """
+
+        values = 0.0
+        observables = self.op_to_qbit(op)
+
+        # Loop over all qubit-mapped Paul strings and get Sampler distributions
+        for pauli, coeff in zip(observables.paulis, observables.coeffs):
+            values += result_from_distr(pauli, run_parameters) * coeff
+
+        if isinstance(values, complex):
+            if abs(values.imag) > 10**-2:
+                print("Warning: Complex number detected with Im = ", values.imag)
+
+        return values.real
+
+    def _sampler_distributions(self, pauli: Pauli, run_parameters: list[float]):
+        """
+        Get results from a sampler distribution for one given Pauli string
+        """
+        # Create QuantumCircuit
+        ansatz_w_obs = self.circuit.compose(to_CBS_measurement(pauli))
+        ansatz_w_obs.measure_all()
+
+        # Run sampler
+        self.primitive.run(ansatz_w_obs, parameter_values=run_parameters)
+
+        # Get quasi-distribution in binary probabilities
+        distr = job.result().quasi_dists[0].binary_probabilities()
+
+        result = 0.0
+        for nr, (key, value) in enumerate(distr.items()):
+            # Here we could check if we want a given key (bitstring) in the result distribution
+            result += value * get_bitstring_sign(observable, key)
+        return result
+
+
+def to_CBS_measurement(op: Pauli) -> QuantumCircuit:
+    """
+    Converts a Pauli string from Qiskit to Pauli string with measuremnt in the corresponding basis as QuantumCircuit
+    Not to be used with SlowQuant FermionicOperators!
+    """
+    num_qubits = len(op)
+    qc = QuantumCircuit(num_qubits)
+    for nr, i in enumerate(op):
+        if i == Pauli("X"):
+            qc.append(i, [nr])
+            qc.h(nr)
+        elif i == Pauli("Y"):
+            qc.append(i, [nr])
+            qc.sdg(nr)
+            qc.h(nr)
+    return qc
+
+
+def get_bitstring_sign(op: Pauli, binary: str) -> int:
+    """
+    Takes Pauli String and a state in binary form and returns the sign based on the expectation value of the Pauli string with each single quibit state
+    """
+    sign = 1
+    for nr, i in enumerate(op.to_label()):
+        # print(i, binary[nr])
+        if not i == "I":
+            if binary[nr] == "1":
+                sign = sign * (-1)
+    return sign
