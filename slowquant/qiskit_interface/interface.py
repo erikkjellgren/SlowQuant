@@ -1,6 +1,6 @@
-from qiskit import QuantumCircuit, primitives
+from qiskit.circuit import QuantumCircuit
 from qiskit.primitives import BaseEstimator, BaseSampler
-from qiskit.quantum_info import Pauli
+from qiskit.quantum_info import Pauli, SparsePauliOp
 from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFock
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
@@ -16,9 +16,14 @@ from slowquant.qiskit_interface.custom_ansatz import (
 
 
 class QuantumInterface:
+    """Quantum interface class.
+
+    This class handles the interface with qiskit and the communication with quantum hardware.
+    """
+
     def __init__(
         self,
-        primitive: primitives,
+        primitive: BaseEstimator | BaseSampler,
         ansatz: str,
         mapper: FermionicMapper,
     ) -> None:
@@ -26,7 +31,7 @@ class QuantumInterface:
         Interface to Qiskit to use IBM quantum hardware or simulator.
 
         Args:
-            estimator: Qiskit Estimator object
+            primitive: Qiskit Estimator or Sampler object
             ansatz: Name of qiskit ansatz to be used. Currenly supported: UCCSD, UCCD, and PUCCD
             mapper: Qiskit mapper object, e.g. JW or Parity
         """
@@ -107,6 +112,11 @@ class QuantumInterface:
 
     @property
     def parameters(self) -> list[float]:
+        """Get ansatz parameters.
+
+        Returns:
+            Ansatz parameters.
+        """
         return self._parameters
 
     @parameters.setter
@@ -114,6 +124,11 @@ class QuantumInterface:
         self,
         parameters: list[float],
     ) -> None:
+        """Set ansatz parameters.
+
+        Args:
+            parameters: List of ansatz parameters.
+        """
         if len(parameters) != self.circuit.num_parameters:
             raise ValueError(
                 "The length of the parameter list does not fit the chosen circuit for the Ansatz ",
@@ -121,7 +136,7 @@ class QuantumInterface:
             )
         self._parameters = parameters.copy()
 
-    def op_to_qbit(self, op: FermionicOperator):
+    def op_to_qbit(self, op: FermionicOperator) -> SparsePauliOp:
         """
         Fermionic operator to qbit rep
 
@@ -133,11 +148,13 @@ class QuantumInterface:
     def quantum_expectation_value(
         self, op: FermionicOperator, custom_parameters: list[float] | None = None
     ) -> float:
-        """
-        Calculate expectation value of circuit and observables
+        """Calculate expectation value of circuit and observables.
 
         Args:
-            op: Operator as SlowQuant's FermionicOperator object
+            op: Operator as SlowQuant's FermionicOperator object.
+
+        Returns:
+            Expectation value of fermionic operator.
         """
         if custom_parameters is None:
             run_parameters = self.parameters
@@ -150,15 +167,22 @@ class QuantumInterface:
         elif isinstance(self.primitive, BaseSampler):
             return self._sampler_quantum_expectation_value(op, run_parameters)
         else:
-            raise ValueError("The Quantum Interface was initiated with an unknown Qiskit primitive.")
+            raise ValueError(
+                "The Quantum Interface was initiated with an unknown Qiskit primitive, {type(self.primitive)}"
+            )
 
     def _estimator_quantum_expectation_value(
         self, op: FermionicOperator, run_parameters: list[float]
     ) -> float:
-        """
-        Calculate expectation value of circuit and observables via Estimator
-        """
+        """Calculate expectation value of circuit and observables via Estimator.
 
+        Args:
+            op: SlowQuant fermionic operator.
+            run_parameters: Circuit parameters.
+
+        Returns:
+            Expectation value of operator.
+        """
         job = self.primitive.run(
             circuits=self.circuit,
             parameter_values=run_parameters,
@@ -174,10 +198,22 @@ class QuantumInterface:
         return values.real
 
     def _sampler_quantum_expectation_value(self, op: FermionicOperator, run_parameters: list[float]) -> float:
-        """
-        Calculate expectation value of circuit and observables via Sampler
-        """
+        """Calculate expectation value of circuit and observables via Sampler.
 
+        The expectation value over a fermionic operator is calcuated as:
+
+        .. math::
+            E = \\sum_i^N c_i\\left<0\\left|P_i\\right|0\\right>
+
+        With :math:`c_i` being the :math:`i` the coefficient and :math:`P_i` the :math:`i` the Pauli string.
+
+        Args:
+            op: SlowQuant fermionic operator.
+            run_parameters: Circuit parameters.
+
+        Returns:
+            Expectation value of operator.
+        """
         values = 0.0
         observables = self.op_to_qbit(op)
 
@@ -191,9 +227,22 @@ class QuantumInterface:
 
         return values.real
 
-    def _sampler_distributions(self, pauli: Pauli, run_parameters: list[float]):
-        """
-        Get results from a sampler distribution for one given Pauli string
+    def _sampler_distributions(self, pauli: Pauli, run_parameters: list[float]) -> float:
+        """Get results from a sampler distribution for one given Pauli string.
+
+        The expectation value of a Pauli string is calcuated as:
+
+        .. math::
+            E = \\sum_i^N p_i\\left<b_i\\left|P\\right|b_i\\right>
+
+        With :math:`p_i` being the :math:`i` th probability and :math:`b_i` being the `i` th bit-string.
+
+        Args:
+            pauli: Pauli string to measure.
+            run_paramters: Parameters of circuit.
+
+        Returns:
+            Probability weighted Pauli string.
         """
         # Create QuantumCircuit
         ansatz_w_obs = self.circuit.compose(to_CBS_measurement(pauli))
@@ -206,38 +255,80 @@ class QuantumInterface:
         distr = job.result().quasi_dists[0].binary_probabilities()
 
         result = 0.0
-        for nr, (key, value) in enumerate(distr.items()):
+        for key, value in distr.items():
             # Here we could check if we want a given key (bitstring) in the result distribution
             result += value * get_bitstring_sign(pauli, key)
         return result
 
 
 def to_CBS_measurement(op: Pauli) -> QuantumCircuit:
-    """
-    Converts a Pauli string from Qiskit to Pauli string with measuremnt in the corresponding basis as QuantumCircuit
-    Not to be used with SlowQuant FermionicOperators!
+    """Convert a Pauli string to Pauli measurement circuit.
+
+    This is achived by the following transformation:
+
+    .. math::
+        \\begin{align}
+        I &\\rightarrow I\\\\
+        Z &\\rightarrow Z\\\\
+        X &\\rightarrow XH\\\\
+        Y &\\rightarrow YS^{\\dagger}H
+        \\end{align}
+
+    Args:
+        op: Pauli string operator.
+
+    Returns:
+        Pauli measuremnt quantum circuit.
     """
     num_qubits = len(op)
     qc = QuantumCircuit(num_qubits)
-    for nr, i in enumerate(op):
-        if i == Pauli("X"):
-            qc.append(i, [nr])
-            qc.h(nr)
-        elif i == Pauli("Y"):
-            qc.append(i, [nr])
-            qc.sdg(nr)
-            qc.h(nr)
+    for i, pauli in enumerate(op):
+        if pauli == Pauli("X"):
+            qc.append(pauli, [i])
+            qc.h(i)
+        elif pauli == Pauli("Y"):
+            qc.append(pauli, [i])
+            qc.sdg(i)
+            qc.h(i)
     return qc
 
 
 def get_bitstring_sign(op: Pauli, binary: str) -> int:
-    """
-    Takes Pauli String and a state in binary form and returns the sign based on the expectation value of the Pauli string with each single quibit state
+    """Convert Pauli string and bit-string measurement to expectation value.
+
+    Takes Pauli String and a state in binary form and returns the sign based on the expectation value of the Pauli string with each single quibit state.
+
+    This is achived by using the following evaluations:
+
+    .. math::
+        \\begin{align}
+        \\left<0\\left|I\\right|0\\right> &= 1\\\\
+        \\left<1\\left|I\\right|1\\right> &= 1\\\\
+        \\left<0\\left|Z\\right|0\\right> &= 1\\\\
+        \\left<1\\left|Z\\right|1\\right> &= -1\\\\
+        \\left<0\\left|HXH\\right|0\\right> &= 1\\\\
+        \\left<1\\left|HXH\\right|1\\right> &= -1\\\\
+        \\left<0\\left|HSYS^{\\dagger}H\\right|0\\right> &= 1\\\\
+        \\left<1\\left|HSYS^{\\dagger}H\\right|1\\right> &= -1
+        \\end{align}
+
+    The total expectation value is then evaulated as:
+
+    .. math::
+        E = \\prod_i^N\\left<b_i\\left|P_{i,T}\\right|b_i\\right>
+
+    With :math:`b_i` being the :math:`i` th bit and :math:`P_{i,T}` being the :math:`i` th proberly transformed Pauli operator.
+
+    Args:
+        op: Pauli string operator.
+        binary: Measured bit-string.
+
+    Returns:
+        Expectation value of Pauli string.
     """
     sign = 1
-    for nr, i in enumerate(op.to_label()):
-        # print(i, binary[nr])
-        if not i == "I":
-            if binary[nr] == "1":
+    for i, pauli in enumerate(op.to_label()):
+        if not pauli == "I":
+            if binary[i] == "1":
                 sign = sign * (-1)
     return sign

@@ -11,9 +11,11 @@ SlowQuant
    :maxdepth: 2
    :caption: Qiskit Interface:
 
+   autodoc/qiskit_interface.rst
    autodoc/qiskit_base.rst
    autodoc/qiskit_operators.rst
    autodoc/qiskit_wavefunction.rst
+   autodoc/qiskit_linear_response.rst
    autodoc/qiskit_optimizers.rst
 
 .. toctree::
