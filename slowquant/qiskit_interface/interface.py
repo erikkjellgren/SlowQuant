@@ -1,4 +1,4 @@
-from qiskit.circuit import QuantumCircuit
+from qiskit import QuantumCircuit
 from qiskit.primitives import BaseEstimator, BaseSampler
 from qiskit.quantum_info import Pauli, SparsePauliOp
 from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFock

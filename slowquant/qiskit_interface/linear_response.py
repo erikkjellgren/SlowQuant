@@ -2,8 +2,6 @@ import numpy as np
 import scipy
 from dmdm.util import iterate_t1_sa, iterate_t2_sa  # temporary solution
 
-from slowquant.qiskit_interface.base import FermionicOperator
-from slowquant.qiskit_interface.interface import QuantumInterface
 from slowquant.qiskit_interface.operators import (
     G1,
     G2_1,
