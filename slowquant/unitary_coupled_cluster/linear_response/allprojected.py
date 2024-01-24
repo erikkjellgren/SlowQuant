@@ -113,10 +113,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = expectation_value_hybrid_flow(
                     self.wf.state_vector, [GI.dagger, self.H_1i_1a, qJ], self.wf.state_vector
                 )
-                # Make B
-                self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = -expectation_value_hybrid_flow(
-                    self.wf.state_vector, [GI.dagger, qJ.dagger, self.H_1i_1a], self.wf.state_vector
-                )
         for j, GJ in enumerate(self.G_ops):
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
