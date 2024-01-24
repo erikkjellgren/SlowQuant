@@ -15,7 +15,9 @@ from slowquant.qiskit_interface.operators import (
     G2_2,
     commutator,
     double_commutator,
-    hamiltonian_full_space,
+    hamiltonian_pauli_0i_0a,
+    hamiltonian_pauli_1i_1a,
+    hamiltonian_pauli_2i_2a,
 )
 from slowquant.qiskit_interface.wavefunction import WaveFunction
 from slowquant.unitary_coupled_cluster.density_matrix import (
@@ -39,7 +41,10 @@ class quantumLR:
 
         self.wf = wf
         # Create operators
-        self.H = hamiltonian_full_space(wf.h_mo, wf.g_mo, wf.num_orbs)
+        self.H_0i_0a = hamiltonian_pauli_0i_0a(wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs)
+        self.H_1i_1a = hamiltonian_pauli_1i_1a(
+            wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs, wf.num_virtual_orbs
+        )
 
         self.G_ops = []
         # G1
@@ -103,10 +108,10 @@ class quantumLR:
         grad = np.zeros(2 * self.num_G)
         for i, op in enumerate(self.G_ops):
             grad[i] = self.wf.QI.quantum_expectation_value(
-                commutator(self.H, op).get_folded_operator(*self.orbs)
+                commutator(self.H_0i_0a, op).get_folded_operator(*self.orbs)
             )
             grad[i + self.num_G] = self.wf.QI.quantum_expectation_value(
-                commutator(op.dagger, self.H).get_folded_operator(*self.orbs)
+                commutator(op.dagger, self.H_0i_0a).get_folded_operator(*self.orbs)
             )
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
@@ -139,16 +144,16 @@ class quantumLR:
             for i, GI in enumerate(self.G_ops):
                 # Make A
                 val = self.wf.QI.quantum_expectation_value(
-                    (GI.dagger * self.H * qJ).get_folded_operator(*self.orbs)
+                    (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
                 ) - self.wf.QI.quantum_expectation_value(
-                    (self.H * qJ * GI.dagger).get_folded_operator(*self.orbs)
+                    (self.H_1i_1a * qJ * GI.dagger).get_folded_operator(*self.orbs)
                 )
                 self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
                 # Make B
                 val = self.wf.QI.quantum_expectation_value(
-                    (qJ.dagger * self.H * GI.dagger).get_folded_operator(*self.orbs)
+                    (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs)
                 ) - self.wf.QI.quantum_expectation_value(
-                    (GI.dagger * qJ.dagger * self.H).get_folded_operator(*self.orbs)
+                    (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
                 )
                 self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
 
@@ -159,13 +164,13 @@ class quantumLR:
                 self.A[i + idx_shift, j + idx_shift] = self.A[
                     j + idx_shift, i + idx_shift
                 ] = self.wf.QI.quantum_expectation_value(
-                    double_commutator(GI.dagger, self.H, GJ).get_folded_operator(*self.orbs)
+                    double_commutator(GI.dagger, self.H_0i_0a, GJ).get_folded_operator(*self.orbs)
                 )
                 # Make B
                 self.B[i + idx_shift, j + idx_shift] = self.B[
                     j + idx_shift, i + idx_shift
                 ] = self.wf.QI.quantum_expectation_value(
-                    double_commutator(GI.dagger, self.H, GJ.dagger).get_folded_operator(*self.orbs)
+                    double_commutator(GI.dagger, self.H_0i_0a, GJ.dagger).get_folded_operator(*self.orbs)
                 )
                 # Make Sigma
                 self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[
@@ -192,13 +197,15 @@ class quantumLR:
             for i, GI in enumerate(self.G_ops):
                 # Make A
                 val = self.wf.QI.op_to_qbit(
-                    (GI.dagger * self.H * qJ).get_folded_operator(*self.orbs)
-                ) - self.wf.QI.op_to_qbit((self.H * qJ * GI.dagger).get_folded_operator(*self.orbs))
+                    (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
+                ) - self.wf.QI.op_to_qbit((self.H_1i_1a * qJ * GI.dagger).get_folded_operator(*self.orbs))
                 A[i + idx_shift][j] = A[j][i + idx_shift] = val
                 # Make B
                 val = self.wf.QI.op_to_qbit(
-                    (qJ.dagger * self.H * GI.dagger).get_folded_operator(*self.orbs)
-                ) - self.wf.QI.op_to_qbit((GI.dagger * qJ.dagger * self.H).get_folded_operator(*self.orbs))
+                    (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs)
+                ) - self.wf.QI.op_to_qbit(
+                    (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                )
                 B[i + idx_shift][j] = B[j][i + idx_shift] = val
 
         # GG
@@ -206,11 +213,11 @@ class quantumLR:
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
                 A[i + idx_shift][j + idx_shift] = A[j + idx_shift][i + idx_shift] = self.wf.QI.op_to_qbit(
-                    double_commutator(GI.dagger, self.H, GJ).get_folded_operator(*self.orbs)
+                    double_commutator(GI.dagger, self.H_1i_1a, GJ).get_folded_operator(*self.orbs)
                 )
                 # Make B
                 B[i + idx_shift][j + idx_shift] = B[j + idx_shift][i + idx_shift] = self.wf.QI.op_to_qbit(
-                    double_commutator(GI.dagger, self.H, GJ.dagger).get_folded_operator(*self.orbs)
+                    double_commutator(GI.dagger, self.H_1i_1a, GJ.dagger).get_folded_operator(*self.orbs)
                 )
                 # Make Sigma
                 Sigma[i + idx_shift][j + idx_shift] = Sigma[j + idx_shift][
@@ -240,7 +247,9 @@ class quantumLR:
         HG_exp = []
         for j, GJ in enumerate(self.G_ops):
             G_exp.append(self.wf.QI.quantum_expectation_value(GJ.get_folded_operator(*self.orbs)))
-            HG_exp.append(self.wf.QI.quantum_expectation_value((self.H * GJ).get_folded_operator(*self.orbs)))
+            HG_exp.append(
+                self.wf.QI.quantum_expectation_value((self.H_0i_0a * GJ).get_folded_operator(*self.orbs))
+            )
 
         # Check gradients
         grad = get_orbital_gradient_response(
@@ -290,11 +299,11 @@ class quantumLR:
             for i, GI in enumerate(self.G_ops):
                 # Make A
                 self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = self.wf.QI.quantum_expectation_value(
-                    (GI.dagger * self.H * qJ).get_folded_operator(*self.orbs)
+                    (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
                 )
                 # Make B
                 self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = -self.wf.QI.quantum_expectation_value(
-                    (GI.dagger * qJ.dagger * self.H).get_folded_operator(*self.orbs)
+                    (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
                 )
 
         # Calculate Matrices
@@ -302,7 +311,7 @@ class quantumLR:
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
                 val = self.wf.QI.quantum_expectation_value(
-                    (GI.dagger * self.H * GJ).get_folded_operator(*self.orbs)
+                    (GI.dagger * self.H_0i_0a * GJ).get_folded_operator(*self.orbs)
                 )
                 GG_exp = self.wf.QI.quantum_expectation_value(
                     (GI.dagger * GJ).get_folded_operator(*self.orbs)
@@ -335,12 +344,23 @@ class quantumLR:
         print("Gs", self.num_G)
         print("qs", self.num_q)
 
+        # This hamiltonian is expensive and not needed in the naive orbitale rotation formalism
+        self.H_2i_2a = hamiltonian_pauli_2i_2a(
+            self.wf.h_mo,
+            self.wf.g_mo,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
+        )
+
         # pre-calculate <0|G|0> and <0|HG|0>
         G_exp = []
         HG_exp = []
         for j, GJ in enumerate(self.G_ops):
             G_exp.append(self.wf.QI.quantum_expectation_value(GJ.get_folded_operator(*self.orbs)))
-            HG_exp.append(self.wf.QI.quantum_expectation_value((self.H * GJ).get_folded_operator(*self.orbs)))
+            HG_exp.append(
+                self.wf.QI.quantum_expectation_value((self.H_0i_0a * GJ).get_folded_operator(*self.orbs))
+            )
 
         # Check gradients
         grad = get_orbital_gradient_response(  # proj-q and naive-q lead to same working equations
@@ -370,7 +390,7 @@ class quantumLR:
             for i, qI in enumerate(self.q_ops[j:], j):
                 # Make A
                 val = self.wf.QI.quantum_expectation_value(
-                    (qI.dagger * self.H * qJ).get_folded_operator(*self.orbs)
+                    (qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs)
                 )
                 qq_exp = self.wf.QI.quantum_expectation_value(
                     (qI.dagger * qJ).get_folded_operator(*self.orbs)
@@ -385,7 +405,7 @@ class quantumLR:
             for i, GI in enumerate(self.G_ops):
                 # Make A
                 self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = self.wf.QI.quantum_expectation_value(
-                    (GI.dagger * self.H * qJ).get_folded_operator(*self.orbs)
+                    (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
                 )
 
         # Calculate Matrices
@@ -393,7 +413,7 @@ class quantumLR:
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
                 val = self.wf.QI.quantum_expectation_value(
-                    (GI.dagger * self.H * GJ).get_folded_operator(*self.orbs)
+                    (GI.dagger * self.H_0i_0a * GJ).get_folded_operator(*self.orbs)
                 )
                 GG_exp = self.wf.QI.quantum_expectation_value(
                     (GI.dagger * GJ).get_folded_operator(*self.orbs)
