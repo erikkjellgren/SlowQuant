@@ -151,17 +151,17 @@ class LinearResponseBaseClass:
         self.hessian = E2
         self.metric = S
 
-        eigval, eigvec = scipy.linalg.eig(E2, S)
+        eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)
         sorting = np.argsort(eigval)
         self.excitation_energies = np.real(eigval[sorting][size:])
         self.response_vectors = np.real(eigvec[:, sorting][:, size:])
         self.normed_response_vectors = np.zeros_like(self.response_vectors)
-        num_q = len(self.q_ops)
-        num_G = size - num_q
-        self.Z_q = self.response_vectors[:num_q, :]
-        self.Z_G = self.response_vectors[num_q : num_q + num_G, :]
-        self.Y_q = self.response_vectors[num_q + num_G : 2 * num_q + num_G]
-        self.Y_G = self.response_vectors[2 * num_q + num_G :]
+        self.num_q = len(self.q_ops)
+        self.num_G = size - self.num_q
+        self.Z_q = self.response_vectors[: self.num_q, :]
+        self.Z_G = self.response_vectors[self.num_q : self.num_q + self.num_G, :]
+        self.Y_q = self.response_vectors[self.num_q + self.num_G : 2 * self.num_q + self.num_G]
+        self.Y_G = self.response_vectors[2 * self.num_q + self.num_G :]
         self.Z_q_normed = np.zeros_like(self.Z_q)
         self.Z_G_normed = np.zeros_like(self.Z_G)
         self.Y_q_normed = np.zeros_like(self.Y_q)
@@ -180,10 +180,26 @@ class LinearResponseBaseClass:
             )
 
     def get_excited_state_norm(self) -> np.ndarray:
-        raise NotImplementedError
+        """Calculate the norm of excited states.
 
-    def get_excited_state_overlap(self) -> np.ndarray:
-        raise NotImplementedError
+        Returns:
+            Norm of excited states.
+        """
+
+        norms = np.zeros(len(self.response_vectors[0]))  # np.zeros(len(self.Z_G[0]))
+        for state_number in range(len(self.response_vectors[0])):
+            # Get Z_q Z_G Y_q and Y_G matrices
+            ZZq = np.outer(self.Z_q[:, state_number], self.Z_q[:, state_number].transpose())
+            YYq = np.outer(self.Y_q[:, state_number], self.Y_q[:, state_number].transpose())
+            ZZG = np.outer(self.Z_G[:, state_number], self.Z_G[:, state_number].transpose())
+            YYG = np.outer(self.Y_G[:, state_number], self.Y_G[:, state_number].transpose())
+
+            norms[state_number] = np.sum(self.metric[: self.num_q, : self.num_q] * (ZZq - YYq)) + np.sum(
+                self.metric[self.num_q : self.num_q + self.num_G, self.num_q : self.num_q + self.num_G]
+                * (ZZG - YYG)
+            )
+
+        return norms
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         raise NotImplementedError

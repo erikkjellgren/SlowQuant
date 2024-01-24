@@ -159,43 +159,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 if i == j:
                     self.Sigma[i + idx_shift, j + idx_shift] = 1
 
-    def get_excited_state_norm(self) -> np.ndarray:
-        """Calculate the norm of excited state.
-
-        Returns:
-            Norm of excited state.
-        """
-        number_excitations = len(self.excitation_energies)
-        rdms = ReducedDenstiyMatrix(
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-            self.wf.rdm1,
-            rdm2=self.wf.rdm2,
-        )
-        norms = np.zeros(len(self.response_vectors[0]))
-        for state_number in range(len(self.response_vectors[0])):
-            q_part = get_orbital_response_vector_norm(
-                rdms, self.wf.kappa_idx, self.response_vectors, state_number, number_excitations
-            )
-            g_part = 0
-            for i, _ in enumerate(self.G_ops):
-                g_part += self.Z_G[i, state_number] ** 2 - self.Y_G[i, state_number] ** 2
-            norms[state_number] = q_part + g_part
-        return norms
-
-    def get_excited_state_overlap(self) -> np.ndarray:
-        """Calculate the overlap of excited states with the ground state
-
-        Returns:
-            Overlap of excited states with ground state
-        """
-
-        overlaps = np.zeros(len(self.Z_G[0]))
-        print("Calculations of excited state overlaps is superfluous as they are zero by design.")
-
-        return overlaps
-
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.
 
