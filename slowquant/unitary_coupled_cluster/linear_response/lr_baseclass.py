@@ -148,6 +148,9 @@ class LinearResponseBaseClass:
         S[size:, size:] = -self.Sigma
         print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma)))}")
 
+        self.hessian = E2
+        self.metric = S
+
         eigval, eigvec = scipy.linalg.eig(E2, S)
         sorting = np.argsort(eigval)
         self.excitation_energies = np.real(eigval[sorting][size:])

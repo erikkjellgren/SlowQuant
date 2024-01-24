@@ -1,7 +1,12 @@
+from collections.abc import Sequence
+
 import numpy as np
 import scipy
 from dmdm.util import iterate_t1_sa, iterate_t2_sa  # temporary solution
 
+from slowquant.molecularintegrals.integralfunctions import (
+    one_electron_integral_transform,
+)
 from slowquant.qiskit_interface.base import FermionicOperator
 from slowquant.qiskit_interface.interface import QuantumInterface
 from slowquant.qiskit_interface.operators import (
@@ -406,7 +411,7 @@ class quantumLR:
                     j + idx_shift, i + idx_shift
                 ] = GG_exp - (G_exp[i] * G_exp[j])
 
-    def get_excitation_energies(self):
+    def get_excitation_energies(self) -> np.ndarray:
         """
         Solve LR eigenvalue problem
         """
@@ -414,20 +419,71 @@ class quantumLR:
         # Build Hessian and Metric
         size = len(self.A)
         self.Delta = np.zeros_like(self.Sigma)
-        self.E2 = np.zeros((size * 2, size * 2))
-        self.E2[:size, :size] = self.A
-        self.E2[:size, size:] = self.B
-        self.E2[size:, :size] = self.B
-        self.E2[size:, size:] = self.A
-        self.S = np.zeros((size * 2, size * 2))
-        self.S[:size, :size] = self.Sigma
-        self.S[:size, size:] = self.Delta
-        self.S[size:, :size] = -self.Delta
-        self.S[size:, size:] = -self.Sigma
+        self.hessian = np.zeros((size * 2, size * 2))
+        self.hessian[:size, :size] = self.A
+        self.hessian[:size, size:] = self.B
+        self.hessian[size:, :size] = self.B
+        self.hessian[size:, size:] = self.A
+        self.metric = np.zeros((size * 2, size * 2))
+        self.metric[:size, :size] = self.Sigma
+        self.metric[:size, size:] = self.Delta
+        self.metric[size:, :size] = -self.Delta
+        self.metric[size:, size:] = -self.Sigma
 
-        # Get eigenvalues
-        eigval, eigvec = scipy.linalg.eig(self.E2, self.S)
+        # Solve eigenvalue equation
+        eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)
         sorting = np.argsort(eigval)
         self.excitation_energies = np.real(eigval[sorting][size:])
+        self.excitation_vectors = np.real(eigvec[:, sorting][:, size:])
 
         return self.excitation_energies
+
+    def get_normed_excitation_vectors(self) -> None:
+        """
+        Get normed excitation vectors via excitated state norm
+        """
+
+        self.normed_excitation_vectors = np.zeros_like(self.excitation_vectors)
+        self._Z_q = self.excitation_vectors[: self.num_q, :]
+        self._Z_G = self.excitation_vectors[self.num_q : self.num_q + self.num_G, :]
+        self._Y_q = self.excitation_vectors[self.num_q + self.num_G : 2 * self.num_q + self.num_G]
+        self._Y_G = self.excitation_vectors[2 * self.num_q + self.num_G :]
+        self._Z_q_normed = np.zeros_like(self._Z_q)
+        self._Z_G_normed = np.zeros_like(self._Z_G)
+        self._Y_q_normed = np.zeros_like(self._Y_q)
+        self._Y_G_normed = np.zeros_like(self._Y_G)
+
+        norms = self._get_excited_state_norm()
+        for state_number, norm in enumerate(norms):
+            if norm < 10**-10:
+                print(f"WARNING: State number {state_number} could not be normalized. Norm of {norm}.")
+                continue
+            self._Z_q_normed[:, state_number] = self._Z_q[:, state_number] * (1 / norm) ** 0.5
+            self._Z_G_normed[:, state_number] = self._Z_G[:, state_number] * (1 / norm) ** 0.5
+            self._Y_q_normed[:, state_number] = self._Y_q[:, state_number] * (1 / norm) ** 0.5
+            self._Y_G_normed[:, state_number] = self._Y_G[:, state_number] * (1 / norm) ** 0.5
+            self.normed_excitation_vectors[:, state_number] = (
+                self.excitation_vectors[:, state_number] * (1 / norm) ** 0.5
+            )
+
+    def _get_excited_state_norm(self) -> np.ndarray:
+        """Calculate the norm of excited states.
+
+        Returns:
+            Norm of excited states.
+        """
+
+        norms = np.zeros(len(self._Z_G[0]))
+        for state_number in range(len(self._Z_G[0])):
+            # Get Z_q Z_G Y_q and Y_G matrices
+            ZZq = np.outer(self._Z_q[:, state_number], self._Z_q[:, state_number].transpose())
+            YYq = np.outer(self._Y_q[:, state_number], self._Y_q[:, state_number].transpose())
+            ZZG = np.outer(self._Z_G[:, state_number], self._Z_G[:, state_number].transpose())
+            YYG = np.outer(self._Y_G[:, state_number], self._Y_G[:, state_number].transpose())
+
+            norms[state_number] = np.sum(self.metric[: self.num_q, : self.num_q] * (ZZq - YYq)) + np.sum(
+                self.metric[self.num_q : self.num_q + self.num_G, self.num_q : self.num_q + self.num_G]
+                * (ZZG - YYG)
+            )
+
+        return norms

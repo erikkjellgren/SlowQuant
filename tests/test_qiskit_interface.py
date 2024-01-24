@@ -157,6 +157,3 @@ def test_LiH_naive_sampler() -> None:
     ]
 
     assert np.allclose(excitation_energies, solution, atol=10**-6)
-
-
-test_LiH_naive_sampler()
