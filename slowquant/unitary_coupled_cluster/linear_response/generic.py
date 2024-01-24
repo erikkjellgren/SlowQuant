@@ -270,26 +270,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
             )
         return norms
 
-    def get_excited_state_overlap(self) -> np.ndarray:
-        """Calculate the overlap of excited states with the ground state
-
-        Returns:
-            Overlap of excited states with ground state
-        """
-        number_excitations = len(self.excitation_energies)
-        overlaps = np.zeros(len(self.response_vectors[0]))
-        for state_number in range(len(self.response_vectors[0])):
-            transfer_op = OperatorHybrid({})
-            for i, G in enumerate(self.q_ops + self.G_ops):
-                transfer_op += (
-                    self.response_vectors[i, state_number] * G.dagger
-                    + self.response_vectors[i + number_excitations, state_number] * G
-                )
-            overlaps[state_number] = expectation_value_hybrid_flow(
-                self.wf.state_vector, [transfer_op], self.wf.state_vector
-            )
-        return overlaps
-
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.
 
