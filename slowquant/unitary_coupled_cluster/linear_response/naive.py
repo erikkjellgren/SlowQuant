@@ -136,32 +136,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     self.wf.state_vector, GI.dagger, GJ, self.wf.state_vector
                 )
 
-    def get_excited_state_norm(self) -> np.ndarray:
-        """Calculate the norm of excited states.
-
-        Returns:
-            Norm of excited states.
-        """
-        rdms = ReducedDenstiyMatrix(
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-            self.wf.rdm1,
-            rdm2=self.wf.rdm2,
-        )
-        norms = np.zeros(len(self.Z_G[0]))
-        for state_number in range(len(self.Z_G[0])):
-            q_part = get_orbital_response_vector_norm(
-                rdms, self.wf.kappa_idx, self.response_vectors, state_number, len(self.excitation_energies)
-            )
-            transfer_op = OperatorHybrid({})
-            for i, G in enumerate(self.G_ops):
-                transfer_op += self.Z_G[i, state_number] * G.dagger + self.Y_G[i, state_number] * G
-            norms[state_number] = q_part + expectation_value_hybrid_flow_commutator(
-                self.wf.state_vector, transfer_op, transfer_op.dagger, self.wf.state_vector
-            )
-        return norms
-
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.
 

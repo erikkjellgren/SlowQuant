@@ -250,26 +250,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 )
                 self.Delta[j + idx_shift, i + idx_shift] = -self.Delta[i + idx_shift, j + idx_shift]
 
-    def get_excited_state_norm(self) -> np.ndarray:
-        """Calculate the norm of excited state.
-
-        Returns:
-            Norm of excited state.
-        """
-        number_excitations = len(self.excitation_energies)
-        norms = np.zeros(len(self.response_vectors[0]))
-        for state_number in range(len(self.response_vectors[0])):
-            transfer_op = OperatorHybrid({})
-            for i, G in enumerate(self.q_ops + self.G_ops):
-                transfer_op += (
-                    self.response_vectors[i, state_number] * G.dagger
-                    + self.response_vectors[i + number_excitations, state_number] * G
-                )
-            norms[state_number] = expectation_value_hybrid_flow_commutator(
-                self.wf.state_vector, transfer_op, transfer_op.dagger, self.wf.state_vector
-            )
-        return norms
-
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.
 

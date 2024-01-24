@@ -126,23 +126,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 if i == j:
                     self.Sigma[i + idx_shift, j + idx_shift] = 1
 
-    def get_excited_state_norm(self) -> np.ndarray:
-        """Calculate the norm of excited state.
-
-        Returns:
-            Norm of excited state.
-        """
-        norms = np.zeros(len(self.response_vectors[0]))
-        for state_number in range(len(self.response_vectors[0])):
-            q_part = 0
-            for j in range(len(self.q_ops)):
-                q_part += self.Z_q[j, state_number] ** 2 - self.Y_q[j, state_number] ** 2
-            g_part = 0
-            for i in range(len(self.G_ops)):
-                g_part += self.Z_G[i, state_number] ** 2 - self.Y_G[i, state_number] ** 2
-            norms[state_number] = q_part + g_part
-        return norms
-
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.
 
