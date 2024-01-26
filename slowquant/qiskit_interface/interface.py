@@ -220,11 +220,11 @@ class QuantumInterface:
         # Loop over all clique Paulies
         cliques = make_cliques(observables.paulis)
         distributions = {}
-        for pauli in cliques.keys():
-            dist = self._sampler_distributions(Pauli(pauli), run_parameters)
+        for clique_pauli in cliques.keys():
+            dist = self._sampler_distributions(Pauli(clique_pauli), run_parameters)
             # It is wasteful to store the distribution per Pauli instead of per Clique,
             # but it help unpack it later.
-            for pauli in cliques[pauli]:
+            for pauli in cliques[clique_pauli]:
                 distributions[pauli] = dist
 
         # Loop over all qubit-mapped Paul strings and get Sampler distributions
