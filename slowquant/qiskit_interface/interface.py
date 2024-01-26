@@ -217,9 +217,23 @@ class QuantumInterface:
         values = 0.0
         observables = self.op_to_qbit(op)
 
+        # Loop over all clique Paulies
+        cliques = make_cliques(observables.paulis)
+        distributions = {}
+        for pauli in cliques.keys():
+            dist = self._sampler_distributions(Pauli(pauli), run_parameters)
+            # It is wasteful to store the distribution per Pauli instead of per Clique,
+            # but it help unpack it later.
+            for pauli in cliques[pauli]:
+                distributions[pauli] = dist
+
         # Loop over all qubit-mapped Paul strings and get Sampler distributions
         for pauli, coeff in zip(observables.paulis, observables.coeffs):
-            values += self._sampler_distributions(pauli, run_parameters) * coeff
+            result = 0.0
+            for key, value in distributions[str(pauli)].items():
+                # Here we could check if we want a given key (bitstring) in the result distribution
+                result += value * get_bitstring_sign(pauli, key)
+            values += result * coeff
 
         if isinstance(values, complex):
             if abs(values.imag) > 10**-2:
@@ -227,7 +241,7 @@ class QuantumInterface:
 
         return values.real
 
-    def _sampler_distributions(self, pauli: Pauli, run_parameters: list[float]) -> float:
+    def _sampler_distributions(self, pauli: Pauli, run_parameters: list[float]) -> dict[str, float]:
         """Get results from a sampler distribution for one given Pauli string.
 
         The expectation value of a Pauli string is calcuated as:
@@ -253,12 +267,7 @@ class QuantumInterface:
 
         # Get quasi-distribution in binary probabilities
         distr = job.result().quasi_dists[0].binary_probabilities()
-
-        result = 0.0
-        for key, value in distr.items():
-            # Here we could check if we want a given key (bitstring) in the result distribution
-            result += value * get_bitstring_sign(pauli, key)
-        return result
+        return distr
 
 
 def to_CBS_measurement(op: Pauli) -> QuantumCircuit:
@@ -332,3 +341,43 @@ def get_bitstring_sign(op: Pauli, binary: str) -> int:
             if binary[i] == "1":
                 sign = sign * (-1)
     return sign
+
+
+def make_cliques(paulis: Pauli) -> dict[str, list[str]]:
+    """Partition Pauli strings into simultaniously measurable cliques.
+
+    The Pauli strings are put into cliques accourding to Qubit-Wise Commutativity (QWC).
+
+    #. https://arxiv.org/pdf/1907.13623.pdf, Sec. 4.1, 4.2, and 7.0
+    """
+    cliques: dict[str, list[str]] = {"Z" * len(paulis[0]): []}
+    for pauli in paulis:
+        pauli_str = str(pauli)
+        if "X" not in pauli_str and "Y" not in pauli_str:
+            cliques["Z" * len(paulis[0])].append(pauli_str)
+        else:
+            for clique in cliques.keys():
+                is_commuting = True
+                for p_clique, p_op in zip(clique, pauli_str):
+                    if p_clique == "I" or p_op == "I":
+                        continue
+                    if p_clique != p_op:
+                        is_commuting = False
+                        break
+                if is_commuting:
+                    commuting_clique = clique
+                    break
+            if is_commuting:
+                new_clique_pauli = ""
+                for p_clique, p_op in zip(commuting_clique, pauli_str):
+                    if p_clique != "I":
+                        new_clique_pauli += p_clique
+                    else:
+                        new_clique_pauli += p_op
+                if new_clique_pauli != commuting_clique:
+                    cliques[new_clique_pauli] = cliques[commuting_clique]
+                    del cliques[commuting_clique]
+                cliques[new_clique_pauli].append(pauli_str)
+            else:
+                cliques[pauli_str] = [pauli_str]
+    return cliques
