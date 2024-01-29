@@ -1,5 +1,4 @@
 import numpy as np
-import scipy
 from dmdm.util import iterate_t1_sa, iterate_t2_sa  # temporary solution
 
 from slowquant.molecularintegrals.integralfunctions import (
