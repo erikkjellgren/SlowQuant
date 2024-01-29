@@ -1,15 +1,5 @@
 import numpy as np
 from slowquant.qiskit_interface.linear_response.lr_baseclass import quantumLRBaseClass
-from slowquant.qiskit_interface.operators import (
-    G1,
-    G2_1,
-    G2_2,
-    commutator,
-    double_commutator,
-    hamiltonian_pauli_0i_0a,
-    hamiltonian_pauli_1i_1a,
-    hamiltonian_pauli_2i_2a,
-)
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_orbital_gradient_response,
