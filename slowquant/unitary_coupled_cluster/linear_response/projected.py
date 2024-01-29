@@ -226,12 +226,9 @@ class LinearResponseUCC(LinearResponseBaseClass):
             g_part_z = 0.0
             for i, G in enumerate(self.G_ops):
                 exp_G = expectation_value_hybrid_flow(self.wf.state_vector, [G], self.wf.state_vector)
-                exp_G_dagger = expectation_value_hybrid_flow(
-                    self.wf.state_vector, [G.dagger], self.wf.state_vector
-                )
                 g_part_x += (
                     self.Z_G_normed[i, state_number]
-                    * exp_G_dagger
+                    * exp_G
                     * expectation_value_hybrid_flow(self.wf.state_vector, [mux_op], self.wf.state_vector)
                 )
                 g_part_x -= self.Z_G_normed[i, state_number] * expectation_value_hybrid_flow(
@@ -247,7 +244,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 )
                 g_part_y += (
                     self.Z_G_normed[i, state_number]
-                    * exp_G_dagger
+                    * exp_G
                     * expectation_value_hybrid_flow(self.wf.state_vector, [muy_op], self.wf.state_vector)
                 )
                 g_part_y -= self.Z_G_normed[i, state_number] * expectation_value_hybrid_flow(
@@ -263,7 +260,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 )
                 g_part_z += (
                     self.Z_G_normed[i, state_number]
-                    * exp_G_dagger
+                    * exp_G
                     * expectation_value_hybrid_flow(self.wf.state_vector, [muz_op], self.wf.state_vector)
                 )
                 g_part_z -= self.Z_G_normed[i, state_number] * expectation_value_hybrid_flow(
