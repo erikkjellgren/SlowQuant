@@ -224,11 +224,11 @@ class LinearResponseUCC(LinearResponseBaseClass):
             g_part_x = 0.0
             g_part_y = 0.0
             g_part_z = 0.0
+            exp_mux = expectation_value_hybrid_flow(self.wf.state_vector, [mux_op], self.wf.state_vector)
+            exp_muy = expectation_value_hybrid_flow(self.wf.state_vector, [muy_op], self.wf.state_vector)
+            exp_muz = expectation_value_hybrid_flow(self.wf.state_vector, [muz_op], self.wf.state_vector)
             for i, G in enumerate(self.G_ops):
                 exp_G = expectation_value_hybrid_flow(self.wf.state_vector, [G], self.wf.state_vector)
-                exp_mux = expectation_value_hybrid_flow(self.wf.state_vector, [mux_op], self.wf.state_vector)
-                exp_muy = expectation_value_hybrid_flow(self.wf.state_vector, [muy_op], self.wf.state_vector)
-                exp_muz = expectation_value_hybrid_flow(self.wf.state_vector, [muz_op], self.wf.state_vector)
                 exp_Gmux = expectation_value_hybrid_flow(
                     self.wf.state_vector, [G.dagger, mux_op], self.wf.state_vector
                 )
@@ -239,43 +239,19 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     self.wf.state_vector, [G.dagger, muz_op], self.wf.state_vector
                 )
 
-                g_part_x += (
-                    self.Z_G_normed[i, state_number]
-                    * exp_G
-                    * exp_mux
-                )
+                g_part_x += self.Z_G_normed[i, state_number] * exp_G * exp_mux
                 g_part_x -= self.Z_G_normed[i, state_number] * exp_Gmux
-                g_part_x -= (
-                    self.Y_G_normed[i, state_number]
-                    * exp_G
-                    * exp_mux
-                )
+                g_part_x -= self.Y_G_normed[i, state_number] * exp_G * exp_mux
                 g_part_x += self.Y_G_normed[i, state_number] * exp_Gmux
-                g_part_y += (
-                    self.Z_G_normed[i, state_number]
-                    * exp_G
-                    * exp_muy
-                )
+                g_part_y += self.Z_G_normed[i, state_number] * exp_G * exp_muy
                 g_part_y -= self.Z_G_normed[i, state_number] * exp_Gmuy
-                g_part_y -= (
-                    self.Y_G_normed[i, state_number]
-                    * exp_G
-                    * exp_muy
-                )
+                g_part_y -= self.Y_G_normed[i, state_number] * exp_G * exp_muy
                 g_part_y += self.Y_G_normed[i, state_number] * exp_Gmuy
-                g_part_z += (
-                    self.Z_G_normed[i, state_number]
-                    * exp_G
-                    * exp_muz
-                )
+                g_part_z += self.Z_G_normed[i, state_number] * exp_G * exp_muz
                 g_part_z -= self.Z_G_normed[i, state_number] * exp_Gmuz
-                g_part_z -= (
-                    self.Y_G_normed[i, state_number]
-                    * exp_G
-                    * exp_muz
-                )
+                g_part_z -= self.Y_G_normed[i, state_number] * exp_G * exp_muz
                 g_part_z += self.Y_G_normed[i, state_number] * exp_Gmuz
-                
+
             transition_dipoles[state_number, 0] = q_part_x + g_part_x
             transition_dipoles[state_number, 1] = q_part_y + g_part_y
             transition_dipoles[state_number, 2] = q_part_z + g_part_z
