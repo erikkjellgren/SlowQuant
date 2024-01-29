@@ -189,8 +189,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
         muz_op = one_elec_op_hybrid_0i_0a(
             muz, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.num_virtual_orbs
         )
-        transition_dipoles = np.zeros((len(self.normed_response_vectors[0]), 3))
-        for state_number in range(len(self.normed_response_vectors[0])):
+        transition_dipoles = np.zeros((number_excitations, 3))
+        for state_number in range(number_excitations):
             q_part_x = get_orbital_response_property_gradient(
                 rdms,
                 mux,
