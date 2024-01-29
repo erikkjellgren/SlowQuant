@@ -389,9 +389,7 @@ def one_elec_op_full_space(ints_mo: np.ndarray, num_orbs: int) -> FermionicOpera
     return one_elec_op
 
 
-def one_elec_op_pauli_0i_0a(
-    ints_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int
-) -> FermionicOperator:
+def one_elec_op_0i_0a(ints_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int) -> FermionicOperator:
     """Create one-electron operator that makes no changes in the inactive and virtual orbitals.
 
     Args:
@@ -415,7 +413,7 @@ def one_elec_op_pauli_0i_0a(
     return one_elec_op
 
 
-def one_elec_op_pauli_1i_1a(
+def one_elec_op_1i_1a(
     ints_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int
 ) -> FermionicOperator:
     """Create one-electron operator that makes up to one change in the inactive and virtual orbitals.
