@@ -67,7 +67,7 @@ class quantumLR(quantumLRBaseClass):
                 print("WARNING: Large Gradient detected in q of ", np.max(np.abs(grad)))
 
         grad = np.zeros(self.num_G)  # G^\dagger is the same
-        for i, op in enumerate(self.G_ops):
+        for i in range(self.num_G):
             grad[i] = HG_exp[i] - (self.wf.energy_elec * G_exp[i])
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
