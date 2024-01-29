@@ -5,7 +5,6 @@ from slowquant.qiskit_interface.operators import (
     commutator,
     double_commutator,
 )
-from slowquant.qiskit_interface.wavefunction import WaveFunction
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_orbital_gradient_response,
