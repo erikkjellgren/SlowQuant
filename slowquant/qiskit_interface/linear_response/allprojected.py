@@ -8,7 +8,6 @@ from slowquant.qiskit_interface.base import FermionicOperator
 from slowquant.qiskit_interface.interface import QuantumInterface
 from slowquant.qiskit_interface.linear_response.lr_baseclass import quantumLRBaseClass
 from slowquant.qiskit_interface.operators import hamiltonian_pauli_2i_2a
-from slowquant.qiskit_interface.wavefunction import WaveFunction
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_orbital_gradient_response,
