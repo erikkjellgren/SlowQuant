@@ -7,16 +7,7 @@ from slowquant.molecularintegrals.integralfunctions import (
 from slowquant.qiskit_interface.base import FermionicOperator
 from slowquant.qiskit_interface.interface import QuantumInterface
 from slowquant.qiskit_interface.linear_response.lr_baseclass import quantumLRBaseClass
-from slowquant.qiskit_interface.operators import (
-    G1,
-    G2_1,
-    G2_2,
-    commutator,
-    double_commutator,
-    hamiltonian_pauli_0i_0a,
-    hamiltonian_pauli_1i_1a,
-    hamiltonian_pauli_2i_2a,
-)
+from slowquant.qiskit_interface.operators import hamiltonian_pauli_2i_2a
 from slowquant.qiskit_interface.wavefunction import WaveFunction
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
