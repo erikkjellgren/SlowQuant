@@ -8,7 +8,6 @@ from slowquant.qiskit_interface.operators import (
     G2_2,
     hamiltonian_pauli_0i_0a,
     hamiltonian_pauli_1i_1a,
-    hamiltonian_pauli_2i_2a,
 )
 from slowquant.qiskit_interface.wavefunction import WaveFunction
 from slowquant.unitary_coupled_cluster.density_matrix import (
