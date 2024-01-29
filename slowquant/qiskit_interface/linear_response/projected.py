@@ -54,7 +54,7 @@ class quantumLR(quantumLRBaseClass):
         # pre-calculate <0|G|0> and <0|HG|0>
         G_exp = []
         HG_exp = []
-        for j, GJ in enumerate(self.G_ops):
+        for GJ in self.G_ops:
             G_exp.append(self.wf.QI.quantum_expectation_value(GJ.get_folded_operator(*self.orbs)))
             HG_exp.append(
                 self.wf.QI.quantum_expectation_value((self.H_0i_0a * GJ).get_folded_operator(*self.orbs))
