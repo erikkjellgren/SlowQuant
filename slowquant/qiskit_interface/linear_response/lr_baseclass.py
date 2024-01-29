@@ -6,8 +6,6 @@ from slowquant.qiskit_interface.operators import (
     G1,
     G2_1,
     G2_2,
-    commutator,
-    double_commutator,
     hamiltonian_pauli_0i_0a,
     hamiltonian_pauli_1i_1a,
     hamiltonian_pauli_2i_2a,
