@@ -5,7 +5,6 @@ import numpy as np
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
-from slowquant.qiskit_interface.base import FermionicOperator
 from slowquant.qiskit_interface.linear_response.lr_baseclass import quantumLRBaseClass
 from slowquant.qiskit_interface.operators import (
     hamiltonian_pauli_2i_2a,
