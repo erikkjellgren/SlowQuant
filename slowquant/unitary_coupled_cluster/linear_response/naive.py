@@ -170,8 +170,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
         transition_dipole_x = 0.0
         transition_dipole_y = 0.0
         transition_dipole_z = 0.0
-        transition_dipoles = np.zeros((len(self.Z_G_normed[0]), 3))
-        for state_number in range(len(self.Z_G_normed[0])):
+        transition_dipoles = np.zeros((number_excitations, 3))
+        for state_number in range(number_excitations):
             transfer_op = OperatorHybrid({})
             for i, G in enumerate(self.G_ops):
                 transfer_op += (

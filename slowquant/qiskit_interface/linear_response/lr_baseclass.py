@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 import numpy as np
 import scipy
 from dmdm.util import iterate_t1_sa, iterate_t2_sa  # temporary solution
@@ -139,3 +141,56 @@ class quantumLRBaseClass:
             )
 
         return norms
+
+    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+        raise NotImplementedError
+
+    def get_oscillator_strength(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+        r"""Calculate oscillator strength.
+
+        .. math::
+            f_n = \frac{2}{3}e_n\left|\left<0\left|\hat{\mu}\right|n\left>\right|^2
+
+        Args:
+            dipole_integrals: Dipole integrals (x,y,z) in AO basis.
+
+        Rerturns:
+            Oscillator Strength.
+        """
+        transition_dipoles = self.get_transition_dipole(dipole_integrals)
+        osc_strs = np.zeros(len(transition_dipoles))
+        for idx, (excitation_energy, transition_dipole) in enumerate(
+            zip(self.excitation_energies, transition_dipoles)
+        ):
+            osc_strs[idx] = (
+                2
+                / 3
+                * excitation_energy
+                * (transition_dipole[0] ** 2 + transition_dipole[1] ** 2 + transition_dipole[2] ** 2)
+            )
+        self.oscillator_strengths = osc_strs
+        return osc_strs
+
+    def get_formatted_oscillator_strength(self) -> str:
+        """Create table of excitation energies and oscillator strengths.
+
+        Returns:
+            Nicely formatted table.
+        """
+        if not hasattr(self, "oscillator_strengths"):
+            raise ValueError(
+                "Oscillator strengths have not been calculated. Run get_oscillator_strength() first."
+            )
+
+        output = (
+            "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n"
+        )
+
+        for i, (exc_energy, osc_strength) in enumerate(
+            zip(self.excitation_energies, self.oscillator_strengths)
+        ):
+            exc_str = f"{exc_energy:2.6f}"
+            exc_str_ev = f"{exc_energy*27.2114079527:3.6f}"
+            osc_str = f"{osc_strength:1.6f}"
+            output += f"{str(i+1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
+        return output

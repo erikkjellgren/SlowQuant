@@ -227,9 +227,10 @@ class LinearResponseBaseClass:
                 * excitation_energy
                 * (transition_dipole[0] ** 2 + transition_dipole[1] ** 2 + transition_dipole[2] ** 2)
             )
+        self.oscillator_strengths = osc_strs
         return osc_strs
 
-    def get_nice_output(self, dipole_integrals: Sequence[np.ndarray]) -> str:
+    def get_formatted_oscillator_strength(self) -> str:
         """Create table of excitation energies and oscillator strengths.
 
         Args:
@@ -238,11 +239,19 @@ class LinearResponseBaseClass:
         Returns:
             Nicely formatted table.
         """
+
+        if not hasattr(self, "oscillator_strengths"):
+            raise ValueError(
+                "Oscillator strengths have not been calculated. Run get_oscillator_strength() first."
+            )
+
         output = (
             "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n"
         )
-        osc_strs = self.get_oscillator_strength(dipole_integrals)
-        for i, (exc_energy, osc_strength) in enumerate(zip(self.excitation_energies, osc_strs)):
+
+        for i, (exc_energy, osc_strength) in enumerate(
+            zip(self.excitation_energies, self.oscillator_strengths)
+        ):
             exc_str = f"{exc_energy:2.6f}"
             exc_str_ev = f"{exc_energy*27.2114079527:3.6f}"
             osc_str = f"{osc_strength:1.6f}"
