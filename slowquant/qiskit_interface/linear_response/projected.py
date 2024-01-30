@@ -6,7 +6,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
 from slowquant.qiskit_interface.linear_response.lr_baseclass import quantumLRBaseClass
-from slowquant.qiskit_interface.operators import one_elec_op_pauli_0i_0a
+from slowquant.qiskit_interface.operators import one_elec_op_0i_0a
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_orbital_gradient_response,
@@ -146,9 +146,9 @@ class quantumLR(quantumLRBaseClass):
         mux = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[0])
         muy = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[1])
         muz = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[2])
-        mux_op = one_elec_op_pauli_0i_0a(mux, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-        muy_op = one_elec_op_pauli_0i_0a(muy, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-        muz_op = one_elec_op_pauli_0i_0a(muz, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
+        mux_op = one_elec_op_0i_0a(mux, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
+        muy_op = one_elec_op_0i_0a(muy, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
+        muz_op = one_elec_op_0i_0a(muz, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
 
         transition_dipoles = np.zeros((number_excitations, 3))
         for state_number in range(number_excitations):
