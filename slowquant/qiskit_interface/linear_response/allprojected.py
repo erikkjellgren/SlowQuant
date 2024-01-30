@@ -1,7 +1,6 @@
 from collections.abc import Sequence
 
 import numpy as np
-from dmdm.util import iterate_t1_sa, iterate_t2_sa  # temporary solution
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
