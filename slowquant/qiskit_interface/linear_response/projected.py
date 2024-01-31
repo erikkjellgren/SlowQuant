@@ -182,12 +182,12 @@ class quantumLR(quantumLRBaseClass):
         if cliques:
             for i in range(self.num_params):
                 for j in range(self.num_params):
-                    A[i][j] = make_cliques(A[i][j]).keys()
-                    B[i][j] = make_cliques(B[i][j]).keys()
-                    Sigma[i][j] = make_cliques(Sigma[i][j]).keys()
-                G_exp[i] = make_cliques(G_exp[i]).keys()
-                HG_exp[i] = make_cliques(HG_exp[i]).keys()
-            energy = make_cliques(energy).keys()
+                    A[i][j] = list(make_cliques(A[i][j]).keys())
+                    B[i][j] = list(make_cliques(B[i][j]).keys())
+                    Sigma[i][j] = list(make_cliques(Sigma[i][j]).keys())
+                G_exp[i] = list(make_cliques(G_exp[i]).keys())
+                HG_exp[i] = list(make_cliques(HG_exp[i]).keys())
+            energy = list(make_cliques(energy).keys())
 
         return A, B, Sigma, G_exp, HG_exp, energy
 

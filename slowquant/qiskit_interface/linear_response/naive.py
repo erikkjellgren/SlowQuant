@@ -187,9 +187,9 @@ class quantumLR(quantumLRBaseClass):
         if cliques:
             for i in range(self.num_params):
                 for j in range(self.num_params):
-                    A[i][j] = make_cliques(A[i][j]).keys()
-                    B[i][j] = make_cliques(B[i][j]).keys()
-                    Sigma[i][j] = make_cliques(Sigma[i][j]).keys()
+                    A[i][j] = list(make_cliques(A[i][j]).keys())
+                    B[i][j] = list(make_cliques(B[i][j]).keys())
+                    Sigma[i][j] = list(make_cliques(Sigma[i][j]).keys())
 
         return A, B, Sigma
 
