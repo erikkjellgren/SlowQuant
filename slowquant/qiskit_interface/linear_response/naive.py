@@ -6,6 +6,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
 from slowquant.qiskit_interface.base import FermionicOperator
+from slowquant.qiskit_interface.interface import make_cliques
 from slowquant.qiskit_interface.linear_response.lr_baseclass import quantumLRBaseClass
 from slowquant.qiskit_interface.operators import (
     commutator,
@@ -131,6 +132,7 @@ class quantumLR(quantumLRBaseClass):
 
     def _get_qbitmap(
         self,
+        cliques: bool = True,
     ) -> np.ndarray:
         idx_shift = self.num_q
         print("Gs", self.num_G)
@@ -181,6 +183,13 @@ class quantumLR(quantumLRBaseClass):
                 Sigma[i + idx_shift][j + idx_shift] = Sigma[j + idx_shift][
                     i + idx_shift
                 ] = self.wf.QI.op_to_qbit(commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)).paulis
+
+        if cliques:
+            for i in range(self.num_params):
+                for j in range(self.num_params):
+                    A[i][j] = make_cliques(A[i][j]).keys()
+                    B[i][j] = make_cliques(B[i][j]).keys()
+                    Sigma[i][j] = make_cliques(Sigma[i][j]).keys()
 
         return A, B, Sigma
 
