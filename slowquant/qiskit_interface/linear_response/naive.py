@@ -146,15 +146,23 @@ class quantumLR(quantumLRBaseClass):
         for j, qJ in enumerate(self.q_ops):
             for i, GI in enumerate(self.G_ops):
                 # Make A
-                val = self.wf.QI.op_to_qbit(
-                    (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
-                ) - self.wf.QI.op_to_qbit((self.H_1i_1a * qJ * GI.dagger).get_folded_operator(*self.orbs))
+                val = (
+                    self.wf.QI.op_to_qbit(
+                        (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
+                    ).paulis
+                    + self.wf.QI.op_to_qbit(
+                        (self.H_1i_1a * qJ * GI.dagger).get_folded_operator(*self.orbs)
+                    ).paulis
+                )
                 A[i + idx_shift][j] = A[j][i + idx_shift] = val
                 # Make B
-                val = self.wf.QI.op_to_qbit(
-                    (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs)
-                ) - self.wf.QI.op_to_qbit(
-                    (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                val = (
+                    self.wf.QI.op_to_qbit(
+                        (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs)
+                    ).paulis
+                    + self.wf.QI.op_to_qbit(
+                        (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                    ).paulis
                 )
                 B[i + idx_shift][j] = B[j][i + idx_shift] = val
 
@@ -164,15 +172,15 @@ class quantumLR(quantumLRBaseClass):
                 # Make A
                 A[i + idx_shift][j + idx_shift] = A[j + idx_shift][i + idx_shift] = self.wf.QI.op_to_qbit(
                     double_commutator(GI.dagger, self.H_1i_1a, GJ).get_folded_operator(*self.orbs)
-                )
+                ).paulis
                 # Make B
                 B[i + idx_shift][j + idx_shift] = B[j + idx_shift][i + idx_shift] = self.wf.QI.op_to_qbit(
                     double_commutator(GI.dagger, self.H_1i_1a, GJ.dagger).get_folded_operator(*self.orbs)
-                )
+                ).paulis
                 # Make Sigma
                 Sigma[i + idx_shift][j + idx_shift] = Sigma[j + idx_shift][
                     i + idx_shift
-                ] = self.wf.QI.op_to_qbit(commutator(GI.dagger, GJ).get_folded_operator(*self.orbs))
+                ] = self.wf.QI.op_to_qbit(commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)).paulis
 
         return A, B, Sigma
 
