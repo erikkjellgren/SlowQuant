@@ -123,6 +123,62 @@ class quantumLR(quantumLRBaseClass):
                     j + idx_shift, i + idx_shift
                 ] = GG_exp - (self.G_exp[i] * self.G_exp[j])
 
+    def _get_qbitmap(
+        self,
+    ) -> np.ndarray:
+        idx_shift = self.num_q
+        print("Gs", self.num_G)
+        print("qs", self.num_q)
+
+        ## qq block not possible (yet) as per RDMs
+
+        A = [[0] * self.num_params for _ in range(self.num_params)]
+        B = [[0] * self.num_params for _ in range(self.num_params)]
+        Sigma = [[0] * self.num_params for _ in range(self.num_params)]
+
+        # pre-calculate <0|G|0> and <0|HG|0>
+        G_exp = []  # save and use for properties
+        HG_exp = []
+        for GJ in self.G_ops:
+            G_exp.append(self.wf.QI.op_to_qbit(GJ.get_folded_operator(*self.orbs)).paulis)
+            HG_exp.append(self.wf.QI.op_to_qbit((self.H_0i_0a * GJ).get_folded_operator(*self.orbs)).paulis)
+        energy = self.wf.QI.op_to_qbit((self.H_0i_0a).get_folded_operator(*self.orbs)).paulis
+
+        # Gq
+        for j, qJ in enumerate(self.q_ops):
+            for i, GI in enumerate(self.G_ops):
+                # Make A
+                A[j][i + idx_shift] = A[i + idx_shift][j] = self.wf.QI.op_to_qbit(
+                    (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
+                ).paulis
+                # Make B
+                B[j][i + idx_shift] = B[i + idx_shift][j] = self.wf.QI.op_to_qbit(
+                    (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                ).paulis
+
+        # Calculate Matrices
+        for j, GJ in enumerate(self.G_ops):
+            for i, GI in enumerate(self.G_ops[j:], j):
+                # Make A
+                val = self.wf.QI.op_to_qbit(
+                    (GI.dagger * self.H_0i_0a * GJ).get_folded_operator(*self.orbs)
+                ).paulis
+                GG_exp = self.wf.QI.op_to_qbit((GI.dagger * GJ).get_folded_operator(*self.orbs)).paulis
+                val += GG_exp + energy
+                val += G_exp[i] + HG_exp[j]
+                val += G_exp[i] + G_exp[j] + energy
+                A[i + idx_shift][j + idx_shift] = A[j + idx_shift][i + idx_shift] = val
+                # Make B
+                val = HG_exp[i] + G_exp[j]
+                val += G_exp[i] + G_exp[j] + energy
+                B[i + idx_shift][j + idx_shift] = B[j + idx_shift][i + idx_shift] = val
+                # Make Sigma
+                Sigma[i + idx_shift][j + idx_shift] = Sigma[j + idx_shift][i + idx_shift] = (
+                    GG_exp + G_exp[i] + G_exp[j]
+                )
+
+        return A, B, Sigma, G_exp, HG_exp, energy
+
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.
 
