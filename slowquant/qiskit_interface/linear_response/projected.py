@@ -161,7 +161,7 @@ class quantumLR(quantumLRBaseClass):
                     (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
                 ).paulis
 
-        # Calculate Matrices
+        # GG
         for j, GJ in enumerate(self.G_ops):
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
