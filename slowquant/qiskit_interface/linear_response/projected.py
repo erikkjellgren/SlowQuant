@@ -6,7 +6,10 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
 from slowquant.qiskit_interface.interface import make_cliques
-from slowquant.qiskit_interface.linear_response.lr_baseclass import quantumLRBaseClass
+from slowquant.qiskit_interface.linear_response.lr_baseclass import (
+    get_num_nonCBS,
+    quantumLRBaseClass,
+)
 from slowquant.qiskit_interface.operators import one_elec_op_0i_0a
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
@@ -188,6 +191,10 @@ class quantumLR(quantumLRBaseClass):
                 G_exp[i] = list(make_cliques(G_exp[i]).keys())
                 HG_exp[i] = list(make_cliques(HG_exp[i]).keys())
             energy = list(make_cliques(energy).keys())
+
+            print("Number of non-CBS Pauli strings in A: ", get_num_nonCBS(A))
+            print("Number of non-CBS Pauli strings in B: ", get_num_nonCBS(B))
+            print("Number of non-CBS Pauli strings in Sigma: ", get_num_nonCBS(Sigma))
 
         return A, B, Sigma, G_exp, HG_exp, energy
 

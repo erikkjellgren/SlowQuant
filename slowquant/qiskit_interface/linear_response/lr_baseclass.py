@@ -194,3 +194,17 @@ class quantumLRBaseClass:
             osc_str = f"{osc_strength:1.6f}"
             output += f"{str(i+1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
         return output
+
+
+def get_num_nonCBS(test):
+    count = 0
+    for i in range(2):
+        for j in range(2):
+            for paulis in test[i][j]:
+                if any(letter in paulis for letter in ("X", "Y")):
+                    count += 1
+    return count
+
+
+def contains_letter(s):
+    return any(char.isalpha() for char in s)

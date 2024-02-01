@@ -7,7 +7,10 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.qiskit_interface.base import FermionicOperator
 from slowquant.qiskit_interface.interface import make_cliques
-from slowquant.qiskit_interface.linear_response.lr_baseclass import quantumLRBaseClass
+from slowquant.qiskit_interface.linear_response.lr_baseclass import (
+    get_num_nonCBS,
+    quantumLRBaseClass,
+)
 from slowquant.qiskit_interface.operators import (
     commutator,
     double_commutator,
@@ -190,6 +193,10 @@ class quantumLR(quantumLRBaseClass):
                     A[i][j] = list(make_cliques(A[i][j]).keys())
                     B[i][j] = list(make_cliques(B[i][j]).keys())
                     Sigma[i][j] = list(make_cliques(Sigma[i][j]).keys())
+
+            print("Number of non-CBS Pauli strings in A: ", get_num_nonCBS(A))
+            print("Number of non-CBS Pauli strings in B: ", get_num_nonCBS(B))
+            print("Number of non-CBS Pauli strings in Sigma: ", get_num_nonCBS(Sigma))
 
         return A, B, Sigma
 
