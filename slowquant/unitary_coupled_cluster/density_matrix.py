@@ -161,6 +161,20 @@ def get_electronic_energy(
     num_inactive_orbs: int,
     num_active_orbs: int,
 ) -> float:
+    r"""Calculate electronic energy.
+
+    .. math::
+        E = \sum_{pq}h_{pq}\Gamma^{[1]}_{pq} + \frac{1}{2}\sum_{pqrs}g_{pqrs}\Gamma^{[2]}_{pqrs}
+
+    Args:
+        h_int: One-electron integrals in MO.
+        g_int: Two-electron integrals in MO.
+        num_inactive_orbs: Number of inactive orbitals.
+        num_active_orbs: Number of active orbitals.
+
+    Returns:
+        Electronic energy.
+    """
     energy = 0
     for p in range(num_inactive_orbs + num_active_orbs):
         for q in range(num_inactive_orbs + num_active_orbs):

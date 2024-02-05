@@ -25,9 +25,7 @@ class quantumLR(quantumLRBaseClass):
     def run(
         self,
     ) -> None:
-        """
-        Run simulation of naive LR matrix elements
-        """
+        """Run simulation of naive LR matrix elements."""
         # RDMs
         rdms = ReducedDenstiyMatrix(
             self.wf.num_inactive_orbs,
@@ -111,22 +109,22 @@ class quantumLR(quantumLRBaseClass):
         for j, GJ in enumerate(self.G_ops):
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
-                self.A[i + idx_shift, j + idx_shift] = self.A[
-                    j + idx_shift, i + idx_shift
-                ] = self.wf.QI.quantum_expectation_value(
-                    double_commutator(GI.dagger, self.H_0i_0a, GJ).get_folded_operator(*self.orbs)
+                self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = (
+                    self.wf.QI.quantum_expectation_value(
+                        double_commutator(GI.dagger, self.H_0i_0a, GJ).get_folded_operator(*self.orbs)
+                    )
                 )
                 # Make B
-                self.B[i + idx_shift, j + idx_shift] = self.B[
-                    j + idx_shift, i + idx_shift
-                ] = self.wf.QI.quantum_expectation_value(
-                    double_commutator(GI.dagger, self.H_0i_0a, GJ.dagger).get_folded_operator(*self.orbs)
+                self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = (
+                    self.wf.QI.quantum_expectation_value(
+                        double_commutator(GI.dagger, self.H_0i_0a, GJ.dagger).get_folded_operator(*self.orbs)
+                    )
                 )
                 # Make Sigma
-                self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[
-                    j + idx_shift, i + idx_shift
-                ] = self.wf.QI.quantum_expectation_value(
-                    commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)
+                self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = (
+                    self.wf.QI.quantum_expectation_value(
+                        commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)
+                    )
                 )
 
     def _get_qbitmap(
@@ -136,7 +134,7 @@ class quantumLR(quantumLRBaseClass):
         print("Gs", self.num_G)
         print("qs", self.num_q)
 
-        ## qq block not possible (yet) as per RDMs
+        # qq block not possible (yet) as per RDMs
 
         A = [[0] * self.num_params for _ in range(self.num_params)]
         B = [[0] * self.num_params for _ in range(self.num_params)]
@@ -170,9 +168,9 @@ class quantumLR(quantumLRBaseClass):
                     double_commutator(GI.dagger, self.H_1i_1a, GJ.dagger).get_folded_operator(*self.orbs)
                 )
                 # Make Sigma
-                Sigma[i + idx_shift][j + idx_shift] = Sigma[j + idx_shift][
-                    i + idx_shift
-                ] = self.wf.QI.op_to_qbit(commutator(GI.dagger, GJ).get_folded_operator(*self.orbs))
+                Sigma[i + idx_shift][j + idx_shift] = Sigma[j + idx_shift][i + idx_shift] = (
+                    self.wf.QI.op_to_qbit(commutator(GI.dagger, GJ).get_folded_operator(*self.orbs))
+                )
 
         return A, B, Sigma
 
@@ -185,7 +183,6 @@ class quantumLR(quantumLRBaseClass):
         Returns:
             Transition dipole moment.
         """
-
         if len(dipole_integrals) != 3:
             raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
         number_excitations = len(self.excitation_energies)

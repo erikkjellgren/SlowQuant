@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import time
 from collections.abc import Sequence
@@ -17,6 +19,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_gradient,
 )
 from slowquant.unitary_coupled_cluster.operator_hybrid import (
+    OperatorHybrid,
     epq_hybrid,
     expectation_value_hybrid,
     expectation_value_hybrid_flow,
@@ -30,15 +33,41 @@ from slowquant.unitary_coupled_cluster.operator_pauli import (
 from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_ucc_u
 
 
-def eE(wf, E, p, q):
+def eE(wf: WaveFunctionUCC, E: dict[tuple[int, int], OperatorHybrid], p: int, q: int) -> float:
+    r"""Calcuate expectation value.
+
+    .. math::
+        \left<0\left|\hat{E}_{pq}\right|0\right>
+    """
     return expectation_value_hybrid_flow(wf.state_vector, [E[(p, q)]], wf.state_vector)
 
 
-def eEE(wf, E, p, q, r, s):
+def eEE(
+    wf: WaveFunctionUCC, E: dict[tuple[int, int], OperatorHybrid], p: int, q: int, r: int, s: int
+) -> float:
+    r"""Calcuate expectation value.
+
+    .. math::
+        \left<0\left|\hat{E}_{pq}\hat{E}_{rs}\right|0\right>
+    """
     return expectation_value_hybrid_flow(wf.state_vector, [E[(p, q)], E[(r, s)]], wf.state_vector)
 
 
-def eEEE(wf, E, p, q, r, s, t, u):
+def eEEE(
+    wf: WaveFunctionUCC,
+    E: dict[tuple[int, int], OperatorHybrid],
+    p: int,
+    q: int,
+    r: int,
+    s: int,
+    t: int,
+    u: int,
+) -> float:
+    r"""Calcuate expectation value.
+
+    .. math::
+        \left<0\left|\hat{E}_{pq}\hat{E}_{rs}\hat{E}_{tu}\right|0\right>
+    """
     return expectation_value_hybrid_flow(wf.state_vector, [E[(p, q)], E[(r, s)], E[(t, u)]], wf.state_vector)
 
 
@@ -619,8 +648,8 @@ class WaveFunctionUCC:
                         epq_pauli(p, q, self.num_spin_orbs),
                         self.state_vector,
                     )
-                    self._rdm1[p_idx, q_idx] = val
-                    self._rdm1[q_idx, p_idx] = val
+                    self._rdm1[p_idx, q_idx] = val  # type: ignore
+                    self._rdm1[q_idx, p_idx] = val  # type: ignore
         return self._rdm1
 
     @property
@@ -672,10 +701,10 @@ class WaveFunctionUCC:
                             )
                             if q == r:
                                 val -= self.rdm1[p_idx, s_idx]
-                            self._rdm2[p_idx, q_idx, r_idx, s_idx] = val
-                            self._rdm2[r_idx, s_idx, p_idx, q_idx] = val
-                            self._rdm2[q_idx, p_idx, s_idx, r_idx] = val
-                            self._rdm2[s_idx, r_idx, q_idx, p_idx] = val
+                            self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
+                            self._rdm2[r_idx, s_idx, p_idx, q_idx] = val  # type: ignore
+                            self._rdm2[q_idx, p_idx, s_idx, r_idx] = val  # type: ignore
+                            self._rdm2[s_idx, r_idx, q_idx, p_idx] = val  # type: ignore
         return self._rdm2
 
     @property
@@ -747,18 +776,18 @@ class WaveFunctionUCC:
                                         val += expectation_value_hybrid_flow(
                                             self.state_vector, [E[(p, s)]], self.state_vector
                                         )
-                                    self._rdm3[p_idx, q_idx, r_idx, s_idx, t_idx, u_idx] = val
-                                    self._rdm3[p_idx, q_idx, t_idx, u_idx, r_idx, s_idx] = val
-                                    self._rdm3[r_idx, s_idx, p_idx, q_idx, t_idx, u_idx] = val
-                                    self._rdm3[r_idx, s_idx, t_idx, u_idx, p_idx, q_idx] = val
-                                    self._rdm3[t_idx, u_idx, p_idx, q_idx, r_idx, s_idx] = val
-                                    self._rdm3[t_idx, u_idx, r_idx, s_idx, p_idx, q_idx] = val
-                                    self._rdm3[q_idx, p_idx, s_idx, r_idx, u_idx, t_idx] = val
-                                    self._rdm3[q_idx, p_idx, u_idx, t_idx, s_idx, r_idx] = val
-                                    self._rdm3[s_idx, r_idx, q_idx, p_idx, u_idx, t_idx] = val
-                                    self._rdm3[s_idx, r_idx, u_idx, t_idx, q_idx, p_idx] = val
-                                    self._rdm3[u_idx, t_idx, q_idx, p_idx, s_idx, r_idx] = val
-                                    self._rdm3[u_idx, t_idx, s_idx, r_idx, q_idx, p_idx] = val
+                                    self._rdm3[p_idx, q_idx, r_idx, s_idx, t_idx, u_idx] = val  # type: ignore
+                                    self._rdm3[p_idx, q_idx, t_idx, u_idx, r_idx, s_idx] = val  # type: ignore
+                                    self._rdm3[r_idx, s_idx, p_idx, q_idx, t_idx, u_idx] = val  # type: ignore
+                                    self._rdm3[r_idx, s_idx, t_idx, u_idx, p_idx, q_idx] = val  # type: ignore
+                                    self._rdm3[t_idx, u_idx, p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
+                                    self._rdm3[t_idx, u_idx, r_idx, s_idx, p_idx, q_idx] = val  # type: ignore
+                                    self._rdm3[q_idx, p_idx, s_idx, r_idx, u_idx, t_idx] = val  # type: ignore
+                                    self._rdm3[q_idx, p_idx, u_idx, t_idx, s_idx, r_idx] = val  # type: ignore
+                                    self._rdm3[s_idx, r_idx, q_idx, p_idx, u_idx, t_idx] = val  # type: ignore
+                                    self._rdm3[s_idx, r_idx, u_idx, t_idx, q_idx, p_idx] = val  # type: ignore
+                                    self._rdm3[u_idx, t_idx, q_idx, p_idx, s_idx, r_idx] = val  # type: ignore
+                                    self._rdm3[u_idx, t_idx, s_idx, r_idx, q_idx, p_idx] = val  # type: ignore
         return self._rdm3
 
     @property
@@ -862,148 +891,148 @@ class WaveFunctionUCC:
                                                 val += eEE(self, E, p, u, r, s)
                                             if m == q and t == n and r == u:
                                                 val -= eE(self, E, p, s)
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 p_idx, q_idx, r_idx, s_idx, t_idx, u_idx, m_idx, n_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 p_idx, q_idx, r_idx, s_idx, m_idx, n_idx, t_idx, u_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 p_idx, q_idx, t_idx, u_idx, r_idx, s_idx, m_idx, n_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 p_idx, q_idx, t_idx, u_idx, m_idx, n_idx, r_idx, s_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 p_idx, q_idx, m_idx, n_idx, r_idx, s_idx, t_idx, u_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 p_idx, q_idx, m_idx, n_idx, t_idx, u_idx, r_idx, s_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 r_idx, s_idx, p_idx, q_idx, t_idx, u_idx, m_idx, n_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 r_idx, s_idx, p_idx, q_idx, m_idx, n_idx, t_idx, u_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 r_idx, s_idx, t_idx, u_idx, p_idx, q_idx, m_idx, n_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 r_idx, s_idx, t_idx, u_idx, m_idx, n_idx, p_idx, q_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 r_idx, s_idx, m_idx, n_idx, p_idx, q_idx, t_idx, u_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 r_idx, s_idx, m_idx, n_idx, t_idx, u_idx, p_idx, q_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 t_idx, u_idx, p_idx, q_idx, r_idx, s_idx, m_idx, n_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 t_idx, u_idx, p_idx, q_idx, m_idx, n_idx, r_idx, s_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 t_idx, u_idx, r_idx, s_idx, p_idx, q_idx, m_idx, n_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 t_idx, u_idx, r_idx, s_idx, m_idx, n_idx, p_idx, q_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 t_idx, u_idx, m_idx, n_idx, p_idx, q_idx, r_idx, s_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 t_idx, u_idx, m_idx, n_idx, r_idx, s_idx, p_idx, q_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 m_idx, n_idx, p_idx, q_idx, r_idx, s_idx, t_idx, u_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 m_idx, n_idx, p_idx, q_idx, t_idx, u_idx, r_idx, s_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 m_idx, n_idx, r_idx, s_idx, p_idx, q_idx, t_idx, u_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 m_idx, n_idx, r_idx, s_idx, t_idx, u_idx, p_idx, q_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 m_idx, n_idx, t_idx, u_idx, p_idx, q_idx, r_idx, s_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 m_idx, n_idx, t_idx, u_idx, r_idx, s_idx, p_idx, q_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 q_idx, p_idx, s_idx, r_idx, u_idx, t_idx, n_idx, m_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 q_idx, p_idx, s_idx, r_idx, n_idx, m_idx, u_idx, t_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 q_idx, p_idx, u_idx, t_idx, s_idx, r_idx, n_idx, m_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 q_idx, p_idx, u_idx, t_idx, n_idx, m_idx, s_idx, r_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 q_idx, p_idx, n_idx, m_idx, s_idx, r_idx, u_idx, t_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 q_idx, p_idx, n_idx, m_idx, u_idx, t_idx, s_idx, r_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 s_idx, r_idx, q_idx, p_idx, u_idx, t_idx, n_idx, m_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 s_idx, r_idx, q_idx, p_idx, n_idx, m_idx, u_idx, t_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 s_idx, r_idx, u_idx, t_idx, q_idx, p_idx, n_idx, m_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 s_idx, r_idx, u_idx, t_idx, n_idx, m_idx, q_idx, p_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 s_idx, r_idx, n_idx, m_idx, q_idx, p_idx, u_idx, t_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 s_idx, r_idx, n_idx, m_idx, u_idx, t_idx, q_idx, p_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 u_idx, t_idx, q_idx, p_idx, s_idx, r_idx, n_idx, m_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 u_idx, t_idx, q_idx, p_idx, n_idx, m_idx, s_idx, r_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 u_idx, t_idx, s_idx, r_idx, q_idx, p_idx, n_idx, m_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 u_idx, t_idx, s_idx, r_idx, n_idx, m_idx, q_idx, p_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 u_idx, t_idx, n_idx, m_idx, q_idx, p_idx, s_idx, r_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 u_idx, t_idx, n_idx, m_idx, s_idx, r_idx, q_idx, p_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 n_idx, m_idx, q_idx, p_idx, s_idx, r_idx, u_idx, t_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 n_idx, m_idx, q_idx, p_idx, u_idx, t_idx, s_idx, r_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 n_idx, m_idx, s_idx, r_idx, q_idx, p_idx, u_idx, t_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 n_idx, m_idx, s_idx, r_idx, u_idx, t_idx, q_idx, p_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 n_idx, m_idx, u_idx, t_idx, q_idx, p_idx, s_idx, r_idx
                                             ] = val
-                                            self._rdm4[
+                                            self._rdm4[  # type: ignore
                                                 n_idx, m_idx, u_idx, t_idx, s_idx, r_idx, q_idx, p_idx
                                             ] = val
         return self._rdm4

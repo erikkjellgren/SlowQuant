@@ -1,7 +1,7 @@
 ---
 repos:
   - repo: https://github.com/ambv/black
-    rev: 23.12.1
+    rev: 24.1.1
     hooks:
       - id: black
         additional_dependencies:
@@ -51,4 +51,4 @@ repos:
     hooks:
       - id: pydocstyle
         args:
-          - --ignore=D100,D101,D104,D203,D213,D406,D407,D413,R0915
+          - --ignore=D100,D101,D104,D203,D213,D406,D407,D413

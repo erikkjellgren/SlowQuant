@@ -1,6 +1,3 @@
-# Import PySCF, SlowQuant, DMDM
-import sys
-
 import numpy as np
 import pyscf
 from qiskit.primitives import Estimator, Sampler

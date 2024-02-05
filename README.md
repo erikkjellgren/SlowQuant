@@ -1,5 +1,3 @@
-[![Build Status](https://travis-ci.com/erikkjellgren/SlowQuant.svg?branch=master)](https://travis-ci.com/erikkjellgren/SlowQuant)
-[![Coverage Status](https://coveralls.io/repos/github/erikkjellgren/SlowQuant/badge.svg?branch=master)](https://coveralls.io/github/erikkjellgren/SlowQuant?branch=master)
 [![Documentation Status](https://readthedocs.org/projects/slowquant/badge/?version=latest)](http://slowquant.readthedocs.io/en/latest/?badge=latest)
 
 # SlowQuant
@@ -33,6 +31,7 @@ Just use [PySCF](https://github.com/pyscf/pyscf) instead.
 
 | Feature               | Last living commit                       |
 |-----------------------|------------------------------------------|
+| KS-DFT                | 1b9c5669ab72dfceee0a69c8dca1c67dd4b31bfd |
 | MP2                   | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
 | RPA                   | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
 | Geometry Optimization | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |

@@ -185,8 +185,7 @@ class LinearResponseBaseClass:
         Returns:
             Norm of excited states.
         """
-
-        norms = np.zeros(len(self.response_vectors[0]))  # np.zeros(len(self.Z_G[0]))
+        norms = np.zeros(len(self.response_vectors[0]))
         for state_number in range(len(self.response_vectors[0])):
             # Get Z_q Z_G Y_q and Y_G matrices
             ZZq = np.outer(self.Z_q[:, state_number], self.Z_q[:, state_number].transpose())
@@ -202,6 +201,14 @@ class LinearResponseBaseClass:
         return norms
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+        """Calculate transition dipole moment.
+
+        Args:
+            dipole_integrals: Dipole integrals (x,y,z) in AO basis.
+
+        Returns:
+            Transition dipole moment.
+        """
         raise NotImplementedError
 
     def get_oscillator_strength(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
@@ -239,7 +246,6 @@ class LinearResponseBaseClass:
         Returns:
             Nicely formatted table.
         """
-
         if not hasattr(self, "oscillator_strengths"):
             raise ValueError(
                 "Oscillator strengths have not been calculated. Run get_oscillator_strength() first."

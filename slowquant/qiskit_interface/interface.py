@@ -27,8 +27,7 @@ class QuantumInterface:
         ansatz: str,
         mapper: FermionicMapper,
     ) -> None:
-        """
-        Interface to Qiskit to use IBM quantum hardware or simulator.
+        """Interface to Qiskit to use IBM quantum hardware or simulator.
 
         Args:
             primitive: Qiskit Estimator or Sampler object
@@ -36,15 +35,14 @@ class QuantumInterface:
             mapper: Qiskit mapper object, e.g. JW or Parity
         """
         allowed_ansatz = ["UCCSD", "PUCCD", "UCCD", "ErikD", "ErikSD"]
-        if not ansatz in allowed_ansatz:
+        if ansatz not in allowed_ansatz:
             raise ValueError("The chosen Ansatz is not availbale. Choose from: ", allowed_ansatz)
         self.ansatz = ansatz
         self.primitive = primitive
         self.mapper = mapper
 
     def construct_circuit(self, num_orbs: int, num_parts: int) -> None:
-        """
-        Construct qiskit circuit
+        """Construct qiskit circuit.
 
         Args:
             num_orbs: number of orbitals
@@ -137,11 +135,13 @@ class QuantumInterface:
         self._parameters = parameters.copy()
 
     def op_to_qbit(self, op: FermionicOperator) -> SparsePauliOp:
-        """
-        Fermionic operator to qbit rep
+        """Fermionic operator to qbit rep.
 
         Args:
             op: Operator as SlowQuant's FermionicOperator object
+
+        Returns:
+            Qubit representation of operator.
         """
         return self.mapper.map(FermionicOp(op.get_qiskit_form(self.num_orbs), 2 * self.num_orbs))
 
@@ -198,12 +198,12 @@ class QuantumInterface:
         return values.real
 
     def _sampler_quantum_expectation_value(self, op: FermionicOperator, run_parameters: list[float]) -> float:
-        """Calculate expectation value of circuit and observables via Sampler.
+        r"""Calculate expectation value of circuit and observables via Sampler.
 
         The expectation value over a fermionic operator is calcuated as:
 
         .. math::
-            E = \\sum_i^N c_i\\left<0\\left|P_i\\right|0\\right>
+            E = \sum_i^N c_i\left<0\left|P_i\right|0\right>
 
         With :math:`c_i` being the :math:`i` the coefficient and :math:`P_i` the :math:`i` the Pauli string.
 
@@ -242,12 +242,12 @@ class QuantumInterface:
         return values.real
 
     def _sampler_distributions(self, pauli: Pauli, run_parameters: list[float]) -> dict[str, float]:
-        """Get results from a sampler distribution for one given Pauli string.
+        r"""Get results from a sampler distribution for one given Pauli string.
 
         The expectation value of a Pauli string is calcuated as:
 
         .. math::
-            E = \\sum_i^N p_i\\left<b_i\\left|P\\right|b_i\\right>
+            E = \sum_i^N p_i\left<b_i\left|P\right|b_i\right>
 
         With :math:`p_i` being the :math:`i` th probability and :math:`b_i` being the `i` th bit-string.
 
@@ -259,7 +259,7 @@ class QuantumInterface:
             Probability weighted Pauli string.
         """
         # Create QuantumCircuit
-        ansatz_w_obs = self.circuit.compose(to_CBS_measurement(pauli))
+        ansatz_w_obs = self.circuit.compose(to_cbs_measurement(pauli))
         ansatz_w_obs.measure_all()
 
         # Run sampler
@@ -270,18 +270,18 @@ class QuantumInterface:
         return distr
 
 
-def to_CBS_measurement(op: Pauli) -> QuantumCircuit:
-    """Convert a Pauli string to Pauli measurement circuit.
+def to_cbs_measurement(op: Pauli) -> QuantumCircuit:
+    r"""Convert a Pauli string to Pauli measurement circuit.
 
     This is achived by the following transformation:
 
     .. math::
-        \\begin{align}
-        I &\\rightarrow I\\\\
-        Z &\\rightarrow Z\\\\
-        X &\\rightarrow XH\\\\
-        Y &\\rightarrow YS^{\\dagger}H
-        \\end{align}
+        \begin{align}
+        I &\rightarrow I\\
+        Z &\rightarrow Z\\
+        X &\rightarrow XH\\
+        Y &\rightarrow YS^{\dagger}H
+        \end{align}
 
     Args:
         op: Pauli string operator.
@@ -303,28 +303,28 @@ def to_CBS_measurement(op: Pauli) -> QuantumCircuit:
 
 
 def get_bitstring_sign(op: Pauli, binary: str) -> int:
-    """Convert Pauli string and bit-string measurement to expectation value.
+    r"""Convert Pauli string and bit-string measurement to expectation value.
 
     Takes Pauli String and a state in binary form and returns the sign based on the expectation value of the Pauli string with each single quibit state.
 
     This is achived by using the following evaluations:
 
     .. math::
-        \\begin{align}
-        \\left<0\\left|I\\right|0\\right> &= 1\\\\
-        \\left<1\\left|I\\right|1\\right> &= 1\\\\
-        \\left<0\\left|Z\\right|0\\right> &= 1\\\\
-        \\left<1\\left|Z\\right|1\\right> &= -1\\\\
-        \\left<0\\left|HXH\\right|0\\right> &= 1\\\\
-        \\left<1\\left|HXH\\right|1\\right> &= -1\\\\
-        \\left<0\\left|HSYS^{\\dagger}H\\right|0\\right> &= 1\\\\
-        \\left<1\\left|HSYS^{\\dagger}H\\right|1\\right> &= -1
-        \\end{align}
+        \begin{align}
+        \left<0\left|I\right|0\right> &= 1\\
+        \left<1\left|I\right|1\right> &= 1\\
+        \left<0\left|Z\right|0\right> &= 1\\
+        \left<1\left|Z\right|1\right> &= -1\\
+        \left<0\left|HXH\right|0\right> &= 1\\
+        \left<1\left|HXH\right|1\right> &= -1\\
+        \left<0\left|HSYS^{\dagger}H\right|0\right> &= 1\\
+        \left<1\left|HSYS^{\dagger}H\right|1\right> &= -1
+        \end{align}
 
     The total expectation value is then evaulated as:
 
     .. math::
-        E = \\prod_i^N\\left<b_i\\left|P_{i,T}\\right|b_i\\right>
+        E = \prod_i^N\left<b_i\left|P_{i,T}\right|b_i\right>
 
     With :math:`b_i` being the :math:`i` th bit and :math:`P_{i,T}` being the :math:`i` th proberly transformed Pauli operator.
 

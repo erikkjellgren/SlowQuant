@@ -43,6 +43,7 @@ class WaveFunction:
             c_orthonormal: Initial orbital coefficients.
             h_ao: One-electron integrals in AO for Hamiltonian.
             g_ao: Two-electron integrals in AO.
+            quantum_interface: QuantumInterface.
             include_active_kappa: Include active-active orbital rotations.
         """
         if len(cas) != 2:
@@ -250,10 +251,20 @@ class WaveFunction:
 
     @property
     def ansatz_parameters(self) -> list[float]:
+        """Getter for ansatz parameters.
+
+        Returns:
+            Ansatz parameters.
+        """
         return self.QI.parameters
 
     @ansatz_parameters.setter
     def ansatz_parameters(self, parameters: list[float]) -> None:
+        """Setter for ansatz paramters.
+
+        Args:
+            parameters: New ansatz paramters.
+        """
         self._rdm1 = None
         self._rdm2 = None
         self._rdm3 = None
@@ -263,7 +274,12 @@ class WaveFunction:
 
     @property
     def rdm1(self) -> np.ndarray:
-        """Calcuate one-electron reduced density matrix.
+        r"""Calcuate one-electron reduced density matrix.
+
+        The trace condition is enforced:
+
+        .. math::
+            \sum_i\Gamma^{[1]}_{ii} = N_e
 
         Returns:
             One-electron reduced density matrix.
@@ -280,16 +296,21 @@ class WaveFunction:
                     val = self.QI.quantum_expectation_value(rdm1_op)
                     self._rdm1[p_idx, q_idx] = val
                     self._rdm1[q_idx, p_idx] = val
-            # trace = 0
-            # for i in range(self.num_active_orbs):
-            #    trace += self._rdm1[i, i]
-            # for i in range(self.num_active_orbs):
-            #    self._rdm1[i, i] = self._rdm1[i, i] * self.num_active_elec / trace
+            trace = 0
+            for i in range(self.num_active_orbs):
+                trace += self._rdm1[i, i]
+            for i in range(self.num_active_orbs):
+                self._rdm1[i, i] = self._rdm1[i, i] * self.num_active_elec / trace
         return self._rdm1
 
     @property
     def rdm2(self) -> np.ndarray:
-        """Calcuate two-electron reduced density matrix.
+        r"""Calcuate two-electron reduced density matrix.
+
+        The trace condition is enforced:
+
+        .. math::
+            \sum_{ij}\Gamma^{[2]}_{iijj} = N_e(N_e-1)
 
         Returns:
             Two-electron reduced density matrix.
@@ -329,15 +350,15 @@ class WaveFunction:
                             self._rdm2[r_idx, s_idx, p_idx, q_idx] = val
                             self._rdm2[q_idx, p_idx, s_idx, r_idx] = val
                             self._rdm2[s_idx, r_idx, q_idx, p_idx] = val
-            # trace = 0
-            # for i in range(self.num_active_orbs):
-            #    for j in range(self.num_active_orbs):
-            #        trace += self._rdm2[i, i, j, j]
-            # for i in range(self.num_active_orbs):
-            #    for j in range(self.num_active_orbs):
-            #        self._rdm2[i, i, j, j] = (
-            #            self._rdm2[i, i, j, j] * self.num_active_elec * (self.num_active_elec - 1) / trace
-            #        )
+            trace = 0
+            for i in range(self.num_active_orbs):
+                for j in range(self.num_active_orbs):
+                    trace += self._rdm2[i, i, j, j]
+            for i in range(self.num_active_orbs):
+                for j in range(self.num_active_orbs):
+                    self._rdm2[i, i, j, j] = (
+                        self._rdm2[i, i, j, j] * self.num_active_elec * (self.num_active_elec - 1) / trace
+                    )
         return self._rdm2
 
     def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
@@ -356,6 +377,11 @@ class WaveFunction:
 
     @property
     def energy_elec(self) -> float:
+        """Get electronic energy.
+
+        Returns:
+            Electronic energy.
+        """
         if self._energy_elec is None:
             H = hamiltonian_pauli_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
@@ -379,6 +405,8 @@ class WaveFunction:
 
             Args:
                 x: Wave function parameters.
+                energy_func: Function to calculate energy.
+                silent: Supress print.
             """
             global iteration
             global start
@@ -400,7 +428,9 @@ class WaveFunction:
             """Print progress during energy minimization of wave function.
 
             Args:
-                x: Wave function parameters.
+                theta: Wave function parameters.
+                f_val: Function value at theta.
+                silent: Supress print.
             """
             global iteration
             global start
@@ -531,6 +561,7 @@ class WaveFunction:
 
             Args:
                 x: Wave function parameters.
+                energy_func: Function to calculate energy.
             """
             global iteration
             global start
@@ -550,7 +581,8 @@ class WaveFunction:
             """Print progress during energy minimization of wave function.
 
             Args:
-                x: Wave function parameters.
+                theta: Wave function parameters.
+                f_val: Function value at theta.
             """
             global iteration
             global start
@@ -602,12 +634,33 @@ class WaveFunction:
         self._energy_elec = res.fun
 
 
-def calc_energy_theta(parameters, operator: FermionicOperator, quantum_interface: QuantumInterface) -> float:
+def calc_energy_theta(
+    parameters: list[float], operator: FermionicOperator, quantum_interface: QuantumInterface
+) -> float:
+    """Calculate electronic energy using expectation values.
+
+    Args:
+        paramters: Ansatz paramters.
+        operator: Hamiltonian operator.
+        quantum_interface: QuantumInterface.
+
+    Returns:
+        Electronic energy.
+    """
     quantum_interface.parameters = parameters
     return quantum_interface.quantum_expectation_value(operator)
 
 
-def calc_energy_oo(kappa, wf) -> float:
+def calc_energy_oo(kappa: list[float], wf: WaveFunction) -> float:
+    """Calculate electronic energy using RDMs.
+
+    Args:
+        kappa: Orbital rotation parameters.
+        wf: Wave function object.
+
+    Returns:
+        Electronic energy.
+    """
     kappa_mat = np.zeros_like(wf.c_orthonormal)
     for kappa_val, (p, q) in zip(np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx):
         kappa_mat[p, q] = kappa_val
@@ -636,6 +689,15 @@ def calc_energy_oo(kappa, wf) -> float:
 
 
 def calc_energy_both(parameters, wf) -> float:
+    """Calculate electronic energy.
+
+    Args:
+        parameters: Ansatz and orbital rotation parameters.
+        wf: Wave function object.
+
+    Returns:
+        Electronic energy.
+    """
     kappa = parameters[: len(wf.kappa)]
     theta = parameters[len(wf.kappa) :]
     assert len(theta) == len(wf.ansatz_parameters)
@@ -670,6 +732,7 @@ def orbital_rotation_gradient(
     """Calcuate electronic gradient with respect to orbital rotations.
 
     Args:
+        placeholder: Placeholder for kappa parameters, these are fetched OOP style instead.
         wf: Wave function object.
 
     Return:
@@ -691,27 +754,27 @@ def orbital_rotation_gradient(
 def ansatz_parameters_gradient(
     parameters: list[float], operator, quantum_interface: QuantumInterface
 ) -> np.ndarray:
-    """Calculate gradient with respect to ansatz parameters.
+    r"""Calculate gradient with respect to ansatz parameters.
 
     The gradient is calculated using parameter-shift assuming three eigenvalues of the generators.
     This works for fermionic generators of the type:
 
     .. math::
-        \\hat{G}_{pq} = \\hat{a}^\\dagger_p \\hat{a}_q - \\hat{a}_q^\\dagger \\hat{a}_p
+        \hat{G}_{pq} = \hat{a}^\dagger_p \hat{a}_q - \hat{a}_q^\dagger \hat{a}_p
 
     and,
 
     .. math::
-        \\hat{G}_{pqrs} = \\hat{a}^\\dagger_p \\hat{a}^\\dagger_q \\hat{a}_r \\hat{a}_s - \\hat{a}^\\dagger_s \\hat{a}^\\dagger_r \\hat{a}_p \\hat{a}_q
+        \hat{G}_{pqrs} = \hat{a}^\dagger_p \hat{a}^\dagger_q \hat{a}_r \hat{a}_s - \hat{a}^\dagger_s \hat{a}^\dagger_r \hat{a}_p \hat{a}_q
 
     The parameter-shift rule is implemented as:
 
     .. math::
-        \\begin{align}
-        \\frac{\\partial E(\\boldsymbol{\\theta})}{\\partial \\theta_i} &=
-        \\frac{\\sqrt{2}+1}{2\\sqrt{2}}\\left(E\\left(\\theta_i += \\frac{\\pi}{2} - \\frac{\\pi}{4}\\right) - E\\left(\\theta_i += -\\frac{\\pi}{2} + \\frac{\\pi}{4}\\right)\\right)\\\\
-        &- \\frac{\\sqrt{2}-1}{2\\sqrt{2}}\\left(E\\left(\\theta_i += \\frac{\\pi}{2} + \\frac{\\pi}{4}\\right) - E\\left(\\theta_i += -\\frac{\\pi}{2} - \\frac{\\pi}{4}\\right)\\right)
-        \\end{align}
+        \begin{align}
+        \frac{\partial E(\boldsymbol{\theta})}{\partial \theta_i} &=
+        \frac{\sqrt{2}+1}{2\sqrt{2}}\left(E\left(\theta_i += \frac{\pi}{2} - \frac{\pi}{4}\right) - E\left(\theta_i += -\frac{\\pi}{2} + \frac{\pi}{4}\right)\\right)\\
+        &- \frac{\sqrt{2}-1}{2\sqrt{2}}\left(E\left(\theta_i += \frac{\pi}{2} + \frac{\pi}{4}\right) - E\left(\theta_i += -\frac{\pi}{2} - \frac{\pi}{4}\right)\right)
+        \end{align}
 
 
     #. 10.1088/1367-2630/ac2cb3: Eq. (F14)
@@ -748,6 +811,15 @@ def ansatz_parameters_gradient(
 
 
 def calc_gradient_both(parameters, wf) -> np.ndarray:
+    """Calculate electronic gradient.
+
+    Args:
+        parameters: Ansatz and orbital rotation parameters.
+        wf: Wave function object.
+
+    Returns:
+        Electronic gradient.
+    """
     gradient = np.zeros(len(parameters))
     theta = parameters[len(wf.kappa) :]
     assert len(theta) == len(wf.ansatz_parameters)

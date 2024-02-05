@@ -10,4 +10,5 @@ disable=duplicate-code,
         too-many-branches,
         too-many-instance-attributes,
         too-many-locals,
-        too-many-nested-blocks
+        too-many-nested-blocks,
+        too-many-statements

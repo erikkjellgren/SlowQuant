@@ -13,7 +13,6 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_response_hessian_block,
     get_orbital_response_metric_sigma,
     get_orbital_response_property_gradient,
-    get_orbital_response_vector_norm,
 )
 from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
     LinearResponseBaseClass,
@@ -124,12 +123,12 @@ class LinearResponseUCC(LinearResponseBaseClass):
                         self.csf, [GI.dagger, self.U.dagger, qJ.dagger, self.H_1i_1a], self.wf.state_vector
                     )  # added an assumed zero (approximation)
                     # Make B
-                    self.B_tracked[j, i + idx_shift] = self.B_tracked[
-                        i + idx_shift, j
-                    ] = -expectation_value_hybrid_flow(
-                        self.csf,
-                        [GI.dagger, self.U.dagger, qJ.dagger, self.H_1i_1a],
-                        self.wf.state_vector,
+                    self.B_tracked[j, i + idx_shift] = self.B_tracked[i + idx_shift, j] = (
+                        -expectation_value_hybrid_flow(
+                            self.csf,
+                            [GI.dagger, self.U.dagger, qJ.dagger, self.H_1i_1a],
+                            self.wf.state_vector,
+                        )
                     )
                 else:
                     # Make A

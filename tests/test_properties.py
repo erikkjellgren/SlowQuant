@@ -19,9 +19,7 @@ def test_properties_h2o_sto3g() -> None:
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
     A.init_properties()
-    assert_allclose(
-        A.properties.get_dipole_moment(A.hartree_fock.rdm1), [0, 0.603521296525, 0], atol=10**-6
-    )
+    assert_allclose(A.properties.get_dipole_moment(A.hartree_fock.rdm1), [0, 0.603521296525, 0], atol=10**-6)
 
 
 def test_properties_h2o_dz() -> None:
@@ -40,9 +38,7 @@ def test_properties_h2o_dz() -> None:
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
     A.init_properties()
-    assert_allclose(
-        A.properties.get_dipole_moment(A.hartree_fock.rdm1), [0, 1.070995737060, 0], atol=10**-6
-    )
+    assert_allclose(A.properties.get_dipole_moment(A.hartree_fock.rdm1), [0, 1.070995737060, 0], atol=10**-6)
 
 
 def test_properties_h2o_dzp() -> None:

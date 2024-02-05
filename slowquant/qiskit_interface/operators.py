@@ -4,10 +4,10 @@ from slowquant.qiskit_interface.base import FermionicOperator, a_op
 
 
 def Epq(p: int, q: int) -> FermionicOperator:
-    """Construct the singlet one-electron excitation operator.
+    r"""Construct the singlet one-electron excitation operator.
 
     .. math::
-        \\hat{E}_{pq} = \\hat{a}^\\dagger_{p,\\alpha}\\hat{a}_{q,\\alpha} + \\hat{a}^\\dagger_{p,\\beta}\\hat{a}_{q,\\beta}
+        \hat{E}_{pq} = \hat{a}^\dagger_{p,\alpha}\hat{a}_{q,\alpha} + \hat{a}^\dagger_{p,\beta}\hat{a}_{q,\beta}
 
     Args:
         p: Spatial orbital index.
@@ -26,10 +26,10 @@ def Epq(p: int, q: int) -> FermionicOperator:
 
 
 def epqrs(p: int, q: int, r: int, s: int) -> FermionicOperator:
-    """Construct the singlet two-electron excitation operator.
+    r"""Construct the singlet two-electron excitation operator.
 
     .. math::
-        \\hat{e}_{pqrs} = \\hat{E}_{pq}\\hat{E}_{rs} - \\delta_{qr}\\hat{E}_{ps}
+        \hat{e}_{pqrs} = \hat{E}_{pq}\hat{E}_{rs} - \delta_{qr}\hat{E}_{ps}
 
     Args:
         p: Spatial orbital index.
@@ -46,10 +46,10 @@ def epqrs(p: int, q: int, r: int, s: int) -> FermionicOperator:
 
 
 def Eminuspq(p: int, q: int) -> FermionicOperator:
-    """Construct Hermitian singlet one-electron excitation operator.
+    r"""Construct Hermitian singlet one-electron excitation operator.
 
     .. math::
-        \\hat{E}^-_{pq} = \\hat{E}_{pq} - \\hat{E}_{qp}
+        \hat{E}^-_{pq} = \hat{E}_{pq} - \hat{E}_{qp}
 
     Args:
         p: Spatial orbital index.
@@ -62,10 +62,10 @@ def Eminuspq(p: int, q: int) -> FermionicOperator:
 
 
 def commutator(A: FermionicOperator, B: FermionicOperator) -> FermionicOperator:
-    """Construct operator commutator.
+    r"""Construct operator commutator.
 
     .. math::
-        \\left[\\hat{A},\\hat{B}\\right] = \\hat{A}\\hat{B} - \\hat{B}\\hat{A}
+        \left[\hat{A},\hat{B}\right] = \hat{A}\hat{B} - \hat{B}\hat{A}
 
     Args:
         A: Fermionic operator.
@@ -78,10 +78,10 @@ def commutator(A: FermionicOperator, B: FermionicOperator) -> FermionicOperator:
 
 
 def double_commutator(A: FermionicOperator, B: FermionicOperator, C: FermionicOperator) -> FermionicOperator:
-    """Construct operator double commutator.
+    r"""Construct operator double commutator.
 
     .. math::
-        \\left[\\hat{A},\\left[\\hat{B},\\hat{C}\\right]\\right] = \\hat{A}\\hat{B}\\hat{C} - \\hat{A}\\hat{C}\\hat{B} - \\hat{B}\\hat{C}\\hat{A} + \\hat{C}\\hat{B}\\hat{A}
+        \left[\hat{A},\left[\hat{B},\hat{C}\right]\right] = \hat{A}\hat{B}\hat{C} - \hat{A}\hat{C}\hat{B} - \hat{B}\hat{C}\hat{A} + \hat{C}\hat{B}\hat{A}
 
     Args:
         A: Fermionic operator.
@@ -95,10 +95,10 @@ def double_commutator(A: FermionicOperator, B: FermionicOperator, C: FermionicOp
 
 
 def G1(i: int, a: int) -> FermionicOperator:
-    """Construct singlet one-electron spin-adapted excitation operator.
+    r"""Construct singlet one-electron spin-adapted excitation operator.
 
     .. math::
-        \\hat{G}^{[1]}_{ia} = \\frac{1}{\\sqrt{2}}\\hat{E}_{ai}
+        \hat{G}^{[1]}_{ia} = \frac{1}{\sqrt{2}}\hat{E}_{ai}
 
     Args:
         i: Spatial orbital index.
@@ -110,10 +110,10 @@ def G1(i: int, a: int) -> FermionicOperator:
 
 
 def G2_1(i: int, j: int, a: int, b: int) -> FermionicOperator:
-    """Construct first singlet two-electron spin-adapted excitation operator.
+    r"""Construct first singlet two-electron spin-adapted excitation operator.
 
     .. math::
-        \\hat{G}^{[1]}_{aibj} = \\frac{1}{2\\sqrt{\\left(1+\\delta_{ab}\\right)\\left(1+\\delta_{ij}\\right)}}\\left(\\hat{E}_{ai}\\hat{E}_{bj} + \\hat{E}_{aj}\\hat{E}_{bi}\\right)
+        \hat{G}^{[1]}_{aibj} = \frac{1}{2\sqrt{\left(1+\delta_{ab}\right)\left(1+\delta_{ij}\right)}}\left(\hat{E}_{ai}\hat{E}_{bj} + \hat{E}_{aj}\hat{E}_{bi}\right)
 
     Args:
         i: Spatial orbital index.
@@ -132,10 +132,10 @@ def G2_1(i: int, j: int, a: int, b: int) -> FermionicOperator:
 
 
 def G2_2(i: int, j: int, a: int, b: int) -> FermionicOperator:
-    """Construct second singlet two-electron spin-adapted excitation operator.
+    r"""Construct second singlet two-electron spin-adapted excitation operator.
 
     .. math::
-        \\hat{G}^{[2]}_{aibj} = \\frac{1}{2\\sqrt{3}}\\left(\\hat{E}_{ai}\\hat{E}_{bj} - \\hat{E}_{aj}\\hat{E}_{bi}\\right)
+        \hat{G}^{[2]}_{aibj} = \frac{1}{2\sqrt{3}}\left(\hat{E}_{ai}\hat{E}_{bj} - \hat{E}_{aj}\hat{E}_{bi}\right)
 
     Args:
         i: Spatial orbital index.
@@ -149,10 +149,10 @@ def G2_2(i: int, j: int, a: int, b: int) -> FermionicOperator:
 
 
 def hamiltonian_full_space(h_mo: np.ndarray, g_mo: np.ndarray, num_orbs: int) -> FermionicOperator:
-    """Construct full-space electronic Hamiltonian.
+    r"""Construct full-space electronic Hamiltonian.
 
     .. math::
-        \\hat{H} = \\sum_{pq}h_{pq}\\hat{E}_{pq} + \\frac{1}{2}\\sum_{pqrs}g_{pqrs}\\hat{e}_{pqrs}
+        \hat{H} = \sum_{pq}h_{pq}\hat{E}_{pq} + \frac{1}{2}\sum_{pqrs}g_{pqrs}\hat{e}_{pqrs}
 
     Args:
         h_mo: Core one-electron integrals in MO basis.
@@ -369,10 +369,10 @@ def hamiltonian_pauli_2i_2a(
 
 
 def one_elec_op_full_space(ints_mo: np.ndarray, num_orbs: int) -> FermionicOperator:
-    """Construct full-space one-electron operator.
+    r"""Construct full-space one-electron operator.
 
     .. math::
-        \\hat{O} = \\sum_{pq}h_{pq}\\hat{E}_{pq}
+        \hat{O} = \sum_{pq}h_{pq}\hat{E}_{pq}
 
     Args:
         ints_mo: One-electron integrals for operator in MO basis.

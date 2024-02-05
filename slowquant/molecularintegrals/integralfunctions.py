@@ -184,10 +184,28 @@ def hermite_multipole_integral(
 
 
 def one_electron_integral_transform(C: np.ndarray, int1e: np.ndarray) -> np.ndarray:
+    """Transform one-electron integrals from AO to MO.
+
+    Args:
+        C: MO coefficients.
+        int1e: One-electron integrals in AO.
+
+    Returns:
+        One-electron integrals in MO.
+    """
     return np.einsum("ai,bj,ab->ij", C, C, int1e, optimize=["einsum_path", (0, 2), (0, 1)])
 
 
 def two_electron_integral_transform(C: np.ndarray, int2e: np.ndarray) -> np.ndarray:
+    """Transform two-electron integrals from AO to MO.
+
+    Args:
+        C: MO coefficients.
+        int2e: Two-electron integrals in AO.
+
+    Returns:
+        Two-electron integrals in MO.
+    """
     return np.einsum(
         "ai,bj,ck,dl,abcd->ijkl", C, C, C, C, int2e, optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)]
     )

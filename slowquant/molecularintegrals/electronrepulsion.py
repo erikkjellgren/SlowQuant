@@ -77,30 +77,30 @@ def electron_repulsion_integral_driver(
                     end_idx3 = shell3.bf_idx[-1] + 1
                     start_idx4 = shell4.bf_idx[0]
                     end_idx4 = shell4.bf_idx[-1] + 1
-                    V[
-                        start_idx1:end_idx1, start_idx2:end_idx2, start_idx3:end_idx3, start_idx4:end_idx4
-                    ] = V_slice
-                    V[
-                        start_idx2:end_idx2, start_idx1:end_idx1, start_idx3:end_idx3, start_idx4:end_idx4
-                    ] = V_slice.transpose([1, 0, 2, 3])
-                    V[
-                        start_idx1:end_idx1, start_idx2:end_idx2, start_idx4:end_idx4, start_idx3:end_idx3
-                    ] = V_slice.transpose([0, 1, 3, 2])
-                    V[
-                        start_idx2:end_idx2, start_idx1:end_idx1, start_idx4:end_idx4, start_idx3:end_idx3
-                    ] = V_slice.transpose([1, 0, 3, 2])
-                    V[
-                        start_idx3:end_idx3, start_idx4:end_idx4, start_idx1:end_idx1, start_idx2:end_idx2
-                    ] = V_slice.transpose([2, 3, 0, 1])
-                    V[
-                        start_idx3:end_idx3, start_idx4:end_idx4, start_idx2:end_idx2, start_idx1:end_idx1
-                    ] = V_slice.transpose([2, 3, 1, 0])
-                    V[
-                        start_idx4:end_idx4, start_idx3:end_idx3, start_idx1:end_idx1, start_idx2:end_idx2
-                    ] = V_slice.transpose([3, 2, 0, 1])
-                    V[
-                        start_idx4:end_idx4, start_idx3:end_idx3, start_idx2:end_idx2, start_idx1:end_idx1
-                    ] = V_slice.transpose([3, 2, 1, 0])
+                    V[start_idx1:end_idx1, start_idx2:end_idx2, start_idx3:end_idx3, start_idx4:end_idx4] = (
+                        V_slice
+                    )
+                    V[start_idx2:end_idx2, start_idx1:end_idx1, start_idx3:end_idx3, start_idx4:end_idx4] = (
+                        V_slice.transpose([1, 0, 2, 3])
+                    )
+                    V[start_idx1:end_idx1, start_idx2:end_idx2, start_idx4:end_idx4, start_idx3:end_idx3] = (
+                        V_slice.transpose([0, 1, 3, 2])
+                    )
+                    V[start_idx2:end_idx2, start_idx1:end_idx1, start_idx4:end_idx4, start_idx3:end_idx3] = (
+                        V_slice.transpose([1, 0, 3, 2])
+                    )
+                    V[start_idx3:end_idx3, start_idx4:end_idx4, start_idx1:end_idx1, start_idx2:end_idx2] = (
+                        V_slice.transpose([2, 3, 0, 1])
+                    )
+                    V[start_idx3:end_idx3, start_idx4:end_idx4, start_idx2:end_idx2, start_idx1:end_idx1] = (
+                        V_slice.transpose([2, 3, 1, 0])
+                    )
+                    V[start_idx4:end_idx4, start_idx3:end_idx3, start_idx1:end_idx1, start_idx2:end_idx2] = (
+                        V_slice.transpose([3, 2, 0, 1])
+                    )
+                    V[start_idx4:end_idx4, start_idx3:end_idx3, start_idx2:end_idx2, start_idx1:end_idx1] = (
+                        V_slice.transpose([3, 2, 1, 0])
+                    )
     return V
 
 

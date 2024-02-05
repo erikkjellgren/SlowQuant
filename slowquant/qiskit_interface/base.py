@@ -116,7 +116,7 @@ def do_extended_normal_ordering(
                         factor *= -1
                         changed = True
                 elif a.dagger and not b.dagger:
-                    None
+                    pass
                 else:
                     if a.idx == b.idx:
                         is_zero = True
@@ -146,6 +146,12 @@ class FermionicOperator:
     def __init__(
         self, annihilation_operator: dict[str, list[a_op]] | a_op, factor: dict[str, float] | float
     ) -> None:
+        """Initialize fermionic operator class.
+
+        Args:
+            annihilation_operator: Annihilation operator.
+            factor: Factor in front of operator.
+        """
         if isinstance(annihilation_operator, dict) and not isinstance(factor, dict):
             raise ValueError(f"factor cannot be {type(factor)} when annihilation_operator is dict")
         if not isinstance(annihilation_operator, dict) and isinstance(factor, float):
@@ -161,6 +167,14 @@ class FermionicOperator:
             self.factors = factor
 
     def __add__(self, fermistring: FermionicOperator) -> FermionicOperator:
+        """Addition of two fermionic operators.
+
+        Args:
+            fermistring: Fermionic operator.
+
+        Returns:
+            New fermionic operator.
+        """
         operators = copy.copy(self.operators)
         factors = copy.copy(self.factors)
         for string_key in fermistring.operators.keys():
@@ -175,6 +189,14 @@ class FermionicOperator:
         return FermionicOperator(operators, factors)
 
     def __sub__(self, fermistring: FermionicOperator) -> FermionicOperator:
+        """Subtraction of two fermionic operators.
+
+        Args:
+            fermistring: Fermionic operator.
+
+        Returns:
+            New fermionic operator.
+        """
         operators = copy.copy(self.operators)
         factors = copy.copy(self.factors)
         for string_key in fermistring.operators.keys():
@@ -189,6 +211,14 @@ class FermionicOperator:
         return FermionicOperator(operators, factors)
 
     def __mul__(self, fermistring: FermionicOperator) -> FermionicOperator:
+        """Multiplication of two fermionic operators.
+
+        Args:
+            fermistring: Fermionic operator.
+
+        Returns:
+            New fermionic operator.
+        """
         operators = {}
         factors = {}
         for string_key1 in fermistring.operators.keys():
@@ -206,7 +236,7 @@ class FermionicOperator:
                         },
                     )
                 )
-                for str_key in new_ops.keys():
+                for str_key in new_ops:  # pylint: disable=C0206
                     if str_key not in operators.keys():
                         operators[str_key] = new_ops[str_key]
                         factors[str_key] = new_facs[str_key]
@@ -218,6 +248,14 @@ class FermionicOperator:
         return FermionicOperator(operators, factors)
 
     def __rmul__(self, number: float) -> FermionicOperator:
+        """Multiplication of number with fermionic operator.
+
+        Args:
+            number: Number.
+
+        Returns:
+            New fermionic operator.
+        """
         operators = {}
         factors = {}
         for key_string in self.operators:
@@ -227,6 +265,11 @@ class FermionicOperator:
 
     @property
     def dagger(self) -> FermionicOperator:
+        """Complex conjugation of fermionic operator.
+
+        Returns:
+            New fermionic operator.
+        """
         operators = {}
         factors = {}
         for key_string in self.operators.keys():

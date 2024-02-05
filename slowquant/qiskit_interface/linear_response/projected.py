@@ -20,9 +20,7 @@ class quantumLR(quantumLRBaseClass):
     def run(
         self,
     ) -> None:
-        """
-        Run simulation of projected LR matrix elements
-        """
+        """Run simulation of projected LR matrix elements."""
         # RDMs
         rdms = ReducedDenstiyMatrix(
             self.wf.num_inactive_orbs,
@@ -119,9 +117,9 @@ class quantumLR(quantumLRBaseClass):
                 val -= self.G_exp[i] * self.G_exp[j] * self.wf.energy_elec
                 self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
                 # Make Sigma
-                self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[
-                    j + idx_shift, i + idx_shift
-                ] = GG_exp - (self.G_exp[i] * self.G_exp[j])
+                self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = (
+                    GG_exp - (self.G_exp[i] * self.G_exp[j])
+                )
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.

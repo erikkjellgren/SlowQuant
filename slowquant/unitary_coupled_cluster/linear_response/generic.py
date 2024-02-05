@@ -13,7 +13,6 @@ from slowquant.unitary_coupled_cluster.operator_hybrid import (
     OperatorHybridData,
     convert_pauli_to_hybrid_form,
     expectation_value_hybrid,
-    expectation_value_hybrid_flow,
     expectation_value_hybrid_flow_commutator,
     expectation_value_hybrid_flow_double_commutator,
     hamiltonian_hybrid_2i_2a,
@@ -34,6 +33,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
         do_transform_orbital_rotations: bool = False,
         is_spin_conserving: bool = True,
     ) -> None:
+        """Initialize generic linear response."""
         super().__init__(wave_function, excitations, is_spin_conserving)
 
         if operator_type.lower() not in ("naive", "projected", "selfconsistent", "statetransfer"):
@@ -186,30 +186,30 @@ class LinearResponseUCC(LinearResponseBaseClass):
         for j, GJ in enumerate(self.G_ops):
             for i, qI in enumerate(self.q_ops):
                 # Make A
-                self.A[i, j + idx_shift] = self.A[
-                    j + idx_shift, i
-                ] = expectation_value_hybrid_flow_double_commutator(
-                    self.wf.state_vector,
-                    GJ,
-                    self.H_1i_1a,
-                    qI.dagger,
-                    self.wf.state_vector,
+                self.A[i, j + idx_shift] = self.A[j + idx_shift, i] = (
+                    expectation_value_hybrid_flow_double_commutator(
+                        self.wf.state_vector,
+                        GJ,
+                        self.H_1i_1a,
+                        qI.dagger,
+                        self.wf.state_vector,
+                    )
                 )
                 # Make B
-                self.B[i, j + idx_shift] = self.B[
-                    j + idx_shift, i
-                ] = expectation_value_hybrid_flow_double_commutator(
-                    self.wf.state_vector,
-                    GJ.dagger,
-                    self.H_1i_1a,
-                    qI.dagger,
-                    self.wf.state_vector,
+                self.B[i, j + idx_shift] = self.B[j + idx_shift, i] = (
+                    expectation_value_hybrid_flow_double_commutator(
+                        self.wf.state_vector,
+                        GJ.dagger,
+                        self.H_1i_1a,
+                        qI.dagger,
+                        self.wf.state_vector,
+                    )
                 )
                 # Make Sigma
-                self.Sigma[i, j + idx_shift] = self.Sigma[
-                    j + idx_shift, i
-                ] = expectation_value_hybrid_flow_commutator(
-                    self.wf.state_vector, qI.dagger, GJ, self.wf.state_vector
+                self.Sigma[i, j + idx_shift] = self.Sigma[j + idx_shift, i] = (
+                    expectation_value_hybrid_flow_commutator(
+                        self.wf.state_vector, qI.dagger, GJ, self.wf.state_vector
+                    )
                 )
                 # Make Delta
                 self.Delta[i, j + idx_shift] = expectation_value_hybrid_flow_commutator(
@@ -219,30 +219,30 @@ class LinearResponseUCC(LinearResponseBaseClass):
         for j, GJ in enumerate(self.G_ops):
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
-                self.A[i + idx_shift, j + idx_shift] = self.A[
-                    j + idx_shift, i + idx_shift
-                ] = expectation_value_hybrid_flow_double_commutator(
-                    self.wf.state_vector,
-                    GI.dagger,
-                    self.H_0i_0a,
-                    GJ,
-                    self.wf.state_vector,
+                self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = (
+                    expectation_value_hybrid_flow_double_commutator(
+                        self.wf.state_vector,
+                        GI.dagger,
+                        self.H_0i_0a,
+                        GJ,
+                        self.wf.state_vector,
+                    )
                 )
                 # Make B
-                self.B[i + idx_shift, j + idx_shift] = self.B[
-                    j + idx_shift, i + idx_shift
-                ] = expectation_value_hybrid_flow_double_commutator(
-                    self.wf.state_vector,
-                    GI.dagger,
-                    self.H_0i_0a,
-                    GJ.dagger,
-                    self.wf.state_vector,
+                self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = (
+                    expectation_value_hybrid_flow_double_commutator(
+                        self.wf.state_vector,
+                        GI.dagger,
+                        self.H_0i_0a,
+                        GJ.dagger,
+                        self.wf.state_vector,
+                    )
                 )
                 # Make Sigma
-                self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[
-                    j + idx_shift, i + idx_shift
-                ] = expectation_value_hybrid_flow_commutator(
-                    self.wf.state_vector, GI.dagger, GJ, self.wf.state_vector
+                self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = (
+                    expectation_value_hybrid_flow_commutator(
+                        self.wf.state_vector, GI.dagger, GJ, self.wf.state_vector
+                    )
                 )
                 # Make Delta
                 self.Delta[i + idx_shift, j + idx_shift] = expectation_value_hybrid_flow_commutator(

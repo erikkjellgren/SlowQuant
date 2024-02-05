@@ -135,10 +135,10 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 )
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
                 # Make B
-                self.B[i + idx_shift, j + idx_shift] = self.B[
-                    j + idx_shift, i + idx_shift
-                ] = -expectation_value_hybrid_flow(
-                    self.csf, [GI.dagger, GJ.dagger, self.U.dagger, self.H_0i_0a], self.wf.state_vector
+                self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = (
+                    -expectation_value_hybrid_flow(
+                        self.csf, [GI.dagger, GJ.dagger, self.U.dagger, self.H_0i_0a], self.wf.state_vector
+                    )
                 )
                 # Make Sigma
                 if i == j:
