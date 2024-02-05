@@ -137,9 +137,9 @@ class quantumLR(quantumLRBaseClass):
 
         ## qq block not implemented yet
 
-        A = [[0] * self.num_params for _ in range(self.num_params)]
-        B = [[0] * self.num_params for _ in range(self.num_params)]
-        Sigma = [[0] * self.num_params for _ in range(self.num_params)]
+        A = [[""] * self.num_params for _ in range(self.num_params)]
+        B = [[""] * self.num_params for _ in range(self.num_params)]
+        Sigma = [[""] * self.num_params for _ in range(self.num_params)]
 
         # pre-calculate <0|G|0> and <0|HG|0>
         G_exp = []  # save and use for properties
@@ -180,10 +180,13 @@ class quantumLR(quantumLRBaseClass):
 
         if cliques:
             for i in range(self.num_params):
-                for j in range(self.num_params):
-                    A[i][j] = list(make_cliques(A[i][j]).keys())
-                    B[i][j] = list(make_cliques(B[i][j]).keys())
-                    Sigma[i][j] = list(make_cliques(Sigma[i][j]).keys())
+                for j in range(i, self.num_params):
+                    if not A[i][j] == "":
+                        A[i][j] = list(make_cliques(A[i][j]).keys())
+                    if not B[i][j] == "":
+                        B[i][j] = list(make_cliques(B[i][j]).keys())
+                    if not Sigma[i][j] == "":
+                        Sigma[i][j] = list(make_cliques(Sigma[i][j]).keys())
 
             print("Number of non-CBS Pauli strings in A: ", get_num_nonCBS(A))
             print("Number of non-CBS Pauli strings in B: ", get_num_nonCBS(B))

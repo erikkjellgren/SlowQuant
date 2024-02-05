@@ -137,9 +137,9 @@ class quantumLR(quantumLRBaseClass):
 
         ## qq block not possible (yet) as per RDMs
 
-        A = [[0] * self.num_params for _ in range(self.num_params)]
-        B = [[0] * self.num_params for _ in range(self.num_params)]
-        Sigma = [[0] * self.num_params for _ in range(self.num_params)]
+        A = [[""] * self.num_params for _ in range(self.num_params)]
+        B = [[""] * self.num_params for _ in range(self.num_params)]
+        Sigma = [[""] * self.num_params for _ in range(self.num_params)]
 
         # pre-calculate <0|G|0> and <0|HG|0>
         G_exp = []  # save and use for properties
@@ -184,19 +184,19 @@ class quantumLR(quantumLRBaseClass):
 
         if cliques:
             for i in range(self.num_params):
-                for j in range(self.num_params):
-                    A[i][j] = list(make_cliques(A[i][j]).keys())
-                    B[i][j] = list(make_cliques(B[i][j]).keys())
-                    Sigma[i][j] = list(make_cliques(Sigma[i][j]).keys())
-                G_exp[i] = list(make_cliques(G_exp[i]).keys())
-                HG_exp[i] = list(make_cliques(HG_exp[i]).keys())
-            energy = list(make_cliques(energy).keys())
+                for j in range(i, self.num_params):
+                    if not A[i][j] == "":
+                        A[i][j] = list(make_cliques(A[i][j]).keys())
+                    if not B[i][j] == "":
+                        B[i][j] = list(make_cliques(B[i][j]).keys())
+                    if not Sigma[i][j] == "":
+                        Sigma[i][j] = list(make_cliques(Sigma[i][j]).keys())
 
             print("Number of non-CBS Pauli strings in A: ", get_num_nonCBS(A))
             print("Number of non-CBS Pauli strings in B: ", get_num_nonCBS(B))
             print("Number of non-CBS Pauli strings in Sigma: ", get_num_nonCBS(Sigma))
 
-        return A, B, Sigma, G_exp, HG_exp, energy
+        return A, B, Sigma
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.

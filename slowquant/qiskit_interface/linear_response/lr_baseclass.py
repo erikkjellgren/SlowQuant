@@ -196,15 +196,12 @@ class quantumLRBaseClass:
         return output
 
 
-def get_num_nonCBS(test):
+def get_num_nonCBS(matrix):
     count = 0
-    for i in range(2):
-        for j in range(2):
-            for paulis in test[i][j]:
+    dim = len(matrix[0])
+    for i in range(dim):
+        for j in range(dim):
+            for paulis in matrix[i][j]:
                 if any(letter in paulis for letter in ("X", "Y")):
                     count += 1
     return count
-
-
-def contains_letter(s):
-    return any(char.isalpha() for char in s)
