@@ -4,6 +4,7 @@ from functools import partial
 
 import numpy as np
 import scipy
+from qiskit.primitives import BaseEstimator, BaseSampler
 from qiskit_algorithms.optimizers import COBYLA, L_BFGS_B, QNSPSA, SLSQP, SPSA
 
 from slowquant.molecularintegrals.integralfunctions import (
@@ -260,6 +261,14 @@ class WaveFunction:
         self._rdm4 = None
         self._energy_elec = None
         self.QI.parameters = parameters
+
+    def change_primitive(self, primitive: BaseEstimator | BaseSampler) -> None:
+        self._rdm1 = None
+        self._rdm2 = None
+        self._rdm3 = None
+        self._rdm4 = None
+        self._energy_elec = None
+        self.QI._primitive = primitive
 
     @property
     def rdm1(self) -> np.ndarray:
