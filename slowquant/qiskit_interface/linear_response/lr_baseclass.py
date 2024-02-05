@@ -200,8 +200,25 @@ def get_num_nonCBS(matrix):
     count = 0
     dim = len(matrix[0])
     for i in range(dim):
-        for j in range(dim):
+        for j in range(i, dim):
             for paulis in matrix[i][j]:
                 if any(letter in paulis for letter in ("X", "Y")):
                     count += 1
     return count
+
+
+def get_num_CBS_elements(matrix):
+    count_CBS = 0
+    count_nCBS = 0
+    dim = len(matrix[0])
+    for i in range(dim):
+        for j in range(i, dim):
+            count_IM = 0
+            for paulis in matrix[i][j]:
+                if any(letter in paulis for letter in ("X", "Y")):
+                    count_IM += 1
+            if count_IM == 0 and not matrix[i][j] == "":
+                count_CBS += 1
+            elif count_IM > 0 and not matrix[i][j] == "":
+                count_nCBS += 1
+    return count_CBS, count_nCBS

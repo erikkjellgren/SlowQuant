@@ -7,6 +7,7 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.qiskit_interface.interface import make_cliques
 from slowquant.qiskit_interface.linear_response.lr_baseclass import (
+    get_num_CBS_elements,
     get_num_nonCBS,
     quantumLRBaseClass,
 )
@@ -184,7 +185,7 @@ class quantumLR(quantumLRBaseClass):
 
         if cliques:
             for i in range(self.num_params):
-                for j in range(i, self.num_params):
+                for j in range(self.num_params):
                     if not A[i][j] == "":
                         A[i][j] = list(make_cliques(A[i][j]).keys())
                     if not B[i][j] == "":
@@ -195,6 +196,13 @@ class quantumLR(quantumLRBaseClass):
             print("Number of non-CBS Pauli strings in A: ", get_num_nonCBS(A))
             print("Number of non-CBS Pauli strings in B: ", get_num_nonCBS(B))
             print("Number of non-CBS Pauli strings in Sigma: ", get_num_nonCBS(Sigma))
+
+            CBS, nonCBS = get_num_CBS_elements(A)
+            print("In A    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
+            CBS, nonCBS = get_num_CBS_elements(B)
+            print("In B    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
+            CBS, nonCBS = get_num_CBS_elements(Sigma)
+            print("In Sigma, number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
 
         return A, B, Sigma
 
