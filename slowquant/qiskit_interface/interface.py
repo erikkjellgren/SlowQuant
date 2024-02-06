@@ -38,7 +38,7 @@ class QuantumInterface:
         if ansatz not in allowed_ansatz:
             raise ValueError("The chosen Ansatz is not availbale. Choose from: ", allowed_ansatz)
         self.ansatz = ansatz
-        self.primitive = primitive
+        self._primitive = primitive
         self.mapper = mapper
 
     def construct_circuit(self, num_orbs: int, num_parts: int) -> None:
@@ -162,12 +162,12 @@ class QuantumInterface:
             run_parameters = custom_parameters
 
         # Check if estimator or sampler
-        if isinstance(self.primitive, BaseEstimator):
+        if isinstance(self._primitive, BaseEstimator):
             return self._estimator_quantum_expectation_value(op, run_parameters)
-        if isinstance(self.primitive, BaseSampler):
+        if isinstance(self._primitive, BaseSampler):
             return self._sampler_quantum_expectation_value(op, run_parameters)
         raise ValueError(
-            "The Quantum Interface was initiated with an unknown Qiskit primitive, {type(self.primitive)}"
+            "The Quantum Interface was initiated with an unknown Qiskit primitive, {type(self._primitive)}"
         )
 
     def _estimator_quantum_expectation_value(
@@ -182,7 +182,7 @@ class QuantumInterface:
         Returns:
             Expectation value of operator.
         """
-        job = self.primitive.run(
+        job = self._primitive.run(
             circuits=self.circuit,
             parameter_values=run_parameters,
             observables=self.op_to_qbit(op),
@@ -262,7 +262,7 @@ class QuantumInterface:
         ansatz_w_obs.measure_all()
 
         # Run sampler
-        job = self.primitive.run(ansatz_w_obs, parameter_values=run_parameters)
+        job = self._primitive.run(ansatz_w_obs, parameter_values=run_parameters)
 
         # Get quasi-distribution in binary probabilities
         distr = job.result().quasi_dists[0].binary_probabilities()
