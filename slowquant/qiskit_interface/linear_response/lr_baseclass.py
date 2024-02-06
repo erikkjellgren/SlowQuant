@@ -201,7 +201,15 @@ class quantumLRBaseClass:
         return output
 
 
-def get_num_nonCBS(matrix):
+def get_num_nonCBS(matrix: list[list[str]]) -> int:
+    """Count number of non computational basis measurements in operator matrix.
+
+    Args:
+        matrix: Operator matrix.
+
+    Returns:
+        Number of non computational basis measurements.
+    """
     count = 0
     dim = len(matrix[0])
     for i in range(dim):
@@ -212,7 +220,15 @@ def get_num_nonCBS(matrix):
     return count
 
 
-def get_num_CBS_elements(matrix):
+def get_num_CBS_elements(matrix: list[list[str]]) -> tuple[int, int]:
+    """Count number of computational basis measurements and non computational basis measurements in operator matrix.
+
+    Args:
+        matrix: Operator matrix.
+
+    Returns:
+        Number of computational basis measurements and non computational basis measurements.
+    """
     count_CBS = 0
     count_nCBS = 0
     dim = len(matrix[0])

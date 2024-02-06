@@ -129,12 +129,20 @@ class quantumLR(quantumLRBaseClass):
     def _get_qbitmap(
         self,
         cliques: bool = True,
-    ) -> np.ndarray:
+    ) -> tuple[list[list[str]], list[list[str]], list[list[str]]]:
+        """Get qubit map of operators.
+
+        Args:
+            cliques: If using cliques.
+
+        Returns:
+            Qubit map of operators.
+        """
         idx_shift = self.num_q
         print("Gs", self.num_G)
         print("qs", self.num_q)
 
-        ## qq block not possible (yet) as per RDMs
+        # qq block not possible (yet) as per RDMs
 
         A = [[""] * self.num_params for _ in range(self.num_params)]
         B = [[""] * self.num_params for _ in range(self.num_params)]
@@ -185,11 +193,12 @@ class quantumLR(quantumLRBaseClass):
             for i in range(self.num_params):
                 for j in range(self.num_params):
                     if not A[i][j] == "":
-                        A[i][j] = list(make_cliques(A[i][j]).keys())
+                        A[i][j] = list(make_cliques(A[i][j]).keys())  # type: ignore [call-overload]
                     if not B[i][j] == "":
-                        B[i][j] = list(make_cliques(B[i][j]).keys())
+                        B[i][j] = list(make_cliques(B[i][j]).keys())  # type: ignore [call-overload]
+
                     if not Sigma[i][j] == "":
-                        Sigma[i][j] = list(make_cliques(Sigma[i][j]).keys())
+                        Sigma[i][j] = list(make_cliques(Sigma[i][j]).keys())  # type: ignore [call-overload]
 
             print("Number of non-CBS Pauli strings in A: ", get_num_nonCBS(A))
             print("Number of non-CBS Pauli strings in B: ", get_num_nonCBS(B))

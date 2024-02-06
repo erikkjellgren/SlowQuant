@@ -135,7 +135,15 @@ class quantumLR(quantumLRBaseClass):
     def _get_qbitmap(
         self,
         cliques: bool = True,
-    ) -> np.ndarray:
+    ) -> tuple[list[list[str]], list[list[str]], list[list[str]]]:
+        """Get qubit map of operators.
+
+        Args:
+            cliques: If using cliques.
+
+        Returns:
+            Qubit map of operators.
+        """
         idx_shift = self.num_q
         print("Gs", self.num_G)
         print("qs", self.num_q)
@@ -182,19 +190,19 @@ class quantumLR(quantumLRBaseClass):
                     double_commutator(GI.dagger, self.H_1i_1a, GJ.dagger).get_folded_operator(*self.orbs)
                 ).paulis
                 # Make Sigma
-                Sigma[i + idx_shift][j + idx_shift] = Sigma[j + idx_shift][
-                    i + idx_shift
-                ] = self.wf.QI.op_to_qbit(commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)).paulis
+                Sigma[i + idx_shift][j + idx_shift] = Sigma[j + idx_shift][i + idx_shift] = (
+                    self.wf.QI.op_to_qbit(commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)).paulis
+                )
 
         if cliques:
             for i in range(self.num_params):
                 for j in range(self.num_params):
                     if not A[i][j] == "":
-                        A[i][j] = list(make_cliques(A[i][j]).keys())
+                        A[i][j] = list(make_cliques(A[i][j]).keys())  # type: ignore [call-overload]
                     if not B[i][j] == "":
-                        B[i][j] = list(make_cliques(B[i][j]).keys())
+                        B[i][j] = list(make_cliques(B[i][j]).keys())  # type: ignore [call-overload]
                     if not Sigma[i][j] == "":
-                        Sigma[i][j] = list(make_cliques(Sigma[i][j]).keys())
+                        Sigma[i][j] = list(make_cliques(Sigma[i][j]).keys())  # type: ignore [call-overload]
 
             print("Number of non-CBS Pauli strings in A: ", get_num_nonCBS(A))
             print("Number of non-CBS Pauli strings in B: ", get_num_nonCBS(B))
