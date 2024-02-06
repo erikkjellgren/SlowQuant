@@ -194,3 +194,31 @@ class quantumLRBaseClass:
             osc_str = f"{osc_strength:1.6f}"
             output += f"{str(i+1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
         return output
+
+
+def get_num_nonCBS(matrix):
+    count = 0
+    dim = len(matrix[0])
+    for i in range(dim):
+        for j in range(i, dim):
+            for paulis in matrix[i][j]:
+                if any(letter in paulis for letter in ("X", "Y")):
+                    count += 1
+    return count
+
+
+def get_num_CBS_elements(matrix):
+    count_CBS = 0
+    count_nCBS = 0
+    dim = len(matrix[0])
+    for i in range(dim):
+        for j in range(i, dim):
+            count_IM = 0
+            for paulis in matrix[i][j]:
+                if any(letter in paulis for letter in ("X", "Y")):
+                    count_IM += 1
+            if count_IM == 0 and not matrix[i][j] == "":
+                count_CBS += 1
+            elif count_IM > 0 and not matrix[i][j] == "":
+                count_nCBS += 1
+    return count_CBS, count_nCBS
