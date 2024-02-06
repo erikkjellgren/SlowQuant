@@ -1,3 +1,4 @@
+# type: ignore
 import numpy as np
 
 import slowquant.SlowQuant as sq

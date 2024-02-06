@@ -228,8 +228,8 @@ def expectation_value_hybrid_flow(
             }
         )
     for operator in operators:
-        state_vector = state_vector * operator
-    return state_vector * ref_vector
+        state_vector = state_vector * operator  # type: ignore [assignment]
+    return state_vector * ref_vector  # type: ignore [return-value]
 
 
 def expectation_value_hybrid_flow_commutator(

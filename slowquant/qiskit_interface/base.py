@@ -62,7 +62,7 @@ def operator_to_qiskit_key(operator_string: list[a_op], remapping: dict[int, int
 
 def do_extended_normal_ordering(
     fermistring: FermionicOperator,
-) -> tuple[dict[str, float], dict[str, list[a_op]]]:
+) -> tuple[dict[str, list[a_op]], dict[str, float]]:
     """Reorder fermionic operator string.
 
     The string will be ordered such that all creation operators are first,
@@ -156,15 +156,19 @@ class FermionicOperator:
             raise ValueError(f"factor cannot be {type(factor)} when annihilation_operator is dict")
         if not isinstance(annihilation_operator, dict) and isinstance(factor, float):
             raise ValueError(f"factor cannot be dict when annihilation_operator is {type(a_op)}")
-        if not isinstance(annihilation_operator, dict):
+        if not isinstance(annihilation_operator, dict) and not isinstance(factor, dict):
             string_key = operator_string_to_key([annihilation_operator])
             self.operators = {}
             self.operators[string_key] = [annihilation_operator]
             self.factors = {}
             self.factors[string_key] = factor
-        if isinstance(annihilation_operator, dict) and isinstance(factor, dict):
+        elif isinstance(annihilation_operator, dict) and isinstance(factor, dict):
             self.operators = annihilation_operator
             self.factors = factor
+        else:
+            raise ValueError(
+                f"Could not assign operator of {type(annihilation_operator)} with factor of {type(factor)}"
+            )
 
     def __add__(self, fermistring: FermionicOperator) -> FermionicOperator:
         """Addition of two fermionic operators.
@@ -219,8 +223,8 @@ class FermionicOperator:
         Returns:
             New fermionic operator.
         """
-        operators = {}
-        factors = {}
+        operators: dict[str, list[a_op]] = {}
+        factors: dict[str, float] = {}
         for string_key1 in fermistring.operators.keys():
             for string_key2 in self.operators.keys():
                 new_ops, new_facs = do_extended_normal_ordering(
@@ -340,7 +344,7 @@ class FermionicOperator:
            Folded fermionic operator.
         """
         operators = {}
-        factors = {}
+        factors: dict[str, float] = {}
         inactive_idx = []
         active_idx = []
         virtual_idx = []

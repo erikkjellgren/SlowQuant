@@ -1099,10 +1099,10 @@ class WaveFunctionUCC:
             time_str = f"{time.time() - start:7.2f}"  # type: ignore
             e_str = f"{e_tot(x):3.12f}"
             print(f"{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
-            iteration += 1  # type: ignore
-            if iteration > 500:
+            iteration += 1  # type: ignore [name-defined]
+            if iteration > 500:  # type: ignore [name-defined]
                 raise ValueError("Did not converge in 500 iterations in energy minimization.")
-            start = time.time()  # type: ignore
+            start = time.time()  # type: ignore [name-defined]
 
         def silent_progress(x: Sequence[float]) -> None:  # pylint: disable=unused-argument
             """Print progress during energy minimization of wave function.
@@ -1111,8 +1111,8 @@ class WaveFunctionUCC:
                 x: Wave function parameters.
             """
             global iteration  # pylint: disable=global-variable-undefined
-            iteration += 1  # type: ignore
-            if iteration > 500:
+            iteration += 1  # type: ignore [name-defined]
+            if iteration > 500:  # type: ignore [name-defined]
                 raise ValueError("Did not converge in 500 iterations in energy minimization.")
 
         parameters: list[float] = []
@@ -1540,7 +1540,7 @@ def active_space_parameter_gradient(
     eps = np.finfo(np.float64).eps ** (1 / 2)
     E = expectation_value_hybrid(wf.state_vector, Hamiltonian, wf.state_vector)
     for i, _ in enumerate(theta_params):
-        sign_step = (theta_params[i] >= 0).astype(float) * 2 - 1
+        sign_step = (theta_params[i] >= 0).astype(float) * 2 - 1  # type: ignore [attr-defined]
         step_size = eps * sign_step * max(1, abs(theta_params[i]))
         theta_params[i] += step_size
         theta_dict = {}

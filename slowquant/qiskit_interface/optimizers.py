@@ -8,10 +8,10 @@ import scipy
 class Result:
     """Result class for optimizers."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize result class."""
-        self.x: np.ndarray | None = None
-        self.fun: float | None = None
+        self.x: np.ndarray
+        self.fun: float
 
 
 class RotoSolve:
@@ -70,7 +70,7 @@ class RotoSolve:
         Returns:
             Minimization results.
         """
-        f_best = 10**20
+        f_best = float(10**20)
         x_best = x.copy()
         fails = 0
         res = Result()

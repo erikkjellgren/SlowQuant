@@ -74,6 +74,7 @@ class WaveFunction:
         self._rdm4 = None
         self._h_mo = None
         self._g_mo = None
+        self.do_trace_corrected = True
         active_space = []
         orbital_counter = 0
         for i in range(num_elec - cas[0], num_elec):
@@ -182,7 +183,7 @@ class WaveFunction:
                     self.kappa_hf_like_idx.append([p, q])
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     self.kappa_hf_like_idx.append([p, q])
-        self._energy_elec = None
+        self._energy_elec: float | None = None
         # Setup Qiskit stuff
         self.QI = quantum_interface
         self.QI.construct_circuit(self.num_active_orbs, self.num_active_elec)
@@ -308,13 +309,14 @@ class WaveFunction:
                         self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                     )
                     val = self.QI.quantum_expectation_value(rdm1_op)
-                    self._rdm1[p_idx, q_idx] = val
-                    self._rdm1[q_idx, p_idx] = val
-            trace = 0
-            for i in range(self.num_active_orbs):
-                trace += self._rdm1[i, i]
-            for i in range(self.num_active_orbs):
-                self._rdm1[i, i] = self._rdm1[i, i] * self.num_active_elec / trace
+                    self._rdm1[p_idx, q_idx] = val  # type: ignore [index]
+                    self._rdm1[q_idx, p_idx] = val  # type: ignore [index]
+            if self.do_trace_corrected:
+                trace = 0.0
+                for i in range(self.num_active_orbs):
+                    trace += self._rdm1[i, i]  # type: ignore [index]
+                for i in range(self.num_active_orbs):
+                    self._rdm1[i, i] = self._rdm1[i, i] * self.num_active_elec / trace  # type: ignore [index]
         return self._rdm1
 
     @property
@@ -360,19 +362,20 @@ class WaveFunction:
                             val = self.QI.quantum_expectation_value(pdm2_op)
                             if q == r:
                                 val -= self.rdm1[p_idx, s_idx]
-                            self._rdm2[p_idx, q_idx, r_idx, s_idx] = val
-                            self._rdm2[r_idx, s_idx, p_idx, q_idx] = val
-                            self._rdm2[q_idx, p_idx, s_idx, r_idx] = val
-                            self._rdm2[s_idx, r_idx, q_idx, p_idx] = val
-            trace = 0
-            for i in range(self.num_active_orbs):
-                for j in range(self.num_active_orbs):
-                    trace += self._rdm2[i, i, j, j]
-            for i in range(self.num_active_orbs):
-                for j in range(self.num_active_orbs):
-                    self._rdm2[i, i, j, j] = (
-                        self._rdm2[i, i, j, j] * self.num_active_elec * (self.num_active_elec - 1) / trace
-                    )
+                            self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore [index]
+                            self._rdm2[r_idx, s_idx, p_idx, q_idx] = val  # type: ignore [index]
+                            self._rdm2[q_idx, p_idx, s_idx, r_idx] = val  # type: ignore [index]
+                            self._rdm2[s_idx, r_idx, q_idx, p_idx] = val  # type: ignore [index]
+            if self.do_trace_corrected:
+                trace = 0.0
+                for i in range(self.num_active_orbs):
+                    for j in range(self.num_active_orbs):
+                        trace += self._rdm2[i, i, j, j]  # type: ignore [index]
+                for i in range(self.num_active_orbs):
+                    for j in range(self.num_active_orbs):
+                        self._rdm2[i, i, j, j] = (  # type: ignore [index]
+                            self._rdm2[i, i, j, j] * self.num_active_elec * (self.num_active_elec - 1) / trace  # type: ignore [index]
+                        )
         return self._rdm2
 
     def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
@@ -424,11 +427,11 @@ class WaveFunction:
             """
             global iteration  # pylint: disable=global-variable-undefined
             global start  # pylint: disable=global-variable-undefined
-            time_str = f"{time.time() - start:7.2f}"  # pylint: disable=used-before-assignment
+            time_str = f"{time.time() - start:7.2f}"  # type: ignore [name-defined] # pylint: disable=used-before-assignment
             if not silent:
                 e_str = f"{energy_func(x):3.16f}"
                 print(
-                    f"--------{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}"  # pylint: disable=used-before-assignment
+                    f"--------{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}"  # type: ignore [name-defined] # pylint: disable=used-before-assignment
                 )
             iteration += 1  # type: ignore
             start = time.time()  # type: ignore
