@@ -6,7 +6,12 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
 from slowquant.qiskit_interface.base import FermionicOperator
-from slowquant.qiskit_interface.linear_response.lr_baseclass import quantumLRBaseClass
+from slowquant.qiskit_interface.interface import make_cliques
+from slowquant.qiskit_interface.linear_response.lr_baseclass import (
+    get_num_CBS_elements,
+    get_num_nonCBS,
+    quantumLRBaseClass,
+)
 from slowquant.qiskit_interface.operators import (
     commutator,
     double_commutator,
@@ -129,6 +134,7 @@ class quantumLR(quantumLRBaseClass):
 
     def _get_qbitmap(
         self,
+        cliques: bool = True,
     ) -> np.ndarray:
         idx_shift = self.num_q
         print("Gs", self.num_G)
@@ -136,23 +142,31 @@ class quantumLR(quantumLRBaseClass):
 
         # qq block not possible (yet) as per RDMs
 
-        A = [[0] * self.num_params for _ in range(self.num_params)]
-        B = [[0] * self.num_params for _ in range(self.num_params)]
-        Sigma = [[0] * self.num_params for _ in range(self.num_params)]
+        A = [[""] * self.num_params for _ in range(self.num_params)]
+        B = [[""] * self.num_params for _ in range(self.num_params)]
+        Sigma = [[""] * self.num_params for _ in range(self.num_params)]
 
         # Gq
         for j, qJ in enumerate(self.q_ops):
             for i, GI in enumerate(self.G_ops):
                 # Make A
-                val = self.wf.QI.op_to_qbit(
-                    (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
-                ) - self.wf.QI.op_to_qbit((self.H_1i_1a * qJ * GI.dagger).get_folded_operator(*self.orbs))
+                val = (
+                    self.wf.QI.op_to_qbit(
+                        (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
+                    ).paulis
+                    + self.wf.QI.op_to_qbit(
+                        (self.H_1i_1a * qJ * GI.dagger).get_folded_operator(*self.orbs)
+                    ).paulis
+                )
                 A[i + idx_shift][j] = A[j][i + idx_shift] = val
                 # Make B
-                val = self.wf.QI.op_to_qbit(
-                    (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs)
-                ) - self.wf.QI.op_to_qbit(
-                    (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                val = (
+                    self.wf.QI.op_to_qbit(
+                        (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs)
+                    ).paulis
+                    + self.wf.QI.op_to_qbit(
+                        (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                    ).paulis
                 )
                 B[i + idx_shift][j] = B[j][i + idx_shift] = val
 
@@ -162,15 +176,36 @@ class quantumLR(quantumLRBaseClass):
                 # Make A
                 A[i + idx_shift][j + idx_shift] = A[j + idx_shift][i + idx_shift] = self.wf.QI.op_to_qbit(
                     double_commutator(GI.dagger, self.H_1i_1a, GJ).get_folded_operator(*self.orbs)
-                )
+                ).paulis
                 # Make B
                 B[i + idx_shift][j + idx_shift] = B[j + idx_shift][i + idx_shift] = self.wf.QI.op_to_qbit(
                     double_commutator(GI.dagger, self.H_1i_1a, GJ.dagger).get_folded_operator(*self.orbs)
-                )
+                ).paulis
                 # Make Sigma
-                Sigma[i + idx_shift][j + idx_shift] = Sigma[j + idx_shift][i + idx_shift] = (
-                    self.wf.QI.op_to_qbit(commutator(GI.dagger, GJ).get_folded_operator(*self.orbs))
-                )
+                Sigma[i + idx_shift][j + idx_shift] = Sigma[j + idx_shift][
+                    i + idx_shift
+                ] = self.wf.QI.op_to_qbit(commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)).paulis
+
+        if cliques:
+            for i in range(self.num_params):
+                for j in range(self.num_params):
+                    if not A[i][j] == "":
+                        A[i][j] = list(make_cliques(A[i][j]).keys())
+                    if not B[i][j] == "":
+                        B[i][j] = list(make_cliques(B[i][j]).keys())
+                    if not Sigma[i][j] == "":
+                        Sigma[i][j] = list(make_cliques(Sigma[i][j]).keys())
+
+            print("Number of non-CBS Pauli strings in A: ", get_num_nonCBS(A))
+            print("Number of non-CBS Pauli strings in B: ", get_num_nonCBS(B))
+            print("Number of non-CBS Pauli strings in Sigma: ", get_num_nonCBS(Sigma))
+
+            CBS, nonCBS = get_num_CBS_elements(A)
+            print("In A    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
+            CBS, nonCBS = get_num_CBS_elements(B)
+            print("In B    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
+            CBS, nonCBS = get_num_CBS_elements(Sigma)
+            print("In Sigma, number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
 
         return A, B, Sigma
 

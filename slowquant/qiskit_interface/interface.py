@@ -258,7 +258,7 @@ class QuantumInterface:
             Probability weighted Pauli string.
         """
         # Create QuantumCircuit
-        ansatz_w_obs = self.circuit.compose(to_cbs_measurement(pauli))
+        ansatz_w_obs = self.circuit.compose(to_CBS_measurement(pauli))
         ansatz_w_obs.measure_all()
 
         # Run sampler
@@ -269,7 +269,7 @@ class QuantumInterface:
         return distr
 
 
-def to_cbs_measurement(op: Pauli) -> QuantumCircuit:
+def to_CBS_measurement(op: Pauli) -> QuantumCircuit:
     r"""Convert a Pauli string to Pauli measurement circuit.
 
     This is achived by the following transformation:
