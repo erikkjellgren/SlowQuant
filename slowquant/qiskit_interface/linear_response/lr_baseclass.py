@@ -15,6 +15,7 @@ from slowquant.qiskit_interface.wavefunction import WaveFunction
 
 
 class quantumLRBaseClass:
+
     def __init__(
         self,
         wf: WaveFunction,
@@ -36,8 +37,8 @@ class quantumLRBaseClass:
         for a, i, _, _, _ in iterate_t1_sa(wf.active_occ_idx, wf.active_unocc_idx):
             self.G_ops.append(G1(a, i))
         # G2
-        for a, i, b, j, _, _, id in iterate_t2_sa(wf.active_occ_idx, wf.active_unocc_idx):
-            if id > 0:
+        for a, i, b, j, _, _, op_id in iterate_t2_sa(wf.active_occ_idx, wf.active_unocc_idx):
+            if op_id > 0:
                 # G2_1
                 self.G_ops.append(G2_1(a, b, i, j))
             else:
@@ -65,6 +66,7 @@ class quantumLRBaseClass:
         raise NotImplementedError
 
     def _get_qbitmap(self) -> np.ndarray:
+        """Get qbitmapping of operators."""
         raise NotImplementedError
 
     def get_excitation_energies(self) -> np.ndarray:

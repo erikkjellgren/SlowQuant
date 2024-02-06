@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 from __future__ import annotations
 
 import os
@@ -1082,8 +1083,8 @@ class WaveFunctionUCC:
             orbital_optimized=orbital_optimization,
             wf=self,
         )
-        global iteration
-        global start
+        global iteration  # pylint: disable=global-variable-undefined
+        global start  # pylint: disable=global-variable-undefined
         iteration = 0  # type: ignore
         start = time.time()  # type: ignore
 
@@ -1093,8 +1094,8 @@ class WaveFunctionUCC:
             Args:
                 x: Wave function parameters.
             """
-            global iteration
-            global start
+            global iteration  # pylint: disable=global-variable-undefined
+            global start  # pylint: disable=global-variable-undefined
             time_str = f"{time.time() - start:7.2f}"  # type: ignore
             e_str = f"{e_tot(x):3.12f}"
             print(f"{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
@@ -1103,13 +1104,13 @@ class WaveFunctionUCC:
                 raise ValueError("Did not converge in 500 iterations in energy minimization.")
             start = time.time()  # type: ignore
 
-        def silent_progress(x: Sequence[float]) -> None:
+        def silent_progress(x: Sequence[float]) -> None:  # pylint: disable=unused-argument
             """Print progress during energy minimization of wave function.
 
             Args:
                 x: Wave function parameters.
             """
-            global iteration
+            global iteration  # pylint: disable=global-variable-undefined
             iteration += 1  # type: ignore
             if iteration > 500:
                 raise ValueError("Did not converge in 500 iterations in energy minimization.")
@@ -1214,10 +1215,10 @@ class WaveFunctionUCC:
         param_idx = 0
         if orbital_optimization:
             param_idx += len(self.kappa)
-            for i in range(len(self.kappa)):
+            for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
                 self.kappa[i] = 0
                 self._kappa_old[i] = 0
-            for i in range(len(self.kappa_redundant)):
+            for i in range(len(self.kappa_redundant)):  # pylint: disable=consider-using-enumerate
                 self.kappa_redundant[i] = 0
                 self._kappa_redundant_old[i] = 0
         if "s" in excitations:
@@ -1359,20 +1360,24 @@ def energy_ucc(
 
     kappa_mat = np.zeros_like(wf.c_orthonormal)
     if orbital_optimized:
-        for kappa_val, (p, q) in zip(np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx):
+        for kappa_val, (p, q) in zip(
+            np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx  # pylint: disable=protected-access
+        ):
             kappa_mat[p, q] = kappa_val
             kappa_mat[q, p] = -kappa_val
     if len(wf.kappa_redundant) != 0:
         if np.max(np.abs(wf.kappa_redundant)) > 0.0:
             for kappa_val, (p, q) in zip(
-                np.array(wf.kappa_redundant) - np.array(wf._kappa_redundant_old), wf.kappa_redundant_idx
+                np.array(wf.kappa_redundant)
+                - np.array(wf._kappa_redundant_old),  # pylint: disable=protected-access
+                wf.kappa_redundant_idx,
             ):
                 kappa_mat[p, q] = kappa_val
                 kappa_mat[q, p] = -kappa_val
     c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
     if orbital_optimized:
-        wf._kappa_old = kappa.copy()
-        wf._kappa_redundant_old = wf.kappa_redundant.copy()
+        wf._kappa_old = kappa.copy()  # pylint: disable=protected-access
+        wf._kappa_redundant_old = wf.kappa_redundant.copy()  # pylint: disable=protected-access
     # Moving expansion point of kappa
     wf.c_orthonormal = c_trans
     # Add thetas
@@ -1623,7 +1628,7 @@ def load_wavefunction(filename: str) -> WaveFunctionUCC:
     if len(dat["theta6"]) > 0:
         if np.max(np.abs(dat["theta6"])) > 10**-6:
             excitations += "6"
-    wf._excitations = excitations
+    wf._excitations = excitations  # pylint: disable=protected-access
     wf.add_multiple_theta(
         {
             "theta1": list(dat["theta1"]),
@@ -1633,22 +1638,22 @@ def load_wavefunction(filename: str) -> WaveFunctionUCC:
             "theta5": list(dat["theta5"]),
             "theta6": list(dat["theta6"]),
         },
-        wf._excitations,
+        wf._excitations,  # pylint: disable=protected-access
     )
     thetas = []
-    if "s" in wf._excitations:
+    if "s" in wf._excitations:  # pylint: disable=protected-access
         thetas += wf.theta1
-    if "d" in wf._excitations:
+    if "d" in wf._excitations:  # pylint: disable=protected-access
         thetas += wf.theta2
-    if "t" in wf._excitations:
+    if "t" in wf._excitations:  # pylint: disable=protected-access
         thetas += wf.theta3
-    if "q" in wf._excitations:
+    if "q" in wf._excitations:  # pylint: disable=protected-access
         thetas += wf.theta4
-    if "5" in wf._excitations:
+    if "5" in wf._excitations:  # pylint: disable=protected-access
         thetas += wf.theta5
-    if "6" in wf._excitations:
+    if "6" in wf._excitations:  # pylint: disable=protected-access
         thetas += wf.theta6
-    energy = energy_ucc(thetas, wf._excitations, False, wf)
+    energy = energy_ucc(thetas, wf._excitations, False, wf)  # pylint: disable=protected-access
     if abs(energy - float(dat["energy_elec"])) > 10**-6:
         raise ValueError(
             f'Calculate energy is different from saved energy: {energy} and {float(dat["energy_elec"])}.'

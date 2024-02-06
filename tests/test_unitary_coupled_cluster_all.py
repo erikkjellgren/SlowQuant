@@ -1,15 +1,15 @@
 import numpy as np
 
 import slowquant.SlowQuant as sq
-import slowquant.unitary_coupled_cluster.linear_response.allprojected as allprojected
-import slowquant.unitary_coupled_cluster.linear_response.allselfconsistent as allselfconsistent
-import slowquant.unitary_coupled_cluster.linear_response.allstatetransfer as allstatetransfer
-import slowquant.unitary_coupled_cluster.linear_response.generic as generic
-import slowquant.unitary_coupled_cluster.linear_response.naive as naive
-import slowquant.unitary_coupled_cluster.linear_response.projected as projected
-import slowquant.unitary_coupled_cluster.linear_response.projected_statetransfer as projected_statetransfer
-import slowquant.unitary_coupled_cluster.linear_response.selfconsistent as selfconsistent
-import slowquant.unitary_coupled_cluster.linear_response.statetransfer as statetransfer
+import slowquant.unitary_coupled_cluster.linear_response.allprojected as allprojected  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.allselfconsistent as allselfconsistent  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.allstatetransfer as allstatetransfer  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.generic as generic  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.projected as projected  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.projected_statetransfer as projected_statetransfer  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.selfconsistent as selfconsistent  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.statetransfer as statetransfer  # pylint: disable=consider-using-from-import
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 

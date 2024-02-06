@@ -93,21 +93,21 @@ def expectation_value_pauli(
     """
     if len(bra.inactive) != len(ket.inactive):
         raise ValueError("Bra and Ket does not have same number of inactive orbitals")
-    if len(bra._active) != len(ket._active):
+    if len(bra._active) != len(ket._active):  # pylint: disable=protected-access
         raise ValueError("Bra and Ket does not have same number of active orbitals")
     total: complex = 0.0
     for op, fac in pauliop.operators.items():
         if abs(fac) < 10**-12:
             continue
         tmp = 1.0
-        for i in range(len(bra.bra_inactive)):
+        for i in range(len(bra.bra_inactive)):  # pylint: disable=consider-using-enumerate
             tmp *= np.matmul(bra.bra_inactive[i], np.matmul(symbol_to_mat(op[i]), ket.ket_inactive[:, i]))  # type: ignore
-        for i in range(len(bra.bra_virtual)):
-            op_idx = i + len(bra.bra_inactive) + len(bra._active_onvector)
+        for i in range(len(bra.bra_virtual)):  # pylint: disable=consider-using-enumerate
+            op_idx = i + len(bra.bra_inactive) + len(bra._active_onvector)  # pylint: disable=protected-access
             tmp *= np.matmul(bra.bra_virtual[i], np.matmul(symbol_to_mat(op[op_idx]), ket.ket_virtual[:, i]))  # type: ignore
         if abs(tmp) < 10**-12:
             continue
-        number_active_orbitals = len(bra._active_onvector)
+        number_active_orbitals = len(bra._active_onvector)  # pylint: disable=protected-access
         active_start = len(bra.bra_inactive)
         active_end = active_start + number_active_orbitals
         tmp_active = 1.0

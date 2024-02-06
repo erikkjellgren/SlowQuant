@@ -164,12 +164,11 @@ class QuantumInterface:
         # Check if estimator or sampler
         if isinstance(self.primitive, BaseEstimator):
             return self._estimator_quantum_expectation_value(op, run_parameters)
-        elif isinstance(self.primitive, BaseSampler):
+        if isinstance(self.primitive, BaseSampler):
             return self._sampler_quantum_expectation_value(op, run_parameters)
-        else:
-            raise ValueError(
-                "The Quantum Interface was initiated with an unknown Qiskit primitive, {type(self.primitive)}"
-            )
+        raise ValueError(
+            "The Quantum Interface was initiated with an unknown Qiskit primitive, {type(self.primitive)}"
+        )
 
     def _estimator_quantum_expectation_value(
         self, op: FermionicOperator, run_parameters: list[float]
@@ -220,11 +219,11 @@ class QuantumInterface:
         # Loop over all clique Paulies
         cliques = make_cliques(observables.paulis)
         distributions = {}
-        for clique_pauli in cliques.keys():
+        for clique_pauli, clique in cliques.items():
             dist = self._sampler_distributions(Pauli(clique_pauli), run_parameters)
             # It is wasteful to store the distribution per Pauli instead of per Clique,
             # but it help unpack it later.
-            for pauli in cliques[clique_pauli]:
+            for pauli in clique:
                 distributions[pauli] = dist
 
         # Loop over all qubit-mapped Paul strings and get Sampler distributions
@@ -356,7 +355,7 @@ def make_cliques(paulis: Pauli) -> dict[str, list[str]]:
         if "X" not in pauli_str and "Y" not in pauli_str:
             cliques["Z" * len(paulis[0])].append(pauli_str)
         else:
-            for clique in cliques.keys():
+            for clique in cliques:
                 is_commuting = True
                 for p_clique, p_op in zip(clique, pauli_str):
                     if p_clique == "I" or p_op == "I":

@@ -35,22 +35,22 @@ def expectation_value_hybrid(
     """
     if len(bra.inactive) != len(ket.inactive):
         raise ValueError("Bra and Ket does not have same number of inactive orbitals")
-    if len(bra._active) != len(ket._active):
+    if len(bra._active) != len(ket._active):  # pylint: disable=protected-access
         raise ValueError("Bra and Ket does not have same number of active orbitals")
     total = 0
     for _, op in hybridop.operators.items():
         tmp = 1
-        for i in range(len(bra.bra_inactive)):
+        for i in range(len(bra.bra_inactive)):  # pylint: disable=consider-using-enumerate
             tmp *= np.matmul(
                 bra.bra_inactive[i], np.matmul(symbol_to_mat(op.inactive_pauli[i]), ket.ket_inactive[:, i])  # type: ignore
             )
-        for i in range(len(bra.bra_virtual)):
+        for i in range(len(bra.bra_virtual)):  # pylint: disable=consider-using-enumerate
             tmp *= np.matmul(
                 bra.bra_virtual[i], np.matmul(symbol_to_mat(op.virtual_pauli[i]), ket.ket_virtual[:, i])  # type: ignore
             )
         if abs(tmp) < 10**-12:
             continue
-        number_active_orbitals = len(bra._active_onvector)
+        number_active_orbitals = len(bra._active_onvector)  # pylint: disable=protected-access
         if number_active_orbitals != 0:
             if number_active_orbitals >= use_csr:
                 operator = copy.deepcopy(ket.ket_active_csr)
@@ -189,7 +189,7 @@ def expectation_value_hybrid_flow(
         num_virtual_spin_orbs = len(state_vec.virtual[0])
     else:
         num_virtual_spin_orbs = 0
-    if len(state_vec._active_onvector) >= 10:
+    if len(state_vec._active_onvector) >= 10:  # pylint: disable=protected-access
         state_vector = StateVectorOperator(
             {
                 "o" * num_inactive_spin_orbs
@@ -496,7 +496,7 @@ def make_projection_operator(state_vector: StateVector, use_csr: int = 10) -> Op
         num_virtual_orbs = len(state_vector.virtual[0])
     else:
         num_virtual_orbs = 0
-    if len(state_vector._active_onvector) > use_csr:
+    if len(state_vector._active_onvector) > use_csr:  # pylint: disable=protected-access
         active_matrix = (
             lw.outer(state_vector.ket_active_csr, state_vector.bra_active_csr)
             * 1

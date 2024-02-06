@@ -18,6 +18,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
 
 
 class quantumLR(quantumLRBaseClass):
+
     def run(
         self,
     ) -> None:

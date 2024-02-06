@@ -602,6 +602,7 @@ def test_lih_sto3g_uccsd_lr_naive() -> None:
 
 
 def test_LiH_sto3g_uccsd_lr() -> None:
+    """Test LiH UCCSD(2,2) LR"""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """Li 0.0           0.0  0.0;

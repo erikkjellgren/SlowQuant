@@ -57,7 +57,9 @@ class RotoSolve:
         self.threshold = tol
         self.max_fail = 3
 
-    def minimize(self, f: Callable[[list[float]], float], x: list[float], jac=None) -> Result:
+    def minimize(
+        self, f: Callable[[list[float]], float], x: list[float], jac=None  # pylint: disable=unused-argument
+    ) -> Result:
         """Run minimization.
 
         Args:
@@ -73,7 +75,7 @@ class RotoSolve:
         fails = 0
         res = Result()
         for _ in range(self.max_iterations):
-            for i in range(len(x)):
+            for i in range(len(x)):  # pylint: disable=consider-using-enumerate
                 e_vals = get_energy_evals(f, x, i)
                 f_reconstructed = partial(reconstructed_f, energy_vals=e_vals)
                 vecf = np.vectorize(f_reconstructed)

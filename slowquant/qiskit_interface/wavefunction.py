@@ -4,7 +4,7 @@ from functools import partial
 
 import numpy as np
 import scipy
-from qiskit_algorithms.optimizers import COBYLA, L_BFGS_B, QNSPSA, SLSQP, SPSA
+from qiskit_algorithms.optimizers import COBYLA, L_BFGS_B, SLSQP, SPSA
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
@@ -397,8 +397,8 @@ class WaveFunction:
         is_silent_subiterations: bool = False,
     ) -> None:
         """Run VQE of wave function."""
-        global iteration
-        global start
+        global iteration  # pylint: disable=global-variable-undefined
+        global start  # pylint: disable=global-variable-undefined
 
         def print_progress(x, energy_func, silent: bool) -> None:
             """Print progress during energy minimization of wave function.
@@ -408,18 +408,20 @@ class WaveFunction:
                 energy_func: Function to calculate energy.
                 silent: Supress print.
             """
-            global iteration
-            global start
-            time_str = f"{time.time() - start:7.2f}"  # type: ignore
+            global iteration  # pylint: disable=global-variable-undefined
+            global start  # pylint: disable=global-variable-undefined
+            time_str = f"{time.time() - start:7.2f}"  # pylint: disable=used-before-assignment
             if not silent:
                 e_str = f"{energy_func(x):3.16f}"
-                print(f"--------{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+                print(
+                    f"--------{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}"  # pylint: disable=used-before-assignment
+                )
             iteration += 1  # type: ignore
             start = time.time()  # type: ignore
 
         def print_progress_SPSA(
             ___,
-            theta,
+            theta,  # pylint: disable=unused-argument
             f_val,
             _,
             __,
@@ -432,8 +434,8 @@ class WaveFunction:
                 f_val: Function value at theta.
                 silent: Supress print.
             """
-            global iteration
-            global start
+            global iteration  # pylint: disable=global-variable-undefined
+            global start  # pylint: disable=global-variable-undefined
             time_str = f"{time.time() - start:7.2f}"  # type: ignore
             e_str = f"{f_val:3.12f}"
             if not silent:
@@ -485,13 +487,6 @@ class WaveFunction:
                 print("WARNING: Convergence tolerence cannot be set for SPSA; using qiskit default")
                 print_progress_SPSA_ = partial(print_progress_SPSA, silent=is_silent_subiterations)
                 optimizer = SPSA(maxiter=maxiter, callback=print_progress_SPSA_)
-            elif ansatz_optimizer.lower() == "qnspsa":
-                optimizer = QNSPSA(
-                    QNSPSA.get_fidelity(self.QI.ansatz, sampler=self.qiskit_sampler),
-                    maxiter=maxiter,
-                    tol=tol,
-                    callback=print_progress_SPSA,
-                )
             else:
                 raise ValueError(f"Unknown optimizer: {ansatz_optimizer}")
             res = optimizer.minimize(energy_theta, self.ansatz_parameters, jac=gradient_theta)
@@ -517,10 +512,10 @@ class WaveFunction:
                 )
                 optimizer = L_BFGS_B(maxiter=maxiter, tol=tol, callback=print_progress_)
                 res = optimizer.minimize(energy_oo, [0.0] * len(self.kappa_idx), jac=gradiet_oo)
-                for i in range(len(self.kappa)):
+                for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
                     self.kappa[i] = 0.0
                     self._kappa_old[i] = 0.0
-                for i in range(len(self.kappa_redundant)):
+                for i in range(len(self.kappa_redundant)):  # pylint: disable=consider-using-enumerate
                     self.kappa_redundant[i] = 0.0
                     self._kappa_redundant_old[i] = 0.0
             else:
@@ -551,8 +546,8 @@ class WaveFunction:
         """Run VQE of wave function."""
         if not orbital_optimization:
             raise ValueError("Does only work with orbital optimization right now")
-        global iteration
-        global start
+        global iteration  # pylint: disable=global-variable-undefined
+        global start  # pylint: disable=global-variable-undefined
         iteration = 0  # type: ignore
         start = time.time()  # type: ignore
 
@@ -563,8 +558,8 @@ class WaveFunction:
                 x: Wave function parameters.
                 energy_func: Function to calculate energy.
             """
-            global iteration
-            global start
+            global iteration  # pylint: disable=global-variable-undefined
+            global start  # pylint: disable=global-variable-undefined
             time_str = f"{time.time() - start:7.2f}"  # type: ignore
             e_str = f"{energy_func(x):3.12f}"
             print(f"{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
@@ -573,7 +568,7 @@ class WaveFunction:
 
         def print_progress_SPSA(
             ___,
-            theta,
+            theta,  # pylint: disable=unused-argument
             f_val,
             _,
             __,
@@ -584,8 +579,8 @@ class WaveFunction:
                 theta: Wave function parameters.
                 f_val: Function value at theta.
             """
-            global iteration
-            global start
+            global iteration  # pylint: disable=global-variable-undefined
+            global start  # pylint: disable=global-variable-undefined
             time_str = f"{time.time() - start:7.2f}"  # type: ignore
             e_str = f"{f_val:3.12f}"
             print(f"{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
@@ -625,10 +620,10 @@ class WaveFunction:
         parameters = self.kappa + self.ansatz_parameters
         res = optimizer.minimize(energy_both, parameters, jac=gradient_both)
         self.ansatz_parameters = res.x[len(self.kappa) :].tolist()
-        for i in range(len(self.kappa)):
+        for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
             self.kappa[i] = 0.0
             self._kappa_old[i] = 0.0
-        for i in range(len(self.kappa_redundant)):
+        for i in range(len(self.kappa_redundant)):  # pylint: disable=consider-using-enumerate
             self.kappa_redundant[i] = 0.0
             self._kappa_redundant_old[i] = 0.0
         self._energy_elec = res.fun
@@ -662,19 +657,23 @@ def calc_energy_oo(kappa: list[float], wf: WaveFunction) -> float:
         Electronic energy.
     """
     kappa_mat = np.zeros_like(wf.c_orthonormal)
-    for kappa_val, (p, q) in zip(np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx):
+    for kappa_val, (p, q) in zip(
+        np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx  # pylint: disable=protected-access
+    ):
         kappa_mat[p, q] = kappa_val
         kappa_mat[q, p] = -kappa_val
     if len(wf.kappa_redundant) != 0:
         if np.max(np.abs(wf.kappa_redundant)) > 0.0:
             for kappa_val, (p, q) in zip(
-                np.array(wf.kappa_redundant) - np.array(wf._kappa_redundant_old), wf.kappa_redundant_idx
+                np.array(wf.kappa_redundant)
+                - np.array(wf._kappa_redundant_old),  # pylint: disable=protected-access
+                wf.kappa_redundant_idx,
             ):
                 kappa_mat[p, q] = kappa_val
                 kappa_mat[q, p] = -kappa_val
     c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
-    wf._kappa_old = kappa.copy()
-    wf._kappa_redundant_old = wf.kappa_redundant.copy()
+    wf._kappa_old = kappa.copy()  # pylint: disable=protected-access
+    wf._kappa_redundant_old = wf.kappa_redundant.copy()  # pylint: disable=protected-access
     # Moving expansion point of kappa
     wf.c_orthonormal = c_trans
     rdms = ReducedDenstiyMatrix(
@@ -703,19 +702,23 @@ def calc_energy_both(parameters, wf) -> float:
     assert len(theta) == len(wf.ansatz_parameters)
     # Do orbital partial
     kappa_mat = np.zeros_like(wf.c_orthonormal)
-    for kappa_val, (p, q) in zip(np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx):
+    for kappa_val, (p, q) in zip(
+        np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx  # pylint: disable=protected-access
+    ):
         kappa_mat[p, q] = kappa_val
         kappa_mat[q, p] = -kappa_val
     if len(wf.kappa_redundant) != 0:
         if np.max(np.abs(wf.kappa_redundant)) > 0.0:
             for kappa_val, (p, q) in zip(
-                np.array(wf.kappa_redundant) - np.array(wf._kappa_redundant_old), wf.kappa_redundant_idx
+                np.array(wf.kappa_redundant)
+                - np.array(wf._kappa_redundant_old),  # pylint: disable=protected-access
+                wf.kappa_redundant_idx,
             ):
                 kappa_mat[p, q] = kappa_val
                 kappa_mat[q, p] = -kappa_val
     c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
-    wf._kappa_old = kappa.copy()
-    wf._kappa_redundant_old = wf.kappa_redundant.copy()
+    wf._kappa_old = kappa.copy()  # pylint: disable=protected-access
+    wf._kappa_redundant_old = wf.kappa_redundant.copy()  # pylint: disable=protected-access
     # Moving expansion point of kappa
     wf.c_orthonormal = c_trans
     # Build operator
@@ -726,7 +729,7 @@ def calc_energy_both(parameters, wf) -> float:
 
 
 def orbital_rotation_gradient(
-    placeholder,
+    placeholder,  # pylint: disable=unused-argument
     wf,
 ) -> np.ndarray:
     """Calcuate electronic gradient with respect to orbital rotations.
@@ -791,7 +794,7 @@ def ansatz_parameters_gradient(
     gradient = np.zeros(len(parameters))
     h = np.pi / 2 - np.pi / 4
     h2 = np.pi / 2 + np.pi / 4
-    for i in range(len(parameters)):
+    for i in range(len(parameters)):  # pylint: disable=consider-using-enumerate
         parameters[i] += h
         Ep = quantum_interface.quantum_expectation_value(operator, custom_parameters=parameters)
         parameters[i] -= h

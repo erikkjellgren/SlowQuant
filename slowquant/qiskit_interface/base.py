@@ -237,7 +237,7 @@ class FermionicOperator:
                     )
                 )
                 for str_key in new_ops:  # pylint: disable=C0206
-                    if str_key not in operators.keys():
+                    if str_key not in operators.keys():  # pylint: disable=C0201
                         operators[str_key] = new_ops[str_key]
                         factors[str_key] = new_facs[str_key]
                     else:

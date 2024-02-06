@@ -15,12 +15,6 @@ from slowquant.unitary_coupled_cluster.util import ThetaPicker
 
 
 class LinearResponseBaseClass:
-    A: np.ndarray
-    B: np.ndarray
-    Sigma: np.ndarray
-    Delta: np.ndarray
-    wf: WaveFunctionUCC
-
     def __init__(
         self,
         wave_function: WaveFunctionUCC,

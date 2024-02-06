@@ -3,11 +3,11 @@ import pyscf
 from qiskit.primitives import Estimator, Sampler
 from qiskit_nature.second_q.mappers import ParityMapper
 
-import slowquant.qiskit_interface.linear_response.allprojected as q_allprojected
-import slowquant.qiskit_interface.linear_response.naive as q_naive
-import slowquant.qiskit_interface.linear_response.projected as q_projected
-import slowquant.unitary_coupled_cluster.linear_response.allprojected as allprojected
-import slowquant.unitary_coupled_cluster.linear_response.naive as naive
+import slowquant.qiskit_interface.linear_response.allprojected as q_allprojected  # pylint: disable=consider-using-from-import
+import slowquant.qiskit_interface.linear_response.naive as q_naive  # pylint: disable=consider-using-from-import
+import slowquant.qiskit_interface.linear_response.projected as q_projected  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.allprojected as allprojected  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
 from slowquant.qiskit_interface.interface import QuantumInterface
 from slowquant.qiskit_interface.wavefunction import WaveFunction
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
