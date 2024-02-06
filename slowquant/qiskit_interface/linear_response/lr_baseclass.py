@@ -200,6 +200,47 @@ class quantumLRBaseClass:
             output += f"{str(i+1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
         return output
 
+    def get_excited_state_contributions(self, num_contr: int | None = None, cutoff: float = 10**-30) -> None:
+        """Create table of contributions to each excitation vector.
+
+        Returns:
+            Nicely formatted table.
+        """
+        if not hasattr(self, "normed_excitation_vectors"):
+            raise ValueError(
+                "Normed excitation vectors have not been calculated. Run get_normed_excitation_vectors() first."
+            )
+
+        if num_contr is None:
+            num_contr = self.num_params
+
+        print(f"{'Value'.center(12)} | {'Position'.center(12)} | {'Operator'.center(12)}\n")
+
+        for state, vec in enumerate(self.normed_excitation_vectors.T):
+
+            sorted_indices = np.argsort(vec)[::-1]
+            sorted_vec = vec[sorted_indices]
+
+            print("Excited state: ", state)
+            for i in range(num_contr):
+                if sorted_vec[i] < cutoff:
+                    continue
+                element = f"{sorted_vec[i]:.2e}"
+                if sorted_indices[i] < self.num_params:
+                    if sorted_indices[i] < self.num_q:
+                        operator_index = "q" + str(sorted_indices[i])
+                    else:
+                        operator_index = "G" + str(sorted_indices[i] - self.num_q)
+                else:
+                    if sorted_indices[i] - self.num_params < self.num_q:
+                        operator_index = "q" + str(sorted_indices[i] - self.num_params) + "^d"
+                    else:
+                        operator_index = "G" + str(sorted_indices[i] - self.num_params - self.num_q) + "^d"
+
+                print(
+                    f"{element.center(12)} | {str(sorted_indices[i]).center(12)} | {operator_index.center(12)}"
+                )
+
 
 def get_num_nonCBS(matrix: list[list[str]]) -> int:
     """Count number of non computational basis measurements in operator matrix.
