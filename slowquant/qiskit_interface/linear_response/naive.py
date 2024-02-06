@@ -30,9 +30,7 @@ class quantumLR(quantumLRBaseClass):
     def run(
         self,
     ) -> None:
-        """
-        Run simulation of naive LR matrix elements
-        """
+        """Run simulation of naive LR matrix elements."""
         # RDMs
         rdms = ReducedDenstiyMatrix(
             self.wf.num_inactive_orbs,
@@ -116,33 +114,41 @@ class quantumLR(quantumLRBaseClass):
         for j, GJ in enumerate(self.G_ops):
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
-                self.A[i + idx_shift, j + idx_shift] = self.A[
-                    j + idx_shift, i + idx_shift
-                ] = self.wf.QI.quantum_expectation_value(
-                    double_commutator(GI.dagger, self.H_0i_0a, GJ).get_folded_operator(*self.orbs)
+                self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = (
+                    self.wf.QI.quantum_expectation_value(
+                        double_commutator(GI.dagger, self.H_0i_0a, GJ).get_folded_operator(*self.orbs)
+                    )
                 )
                 # Make B
-                self.B[i + idx_shift, j + idx_shift] = self.B[
-                    j + idx_shift, i + idx_shift
-                ] = self.wf.QI.quantum_expectation_value(
-                    double_commutator(GI.dagger, self.H_0i_0a, GJ.dagger).get_folded_operator(*self.orbs)
+                self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = (
+                    self.wf.QI.quantum_expectation_value(
+                        double_commutator(GI.dagger, self.H_0i_0a, GJ.dagger).get_folded_operator(*self.orbs)
+                    )
                 )
                 # Make Sigma
-                self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[
-                    j + idx_shift, i + idx_shift
-                ] = self.wf.QI.quantum_expectation_value(
-                    commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)
+                self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = (
+                    self.wf.QI.quantum_expectation_value(
+                        commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)
+                    )
                 )
 
     def _get_qbitmap(
         self,
         cliques: bool = True,
-    ) -> np.ndarray:
+    ) -> tuple[list[list[str]], list[list[str]], list[list[str]]]:
+        """Get qubit map of operators.
+
+        Args:
+            cliques: If using cliques.
+
+        Returns:
+            Qubit map of operators.
+        """
         idx_shift = self.num_q
         print("Gs", self.num_G)
         print("qs", self.num_q)
 
-        ## qq block not possible (yet) as per RDMs
+        # qq block not possible (yet) as per RDMs
 
         A = [[""] * self.num_params for _ in range(self.num_params)]
         B = [[""] * self.num_params for _ in range(self.num_params)]
@@ -184,19 +190,19 @@ class quantumLR(quantumLRBaseClass):
                     double_commutator(GI.dagger, self.H_1i_1a, GJ.dagger).get_folded_operator(*self.orbs)
                 ).paulis
                 # Make Sigma
-                Sigma[i + idx_shift][j + idx_shift] = Sigma[j + idx_shift][
-                    i + idx_shift
-                ] = self.wf.QI.op_to_qbit(commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)).paulis
+                Sigma[i + idx_shift][j + idx_shift] = Sigma[j + idx_shift][i + idx_shift] = (
+                    self.wf.QI.op_to_qbit(commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)).paulis
+                )
 
         if cliques:
             for i in range(self.num_params):
                 for j in range(self.num_params):
                     if not A[i][j] == "":
-                        A[i][j] = list(make_cliques(A[i][j]).keys())
+                        A[i][j] = list(make_cliques(A[i][j]).keys())  # type: ignore [call-overload]
                     if not B[i][j] == "":
-                        B[i][j] = list(make_cliques(B[i][j]).keys())
+                        B[i][j] = list(make_cliques(B[i][j]).keys())  # type: ignore [call-overload]
                     if not Sigma[i][j] == "":
-                        Sigma[i][j] = list(make_cliques(Sigma[i][j]).keys())
+                        Sigma[i][j] = list(make_cliques(Sigma[i][j]).keys())  # type: ignore [call-overload]
 
             print("Number of non-CBS Pauli strings in A: ", get_num_nonCBS(A))
             print("Number of non-CBS Pauli strings in B: ", get_num_nonCBS(B))
@@ -220,7 +226,6 @@ class quantumLR(quantumLRBaseClass):
         Returns:
             Transition dipole moment.
         """
-
         if len(dipole_integrals) != 3:
             raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
         number_excitations = len(self.excitation_energies)

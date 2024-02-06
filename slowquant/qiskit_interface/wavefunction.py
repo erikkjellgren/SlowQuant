@@ -5,7 +5,7 @@ from functools import partial
 import numpy as np
 import scipy
 from qiskit.primitives import BaseEstimator, BaseSampler
-from qiskit_algorithms.optimizers import COBYLA, L_BFGS_B, QNSPSA, SLSQP, SPSA
+from qiskit_algorithms.optimizers import COBYLA, L_BFGS_B, SLSQP, SPSA
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
@@ -44,6 +44,7 @@ class WaveFunction:
             c_orthonormal: Initial orbital coefficients.
             h_ao: One-electron integrals in AO for Hamiltonian.
             g_ao: Two-electron integrals in AO.
+            quantum_interface: QuantumInterface.
             include_active_kappa: Include active-active orbital rotations.
         """
         if len(cas) != 2:
@@ -73,6 +74,7 @@ class WaveFunction:
         self._rdm4 = None
         self._h_mo = None
         self._g_mo = None
+        self.do_trace_corrected = True
         active_space = []
         orbital_counter = 0
         for i in range(num_elec - cas[0], num_elec):
@@ -181,7 +183,7 @@ class WaveFunction:
                     self.kappa_hf_like_idx.append([p, q])
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     self.kappa_hf_like_idx.append([p, q])
-        self._energy_elec = None
+        self._energy_elec: float | None = None
         # Setup Qiskit stuff
         self.QI = quantum_interface
         self.QI.construct_circuit(self.num_active_orbs, self.num_active_elec)
@@ -251,10 +253,20 @@ class WaveFunction:
 
     @property
     def ansatz_parameters(self) -> list[float]:
+        """Getter for ansatz parameters.
+
+        Returns:
+            Ansatz parameters.
+        """
         return self.QI.parameters
 
     @ansatz_parameters.setter
     def ansatz_parameters(self, parameters: list[float]) -> None:
+        """Setter for ansatz paramters.
+
+        Args:
+            parameters: New ansatz paramters.
+        """
         self._rdm1 = None
         self._rdm2 = None
         self._rdm3 = None
@@ -263,16 +275,26 @@ class WaveFunction:
         self.QI.parameters = parameters
 
     def change_primitive(self, primitive: BaseEstimator | BaseSampler) -> None:
+        """Change the primitive expectation value calculator.
+
+        Args:
+            primitive: Primitive object.
+        """
         self._rdm1 = None
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
         self._energy_elec = None
-        self.QI._primitive = primitive
+        self.QI._primitive = primitive  # pylint: disable=protected-access
 
     @property
     def rdm1(self) -> np.ndarray:
-        """Calcuate one-electron reduced density matrix.
+        r"""Calcuate one-electron reduced density matrix.
+
+        The trace condition is enforced:
+
+        .. math::
+            \sum_i\Gamma^{[1]}_{ii} = N_e
 
         Returns:
             One-electron reduced density matrix.
@@ -287,18 +309,24 @@ class WaveFunction:
                         self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                     )
                     val = self.QI.quantum_expectation_value(rdm1_op)
-                    self._rdm1[p_idx, q_idx] = val
-                    self._rdm1[q_idx, p_idx] = val
-            # trace = 0
-            # for i in range(self.num_active_orbs):
-            #    trace += self._rdm1[i, i]
-            # for i in range(self.num_active_orbs):
-            #    self._rdm1[i, i] = self._rdm1[i, i] * self.num_active_elec / trace
+                    self._rdm1[p_idx, q_idx] = val  # type: ignore [index]
+                    self._rdm1[q_idx, p_idx] = val  # type: ignore [index]
+            if self.do_trace_corrected:
+                trace = 0.0
+                for i in range(self.num_active_orbs):
+                    trace += self._rdm1[i, i]  # type: ignore [index]
+                for i in range(self.num_active_orbs):
+                    self._rdm1[i, i] = self._rdm1[i, i] * self.num_active_elec / trace  # type: ignore [index]
         return self._rdm1
 
     @property
     def rdm2(self) -> np.ndarray:
-        """Calcuate two-electron reduced density matrix.
+        r"""Calcuate two-electron reduced density matrix.
+
+        The trace condition is enforced:
+
+        .. math::
+            \sum_{ij}\Gamma^{[2]}_{iijj} = N_e(N_e-1)
 
         Returns:
             Two-electron reduced density matrix.
@@ -334,19 +362,20 @@ class WaveFunction:
                             val = self.QI.quantum_expectation_value(pdm2_op)
                             if q == r:
                                 val -= self.rdm1[p_idx, s_idx]
-                            self._rdm2[p_idx, q_idx, r_idx, s_idx] = val
-                            self._rdm2[r_idx, s_idx, p_idx, q_idx] = val
-                            self._rdm2[q_idx, p_idx, s_idx, r_idx] = val
-                            self._rdm2[s_idx, r_idx, q_idx, p_idx] = val
-            # trace = 0
-            # for i in range(self.num_active_orbs):
-            #    for j in range(self.num_active_orbs):
-            #        trace += self._rdm2[i, i, j, j]
-            # for i in range(self.num_active_orbs):
-            #    for j in range(self.num_active_orbs):
-            #        self._rdm2[i, i, j, j] = (
-            #            self._rdm2[i, i, j, j] * self.num_active_elec * (self.num_active_elec - 1) / trace
-            #        )
+                            self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore [index]
+                            self._rdm2[r_idx, s_idx, p_idx, q_idx] = val  # type: ignore [index]
+                            self._rdm2[q_idx, p_idx, s_idx, r_idx] = val  # type: ignore [index]
+                            self._rdm2[s_idx, r_idx, q_idx, p_idx] = val  # type: ignore [index]
+            if self.do_trace_corrected:
+                trace = 0.0
+                for i in range(self.num_active_orbs):
+                    for j in range(self.num_active_orbs):
+                        trace += self._rdm2[i, i, j, j]  # type: ignore [index]
+                for i in range(self.num_active_orbs):
+                    for j in range(self.num_active_orbs):
+                        self._rdm2[i, i, j, j] = (  # type: ignore [index]
+                            self._rdm2[i, i, j, j] * self.num_active_elec * (self.num_active_elec - 1) / trace  # type: ignore [index]
+                        )
         return self._rdm2
 
     def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
@@ -365,6 +394,11 @@ class WaveFunction:
 
     @property
     def energy_elec(self) -> float:
+        """Get electronic energy.
+
+        Returns:
+            Electronic energy.
+        """
         if self._energy_elec is None:
             H = hamiltonian_pauli_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
@@ -380,27 +414,31 @@ class WaveFunction:
         is_silent_subiterations: bool = False,
     ) -> None:
         """Run VQE of wave function."""
-        global iteration
-        global start
+        global iteration  # pylint: disable=global-variable-undefined
+        global start  # pylint: disable=global-variable-undefined
 
         def print_progress(x, energy_func, silent: bool) -> None:
             """Print progress during energy minimization of wave function.
 
             Args:
                 x: Wave function parameters.
+                energy_func: Function to calculate energy.
+                silent: Supress print.
             """
-            global iteration
-            global start
-            time_str = f"{time.time() - start:7.2f}"  # type: ignore
+            global iteration  # pylint: disable=global-variable-undefined
+            global start  # pylint: disable=global-variable-undefined
+            time_str = f"{time.time() - start:7.2f}"  # type: ignore [name-defined] # pylint: disable=used-before-assignment
             if not silent:
                 e_str = f"{energy_func(x):3.16f}"
-                print(f"--------{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+                print(
+                    f"--------{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}"  # type: ignore [name-defined] # pylint: disable=used-before-assignment
+                )
             iteration += 1  # type: ignore
             start = time.time()  # type: ignore
 
         def print_progress_SPSA(
             ___,
-            theta,
+            theta,  # pylint: disable=unused-argument
             f_val,
             _,
             __,
@@ -409,10 +447,12 @@ class WaveFunction:
             """Print progress during energy minimization of wave function.
 
             Args:
-                x: Wave function parameters.
+                theta: Wave function parameters.
+                f_val: Function value at theta.
+                silent: Supress print.
             """
-            global iteration
-            global start
+            global iteration  # pylint: disable=global-variable-undefined
+            global start  # pylint: disable=global-variable-undefined
             time_str = f"{time.time() - start:7.2f}"  # type: ignore
             e_str = f"{f_val:3.12f}"
             if not silent:
@@ -464,13 +504,6 @@ class WaveFunction:
                 print("WARNING: Convergence tolerence cannot be set for SPSA; using qiskit default")
                 print_progress_SPSA_ = partial(print_progress_SPSA, silent=is_silent_subiterations)
                 optimizer = SPSA(maxiter=maxiter, callback=print_progress_SPSA_)
-            elif ansatz_optimizer.lower() == "qnspsa":
-                optimizer = QNSPSA(
-                    QNSPSA.get_fidelity(self.QI.ansatz, sampler=self.qiskit_sampler),
-                    maxiter=maxiter,
-                    tol=tol,
-                    callback=print_progress_SPSA,
-                )
             else:
                 raise ValueError(f"Unknown optimizer: {ansatz_optimizer}")
             res = optimizer.minimize(energy_theta, self.ansatz_parameters, jac=gradient_theta)
@@ -496,10 +529,10 @@ class WaveFunction:
                 )
                 optimizer = L_BFGS_B(maxiter=maxiter, tol=tol, callback=print_progress_)
                 res = optimizer.minimize(energy_oo, [0.0] * len(self.kappa_idx), jac=gradiet_oo)
-                for i in range(len(self.kappa)):
+                for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
                     self.kappa[i] = 0.0
                     self._kappa_old[i] = 0.0
-                for i in range(len(self.kappa_redundant)):
+                for i in range(len(self.kappa_redundant)):  # pylint: disable=consider-using-enumerate
                     self.kappa_redundant[i] = 0.0
                     self._kappa_redundant_old[i] = 0.0
             else:
@@ -530,8 +563,8 @@ class WaveFunction:
         """Run VQE of wave function."""
         if not orbital_optimization:
             raise ValueError("Does only work with orbital optimization right now")
-        global iteration
-        global start
+        global iteration  # pylint: disable=global-variable-undefined
+        global start  # pylint: disable=global-variable-undefined
         iteration = 0  # type: ignore
         start = time.time()  # type: ignore
 
@@ -540,9 +573,10 @@ class WaveFunction:
 
             Args:
                 x: Wave function parameters.
+                energy_func: Function to calculate energy.
             """
-            global iteration
-            global start
+            global iteration  # pylint: disable=global-variable-undefined
+            global start  # pylint: disable=global-variable-undefined
             time_str = f"{time.time() - start:7.2f}"  # type: ignore
             e_str = f"{energy_func(x):3.12f}"
             print(f"{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
@@ -551,7 +585,7 @@ class WaveFunction:
 
         def print_progress_SPSA(
             ___,
-            theta,
+            theta,  # pylint: disable=unused-argument
             f_val,
             _,
             __,
@@ -559,10 +593,11 @@ class WaveFunction:
             """Print progress during energy minimization of wave function.
 
             Args:
-                x: Wave function parameters.
+                theta: Wave function parameters.
+                f_val: Function value at theta.
             """
-            global iteration
-            global start
+            global iteration  # pylint: disable=global-variable-undefined
+            global start  # pylint: disable=global-variable-undefined
             time_str = f"{time.time() - start:7.2f}"  # type: ignore
             e_str = f"{f_val:3.12f}"
             print(f"{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
@@ -602,35 +637,60 @@ class WaveFunction:
         parameters = self.kappa + self.ansatz_parameters
         res = optimizer.minimize(energy_both, parameters, jac=gradient_both)
         self.ansatz_parameters = res.x[len(self.kappa) :].tolist()
-        for i in range(len(self.kappa)):
+        for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
             self.kappa[i] = 0.0
             self._kappa_old[i] = 0.0
-        for i in range(len(self.kappa_redundant)):
+        for i in range(len(self.kappa_redundant)):  # pylint: disable=consider-using-enumerate
             self.kappa_redundant[i] = 0.0
             self._kappa_redundant_old[i] = 0.0
         self._energy_elec = res.fun
 
 
-def calc_energy_theta(parameters, operator: FermionicOperator, quantum_interface: QuantumInterface) -> float:
+def calc_energy_theta(
+    parameters: list[float], operator: FermionicOperator, quantum_interface: QuantumInterface
+) -> float:
+    """Calculate electronic energy using expectation values.
+
+    Args:
+        paramters: Ansatz paramters.
+        operator: Hamiltonian operator.
+        quantum_interface: QuantumInterface.
+
+    Returns:
+        Electronic energy.
+    """
     quantum_interface.parameters = parameters
     return quantum_interface.quantum_expectation_value(operator)
 
 
-def calc_energy_oo(kappa, wf) -> float:
+def calc_energy_oo(kappa: list[float], wf: WaveFunction) -> float:
+    """Calculate electronic energy using RDMs.
+
+    Args:
+        kappa: Orbital rotation parameters.
+        wf: Wave function object.
+
+    Returns:
+        Electronic energy.
+    """
     kappa_mat = np.zeros_like(wf.c_orthonormal)
-    for kappa_val, (p, q) in zip(np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx):
+    for kappa_val, (p, q) in zip(
+        np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx  # pylint: disable=protected-access
+    ):
         kappa_mat[p, q] = kappa_val
         kappa_mat[q, p] = -kappa_val
     if len(wf.kappa_redundant) != 0:
         if np.max(np.abs(wf.kappa_redundant)) > 0.0:
             for kappa_val, (p, q) in zip(
-                np.array(wf.kappa_redundant) - np.array(wf._kappa_redundant_old), wf.kappa_redundant_idx
+                np.array(wf.kappa_redundant)
+                - np.array(wf._kappa_redundant_old),  # pylint: disable=protected-access
+                wf.kappa_redundant_idx,
             ):
                 kappa_mat[p, q] = kappa_val
                 kappa_mat[q, p] = -kappa_val
     c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
-    wf._kappa_old = kappa.copy()
-    wf._kappa_redundant_old = wf.kappa_redundant.copy()
+    wf._kappa_old = kappa.copy()  # pylint: disable=protected-access
+    wf._kappa_redundant_old = wf.kappa_redundant.copy()  # pylint: disable=protected-access
     # Moving expansion point of kappa
     wf.c_orthonormal = c_trans
     rdms = ReducedDenstiyMatrix(
@@ -645,24 +705,37 @@ def calc_energy_oo(kappa, wf) -> float:
 
 
 def calc_energy_both(parameters, wf) -> float:
+    """Calculate electronic energy.
+
+    Args:
+        parameters: Ansatz and orbital rotation parameters.
+        wf: Wave function object.
+
+    Returns:
+        Electronic energy.
+    """
     kappa = parameters[: len(wf.kappa)]
     theta = parameters[len(wf.kappa) :]
     assert len(theta) == len(wf.ansatz_parameters)
     # Do orbital partial
     kappa_mat = np.zeros_like(wf.c_orthonormal)
-    for kappa_val, (p, q) in zip(np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx):
+    for kappa_val, (p, q) in zip(
+        np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx  # pylint: disable=protected-access
+    ):
         kappa_mat[p, q] = kappa_val
         kappa_mat[q, p] = -kappa_val
     if len(wf.kappa_redundant) != 0:
         if np.max(np.abs(wf.kappa_redundant)) > 0.0:
             for kappa_val, (p, q) in zip(
-                np.array(wf.kappa_redundant) - np.array(wf._kappa_redundant_old), wf.kappa_redundant_idx
+                np.array(wf.kappa_redundant)
+                - np.array(wf._kappa_redundant_old),  # pylint: disable=protected-access
+                wf.kappa_redundant_idx,
             ):
                 kappa_mat[p, q] = kappa_val
                 kappa_mat[q, p] = -kappa_val
     c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
-    wf._kappa_old = kappa.copy()
-    wf._kappa_redundant_old = wf.kappa_redundant.copy()
+    wf._kappa_old = kappa.copy()  # pylint: disable=protected-access
+    wf._kappa_redundant_old = wf.kappa_redundant.copy()  # pylint: disable=protected-access
     # Moving expansion point of kappa
     wf.c_orthonormal = c_trans
     # Build operator
@@ -673,12 +746,13 @@ def calc_energy_both(parameters, wf) -> float:
 
 
 def orbital_rotation_gradient(
-    placeholder,
+    placeholder,  # pylint: disable=unused-argument
     wf,
 ) -> np.ndarray:
     """Calcuate electronic gradient with respect to orbital rotations.
 
     Args:
+        placeholder: Placeholder for kappa parameters, these are fetched OOP style instead.
         wf: Wave function object.
 
     Return:
@@ -700,27 +774,27 @@ def orbital_rotation_gradient(
 def ansatz_parameters_gradient(
     parameters: list[float], operator, quantum_interface: QuantumInterface
 ) -> np.ndarray:
-    """Calculate gradient with respect to ansatz parameters.
+    r"""Calculate gradient with respect to ansatz parameters.
 
     The gradient is calculated using parameter-shift assuming three eigenvalues of the generators.
     This works for fermionic generators of the type:
 
     .. math::
-        \\hat{G}_{pq} = \\hat{a}^\\dagger_p \\hat{a}_q - \\hat{a}_q^\\dagger \\hat{a}_p
+        \hat{G}_{pq} = \hat{a}^\dagger_p \hat{a}_q - \hat{a}_q^\dagger \hat{a}_p
 
     and,
 
     .. math::
-        \\hat{G}_{pqrs} = \\hat{a}^\\dagger_p \\hat{a}^\\dagger_q \\hat{a}_r \\hat{a}_s - \\hat{a}^\\dagger_s \\hat{a}^\\dagger_r \\hat{a}_p \\hat{a}_q
+        \hat{G}_{pqrs} = \hat{a}^\dagger_p \hat{a}^\dagger_q \hat{a}_r \hat{a}_s - \hat{a}^\dagger_s \hat{a}^\dagger_r \hat{a}_p \hat{a}_q
 
     The parameter-shift rule is implemented as:
 
     .. math::
-        \\begin{align}
-        \\frac{\\partial E(\\boldsymbol{\\theta})}{\\partial \\theta_i} &=
-        \\frac{\\sqrt{2}+1}{2\\sqrt{2}}\\left(E\\left(\\theta_i += \\frac{\\pi}{2} - \\frac{\\pi}{4}\\right) - E\\left(\\theta_i += -\\frac{\\pi}{2} + \\frac{\\pi}{4}\\right)\\right)\\\\
-        &- \\frac{\\sqrt{2}-1}{2\\sqrt{2}}\\left(E\\left(\\theta_i += \\frac{\\pi}{2} + \\frac{\\pi}{4}\\right) - E\\left(\\theta_i += -\\frac{\\pi}{2} - \\frac{\\pi}{4}\\right)\\right)
-        \\end{align}
+        \begin{align}
+        \frac{\partial E(\boldsymbol{\theta})}{\partial \theta_i} &=
+        \frac{\sqrt{2}+1}{2\sqrt{2}}\left(E\left(\theta_i += \frac{\pi}{2} - \frac{\pi}{4}\right) - E\left(\theta_i += -\frac{\\pi}{2} + \frac{\pi}{4}\right)\\right)\\
+        &- \frac{\sqrt{2}-1}{2\sqrt{2}}\left(E\left(\theta_i += \frac{\pi}{2} + \frac{\pi}{4}\right) - E\left(\theta_i += -\frac{\pi}{2} - \frac{\pi}{4}\right)\right)
+        \end{align}
 
 
     #. 10.1088/1367-2630/ac2cb3: Eq. (F14)
@@ -737,7 +811,7 @@ def ansatz_parameters_gradient(
     gradient = np.zeros(len(parameters))
     h = np.pi / 2 - np.pi / 4
     h2 = np.pi / 2 + np.pi / 4
-    for i in range(len(parameters)):
+    for i in range(len(parameters)):  # pylint: disable=consider-using-enumerate
         parameters[i] += h
         Ep = quantum_interface.quantum_expectation_value(operator, custom_parameters=parameters)
         parameters[i] -= h
@@ -757,6 +831,15 @@ def ansatz_parameters_gradient(
 
 
 def calc_gradient_both(parameters, wf) -> np.ndarray:
+    """Calculate electronic gradient.
+
+    Args:
+        parameters: Ansatz and orbital rotation parameters.
+        wf: Wave function object.
+
+    Returns:
+        Electronic gradient.
+    """
     gradient = np.zeros(len(parameters))
     theta = parameters[len(wf.kappa) :]
     assert len(theta) == len(wf.ansatz_parameters)

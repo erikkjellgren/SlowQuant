@@ -15,14 +15,16 @@ from slowquant.qiskit_interface.wavefunction import WaveFunction
 
 
 class quantumLRBaseClass:
+
     def __init__(
         self,
         wf: WaveFunction,
     ) -> None:
-        """
-        Initialize linear response by calculating the needed matrices.
-        """
+        """Initialize linear response by calculating the needed matrices.
 
+        Args:
+            wf: Wavefunction object.
+        """
         self.wf = wf
         # Create operators
         self.H_0i_0a = hamiltonian_pauli_0i_0a(wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs)
@@ -35,8 +37,8 @@ class quantumLRBaseClass:
         for a, i, _, _, _ in iterate_t1_sa(wf.active_occ_idx, wf.active_unocc_idx):
             self.G_ops.append(G1(a, i))
         # G2
-        for a, i, b, j, _, _, id in iterate_t2_sa(wf.active_occ_idx, wf.active_unocc_idx):
-            if id > 0:
+        for a, i, b, j, _, _, op_id in iterate_t2_sa(wf.active_occ_idx, wf.active_unocc_idx):
+            if op_id > 0:
                 # G2_1
                 self.G_ops.append(G2_1(a, b, i, j))
             else:
@@ -60,16 +62,15 @@ class quantumLRBaseClass:
         self.orbs = [self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.num_virtual_orbs]
 
     def run(self) -> None:
+        """Run linear response."""
         raise NotImplementedError
 
-    def _get_qbitmap(self) -> np.ndarray:
+    def _get_qbitmap(self) -> tuple[list[list[str]], list[list[str]], list[list[str]]]:
+        """Get qbitmapping of operators."""
         raise NotImplementedError
 
     def get_excitation_energies(self) -> np.ndarray:
-        """
-        Solve LR eigenvalue problem
-        """
-
+        """Solve LR eigenvalue problem."""
         # Build Hessian and Metric
         size = len(self.A)
         self.Delta = np.zeros_like(self.Sigma)
@@ -93,10 +94,7 @@ class quantumLRBaseClass:
         return self.excitation_energies
 
     def get_normed_excitation_vectors(self) -> None:
-        """
-        Get normed excitation vectors via excitated state norm
-        """
-
+        """Get normed excitation vectors via excitated state norm."""
         self.normed_excitation_vectors = np.zeros_like(self.excitation_vectors)
         self._Z_q = self.excitation_vectors[: self.num_q, :]
         self._Z_G = self.excitation_vectors[self.num_q : self.num_q + self.num_G, :]
@@ -126,7 +124,6 @@ class quantumLRBaseClass:
         Returns:
             Norm of excited states.
         """
-
         norms = np.zeros(len(self._Z_G[0]))
         for state_number in range(len(self._Z_G[0])):
             # Get Z_q Z_G Y_q and Y_G matrices
@@ -143,6 +140,14 @@ class quantumLRBaseClass:
         return norms
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+        """Calculate transtition dipole moment.
+
+        Args:
+            dipole_integrals: Dipole integrals (x,y,z) in AO basis.
+
+        Returns:
+            Transition dipole moments.
+        """
         raise NotImplementedError
 
     def get_oscillator_strength(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
@@ -196,7 +201,15 @@ class quantumLRBaseClass:
         return output
 
 
-def get_num_nonCBS(matrix):
+def get_num_nonCBS(matrix: list[list[str]]) -> int:
+    """Count number of non computational basis measurements in operator matrix.
+
+    Args:
+        matrix: Operator matrix.
+
+    Returns:
+        Number of non computational basis measurements.
+    """
     count = 0
     dim = len(matrix[0])
     for i in range(dim):
@@ -207,7 +220,15 @@ def get_num_nonCBS(matrix):
     return count
 
 
-def get_num_CBS_elements(matrix):
+def get_num_CBS_elements(matrix: list[list[str]]) -> tuple[int, int]:
+    """Count how many individual elements in matrix require only measurement in computational basis and how many do not.
+
+    Args:
+        matrix: Operator matrix.
+
+    Returns:
+        Number of elements only requiring computational basis measurements and how many do not.
+    """
     count_CBS = 0
     count_nCBS = 0
     dim = len(matrix[0])

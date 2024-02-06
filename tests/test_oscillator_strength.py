@@ -1,11 +1,11 @@
 import numpy as np
 
 import slowquant.SlowQuant as sq
-import slowquant.unitary_coupled_cluster.linear_response.allstatetransfer as allstatetransfer
-import slowquant.unitary_coupled_cluster.linear_response.generic as generic
-import slowquant.unitary_coupled_cluster.linear_response.naive as naive
-import slowquant.unitary_coupled_cluster.linear_response.projected as projected
-import slowquant.unitary_coupled_cluster.linear_response.statetransfer as statetransfer
+import slowquant.unitary_coupled_cluster.linear_response.allstatetransfer as allstatetransfer  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.generic as generic  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.projected as projected  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.statetransfer as statetransfer  # pylint: disable=consider-using-from-import
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 

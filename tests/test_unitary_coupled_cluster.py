@@ -1,3 +1,4 @@
+# type: ignore
 import numpy as np
 
 import slowquant.SlowQuant as sq
@@ -105,31 +106,6 @@ def test_h10_sto3g_uccsd() -> None:
     assert abs(WF.energy_elec - (-18.839645894737956)) < 10**-8
 
 
-def test_h2_431g_oouccsd() -> None:
-    """Test OO-UCCSD(2,2)."""
-    A = sq.SlowQuant()
-    A.set_molecule(
-        """H  1.4  0.0  0.0;
-           H  0.0  0.0  0.0;""",
-        distance_unit="bohr",
-    )
-    A.set_basis_set("4-31G")
-    A.init_hartree_fock()
-    A.hartree_fock.run_restricted_hartree_fock()
-    h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
-    g_eri = A.integral.electron_repulsion_tensor
-    WF = WaveFunctionUCC(
-        A.molecule.number_bf * 2,
-        A.molecule.number_electrons,
-        (2, 2),
-        A.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
-    )
-    WF.run_ucc("SD", True)
-    assert abs(WF.energy_elec - (-1.860533598715)) < 10**-8
-
-
 def test_h2_431g_oouccd() -> None:
     """Test OO-UCCD(2,2)."""
     A = sq.SlowQuant()
@@ -154,31 +130,6 @@ def test_h2_431g_oouccd() -> None:
     )
     WF.run_ucc("D", True)
     assert abs(WF.energy_elec - (-1.860533598715)) < 10**-8
-
-
-def test_h2_431g_uccsd() -> None:
-    """Test UCCSD(2,2)."""
-    A = sq.SlowQuant()
-    A.set_molecule(
-        """H  1.4  0.0  0.0;
-           H  0.0  0.0  0.0;""",
-        distance_unit="bohr",
-    )
-    A.set_basis_set("4-31G")
-    A.init_hartree_fock()
-    A.hartree_fock.run_restricted_hartree_fock()
-    h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
-    g_eri = A.integral.electron_repulsion_tensor
-    WF = WaveFunctionUCC(
-        A.molecule.number_bf * 2,
-        A.molecule.number_electrons,
-        (2, 2),
-        A.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
-    )
-    WF.run_ucc("SD", False)
-    assert abs(WF.energy_elec - (-1.8466860579618674)) < 10**-8
 
 
 def test_h4_sto3g_oouccsd() -> None:
@@ -209,8 +160,7 @@ def test_h4_sto3g_oouccsd() -> None:
     # Test sparse matrix also works
     H = hamiltonian_pauli(WF.h_mo, WF.g_mo, WF.num_orbs)
     assert (
-        abs(WF.energy_elec - expectation_value_pauli(WF.state_vector, H, WF.state_vector, use_csr=0))
-        < 10**-8
+        abs(WF.energy_elec - expectation_value_pauli(WF.state_vector, H, WF.state_vector, use_csr=0)) < 10**-8
     )
 
 
@@ -243,8 +193,7 @@ def test_h4_sto3g_oouccd() -> None:
     # Test sparse matrix also works
     H = hamiltonian_pauli(WF.h_mo, WF.g_mo, WF.num_orbs)
     assert (
-        abs(WF.energy_elec - expectation_value_pauli(WF.state_vector, H, WF.state_vector, use_csr=0))
-        < 10**-8
+        abs(WF.energy_elec - expectation_value_pauli(WF.state_vector, H, WF.state_vector, use_csr=0)) < 10**-8
     )
 
 
@@ -397,7 +346,7 @@ def test_h2_631g_oouccsd_lr() -> None:
     assert abs(osc_strengths[5] - 0.0) < 10**-3
 
 
-def test_h4_sto3g_uccsd_lr_naive() -> None:  # pylint: disable=R0915
+def test_h4_sto3g_uccsd_lr_naive() -> None:
     """Test Linear Response for uccsd(4,4)."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -490,7 +439,7 @@ def test_h4_sto3g_uccsd_lr_naive() -> None:  # pylint: disable=R0915
     assert abs(osc_strengths[13] - 0.0) < 10**-3
 
 
-def test_be_sto3g_uccsd_lr_naive() -> None:  # pylint: disable=R0915
+def test_be_sto3g_uccsd_lr_naive() -> None:
     """Test Linear Response for uccsd(2,2)."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -564,7 +513,7 @@ def test_be_sto3g_uccsd_lr_naive() -> None:  # pylint: disable=R0915
     assert abs(osc_strengths[9] - 0.0) < 10**-3
 
 
-def test_lih_sto3g_uccsd_lr_naive() -> None:  # pylint: disable=R0915
+def test_lih_sto3g_uccsd_lr_naive() -> None:
     """Test Linear Response for uccsd.
     This examples was used to find and fix a bug :)
     """
@@ -653,84 +602,8 @@ def test_lih_sto3g_uccsd_lr_naive() -> None:  # pylint: disable=R0915
     assert abs(osc_strengths[12] - 0.003904) < 10**-3
 
 
-def test_OHm_sto3g_uccsd_lr() -> None:  # pylint: disable=R0915
-    SQobj = sq.SlowQuant()
-    SQobj.set_molecule(
-        """O  0.0  0.0  0.0;
-           H  1.4  0.0  0.0;""",
-        distance_unit="angstrom",
-        molecular_charge=-1,
-    )
-    SQobj.set_basis_set("STO-3G")
-    SQobj.init_hartree_fock()
-    SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
-    WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
-        SQobj.molecule.number_electrons,
-        (2, 2),
-        SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
-    )
-    dipole_integrals = (
-        SQobj.integral.get_multipole_matrix([1, 0, 0]),
-        SQobj.integral.get_multipole_matrix([0, 1, 0]),
-        SQobj.integral.get_multipole_matrix([0, 0, 1]),
-    )
-
-    WF.run_ucc("SD", True)
-
-    LR = naiveLR.LinearResponseUCC(WF, excitations="SD")
-    LR.calc_excitation_energies()
-    assert abs(LR.excitation_energies[0] - 0.000000) < 10**-4
-    assert abs(LR.excitation_energies[1] - 0.000000) < 10**-4
-    assert abs(LR.excitation_energies[2] - 0.137490) < 10**-4
-    assert abs(LR.excitation_energies[3] - 0.143084) < 10**-4
-    assert abs(LR.excitation_energies[4] - 0.433389) < 10**-4
-    assert abs(LR.excitation_energies[5] - 0.568480) < 10**-4
-    assert abs(LR.excitation_energies[6] - 0.659111) < 10**-4
-    assert abs(LR.excitation_energies[7] - 1.049113) < 10**-4
-    assert abs(LR.excitation_energies[8] - 19.547355) < 10**-4
-    assert abs(LR.excitation_energies[9] - 19.838150) < 10**-4
-    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
-    assert abs(osc_strengths[0] - 0.000000) < 10**-3
-    assert abs(osc_strengths[1] - 0.000000) < 10**-3
-    assert abs(osc_strengths[2] - 0.000304) < 10**-3
-    assert abs(osc_strengths[3] - 0.000360) < 10**-3
-    assert abs(osc_strengths[4] - 0.045164) < 10**-3
-    assert abs(osc_strengths[5] - 0.854043) < 10**-3
-    assert abs(osc_strengths[6] - 0.010548) < 10**-3
-    assert abs(osc_strengths[7] - 0.041511) < 10**-3
-    assert abs(osc_strengths[8] - 0.094685) < 10**-3
-    assert abs(osc_strengths[9] - 0.001133) < 10**-3
-    LR = selfconsistentLR.LinearResponseUCC(WF, excitations="SD")
-    LR.calc_excitation_energies()
-    assert abs(LR.excitation_energies[0] - 0.000000) < 10**-4
-    assert abs(LR.excitation_energies[1] - 0.000000) < 10**-4
-    assert abs(LR.excitation_energies[2] - 0.137490) < 10**-4
-    assert abs(LR.excitation_energies[3] - 0.143084) < 10**-4
-    assert abs(LR.excitation_energies[4] - 0.433389) < 10**-4
-    assert abs(LR.excitation_energies[5] - 0.568480) < 10**-4
-    assert abs(LR.excitation_energies[6] - 0.659111) < 10**-4
-    assert abs(LR.excitation_energies[7] - 1.049113) < 10**-4
-    assert abs(LR.excitation_energies[8] - 19.547355) < 10**-4
-    assert abs(LR.excitation_energies[9] - 19.838150) < 10**-4
-    osc_strengths = LR.get_oscillator_strength(dipole_integrals)
-    assert abs(osc_strengths[0] - 0.000000) < 10**-3
-    assert abs(osc_strengths[1] - 0.000000) < 10**-3
-    assert abs(osc_strengths[2] - 0.000304) < 10**-3
-    assert abs(osc_strengths[3] - 0.000360) < 10**-3
-    assert abs(osc_strengths[4] - 0.045164) < 10**-3
-    assert abs(osc_strengths[5] - 0.854043) < 10**-3
-    assert abs(osc_strengths[6] - 0.010548) < 10**-3
-    assert abs(osc_strengths[7] - 0.041511) < 10**-3
-    assert abs(osc_strengths[8] - 0.094685) < 10**-3
-    assert abs(osc_strengths[9] - 0.001133) < 10**-3
-
-
-def test_LiH_sto3g_uccsd_lr() -> None:  # pylint: disable=R0915
+def test_LiH_sto3g_uccsd_lr() -> None:
+    """Test LiH UCCSD(2,2) LR"""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """Li 0.0           0.0  0.0;
@@ -818,7 +691,7 @@ def test_LiH_sto3g_uccsd_lr() -> None:  # pylint: disable=R0915
     assert abs(osc_strengths[12] - 0.003903) < 10**-3
 
 
-def test_H4_sto3g_uccsdtq() -> None:  # pylint: disable=R0915
+def test_H4_sto3g_uccsdtq() -> None:
     """Test if SDTQ works, had a bug where T didnt work"""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -846,7 +719,7 @@ def test_H4_sto3g_uccsdtq() -> None:  # pylint: disable=R0915
     assert abs(WF.energy_elec - (-3.714153922167)) < 10**-8
 
 
-def test_H2_sto3g_uccsd_saveload() -> None:  # pylint: disable=R0915
+def test_H2_sto3g_uccsd_saveload() -> None:
     """Test if saving and loading of wave function works"""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(

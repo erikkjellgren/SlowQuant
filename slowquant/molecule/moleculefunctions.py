@@ -100,6 +100,7 @@ def primitive_gauss(
     ang_y: int,
     ang_z: int,
 ) -> float:
+    """Primitive Gaussian."""
     return (
         (coord_x - center_x) ** ang_x
         * (coord_y - center_y) ** ang_y

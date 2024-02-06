@@ -1,5 +1,8 @@
 [MASTER]
-disable=duplicate-code,
+disable=abstract-method,
+        arguments-out-of-order,
+        attribute-defined-outside-init,
+        duplicate-code,
         import-error,
         invalid-name,
         line-too-long,
@@ -10,4 +13,5 @@ disable=duplicate-code,
         too-many-branches,
         too-many-instance-attributes,
         too-many-locals,
-        too-many-nested-blocks
+        too-many-nested-blocks,
+        too-many-statements

@@ -229,10 +229,10 @@ class _Molecule:
         bf_amplitudes = np.zeros((len(points), self.number_bf))
         for shell in self.shells:
             x, y, z = shell.center
-            for bf_i in range(len(shell.angular_moments)):
+            for bf_i in range(len(shell.angular_moments)):  # pylint: disable=C0200
                 bf_idx = shell.bf_idx[bf_i]
                 ang_x, ang_y, ang_z = shell.angular_moments[bf_i]
-                for prim_i in range(len(shell.contraction_coefficients)):
+                for prim_i in range(len(shell.contraction_coefficients)):  # pylint: disable=C0200
                     exponent = shell.exponents[prim_i]
                     coeff = shell.contraction_coefficients[prim_i]
                     norm = shell.normalization[bf_i, prim_i]

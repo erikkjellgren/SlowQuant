@@ -62,7 +62,7 @@ def operator_to_qiskit_key(operator_string: list[a_op], remapping: dict[int, int
 
 def do_extended_normal_ordering(
     fermistring: FermionicOperator,
-) -> tuple[dict[str, float], dict[str, list[a_op]]]:
+) -> tuple[dict[str, list[a_op]], dict[str, float]]:
     """Reorder fermionic operator string.
 
     The string will be ordered such that all creation operators are first,
@@ -116,7 +116,7 @@ def do_extended_normal_ordering(
                         factor *= -1
                         changed = True
                 elif a.dagger and not b.dagger:
-                    None
+                    pass
                 else:
                     if a.idx == b.idx:
                         is_zero = True
@@ -146,21 +146,39 @@ class FermionicOperator:
     def __init__(
         self, annihilation_operator: dict[str, list[a_op]] | a_op, factor: dict[str, float] | float
     ) -> None:
+        """Initialize fermionic operator class.
+
+        Args:
+            annihilation_operator: Annihilation operator.
+            factor: Factor in front of operator.
+        """
         if isinstance(annihilation_operator, dict) and not isinstance(factor, dict):
             raise ValueError(f"factor cannot be {type(factor)} when annihilation_operator is dict")
         if not isinstance(annihilation_operator, dict) and isinstance(factor, float):
             raise ValueError(f"factor cannot be dict when annihilation_operator is {type(a_op)}")
-        if not isinstance(annihilation_operator, dict):
+        if not isinstance(annihilation_operator, dict) and not isinstance(factor, dict):
             string_key = operator_string_to_key([annihilation_operator])
             self.operators = {}
             self.operators[string_key] = [annihilation_operator]
             self.factors = {}
             self.factors[string_key] = factor
-        if isinstance(annihilation_operator, dict) and isinstance(factor, dict):
+        elif isinstance(annihilation_operator, dict) and isinstance(factor, dict):
             self.operators = annihilation_operator
             self.factors = factor
+        else:
+            raise ValueError(
+                f"Could not assign operator of {type(annihilation_operator)} with factor of {type(factor)}"
+            )
 
     def __add__(self, fermistring: FermionicOperator) -> FermionicOperator:
+        """Addition of two fermionic operators.
+
+        Args:
+            fermistring: Fermionic operator.
+
+        Returns:
+            New fermionic operator.
+        """
         operators = copy.copy(self.operators)
         factors = copy.copy(self.factors)
         for string_key in fermistring.operators.keys():
@@ -175,6 +193,14 @@ class FermionicOperator:
         return FermionicOperator(operators, factors)
 
     def __sub__(self, fermistring: FermionicOperator) -> FermionicOperator:
+        """Subtraction of two fermionic operators.
+
+        Args:
+            fermistring: Fermionic operator.
+
+        Returns:
+            New fermionic operator.
+        """
         operators = copy.copy(self.operators)
         factors = copy.copy(self.factors)
         for string_key in fermistring.operators.keys():
@@ -189,8 +215,16 @@ class FermionicOperator:
         return FermionicOperator(operators, factors)
 
     def __mul__(self, fermistring: FermionicOperator) -> FermionicOperator:
-        operators = {}
-        factors = {}
+        """Multiplication of two fermionic operators.
+
+        Args:
+            fermistring: Fermionic operator.
+
+        Returns:
+            New fermionic operator.
+        """
+        operators: dict[str, list[a_op]] = {}
+        factors: dict[str, float] = {}
         for string_key1 in fermistring.operators.keys():
             for string_key2 in self.operators.keys():
                 new_ops, new_facs = do_extended_normal_ordering(
@@ -206,8 +240,8 @@ class FermionicOperator:
                         },
                     )
                 )
-                for str_key in new_ops.keys():
-                    if str_key not in operators.keys():
+                for str_key in new_ops:  # pylint: disable=C0206
+                    if str_key not in operators.keys():  # pylint: disable=C0201
                         operators[str_key] = new_ops[str_key]
                         factors[str_key] = new_facs[str_key]
                     else:
@@ -218,6 +252,14 @@ class FermionicOperator:
         return FermionicOperator(operators, factors)
 
     def __rmul__(self, number: float) -> FermionicOperator:
+        """Multiplication of number with fermionic operator.
+
+        Args:
+            number: Number.
+
+        Returns:
+            New fermionic operator.
+        """
         operators = {}
         factors = {}
         for key_string in self.operators:
@@ -227,6 +269,11 @@ class FermionicOperator:
 
     @property
     def dagger(self) -> FermionicOperator:
+        """Complex conjugation of fermionic operator.
+
+        Returns:
+            New fermionic operator.
+        """
         operators = {}
         factors = {}
         for key_string in self.operators.keys():
@@ -297,7 +344,7 @@ class FermionicOperator:
            Folded fermionic operator.
         """
         operators = {}
-        factors = {}
+        factors: dict[str, float] = {}
         inactive_idx = []
         active_idx = []
         virtual_idx = []

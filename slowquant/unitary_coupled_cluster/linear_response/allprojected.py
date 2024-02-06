@@ -11,13 +11,11 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_orbital_gradient_response,
     get_orbital_response_property_gradient,
-    get_orbital_response_vector_norm,
 )
 from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
     LinearResponseBaseClass,
 )
 from slowquant.unitary_coupled_cluster.operator_hybrid import (
-    OperatorHybrid,
     expectation_value_hybrid_flow,
     hamiltonian_hybrid_2i_2a,
     one_elec_op_hybrid_0i_0a,

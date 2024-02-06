@@ -1,15 +1,16 @@
+# type: ignore
 import numpy as np
 
 import slowquant.SlowQuant as sq
-import slowquant.unitary_coupled_cluster.linear_response.allprojected as allprojected
-import slowquant.unitary_coupled_cluster.linear_response.allselfconsistent as allselfconsistent
-import slowquant.unitary_coupled_cluster.linear_response.allstatetransfer as allstatetransfer
-import slowquant.unitary_coupled_cluster.linear_response.generic as generic
-import slowquant.unitary_coupled_cluster.linear_response.naive as naive
-import slowquant.unitary_coupled_cluster.linear_response.projected as projected
-import slowquant.unitary_coupled_cluster.linear_response.projected_statetransfer as projected_statetransfer
-import slowquant.unitary_coupled_cluster.linear_response.selfconsistent as selfconsistent
-import slowquant.unitary_coupled_cluster.linear_response.statetransfer as statetransfer
+import slowquant.unitary_coupled_cluster.linear_response.allprojected as allprojected  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.allselfconsistent as allselfconsistent  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.allstatetransfer as allstatetransfer  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.generic as generic  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.projected as projected  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.projected_statetransfer as projected_statetransfer  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.selfconsistent as selfconsistent  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.statetransfer as statetransfer  # pylint: disable=consider-using-from-import
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
@@ -44,7 +45,7 @@ def test_h2_sto3g_uccsd_lr() -> None:
     assert abs(LR.excitation_energies[0] - 1.0157376) < 10**-3
     assert abs(LR.excitation_energies[1] - 1.71950367) < 10**-3
     # ST
-    LR = allstatetransfer.LinearResponseUCC(
+    LR = allstatetransfer.LinearResponseUCC(  # type: ignore [assigment]
         WF,
         excitations="SD",
     )
@@ -97,7 +98,7 @@ def test_h2_sto3g_uccsd_lr_matrices() -> None:
     assert np.allclose(LR_naive.Delta, LR_native.Delta, atol=threshold)
 
     # ST
-    LR_naive = allstatetransfer.LinearResponseUCC(
+    LR_naive = allstatetransfer.LinearResponseUCC(  # type: ignore [assigment]
         WF,
         excitations="SD",
     )
@@ -164,7 +165,7 @@ def test_LiH_atmethods_energies() -> None:
     assert np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)
 
     # atST
-    LR_naive = allstatetransfer.LinearResponseUCC(
+    LR_naive = allstatetransfer.LinearResponseUCC(  # type: ignore [assignment]
         WF,
         excitations="SD",
     )
@@ -237,7 +238,7 @@ def test_LiH_naiveq_methods_energies() -> None:
     assert np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)
 
     # proj:
-    LR_naive = projected.LinearResponseUCC(
+    LR_naive = projected.LinearResponseUCC(  # type: ignore [assigment]
         WF,
         excitations="SD",
     )
@@ -263,7 +264,7 @@ def test_LiH_naiveq_methods_energies() -> None:
     assert np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)
 
     # SC
-    LR_naive = selfconsistent.LinearResponseUCC(
+    LR_naive = selfconsistent.LinearResponseUCC(  # type: ignore [assigment]
         WF,
         excitations="SD",
     )
@@ -289,7 +290,7 @@ def test_LiH_naiveq_methods_energies() -> None:
     assert np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)
 
     # ST
-    LR_naive = statetransfer.LinearResponseUCC(
+    LR_naive = statetransfer.LinearResponseUCC(  # type: ignore [assigment]
         WF,
         excitations="SD",
     )
@@ -422,7 +423,7 @@ def test_LiH_naiveq_methods_matrices() -> None:
     assert np.allclose(LR_generic.Delta, np.zeros_like(LR_generic.Delta), atol=threshold)
 
     # SC
-    LR_naive = selfconsistent.LinearResponseUCC(
+    LR_naive = selfconsistent.LinearResponseUCC(  # type: ignore [assigment]
         WF,
         excitations="SD",
     )
@@ -443,7 +444,7 @@ def test_LiH_naiveq_methods_matrices() -> None:
 
     # projected:
     threshold = 10 ** (-5)
-    LR_naive = projected.LinearResponseUCC(
+    LR_naive = projected.LinearResponseUCC(  # type: ignore [assigment]
         WF,
         excitations="SD",
     )
@@ -464,7 +465,7 @@ def test_LiH_naiveq_methods_matrices() -> None:
     assert np.allclose(LR_naive.Delta, np.zeros_like(LR_naive.Delta), atol=threshold)
 
     # ST
-    LR_naive = statetransfer.LinearResponseUCC(
+    LR_naive = statetransfer.LinearResponseUCC(  # type: ignore [assigment]
         WF,
         excitations="SD",
     )
@@ -624,4 +625,4 @@ def test_LiH_STproj_energies() -> None:
         ]
     )
 
-    assert np.allclose(LR_HSTproj_naive.excitation_energies, solutions, atol=threshold * 10)
+    assert np.allclose(LR_HSTproj_naive.excitation_energies, solutions, atol=threshold * 10)  # type: ignore [assignment]
