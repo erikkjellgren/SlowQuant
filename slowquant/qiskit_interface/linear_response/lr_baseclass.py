@@ -65,7 +65,7 @@ class quantumLRBaseClass:
         """Run linear response."""
         raise NotImplementedError
 
-    def _get_qbitmap(self) -> np.ndarray:
+    def _get_qbitmap(self) -> tuple[list[list[str]], list[list[str]], list[list[str]]]:
         """Get qbitmapping of operators."""
         raise NotImplementedError
 
@@ -221,13 +221,13 @@ def get_num_nonCBS(matrix: list[list[str]]) -> int:
 
 
 def get_num_CBS_elements(matrix: list[list[str]]) -> tuple[int, int]:
-    """Count number of computational basis measurements and non computational basis measurements in operator matrix.
+    """Count how many individual elements in matrix require only measurement in computational basis and how many do not.
 
     Args:
         matrix: Operator matrix.
 
     Returns:
-        Number of computational basis measurements and non computational basis measurements.
+        Number of elements only requiring computational basis measurements and how many do not.
     """
     count_CBS = 0
     count_nCBS = 0
