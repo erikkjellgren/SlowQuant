@@ -417,7 +417,7 @@ class FermionicOperator:
         creation = []
         annihilation = []
         for op_string in excitations:
-            numbers = re.findall(r"\d", op_string)
+            numbers = re.findall(r"\d+", op_string)
             numbers = [int(num) for num in numbers]
             midpoint = len(numbers) // 2
             c = numbers[:midpoint]
