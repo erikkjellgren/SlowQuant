@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import re
 
 
 class a_op:
@@ -407,3 +408,21 @@ class FermionicOperator:
                 factors[new_key] = fac * self.factors[key_string]
                 operators[new_key] = active_op
         return FermionicOperator(operators, factors)
+
+    def get_info(self) -> tuple[list[list[int]], list[list[int]], list[float]]:
+        """Return operator excitation in ordered strings with coefficient."""
+        excitations = list(self.factors.keys())
+        coefficients = list(self.factors.values())
+
+        creation = []
+        annihilation = []
+        for op_string in excitations:
+            numbers = re.findall(r"\d", op_string)
+            numbers = [int(num) for num in numbers]
+            midpoint = len(numbers) // 2
+            c = numbers[:midpoint]
+            a = numbers[midpoint:]
+            creation.append(c)
+            annihilation.append(a)
+
+        return annihilation, creation, coefficients
