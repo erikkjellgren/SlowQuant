@@ -66,12 +66,26 @@ class quantumLRBaseClass:
         # q operators
         print(f"{'Annihilation'.center(12)} | {'Creation'.center(12)} | {'Coefficient'.center(12)}\n")
         if self.num_q > 0:
-            print("Orbital roation operators:")
+            print("Orbital rotation operators:")
             for nr, op in enumerate(self.q_ops):
                 annihilation, creation, coefficients = op.get_info()
                 print("q" + str(nr) + ":")
                 for a, c, coeff in zip(annihilation, creation, coefficients):
-                    print(str(a).center(12) + " | " + str(c).center(12) + " | " + f"{coeff:.3f}".center(12))
+                    if a[0] in self.wf.active_spin_idx:
+                        exc_type = "active -> virtual"
+                    elif c[0] in self.wf.active_spin_idx:
+                        exc_type = "inactive -> active"
+                    else:
+                        exc_type = "inactive -> virtual"
+                    print(
+                        str(a).center(12)
+                        + " | "
+                        + str(c).center(12)
+                        + " | "
+                        + f"{coeff:.3f}".center(12)
+                        + " | "
+                        + exc_type
+                    )
 
         if self.num_G > 0:
             print("Active-space excitation operators:")
