@@ -1,4 +1,7 @@
 numba
 numpy
+qiskit
+qiskit-algorithms
+qiskit-nature
 scipy
 sphinx-rtd-theme==2.0.0
