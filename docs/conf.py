@@ -2,6 +2,11 @@
 # -*- coding: utf-8 -*-
 # pylint: skip-file
 
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath(".."))
+
 # -- General configuration ------------------------------------------------
 # If your documentation needs a minimal Sphinx version, state it here.
 # needs_sphinx = '1.0'
@@ -21,7 +26,7 @@ master_doc = "index"
 
 # General information about the project.
 project = "SLOWQUANT"
-copyright = "2023, Erik Kjellgren"  # pylint: disable=W0622
+copyright = "2017-2024, Erik Kjellgren"  # pylint: disable=W0622
 author = "Erik Kjellgren"
 
 # -- Options for HTML output ----------------------------------------------
