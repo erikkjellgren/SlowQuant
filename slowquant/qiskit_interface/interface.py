@@ -191,8 +191,12 @@ class QuantumInterface:
             parameter_values=run_parameters,
             observables=self.op_to_qbit(op),
         )
-        if hasattr(self._primitive, "shots"):
+        if hasattr(self._primitive.options, "shots"):
+            # Shot-noise simulator
             self.total_shots_used += self._primitive.options.shots
+        elif "execution" in self._primitive.options:
+            # Device
+            self.total_shots_used += self._primitive.options["execution"]["shots"]
         self.total_device_calls += 1
         result = job.result()
         values = result.values[0]
@@ -270,8 +274,12 @@ class QuantumInterface:
 
         # Run sampler
         job = self._primitive.run(ansatz_w_obs, parameter_values=run_parameters)
-        if hasattr(self._primitive, "shots"):
+        if hasattr(self._primitive.options, "shots"):
+            # Shot-noise simulator
             self.total_shots_used += self._primitive.options.shots
+        elif "execution" in self._primitive.options:
+            # Device
+            self.total_shots_used += self._primitive.options["execution"]["shots"]
         self.total_device_calls += 1
 
         # Get quasi-distribution in binary probabilities
