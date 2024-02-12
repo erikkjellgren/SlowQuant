@@ -43,7 +43,7 @@ class QuantumInterface:
             do_M_iqa: Use independent qubit approximation when constructing the read-out correlation matrix.
             do_M_ansatz0: Use the ansatz with theta=0 when constructing the read-out correlation matrix
         """
-        allowed_ansatz = ("UCCSD", "PUCCD", "UCCD", "ErikD", "ErikSD")
+        allowed_ansatz = ("UCCSD", "PUCCD", "UCCD", "ErikD", "ErikSD", "HF")
         if ansatz not in allowed_ansatz:
             raise ValueError("The chosen Ansatz is not availbale. Choose from: ", allowed_ansatz)
         self.ansatz = ansatz
@@ -52,6 +52,8 @@ class QuantumInterface:
         self._do_M_mitigation = do_M_mitigation
         self._do_M_iqa = do_M_iqa
         self._do_M_ansatz0 = do_M_ansatz0
+        self.total_shots_used = 0
+        self.total_device_calls = 0
 
     def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int]) -> None:
         """Construct qiskit circuit.
@@ -62,44 +64,44 @@ class QuantumInterface:
         """
         self.num_orbs = num_orbs
         self.num_spin_orbs = 2 * num_orbs
-        self.num_elec = num_elec
+        self.num_elec = tuple(num_elec)
 
         if self.ansatz == "UCCSD":
             self.circuit = UCCSD(
                 num_orbs,
-                num_elec,
+                self.num_elec,
                 self.mapper,
                 initial_state=HartreeFock(
                     num_orbs,
-                    num_elec,
+                    self.num_elec,
                     self.mapper,
                 ),
             )
         elif self.ansatz == "PUCCD":
             self.circuit = PUCCD(
                 num_orbs,
-                num_elec,
+                self.num_elec,
                 self.mapper,
                 initial_state=HartreeFock(
                     num_orbs,
-                    num_elec,
+                    self.num_elec,
                     self.mapper,
                 ),
             )
         elif self.ansatz == "UCCD":
             self.circuit = UCC(
                 num_orbs,
-                num_elec,
+                self.num_elec,
                 "d",
                 self.mapper,
                 initial_state=HartreeFock(
                     num_orbs,
-                    num_elec,
+                    self.num_elec,
                     self.mapper,
                 ),
             )
         elif self.ansatz == "ErikD":
-            if num_orbs != 2 or list(num_elec) != [1, 1]:
+            if num_orbs != 2 or self.num_elec != (1, 1):
                 raise ValueError(f"Chosen ansatz, {self.ansatz}, only works for (2,2)")
             if isinstance(self.mapper, JordanWignerMapper):
                 self.circuit = ErikD_JW()
@@ -108,7 +110,7 @@ class QuantumInterface:
             else:
                 raise ValueError(f"Unsupported mapper, {type(self.mapper)}, for ansatz {self.ansatz}")
         elif self.ansatz == "ErikSD":
-            if num_orbs != 2 or list(num_elec) != [1, 1]:
+            if num_orbs != 2 or self.num_elec != (1, 1):
                 raise ValueError(f"Chosen ansatz, {self.ansatz}, only works for (2,2)")
             if isinstance(self.mapper, JordanWignerMapper):
                 self.circuit = ErikSD_JW()
@@ -116,6 +118,8 @@ class QuantumInterface:
                 self.circuit = ErikSD_Parity()
             else:
                 raise ValueError(f"Unsupported mapper, {type(self.mapper)}, for ansatz {self.ansatz}")
+        elif self.ansatz == "HF":
+            self.circuit = HartreeFock(num_orbs, self.num_elec, self.mapper)
 
         self.num_qubits = self.circuit.num_qubits
         # Set parameter to HarteeFock
@@ -200,6 +204,9 @@ class QuantumInterface:
             parameter_values=run_parameters,
             observables=self.op_to_qbit(op),
         )
+        if hasattr(self._primitive, "shots"):
+            self.total_shots_used += self._primitive.options.shots
+        self.total_device_calls += 1
         result = job.result()
         values = result.values[0]
 
@@ -292,6 +299,9 @@ class QuantumInterface:
 
         # Run sampler
         job = self._primitive.run(ansatz_w_obs, parameter_values=run_parameters)
+        if hasattr(self._primitive, "shots"):
+            self.total_shots_used += self._primitive.options.shots
+        self.total_device_calls += 1
 
         # Get quasi-distribution in binary probabilities
         distr = job.result().quasi_dists[0].binary_probabilities()
@@ -463,7 +473,7 @@ def get_bitstring_sign(op: Pauli, binary: str) -> int:
     return sign
 
 
-def make_cliques(paulis: Pauli) -> dict[str, list[str]]:
+def make_cliques(paulis: PauliList) -> dict[str, list[str]]:
     """Partition Pauli strings into simultaniously measurable cliques.
 
     The Pauli strings are put into cliques accourding to Qubit-Wise Commutativity (QWC).
