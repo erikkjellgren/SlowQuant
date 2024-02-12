@@ -186,7 +186,9 @@ class WaveFunction:
         self._energy_elec: float | None = None
         # Setup Qiskit stuff
         self.QI = quantum_interface
-        self.QI.construct_circuit(self.num_active_orbs, self.num_active_elec)
+        self.QI.construct_circuit(
+            self.num_active_orbs, (self.num_active_elec // 2, self.num_active_elec // 2)
+        )
 
     @property
     def c_orthonormal(self) -> np.ndarray:
@@ -431,7 +433,7 @@ class WaveFunction:
             if not silent:
                 e_str = f"{energy_func(x):3.16f}"
                 print(
-                    f"--------{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}"  # type: ignore [name-defined] # pylint: disable=used-before-assignment
+                    f"--------{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}"  # type: ignore [name-defined] # pylint: disable=used-before-assignment
                 )
             iteration += 1  # type: ignore
             start = time.time()  # type: ignore
@@ -456,7 +458,7 @@ class WaveFunction:
             time_str = f"{time.time() - start:7.2f}"  # type: ignore
             e_str = f"{f_val:3.12f}"
             if not silent:
-                print(f"--------{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+                print(f"--------{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
             iteration += 1  # type: ignore
             start = time.time()  # type: ignore
 
@@ -547,7 +549,7 @@ class WaveFunction:
             e_new = res.fun
             time_str = f"{time.time() - full_start:7.2f}"  # type: ignore
             e_str = f"{e_new:3.12f}"
-            print(f"{str(full_iter+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+            print(f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
             if abs(e_new - e_old) < tol:
                 break
             e_old = e_new
@@ -579,7 +581,7 @@ class WaveFunction:
             global start  # pylint: disable=global-variable-undefined
             time_str = f"{time.time() - start:7.2f}"  # type: ignore
             e_str = f"{energy_func(x):3.12f}"
-            print(f"{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+            print(f"{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
             iteration += 1  # type: ignore
             start = time.time()  # type: ignore
 
@@ -600,7 +602,7 @@ class WaveFunction:
             global start  # pylint: disable=global-variable-undefined
             time_str = f"{time.time() - start:7.2f}"  # type: ignore
             e_str = f"{f_val:3.12f}"
-            print(f"{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+            print(f"{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
             iteration += 1  # type: ignore
             start = time.time()  # type: ignore
 

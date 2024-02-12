@@ -1,6 +1,9 @@
+import itertools
+
+import numpy as np
 from qiskit import QuantumCircuit
 from qiskit.primitives import BaseEstimator, BaseSampler
-from qiskit.quantum_info import Pauli, SparsePauliOp
+from qiskit.quantum_info import Pauli, PauliList, SparsePauliOp
 from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFock
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
@@ -26,68 +29,77 @@ class QuantumInterface:
         primitive: BaseEstimator | BaseSampler,
         ansatz: str,
         mapper: FermionicMapper,
+        do_M_mitigation: bool = False,
+        do_M_iqa: bool = False,
+        do_M_ansatz0: bool = False,
     ) -> None:
         """Interface to Qiskit to use IBM quantum hardware or simulator.
 
         Args:
-            primitive: Qiskit Estimator or Sampler object
-            ansatz: Name of qiskit ansatz to be used. Currenly supported: UCCSD, UCCD, and PUCCD
-            mapper: Qiskit mapper object, e.g. JW or Parity
+            primitive: Qiskit Estimator or Sampler object.
+            ansatz: Name of ansatz to be used.
+            mapper: Qiskit mapper object.
+            do_M_mitigation: Do error mitigation via read-out correlation matrix.
+            do_M_iqa: Use independent qubit approximation when constructing the read-out correlation matrix.
+            do_M_ansatz0: Use the ansatz with theta=0 when constructing the read-out correlation matrix
         """
-        allowed_ansatz = ["UCCSD", "PUCCD", "UCCD", "ErikD", "ErikSD"]
+        allowed_ansatz = ("UCCSD", "PUCCD", "UCCD", "ErikD", "ErikSD")
         if ansatz not in allowed_ansatz:
             raise ValueError("The chosen Ansatz is not availbale. Choose from: ", allowed_ansatz)
         self.ansatz = ansatz
         self._primitive = primitive
         self.mapper = mapper
+        self._do_M_mitigation = do_M_mitigation
+        self._do_M_iqa = do_M_iqa
+        self._do_M_ansatz0 = do_M_ansatz0
 
-    def construct_circuit(self, num_orbs: int, num_parts: int) -> None:
+    def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int]) -> None:
         """Construct qiskit circuit.
 
         Args:
-            num_orbs: number of orbitals
-            num_parts: number of particles/electrons
+            num_orbs: Number of orbitals in spatial basis.
+            num_elec: Number of electrons (alpha, beta).
         """
-        self.num_orbs = (
-            num_orbs  # that might be a dirty and stupid solution for the num_orbs problem. revisit it!
-        )
+        self.num_orbs = num_orbs
+        self.num_spin_orbs = 2 * num_orbs
+        self.num_elec = num_elec
 
         if self.ansatz == "UCCSD":
             self.circuit = UCCSD(
                 num_orbs,
-                (num_parts // 2, num_parts // 2),
+                num_elec,
                 self.mapper,
                 initial_state=HartreeFock(
                     num_orbs,
-                    (num_parts // 2, num_parts // 2),
+                    num_elec,
                     self.mapper,
                 ),
             )
         elif self.ansatz == "PUCCD":
             self.circuit = PUCCD(
                 num_orbs,
-                (num_parts // 2, num_parts // 2),
+                num_elec,
                 self.mapper,
                 initial_state=HartreeFock(
                     num_orbs,
-                    (num_parts // 2, num_parts // 2),
+                    num_elec,
                     self.mapper,
                 ),
             )
         elif self.ansatz == "UCCD":
             self.circuit = UCC(
                 num_orbs,
-                (num_parts // 2, num_parts // 2),
+                num_elec,
                 "d",
                 self.mapper,
                 initial_state=HartreeFock(
                     num_orbs,
-                    (num_parts // 2, num_parts // 2),
+                    num_elec,
                     self.mapper,
                 ),
             )
         elif self.ansatz == "ErikD":
-            if num_orbs != 2 or num_parts != 2:
+            if num_orbs != 2 or list(num_elec) != [1, 1]:
                 raise ValueError(f"Chosen ansatz, {self.ansatz}, only works for (2,2)")
             if isinstance(self.mapper, JordanWignerMapper):
                 self.circuit = ErikD_JW()
@@ -96,7 +108,7 @@ class QuantumInterface:
             else:
                 raise ValueError(f"Unsupported mapper, {type(self.mapper)}, for ansatz {self.ansatz}")
         elif self.ansatz == "ErikSD":
-            if num_orbs != 2 or num_parts != 2:
+            if num_orbs != 2 or list(num_elec) != [1, 1]:
                 raise ValueError(f"Chosen ansatz, {self.ansatz}, only works for (2,2)")
             if isinstance(self.mapper, JordanWignerMapper):
                 self.circuit = ErikSD_JW()
@@ -105,6 +117,7 @@ class QuantumInterface:
             else:
                 raise ValueError(f"Unsupported mapper, {type(self.mapper)}, for ansatz {self.ansatz}")
 
+        self.num_qubits = self.circuit.num_qubits
         # Set parameter to HarteeFock
         self._parameters = [0.0] * self.circuit.num_parameters
 
@@ -143,7 +156,7 @@ class QuantumInterface:
         Returns:
             Qubit representation of operator.
         """
-        return self.mapper.map(FermionicOp(op.get_qiskit_form(self.num_orbs), 2 * self.num_orbs))
+        return self.mapper.map(FermionicOp(op.get_qiskit_form(self.num_orbs), self.num_spin_orbs))
 
     def quantum_expectation_value(
         self, op: FermionicOperator, custom_parameters: list[float] | None = None
@@ -221,6 +234,17 @@ class QuantumInterface:
         distributions = {}
         for clique_pauli, clique in cliques.items():
             dist = self._sampler_distributions(Pauli(clique_pauli), run_parameters)
+            if self._do_M_mitigation:
+                if not hasattr(self, "_Minv"):
+                    self._make_Minv()
+                C = np.zeros(2**self.num_qubits)
+                for bitstring, prob in dist.items():
+                    idx = int(bitstring[::-1], 2)
+                    C[idx] = prob
+                C_new = self._Minv @ C
+                for bitstring, prob in dist.items():
+                    idx = int(bitstring[::-1], 2)
+                    dist[bitstring] = C_new[idx]
             # It is wasteful to store the distribution per Pauli instead of per Clique,
             # but it help unpack it later.
             for pauli in clique:
@@ -240,7 +264,9 @@ class QuantumInterface:
 
         return values.real
 
-    def _sampler_distributions(self, pauli: Pauli, run_parameters: list[float]) -> dict[str, float]:
+    def _sampler_distributions(
+        self, pauli: PauliList, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
+    ) -> dict[str, float]:
         r"""Get results from a sampler distribution for one given Pauli string.
 
         The expectation value of a Pauli string is calcuated as:
@@ -258,7 +284,10 @@ class QuantumInterface:
             Probability weighted Pauli string.
         """
         # Create QuantumCircuit
-        ansatz_w_obs = self.circuit.compose(to_CBS_measurement(pauli))
+        if custom_circ is None:
+            ansatz_w_obs = self.circuit.compose(to_CBS_measurement(pauli))
+        else:
+            ansatz_w_obs = custom_circ.compose(to_CBS_measurement(pauli))
         ansatz_w_obs.measure_all()
 
         # Run sampler
@@ -268,8 +297,100 @@ class QuantumInterface:
         distr = job.result().quasi_dists[0].binary_probabilities()
         return distr
 
+    def _make_Minv(self) -> None:
+        r"""Make inverse of read-out correlation matrix.
 
-def to_CBS_measurement(op: Pauli) -> QuantumCircuit:
+        The read-out correlation matrix is of the form (for two qubits):
+
+        .. math::
+            M = \begin{pmatrix}
+                P(00|00) & P(00|10) & P(00|01) & P(00|11)\\
+                P(10|00) & P(10|10) & P(10|01) & P(10|11)\\
+                P(01|00) & P(01|10) & P(01|01) & P(01|11)\\
+                P(11|00) & P(11|10) & P(11|01) & P(11|11)
+                \end{pmatrix}
+
+        With :math:`P(AB|CD)` meaning the probability of reading :math:`AB` given the circuit is prepared to give :math:`CD`.
+
+        The construction also supports the independent qubit approximation, which for two qubits means that:
+
+        .. math::
+            P(\tilde{q}_1 \tilde{q}_0|q_1 q_0) = P(\tilde{q}_1|q_1)P(\tilde{q}_0|q_0)
+
+        Under this approximation only :math:`\left<00\right|` and :math:`\left<11\right|` need to be measured,
+        in order the gain enough information to construct :math:`M`.
+
+        The read-out correlation take the following form (for two qubits):
+
+        .. math::
+            M = \begin{pmatrix}
+                P_{q1}(0|0)P_{q0}(0|0) & P_{q1}(0|1)P_{q0}(0|0) & P_{q1}(0|0)P_{q0}(0|1) & P_{q1}(0|1)P_{q0}(0|1)\\
+                P_{q1}(1|0)P_{q0}(0|0) & P_{q1}(1|1)P_{q0}(0|0) & P_{q1}(1|0)P_{q0}(0|1) & P_{q1}(1|1)P_{q0}(0|1)\\
+                P_{q1}(0|0)P_{q0}(1|0) & P_{q1}(0|1)P_{q0}(1|0) & P_{q1}(0|0)P_{q0}(1|1) & P_{q1}(0|1)P_{q0}(1|1)\\
+                P_{q1}(1|0)P_{q0}(1|0) & P_{q1}(1|1)P_{q0}(1|0) & P_{q1}(1|0)P_{q0}(1|1) & P_{q1}(1|1)P_{q0}(1|1)
+                \end{pmatrix}
+
+        The construct also support the building of the read-out correlation matrix when the ansatz is included:
+
+        .. math::
+            \left<00\right| \rightarrow \left<00\right|\boldsymbol{U}^\dagger\left(\boldsymbol{\theta}=\boldsymbol{0}\right)
+
+        This way some of the gate-error can be build into the read-out correlation matrix.
+
+        #. https://qiskit.org/textbook/ch-quantum-hardware/measurement-error-mitigation.html
+        """
+        if self.num_qubits > 12:
+            raise ValueError("Current implementation does not scale above 12 qubits?")
+        if self._do_M_ansatz0:
+            ansatz = self.circuit
+            # Negate the Hartree-Fock State
+            ansatz = ansatz.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
+        else:
+            ansatz = QuantumCircuit(self.num_qubits)
+        M = np.zeros((2**self.num_qubits, 2**self.num_qubits))
+        if self._do_M_iqa:
+            Pzero = self._sampler_distributions(
+                Pauli("Z" * self.num_qubits), [10**-8] * len(ansatz.parameters), ansatz.copy()
+            )
+            ansatzX = ansatz.copy()
+            for i in range(self.num_qubits):
+                ansatzX.x(i)
+            Pone = self._sampler_distributions(
+                Pauli("Z" * self.num_qubits), [10**-8] * len(ansatz.parameters), ansatzX
+            )
+            for comb in itertools.product([0, 1], repeat=self.num_qubits):
+                idx2 = int("".join([str(x) for x in comb]), 2)
+                for comb_m in itertools.product([0, 1], repeat=self.num_qubits):
+                    P = 1.0
+                    idx1 = int("".join([str(x) for x in comb_m]), 2)
+                    for idx, (bit, bit_m) in enumerate(zip(comb[::-1], comb_m[::-1])):
+                        val = 0.0
+                        if bit == 0:
+                            Pout = Pzero
+                        else:
+                            Pout = Pone
+                        for bitstring, prob in Pout.items():
+                            if bitstring[idx] == str(bit_m):
+                                val += prob
+                        P *= val
+                    M[idx1, idx2] = P
+        else:
+            for comb in itertools.product([0, 1], repeat=self.num_qubits):
+                ansatzX = ansatz.copy()
+                idx2 = int("".join([str(x) for x in comb]), 2)
+                for i, bit in enumerate(comb):
+                    if bit == 1:
+                        ansatzX.x(i)
+                Px = self._sampler_distributions(
+                    Pauli("Z" * self.num_qubits), [10**-8] * len(ansatz.parameters), ansatzX
+                )
+                for bitstring, prob in Px.items():
+                    idx1 = int(bitstring[::-1], 2)
+                    M[idx1, idx2] = prob
+        self._Minv = np.linalg.inv(M)
+
+
+def to_CBS_measurement(op: PauliList) -> QuantumCircuit:
     r"""Convert a Pauli string to Pauli measurement circuit.
 
     This is achived by the following transformation:
