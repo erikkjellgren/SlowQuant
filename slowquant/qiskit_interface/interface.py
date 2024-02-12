@@ -360,6 +360,10 @@ class QuantumInterface:
         """
         if self.num_qubits > 12:
             raise ValueError("Current implementation does not scale above 12 qubits?")
+        if self._primitive.options["transpilation"]["initial_layout"] is None:
+            raise ValueError(
+                "Doing read-out correlation matrix requires qubits to be fixed. Got ['transpilation']['initial_layout'] as None"
+            )
         if self._do_M_ansatz0:
             ansatz = self.circuit
             # Negate the Hartree-Fock State
