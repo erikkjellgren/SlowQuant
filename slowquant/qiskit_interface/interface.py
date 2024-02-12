@@ -286,6 +286,7 @@ class QuantumInterface:
         Args:
             pauli: Pauli string to measure.
             run_paramters: Parameters of circuit.
+            custom_circ: Specific circuit to run.
 
         Returns:
             Probability weighted Pauli string.
