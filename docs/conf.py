@@ -37,6 +37,7 @@ html_theme_path = [
 html_static_path = ["_static"]
 html_logo = "_static/slowquant.png"
 autoclass_content = "both"
+autodoc_default_options = {"members": True, "undoc-members": True, "private-members": True}
 
 # -- Options for LaTeX output ---------------------------------------------
 latex_elements = {"preamble": r"\pdfimageresolution=144"}
