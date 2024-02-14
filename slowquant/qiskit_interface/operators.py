@@ -439,3 +439,18 @@ def one_elec_op_1i_1a(
             if abs(ints_mo[p, q]) > 10**-14:
                 one_elec_op += ints_mo[p, q] * Epq(p, q)
     return one_elec_op
+
+
+def anni(spin_idx: int, dagger: bool) -> FermionicOperator:
+    """Create annihilation operator.
+
+    Args:
+        spin_idx: Spin orbital index.
+        dagger: If creation operator.
+
+    Returns:
+        Annihilation operator.
+    """
+    if spin_idx % 2 == 0:
+        return FermionicOperator(a_op(spin_idx // 2, "alpha", dagger), 1)
+    return FermionicOperator(a_op(spin_idx // 2, "beta", dagger), 1)

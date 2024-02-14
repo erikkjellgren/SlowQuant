@@ -12,6 +12,7 @@ from slowquant.qiskit_interface.custom_ansatz import (
     ErikD_Parity,
     ErikSD_JW,
     ErikSD_Parity,
+    smallUCCSD,
 )
 
 
@@ -34,7 +35,7 @@ class QuantumInterface:
             ansatz: Name of ansatz to be used.
             mapper: Qiskit mapper object, e.g. JW or Parity.
         """
-        allowed_ansatz = ("UCCSD", "PUCCD", "UCCD", "ErikD", "ErikSD", "HF")
+        allowed_ansatz = ("UCCSD", "PUCCD", "UCCD", "ErikD", "ErikSD", "HF", "smallUCCSD")
         if ansatz not in allowed_ansatz:
             raise ValueError("The chosen Ansatz is not availbale. Choose from: ", allowed_ansatz)
         self.ansatz = ansatz
@@ -108,6 +109,8 @@ class QuantumInterface:
                 raise ValueError(f"Unsupported mapper, {type(self.mapper)}, for ansatz {self.ansatz}")
         elif self.ansatz == "HF":
             self.circuit = HartreeFock(num_orbs, self.num_elec, self.mapper)
+        elif self.ansatz == "smallUCCSD":
+            self.circuit = smallUCCSD(num_orbs, self.num_elec, self.mapper)
 
         # Set parameter to HarteeFock
         self._parameters = [0.0] * self.circuit.num_parameters
