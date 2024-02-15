@@ -227,9 +227,10 @@ class QuantumInterface:
         values = 0.0
         observables = self.op_to_qbit(op)
 
-        # Loop over all clique Paulies
+        # Obtain cliques for operator's Pauli strings
         cliques = make_cliques(observables.paulis)
         distributions = {}
+        # Simulate each clique Pauli String
         for clique_pauli, clique in cliques.items():
             dist = self._sampler_distributions(Pauli(clique_pauli), run_parameters)
             # It is wasteful to store the distribution per Pauli instead of per Clique,
