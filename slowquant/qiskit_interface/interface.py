@@ -232,23 +232,24 @@ class QuantumInterface:
         distributions = {}
 
         # Simulate each clique Pauli String with one combined device call
-        distr = self._one_call_sampler_distributions(list(cliques.keys()), run_parameters)
+        # and return a list of distributions
+        distr = self._one_call_sampler_distributions(PauliList(list(cliques.keys())), run_parameters)
 
-        # Simulate each clique Pauli String with individual device calls
-        for nr, (clique) in enumerate(cliques.values()):
-            dist = distr[nr]
-            # It is wasteful to store the distribution per Pauli instead of per Clique,
+        # Loop over all cliques and their commuting Pauli strings to obtain the result for each Pauli string
+        for nr, clique in enumerate(cliques.values()):
+            dist = distr[nr]  # Measured distribution for a given clique
+            # It is wasteful to store the distribution per Pauli instead of per clique,
             # but it help unpack it later.
-            for pauli in clique:
-                distributions[pauli] = dist
+            for pauli in clique:  # Loop over all Pauli strings associated with one clique
+                result = 0.0
+                for key, value in dist.items():  # build result from quasi-distribution
+                    # Here we could check if we want a given key (bitstring) in the result distribution
+                    result += value * get_bitstring_sign(Pauli(pauli), key)
+                distributions[pauli] = result
 
-        # Loop over all qubit-mapped Paul strings and get Sampler distributions
+        # Loop over all Pauli strings in observable and build final result with coefficients
         for pauli, coeff in zip(observables.paulis, observables.coeffs):
-            result = 0.0
-            for key, value in distributions[str(pauli)].items():
-                # Here we could check if we want a given key (bitstring) in the result distribution
-                result += value * get_bitstring_sign(pauli, key)
-            values += result * coeff
+            values += distributions[str(pauli)] * coeff
 
         if isinstance(values, complex):
             if abs(values.imag) > 10**-2:
@@ -257,7 +258,7 @@ class QuantumInterface:
         return values.real
 
     def _one_call_sampler_distributions(
-        self, paulis: list[str], run_parameters: list[float]
+        self, paulis: PauliList, run_parameters: list[float]
     ) -> list[dict[str, float]]:
         r"""Get results from a sampler distribution for several Pauli strings.
 
@@ -277,6 +278,7 @@ class QuantumInterface:
         """
         num_paulis = len(paulis)
         circuits = [None] * num_paulis
+
         # Create QuantumCircuits
         for nr, pauli in enumerate(paulis):
             ansatz_w_obs = self.circuit.compose(to_CBS_measurement(pauli))
