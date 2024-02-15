@@ -287,6 +287,8 @@ class WaveFunction:
         self._rdm3 = None
         self._rdm4 = None
         self._energy_elec = None
+        self.QI.total_device_calls = 0
+        self.QI.total_shots_used = 0
         self.QI._primitive = primitive  # pylint: disable=protected-access
 
     @property
@@ -406,6 +408,29 @@ class WaveFunction:
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             self._energy_elec = calc_energy_theta(self.ansatz_parameters, H, self.QI)
         return self._energy_elec
+
+    def _calc_energy_elec(self) -> float:
+        """Run electronic energy simulation, regardless of self.energy_elec variable.
+
+        Returns:
+            Electronic energy.
+        """
+        H = hamiltonian_pauli_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+        H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+        energy_elec = calc_energy_theta(self.ansatz_parameters, H, self.QI)
+
+        return energy_elec
+
+    def _get_hamiltonian(self) -> FermionicOperator:
+        """Return electronic Hamiltonian as FermionicOperator.
+
+        Returns:
+            FermionicOperator.
+        """
+        H = hamiltonian_pauli_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+        H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+
+        return H
 
     def run_vqe_2step(
         self,
