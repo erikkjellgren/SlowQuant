@@ -289,6 +289,8 @@ class WaveFunction:
         self._energy_elec = None
         self.QI.total_device_calls = 0
         self.QI.total_shots_used = 0
+        self.QI.total_paulis_evaluated = 0
+        self.QI.distributions = {}
         self.QI._primitive = primitive  # pylint: disable=protected-access
 
     @property

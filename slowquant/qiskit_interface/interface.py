@@ -42,6 +42,7 @@ class QuantumInterface:
         self.mapper = mapper
         self.total_shots_used = 0
         self.total_device_calls = 0
+        self.total_paulis_evaluated = 0
 
     def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int]) -> None:
         """Construct qiskit circuit.
@@ -186,10 +187,11 @@ class QuantumInterface:
         Returns:
             Expectation value of operator.
         """
+        observables = self.op_to_qbit(op)
         job = self._primitive.run(
             circuits=self.circuit,
             parameter_values=run_parameters,
-            observables=self.op_to_qbit(op),
+            observables=observables,
         )
         if hasattr(self._primitive.options, "shots"):
             # Shot-noise simulator
@@ -198,6 +200,7 @@ class QuantumInterface:
             # Device
             self.total_shots_used += self._primitive.options["execution"]["shots"]
         self.total_device_calls += 1
+        self.total_paulis_evaluated += len(observables)
         result = job.result()
         values = result.values[0]
 
@@ -225,31 +228,41 @@ class QuantumInterface:
             Expectation value of operator.
         """
         values = 0.0
+        # Map Fermionic to Qubit
         observables = self.op_to_qbit(op)
 
         # Obtain cliques for operator's Pauli strings
-        cliques = make_cliques(observables.paulis)
-        distributions = {}
+        raw_cliques = make_cliques(observables.paulis)
+        cliques = {}
 
-        # Simulate each clique Pauli String with one combined device call
-        # and return a list of distributions
-        distr = self._one_call_sampler_distributions(PauliList(list(cliques.keys())), run_parameters)
+        if not hasattr(self, "distributions"):
+            self.distributions: dict[str, float] = {}
 
-        # Loop over all cliques and their commuting Pauli strings to obtain the result for each Pauli string
-        for nr, clique in enumerate(cliques.values()):
-            dist = distr[nr]  # Measured distribution for a given clique
-            # It is wasteful to store the distribution per Pauli instead of per clique,
-            # but it help unpack it later.
-            for pauli in clique:  # Loop over all Pauli strings associated with one clique
-                result = 0.0
-                for key, value in dist.items():  # build result from quasi-distribution
-                    # Here we could check if we want a given key (bitstring) in the result distribution
-                    result += value * get_bitstring_sign(Pauli(pauli), key)
-                distributions[pauli] = result
+        # Check if cliques have already been calculated
+        for clique_pauli, clique in raw_cliques.items():
+            if clique_pauli not in self.distributions:
+                cliques[clique_pauli] = clique
+
+        if len(cliques) != 0:
+            # Simulate each clique Pauli String with one combined device call
+            # and return a list of distributions
+            distr = self._one_call_sampler_distributions(PauliList(list(cliques.keys())), run_parameters)
+
+            # Loop over all cliques and their commuting Pauli strings to obtain the result for each Pauli string
+            for nr, clique in enumerate(cliques.values()):
+                dist = distr[nr]  # Measured distribution for a given clique
+                # It is wasteful to store the distribution per Pauli instead of per clique,
+                # but it help unpack it later.
+                for pauli in clique:  # Loop over all Pauli strings associated with one clique
+                    result = 0.0
+                    for key, value in dist.items():  # build result from quasi-distribution
+                        # Here we could check if we want a given key (bitstring) in the result distribution
+                        result += value * get_bitstring_sign(Pauli(pauli), key)
+                    self.distributions[pauli] = result
 
         # Loop over all Pauli strings in observable and build final result with coefficients
         for pauli, coeff in zip(observables.paulis, observables.coeffs):
-            values += distributions[str(pauli)] * coeff
+            values += self.distributions[str(pauli)] * coeff
 
         if isinstance(values, complex):
             if abs(values.imag) > 10**-2:
@@ -294,6 +307,7 @@ class QuantumInterface:
             # Device
             self.total_shots_used += self._primitive.options["execution"]["shots"] * num_paulis
         self.total_device_calls += 1
+        self.total_paulis_evaluated += num_paulis
 
         # Get quasi-distribution in binary probabilities
         distr = [res.binary_probabilities() for res in job.result().quasi_dists]
