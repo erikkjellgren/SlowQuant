@@ -115,36 +115,45 @@ def smallUCCSD(num_orbs: int, num_elec: Sequence[int], mapper: FermionicMapper) 
 
     params = []
     ops = []
+    factors = []
     idx = 0
     for _, a, i, _ in iterate_t1(occ, unocc, 0, True):
         op = anni(i, True) * anni(a, False)
         T = op - op.dagger
-        ops.append(mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs)).paulis)
+        op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
+        ops.append(op_mapped.paulis)
         params.append(Parameter(f"p{idx}"))
+        factors.append(op_mapped.coeffs)
         idx += 1
     for _, a, i, b, j, _ in iterate_t2(occ, unocc, 0, True):
-        op = anni(j, True) * anni(b, False) * anni(i, True) * anni(a, True)
+        op = anni(j, True) * anni(b, False) * anni(i, True) * anni(a, False)
         T = op - op.dagger
-        ops.append(mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs)).paulis)
+        op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
+        ops.append(op_mapped.paulis)
         params.append(Parameter(f"p{idx}"))
+        factors.append(op_mapped.coeffs)
         idx += 1
     params_long = []
     ops_long = []
-    for param, paulis in zip(params, ops):
-        for pauli in paulis:
+    facs_long = []
+    for param, paulis, facs in zip(params, ops, factors):
+        for pauli, fac in zip(paulis, facs):
             ops_long.append(str(pauli))
             params_long.append(param)
+            facs_long.append((-1.0j * (fac)).real)
     ops_long = np.array(ops_long)
     params_long = np.array(params_long)
+    facs_long = np.array(facs_long)
     sort_idx = np.argsort(ops_long)
     ops_long = ops_long[sort_idx]
     params_long = params_long[sort_idx]
+    facs_long = facs_long[sort_idx]
 
     qc = HartreeFock(num_orbs, num_elec, mapper)
     num_qubits = qc.num_qubits
-    for param, pauli in zip(params_long, ops_long):
+    for param, pauli, fac in zip(params_long, ops_long, facs_long):
         qc.append(
-            PauliEvolutionGate(Pauli(pauli), param),
+            PauliEvolutionGate(Pauli(pauli), fac * param),
             np.linspace(0, num_qubits - 1, num_qubits, dtype=int).tolist(),
         )
     return transpile(qc, optimization_level=3)

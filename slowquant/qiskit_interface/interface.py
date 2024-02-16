@@ -35,7 +35,7 @@ class QuantumInterface:
             ansatz: Name of ansatz to be used.
             mapper: Qiskit mapper object, e.g. JW or Parity.
         """
-        allowed_ansatz = ("UCCSD", "PUCCD", "UCCD", "ErikD", "ErikSD", "HF", "smallUCCSD")
+        allowed_ansatz = ("UCCSD", "PUCCD", "UCCD", "ErikD", "ErikSD", "smallUCCSD")
         if ansatz not in allowed_ansatz:
             raise ValueError("The chosen Ansatz is not availbale. Choose from: ", allowed_ansatz)
         self.ansatz = ansatz
@@ -107,8 +107,6 @@ class QuantumInterface:
                 self.circuit = ErikSD_Parity()
             else:
                 raise ValueError(f"Unsupported mapper, {type(self.mapper)}, for ansatz {self.ansatz}")
-        elif self.ansatz == "HF":
-            self.circuit = HartreeFock(num_orbs, self.num_elec, self.mapper)
         elif self.ansatz == "smallUCCSD":
             self.circuit = smallUCCSD(num_orbs, self.num_elec, self.mapper)
 
