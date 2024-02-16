@@ -230,9 +230,12 @@ class QuantumInterface:
         values = 0.0
         # Map Fermionic to Qubit
         observables = self.op_to_qbit(op)
-
         # Obtain cliques for operator's Pauli strings
         raw_cliques = make_cliques(observables.paulis)
+        # Make sure clique head is in clique Pauli list
+        for clique_pauli, clique in raw_cliques.items():
+            if clique_pauli not in clique:
+                clique.append(clique_pauli)
         cliques = {}
 
         if not hasattr(self, "distributions"):
@@ -244,16 +247,14 @@ class QuantumInterface:
                 cliques[clique_pauli] = clique
 
         if len(cliques) != 0:
-            # Simulate each clique Pauli String with one combined device call
+            # Simulate each clique head with one combined device call
             # and return a list of distributions
             distr = self._one_call_sampler_distributions(PauliList(list(cliques.keys())), run_parameters)
 
-            # Loop over all cliques and their commuting Pauli strings to obtain the result for each Pauli string
+            # Loop over all clique Paul lists to obtain the result for each Pauli string from the clique head distribution
             for nr, clique in enumerate(cliques.values()):
-                dist = distr[nr]  # Measured distribution for a given clique
-                # It is wasteful to store the distribution per Pauli instead of per clique,
-                # but it help unpack it later.
-                for pauli in clique:  # Loop over all Pauli strings associated with one clique
+                dist = distr[nr]  # Measured distribution for a given clique head
+                for pauli in clique:  # Loop over all clique Pauli strings associated with one clique head
                     result = 0.0
                     for key, value in dist.items():  # build result from quasi-distribution
                         # Here we could check if we want a given key (bitstring) in the result distribution
