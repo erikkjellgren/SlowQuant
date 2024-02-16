@@ -137,6 +137,8 @@ class QuantumInterface:
                 "The length of the parameter list does not fit the chosen circuit for the Ansatz ",
                 self.ansatz,
             )
+        if hasattr(self, "distributions"):
+            self.distributions.clear()
         self._parameters = parameters.copy()
 
     def op_to_qbit(self, op: FermionicOperator) -> SparsePauliOp:
