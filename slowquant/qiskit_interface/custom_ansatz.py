@@ -13,7 +13,9 @@ from slowquant.qiskit_interface.operators import anni
 from slowquant.unitary_coupled_cluster.util import iterate_t1, iterate_t2
 
 
-def smallUCCSD(num_orbs: int, num_elec: Sequence[int], mapper: FermionicMapper) -> QuantumCircuit:
+def smallUCC(
+    num_orbs: int, num_elec: Sequence[int], exictations: str, mapper: FermionicMapper
+) -> QuantumCircuit:
     r"""Create UCCSD ansatz that orders Paulies to minimize circuit.
 
     The UCCSD ansatz is given as:
@@ -97,10 +99,11 @@ def smallUCCSD(num_orbs: int, num_elec: Sequence[int], mapper: FermionicMapper) 
     Args:
         num_orbs: Number of spatial orbitals.
         num_elec: Number of electrons (alpha, beta).
+        exictations: Excitation order.
         mapper: Fermionic to qubit mapper.
 
     Returns:
-        Small circuit UCCSD.
+        Small circuit UCC.
     """
     num_spin_orbs = 2 * num_orbs
     occ = []
@@ -117,22 +120,24 @@ def smallUCCSD(num_orbs: int, num_elec: Sequence[int], mapper: FermionicMapper) 
     ops = []
     factors = []
     idx = 0
-    for _, a, i, _ in iterate_t1(occ, unocc, 0, True):
-        op = anni(i, True) * anni(a, False)
-        T = op - op.dagger
-        op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
-        ops.append(op_mapped.paulis)
-        params.append(Parameter(f"p{idx}"))
-        factors.append(op_mapped.coeffs)
-        idx += 1
-    for _, a, i, b, j, _ in iterate_t2(occ, unocc, 0, True):
-        op = anni(j, True) * anni(b, False) * anni(i, True) * anni(a, False)
-        T = op - op.dagger
-        op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
-        ops.append(op_mapped.paulis)
-        params.append(Parameter(f"p{idx}"))
-        factors.append(op_mapped.coeffs)
-        idx += 1
+    if "s" in exictations.lower():
+        for _, a, i, _ in iterate_t1(occ, unocc, 0, True):
+            op = anni(i, True) * anni(a, False)
+            T = op - op.dagger
+            op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
+            ops.append(op_mapped.paulis)
+            params.append(Parameter(f"p{idx}"))
+            factors.append(op_mapped.coeffs)
+            idx += 1
+    if "d" in exictations.lower():
+        for _, a, i, b, j, _ in iterate_t2(occ, unocc, 0, True):
+            op = anni(j, True) * anni(b, False) * anni(i, True) * anni(a, False)
+            T = op - op.dagger
+            op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
+            ops.append(op_mapped.paulis)
+            params.append(Parameter(f"p{idx}"))
+            factors.append(op_mapped.coeffs)
+            idx += 1
     params_long = []
     ops_long = []
     facs_long = []

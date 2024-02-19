@@ -12,7 +12,7 @@ from slowquant.qiskit_interface.custom_ansatz import (
     ErikD_Parity,
     ErikSD_JW,
     ErikSD_Parity,
-    smallUCCSD,
+    smallUCC,
 )
 
 
@@ -108,7 +108,9 @@ class QuantumInterface:
             else:
                 raise ValueError(f"Unsupported mapper, {type(self.mapper)}, for ansatz {self.ansatz}")
         elif self.ansatz == "smallUCCSD":
-            self.circuit = smallUCCSD(num_orbs, self.num_elec, self.mapper)
+            self.circuit = smallUCC(num_orbs, self.num_elec, "SD", self.mapper)
+        elif self.ansatz == "smallUCCD":
+            self.circuit = smallUCC(num_orbs, self.num_elec, "D", self.mapper)
 
         # Set parameter to HarteeFock
         self._parameters = [0.0] * self.circuit.num_parameters
