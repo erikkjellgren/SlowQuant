@@ -171,8 +171,10 @@ class QuantumInterface:
         # Check if estimator or sampler
         if isinstance(self._primitive, BaseEstimator):
             return self._estimator_quantum_expectation_value(op, run_parameters)
+        if isinstance(self._primitive, BaseSampler) and custom_parameters is None:
+            return self._sampler_quantum_expectation_value(op)
         if isinstance(self._primitive, BaseSampler):
-            return self._sampler_quantum_expectation_value(op, run_parameters)
+            return self._sampler_quantum_expectation_value_nosave(op, run_parameters)
         raise ValueError(
             "The Quantum Interface was initiated with an unknown Qiskit primitive, {type(self._primitive)}"
         )
@@ -212,8 +214,10 @@ class QuantumInterface:
 
         return values.real
 
-    def _sampler_quantum_expectation_value(self, op: FermionicOperator, run_parameters: list[float]) -> float:
+    def _sampler_quantum_expectation_value(self, op: FermionicOperator) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
+
+        Calculated Pauli expectation values will be saved in memory.
 
         The expectation value over a fermionic operator is calcuated as:
 
@@ -224,7 +228,6 @@ class QuantumInterface:
 
         Args:
             op: SlowQuant fermionic operator.
-            run_parameters: Circuit parameters.
 
         Returns:
             Expectation value of operator.
@@ -251,7 +254,7 @@ class QuantumInterface:
         if len(cliques) != 0:
             # Simulate each clique head with one combined device call
             # and return a list of distributions
-            distr = self._one_call_sampler_distributions(PauliList(list(cliques.keys())), run_parameters)
+            distr = self._one_call_sampler_distributions(PauliList(list(cliques.keys())), self.parameters)
 
             # Loop over all clique Paul lists to obtain the result for each Pauli string from the clique head distribution
             for nr, clique in enumerate(cliques.values()):
@@ -266,6 +269,58 @@ class QuantumInterface:
         # Loop over all Pauli strings in observable and build final result with coefficients
         for pauli, coeff in zip(observables.paulis, observables.coeffs):
             values += self.distributions[str(pauli)] * coeff
+
+        if isinstance(values, complex):
+            if abs(values.imag) > 10**-2:
+                print("Warning: Complex number detected with Im = ", values.imag)
+
+        return values.real
+
+    def _sampler_quantum_expectation_value_nosave(
+        self, op: FermionicOperator, run_parameters: list[float]
+    ) -> float:
+        r"""Calculate expectation value of circuit and observables via Sampler.
+
+        Calling this function will not use any pre-calculated Pauli expectaion values.
+        Nor will it save any of the calculated Pauli expectation values.
+
+        The expectation value over a fermionic operator is calcuated as:
+
+        .. math::
+            E = \sum_i^N c_i\left<0\left|P_i\right|0\right>
+
+        With :math:`c_i` being the :math:`i` the coefficient and :math:`P_i` the :math:`i` the Pauli string.
+
+        Args:
+            op: SlowQuant fermionic operator.
+            run_parameters: Circuit parameters.
+
+        Returns:
+            Expectation value of operator.
+        """
+        values = 0.0
+        # Map Fermionic to Qubit
+        observables = self.op_to_qbit(op)
+        # Obtain cliques for operator's Pauli strings
+        cliques = make_cliques(observables.paulis)
+
+        # Simulate each clique head with one combined device call
+        # and return a list of distributions
+        distr = self._one_call_sampler_distributions(PauliList(list(cliques.keys())), run_parameters)
+        distributions = {}
+        # Loop over all clique Paul lists to obtain the result for each Pauli string from the clique head distribution
+        for nr, clique in enumerate(cliques.values()):
+            dist = distr[nr]  # Measured distribution for a given clique head
+            for pauli in clique:  # Loop over all clique Pauli strings associated with one clique head
+                result = 0.0
+                for key, value in dist.items():  # build result from quasi-distribution
+                    # Here we could check if we want a given key (bitstring) in the result distribution
+                    result += value * get_bitstring_sign(Pauli(pauli), key)
+                distributions[pauli] = result
+
+        # Loop over all Pauli strings in observable and build final result with coefficients
+        for pauli, coeff in zip(observables.paulis, observables.coeffs):
+            values += distributions[str(pauli)] * coeff
 
         if isinstance(values, complex):
             if abs(values.imag) > 10**-2:
