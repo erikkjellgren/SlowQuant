@@ -200,7 +200,7 @@ class QuantumInterface:
             self.total_shots_used += self._primitive.options.shots
         elif "execution" in self._primitive.options:
             # Device
-            self.total_shots_used += self._primitive.options["execution"]["shots"]
+            self.total_shots_used += self._primitive.options["execution"]["shots"] * len(observables)
         self.total_device_calls += 1
         self.total_paulis_evaluated += len(observables)
         result = job.result()
