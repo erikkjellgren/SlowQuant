@@ -398,3 +398,31 @@ def test_LiH_oscillator_strength() -> None:
     ]
 
     assert np.allclose(osc_strengths, solution, atol=10**-6)
+
+
+def test_gradient_optimizer_H2() -> None:
+    """Test that an optimizer using gradients works."""
+    # Define molecule
+    atom = "H .0 .0 .0; H .735 .0 .0"
+    basis = "sto-3g"
+
+    # PySCF
+    mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
+    rhf = pyscf.scf.RHF(mol).run()
+
+    estimator = Sampler()
+    mapper = ParityMapper(num_particles=(1, 1))
+    QI = QuantumInterface(estimator, "UCCD", mapper)
+
+    WF = WaveFunction(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 2),
+        rhf.mo_coeff,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        QI,
+    )
+
+    WF.run_vqe_2step("SLSQP", False)
+    assert abs(WF.energy_elec - -1.8572750819575072) < 10**-6
