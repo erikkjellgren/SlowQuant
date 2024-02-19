@@ -197,7 +197,7 @@ class QuantumInterface:
         )
         if hasattr(self._primitive.options, "shots"):
             # Shot-noise simulator
-            self.total_shots_used += self._primitive.options.shots
+            self.total_shots_used += self._primitive.options.shots * len(observables)
         elif "execution" in self._primitive.options:
             # Device
             self.total_shots_used += self._primitive.options["execution"]["shots"] * len(observables)
