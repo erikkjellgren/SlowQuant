@@ -14,7 +14,11 @@ from slowquant.unitary_coupled_cluster.util import iterate_t1, iterate_t2
 
 
 def smallUCC(
-    num_orbs: int, num_elec: Sequence[int], exictations: str, mapper: FermionicMapper
+    num_orbs: int,
+    num_elec: Sequence[int],
+    exictations: str,
+    mapper: FermionicMapper,
+    within_op_only: bool = False,
 ) -> QuantumCircuit:
     r"""Create UCCSD ansatz that orders Paulies to minimize circuit.
 
@@ -142,17 +146,24 @@ def smallUCC(
     ops_long = []
     facs_long = []
     for param, paulis, facs in zip(params, ops, factors):
+        if within_op_only:
+            paulis = np.array(paulis)
+            facs = np.array(facs)
+            sort_idx = np.argsort(paulis)
+            paulis = paulis[sort_idx]
+            facs = facs[sort_idx]
         for pauli, fac in zip(paulis, facs):
             ops_long.append(str(pauli))
             params_long.append(param)
             facs_long.append((-1.0j * (fac)).real)
-    ops_long = np.array(ops_long)
-    params_long = np.array(params_long)
-    facs_long = np.array(facs_long)
-    sort_idx = np.argsort(ops_long)
-    ops_long = ops_long[sort_idx]
-    params_long = params_long[sort_idx]
-    facs_long = facs_long[sort_idx]
+    if not within_op_only:
+        ops_long = np.array(ops_long)
+        params_long = np.array(params_long)
+        facs_long = np.array(facs_long)
+        sort_idx = np.argsort(ops_long)
+        ops_long = ops_long[sort_idx]
+        params_long = params_long[sort_idx]
+        facs_long = facs_long[sort_idx]
 
     qc = HartreeFock(num_orbs, num_elec, mapper)
     num_qubits = qc.num_qubits
