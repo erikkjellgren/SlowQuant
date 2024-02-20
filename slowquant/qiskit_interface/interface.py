@@ -12,6 +12,7 @@ from slowquant.qiskit_interface.custom_ansatz import (
     ErikD_Parity,
     ErikSD_JW,
     ErikSD_Parity,
+    tUPS,
 )
 
 
@@ -26,6 +27,7 @@ class QuantumInterface:
         primitive: BaseEstimator | BaseSampler,
         ansatz: str,
         mapper: FermionicMapper,
+        n_layers: int = 1,
     ) -> None:
         """Interface to Qiskit to use IBM quantum hardware or simulator.
 
@@ -34,7 +36,7 @@ class QuantumInterface:
             ansatz: Name of ansatz to be used.
             mapper: Qiskit mapper object, e.g. JW or Parity.
         """
-        allowed_ansatz = ("UCCSD", "PUCCD", "UCCD", "ErikD", "ErikSD", "HF")
+        allowed_ansatz = ("UCCSD", "PUCCD", "UCCD", "ErikD", "ErikSD", "HF", "tUPS", "pptUPS")
         if ansatz not in allowed_ansatz:
             raise ValueError("The chosen Ansatz is not availbale. Choose from: ", allowed_ansatz)
         self.ansatz = ansatz
@@ -43,6 +45,7 @@ class QuantumInterface:
         self.total_shots_used = 0
         self.total_device_calls = 0
         self.total_paulis_evaluated = 0
+        self.n_layers = n_layers
 
     def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int]) -> None:
         """Construct qiskit circuit.
@@ -53,7 +56,7 @@ class QuantumInterface:
         """
         self.num_orbs = num_orbs
         self.num_spin_orbs = 2 * num_orbs
-        self.num_elec = tuple(num_elec)
+        self.num_elec = num_elec
 
         if self.ansatz == "UCCSD":
             self.circuit = UCCSD(
@@ -109,6 +112,10 @@ class QuantumInterface:
                 raise ValueError(f"Unsupported mapper, {type(self.mapper)}, for ansatz {self.ansatz}")
         elif self.ansatz == "HF":
             self.circuit = HartreeFock(num_orbs, self.num_elec, self.mapper)
+        elif self.ansatz == "tUPS":
+            self.circuit = tUPS(num_orbs, self.num_elec, self.mapper, self.n_layers, False)
+        elif self.ansatz == "pptUPS":
+            self.circuit = tUPS(num_orbs, self.num_elec, self.mapper, self.n_layers, True)
 
         # Set parameter to HarteeFock
         self._parameters = [0.0] * self.circuit.num_parameters
