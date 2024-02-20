@@ -202,10 +202,9 @@ def tUPS(
     num_qubits = num_spin_orbs  # qc.num_qubits
     if do_pp:
         qc = QuantumCircuit(num_qubits)
-        for p in range(0, num_orbs):
+        for p in range(0, 2*num_orbs):
             if p % 2 == 0:
-                qc.x(2 * p)
-                qc.x(2 * p + 1)
+                qc.x(p)
     else:
         qc = HartreeFock(num_orbs, num_elec, mapper)
     for param, pauli, fac in zip(params_long, ops_long, facs_long):
