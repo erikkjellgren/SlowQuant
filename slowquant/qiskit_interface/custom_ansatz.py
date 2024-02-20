@@ -18,7 +18,7 @@ def smallUCC(
     num_elec: Sequence[int],
     exictations: str,
     mapper: FermionicMapper,
-    within_op_only: bool = False,
+    within_op_only: bool = True,
 ) -> QuantumCircuit:
     r"""Create UCCSD ansatz that orders Paulies to minimize circuit.
 
@@ -147,6 +147,7 @@ def smallUCC(
     facs_long = []
     for param, paulis, facs in zip(params, ops, factors):
         if within_op_only:
+            paulis = [str(pauli) for pauli in paulis]
             paulis = np.array(paulis)
             facs = np.array(facs)
             sort_idx = np.argsort(paulis)
