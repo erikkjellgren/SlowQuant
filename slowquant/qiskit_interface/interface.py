@@ -278,17 +278,7 @@ class QuantumInterface:
             for nr, clique in enumerate(cliques.values()):
                 dist = distr[nr]  # Measured distribution for a given clique head
                 if self._do_M_mitigation:  # apply error mitigation if requested
-                    C = np.zeros(2**self.num_qubits)
-                    # Convert bitstring distribution to columnvector of probabilities
-                    for bitstring, prob in dist.items():
-                        idx = int(bitstring[::-1], 2)
-                        C[idx] = prob
-                    # Apply M error mitigation matrix
-                    C_new = self._Minv @ C
-                    # Convert columnvector of probabilities to bitstring distribution
-                    for bitstring, prob in dist.items():
-                        idx = int(bitstring[::-1], 2)
-                        dist[bitstring] = C_new[idx]
+                    dist = correct_distribution(dist, self._Minv)
                 for pauli in clique:  # Loop over all clique Pauli strings associated with one clique head
                     result = 0.0
                     for key, value in dist.items():  # build result from quasi-distribution
@@ -347,17 +337,7 @@ class QuantumInterface:
         for nr, clique in enumerate(cliques.values()):
             dist = distr[nr]  # Measured distribution for a given clique head
             if self._do_M_mitigation:  # apply error mitigation if requested
-                C = np.zeros(2**self.num_qubits)
-                # Convert bitstring distribution to columnvector of probabilities
-                for bitstring, prob in dist.items():
-                    idx = int(bitstring[::-1], 2)
-                    C[idx] = prob
-                # Apply M error mitigation matrix
-                C_new = self._Minv @ C
-                # Convert columnvector of probabilities to bitstring distribution
-                for bitstring, prob in dist.items():
-                    idx = int(bitstring[::-1], 2)
-                    dist[bitstring] = C_new[idx]
+                dist = correct_distribution(dist, self._Minv)
             for pauli in clique:  # Loop over all clique Pauli strings associated with one clique head
                 result = 0.0
                 for key, value in dist.items():  # build result from quasi-distribution
@@ -671,3 +651,27 @@ def make_cliques(paulis: PauliList) -> dict[str, list[str]]:
             else:
                 cliques[pauli_str] = [pauli_str]
     return cliques
+
+
+def correct_distribution(dist: dict[str, float], M: np.ndarray) -> dict[str, float]:
+    r"""Corrects a quasi-distribution of bitstrings based on a correlation matrix in statevector notation.
+
+    Args:
+        dist: Quasi-distribution.
+        M:    Correlation martix.
+
+    Returns:
+        Quasi-distribution corrected by correlation matrix.
+    """
+    C = np.zeros(np.shape(M)[0])
+    # Convert bitstring distribution to columnvector of probabilities
+    for bitstring, prob in dist.items():
+        idx = int(bitstring[::-1], 2)
+        C[idx] = prob
+    # Apply M error mitigation matrix
+    C_new = M @ C
+    # Convert columnvector of probabilities to bitstring distribution
+    for bitstring, prob in dist.items():
+        idx = int(bitstring[::-1], 2)
+        dist[bitstring] = C_new[idx]
+    return dist
