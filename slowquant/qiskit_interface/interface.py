@@ -266,6 +266,10 @@ class QuantumInterface:
                 cliques[clique_pauli] = clique
 
         if len(cliques) != 0:
+            # Check if error mitigation is requested and if read-out matrix already exists.
+            if self._do_M_mitigation and self._Minv is None:
+                self._make_Minv()
+
             # Simulate each clique head with one combined device call
             # and return a list of distributions
             distr = self._one_call_sampler_distributions(PauliList(list(cliques.keys())), self.parameters)
@@ -273,6 +277,18 @@ class QuantumInterface:
             # Loop over all clique Paul lists to obtain the result for each Pauli string from the clique head distribution
             for nr, clique in enumerate(cliques.values()):
                 dist = distr[nr]  # Measured distribution for a given clique head
+                if self._do_M_mitigation:  # apply error mitigation if requested
+                    C = np.zeros(2**self.num_qubits)
+                    # Convert bitstring distribution to columnvector of probabilities
+                    for bitstring, prob in dist.items():
+                        idx = int(bitstring[::-1], 2)
+                        C[idx] = prob
+                    # Apply M error mitigation matrix
+                    C_new = self._Minv @ C
+                    # Convert columnvector of probabilities to bitstring distribution
+                    for bitstring, prob in dist.items():
+                        idx = int(bitstring[::-1], 2)
+                        dist[bitstring] = C_new[idx]
                 for pauli in clique:  # Loop over all clique Pauli strings associated with one clique head
                     result = 0.0
                     for key, value in dist.items():  # build result from quasi-distribution
@@ -323,8 +339,8 @@ class QuantumInterface:
         distr = self._one_call_sampler_distributions(PauliList(list(cliques.keys())), run_parameters)
         distributions = {}
 
-        # check if error mitigation is requested.
-        if self._do_M_mitigation and self._Minv is None:  # check if read-out matrix already exist.
+        # Check if error mitigation is requested and if read-out matrix already exists.
+        if self._do_M_mitigation and self._Minv is None:
             self._make_Minv()
 
         # Loop over all clique Paul lists to obtain the result for each Pauli string from the clique head distribution
