@@ -52,6 +52,7 @@ class QuantumInterface:
         self._do_M_mitigation = do_M_mitigation
         self._do_M_iqa = do_M_iqa
         self._do_M_ansatz0 = do_M_ansatz0
+        self._Minv = None
         self.total_shots_used = 0
         self.total_device_calls = 0
 
@@ -245,14 +246,17 @@ class QuantumInterface:
         distributions = {}
         for clique_pauli, clique in cliques.items():
             dist = self._sampler_distributions(Pauli(clique_pauli), run_parameters)
-            if self._do_M_mitigation:
-                if not hasattr(self, "_Minv"):
-                    self._make_Minv()
+            if self._do_M_mitigation:  # check if error mitigation is requested.
+                if self._Minv is None:  # check if read-out matrix already exist.
+                    self._make_Minv()  # if not: make it.
                 C = np.zeros(2**self.num_qubits)
+                # Convert bitstring distribution to columnvector of probabilities
                 for bitstring, prob in dist.items():
                     idx = int(bitstring[::-1], 2)
                     C[idx] = prob
+                # Apply M error mitigation matrix
                 C_new = self._Minv @ C
+                # Convert columnvector of probabilities to bitstring distribution
                 for bitstring, prob in dist.items():
                     idx = int(bitstring[::-1], 2)
                     dist[bitstring] = C_new[idx]
@@ -358,12 +362,16 @@ class QuantumInterface:
 
         #. https://qiskit.org/textbook/ch-quantum-hardware/measurement-error-mitigation.html
         """
+        print("Measuring error mitigation read-out matrix.")
         if self.num_qubits > 12:
             raise ValueError("Current implementation does not scale above 12 qubits?")
-        if self._primitive.options["transpilation"]["initial_layout"] is None:
-            raise ValueError(
-                "Doing read-out correlation matrix requires qubits to be fixed. Got ['transpilation']['initial_layout'] as None"
-            )
+        if "transpilation" in self._primitive.options:
+            if self._primitive.options["transpilation"]["initial_layout"] is None:
+                raise ValueError(
+                    "Doing read-out correlation matrix requires qubits to be fixed. Got ['transpilation']['initial_layout'] as None"
+                )
+        else:
+            print("No transpilation option found in primitive. Debugging run via simulator is assumed.")
         if self._do_M_ansatz0:
             ansatz = self.circuit
             # Negate the Hartree-Fock State
