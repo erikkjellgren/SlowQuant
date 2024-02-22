@@ -272,7 +272,9 @@ class QuantumInterface:
 
             # Simulate each clique head with one combined device call
             # and return a list of distributions
-            distr = self._one_call_sampler_distributions(PauliList(list(cliques.keys())), self.parameters)
+            distr = self._one_call_pauli_sampler_distributions(
+                PauliList(list(cliques.keys())), self.parameters
+            )
 
             # Loop over all clique Paul lists to obtain the result for each Pauli string from the clique head distribution
             for nr, clique in enumerate(cliques.values()):
@@ -326,7 +328,7 @@ class QuantumInterface:
 
         # Simulate each clique head with one combined device call
         # and return a list of distributions
-        distr = self._one_call_sampler_distributions(PauliList(list(cliques.keys())), run_parameters)
+        distr = self._one_call_pauli_sampler_distributions(PauliList(list(cliques.keys())), run_parameters)
         distributions = {}
 
         # Check if error mitigation is requested and if read-out matrix already exists.
@@ -355,10 +357,10 @@ class QuantumInterface:
 
         return values.real
 
-    def _one_call_sampler_distributions(
-        self, paulis: PauliList, run_parameters: list[float]
+    def _one_call_pauli_sampler_distributions(
+        self, paulis: PauliList, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
     ) -> list[dict[str, float]]:
-        r"""Get results from a sampler distribution for several Pauli strings.
+        r"""Get results from a sampler distribution for several Pauli strings measured one circuit.
 
         The expectation value of a Pauli string is calcuated as:
 
@@ -368,8 +370,9 @@ class QuantumInterface:
         With :math:`p_i` being the :math:`i` th probability and :math:`b_i` being the `i` th bit-string.
 
         Args:
-            pauli: Pauli string to measure.
+            paulis: List of Pauli strings to measure.
             run_paramters: Parameters of circuit.
+            custom_circ: Specific circuit to run.
 
         Returns:
             Probability weighted Pauli string.
@@ -378,10 +381,16 @@ class QuantumInterface:
         circuits = [None] * num_paulis
 
         # Create QuantumCircuits
-        for nr, pauli in enumerate(paulis):
-            ansatz_w_obs = self.circuit.compose(to_CBS_measurement(pauli))
-            ansatz_w_obs.measure_all()
-            circuits[nr] = ansatz_w_obs
+        if custom_circ is None:
+            for nr, pauli in enumerate(paulis):
+                ansatz_w_obs = self.circuit.compose(to_CBS_measurement(pauli))
+                ansatz_w_obs.measure_all()
+                circuits[nr] = ansatz_w_obs
+        else:
+            for nr, pauli in enumerate(paulis):
+                ansatz_w_obs = custom_circ.compose(to_CBS_measurement(pauli))
+                ansatz_w_obs.measure_all()
+                circuits[nr] = ansatz_w_obs
 
         # Run sampler
         job = self._primitive.run(circuits, parameter_values=[run_parameters] * num_paulis)
@@ -393,6 +402,52 @@ class QuantumInterface:
             self.total_shots_used += self._primitive.options["execution"]["shots"] * num_paulis
         self.total_device_calls += 1
         self.total_paulis_evaluated += num_paulis
+
+        # Get quasi-distribution in binary probabilities
+        distr = [res.binary_probabilities() for res in job.result().quasi_dists]
+        return distr
+
+    def _one_call_circuit_sampler_distributions(
+        self, pauli: Pauli, run_parameters: list[list[float]], circuits_in: list[QuantumCircuit]
+    ) -> list[dict[str, float]]:
+        r"""Get results from a sampler distribution for one given Pauli string measured on several circuits.
+
+        The expectation value of a Pauli string is calcuated as:
+
+        .. math::
+            E = \sum_i^N p_i\left<b_i\left|P\right|b_i\right>
+
+        With :math:`p_i` being the :math:`i` th probability and :math:`b_i` being the `i` th bit-string.
+
+        Args:
+            pauli: Pauli string to measure.
+            run_paramters: List of parameters of each circuit.
+            circuits_in: List of circuits
+
+        Returns:
+            Probability weighted Pauli string.
+        """
+        num_circuits = len(circuits_in)
+        circuits = [None] * num_circuits
+
+        # Circuit from pauli
+        pauli_circuit = to_CBS_measurement(pauli)
+        # Create QuantumCircuits
+        for nr, circuit in enumerate(circuits_in):
+            ansatz_w_obs = circuit.compose(pauli_circuit)
+            ansatz_w_obs.measure_all()
+            circuits[nr] = ansatz_w_obs
+
+        # Run sampler
+        job = self._primitive.run(circuits, parameter_values=run_parameters)
+        if hasattr(self._primitive.options, "shots"):
+            # Shot-noise simulator
+            self.total_shots_used += self._primitive.options.shots * num_circuits
+        elif "execution" in self._primitive.options:
+            # Device
+            self.total_shots_used += self._primitive.options["execution"]["shots"] * num_circuits
+        self.total_device_calls += 1
+        self.total_paulis_evaluated += num_circuits
 
         # Get quasi-distribution in binary probabilities
         distr = [res.binary_probabilities() for res in job.result().quasi_dists]
@@ -440,7 +495,7 @@ class QuantumInterface:
         return distr
 
     def _make_Minv(self) -> None:
-        r"""Make inverse of read-out correlation matrix.
+        r"""Make inverse of read-out correlation matrix with one device call.
 
         The read-out correlation matrix is of the form (for two qubits):
 
@@ -499,14 +554,13 @@ class QuantumInterface:
             ansatz = QuantumCircuit(self.num_qubits)
         M = np.zeros((2**self.num_qubits, 2**self.num_qubits))
         if self._do_M_iqa:
-            Pzero = self._sampler_distributions(
-                Pauli("Z" * self.num_qubits), [10**-8] * len(ansatz.parameters), ansatz.copy()
-            )
             ansatzX = ansatz.copy()
             for i in range(self.num_qubits):
                 ansatzX.x(i)
-            Pone = self._sampler_distributions(
-                Pauli("Z" * self.num_qubits), [10**-8] * len(ansatz.parameters), ansatzX
+            [Pzero, Pone] = self._one_call_circuit_sampler_distributions(
+                Pauli("Z" * self.num_qubits),
+                [[10**-8] * len(ansatz.parameters)] * 2,
+                [ansatz.copy(), ansatzX],
             )
             for comb in itertools.product([0, 1], repeat=self.num_qubits):
                 idx2 = int("".join([str(x) for x in comb]), 2)
@@ -525,15 +579,23 @@ class QuantumInterface:
                         P *= val
                     M[idx1, idx2] = P
         else:
-            for comb in itertools.product([0, 1], repeat=self.num_qubits):
+            ansatz_list = [None] * 2**self.num_qubits
+            for nr, comb in enumerate(itertools.product([0, 1], repeat=self.num_qubits)):
                 ansatzX = ansatz.copy()
                 idx2 = int("".join([str(x) for x in comb]), 2)
                 for i, bit in enumerate(comb):
                     if bit == 1:
                         ansatzX.x(i)
-                Px = self._sampler_distributions(
-                    Pauli("Z" * self.num_qubits), [10**-8] * len(ansatz.parameters), ansatzX
-                )
+                # Make list of custom ansatz
+                ansatz_list[nr] = ansatzX
+            # Simulate all elements with one device call
+            Px_list = self._one_call_circuit_sampler_distributions(
+                Pauli("Z" * self.num_qubits),
+                [[10**-8] * len(ansatz.parameters)] * len(ansatz_list),
+                ansatz_list,
+            )
+            # Construct M
+            for idx2, Px in enumerate(Px_list):
                 for bitstring, prob in Px.items():
                     idx1 = int(bitstring[::-1], 2)
                     M[idx1, idx2] = prob
