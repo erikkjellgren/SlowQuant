@@ -401,11 +401,11 @@ class QuantumInterface:
                 circuits[nr_circuit + (nr_pauli * num_circuits)] = ansatz_w_obs
 
         # Run sampler
-        if num_paulis == 1:
-            parameter_values = run_parameters
-        else:
-            parameter_values = run_parameters * num_paulis
-        job = self._primitive.run(circuits, parameter_values=parameter_values)
+        # if num_paulis == 1:
+        #     parameter_values = run_parameters
+        # else:
+        #     parameter_values = run_parameters * num_paulis
+        job = self._primitive.run(circuits, parameter_values=run_parameters * num_paulis)
         if hasattr(self._primitive.options, "shots"):
             # Shot-noise simulator
             self.total_shots_used += self._primitive.options.shots * num_paulis * num_circuits
