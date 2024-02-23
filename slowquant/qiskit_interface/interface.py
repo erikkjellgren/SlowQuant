@@ -272,6 +272,7 @@ class QuantumInterface:
 
             # Simulate each clique head with one combined device call
             # and return a list of distributions
+            print(self.parameters)
             distr = self._one_call_sampler_distributions(
                 PauliList(list(cliques.keys())), self.parameters, self.circuit
             )
@@ -401,11 +402,13 @@ class QuantumInterface:
                 circuits[nr_circuit + (nr_pauli * num_circuits)] = ansatz_w_obs
 
         # Run sampler
-        # if num_paulis == 1:
-        #     parameter_values = run_parameters
-        # else:
-        #     parameter_values = run_parameters * num_paulis
-        job = self._primitive.run(circuits, parameter_values=[run_parameters] * num_paulis)
+        parameter_values = run_parameters
+        if num_circuits == 1:
+            parameter_values = parameter_values * num_paulis
+        else:
+            parameter_values = parameter_values * num_paulis
+        print(parameter_values)
+        job = self._primitive.run(circuits, parameter_values=parameter_values)
         if hasattr(self._primitive.options, "shots"):
             # Shot-noise simulator
             self.total_shots_used += self._primitive.options.shots * num_paulis * num_circuits
@@ -555,6 +558,8 @@ class QuantumInterface:
                 # Make list of custom ansatz
                 ansatz_list[nr] = ansatzX
             # Simulate all elements with one device call
+            print(len(ansatz.parameters), len(ansatz_list))
+            print([[10**-8] * len(ansatz.parameters)] * len(ansatz_list))
             Px_list = self._one_call_sampler_distributions(
                 Pauli("Z" * self.num_qubits),
                 [[10**-8] * len(ansatz.parameters)] * len(ansatz_list),
