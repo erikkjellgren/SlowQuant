@@ -1,4 +1,6 @@
+import copy
 import itertools
+import math
 
 import numpy as np
 from qiskit import QuantumCircuit
@@ -29,6 +31,8 @@ class QuantumInterface:
         primitive: BaseEstimator | BaseSampler,
         ansatz: str,
         mapper: FermionicMapper,
+        shots: None | int = None,
+        max_shots_per_run: int = 100000,
         do_M_mitigation: bool = False,
         do_M_iqa: bool = False,
         do_M_ansatz0: bool = False,
@@ -39,6 +43,8 @@ class QuantumInterface:
             primitive: Qiskit Estimator or Sampler object.
             ansatz: Name of ansatz to be used.
             mapper: Qiskit mapper object.
+            shots: Number of shots. If not specified use shotnumber from primitive (default).
+            max_shots_per_run: Maximum number of shots allowed in a single run. Set to 100000 per IBM machines.
             do_M_mitigation: Do error mitigation via read-out correlation matrix.
             do_M_iqa: Use independent qubit approximation when constructing the read-out correlation matrix.
             do_M_ansatz0: Use the ansatz with theta=0 when constructing the read-out correlation matrix
@@ -49,6 +55,23 @@ class QuantumInterface:
         self.ansatz = ansatz
         self._primitive = primitive
         self.mapper = mapper
+        if shots is None:
+            if hasattr(self._primitive.options, "shots"):
+                # Shot-noise simulator
+                self.shots = self._primitive.options.shots
+                print("Number of shots has been set to value defined in primitive option: ", self.shots)
+            elif "execution" in self._primitive.options:
+                # Device
+                self.shots = self._primitive.options["execution"]["shots"]
+                print("Number of shots has been set to value defined in primitive option: ", self.shots)
+            else:
+                print(
+                    "WARNING: No number of shots option found in primitive. Ideal simulator is assumed and shots set to None / Zero"
+                )
+                self.shots = None
+        else:
+            self.shots = shots
+        self.max_shots_per_run = max_shots_per_run
         self._do_M_mitigation = do_M_mitigation
         self._do_M_iqa = do_M_iqa
         self._do_M_ansatz0 = do_M_ansatz0
@@ -390,34 +413,82 @@ class QuantumInterface:
             circuits_in = [circuits_in]
         num_circuits = len(circuits_in)
 
-        circuits = [None] * (num_paulis * num_circuits)
+        if hasattr(self._primitive.options, "shots"):
+            # Shot-noise simulator
+            run_shots = self._primitive.options.shots
+        elif "execution" in self._primitive.options:
+            # Device
+            run_shots = self._primitive.options["execution"]["shots"]
+        if (self.shots is not None) and (self.shots <= self.max_shots_per_run) and (self.shots != run_shots):
+            print(
+                "WARNING: Number of shots defined in primitve has been overwritten from ",
+                run_shots,
+                " to ",
+                self.shots,
+                " shots.",
+            )
+            self._primitive.set_options(shots=self.shots)  # Does this work for simulator and machine?
 
-        # Create QuantumCircuits
-        for nr_pauli, pauli in enumerate(paulis):
-            pauli_circuit = to_CBS_measurement(pauli)
-            for nr_circuit, circuit in enumerate(circuits_in):
-                ansatz_w_obs = circuit.compose(pauli_circuit)
-                ansatz_w_obs.measure_all()
-                circuits[nr_circuit + (nr_pauli * num_circuits)] = ansatz_w_obs
+        # Number of shots within limit
+        if self.shots is None or self.shots <= self.max_shots_per_run:
+            circuits = [None] * (num_paulis * num_circuits)
+            circuit_multipl = 1
+            # Create QuantumCircuits
+            for nr_pauli, pauli in enumerate(paulis):
+                pauli_circuit = to_CBS_measurement(pauli)
+                for nr_circuit, circuit in enumerate(circuits_in):
+                    ansatz_w_obs = circuit.compose(pauli_circuit)
+                    ansatz_w_obs.measure_all()
+                    circuits[nr_circuit + (nr_pauli * num_circuits)] = ansatz_w_obs
+        # Number of shots exceed limit. Append circuits.
+        else:
+            print("Number of requested shots exceed the limit of ", self.max_shots_per_run)
+            print("Additional circuits are appended to circumvent limit.")
+            # Get number of circuits needed per Pauli string
+            circuit_multipl = math.floor(self.shots / self.max_shots_per_run)
+            if self.shots % self.max_shots_per_run != 0:
+                self.shots = circuit_multipl * self.max_shots_per_run
+                print(
+                    "WARNING: Defined shots must be multiple of max shots per run. Shots has been adjusted to ",
+                    self.shots,
+                )
+            circuits = [None] * (num_paulis * num_circuits)
+            # Create QuantumCircuits
+            for nr_pauli, pauli in enumerate(paulis):
+                pauli_circuit = to_CBS_measurement(pauli)
+                for nr_circuit, circuit in enumerate(circuits_in):
+                    ansatz_w_obs = circuit.compose(pauli_circuit)
+                    ansatz_w_obs.measure_all()
+                    circuits[(nr_circuit + (nr_pauli * num_circuits))] = ansatz_w_obs
+            circuits = circuits * circuit_multipl
 
         # Run sampler
         if num_circuits == 1:
-            parameter_values = [run_parameters] * num_paulis
+            parameter_values = [run_parameters] * (num_paulis * circuit_multipl)
         else:
-            parameter_values = run_parameters * num_paulis  # type: ignore
+            parameter_values = run_parameters * (num_paulis * circuit_multipl)  # type: ignore
         job = self._primitive.run(circuits, parameter_values=parameter_values)
-        if hasattr(self._primitive.options, "shots"):
+        if self.shots is not None:
             # Shot-noise simulator
-            self.total_shots_used += self._primitive.options.shots * num_paulis * num_circuits
-        elif "execution" in self._primitive.options:
-            # Device
-            self.total_shots_used += self._primitive.options["execution"]["shots"] * num_paulis * num_circuits
+            self.total_shots_used += self.shots * num_paulis * num_circuits
         self.total_device_calls += 1
         self.total_paulis_evaluated += num_paulis * num_circuits
 
         # Get quasi-distribution in binary probabilities
         distr = [res.binary_probabilities() for res in job.result().quasi_dists]
-        return distr
+        if circuit_multipl == 1:
+            return distr
+
+        # Post-process multiple circuit runs together
+        length = num_paulis * num_circuits
+        dist_combined = copy.deepcopy(distr[:length])
+        for nr, dist in enumerate(distr[length:]):
+            for key, value in dist.items():
+                dist_combined[nr % length][key] = value + dist_combined[nr % length].get(key, 0)
+        for dist in dist_combined:
+            for key in dist:
+                dist[key] /= circuit_multipl
+        return dist_combined
 
     def _sampler_distributions(
         self, pauli: PauliList, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
