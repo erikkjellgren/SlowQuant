@@ -291,6 +291,19 @@ class WaveFunction:
         self.QI.total_shots_used = 0
         self.QI.total_paulis_evaluated = 0
         self.QI.distributions = {}
+        if self.QI.shots is None:
+            if hasattr(primitive.options, "shots"):
+                # Shot-noise simulator
+                self.QI.shots = primitive.options.shots
+                print("Number of shots has been set to value defined in primitive option: ", self.QI.shots)
+            elif "execution" in primitive.options:
+                # Device
+                self.QI.shots = primitive.options["execution"]["shots"]
+                print("Number of shots has been set to value defined in primitive option: ", self.QI.shots)
+            else:
+                print("WARNING: No number of shots option found in primitive.")
+        else:
+            print("Number of shots stay as defined by QI at ", self.QI.shots)
         self.QI._Minv = None  # pylint: disable=protected-access
         self.QI._primitive = primitive  # pylint: disable=protected-access
 
