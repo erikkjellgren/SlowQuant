@@ -291,21 +291,17 @@ class WaveFunction:
         self.QI.total_shots_used = 0
         self.QI.total_paulis_evaluated = 0
         self.QI.distributions = {}
-        if self.QI.shots is None:
-            if hasattr(primitive.options, "shots"):
-                # Shot-noise simulator
-                self.QI.shots = primitive.options.shots
-                print("Number of shots has been set to value defined in primitive option: ", self.QI.shots)
-            elif "execution" in primitive.options:
-                # Device
-                self.QI.shots = primitive.options["execution"]["shots"]
-                print("Number of shots has been set to value defined in primitive option: ", self.QI.shots)
-            else:
-                print("WARNING: No number of shots option found in primitive.")
-        else:
-            print("Number of shots stay as defined by QI at ", self.QI.shots)
         self.QI._Minv = None  # pylint: disable=protected-access
         self.QI._primitive = primitive  # pylint: disable=protected-access
+        # IMPORTANT: Shot number in primitive gets always overwritten if a shot number is defined in QI!
+        if self.QI.shots is not None:
+            print(
+                "Number of shots defined in new primitive are ignored as there is a number defined in the QI of ",
+                self.QI.shots,
+            )
+            print("If you want to change the number of shots, do this manually.")
+            print("Set the number of shots manually to None if you run an ideal simulator.")
+        self.QI.shots = self.QI.shots  # Redo shot check with new primitive
 
     @property
     def rdm1(self) -> np.ndarray:
