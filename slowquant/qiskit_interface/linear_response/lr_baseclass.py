@@ -240,26 +240,24 @@ class quantumLRBaseClass:
         Returns:
             Nicely formatted table.
         """
-        if not hasattr(self, "normed_excitation_vectors"):
-            raise ValueError(
-                "Normed excitation vectors have not been calculated. Run get_normed_excitation_vectors() first."
-            )
+        if not hasattr(self, "excitation_vectors"):
+            raise ValueError("Excitation vectors have not been calculated.")
 
         if num_contr is None:
-            num_contr = self.num_params
+            num_contr = self.num_params * 2
 
         print(f"{'Value'.center(12)} | {'Position'.center(12)} | {'Operator'.center(12)}\n")
 
-        for state, vec in enumerate(self.normed_excitation_vectors.T):
+        for state, vec in enumerate(self.excitation_vectors.T):
 
-            sorted_indices = np.argsort(vec)[::-1]
-            sorted_vec = vec[sorted_indices]
+            sorted_indices = np.argsort(np.abs(vec))[::-1]
+            sorted_vec = np.abs(vec[sorted_indices]) ** 2
 
             print("Excited state: ", state)
             for i in range(num_contr):
                 if sorted_vec[i] < cutoff:
                     continue
-                element = f"{sorted_vec[i]:.2e}"
+                element = f"{sorted_vec[i]:.3f}"
                 if sorted_indices[i] < self.num_params:
                     if sorted_indices[i] < self.num_q:
                         operator_index = "q" + str(sorted_indices[i])
