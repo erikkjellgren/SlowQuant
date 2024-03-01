@@ -143,8 +143,6 @@ class quantumLR(quantumLRBaseClass):
         print("Gs", self.num_G)
         print("qs", self.num_q)
 
-        # qq block not implemented yet
-
         A = [[""] * self.num_params for _ in range(self.num_params)]
         B = [[""] * self.num_params for _ in range(self.num_params)]
         Sigma = [[""] * self.num_params for _ in range(self.num_params)]
@@ -156,6 +154,19 @@ class quantumLR(quantumLRBaseClass):
             G_exp.append(self.wf.QI.op_to_qbit(GJ.get_folded_operator(*self.orbs)).paulis)
             HG_exp.append(self.wf.QI.op_to_qbit((self.H_0i_0a * GJ).get_folded_operator(*self.orbs)).paulis)
         energy = self.wf.QI.op_to_qbit((self.H_0i_0a).get_folded_operator(*self.orbs)).paulis
+
+        # qq
+        for j, qJ in enumerate(self.q_ops):
+            for i, qI in enumerate(self.q_ops[j:], j):
+                # Make A
+                val = self.wf.QI.op_to_qbit(
+                    (qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs)
+                ).paulis
+                qq_exp = self.wf.QI.op_to_qbit((qI.dagger * qJ).get_folded_operator(*self.orbs)).paulis
+                val += qq_exp + energy
+                A[i][j] = A[j][i] = val
+                # Make Sigma
+                Sigma[i][j] = Sigma[j][i] = qq_exp
 
         # Gq
         for j, qJ in enumerate(self.q_ops):
