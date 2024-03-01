@@ -11,7 +11,10 @@ from slowquant.qiskit_interface.linear_response.lr_baseclass import (
     get_num_nonCBS,
     quantumLRBaseClass,
 )
-from slowquant.qiskit_interface.operators import one_elec_op_0i_0a
+from slowquant.qiskit_interface.operators import (
+    hamiltonian_pauli_2i_2a,
+    one_elec_op_0i_0a,
+)
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_orbital_gradient_response,
@@ -24,8 +27,13 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
 class quantumLR(quantumLRBaseClass):
     def run(
         self,
+        do_rdm: bool = True,
     ) -> None:
-        """Run simulation of projected LR matrix elements."""
+        """Run simulation of projected LR matrix elements.
+
+        Args:
+            do_rdm: Use RDMs for QQ part.
+        """
         # RDMs
         rdms = ReducedDenstiyMatrix(
             self.wf.num_inactive_orbs,
@@ -71,25 +79,54 @@ class quantumLR(quantumLRBaseClass):
                 print("WARNING: Large Gradient detected in G of ", np.max(np.abs(grad)))
 
         # qq
-        self.A[: self.num_q, : self.num_q] = get_orbital_response_hessian_block(
-            rdms,
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.kappa_idx_dagger,
-            self.wf.kappa_idx,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        self.B[: self.num_q, : self.num_q] = get_orbital_response_hessian_block(
-            rdms,
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.kappa_idx_dagger,
-            self.wf.kappa_idx_dagger,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        self.Sigma[: self.num_q, : self.num_q] = get_orbital_response_metric_sigma(rdms, self.wf.kappa_idx)
+        if do_rdm:
+            self.A[: self.num_q, : self.num_q] = get_orbital_response_hessian_block(
+                rdms,
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.kappa_idx_dagger,
+                self.wf.kappa_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+            )
+            self.B[: self.num_q, : self.num_q] = get_orbital_response_hessian_block(
+                rdms,
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.kappa_idx_dagger,
+                self.wf.kappa_idx_dagger,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+            )
+            self.Sigma[: self.num_q, : self.num_q] = get_orbital_response_metric_sigma(
+                rdms, self.wf.kappa_idx
+            )
+        else:
+            self.H_2i_2a = hamiltonian_pauli_2i_2a(
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.num_virtual_orbs,
+            )
+            for j, qJ in enumerate(self.q_ops):
+                for i, qI in enumerate(self.q_ops[j:], j):
+                    # Make A
+                    self.A[i, j] = self.A[j, i] = self.wf.QI.quantum_expectation_value(
+                        (qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs)
+                    ) - self.wf.QI.quantum_expectation_value(
+                        (qI.dagger * qJ * self.H_2i_2a).get_folded_operator(*self.orbs)
+                    )
+                    # Make B
+                    self.B[i, j] = self.B[j, i] = -(
+                        self.wf.QI.quantum_expectation_value(
+                            (qI.dagger * qJ.dagger * self.H_2i_2a).get_folded_operator(*self.orbs)
+                        )
+                    )
+                    # Make Sigma
+                    self.Sigma[i, j] = self.Sigma[j, i] = self.wf.QI.quantum_expectation_value(
+                        (qI.dagger * qJ).get_folded_operator(*self.orbs)
+                    )
 
         # Gq
         for j, qJ in enumerate(self.q_ops):
@@ -129,11 +166,13 @@ class quantumLR(quantumLRBaseClass):
     def _get_qbitmap(
         self,
         cliques: bool = True,
+        do_rdm: bool = True,
     ) -> tuple[list[list[str]], list[list[str]], list[list[str]]]:
         """Get qubit map of operators.
 
         Args:
             cliques: If using cliques.
+            do_rdm: Use RDMs for QQ part.
 
         Returns:
             Qubit map of operators.
@@ -141,8 +180,6 @@ class quantumLR(quantumLRBaseClass):
         idx_shift = self.num_q
         print("Gs", self.num_G)
         print("qs", self.num_q)
-
-        # qq block not possible (yet) as per RDMs
 
         A = [[""] * self.num_params for _ in range(self.num_params)]
         B = [[""] * self.num_params for _ in range(self.num_params)]
@@ -155,6 +192,34 @@ class quantumLR(quantumLRBaseClass):
             G_exp.append(self.wf.QI.op_to_qbit(GJ.get_folded_operator(*self.orbs)).paulis)
             HG_exp.append(self.wf.QI.op_to_qbit((self.H_0i_0a * GJ).get_folded_operator(*self.orbs)).paulis)
         energy = self.wf.QI.op_to_qbit((self.H_0i_0a).get_folded_operator(*self.orbs)).paulis
+
+        if not do_rdm:
+            self.H_2i_2a = hamiltonian_pauli_2i_2a(
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.num_virtual_orbs,
+            )
+            for j, qJ in enumerate(self.q_ops):
+                for i, qI in enumerate(self.q_ops[j:], j):
+                    # Make A
+                    A[i][j] = A[j][i] = (
+                        self.wf.QI.op_to_qbit(
+                            (qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs)
+                        ).paulis
+                        + self.wf.QI.op_to_qbit(
+                            (qI.dagger * qJ * self.H_2i_2a).get_folded_operator(*self.orbs)
+                        ).paulis
+                    )
+                    # Make B
+                    B[i][j] = B[j][i] = self.wf.QI.op_to_qbit(
+                        (qI.dagger * qJ.dagger * self.H_2i_2a).get_folded_operator(*self.orbs)
+                    ).paulis
+                    # Make Sigma
+                    Sigma[i][j] = Sigma[j][i] = self.wf.QI.op_to_qbit(
+                        (qI.dagger * qJ).get_folded_operator(*self.orbs)
+                    ).paulis
 
         # Gq
         for j, qJ in enumerate(self.q_ops):
