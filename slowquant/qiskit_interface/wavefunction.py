@@ -293,6 +293,15 @@ class WaveFunction:
         self.QI.distributions = {}
         self.QI._Minv = None  # pylint: disable=protected-access
         self.QI._primitive = primitive  # pylint: disable=protected-access
+        # IMPORTANT: Shot number in primitive gets always overwritten if a shot number is defined in QI!
+        if self.QI.shots is not None:
+            print(
+                "Number of shots defined in new primitive are ignored as there is a number defined in the QI of ",
+                self.QI.shots,
+            )
+            print("If you want to change the number of shots, do this manually.")
+            print("Set the number of shots manually to None if you run an ideal simulator.")
+        self.QI.shots = self.QI.shots  # Redo shot check with new primitive
 
     @property
     def rdm1(self) -> np.ndarray:

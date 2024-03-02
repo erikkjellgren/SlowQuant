@@ -1,6 +1,7 @@
 import numpy as np
 import pyscf
 from qiskit.primitives import Estimator, Sampler
+from qiskit_aer.primitives import Sampler as SamplerAer
 from qiskit_nature.second_q.mappers import ParityMapper
 
 import slowquant.qiskit_interface.linear_response.allprojected as q_allprojected  # pylint: disable=consider-using-from-import
@@ -426,3 +427,70 @@ def test_gradient_optimizer_H2() -> None:
 
     WF.run_vqe_2step("SLSQP", False)
     assert abs(WF.energy_elec - -1.8572750819575072) < 10**-6
+
+
+def test_sampler_changes() -> None:
+    """
+    Test primitive changes
+    """
+    # Define molecule
+    atom = "Li .0 .0 .0; H .0 .0 1.672"
+    basis = "sto-3g"
+
+    # PySCF
+    mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
+    rhf = pyscf.scf.RHF(mol).run()
+
+    mapper = ParityMapper(num_particles=(1, 1))
+
+    # Ideal Estimator
+    estimator = Estimator()
+    QI = QuantumInterface(estimator, "ErikSD", mapper)
+
+    qWF = WaveFunction(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 2),
+        rhf.mo_coeff,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        QI,
+    )
+
+    assert QI.max_shots_per_run == 100000
+    assert QI.shots is None
+
+    # Ideal Sampler
+    sampler = Sampler()
+    qWF.change_primitive(sampler)
+
+    assert QI.max_shots_per_run == 100000
+    assert QI.shots is None
+
+    # Change to shot noise simulator reset shots
+    sampler = SamplerAer(run_options={"shots": 10000}, transpile_options={"optimization_level": 0})
+    qWF.change_primitive(sampler)
+
+    assert QI.max_shots_per_run == 100000
+    assert QI.shots == 10000
+
+    # Change of sampler keeps defined shots in QI.
+    sampler = SamplerAer(run_options={"shots": 100000}, transpile_options={"optimization_level": 0})
+    qWF.change_primitive(sampler)
+
+    assert QI.max_shots_per_run == 100000
+    assert QI.shots == 10000
+
+    # Change shots in QI
+    QI.shots = 200000
+
+    assert QI.max_shots_per_run == 100000
+    assert QI.shots == 200000
+    assert QI._circuit_multipl == 2  # pylint: disable=protected-access
+
+    # Change limit
+    QI.max_shots_per_run = 50000
+
+    assert QI.max_shots_per_run == 50000
+    assert QI.shots == 200000
+    assert QI._circuit_multipl == 4  # pylint: disable=protected-access
