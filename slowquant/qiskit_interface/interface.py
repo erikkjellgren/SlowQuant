@@ -152,6 +152,10 @@ class QuantumInterface:
                 self.ansatz,
             )
         if hasattr(self, "distributions"):
+            if self._parameters == parameters:
+                print(
+                    "WARNING: You are resetting the distributions by parsing new but identical parameters to QI."
+                )
             self.distributions.clear()
         self._parameters = parameters.copy()
 
