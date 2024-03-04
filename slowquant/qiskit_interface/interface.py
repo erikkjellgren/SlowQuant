@@ -152,7 +152,7 @@ class QuantumInterface:
                 self.ansatz,
             )
         if hasattr(self, "distributions"):
-            if self._parameters == parameters:
+            if np.array_equal(self._parameters, parameters):
                 print(
                     "WARNING: You are resetting the distributions by parsing new but identical parameters to QI."
                 )
