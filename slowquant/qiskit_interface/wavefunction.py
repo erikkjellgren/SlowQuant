@@ -409,7 +409,7 @@ class WaveFunction:
         if self._energy_elec is None:
             H = hamiltonian_pauli_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-            self._energy_elec = calc_energy_theta(self.ansatz_parameters, H, self.QI)
+            self._energy_elec = self.QI.quantum_expectation_value(H)
         return self._energy_elec
 
     def _calc_energy_elec(self) -> float:
@@ -420,7 +420,7 @@ class WaveFunction:
         """
         H = hamiltonian_pauli_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
         H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-        energy_elec = calc_energy_theta(self.ansatz_parameters, H, self.QI)
+        energy_elec = self.QI.quantum_expectation_value(H)
 
         return energy_elec
 
