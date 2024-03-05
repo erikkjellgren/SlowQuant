@@ -400,6 +400,114 @@ def test_LiH_oscillator_strength() -> None:
     assert np.allclose(osc_strengths, solution, atol=10**-6)
 
 
+def test_LiH_oscillator_strength_sampler() -> None:
+    """
+    Test oscillator strength for various LR parametrizations
+    """
+    # Define molecule
+    atom = "Li .0 .0 .0; H .0 .0 1.672"
+    basis = "sto-3g"
+
+    # PySCF
+    mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
+    rhf = pyscf.scf.RHF(mol).run()
+
+    x, y, z = mol.intor("int1e_r", comp=3)
+
+    # Optimize WF with QSQ
+    estimator = Sampler()
+    mapper = ParityMapper(num_particles=(1, 1))
+
+    QI = QuantumInterface(estimator, "ErikSD", mapper)
+
+    qWF = WaveFunction(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 2),
+        rhf.mo_coeff,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        QI,
+    )
+
+    qWF.run_vqe_2step("rotosolve", True)
+
+    # naive LR with QSQ
+    qLR_naive = q_naive.quantumLR(qWF)
+    qLR_naive.run()
+    qLR_naive.get_excitation_energies()
+    qLR_naive.get_normed_excitation_vectors()
+    osc_strengths = qLR_naive.get_oscillator_strength([x, y, z])
+
+    solution = [
+        0.04992951,
+        0.24117268,
+        0.24117268,
+        0.15818662,
+        0.16641953,
+        0.01035875,
+        0.01035875,
+        0.00625739,
+        0.06237985,
+        0.12886174,
+        0.12886174,
+        0.04602288,
+        0.0039073,
+    ]
+
+    assert np.allclose(osc_strengths, solution, atol=10**-6)
+
+    # proj LR with QSQ
+    qLR_proj = q_projected.quantumLR(qWF)
+    qLR_proj.run()
+    qLR_proj.get_excitation_energies()
+    qLR_proj.get_normed_excitation_vectors()
+    osc_strengths = qLR_proj.get_oscillator_strength([x, y, z])
+
+    solution = [
+        0.04993107,
+        0.2411727,
+        0.2411727,
+        0.15817542,
+        0.16644054,
+        0.01035886,
+        0.01035886,
+        0.00626092,
+        0.06237985,
+        0.12886175,
+        0.12886175,
+        0.04602288,
+        0.00390731,
+    ]
+
+    assert np.allclose(osc_strengths, solution, atol=10**-6)
+
+    # allproj LR with QSQ
+    qLR_allproj = q_allprojected.quantumLR(qWF)
+    qLR_allproj.run()
+    qLR_allproj.get_excitation_energies()
+    qLR_allproj.get_normed_excitation_vectors()
+    osc_strengths = qLR_allproj.get_oscillator_strength([x, y, z])
+
+    solution = [
+        0.05008036,
+        0.25084185,
+        0.25084185,
+        0.16221444,
+        0.16126765,
+        0.01835595,
+        0.01835595,
+        0.00673977,
+        0.06319556,
+        0.1338435,
+        0.1338435,
+        0.04670223,
+        0.00384225,
+    ]
+
+    assert np.allclose(osc_strengths, solution, atol=10**-6)
+
+
 def test_gradient_optimizer_H2() -> None:
     """Test that an optimizer using gradients works."""
     # Define molecule
