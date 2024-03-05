@@ -28,24 +28,52 @@ class quantumLR(quantumLRBaseClass):
     def run(
         self,
         do_rdm: bool = True,
+        do_gradients: bool = True,
     ) -> None:
         """Run simulation of projected LR matrix elements.
 
         Args:
             do_rdm: Use RDMs for QQ part.
+            do_gradients: Calculate gradients w.r.t. orbital rotations and active space excitations.
         """
-        # RDMs
-        rdms = ReducedDenstiyMatrix(
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-            self.wf.rdm1,
-            rdm2=self.wf.rdm2,
-        )
-
         idx_shift = self.num_q
         print("Gs", self.num_G)
         print("qs", self.num_q)
+
+        if do_rdm:
+            # RDMs
+            rdms = ReducedDenstiyMatrix(
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.num_virtual_orbs,
+                self.wf.rdm1,
+                rdm2=self.wf.rdm2,
+            )
+            if do_gradients:
+                # Check gradients
+                grad = get_orbital_gradient_response(
+                    rdms,
+                    self.wf.h_mo,
+                    self.wf.g_mo,
+                    self.wf.kappa_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                )
+        else:
+            if do_gradients:
+                grad = np.zeros(2 * self.num_q)
+                for i, op in enumerate(self.q_ops):
+                    grad[i] = self.wf.QI.quantum_expectation_value(
+                        (self.H_1i_1a * op).get_folded_operator(*self.orbs)
+                    )
+                    grad[i + self.num_q] = self.wf.QI.quantum_expectation_value(
+                        (op.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                    )
+        if do_gradients:
+            if len(grad) != 0:
+                print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+                if np.max(np.abs(grad)) > 10**-3:
+                    print("WARNING: Large Gradient detected in q of ", np.max(np.abs(grad)))
 
         # pre-calculate <0|G|0> and <0|HG|0>
         self.G_exp = []  # save and use for properties
@@ -56,27 +84,14 @@ class quantumLR(quantumLRBaseClass):
                 self.wf.QI.quantum_expectation_value((self.H_0i_0a * GJ).get_folded_operator(*self.orbs))
             )
 
-        # Check gradients
-        grad = get_orbital_gradient_response(
-            rdms,
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.kappa_idx,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        if len(grad) != 0:
-            print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-            if np.max(np.abs(grad)) > 10**-3:
-                print("WARNING: Large Gradient detected in q of ", np.max(np.abs(grad)))
-
-        grad = np.zeros(self.num_G)  # G^\dagger is the same
-        for i in range(self.num_G):
-            grad[i] = HG_exp[i] - (self.wf.energy_elec * self.G_exp[i])
-        if len(grad) != 0:
-            print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-            if np.max(np.abs(grad)) > 10**-3:
-                print("WARNING: Large Gradient detected in G of ", np.max(np.abs(grad)))
+        if do_gradients:
+            grad = np.zeros(self.num_G)  # G^\dagger is the same
+            for i in range(self.num_G):
+                grad[i] = HG_exp[i] - (self.wf.energy_elec * self.G_exp[i])
+            if len(grad) != 0:
+                print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+                if np.max(np.abs(grad)) > 10**-3:
+                    print("WARNING: Large Gradient detected in G of ", np.max(np.abs(grad)))
 
         # qq
         if do_rdm:

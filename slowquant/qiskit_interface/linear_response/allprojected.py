@@ -17,7 +17,6 @@ from slowquant.qiskit_interface.operators import (
 )
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
-    get_orbital_gradient_response,
     get_orbital_response_property_gradient,
 )
 
@@ -26,16 +25,13 @@ class quantumLR(quantumLRBaseClass):
 
     def run(
         self,
+        do_gradients: bool = True,
     ) -> None:
-        """Run simulation of all projected LR matrix elements."""
-        rdms = ReducedDenstiyMatrix(
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-            self.wf.rdm1,
-            rdm2=self.wf.rdm2,
-        )
+        """Run simulation of all projected LR matrix elements.
 
+        Args:
+            do_gradients: Calculate gradients w.r.t. orbital rotations and active space excitations.
+        """
         idx_shift = self.num_q
         print("Gs", self.num_G)
         print("qs", self.num_q)
@@ -59,27 +55,27 @@ class quantumLR(quantumLRBaseClass):
             )
 
         # Check gradients
-        grad = get_orbital_gradient_response(  # proj-q and naive-q lead to same working equations
-            rdms,
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.kappa_idx,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
+        if do_gradients:
+            grad = np.zeros(2 * self.num_q)
+            for i, op in enumerate(self.q_ops):
+                grad[i] = self.wf.QI.quantum_expectation_value(
+                    (self.H_1i_1a * op).get_folded_operator(*self.orbs)
+                )
+                grad[i + self.num_q] = self.wf.QI.quantum_expectation_value(
+                    (op.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                )
+            if len(grad) != 0:
+                print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+                if np.max(np.abs(grad)) > 10**-3:
+                    print("WARNING: Large Gradient detected in q of ", np.max(np.abs(grad)))
 
-        if len(grad) != 0:
-            print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-            if np.max(np.abs(grad)) > 10**-3:
-                print("WARNING: Large Gradient detected in q of ", np.max(np.abs(grad)))
-
-        grad = np.zeros(self.num_G)  # G^\dagger is the same
-        for i in range(self.num_G):
-            grad[i] = HG_exp[i] - (self.wf.energy_elec * self.G_exp[i])
-        if len(grad) != 0:
-            print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-            if np.max(np.abs(grad)) > 10**-3:
-                print("WARNING: Large Gradient detected in G of ", np.max(np.abs(grad)))
+            grad = np.zeros(self.num_G)  # G^\dagger is the same
+            for i in range(self.num_G):
+                grad[i] = HG_exp[i] - (self.wf.energy_elec * self.G_exp[i])
+            if len(grad) != 0:
+                print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+                if np.max(np.abs(grad)) > 10**-3:
+                    print("WARNING: Large Gradient detected in G of ", np.max(np.abs(grad)))
 
         # qq
         for j, qJ in enumerate(self.q_ops):
