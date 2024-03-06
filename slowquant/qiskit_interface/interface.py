@@ -349,14 +349,10 @@ class QuantumInterface:
         observables = self.op_to_qbit(op)
         # Obtain cliques for operator's Pauli strings
         raw_cliques = make_cliques(observables.paulis)
-        # Make sure clique head is in clique Pauli list
-        for clique_pauli, clique in raw_cliques.items():
-            if clique_pauli not in clique:
-                clique.append(clique_pauli)
         cliques = {}
 
         if not hasattr(self, "distributions"):
-            self.distributions: dict[str, float] = {}
+            self.distributions: dict[str, dict[str, float]] = {}
 
         # Check if cliques have already been calculated
         for clique_pauli, clique in raw_cliques.items():
@@ -374,21 +370,29 @@ class QuantumInterface:
                 PauliList(list(cliques.keys())), self.parameters, self.circuit
             )
 
-            # Loop over all clique Paul lists to obtain the result for each Pauli string from the clique head distribution
-            for nr, clique in enumerate(cliques.values()):
-                dist = distr[nr]  # Measured distribution for a given clique head
+            # Loop over all clique_pauli and save them together with the simulated distribution
+            for nr, clique_pauli in enumerate(cliques.keys()):
+                dist = distr[nr]
                 if self._do_M_mitigation:  # apply error mitigation if requested
                     dist = correct_distribution(dist, self._Minv)
-                for pauli in clique:  # Loop over all clique Pauli strings associated with one clique head
-                    result = 0.0
-                    for key, value in dist.items():  # build result from quasi-distribution
-                        # Here we could check if we want a given key (bitstring) in the result distribution
-                        result += value * get_bitstring_sign(Pauli(pauli), key)
-                    self.distributions[pauli] = result
+                self.distributions[clique_pauli] = dist
 
         # Loop over all Pauli strings in observable and build final result with coefficients
         for pauli, coeff in zip(observables.paulis, observables.coeffs):
-            values += self.distributions[str(pauli)] * coeff
+            # Find clique_pauli (head) for given pauli string in observable
+            head = None
+            for clique_pauli, clique in raw_cliques.items():
+                if str(pauli) in clique:
+                    head = clique_pauli
+            if head is None:
+                raise ValueError("Pauli string in observable not found in cliques.")
+            # Use saved distribution of clique_pauli (head) to build result
+            result = 0.0
+            for key, value in self.distributions[head].items():  # build result from quasi-distribution
+                # Here we could check if we want a given key (bitstring) in the result distribution
+                result += value * get_bitstring_sign(Pauli(pauli), key)
+            # Get value
+            values += result * coeff
 
         if isinstance(values, complex):
             if abs(values.imag) > 10**-2:
