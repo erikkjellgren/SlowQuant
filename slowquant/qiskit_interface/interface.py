@@ -160,7 +160,9 @@ class QuantumInterface:
                 self.ansatz,
             )
         if hasattr(self, "distributions"):
-            self.distributions.clear()
+            # The distributions should only reset if the parameters are actually changed.
+            if not np.array_equal(self._parameters, parameters):
+                self.distributions.clear()
         self._parameters = parameters.copy()
 
     @property
@@ -356,8 +358,10 @@ class QuantumInterface:
 
         # Check if cliques have already been calculated
         for clique_pauli, clique in raw_cliques.items():
-            if clique_pauli not in self.distributions:
-                cliques[clique_pauli] = clique
+            for pauli in clique:
+                if pauli not in self.distributions:
+                    cliques[clique_pauli] = clique
+                    break
 
         if len(cliques) != 0:
             # Check if error mitigation is requested and if read-out matrix already exists.
