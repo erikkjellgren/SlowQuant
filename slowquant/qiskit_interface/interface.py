@@ -152,11 +152,9 @@ class QuantumInterface:
                 self.ansatz,
             )
         if hasattr(self, "distributions"):
-            if np.array_equal(self._parameters, parameters):
-                print(
-                    "WARNING: You are resetting the distributions by parsing new but identical parameters to QI."
-                )
-            self.distributions.clear()
+            # The distributions should only reset if the parameters are actually changed.
+            if not np.array_equal(self._parameters, parameters):
+                self.distributions.clear()
         self._parameters = parameters.copy()
 
     def op_to_qbit(self, op: FermionicOperator) -> SparsePauliOp:
