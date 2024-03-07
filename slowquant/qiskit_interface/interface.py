@@ -362,8 +362,10 @@ class QuantumInterface:
 
         # Check if cliques have already been calculated
         for clique_pauli, clique in raw_cliques.items():
-            if clique_pauli not in self.distributions:
-                cliques[clique_pauli] = clique
+            for pauli in clique:
+                if pauli not in self.distributions:
+                    cliques[clique_pauli] = clique
+                    break
 
         if len(cliques) != 0:
             # Check if error mitigation is requested and if read-out matrix already exists.
