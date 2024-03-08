@@ -27,7 +27,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
 class quantumLR(quantumLRBaseClass):
     def run(
         self,
-        do_rdm: bool = True,
+        do_rdm: bool = False,
         do_gradients: bool = True,
     ) -> None:
         """Run simulation of projected LR matrix elements.
@@ -181,7 +181,7 @@ class quantumLR(quantumLRBaseClass):
     def _get_qbitmap(
         self,
         cliques: bool = True,
-        do_rdm: bool = True,
+        do_rdm: bool = False,
     ) -> tuple[list[list[str]], list[list[str]], list[list[str]]]:
         """Get qubit map of operators.
 
