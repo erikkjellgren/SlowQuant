@@ -103,6 +103,24 @@ class quantumLRBaseClass:
         """Get qbitmapping of operators."""
         raise NotImplementedError
 
+    def _get_qbitmap_std(self) -> tuple[list[list[str]], list[list[str]], list[list[str]]]:
+        """Get standard deviation for each element of LR equation."""
+        # Get qbitmap in Pauli strings
+        A, B, Sigma = self._get_qbitmap()
+
+        # Obtain all unique Pauli strings
+        unique_strings = []
+        for i in range(self.num_params):
+            for j in range(self.num_params):
+                for matrix in [A, B, Sigma]:
+                    for string in matrix[i][j]:
+                        if string not in unique_strings:
+                            unique_strings.append(string)
+        print("Unique Pauli strings: ", unique_strings)
+
+        # Simulate these strings
+        return A, B, Sigma
+
     def get_excitation_energies(self) -> np.ndarray:
         """Solve LR eigenvalue problem."""
         # Build Hessian and Metric
