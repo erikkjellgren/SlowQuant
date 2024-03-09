@@ -514,6 +514,11 @@ class WaveFunction:
                     print_progress, energy_func=energy_theta, silent=is_silent_subiterations
                 )
                 optimizer = SLSQP(maxiter=maxiter, ftol=tol, callback=print_progress_)
+            elif ansatz_optimizer.lower() == "slsqp_nograd":
+                print_progress_ = partial(
+                    print_progress, energy_func=energy_theta, silent=is_silent_subiterations
+                )
+                optimizer = SLSQP(maxiter=maxiter, ftol=tol, callback=print_progress_)
             elif ansatz_optimizer.lower() == "l_bfgs_b":
                 print_progress_ = partial(
                     print_progress, energy_func=energy_theta, silent=is_silent_subiterations
@@ -535,7 +540,10 @@ class WaveFunction:
                 optimizer = SPSA(maxiter=maxiter, callback=print_progress_SPSA_)
             else:
                 raise ValueError(f"Unknown optimizer: {ansatz_optimizer}")
-            res = optimizer.minimize(energy_theta, self.ansatz_parameters, jac=gradient_theta)
+            if ansatz_optimizer.lower() == "slsqp_nograd":
+                res = optimizer.minimize(energy_theta, self.ansatz_parameters)
+            else:
+                res = optimizer.minimize(energy_theta, self.ansatz_parameters, jac=gradient_theta)
             self.ansatz_parameters = res.x.tolist()
 
             if orbital_optimization and len(self.kappa) != 0:
