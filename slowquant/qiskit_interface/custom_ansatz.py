@@ -1,13 +1,10 @@
 import numpy as np
 from qiskit.circuit import Parameter, QuantumCircuit
-from qiskit.circuit.library import PauliEvolutionGate
-from qiskit.quantum_info import Pauli
 from qiskit_nature.second_q.circuit.library import HartreeFock
 from qiskit_nature.second_q.mappers import JordanWignerMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
-from qiskit_nature.second_q.operators import FermionicOp
 
-from slowquant.qiskit_interface.operators import Epq
+from slowquant.qiskit_interface.operators_circuits import tups_double, tups_single
 
 
 def ErikD_JW():
@@ -125,7 +122,16 @@ def tUPS(
     n_layers: int,
     do_pp: bool,
 ) -> QuantumCircuit:
-    r"""tUPS ansatz"""
+    r"""tUPS ansatz.
+
+    Args:
+
+
+    Returns:
+        tUPS ansatz circuit.
+
+    #. 10.48550/arXiv.2312.09761
+    """
     if not isinstance(mapper, JordanWignerMapper):
         raise ValueError(f"tUPS only implemented for JW mapper, got: {type(mapper)}")
     if num_orbs % 2 != 0:
@@ -135,81 +141,34 @@ def tUPS(
             f"pp-tUPS only implemented for number of electrons and number of orbitals being the same, got: ({np.sum(num_elec)}, {num_orbs}), (elec, orbs)"
         )
 
-    num_spin_orbs = 2 * num_orbs
-    operators = []
-    factors = []
-    params = []
-    idx = 0
-    for _ in range(n_layers):
-        for p in range(0, num_orbs - 1, 2):
-            print(p)
-            epq = Epq(p + 1, p)
-            eqp = Epq(p, p + 1)
-            # First single
-            T = epq - eqp
-            op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
-            operators.append(op_mapped.paulis)
-            params.append(Parameter(f"p{idx}"))
-            factors.append(op_mapped.coeffs)
-            idx += 1
-            # Double
-            T = epq * epq - eqp * eqp
-            op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
-            operators.append(op_mapped.paulis)
-            params.append(Parameter(f"p{idx}"))
-            factors.append(op_mapped.coeffs)
-            idx += 1
-            # Second single
-            T = epq - eqp
-            op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
-            operators.append(op_mapped.paulis)
-            params.append(Parameter(f"p{idx}"))
-            factors.append(op_mapped.coeffs)
-            idx += 1
-        for p in range(1, num_orbs - 2, 2):
-            print(p)
-            epq = Epq(p + 1, p)
-            eqp = Epq(p, p + 1)
-            # First single
-            T = epq - eqp
-            op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
-            operators.append(op_mapped.paulis)
-            params.append(Parameter(f"p{idx}"))
-            factors.append(op_mapped.coeffs)
-            idx += 1
-            # Double
-            T = epq * epq - eqp * eqp
-            op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
-            operators.append(op_mapped.paulis)
-            params.append(Parameter(f"p{idx}"))
-            factors.append(op_mapped.coeffs)
-            idx += 1
-            # Second single
-            T = epq - eqp
-            op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
-            operators.append(op_mapped.paulis)
-            params.append(Parameter(f"p{idx}"))
-            factors.append(op_mapped.coeffs)
-            idx += 1
-    params_long = []
-    ops_long = []
-    facs_long = []
-    for param, paulis, facs in zip(params, operators, factors):
-        for pauli, fac in zip(paulis, facs):
-            ops_long.append(str(pauli))
-            params_long.append(param)
-            facs_long.append((-1.0j * (fac)).real)
-    num_qubits = num_spin_orbs  # qc.num_qubits
+    num_qubits = 2 * num_orbs  # qc.num_qubits
     if do_pp:
         qc = QuantumCircuit(num_qubits)
-        for p in range(0, 2*num_orbs):
+        for p in range(0, 2 * num_orbs):
             if p % 2 == 0:
                 qc.x(p)
     else:
         qc = HartreeFock(num_orbs, num_elec, mapper)
-    for param, pauli, fac in zip(params_long, ops_long, facs_long):
-        qc.append(
-            PauliEvolutionGate(Pauli(pauli), fac * param),
-            np.linspace(0, num_qubits - 1, num_qubits, dtype=int).tolist(),
-        )
+    idx = 0
+    for _ in range(n_layers):
+        for p in range(0, num_orbs - 1, 2):
+            # First single
+            qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx}"))
+            idx += 1
+            # Double
+            qc = tups_double(p, num_orbs, qc, Parameter(f"p{idx}"))
+            idx += 1
+            # Second single
+            qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx}"))
+            idx += 1
+        for p in range(1, num_orbs - 2, 2):
+            # First single
+            qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx}"))
+            idx += 1
+            # Double
+            qc = tups_double(p, num_orbs, qc, Parameter(f"p{idx}"))
+            idx += 1
+            # Second single
+            qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx}"))
+            idx += 1
     return qc
