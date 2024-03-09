@@ -234,7 +234,7 @@ class LinearResponseBaseClass:
         for idx, (excitation_energy, transition_electric_dipole, transition_magnetic_dipole) in enumerate(
             zip(self.excitation_energies, transition_electric_dipoles, transition_magnetic_dipoles)
         ):
-            rot_strengths[idx] = (
+            rot_strengths[idx] = excitation_energy * (
                 transition_electric_dipole[0] * transition_magnetic_dipole[0]
                 + transition_electric_dipole[1] * transition_magnetic_dipole[1]
                 + transition_electric_dipole[2] * transition_magnetic_dipole[2]
