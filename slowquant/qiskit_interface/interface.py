@@ -755,7 +755,7 @@ class Clique:
         self.cliques: list[CliqueHead] = []
 
     def add_paulis(self, paulis: list[str]) -> list[str]:
-        """Add paulis to cliques.
+        """Add list of Pauli strings to cliques and return clique heads to be simulated.
 
         Args:
             paulis: Paulis to be added to cliques.
@@ -763,30 +763,31 @@ class Clique:
         Returns:
             List of clique heads to be calculated.
         """
-        old_heads = []
-        for clique_head in self.cliques:
-            old_heads.append(clique_head.head)
-
         # The special case of computational basis
         # should always be the first clique.
         if len(self.cliques) == 0:
             self.cliques.append(CliqueHead("Z" * len(paulis[0]), None))
 
+        # Loop over Pauli strings (passed via observable)
         for pauli in paulis:
+            # Loop over Clique heads simulated so far
             for clique_head in self.cliques:
+                # Check if Pauli string belongs to any already simulated Clique head.
                 do_fit, head_fit = fit_in_clique(pauli, clique_head.head)
                 if do_fit:
                     if head_fit != clique_head.head:
+                        # Update Clique head by setting distr to None (= to be simulated)
                         clique_head.distr = None
                     clique_head.head = head_fit
                     break
             else:  # no break
+                # Pauli String does not fit any simulated Clique head and has to be simulated
                 self.cliques.append(CliqueHead(pauli, None))
 
         # Find new Paulis that need to be measured
         new_heads = []
         for clique_head in self.cliques:
-            if clique_head.head not in old_heads:
+            if clique_head.distr is None:
                 new_heads.append(clique_head.head)
         return new_heads
 
@@ -812,7 +813,7 @@ class Clique:
                 raise ValueError(f"Head, {clique_head.head}, has a distr that is None")
 
     def get_distr(self, pauli: str) -> dict[str, float]:
-        """Get sample state distribution.
+        """Get sample state distribution for a Pauli string.
 
         Args:
             pauli: Pauli string.
@@ -845,12 +846,14 @@ def fit_in_clique(pauli: str, head: str) -> tuple[bool, str]:
     """
     is_commuting = True
     new_head = ""
+    # Check commuting
     for p_clique, p_op in zip(head, pauli):
         if p_clique == "I" or p_op == "I":
             continue
         if p_clique != p_op:
             is_commuting = False
             break
+    # Check common Clique head
     if is_commuting:
         for p_clique, p_op in zip(head, pauli):
             if p_clique != "I":
