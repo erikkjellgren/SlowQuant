@@ -103,32 +103,9 @@ class quantumLRBaseClass:
         """Get qbitmapping of operators."""
         raise NotImplementedError
 
-    def _get_qbitmap_std(self, repetition: int) -> tuple[list[list[str]], list[list[str]], list[list[str]]]:
-        """Get standard deviation for each element of LR equation.
-
-        Args:
-            repetition: Number of repetition runs to get standard deviation
-        """
-        # Get qbitmap in Pauli strings
-        A, B, Sigma = self._get_qbitmap()
-
-        # Obtain all unique Pauli strings
-        unique_strings = []
-        for i in range(self.num_params):
-            for j in range(self.num_params):
-                for matrix in [A, B, Sigma]:
-                    for string in matrix[i][j]:
-                        if string not in unique_strings:
-                            unique_strings.append(string)
-        print("Unique Pauli strings (without QWC): ", unique_strings)
-
-        # Simulate these strings and get std for each Pauli string
-        print("Unique Pauli strings are simulated with number of shots = ", self.wf.QI.shots)
-        print(repetition)
-
-        # Create A, B and Sigma out of the unqiue Pauli string stds
-
-        return A, B, Sigma
+    def _run_std(self) -> tuple[list[list[float]], list[list[float]], list[list[float]]]:
+        """Get standard deviation in matrix elements of LR equation."""
+        raise NotImplementedError
 
     def get_excitation_energies(self) -> np.ndarray:
         """Solve LR eigenvalue problem."""
