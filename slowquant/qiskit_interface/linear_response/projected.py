@@ -180,7 +180,7 @@ class quantumLR(quantumLRBaseClass):
 
     def _get_qbitmap(
         self,
-        cliques: bool = True,
+        cliques: bool = False,
         do_rdm: bool = False,
     ) -> tuple[list[list[str]], list[list[str]], list[list[str]]]:
         """Get qubit map of operators.
@@ -204,9 +204,11 @@ class quantumLR(quantumLRBaseClass):
         G_exp = []  # save and use for properties
         HG_exp = []
         for GJ in self.G_ops:
-            G_exp.append(self.wf.QI.op_to_qbit(GJ.get_folded_operator(*self.orbs)).paulis)
-            HG_exp.append(self.wf.QI.op_to_qbit((self.H_0i_0a * GJ).get_folded_operator(*self.orbs)).paulis)
-        energy = self.wf.QI.op_to_qbit((self.H_0i_0a).get_folded_operator(*self.orbs)).paulis
+            G_exp.append(self.wf.QI.op_to_qbit(GJ.get_folded_operator(*self.orbs)).paulis.to_labels())
+            HG_exp.append(
+                self.wf.QI.op_to_qbit((self.H_0i_0a * GJ).get_folded_operator(*self.orbs)).paulis.to_labels()
+            )
+        energy = self.wf.QI.op_to_qbit((self.H_0i_0a).get_folded_operator(*self.orbs)).paulis.to_labels()
 
         if not do_rdm:
             self.H_2i_2a = hamiltonian_pauli_2i_2a(
@@ -222,19 +224,19 @@ class quantumLR(quantumLRBaseClass):
                     A[i][j] = A[j][i] = (
                         self.wf.QI.op_to_qbit(
                             (qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs)
-                        ).paulis
+                        ).paulis.to_labels()
                         + self.wf.QI.op_to_qbit(
                             (qI.dagger * qJ * self.H_2i_2a).get_folded_operator(*self.orbs)
-                        ).paulis
+                        ).paulis.to_labels()
                     )
                     # Make B
                     B[i][j] = B[j][i] = self.wf.QI.op_to_qbit(
                         (qI.dagger * qJ.dagger * self.H_2i_2a).get_folded_operator(*self.orbs)
-                    ).paulis
+                    ).paulis.to_labels()
                     # Make Sigma
                     Sigma[i][j] = Sigma[j][i] = self.wf.QI.op_to_qbit(
                         (qI.dagger * qJ).get_folded_operator(*self.orbs)
-                    ).paulis
+                    ).paulis.to_labels()
 
         # Gq
         for j, qJ in enumerate(self.q_ops):
@@ -242,11 +244,11 @@ class quantumLR(quantumLRBaseClass):
                 # Make A
                 A[j][i + idx_shift] = A[i + idx_shift][j] = self.wf.QI.op_to_qbit(
                     (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
-                ).paulis
+                ).paulis.to_labels()
                 # Make B
                 B[j][i + idx_shift] = B[i + idx_shift][j] = self.wf.QI.op_to_qbit(
                     (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
-                ).paulis
+                ).paulis.to_labels()
 
         # GG
         for j, GJ in enumerate(self.G_ops):
@@ -254,8 +256,10 @@ class quantumLR(quantumLRBaseClass):
                 # Make A
                 val = self.wf.QI.op_to_qbit(
                     (GI.dagger * self.H_0i_0a * GJ).get_folded_operator(*self.orbs)
-                ).paulis
-                GG_exp = self.wf.QI.op_to_qbit((GI.dagger * GJ).get_folded_operator(*self.orbs)).paulis
+                ).paulis.to_labels()
+                GG_exp = self.wf.QI.op_to_qbit(
+                    (GI.dagger * GJ).get_folded_operator(*self.orbs)
+                ).paulis.to_labels()
                 val += GG_exp + energy
                 val += G_exp[i] + HG_exp[j]
                 val += G_exp[i] + G_exp[j] + energy
@@ -280,16 +284,16 @@ class quantumLR(quantumLRBaseClass):
                     if not Sigma[i][j] == "":
                         Sigma[i][j] = list(make_cliques(Sigma[i][j]).keys())  # type: ignore [call-overload]
 
-            print("Number of non-CBS Pauli strings in A: ", get_num_nonCBS(A))
-            print("Number of non-CBS Pauli strings in B: ", get_num_nonCBS(B))
-            print("Number of non-CBS Pauli strings in Sigma: ", get_num_nonCBS(Sigma))
+        print("Number of non-CBS Pauli strings in A: ", get_num_nonCBS(A))
+        print("Number of non-CBS Pauli strings in B: ", get_num_nonCBS(B))
+        print("Number of non-CBS Pauli strings in Sigma: ", get_num_nonCBS(Sigma))
 
-            CBS, nonCBS = get_num_CBS_elements(A)
-            print("In A    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
-            CBS, nonCBS = get_num_CBS_elements(B)
-            print("In B    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
-            CBS, nonCBS = get_num_CBS_elements(Sigma)
-            print("In Sigma, number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
+        CBS, nonCBS = get_num_CBS_elements(A)
+        print("In A    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
+        CBS, nonCBS = get_num_CBS_elements(B)
+        print("In B    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
+        CBS, nonCBS = get_num_CBS_elements(Sigma)
+        print("In Sigma, number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
 
         return A, B, Sigma
 
