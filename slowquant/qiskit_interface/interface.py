@@ -461,6 +461,33 @@ class QuantumInterface:
 
         return values.real
 
+    def quantum_std(self, op: FermionicOperator, custom_parameters: list[float] | None = None) -> float:
+        """Calculate variance (std**2) of expectation value of circuit and observables.
+
+        Args:
+            op: SlowQuant fermionic operator.
+            run_parameters: Circuit parameters.
+
+        Returns:
+            Expectation value of operator.
+        """
+        if isinstance(self._primitive, BaseEstimator):
+            raise ValueError("This function does not work with Estimator.")
+        if self.shots is None:
+            raise ValueError("This cannot be performed with ideal simulator and shots = None")
+        if custom_parameters is None:
+            run_parameters = self.parameters
+        else:
+            run_parameters = custom_parameters
+        observables = self.op_to_qbit(op)
+
+        value = 0.0
+        for pauli, coeff in zip(observables.paulis, observables.coeffs):
+            p1 = self._sampler_distribution_p1(pauli, run_parameters)
+            sigma_p = 2 * np.abs(coeff.real) * ((p1 - p1**2) ** (1 / 2)) / (self.shots ** (1 / 2))
+            value += sigma_p**2
+        return value
+
     def _one_call_sampler_distributions(
         self,
         paulis: PauliList | Pauli,
@@ -553,7 +580,12 @@ class QuantumInterface:
             print(
                 "WARNING: The chosen function does not allow for appending circuits. Choose _one_call_sampler_distributions instead."
             )
-            print("Simulation will be run without appending circuits with ", self.shots, " shots.")
+            print(
+                "Simulation will be run without appending circuits with ", self.max_shots_per_run, " shots."
+            )
+            shots: int | None = self.max_shots_per_run
+        else:
+            shots = self.shots
 
         # Create QuantumCircuit
         if custom_circ is None:
@@ -564,14 +596,36 @@ class QuantumInterface:
 
         # Run sampler
         job = self._primitive.run(ansatz_w_obs, parameter_values=run_parameters)
-        if self.shots is not None:  # check if ideal simulator
-            self.total_shots_used += self.shots
+        if shots is not None:  # check if ideal simulator
+            self.total_shots_used += shots
         self.total_device_calls += 1
         self.total_paulis_evaluated += 1
 
         # Get quasi-distribution in binary probabilities
         distr = job.result().quasi_dists[0].binary_probabilities()
         return distr
+
+    def _sampler_distribution_p1(
+        self, pauli: Pauli, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
+    ) -> float:
+        """Sample the probability of measuring one for a given Pauli string.
+
+        Args:
+            pauli: Pauli string.
+            run_paramters: Ansatz parameters.
+            shots: Number of shots.
+
+        Returns:
+            p1 probability.
+        """
+        # Get quasi-distribution in binary probabilities
+        distr = self._sampler_distributions(pauli, run_parameters, custom_circ)
+
+        p1 = 0.0
+        for key, value in distr.items():
+            if get_bitstring_sign(pauli, key) == 1:
+                p1 += value
+        return p1
 
     def _make_Minv(self) -> None:
         r"""Make inverse of read-out correlation matrix with one device call.
