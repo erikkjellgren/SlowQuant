@@ -12,7 +12,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     two_electron_integral_transform,
 )
 from slowquant.qiskit_interface.base import FermionicOperator
-from slowquant.qiskit_interface.interface import QuantumInterface
+from slowquant.qiskit_interface.interface import Clique, QuantumInterface
 from slowquant.qiskit_interface.operators import Epq, hamiltonian_pauli_0i_0a
 from slowquant.qiskit_interface.optimizers import RotoSolve
 from slowquant.unitary_coupled_cluster.density_matrix import (
@@ -290,7 +290,7 @@ class WaveFunction:
         self.QI.total_device_calls = 0
         self.QI.total_shots_used = 0
         self.QI.total_paulis_evaluated = 0
-        self.QI.distributions = {}
+        self.QI.cliques = Clique()
         self.QI._Minv = None  # pylint: disable=protected-access
         self.QI._primitive = primitive  # pylint: disable=protected-access
         # IMPORTANT: Shot number in primitive gets always overwritten if a shot number is defined in QI!
