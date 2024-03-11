@@ -159,10 +159,10 @@ class QuantumInterface:
                 "The length of the parameter list does not fit the chosen circuit for the Ansatz ",
                 self.ansatz,
             )
-        if hasattr(self, "distributions"):
+        if hasattr(self, "cliques"):
             # The distributions should only reset if the parameters are actually changed.
             if not np.array_equal(self._parameters, parameters):
-                self.distributions.clear()
+                self.cliques = Clique()
         self._parameters = parameters.copy()
 
     @property
@@ -349,50 +349,33 @@ class QuantumInterface:
         values = 0.0
         # Map Fermionic to Qubit
         observables = self.op_to_qbit(op)
-        # Obtain cliques for operator's Pauli strings
-        raw_cliques = make_cliques(observables.paulis)
-        # Make sure clique head is in clique Pauli list
-        for clique_pauli, clique in raw_cliques.items():
-            if clique_pauli not in clique:
-                clique.append(clique_pauli)
-        cliques = {}
 
-        if not hasattr(self, "distributions"):
-            self.distributions: dict[str, float] = {}
+        if not hasattr(self, "cliques"):
+            self.cliques = Clique()
 
-        # Check if cliques have already been calculated
-        for clique_pauli, clique in raw_cliques.items():
-            for pauli in clique:
-                if pauli not in self.distributions:
-                    cliques[clique_pauli] = clique
-                    break
+        new_heads = self.cliques.add_paulis([str(x) for x in observables.paulis])
 
-        if len(cliques) != 0:
+        if len(new_heads) != 0:
             # Check if error mitigation is requested and if read-out matrix already exists.
             if self._do_M_mitigation and self._Minv is None:
                 self._make_Minv()
 
             # Simulate each clique head with one combined device call
             # and return a list of distributions
-            distr = self._one_call_sampler_distributions(
-                PauliList(list(cliques.keys())), self.parameters, self.circuit
-            )
-
-            # Loop over all clique Paul lists to obtain the result for each Pauli string from the clique head distribution
-            for nr, clique in enumerate(cliques.values()):
-                dist = distr[nr]  # Measured distribution for a given clique head
-                if self._do_M_mitigation:  # apply error mitigation if requested
-                    dist = correct_distribution(dist, self._Minv)
-                for pauli in clique:  # Loop over all clique Pauli strings associated with one clique head
-                    result = 0.0
-                    for key, value in dist.items():  # build result from quasi-distribution
-                        # Here we could check if we want a given key (bitstring) in the result distribution
-                        result += value * get_bitstring_sign(Pauli(pauli), key)
-                    self.distributions[pauli] = result
+            distr = self._one_call_sampler_distributions(PauliList(new_heads), self.parameters, self.circuit)
+            if self._do_M_mitigation:  # apply error mitigation if requested
+                for i, dist in enumerate(distr):
+                    distr[i] = correct_distribution(dist, self._Minv)
+            self.cliques.update_distr(new_heads, distr)
 
         # Loop over all Pauli strings in observable and build final result with coefficients
         for pauli, coeff in zip(observables.paulis, observables.coeffs):
-            values += self.distributions[str(pauli)] * coeff
+            result = 0.0
+            for key, value in self.cliques.get_distr(
+                str(pauli)
+            ).items():  # build result from quasi-distribution
+                result += value * get_bitstring_sign(Pauli(pauli), key)
+            values += result * coeff
 
         if isinstance(values, complex):
             if abs(values.imag) > 10**-2:
@@ -752,6 +735,132 @@ def get_bitstring_sign(op: Pauli, binary: str) -> int:
             if binary[i] == "1":
                 sign = sign * (-1)
     return sign
+
+
+class CliqueHead:
+    def __init__(self, head: str, distr: dict[str, float] | None) -> None:
+        """Initialize clique head dataclass.
+
+        Args:
+            head: Clique head.
+            distr: Sample state distribution.
+        """
+        self.head = head
+        self.distr = distr
+
+
+class Clique:
+    def __init__(self) -> None:
+        """Initialize clique class."""
+        self.cliques: list[CliqueHead] = []
+
+    def add_paulis(self, paulis: list[str]) -> list[str]:
+        """Add list of Pauli strings to cliques and return clique heads to be simulated.
+
+        Args:
+            paulis: Paulis to be added to cliques.
+
+        Returns:
+            List of clique heads to be calculated.
+        """
+        # The special case of computational basis
+        # should always be the first clique.
+        if len(self.cliques) == 0:
+            self.cliques.append(CliqueHead("Z" * len(paulis[0]), None))
+
+        # Loop over Pauli strings (passed via observable)
+        for pauli in paulis:
+            # Loop over Clique heads simulated so far
+            for clique_head in self.cliques:
+                # Check if Pauli string belongs to any already simulated Clique head.
+                do_fit, head_fit = fit_in_clique(pauli, clique_head.head)
+                if do_fit:
+                    if head_fit != clique_head.head:
+                        # Update Clique head by setting distr to None (= to be simulated)
+                        clique_head.distr = None
+                    clique_head.head = head_fit
+                    break
+            else:  # no break
+                # Pauli String does not fit any simulated Clique head and has to be simulated
+                self.cliques.append(CliqueHead(pauli, None))
+
+        # Find new Paulis that need to be measured
+        new_heads = []
+        for clique_head in self.cliques:
+            if clique_head.distr is None:
+                new_heads.append(clique_head.head)
+        return new_heads
+
+    def update_distr(self, new_heads: list[str], new_distr: list[dict[str, float]]) -> None:
+        """Update sample state distributions of clique heads.
+
+        Args:
+            new_heads: List of clique heads.
+            new_distr: List of sample state distributions.
+        """
+        for head, distr in zip(new_heads, new_distr):
+            for clique_head in self.cliques:
+                if head == clique_head.head:
+                    if clique_head.distr is not None:
+                        raise ValueError(
+                            f"Trying to update head distr that is not None. Head; {clique_head.head}"
+                        )
+                    clique_head.distr = distr
+
+        # Check that all heads have a distr
+        for clique_head in self.cliques:
+            if clique_head.distr is None:
+                raise ValueError(f"Head, {clique_head.head}, has a distr that is None")
+
+    def get_distr(self, pauli: str) -> dict[str, float]:
+        """Get sample state distribution for a Pauli string.
+
+        Args:
+            pauli: Pauli string.
+
+        Returns:
+            Sample state distribution.
+        """
+        for clique_head in self.cliques:
+            do_fit, head_fit = fit_in_clique(pauli, clique_head.head)
+            if do_fit:
+                if clique_head.head != head_fit:
+                    raise ValueError(
+                        f"Found matching clique, but head will be mutate. Head; {clique_head.head}, Pauli; {pauli}"
+                    )
+                if clique_head.distr is None:
+                    raise ValueError(f"Head, {clique_head.head}, has a distr that is None")
+                return clique_head.distr
+        raise ValueError(f"Could not find matching clique for Pauli, {pauli}")
+
+
+def fit_in_clique(pauli: str, head: str) -> tuple[bool, str]:
+    """Check if a Pauli fits in a given clique.
+
+    Args:
+        pauli: Pauli string.
+        head: Clique head.
+
+    Returns:
+        If commuting and new clique head.
+    """
+    is_commuting = True
+    new_head = ""
+    # Check commuting
+    for p_clique, p_op in zip(head, pauli):
+        if p_clique == "I" or p_op == "I":
+            continue
+        if p_clique != p_op:
+            is_commuting = False
+            break
+    # Check common Clique head
+    if is_commuting:
+        for p_clique, p_op in zip(head, pauli):
+            if p_clique != "I":
+                new_head += p_clique
+            else:
+                new_head += p_op
+    return is_commuting, new_head
 
 
 def make_cliques(paulis: PauliList) -> dict[str, list[str]]:
