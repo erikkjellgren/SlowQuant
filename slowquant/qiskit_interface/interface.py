@@ -364,7 +364,8 @@ class QuantumInterface:
             # and return a list of distributions
             distr = self._one_call_sampler_distributions(PauliList(new_heads), self.parameters, self.circuit)
             if self._do_M_mitigation:  # apply error mitigation if requested
-                dist = correct_distribution(dist, self._Minv)
+                for i, dist in enumerate(distr):
+                    distr[i] = correct_distribution(dist, self._Minv)
             self.cliques.update_distr(new_heads, distr)
 
         # Loop over all Pauli strings in observable and build final result with coefficients
@@ -738,18 +739,38 @@ def get_bitstring_sign(op: Pauli, binary: str) -> int:
 
 class CliqueHead:
     def __init__(self, head: str, distr: dict[str, float] | None) -> None:
+        """Initialize clique head dataclass.
+
+        Args:
+            head: Clique head.
+            distr: Sample state distribution.
+        """
         self.head = head
         self.distr = distr
 
 
 class Clique:
     def __init__(self) -> None:
+        """Initialize clique class."""
         self.cliques: list[CliqueHead] = []
 
     def add_paulis(self, paulis: list[str]) -> list[str]:
+        """Add paulis to cliques.
+
+        Args:
+            paulis: Paulis to be added to cliques.
+
+        Returns:
+            List of clique heads to be calculated.
+        """
         old_heads = []
         for clique_head in self.cliques:
             old_heads.append(clique_head.head)
+
+        # The special case of computational basis
+        # should always be the first clique.
+        if len(self.cliques) == 0:
+            self.cliques.append(CliqueHead("Z" * len(paulis[0]), None))
 
         for pauli in paulis:
             for clique_head in self.cliques:
@@ -770,10 +791,16 @@ class Clique:
         return new_heads
 
     def update_distr(self, new_heads: list[str], new_distr: list[dict[str, float]]) -> None:
+        """Update sample state distributions of clique heads.
+
+        Args:
+            new_heads: List of clique heads.
+            new_distr: List of sample state distributions.
+        """
         for head, distr in zip(new_heads, new_distr):
             for clique_head in self.cliques:
                 if head == clique_head.head:
-                    if clique_head.distr != None:
+                    if clique_head.distr is not None:
                         raise ValueError(
                             f"Trying to update head distr that is not None. Head; {clique_head.head}"
                         )
@@ -785,6 +812,14 @@ class Clique:
                 raise ValueError(f"Head, {clique_head.head}, has a distr that is None")
 
     def get_distr(self, pauli: str) -> dict[str, float]:
+        """Get sample state distribution.
+
+        Args:
+            pauli: Pauli string.
+
+        Returns:
+            Sample state distribution.
+        """
         for clique_head in self.cliques:
             do_fit, head_fit = fit_in_clique(pauli, clique_head.head)
             if do_fit:
@@ -799,6 +834,15 @@ class Clique:
 
 
 def fit_in_clique(pauli: str, head: str) -> tuple[bool, str]:
+    """Check if a Pauli fits in a given clique.
+
+    Args:
+        pauli: Pauli string.
+        head: Clique head.
+
+    Returns:
+        If commuting and new clique head.
+    """
     is_commuting = True
     new_head = ""
     for p_clique, p_op in zip(head, pauli):
