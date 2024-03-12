@@ -103,7 +103,9 @@ class quantumLRBaseClass:
         """Get qbitmapping of operators."""
         raise NotImplementedError
 
-    def _run_std(self) -> tuple[list[list[float]], list[list[float]], list[list[float]]]:
+    def _run_std(
+        self, no_coeffs: bool = False
+    ) -> tuple[list[list[float]], list[list[float]], list[list[float]]]:
         """Get standard deviation in matrix elements of LR equation."""
         raise NotImplementedError
 

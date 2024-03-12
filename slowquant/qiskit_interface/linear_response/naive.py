@@ -298,6 +298,7 @@ class quantumLR(quantumLRBaseClass):
 
     def _run_std(
         self,
+        no_coeffs: bool = False,
     ) -> tuple[list[list[float]], list[list[float]], list[list[float]]]:
         """Get standard deviation in matrix elements of LR equation."""
         idx_shift = self.num_q
@@ -320,18 +321,25 @@ class quantumLR(quantumLRBaseClass):
             for i, qI in enumerate(self.q_ops[j:], j):
                 # Make A
                 A[i, j] = A[j, i] = np.sqrt(
-                    self.wf.QI.quantum_std((qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs))
-                    + self.wf.QI.quantum_std((qI.dagger * qJ * self.H_2i_2a).get_folded_operator(*self.orbs))
+                    self.wf.QI.quantum_std(
+                        (qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
+                    + self.wf.QI.quantum_std(
+                        (qI.dagger * qJ * self.H_2i_2a).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
                 )
                 # Make B
                 B[i, j] = B[j, i] = np.sqrt(
                     self.wf.QI.quantum_std(
-                        (qI.dagger * qJ.dagger * self.H_2i_2a).get_folded_operator(*self.orbs)
+                        (qI.dagger * qJ.dagger * self.H_2i_2a).get_folded_operator(*self.orbs),
+                        no_coeffs=no_coeffs,
                     )
                 )
                 # Make Sigma
                 Sigma[i, j] = Sigma[j, i] = np.sqrt(
-                    self.wf.QI.quantum_std((qI.dagger * qJ).get_folded_operator(*self.orbs))
+                    self.wf.QI.quantum_std(
+                        (qI.dagger * qJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
                 )
 
         # Gq
@@ -339,17 +347,23 @@ class quantumLR(quantumLRBaseClass):
             for i, GI in enumerate(self.G_ops):
                 # Make A
                 val = np.sqrt(
-                    self.wf.QI.quantum_std((GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs))
-                    + self.wf.QI.quantum_std((self.H_1i_1a * qJ * GI.dagger).get_folded_operator(*self.orbs))
+                    self.wf.QI.quantum_std(
+                        (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
+                    + self.wf.QI.quantum_std(
+                        (self.H_1i_1a * qJ * GI.dagger).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
                 )
                 A[i + idx_shift, j] = A[j, i + idx_shift] = val
                 # Make B
                 val = np.sqrt(
                     self.wf.QI.quantum_std(
-                        (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs)
+                        (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs),
+                        no_coeffs=no_coeffs,
                     )
                     + self.wf.QI.quantum_std(
-                        (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                        (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs),
+                        no_coeffs=no_coeffs,
                     )
                 )
                 B[i + idx_shift, j] = B[j, i + idx_shift] = val
@@ -360,18 +374,22 @@ class quantumLR(quantumLRBaseClass):
                 # Make A
                 A[i + idx_shift, j + idx_shift] = A[j + idx_shift, i + idx_shift] = np.sqrt(
                     self.wf.QI.quantum_std(
-                        double_commutator(GI.dagger, self.H_0i_0a, GJ).get_folded_operator(*self.orbs)
+                        double_commutator(GI.dagger, self.H_0i_0a, GJ).get_folded_operator(*self.orbs),
+                        no_coeffs=no_coeffs,
                     )
                 )
                 # Make B
                 B[i + idx_shift, j + idx_shift] = B[j + idx_shift, i + idx_shift] = np.sqrt(
                     self.wf.QI.quantum_std(
-                        double_commutator(GI.dagger, self.H_0i_0a, GJ.dagger).get_folded_operator(*self.orbs)
+                        double_commutator(GI.dagger, self.H_0i_0a, GJ.dagger).get_folded_operator(*self.orbs),
+                        no_coeffs=no_coeffs,
                     )
                 )
                 # Make Sigma
                 Sigma[i + idx_shift, j + idx_shift] = Sigma[j + idx_shift, i + idx_shift] = np.sqrt(
-                    self.wf.QI.quantum_std(commutator(GI.dagger, GJ).get_folded_operator(*self.orbs))
+                    self.wf.QI.quantum_std(
+                        commutator(GI.dagger, GJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
                 )
         self._analyze_std(A, B, Sigma)
         return A, B, Sigma

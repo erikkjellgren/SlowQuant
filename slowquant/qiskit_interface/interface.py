@@ -452,7 +452,11 @@ class QuantumInterface:
         return values.real
 
     def quantum_std(
-        self, op: FermionicOperator, do_cliques: bool = True, custom_parameters: list[float] | None = None
+        self,
+        op: FermionicOperator,
+        do_cliques: bool = True,
+        no_coeffs: bool = False,
+        custom_parameters: list[float] | None = None,
     ) -> float:
         """Calculate variance (std**2) of expectation value of circuit and observables.
 
@@ -496,6 +500,8 @@ class QuantumInterface:
         # Loop over all Pauli strings in observable and build final result with coefficients
         result = 0.0
         for pauli, coeff in zip(observables.paulis, observables.coeffs):
+            if no_coeffs:
+                coeff = 1
             # Get distribution from cliques
             if do_cliques:
                 dist = self.cliques.get_distr(str(pauli))
