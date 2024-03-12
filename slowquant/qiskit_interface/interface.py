@@ -465,8 +465,6 @@ class QuantumInterface:
         """
         if isinstance(self._primitive, BaseEstimator):
             raise ValueError("This function does not work with Estimator.")
-        if self.shots is None:  # maybe change
-            raise ValueError("This cannot be performed with ideal simulator and shots = None")
         if custom_parameters is None:
             run_parameters = self.parameters
         else:
@@ -508,7 +506,10 @@ class QuantumInterface:
                         p1 += value
             else:
                 p1 = self._sampler_distribution_p1(pauli, run_parameters)
-            sigma_p = 2 * np.abs(coeff.real) * ((p1 - p1**2) ** (1 / 2)) / (self.shots ** (1 / 2))
+            if self.shots is None:
+                sigma_p = 2 * np.abs(coeff.real) * ((p1 - p1**2) ** (1 / 2))
+            else:
+                sigma_p = 2 * np.abs(coeff.real) * ((p1 - p1**2) ** (1 / 2)) / (self.shots ** (1 / 2))
             result += sigma_p**2
         return result
 

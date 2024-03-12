@@ -104,7 +104,6 @@ class Clique:
         """
         # The special case of computational basis
         # should always be the first clique.
-        # Is that needed? Alreday in make_cliques?
         if len(self.cliques) == 0:
             self.cliques.append(CliqueHead("Z" * len(paulis[0]), None))
 

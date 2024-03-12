@@ -373,6 +373,7 @@ class quantumLR(quantumLRBaseClass):
                 Sigma[i + idx_shift, j + idx_shift] = Sigma[j + idx_shift, i + idx_shift] = np.sqrt(
                     self.wf.QI.quantum_std(commutator(GI.dagger, GJ).get_folded_operator(*self.orbs))
                 )
+        self._analyze_std(A, B, Sigma)
         return A, B, Sigma
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:

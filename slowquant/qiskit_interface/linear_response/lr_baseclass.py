@@ -107,6 +107,27 @@ class quantumLRBaseClass:
         """Get standard deviation in matrix elements of LR equation."""
         raise NotImplementedError
 
+    def _analyze_std(self, A: np.ndarray, B: np.ndarray, Sigma: np.ndarray, max_values: int = 4) -> None:
+        """Analyze standard deviation in matrix elements of LR equation."""
+        matrix_name = ["A", "B", "Sigma"]
+        for nr, matrix in enumerate([A, B, Sigma]):
+            print(f"\nAnalysis of {matrix_name[nr]}")
+            print(f"The average standard deviation is {(np.sum(matrix) / (self.num_params**2))}")
+            print(f"Maximum standard deviations are of value {np.sort(matrix.flatten())[::-1][:max_values]}")
+            indices = np.unravel_index(np.argsort(matrix.flatten())[::-1][:max_values], matrix.shape)
+            print("These maximum values are in:")
+            for i in range(max_values):
+                area = ""
+                if indices[0][i] < self.num_q:
+                    area += "q"
+                else:
+                    area += "G"
+                if indices[1][i] < self.num_q:
+                    area += "q"
+                else:
+                    area += "G"
+                print(f"Indices {indices[0][i],indices[1][i]}. Part of matrix block {area}")
+
     def get_excitation_energies(self) -> np.ndarray:
         """Solve LR eigenvalue problem."""
         # Build Hessian and Metric
