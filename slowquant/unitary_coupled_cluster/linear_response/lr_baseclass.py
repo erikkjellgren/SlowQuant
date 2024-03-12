@@ -219,7 +219,7 @@ class LinearResponseBaseClass:
         r"""Calculate rotational strengths.
 
         .. math::
-            R_n = e_n\left<0\left|\hat{\mu}\right|n\left>\cdot\left<n\left|\hat{m}\right|0\left>
+            R_n = \left<0\left|\hat{\mu}\right|n\left>\cdot\left<n\left|\hat{m}\right|0\left>
 
         Args:
             dipole_integrals: Dipole integrals (x,y,z) in AO basis.
@@ -231,10 +231,10 @@ class LinearResponseBaseClass:
         transition_electric_dipoles = self.get_property_gradient(dipole_integrals)
         transition_magnetic_dipoles = self.get_property_gradient(magnetic_moment_integrals, is_imag_op=True)
         rot_strengths = np.zeros(len(transition_electric_dipoles))
-        for idx, (excitation_energy, transition_electric_dipole, transition_magnetic_dipole) in enumerate(
-            zip(self.excitation_energies, transition_electric_dipoles, transition_magnetic_dipoles)
+        for idx, (transition_electric_dipole, transition_magnetic_dipole) in enumerate(
+            zip(transition_electric_dipoles, transition_magnetic_dipoles)
         ):
-            rot_strengths[idx] = excitation_energy * (
+            rot_strengths[idx] = (
                 transition_electric_dipole[0] * transition_magnetic_dipole[0]
                 + transition_electric_dipole[1] * transition_magnetic_dipole[1]
                 + transition_electric_dipole[2] * transition_magnetic_dipole[2]
