@@ -465,7 +465,7 @@ class QuantumInterface:
         """
         if isinstance(self._primitive, BaseEstimator):
             raise ValueError("This function does not work with Estimator.")
-        if self.shots is None:
+        if self.shots is None:  # maybe change
             raise ValueError("This cannot be performed with ideal simulator and shots = None")
         if custom_parameters is None:
             run_parameters = self.parameters
@@ -496,7 +496,7 @@ class QuantumInterface:
                 self.cliques.update_distr(new_heads, distr)
 
         # Loop over all Pauli strings in observable and build final result with coefficients
-        value = 0.0
+        result = 0.0
         for pauli, coeff in zip(observables.paulis, observables.coeffs):
             # Get distribution from cliques
             if do_cliques:
@@ -509,8 +509,8 @@ class QuantumInterface:
             else:
                 p1 = self._sampler_distribution_p1(pauli, run_parameters)
             sigma_p = 2 * np.abs(coeff.real) * ((p1 - p1**2) ** (1 / 2)) / (self.shots ** (1 / 2))
-            value += sigma_p**2
-        return value
+            result += sigma_p**2
+        return result
 
     def _one_call_sampler_distributions(
         self,
