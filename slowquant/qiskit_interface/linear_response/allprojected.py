@@ -5,7 +5,6 @@ import numpy as np
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
-from slowquant.qiskit_interface.interface import make_cliques
 from slowquant.qiskit_interface.linear_response.lr_baseclass import (
     get_num_CBS_elements,
     get_num_nonCBS,
@@ -15,6 +14,7 @@ from slowquant.qiskit_interface.operators import (
     hamiltonian_pauli_2i_2a,
     one_elec_op_0i_0a,
 )
+from slowquant.qiskit_interface.util import make_cliques
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_orbital_response_property_gradient,
