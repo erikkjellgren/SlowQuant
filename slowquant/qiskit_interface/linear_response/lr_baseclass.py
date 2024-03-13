@@ -112,7 +112,7 @@ class quantumLRBaseClass:
     def _analyze_std(self, A: np.ndarray, B: np.ndarray, Sigma: np.ndarray, max_values: int = 4) -> None:
         """Analyze standard deviation in matrix elements of LR equation."""
         matrix_name = ["A", "B", "Sigma"]
-        for nr, matrix in enumerate([A, B, Sigma]):
+        for nr, matrix in enumerate([np.abs(A), np.abs(B), np.abs(Sigma)]):
             print(f"\nAnalysis of {matrix_name[nr]}")
             print(f"The average standard deviation is {(np.sum(matrix) / (self.num_params**2))}")
             print(f"Maximum standard deviations are of value {np.sort(matrix.flatten())[::-1][:max_values]}")
