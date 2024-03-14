@@ -121,16 +121,16 @@ def tUPS(
     mapper: FermionicMapper,
     n_layers: int,
     do_pp: bool,
-) -> QuantumCircuit:
+) -> tuple[QuantumCircuit, dict[str, int]]:
     r"""tUPS ansatz.
+
+    #. 10.48550/arXiv.2312.09761
 
     Args:
 
 
     Returns:
         tUPS ansatz circuit.
-
-    #. 10.48550/arXiv.2312.09761
     """
     if not isinstance(mapper, JordanWignerMapper):
         raise ValueError(f"tUPS only implemented for JW mapper, got: {type(mapper)}")
@@ -149,26 +149,33 @@ def tUPS(
                 qc.x(p)
     else:
         qc = HartreeFock(num_orbs, num_elec, mapper)
+    grad_param_R = {}
     idx = 0
     for _ in range(n_layers):
         for p in range(0, num_orbs - 1, 2):
             # First single
             qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx}"))
+            grad_param_R[f"p{idx}"] = 4
             idx += 1
             # Double
             qc = tups_double(p, num_orbs, qc, Parameter(f"p{idx}"))
+            grad_param_R[f"p{idx}"] = 2
             idx += 1
             # Second single
             qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx}"))
+            grad_param_R[f"p{idx}"] = 4
             idx += 1
         for p in range(1, num_orbs - 2, 2):
             # First single
             qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx}"))
+            grad_param_R[f"p{idx}"] = 4
             idx += 1
             # Double
             qc = tups_double(p, num_orbs, qc, Parameter(f"p{idx}"))
+            grad_param_R[f"p{idx}"] = 2
             idx += 1
             # Second single
             qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx}"))
+            grad_param_R[f"p{idx}"] = 4
             idx += 1
-    return qc
+    return qc, grad_param_R

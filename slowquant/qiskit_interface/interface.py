@@ -57,6 +57,9 @@ class QuantumInterface:
         self.num_orbs = num_orbs
         self.num_spin_orbs = 2 * num_orbs
         self.num_elec = num_elec
+        self.grad_param_R: dict[str, int] = (
+            {}
+        )  # Contains information about the parameterization needed for gradient evaluations.
 
         if self.ansatz == "UCCSD":
             self.circuit = UCCSD(
@@ -113,9 +116,21 @@ class QuantumInterface:
         elif self.ansatz == "HF":
             self.circuit = HartreeFock(num_orbs, self.num_elec, self.mapper)
         elif self.ansatz == "tUPS":
-            self.circuit = tUPS(num_orbs, self.num_elec, self.mapper, self.n_layers, False)
+            self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.n_layers, False)
         elif self.ansatz == "pptUPS":
-            self.circuit = tUPS(num_orbs, self.num_elec, self.mapper, self.n_layers, True)
+            self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.n_layers, True)
+        if len(self.grad_param_R) == 0:
+            for par in self.circuit.parameters:
+                # Default value two
+                self.grad_param_R[str(par)] = 2
+        if len(self.grad_param_R) != len(self.circuit.parameters):
+            raise ValueError(
+                f"Number of elements in grad_param_R, {len(self.grad_param_R)}, does not match number of parameters, {len(self.circuit.parameters)}"
+            )
+        self.param_names = [str(x) for x in self.circuit.parameters]
+        for name in self.param_names:
+            if name not in self.grad_param_R.keys(): # pylint: disable=consider-iterating-dictionary
+                raise ValueError(f"Got parameter name, {name}, that is not in grad_param_R")
 
         # Set parameter to HarteeFock
         self._parameters = [0.0] * self.circuit.num_parameters
