@@ -299,6 +299,7 @@ class quantumLR(quantumLRBaseClass):
     def _run_std(
         self,
         no_coeffs: bool = False,
+        verbose: bool = True,
     ) -> tuple[list[list[float]], list[list[float]], list[list[float]]]:
         """Get standard deviation in matrix elements of LR equation."""
         idx_shift = self.num_q
@@ -391,7 +392,7 @@ class quantumLR(quantumLRBaseClass):
                         commutator(GI.dagger, GJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
                     )
                 )
-        self._analyze_std(A, B, Sigma)
+        self._analyze_std(A, B, Sigma, verbose=verbose)
         return A, B, Sigma
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
