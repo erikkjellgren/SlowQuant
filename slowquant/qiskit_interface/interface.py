@@ -1,3 +1,5 @@
+from typing import Any
+
 from qiskit import QuantumCircuit
 from qiskit.primitives import BaseEstimator, BaseSampler
 from qiskit.quantum_info import Pauli, PauliList, SparsePauliOp
@@ -22,12 +24,12 @@ class QuantumInterface:
     This class handles the interface with qiskit and the communication with quantum hardware.
     """
 
-    def __init__(
+    def __init__(  # pylint: disable=dangerous-default-value
         self,
         primitive: BaseEstimator | BaseSampler,
         ansatz: str,
         mapper: FermionicMapper,
-        n_layers: int = 1,
+        ansatz_options: dict[str, Any] = {},
     ) -> None:
         """Interface to Qiskit to use IBM quantum hardware or simulator.
 
@@ -35,17 +37,18 @@ class QuantumInterface:
             primitive: Qiskit Estimator or Sampler object
             ansatz: Name of ansatz to be used.
             mapper: Qiskit mapper object, e.g. JW or Parity.
+            ansatz_options: Ansatz options.
         """
-        allowed_ansatz = ("UCCSD", "PUCCD", "UCCD", "ErikD", "ErikSD", "HF", "tUPS", "pptUPS")
+        allowed_ansatz = ("UCCSD", "PUCCD", "UCCD", "ErikD", "ErikSD", "HF", "tUPS")
         if ansatz not in allowed_ansatz:
-            raise ValueError("The chosen Ansatz is not availbale. Choose from: ", allowed_ansatz)
+            raise ValueError("The chosen Ansatz is not available. Choose from: ", allowed_ansatz)
         self.ansatz = ansatz
         self._primitive = primitive
         self.mapper = mapper
         self.total_shots_used = 0
         self.total_device_calls = 0
         self.total_paulis_evaluated = 0
-        self.n_layers = n_layers
+        self.ansatz_options = ansatz_options
 
     def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int]) -> None:
         """Construct qiskit circuit.
@@ -62,6 +65,8 @@ class QuantumInterface:
         )  # Contains information about the parameterization needed for gradient evaluations.
 
         if self.ansatz == "UCCSD":
+            if len(self.ansatz_options) != 0:
+                raise ValueError(f"No options available for UCCSD got {self.ansatz_options}")
             self.circuit = UCCSD(
                 num_orbs,
                 self.num_elec,
@@ -73,6 +78,8 @@ class QuantumInterface:
                 ),
             )
         elif self.ansatz == "PUCCD":
+            if len(self.ansatz_options) != 0:
+                raise ValueError(f"No options available for PUCCD got {self.ansatz_options}")
             self.circuit = PUCCD(
                 num_orbs,
                 self.num_elec,
@@ -84,6 +91,8 @@ class QuantumInterface:
                 ),
             )
         elif self.ansatz == "UCCD":
+            if len(self.ansatz_options) != 0:
+                raise ValueError(f"No options available for UCCD got {self.ansatz_options}")
             self.circuit = UCC(
                 num_orbs,
                 self.num_elec,
@@ -96,6 +105,8 @@ class QuantumInterface:
                 ),
             )
         elif self.ansatz == "ErikD":
+            if len(self.ansatz_options) != 0:
+                raise ValueError(f"No options available for ErikD got {self.ansatz_options}")
             if num_orbs != 2 or self.num_elec != (1, 1):
                 raise ValueError(f"Chosen ansatz, {self.ansatz}, only works for (2,2)")
             if isinstance(self.mapper, JordanWignerMapper):
@@ -105,6 +116,8 @@ class QuantumInterface:
             else:
                 raise ValueError(f"Unsupported mapper, {type(self.mapper)}, for ansatz {self.ansatz}")
         elif self.ansatz == "ErikSD":
+            if len(self.ansatz_options) != 0:
+                raise ValueError(f"No options available for ErikSD got {self.ansatz_options}")
             if num_orbs != 2 or self.num_elec != (1, 1):
                 raise ValueError(f"Chosen ansatz, {self.ansatz}, only works for (2,2)")
             if isinstance(self.mapper, JordanWignerMapper):
@@ -114,11 +127,13 @@ class QuantumInterface:
             else:
                 raise ValueError(f"Unsupported mapper, {type(self.mapper)}, for ansatz {self.ansatz}")
         elif self.ansatz == "HF":
+            if len(self.ansatz_options) != 0:
+                raise ValueError(f"No options available for HF got {self.ansatz_options}")
             self.circuit = HartreeFock(num_orbs, self.num_elec, self.mapper)
         elif self.ansatz == "tUPS":
-            self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.n_layers, False)
-        elif self.ansatz == "pptUPS":
-            self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.n_layers, True)
+            self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
+
+        # Check that R parameter for gradient is consistent with the paramter names.
         if len(self.grad_param_R) == 0:
             for par in self.circuit.parameters:
                 # Default value two
@@ -129,8 +144,10 @@ class QuantumInterface:
             )
         self.param_names = [str(x) for x in self.circuit.parameters]
         for name in self.param_names:
-            if name not in self.grad_param_R.keys(): # pylint: disable=consider-iterating-dictionary
-                raise ValueError(f"Got parameter name, {name}, that is not in grad_param_R")
+            if name not in self.grad_param_R.keys():  # pylint: disable=consider-iterating-dictionary
+                raise ValueError(
+                    f"Got parameter name, {name}, that is not in grad_param_R, {self.grad_param_R}"
+                )
 
         # Set parameter to HarteeFock
         self._parameters = [0.0] * self.circuit.num_parameters

@@ -1,3 +1,5 @@
+from typing import Any
+
 import numpy as np
 from qiskit.circuit import Parameter, QuantumCircuit
 from qiskit_nature.second_q.circuit.library import HartreeFock
@@ -119,19 +121,36 @@ def tUPS(
     num_orbs: int,
     num_elec: tuple[int, int],
     mapper: FermionicMapper,
-    n_layers: int,
-    do_pp: bool,
+    ansatz_options: dict[str, Any],
 ) -> tuple[QuantumCircuit, dict[str, int]]:
     r"""tUPS ansatz.
 
     #. 10.48550/arXiv.2312.09761
 
-    Args:
+    Ansatz Options:
+        * n_layers [int]: Number of layers.
+        * do_pp [bool]: Do perfect pairing.
 
+    Args:
+        num_orbs: Number of spatial orbitals.
+        num_elec: Number of alpha and beta electrons.
+        ansatz_options: Ansatz options.
 
     Returns:
-        tUPS ansatz circuit.
+        tUPS ansatz circuit and R parameters needed for gradients.
     """
+    valid_options = ("n_layers", "do_pp")
+    for option in ansatz_options:
+        if option not in valid_options:
+            raise ValueError(f"Got unknown option for tUPS, {option}. Valid options are: {valid_options}")
+    if "n_layers" not in ansatz_options.keys():
+        raise ValueError("tUPS require the option 'n_layers'")
+    n_layers = ansatz_options["n_layers"]
+    if "do_pp" in ansatz_options.keys():
+        do_pp = ansatz_options["do_pp"]
+    else:
+        do_pp = False
+
     if not isinstance(mapper, JordanWignerMapper):
         raise ValueError(f"tUPS only implemented for JW mapper, got: {type(mapper)}")
     if num_orbs % 2 != 0:

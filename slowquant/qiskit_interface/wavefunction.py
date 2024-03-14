@@ -388,7 +388,7 @@ class WaveFunction:
         r"""Check orthonormality of orbitals.
 
         .. math::
-            I = C_\text{MO}S\C_\text{MO}^T
+            \boldsymbol{I} = \boldsymbol{C}_\text{MO}\boldsymbol{S}\boldsymbol{C}_\text{MO}^T
 
         Args:
             overlap_integral: Overlap integral in AO basis.
@@ -817,10 +817,9 @@ def orbital_rotation_gradient(
 
 
 def ansatz_parameters_gradient(
-    parameters: list[float], operator, quantum_interface: QuantumInterface
+    parameters: list[float], operator: FermionicOperator, quantum_interface: QuantumInterface
 ) -> np.ndarray:
     r"""Calculate gradient with respect to ansatz parameters.
-
 
     Args:
         parameters: Ansatz parameters.
@@ -843,7 +842,11 @@ def ansatz_parameters_gradient(
 
 
 def get_energy_evals_for_grad(
-    operator, quantum_interface, parameters: list[float], idx: int, R: int
+    operator: FermionicOperator,
+    quantum_interface: QuantumInterface,
+    parameters: list[float],
+    idx: int,
+    R: int,
 ) -> list[float]:
     r"""Get energy evaluations needed for the gradient calculation.
 
@@ -869,7 +872,7 @@ def get_energy_evals_for_grad(
     return e_vals
 
 
-def calc_gradient_both(parameters, wf) -> np.ndarray:
+def calc_gradient_both(parameters: list[float], wf: WaveFunction) -> np.ndarray:
     """Calculate electronic gradient.
 
     Args:

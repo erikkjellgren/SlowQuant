@@ -145,7 +145,7 @@ def reconstructed_f(x: float, energy_vals: list[float], R: int) -> float:
     For better numerical stability the implemented form is instead:
 
     .. math::
-        E(x) = \sum_{\mu=-R}^{R}E(x_\mu)\frac{\sinc\left(\frac{2R+1}{2}(x-x_\mu)\right)}{\sinc\left(\frac{1}{2}(x-x_\mu)\right)}
+        E(x) = \sum_{\mu=-R}^{R}E(x_\mu)\frac{\mathrm{sinc}\left(\frac{2R+1}{2}(x-x_\mu)\right)}{\mathrm{sinc}\left(\frac{1}{2}(x-x_\mu)\right)}
 
     #. 10.22331/q-2022-03-30-677, Eq. (57)
     #. https://pennylane.ai/qml/demos/tutorial_general_parshift/, 2024-03-14
