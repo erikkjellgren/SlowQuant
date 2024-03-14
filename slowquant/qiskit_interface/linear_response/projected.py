@@ -155,7 +155,7 @@ class quantumLR(quantumLRBaseClass):
                     (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
                 )
 
-        # Calculate Matrices
+        # GG
         for j, GJ in enumerate(self.G_ops):
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
@@ -295,6 +295,107 @@ class quantumLR(quantumLRBaseClass):
         CBS, nonCBS = get_num_CBS_elements(Sigma)
         print("In Sigma, number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
 
+        return A, B, Sigma
+
+    def _run_std(
+        self,
+        no_coeffs: bool = False,
+    ) -> tuple[list[list[float]], list[list[float]], list[list[float]]]:
+        """Get standard deviation in matrix elements of LR equation."""
+        idx_shift = self.num_q
+        print("Gs", self.num_G)
+        print("qs", self.num_q)
+
+        A = np.zeros((self.num_params, self.num_params))
+        B = np.zeros((self.num_params, self.num_params))
+        Sigma = np.zeros((self.num_params, self.num_params))
+
+        # pre-calculate <0|G|0> and <0|HG|0>
+        G_exp = []  # save and use for properties
+        HG_exp = []
+        for GJ in self.G_ops:
+            G_exp.append(self.wf.QI.quantum_std(GJ.get_folded_operator(*self.orbs), no_coeffs=no_coeffs))
+            HG_exp.append(
+                self.wf.QI.quantum_std(
+                    (self.H_0i_0a * GJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                )
+            )
+        energy = self.wf.QI.quantum_std((self.H_0i_0a).get_folded_operator(*self.orbs), no_coeffs=no_coeffs)
+
+        # qq
+        self.H_2i_2a = hamiltonian_pauli_2i_2a(
+            self.wf.h_mo,
+            self.wf.g_mo,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
+        )
+
+        for j, qJ in enumerate(self.q_ops):
+            for i, qI in enumerate(self.q_ops[j:], j):
+                # Make A
+                A[i, j] = A[j, i] = np.sqrt(
+                    self.wf.QI.quantum_std(
+                        (qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
+                    + self.wf.QI.quantum_std(
+                        (qI.dagger * qJ * self.H_2i_2a).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
+                )
+                # Make B
+                B[i, j] = B[j, i] = np.sqrt(
+                    self.wf.QI.quantum_std(
+                        (qI.dagger * qJ.dagger * self.H_2i_2a).get_folded_operator(*self.orbs),
+                        no_coeffs=no_coeffs,
+                    )
+                )
+                # Make Sigma
+                Sigma[i, j] = Sigma[j, i] = np.sqrt(
+                    self.wf.QI.quantum_std(
+                        (qI.dagger * qJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
+                )
+
+        # Gq
+        for j, qJ in enumerate(self.q_ops):
+            for i, GI in enumerate(self.G_ops):
+                # Make A
+                A[j, i + idx_shift] = A[i + idx_shift, j] = np.sqrt(
+                    self.wf.QI.quantum_std(
+                        (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
+                )
+                # Make B
+                B[j, i + idx_shift] = B[i + idx_shift, j] = np.sqrt(
+                    self.wf.QI.quantum_std(
+                        (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs),
+                        no_coeffs=no_coeffs,
+                    )
+                )
+
+        # GG
+        for j, GJ in enumerate(self.G_ops):
+            for i, GI in enumerate(self.G_ops[j:], j):
+                # Make A
+                val = self.wf.QI.quantum_std(
+                    (GI.dagger * self.H_0i_0a * GJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                )
+                GG_exp = self.wf.QI.quantum_std(
+                    (GI.dagger * GJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                )
+                val += GG_exp * energy  # Var(A*B) = Var(A)*Var(B) + (E[A]^2 * Var(B)) + (E[B]^2 * Var(A))
+                val += G_exp[i] * HG_exp[j]
+                val += G_exp[i] * G_exp[j] * energy
+                A[i + idx_shift, j + idx_shift] = A[j + idx_shift, i + idx_shift] = val
+                # Make B
+                val = HG_exp[i] * G_exp[j]
+                val += G_exp[i] * G_exp[j] * energy
+                B[i + idx_shift, j + idx_shift] = B[j + idx_shift, i + idx_shift] = val
+                # Make Sigma
+                Sigma[i + idx_shift, j + idx_shift] = Sigma[j + idx_shift, i + idx_shift] = GG_exp + (
+                    G_exp[i] * G_exp[j]
+                )
+        self._analyze_std(A, B, Sigma)
         return A, B, Sigma
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
