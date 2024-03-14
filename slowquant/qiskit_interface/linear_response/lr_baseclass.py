@@ -61,6 +61,40 @@ class quantumLRBaseClass:
 
         self.orbs = [self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.num_virtual_orbs]
 
+    def get_operator_info(self) -> None:
+        """Information about operators."""
+        # q operators
+        print(f"{'Annihilation'.center(12)} | {'Creation'.center(12)} | {'Coefficient'.center(12)}\n")
+        if self.num_q > 0:
+            print("Orbital rotation operators:")
+            for nr, op in enumerate(self.q_ops):
+                annihilation, creation, coefficients = op.get_info()
+                print("q" + str(nr) + ":")
+                for a, c, coeff in zip(annihilation, creation, coefficients):
+                    if a[0] in self.wf.active_spin_idx:
+                        exc_type = "active -> virtual"
+                    elif c[0] in self.wf.active_spin_idx:
+                        exc_type = "inactive -> active"
+                    else:
+                        exc_type = "inactive -> virtual"
+                    print(
+                        str(a).center(12)
+                        + " | "
+                        + str(c).center(12)
+                        + " | "
+                        + f"{coeff:.3f}".center(12)
+                        + " | "
+                        + exc_type
+                    )
+
+        if self.num_G > 0:
+            print("Active-space excitation operators:")
+            for nr, op in enumerate(self.G_ops):
+                annihilation, creation, coefficients = op.get_info()
+                print("G" + str(nr) + ":")
+                for a, c, coeff in zip(annihilation, creation, coefficients):
+                    print(str(a).center(12) + " | " + str(c).center(12) + " | " + f"{coeff:.3f}".center(12))
+
     def run(self) -> None:
         """Run linear response."""
         raise NotImplementedError
@@ -199,6 +233,45 @@ class quantumLRBaseClass:
             osc_str = f"{osc_strength:1.6f}"
             output += f"{str(i + 1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
         return output
+
+    def get_excited_state_contributions(self, num_contr: int | None = None, cutoff: float = 10**-30) -> None:
+        """Create table of contributions to each excitation vector.
+
+        Returns:
+            Nicely formatted table.
+        """
+        if not hasattr(self, "excitation_vectors"):
+            raise ValueError("Excitation vectors have not been calculated.")
+
+        if num_contr is None:
+            num_contr = self.num_params * 2
+
+        print(f"{'Value'.center(12)} | {'Position'.center(12)} | {'Operator'.center(12)}\n")
+
+        for state, vec in enumerate(self.excitation_vectors.T):
+
+            sorted_indices = np.argsort(np.abs(vec))[::-1]
+            sorted_vec = np.abs(vec[sorted_indices]) ** 2
+
+            print("Excited state: ", state)
+            for i in range(num_contr):
+                if sorted_vec[i] < cutoff:
+                    continue
+                element = f"{sorted_vec[i]:.3f}"
+                if sorted_indices[i] < self.num_params:
+                    if sorted_indices[i] < self.num_q:
+                        operator_index = "q" + str(sorted_indices[i])
+                    else:
+                        operator_index = "G" + str(sorted_indices[i] - self.num_q)
+                else:
+                    if sorted_indices[i] - self.num_params < self.num_q:
+                        operator_index = "q" + str(sorted_indices[i] - self.num_params) + "^d"
+                    else:
+                        operator_index = "G" + str(sorted_indices[i] - self.num_params - self.num_q) + "^d"
+
+                print(
+                    f"{element.center(12)} | {str(sorted_indices[i]).center(12)} | {operator_index.center(12)}"
+                )
 
 
 def get_num_nonCBS(matrix: list[list[str]]) -> int:

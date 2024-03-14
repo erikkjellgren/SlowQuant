@@ -12,7 +12,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     two_electron_integral_transform,
 )
 from slowquant.qiskit_interface.base import FermionicOperator
-from slowquant.qiskit_interface.interface import QuantumInterface
+from slowquant.qiskit_interface.interface import Clique, QuantumInterface
 from slowquant.qiskit_interface.operators import Epq, hamiltonian_pauli_0i_0a
 from slowquant.qiskit_interface.optimizers import RotoSolve
 from slowquant.unitary_coupled_cluster.density_matrix import (
@@ -290,8 +290,18 @@ class WaveFunction:
         self.QI.total_device_calls = 0
         self.QI.total_shots_used = 0
         self.QI.total_paulis_evaluated = 0
-        self.QI.distributions = {}
+        self.QI.cliques = Clique()
+        self.QI._Minv = None  # pylint: disable=protected-access
         self.QI._primitive = primitive  # pylint: disable=protected-access
+        # IMPORTANT: Shot number in primitive gets always overwritten if a shot number is defined in QI!
+        if self.QI.shots is not None:
+            print(
+                "Number of shots defined in new primitive are ignored as there is a number defined in the QI of ",
+                self.QI.shots,
+            )
+            print("If you want to change the number of shots, do this manually.")
+            print("Set the number of shots manually to None if you run an ideal simulator.")
+        self.QI.shots = self.QI.shots  # Redo shot check with new primitive
 
     @property
     def rdm1(self) -> np.ndarray:
@@ -408,7 +418,7 @@ class WaveFunction:
         if self._energy_elec is None:
             H = hamiltonian_pauli_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-            self._energy_elec = calc_energy_theta(self.ansatz_parameters, H, self.QI)
+            self._energy_elec = self.QI.quantum_expectation_value(H)
         return self._energy_elec
 
     def _calc_energy_elec(self) -> float:
@@ -419,7 +429,7 @@ class WaveFunction:
         """
         H = hamiltonian_pauli_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
         H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-        energy_elec = calc_energy_theta(self.ansatz_parameters, H, self.QI)
+        energy_elec = self.QI.quantum_expectation_value(H)
 
         return energy_elec
 
