@@ -1042,7 +1042,7 @@ class WaveFunctionUCC:
         r"""Check orthonormality of orbitals.
 
         .. math::
-            I = C_\text{MO}S\C_\text{MO}^T
+            \boldsymbol{I} = \boldsymbol{C}_\text{MO}\boldsymbol{S}\boldsymbol{C}_\text{MO}^T
 
         Args:
             overlap_integral: Overlap integral in AO basis.
@@ -1098,7 +1098,7 @@ class WaveFunctionUCC:
             global start  # pylint: disable=global-variable-undefined
             time_str = f"{time.time() - start:7.2f}"  # type: ignore
             e_str = f"{e_tot(x):3.12f}"
-            print(f"{str(iteration+1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+            print(f"{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
             iteration += 1  # type: ignore [name-defined]
             if iteration > 500:  # type: ignore [name-defined]
                 raise ValueError("Did not converge in 500 iterations in energy minimization.")
@@ -1199,7 +1199,7 @@ class WaveFunctionUCC:
             print(f"### Number theta5: {num_theta5}")
             print(f"### Number theta6: {num_theta6}")
             print(
-                f"### Total parameters: {num_kappa+num_theta1+num_theta2+num_theta3+num_theta4+num_theta5+num_theta6}\n"
+                f"### Total parameters: {num_kappa + num_theta1 + num_theta2 + num_theta3 + num_theta4 + num_theta5 + num_theta6}\n"
             )
             print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
             res = scipy.optimize.minimize(

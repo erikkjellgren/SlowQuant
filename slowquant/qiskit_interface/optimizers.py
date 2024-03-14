@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from functools import partial
 
 import numpy as np
@@ -43,11 +43,18 @@ class RotoSolve:
     """
 
     def __init__(
-        self, maxiter: int = 30, tol: float = 1e-6, callback: Callable[[list[float]], None] | None = None
+        self,
+        R: dict[str, int],
+        param_names: Sequence[str],
+        maxiter: int = 30,
+        tol: float = 1e-6,
+        callback: Callable[[list[float]], None] | None = None,
     ) -> None:
         """Initialize Rotosolver.
 
         Args:
+            R: R parameter used for the function reconstruction.
+            param_names: Names of parameters, used to index R.
             maxiter: Maximum number of iterations (sweeps).
             tol: Convergence tolerence.
             callback: Callback function, takes only x (parameters) as an argument.
@@ -56,6 +63,8 @@ class RotoSolve:
         self.max_iterations = maxiter
         self.threshold = tol
         self.max_fail = 3
+        self._R = R
+        self._param_names = param_names
 
     def minimize(
         self, f: Callable[[list[float]], float], x: list[float], jac=None  # pylint: disable=unused-argument
@@ -75,9 +84,9 @@ class RotoSolve:
         fails = 0
         res = Result()
         for _ in range(self.max_iterations):
-            for i in range(len(x)):  # pylint: disable=consider-using-enumerate
-                e_vals = get_energy_evals(f, x, i)
-                f_reconstructed = partial(reconstructed_f, energy_vals=e_vals)
+            for i, par_name in enumerate(self._param_names):
+                e_vals = get_energy_evals(f, x, i, self._R[par_name])
+                f_reconstructed = partial(reconstructed_f, energy_vals=e_vals, R=self._R[par_name])
                 vecf = np.vectorize(f_reconstructed)
                 values = vecf(np.linspace(-np.pi, np.pi, int(1e4)))
                 theta = np.linspace(-np.pi, np.pi, int(1e4))[np.argmin(values)]
@@ -106,45 +115,55 @@ class RotoSolve:
         return res
 
 
-def get_energy_evals(f: Callable[[list[float]], float], x: list[float], idx: int) -> list[float]:
+def get_energy_evals(f: Callable[[list[float]], float], x: list[float], idx: int, R: int) -> list[float]:
     """Evaluate the function in all points needed for the reconstrucing in Rotosolve.
 
     Args:
         f: Function to evaluate.
         x: Parameters of f.
         idx: Index of parameter to be changed.
+        R: Parameter to control how many points are needed.
 
     Returns:
         All needed function evaluations.
     """
     e_vals = []
     x = x.copy()
-    R = 2
-    for mu in [-2, -1, 0, 1, 2]:
+    for mu in range(-R, R + 1):
         x_mu = 2 * mu / (2 * R + 1) * np.pi
         x[idx] = x_mu
         e_vals.append(f(x))
     return e_vals
 
 
-def reconstructed_f(x: float, energy_vals: list[float]) -> float:
+def reconstructed_f(x: float, energy_vals: list[float], R: int) -> float:
     r"""Reconstructed the function in terms of sin-functions.
 
     .. math::
         E(x) = \frac{\sin\left(\frac{2R+1}{2}x\right)}{2R+1}\sum_{\mu=-R}^{R}E(x_\mu)\frac{(-1)^\mu}{\sin\left(\frac{x - x_\mu}{2}\right)}
 
+    For better numerical stability the implemented form is instead:
+
+    .. math::
+        E(x) = \sum_{\mu=-R}^{R}E(x_\mu)\frac{\mathrm{sinc}\left(\frac{2R+1}{2}(x-x_\mu)\right)}{\mathrm{sinc}\left(\frac{1}{2}(x-x_\mu)\right)}
+
     #. 10.22331/q-2022-03-30-677, Eq. (57)
+    #. https://pennylane.ai/qml/demos/tutorial_general_parshift/, 2024-03-14
 
     Args:
         x: Function variable.
         energy_vals: Pre-calculated points of original function.
+        R: Parameter to control how many points are needed.
 
     Returns:
         Function value in x.
     """
-    R = 2
-    e = 0
-    for i, mu in enumerate([-2, -1, 0, 1, 2]):
+    e = 0.0
+    for i, mu in enumerate(list(range(-R, R + 1))):
         x_mu = 2 * mu / (2 * R + 1) * np.pi
-        e += energy_vals[i] * (-1) ** mu / np.sin(x / 2 - x_mu / 2)
-    return np.sin((2 * R + 1) / 2 * x) / (2 * R + 1) * e
+        e += (
+            energy_vals[i]
+            * np.sinc((2 * R + 1) / 2 * (x - x_mu) / np.pi)
+            / (np.sinc(1 / 2 * (x - x_mu) / np.pi))
+        )
+    return e

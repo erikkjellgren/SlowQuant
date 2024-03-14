@@ -398,7 +398,7 @@ class WaveFunction:
         r"""Check orthonormality of orbitals.
 
         .. math::
-            I = C_\text{MO}S\C_\text{MO}^T
+            \boldsymbol{I} = \boldsymbol{C}_\text{MO}\boldsymbol{S}\boldsymbol{C}_\text{MO}^T
 
         Args:
             overlap_integral: Overlap integral in AO basis.
@@ -524,6 +524,11 @@ class WaveFunction:
                     print_progress, energy_func=energy_theta, silent=is_silent_subiterations
                 )
                 optimizer = SLSQP(maxiter=maxiter, ftol=tol, callback=print_progress_)
+            elif ansatz_optimizer.lower() == "slsqp_nograd":
+                print_progress_ = partial(
+                    print_progress, energy_func=energy_theta, silent=is_silent_subiterations
+                )
+                optimizer = SLSQP(maxiter=maxiter, ftol=tol, callback=print_progress_)
             elif ansatz_optimizer.lower() == "l_bfgs_b":
                 print_progress_ = partial(
                     print_progress, energy_func=energy_theta, silent=is_silent_subiterations
@@ -538,14 +543,23 @@ class WaveFunction:
                 print_progress_ = partial(
                     print_progress, energy_func=energy_theta, silent=is_silent_subiterations
                 )
-                optimizer = RotoSolve(maxiter=maxiter, tol=tol, callback=print_progress_)
+                optimizer = RotoSolve(
+                    self.QI.grad_param_R,
+                    self.QI.param_names,
+                    maxiter=maxiter,
+                    tol=tol,
+                    callback=print_progress_,
+                )
             elif ansatz_optimizer.lower() == "spsa":
                 print("WARNING: Convergence tolerence cannot be set for SPSA; using qiskit default")
                 print_progress_SPSA_ = partial(print_progress_SPSA, silent=is_silent_subiterations)
                 optimizer = SPSA(maxiter=maxiter, callback=print_progress_SPSA_)
             else:
                 raise ValueError(f"Unknown optimizer: {ansatz_optimizer}")
-            res = optimizer.minimize(energy_theta, self.ansatz_parameters, jac=gradient_theta)
+            if ansatz_optimizer.lower() == "slsqp_nograd":
+                res = optimizer.minimize(energy_theta, self.ansatz_parameters)
+            else:
+                res = optimizer.minimize(energy_theta, self.ansatz_parameters, jac=gradient_theta)
             self.ansatz_parameters = res.x.tolist()
 
             if orbital_optimization and len(self.kappa) != 0:
@@ -667,7 +681,9 @@ class WaveFunction:
                     "Cannot use rotosolve together with orbital optimization in the one-step solver."
                 )
             print_progress_ = partial(print_progress, energy_func=energy_both)
-            optimizer = RotoSolve(maxiter=maxiter, tol=tol, callback=print_progress_)
+            optimizer = RotoSolve(
+                self.QI.grad_param_R, self.QI.param_names, maxiter=maxiter, tol=tol, callback=print_progress_
+            )
         elif optimizer_name.lower() == "spsa":
             print("WARNING: Convergence tolerence cannot be set for SPSA; using qiskit default")
             optimizer = SPSA(maxiter=maxiter, callback=print_progress_SPSA)
@@ -811,33 +827,9 @@ def orbital_rotation_gradient(
 
 
 def ansatz_parameters_gradient(
-    parameters: list[float], operator, quantum_interface: QuantumInterface
+    parameters: list[float], operator: FermionicOperator, quantum_interface: QuantumInterface
 ) -> np.ndarray:
     r"""Calculate gradient with respect to ansatz parameters.
-
-    The gradient is calculated using parameter-shift assuming three eigenvalues of the generators.
-    This works for fermionic generators of the type:
-
-    .. math::
-        \hat{G}_{pq} = \hat{a}^\dagger_p \hat{a}_q - \hat{a}_q^\dagger \hat{a}_p
-
-    and,
-
-    .. math::
-        \hat{G}_{pqrs} = \hat{a}^\dagger_p \hat{a}^\dagger_q \hat{a}_r \hat{a}_s - \hat{a}^\dagger_s \hat{a}^\dagger_r \hat{a}_p \hat{a}_q
-
-    The parameter-shift rule is implemented as:
-
-    .. math::
-        \begin{align}
-        \frac{\partial E(\boldsymbol{\theta})}{\partial \theta_i} &=
-        \frac{\sqrt{2}+1}{2\sqrt{2}}\left(E\left(\theta_i += \frac{\pi}{2} - \frac{\pi}{4}\right) - E\left(\theta_i += -\frac{\\pi}{2} + \frac{\pi}{4}\right)\\right)\\
-        &- \frac{\sqrt{2}-1}{2\sqrt{2}}\left(E\left(\theta_i += \frac{\pi}{2} + \frac{\pi}{4}\right) - E\left(\theta_i += -\frac{\pi}{2} - \frac{\pi}{4}\right)\right)
-        \end{align}
-
-
-    #. 10.1088/1367-2630/ac2cb3: Eq. (F14)
-    #. 10.22331/q-2022-03-30-677: Eq. (8)
 
     Args:
         parameters: Ansatz parameters.
@@ -848,28 +840,49 @@ def ansatz_parameters_gradient(
         Gradient with repsect to ansatz parameters.
     """
     gradient = np.zeros(len(parameters))
-    h = np.pi / 2 - np.pi / 4
-    h2 = np.pi / 2 + np.pi / 4
     for i in range(len(parameters)):  # pylint: disable=consider-using-enumerate
-        parameters[i] += h
-        Ep = quantum_interface.quantum_expectation_value(operator, custom_parameters=parameters)
-        parameters[i] -= h
-        parameters[i] += h2
-        Ep2 = quantum_interface.quantum_expectation_value(operator, custom_parameters=parameters)
-        parameters[i] -= h2
-        parameters[i] -= h
-        Em = quantum_interface.quantum_expectation_value(operator, custom_parameters=parameters)
-        parameters[i] += h
-        parameters[i] -= h2
-        Em2 = quantum_interface.quantum_expectation_value(operator, custom_parameters=parameters)
-        parameters[i] += h2
-        gradient[i] = (2 ** (1 / 2) + 1) / (2 * 2 ** (1 / 2)) * (Ep - Em) - (2 ** (1 / 2) - 1) / (
-            2 * 2 ** (1 / 2)
-        ) * (Ep2 - Em2)
+        R = quantum_interface.grad_param_R[quantum_interface.param_names[i]]
+        e_vals_grad = get_energy_evals_for_grad(operator, quantum_interface, parameters, i, R)
+        grad = 0.0
+        for j, mu in enumerate(list(range(1, 2 * R + 1))):
+            x_mu = (2 * mu - 1) / (2 * R) * np.pi
+            grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R * (np.sin(1 / 2 * x_mu)) ** 2)
+        gradient[i] = grad
     return gradient
 
 
-def calc_gradient_both(parameters, wf) -> np.ndarray:
+def get_energy_evals_for_grad(
+    operator: FermionicOperator,
+    quantum_interface: QuantumInterface,
+    parameters: list[float],
+    idx: int,
+    R: int,
+) -> list[float]:
+    r"""Get energy evaluations needed for the gradient calculation.
+
+    The gradient formula is defined for x=0,
+    so x_shift is used to shift ensure we can get the energy in the point we actually want.
+
+    Args:
+        operator: Operator which the derivative is with respect to.
+        parameters: Paramters.
+        idx: Parameter idx.
+        R: Parameter to control we get the needed points.
+
+    Returns:
+        Energies in a few fixed points.
+    """
+    e_vals = []
+    x = parameters.copy()
+    x_shift = x[idx]
+    for mu in range(1, 2 * R + 1):
+        x_mu = (2 * mu - 1) / (2 * R) * np.pi
+        x[idx] = x_mu + x_shift
+        e_vals.append(quantum_interface.quantum_expectation_value(operator, custom_parameters=x))
+    return e_vals
+
+
+def calc_gradient_both(parameters: list[float], wf: WaveFunction) -> np.ndarray:
     """Calculate electronic gradient.
 
     Args:

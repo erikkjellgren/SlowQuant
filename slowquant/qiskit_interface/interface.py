@@ -1,6 +1,7 @@
 import copy
 import itertools
 import math
+from typing import Any
 
 import numpy as np
 from qiskit import QuantumCircuit
@@ -17,6 +18,7 @@ from slowquant.qiskit_interface.custom_ansatz import (
     ErikD_Parity,
     ErikSD_JW,
     ErikSD_Parity,
+    tUPS,
 )
 
 
@@ -26,11 +28,12 @@ class QuantumInterface:
     This class handles the interface with qiskit and the communication with quantum hardware.
     """
 
-    def __init__(
+    def __init__(  # pylint: disable=dangerous-default-value
         self,
         primitive: BaseEstimator | BaseSampler,
         ansatz: str,
         mapper: FermionicMapper,
+        ansatz_options: dict[str, Any] = {},
         shots: None | int = None,
         max_shots_per_run: int = 100000,
         do_M_mitigation: bool = False,
@@ -42,6 +45,8 @@ class QuantumInterface:
         Args:
             primitive: Qiskit Estimator or Sampler object.
             ansatz: Name of ansatz to be used.
+            mapper: Qiskit mapper object, e.g. JW or Parity.
+            ansatz_options: Ansatz options.
             mapper: Qiskit mapper object.
             shots: Number of shots. If not specified use shotnumber from primitive (default).
             max_shots_per_run: Maximum number of shots allowed in a single run. Set to 100000 per IBM machines.
@@ -49,9 +54,9 @@ class QuantumInterface:
             do_M_iqa: Use independent qubit approximation when constructing the read-out correlation matrix.
             do_M_ansatz0: Use the ansatz with theta=0 when constructing the read-out correlation matrix
         """
-        allowed_ansatz = ("UCCSD", "PUCCD", "UCCD", "ErikD", "ErikSD", "HF")
+        allowed_ansatz = ("UCCSD", "PUCCD", "UCCD", "ErikD", "ErikSD", "HF", "tUPS")
         if ansatz not in allowed_ansatz:
-            raise ValueError("The chosen Ansatz is not availbale. Choose from: ", allowed_ansatz)
+            raise ValueError("The chosen Ansatz is not available. Choose from: ", allowed_ansatz)
         self.ansatz = ansatz
         self._primitive = primitive
         self.mapper = mapper
@@ -64,6 +69,7 @@ class QuantumInterface:
         self.total_shots_used = 0
         self.total_device_calls = 0
         self.total_paulis_evaluated = 0
+        self.ansatz_options = ansatz_options
 
     def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int]) -> None:
         """Construct qiskit circuit.
@@ -74,9 +80,14 @@ class QuantumInterface:
         """
         self.num_orbs = num_orbs
         self.num_spin_orbs = 2 * num_orbs
-        self.num_elec = tuple(num_elec)
+        self.num_elec = num_elec
+        self.grad_param_R: dict[str, int] = (
+            {}
+        )  # Contains information about the parameterization needed for gradient evaluations.
 
         if self.ansatz == "UCCSD":
+            if len(self.ansatz_options) != 0:
+                raise ValueError(f"No options available for UCCSD got {self.ansatz_options}")
             self.circuit = UCCSD(
                 num_orbs,
                 self.num_elec,
@@ -88,6 +99,8 @@ class QuantumInterface:
                 ),
             )
         elif self.ansatz == "PUCCD":
+            if len(self.ansatz_options) != 0:
+                raise ValueError(f"No options available for PUCCD got {self.ansatz_options}")
             self.circuit = PUCCD(
                 num_orbs,
                 self.num_elec,
@@ -99,6 +112,8 @@ class QuantumInterface:
                 ),
             )
         elif self.ansatz == "UCCD":
+            if len(self.ansatz_options) != 0:
+                raise ValueError(f"No options available for UCCD got {self.ansatz_options}")
             self.circuit = UCC(
                 num_orbs,
                 self.num_elec,
@@ -111,6 +126,8 @@ class QuantumInterface:
                 ),
             )
         elif self.ansatz == "ErikD":
+            if len(self.ansatz_options) != 0:
+                raise ValueError(f"No options available for ErikD got {self.ansatz_options}")
             if num_orbs != 2 or self.num_elec != (1, 1):
                 raise ValueError(f"Chosen ansatz, {self.ansatz}, only works for (2,2)")
             if isinstance(self.mapper, JordanWignerMapper):
@@ -120,6 +137,8 @@ class QuantumInterface:
             else:
                 raise ValueError(f"Unsupported mapper, {type(self.mapper)}, for ansatz {self.ansatz}")
         elif self.ansatz == "ErikSD":
+            if len(self.ansatz_options) != 0:
+                raise ValueError(f"No options available for ErikSD got {self.ansatz_options}")
             if num_orbs != 2 or self.num_elec != (1, 1):
                 raise ValueError(f"Chosen ansatz, {self.ansatz}, only works for (2,2)")
             if isinstance(self.mapper, JordanWignerMapper):
@@ -129,7 +148,27 @@ class QuantumInterface:
             else:
                 raise ValueError(f"Unsupported mapper, {type(self.mapper)}, for ansatz {self.ansatz}")
         elif self.ansatz == "HF":
+            if len(self.ansatz_options) != 0:
+                raise ValueError(f"No options available for HF got {self.ansatz_options}")
             self.circuit = HartreeFock(num_orbs, self.num_elec, self.mapper)
+        elif self.ansatz == "tUPS":
+            self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
+
+        # Check that R parameter for gradient is consistent with the paramter names.
+        if len(self.grad_param_R) == 0:
+            for par in self.circuit.parameters:
+                # Default value two
+                self.grad_param_R[str(par)] = 2
+        if len(self.grad_param_R) != len(self.circuit.parameters):
+            raise ValueError(
+                f"Number of elements in grad_param_R, {len(self.grad_param_R)}, does not match number of parameters, {len(self.circuit.parameters)}"
+            )
+        self.param_names = [str(x) for x in self.circuit.parameters]
+        for name in self.param_names:
+            if name not in self.grad_param_R.keys():  # pylint: disable=consider-iterating-dictionary
+                raise ValueError(
+                    f"Got parameter name, {name}, that is not in grad_param_R, {self.grad_param_R}"
+                )
 
         self.num_qubits = self.circuit.num_qubits
         # Set parameter to HarteeFock
