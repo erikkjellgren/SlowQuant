@@ -76,18 +76,18 @@ class quantumLR(quantumLRBaseClass):
                     print("WARNING: Large Gradient detected in q of ", np.max(np.abs(grad)))
 
         # pre-calculate <0|G|0> and <0|HG|0>
-        self.G_exp = []  # save and use for properties
-        HG_exp = []
+        self._G_exp = []  # save and use for properties
+        self._HG_exp = []
         for GJ in self.G_ops:
-            self.G_exp.append(self.wf.QI.quantum_expectation_value(GJ.get_folded_operator(*self.orbs)))
-            HG_exp.append(
+            self._G_exp.append(self.wf.QI.quantum_expectation_value(GJ.get_folded_operator(*self.orbs)))
+            self._HG_exp.append(
                 self.wf.QI.quantum_expectation_value((self.H_0i_0a * GJ).get_folded_operator(*self.orbs))
             )
 
         if do_gradients:
             grad = np.zeros(self.num_G)  # G^\dagger is the same
             for i in range(self.num_G):
-                grad[i] = HG_exp[i] - (self.wf.energy_elec * self.G_exp[i])
+                grad[i] = self._HG_exp[i] - (self.wf.energy_elec * self._G_exp[i])
             if len(grad) != 0:
                 print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
                 if np.max(np.abs(grad)) > 10**-3:
@@ -166,16 +166,16 @@ class quantumLR(quantumLRBaseClass):
                     (GI.dagger * GJ).get_folded_operator(*self.orbs)
                 )
                 val -= GG_exp * self.wf.energy_elec
-                val -= self.G_exp[i] * HG_exp[j]
-                val += self.G_exp[i] * self.G_exp[j] * self.wf.energy_elec
+                val -= self._G_exp[i] * self._HG_exp[j]
+                val += self._G_exp[i] * self._G_exp[j] * self.wf.energy_elec
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
                 # Make B
-                val = HG_exp[i] * self.G_exp[j]
-                val -= self.G_exp[i] * self.G_exp[j] * self.wf.energy_elec
+                val = self._HG_exp[i] * self._G_exp[j]
+                val -= self._G_exp[i] * self._G_exp[j] * self.wf.energy_elec
                 self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
                 # Make Sigma
                 self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = (
-                    GG_exp - (self.G_exp[i] * self.G_exp[j])
+                    GG_exp - (self._G_exp[i] * self._G_exp[j])
                 )
 
     def _get_qbitmap(
@@ -310,17 +310,28 @@ class quantumLR(quantumLRBaseClass):
         B = np.zeros((self.num_params, self.num_params))
         Sigma = np.zeros((self.num_params, self.num_params))
 
-        # pre-calculate <0|G|0> and <0|HG|0>
-        G_exp = []  # save and use for properties
-        HG_exp = []
+        if not hasattr(self, "_G_exp") or len(self._G_exp) == 0:
+            # pre-calculate <0|G|0> and <0|HG|0>
+            self._G_exp = []  # save and use for properties
+            self._HG_exp = []
+            for GJ in self.G_ops:
+                self._G_exp.append(self.wf.QI.quantum_expectation_value(GJ.get_folded_operator(*self.orbs)))
+                self._HG_exp.append(
+                    self.wf.QI.quantum_expectation_value((self.H_0i_0a * GJ).get_folded_operator(*self.orbs))
+                )
+        # pre-calculate std of <0|G|0> and <0|HG|0>
+        var_G_exp = []  # save and use for properties
+        var_HG_exp = []
         for GJ in self.G_ops:
-            G_exp.append(self.wf.QI.quantum_std(GJ.get_folded_operator(*self.orbs), no_coeffs=no_coeffs))
-            HG_exp.append(
+            var_G_exp.append(self.wf.QI.quantum_std(GJ.get_folded_operator(*self.orbs), no_coeffs=no_coeffs))
+            var_HG_exp.append(
                 self.wf.QI.quantum_std(
                     (self.H_0i_0a * GJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
                 )
             )
-        energy = self.wf.QI.quantum_std((self.H_0i_0a).get_folded_operator(*self.orbs), no_coeffs=no_coeffs)
+        var_energy = self.wf.QI.quantum_std(
+            (self.H_0i_0a).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+        )
 
         # qq
         self.H_2i_2a = hamiltonian_pauli_2i_2a(
@@ -380,20 +391,37 @@ class quantumLR(quantumLRBaseClass):
                 val = self.wf.QI.quantum_std(
                     (GI.dagger * self.H_0i_0a * GJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
                 )
-                GG_exp = self.wf.QI.quantum_std(
+                var_GG_exp = self.wf.QI.quantum_std(
                     (GI.dagger * GJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
                 )
-                val += GG_exp * energy  # Var(A*B) = Var(A)*Var(B) + (E[A]^2 * Var(B)) + (E[B]^2 * Var(A))
-                val += G_exp[i] * HG_exp[j]
-                val += G_exp[i] * G_exp[j] * energy
-                A[i + idx_shift, j + idx_shift] = A[j + idx_shift, i + idx_shift] = val
+                GG_exp = self.wf.QI.quantum_expectation_value(
+                    (GI.dagger * GJ).get_folded_operator(*self.orbs)
+                )
+                # Var(A*B) = (\mu(A)^2 + var(A)) * (\mu(B)^2 + var(B)) - \mu(A)^2 \mu(B)^2
+                val += (GG_exp**2 + var_GG_exp) * (self.wf.energy_elec**2 + var_energy) - (
+                    GG_exp**2 * self.wf.energy_elec**2
+                )
+                val += (self._G_exp[i] ** 2 + var_G_exp[i]) * (self._HG_exp[j] ** 2 + var_HG_exp[j]) - (
+                    self._G_exp[i] ** 2 * self._HG_exp[j] ** 2
+                )
+                val += (self._G_exp[i] ** 2 + var_G_exp[i]) * (self._G_exp[j] ** 2 + var_G_exp[j]) * (
+                    self.wf.energy_elec**2 + var_energy
+                ) - (self._G_exp[i] ** 2 * self._G_exp[j] ** 2 * self.wf.energy_elec**2)
+                A[i + idx_shift, j + idx_shift] = A[j + idx_shift, i + idx_shift] = np.sqrt(val)
                 # Make B
-                val = HG_exp[i] * G_exp[j]
-                val += G_exp[i] * G_exp[j] * energy
-                B[i + idx_shift, j + idx_shift] = B[j + idx_shift, i + idx_shift] = val
+                val = (self._G_exp[j] ** 2 + var_G_exp[j]) * (self._HG_exp[i] ** 2 + var_HG_exp[i]) - (
+                    self._G_exp[j] ** 2 * self._HG_exp[i] ** 2
+                )
+                val += (self._G_exp[i] ** 2 + var_G_exp[i]) * (self._G_exp[j] ** 2 + var_G_exp[j]) * (
+                    self.wf.energy_elec**2 + var_energy
+                ) - (self._G_exp[i] ** 2 * self._G_exp[j] ** 2 * self.wf.energy_elec**2)
+                B[i + idx_shift, j + idx_shift] = B[j + idx_shift, i + idx_shift] = np.sqrt(val)
                 # Make Sigma
-                Sigma[i + idx_shift, j + idx_shift] = Sigma[j + idx_shift, i + idx_shift] = GG_exp + (
-                    G_exp[i] * G_exp[j]
+                val = (self._G_exp[i] ** 2 + var_G_exp[i]) * (self._G_exp[j] ** 2 + var_G_exp[j]) - (
+                    self._G_exp[i] ** 2 * self._G_exp[j] ** 2
+                )
+                Sigma[i + idx_shift, j + idx_shift] = Sigma[j + idx_shift, i + idx_shift] = np.sqrt(
+                    var_GG_exp + val
                 )
         self._analyze_std(A, B, Sigma)
         return A, B, Sigma
@@ -464,7 +492,7 @@ class quantumLR(quantumLRBaseClass):
             exp_muy = self.wf.QI.quantum_expectation_value(muy_op.get_folded_operator(*self.orbs))
             exp_muz = self.wf.QI.quantum_expectation_value(muz_op.get_folded_operator(*self.orbs))
             for i, G in enumerate(self.G_ops):
-                exp_G = self.G_exp[i]
+                exp_G = self._G_exp[i]
                 exp_Gmux = self.wf.QI.quantum_expectation_value(
                     (G.dagger * mux_op).get_folded_operator(*self.orbs)
                 )
