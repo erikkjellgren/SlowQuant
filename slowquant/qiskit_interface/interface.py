@@ -367,7 +367,7 @@ class QuantumInterface:
 
         return values.real
 
-    def _sampler_quantum_expectation_value(self, op: FermionicOperator) -> float:
+    def _sampler_quantum_expectation_value(self, op: FermionicOperator | SparsePauliOp) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
 
         Calculated Pauli expectation values will be saved in memory.
@@ -387,7 +387,14 @@ class QuantumInterface:
         """
         values = 0.0
         # Map Fermionic to Qubit
-        observables = self.op_to_qbit(op)
+        if isinstance(op, FermionicOperator):
+            observables = self.op_to_qbit(op)
+        elif isinstance(op, SparsePauliOp):
+            observables = op
+        else:
+            raise ValueError(
+                f"Got unknown operator type {type(op)}, expected FermionicOperator or SparsePauliOp"
+            )
 
         if not hasattr(self, "cliques"):
             self.cliques = Clique()
