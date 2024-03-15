@@ -284,6 +284,7 @@ class QuantumInterface:
 
         Args:
             op: Operator as SlowQuant's FermionicOperator object.
+            custom_parameters: optional custom circuit parameters.
 
         Returns:
             Expectation value of fermionic operator.
@@ -462,10 +463,12 @@ class QuantumInterface:
 
         Args:
             op: SlowQuant fermionic operator.
-            run_parameters: Circuit parameters.
+            do_cliques: boolean if cliques are used.
+            no_coeffs: boolean if coefficients of each Pauli string are used or all st to 1.
+            custom_parameters: optional custom circuit parameters.
 
         Returns:
-            Expectation value of operator.
+            Variance of expectation value.
         """
         if isinstance(self._primitive, BaseEstimator):
             raise ValueError("This function does not work with Estimator.")
@@ -641,10 +644,9 @@ class QuantumInterface:
     ) -> float:
         """Sample the probability of measuring one for a given Pauli string.
 
-        Args:
             pauli: Pauli string.
             run_paramters: Ansatz parameters.
-            shots: Number of shots.
+            custom_circ: Custom circuit to run.
 
         Returns:
             p1 probability.
