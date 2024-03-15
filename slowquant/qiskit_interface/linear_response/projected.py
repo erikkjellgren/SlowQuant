@@ -324,13 +324,15 @@ class quantumLR(quantumLRBaseClass):
         var_G_exp = []  # save and use for properties
         var_HG_exp = []
         for GJ in self.G_ops:
-            var_G_exp.append(self.wf.QI.quantum_std(GJ.get_folded_operator(*self.orbs), no_coeffs=no_coeffs))
+            var_G_exp.append(
+                self.wf.QI.quantum_variance(GJ.get_folded_operator(*self.orbs), no_coeffs=no_coeffs)
+            )
             var_HG_exp.append(
-                self.wf.QI.quantum_std(
+                self.wf.QI.quantum_variance(
                     (self.H_0i_0a * GJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
                 )
             )
-        var_energy = self.wf.QI.quantum_std(
+        var_energy = self.wf.QI.quantum_variance(
             (self.H_0i_0a).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
         )
 
@@ -347,23 +349,23 @@ class quantumLR(quantumLRBaseClass):
             for i, qI in enumerate(self.q_ops[j:], j):
                 # Make A
                 A[i, j] = A[j, i] = np.sqrt(
-                    self.wf.QI.quantum_std(
+                    self.wf.QI.quantum_variance(
                         (qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
                     )
-                    + self.wf.QI.quantum_std(
+                    + self.wf.QI.quantum_variance(
                         (qI.dagger * qJ * self.H_2i_2a).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
                     )
                 )
                 # Make B
                 B[i, j] = B[j, i] = np.sqrt(
-                    self.wf.QI.quantum_std(
+                    self.wf.QI.quantum_variance(
                         (qI.dagger * qJ.dagger * self.H_2i_2a).get_folded_operator(*self.orbs),
                         no_coeffs=no_coeffs,
                     )
                 )
                 # Make Sigma
                 Sigma[i, j] = Sigma[j, i] = np.sqrt(
-                    self.wf.QI.quantum_std(
+                    self.wf.QI.quantum_variance(
                         (qI.dagger * qJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
                     )
                 )
@@ -373,13 +375,13 @@ class quantumLR(quantumLRBaseClass):
             for i, GI in enumerate(self.G_ops):
                 # Make A
                 A[j, i + idx_shift] = A[i + idx_shift, j] = np.sqrt(
-                    self.wf.QI.quantum_std(
+                    self.wf.QI.quantum_variance(
                         (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
                     )
                 )
                 # Make B
                 B[j, i + idx_shift] = B[i + idx_shift, j] = np.sqrt(
-                    self.wf.QI.quantum_std(
+                    self.wf.QI.quantum_variance(
                         (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs),
                         no_coeffs=no_coeffs,
                     )
@@ -389,10 +391,10 @@ class quantumLR(quantumLRBaseClass):
         for j, GJ in enumerate(self.G_ops):
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
-                val = self.wf.QI.quantum_std(
+                val = self.wf.QI.quantum_variance(
                     (GI.dagger * self.H_0i_0a * GJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
                 )
-                var_GG_exp = self.wf.QI.quantum_std(
+                var_GG_exp = self.wf.QI.quantum_variance(
                     (GI.dagger * GJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
                 )
                 GG_exp = self.wf.QI.quantum_expectation_value(
