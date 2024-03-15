@@ -451,7 +451,7 @@ class QuantumInterface:
 
         return values.real
 
-    def quantum_std(
+    def quantum_variance(
         self,
         op: FermionicOperator,
         do_cliques: bool = True,
