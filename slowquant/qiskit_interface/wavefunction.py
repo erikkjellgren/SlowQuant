@@ -6,6 +6,7 @@ from functools import partial
 import numpy as np
 import scipy
 from qiskit.primitives import BaseEstimator, BaseSampler
+from qiskit.quantum_info import SparsePauliOp
 from qiskit_algorithms.optimizers import COBYLA, L_BFGS_B, SLSQP, SPSA
 
 from slowquant.molecularintegrals.integralfunctions import (
@@ -736,12 +737,10 @@ class WaveFunction:
                         self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                     )
                     mapped_op = self.QI.op_to_qbit(rdm1_op)
-                    # Set coefficients to one, so Paulis cannot cancel out.
-                    mapped_op.coeffs = np.ones(len(mapped_op.coeffs))
                     if cumulated_paulis is None:
-                        cumulated_paulis = mapped_op
+                        cumulated_paulis = set(mapped_op.paulis)
                     else:
-                        cumulated_paulis += mapped_op
+                        cumulated_paulis = cumulated_paulis.union(mapped_op.paulis)
         if rdm_order >= 2:
             self._rdm2 = None
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
@@ -760,9 +759,7 @@ class WaveFunction:
                                 self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                             )
                             mapped_op = self.QI.op_to_qbit(pdm2_op)
-                            # Set coefficients to one, so Paulis cannot cancel out.
-                            mapped_op.coeffs = np.ones(len(mapped_op.coeffs))
-                            cumulated_paulis += mapped_op
+                            cumulated_paulis = cumulated_paulis.union(mapped_op.paulis)  # type: ignore[union-attr]
         if rdm_order >= 3:
             self._rdm3 = None
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
@@ -775,9 +772,7 @@ class WaveFunction:
                                         self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                                     )
                                     mapped_op = self.QI.op_to_qbit(pdm3_op)
-                                    # Set coefficients to one, so Paulis cannot cancel out.
-                                    mapped_op.coeffs = np.ones(len(mapped_op.coeffs))
-                                    cumulated_paulis += mapped_op
+                                    cumulated_paulis = cumulated_paulis.union(mapped_op.paulis)  # type: ignore[union-attr]
         if rdm_order >= 4:
             self._rdm4 = None
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
@@ -796,12 +791,13 @@ class WaveFunction:
                                                 self.num_virtual_orbs,
                                             )
                                             mapped_op = self.QI.op_to_qbit(pdm4_op)
-                                            # Set coefficients to one, so Paulis cannot cancel out.
-                                            mapped_op.coeffs = np.ones(len(mapped_op.coeffs))
-                                            cumulated_paulis += mapped_op
+                                            cumulated_paulis = cumulated_paulis.union(mapped_op.paulis)  # type: ignore[union-attr]
         # Calling expectation value to put all Paulis in cliques
         # and compute distributions for the cliques.
-        _ = self.QI._sampler_quantum_expectation_value(cumulated_paulis)  # pylint: disable=protected-access
+        # The coefficients are set to one, so the Paulis cannot cancel out.
+        _ = self.QI._sampler_quantum_expectation_value(  # pylint: disable=protected-access
+            SparsePauliOp(cumulated_paulis, np.ones(len(cumulated_paulis)))  # type: ignore[arg-type]
+        )
 
     def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
         r"""Check orthonormality of orbitals.
