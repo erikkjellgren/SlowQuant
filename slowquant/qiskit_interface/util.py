@@ -68,11 +68,12 @@ def get_bitstring_sign(op: Pauli, binary: str) -> int:
     Returns:
         Expectation value of Pauli string.
     """
-    count = 0
-    for i, pauli in enumerate(op.to_label()):
-        if not pauli == "I":
-            if binary[i] == "1":
-                count += 1
+    # The sign will never change if the letter is I, thus represent all I's as 0.
+    # The rest is represented by 1.
+    opbit = int(str(op).replace("I", "0").replace("Z", "1").replace("X", "1").replace("Y", "1"), 2)
+    # There can only be sign change when the binary-string is 1.
+    # Now a binary-and can be performed to calculate number of sign changes.
+    count = (opbit & int(binary, 2)).bit_count()
     if count % 2 == 1:
         return -1
     return 1
