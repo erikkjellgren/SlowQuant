@@ -6,7 +6,6 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
 from slowquant.qiskit_interface.base import FermionicOperator
-from slowquant.qiskit_interface.interface import make_cliques
 from slowquant.qiskit_interface.linear_response.lr_baseclass import (
     get_num_CBS_elements,
     get_num_nonCBS,
@@ -18,6 +17,7 @@ from slowquant.qiskit_interface.operators import (
     hamiltonian_pauli_2i_2a,
     one_elec_op_0i_0a,
 )
+from slowquant.qiskit_interface.util import make_cliques
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_orbital_gradient_response,
@@ -30,7 +30,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
 class quantumLR(quantumLRBaseClass):
     def run(
         self,
-        do_rdm: bool = True,
+        do_rdm: bool = False,
         do_gradients: bool = True,
     ) -> None:
         """Run simulation of naive LR matrix elements.
@@ -183,8 +183,8 @@ class quantumLR(quantumLRBaseClass):
 
     def _get_qbitmap(
         self,
-        cliques: bool = True,
-        do_rdm: bool = True,
+        cliques: bool = False,
+        do_rdm: bool = False,
     ) -> tuple[list[list[str]], list[list[str]], list[list[str]]]:
         """Get qubit map of operators.
 
@@ -217,19 +217,19 @@ class quantumLR(quantumLRBaseClass):
                     A[i][j] = A[j][i] = (
                         self.wf.QI.op_to_qbit(
                             (qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs)
-                        ).paulis
+                        ).paulis.to_labels()
                         + self.wf.QI.op_to_qbit(
                             (qI.dagger * qJ * self.H_2i_2a).get_folded_operator(*self.orbs)
-                        ).paulis
+                        ).paulis.to_labels()
                     )
                     # Make B
                     B[i][j] = B[j][i] = self.wf.QI.op_to_qbit(
                         (qI.dagger * qJ.dagger * self.H_2i_2a).get_folded_operator(*self.orbs)
-                    ).paulis
+                    ).paulis.to_labels()
                     # Make Sigma
                     Sigma[i][j] = Sigma[j][i] = self.wf.QI.op_to_qbit(
                         (qI.dagger * qJ).get_folded_operator(*self.orbs)
-                    ).paulis
+                    ).paulis.to_labels()
 
         # Gq
         for j, qJ in enumerate(self.q_ops):
@@ -238,20 +238,20 @@ class quantumLR(quantumLRBaseClass):
                 val = (
                     self.wf.QI.op_to_qbit(
                         (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
-                    ).paulis
+                    ).paulis.to_labels()
                     + self.wf.QI.op_to_qbit(
                         (self.H_1i_1a * qJ * GI.dagger).get_folded_operator(*self.orbs)
-                    ).paulis
+                    ).paulis.to_labels()
                 )
                 A[i + idx_shift][j] = A[j][i + idx_shift] = val
                 # Make B
                 val = (
                     self.wf.QI.op_to_qbit(
                         (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs)
-                    ).paulis
+                    ).paulis.to_labels()
                     + self.wf.QI.op_to_qbit(
                         (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
-                    ).paulis
+                    ).paulis.to_labels()
                 )
                 B[i + idx_shift][j] = B[j][i + idx_shift] = val
 
@@ -261,14 +261,16 @@ class quantumLR(quantumLRBaseClass):
                 # Make A
                 A[i + idx_shift][j + idx_shift] = A[j + idx_shift][i + idx_shift] = self.wf.QI.op_to_qbit(
                     double_commutator(GI.dagger, self.H_1i_1a, GJ).get_folded_operator(*self.orbs)
-                ).paulis
+                ).paulis.to_labels()
                 # Make B
                 B[i + idx_shift][j + idx_shift] = B[j + idx_shift][i + idx_shift] = self.wf.QI.op_to_qbit(
                     double_commutator(GI.dagger, self.H_1i_1a, GJ.dagger).get_folded_operator(*self.orbs)
-                ).paulis
+                ).paulis.to_labels()
                 # Make Sigma
                 Sigma[i + idx_shift][j + idx_shift] = Sigma[j + idx_shift][i + idx_shift] = (
-                    self.wf.QI.op_to_qbit(commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)).paulis
+                    self.wf.QI.op_to_qbit(
+                        commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)
+                    ).paulis.to_labels()
                 )
 
         if cliques:
@@ -281,17 +283,116 @@ class quantumLR(quantumLRBaseClass):
                     if not Sigma[i][j] == "":
                         Sigma[i][j] = list(make_cliques(Sigma[i][j]).keys())  # type: ignore [call-overload]
 
-            print("Number of non-CBS Pauli strings in A: ", get_num_nonCBS(A))
-            print("Number of non-CBS Pauli strings in B: ", get_num_nonCBS(B))
-            print("Number of non-CBS Pauli strings in Sigma: ", get_num_nonCBS(Sigma))
+        print("Number of non-CBS Pauli strings in A: ", get_num_nonCBS(A))
+        print("Number of non-CBS Pauli strings in B: ", get_num_nonCBS(B))
+        print("Number of non-CBS Pauli strings in Sigma: ", get_num_nonCBS(Sigma))
 
-            CBS, nonCBS = get_num_CBS_elements(A)
-            print("In A    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
-            CBS, nonCBS = get_num_CBS_elements(B)
-            print("In B    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
-            CBS, nonCBS = get_num_CBS_elements(Sigma)
-            print("In Sigma, number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
+        CBS, nonCBS = get_num_CBS_elements(A)
+        print("In A    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
+        CBS, nonCBS = get_num_CBS_elements(B)
+        print("In B    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
+        CBS, nonCBS = get_num_CBS_elements(Sigma)
+        print("In Sigma, number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
 
+        return A, B, Sigma
+
+    def _run_std(
+        self,
+        no_coeffs: bool = False,
+        verbose: bool = True,
+    ) -> tuple[list[list[float]], list[list[float]], list[list[float]]]:
+        """Get standard deviation in matrix elements of LR equation."""
+        idx_shift = self.num_q
+        print("Gs", self.num_G)
+        print("qs", self.num_q)
+
+        self.H_2i_2a = hamiltonian_pauli_2i_2a(
+            self.wf.h_mo,
+            self.wf.g_mo,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
+        )
+
+        A = np.zeros((self.num_params, self.num_params))
+        B = np.zeros((self.num_params, self.num_params))
+        Sigma = np.zeros((self.num_params, self.num_params))
+
+        for j, qJ in enumerate(self.q_ops):
+            for i, qI in enumerate(self.q_ops[j:], j):
+                # Make A
+                A[i, j] = A[j, i] = np.sqrt(
+                    self.wf.QI.quantum_variance(
+                        (qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
+                    + self.wf.QI.quantum_variance(
+                        (qI.dagger * qJ * self.H_2i_2a).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
+                )
+                # Make B
+                B[i, j] = B[j, i] = np.sqrt(
+                    self.wf.QI.quantum_variance(
+                        (qI.dagger * qJ.dagger * self.H_2i_2a).get_folded_operator(*self.orbs),
+                        no_coeffs=no_coeffs,
+                    )
+                )
+                # Make Sigma
+                Sigma[i, j] = Sigma[j, i] = np.sqrt(
+                    self.wf.QI.quantum_variance(
+                        (qI.dagger * qJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
+                )
+
+        # Gq
+        for j, qJ in enumerate(self.q_ops):
+            for i, GI in enumerate(self.G_ops):
+                # Make A
+                val = np.sqrt(
+                    self.wf.QI.quantum_variance(
+                        (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
+                    + self.wf.QI.quantum_variance(
+                        (self.H_1i_1a * qJ * GI.dagger).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
+                )
+                A[i + idx_shift, j] = A[j, i + idx_shift] = val
+                # Make B
+                val = np.sqrt(
+                    self.wf.QI.quantum_variance(
+                        (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs),
+                        no_coeffs=no_coeffs,
+                    )
+                    + self.wf.QI.quantum_variance(
+                        (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs),
+                        no_coeffs=no_coeffs,
+                    )
+                )
+                B[i + idx_shift, j] = B[j, i + idx_shift] = val
+
+        # GG
+        for j, GJ in enumerate(self.G_ops):
+            for i, GI in enumerate(self.G_ops[j:], j):
+                # Make A
+                A[i + idx_shift, j + idx_shift] = A[j + idx_shift, i + idx_shift] = np.sqrt(
+                    self.wf.QI.quantum_variance(
+                        double_commutator(GI.dagger, self.H_0i_0a, GJ).get_folded_operator(*self.orbs),
+                        no_coeffs=no_coeffs,
+                    )
+                )
+                # Make B
+                B[i + idx_shift, j + idx_shift] = B[j + idx_shift, i + idx_shift] = np.sqrt(
+                    self.wf.QI.quantum_variance(
+                        double_commutator(GI.dagger, self.H_0i_0a, GJ.dagger).get_folded_operator(*self.orbs),
+                        no_coeffs=no_coeffs,
+                    )
+                )
+                # Make Sigma
+                Sigma[i + idx_shift, j + idx_shift] = Sigma[j + idx_shift, i + idx_shift] = np.sqrt(
+                    self.wf.QI.quantum_variance(
+                        commutator(GI.dagger, GJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
+                )
+        self._analyze_std(A, B, Sigma, verbose=verbose)
         return A, B, Sigma
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
