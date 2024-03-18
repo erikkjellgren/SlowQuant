@@ -52,13 +52,13 @@ class quantumLR(quantumLRBaseClass):
                 val -= GG_exp * self.wf.energy_elec
                 val -= self.G_exp[i] * HG_exp[j]
                 val += self.G_exp[i] * self.G_exp[j] * self.wf.energy_elec
-                self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
+                self.A[i, j] = self.A[j, i] = val
                 # Make B
                 val = HG_exp[i] * self.G_exp[j]
                 val -= self.G_exp[i] * self.G_exp[j] * self.wf.energy_elec
-                self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
+                self.B[i, j] = self.B[j, i] = val
                 # Make Sigma
-                self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = (
+                self.Sigma[i, j] = self.Sigma[j, i] = (
                     GG_exp - (self.G_exp[i] * self.G_exp[j])
                 )
 
