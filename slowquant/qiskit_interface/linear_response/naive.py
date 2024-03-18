@@ -30,7 +30,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
 class quantumLR(quantumLRBaseClass):
     def run(
         self,
-        do_rdm: bool = False,
+        do_rdm: bool = True,
         do_gradients: bool = True,
     ) -> None:
         """Run simulation of naive LR matrix elements.
