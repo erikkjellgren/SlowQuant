@@ -103,6 +103,59 @@ class quantumLRBaseClass:
         """Get qbitmapping of operators."""
         raise NotImplementedError
 
+    def _run_std(
+        self, no_coeffs: bool = False, verbose: bool = True
+    ) -> tuple[list[list[float]], list[list[float]], list[list[float]]]:
+        """Get standard deviation in matrix elements of LR equation."""
+        raise NotImplementedError
+
+    def _analyze_std(
+        self, A: np.ndarray, B: np.ndarray, Sigma: np.ndarray, max_values: int = 4, verbose: bool = True
+    ) -> None:
+        """Analyze standard deviation in matrix elements of LR equation."""
+        matrix_name = ["A", "B", "Sigma"]
+        for nr, matrix in enumerate([np.abs(A), np.abs(B), np.abs(Sigma)]):
+            print(f"\nAnalysis of {matrix_name[nr]}")
+            print(f"The average standard deviation is {(np.sum(matrix) / (self.num_params**2))}")
+            print(f"Maximum standard deviations are of value {np.sort(matrix.flatten())[::-1][:max_values]}")
+            indices = np.unravel_index(np.argsort(matrix.flatten())[::-1][:max_values], matrix.shape)
+            print("These maximum values are in:")
+            for i in range(max_values):
+                area = ""
+                if indices[0][i] < self.num_q:
+                    area += "q"
+                else:
+                    area += "G"
+                if indices[1][i] < self.num_q:
+                    area += "q"
+                else:
+                    area += "G"
+                print(f"Indices {indices[0][i],indices[1][i]}. Part of matrix block {area}")
+        if verbose:
+            print("\nStandard deviation in each operator row for A | B | Sigma")
+            A_row = np.sum(A, axis=1)
+            B_row = np.sum(B, axis=1)
+            Sigma_row = np.sum(Sigma, axis=1)
+            for nr, i in enumerate(range(self.num_params)):
+                if nr < self.num_q:
+                    print(
+                        f"q{str(nr):<{3}}:"
+                        + f"{A_row[nr]:3.6f}".center(10)
+                        + " | "
+                        + f"{B_row[nr]:3.6f}".center(10)
+                        + " | "
+                        f"{Sigma_row[nr]:3.6f}".center(10)
+                    )
+                else:
+                    print(
+                        f"G{str(nr-self.num_q):<{3}}:"
+                        + f"{A_row[nr]:3.6f}".center(10)
+                        + " | "
+                        + f"{B_row[nr]:3.6f}".center(10)
+                        + " | "
+                        f"{Sigma_row[nr]:3.6f}".center(10)
+                    )
+
     def get_excitation_energies(self) -> np.ndarray:
         """Solve LR eigenvalue problem."""
         # Build Hessian and Metric

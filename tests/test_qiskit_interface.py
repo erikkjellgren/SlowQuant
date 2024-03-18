@@ -64,7 +64,7 @@ def test_LiH_naive_estimator() -> None:
     # LR with QSQ
     qLR = q_naive.quantumLR(qWF)
 
-    qLR.run()
+    qLR.run(do_rdm=True)
     excitation_energies = qLR.get_excitation_energies()
 
     assert np.allclose(excitation_energies, LR.excitation_energies, atol=10**-4)
@@ -121,7 +121,7 @@ def test_LiH_projected_estimator() -> None:
     # LR with QSQ
     qLR = q_projected.quantumLR(qWF)
 
-    qLR.run()
+    qLR.run(do_rdm=True)
     excitation_energies = qLR.get_excitation_energies()
 
     solution = [
@@ -269,7 +269,7 @@ def test_LiH_naive_sampler() -> None:
     # LR with QSQ
     qLR = q_naive.quantumLR(qWF)
 
-    qLR.run()
+    qLR.run(do_rdm=True)
     excitation_energies = qLR.get_excitation_energies()
 
     assert np.allclose(excitation_energies, LR.excitation_energies, atol=10**-4)
@@ -327,7 +327,7 @@ def test_LiH_oscillator_strength() -> None:
 
     # naive LR with QSQ
     qLR_naive = q_naive.quantumLR(qWF)
-    qLR_naive.run()
+    qLR_naive.run(do_rdm=True)
     qLR_naive.get_excitation_energies()
     qLR_naive.get_normed_excitation_vectors()
     osc_strengths = qLR_naive.get_oscillator_strength([x, y, z])
@@ -352,7 +352,7 @@ def test_LiH_oscillator_strength() -> None:
 
     # proj LR with QSQ
     qLR_proj = q_projected.quantumLR(qWF)
-    qLR_proj.run()
+    qLR_proj.run(do_rdm=True)
     qLR_proj.get_excitation_energies()
     qLR_proj.get_normed_excitation_vectors()
     osc_strengths = qLR_proj.get_oscillator_strength([x, y, z])
@@ -435,7 +435,7 @@ def test_LiH_oscillator_strength_sampler() -> None:
 
     # naive LR with QSQ
     qLR_naive = q_naive.quantumLR(qWF)
-    qLR_naive.run()
+    qLR_naive.run(do_rdm=True)
     qLR_naive.get_excitation_energies()
     qLR_naive.get_normed_excitation_vectors()
     osc_strengths = qLR_naive.get_oscillator_strength([x, y, z])
@@ -460,7 +460,7 @@ def test_LiH_oscillator_strength_sampler() -> None:
 
     # proj LR with QSQ
     qLR_proj = q_projected.quantumLR(qWF)
-    qLR_proj.run()
+    qLR_proj.run(do_rdm=True)
     qLR_proj.get_excitation_energies()
     qLR_proj.get_normed_excitation_vectors()
     osc_strengths = qLR_proj.get_oscillator_strength([x, y, z])

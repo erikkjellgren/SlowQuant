@@ -5,7 +5,6 @@ import numpy as np
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
-from slowquant.qiskit_interface.interface import make_cliques
 from slowquant.qiskit_interface.linear_response.lr_baseclass import (
     get_num_CBS_elements,
     get_num_nonCBS,
@@ -15,6 +14,7 @@ from slowquant.qiskit_interface.operators import (
     hamiltonian_pauli_2i_2a,
     one_elec_op_0i_0a,
 )
+from slowquant.qiskit_interface.util import make_cliques
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_orbital_response_property_gradient,
@@ -46,11 +46,11 @@ class quantumLR(quantumLRBaseClass):
         )
 
         # pre-calculate <0|G|0> and <0|HG|0>
-        self.G_exp = []
-        HG_exp = []
+        self._G_exp = []
+        self._HG_exp = []
         for GJ in self.G_ops:
-            self.G_exp.append(self.wf.QI.quantum_expectation_value(GJ.get_folded_operator(*self.orbs)))
-            HG_exp.append(
+            self._G_exp.append(self.wf.QI.quantum_expectation_value(GJ.get_folded_operator(*self.orbs)))
+            self._HG_exp.append(
                 self.wf.QI.quantum_expectation_value((self.H_0i_0a * GJ).get_folded_operator(*self.orbs))
             )
 
@@ -71,7 +71,7 @@ class quantumLR(quantumLRBaseClass):
 
             grad = np.zeros(self.num_G)  # G^\dagger is the same
             for i in range(self.num_G):
-                grad[i] = HG_exp[i] - (self.wf.energy_elec * self.G_exp[i])
+                grad[i] = self._HG_exp[i] - (self.wf.energy_elec * self._G_exp[i])
             if len(grad) != 0:
                 print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
                 if np.max(np.abs(grad)) > 10**-3:
@@ -111,21 +111,21 @@ class quantumLR(quantumLRBaseClass):
                     (GI.dagger * GJ).get_folded_operator(*self.orbs)
                 )
                 val -= GG_exp * self.wf.energy_elec
-                val -= self.G_exp[i] * HG_exp[j]
-                val += self.G_exp[i] * self.G_exp[j] * self.wf.energy_elec
+                val -= self._G_exp[i] * self._HG_exp[j]
+                val += self._G_exp[i] * self._G_exp[j] * self.wf.energy_elec
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
                 # Make B
-                val = HG_exp[i] * self.G_exp[j]
-                val -= self.G_exp[i] * self.G_exp[j] * self.wf.energy_elec
+                val = self._HG_exp[i] * self._G_exp[j]
+                val -= self._G_exp[i] * self._G_exp[j] * self.wf.energy_elec
                 self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
                 # Make Sigma
                 self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = (
-                    GG_exp - (self.G_exp[i] * self.G_exp[j])
+                    GG_exp - (self._G_exp[i] * self._G_exp[j])
                 )
 
     def _get_qbitmap(
         self,
-        cliques: bool = True,
+        cliques: bool = False,
     ) -> tuple[list[list[str]], list[list[str]], list[list[str]]]:
         """Get qubit map of operators.
 
@@ -147,9 +147,11 @@ class quantumLR(quantumLRBaseClass):
         G_exp = []  # save and use for properties
         HG_exp = []
         for GJ in self.G_ops:
-            G_exp.append(self.wf.QI.op_to_qbit(GJ.get_folded_operator(*self.orbs)).paulis)
-            HG_exp.append(self.wf.QI.op_to_qbit((self.H_0i_0a * GJ).get_folded_operator(*self.orbs)).paulis)
-        energy = self.wf.QI.op_to_qbit((self.H_0i_0a).get_folded_operator(*self.orbs)).paulis
+            G_exp.append(self.wf.QI.op_to_qbit(GJ.get_folded_operator(*self.orbs)).paulis.to_labels())
+            HG_exp.append(
+                self.wf.QI.op_to_qbit((self.H_0i_0a * GJ).get_folded_operator(*self.orbs)).paulis.to_labels()
+            )
+        energy = self.wf.QI.op_to_qbit((self.H_0i_0a).get_folded_operator(*self.orbs)).paulis.to_labels()
 
         # qq
         for j, qJ in enumerate(self.q_ops):
@@ -157,8 +159,10 @@ class quantumLR(quantumLRBaseClass):
                 # Make A
                 val = self.wf.QI.op_to_qbit(
                     (qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs)
-                ).paulis
-                qq_exp = self.wf.QI.op_to_qbit((qI.dagger * qJ).get_folded_operator(*self.orbs)).paulis
+                ).paulis.to_labels()
+                qq_exp = self.wf.QI.op_to_qbit(
+                    (qI.dagger * qJ).get_folded_operator(*self.orbs)
+                ).paulis.to_labels()
                 val += qq_exp + energy
                 A[i][j] = A[j][i] = val
                 # Make Sigma
@@ -170,7 +174,7 @@ class quantumLR(quantumLRBaseClass):
                 # Make A
                 A[j][i + idx_shift] = A[i + idx_shift][j] = self.wf.QI.op_to_qbit(
                     (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
-                ).paulis
+                ).paulis.to_labels()
 
         # GG
         for j, GJ in enumerate(self.G_ops):
@@ -178,8 +182,10 @@ class quantumLR(quantumLRBaseClass):
                 # Make A
                 val = self.wf.QI.op_to_qbit(
                     (GI.dagger * self.H_0i_0a * GJ).get_folded_operator(*self.orbs)
-                ).paulis
-                GG_exp = self.wf.QI.op_to_qbit((GI.dagger * GJ).get_folded_operator(*self.orbs)).paulis
+                ).paulis.to_labels()
+                GG_exp = self.wf.QI.op_to_qbit(
+                    (GI.dagger * GJ).get_folded_operator(*self.orbs)
+                ).paulis.to_labels()
                 val += GG_exp + energy
                 val += G_exp[i] + HG_exp[j]
                 val += G_exp[i] + G_exp[j] + energy
@@ -203,17 +209,136 @@ class quantumLR(quantumLRBaseClass):
                     if not Sigma[i][j] == "":
                         Sigma[i][j] = list(make_cliques(Sigma[i][j]).keys())  # type: ignore [call-overload]
 
-            print("Number of non-CBS Pauli strings in A: ", get_num_nonCBS(A))
-            print("Number of non-CBS Pauli strings in B: ", get_num_nonCBS(B))
-            print("Number of non-CBS Pauli strings in Sigma: ", get_num_nonCBS(Sigma))
+        print("Number of non-CBS Pauli strings in A: ", get_num_nonCBS(A))
+        print("Number of non-CBS Pauli strings in B: ", get_num_nonCBS(B))
+        print("Number of non-CBS Pauli strings in Sigma: ", get_num_nonCBS(Sigma))
 
-            CBS, nonCBS = get_num_CBS_elements(A)
-            print("In A    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
-            CBS, nonCBS = get_num_CBS_elements(B)
-            print("In B    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
-            CBS, nonCBS = get_num_CBS_elements(Sigma)
-            print("In Sigma, number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
+        CBS, nonCBS = get_num_CBS_elements(A)
+        print("In A    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
+        CBS, nonCBS = get_num_CBS_elements(B)
+        print("In B    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
+        CBS, nonCBS = get_num_CBS_elements(Sigma)
+        print("In Sigma, number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
 
+        return A, B, Sigma
+
+    def _run_std(
+        self,
+        no_coeffs: bool = False,
+        verbose: bool = True,
+    ) -> tuple[list[list[float]], list[list[float]], list[list[float]]]:
+        """Get standard deviation in matrix elements of LR equation."""
+        idx_shift = self.num_q
+        print("Gs", self.num_G)
+        print("qs", self.num_q)
+
+        A = np.zeros((self.num_params, self.num_params))
+        B = np.zeros((self.num_params, self.num_params))
+        Sigma = np.zeros((self.num_params, self.num_params))
+
+        if not hasattr(self, "_G_exp") or len(self._G_exp) == 0:
+            # pre-calculate <0|G|0> and <0|HG|0>
+            self._G_exp = []  # save and use for properties
+            self._HG_exp = []
+            for GJ in self.G_ops:
+                self._G_exp.append(self.wf.QI.quantum_expectation_value(GJ.get_folded_operator(*self.orbs)))
+                self._HG_exp.append(
+                    self.wf.QI.quantum_expectation_value((self.H_0i_0a * GJ).get_folded_operator(*self.orbs))
+                )
+        # pre-calculate std of <0|G|0> and <0|HG|0>
+        var_G_exp = []  # save and use for properties
+        var_HG_exp = []
+        for GJ in self.G_ops:
+            var_G_exp.append(
+                self.wf.QI.quantum_variance(GJ.get_folded_operator(*self.orbs), no_coeffs=no_coeffs)
+            )
+            var_HG_exp.append(
+                self.wf.QI.quantum_variance(
+                    (self.H_0i_0a * GJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                )
+            )
+        var_energy = self.wf.QI.quantum_variance(
+            (self.H_0i_0a).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+        )
+
+        # qq
+        self.H_2i_2a = hamiltonian_pauli_2i_2a(
+            self.wf.h_mo,
+            self.wf.g_mo,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
+        )
+
+        for j, qJ in enumerate(self.q_ops):
+            for i, qI in enumerate(self.q_ops[j:], j):
+                qq_exp = self.wf.QI.quantum_expectation_value(
+                    (qI.dagger * qJ).get_folded_operator(*self.orbs)
+                )
+                var_qq_exp = self.wf.QI.quantum_variance(
+                    (qI.dagger * qJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                )
+                # Make A
+                val = self.wf.QI.quantum_variance(
+                    (qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                )
+                val += (qq_exp**2 + var_qq_exp) * (self.wf.energy_elec**2 + var_energy) - (
+                    qq_exp**2 * self.wf.energy_elec**2
+                )
+                A[i, j] = A[j, i] = np.sqrt(val)
+                # Make Sigma
+                Sigma[i, j] = Sigma[j, i] = np.sqrt(var_qq_exp)
+
+        # Gq
+        for j, qJ in enumerate(self.q_ops):
+            for i, GI in enumerate(self.G_ops):
+                # Make A
+                A[j, i + idx_shift] = A[i + idx_shift, j] = np.sqrt(
+                    self.wf.QI.quantum_variance(
+                        (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
+                )
+
+        # GG
+        for j, GJ in enumerate(self.G_ops):
+            for i, GI in enumerate(self.G_ops[j:], j):
+                # Make A
+                val = self.wf.QI.quantum_variance(
+                    (GI.dagger * self.H_0i_0a * GJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                )
+                var_GG_exp = self.wf.QI.quantum_variance(
+                    (GI.dagger * GJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                )
+                GG_exp = self.wf.QI.quantum_expectation_value(
+                    (GI.dagger * GJ).get_folded_operator(*self.orbs)
+                )
+                # Var(A*B) = (\mu(A)^2 + var(A)) * (\mu(B)^2 + var(B)) - \mu(A)^2 \mu(B)^2
+                val += (GG_exp**2 + var_GG_exp) * (self.wf.energy_elec**2 + var_energy) - (
+                    GG_exp**2 * self.wf.energy_elec**2
+                )
+                val += (self._G_exp[i] ** 2 + var_G_exp[i]) * (self._HG_exp[j] ** 2 + var_HG_exp[j]) - (
+                    self._G_exp[i] ** 2 * self._HG_exp[j] ** 2
+                )
+                val += (self._G_exp[i] ** 2 + var_G_exp[i]) * (self._G_exp[j] ** 2 + var_G_exp[j]) * (
+                    self.wf.energy_elec**2 + var_energy
+                ) - (self._G_exp[i] ** 2 * self._G_exp[j] ** 2 * self.wf.energy_elec**2)
+                A[i + idx_shift, j + idx_shift] = A[j + idx_shift, i + idx_shift] = np.sqrt(val)
+                # Make B
+                val = (self._G_exp[j] ** 2 + var_G_exp[j]) * (self._HG_exp[i] ** 2 + var_HG_exp[i]) - (
+                    self._G_exp[j] ** 2 * self._HG_exp[i] ** 2
+                )
+                val += (self._G_exp[i] ** 2 + var_G_exp[i]) * (self._G_exp[j] ** 2 + var_G_exp[j]) * (
+                    self.wf.energy_elec**2 + var_energy
+                ) - (self._G_exp[i] ** 2 * self._G_exp[j] ** 2 * self.wf.energy_elec**2)
+                B[i + idx_shift, j + idx_shift] = B[j + idx_shift, i + idx_shift] = np.sqrt(val)
+                # Make Sigma
+                val = (self._G_exp[i] ** 2 + var_G_exp[i]) * (self._G_exp[j] ** 2 + var_G_exp[j]) - (
+                    self._G_exp[i] ** 2 * self._G_exp[j] ** 2
+                )
+                Sigma[i + idx_shift, j + idx_shift] = Sigma[j + idx_shift, i + idx_shift] = np.sqrt(
+                    var_GG_exp + val
+                )
+        self._analyze_std(A, B, Sigma, verbose=verbose)
         return A, B, Sigma
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
@@ -282,7 +407,7 @@ class quantumLR(quantumLRBaseClass):
             exp_muy = self.wf.QI.quantum_expectation_value(muy_op.get_folded_operator(*self.orbs))
             exp_muz = self.wf.QI.quantum_expectation_value(muz_op.get_folded_operator(*self.orbs))
             for i, G in enumerate(self.G_ops):
-                exp_G = self.G_exp[i]
+                exp_G = self._G_exp[i]
                 exp_Gmux = self.wf.QI.quantum_expectation_value(
                     (G.dagger * mux_op).get_folded_operator(*self.orbs)
                 )
