@@ -20,7 +20,6 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_gradient,
 )
 from slowquant.unitary_coupled_cluster.operator_hybrid import (
-    OperatorHybrid,
     epq_hybrid,
     expectation_value_hybrid,
     expectation_value_hybrid_flow,
@@ -32,44 +31,6 @@ from slowquant.unitary_coupled_cluster.operator_pauli import (
     hamiltonian_pauli_0i_0a,
 )
 from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_ucc_u
-
-
-def eE(wf: WaveFunctionUCC, E: dict[tuple[int, int], OperatorHybrid], p: int, q: int) -> float:
-    r"""Calcuate expectation value.
-
-    .. math::
-        \left<0\left|\hat{E}_{pq}\right|0\right>
-    """
-    return expectation_value_hybrid_flow(wf.state_vector, [E[(p, q)]], wf.state_vector)
-
-
-def eEE(
-    wf: WaveFunctionUCC, E: dict[tuple[int, int], OperatorHybrid], p: int, q: int, r: int, s: int
-) -> float:
-    r"""Calcuate expectation value.
-
-    .. math::
-        \left<0\left|\hat{E}_{pq}\hat{E}_{rs}\right|0\right>
-    """
-    return expectation_value_hybrid_flow(wf.state_vector, [E[(p, q)], E[(r, s)]], wf.state_vector)
-
-
-def eEEE(
-    wf: WaveFunctionUCC,
-    E: dict[tuple[int, int], OperatorHybrid],
-    p: int,
-    q: int,
-    r: int,
-    s: int,
-    t: int,
-    u: int,
-) -> float:
-    r"""Calcuate expectation value.
-
-    .. math::
-        \left<0\left|\hat{E}_{pq}\hat{E}_{rs}\hat{E}_{tu}\right|0\right>
-    """
-    return expectation_value_hybrid_flow(wf.state_vector, [E[(p, q)], E[(r, s)], E[(t, u)]], wf.state_vector)
 
 
 class WaveFunctionUCC:
@@ -758,25 +719,13 @@ class WaveFunctionUCC:
                                         self.state_vector,
                                     )
                                     if t == s:
-                                        val -= expectation_value_hybrid_flow(
-                                            self.state_vector, [E[(p, q)], E[(r, u)]], self.state_vector
-                                        )
+                                        val -= self.rdm2[p_idx, q_idx, r_idx, u_idx]
                                     if r == q:
-                                        val -= expectation_value_hybrid_flow(
-                                            self.state_vector, [E[(p, s)], E[(t, u)]], self.state_vector
-                                        )
-                                    if r == q and t == s:
-                                        val += expectation_value_hybrid_flow(
-                                            self.state_vector, [E[(p, u)]], self.state_vector
-                                        )
+                                        val -= self.rdm2[p_idx, s_idx, t_idx, u_idx]
                                     if t == q:
-                                        val -= expectation_value_hybrid_flow(
-                                            self.state_vector, [E[(p, u)], E[(r, s)]], self.state_vector
-                                        )
-                                    if t == q and r == u:
-                                        val += expectation_value_hybrid_flow(
-                                            self.state_vector, [E[(p, s)]], self.state_vector
-                                        )
+                                        val -= self.rdm2[p_idx, u_idx, r_idx, s_idx]
+                                    if t == s and r == q:
+                                        val -= self.rdm1[p_idx, u_idx]
                                     self._rdm3[p_idx, q_idx, r_idx, s_idx, t_idx, u_idx] = val  # type: ignore
                                     self._rdm3[p_idx, q_idx, t_idx, u_idx, r_idx, s_idx] = val  # type: ignore
                                     self._rdm3[r_idx, s_idx, p_idx, q_idx, t_idx, u_idx] = val  # type: ignore
@@ -846,52 +795,34 @@ class WaveFunctionUCC:
                                                 [E[(p, q)], E[(r, s)], E[(t, u)], E[(m, n)]],
                                                 self.state_vector,
                                             )
-                                            if m == u:
-                                                val += -eEEE(self, E, p, q, r, s, t, n)
-                                            if t == s:
-                                                val += -eEEE(self, E, p, q, r, u, m, n)
-                                            if t == s and m == u:
-                                                val += eEE(self, E, p, q, r, n)
-                                            if m == s:
-                                                val += -eEEE(self, E, p, q, r, n, t, u)
-                                            if m == s and t == n:
-                                                val += eEE(self, E, p, q, r, u)
                                             if r == q:
-                                                val += -eEEE(self, E, p, s, t, u, m, n)
-                                            if r == q and m == u:
-                                                val += eEE(self, E, p, s, t, n)
-                                            if r == q and t == s:
-                                                val += eEE(self, E, p, u, m, n)
-                                            if r == q and t == s and m == u:
-                                                val -= eE(self, E, p, n)
-                                            if r == q and m == s:
-                                                val += eEE(self, E, p, n, t, u)
-                                            if r == q and m == s and t == n:
-                                                val -= eE(self, E, p, u)
+                                                val -= self.rdm3[p_idx, s_idx, t_idx, u_idx, m_idx, n_idx]
                                             if t == q:
-                                                val += -eEEE(self, E, p, u, r, s, m, n)
-                                            if t == q and m == s:
-                                                val += eEE(self, E, p, u, r, n)
-                                            if t == q and r == u:
-                                                val += eEE(self, E, p, s, m, n)
-                                            if t == q and r == u and m == s:
-                                                val -= eE(self, E, p, n)
-                                            if t == q and m == u:
-                                                val += eEE(self, E, p, n, r, s)
-                                            if t == q and m == u and r == n:
-                                                val -= eE(self, E, p, s)
+                                                val -= self.rdm3[p_idx, u_idx, r_idx, s_idx, m_idx, n_idx]
                                             if m == q:
-                                                val += -eEEE(self, E, p, n, r, s, t, u)
-                                            if m == q and t == s:
-                                                val += eEE(self, E, p, n, r, u)
-                                            if m == q and r == n:
-                                                val += eEE(self, E, p, s, t, u)
-                                            if m == q and r == n and t == s:
-                                                val -= eE(self, E, p, u)
-                                            if m == q and t == n:
-                                                val += eEE(self, E, p, u, r, s)
-                                            if m == q and t == n and r == u:
-                                                val -= eE(self, E, p, s)
+                                                val -= self.rdm3[p_idx, n_idx, r_idx, s_idx, t_idx, u_idx]
+                                            if m == u:
+                                                val -= self.rdm3[p_idx, q_idx, r_idx, s_idx, t_idx, n_idx]
+                                            if t == s:
+                                                val -= self.rdm3[p_idx, q_idx, r_idx, u_idx, m_idx, n_idx]
+                                            if m == s:
+                                                val -= self.rdm3[p_idx, q_idx, r_idx, n_idx, t_idx, u_idx]
+                                            if m == u and r == q:
+                                                val -= self.rdm2[p_idx, s_idx, t_idx, n_idx]
+                                            if m == u and t == q:
+                                                val -= self.rdm2[p_idx, n_idx, r_idx, s_idx]
+                                            if t == s and m == u:
+                                                val -= self.rdm2[p_idx, q_idx, r_idx, n_idx]
+                                            if t == s and r == q:
+                                                val -= self.rdm2[p_idx, u_idx, m_idx, n_idx]
+                                            if t == s and m == q:
+                                                val -= self.rdm2[p_idx, n_idx, r_idx, u_idx]
+                                            if m == s and r == q:
+                                                val -= self.rdm2[p_idx, n_idx, t_idx, u_idx]
+                                            if m == s and t == q:
+                                                val -= self.rdm2[p_idx, u_idx, r_idx, n_idx]
+                                            if m == u and t == s and r == q:
+                                                val -= self.rdm1[p_idx, n_idx]
                                             self._rdm4[  # type: ignore
                                                 p_idx, q_idx, r_idx, s_idx, t_idx, u_idx, m_idx, n_idx
                                             ] = val

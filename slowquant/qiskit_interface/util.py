@@ -38,9 +38,9 @@ def to_CBS_measurement(op: PauliList) -> QuantumCircuit:
 def get_bitstring_sign(op: Pauli, binary: str) -> int:
     r"""Convert Pauli string and bit-string measurement to expectation value.
 
-    Takes Pauli String and a state in binary form and returns the sign based on the expectation value of the Pauli string with each single quibit state.
+    Takes Pauli String and a state in binary form and returns the sign based on the expectation value of the Pauli string with each single qubit state.
 
-    This is achived by using the following evaluations:
+    This is achieved by using the following evaluations:
 
     .. math::
         \begin{align}
@@ -59,7 +59,7 @@ def get_bitstring_sign(op: Pauli, binary: str) -> int:
     .. math::
         E = \prod_i^N\left<b_i\left|P_{i,T}\right|b_i\right>
 
-    With :math:`b_i` being the :math:`i` th bit and :math:`P_{i,T}` being the :math:`i` th proberly transformed Pauli operator.
+    With :math:`b_i` being the :math:`i` th bit and :math:`P_{i,T}` being the :math:`i` th properly transformed Pauli operator.
 
     Args:
         op: Pauli string operator.
@@ -68,12 +68,14 @@ def get_bitstring_sign(op: Pauli, binary: str) -> int:
     Returns:
         Expectation value of Pauli string.
     """
-    sign = 1
+    count = 0
     for i, pauli in enumerate(op.to_label()):
         if not pauli == "I":
             if binary[i] == "1":
-                sign = sign * (-1)
-    return sign
+                count += 1
+    if count % 2 == 1:
+        return -1
+    return 1
 
 
 class CliqueHead:
@@ -165,7 +167,7 @@ class Clique:
             if do_fit:
                 if clique_head.head != head_fit:
                     raise ValueError(
-                        f"Found matching clique, but head will be mutate. Head; {clique_head.head}, Pauli; {pauli}"
+                        f"Found matching clique, but head will be mutated. Head; {clique_head.head}, Pauli; {pauli}"
                     )
                 if clique_head.distr is None:
                     raise ValueError(f"Head, {clique_head.head}, has a distr that is None")
