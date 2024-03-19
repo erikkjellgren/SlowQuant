@@ -24,7 +24,6 @@ from slowquant.qiskit_interface.util import (
     Clique,
     correct_distribution,
     get_bitstring_sign,
-    make_cliques,
     to_CBS_measurement,
 )
 
@@ -314,7 +313,10 @@ class QuantumInterface:
         Returns:
             Qubit representation of operator.
         """
-        return self.mapper.map(FermionicOp(op.get_qiskit_form(self.num_orbs), self.num_spin_orbs))
+        mapped_op = self.mapper.map(FermionicOp(op.get_qiskit_form(self.num_orbs), self.num_spin_orbs))
+        if not isinstance(mapped_op, SparsePauliOp):
+            raise TypeError(f"The qubit form of the operator is not SparsePauliOp got, {type(mapped_op)}")
+        return mapped_op
 
     def quantum_expectation_value(
         self, op: FermionicOperator, custom_parameters: list[float] | None = None
@@ -423,12 +425,11 @@ class QuantumInterface:
             self.cliques.update_distr(new_heads, distr)
 
         # Loop over all Pauli strings in observable and build final result with coefficients
-        for pauli, coeff in zip(observables.paulis, observables.coeffs):
+        paulis_str = [str(x) for x in observables.paulis]
+        for pauli, coeff in zip(paulis_str, observables.coeffs):
             result = 0.0
-            for key, value in self.cliques.get_distr(
-                str(pauli)
-            ).items():  # build result from quasi-distribution
-                result += value * get_bitstring_sign(Pauli(pauli), key)
+            for key, value in self.cliques.get_distr(pauli).items():  # build result from quasi-distribution
+                result += value * get_bitstring_sign(pauli, key)
             values += result * coeff
 
         if isinstance(values, complex):
@@ -463,34 +464,29 @@ class QuantumInterface:
         # Map Fermionic to Qubit
         observables = self.op_to_qbit(op)
         # Obtain cliques for operator's Pauli strings
-        cliques = make_cliques(observables.paulis)
+        cliques = Clique()
 
-        # Simulate each clique head with one combined device call
-        # and return a list of distributions
-        distr = self._one_call_sampler_distributions(
-            PauliList(list(cliques.keys())), run_parameters, self.circuit
-        )
-        distributions = {}
+        new_heads = cliques.add_paulis([str(x) for x in observables.paulis])
 
         # Check if error mitigation is requested and if read-out matrix already exists.
         if self._do_M_mitigation and self._Minv is None:
             self._make_Minv()
 
-        # Loop over all clique Paul lists to obtain the result for each Pauli string from the clique head distribution
-        for nr, clique in enumerate(cliques.values()):
-            dist = distr[nr]  # Measured distribution for a given clique head
-            if self._do_M_mitigation:  # apply error mitigation if requested
-                dist = correct_distribution(dist, self._Minv)
-            for pauli in clique:  # Loop over all clique Pauli strings associated with one clique head
-                result = 0.0
-                for key, value in dist.items():  # build result from quasi-distribution
-                    # Here we could check if we want a given key (bitstring) in the result distribution
-                    result += value * get_bitstring_sign(Pauli(pauli), key)
-                distributions[pauli] = result
+        # Simulate each clique head with one combined device call
+        # and return a list of distributions
+        distr = self._one_call_sampler_distributions(PauliList(new_heads), run_parameters, self.circuit)
+        if self._do_M_mitigation:  # apply error mitigation if requested
+            for i, dist in enumerate(distr):
+                distr[i] = correct_distribution(dist, self._Minv)
+        cliques.update_distr(new_heads, distr)
 
         # Loop over all Pauli strings in observable and build final result with coefficients
-        for pauli, coeff in zip(observables.paulis, observables.coeffs):
-            values += distributions[str(pauli)] * coeff
+        paulis_str = [str(x) for x in observables.paulis]
+        for pauli, coeff in zip(paulis_str, observables.coeffs):
+            result = 0.0
+            for key, value in cliques.get_distr(pauli).items():  # build result from quasi-distribution
+                result += value * get_bitstring_sign(pauli, key)
+            values += result * coeff
 
         if isinstance(values, complex):
             if abs(values.imag) > 10**-2:
@@ -548,12 +544,13 @@ class QuantumInterface:
 
         # Loop over all Pauli strings in observable and build final result with coefficients
         result = 0.0
-        for pauli, coeff in zip(observables.paulis, observables.coeffs):
+        paulis_str = [str(x) for x in observables.paulis]
+        for pauli, coeff in zip(paulis_str, observables.coeffs):
             if no_coeffs:
                 coeff = 1
             # Get distribution from cliques
             if do_cliques:
-                dist = self.cliques.get_distr(str(pauli))
+                dist = self.cliques.get_distr(pauli)
                 # Calculate p1: Probability of measuring one
                 p1 = 0.0
                 for key, value in dist.items():
@@ -592,6 +589,8 @@ class QuantumInterface:
             Array of quasi-distributions in order of all circuits results for a given Pauli String first.
             E.g.: [PauliString[0] for Circuit[0], PauliString[0] for Circuit[1], ...]
         """
+        if not isinstance(self._primitive, BaseSampler):
+            raise TypeError(f"Expeccted primitive to be of type BaseSampler got, {type(self._primitive)}")
         if isinstance(paulis, Pauli):
             paulis = PauliList(paulis)
         num_paulis = len(paulis)
@@ -637,7 +636,7 @@ class QuantumInterface:
         return dist_combined
 
     def _sampler_distributions(
-        self, pauli: PauliList, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
+        self, pauli: PauliList | Pauli, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
     ) -> dict[str, float]:
         r"""Get results from a sampler distribution for one given Pauli string.
 
@@ -656,6 +655,10 @@ class QuantumInterface:
         Returns:
             Quasi-distributions.
         """
+        if not isinstance(self._primitive, BaseSampler):
+            raise TypeError(f"Expeccted primitive to be of type BaseSampler got, {type(self._primitive)}")
+        if isinstance(pauli, Pauli):
+            pauli = PauliList(pauli)
         if self._circuit_multipl > 1:
             print(
                 "WARNING: The chosen function does not allow for appending circuits. Choose _one_call_sampler_distributions instead."
@@ -686,7 +689,7 @@ class QuantumInterface:
         return distr
 
     def _sampler_distribution_p1(
-        self, pauli: Pauli, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
+        self, pauli: str, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
     ) -> float:
         """Sample the probability of measuring one for a given Pauli string.
 
@@ -698,7 +701,7 @@ class QuantumInterface:
             p1 probability.
         """
         # Get quasi-distribution in binary probabilities
-        distr = self._sampler_distributions(pauli, run_parameters, custom_circ)
+        distr = self._sampler_distributions(Pauli(pauli), run_parameters, custom_circ)
 
         p1 = 0.0
         for key, value in distr.items():
