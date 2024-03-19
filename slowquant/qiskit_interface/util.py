@@ -35,7 +35,7 @@ def to_CBS_measurement(op: PauliList) -> QuantumCircuit:
     return qc
 
 
-def get_bitstring_sign(op: Pauli, binary: str) -> int:
+def get_bitstring_sign(op: str, binary: str) -> int:
     r"""Convert Pauli string and bit-string measurement to expectation value.
 
     Takes Pauli String and a state in binary form and returns the sign based on the expectation value of the Pauli string with each single qubit state.
@@ -70,7 +70,7 @@ def get_bitstring_sign(op: Pauli, binary: str) -> int:
     """
     # The sign will never change if the letter is I, thus represent all I's as 0.
     # The rest is represented by 1.
-    opbit = int(str(op).replace("I", "0").replace("Z", "1").replace("X", "1").replace("Y", "1"), 2)
+    opbit = int(op.replace("I", "0").replace("Z", "1").replace("X", "1").replace("Y", "1"), 2)
     # There can only be sign change when the binary-string is 1.
     # Now a binary-and can be performed to calculate number of sign changes.
     count = (opbit & int(binary, 2)).bit_count()
@@ -92,6 +92,11 @@ class CliqueHead:
 
 
 class Clique:
+    """Clique class.
+
+    #. https://arxiv.org/pdf/1907.13623.pdf, Sec. 4.1, 4.2, and 7.0
+    """
+
     def __init__(self) -> None:
         """Initialize clique class."""
         self.cliques: list[CliqueHead] = []
@@ -203,46 +208,6 @@ def fit_in_clique(pauli: str, head: str) -> tuple[bool, str]:
             else:
                 new_head += p_op
     return is_commuting, new_head
-
-
-def make_cliques(paulis: PauliList) -> dict[str, list[str]]:
-    """Partition Pauli strings into simultaniously measurable cliques.
-
-    The Pauli strings are put into cliques accourding to Qubit-Wise Commutativity (QWC).
-
-    #. https://arxiv.org/pdf/1907.13623.pdf, Sec. 4.1, 4.2, and 7.0
-    """
-    cliques: dict[str, list[str]] = {"Z" * len(paulis[0]): []}
-    for pauli in paulis:
-        pauli_str = str(pauli)
-        if "X" not in pauli_str and "Y" not in pauli_str:
-            cliques["Z" * len(paulis[0])].append(pauli_str)
-        else:
-            for clique in cliques:
-                is_commuting = True
-                for p_clique, p_op in zip(clique, pauli_str):
-                    if p_clique == "I" or p_op == "I":
-                        continue
-                    if p_clique != p_op:
-                        is_commuting = False
-                        break
-                if is_commuting:
-                    commuting_clique = clique
-                    break
-            if is_commuting:
-                new_clique_pauli = ""
-                for p_clique, p_op in zip(commuting_clique, pauli_str):
-                    if p_clique != "I":
-                        new_clique_pauli += p_clique
-                    else:
-                        new_clique_pauli += p_op
-                if new_clique_pauli != commuting_clique:
-                    cliques[new_clique_pauli] = cliques[commuting_clique]
-                    del cliques[commuting_clique]
-                cliques[new_clique_pauli].append(pauli_str)
-            else:
-                cliques[pauli_str] = [pauli_str]
-    return cliques
 
 
 def correct_distribution(dist: dict[str, float], M: np.ndarray) -> dict[str, float]:

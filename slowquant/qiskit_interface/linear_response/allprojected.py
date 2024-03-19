@@ -14,7 +14,7 @@ from slowquant.qiskit_interface.operators import (
     hamiltonian_pauli_2i_2a,
     one_elec_op_0i_0a,
 )
-from slowquant.qiskit_interface.util import make_cliques
+from slowquant.qiskit_interface.util import Clique
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_orbital_response_property_gradient,
@@ -203,11 +203,17 @@ class quantumLR(quantumLRBaseClass):
             for i in range(self.num_params):
                 for j in range(self.num_params):
                     if not A[i][j] == "":
-                        A[i][j] = list(make_cliques(A[i][j]).keys())  # type: ignore [call-overload]
+                        clique = Clique()
+                        clique.add_paulis([str(x) for x in A[i][j]])
+                        A[i][j] = [x.head for x in clique.cliques]  # type: ignore [call-overload]
                     if not B[i][j] == "":
-                        B[i][j] = list(make_cliques(B[i][j]).keys())  # type: ignore [call-overload]
+                        clique = Clique()
+                        clique.add_paulis([str(x) for x in B[i][j]])
+                        B[i][j] = [x.head for x in clique.cliques]  # type: ignore [call-overload]
                     if not Sigma[i][j] == "":
-                        Sigma[i][j] = list(make_cliques(Sigma[i][j]).keys())  # type: ignore [call-overload]
+                        clique = Clique()
+                        clique.add_paulis([str(x) for x in Sigma[i][j]])
+                        Sigma[i][j] = [x.head for x in clique.cliques]  # type: ignore [call-overload]
 
         print("Number of non-CBS Pauli strings in A: ", get_num_nonCBS(A))
         print("Number of non-CBS Pauli strings in B: ", get_num_nonCBS(B))
@@ -226,7 +232,7 @@ class quantumLR(quantumLRBaseClass):
         self,
         no_coeffs: bool = False,
         verbose: bool = True,
-    ) -> tuple[list[list[float]], list[list[float]], list[list[float]]]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Get standard deviation in matrix elements of LR equation."""
         idx_shift = self.num_q
         print("Gs", self.num_G)
