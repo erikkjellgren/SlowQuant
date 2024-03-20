@@ -1590,4 +1590,5 @@ def load_wavefunction(filename: str) -> WaveFunctionUCC:
             f'Calculate energy is different from saved energy: {energy} and {float(dat["energy_elec"])}.'
         )
     wf.energy_elec = energy
+    print(f"Electronic energy of loaded wave function is {energy}")
     return wf
