@@ -7,7 +7,6 @@ import numpy as np
 import scipy
 from qiskit.primitives import BaseEstimator, BaseSampler
 from qiskit.quantum_info import SparsePauliOp
-from qiskit_algorithms.optimizers import COBYLA, L_BFGS_B, SLSQP, SPSA
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
@@ -16,7 +15,7 @@ from slowquant.molecularintegrals.integralfunctions import (
 from slowquant.qiskit_interface.base import FermionicOperator
 from slowquant.qiskit_interface.interface import Clique, QuantumInterface
 from slowquant.qiskit_interface.operators import Epq, hamiltonian_pauli_0i_0a
-from slowquant.qiskit_interface.optimizers import RotoSolve
+from slowquant.qiskit_interface.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_electronic_energy,
@@ -851,66 +850,26 @@ class WaveFunction:
 
     def run_vqe_2step(
         self,
-        ansatz_optimizer: str,
+        optimizer_name: str,
         orbital_optimization: bool = False,
         tol: float = 1e-8,
         maxiter: int = 1000,
         is_silent_subiterations: bool = False,
     ) -> None:
-        """Run VQE of wave function."""
-        global iteration  # pylint: disable=global-variable-undefined
-        global start  # pylint: disable=global-variable-undefined
+        """Run VQE of wave function.
 
-        def print_progress(x, energy_func, silent: bool) -> None:
-            """Print progress during energy minimization of wave function.
-
-            Args:
-                x: Wave function parameters.
-                energy_func: Function to calculate energy.
-                silent: Supress print.
-            """
-            global iteration  # pylint: disable=global-variable-undefined
-            global start  # pylint: disable=global-variable-undefined
-            time_str = f"{time.time() - start:7.2f}"  # type: ignore [name-defined] # pylint: disable=used-before-assignment
-            if not silent:
-                e_str = f"{energy_func(x):3.16f}"
-                print(
-                    f"--------{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}"  # type: ignore [name-defined] # pylint: disable=used-before-assignment
-                )
-            iteration += 1  # type: ignore
-            start = time.time()  # type: ignore
-
-        def print_progress_SPSA(
-            ___,
-            theta,  # pylint: disable=unused-argument
-            f_val,
-            _,
-            __,
-            silent: bool,
-        ) -> None:
-            """Print progress during energy minimization of wave function.
-
-            Args:
-                theta: Wave function parameters.
-                f_val: Function value at theta.
-                silent: Supress print.
-            """
-            global iteration  # pylint: disable=global-variable-undefined
-            global start  # pylint: disable=global-variable-undefined
-            time_str = f"{time.time() - start:7.2f}"  # type: ignore
-            e_str = f"{f_val:3.12f}"
-            if not silent:
-                print(f"--------{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
-            iteration += 1  # type: ignore
-            start = time.time()  # type: ignore
-
+        Args:
+            optimizer_name: Name of optimizer.
+            orbital_optimization: Perform orbital optimization.
+            tol: Convergence tolerance.
+            maxiter: Maximum number of iterations.
+            is_silent_subiterations: Silence subiterations.
+        """
         e_old = 1e12
         print("Full optimization")
         print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
         for full_iter in range(0, int(maxiter)):
             full_start = time.time()
-            iteration = 0  # type: ignore
-            start = time.time()  # type: ignore
 
             # Do ansatz optimization
             if not is_silent_subiterations:
@@ -924,52 +883,21 @@ class WaveFunction:
                 quantum_interface=self.QI,
             )
             gradient_theta = partial(ansatz_parameters_gradient, operator=H, quantum_interface=self.QI)
-            if ansatz_optimizer.lower() == "slsqp":
-                print_progress_ = partial(
-                    print_progress, energy_func=energy_theta, silent=is_silent_subiterations
-                )
-                optimizer = SLSQP(maxiter=maxiter, ftol=tol, callback=print_progress_)
-            elif ansatz_optimizer.lower() == "slsqp_nograd":
-                print_progress_ = partial(
-                    print_progress, energy_func=energy_theta, silent=is_silent_subiterations
-                )
-                optimizer = SLSQP(maxiter=maxiter, ftol=tol, callback=print_progress_)
-            elif ansatz_optimizer.lower() == "l_bfgs_b":
-                print_progress_ = partial(
-                    print_progress, energy_func=energy_theta, silent=is_silent_subiterations
-                )
-                optimizer = L_BFGS_B(maxiter=maxiter, tol=tol, callback=print_progress_)
-            elif ansatz_optimizer.lower() == "cobyla":
-                print_progress_ = partial(
-                    print_progress, energy_func=energy_theta, silent=is_silent_subiterations
-                )
-                optimizer = COBYLA(maxiter=maxiter, tol=tol, callback=print_progress_)
-            elif ansatz_optimizer.lower() == "rotosolve":
-                print_progress_ = partial(
-                    print_progress, energy_func=energy_theta, silent=is_silent_subiterations
-                )
-                optimizer = RotoSolve(
-                    self.QI.grad_param_R,
-                    self.QI.param_names,
-                    maxiter=maxiter,
-                    tol=tol,
-                    callback=print_progress_,
-                )
-            elif ansatz_optimizer.lower() == "spsa":
-                print("WARNING: Convergence tolerence cannot be set for SPSA; using qiskit default")
-                print_progress_SPSA_ = partial(print_progress_SPSA, silent=is_silent_subiterations)
-                optimizer = SPSA(maxiter=maxiter, callback=print_progress_SPSA_)
-            else:
-                raise ValueError(f"Unknown optimizer: {ansatz_optimizer}")
-            if ansatz_optimizer.lower() == "slsqp_nograd":
-                res = optimizer.minimize(energy_theta, self.ansatz_parameters)
-            else:
-                res = optimizer.minimize(energy_theta, self.ansatz_parameters, jac=gradient_theta)
+            optimizer = Optimizers(
+                energy_theta,
+                optimizer_name,
+                grad=gradient_theta,
+                maxiter=maxiter,
+                tol=tol,
+                is_silent=is_silent_subiterations,
+            )
+            res = optimizer.minimize(
+                self.ansatz_parameters,
+                extra_options={"R": self.QI.grad_param_R, "param_names": self.QI.param_names},
+            )
             self.ansatz_parameters = res.x.tolist()
 
             if orbital_optimization and len(self.kappa) != 0:
-                iteration = 0  # type: ignore
-                start = time.time()  # type: ignore
                 if not is_silent_subiterations:
                     print("--------Orbital optimization")
                     print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
@@ -977,16 +905,20 @@ class WaveFunction:
                     calc_energy_oo,
                     wf=self,
                 )
-                gradiet_oo = partial(
+                gradient_oo = partial(
                     orbital_rotation_gradient,
                     wf=self,
                 )
 
-                print_progress_ = partial(
-                    print_progress, energy_func=energy_oo, silent=is_silent_subiterations
+                optimizer = Optimizers(
+                    energy_oo,
+                    "l-bfgs-b",
+                    grad=gradient_oo,
+                    maxiter=maxiter,
+                    tol=tol,
+                    is_silent=is_silent_subiterations,
                 )
-                optimizer = L_BFGS_B(maxiter=maxiter, tol=tol, callback=print_progress_)
-                res = optimizer.minimize(energy_oo, [0.0] * len(self.kappa_idx), jac=gradiet_oo)
+                res = optimizer.minimize([0.0] * len(self.kappa_idx))
                 for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
                     self.kappa[i] = 0.0
                     self._kappa_old[i] = 0.0
@@ -1018,84 +950,60 @@ class WaveFunction:
         tol: float = 1e-8,
         maxiter: int = 1000,
     ) -> None:
-        """Run VQE of wave function."""
-        if not orbital_optimization:
-            raise ValueError("Does only work with orbital optimization right now")
-        global iteration  # pylint: disable=global-variable-undefined
-        global start  # pylint: disable=global-variable-undefined
-        iteration = 0  # type: ignore
-        start = time.time()  # type: ignore
+        """Run VQE of wave function.
 
-        def print_progress(x, energy_func) -> None:
-            """Print progress during energy minimization of wave function.
-
-            Args:
-                x: Wave function parameters.
-                energy_func: Function to calculate energy.
-            """
-            global iteration  # pylint: disable=global-variable-undefined
-            global start  # pylint: disable=global-variable-undefined
-            time_str = f"{time.time() - start:7.2f}"  # type: ignore
-            e_str = f"{energy_func(x):3.12f}"
-            print(f"{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
-            iteration += 1  # type: ignore
-            start = time.time()  # type: ignore
-
-        def print_progress_SPSA(
-            ___,
-            theta,  # pylint: disable=unused-argument
-            f_val,
-            _,
-            __,
-        ) -> None:
-            """Print progress during energy minimization of wave function.
-
-            Args:
-                theta: Wave function parameters.
-                f_val: Function value at theta.
-            """
-            global iteration  # pylint: disable=global-variable-undefined
-            global start  # pylint: disable=global-variable-undefined
-            time_str = f"{time.time() - start:7.2f}"  # type: ignore
-            e_str = f"{f_val:3.12f}"
-            print(f"{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
-            iteration += 1  # type: ignore
-            start = time.time()  # type: ignore
-
-        print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
-        energy_both = partial(
-            calc_energy_both,
-            wf=self,
-        )
-        gradient_both = partial(
-            calc_gradient_both,
-            wf=self,
-        )
-        if optimizer_name.lower() == "slsqp":
-            print_progress_ = partial(print_progress, energy_func=energy_both)
-            optimizer = SLSQP(maxiter=maxiter, ftol=tol, callback=print_progress_)
-        elif optimizer_name.lower() == "l_bfgs_b":
-            print_progress_ = partial(print_progress, energy_func=energy_both)
-            optimizer = L_BFGS_B(maxiter=maxiter, tol=tol, callback=print_progress_)
-        elif optimizer_name.lower() == "cobyla":
-            print_progress_ = partial(print_progress, energy_func=energy_both)
-            optimizer = COBYLA(maxiter=maxiter, tol=tol, callback=print_progress_)
-        elif optimizer_name.lower() == "rotosolve":
+        Args:
+            optimizer_name: Name of optimizer.
+            orbital_optimization: Perform orbital optimization.
+            tol: Convergence tolerance.
+            maxiter: Maximum number of iterations.
+        """
+        if optimizer_name.lower() == "rotosolve":
             if orbital_optimization and len(self.kappa) != 0:
                 raise ValueError(
-                    "Cannot use rotosolve together with orbital optimization in the one-step solver."
+                    "Cannot use RotoSolve together with orbital optimization in the one-step solver."
                 )
-            print_progress_ = partial(print_progress, energy_func=energy_both)
-            optimizer = RotoSolve(
-                self.QI.grad_param_R, self.QI.param_names, maxiter=maxiter, tol=tol, callback=print_progress_
-            )
-        elif optimizer_name.lower() == "spsa":
-            print("WARNING: Convergence tolerence cannot be set for SPSA; using qiskit default")
-            optimizer = SPSA(maxiter=maxiter, callback=print_progress_SPSA)
+
+        print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+        if orbital_optimization:
+            if len(self.ansatz_parameters) > 0:
+                energy = partial(
+                    calc_energy_both,
+                    wf=self,
+                )
+                gradient = partial(
+                    calc_gradient_both,
+                    wf=self,
+                )
+            else:
+                energy = partial(
+                    calc_energy_oo,
+                    wf=self,
+                )
+                gradient = partial(
+                    orbital_rotation_gradient,
+                    wf=self,
+                )
         else:
-            raise ValueError(f"Unknown optimizer: {optimizer_name}")
-        parameters = self.kappa + self.ansatz_parameters
-        res = optimizer.minimize(energy_both, parameters, jac=gradient_both)
+            H = hamiltonian_pauli_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+            H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+            energy = partial(
+                calc_energy_theta,
+                operator=H,
+                quantum_interface=self.QI,
+            )
+            gradient = partial(ansatz_parameters_gradient, operator=H, quantum_interface=self.QI)
+        if orbital_optimization:
+            if len(self.ansatz_parameters) > 0:
+                parameters = self.kappa + self.ansatz_parameters
+            else:
+                parameters = self.kappa
+        else:
+            parameters = self.ansatz_parameters
+        optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
+        res = optimizer.minimize(
+            parameters, extra_options={"R": self.QI.grad_param_R, "param_names": self.QI.param_names}
+        )
         self.ansatz_parameters = res.x[len(self.kappa) :].tolist()
         for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
             self.kappa[i] = 0.0
