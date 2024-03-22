@@ -133,9 +133,9 @@ class quantumLRBaseClass:
                 print(f"Indices {indices[0][i],indices[1][i]}. Part of matrix block {area}")
         if verbose:
             print("\nStandard deviation in each operator row for A | B | Sigma")
-            A_row = np.sum(A, axis=1)
-            B_row = np.sum(B, axis=1)
-            Sigma_row = np.sum(Sigma, axis=1)
+            A_row = np.sum(A, axis=1) / self.num_params
+            B_row = np.sum(B, axis=1) / self.num_params
+            Sigma_row = np.sum(Sigma, axis=1) / self.num_params
             for nr, i in enumerate(range(self.num_params)):
                 if nr < self.num_q:
                     print(

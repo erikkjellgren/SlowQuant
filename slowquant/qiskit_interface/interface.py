@@ -304,6 +304,10 @@ class QuantumInterface:
         if hasattr(self, "_shots"):  # Check if it is initialization
             self.shots = self._shots
 
+    def _reset_cliques(self) -> None:
+        """Reset cliques to empty."""
+        self.cliques = Clique()
+
     def op_to_qbit(self, op: FermionicOperator) -> SparsePauliOp:
         """Fermionic operator to qbit rep.
 
@@ -411,11 +415,11 @@ class QuantumInterface:
 
         new_heads = self.cliques.add_paulis([str(x) for x in observables.paulis])
 
-        if len(new_heads) != 0:
-            # Check if error mitigation is requested and if read-out matrix already exists.
-            if self._do_M_mitigation and self._Minv is None:
-                self._make_Minv()
+        # Check if error mitigation is requested and if read-out matrix already exists.
+        if self._do_M_mitigation and self._Minv is None:
+            self._make_Minv()
 
+        if len(new_heads) != 0:
             # Simulate each clique head with one combined device call
             # and return a list of distributions
             distr = self._one_call_sampler_distributions(PauliList(new_heads), self.parameters, self.circuit)
