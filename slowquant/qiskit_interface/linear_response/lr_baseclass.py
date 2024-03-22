@@ -172,6 +172,16 @@ class quantumLRBaseClass:
         self.metric[size:, :size] = -self.Delta
         self.metric[size:, size:] = -self.Sigma
 
+        # Check eigenvalues of Hessian/Metric
+        (
+            hess_eigval,
+            _,
+        ) = scipy.linalg.eig(self.hessian)
+        print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
+        if np.min(hess_eigval) < 0:
+            print("WARNING: Negative eigenvalue in Hessian.")
+        print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.metric)))}")
+
         # Solve eigenvalue equation
         eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)
         sorting = np.argsort(eigval)
