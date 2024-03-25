@@ -24,7 +24,7 @@ def to_CBS_measurement(op: str) -> QuantumCircuit:
     """
     num_qubits = len(op)
     qc = QuantumCircuit(num_qubits)
-    for i, pauli in enumerate(op):
+    for i, pauli in enumerate(op[::-1]):
         if pauli == "X":
             qc.append(Pauli("X"), [i])
             qc.h(i)
