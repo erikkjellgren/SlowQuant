@@ -413,7 +413,8 @@ class QuantumInterface:
         if not hasattr(self, "cliques"):
             self.cliques = Clique()
 
-        new_heads = self.cliques.add_paulis([str(x) for x in observables.paulis])
+        paulis_str = [str(x) for x in observables.paulis]
+        new_heads = self.cliques.add_paulis(paulis_str)
 
         # Check if error mitigation is requested and if read-out matrix already exists.
         if self._do_M_mitigation and self._Minv is None:
@@ -429,7 +430,6 @@ class QuantumInterface:
             self.cliques.update_distr(new_heads, distr)
 
         # Loop over all Pauli strings in observable and build final result with coefficients
-        paulis_str = [str(x) for x in observables.paulis]
         for pauli, coeff in zip(paulis_str, observables.coeffs):
             result = 0.0
             for key, value in self.cliques.get_distr(pauli).items():  # build result from quasi-distribution
@@ -443,7 +443,7 @@ class QuantumInterface:
         return values.real
 
     def _sampler_quantum_expectation_value_nosave(
-        self, op: FermionicOperator, run_parameters: list[float]
+        self, op: FermionicOperator | SparsePauliOp, run_parameters: list[float], do_cliques: bool = True
     ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
 
@@ -466,31 +466,53 @@ class QuantumInterface:
         """
         values = 0.0
         # Map Fermionic to Qubit
-        observables = self.op_to_qbit(op)
-        # Obtain cliques for operator's Pauli strings
-        cliques = Clique()
-
-        new_heads = cliques.add_paulis([str(x) for x in observables.paulis])
+        if isinstance(op, FermionicOperator):
+            observables = self.op_to_qbit(op)
+        elif isinstance(op, SparsePauliOp):
+            observables = op
+        else:
+            raise ValueError(
+                f"Got unknown operator type {type(op)}, expected FermionicOperator or SparsePauliOp"
+            )
 
         # Check if error mitigation is requested and if read-out matrix already exists.
         if self._do_M_mitigation and self._Minv is None:
             self._make_Minv()
 
-        # Simulate each clique head with one combined device call
-        # and return a list of distributions
-        distr = self._one_call_sampler_distributions(new_heads, run_parameters, self.circuit)
-        if self._do_M_mitigation:  # apply error mitigation if requested
-            for i, dist in enumerate(distr):
-                distr[i] = correct_distribution(dist, self._Minv)
-        cliques.update_distr(new_heads, distr)
-
-        # Loop over all Pauli strings in observable and build final result with coefficients
         paulis_str = [str(x) for x in observables.paulis]
-        for pauli, coeff in zip(paulis_str, observables.coeffs):
-            result = 0.0
-            for key, value in cliques.get_distr(pauli).items():  # build result from quasi-distribution
-                result += value * get_bitstring_sign(pauli, key)
-            values += result * coeff
+        if do_cliques:
+            # Obtain cliques for operator's Pauli strings
+            cliques = Clique()
+
+            new_heads = cliques.add_paulis(paulis_str)
+
+            # Simulate each clique head with one combined device call
+            # and return a list of distributions
+            distr = self._one_call_sampler_distributions(new_heads, run_parameters, self.circuit)
+            if self._do_M_mitigation:  # apply error mitigation if requested
+                for i, dist in enumerate(distr):
+                    distr[i] = correct_distribution(dist, self._Minv)
+            cliques.update_distr(new_heads, distr)
+
+            # Loop over all Pauli strings in observable and build final result with coefficients
+            for pauli, coeff in zip(paulis_str, observables.coeffs):
+                result = 0.0
+                for key, value in cliques.get_distr(pauli).items():  # build result from quasi-distribution
+                    result += value * get_bitstring_sign(pauli, key)
+                values += result * coeff
+        else:
+            # Simulate each Pauli string with one combined device call
+            distr = self._one_call_sampler_distributions(paulis_str, run_parameters, self.circuit)
+            if self._do_M_mitigation:  # apply error mitigation if requested
+                for i, dist in enumerate(distr):
+                    distr[i] = correct_distribution(dist, self._Minv)
+
+            # Loop over all Pauli strings in observable and build final result with coefficients
+            for pauli, coeff, dist in zip(paulis_str, observables.coeffs, distr):
+                result = 0.0
+                for key, value in dist.items():  # build result from quasi-distribution
+                    result += value * get_bitstring_sign(pauli, key)
+                values += result * coeff
 
         if isinstance(values, complex):
             if abs(values.imag) > 10**-2:
@@ -500,7 +522,7 @@ class QuantumInterface:
 
     def quantum_variance(
         self,
-        op: FermionicOperator,
+        op: FermionicOperator | SparsePauliOp,
         do_cliques: bool = True,
         no_coeffs: bool = False,
         custom_parameters: list[float] | None = None,
@@ -523,7 +545,15 @@ class QuantumInterface:
         else:
             run_parameters = custom_parameters
 
-        observables = self.op_to_qbit(op)
+        # Map Fermionic to Qubit
+        if isinstance(op, FermionicOperator):
+            observables = self.op_to_qbit(op)
+        elif isinstance(op, SparsePauliOp):
+            observables = op
+        else:
+            raise ValueError(
+                f"Got unknown operator type {type(op)}, expected FermionicOperator or SparsePauliOp"
+            )
 
         if do_cliques:
             if not hasattr(self, "cliques"):
