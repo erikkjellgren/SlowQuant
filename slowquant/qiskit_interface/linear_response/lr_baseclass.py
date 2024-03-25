@@ -110,7 +110,13 @@ class quantumLRBaseClass:
         raise NotImplementedError
 
     def _analyze_std(
-        self, A: np.ndarray, B: np.ndarray, Sigma: np.ndarray, max_values: int = 4, verbose: bool = True
+        self,
+        A: np.ndarray,
+        B: np.ndarray,
+        Sigma: np.ndarray,
+        max_values: int = 4,
+        verbose: bool = True,
+        cv: bool = True,
     ) -> None:
         """Analyze standard deviation in matrix elements of LR equation."""
         matrix_name = ["A", "B", "Sigma"]
@@ -155,6 +161,59 @@ class quantumLRBaseClass:
                         + " | "
                         f"{Sigma_row[nr]:3.6f}".center(10)
                     )
+
+        if cv:
+            print("\n Coefficient of variation:")
+            if np.all(self.A == 0):
+                print("Expectation values are needed for coefficient of variation. Running qLR")
+                self.run()
+            A_cv = np.abs(A / self.A)
+            B_cv = np.abs(B / self.B)
+            Sigma_cv = np.abs(Sigma / self.Sigma)
+            A_cv[np.isnan(A_cv)] = 0
+            B_cv[np.isnan(B_cv)] = 0
+            Sigma_cv[np.isnan(Sigma_cv)] = 0
+            for nr, matrix in enumerate([A_cv, B_cv, Sigma_cv]):
+                print(f"\nAnalysis of {matrix_name[nr]}")
+                print(f"The average CV is {(np.sum(matrix) / (self.num_params**2))}")
+                print(f"Maximum CV are of value {np.sort(matrix.flatten())[::-1][:max_values]}")
+                indices = np.unravel_index(np.argsort(matrix.flatten())[::-1][:max_values], matrix.shape)
+                print("These maximum values are in:")
+                for i in range(max_values):
+                    area = ""
+                    if indices[0][i] < self.num_q:
+                        area += "q"
+                    else:
+                        area += "G"
+                    if indices[1][i] < self.num_q:
+                        area += "q"
+                    else:
+                        area += "G"
+                    print(f"Indices {indices[0][i],indices[1][i]}. Part of matrix block {area}")
+            if verbose:
+                print("\nCV in each operator row for A | B | Sigma")
+                A_row = np.sum(A_cv, axis=1) / self.num_params
+                B_row = np.sum(B_cv, axis=1) / self.num_params
+                Sigma_row = np.sum(Sigma_cv, axis=1) / self.num_params
+                for nr, i in enumerate(range(self.num_params)):
+                    if nr < self.num_q:
+                        print(
+                            f"q{str(nr):<{3}}:"
+                            + f"{A_row[nr]:3.6f}".center(10)
+                            + " | "
+                            + f"{B_row[nr]:3.6f}".center(10)
+                            + " | "
+                            f"{Sigma_row[nr]:3.6f}".center(10)
+                        )
+                    else:
+                        print(
+                            f"G{str(nr-self.num_q):<{3}}:"
+                            + f"{A_row[nr]:3.6f}".center(10)
+                            + " | "
+                            + f"{B_row[nr]:3.6f}".center(10)
+                            + " | "
+                            f"{Sigma_row[nr]:3.6f}".center(10)
+                        )
 
     def get_excitation_energies(self) -> np.ndarray:
         """Solve LR eigenvalue problem."""
