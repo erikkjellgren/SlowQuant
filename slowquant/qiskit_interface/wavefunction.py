@@ -1,4 +1,3 @@
-# pylint: disable=too-many-lines
 import time
 from collections.abc import Sequence
 from functools import partial
@@ -278,11 +277,12 @@ class WaveFunction:
         self._energy_elec = None
         self.QI.parameters = parameters
 
-    def change_primitive(self, primitive: BaseEstimator | BaseSampler) -> None:
+    def change_primitive(self, primitive: BaseEstimator | BaseSampler, verbose: bool = True) -> None:
         """Change the primitive expectation value calculator.
 
         Args:
             primitive: Primitive object.
+            verbose: Print more info.
         """
         self._rdm1 = None
         self._rdm2 = None
@@ -296,7 +296,7 @@ class WaveFunction:
         self.QI._Minv = None  # pylint: disable=protected-access
         self.QI._primitive = primitive  # pylint: disable=protected-access
         # IMPORTANT: Shot number in primitive gets always overwritten if a shot number is defined in QI!
-        if self.QI.shots is not None:
+        if self.QI.shots is not None and verbose:
             print(
                 "Number of shots defined in new primitive are ignored as there is a number defined in the QI of ",
                 self.QI.shots,
