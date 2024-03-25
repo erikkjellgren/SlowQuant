@@ -6,7 +6,7 @@ from typing import Any
 import numpy as np
 from qiskit import QuantumCircuit
 from qiskit.primitives import BaseEstimator, BaseSampler
-from qiskit.quantum_info import Pauli, PauliList, SparsePauliOp
+from qiskit.quantum_info import SparsePauliOp
 from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFock
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
@@ -422,7 +422,7 @@ class QuantumInterface:
         if len(new_heads) != 0:
             # Simulate each clique head with one combined device call
             # and return a list of distributions
-            distr = self._one_call_sampler_distributions(PauliList(new_heads), self.parameters, self.circuit)
+            distr = self._one_call_sampler_distributions(new_heads, self.parameters, self.circuit)
             if self._do_M_mitigation:  # apply error mitigation if requested
                 for i, dist in enumerate(distr):
                     distr[i] = correct_distribution(dist, self._Minv)
@@ -478,7 +478,7 @@ class QuantumInterface:
 
         # Simulate each clique head with one combined device call
         # and return a list of distributions
-        distr = self._one_call_sampler_distributions(PauliList(new_heads), run_parameters, self.circuit)
+        distr = self._one_call_sampler_distributions(new_heads, run_parameters, self.circuit)
         if self._do_M_mitigation:  # apply error mitigation if requested
             for i, dist in enumerate(distr):
                 distr[i] = correct_distribution(dist, self._Minv)
@@ -538,9 +538,7 @@ class QuantumInterface:
 
                 # Simulate each clique head with one combined device call
                 # and return a list of distributions
-                distr = self._one_call_sampler_distributions(
-                    PauliList(new_heads), run_parameters, self.circuit
-                )
+                distr = self._one_call_sampler_distributions(new_heads, run_parameters, self.circuit)
                 if self._do_M_mitigation:  # apply error mitigation if requested
                     for i, dist in enumerate(distr):
                         distr[i] = correct_distribution(dist, self._Minv)
@@ -571,7 +569,7 @@ class QuantumInterface:
 
     def _one_call_sampler_distributions(
         self,
-        paulis: PauliList | Pauli,
+        paulis: list[str] | str,
         run_parameters: list[list[float]] | list[float],
         circuits_in: list[QuantumCircuit] | QuantumCircuit,
     ) -> list[dict[str, float]]:
@@ -595,8 +593,8 @@ class QuantumInterface:
         """
         if not isinstance(self._primitive, BaseSampler):
             raise TypeError(f"Expeccted primitive to be of type BaseSampler got, {type(self._primitive)}")
-        if isinstance(paulis, Pauli):
-            paulis = PauliList(paulis)
+        if isinstance(paulis, str):
+            paulis = [paulis]
         num_paulis = len(paulis)
         if isinstance(circuits_in, QuantumCircuit):
             circuits_in = [circuits_in]
@@ -640,7 +638,7 @@ class QuantumInterface:
         return dist_combined
 
     def _sampler_distributions(
-        self, pauli: PauliList | Pauli, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
+        self, pauli: str, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
     ) -> dict[str, float]:
         r"""Get results from a sampler distribution for one given Pauli string.
 
@@ -661,8 +659,6 @@ class QuantumInterface:
         """
         if not isinstance(self._primitive, BaseSampler):
             raise TypeError(f"Expeccted primitive to be of type BaseSampler got, {type(self._primitive)}")
-        if isinstance(pauli, Pauli):
-            pauli = PauliList(pauli)
         if self._circuit_multipl > 1:
             print(
                 "WARNING: The chosen function does not allow for appending circuits. Choose _one_call_sampler_distributions instead."
@@ -705,7 +701,7 @@ class QuantumInterface:
             p1 probability.
         """
         # Get quasi-distribution in binary probabilities
-        distr = self._sampler_distributions(Pauli(pauli), run_parameters, custom_circ)
+        distr = self._sampler_distributions(pauli, run_parameters, custom_circ)
 
         p1 = 0.0
         for key, value in distr.items():
@@ -777,7 +773,7 @@ class QuantumInterface:
             for i in range(self.num_qubits):
                 ansatzX.x(i)
             [Pzero, Pone] = self._one_call_sampler_distributions(
-                Pauli("Z" * self.num_qubits),
+                "Z" * self.num_qubits,
                 [[10**-8] * len(ansatz.parameters)] * 2,
                 [ansatz.copy(), ansatzX],
             )
@@ -809,7 +805,7 @@ class QuantumInterface:
                 ansatz_list[nr] = ansatzX
             # Simulate all elements with one device call
             Px_list = self._one_call_sampler_distributions(
-                Pauli("Z" * self.num_qubits),
+                "Z" * self.num_qubits,
                 [[10**-8] * len(ansatz.parameters)] * len(ansatz_list),
                 ansatz_list,
             )

@@ -1,9 +1,9 @@
 import numpy as np
 from qiskit import QuantumCircuit
-from qiskit.quantum_info import Pauli, PauliList
+from qiskit.quantum_info import Pauli
 
 
-def to_CBS_measurement(op: PauliList) -> QuantumCircuit:
+def to_CBS_measurement(op: str) -> QuantumCircuit:
     r"""Convert a Pauli string to Pauli measurement circuit.
 
     This is achived by the following transformation:
@@ -17,7 +17,7 @@ def to_CBS_measurement(op: PauliList) -> QuantumCircuit:
         \end{align}
 
     Args:
-        op: Pauli string operator.
+        op: Pauli string.
 
     Returns:
         Pauli measuremnt quantum circuit.
@@ -25,11 +25,11 @@ def to_CBS_measurement(op: PauliList) -> QuantumCircuit:
     num_qubits = len(op)
     qc = QuantumCircuit(num_qubits)
     for i, pauli in enumerate(op):
-        if pauli == Pauli("X"):
-            qc.append(pauli, [i])
+        if pauli == "X":
+            qc.append(Pauli("X"), [i])
             qc.h(i)
-        elif pauli == Pauli("Y"):
-            qc.append(pauli, [i])
+        elif pauli == "Y":
+            qc.append(Pauli("Y"), [i])
             qc.sdg(i)
             qc.h(i)
     return qc
