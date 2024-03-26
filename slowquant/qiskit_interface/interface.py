@@ -222,6 +222,29 @@ class QuantumInterface:
         self._parameters = parameters.copy()
 
     @property
+    def optimization_level(self) -> int:
+        """Get optimization level of transpilation.
+
+        Returns:
+            optimization level.
+        """
+        return self._optimization_level
+
+    @optimization_level.setter
+    def optimization_level(
+        self,
+        optimization_level: int,
+    ) -> None:
+        """Set optimization level.
+
+        Args:
+            optimization_level: optimization_level
+        """
+        if optimization_level > 3:
+            raise ValueError("The chosen optimization level is not valid. It has to be 1-3.")
+        self._optimization_level = optimization_level
+
+    @property
     def shots(self) -> int | None:
         """Get number of shots.
 
@@ -318,6 +341,11 @@ class QuantumInterface:
     def _reset_cliques(self) -> None:
         """Reset cliques to empty."""
         self.cliques = Clique()
+
+    def _null_shots(self) -> None:
+        """Set number of shots to None."""
+        self._shots = None
+        self._circuit_multipl = 1
 
     def op_to_qbit(self, op: FermionicOperator) -> SparsePauliOp:
         """Fermionic operator to qbit rep.
@@ -656,7 +684,11 @@ class QuantumInterface:
             parameter_values = [run_parameters] * (num_paulis * self._circuit_multipl)
         else:
             parameter_values = run_parameters * (num_paulis * self._circuit_multipl)  # type: ignore
-        job = self._primitive.run(circuits, parameter_values=parameter_values)
+        job = self._primitive.run(
+            transpile(circuits, backend=self.backend, optimization_level=self.optimization_level),
+            parameter_values=parameter_values,
+            skip_transpilation=self.skip_primitive_transpilation,
+        )
         if self.shots is not None:  # check if ideal simulator
             self.total_shots_used += self.shots * num_paulis * num_circuits * self._circuit_multipl
         self.total_device_calls += 1
@@ -719,7 +751,11 @@ class QuantumInterface:
         ansatz_w_obs.measure_all()
 
         # Run sampler
-        job = self._primitive.run(ansatz_w_obs, parameter_values=run_parameters)
+        job = self._primitive.run(
+            transpile(ansatz_w_obs, backend=self.backend, optimization_level=self.optimization_level),
+            parameter_values=run_parameters,
+            skip_transpilation=self.skip_primitive_transpilation,
+        )
         if shots is not None:  # check if ideal simulator
             self.total_shots_used += shots
         self.total_device_calls += 1
