@@ -245,6 +245,33 @@ class QuantumInterface:
         self._optimization_level = optimization_level
 
     @property
+    def circuit(self) -> QuantumCircuit:
+        """Get circuit.
+
+        Returns:
+            circuit
+        """
+        return self._circuit
+
+    @circuit.setter
+    def circuit(
+        self,
+        circuit: QuantumCircuit,
+    ) -> None:
+        """Set circuit.
+
+        Args:
+            circuit: circuit
+        """
+        # Check if estimator is primitve. If yes, pre-transpile circuit for later use.
+        if isinstance(self._primitive, BaseEstimator):
+            self._circuit = transpile(
+                circuit, backend=self.backend, optimization_level=self.optimization_level
+            )
+        else:
+            self._circuit = circuit
+
+    @property
     def shots(self) -> int | None:
         """Get number of shots.
 
@@ -405,7 +432,8 @@ class QuantumInterface:
         job = self._primitive.run(
             circuits=self.circuit,
             parameter_values=run_parameters,
-            observables=observables,
+            observables=observables.apply_layout(self.circuit.layout),
+            skip_tranpilation=self.skip_primitive_transpilation,
         )
         if self.shots is not None:  # check if ideal simulator
             self.total_shots_used += self.shots * len(observables)
