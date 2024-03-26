@@ -602,3 +602,36 @@ def test_sampler_changes() -> None:
     assert QI.max_shots_per_run == 50000
     assert QI.shots == 200000
     assert QI._circuit_multipl == 4  # pylint: disable=protected-access
+
+
+def test_qiskit_aer() -> None:
+    """
+    Test if qiskit aer works.
+    This just runs a simulation with some shots checking that nothing is broken with qiskit aer.
+    No values are compared.
+    """
+    # Define molecule
+    atom = "Li .0 .0 .0; H .0 .0 1.672"
+    basis = "sto-3g"
+
+    # PySCF
+    mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
+    rhf = pyscf.scf.RHF(mol).run()
+
+    # Optimize WF with QSQ
+    sampler = SamplerAer(run_options={"shots": 10}, transpile_options={"optimization_level": 0})
+    mapper = ParityMapper(num_particles=(1, 1))
+
+    QI = QuantumInterface(sampler, "UCCSD", mapper)
+
+    qWF = WaveFunction(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 2),
+        rhf.mo_coeff,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        QI,
+    )
+
+    print(qWF.energy_elec)
