@@ -5,7 +5,9 @@ from typing import Any
 
 import numpy as np
 from qiskit import QuantumCircuit
+from qiskit.compiler import transpile
 from qiskit.primitives import BaseEstimator, BaseSampler
+from qiskit.providers import Backend
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFock
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
@@ -39,6 +41,9 @@ class QuantumInterface:
         primitive: BaseEstimator | BaseSampler,
         ansatz: str,
         mapper: FermionicMapper,
+        backend: Backend | None = None,
+        optimization_level: int = 3,
+        skip_primitive_transpilation: bool = True,
         ansatz_options: dict[str, Any] = {},
         shots: None | int = None,
         max_shots_per_run: int = 100000,
@@ -54,6 +59,9 @@ class QuantumInterface:
             mapper: Qiskit mapper object, e.g. JW or Parity.
             ansatz_options: Ansatz options.
             mapper: Qiskit mapper object.
+            backend: Backend for which to transpile circuits. Use None for ideal or shot noise simulator.
+            optimization_level: Optimization level of transpilation
+            skip_primitive_transpilation: Do not transpile at primitive runtime stage.
             shots: Number of shots. If not specified use shotnumber from primitive (default).
             max_shots_per_run: Maximum number of shots allowed in a single run. Set to 100000 per IBM machines.
             do_M_mitigation: Do error mitigation via read-out correlation matrix.
@@ -66,6 +74,9 @@ class QuantumInterface:
         self.ansatz = ansatz
         self._primitive = primitive
         self.mapper = mapper
+        self.backend = backend
+        self.optimization_level = optimization_level
+        self.skip_primitive_transpilation = skip_primitive_transpilation
         self.max_shots_per_run = max_shots_per_run
         self.shots = shots
         self._do_M_mitigation = do_M_mitigation
