@@ -94,7 +94,7 @@ class CliqueHead:
 class Clique:
     """Clique class.
 
-    #. https://arxiv.org/pdf/1907.13623.pdf, Sec. 4.1, 4.2, and 7.0
+    #. https://ieeexplore.ieee.org/abstract/document/9259964, Sec. III A, III B, and VI
     """
 
     def __init__(self) -> None:
