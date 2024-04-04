@@ -104,7 +104,7 @@ class quantumLRBaseClass:
         raise NotImplementedError
 
     def _run_std(
-        self, no_coeffs: bool = False, verbose: bool = True
+        self, no_coeffs: bool = False, verbose: bool = True, cv: bool = True
     ) -> tuple[list[list[float]], list[list[float]], list[list[float]]]:
         """Get standard deviation in matrix elements of LR equation."""
         raise NotImplementedError
@@ -175,7 +175,7 @@ class quantumLRBaseClass:
             Sigma_cv[np.isnan(Sigma_cv)] = 0
             for nr, matrix in enumerate([A_cv, B_cv, Sigma_cv]):
                 print(f"\nAnalysis of {matrix_name[nr]}")
-                print(f"The average CV is {(np.sum(matrix) / (self.num_params**2))}")
+                print(f"The average CV is {(np.sum(matrix) / (self.num_params**2)):1.2e}")
                 print(f"Maximum CV are of value {np.sort(matrix.flatten())[::-1][:max_values]}")
                 indices = np.unravel_index(np.argsort(matrix.flatten())[::-1][:max_values], matrix.shape)
                 print("These maximum values are in:")
@@ -199,20 +199,20 @@ class quantumLRBaseClass:
                     if nr < self.num_q:
                         print(
                             f"q{str(nr):<{3}}:"
-                            + f"{A_row[nr]:3.6f}".center(10)
+                            + f"{A_row[nr]:1.2e}".center(10)
                             + " | "
-                            + f"{B_row[nr]:3.6f}".center(10)
+                            + f"{B_row[nr]:1.2e}".center(10)
                             + " | "
-                            f"{Sigma_row[nr]:3.6f}".center(10)
+                            f"{Sigma_row[nr]:1.2e}".center(10)
                         )
                     else:
                         print(
                             f"G{str(nr-self.num_q):<{3}}:"
-                            + f"{A_row[nr]:3.6f}".center(10)
+                            + f"{A_row[nr]:1.2e}".center(10)
                             + " | "
-                            + f"{B_row[nr]:3.6f}".center(10)
+                            + f"{B_row[nr]:1.2e}".center(10)
                             + " | "
-                            f"{Sigma_row[nr]:3.6f}".center(10)
+                            f"{Sigma_row[nr]:1.2e}".center(10)
                         )
 
     def get_excitation_energies(self) -> np.ndarray:
@@ -356,7 +356,7 @@ class quantumLRBaseClass:
             output += f"{str(i + 1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
         return output
 
-    def get_excited_state_contributions(self, num_contr: int | None = None, cutoff: float = 10**-30) -> None:
+    def get_excited_state_contributions(self, num_contr: int | None = None, cutoff: float = 10**-2) -> None:
         """Create table of contributions to each excitation vector.
 
         Returns:
@@ -364,6 +364,8 @@ class quantumLRBaseClass:
         """
         if not hasattr(self, "excitation_vectors"):
             raise ValueError("Excitation vectors have not been calculated.")
+
+        do_osc = hasattr(self, "oscillator_strengths")
 
         if num_contr is None:
             num_contr = self.num_params * 2
@@ -375,7 +377,12 @@ class quantumLRBaseClass:
             sorted_indices = np.argsort(np.abs(vec))[::-1]
             sorted_vec = np.abs(vec[sorted_indices]) ** 2
 
-            print("Excited state: ", state)
+            if do_osc:
+                print(
+                    f"Excited state: {state:3}: {self.excitation_energies[state]:2.3f} Ha f = {self.oscillator_strengths[state]:2.3f}"
+                )
+            else:
+                print(f"Excited state: {state:3}: {self.excitation_energies[state]:2.3f} Ha")
             for i in range(num_contr):
                 if sorted_vec[i] < cutoff:
                     continue
