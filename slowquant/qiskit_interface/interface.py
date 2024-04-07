@@ -7,7 +7,6 @@ import numpy as np
 from qiskit import QuantumCircuit
 from qiskit.compiler import transpile
 from qiskit.primitives import BaseEstimator, BaseSampler
-from qiskit.providers import Backend
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFock
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
@@ -41,9 +40,7 @@ class QuantumInterface:
         primitive: BaseEstimator | BaseSampler,
         ansatz: str,
         mapper: FermionicMapper,
-        backend: Backend | None = None,
-        optimization_level: int = 3,
-        skip_primitive_transpilation: bool = True,
+        ISA: bool = False,
         ansatz_options: dict[str, Any] = {},
         shots: None | int = None,
         max_shots_per_run: int = 100000,
@@ -59,9 +56,7 @@ class QuantumInterface:
             mapper: Qiskit mapper object, e.g. JW or Parity.
             ansatz_options: Ansatz options.
             mapper: Qiskit mapper object.
-            backend: Backend for which to transpile circuits. Use None for ideal or shot noise simulator.
-            optimization_level: Optimization level of transpilation
-            skip_primitive_transpilation: Do not transpile at primitive runtime stage.
+            ISA: Use ISA for submitting to IBM quantum. Locally transpiling is performed.
             shots: Number of shots. If not specified use shotnumber from primitive (default).
             max_shots_per_run: Maximum number of shots allowed in a single run. Set to 100000 per IBM machines.
             do_M_mitigation: Do error mitigation via read-out correlation matrix.
@@ -74,9 +69,7 @@ class QuantumInterface:
         self.ansatz = ansatz
         self._primitive = primitive
         self.mapper = mapper
-        self.backend = backend
-        self.optimization_level = optimization_level
-        self.skip_primitive_transpilation = skip_primitive_transpilation
+        self.ISA = ISA
         self.max_shots_per_run = max_shots_per_run
         self.shots = shots
         self._do_M_mitigation = do_M_mitigation
@@ -192,6 +185,45 @@ class QuantumInterface:
         self._parameters = [0.0] * self.circuit.num_parameters
 
     @property
+    def ISA(self) -> bool:
+        """Get ISA setting.
+
+        Returns:
+            ISA setting.
+        """
+        return self._ISA
+
+    @ISA.setter
+    def ISA(self, ISA) -> None:
+        """Set ISA and handle tranpile arguments
+
+        Args:
+            ISA: ISA bool
+        """
+        self._ISA = ISA
+
+        if ISA:
+            # Get backend from primitive
+            if hasattr(self._primitive, "_backend"):
+                self._ISA_backend = self._primitive._backend  # pylint: disable=protected-access
+            else:
+                self._ISA_backend = None
+
+            # Get optimization level from backend
+            if hasattr(
+                self._primitive._transpile_options, "optimization_level"  # pylint: disable=protected-access
+            ):
+                self._ISA_level = self._primitive._transpile_options[  # pylint: disable=protected-access
+                    "optimization_level"
+                ]
+            elif hasattr(self._primitive.options, "optimization_level"):
+                self._ISA_level = self._primitive.options["optimization_level"]
+            else:
+                self._ISA_level = 1
+
+            print(f"ISA uses backend {self._ISA_backend.name} with optimization level {self._ISA_level}")
+
+    @property
     def parameters(self) -> list[float]:
         """Get ansatz parameters.
 
@@ -263,11 +295,10 @@ class QuantumInterface:
         Args:
             circuit: circuit
         """
-        # Check if estimator is primitve. If yes, pre-transpile circuit for later use.
-        if isinstance(self._primitive, BaseEstimator):
-            self._circuit = transpile(
-                circuit, backend=self.backend, optimization_level=self.optimization_level
-            )
+        # Check if estimator is primitve and ISA selected. If yes, pre-transpile circuit for later use.
+
+        if isinstance(self._primitive, BaseEstimator) and self.ISA:
+            self._circuit = transpile(circuit, backend=self._ISA_backend, optimization_level=self._ISA_level)
         else:
             self._circuit = circuit
 
@@ -429,11 +460,13 @@ class QuantumInterface:
             Expectation value of operator.
         """
         observables = self.op_to_qbit(op)
+        if self.ISA:
+            observables = observables.apply_layout(self.circuit.layout)
         job = self._primitive.run(
             circuits=self.circuit,
             parameter_values=run_parameters,
-            observables=observables.apply_layout(self.circuit.layout),
-            skip_tranpilation=self.skip_primitive_transpilation,
+            observables=observables,
+            skip_tranpilation=self.ISA,
         )
         if self.shots is not None:  # check if ideal simulator
             self.total_shots_used += self.shots * len(observables)
@@ -712,11 +745,17 @@ class QuantumInterface:
             parameter_values = [run_parameters] * (num_paulis * self._circuit_multipl)
         else:
             parameter_values = run_parameters * (num_paulis * self._circuit_multipl)  # type: ignore
-        job = self._primitive.run(
-            transpile(circuits, backend=self.backend, optimization_level=self.optimization_level),
-            parameter_values=parameter_values,
-            skip_transpilation=self.skip_primitive_transpilation,
-        )
+        if self.ISA:
+            job = self._primitive.run(
+                transpile(circuits, backend=self._ISA_backend, optimization_level=self._ISA_level),
+                parameter_values=parameter_values,
+                skip_transpilation=True,
+            )
+        else:
+            job = self._primitive.run(
+                circuits,
+                parameter_values=parameter_values,
+            )
         if self.shots is not None:  # check if ideal simulator
             self.total_shots_used += self.shots * num_paulis * num_circuits * self._circuit_multipl
         self.total_device_calls += 1
@@ -779,11 +818,17 @@ class QuantumInterface:
         ansatz_w_obs.measure_all()
 
         # Run sampler
-        job = self._primitive.run(
-            transpile(ansatz_w_obs, backend=self.backend, optimization_level=self.optimization_level),
-            parameter_values=run_parameters,
-            skip_transpilation=self.skip_primitive_transpilation,
-        )
+        if self.ISA:
+            job = self._primitive.run(
+                transpile(ansatz_w_obs, backend=self._ISA_backend, optimization_level=self._ISA_level),
+                parameter_values=run_parameters,
+                skip_transpilation=True,
+            )
+        else:
+            job = self._primitive.run(
+                ansatz_w_obs,
+                parameter_values=run_parameters,
+            )
         if shots is not None:  # check if ideal simulator
             self.total_shots_used += shots
         self.total_device_calls += 1
