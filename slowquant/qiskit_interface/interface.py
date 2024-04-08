@@ -76,6 +76,7 @@ class QuantumInterface:
         self.total_device_calls = 0
         self.total_paulis_evaluated = 0
         self.ansatz_options = ansatz_options
+        self._save_paulis = True  # hard switch to stopping using Pauli saving (debugging tool).
 
     def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int]) -> None:
         """Construct qiskit circuit.
@@ -334,15 +335,17 @@ class QuantumInterface:
         Returns:
             Expectation value of fermionic operator.
         """
+        save_paulis = self._save_paulis
         if custom_parameters is None:
             run_parameters = self.parameters
         else:
             run_parameters = custom_parameters
+            save_paulis = False
 
         # Check if estimator or sampler
         if isinstance(self._primitive, BaseEstimator):
             return self._estimator_quantum_expectation_value(op, run_parameters)
-        if isinstance(self._primitive, BaseSampler) and custom_parameters is None:
+        if isinstance(self._primitive, BaseSampler) and save_paulis:
             return self._sampler_quantum_expectation_value(op)
         if isinstance(self._primitive, BaseSampler):
             return self._sampler_quantum_expectation_value_nosave(op, run_parameters)
