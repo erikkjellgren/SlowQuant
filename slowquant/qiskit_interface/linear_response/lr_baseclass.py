@@ -138,7 +138,7 @@ class quantumLRBaseClass:
                     area += "G"
                 print(f"Indices {indices[0][i],indices[1][i]}. Part of matrix block {area}")
         if verbose:
-            print("\nStandard deviation in each operator row for A | B | Sigma")
+            print("\nStandard deviation in each operator row for E | A | B | Sigma")
             A_row = np.sum(A, axis=1) / self.num_params
             B_row = np.sum(B, axis=1) / self.num_params
             Sigma_row = np.sum(Sigma, axis=1) / self.num_params
@@ -146,6 +146,8 @@ class quantumLRBaseClass:
                 if nr < self.num_q:
                     print(
                         f"q{str(nr):<{3}}:"
+                        + f"{(A_row[nr]+B_row[nr])/2:3.6f}".center(10)
+                        + " | "
                         + f"{A_row[nr]:3.6f}".center(10)
                         + " | "
                         + f"{B_row[nr]:3.6f}".center(10)
@@ -155,6 +157,8 @@ class quantumLRBaseClass:
                 else:
                     print(
                         f"G{str(nr-self.num_q):<{3}}:"
+                        + f"{(A_row[nr]+B_row[nr])/2:3.6f}".center(10)
+                        + " | "
                         + f"{A_row[nr]:3.6f}".center(10)
                         + " | "
                         + f"{B_row[nr]:3.6f}".center(10)
@@ -191,7 +195,7 @@ class quantumLRBaseClass:
                         area += "G"
                     print(f"Indices {indices[0][i],indices[1][i]}. Part of matrix block {area}")
             if verbose:
-                print("\nCV in each operator row for A | B | Sigma")
+                print("\nCV in each operator row for E | A | B | Sigma")
                 A_row = np.sum(A_cv, axis=1) / self.num_params
                 B_row = np.sum(B_cv, axis=1) / self.num_params
                 Sigma_row = np.sum(Sigma_cv, axis=1) / self.num_params
@@ -199,21 +203,32 @@ class quantumLRBaseClass:
                     if nr < self.num_q:
                         print(
                             f"q{str(nr):<{3}}:"
-                            + f"{A_row[nr]:1.2e}".center(10)
+                            + f"{(A_row[nr]+B_row[nr])/2:1.3e}".center(10)
                             + " | "
-                            + f"{B_row[nr]:1.2e}".center(10)
+                            + f"{A_row[nr]:1.3e}".center(10)
                             + " | "
-                            f"{Sigma_row[nr]:1.2e}".center(10)
+                            + f"{B_row[nr]:1.3e}".center(10)
+                            + " | "
+                            f"{Sigma_row[nr]:1.3e}".center(10)
                         )
                     else:
                         print(
                             f"G{str(nr-self.num_q):<{3}}:"
-                            + f"{A_row[nr]:1.2e}".center(10)
+                            + f"{(A_row[nr]+B_row[nr])/2:1.3e}".center(10)
                             + " | "
-                            + f"{B_row[nr]:1.2e}".center(10)
+                            + f"{A_row[nr]:1.3e}".center(10)
                             + " | "
-                            f"{Sigma_row[nr]:1.2e}".center(10)
+                            + f"{B_row[nr]:1.3e}".center(10)
+                            + " | "
+                            f"{Sigma_row[nr]:1.3e}".center(10)
                         )
+
+                print("\n Condition numbers:\n")
+                print(f"Hessian: {np.linalg.cond(self.hessian)}")
+                print(f"A      : {np.linalg.cond(self.A)}")
+                print(f"B      : {np.linalg.cond(self.B)}")
+                print(f"Metric : {np.linalg.cond(self.metric)}")
+                print(f"Sigma  : {np.linalg.cond(self.Sigma)}")
 
     def get_excitation_energies(self) -> np.ndarray:
         """Solve LR eigenvalue problem."""
