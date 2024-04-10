@@ -195,7 +195,7 @@ class QuantumInterface:
 
     @ISA.setter
     def ISA(self, ISA) -> None:
-        """Set ISA and handle tranpile arguments
+        """Set ISA and handle tranpile arguments.
 
         Args:
             ISA: ISA bool
@@ -206,11 +206,13 @@ class QuantumInterface:
             # Get backend from primitive
             if hasattr(self._primitive, "_backend"):
                 self._ISA_backend = self._primitive._backend  # pylint: disable=protected-access
+                name = self._ISA_backend.name
             else:
                 self._ISA_backend = None
+                name = "None"
 
             # Get optimization level from backend
-            if hasattr(
+            if hasattr(self._primitive, "_transpile_options") and hasattr(
                 self._primitive._transpile_options, "optimization_level"  # pylint: disable=protected-access
             ):
                 self._ISA_level = self._primitive._transpile_options[  # pylint: disable=protected-access
@@ -221,7 +223,23 @@ class QuantumInterface:
             else:
                 self._ISA_level = 1
 
-            print(f"ISA uses backend {self._ISA_backend.name} with optimization level {self._ISA_level}")
+            self._ISA_layout = None
+
+            print(f"ISA uses backend {name} with optimization level {self._ISA_level}")
+
+    def _check_layout(self, circuit: QuantumCircuit) -> None:
+        """Check if transpiled layout has changed.
+
+        Args:
+            circuit: Circuit whose layout is to be checked.
+        """
+        if circuit.layout is not None:
+            if self._ISA_layout is None:
+                self._ISA_layout = circuit.layout.final_index_layout()
+            else:
+                if not np.array_equal(self._ISA_layout, circuit.layout.final_index_layout()):
+                    print("WARNING: Transpiled layout has changed.")
+                    self._ISA_layout = circuit.layout.final_index_layout()
 
     @property
     def parameters(self) -> list[float]:
@@ -299,6 +317,7 @@ class QuantumInterface:
 
         if isinstance(self._primitive, BaseEstimator) and self.ISA:
             self._circuit = transpile(circuit, backend=self._ISA_backend, optimization_level=self._ISA_level)
+            self._check_layout(self._circuit)
         else:
             self._circuit = circuit
 
@@ -746,8 +765,10 @@ class QuantumInterface:
         else:
             parameter_values = run_parameters * (num_paulis * self._circuit_multipl)  # type: ignore
         if self.ISA:
+            circuits = transpile(circuits, backend=self._ISA_backend, optimization_level=self._ISA_level)
+            self._check_layout(circuits[0])
             job = self._primitive.run(
-                transpile(circuits, backend=self._ISA_backend, optimization_level=self._ISA_level),
+                circuits,
                 parameter_values=parameter_values,
                 skip_transpilation=True,
             )
@@ -819,8 +840,10 @@ class QuantumInterface:
 
         # Run sampler
         if self.ISA:
+            circuit = transpile(ansatz_w_obs, backend=self._ISA_backend, optimization_level=self._ISA_level)
+            self._check_layout(circuit)
             job = self._primitive.run(
-                transpile(ansatz_w_obs, backend=self._ISA_backend, optimization_level=self._ISA_level),
+                circuit,
                 parameter_values=run_parameters,
                 skip_transpilation=True,
             )
