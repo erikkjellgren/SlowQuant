@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 
 import numpy as np
+from qiskit.primitives import BaseSampler
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
@@ -42,7 +43,8 @@ class quantumLR(quantumLRBaseClass):
 
         if self.num_q != 0:
             if do_rdm:
-                self.wf.precalc_rdm_paulis(2)
+                if isinstance(self.wf.QI._primitive, BaseSampler):  # pylint: disable=protected-access
+                    self.wf.precalc_rdm_paulis(2)
                 # RDMs
                 rdms = ReducedDenstiyMatrix(
                     self.wf.num_inactive_orbs,
@@ -70,7 +72,7 @@ class quantumLR(quantumLRBaseClass):
                         )
                         grad[i + self.num_q] = self.wf.QI.quantum_expectation_value(
                             (op.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
-                    )
+                        )
         if do_gradients:
             if self.num_q != 0:
                 print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
@@ -150,12 +152,16 @@ class quantumLR(quantumLRBaseClass):
             for j, qJ in enumerate(self.q_ops):
                 for i, GI in enumerate(self.G_ops):
                     # Make A
-                    self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = self.wf.QI.quantum_expectation_value(
-                        (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
+                    self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = (
+                        self.wf.QI.quantum_expectation_value(
+                            (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
+                        )
                     )
                     # Make B
-                    self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = -self.wf.QI.quantum_expectation_value(
-                        (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                    self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = (
+                        -self.wf.QI.quantum_expectation_value(
+                            (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                        )
                     )
 
         # GG
