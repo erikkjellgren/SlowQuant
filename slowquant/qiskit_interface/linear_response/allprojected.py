@@ -36,14 +36,15 @@ class quantumLR(quantumLRBaseClass):
         print("Gs", self.num_G)
         print("qs", self.num_q)
 
-        # This hamiltonian is expensive and not needed in the naive orbitale rotation formalism
-        self.H_2i_2a = hamiltonian_pauli_2i_2a(
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-        )
+        if self.num_q != 0:
+            # This hamiltonian is expensive and not needed in the naive orbitale rotation formalism
+            self.H_2i_2a = hamiltonian_pauli_2i_2a(
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.num_virtual_orbs,
+            )
 
         # pre-calculate <0|G|0> and <0|HG|0>
         self._G_exp = []
