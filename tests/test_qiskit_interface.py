@@ -293,6 +293,61 @@ def test_LiH_naive_sampler() -> None:
     assert np.allclose(excitation_energies, solution, atol=10**-6)
 
 
+def test_LiH_naive_sampler_ISA() -> None:
+    """
+    Test LiH ooVQE with rotosolve + naive LR with sampler
+    """
+    # Define molecule
+    atom = "Li .0 .0 .0; H .0 .0 1.672"
+    basis = "sto-3g"
+
+    # PySCF
+    mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
+    rhf = pyscf.scf.RHF(mol).run()
+
+    # Optimize WF with QSQ
+    sampler = Sampler()
+    mapper = ParityMapper(num_particles=(1, 1))
+
+    QI = QuantumInterface(sampler, "UCCSD", mapper, ISA=True)
+
+    qWF = WaveFunction(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 2),
+        rhf.mo_coeff,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        QI,
+    )
+
+    qWF.run_vqe_2step("rotosolve", True)
+
+    # LR with QSQ
+    qLR = q_naive.quantumLR(qWF)
+
+    qLR.run(do_rdm=True)
+    excitation_energies = qLR.get_excitation_energies()
+
+    solution = [
+        0.12947075,
+        0.17874853,
+        0.17874853,
+        0.60462373,
+        0.64663037,
+        0.74060052,
+        0.74060052,
+        1.00275465,
+        2.0748271,
+        2.13720201,
+        2.13720201,
+        2.45509667,
+        2.95432578,
+    ]
+
+    assert np.allclose(excitation_energies, solution, atol=10**-6)
+
+
 def test_LiH_oscillator_strength() -> None:
     """
     Test oscillator strength for various LR parametrizations
