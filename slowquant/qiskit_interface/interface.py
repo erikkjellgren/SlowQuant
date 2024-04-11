@@ -18,6 +18,7 @@ from slowquant.qiskit_interface.custom_ansatz import (
     ErikD_Parity,
     ErikSD_JW,
     ErikSD_Parity,
+    efficientUCCSD,
     tUPS,
 )
 from slowquant.qiskit_interface.util import (
@@ -60,7 +61,7 @@ class QuantumInterface:
             do_M_iqa: Use independent qubit approximation when constructing the read-out correlation matrix.
             do_M_ansatz0: Use the ansatz with theta=0 when constructing the read-out correlation matrix
         """
-        allowed_ansatz = ("UCCSD", "PUCCD", "UCCD", "ErikD", "ErikSD", "HF", "tUPS")
+        allowed_ansatz = ("UCCSD", "PUCCD", "UCCD", "ErikD", "ErikSD", "HF", "tUPS", "efficientUCCSD")
         if ansatz not in allowed_ansatz:
             raise ValueError("The chosen Ansatz is not available. Choose from: ", allowed_ansatz)
         self.ansatz = ansatz
@@ -159,6 +160,8 @@ class QuantumInterface:
             self.circuit = HartreeFock(num_orbs, self.num_elec, self.mapper)
         elif self.ansatz == "tUPS":
             self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
+        elif self.ansatz == "efficientUCCSD":
+            self.circuit, self.grad_param_R = efficientUCCSD(num_orbs, self.num_elec, self.mapper)
 
         # Check that R parameter for gradient is consistent with the paramter names.
         if len(self.grad_param_R) == 0:

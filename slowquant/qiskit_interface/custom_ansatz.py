@@ -6,7 +6,13 @@ from qiskit_nature.second_q.circuit.library import HartreeFock
 from qiskit_nature.second_q.mappers import JordanWignerMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 
-from slowquant.qiskit_interface.operators_circuits import tups_double, tups_single
+from slowquant.qiskit_interface.operators_circuits import (
+    double_excitation,
+    single_excitation,
+    tups_double,
+    tups_single,
+)
+from slowquant.unitary_coupled_cluster.util import iterate_t1, iterate_t2
 
 
 def ErikD_JW():
@@ -123,7 +129,7 @@ def tUPS(
     mapper: FermionicMapper,
     ansatz_options: dict[str, Any],
 ) -> tuple[QuantumCircuit, dict[str, int]]:
-    r"""tUPS ansatz.
+    """tUPS ansatz.
 
     #. 10.48550/arXiv.2312.09761
 
@@ -134,6 +140,7 @@ def tUPS(
     Args:
         num_orbs: Number of spatial orbitals.
         num_elec: Number of alpha and beta electrons.
+        mapper: Fermioinc to qubit mapper.
         ansatz_options: Ansatz options.
 
     Returns:
@@ -197,4 +204,50 @@ def tUPS(
             qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx}"))
             grad_param_R[f"p{idx}"] = 4
             idx += 1
+    return qc, grad_param_R
+
+
+def efficientUCCSD(
+    num_orbs: int,
+    num_elec: tuple[int, int],
+    mapper: FermionicMapper,
+) -> tuple[QuantumCircuit, dict[str, int]]:
+    """Efficient UCCSD ansatz.
+
+    #. 10.1103/PhysRevA.102.062612
+
+    Args:
+        num_orbs: Number of spatial orbitals.
+        num_elec: Number of alpha and beta electrons.
+        mapper: Fermioinc to qubit mapper.
+
+    Returns:
+        Efficient UCCSD ansatz circuit and R parameters needed for gradients.
+    """
+    if not isinstance(mapper, JordanWignerMapper):
+        raise ValueError(f"efficientUCCSD only implemented for JW mapper, got: {type(mapper)}")
+    num_spin_orbs = 2 * num_orbs
+    occ = []
+    unocc = []
+    idx = 0
+    for _ in range(np.sum(num_elec)):
+        occ.append(idx)
+        idx += 1
+    for _ in range(num_spin_orbs - np.sum(num_elec)):
+        unocc.append(idx)
+        idx += 1
+    print(occ, unocc)
+    qc = HartreeFock(num_orbs, num_elec, mapper)
+    grad_param_R = {}
+    idx = 0
+    for _, a, i, _ in iterate_t1(occ, unocc, 0, True):
+        print(a, i)
+        qc = single_excitation(a, i, num_orbs, qc, Parameter(f"p{idx}"))
+        grad_param_R[f"p{idx}"] = 2
+        idx += 1
+    for _, a, i, b, j, _ in iterate_t2(occ, unocc, 0, True):
+        print(a, b, i, j)
+        qc = double_excitation(a, b, i, j, num_orbs, qc, Parameter(f"p{idx}"))
+        grad_param_R[f"p{idx}"] = 2
+        idx += 1
     return qc, grad_param_R
