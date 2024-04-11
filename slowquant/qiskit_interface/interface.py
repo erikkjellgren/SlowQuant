@@ -76,7 +76,8 @@ class QuantumInterface:
         self.total_device_calls = 0
         self.total_paulis_evaluated = 0
         self.ansatz_options = ansatz_options
-        self._save_paulis = True  # hard switch to stopping using Pauli saving (debugging tool).
+        self._save_paulis = True  # hard switch to stop using Pauli saving (debugging tool).
+        self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
 
     def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int]) -> None:
         """Construct qiskit circuit.
@@ -348,7 +349,9 @@ class QuantumInterface:
         if isinstance(self._primitive, BaseSampler) and save_paulis:
             return self._sampler_quantum_expectation_value(op)
         if isinstance(self._primitive, BaseSampler):
-            return self._sampler_quantum_expectation_value_nosave(op, run_parameters)
+            return self._sampler_quantum_expectation_value_nosave(
+                op, run_parameters, do_cliques=self._do_cliques
+            )
         raise ValueError(
             "The Quantum Interface was initiated with an unknown Qiskit primitive, {type(self._primitive)}"
         )
