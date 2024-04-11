@@ -248,7 +248,7 @@ def test_LiH_naive_sampler() -> None:
     sampler = Sampler()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(sampler, "UCCSD", mapper)
+    QI = QuantumInterface(sampler, "ErikSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -309,7 +309,7 @@ def test_LiH_naive_sampler_ISA() -> None:
     sampler = Sampler()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(sampler, "UCCSD", mapper, ISA=True)
+    QI = QuantumInterface(sampler, "ErikSD", mapper, ISA=True)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -677,7 +677,7 @@ def test_qiskit_aer() -> None:
     sampler = SamplerAer(run_options={"shots": 10}, transpile_options={"optimization_level": 0})
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(sampler, "UCCSD", mapper)
+    QI = QuantumInterface(sampler, "ErikSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,

@@ -72,14 +72,15 @@ class QuantumInterface:
         self.ISA = ISA
         self.max_shots_per_run = max_shots_per_run
         self.shots = shots
-        self._do_M_mitigation = do_M_mitigation
-        self._do_M_iqa = do_M_iqa
-        self._do_M_ansatz0 = do_M_ansatz0
+        self.do_M_mitigation = do_M_mitigation
+        self.do_M_iqa = do_M_iqa
+        self.do_M_ansatz0 = do_M_ansatz0
         self._Minv = None
         self.total_shots_used = 0
         self.total_device_calls = 0
         self.total_paulis_evaluated = 0
         self.ansatz_options = ansatz_options
+        self._save_layout = False
 
     def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int]) -> None:
         """Construct qiskit circuit.
@@ -233,13 +234,12 @@ class QuantumInterface:
         Args:
             circuit: Circuit whose layout is to be checked.
         """
-        if circuit.layout is not None:
+        if self._save_layout and circuit.layout is not None:
             if self._ISA_layout is None:
                 self._ISA_layout = circuit.layout.final_index_layout()
             else:
                 if not np.array_equal(self._ISA_layout, circuit.layout.final_index_layout()):
-                    print("WARNING: Transpiled layout has changed.")
-                    self._ISA_layout = circuit.layout.final_index_layout()
+                    print("WARNING: Transpiled layout has changed from readout error run.")
 
     @property
     def parameters(self) -> list[float]:
@@ -317,7 +317,6 @@ class QuantumInterface:
 
         if isinstance(self._primitive, BaseEstimator) and self.ISA:
             self._circuit = transpile(circuit, backend=self._ISA_backend, optimization_level=self._ISA_level)
-            self._check_layout(self._circuit)
         else:
             self._circuit = circuit
 
@@ -536,14 +535,14 @@ class QuantumInterface:
         new_heads = self.cliques.add_paulis(paulis_str)
 
         # Check if error mitigation is requested and if read-out matrix already exists.
-        if self._do_M_mitigation and self._Minv is None:
+        if self.do_M_mitigation and self._Minv is None:
             self._make_Minv()
 
         if len(new_heads) != 0:
             # Simulate each clique head with one combined device call
             # and return a list of distributions
             distr = self._one_call_sampler_distributions(new_heads, self.parameters, self.circuit)
-            if self._do_M_mitigation:  # apply error mitigation if requested
+            if self.do_M_mitigation:  # apply error mitigation if requested
                 for i, dist in enumerate(distr):
                     distr[i] = correct_distribution(dist, self._Minv)
             self.cliques.update_distr(new_heads, distr)
@@ -595,7 +594,7 @@ class QuantumInterface:
             )
 
         # Check if error mitigation is requested and if read-out matrix already exists.
-        if self._do_M_mitigation and self._Minv is None:
+        if self.do_M_mitigation and self._Minv is None:
             self._make_Minv()
 
         paulis_str = [str(x) for x in observables.paulis]
@@ -608,7 +607,7 @@ class QuantumInterface:
             # Simulate each clique head with one combined device call
             # and return a list of distributions
             distr = self._one_call_sampler_distributions(new_heads, run_parameters, self.circuit)
-            if self._do_M_mitigation:  # apply error mitigation if requested
+            if self.do_M_mitigation:  # apply error mitigation if requested
                 for i, dist in enumerate(distr):
                     distr[i] = correct_distribution(dist, self._Minv)
             cliques.update_distr(new_heads, distr)
@@ -622,7 +621,7 @@ class QuantumInterface:
         else:
             # Simulate each Pauli string with one combined device call
             distr = self._one_call_sampler_distributions(paulis_str, run_parameters, self.circuit)
-            if self._do_M_mitigation:  # apply error mitigation if requested
+            if self.do_M_mitigation:  # apply error mitigation if requested
                 for i, dist in enumerate(distr):
                     distr[i] = correct_distribution(dist, self._Minv)
 
@@ -682,13 +681,13 @@ class QuantumInterface:
 
             if len(new_heads) != 0:
                 # Check if error mitigation is requested and if read-out matrix already exists.
-                if self._do_M_mitigation and self._Minv is None:
+                if self.do_M_mitigation and self._Minv is None:
                     self._make_Minv()
 
                 # Simulate each clique head with one combined device call
                 # and return a list of distributions
                 distr = self._one_call_sampler_distributions(new_heads, run_parameters, self.circuit)
-                if self._do_M_mitigation:  # apply error mitigation if requested
+                if self.do_M_mitigation:  # apply error mitigation if requested
                     for i, dist in enumerate(distr):
                         distr[i] = correct_distribution(dist, self._Minv)
                 self.cliques.update_distr(new_heads, distr)
@@ -765,7 +764,13 @@ class QuantumInterface:
         else:
             parameter_values = run_parameters * (num_paulis * self._circuit_multipl)  # type: ignore
         if self.ISA:
-            circuits = transpile(circuits, backend=self._ISA_backend, optimization_level=self._ISA_level)
+            circuits = transpile(
+                circuits,
+                backend=self._ISA_backend,
+                optimization_level=self._ISA_level,
+                coupling_map=[self._ISA_layout],
+                initial_layout=self._ISA_layout,
+            )
             self._check_layout(circuits[0])
             job = self._primitive.run(
                 circuits,
@@ -840,7 +845,13 @@ class QuantumInterface:
 
         # Run sampler
         if self.ISA:
-            circuit = transpile(ansatz_w_obs, backend=self._ISA_backend, optimization_level=self._ISA_level)
+            circuit = transpile(
+                ansatz_w_obs,
+                backend=self._ISA_backend,
+                optimization_level=self._ISA_level,
+                coupling_map=[self._ISA_layout],
+                initial_layout=self._ISA_layout,
+            )
             self._check_layout(circuit)
             job = self._primitive.run(
                 circuit,
@@ -925,6 +936,7 @@ class QuantumInterface:
         #. https://qiskit.org/textbook/ch-quantum-hardware/measurement-error-mitigation.html
         """
         print("Measuring error mitigation read-out matrix.")
+        self._save_layout = True
         if self.num_qubits > 12:
             raise ValueError("Current implementation does not scale above 12 qubits?")
         if "transpilation" in self._primitive.options:
@@ -934,14 +946,14 @@ class QuantumInterface:
                 )
         else:
             print("No transpilation option found in primitive. Run via simulator is assumed.")
-        if self._do_M_ansatz0:
+        if self.do_M_ansatz0:
             ansatz = self.circuit
             # Negate the Hartree-Fock State
             ansatz = ansatz.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
         else:
             ansatz = QuantumCircuit(self.num_qubits)
         M = np.zeros((2**self.num_qubits, 2**self.num_qubits))
-        if self._do_M_iqa:
+        if self.do_M_iqa:
             ansatzX = ansatz.copy()
             for i in range(self.num_qubits):
                 ansatzX.x(i)
