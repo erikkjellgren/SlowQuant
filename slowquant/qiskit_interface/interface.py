@@ -225,6 +225,7 @@ class QuantumInterface:
                 self._ISA_level = 1
 
             self._ISA_layout = None
+            self._ISA_map: list[int] | None = None
 
             print(f"ISA uses backend {name} with optimization level {self._ISA_level}")
 
@@ -237,6 +238,7 @@ class QuantumInterface:
         if self._save_layout and circuit.layout is not None:
             if self._ISA_layout is None:
                 self._ISA_layout = circuit.layout.final_index_layout()
+                self._ISA_map = [circuit.layout.final_index_layout()]
             else:
                 if not np.array_equal(self._ISA_layout, circuit.layout.final_index_layout()):
                     print("WARNING: Transpiled layout has changed from readout error run.")
@@ -768,7 +770,7 @@ class QuantumInterface:
                 circuits,
                 backend=self._ISA_backend,
                 optimization_level=self._ISA_level,
-                coupling_map=[self._ISA_layout],
+                coupling_map=self._ISA_map,
                 initial_layout=self._ISA_layout,
             )
             self._check_layout(circuits[0])
@@ -849,7 +851,7 @@ class QuantumInterface:
                 ansatz_w_obs,
                 backend=self._ISA_backend,
                 optimization_level=self._ISA_level,
-                coupling_map=[self._ISA_layout],
+                coupling_map=self._ISA_map,
                 initial_layout=self._ISA_layout,
             )
             self._check_layout(circuit)
