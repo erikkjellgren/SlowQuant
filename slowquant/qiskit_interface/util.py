@@ -270,7 +270,9 @@ def postselection(
                 if bit != current_parity:
                     current_parity = bit
                     change_counter += 1
-            if current_parity == "1":
+            if current_parity == "1" and num_elec[0] % 2 == 0:
+                change_counter += 1
+            elif current_parity == "0" and num_elec[0] % 2 == 1:
                 change_counter += 1
             if change_counter != num_elec[0]:
                 break
@@ -280,7 +282,9 @@ def postselection(
                 if bit != current_parity:
                     current_parity = bit
                     change_counter += 1
-            if current_parity == "1":
+            if current_parity == "1" and num_elec[1] % 2 == 0:
+                change_counter += 1
+            elif current_parity == "0" and num_elec[1] % 2 == 1:
                 change_counter += 1
             if change_counter != num_elec[1]:
                 break
