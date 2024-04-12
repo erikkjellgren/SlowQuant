@@ -270,7 +270,7 @@ def postselection(
         Post-selected distribution.
     """
     new_dist = {}
-    prop_sum = 0.0
+    prob_sum = 0.0
     if isinstance(mapper, JordanWignerMapper):
         for bitstr, val in dist.items():
             num_a = len(bitstr) // 2
@@ -278,7 +278,7 @@ def postselection(
             bitstr_b = bitstr[num_a:]
             if bitstr_a.count("1") == num_elec[0] and bitstr_b.count("1") == num_elec[1]:
                 new_dist[bitstr] = val
-                prop_sum += val
+                prob_sum += val
     elif isinstance(mapper, ParityMapper):
         for bitstr, val in dist.items():
             num_a = len(bitstr) // 2
@@ -309,10 +309,10 @@ def postselection(
             if change_counter != num_elec[1]:
                 break
             new_dist[bitstr] = val
-            prop_sum += val
+            prob_sum += val
     else:
         raise ValueError(f"Post-selection only supported for JW and parity mapper got, {type(mapper)}")
     # Renormalize distribution
     for bitstr, val in new_dist.items():
-        new_dist[bitstr] = val / prop_sum
+        new_dist[bitstr] = val / prob_sum
     return new_dist
