@@ -241,6 +241,26 @@ def postselection(
 ) -> dict[str, float]:
     r"""Perform post-selection on distribution in computational basis.
 
+    For the Jordan-Wigner mapper the postselection ensure that,
+
+    .. math::
+        \text{sum}\left(\left|\alpha\right>) = N_\alpha
+
+    and,
+
+    .. math::
+        \text{sum}\left(\left|\beta\right>) = N_\beta
+
+    For the Parity mapper it is counted how many times bitstring changes between 0 and 1.
+    For the bitstring :math:`\left|01\right>` the counting is done by padding the string before counting.
+    I.e.
+
+    .. math::
+        \left|01\right> \rightarrow 0\left|01\right>p
+
+    Where :math:`p` is zero for even number of electrons and one for odd number of electrons.
+    This counting is done independtly for the :math:`\alpha` part and :math:`\beta` part.
+
     Args:
         dist: Measured quasi-distribution.
         mapper: Fermionic to qubit mapper.
