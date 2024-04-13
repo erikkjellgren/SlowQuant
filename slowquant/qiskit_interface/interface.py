@@ -241,6 +241,11 @@ class QuantumInterface:
                 if not np.array_equal(self._ISA_layout, circuit.layout.final_index_layout()):
                     print("WARNING: Transpiled layout has changed from readout error run.")
 
+    def redo_M_mitigation(self) -> None:
+        """Redo M_mitigation."""
+        self._ISA_layout = None
+        self._make_Minv()
+
     @property
     def parameters(self) -> list[float]:
         """Get ansatz parameters.
@@ -270,29 +275,6 @@ class QuantumInterface:
             if not np.array_equal(self._parameters, parameters):
                 self.cliques = Clique()
         self._parameters = parameters.copy()
-
-    @property
-    def optimization_level(self) -> int:
-        """Get optimization level of transpilation.
-
-        Returns:
-            optimization level.
-        """
-        return self._optimization_level
-
-    @optimization_level.setter
-    def optimization_level(
-        self,
-        optimization_level: int,
-    ) -> None:
-        """Set optimization level.
-
-        Args:
-            optimization_level: optimization_level
-        """
-        if optimization_level > 3:
-            raise ValueError("The chosen optimization level is not valid. It has to be 1-3.")
-        self._optimization_level = optimization_level
 
     @property
     def circuit(self) -> QuantumCircuit:
