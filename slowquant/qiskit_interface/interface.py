@@ -76,6 +76,8 @@ class QuantumInterface:
         self.total_device_calls = 0
         self.total_paulis_evaluated = 0
         self.ansatz_options = ansatz_options
+        self._save_paulis = True  # hard switch to stop using Pauli saving (debugging tool).
+        self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
 
     def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int]) -> None:
         """Construct qiskit circuit.
@@ -334,18 +336,22 @@ class QuantumInterface:
         Returns:
             Expectation value of fermionic operator.
         """
+        save_paulis = self._save_paulis
         if custom_parameters is None:
             run_parameters = self.parameters
         else:
             run_parameters = custom_parameters
+            save_paulis = False
 
         # Check if estimator or sampler
         if isinstance(self._primitive, BaseEstimator):
             return self._estimator_quantum_expectation_value(op, run_parameters)
-        if isinstance(self._primitive, BaseSampler) and custom_parameters is None:
+        if isinstance(self._primitive, BaseSampler) and save_paulis:
             return self._sampler_quantum_expectation_value(op)
         if isinstance(self._primitive, BaseSampler):
-            return self._sampler_quantum_expectation_value_nosave(op, run_parameters)
+            return self._sampler_quantum_expectation_value_nosave(
+                op, run_parameters, do_cliques=self._do_cliques
+            )
         raise ValueError(
             "The Quantum Interface was initiated with an unknown Qiskit primitive, {type(self._primitive)}"
         )
@@ -622,7 +628,7 @@ class QuantumInterface:
             E.g.: [PauliString[0] for Circuit[0], PauliString[0] for Circuit[1], ...]
         """
         if not isinstance(self._primitive, BaseSampler):
-            raise TypeError(f"Expeccted primitive to be of type BaseSampler got, {type(self._primitive)}")
+            raise TypeError(f"Expected primitive to be of type BaseSampler got, {type(self._primitive)}")
         if isinstance(paulis, str):
             paulis = [paulis]
         num_paulis = len(paulis)
@@ -688,7 +694,7 @@ class QuantumInterface:
             Quasi-distributions.
         """
         if not isinstance(self._primitive, BaseSampler):
-            raise TypeError(f"Expeccted primitive to be of type BaseSampler got, {type(self._primitive)}")
+            raise TypeError(f"Expected primitive to be of type BaseSampler got, {type(self._primitive)}")
         if self._circuit_multipl > 1:
             print(
                 "WARNING: The chosen function does not allow for appending circuits. Choose _one_call_sampler_distributions instead."
