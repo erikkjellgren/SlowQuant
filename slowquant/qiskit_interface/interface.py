@@ -25,6 +25,7 @@ from slowquant.qiskit_interface.util import (
     Clique,
     correct_distribution,
     get_bitstring_sign,
+    postselection,
     to_CBS_measurement,
 )
 
@@ -47,6 +48,7 @@ class QuantumInterface:
         do_M_mitigation: bool = False,
         do_M_iqa: bool = False,
         do_M_ansatz0: bool = False,
+        do_postselection: bool = True,
     ) -> None:
         """Interface to Qiskit to use IBM quantum hardware or simulator.
 
@@ -61,7 +63,8 @@ class QuantumInterface:
             max_shots_per_run: Maximum number of shots allowed in a single run. Set to 100000 per IBM machines.
             do_M_mitigation: Do error mitigation via read-out correlation matrix.
             do_M_iqa: Use independent qubit approximation when constructing the read-out correlation matrix.
-            do_M_ansatz0: Use the ansatz with theta=0 when constructing the read-out correlation matrix
+            do_M_ansatz0: Use the ansatz with theta=0 when constructing the read-out correlation matrix.
+            do_postselection: Use postselection to preserve number of particles in the computational basis.
         """
         allowed_ansatz = ("UCCSD", "PUCCD", "UCCD", "ErikD", "ErikSD", "HF", "tUPS")
         if ansatz not in allowed_ansatz:
@@ -80,6 +83,7 @@ class QuantumInterface:
         self.total_device_calls = 0
         self.total_paulis_evaluated = 0
         self.ansatz_options = ansatz_options
+        self.do_postselection = do_postselection
         self._save_layout = False
         self._save_paulis = True  # hard switch to stop using Pauli saving (debugging tool).
         self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
@@ -533,6 +537,10 @@ class QuantumInterface:
             if self.do_M_mitigation:  # apply error mitigation if requested
                 for i, dist in enumerate(distr):
                     distr[i] = correct_distribution(dist, self._Minv)
+            if self.do_postselection:
+                for i, (dist, head) in enumerate(zip(distr, new_heads)):
+                    if "X" not in head and "Y" not in head:
+                        distr[i] = postselection(dist, self.mapper, self.num_elec)
             self.cliques.update_distr(new_heads, distr)
 
         # Loop over all Pauli strings in observable and build final result with coefficients
@@ -598,6 +606,10 @@ class QuantumInterface:
             if self.do_M_mitigation:  # apply error mitigation if requested
                 for i, dist in enumerate(distr):
                     distr[i] = correct_distribution(dist, self._Minv)
+            if self.do_postselection:
+                for i, (dist, head) in enumerate(zip(distr, new_heads)):
+                    if "X" not in head and "Y" not in head:
+                        distr[i] = postselection(dist, self.mapper, self.num_elec)
             cliques.update_distr(new_heads, distr)
 
             # Loop over all Pauli strings in observable and build final result with coefficients
@@ -612,6 +624,10 @@ class QuantumInterface:
             if self.do_M_mitigation:  # apply error mitigation if requested
                 for i, dist in enumerate(distr):
                     distr[i] = correct_distribution(dist, self._Minv)
+            if self.do_postselection:
+                for i, (dist, pauli) in enumerate(zip(distr, paulis_str)):
+                    if "X" not in pauli and "Y" not in pauli:
+                        distr[i] = postselection(dist, self.mapper, self.num_elec)
 
             # Loop over all Pauli strings in observable and build final result with coefficients
             for pauli, coeff, dist in zip(paulis_str, observables.coeffs, distr):
@@ -678,7 +694,15 @@ class QuantumInterface:
                 if self.do_M_mitigation:  # apply error mitigation if requested
                     for i, dist in enumerate(distr):
                         distr[i] = correct_distribution(dist, self._Minv)
+                if self.do_postselection:
+                    for i, (dist, head) in enumerate(zip(distr, new_heads)):
+                        if "X" not in head and "Y" not in head:
+                            distr[i] = postselection(dist, self.mapper, self.num_elec)
                 self.cliques.update_distr(new_heads, distr)
+        else:
+            print(
+                "WARNING: REM and Post-Selection not implemented for quantum variance without the use of cliques."
+            )
 
         # Loop over all Pauli strings in observable and build final result with coefficients
         result = 0.0
