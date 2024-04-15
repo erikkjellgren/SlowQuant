@@ -400,7 +400,7 @@ class QuantumInterface:
         """Reset cliques to empty."""
         self.cliques = Clique()
 
-    def _null_shots(self) -> None:
+    def null_shots(self) -> None:
         """Set number of shots to None."""
         self._shots = None
         self._circuit_multipl = 1
