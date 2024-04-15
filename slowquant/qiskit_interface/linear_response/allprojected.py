@@ -37,7 +37,6 @@ class quantumLR(quantumLRBaseClass):
         print("qs", self.num_q)
 
         if self.num_q != 0:
-            # This hamiltonian is expensive and not needed in the naive orbitale rotation formalism
             self.H_2i_2a = hamiltonian_pauli_2i_2a(
                 self.wf.h_mo,
                 self.wf.g_mo,
