@@ -274,6 +274,63 @@ def test_LiH_allprojected_estimator() -> None:
     assert np.allclose(excitation_energies, solution, atol=10**-6)
 
 
+def test_LiH_dumb_allprojected_estimator() -> None:
+    """
+    Test LiH ooVQE with rotosolve + dumb allprojected LR with estimator
+    """
+    # Define molecule
+    atom = "Li .0 .0 .0; H .0 .0 1.672"
+    basis = "sto-3g"
+
+    # PySCF
+    mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
+    rhf = pyscf.scf.RHF(mol).run()
+
+    # Optimize WF with QSQ
+    estimator = Estimator()
+    mapper = ParityMapper(num_particles=(1, 1))
+
+    QI = QuantumInterface(estimator, "ErikSD", mapper)
+
+    qWF = WaveFunction(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 2),
+        rhf.mo_coeff,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        QI,
+    )
+
+    qWF.run_vqe_2step("rotosolve", True)
+
+    # LR with QSQ
+    qLR = q_allprojected.quantumLR(qWF)
+
+    qLR.run()
+    excitation_energies = qLR.get_excitation_energies()
+
+    print(excitation_energies)
+
+    solution = [
+        0.12961625,
+        0.18079147,
+        0.18079147,
+        0.60483322,
+        0.6469466,
+        0.74931037,
+        0.74931037,
+        1.00301551,
+        2.07493174,
+        2.13725269,
+        2.13725269,
+        2.45535992,
+        2.95516418,
+    ]
+
+    assert np.allclose(excitation_energies, solution, atol=10**-6)
+
+
 def test_LiH_naive_sampler() -> None:
     """
     Test LiH ooVQE with rotosolve + naive LR with sampler
