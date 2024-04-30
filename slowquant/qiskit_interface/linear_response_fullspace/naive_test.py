@@ -45,11 +45,11 @@ class quantumLR(quantumLRBaseClass):
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = (
-                    2 * self.wf.energy_elec * self.wf.QI.quantum_expectation_value((GI.dagger * self.H_0i_0a * GJ - GI.dagger * GJ - GJ * GI.dagger + GJ * self.H_0i_0a * GI.dagger).get_folded_operators(*self.orbs))
+                    2 * self.wf.energy_elec * self.wf.QI.quantum_expectation_value((GI.dagger * self.H_0i_0a * GJ - GI.dagger * GJ - GJ * GI.dagger + GJ * self.H_0i_0a * GI.dagger).get_folded_operator(*self.orbs))
                 )
                 # Make B
                 self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = (
-                    2 * self.wf.energy_elec * self.wf.QI.quantum_expectation_value((GI.dagger * self.H_0i_0a * GJ.dagger - GI.dagger * GJ.dagger - GJ.dagger * GI.dagger + GJ.dagger * self.H_0i_0a * GI.dagger).get_folded_operators(*self.orbs))
+                    2 * self.wf.energy_elec * self.wf.QI.quantum_expectation_value((GI.dagger * self.H_0i_0a * GJ.dagger - GI.dagger * GJ.dagger - GJ.dagger * GI.dagger + GJ.dagger * self.H_0i_0a * GI.dagger).get_folded_operator(*self.orbs))
                     )
                 # Make Sigma
                 self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = (
