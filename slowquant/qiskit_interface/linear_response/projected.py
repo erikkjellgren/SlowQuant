@@ -1,17 +1,21 @@
 from collections.abc import Sequence
 
 import numpy as np
+from qiskit.primitives import BaseSampler
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
-from slowquant.qiskit_interface.interface import make_cliques
 from slowquant.qiskit_interface.linear_response.lr_baseclass import (
     get_num_CBS_elements,
     get_num_nonCBS,
     quantumLRBaseClass,
 )
-from slowquant.qiskit_interface.operators import one_elec_op_0i_0a
+from slowquant.qiskit_interface.operators import (
+    hamiltonian_pauli_2i_2a,
+    one_elec_op_0i_0a,
+)
+from slowquant.qiskit_interface.util import Clique
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_orbital_gradient_response,
@@ -24,86 +28,143 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
 class quantumLR(quantumLRBaseClass):
     def run(
         self,
+        do_rdm: bool = True,
+        do_gradients: bool = True,
     ) -> None:
-        """Run simulation of projected LR matrix elements."""
-        # RDMs
-        rdms = ReducedDenstiyMatrix(
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-            self.wf.rdm1,
-            rdm2=self.wf.rdm2,
-        )
+        """Run simulation of projected LR matrix elements.
 
+        Args:
+            do_rdm: Use RDMs for QQ part.
+            do_gradients: Calculate gradients w.r.t. orbital rotations and active space excitations.
+        """
         idx_shift = self.num_q
         print("Gs", self.num_G)
         print("qs", self.num_q)
 
+        if self.num_q != 0:
+            if do_rdm:
+                if isinstance(self.wf.QI._primitive, BaseSampler):  # pylint: disable=protected-access
+                    self.wf.precalc_rdm_paulis(2)
+                # RDMs
+                rdms = ReducedDenstiyMatrix(
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.num_virtual_orbs,
+                    self.wf.rdm1,
+                    rdm2=self.wf.rdm2,
+                )
+                if do_gradients:
+                    # Check gradients
+                    grad = get_orbital_gradient_response(
+                        rdms,
+                        self.wf.h_mo,
+                        self.wf.g_mo,
+                        self.wf.kappa_idx,
+                        self.wf.num_inactive_orbs,
+                        self.wf.num_active_orbs,
+                    )
+            else:
+                if do_gradients:
+                    grad = np.zeros(2 * self.num_q)
+                    for i, op in enumerate(self.q_ops):
+                        grad[i] = self.wf.QI.quantum_expectation_value(
+                            (self.H_1i_1a * op).get_folded_operator(*self.orbs)
+                        )
+                        grad[i + self.num_q] = self.wf.QI.quantum_expectation_value(
+                            (op.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                        )
+        if do_gradients:
+            if self.num_q != 0:
+                print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+                if np.max(np.abs(grad)) > 10**-3:
+                    print("WARNING: Large Gradient detected in q of ", np.max(np.abs(grad)))
+
         # pre-calculate <0|G|0> and <0|HG|0>
-        self.G_exp = []  # save and use for properties
-        HG_exp = []
+        self._G_exp = []  # save and use for properties
+        self._HG_exp = []
         for GJ in self.G_ops:
-            self.G_exp.append(self.wf.QI.quantum_expectation_value(GJ.get_folded_operator(*self.orbs)))
-            HG_exp.append(
+            self._G_exp.append(self.wf.QI.quantum_expectation_value(GJ.get_folded_operator(*self.orbs)))
+            self._HG_exp.append(
                 self.wf.QI.quantum_expectation_value((self.H_0i_0a * GJ).get_folded_operator(*self.orbs))
             )
 
-        # Check gradients
-        grad = get_orbital_gradient_response(
-            rdms,
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.kappa_idx,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        if len(grad) != 0:
-            print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-            if np.max(np.abs(grad)) > 10**-3:
-                print("WARNING: Large Gradient detected in q of ", np.max(np.abs(grad)))
-
-        grad = np.zeros(self.num_G)  # G^\dagger is the same
-        for i in range(self.num_G):
-            grad[i] = HG_exp[i] - (self.wf.energy_elec * self.G_exp[i])
-        if len(grad) != 0:
-            print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-            if np.max(np.abs(grad)) > 10**-3:
-                print("WARNING: Large Gradient detected in G of ", np.max(np.abs(grad)))
+        if do_gradients:
+            grad = np.zeros(self.num_G)  # G^\dagger is the same
+            for i in range(self.num_G):
+                grad[i] = self._HG_exp[i] - (self.wf.energy_elec * self._G_exp[i])
+            if len(grad) != 0:
+                print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+                if np.max(np.abs(grad)) > 10**-3:
+                    print("WARNING: Large Gradient detected in G of ", np.max(np.abs(grad)))
 
         # qq
-        self.A[: self.num_q, : self.num_q] = get_orbital_response_hessian_block(
-            rdms,
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.kappa_idx_dagger,
-            self.wf.kappa_idx,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        self.B[: self.num_q, : self.num_q] = get_orbital_response_hessian_block(
-            rdms,
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.kappa_idx_dagger,
-            self.wf.kappa_idx_dagger,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        self.Sigma[: self.num_q, : self.num_q] = get_orbital_response_metric_sigma(rdms, self.wf.kappa_idx)
-
-        # Gq
-        for j, qJ in enumerate(self.q_ops):
-            for i, GI in enumerate(self.G_ops):
-                # Make A
-                self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = self.wf.QI.quantum_expectation_value(
-                    (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
+        if self.num_q != 0:
+            if do_rdm:
+                self.A[: self.num_q, : self.num_q] = get_orbital_response_hessian_block(
+                    rdms,
+                    self.wf.h_mo,
+                    self.wf.g_mo,
+                    self.wf.kappa_idx_dagger,
+                    self.wf.kappa_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
                 )
-                # Make B
-                self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = -self.wf.QI.quantum_expectation_value(
-                    (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                self.B[: self.num_q, : self.num_q] = get_orbital_response_hessian_block(
+                    rdms,
+                    self.wf.h_mo,
+                    self.wf.g_mo,
+                    self.wf.kappa_idx_dagger,
+                    self.wf.kappa_idx_dagger,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
                 )
+                self.Sigma[: self.num_q, : self.num_q] = get_orbital_response_metric_sigma(
+                    rdms, self.wf.kappa_idx
+                )
+            else:
+                self.H_2i_2a = hamiltonian_pauli_2i_2a(
+                    self.wf.h_mo,
+                    self.wf.g_mo,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.num_virtual_orbs,
+                )
+                for j, qJ in enumerate(self.q_ops):
+                    for i, qI in enumerate(self.q_ops[j:], j):
+                        # Make A
+                        self.A[i, j] = self.A[j, i] = self.wf.QI.quantum_expectation_value(
+                            (qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs)
+                        ) - self.wf.QI.quantum_expectation_value(
+                            (qI.dagger * qJ * self.H_2i_2a).get_folded_operator(*self.orbs)
+                        )
+                        # Make B
+                        self.B[i, j] = self.B[j, i] = -(
+                            self.wf.QI.quantum_expectation_value(
+                                (qI.dagger * qJ.dagger * self.H_2i_2a).get_folded_operator(*self.orbs)
+                            )
+                        )
+                        # Make Sigma
+                        self.Sigma[i, j] = self.Sigma[j, i] = self.wf.QI.quantum_expectation_value(
+                            (qI.dagger * qJ).get_folded_operator(*self.orbs)
+                        )
 
-        # Calculate Matrices
+            # Gq
+            for j, qJ in enumerate(self.q_ops):
+                for i, GI in enumerate(self.G_ops):
+                    # Make A
+                    self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = (
+                        self.wf.QI.quantum_expectation_value(
+                            (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
+                        )
+                    )
+                    # Make B
+                    self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = (
+                        -self.wf.QI.quantum_expectation_value(
+                            (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                        )
+                    )
+
+        # GG
         for j, GJ in enumerate(self.G_ops):
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
@@ -114,26 +175,200 @@ class quantumLR(quantumLRBaseClass):
                     (GI.dagger * GJ).get_folded_operator(*self.orbs)
                 )
                 val -= GG_exp * self.wf.energy_elec
-                val -= self.G_exp[i] * HG_exp[j]
-                val += self.G_exp[i] * self.G_exp[j] * self.wf.energy_elec
+                val -= self._G_exp[i] * self._HG_exp[j]
+                val += self._G_exp[i] * self._G_exp[j] * self.wf.energy_elec
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
                 # Make B
-                val = HG_exp[i] * self.G_exp[j]
-                val -= self.G_exp[i] * self.G_exp[j] * self.wf.energy_elec
+                val = self._HG_exp[i] * self._G_exp[j]
+                val -= self._G_exp[i] * self._G_exp[j] * self.wf.energy_elec
                 self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
                 # Make Sigma
                 self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = (
-                    GG_exp - (self.G_exp[i] * self.G_exp[j])
+                    GG_exp - (self._G_exp[i] * self._G_exp[j])
+                )
+
+    def _run_no_saving(
+        self,
+        do_rdm: bool = True,
+        do_gradients: bool = True,
+    ) -> None:
+        """Run simulation of projected LR matrix elements without re-using recourring matrix elements.
+
+        Args:
+            do_rdm: Use RDMs for QQ part.
+            do_gradients: Calculate gradients w.r.t. orbital rotations and active space excitations.
+        """
+        idx_shift = self.num_q
+        print("Gs", self.num_G)
+        print("qs", self.num_q)
+
+        if self.num_q != 0:
+            if do_rdm:
+                if isinstance(self.wf.QI._primitive, BaseSampler):  # pylint: disable=protected-access
+                    self.wf.precalc_rdm_paulis(2)
+                # RDMs
+                rdms = ReducedDenstiyMatrix(
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.num_virtual_orbs,
+                    self.wf.rdm1,
+                    rdm2=self.wf.rdm2,
+                )
+                if do_gradients:
+                    # Check gradients
+                    grad = get_orbital_gradient_response(
+                        rdms,
+                        self.wf.h_mo,
+                        self.wf.g_mo,
+                        self.wf.kappa_idx,
+                        self.wf.num_inactive_orbs,
+                        self.wf.num_active_orbs,
+                    )
+            else:
+                if do_gradients:
+                    grad = np.zeros(2 * self.num_q)
+                    for i, op in enumerate(self.q_ops):
+                        grad[i] = self.wf.QI.quantum_expectation_value(
+                            (self.H_1i_1a * op).get_folded_operator(*self.orbs)
+                        )
+                        grad[i + self.num_q] = self.wf.QI.quantum_expectation_value(
+                            (op.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                        )
+        if do_gradients:
+            if self.num_q != 0:
+                print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+                if np.max(np.abs(grad)) > 10**-3:
+                    print("WARNING: Large Gradient detected in q of ", np.max(np.abs(grad)))
+
+        if do_gradients:
+            grad = np.zeros(self.num_G)  # G^\dagger is the same
+            for i, GJ in enumerate(self.G_ops):
+                grad[i] = self.wf.QI.quantum_expectation_value(
+                    (self.H_0i_0a * GJ).get_folded_operator(*self.orbs)
+                ) - (
+                    self.wf._calc_energy_elec()  # pylint: disable=protected-access
+                    * self.wf.QI.quantum_expectation_value(GJ.get_folded_operator(*self.orbs))
+                )
+            if len(grad) != 0:
+                print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+                if np.max(np.abs(grad)) > 10**-3:
+                    print("WARNING: Large Gradient detected in G of ", np.max(np.abs(grad)))
+
+        # qq
+        if self.num_q != 0:
+            if do_rdm:
+                self.A[: self.num_q, : self.num_q] = get_orbital_response_hessian_block(
+                    rdms,
+                    self.wf.h_mo,
+                    self.wf.g_mo,
+                    self.wf.kappa_idx_dagger,
+                    self.wf.kappa_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                )
+                self.B[: self.num_q, : self.num_q] = get_orbital_response_hessian_block(
+                    rdms,
+                    self.wf.h_mo,
+                    self.wf.g_mo,
+                    self.wf.kappa_idx_dagger,
+                    self.wf.kappa_idx_dagger,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                )
+                self.Sigma[: self.num_q, : self.num_q] = get_orbital_response_metric_sigma(
+                    rdms, self.wf.kappa_idx
+                )
+            else:
+                self.H_2i_2a = hamiltonian_pauli_2i_2a(
+                    self.wf.h_mo,
+                    self.wf.g_mo,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.num_virtual_orbs,
+                )
+                for j, qJ in enumerate(self.q_ops):
+                    for i, qI in enumerate(self.q_ops[j:], j):
+                        # Make A
+                        self.A[i, j] = self.A[j, i] = self.wf.QI.quantum_expectation_value(
+                            (qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs)
+                        ) - self.wf.QI.quantum_expectation_value(
+                            (qI.dagger * qJ * self.H_2i_2a).get_folded_operator(*self.orbs)
+                        )
+                        # Make B
+                        self.B[i, j] = self.B[j, i] = -(
+                            self.wf.QI.quantum_expectation_value(
+                                (qI.dagger * qJ.dagger * self.H_2i_2a).get_folded_operator(*self.orbs)
+                            )
+                        )
+                        # Make Sigma
+                        self.Sigma[i, j] = self.Sigma[j, i] = self.wf.QI.quantum_expectation_value(
+                            (qI.dagger * qJ).get_folded_operator(*self.orbs)
+                        )
+
+            # Gq
+            for j, qJ in enumerate(self.q_ops):
+                for i, GI in enumerate(self.G_ops):
+                    # Make A
+                    self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = (
+                        self.wf.QI.quantum_expectation_value(
+                            (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
+                        )
+                    )
+                    # Make B
+                    self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = (
+                        -self.wf.QI.quantum_expectation_value(
+                            (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                        )
+                    )
+
+        # GG
+        for j, GJ in enumerate(self.G_ops):
+            for i, GI in enumerate(self.G_ops[j:], j):
+                # Make A
+                val = self.wf.QI.quantum_expectation_value(
+                    (GI.dagger * self.H_0i_0a * GJ).get_folded_operator(*self.orbs)
+                )
+                val -= (
+                    self.wf.QI.quantum_expectation_value((GI.dagger * GJ).get_folded_operator(*self.orbs))
+                    * self.wf._calc_energy_elec()  # pylint: disable=protected-access
+                )
+                val -= self.wf.QI.quantum_expectation_value(
+                    GI.get_folded_operator(*self.orbs)
+                ) * self.wf.QI.quantum_expectation_value((self.H_0i_0a * GJ).get_folded_operator(*self.orbs))
+                val += (
+                    self.wf.QI.quantum_expectation_value(GI.get_folded_operator(*self.orbs))
+                    * self.wf.QI.quantum_expectation_value(GJ.get_folded_operator(*self.orbs))
+                    * self.wf._calc_energy_elec()  # pylint: disable=protected-access
+                )
+                self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
+                # Make B
+                val = self.wf.QI.quantum_expectation_value(
+                    (self.H_0i_0a * GI).get_folded_operator(*self.orbs)
+                ) * self.wf.QI.quantum_expectation_value(GJ.get_folded_operator(*self.orbs))
+                val -= (
+                    self.wf.QI.quantum_expectation_value(GI.get_folded_operator(*self.orbs))
+                    * self.wf.QI.quantum_expectation_value(GJ.get_folded_operator(*self.orbs))
+                    * self.wf._calc_energy_elec()  # pylint: disable=protected-access
+                )
+                self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
+                # Make Sigma
+                self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[
+                    j + idx_shift, i + idx_shift
+                ] = self.wf.QI.quantum_expectation_value((GI.dagger * GJ).get_folded_operator(*self.orbs)) - (
+                    self.wf.QI.quantum_expectation_value(GI.get_folded_operator(*self.orbs))
+                    * self.wf.QI.quantum_expectation_value(GJ.get_folded_operator(*self.orbs))
                 )
 
     def _get_qbitmap(
         self,
-        cliques: bool = True,
+        cliques: bool = False,
+        do_rdm: bool = False,
     ) -> tuple[list[list[str]], list[list[str]], list[list[str]]]:
         """Get qubit map of operators.
 
         Args:
             cliques: If using cliques.
+            do_rdm: Use RDMs for QQ part.
 
         Returns:
             Qubit map of operators.
@@ -141,8 +376,6 @@ class quantumLR(quantumLRBaseClass):
         idx_shift = self.num_q
         print("Gs", self.num_G)
         print("qs", self.num_q)
-
-        # qq block not possible (yet) as per RDMs
 
         A = [[""] * self.num_params for _ in range(self.num_params)]
         B = [[""] * self.num_params for _ in range(self.num_params)]
@@ -152,9 +385,39 @@ class quantumLR(quantumLRBaseClass):
         G_exp = []  # save and use for properties
         HG_exp = []
         for GJ in self.G_ops:
-            G_exp.append(self.wf.QI.op_to_qbit(GJ.get_folded_operator(*self.orbs)).paulis)
-            HG_exp.append(self.wf.QI.op_to_qbit((self.H_0i_0a * GJ).get_folded_operator(*self.orbs)).paulis)
-        energy = self.wf.QI.op_to_qbit((self.H_0i_0a).get_folded_operator(*self.orbs)).paulis
+            G_exp.append(self.wf.QI.op_to_qbit(GJ.get_folded_operator(*self.orbs)).paulis.to_labels())
+            HG_exp.append(
+                self.wf.QI.op_to_qbit((self.H_0i_0a * GJ).get_folded_operator(*self.orbs)).paulis.to_labels()
+            )
+        energy = self.wf.QI.op_to_qbit((self.H_0i_0a).get_folded_operator(*self.orbs)).paulis.to_labels()
+
+        if not do_rdm:
+            self.H_2i_2a = hamiltonian_pauli_2i_2a(
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.num_virtual_orbs,
+            )
+            for j, qJ in enumerate(self.q_ops):
+                for i, qI in enumerate(self.q_ops[j:], j):
+                    # Make A
+                    A[i][j] = A[j][i] = (
+                        self.wf.QI.op_to_qbit(
+                            (qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs)
+                        ).paulis.to_labels()
+                        + self.wf.QI.op_to_qbit(
+                            (qI.dagger * qJ * self.H_2i_2a).get_folded_operator(*self.orbs)
+                        ).paulis.to_labels()
+                    )
+                    # Make B
+                    B[i][j] = B[j][i] = self.wf.QI.op_to_qbit(
+                        (qI.dagger * qJ.dagger * self.H_2i_2a).get_folded_operator(*self.orbs)
+                    ).paulis.to_labels()
+                    # Make Sigma
+                    Sigma[i][j] = Sigma[j][i] = self.wf.QI.op_to_qbit(
+                        (qI.dagger * qJ).get_folded_operator(*self.orbs)
+                    ).paulis.to_labels()
 
         # Gq
         for j, qJ in enumerate(self.q_ops):
@@ -162,11 +425,11 @@ class quantumLR(quantumLRBaseClass):
                 # Make A
                 A[j][i + idx_shift] = A[i + idx_shift][j] = self.wf.QI.op_to_qbit(
                     (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
-                ).paulis
+                ).paulis.to_labels()
                 # Make B
                 B[j][i + idx_shift] = B[i + idx_shift][j] = self.wf.QI.op_to_qbit(
                     (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
-                ).paulis
+                ).paulis.to_labels()
 
         # GG
         for j, GJ in enumerate(self.G_ops):
@@ -174,8 +437,10 @@ class quantumLR(quantumLRBaseClass):
                 # Make A
                 val = self.wf.QI.op_to_qbit(
                     (GI.dagger * self.H_0i_0a * GJ).get_folded_operator(*self.orbs)
-                ).paulis
-                GG_exp = self.wf.QI.op_to_qbit((GI.dagger * GJ).get_folded_operator(*self.orbs)).paulis
+                ).paulis.to_labels()
+                GG_exp = self.wf.QI.op_to_qbit(
+                    (GI.dagger * GJ).get_folded_operator(*self.orbs)
+                ).paulis.to_labels()
                 val += GG_exp + energy
                 val += G_exp[i] + HG_exp[j]
                 val += G_exp[i] + G_exp[j] + energy
@@ -193,24 +458,171 @@ class quantumLR(quantumLRBaseClass):
             for i in range(self.num_params):
                 for j in range(self.num_params):
                     if not A[i][j] == "":
-                        A[i][j] = list(make_cliques(A[i][j]).keys())  # type: ignore [call-overload]
+                        clique = Clique()
+                        clique.add_paulis([str(x) for x in A[i][j]])
+                        A[i][j] = [x.head for x in clique.cliques]  # type: ignore [call-overload]
                     if not B[i][j] == "":
-                        B[i][j] = list(make_cliques(B[i][j]).keys())  # type: ignore [call-overload]
-
+                        clique = Clique()
+                        clique.add_paulis([str(x) for x in B[i][j]])
+                        B[i][j] = [x.head for x in clique.cliques]  # type: ignore [call-overload]
                     if not Sigma[i][j] == "":
-                        Sigma[i][j] = list(make_cliques(Sigma[i][j]).keys())  # type: ignore [call-overload]
+                        clique = Clique()
+                        clique.add_paulis([str(x) for x in Sigma[i][j]])
+                        Sigma[i][j] = [x.head for x in clique.cliques]  # type: ignore [call-overload]
 
-            print("Number of non-CBS Pauli strings in A: ", get_num_nonCBS(A))
-            print("Number of non-CBS Pauli strings in B: ", get_num_nonCBS(B))
-            print("Number of non-CBS Pauli strings in Sigma: ", get_num_nonCBS(Sigma))
+        print("Number of non-CBS Pauli strings in A: ", get_num_nonCBS(A))
+        print("Number of non-CBS Pauli strings in B: ", get_num_nonCBS(B))
+        print("Number of non-CBS Pauli strings in Sigma: ", get_num_nonCBS(Sigma))
 
-            CBS, nonCBS = get_num_CBS_elements(A)
-            print("In A    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
-            CBS, nonCBS = get_num_CBS_elements(B)
-            print("In B    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
-            CBS, nonCBS = get_num_CBS_elements(Sigma)
-            print("In Sigma, number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
+        CBS, nonCBS = get_num_CBS_elements(A)
+        print("In A    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
+        CBS, nonCBS = get_num_CBS_elements(B)
+        print("In B    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
+        CBS, nonCBS = get_num_CBS_elements(Sigma)
+        print("In Sigma, number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
 
+        return A, B, Sigma
+
+    def _run_std(
+        self,
+        no_coeffs: bool = False,
+        verbose: bool = True,
+        cv: bool = True,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Get standard deviation in matrix elements of LR equation.
+
+        Args:
+            no_coeffs: Set all coefficients of Pauli strings to 1
+            verbose: Print analysis per operator row
+            cv: Perform coefficient of varation analysis
+        """
+        idx_shift = self.num_q
+        print("Gs", self.num_G)
+        print("qs", self.num_q)
+
+        A = np.zeros((self.num_params, self.num_params))
+        B = np.zeros((self.num_params, self.num_params))
+        Sigma = np.zeros((self.num_params, self.num_params))
+
+        if not hasattr(self, "_G_exp") or len(self._G_exp) == 0:
+            # pre-calculate <0|G|0> and <0|HG|0>
+            self._G_exp = []  # save and use for properties
+            self._HG_exp = []
+            for GJ in self.G_ops:
+                self._G_exp.append(self.wf.QI.quantum_expectation_value(GJ.get_folded_operator(*self.orbs)))
+                self._HG_exp.append(
+                    self.wf.QI.quantum_expectation_value((self.H_0i_0a * GJ).get_folded_operator(*self.orbs))
+                )
+        # pre-calculate std of <0|G|0> and <0|HG|0>
+        var_G_exp = []  # save and use for properties
+        var_HG_exp = []
+        for GJ in self.G_ops:
+            var_G_exp.append(
+                self.wf.QI.quantum_variance(GJ.get_folded_operator(*self.orbs), no_coeffs=no_coeffs)
+            )
+            var_HG_exp.append(
+                self.wf.QI.quantum_variance(
+                    (self.H_0i_0a * GJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                )
+            )
+        var_energy = self.wf.QI.quantum_variance(
+            (self.H_0i_0a).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+        )
+
+        # qq
+        self.H_2i_2a = hamiltonian_pauli_2i_2a(
+            self.wf.h_mo,
+            self.wf.g_mo,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
+        )
+
+        for j, qJ in enumerate(self.q_ops):
+            for i, qI in enumerate(self.q_ops[j:], j):
+                # Make A
+                A[i, j] = A[j, i] = np.sqrt(
+                    self.wf.QI.quantum_variance(
+                        (qI.dagger * self.H_2i_2a * qJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
+                    + self.wf.QI.quantum_variance(
+                        (qI.dagger * qJ * self.H_2i_2a).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
+                )
+                # Make B
+                B[i, j] = B[j, i] = np.sqrt(
+                    self.wf.QI.quantum_variance(
+                        (qI.dagger * qJ.dagger * self.H_2i_2a).get_folded_operator(*self.orbs),
+                        no_coeffs=no_coeffs,
+                    )
+                )
+                # Make Sigma
+                Sigma[i, j] = Sigma[j, i] = np.sqrt(
+                    self.wf.QI.quantum_variance(
+                        (qI.dagger * qJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
+                )
+
+        # Gq
+        for j, qJ in enumerate(self.q_ops):
+            for i, GI in enumerate(self.G_ops):
+                # Make A
+                A[j, i + idx_shift] = A[i + idx_shift, j] = np.sqrt(
+                    self.wf.QI.quantum_variance(
+                        (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
+                )
+                # Make B
+                B[j, i + idx_shift] = B[i + idx_shift, j] = np.sqrt(
+                    self.wf.QI.quantum_variance(
+                        (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs),
+                        no_coeffs=no_coeffs,
+                    )
+                )
+
+        # GG
+        for j, GJ in enumerate(self.G_ops):
+            for i, GI in enumerate(self.G_ops[j:], j):
+                # Make A
+                val = self.wf.QI.quantum_variance(
+                    (GI.dagger * self.H_0i_0a * GJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                )
+                var_GG_exp = self.wf.QI.quantum_variance(
+                    (GI.dagger * GJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                )
+                GG_exp = self.wf.QI.quantum_expectation_value(
+                    (GI.dagger * GJ).get_folded_operator(*self.orbs)
+                )
+                # Var(A*B) = (\mu(A)^2 + var(A)) * (\mu(B)^2 + var(B)) - \mu(A)^2 \mu(B)^2
+                val += (GG_exp**2 + var_GG_exp) * (self.wf.energy_elec**2 + var_energy) - (
+                    GG_exp**2 * self.wf.energy_elec**2
+                )
+                val += (self._G_exp[i] ** 2 + var_G_exp[i]) * (self._HG_exp[j] ** 2 + var_HG_exp[j]) - (
+                    self._G_exp[i] ** 2 * self._HG_exp[j] ** 2
+                )
+                val += (self._G_exp[i] ** 2 + var_G_exp[i]) * (self._G_exp[j] ** 2 + var_G_exp[j]) * (
+                    self.wf.energy_elec**2 + var_energy
+                ) - (self._G_exp[i] ** 2 * self._G_exp[j] ** 2 * self.wf.energy_elec**2)
+                A[i + idx_shift, j + idx_shift] = A[j + idx_shift, i + idx_shift] = np.sqrt(val)
+                # Make B
+                val = (self._G_exp[j] ** 2 + var_G_exp[j]) * (self._HG_exp[i] ** 2 + var_HG_exp[i]) - (
+                    self._G_exp[j] ** 2 * self._HG_exp[i] ** 2
+                )
+                val += (self._G_exp[i] ** 2 + var_G_exp[i]) * (self._G_exp[j] ** 2 + var_G_exp[j]) * (
+                    self.wf.energy_elec**2 + var_energy
+                ) - (self._G_exp[i] ** 2 * self._G_exp[j] ** 2 * self.wf.energy_elec**2)
+                B[i + idx_shift, j + idx_shift] = B[j + idx_shift, i + idx_shift] = np.sqrt(val)
+                # Make Sigma
+                val = (self._G_exp[i] ** 2 + var_G_exp[i]) * (self._G_exp[j] ** 2 + var_G_exp[j]) - (
+                    self._G_exp[i] ** 2 * self._G_exp[j] ** 2
+                )
+                Sigma[i + idx_shift, j + idx_shift] = Sigma[j + idx_shift, i + idx_shift] = np.sqrt(
+                    var_GG_exp + val
+                )
+
+        if no_coeffs:
+            cv = False
+        self._analyze_std(A, B, Sigma, verbose=verbose, cv=cv)
         return A, B, Sigma
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
@@ -279,7 +691,7 @@ class quantumLR(quantumLRBaseClass):
             exp_muy = self.wf.QI.quantum_expectation_value(muy_op.get_folded_operator(*self.orbs))
             exp_muz = self.wf.QI.quantum_expectation_value(muz_op.get_folded_operator(*self.orbs))
             for i, G in enumerate(self.G_ops):
-                exp_G = self.G_exp[i]
+                exp_G = self._G_exp[i]
                 exp_Gmux = self.wf.QI.quantum_expectation_value(
                     (G.dagger * mux_op).get_folded_operator(*self.orbs)
                 )

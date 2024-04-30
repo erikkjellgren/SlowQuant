@@ -5,6 +5,7 @@ from functools import partial
 import numpy as np
 import scipy
 from qiskit.primitives import BaseEstimator, BaseSampler
+from qiskit.quantum_info import SparsePauliOp
 from qiskit_algorithms.optimizers import COBYLA, L_BFGS_B, SLSQP, SPSA
 
 from slowquant.molecularintegrals.integralfunctions import (
@@ -12,7 +13,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     two_electron_integral_transform,
 )
 from slowquant.qiskit_interface.base import FermionicOperator
-from slowquant.qiskit_interface.interface import QuantumInterface
+from slowquant.qiskit_interface.interface import Clique, QuantumInterface
 from slowquant.qiskit_interface.operators import Epq, hamiltonian_pauli_0i_0a
 from slowquant.qiskit_interface.optimizers import RotoSolve
 from slowquant.unitary_coupled_cluster.density_matrix import (
@@ -276,11 +277,12 @@ class WaveFunction:
         self._energy_elec = None
         self.QI.parameters = parameters
 
-    def change_primitive(self, primitive: BaseEstimator | BaseSampler) -> None:
+    def change_primitive(self, primitive: BaseEstimator | BaseSampler, verbose: bool = True) -> None:
         """Change the primitive expectation value calculator.
 
         Args:
             primitive: Primitive object.
+            verbose: Print more info.
         """
         self._rdm1 = None
         self._rdm2 = None
@@ -290,9 +292,19 @@ class WaveFunction:
         self.QI.total_device_calls = 0
         self.QI.total_shots_used = 0
         self.QI.total_paulis_evaluated = 0
-        self.QI.distributions = {}
+        self.QI.cliques = Clique()
         self.QI._Minv = None  # pylint: disable=protected-access
         self.QI._primitive = primitive  # pylint: disable=protected-access
+        # IMPORTANT: Shot number in primitive gets always overwritten if a shot number is defined in QI!
+        if self.QI.shots is not None and verbose:
+            print(
+                "Number of shots defined in new primitive are ignored as there is a number defined in the QI of ",
+                self.QI.shots,
+            )
+            print("If you want to change the number of shots, do this manually.")
+            print("Set the number of shots manually to None if you run an ideal simulator.")
+        self.QI.shots = self.QI.shots  # Redo shot check with new primitive
+        self.QI.ISA = self.QI.ISA  # Redo ISA parameter check
 
     @property
     def rdm1(self) -> np.ndarray:
@@ -385,11 +397,414 @@ class WaveFunction:
                         )
         return self._rdm2
 
+    @property
+    def rdm3(self) -> np.ndarray:
+        r"""Calcuate three-electron reduced density matrix.
+
+        The trace condition is enforced:
+
+        .. math::
+            \sum_{ijk}\Gamma^{[3]}_{iijjkk} = N_e(N_e-1)(N_e-2)
+
+        Returns:
+            Three-electron reduced density matrix.
+        """
+        if self._rdm3 is None:
+            self._rdm3 = np.zeros(
+                (
+                    self.num_active_orbs,
+                    self.num_active_orbs,
+                    self.num_active_orbs,
+                    self.num_active_orbs,
+                    self.num_active_orbs,
+                    self.num_active_orbs,
+                )
+            )
+            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                p_idx = p - self.num_inactive_orbs
+                for q in range(self.num_inactive_orbs, p + 1):
+                    q_idx = q - self.num_inactive_orbs
+                    for r in range(self.num_inactive_orbs, p + 1):
+                        r_idx = r - self.num_inactive_orbs
+                        for s in range(self.num_inactive_orbs, p + 1):
+                            s_idx = s - self.num_inactive_orbs
+                            for t in range(self.num_inactive_orbs, r + 1):
+                                t_idx = t - self.num_inactive_orbs
+                                for u in range(self.num_inactive_orbs, p + 1):
+                                    u_idx = u - self.num_inactive_orbs
+                                    pdm3_op = (Epq(p, q) * Epq(r, s) * Epq(t, u)).get_folded_operator(
+                                        self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+                                    )
+                                    val = self.QI.quantum_expectation_value(pdm3_op)
+                                    if t == s:
+                                        val -= self.rdm2[p_idx, q_idx, r_idx, u_idx]
+                                    if r == q:
+                                        val -= self.rdm2[p_idx, s_idx, t_idx, u_idx]
+                                    if t == q:
+                                        val -= self.rdm2[p_idx, u_idx, r_idx, s_idx]
+                                    if t == s and r == q:
+                                        val -= self.rdm1[p_idx, u_idx]
+                                    self._rdm3[p_idx, q_idx, r_idx, s_idx, t_idx, u_idx] = val  # type: ignore
+                                    self._rdm3[p_idx, q_idx, t_idx, u_idx, r_idx, s_idx] = val  # type: ignore
+                                    self._rdm3[r_idx, s_idx, p_idx, q_idx, t_idx, u_idx] = val  # type: ignore
+                                    self._rdm3[r_idx, s_idx, t_idx, u_idx, p_idx, q_idx] = val  # type: ignore
+                                    self._rdm3[t_idx, u_idx, p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
+                                    self._rdm3[t_idx, u_idx, r_idx, s_idx, p_idx, q_idx] = val  # type: ignore
+                                    self._rdm3[q_idx, p_idx, s_idx, r_idx, u_idx, t_idx] = val  # type: ignore
+                                    self._rdm3[q_idx, p_idx, u_idx, t_idx, s_idx, r_idx] = val  # type: ignore
+                                    self._rdm3[s_idx, r_idx, q_idx, p_idx, u_idx, t_idx] = val  # type: ignore
+                                    self._rdm3[s_idx, r_idx, u_idx, t_idx, q_idx, p_idx] = val  # type: ignore
+                                    self._rdm3[u_idx, t_idx, q_idx, p_idx, s_idx, r_idx] = val  # type: ignore
+                                    self._rdm3[u_idx, t_idx, s_idx, r_idx, q_idx, p_idx] = val  # type: ignore
+            if self.do_trace_corrected:
+                trace = 0.0
+                for i in range(self.num_active_orbs):
+                    for j in range(self.num_active_orbs):
+                        for k in range(self.num_active_orbs):
+                            trace += self._rdm3[i, i, j, j, k, k]  # type: ignore [index]
+                for i in range(self.num_active_orbs):
+                    for j in range(self.num_active_orbs):
+                        for k in range(self.num_active_orbs):
+                            self._rdm3[i, i, j, j, k, k] = (  # type: ignore [index]
+                                self._rdm3[i, i, j, j, k, k] * self.num_active_elec * (self.num_active_elec - 1) * (self.num_active_elec - 2) / trace  # type: ignore [index]
+                            )
+        return self._rdm3
+
+    @property
+    def rdm4(self) -> np.ndarray:
+        r"""Calcuate four-electron reduced density matrix.
+
+        The trace condition is enforced:
+
+        .. math::
+            \sum_{ijkl}\Gamma^{[4]}_{iijjkkll} = N_e(N_e-1)(N_e-2)(N_e-3)
+
+        Returns:
+            Four-electron reduced density matrix.
+        """
+        if self._rdm4 is None:
+            self._rdm4 = np.zeros(
+                (
+                    self.num_active_orbs,
+                    self.num_active_orbs,
+                    self.num_active_orbs,
+                    self.num_active_orbs,
+                    self.num_active_orbs,
+                    self.num_active_orbs,
+                    self.num_active_orbs,
+                    self.num_active_orbs,
+                )
+            )
+            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                p_idx = p - self.num_inactive_orbs
+                for q in range(self.num_inactive_orbs, p + 1):
+                    q_idx = q - self.num_inactive_orbs
+                    for r in range(self.num_inactive_orbs, p + 1):
+                        r_idx = r - self.num_inactive_orbs
+                        for s in range(self.num_inactive_orbs, p + 1):
+                            s_idx = s - self.num_inactive_orbs
+                            for t in range(self.num_inactive_orbs, r + 1):
+                                t_idx = t - self.num_inactive_orbs
+                                for u in range(self.num_inactive_orbs, p + 1):
+                                    u_idx = u - self.num_inactive_orbs
+                                    for m in range(self.num_inactive_orbs, t + 1):
+                                        m_idx = m - self.num_inactive_orbs
+                                        for n in range(self.num_inactive_orbs, p + 1):
+                                            n_idx = n - self.num_inactive_orbs
+                                            pdm4_op = (
+                                                Epq(p, q) * Epq(r, s) * Epq(t, u) * Epq(m, n)
+                                            ).get_folded_operator(
+                                                self.num_inactive_orbs,
+                                                self.num_active_orbs,
+                                                self.num_virtual_orbs,
+                                            )
+                                            val = self.QI.quantum_expectation_value(pdm4_op)
+                                            if r == q:
+                                                val -= self.rdm3[p_idx, s_idx, t_idx, u_idx, m_idx, n_idx]
+                                            if t == q:
+                                                val -= self.rdm3[p_idx, u_idx, r_idx, s_idx, m_idx, n_idx]
+                                            if m == q:
+                                                val -= self.rdm3[p_idx, n_idx, r_idx, s_idx, t_idx, u_idx]
+                                            if m == u:
+                                                val -= self.rdm3[p_idx, q_idx, r_idx, s_idx, t_idx, n_idx]
+                                            if t == s:
+                                                val -= self.rdm3[p_idx, q_idx, r_idx, u_idx, m_idx, n_idx]
+                                            if m == s:
+                                                val -= self.rdm3[p_idx, q_idx, r_idx, n_idx, t_idx, u_idx]
+                                            if m == u and r == q:
+                                                val -= self.rdm2[p_idx, s_idx, t_idx, n_idx]
+                                            if m == u and t == q:
+                                                val -= self.rdm2[p_idx, n_idx, r_idx, s_idx]
+                                            if t == s and m == u:
+                                                val -= self.rdm2[p_idx, q_idx, r_idx, n_idx]
+                                            if t == s and r == q:
+                                                val -= self.rdm2[p_idx, u_idx, m_idx, n_idx]
+                                            if t == s and m == q:
+                                                val -= self.rdm2[p_idx, n_idx, r_idx, u_idx]
+                                            if m == s and r == q:
+                                                val -= self.rdm2[p_idx, n_idx, t_idx, u_idx]
+                                            if m == s and t == q:
+                                                val -= self.rdm2[p_idx, u_idx, r_idx, n_idx]
+                                            if m == u and t == s and r == q:
+                                                val -= self.rdm1[p_idx, n_idx]
+                                            self._rdm4[  # type: ignore
+                                                p_idx, q_idx, r_idx, s_idx, t_idx, u_idx, m_idx, n_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                p_idx, q_idx, r_idx, s_idx, m_idx, n_idx, t_idx, u_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                p_idx, q_idx, t_idx, u_idx, r_idx, s_idx, m_idx, n_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                p_idx, q_idx, t_idx, u_idx, m_idx, n_idx, r_idx, s_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                p_idx, q_idx, m_idx, n_idx, r_idx, s_idx, t_idx, u_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                p_idx, q_idx, m_idx, n_idx, t_idx, u_idx, r_idx, s_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                r_idx, s_idx, p_idx, q_idx, t_idx, u_idx, m_idx, n_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                r_idx, s_idx, p_idx, q_idx, m_idx, n_idx, t_idx, u_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                r_idx, s_idx, t_idx, u_idx, p_idx, q_idx, m_idx, n_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                r_idx, s_idx, t_idx, u_idx, m_idx, n_idx, p_idx, q_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                r_idx, s_idx, m_idx, n_idx, p_idx, q_idx, t_idx, u_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                r_idx, s_idx, m_idx, n_idx, t_idx, u_idx, p_idx, q_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                t_idx, u_idx, p_idx, q_idx, r_idx, s_idx, m_idx, n_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                t_idx, u_idx, p_idx, q_idx, m_idx, n_idx, r_idx, s_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                t_idx, u_idx, r_idx, s_idx, p_idx, q_idx, m_idx, n_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                t_idx, u_idx, r_idx, s_idx, m_idx, n_idx, p_idx, q_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                t_idx, u_idx, m_idx, n_idx, p_idx, q_idx, r_idx, s_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                t_idx, u_idx, m_idx, n_idx, r_idx, s_idx, p_idx, q_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                m_idx, n_idx, p_idx, q_idx, r_idx, s_idx, t_idx, u_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                m_idx, n_idx, p_idx, q_idx, t_idx, u_idx, r_idx, s_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                m_idx, n_idx, r_idx, s_idx, p_idx, q_idx, t_idx, u_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                m_idx, n_idx, r_idx, s_idx, t_idx, u_idx, p_idx, q_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                m_idx, n_idx, t_idx, u_idx, p_idx, q_idx, r_idx, s_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                m_idx, n_idx, t_idx, u_idx, r_idx, s_idx, p_idx, q_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                q_idx, p_idx, s_idx, r_idx, u_idx, t_idx, n_idx, m_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                q_idx, p_idx, s_idx, r_idx, n_idx, m_idx, u_idx, t_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                q_idx, p_idx, u_idx, t_idx, s_idx, r_idx, n_idx, m_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                q_idx, p_idx, u_idx, t_idx, n_idx, m_idx, s_idx, r_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                q_idx, p_idx, n_idx, m_idx, s_idx, r_idx, u_idx, t_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                q_idx, p_idx, n_idx, m_idx, u_idx, t_idx, s_idx, r_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                s_idx, r_idx, q_idx, p_idx, u_idx, t_idx, n_idx, m_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                s_idx, r_idx, q_idx, p_idx, n_idx, m_idx, u_idx, t_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                s_idx, r_idx, u_idx, t_idx, q_idx, p_idx, n_idx, m_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                s_idx, r_idx, u_idx, t_idx, n_idx, m_idx, q_idx, p_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                s_idx, r_idx, n_idx, m_idx, q_idx, p_idx, u_idx, t_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                s_idx, r_idx, n_idx, m_idx, u_idx, t_idx, q_idx, p_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                u_idx, t_idx, q_idx, p_idx, s_idx, r_idx, n_idx, m_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                u_idx, t_idx, q_idx, p_idx, n_idx, m_idx, s_idx, r_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                u_idx, t_idx, s_idx, r_idx, q_idx, p_idx, n_idx, m_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                u_idx, t_idx, s_idx, r_idx, n_idx, m_idx, q_idx, p_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                u_idx, t_idx, n_idx, m_idx, q_idx, p_idx, s_idx, r_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                u_idx, t_idx, n_idx, m_idx, s_idx, r_idx, q_idx, p_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                n_idx, m_idx, q_idx, p_idx, s_idx, r_idx, u_idx, t_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                n_idx, m_idx, q_idx, p_idx, u_idx, t_idx, s_idx, r_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                n_idx, m_idx, s_idx, r_idx, q_idx, p_idx, u_idx, t_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                n_idx, m_idx, s_idx, r_idx, u_idx, t_idx, q_idx, p_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                n_idx, m_idx, u_idx, t_idx, q_idx, p_idx, s_idx, r_idx
+                                            ] = val
+                                            self._rdm4[  # type: ignore
+                                                n_idx, m_idx, u_idx, t_idx, s_idx, r_idx, q_idx, p_idx
+                                            ] = val
+            if self.do_trace_corrected:
+                trace = 0.0
+                for i in range(self.num_active_orbs):
+                    for j in range(self.num_active_orbs):
+                        for k in range(self.num_active_orbs):
+                            for l in range(self.num_active_orbs):
+                                trace += self._rdm4[i, i, j, j, k, k, l, l]  # type: ignore [index]
+                for i in range(self.num_active_orbs):
+                    for j in range(self.num_active_orbs):
+                        for k in range(self.num_active_orbs):
+                            for l in range(self.num_active_orbs):
+                                self._rdm4[i, i, j, j, k, k, l, l] = (  # type: ignore [index]
+                                    self._rdm4[i, i, j, j, k, k, l, l]  # type: ignore [index]
+                                    * self.num_active_elec
+                                    * (self.num_active_elec - 1)
+                                    * (self.num_active_elec - 2)
+                                    * (self.num_active_elec - 3)
+                                    / trace
+                                )
+        return self._rdm4
+
+    def precalc_rdm_paulis(self, rdm_order: int) -> None:
+        """Pre-calculate all Paulis used to contruct RDMs up to a certain order.
+
+        This utilizes the saving feature in QuantumInterface when using the Sampler primitive.
+        If saving is turned up in QuantumInterface this function will do nothing but waste device time.
+
+        Args:
+            rdm_order: Max order RDM.
+        """
+        if not isinstance(self.QI._primitive, BaseSampler):  # pylint: disable=protected-access
+            raise TypeError(
+                f"This feature is only supported for Sampler got {type(self.QI._primitive)} from QuantumInterface"  # pylint: disable=protected-access
+            )
+        if rdm_order > 4:
+            raise ValueError(f"Precalculation only supported up to order 4 got {rdm_order}")
+        if rdm_order < 1:
+            raise ValueError(f"Precalculation need atleast an order of 1 got {rdm_order}")
+        cumulated_paulis = None
+        if rdm_order >= 1:
+            self._rdm1 = None
+            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                for q in range(self.num_inactive_orbs, p + 1):
+                    rdm1_op = Epq(p, q).get_folded_operator(
+                        self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+                    )
+                    mapped_op = self.QI.op_to_qbit(rdm1_op)
+                    if cumulated_paulis is None:
+                        cumulated_paulis = set(mapped_op.paulis)
+                    else:
+                        cumulated_paulis = cumulated_paulis.union(mapped_op.paulis)
+        if rdm_order >= 2:
+            self._rdm2 = None
+            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                for q in range(self.num_inactive_orbs, p + 1):
+                    for r in range(self.num_inactive_orbs, p + 1):
+                        if p == q:
+                            s_lim = r + 1
+                        elif p == r:
+                            s_lim = q + 1
+                        elif q < r:
+                            s_lim = p
+                        else:
+                            s_lim = p + 1
+                        for s in range(self.num_inactive_orbs, s_lim):
+                            pdm2_op = (Epq(p, q) * Epq(r, s)).get_folded_operator(
+                                self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+                            )
+                            mapped_op = self.QI.op_to_qbit(pdm2_op)
+                            cumulated_paulis = cumulated_paulis.union(mapped_op.paulis)  # type: ignore[union-attr]
+        if rdm_order >= 3:
+            self._rdm3 = None
+            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                for q in range(self.num_inactive_orbs, p + 1):
+                    for r in range(self.num_inactive_orbs, p + 1):
+                        for s in range(self.num_inactive_orbs, p + 1):
+                            for t in range(self.num_inactive_orbs, r + 1):
+                                for u in range(self.num_inactive_orbs, p + 1):
+                                    pdm3_op = (Epq(p, q) * Epq(r, s) * Epq(t, u)).get_folded_operator(
+                                        self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+                                    )
+                                    mapped_op = self.QI.op_to_qbit(pdm3_op)
+                                    cumulated_paulis = cumulated_paulis.union(mapped_op.paulis)  # type: ignore[union-attr]
+        if rdm_order >= 4:
+            self._rdm4 = None
+            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                for q in range(self.num_inactive_orbs, p + 1):
+                    for r in range(self.num_inactive_orbs, p + 1):
+                        for s in range(self.num_inactive_orbs, p + 1):
+                            for t in range(self.num_inactive_orbs, r + 1):
+                                for u in range(self.num_inactive_orbs, p + 1):
+                                    for m in range(self.num_inactive_orbs, t + 1):
+                                        for n in range(self.num_inactive_orbs, p + 1):
+                                            pdm4_op = (
+                                                Epq(p, q) * Epq(r, s) * Epq(t, u) * Epq(m, n)
+                                            ).get_folded_operator(
+                                                self.num_inactive_orbs,
+                                                self.num_active_orbs,
+                                                self.num_virtual_orbs,
+                                            )
+                                            mapped_op = self.QI.op_to_qbit(pdm4_op)
+                                            cumulated_paulis = cumulated_paulis.union(mapped_op.paulis)  # type: ignore[union-attr]
+        # Calling expectation value to put all Paulis in cliques
+        # and compute distributions for the cliques.
+        # The coefficients are set to one, so the Paulis cannot cancel out.
+        _ = self.QI._sampler_quantum_expectation_value(  # pylint: disable=protected-access
+            SparsePauliOp(cumulated_paulis, np.ones(len(cumulated_paulis)))  # type: ignore[arg-type]
+        )
+
     def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
         r"""Check orthonormality of orbitals.
 
         .. math::
-            I = C_\text{MO}S\C_\text{MO}^T
+            \boldsymbol{I} = \boldsymbol{C}_\text{MO}\boldsymbol{S}\boldsymbol{C}_\text{MO}^T
 
         Args:
             overlap_integral: Overlap integral in AO basis.
@@ -409,7 +824,7 @@ class WaveFunction:
         if self._energy_elec is None:
             H = hamiltonian_pauli_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-            self._energy_elec = calc_energy_theta(self.ansatz_parameters, H, self.QI)
+            self._energy_elec = self.QI.quantum_expectation_value(H)
         return self._energy_elec
 
     def _calc_energy_elec(self) -> float:
@@ -420,7 +835,7 @@ class WaveFunction:
         """
         H = hamiltonian_pauli_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
         H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-        energy_elec = calc_energy_theta(self.ansatz_parameters, H, self.QI)
+        energy_elec = self.QI.quantum_expectation_value(H)
 
         return energy_elec
 
@@ -515,6 +930,11 @@ class WaveFunction:
                     print_progress, energy_func=energy_theta, silent=is_silent_subiterations
                 )
                 optimizer = SLSQP(maxiter=maxiter, ftol=tol, callback=print_progress_)
+            elif ansatz_optimizer.lower() == "slsqp_nograd":
+                print_progress_ = partial(
+                    print_progress, energy_func=energy_theta, silent=is_silent_subiterations
+                )
+                optimizer = SLSQP(maxiter=maxiter, ftol=tol, callback=print_progress_)
             elif ansatz_optimizer.lower() == "l_bfgs_b":
                 print_progress_ = partial(
                     print_progress, energy_func=energy_theta, silent=is_silent_subiterations
@@ -529,14 +949,23 @@ class WaveFunction:
                 print_progress_ = partial(
                     print_progress, energy_func=energy_theta, silent=is_silent_subiterations
                 )
-                optimizer = RotoSolve(maxiter=maxiter, tol=tol, callback=print_progress_)
+                optimizer = RotoSolve(
+                    self.QI.grad_param_R,
+                    self.QI.param_names,
+                    maxiter=maxiter,
+                    tol=tol,
+                    callback=print_progress_,
+                )
             elif ansatz_optimizer.lower() == "spsa":
                 print("WARNING: Convergence tolerence cannot be set for SPSA; using qiskit default")
                 print_progress_SPSA_ = partial(print_progress_SPSA, silent=is_silent_subiterations)
                 optimizer = SPSA(maxiter=maxiter, callback=print_progress_SPSA_)
             else:
                 raise ValueError(f"Unknown optimizer: {ansatz_optimizer}")
-            res = optimizer.minimize(energy_theta, self.ansatz_parameters, jac=gradient_theta)
+            if ansatz_optimizer.lower() == "slsqp_nograd":
+                res = optimizer.minimize(energy_theta, self.ansatz_parameters)
+            else:
+                res = optimizer.minimize(energy_theta, self.ansatz_parameters, jac=gradient_theta)
             self.ansatz_parameters = res.x.tolist()
 
             if orbital_optimization and len(self.kappa) != 0:
@@ -658,7 +1087,9 @@ class WaveFunction:
                     "Cannot use rotosolve together with orbital optimization in the one-step solver."
                 )
             print_progress_ = partial(print_progress, energy_func=energy_both)
-            optimizer = RotoSolve(maxiter=maxiter, tol=tol, callback=print_progress_)
+            optimizer = RotoSolve(
+                self.QI.grad_param_R, self.QI.param_names, maxiter=maxiter, tol=tol, callback=print_progress_
+            )
         elif optimizer_name.lower() == "spsa":
             print("WARNING: Convergence tolerence cannot be set for SPSA; using qiskit default")
             optimizer = SPSA(maxiter=maxiter, callback=print_progress_SPSA)
@@ -802,33 +1233,9 @@ def orbital_rotation_gradient(
 
 
 def ansatz_parameters_gradient(
-    parameters: list[float], operator, quantum_interface: QuantumInterface
+    parameters: list[float], operator: FermionicOperator, quantum_interface: QuantumInterface
 ) -> np.ndarray:
     r"""Calculate gradient with respect to ansatz parameters.
-
-    The gradient is calculated using parameter-shift assuming three eigenvalues of the generators.
-    This works for fermionic generators of the type:
-
-    .. math::
-        \hat{G}_{pq} = \hat{a}^\dagger_p \hat{a}_q - \hat{a}_q^\dagger \hat{a}_p
-
-    and,
-
-    .. math::
-        \hat{G}_{pqrs} = \hat{a}^\dagger_p \hat{a}^\dagger_q \hat{a}_r \hat{a}_s - \hat{a}^\dagger_s \hat{a}^\dagger_r \hat{a}_p \hat{a}_q
-
-    The parameter-shift rule is implemented as:
-
-    .. math::
-        \begin{align}
-        \frac{\partial E(\boldsymbol{\theta})}{\partial \theta_i} &=
-        \frac{\sqrt{2}+1}{2\sqrt{2}}\left(E\left(\theta_i += \frac{\pi}{2} - \frac{\pi}{4}\right) - E\left(\theta_i += -\frac{\\pi}{2} + \frac{\pi}{4}\right)\\right)\\
-        &- \frac{\sqrt{2}-1}{2\sqrt{2}}\left(E\left(\theta_i += \frac{\pi}{2} + \frac{\pi}{4}\right) - E\left(\theta_i += -\frac{\pi}{2} - \frac{\pi}{4}\right)\right)
-        \end{align}
-
-
-    #. 10.1088/1367-2630/ac2cb3: Eq. (F14)
-    #. 10.22331/q-2022-03-30-677: Eq. (8)
 
     Args:
         parameters: Ansatz parameters.
@@ -839,28 +1246,49 @@ def ansatz_parameters_gradient(
         Gradient with repsect to ansatz parameters.
     """
     gradient = np.zeros(len(parameters))
-    h = np.pi / 2 - np.pi / 4
-    h2 = np.pi / 2 + np.pi / 4
     for i in range(len(parameters)):  # pylint: disable=consider-using-enumerate
-        parameters[i] += h
-        Ep = quantum_interface.quantum_expectation_value(operator, custom_parameters=parameters)
-        parameters[i] -= h
-        parameters[i] += h2
-        Ep2 = quantum_interface.quantum_expectation_value(operator, custom_parameters=parameters)
-        parameters[i] -= h2
-        parameters[i] -= h
-        Em = quantum_interface.quantum_expectation_value(operator, custom_parameters=parameters)
-        parameters[i] += h
-        parameters[i] -= h2
-        Em2 = quantum_interface.quantum_expectation_value(operator, custom_parameters=parameters)
-        parameters[i] += h2
-        gradient[i] = (2 ** (1 / 2) + 1) / (2 * 2 ** (1 / 2)) * (Ep - Em) - (2 ** (1 / 2) - 1) / (
-            2 * 2 ** (1 / 2)
-        ) * (Ep2 - Em2)
+        R = quantum_interface.grad_param_R[quantum_interface.param_names[i]]
+        e_vals_grad = get_energy_evals_for_grad(operator, quantum_interface, parameters, i, R)
+        grad = 0.0
+        for j, mu in enumerate(list(range(1, 2 * R + 1))):
+            x_mu = (2 * mu - 1) / (2 * R) * np.pi
+            grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R * (np.sin(1 / 2 * x_mu)) ** 2)
+        gradient[i] = grad
     return gradient
 
 
-def calc_gradient_both(parameters, wf) -> np.ndarray:
+def get_energy_evals_for_grad(
+    operator: FermionicOperator,
+    quantum_interface: QuantumInterface,
+    parameters: list[float],
+    idx: int,
+    R: int,
+) -> list[float]:
+    r"""Get energy evaluations needed for the gradient calculation.
+
+    The gradient formula is defined for x=0,
+    so x_shift is used to shift ensure we can get the energy in the point we actually want.
+
+    Args:
+        operator: Operator which the derivative is with respect to.
+        parameters: Paramters.
+        idx: Parameter idx.
+        R: Parameter to control we get the needed points.
+
+    Returns:
+        Energies in a few fixed points.
+    """
+    e_vals = []
+    x = parameters.copy()
+    x_shift = x[idx]
+    for mu in range(1, 2 * R + 1):
+        x_mu = (2 * mu - 1) / (2 * R) * np.pi
+        x[idx] = x_mu + x_shift
+        e_vals.append(quantum_interface.quantum_expectation_value(operator, custom_parameters=x))
+    return e_vals
+
+
+def calc_gradient_both(parameters: list[float], wf: WaveFunction) -> np.ndarray:
     """Calculate electronic gradient.
 
     Args:

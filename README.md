@@ -4,7 +4,8 @@
 
 ![SlowQuant logo](https://cloud.githubusercontent.com/assets/11976167/26658726/5e125b02-466c-11e7-8790-8412789fc9fb.jpg)
 
-SlowQuant is a molecular quantum chemistry program written in Python.
+SlowQuant is a molecular quantum chemistry program written in Python for classic and quantum computing.
+Its specialty is unitary coupled cluster and (time-dependent) linear response in various novel parametrization schemes.
 Even the computational demanding parts are written in Python, so it lacks speed, thus the name SlowQuant.
 
 Documentation can be found at:
@@ -13,8 +14,11 @@ http://slowquant.readthedocs.io/en/latest/
 
 ## Quantum Computing, VQE
 
-- UCCSD (through qiskit)
+- UCCSD (using hand-crafted Ansatz or through Qiskit)
 - Linear Response SD, spin-adapted operators
+
+These features are also implemented with the active-space approximation and orbital-optimization.
+Suitable for ideal simulator, shot noise simulator, or quantum hardware via IBM Quantum Hub (Interface via Qiskit)
 
 ## Conventional Computing, Unitary Coupled Cluster
 
@@ -23,7 +27,7 @@ Current implementation supports:
 - UCCSD, spin-adapted operators
 - UCCSDTQ56
 - Linear Response SD, spin-adapted operators
-- Linear Respinse SDTQ56
+- Linear Response SDTQ56
 
 These features are also implemented with the active-space approximation and orbital-optimization.
 
