@@ -2,13 +2,10 @@
 import numpy as np
 
 import slowquant.SlowQuant as sq
-import slowquant.unitary_coupled_cluster.linear_response.generic as genericLR
-import slowquant.unitary_coupled_cluster.linear_response.naive as naiveLR
-import slowquant.unitary_coupled_cluster.linear_response.selfconsistent as selfconsistentLR
-from slowquant.unitary_coupled_cluster.operator_pauli import (
-    expectation_value_pauli,
-    hamiltonian_pauli,
-)
+
+# import slowquant.unitary_coupled_cluster.linear_response.generic as genericLR
+# import slowquant.unitary_coupled_cluster.linear_response.naive as naiveLR
+# import slowquant.unitary_coupled_cluster.linear_response.selfconsistent as selfconsistentLR
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import (
     WaveFunctionUCC,
     load_wavefunction,
