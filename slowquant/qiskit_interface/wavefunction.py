@@ -304,6 +304,7 @@ class WaveFunction:
             print("If you want to change the number of shots, do this manually.")
             print("Set the number of shots manually to None if you run an ideal simulator.")
         self.QI.shots = self.QI.shots  # Redo shot check with new primitive
+        self.QI.ISA = self.QI.ISA  # Redo ISA parameter check
 
     @property
     def rdm1(self) -> np.ndarray:
