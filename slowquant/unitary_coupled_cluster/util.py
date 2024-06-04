@@ -5,7 +5,7 @@ import scipy.linalg
 import scipy.sparse as ss
 
 import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
-from slowquant.unitary_coupled_cluster.operator_matrix import build_operator
+from slowquant.unitary_coupled_cluster.operator_matrix import build_operator_matrix
 from slowquant.unitary_coupled_cluster.operators import G1_sa, G2_1_sa, G2_2_sa
 
 
@@ -161,17 +161,17 @@ def construct_ucc_u(
     if "s" in excitations:
         for _, a, i, _ in theta_picker.get_t1_generator_sa():
             if theta[counter] != 0.0:
-                t += theta[counter] * build_operator(G1_sa(i, a), idx2det, det2idx, num_active_orbs)
+                t += theta[counter] * build_operator_matrix(G1_sa(i, a), idx2det, det2idx, num_active_orbs)
             counter += 1
     if "d" in excitations:
         for _, a, i, b, j, _, type_idx in theta_picker.get_t2_generator_sa():
             if theta[counter] != 0.0:
                 if type_idx == 1:
-                    t += theta[counter] * build_operator(
+                    t += theta[counter] * build_operator_matrix(
                         G2_1_sa(i, j, a, b), idx2det, det2idx, num_active_orbs
                     )
                 elif type_idx == 2:
-                    t += theta[counter] * build_operator(
+                    t += theta[counter] * build_operator_matrix(
                         G2_2_sa(i, j, a, b), idx2det, det2idx, num_active_orbs
                     )
                 else:

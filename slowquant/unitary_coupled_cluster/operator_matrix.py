@@ -24,15 +24,15 @@ def get_indexing(
     return idx2det, det2idx
 
 
-def build_operator(
-    op: FermionicOperator, idx2det: dict[int, int], det2idx: dict[int, int], num_orbs: int
+def build_operator_matrix(
+    op: FermionicOperator, idx2det: dict[int, int], det2idx: dict[int, int], num_active_orbs: int
 ) -> np.ndarray:
     num_dets = len(idx2det)
     op_mat = np.zeros((num_dets, num_dets))
     for i in range(num_dets):
         op_state_vec = np.zeros(num_dets)
         for fermi_label in op.factors:
-            det = np.array([int(x) for x in format(idx2det[i], f"#0{2*num_orbs+2}b")[2:]], dtype=int)
+            det = np.array([int(x) for x in format(idx2det[i], f"#0{2*num_active_orbs+2}b")[2:]], dtype=int)
             phase_changes = 0
             for fermi_op in op.operators[fermi_label][::-1]:
                 orb_idx = fermi_op.idx
@@ -63,7 +63,7 @@ def expectation_value(
     num_active_orbs: int,
     num_virtual_orbs: int,
 ) -> float:
-    op_mat = build_operator(
+    op_mat = build_operator_matrix(
         op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs),
         idx2det,
         det2idx,
@@ -84,7 +84,7 @@ def expectation_value_commutator(
     num_virtual_orbs: int,
 ) -> float:
     op = A * B - B * A
-    op_mat = build_operator(
+    op_mat = build_operator_matrix(
         op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs),
         idx2det,
         det2idx,
@@ -106,7 +106,7 @@ def expectation_value_double_commutator(
     num_virtual_orbs: int,
 ) -> float:
     op = A * B * C - A * C * B - B * C * A + C * B * A
-    op_mat = build_operator(
+    op_mat = build_operator_matrix(
         op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs),
         idx2det,
         det2idx,

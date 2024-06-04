@@ -20,7 +20,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_gradient,
 )
 from slowquant.unitary_coupled_cluster.operator_matrix import (
-    build_operator,
+    build_operator_matrix,
     expectation_value,
     expectation_value_mat,
     get_indexing,
@@ -1381,7 +1381,7 @@ def active_space_parameter_gradient(
         theta5
     ) + len(theta6)
 
-    Hamiltonian = build_operator(
+    Hamiltonian = build_operator_matrix(
         hamiltonian_0i_0a(
             wf.h_mo,
             wf.g_mo,
