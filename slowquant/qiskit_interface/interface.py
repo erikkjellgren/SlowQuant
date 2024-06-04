@@ -12,7 +12,6 @@ from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
-from slowquant.qiskit_interface.base import FermionicOperator
 from slowquant.qiskit_interface.custom_ansatz import (
     ErikD_JW,
     ErikD_Parity,
@@ -26,6 +25,7 @@ from slowquant.qiskit_interface.util import (
     get_bitstring_sign,
     to_CBS_measurement,
 )
+from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 
 
 class QuantumInterface:

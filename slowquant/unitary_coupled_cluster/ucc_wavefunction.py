@@ -15,17 +15,17 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
     two_electron_integral_transform,
 )
-from slowquant.qiskit_interface.operators import Epq, hamiltonian_pauli_0i_0a
-from slowquant.unitary_coupled_cluster.base import (
+from slowquant.unitary_coupled_cluster.density_matrix import (
+    ReducedDenstiyMatrix,
+    get_orbital_gradient,
+)
+from slowquant.unitary_coupled_cluster.operator_matrix import (
     build_operator,
     expectation_value,
     expectation_value_mat,
     get_indexing,
 )
-from slowquant.unitary_coupled_cluster.density_matrix import (
-    ReducedDenstiyMatrix,
-    get_orbital_gradient,
-)
+from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_ucc_u
 
 
@@ -1249,7 +1249,7 @@ def energy_ucc(
     wf.add_multiple_theta(theta_dict, excitations)
     return expectation_value(
         wf.ci_coeffs,
-        hamiltonian_pauli_0i_0a(
+        hamiltonian_0i_0a(
             wf.h_mo,
             wf.g_mo,
             wf.num_inactive_orbs,
@@ -1382,7 +1382,7 @@ def active_space_parameter_gradient(
     ) + len(theta6)
 
     Hamiltonian = build_operator(
-        hamiltonian_pauli_0i_0a(
+        hamiltonian_0i_0a(
             wf.h_mo,
             wf.g_mo,
             wf.num_inactive_orbs,

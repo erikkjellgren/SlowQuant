@@ -10,14 +10,14 @@ from slowquant.qiskit_interface.linear_response.lr_baseclass import (
     get_num_nonCBS,
     quantumLRBaseClass,
 )
-from slowquant.qiskit_interface.operators import (
-    hamiltonian_pauli_2i_2a,
-    one_elec_op_0i_0a,
-)
 from slowquant.qiskit_interface.util import Clique
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_orbital_response_property_gradient,
+)
+from slowquant.unitary_coupled_cluster.operators import (
+    hamiltonian_2i_2a,
+    one_elec_op_0i_0a,
 )
 
 
@@ -37,7 +37,7 @@ class quantumLR(quantumLRBaseClass):
         print("qs", self.num_q)
 
         # This hamiltonian is expensive and not needed in the naive orbitale rotation formalism
-        self.H_2i_2a = hamiltonian_pauli_2i_2a(
+        self.H_2i_2a = hamiltonian_2i_2a(
             self.wf.h_mo,
             self.wf.g_mo,
             self.wf.num_inactive_orbs,
@@ -268,7 +268,7 @@ class quantumLR(quantumLRBaseClass):
         )
 
         # qq
-        self.H_2i_2a = hamiltonian_pauli_2i_2a(
+        self.H_2i_2a = hamiltonian_2i_2a(
             self.wf.h_mo,
             self.wf.g_mo,
             self.wf.num_inactive_orbs,

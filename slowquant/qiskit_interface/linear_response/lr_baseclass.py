@@ -4,14 +4,14 @@ import numpy as np
 import scipy
 from dmdm.util import iterate_t1_sa, iterate_t2_sa  # temporary solution
 
-from slowquant.qiskit_interface.operators import (
+from slowquant.qiskit_interface.wavefunction import WaveFunction
+from slowquant.unitary_coupled_cluster.operators import (
     G1,
     G2_1,
     G2_2,
-    hamiltonian_pauli_0i_0a,
-    hamiltonian_pauli_1i_1a,
+    hamiltonian_0i_0a,
+    hamiltonian_1i_1a,
 )
-from slowquant.qiskit_interface.wavefunction import WaveFunction
 
 
 class quantumLRBaseClass:
@@ -27,8 +27,8 @@ class quantumLRBaseClass:
         """
         self.wf = wf
         # Create operators
-        self.H_0i_0a = hamiltonian_pauli_0i_0a(wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs)
-        self.H_1i_1a = hamiltonian_pauli_1i_1a(
+        self.H_0i_0a = hamiltonian_0i_0a(wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs)
+        self.H_1i_1a = hamiltonian_1i_1a(
             wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs, wf.num_virtual_orbs
         )
 

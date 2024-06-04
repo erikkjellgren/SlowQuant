@@ -1,6 +1,6 @@
 import numpy as np
 
-from slowquant.qiskit_interface.base import FermionicOperator, a_op
+from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator, a_op
 
 
 def Epq(p: int, q: int) -> FermionicOperator:
@@ -94,7 +94,7 @@ def double_commutator(A: FermionicOperator, B: FermionicOperator, C: FermionicOp
     return A * B * C - A * C * B - B * C * A + C * B * A
 
 
-def G1(i: int, a: int) -> FermionicOperator:
+def G1_sa(i: int, a: int) -> FermionicOperator:
     r"""Construct singlet one-electron spin-adapted excitation operator.
 
     .. math::
@@ -109,7 +109,7 @@ def G1(i: int, a: int) -> FermionicOperator:
     return 2 ** (-1 / 2) * Epq(a, i)
 
 
-def G2_1(i: int, j: int, a: int, b: int) -> FermionicOperator:
+def G2_1_sa(i: int, j: int, a: int, b: int) -> FermionicOperator:
     r"""Construct first singlet two-electron spin-adapted excitation operator.
 
     .. math::
@@ -131,7 +131,7 @@ def G2_1(i: int, j: int, a: int, b: int) -> FermionicOperator:
     return 1 / 2 * (fac) ** (-1 / 2) * (Epq(a, i) * Epq(b, j) + Epq(a, j) * Epq(b, i))
 
 
-def G2_2(i: int, j: int, a: int, b: int) -> FermionicOperator:
+def G2_2_sa(i: int, j: int, a: int, b: int) -> FermionicOperator:
     r"""Construct second singlet two-electron spin-adapted excitation operator.
 
     .. math::
@@ -178,7 +178,7 @@ def hamiltonian_full_space(h_mo: np.ndarray, g_mo: np.ndarray, num_orbs: int) ->
     return H_operator
 
 
-def hamiltonian_pauli_0i_0a(
+def hamiltonian_0i_0a(
     h_mo: np.ndarray,
     g_mo: np.ndarray,
     num_inactive_orbs: int,
@@ -234,7 +234,7 @@ def hamiltonian_pauli_0i_0a(
     return hamiltonian_operator
 
 
-def hamiltonian_pauli_1i_1a(
+def hamiltonian_1i_1a(
     h_mo: np.ndarray,
     g_mo: np.ndarray,
     num_inactive_orbs: int,
@@ -303,7 +303,7 @@ def hamiltonian_pauli_1i_1a(
     return hamiltonian_operator
 
 
-def hamiltonian_pauli_2i_2a(
+def hamiltonian_2i_2a(
     h_mo: np.ndarray,
     g_mo: np.ndarray,
     num_inactive_orbs: int,

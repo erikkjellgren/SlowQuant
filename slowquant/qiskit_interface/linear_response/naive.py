@@ -5,17 +5,10 @@ import numpy as np
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
-from slowquant.qiskit_interface.base import FermionicOperator
 from slowquant.qiskit_interface.linear_response.lr_baseclass import (
     get_num_CBS_elements,
     get_num_nonCBS,
     quantumLRBaseClass,
-)
-from slowquant.qiskit_interface.operators import (
-    commutator,
-    double_commutator,
-    hamiltonian_pauli_2i_2a,
-    one_elec_op_0i_0a,
 )
 from slowquant.qiskit_interface.util import Clique
 from slowquant.unitary_coupled_cluster.density_matrix import (
@@ -24,6 +17,13 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_response_hessian_block,
     get_orbital_response_metric_sigma,
     get_orbital_response_property_gradient,
+)
+from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
+from slowquant.unitary_coupled_cluster.operators import (
+    commutator,
+    double_commutator,
+    hamiltonian_2i_2a,
+    one_elec_op_0i_0a,
 )
 
 
@@ -115,7 +115,7 @@ class quantumLR(quantumLRBaseClass):
                 rdms, self.wf.kappa_idx
             )
         else:
-            self.H_2i_2a = hamiltonian_pauli_2i_2a(
+            self.H_2i_2a = hamiltonian_2i_2a(
                 self.wf.h_mo,
                 self.wf.g_mo,
                 self.wf.num_inactive_orbs,
@@ -204,7 +204,7 @@ class quantumLR(quantumLRBaseClass):
         Sigma = [[""] * self.num_params for _ in range(self.num_params)]
 
         if not do_rdm:
-            self.H_2i_2a = hamiltonian_pauli_2i_2a(
+            self.H_2i_2a = hamiltonian_2i_2a(
                 self.wf.h_mo,
                 self.wf.g_mo,
                 self.wf.num_inactive_orbs,
@@ -312,7 +312,7 @@ class quantumLR(quantumLRBaseClass):
         print("Gs", self.num_G)
         print("qs", self.num_q)
 
-        self.H_2i_2a = hamiltonian_pauli_2i_2a(
+        self.H_2i_2a = hamiltonian_2i_2a(
             self.wf.h_mo,
             self.wf.g_mo,
             self.wf.num_inactive_orbs,

@@ -5,8 +5,8 @@ import scipy.linalg
 import scipy.sparse as ss
 
 import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
-from slowquant.qiskit_interface.operators import G1, G2_1, G2_2
-from slowquant.unitary_coupled_cluster.base import build_operator
+from slowquant.unitary_coupled_cluster.operator_matrix import build_operator
+from slowquant.unitary_coupled_cluster.operators import G1_sa, G2_1_sa, G2_2_sa
 
 
 def construct_integral_trans_mat(
@@ -161,15 +161,19 @@ def construct_ucc_u(
     if "s" in excitations:
         for _, a, i, _ in theta_picker.get_t1_generator_sa():
             if theta[counter] != 0.0:
-                t += theta[counter] * build_operator(G1(i, a), idx2det, det2idx, num_active_orbs)
+                t += theta[counter] * build_operator(G1_sa(i, a), idx2det, det2idx, num_active_orbs)
             counter += 1
     if "d" in excitations:
         for _, a, i, b, j, _, type_idx in theta_picker.get_t2_generator_sa():
             if theta[counter] != 0.0:
                 if type_idx == 1:
-                    t += theta[counter] * build_operator(G2_1(i, j, a, b), idx2det, det2idx, num_active_orbs)
+                    t += theta[counter] * build_operator(
+                        G2_1_sa(i, j, a, b), idx2det, det2idx, num_active_orbs
+                    )
                 elif type_idx == 2:
-                    t += theta[counter] * build_operator(G2_2(i, j, a, b), idx2det, det2idx, num_active_orbs)
+                    t += theta[counter] * build_operator(
+                        G2_2_sa(i, j, a, b), idx2det, det2idx, num_active_orbs
+                    )
                 else:
                     raise ValueError(f"Expected type_idx to be in (1,2) got {type_idx}")
             counter += 1
