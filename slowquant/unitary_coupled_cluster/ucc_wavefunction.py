@@ -66,6 +66,8 @@ class WaveFunctionUCC:
         self.active_occ_spin_idx_shifted = []
         self.active_unocc_spin_idx_shifted = []
         self.num_elec = num_elec
+        self.num_elec_alpha = num_elec//2
+        self.num_elec_beta = num_elec//2
         self.num_spin_orbs = num_spin_orbs
         self.num_orbs = num_spin_orbs // 2
         self._include_active_kappa = include_active_kappa
@@ -111,6 +113,8 @@ class WaveFunctionUCC:
                 self.active_occ_spin_idx_shifted.append(active_idx - active_shift)
             for active_idx in self.active_unocc_spin_idx:
                 self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
+        self.num_active_elec_alpha = self.num_active_elec//2
+        self.num_active_elec_beta = self.num_active_elec//2
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
         self.num_active_orbs = self.num_active_spin_orbs // 2
         self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
@@ -189,7 +193,7 @@ class WaveFunctionUCC:
                     self.kappa_hf_like_idx.append([p, q])
         # Construct determinant basis
         self.idx2det, self.det2idx = get_indexing(
-            self.num_active_orbs, self.num_active_elec // 2, self.num_active_elec // 2
+            self.num_active_orbs, self.num_active_elec_alpha, self.num_active_elec_beta
         )
         self.num_det = len(self.idx2det)
         self.hf_coeffs = np.zeros(self.num_det)
@@ -283,11 +287,11 @@ class WaveFunctionUCC:
             self._u = construct_ucc_u(
                 self.num_det,
                 self.num_active_orbs,
+                self.num_active_elec_alpha,
+                self.num_active_elec_beta,
                 thetas,
                 self.singlet_excitation_operator_generator,
                 self._excitations,
-                self.det2idx,
-                self.idx2det,
             )
         return self._u
 

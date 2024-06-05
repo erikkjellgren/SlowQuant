@@ -4,7 +4,8 @@ from sympy.utilities.iterables import multiset_permutations
 
 import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
-
+from slowquant.unitary_coupled_cluster.operators import G1_sa, G2_1_sa, G2_2_sa
+import functools
 
 def get_indexing(
     num_orbs: int, num_elec_alpha: int, num_elec_beta: int
@@ -29,26 +30,32 @@ def build_operator_matrix(
 ) -> np.ndarray:
     num_dets = len(idx2det)
     op_mat = np.zeros((num_dets, num_dets))
+    parity_check = {0: 0}
+    num = 0
+    for i in range(2*num_active_orbs-1, -1, -1):
+        num += 2**i
+        parity_check[2*num_active_orbs - i] = num
     for i in range(num_dets):
         op_state_vec = np.zeros(num_dets)
+        det_ = idx2det[i]
         for fermi_label in op.factors:
-            det = np.array([int(x) for x in format(idx2det[i], f"#0{2*num_active_orbs+2}b")[2:]], dtype=int)
+            det = det_
             phase_changes = 0
             for fermi_op in op.operators[fermi_label][::-1]:
                 orb_idx = fermi_op.idx
-                if det[orb_idx] == 0 and fermi_op.dagger:
-                    det[orb_idx] = 1
-                    phase_changes += np.sum(det[0:orb_idx])
-                elif det[orb_idx] == 1 and fermi_op.dagger:
+                nth_bit = (det >> 2*num_active_orbs - 1 - orb_idx) & 1
+                if nth_bit == 0 and fermi_op.dagger:
+                    det = det ^ 2**(2*num_active_orbs - 1 - orb_idx)
+                    phase_changes += (det&parity_check[orb_idx]).bit_count()
+                elif nth_bit == 1 and fermi_op.dagger:
                     break
-                elif det[orb_idx] == 0 and not fermi_op.dagger:
+                elif nth_bit == 0 and not fermi_op.dagger:
                     break
-                elif det[orb_idx] == 1 and not fermi_op.dagger:
-                    det[orb_idx] = 0
-                    phase_changes += np.sum(det[0:orb_idx])
+                elif nth_bit == 1 and not fermi_op.dagger:
+                    det = det ^ 2**(2*num_active_orbs - 1 - orb_idx)
+                    phase_changes += (det&parity_check[orb_idx]).bit_count()
             else:  # nobreak
-                det_idx = int("".join([str(x) for x in det]), 2)
-                op_state_vec[det2idx[det_idx]] += op.factors[fermi_label] * (-1) ** phase_changes
+                op_state_vec[det2idx[det]] += op.factors[fermi_label] * (-1) ** phase_changes
         op_mat[i, :] = op_state_vec
     return op_mat
 
@@ -117,3 +124,21 @@ def expectation_value_double_commutator(
 
 def expectation_value_mat(bra: np.ndarray, op: np.ndarray, ket: np.ndarray) -> float:
     return np.matmul(bra, np.matmul(op, ket))
+
+
+@functools.cache
+def G1_sa_matrix(i: int, a: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int) -> np.ndarray:
+    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
+    return build_operator_matrix(G1_sa(i,a), idx2det, det2idx, num_active_orbs)
+
+
+@functools.cache
+def G2_1_sa_matrix(i: int, j: int, a: int, b: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int) -> np.ndarray:
+    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
+    return build_operator_matrix(G2_1_sa(i,j,a,b), idx2det, det2idx, num_active_orbs)
+
+
+@functools.cache
+def G2_2_sa_matrix(i: int, j: int, a: int, b: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int) -> np.ndarray:
+    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
+    return build_operator_matrix(G2_2_sa(i,j,a,b), idx2det, det2idx, num_active_orbs)

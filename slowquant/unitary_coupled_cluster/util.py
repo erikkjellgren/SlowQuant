@@ -6,7 +6,7 @@ import scipy.sparse as ss
 
 import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
 from slowquant.unitary_coupled_cluster.operator_matrix import build_operator_matrix
-from slowquant.unitary_coupled_cluster.operators import G1_sa, G2_1_sa, G2_2_sa
+from slowquant.unitary_coupled_cluster.operator_matrix import G1_sa_matrix, G2_1_sa_matrix, G2_2_sa_matrix
 
 
 def construct_integral_trans_mat(
@@ -138,11 +138,11 @@ def iterate_t2_sa(
 def construct_ucc_u(
     num_det: int,
     num_active_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
     theta: Sequence[float],
     theta_picker: ThetaPicker,
     excitations: str,
-    det2idx: dict[int, int],
-    idx2det: dict[int, int],
 ) -> np.ndarray:
     """Contruct unitary transformation matrix.
 
@@ -161,19 +161,15 @@ def construct_ucc_u(
     if "s" in excitations:
         for _, a, i, _ in theta_picker.get_t1_generator_sa():
             if theta[counter] != 0.0:
-                t += theta[counter] * build_operator_matrix(G1_sa(i, a), idx2det, det2idx, num_active_orbs)
+                t += theta[counter] * G1_sa_matrix(i, a, num_active_orbs, num_elec_alpha, num_elec_beta) 
             counter += 1
     if "d" in excitations:
         for _, a, i, b, j, _, type_idx in theta_picker.get_t2_generator_sa():
             if theta[counter] != 0.0:
                 if type_idx == 1:
-                    t += theta[counter] * build_operator_matrix(
-                        G2_1_sa(i, j, a, b), idx2det, det2idx, num_active_orbs
-                    )
+                    t += theta[counter] * G2_1_sa_matrix(i,j, a,b, num_active_orbs, num_elec_alpha, num_elec_beta) 
                 elif type_idx == 2:
-                    t += theta[counter] * build_operator_matrix(
-                        G2_2_sa(i, j, a, b), idx2det, det2idx, num_active_orbs
-                    )
+                    t += theta[counter] * G2_2_sa_matrix(i,j, a,b, num_active_orbs, num_elec_alpha, num_elec_beta) 
                 else:
                     raise ValueError(f"Expected type_idx to be in (1,2) got {type_idx}")
             counter += 1
