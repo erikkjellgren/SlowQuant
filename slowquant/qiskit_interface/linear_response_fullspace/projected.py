@@ -5,8 +5,8 @@ import numpy as np
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
-from slowquant.qiskit_interface.interface import make_cliques
-from slowquant.qiskit_interface.linear_response.lr_baseclass import (
+#from slowquant.qiskit_interface.interface import make_cliques
+from slowquant.qiskit_interface.linear_response_fullspace.lr_baseclass import (
     get_num_CBS_elements,
     get_num_nonCBS,
     quantumLRBaseClass,

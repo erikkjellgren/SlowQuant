@@ -62,6 +62,7 @@ class quantumLRBaseClass:
     def get_excitation_energies(self) -> np.ndarray:
         """Solve LR eigenvalue problem."""
         # Build Hessian and Metric
+        print("hallo exictaion")
         size = len(self.A)
         self.Delta = np.zeros_like(self.Sigma)
         self.hessian = np.zeros((size * 2, size * 2))
@@ -82,6 +83,16 @@ class quantumLRBaseClass:
         self.excitation_vectors = np.real(eigvec[:, sorting][:, size:])
 
         return self.excitation_energies
+
+    def print_hessian_matrix(self) -> np.ndarray:
+        size = len(self.A)
+        self.Delta = np.zeros_like(self.Sigma)
+        self.hessian = np.zeros((size * 2, size * 2))
+        self.hessian[:size, :size] = self.A
+        self.hessian[:size, size:] = self.B
+        self.hessian[size:, :size] = self.B
+        self.hessian[size:, size:] = self.A
+        return self.hessian
 
     def get_normed_excitation_vectors(self) -> None:
         """Get normed excitation vectors via excitated state norm."""

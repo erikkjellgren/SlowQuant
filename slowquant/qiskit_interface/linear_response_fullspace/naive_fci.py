@@ -6,8 +6,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
 from slowquant.qiskit_interface.base import FermionicOperator
-from slowquant.qiskit_interface.interface import make_cliques
-from slowquant.qiskit_interface.linear_response.lr_baseclass import (
+from slowquant.qiskit_interface.linear_response_fullspace.lr_baseclass import (
     get_num_CBS_elements,
     get_num_nonCBS,
     quantumLRBaseClass,
@@ -24,9 +23,9 @@ class quantumLR(quantumLRBaseClass):
         self,
     ) -> None:
         """Run simulation of naive LR matrix elements."""
-        idx_shift = self.num_q
+        #idx_shift = self.num_q
         print("Gs", self.num_G)
-
+        
         grad = np.zeros(2 * self.num_G)
         for i, op in enumerate(self.G_ops):
             grad[i] = self.wf.QI.quantum_expectation_value(
@@ -44,15 +43,22 @@ class quantumLR(quantumLRBaseClass):
         for j, GJ in enumerate(self.G_ops):
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
-                self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = (
-                    2 * self.wf.energy_elec * self.wf.QI.quantum_expectation_value((GI.dagger * self.H_0i_0a * GJ - GI.dagger * GJ - GJ * GI.dagger + GJ * self.H_0i_0a * GI.dagger).get_folded_operator(*self.orbs))
+                self.A[i, j] = self.A[j, i] = (
+                self.wf.QI.quantum_expectation_value((GI.dagger * self.H_0i_0a * GJ).get_folded_operator(*self.orbs)) 
+                - self.wf.energy_elec * self.wf.QI.quantum_expectation_value((GI.dagger*GJ).get_folded_operator(*self.orbs)) 
+                - self.wf.energy_elec * self.wf.QI.quantum_expectation_value((GJ*GI.dagger).get_folded_operator(*self.orbs)) 
+                + self.wf.QI.quantum_expectation_value((GJ * self.H_0i_0a * GI.dagger).get_folded_operator(*self.orbs))
                 )
+                
                 # Make B
-                self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = (
-                    2 * self.wf.energy_elec * self.wf.QI.quantum_expectation_value((GI.dagger * self.H_0i_0a * GJ.dagger - GI.dagger * GJ.dagger - GJ.dagger * GI.dagger + GJ.dagger * self.H_0i_0a * GI.dagger).get_folded_operator(*self.orbs))
+                self.B[i, j] = self.B[j, i] = (
+                self.wf.QI.quantum_expectation_value((GI.dagger * self.H_0i_0a * GJ.dagger).get_folded_operator(*self.orbs)) 
+                - self.wf.energy_elec * self.wf.QI.quantum_expectation_value((GI.dagger*GJ.dagger).get_folded_operator(*self.orbs)) 
+                - self.wf.energy_elec * self.wf.QI.quantum_expectation_value((GJ.dagger*GI.dagger).get_folded_operator(*self.orbs)) 
+                + self.wf.QI.quantum_expectation_value((GJ.dagger * self.H_0i_0a * GI.dagger).get_folded_operator(*self.orbs))
                     )
                 # Make Sigma
-                self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = (
+                self.Sigma[i, j] = self.Sigma[j, i] = (
                     self.wf.QI.quantum_expectation_value(
                         commutator(GI.dagger, GJ).get_folded_operator(*self.orbs)
                     )
