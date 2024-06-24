@@ -103,10 +103,24 @@ class quantumLRBaseClass:
         """Get qbitmapping of operators."""
         raise NotImplementedError
 
-    def _run_std(
-        self, no_coeffs: bool = False, verbose: bool = True, cv: bool = True
+    def run_std(
+        self,
+        no_coeffs: bool = False,
+        verbose: bool = True,
+        cv: bool = True,
+        save: bool = False,
     ) -> tuple[list[list[float]], list[list[float]], list[list[float]]]:
-        """Get standard deviation in matrix elements of LR equation."""
+        """Get standard deviation in matrix elements of LR equation.
+
+        Args:
+            no_coeffs:  Boolean to no include coefficiants
+            verbose:    Boolean to print more info
+            cv:         Boolean to calculate coefficient of variance
+            save:       Boolean to save operator-specific standard deviations
+
+        Returns:
+            Array of standard deviations for A, B and Sigma
+        """
         raise NotImplementedError
 
     def _analyze_std(
@@ -117,6 +131,7 @@ class quantumLRBaseClass:
         max_values: int = 4,
         verbose: bool = True,
         cv: bool = True,
+        save: bool = False,
     ) -> None:
         """Analyze standard deviation in matrix elements of LR equation."""
         matrix_name = ["A", "B", "Sigma"]
@@ -138,35 +153,40 @@ class quantumLRBaseClass:
                     area += "G"
                 print(f"Indices {indices[0][i],indices[1][i]}. Part of matrix block {area}")
         if verbose:
-            print("\nStandard deviation in each operator row for E | A | B | Sigma")
             A_row = np.sum(A, axis=1) / self.num_params
             B_row = np.sum(B, axis=1) / self.num_params
             Sigma_row = np.sum(Sigma, axis=1) / self.num_params
-            for nr, i in enumerate(range(self.num_params)):
-                if nr < self.num_q:
-                    print(
-                        f"q{str(nr):<{3}}:"
-                        + f"{(A_row[nr]+B_row[nr])/2:3.6f}".center(10)
-                        + " | "
-                        + f"{A_row[nr]:3.6f}".center(10)
-                        + " | "
-                        + f"{B_row[nr]:3.6f}".center(10)
-                        + " | "
-                        f"{Sigma_row[nr]:3.6f}".center(10)
-                    )
-                else:
-                    print(
-                        f"G{str(nr-self.num_q):<{3}}:"
-                        + f"{(A_row[nr]+B_row[nr])/2:3.6f}".center(10)
-                        + " | "
-                        + f"{A_row[nr]:3.6f}".center(10)
-                        + " | "
-                        + f"{B_row[nr]:3.6f}".center(10)
-                        + " | "
-                        f"{Sigma_row[nr]:3.6f}".center(10)
-                    )
+            if save:
+                self._std_A_row = A_row
+                self._std_B_row = B_row
+                self._std_Sigma_row = Sigma_row
+            else:
+                print("\nStandard deviation in each operator row for E | A | B | Sigma")
+                for nr, i in enumerate(range(self.num_params)):
+                    if nr < self.num_q:
+                        print(
+                            f"q{str(nr):<{3}}:"
+                            + f"{(A_row[nr]+B_row[nr])/2:3.6f}".center(10)
+                            + " | "
+                            + f"{A_row[nr]:3.6f}".center(10)
+                            + " | "
+                            + f"{B_row[nr]:3.6f}".center(10)
+                            + " | "
+                            f"{Sigma_row[nr]:3.6f}".center(10)
+                        )
+                    else:
+                        print(
+                            f"G{str(nr-self.num_q):<{3}}:"
+                            + f"{(A_row[nr]+B_row[nr])/2:3.6f}".center(10)
+                            + " | "
+                            + f"{A_row[nr]:3.6f}".center(10)
+                            + " | "
+                            + f"{B_row[nr]:3.6f}".center(10)
+                            + " | "
+                            f"{Sigma_row[nr]:3.6f}".center(10)
+                        )
 
-        if cv:
+        if cv and not save:
             print("\n Coefficient of variation:")
             if np.all(self.A == 0):
                 print("Expectation values are needed for coefficient of variation. Running qLR")
@@ -416,6 +436,29 @@ class quantumLRBaseClass:
                 print(
                     f"{element.center(12)} | {str(sorted_indices[i]).center(12)} | {operator_index.center(12)}"
                 )
+
+    def _get_std_trend(
+        self, re_calc: bool = False
+    ) -> tuple[list[list[float]], list[list[float]], list[list[float]]]:
+        """Analyze standard deviation trend across excited states."""
+        # result vectors
+        A_trend = np.zeros(self.num_params)
+        B_trend = np.zeros(self.num_params)
+        Sigma_trend = np.zeros(self.num_params)
+
+        # get variance in operators
+        if not hasattr(self, "_std_A_row") or re_calc:
+            self.run_std(save=True)
+
+        # get excitation vector contributions combining (de-)excitation
+        for state, vec in enumerate(np.abs(self.excitation_vectors.T) ** 2):
+            exc_vec = vec[: self.num_params] + vec[self.num_params :]
+
+            A_trend[state] = np.sum(exc_vec * self._std_A_row)
+            B_trend[state] = np.sum(exc_vec * self._std_B_row)
+            Sigma_trend[state] = np.sum(exc_vec * self._std_Sigma_row)
+
+        return A_trend, B_trend, Sigma_trend
 
 
 def get_num_nonCBS(matrix: list[list[str]]) -> int:

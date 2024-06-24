@@ -483,18 +483,23 @@ class quantumLR(quantumLRBaseClass):
 
         return A, B, Sigma
 
-    def _run_std(
+    def run_std(
         self,
         no_coeffs: bool = False,
         verbose: bool = True,
         cv: bool = True,
+        save: bool = False,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Get standard deviation in matrix elements of LR equation.
 
         Args:
-            no_coeffs: Set all coefficients of Pauli strings to 1
-            verbose: Print analysis per operator row
-            cv: Perform coefficient of varation analysis
+            no_coeffs:  Boolean to no include coefficiants
+            verbose:    Boolean to print more info
+            cv:         Boolean to calculate coefficient of variance
+            save:       Boolean to save operator-specific standard deviations
+
+        Returns:
+            Array of standard deviations for A, B and Sigma
         """
         idx_shift = self.num_q
         print("Gs", self.num_G)
@@ -622,7 +627,7 @@ class quantumLR(quantumLRBaseClass):
 
         if no_coeffs:
             cv = False
-        self._analyze_std(A, B, Sigma, verbose=verbose, cv=cv)
+        self._analyze_std(A, B, Sigma, verbose=verbose, cv=cv, save=save)
         return A, B, Sigma
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
