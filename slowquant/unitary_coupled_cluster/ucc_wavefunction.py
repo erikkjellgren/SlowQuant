@@ -9,6 +9,7 @@ from functools import partial
 import numpy as np
 import scipy
 import scipy.optimize
+import scipy.sparse as ss
 
 import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
 from slowquant.molecularintegrals.integralfunctions import (
@@ -66,8 +67,8 @@ class WaveFunctionUCC:
         self.active_occ_spin_idx_shifted = []
         self.active_unocc_spin_idx_shifted = []
         self.num_elec = num_elec
-        self.num_elec_alpha = num_elec//2
-        self.num_elec_beta = num_elec//2
+        self.num_elec_alpha = num_elec // 2
+        self.num_elec_beta = num_elec // 2
         self.num_spin_orbs = num_spin_orbs
         self.num_orbs = num_spin_orbs // 2
         self._include_active_kappa = include_active_kappa
@@ -113,8 +114,8 @@ class WaveFunctionUCC:
                 self.active_occ_spin_idx_shifted.append(active_idx - active_shift)
             for active_idx in self.active_unocc_spin_idx:
                 self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
-        self.num_active_elec_alpha = self.num_active_elec//2
-        self.num_active_elec_beta = self.num_active_elec//2
+        self.num_active_elec_alpha = self.num_active_elec // 2
+        self.num_active_elec_beta = self.num_active_elec // 2
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
         self.num_active_orbs = self.num_active_spin_orbs // 2
         self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
@@ -196,10 +197,13 @@ class WaveFunctionUCC:
             self.num_active_orbs, self.num_active_elec_alpha, self.num_active_elec_beta
         )
         self.num_det = len(self.idx2det)
-        self.hf_coeffs = np.zeros(self.num_det)
+        if self.num_det > 1000:
+            self.hf_coeffs = ss.csr_array(self.num_det)
+        else:
+            self.hf_coeffs = np.zeros(self.num_det)
         hf_det = int("1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec), 2)
         self.hf_coeffs[self.det2idx[hf_det]] = 1
-        self.ci_coeffs = np.copy(self.hf_coeffs)
+        self.ci_coeffs = lw.copy(self.hf_coeffs)
         # Allocate parameterization
         self.singlet_excitation_operator_generator = ThetaPicker(
             self.active_occ_spin_idx_shifted,
@@ -264,7 +268,7 @@ class WaveFunctionUCC:
         self._c_orthonormal = c
 
     @property
-    def u(self) -> np.ndarray:
+    def u(self) -> np.ndarray | ss.csr_array | ss.csc_array:
         """Get unitary ansatz.
 
         Return:

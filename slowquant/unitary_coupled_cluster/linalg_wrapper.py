@@ -4,8 +4,8 @@ import scipy.sparse as ss
 
 
 def matmul(
-    A: np.ndarray | ss.csr_matrix | ss.csc_matrix, B: np.ndarray | ss.csr_matrix | ss.csc_matrix
-) -> np.ndarray | ss.csr_matrix | ss.csc_matrix:
+    A: np.ndarray | ss.csr_array | ss.csc_array, B: np.ndarray | ss.csr_array | ss.csc_array
+) -> np.ndarray | ss.csr_array | ss.csc_array:
     """Matrix multiplication that is agnostic to dense (numpy) and sparse (scipy) matrices.
 
     Args:
@@ -18,17 +18,17 @@ def matmul(
     if isinstance(A, np.ndarray):
         if not isinstance(B, np.ndarray):
             raise TypeError(f"A and B are not same matrix type.\nA type: {type(A)}\nB type: {type(B)}")
-    elif isinstance(A, (ss.csr_matrix, ss.csc_matrix)):
-        if not isinstance(B, ss.csr_matrix) and not isinstance(B, ss.csc_matrix):
+    elif isinstance(A, (ss.csr_array, ss.csc_array)):
+        if not isinstance(B, ss.csr_array) and not isinstance(B, ss.csc_array):
             raise TypeError(f"A and B are not same matrix type.\nA type: {type(A)}\nB type: {type(B)}")
     if isinstance(A, np.ndarray):
         return np.matmul(A, B)
-    if isinstance(A, (ss.csr_matrix, ss.csc_matrix)):
+    if isinstance(A, (ss.csr_array, ss.csc_array)):
         return A.dot(B)
     raise TypeError(f"A got unsupported type: {type(A)}")
 
 
-def expm(A: np.ndarray | ss.csr_matrix | ss.csc_matrix) -> np.ndarray | ss.csr_matrix | ss.csc_matrix:
+def expm(A: np.ndarray | ss.csr_array | ss.csc_array) -> np.ndarray | ss.csr_array | ss.csc_array:
     """Matrix exponential that is agnostic to dense (numpy) and sparse (scipy) matrices.
 
     Args:
@@ -39,12 +39,12 @@ def expm(A: np.ndarray | ss.csr_matrix | ss.csc_matrix) -> np.ndarray | ss.csr_m
     """
     if isinstance(A, np.ndarray):
         return scipy.linalg.expm(A)
-    if isinstance(A, ss.csr_matrix):
+    if isinstance(A, ss.csr_array):
         return ss.linalg.expm(A)
     raise TypeError(f"A got unsupported type: {type(A)}")
 
 
-def zeros_like(A: np.ndarray | ss.csr_matrix | ss.csc_matrix) -> np.ndarray | ss.csr_matrix | ss.csc_matrix:
+def zeros_like(A: np.ndarray | ss.csr_array | ss.csc_array) -> np.ndarray | ss.csr_array | ss.csc_array:
     """Create zero array of same shape as input array.
 
     Args:
@@ -55,15 +55,15 @@ def zeros_like(A: np.ndarray | ss.csr_matrix | ss.csc_matrix) -> np.ndarray | ss
     """
     if isinstance(A, np.ndarray):
         return np.zeros_like(A)
-    if isinstance(A, (ss.csr_matrix, ss.csc_matrix)):
-        return ss.csr_matrix(A.shape)
+    if isinstance(A, (ss.csr_array, ss.csc_array)):
+        return ss.csr_array(A.shape)
     raise TypeError(f"A got unsupported type: {type(A)}")
 
 
 def outer(
-    A: np.ndarray | ss.csr_matrix | ss.csc_matrix, B: np.ndarray | ss.csr_matrix | ss.csc_matrix
-) -> np.ndarray | ss.csr_matrix | ss.csc_matrix:
-    """Outerp product between two vectors.
+    A: np.ndarray | ss.csr_array | ss.csc_array, B: np.ndarray | ss.csr_array | ss.csc_array
+) -> np.ndarray | ss.csr_array | ss.csc_array:
+    """Outer product between two vectors.
 
     Args:
         A: Vector.
@@ -74,10 +74,26 @@ def outer(
     """
     if isinstance(A, np.ndarray):
         return np.outer(A, B)
-    if isinstance(A, (ss.csr_matrix, ss.csc_matrix)):
+    if isinstance(A, (ss.csr_array, ss.csc_array)):
         if A.transpose().get_shape() != B.get_shape():
             raise ValueError(
                 "Shape mismatch between A and B, got A: {A.get_shape()}, and, B: {B.get_shape()}"
             )
         return A.dot(B)
+    raise TypeError(f"A got unsupported type: {type(A)}")
+
+
+def copy(A: np.ndarray | ss.csr_array | ss.csc_array) -> np.ndarray | ss.csr_array | ss.csc_array:
+    """Copy array.
+
+    Args:
+        A: Array to be copied.
+
+    Returns:
+        Copy of A.
+    """
+    if isinstance(A, np.ndarray):
+        return np.copy(A)
+    if isinstance(A, (ss.csr_array, ss.csc_array)):
+        return A.copy()
     raise TypeError(f"A got unsupported type: {type(A)}")
