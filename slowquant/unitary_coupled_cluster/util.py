@@ -2,14 +2,11 @@ from collections.abc import Generator, Sequence
 
 import numpy as np
 import scipy.linalg
-import scipy.sparse as ss
 
-import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
 from slowquant.unitary_coupled_cluster.operator_matrix import (
     G1_sa_matrix,
     G2_1_sa_matrix,
     G2_2_sa_matrix,
-    build_operator_matrix,
 )
 
 
@@ -39,20 +36,17 @@ class ThetaPicker:
         self,
         active_occ_spin_idx: Sequence[int],
         active_unocc_spin_idx: Sequence[int],
-        is_spin_conserving: bool = False,
     ) -> None:
         """Initialize helper class to iterate over active space parameters.
 
         Args:
             active_occ_spin_idx: Spin index of strongly occupied orbitals.
             active_unocc_spin_idx: Spin index of weakly occupied orbitals.
-            is_spin_conserving: Generate spin conserving operators.
         """
         self.active_occ_spin_idx: list[int] = []
         self.active_unocc_spin_idx: list[int] = []
         self.active_occ_idx: list[int] = []
         self.active_unocc_idx: list[int] = []
-        self.is_spin_conserving = is_spin_conserving
         for idx in active_occ_spin_idx:
             self.active_occ_spin_idx.append(idx)
             if idx // 2 not in self.active_occ_idx:
@@ -147,7 +141,7 @@ def construct_ucc_u(
     theta: Sequence[float],
     theta_picker: ThetaPicker,
     excitations: str,
-) -> np.ndarray | ss.csr_array | ss.csc_array:
+) -> np.ndarray:
     """Contruct unitary transformation matrix.
 
     Args:
@@ -160,31 +154,33 @@ def construct_ucc_u(
     Returns:
         Unitary transformation matrix.
     """
-    if num_det > 1000:
-        t = ss.csr_array((num_det, num_det))
-    else:
-        t = np.zeros((num_det, num_det))
+    t = np.zeros((num_det, num_det))
     counter = 0
     if "s" in excitations:
         for _, a, i, _ in theta_picker.get_t1_generator_sa():
             if theta[counter] != 0.0:
-                t += theta[counter] * G1_sa_matrix(i, a, num_active_orbs, num_elec_alpha, num_elec_beta)
+                t += (
+                    theta[counter]
+                    * G1_sa_matrix(i, a, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+                )
             counter += 1
     if "d" in excitations:
         for _, a, i, b, j, _, type_idx in theta_picker.get_t2_generator_sa():
             if theta[counter] != 0.0:
                 if type_idx == 1:
-                    t += theta[counter] * G2_1_sa_matrix(
-                        i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta
+                    t += (
+                        theta[counter]
+                        * G2_1_sa_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
                     )
                 elif type_idx == 2:
-                    t += theta[counter] * G2_2_sa_matrix(
-                        i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta
+                    t += (
+                        theta[counter]
+                        * G2_2_sa_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
                     )
                 else:
                     raise ValueError(f"Expected type_idx to be in (1,2) got {type_idx}")
             counter += 1
     assert counter == len(theta)
     T = t - t.conjugate().transpose()
-    A = lw.expm(T)
+    A = scipy.linalg.expm(T)
     return A

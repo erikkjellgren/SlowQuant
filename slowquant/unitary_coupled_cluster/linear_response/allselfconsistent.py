@@ -10,16 +10,6 @@ from slowquant.molecularintegrals.integralfunctions import (
 from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
     LinearResponseBaseClass,
 )
-from slowquant.unitary_coupled_cluster.operator_hybrid import (
-    OperatorHybrid,
-    OperatorHybridData,
-    convert_pauli_to_hybrid_form,
-    expectation_value_hybrid_flow,
-    hamiltonian_hybrid_2i_2a,
-    one_elec_op_hybrid_0i_0a,
-    one_elec_op_hybrid_1i_1a,
-)
-from slowquant.unitary_coupled_cluster.operator_pauli import epq_pauli
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
@@ -28,16 +18,14 @@ class LinearResponseUCC(LinearResponseBaseClass):
         self,
         wave_function: WaveFunctionUCC,
         excitations: str,
-        is_spin_conserving: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
-            is_spin_conserving: Use spin-conseving operators.
         """
-        super().__init__(wave_function, excitations, is_spin_conserving)
+        super().__init__(wave_function, excitations)
 
         # Overwrite Superclass
         self.q_ops: list[OperatorHybrid] = []

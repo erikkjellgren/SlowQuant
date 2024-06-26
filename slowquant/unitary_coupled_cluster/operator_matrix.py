@@ -40,12 +40,9 @@ def build_operator_matrix(
     idx2det: Sequence[int],
     det2idx: dict[int, int],
     num_active_orbs: int,
-) -> np.ndarray | ss.csr_array:
+) -> np.ndarray:
     num_dets = len(idx2det)
-    if num_dets > 1000:
-        op_mat = ss.lil_array((num_dets, num_dets))
-    else:
-        op_mat = np.zeros((num_dets, num_dets))
+    op_mat = np.zeros((num_dets, num_dets))
     parity_check = {0: 0}
     num = 0
     for i in range(2 * num_active_orbs - 1, -1, -1):
@@ -73,15 +70,13 @@ def build_operator_matrix(
                 val = op.factors[fermi_label] * (-1) ** phase_changes
                 if abs(val) > 10**-14:
                     op_mat[i, det2idx[det]] += val
-    if isinstance(op_mat, ss.lil_array):
-        return ss.csr_array(op_mat)
     return op_mat
 
 
 def expectation_value(
-    bra: np.ndarray | ss.csr_array,
+    bra: np.ndarray,
     op: FermionicOperator,
-    ket: np.ndarray | ss.csr_array,
+    ket: np.ndarray,
     idx2det: Sequence[int],
     det2idx: dict[int, int],
     num_inactive_orbs: int,
@@ -94,17 +89,14 @@ def expectation_value(
         det2idx,
         num_active_orbs,
     )
-    if len(det2idx) > 1000:
-        tmp = op_mat.dot(ket)
-        return ((bra.T).dot(tmp)).toarray()[0, 0]
     return np.matmul(bra, np.matmul(op_mat, ket))
 
 
 def expectation_value_commutator(
-    bra: np.ndarray | ss.csr_array,
+    bra: np.ndarray,
     A: FermionicOperator,
     B: FermionicOperator,
-    ket: np.ndarray | ss.csr_array,
+    ket: np.ndarray,
     idx2det: Sequence[int],
     det2idx: dict[int, int],
     num_inactive_orbs: int,
@@ -118,18 +110,15 @@ def expectation_value_commutator(
         det2idx,
         num_active_orbs,
     )
-    if len(det2idx) > 1000:
-        tmp = op_mat.dot(ket)
-        return ((bra.T).dot(tmp)).toarray()[0, 0]
     return np.matmul(bra, np.matmul(op_mat, ket))
 
 
 def expectation_value_double_commutator(
-    bra: np.ndarray | ss.csr_array,
+    bra: np.ndarray,
     A: FermionicOperator,
     B: FermionicOperator,
     C: FermionicOperator,
-    ket: np.ndarray | ss.csr_array,
+    ket: np.ndarray,
     idx2det: Sequence[int],
     det2idx: dict[int, int],
     num_inactive_orbs: int,
@@ -143,54 +132,46 @@ def expectation_value_double_commutator(
         det2idx,
         num_active_orbs,
     )
-    if len(det2idx) > 1000:
-        tmp = op_mat.dot(ket)
-        return ((bra.T).dot(tmp)).toarray()[0, 0]
     return np.matmul(bra, np.matmul(op_mat, ket))
 
 
 def expectation_value_mat(bra: np.ndarray, op: np.ndarray, ket: np.ndarray) -> float:
-    if isinstance(op, (ss.csr_array, ss.csc_array)):
-        tmp = op.dot(ket)
-        return ((bra.T).dot(tmp)).toarray()[0, 0]
     return np.matmul(bra, np.matmul(op, ket))
 
 
 @functools.cache
 def G1_sa_matrix(
     i: int, a: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
-) -> np.ndarray | ss.csr_array:
+) -> ss.lil_array:
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
-    return build_operator_matrix(G1_sa(i, a), idx2det, det2idx, num_active_orbs)
+    return ss.lil_array(build_operator_matrix(G1_sa(i, a), idx2det, det2idx, num_active_orbs))
 
 
 @functools.cache
 def G2_1_sa_matrix(
     i: int, j: int, a: int, b: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
-) -> np.ndarray | ss.csr_array:
+) -> ss.lil_array:
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
-    return build_operator_matrix(G2_1_sa(i, j, a, b), idx2det, det2idx, num_active_orbs)
+    return ss.lil_array(build_operator_matrix(G2_1_sa(i, j, a, b), idx2det, det2idx, num_active_orbs))
 
 
 @functools.cache
 def G2_2_sa_matrix(
     i: int, j: int, a: int, b: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
-) -> np.ndarray | ss.csr_array:
+) -> ss.lil_array:
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
-    return build_operator_matrix(G2_2_sa(i, j, a, b), idx2det, det2idx, num_active_orbs)
+    return ss.lil_array(build_operator_matrix(G2_2_sa(i, j, a, b), idx2det, det2idx, num_active_orbs))
 
 
 @functools.cache
-def G1_matrix(
-    i: int, a: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
-) -> np.ndarray | ss.csr_array:
+def G1_matrix(i: int, a: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int) -> ss.lil_array:
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
-    return build_operator_matrix(G1(i, a), idx2det, det2idx, num_active_orbs)
+    return ss.lil_array(build_operator_matrix(G1(i, a), idx2det, det2idx, num_active_orbs))
 
 
 @functools.cache
 def G2_matrix(
     i: int, j: int, a: int, b: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
-) -> np.ndarray | ss.csr_array:
+) -> ss.lil_array:
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
-    return build_operator_matrix(G2(i, j, a, b), idx2det, det2idx, num_active_orbs)
+    return ss.lil_array(build_operator_matrix(G2(i, j, a, b), idx2det, det2idx, num_active_orbs))

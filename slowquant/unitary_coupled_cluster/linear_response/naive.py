@@ -30,16 +30,14 @@ class LinearResponseUCC(LinearResponseBaseClass):
         self,
         wave_function: WaveFunctionUCC,
         excitations: str,
-        is_spin_conserving: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
-            is_spin_conserving: Use spin-conseving operators.
         """
-        super().__init__(wave_function, excitations, is_spin_conserving)
+        super().__init__(wave_function, excitations)
 
         rdms = ReducedDenstiyMatrix(
             self.wf.num_inactive_orbs,

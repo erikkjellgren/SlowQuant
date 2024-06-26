@@ -9,9 +9,7 @@ from functools import partial
 import numpy as np
 import scipy
 import scipy.optimize
-import scipy.sparse as ss
 
-import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
     two_electron_integral_transform,
@@ -197,18 +195,14 @@ class WaveFunctionUCC:
             self.num_active_orbs, self.num_active_elec_alpha, self.num_active_elec_beta
         )
         self.num_det = len(self.idx2det)
-        if self.num_det > 1000:
-            self.hf_coeffs = ss.csr_array((self.num_det, 1))
-        else:
-            self.hf_coeffs = np.zeros(self.num_det)
+        self.hf_coeffs = np.zeros(self.num_det)
         hf_det = int("1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec), 2)
         self.hf_coeffs[self.det2idx[hf_det]] = 1
-        self.ci_coeffs = lw.copy(self.hf_coeffs)
+        self.ci_coeffs = np.copy(self.hf_coeffs)
         # Allocate parameterization
         self.singlet_excitation_operator_generator = ThetaPicker(
             self.active_occ_spin_idx_shifted,
             self.active_unocc_spin_idx_shifted,
-            is_spin_conserving=True,
         )
         # Construct theta1
         self._theta1 = []
@@ -268,7 +262,7 @@ class WaveFunctionUCC:
         self._c_orthonormal = c
 
     @property
-    def u(self) -> np.ndarray | ss.csr_array | ss.csc_array:
+    def u(self) -> np.ndarray:
         """Get unitary ansatz.
 
         Return:
@@ -323,7 +317,7 @@ class WaveFunctionUCC:
         self._rdm4 = None
         self._u = None
         self._theta1 = theta.copy()
-        self.ci_coeffs = lw.matmul(self.u, self.hf_coeffs)
+        self.ci_coeffs = np.matmul(self.u, self.hf_coeffs)
 
     @property
     def theta2(self) -> list[float]:
@@ -349,7 +343,7 @@ class WaveFunctionUCC:
         self._rdm4 = None
         self._u = None
         self._theta2 = theta.copy()
-        self.ci_coeffs = lw.matmul(self.u, self.hf_coeffs)
+        self.ci_coeffs = np.matmul(self.u, self.hf_coeffs)
 
     @property
     def theta3(self) -> list[float]:
@@ -373,7 +367,6 @@ class WaveFunctionUCC:
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
-        self._u_number_spin_conserving = None
         self._u = None
         self._theta3 = theta.copy()
 
@@ -399,7 +392,6 @@ class WaveFunctionUCC:
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
-        self._u_number_spin_conserving = None
         self._u = None
         self._theta4 = theta.copy()
 
@@ -425,7 +417,6 @@ class WaveFunctionUCC:
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
-        self._u_number_spin_conserving = None
         self._u = None
         self._theta5 = theta.copy()
 
@@ -451,7 +442,6 @@ class WaveFunctionUCC:
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
-        self._u_number_spin_conserving = None
         self._u = None
         self._theta6 = theta.copy()
 
@@ -479,7 +469,7 @@ class WaveFunctionUCC:
         self._rdm3 = None
         self._rdm4 = None
         self._u = None
-        self.ci_coeffs = lw.matmul(self.u, self.hf_coeffs)
+        self.ci_coeffs = np.matmul(self.u, self.hf_coeffs)
 
     @property
     def c_trans(self) -> np.ndarray:

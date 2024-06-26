@@ -1,8 +1,6 @@
-import copy
 from collections.abc import Sequence
 
 import numpy as np
-import scipy.sparse as ss
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
@@ -17,10 +15,6 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
 from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
     LinearResponseBaseClass,
 )
-from slowquant.unitary_coupled_cluster.operator_hybrid import (
-    expectation_value_hybrid_flow,
-    one_elec_op_hybrid_0i_0a,
-)
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
@@ -29,16 +23,14 @@ class LinearResponseUCC(LinearResponseBaseClass):
         self,
         wave_function: WaveFunctionUCC,
         excitations: str,
-        is_spin_conserving: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
-            is_spin_conserving: Use spin-conseving operators.
         """
-        super().__init__(wave_function, excitations, is_spin_conserving)
+        super().__init__(wave_function, excitations)
 
         rdms = ReducedDenstiyMatrix(
             self.wf.num_inactive_orbs,
@@ -48,9 +40,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
             rdm2=self.wf.rdm2,
         )
         idx_shift = len(self.q_ops)
-        self.csf = copy.deepcopy(self.wf.state_vector)
-        self.csf.active = self.csf._active
-        self.csf.active_csr = ss.csr_matrix(self.csf._active)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
         grad = get_orbital_gradient_response(

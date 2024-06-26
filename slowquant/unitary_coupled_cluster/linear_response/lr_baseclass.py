@@ -21,7 +21,6 @@ class LinearResponseBaseClass:
         self,
         wave_function: WaveFunctionUCC,
         excitations: str,
-        is_spin_conserving: bool = True,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
