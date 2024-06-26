@@ -6,7 +6,7 @@ import scipy.sparse as ss
 from sympy.utilities.iterables import multiset_permutations
 
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
-from slowquant.unitary_coupled_cluster.operators import G1_sa, G2_1_sa, G2_2_sa
+from slowquant.unitary_coupled_cluster.operators import G1, G2, G1_sa, G2_1_sa, G2_2_sa
 
 
 def get_indexing(num_orbs: int, num_elec_alpha: int, num_elec_beta: int) -> tuple[list[int], dict[int, int]]:
@@ -96,7 +96,7 @@ def expectation_value(
     )
     if len(det2idx) > 1000:
         tmp = op_mat.dot(ket)
-        return (bra.dot(tmp)).toarray()[0, 0]
+        return ((bra.T).dot(tmp)).toarray()[0, 0]
     return np.matmul(bra, np.matmul(op_mat, ket))
 
 
@@ -120,7 +120,7 @@ def expectation_value_commutator(
     )
     if len(det2idx) > 1000:
         tmp = op_mat.dot(ket)
-        return (bra.dot(tmp)).toarray()[0, 0]
+        return ((bra.T).dot(tmp)).toarray()[0, 0]
     return np.matmul(bra, np.matmul(op_mat, ket))
 
 
@@ -145,11 +145,14 @@ def expectation_value_double_commutator(
     )
     if len(det2idx) > 1000:
         tmp = op_mat.dot(ket)
-        return (bra.dot(tmp)).toarray()[0, 0]
+        return ((bra.T).dot(tmp)).toarray()[0, 0]
     return np.matmul(bra, np.matmul(op_mat, ket))
 
 
 def expectation_value_mat(bra: np.ndarray, op: np.ndarray, ket: np.ndarray) -> float:
+    if isinstance(op, (ss.csr_array, ss.csc_array)):
+        tmp = op.dot(ket)
+        return ((bra.T).dot(tmp)).toarray()[0, 0]
     return np.matmul(bra, np.matmul(op, ket))
 
 
@@ -175,3 +178,19 @@ def G2_2_sa_matrix(
 ) -> np.ndarray | ss.csr_array:
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
     return build_operator_matrix(G2_2_sa(i, j, a, b), idx2det, det2idx, num_active_orbs)
+
+
+@functools.cache
+def G1_matrix(
+    i: int, a: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
+) -> np.ndarray | ss.csr_array:
+    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
+    return build_operator_matrix(G1(i, a), idx2det, det2idx, num_active_orbs)
+
+
+@functools.cache
+def G2_matrix(
+    i: int, j: int, a: int, b: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
+) -> np.ndarray | ss.csr_array:
+    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
+    return build_operator_matrix(G2(i, j, a, b), idx2det, det2idx, num_active_orbs)

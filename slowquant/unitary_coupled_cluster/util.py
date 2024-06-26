@@ -160,7 +160,10 @@ def construct_ucc_u(
     Returns:
         Unitary transformation matrix.
     """
-    t = np.zeros((num_det, num_det))
+    if num_det > 1000:
+        t = ss.csr_array((num_det, num_det))
+    else:
+        t = np.zeros((num_det, num_det))
     counter = 0
     if "s" in excitations:
         for _, a, i, _ in theta_picker.get_t1_generator_sa():

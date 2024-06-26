@@ -23,6 +23,12 @@ class a_op:
             self.idx += 1
 
 
+def a_op_spin(spin_idx: int, dagger: bool) -> a_op:
+    if spin_idx % 2 == 0:
+        return a_op(spin_idx // 2, "alpha", dagger)
+    return a_op(spin_idx // 2, "beta", dagger)
+
+
 def operator_string_to_key(operator_string: list[a_op]) -> str:
     """Make key string to index a fermionic operator in a dict structure.
 
@@ -170,6 +176,7 @@ class FermionicOperator:
             raise ValueError(
                 f"Could not assign operator of {type(annihilation_operator)} with factor of {type(factor)}"
             )
+        self._operators_ab = None
 
     def __add__(self, fermistring: FermionicOperator) -> FermionicOperator:
         """Addition of two fermionic operators.
@@ -312,7 +319,7 @@ class FermionicOperator:
             num_orbs: Number of spatial orbitals.
 
         Returns:
-            Fermionic opetaros on qiskit form.
+            Fermionic operators on qiskit form.
         """
         qiskit_form = {}
         remapping = {}
@@ -413,7 +420,6 @@ class FermionicOperator:
         """Return operator excitation in ordered strings with coefficient."""
         excitations = list(self.factors.keys())
         coefficients = list(self.factors.values())
-
         creation = []
         annihilation = []
         for op_string in excitations:
@@ -424,5 +430,50 @@ class FermionicOperator:
             a = numbers[midpoint:]
             creation.append(c)
             annihilation.append(a)
-
         return annihilation, creation, coefficients
+
+    def alpha_beta_strings(self, num_orbs: int) -> dict[str, AlphaBetaString]:
+        if not hasattr(self, "_alpha_beta_strings"):
+            self._alpha_beta_strings = {}
+            remapping = {}
+            for i in range(2 * num_orbs):
+                if i < num_orbs:
+                    remapping[2 * i] = i
+                else:
+                    remapping[2 * i + 1 - 2 * num_orbs] = i
+            for fermi_label in self.operators:
+                alpha = []
+                alpha_dagger = []
+                beta = []
+                beta_dagger = []
+                factor = self.factors[fermi_label]
+                phase = 0
+                beta_count = 0
+                for anni in self.operators[fermi_label][::-1]:
+                    if anni.spin == "alpha" and not anni.dagger:
+                        alpha.append(remapping[anni.idx])
+                        if beta_count % 2 == 1:
+                            phase += 1
+                    elif anni.spin == "alpha" and anni.dagger:
+                        alpha_dagger.append(remapping[anni.idx])
+                        if beta_count % 2 == 1:
+                            phase += 1
+                    elif anni.spin == "beta" and not anni.dagger:
+                        beta.append(remapping[anni.idx])
+                        beta_count += 1
+                    elif anni.spin == "beta" and anni.dagger:
+                        beta_dagger.append(remapping[anni.idx])
+                        beta_count += 1
+                self._alpha_beta_strings[fermi_label] = AlphaBetaString(
+                    alpha, alpha_dagger, beta, beta_dagger, factor * (-1) ** phase
+                )
+        return self._alpha_beta_strings
+
+
+class AlphaBetaString:
+    def __init__(self, alpha, alpha_dagger, beta, beta_dagger, factor):
+        self.alpha = alpha
+        self.beta = beta
+        self.alpha_dagger = alpha_dagger
+        self.beta_dagger = beta_dagger
+        self.factor = factor

@@ -198,7 +198,7 @@ class WaveFunctionUCC:
         )
         self.num_det = len(self.idx2det)
         if self.num_det > 1000:
-            self.hf_coeffs = ss.csr_array(self.num_det)
+            self.hf_coeffs = ss.csr_array((self.num_det, 1))
         else:
             self.hf_coeffs = np.zeros(self.num_det)
         hf_det = int("1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec), 2)

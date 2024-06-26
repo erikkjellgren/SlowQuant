@@ -1,6 +1,10 @@
 import numpy as np
 
-from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator, a_op
+from slowquant.unitary_coupled_cluster.fermionic_operator import (
+    FermionicOperator,
+    a_op,
+    a_op_spin,
+)
 
 
 def Epq(p: int, q: int) -> FermionicOperator:
@@ -92,6 +96,19 @@ def double_commutator(A: FermionicOperator, B: FermionicOperator, C: FermionicOp
         Operator from double commutator.
     """
     return A * B * C - A * C * B - B * C * A + C * B * A
+
+
+def G1(i: int, a: int):
+    return FermionicOperator(a_op_spin(a, dagger=True), 1) * FermionicOperator(a_op_spin(i, dagger=False), 1)
+
+
+def G2(i: int, j: int, a: int, b: int):
+    return (
+        FermionicOperator(a_op_spin(a, dagger=True), 1)
+        * FermionicOperator(a_op_spin(b, dagger=True), 1)
+        * FermionicOperator(a_op_spin(i, dagger=False), 1)
+        * FermionicOperator(a_op_spin(j, dagger=False), 1)
+    )
 
 
 def G1_sa(i: int, a: int) -> FermionicOperator:
