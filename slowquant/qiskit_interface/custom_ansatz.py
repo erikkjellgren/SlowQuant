@@ -173,28 +173,28 @@ def tUPS(
     for _ in range(n_layers):
         for p in range(0, num_orbs - 1, 2):
             # First single
-            qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx}"))
-            grad_param_R[f"p{idx}"] = 4
+            qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx:09d}"))
+            grad_param_R[f"p{idx:09d}"] = 4
             idx += 1
             # Double
-            qc = tups_double(p, num_orbs, qc, Parameter(f"p{idx}"))
-            grad_param_R[f"p{idx}"] = 2
+            qc = tups_double(p, num_orbs, qc, Parameter(f"p{idx:09d}"))
+            grad_param_R[f"p{idx:09d}"] = 2
             idx += 1
             # Second single
-            qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx}"))
-            grad_param_R[f"p{idx}"] = 4
+            qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx:09d}"))
+            grad_param_R[f"p{idx:09d}"] = 4
             idx += 1
         for p in range(1, num_orbs - 2, 2):
             # First single
-            qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx}"))
-            grad_param_R[f"p{idx}"] = 4
+            qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx:09d}"))
+            grad_param_R[f"p{idx:09d}"] = 4
             idx += 1
             # Double
-            qc = tups_double(p, num_orbs, qc, Parameter(f"p{idx}"))
-            grad_param_R[f"p{idx}"] = 2
+            qc = tups_double(p, num_orbs, qc, Parameter(f"p{idx:09d}"))
+            grad_param_R[f"p{idx:09d}"] = 2
             idx += 1
             # Second single
-            qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx}"))
-            grad_param_R[f"p{idx}"] = 4
+            qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx:09d}"))
+            grad_param_R[f"p{idx:09d}"] = 4
             idx += 1
     return qc, grad_param_R

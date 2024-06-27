@@ -184,3 +184,63 @@ def construct_ucc_u(
     T = t - t.conjugate().transpose()
     A = scipy.linalg.expm(T)
     return A
+
+
+class UpsStructure:
+    def __init__(self) -> None:
+        self.excitation_indicies = []
+        self.excitation_operator_type = []
+        self.n_params = 0
+
+    def create_tups(self, n_layers: int, num_active_orbs: int) -> None:
+        for _ in range(n_layers):
+            for p in range(0, num_active_orbs - 1, 2):
+                # First single
+                self.excitation_operator_type.append(1)
+                self.excitation_indicies.append((p + 1, p))
+                # Double
+                self.excitation_operator_type.append(2)
+                self.excitation_indicies.append((p + 1, p + 1, p, p))
+                # Second single
+                self.excitation_operator_type.append(1)
+                self.excitation_indicies.append((p + 1, p))
+                self.n_params += 3
+            for p in range(1, num_active_orbs - 2, 2):
+                # First single
+                self.excitation_operator_type.append(1)
+                self.excitation_indicies.append((p + 1, p))
+                # Double
+                self.excitation_operator_type.append(2)
+                self.excitation_indicies.append((p + 1, p + 1, p, p))
+                # Second single
+                self.excitation_operator_type.append(1)
+                self.excitation_indicies.append((p + 1, p))
+                self.n_params += 3
+
+
+def construct_ups_u(
+    num_det: int,
+    num_active_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
+    thetas: Sequence[float],
+    ups_struct: UpsStructure,
+) -> np.ndarray:
+    A = np.eye(num_det)
+    for exc_type, exc_indices, theta in zip(
+        ups_struct.excitation_operator_type, ups_struct.excitation_indicies, thetas
+    ):
+        if exc_type == 1:
+            i, a = exc_indices
+            t = theta * G1_sa_matrix(i, a, num_active_orbs, num_elec_alpha, num_elec_beta)
+        elif exc_type == 2:
+            i, j, a, b = exc_indices
+            t = theta * G2_1_sa_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta)
+        elif exc_type == 3:
+            i, j, a, b = exc_indices
+            t = theta * G2_2_sa_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta)
+        else:
+            raise ValueError(f"Got unknown excitation type, {exc_type}")
+        B = scipy.sparse.linalg.expm(t - t.conjugate().transpose()).todense()
+        A = np.matmul(B, A)
+    return A
