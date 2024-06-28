@@ -2,6 +2,7 @@ from collections.abc import Generator, Sequence
 
 import numpy as np
 import scipy.linalg
+import scipy.sparse as ss
 
 from slowquant.unitary_coupled_cluster.operator_matrix import (
     G1_sa_matrix,
@@ -244,3 +245,32 @@ def construct_ups_u(
         B = scipy.sparse.linalg.expm(t - t.conjugate().transpose()).todense()
         A = np.matmul(B, A)
     return A
+
+
+def construct_ups_state(
+    state: np.ndarray,
+    num_active_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
+    thetas: Sequence[float],
+    ups_struct: UpsStructure,
+) -> np.ndarray:
+    tmp = ss.csr_array([state]).T
+    for exc_type, exc_indices, theta in zip(
+        ups_struct.excitation_operator_type, ups_struct.excitation_indicies, thetas
+    ):
+        if abs(theta) < 10**-14:
+            continue
+        if exc_type == 1:
+            i, a = exc_indices
+            t = theta * G1_sa_matrix(i, a, num_active_orbs, num_elec_alpha, num_elec_beta)
+        elif exc_type == 2:
+            i, j, a, b = exc_indices
+            t = theta * G2_1_sa_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta)
+        elif exc_type == 3:
+            i, j, a, b = exc_indices
+            t = theta * G2_2_sa_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta)
+        else:
+            raise ValueError(f"Got unknown excitation type, {exc_type}")
+        tmp = ss.linalg.expm_multiply(t - t.conjugate().transpose(), tmp)
+    return tmp.T.todense()
