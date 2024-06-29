@@ -240,9 +240,61 @@ def build_operator_matrix(
             else:  # nobreak
                 val = op.factors[fermi_label] * (-1) ** phase_changes
                 if abs(val) > 10**-14:
-                    op_mat[i, det2idx[det]] += val
+                    op_mat[det2idx[det], i] += val
     return op_mat
 
+
+def apply_op_to_vec(
+    op: FermionicOperator,
+    state: np.ndarray,
+    idx2det: Sequence[int],
+    det2idx: dict[int, int],
+    num_active_orbs: int,
+) -> np.ndarray:
+    num_dets = len(idx2det)
+    new_state = np.zeros(num_dets)
+    parity_check = {0: 0}
+    num = 0
+    for i in range(2 * num_active_orbs - 1, -1, -1):
+        num += 2**i
+        parity_check[2 * num_active_orbs - i] = num
+    for i in range(num_dets):
+        if abs(state[i]) < 10**-14:
+            continue
+        det_ = idx2det[i]
+        for fermi_label in op.factors:
+            det = det_
+            phase_changes = 0
+            for fermi_op in op.operators[fermi_label][::-1]:
+                orb_idx = fermi_op.idx
+                nth_bit = (det >> 2 * num_active_orbs - 1 - orb_idx) & 1
+                if nth_bit == 0 and fermi_op.dagger:
+                    det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
+                    phase_changes += (det & parity_check[orb_idx]).bit_count()
+                elif nth_bit == 1 and fermi_op.dagger:
+                    break
+                elif nth_bit == 0 and not fermi_op.dagger:
+                    break
+                elif nth_bit == 1 and not fermi_op.dagger:
+                    det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
+                    phase_changes += (det & parity_check[orb_idx]).bit_count()
+            else:  # nobreak
+                val = op.factors[fermi_label] * (-1) ** phase_changes
+                if abs(val) > 10**-14:
+                    new_state[det2idx[det]] += val * state[i]
+    return new_state
+
+
+def propagate_state(
+    op: FermionicOperator,
+    state: np.ndarray,
+    idx2det: Sequence[int],
+    det2idx: dict[int, int],
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+) -> np.ndarray:
+    return apply_op_to_vec(op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs), state, idx2det, det2idx, num_active_orbs)
 
 def expectation_value(
     bra: np.ndarray,
