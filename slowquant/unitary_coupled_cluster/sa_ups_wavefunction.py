@@ -153,12 +153,6 @@ class WaveFunctionSAUPS:
         # kappa can be optimized in spatial basis
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
-                if True:
-                    self.kappa.append(0.0)
-                    self._kappa_old.append(0.0)
-                    self.kappa_idx.append([p, q])
-                    self.kappa_idx_dagger.append([q, p])
-                    continue
                 if p in self.inactive_idx and q in self.inactive_idx:
                     self.kappa_redundant.append(0.0)
                     self._kappa_redundant_old.append(0.0)
@@ -233,6 +227,8 @@ class WaveFunctionSAUPS:
         """
         self._h_mo = None
         self._g_mo = None
+        self._state_energies = None
+        self._state_ci_coeffs = None
         self._c_orthonormal = c
 
     @property
@@ -274,9 +270,10 @@ class WaveFunctionSAUPS:
         self._rdm1 = None
         self._rdm2 = None
         self._u = None
+        self._state_energies = None
+        self._state_ci_coeffs = None
         self._thetas = theta_vals.copy()
         for i, coeffs in enumerate(self.csf_coeffs):
-            # self.ci_coeffs[i] = np.matmul(self.u, coeffs)
             self.ci_coeffs[i] = construct_ups_state(
                 coeffs,
                 self.num_active_orbs,
@@ -516,7 +513,6 @@ class WaveFunctionSAUPS:
                 jac=parameter_gradient,
                 options={"maxiter": maxiter},
             )
-        self.energy_elec = res["fun"]
         param_idx = 0
         if orbital_optimization:
             param_idx += len(self.kappa)
@@ -527,8 +523,11 @@ class WaveFunctionSAUPS:
                 self.kappa_redundant[i] = 0
                 self._kappa_redundant_old[i] = 0
         self.thetas = res["x"][param_idx : num_theta + param_idx].tolist()
+        self._do_state_ci()
 
-    def energy_states(self) -> list[float]:
+    def _do_state_ci(self) -> None:
+        num_states = 0
+        state_H = np.zeros((num_states, num_states))
         Hamiltonian = build_operator_matrix(
             hamiltonian_0i_0a(
                 self.h_mo,
@@ -540,10 +539,25 @@ class WaveFunctionSAUPS:
             self.det2idx,
             self.num_active_orbs,
         )
-        energies = []
-        for coeffs in self.ci_coeffs:
-            energies.append(expectation_value_mat(coeffs, Hamiltonian, coeffs))
-        return energies
+        for i, coeff_i in enumerate(self.ci_coeffs):
+            for j, coeff_j in enumerate(self.ci_coeffs):
+                if j > i:
+                    continue
+                state_H[i, j] = state_H[j, i] = expectation_value_mat(coeff_i, Hamiltonian, coeff_j)
+        eigval, eigvec = scipy.linalg.eig(state_H)
+        sorting = np.argsort(eigval)
+        self._state_energies = np.real(eigval[sorting][num_states:])
+        self._state_ci_coeffs = np.real(eigvec[:, sorting][:, num_states:])
+
+    @property
+    def energy_states(self) -> np.ndarray:
+        if self._state_energies is None:
+            self._do_state_ci()
+        return self._state_energies
+
+    def get_transition_property(self, ao_integral: np.ndarray, target_state: int) -> float:
+        mo_integral = one_electron_integral_transform(self.c_trans, ao_integral)
+        return 0
 
 
 def energy_saups(
@@ -714,7 +728,7 @@ def active_space_parameter_gradient(
 
     gradient_theta = np.zeros_like(theta)
     eps = np.finfo(np.float64).eps ** (1 / 2)
-    E = 0
+    E = 0.0
     for coeffs in wf.ci_coeffs:
         E += expectation_value_mat(coeffs, Hamiltonian, coeffs)
     E = E / len(wf.ci_coeffs)
@@ -723,7 +737,7 @@ def active_space_parameter_gradient(
         step_size = eps * sign_step * max(1, abs(theta[i]))
         theta[i] += step_size
         wf.thetas = theta
-        E_plus = 0
+        E_plus = 0.0
         for coeffs in wf.ci_coeffs:
             E_plus += expectation_value_mat(coeffs, Hamiltonian, coeffs)
         E_plus = E_plus / len(wf.ci_coeffs)
