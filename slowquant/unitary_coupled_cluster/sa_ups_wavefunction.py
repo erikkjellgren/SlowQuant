@@ -24,7 +24,7 @@ from slowquant.unitary_coupled_cluster.operator_matrix import (
     expectation_value_mat,
     get_indexing,
 )
-from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
+from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a, one_elec_op_0i_0a
 from slowquant.unitary_coupled_cluster.util import (
     UpsStructure,
     construct_ups_state,
@@ -199,7 +199,8 @@ class WaveFunctionSAUPS:
             self.num_active_orbs, self.num_active_elec_alpha, self.num_active_elec_beta
         )
         self.num_det = len(self.idx2det)
-        self.csf_coeffs = np.zeros((len(states[0]), self.num_det))
+        self.num_states = len(states[0])
+        self.csf_coeffs = np.zeros((self.num_states, self.num_det))
         for i, (coeffs, on_vecs) in enumerate(zip(states[0], states[1])):
             for coeff, on_vec in zip(coeffs, on_vecs):
                 idx = self.det2idx[int(on_vec, 2)]
@@ -526,8 +527,7 @@ class WaveFunctionSAUPS:
         self._do_state_ci()
 
     def _do_state_ci(self) -> None:
-        num_states = 0
-        state_H = np.zeros((num_states, num_states))
+        state_H = np.zeros((self.num_states, self.num_states))
         Hamiltonian = build_operator_matrix(
             hamiltonian_0i_0a(
                 self.h_mo,
@@ -546,18 +546,57 @@ class WaveFunctionSAUPS:
                 state_H[i, j] = state_H[j, i] = expectation_value_mat(coeff_i, Hamiltonian, coeff_j)
         eigval, eigvec = scipy.linalg.eig(state_H)
         sorting = np.argsort(eigval)
-        self._state_energies = np.real(eigval[sorting][num_states:])
-        self._state_ci_coeffs = np.real(eigvec[:, sorting][:, num_states:])
+        self._state_energies = np.real(eigval[sorting])
+        self._state_ci_coeffs = np.real(eigvec[:, sorting])
 
     @property
     def energy_states(self) -> np.ndarray:
         if self._state_energies is None:
             self._do_state_ci()
+        if self._state_energies is None:
+            raise ValueError("_state_energies is None")
         return self._state_energies
 
-    def get_transition_property(self, ao_integral: np.ndarray, target_state: int) -> float:
+    @property
+    def excitation_energies(self) -> np.ndarray:
+        energies = np.zeros(self.num_states - 1)
+        for i, energy in enumerate(self.energy_states[1:]):
+            energies[i] = energy - self.energy_states[0]
+        return energies
+
+    def get_transition_property(self, ao_integral: np.ndarray) -> np.ndarray:
+        if self._state_ci_coeffs is None:
+            self._do_state_ci()
+        if self._state_ci_coeffs is None:
+            raise ValueError("_state_ci_coeffs is None")
         mo_integral = one_electron_integral_transform(self.c_trans, ao_integral)
-        return 0
+        transition_property = np.zeros(self.num_states - 1)
+        state_op = np.zeros((self.num_states, self.num_states))
+        op = build_operator_matrix(
+            one_elec_op_0i_0a(mo_integral, self.num_inactive_orbs, self.num_active_orbs).get_folded_operator(
+                self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+            ),
+            self.idx2det,
+            self.det2idx,
+            self.num_active_orbs,
+        )
+        for i, coeff_i in enumerate(self.ci_coeffs):
+            for j, coeff_j in enumerate(self.ci_coeffs):
+                state_op[i, j] = expectation_value_mat(coeff_i, op, coeff_j)
+        for i in range(self.num_states - 1):
+            transition_property[i] = self._state_ci_coeffs[:, i + 1] @ state_op @ self._state_ci_coeffs[:, 0]
+        return transition_property
+
+    def get_oscillator_strenghts(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+        transition_dipole_x = self.get_transition_property(dipole_integrals[0])
+        transition_dipole_y = self.get_transition_property(dipole_integrals[1])
+        transition_dipole_z = self.get_transition_property(dipole_integrals[2])
+        osc_strs = np.zeros(self.num_states - 1)
+        for idx, (excitation_energy, td_x, td_y, td_z) in enumerate(
+            zip(self.excitation_energies, transition_dipole_x, transition_dipole_y, transition_dipole_z)
+        ):
+            osc_strs[idx] = 2 / 3 * excitation_energy * (td_x**2 + td_y**2 + td_z**2)
+        return osc_strs
 
 
 def energy_saups(

@@ -27,13 +27,11 @@ class LinearResponseBaseClass:
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
-            is_spin_conserving: Use spin-conseving operators.
         """
         self.wf = wave_function
         self.theta_picker = ThetaPicker(
             self.wf.active_occ_spin_idx,
             self.wf.active_unocc_spin_idx,
-            is_spin_conserving=is_spin_conserving,
         )
 
         self.G_ops: list[FermionicOperator] = []
