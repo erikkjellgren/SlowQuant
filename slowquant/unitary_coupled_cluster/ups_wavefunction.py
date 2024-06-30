@@ -274,7 +274,7 @@ class WaveFunctionUPS:
             self.num_active_elec_beta,
             self.thetas,
             self.ups_layout,
-        )
+        )[0]
 
     @property
     def c_trans(self) -> np.ndarray:

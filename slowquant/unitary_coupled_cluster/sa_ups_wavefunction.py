@@ -24,7 +24,11 @@ from slowquant.unitary_coupled_cluster.operator_matrix import (
     expectation_value_mat,
     get_indexing,
 )
-from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a, one_elec_op_0i_0a
+from slowquant.unitary_coupled_cluster.operators import (
+    Epq,
+    hamiltonian_0i_0a,
+    one_elec_op_0i_0a,
+)
 from slowquant.unitary_coupled_cluster.util import (
     UpsStructure,
     construct_ups_state,
@@ -339,7 +343,7 @@ class WaveFunctionSAUPS:
                 p_idx = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
                     q_idx = q - self.num_inactive_orbs
-                    val = 0
+                    val = 0.0
                     for coeffs in self.ci_coeffs:
                         val += expectation_value(
                             coeffs,
@@ -388,9 +392,9 @@ class WaveFunctionSAUPS:
                             s_lim = p + 1
                         for s in range(self.num_inactive_orbs, s_lim):
                             s_idx = s - self.num_inactive_orbs
-                            val = 0
+                            val = 0.0
                             for coeffs in self.ci_coeffs:
-                                val = expectation_value(
+                                val += expectation_value(
                                     coeffs,
                                     Epq(p, q) * Epq(r, s),
                                     coeffs,
@@ -400,9 +404,9 @@ class WaveFunctionSAUPS:
                                     self.num_active_orbs,
                                     self.num_inactive_orbs,
                                 )
-                                if q == r:
-                                    val -= self.rdm1[p_idx, s_idx]
                             val = val / len(self.ci_coeffs)
+                            if q == r:
+                                val -= self.rdm1[p_idx, s_idx]
                             self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
                             self._rdm2[r_idx, s_idx, p_idx, q_idx] = val  # type: ignore
                             self._rdm2[q_idx, p_idx, s_idx, r_idx] = val  # type: ignore
