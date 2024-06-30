@@ -186,7 +186,7 @@ class quantumLRBaseClass:
                             f"{Sigma_row[nr]:3.6f}".center(10)
                         )
 
-        if cv and not save:
+        if cv:
             print("\n Coefficient of variation:")
             if np.all(self.A == 0):
                 print("Expectation values are needed for coefficient of variation. Running qLR")
@@ -201,7 +201,7 @@ class quantumLRBaseClass:
             mask = [np.abs(self.A) >= 10**-10, np.abs(self.B) >= 10**-10, np.abs(self.Sigma) >= 10**-10]
             for nr, matrix in enumerate([A_cv, B_cv, Sigma_cv]):
                 print(f"\nAnalysis of {matrix_name[nr]}")
-                print(f"The average CV is {(np.sum(matrix[mask[nr]]) / (np.sum(mask[nr]))):1.2e}")
+                print(f"The average CV is {(np.sum(matrix[mask[nr]]) / (np.sum(mask[nr]))):3.6f}")
                 if np.all(mask[nr]):
                     print(f"Maximum CV are of value {np.sort(matrix.flatten())[::-1][:max_values]}")
                     indices = np.unravel_index(np.argsort(matrix.flatten())[::-1][:max_values], matrix.shape)
@@ -218,34 +218,57 @@ class quantumLRBaseClass:
                             area += "G"
                         print(f"Indices {indices[0][i],indices[1][i]}. Part of matrix block {area}")
 
-            if verbose and np.all(mask):
-                print("\nCV in each operator row for E | A | B | Sigma")
-                A_row = np.sum(A_cv, axis=1) / self.num_params
-                B_row = np.sum(B_cv, axis=1) / self.num_params
-                Sigma_row = np.sum(Sigma_cv, axis=1) / self.num_params
-                for nr, i in enumerate(range(self.num_params)):
-                    if nr < self.num_q:
-                        print(
-                            f"q{str(nr):<{3}}:"
-                            + f"{(A_row[nr]+B_row[nr])/2:1.3e}".center(10)
-                            + " | "
-                            + f"{A_row[nr]:1.3e}".center(10)
-                            + " | "
-                            + f"{B_row[nr]:1.3e}".center(10)
-                            + " | "
-                            f"{Sigma_row[nr]:1.3e}".center(10)
-                        )
+            if verbose:
+                if np.all(mask):
+                    A_row = np.sum(A_cv, axis=1) / self.num_params
+                    B_row = np.sum(B_cv, axis=1) / self.num_params
+                    Sigma_row = np.sum(Sigma_cv, axis=1) / self.num_params
+                else:
+                    A_row = A_cv[mask[0]]
+                    B_row = B_cv[mask[1]]
+                    Sigma_row = Sigma_cv[mask[2]]
+                    # Check if it is still a matrix
+                    if len(np.shape(A_row)) >= 2:
+                        A_row = np.sum(A_row, axis=1) / np.sum(mask[0], axis=1)
                     else:
-                        print(
-                            f"G{str(nr-self.num_q):<{3}}:"
-                            + f"{(A_row[nr]+B_row[nr])/2:1.3e}".center(10)
-                            + " | "
-                            + f"{A_row[nr]:1.3e}".center(10)
-                            + " | "
-                            + f"{B_row[nr]:1.3e}".center(10)
-                            + " | "
-                            f"{Sigma_row[nr]:1.3e}".center(10)
-                        )
+                        A_row = A_row / np.sum(mask[0]) * 2
+                    if len(np.shape(B_row)) >= 2:
+                        B_row = np.sum(B_row, axis=1) / np.sum(mask[1], axis=1)
+                    else:
+                        B_row = B_row / np.sum(mask[1]) * 2
+                    if len(np.shape(Sigma_row)) >= 2:
+                        Sigma_row = np.sum(Sigma_row, axis=1) / np.sum(mask[2], axis=1)
+                    else:
+                        Sigma_row = Sigma_row / np.sum(mask[2]) * 2
+                if save:
+                    self._CV_A_row = A_row
+                    self._CV_B_row = B_row
+                    self._CV_Sigma_row = Sigma_row
+                else:
+                    for nr, i in enumerate(range(self.num_params)):
+                        print("\nCV in each operator row for E | A | B | Sigma")
+                        if nr < self.num_q:
+                            print(
+                                f"q{str(nr):<{3}}:"
+                                + f"{(A_row[nr]+B_row[nr])/2:3.6f}".center(10)
+                                + " | "
+                                + f"{A_row[nr]:3.6f}".center(10)
+                                + " | "
+                                + f"{B_row[nr]:3.6f}".center(10)
+                                + " | "
+                                f"{Sigma_row[nr]:3.6f}".center(10)
+                            )
+                        else:
+                            print(
+                                f"G{str(nr-self.num_q):<{3}}:"
+                                + f"{(A_row[nr]+B_row[nr])/2:3.6f}".center(10)
+                                + " | "
+                                + f"{A_row[nr]:3.6f}".center(10)
+                                + " | "
+                                + f"{B_row[nr]:3.6f}".center(10)
+                                + " | "
+                                f"{Sigma_row[nr]:3.6f}".center(10)
+                            )
 
                 print("\n Condition numbers:\n")
                 print(f"Hessian: {np.linalg.cond(self.hessian)}")
@@ -453,7 +476,7 @@ class quantumLRBaseClass:
 
         # get variance in operators
         if not hasattr(self, "_std_A_row") or re_calc:
-            self.run_std(save=True)
+            self.run_std(save=True, cv=False)
 
         # get excitation vector contributions combining (de-)excitation
         for state, vec in enumerate(np.abs(self.excitation_vectors.T) ** 2):
@@ -462,6 +485,29 @@ class quantumLRBaseClass:
             A_trend[state] = np.sum(exc_vec * self._std_A_row)
             B_trend[state] = np.sum(exc_vec * self._std_B_row)
             Sigma_trend[state] = np.sum(exc_vec * self._std_Sigma_row)
+
+        return A_trend, B_trend, Sigma_trend
+
+    def _get_CV_trend(
+        self, re_calc: bool = False
+    ) -> tuple[list[list[float]], list[list[float]], list[list[float]]]:
+        """Analyze CV trend across excited states."""
+        # result vectors
+        A_trend = np.zeros(self.num_params)
+        B_trend = np.zeros(self.num_params)
+        Sigma_trend = np.zeros(self.num_params)
+
+        # get variance in operators
+        if not hasattr(self, "_CV_A_row") or re_calc:
+            self.run_std(save=True, cv=True)
+
+        # get excitation vector contributions combining (de-)excitation
+        for state, vec in enumerate(np.abs(self.excitation_vectors.T) ** 2):
+            exc_vec = vec[: self.num_params] + vec[self.num_params :]
+
+            A_trend[state] = np.sum(exc_vec * self._CV_A_row)
+            B_trend[state] = np.sum(exc_vec * self._CV_B_row)
+            Sigma_trend[state] = np.sum(exc_vec * self._CV_Sigma_row)
 
         return A_trend, B_trend, Sigma_trend
 
