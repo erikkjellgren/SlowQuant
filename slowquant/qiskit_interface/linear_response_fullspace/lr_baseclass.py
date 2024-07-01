@@ -2,7 +2,7 @@ from collections.abc import Sequence
 
 import numpy as np
 import scipy
-from dmdm.util import iterate_t1_sa, iterate_t2_sa  # temporary solution
+from slowquant.qiskit_interface.linear_response.util import iterate_t1_sa, iterate_t2_sa
 
 from slowquant.qiskit_interface.operators import (
     G1,
@@ -125,10 +125,7 @@ class quantumLRBaseClass:
             ZZG = np.outer(self._Z_G[:, state_number], self._Z_G[:, state_number].transpose())
             YYG = np.outer(self._Y_G[:, state_number], self._Y_G[:, state_number].transpose())
 
-            norms[state_number] = np.sum(
-                self.metric
-                * (ZZG - YYG)
-            )
+            norms[state_number] = np.sum(self.metric * (ZZG - YYG))
 
         return norms
 
