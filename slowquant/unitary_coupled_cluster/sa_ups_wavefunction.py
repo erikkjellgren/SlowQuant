@@ -210,6 +210,16 @@ class WaveFunctionSAUPS:
                 idx = self.det2idx[int(on_vec, 2)]
                 self.csf_coeffs[i, idx] = coeff
         self.ci_coeffs = np.copy(self.csf_coeffs)
+        for i, coeff_i in enumerate(self.ci_coeffs):
+            for j, coeff_j in enumerate(self.ci_coeffs):
+                if i == j:
+                    if abs(1 - coeff_i @ coeff_j) > 10**-10:
+                        raise ValueError(f"state {i} is not normalized got overlap of {coeff_i@coeff_j}")
+                else:
+                    if abs(coeff_i @ coeff_j) > 10**-10:
+                        raise ValueError(
+                            f"state {i} and {j} are not otrhogonal got overlap of {coeff_i@coeff_j}"
+                        )
         self.ups_layout = UpsStructure()
         self.ups_layout.create_tups(n_layers, self.num_active_orbs)
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
@@ -437,7 +447,6 @@ class WaveFunctionSAUPS:
         """Run optimization of SA-UPS wave function.
 
         Args:
-            excitations: Excitation orders to include.
             orbital_optimization: Do orbital optimization.
             is_silent: Do not print any output.
             convergence_threshold: Energy threshold for convergence.
@@ -470,8 +479,6 @@ class WaveFunctionSAUPS:
             e_str = f"{e_tot(x):3.12f}"
             print(f"{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
             iteration += 1  # type: ignore [name-defined]
-            if iteration > 500:  # type: ignore [name-defined]
-                raise ValueError("Did not converge in 500 iterations in energy minimization.")
             start = time.time()  # type: ignore [name-defined]
 
         def silent_progress(x: Sequence[float]) -> None:  # pylint: disable=unused-argument
@@ -480,10 +487,7 @@ class WaveFunctionSAUPS:
             Args:
                 x: Wave function parameters.
             """
-            global iteration  # pylint: disable=global-variable-undefined
-            iteration += 1  # type: ignore [name-defined]
-            if iteration > 500:  # type: ignore [name-defined]
-                raise ValueError("Did not converge in 500 iterations in energy minimization.")
+            pass
 
         parameters: list[float] = []
         num_kappa = 0

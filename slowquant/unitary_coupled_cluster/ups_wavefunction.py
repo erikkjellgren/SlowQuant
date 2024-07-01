@@ -451,8 +451,6 @@ class WaveFunctionUPS:
             e_str = f"{e_tot(x):3.12f}"
             print(f"{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
             iteration += 1  # type: ignore [name-defined]
-            if iteration > 500:  # type: ignore [name-defined]
-                raise ValueError("Did not converge in 500 iterations in energy minimization.")
             start = time.time()  # type: ignore [name-defined]
 
         def silent_progress(x: Sequence[float]) -> None:  # pylint: disable=unused-argument
@@ -461,10 +459,7 @@ class WaveFunctionUPS:
             Args:
                 x: Wave function parameters.
             """
-            global iteration  # pylint: disable=global-variable-undefined
-            iteration += 1  # type: ignore [name-defined]
-            if iteration > 500:  # type: ignore [name-defined]
-                raise ValueError("Did not converge in 500 iterations in energy minimization.")
+            pass
 
         parameters: list[float] = []
         num_kappa = 0
