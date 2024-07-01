@@ -134,6 +134,15 @@ class quantumLRBaseClass:
         save: bool = False,
     ) -> None:
         """Analyze standard deviation in matrix elements of LR equation."""
+        print("\n Condition numbers:\n")
+        print(f"Hessian: {np.linalg.cond(self.hessian)}")
+        print(f"A      : {np.linalg.cond(self.A)}")
+        print(f"B      : {np.linalg.cond(self.B)}")
+        print(f"Metric : {np.linalg.cond(self.metric)}")
+        print(f"Sigma  : {np.linalg.cond(self.Sigma)}")
+        print(f"S-1E   : {np.linalg.cond(np.linalg.inv(self.metric)@self.hessian)}")
+
+        print("\n Quantum variance analysis:")
         matrix_name = ["A", "B", "Sigma"]
         for nr, matrix in enumerate([np.abs(A), np.abs(B), np.abs(Sigma)]):
             print(f"\nAnalysis of {matrix_name[nr]}")
@@ -223,7 +232,15 @@ class quantumLRBaseClass:
                     A_row = np.sum(A_cv, axis=1) / self.num_params
                     B_row = np.sum(B_cv, axis=1) / self.num_params
                     Sigma_row = np.sum(Sigma_cv, axis=1) / self.num_params
+                elif (
+                    np.sum(mask[0]) < self.num_params
+                    or np.sum(mask[1]) < self.num_params
+                    or np.sum(mask[2]) < self.num_params
+                ):
+                    print("CV per operator analysis not possible.")
+                    return
                 else:
+                    print(mask)
                     A_row = A_cv[mask[0]]
                     B_row = B_cv[mask[1]]
                     Sigma_row = Sigma_cv[mask[2]]
@@ -245,8 +262,8 @@ class quantumLRBaseClass:
                     self._CV_B_row = B_row
                     self._CV_Sigma_row = Sigma_row
                 else:
+                    print("\nCV in each operator row for E | A | B | Sigma")
                     for nr, i in enumerate(range(self.num_params)):
-                        print("\nCV in each operator row for E | A | B | Sigma")
                         if nr < self.num_q:
                             print(
                                 f"q{str(nr):<{3}}:"
@@ -269,14 +286,6 @@ class quantumLRBaseClass:
                                 + " | "
                                 f"{Sigma_row[nr]:3.6f}".center(10)
                             )
-
-                print("\n Condition numbers:\n")
-                print(f"Hessian: {np.linalg.cond(self.hessian)}")
-                print(f"A      : {np.linalg.cond(self.A)}")
-                print(f"B      : {np.linalg.cond(self.B)}")
-                print(f"Metric : {np.linalg.cond(self.metric)}")
-                print(f"Sigma  : {np.linalg.cond(self.Sigma)}")
-                print(f"S-1E   : {np.linalg.cond(np.linalg.inv(self.metric)@self.hessian)}")
 
     def get_excitation_energies(self) -> np.ndarray:
         """Solve LR eigenvalue problem."""
