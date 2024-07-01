@@ -274,16 +274,17 @@ def postselection(
     if isinstance(mapper, JordanWignerMapper):
         for bitstr, val in dist.items():
             num_a = len(bitstr) // 2
-            bitstr_a = bitstr[:num_a]
-            bitstr_b = bitstr[num_a:]
+            # Remember that in Qiskit notation you read |0101> from right to left.
+            bitstr_a = bitstr[num_a:]
+            bitstr_b = bitstr[:num_a]
             if bitstr_a.count("1") == num_elec[0] and bitstr_b.count("1") == num_elec[1]:
                 new_dist[bitstr] = val
                 prob_sum += val
     elif isinstance(mapper, ParityMapper):
         for bitstr, val in dist.items():
             num_a = len(bitstr) // 2
-            bitstr_a = bitstr[:num_a]
-            bitstr_b = bitstr[num_a:]
+            bitstr_a = bitstr[num_a:]
+            bitstr_b = bitstr[:num_a]
             current_parity = "0"
             change_counter = 0
             for bit in bitstr_a:
