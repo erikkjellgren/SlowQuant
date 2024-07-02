@@ -240,23 +240,13 @@ class quantumLRBaseClass:
                     print("CV per operator analysis not possible.")
                     return
                 else:
-                    print(mask)
-                    A_row = A_cv[mask[0]]
-                    B_row = B_cv[mask[1]]
-                    Sigma_row = Sigma_cv[mask[2]]
-                    # Check if it is still a matrix
-                    if len(np.shape(A_row)) >= 2:
-                        A_row = np.sum(A_row, axis=1) / np.sum(mask[0], axis=1)
-                    else:
-                        A_row = A_row / np.sum(mask[0]) * 2
-                    if len(np.shape(B_row)) >= 2:
-                        B_row = np.sum(B_row, axis=1) / np.sum(mask[1], axis=1)
-                    else:
-                        B_row = B_row / np.sum(mask[1]) * 2
-                    if len(np.shape(Sigma_row)) >= 2:
-                        Sigma_row = np.sum(Sigma_row, axis=1) / np.sum(mask[2], axis=1)
-                    else:
-                        Sigma_row = Sigma_row / np.sum(mask[2]) * 2
+                    A_row = np.zeros(self.num_params)
+                    B_row = np.zeros(self.num_params)
+                    Sigma_row = np.zeros(self.num_params)
+                    for nr in range(self.num_params):
+                        A_row[nr] = np.sum(A_cv[nr][mask[0][nr]]) / np.sum(mask[0][nr])
+                        B_row[nr] = np.sum(B_cv[nr][mask[1][nr]]) / np.sum(mask[1][nr])
+                        Sigma_row[nr] = np.sum(Sigma_cv[nr][mask[2][nr]]) / np.sum(mask[2][nr])
                 if save:
                     self._CV_A_row = A_row
                     self._CV_B_row = B_row
