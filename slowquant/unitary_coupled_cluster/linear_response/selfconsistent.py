@@ -66,7 +66,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
         for i, op in enumerate(self.G_ops):
             state = propagate_state(
                 op,
-                self.wf.hf_coeffs,
+                self.wf.csf_coeffs,
                 self.wf.idx2det,
                 self.wf.det2idx,
                 self.wf.num_inactive_orbs,
@@ -124,7 +124,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
             for i, GI in enumerate(self.G_ops):
                 state = propagate_state(
                     GI,
-                    self.wf.hf_coeffs,
+                    self.wf.csf_coeffs,
                     self.wf.idx2det,
                     self.wf.det2idx,
                     self.wf.num_inactive_orbs,
@@ -190,7 +190,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
         for j, GJ in enumerate(self.G_ops):
             stateJ = propagate_state(
                 GJ,
-                self.wf.hf_coeffs,
+                self.wf.csf_coeffs,
                 self.wf.idx2det,
                 self.wf.det2idx,
                 self.wf.num_inactive_orbs,
@@ -201,7 +201,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
             for i, GI in enumerate(self.G_ops[j:], j):
                 stateI = propagate_state(
                     GI,
-                    self.wf.hf_coeffs,
+                    self.wf.csf_coeffs,
                     self.wf.idx2det,
                     self.wf.det2idx,
                     self.wf.num_inactive_orbs,
@@ -211,7 +211,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 stateI = np.matmul(self.wf.u, stateI)
                 stateIJ = propagate_state(
                     GI,
-                    self.wf.hf_coeffs,
+                    self.wf.csf_coeffs,
                     self.wf.idx2det,
                     self.wf.det2idx,
                     self.wf.num_inactive_orbs,
@@ -230,7 +230,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 stateIJ = np.matmul(self.wf.u, stateIJ)
                 stateIJd = propagate_state(
                     GI,
-                    self.wf.hf_coeffs,
+                    self.wf.csf_coeffs,
                     self.wf.idx2det,
                     self.wf.det2idx,
                     self.wf.num_inactive_orbs,
@@ -363,7 +363,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
             for i, G in enumerate(self.G_ops):
                 state = propagate_state(
                     G,
-                    self.wf.hf_coeffs,
+                    self.wf.csf_coeffs,
                     self.wf.idx2det,
                     self.wf.det2idx,
                     self.wf.num_inactive_orbs,

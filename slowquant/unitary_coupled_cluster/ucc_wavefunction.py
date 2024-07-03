@@ -195,10 +195,10 @@ class WaveFunctionUCC:
             self.num_active_orbs, self.num_active_elec_alpha, self.num_active_elec_beta
         )
         self.num_det = len(self.idx2det)
-        self.hf_coeffs = np.zeros(self.num_det)
+        self.csf_coeffs = np.zeros(self.num_det)
         hf_det = int("1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec), 2)
-        self.hf_coeffs[self.det2idx[hf_det]] = 1
-        self.ci_coeffs = np.copy(self.hf_coeffs)
+        self.csf_coeffs[self.det2idx[hf_det]] = 1
+        self.ci_coeffs = np.copy(self.csf_coeffs)
         # Allocate parameterization
         self.singlet_excitation_operator_generator = ThetaPicker(
             self.active_occ_spin_idx_shifted,
@@ -317,7 +317,7 @@ class WaveFunctionUCC:
         self._rdm4 = None
         self._u = None
         self._theta1 = theta.copy()
-        self.ci_coeffs = np.matmul(self.u, self.hf_coeffs)
+        self.ci_coeffs = np.matmul(self.u, self.csf_coeffs)
 
     @property
     def theta2(self) -> list[float]:
@@ -343,7 +343,7 @@ class WaveFunctionUCC:
         self._rdm4 = None
         self._u = None
         self._theta2 = theta.copy()
-        self.ci_coeffs = np.matmul(self.u, self.hf_coeffs)
+        self.ci_coeffs = np.matmul(self.u, self.csf_coeffs)
 
     @property
     def theta3(self) -> list[float]:
@@ -469,7 +469,7 @@ class WaveFunctionUCC:
         self._rdm3 = None
         self._rdm4 = None
         self._u = None
-        self.ci_coeffs = np.matmul(self.u, self.hf_coeffs)
+        self.ci_coeffs = np.matmul(self.u, self.csf_coeffs)
 
     @property
     def c_trans(self) -> np.ndarray:
@@ -534,7 +534,7 @@ class WaveFunctionUCC:
                         self.det2idx,
                         self.num_inactive_orbs,
                         self.num_active_orbs,
-                        self.num_inactive_orbs,
+                        self.num_virtual_orbs,
                     )
                     self._rdm1[p_idx, q_idx] = val  # type: ignore
                     self._rdm1[q_idx, p_idx] = val  # type: ignore
@@ -580,7 +580,7 @@ class WaveFunctionUCC:
                                 self.det2idx,
                                 self.num_inactive_orbs,
                                 self.num_active_orbs,
-                                self.num_inactive_orbs,
+                                self.num_virtual_orbs,
                             )
                             if q == r:
                                 val -= self.rdm1[p_idx, s_idx]
@@ -610,18 +610,6 @@ class WaveFunctionUCC:
                     self.num_active_orbs,
                 )
             )
-
-            E = {}
-            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                for q in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                    E[(p, q)] = epq_hybrid(
-                        p,
-                        q,
-                        self.num_inactive_spin_orbs,
-                        self.num_active_spin_orbs,
-                        self.num_virtual_spin_orbs,
-                    )
-
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_idx = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
@@ -634,10 +622,15 @@ class WaveFunctionUCC:
                                 t_idx = t - self.num_inactive_orbs
                                 for u in range(self.num_inactive_orbs, p + 1):
                                     u_idx = u - self.num_inactive_orbs
-                                    val = expectation_value_hybrid_flow(
-                                        self.state_vector,
-                                        [E[(p, q)], E[(r, s)], E[(t, u)]],
-                                        self.state_vector,
+                                    val = expectation_value(
+                                        self.ci_coeffs,
+                                        Epq(p, q)*Epq(r, s)*Epq(t, u),
+                                        self.ci_coeffs,
+                                        self.idx2det,
+                                        self.det2idx,
+                                        self.num_inactive_orbs,
+                                        self.num_active_orbs,
+                                        self.num_virtual_orbs,
                                     )
                                     if t == s:
                                         val -= self.rdm2[p_idx, q_idx, r_idx, u_idx]
@@ -683,18 +676,6 @@ class WaveFunctionUCC:
                     self.num_active_orbs,
                 )
             )
-
-            E = {}
-            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                for q in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                    E[(p, q)] = epq_hybrid(
-                        p,
-                        q,
-                        self.num_inactive_spin_orbs,
-                        self.num_active_spin_orbs,
-                        self.num_virtual_spin_orbs,
-                    )
-
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_idx = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
@@ -711,10 +692,15 @@ class WaveFunctionUCC:
                                         m_idx = m - self.num_inactive_orbs
                                         for n in range(self.num_inactive_orbs, p + 1):
                                             n_idx = n - self.num_inactive_orbs
-                                            val = expectation_value_hybrid_flow(
-                                                self.state_vector,
-                                                [E[(p, q)], E[(r, s)], E[(t, u)], E[(m, n)]],
-                                                self.state_vector,
+                                            val = expectation_value(
+                                                self.ci_coeffs,
+                                                Epq(p, q)*Epq(r, s)*Epq(t, u)*Epq(m, n),
+                                                self.ci_coeffs,
+                                                self.idx2det,
+                                                self.det2idx,
+                                                self.num_inactive_orbs,
+                                                self.num_active_orbs,
+                                                self.num_virtual_orbs,
                                             )
                                             if r == q:
                                                 val -= self.rdm3[p_idx, s_idx, t_idx, u_idx, m_idx, n_idx]
