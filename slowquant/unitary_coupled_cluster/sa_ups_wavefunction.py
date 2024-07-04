@@ -29,11 +29,7 @@ from slowquant.unitary_coupled_cluster.operators import (
     hamiltonian_0i_0a,
     one_elec_op_0i_0a,
 )
-from slowquant.unitary_coupled_cluster.util import (
-    UpsStructure,
-    construct_ups_state,
-    construct_ups_u,
-)
+from slowquant.unitary_coupled_cluster.util import UpsStructure, construct_ups_state
 
 
 class WaveFunctionSAUPS:
@@ -245,24 +241,6 @@ class WaveFunctionSAUPS:
         self._state_energies = None
         self._state_ci_coeffs = None
         self._c_orthonormal = c
-
-    @property
-    def u(self) -> np.ndarray:
-        """Get unitary ansatz.
-
-        Return:
-            Unitary ansatz.
-        """
-        if self._u is None:
-            self._u = construct_ups_u(
-                self.num_det,
-                self.num_active_orbs,
-                self.num_active_elec_alpha,
-                self.num_active_elec_beta,
-                self.thetas,
-                self.ups_layout,
-            )
-        return self._u
 
     @property
     def thetas(self) -> list[float]:
@@ -672,7 +650,7 @@ def energy_saups(
         wf.det2idx,
         wf.num_active_orbs,
     )
-    energy = 0
+    energy = 0.0
     for coeffs in wf.ci_coeffs:
         energy += expectation_value_mat(coeffs, Hamiltonian, coeffs)
     return energy / len(wf.ci_coeffs)

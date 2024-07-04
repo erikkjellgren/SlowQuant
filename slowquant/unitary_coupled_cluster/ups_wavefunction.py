@@ -24,11 +24,7 @@ from slowquant.unitary_coupled_cluster.operator_matrix import (
     get_indexing,
 )
 from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
-from slowquant.unitary_coupled_cluster.util import (
-    UpsStructure,
-    construct_ups_state,
-    construct_ups_u,
-)
+from slowquant.unitary_coupled_cluster.util import UpsStructure, construct_ups_state
 
 
 class WaveFunctionUPS:
@@ -226,24 +222,6 @@ class WaveFunctionUPS:
         self._c_orthonormal = c
 
     @property
-    def u(self) -> np.ndarray:
-        """Get unitary ansatz.
-
-        Return:
-            Unitary ansatz.
-        """
-        if self._u is None:
-            self._u = construct_ups_u(
-                self.num_det,
-                self.num_active_orbs,
-                self.num_active_elec_alpha,
-                self.num_active_elec_beta,
-                self.thetas,
-                self.ups_layout,
-            )
-        return self._u
-
-    @property
     def thetas(self) -> list[float]:
         """Get theta values.
 
@@ -274,7 +252,7 @@ class WaveFunctionUPS:
             self.num_active_elec_beta,
             self.thetas,
             self.ups_layout,
-        )[0]
+        )
 
     @property
     def c_trans(self) -> np.ndarray:
@@ -635,7 +613,7 @@ def orbital_rotation_gradient(
 
 
 def active_space_parameter_gradient(
-    wf: WaveFunctionSAUPS,
+    wf: WaveFunctionUPS,
     parameters: Sequence[float],
     orbital_optimized: bool,
 ) -> np.ndarray:

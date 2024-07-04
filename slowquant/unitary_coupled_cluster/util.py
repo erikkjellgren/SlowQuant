@@ -2,9 +2,9 @@ from collections.abc import Generator, Sequence
 
 import numpy as np
 import scipy.linalg
-import scipy.sparse as ss
 
 from slowquant.unitary_coupled_cluster.operator_matrix import (
+    G1_matrix,
     G1_sa_matrix,
     G2_1_sa_matrix,
     G2_2_sa_matrix,
@@ -197,54 +197,26 @@ class UpsStructure:
         for _ in range(n_layers):
             for p in range(0, num_active_orbs - 1, 2):
                 # First single
-                self.excitation_operator_type.append(1)
-                self.excitation_indicies.append((p + 1, p))
+                self.excitation_operator_type.append("tups_single")
+                self.excitation_indicies.append((p,))
                 # Double
-                self.excitation_operator_type.append(2)
-                self.excitation_indicies.append((p + 1, p + 1, p, p))
+                self.excitation_operator_type.append("tups_double")
+                self.excitation_indicies.append((p,))
                 # Second single
-                self.excitation_operator_type.append(1)
-                self.excitation_indicies.append((p + 1, p))
+                self.excitation_operator_type.append("tups_single")
+                self.excitation_indicies.append((p,))
                 self.n_params += 3
             for p in range(1, num_active_orbs - 2, 2):
                 # First single
-                self.excitation_operator_type.append(1)
-                self.excitation_indicies.append((p + 1, p))
+                self.excitation_operator_type.append("tups_single")
+                self.excitation_indicies.append((p,))
                 # Double
-                self.excitation_operator_type.append(2)
-                self.excitation_indicies.append((p + 1, p + 1, p, p))
+                self.excitation_operator_type.append("tups_double")
+                self.excitation_indicies.append((p,))
                 # Second single
-                self.excitation_operator_type.append(1)
-                self.excitation_indicies.append((p + 1, p))
+                self.excitation_operator_type.append("tups_single")
+                self.excitation_indicies.append((p,))
                 self.n_params += 3
-
-
-def construct_ups_u(
-    num_det: int,
-    num_active_orbs: int,
-    num_elec_alpha: int,
-    num_elec_beta: int,
-    thetas: Sequence[float],
-    ups_struct: UpsStructure,
-) -> np.ndarray:
-    A = np.eye(num_det)
-    for exc_type, exc_indices, theta in zip(
-        ups_struct.excitation_operator_type, ups_struct.excitation_indicies, thetas
-    ):
-        if exc_type == 1:
-            i, a = exc_indices
-            t = theta * G1_sa_matrix(i, a, num_active_orbs, num_elec_alpha, num_elec_beta)
-        elif exc_type == 2:
-            i, j, a, b = exc_indices
-            t = theta * G2_1_sa_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta)
-        elif exc_type == 3:
-            i, j, a, b = exc_indices
-            t = theta * G2_2_sa_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta)
-        else:
-            raise ValueError(f"Got unknown excitation type, {exc_type}")
-        B = scipy.sparse.linalg.expm(t - t.conjugate().transpose()).todense()
-        A = np.matmul(B, A)
-    return A
 
 
 def construct_ups_state(
@@ -255,22 +227,43 @@ def construct_ups_state(
     thetas: Sequence[float],
     ups_struct: UpsStructure,
 ) -> np.ndarray:
-    tmp = ss.csr_array([state]).T
+    n_det = len(state)
+    tmp = state.copy()
     for exc_type, exc_indices, theta in zip(
         ups_struct.excitation_operator_type, ups_struct.excitation_indicies, thetas
     ):
         if abs(theta) < 10**-14:
             continue
-        if exc_type == 1:
-            i, a = exc_indices
-            t = theta * G1_sa_matrix(i, a, num_active_orbs, num_elec_alpha, num_elec_beta)
-        elif exc_type == 2:
-            i, j, a, b = exc_indices
-            t = theta * G2_1_sa_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta)
-        elif exc_type == 3:
-            i, j, a, b = exc_indices
-            t = theta * G2_2_sa_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta)
+        if exc_type == "tups_single":
+            (p,) = exc_indices
+            ta = G1_matrix(p * 2, (p + 1) * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            tb = G1_matrix(
+                p * 2 + 1, (p + 1) * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta
+            ).todense()
+            Ta = ta - ta.conjugate().transpose()
+            Tb = tb - tb.conjugate().transpose()
+            vec = tmp.copy()
+            tmp = (
+                np.matmul(np.eye(n_det), vec)
+                + np.sin(2 ** (-1 / 2) * theta) * np.matmul(Ta, vec)
+                + (1 - np.cos(2 ** (-1 / 2) * theta)) * np.matmul(Ta, np.matmul(Ta, vec))
+            )
+            vec = tmp.copy()
+            tmp = (
+                np.matmul(np.eye(n_det), vec)
+                + np.sin(2 ** (-1 / 2) * theta) * np.matmul(Tb, vec)
+                + (1 - np.cos(2 ** (-1 / 2) * theta)) * np.matmul(Tb, np.matmul(Tb, vec))
+            )
+        elif exc_type == "tups_double":
+            (p,) = exc_indices
+            t = G2_1_sa_matrix(p, p, p + 1, p + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            T = t - t.conjugate().transpose()
+            vec = tmp.copy()
+            tmp = (
+                np.matmul(np.eye(n_det), vec)
+                + np.sin(theta) * np.matmul(T, vec)
+                + (1 - np.cos(theta)) * np.matmul(T, np.matmul(T, vec))
+            )
         else:
             raise ValueError(f"Got unknown excitation type, {exc_type}")
-        tmp = ss.linalg.expm_multiply(t - t.conjugate().transpose(), tmp)
-    return tmp.T.todense()
+    return tmp
