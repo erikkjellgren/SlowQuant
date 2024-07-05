@@ -197,6 +197,7 @@ class quantumLRBaseClass:
 
         if cv:
             print("\n Coefficient of variation:")
+            print("Warning: This analysis is very prone to numerical instabilities!")
             if np.all(self.A == 0):
                 print("Expectation values are needed for coefficient of variation. Running qLR")
                 self.run()
@@ -207,7 +208,12 @@ class quantumLRBaseClass:
             B_cv[np.isnan(B_cv)] = 0
             Sigma_cv[np.isnan(Sigma_cv)] = 0
             # disregard values smaller 10**-10
-            mask = [np.abs(self.A) >= 10**-10, np.abs(self.B) >= 10**-10, np.abs(self.Sigma) >= 10**-10]
+            mask_thresh = 10**-6
+            mask = [
+                np.abs(self.A) >= mask_thresh,
+                np.abs(self.B) >= mask_thresh,
+                np.abs(self.Sigma) >= mask_thresh,
+            ]
             for nr, matrix in enumerate([A_cv, B_cv, Sigma_cv]):
                 print(f"\nAnalysis of {matrix_name[nr]}")
                 print(f"The average CV is {(np.sum(matrix[mask[nr]]) / (np.sum(mask[nr]))):3.6f}")
