@@ -721,9 +721,9 @@ class QuantumInterface:
             else:
                 p1 = self._sampler_distribution_p1(pauli, run_parameters)
             if self.shots is None:
-                var_p = 4 * np.abs(coeff.real) ** 2 * (p1 - p1**2)
+                var_p = 4 * np.abs(coeff.real) ** 2 * np.abs(p1 - p1**2)
             else:
-                var_p = 4 * np.abs(coeff.real) ** 2 * (p1 - p1**2) / (self.shots)
+                var_p = 4 * np.abs(coeff.real) ** 2 * np.abs(p1 - p1**2) / (self.shots)
             result += var_p
         return result
 
