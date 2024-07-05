@@ -9,17 +9,10 @@ from qiskit.compiler import transpile
 from qiskit.primitives import BaseEstimator, BaseSampler
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFock
-from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
-from slowquant.qiskit_interface.custom_ansatz import (
-    ErikD_JW,
-    ErikD_Parity,
-    ErikSD_JW,
-    ErikSD_Parity,
-    tUPS,
-)
+from slowquant.qiskit_interface.custom_ansatz import QNP, tUPS
 from slowquant.qiskit_interface.util import (
     Clique,
     correct_distribution,
@@ -66,7 +59,7 @@ class QuantumInterface:
             do_M_ansatz0: Use the ansatz with theta=0 when constructing the read-out correlation matrix.
             do_postselection: Use postselection to preserve number of particles in the computational basis.
         """
-        allowed_ansatz = ("UCCSD", "PUCCD", "UCCD", "ErikD", "ErikSD", "HF", "tUPS")
+        allowed_ansatz = ("UCCSD", "PUCCD", "UCCD", "HF", "tUPS", "QNP")
         if ansatz not in allowed_ansatz:
             raise ValueError("The chosen Ansatz is not available. Choose from: ", allowed_ansatz)
         self.ansatz = ansatz
@@ -142,34 +135,14 @@ class QuantumInterface:
                     self.mapper,
                 ),
             )
-        elif self.ansatz == "ErikD":
-            if len(self.ansatz_options) != 0:
-                raise ValueError(f"No options available for ErikD got {self.ansatz_options}")
-            if num_orbs != 2 or self.num_elec != (1, 1):
-                raise ValueError(f"Chosen ansatz, {self.ansatz}, only works for (2,2)")
-            if isinstance(self.mapper, JordanWignerMapper):
-                self.circuit = ErikD_JW()
-            elif isinstance(self.mapper, ParityMapper):
-                self.circuit = ErikD_Parity()
-            else:
-                raise ValueError(f"Unsupported mapper, {type(self.mapper)}, for ansatz {self.ansatz}")
-        elif self.ansatz == "ErikSD":
-            if len(self.ansatz_options) != 0:
-                raise ValueError(f"No options available for ErikSD got {self.ansatz_options}")
-            if num_orbs != 2 or self.num_elec != (1, 1):
-                raise ValueError(f"Chosen ansatz, {self.ansatz}, only works for (2,2)")
-            if isinstance(self.mapper, JordanWignerMapper):
-                self.circuit = ErikSD_JW()
-            elif isinstance(self.mapper, ParityMapper):
-                self.circuit = ErikSD_Parity()
-            else:
-                raise ValueError(f"Unsupported mapper, {type(self.mapper)}, for ansatz {self.ansatz}")
         elif self.ansatz == "HF":
             if len(self.ansatz_options) != 0:
                 raise ValueError(f"No options available for HF got {self.ansatz_options}")
             self.circuit = HartreeFock(num_orbs, self.num_elec, self.mapper)
         elif self.ansatz == "tUPS":
             self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
+        elif self.ansatz == "QNP":
+            self.circuit, self.grad_param_R = QNP(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
 
         # Check that R parameter for gradient is consistent with the paramter names.
         if len(self.grad_param_R) == 0:

@@ -9,114 +9,6 @@ from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from slowquant.qiskit_interface.operators_circuits import tups_double, tups_single
 
 
-def ErikD_JW():
-    """UCCD(2,2) circuit for JW.
-
-    Gate count, cx: 3, u: 3
-
-    .. code-block::
-
-             ┌──────────┐               ┌───┐
-        q_0: ┤ Ry(2*p1) ├──■────■────■──┤ X ├
-             └──────────┘┌─┴─┐  │    │  └───┘
-        q_1: ────────────┤ X ├──┼────┼───────
-                ┌───┐    └───┘┌─┴─┐  │
-        q_2: ───┤ X ├─────────┤ X ├──┼───────
-                └───┘         └───┘┌─┴─┐
-        q_3: ──────────────────────┤ X ├─────
-                                   └───┘
-    """
-    p1 = Parameter("p1")
-    qc = QuantumCircuit(4)
-    qc.ry(2 * p1, 0)
-    qc.x(2)
-    qc.cx(0, 1)
-    qc.cx(0, 2)
-    qc.cx(0, 3)
-    qc.x(0)
-    return qc
-
-
-def ErikSD_JW():
-    """UCCSD(2,2) circuit for JW.
-
-    Gate count, cx: 8, u: 7
-
-    .. code-block::
-
-             ┌──────────────┐                  ┌───┐┌───┐
-        q_0: ┤ Ry(2*p1 + π) ├────────■─────────┤ X ├┤ X ├──■───────────────────■───────
-             └──────────────┘        │         └───┘└─┬─┘┌─┴─┐                 │  ┌───┐
-        q_1: ────────────────────────┼────────────────┼──┤ X ├──■─────────■────┼──┤ X ├
-                             ┌───────┴────────┐┌───┐  │  └───┘┌─┴─┐       │  ┌─┴─┐└───┘
-        q_2: ────────────────┤ Ry(2*p2 - π/2) ├┤ H ├──■───────┤ X ├──■────┼──┤ X ├─────
-                             └────────────────┘└───┘          └───┘┌─┴─┐┌─┴─┐├───┤
-        q_3: ──────────────────────────────────────────────────────┤ X ├┤ X ├┤ X ├─────
-                                                                   └───┘└───┘└───┘
-    """
-    p1 = Parameter("p1")
-    p2 = Parameter("p2")
-    qc = QuantumCircuit(4)
-    qc.ry(np.pi + 2 * p1, 0)
-    qc.cry(-np.pi / 2 + 2 * p2, 0, 2)
-    qc.x(0)
-    qc.h(2)
-    qc.cx(2, 0)
-    qc.cx(0, 1)
-    qc.cx(1, 2)
-    qc.cx(2, 3)
-    qc.cx(1, 3)
-    qc.x(1)
-    qc.cx(0, 2)
-    qc.x(3)
-    return qc
-
-
-def ErikD_Parity():
-    """UCCD(2,2) circuit for Parity.
-
-    Gate count, cx: 1, u: 2
-
-    .. code-block::
-
-             ┌──────────┐     ┌───┐
-        q_0: ┤ Ry(2*p1) ├──■──┤ X ├
-             └──────────┘┌─┴─┐└───┘
-        q_1: ────────────┤ X ├─────
-                         └───┘
-
-    """
-    p1 = Parameter("p1")
-    qc = QuantumCircuit(2)
-    qc.ry(2 * p1, 0)
-    qc.cx(0, 1)
-    qc.x(0)
-    return qc
-
-
-def ErikSD_Parity():
-    """UCCSD(2,2) circuit for Parity.
-
-    Gate count, cx: 3, u: 4
-
-    .. code-block::
-
-             ┌──────────────┐                       ┌───┐
-        q_0: ┤ Ry(2*p1 + π) ├────────■──────────────┤ X ├
-             └──────────────┘┌───────┴────────┐┌───┐└─┬─┘
-        q_1: ────────────────┤ Ry(π/2 - 2*p2) ├┤ H ├──■──
-                             └────────────────┘└───┘
-    """
-    p1 = Parameter("p1")
-    p2 = Parameter("p2")
-    qc = QuantumCircuit(2)
-    qc.ry(np.pi + 2 * p1, 0)
-    qc.cry(np.pi / 2 - 2 * p2, 0, 1)
-    qc.h(1)
-    qc.cx(1, 0)
-    return qc
-
-
 def tUPS(
     num_orbs: int,
     num_elec: tuple[int, int],
@@ -125,7 +17,7 @@ def tUPS(
 ) -> tuple[QuantumCircuit, dict[str, int]]:
     r"""tUPS ansatz.
 
-    #. 10.48550/arXiv.2312.09761
+    #. 10.1103/PhysRevResearch.6.023300
 
     Ansatz Options:
         * n_layers [int]: Number of layers.
@@ -194,6 +86,81 @@ def tUPS(
             grad_param_R[f"p{idx:09d}"] = 2
             idx += 1
             # Second single
+            qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx:09d}"))
+            grad_param_R[f"p{idx:09d}"] = 4
+            idx += 1
+    return qc, grad_param_R
+
+
+def QNP(
+    num_orbs: int,
+    num_elec: tuple[int, int],
+    mapper: FermionicMapper,
+    ansatz_options: dict[str, Any],
+) -> tuple[QuantumCircuit, dict[str, int]]:
+    r"""QNP ansatz.
+
+    #. 10.1088/1367-2630/ac2cb3
+
+    Ansatz Options:
+        * n_layers [int]: Number of layers.
+        * do_pp [bool]: Do perfect pairing.
+
+    Args:
+        num_orbs: Number of spatial orbitals.
+        num_elec: Number of alpha and beta electrons.
+        ansatz_options: Ansatz options.
+
+    Returns:
+        QNP ansatz circuit and R parameters needed for gradients.
+    """
+    valid_options = ("n_layers", "do_pp")
+    for option in ansatz_options:
+        if option not in valid_options:
+            raise ValueError(f"Got unknown option for QNP, {option}. Valid options are: {valid_options}")
+    if "n_layers" not in ansatz_options.keys():
+        raise ValueError("QNP require the option 'n_layers'")
+    n_layers = ansatz_options["n_layers"]
+    if "do_pp" in ansatz_options.keys():
+        do_pp = ansatz_options["do_pp"]
+    else:
+        do_pp = False
+
+    if not isinstance(mapper, JordanWignerMapper):
+        raise ValueError(f"QNP only implemented for JW mapper, got: {type(mapper)}")
+    if num_orbs % 2 != 0:
+        raise ValueError(f"QNP only implemented for even number of spatial orbitals, got: {num_orbs}")
+    if do_pp and np.sum(num_elec) != num_orbs:
+        raise ValueError(
+            f"pp-QNP only implemented for number of electrons and number of orbitals being the same, got: ({np.sum(num_elec)}, {num_orbs}), (elec, orbs)"
+        )
+
+    num_qubits = 2 * num_orbs  # qc.num_qubits
+    if do_pp:
+        qc = QuantumCircuit(num_qubits)
+        for p in range(0, 2 * num_orbs):
+            if p % 2 == 0:
+                qc.x(p)
+    else:
+        qc = HartreeFock(num_orbs, num_elec, mapper)
+    grad_param_R = {}
+    idx = 0
+    for _ in range(n_layers):
+        for p in range(0, num_orbs - 1, 2):
+            # Double
+            qc = tups_double(p, num_orbs, qc, Parameter(f"p{idx:09d}"))
+            grad_param_R[f"p{idx:09d}"] = 2
+            idx += 1
+            # Single
+            qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx:09d}"))
+            grad_param_R[f"p{idx:09d}"] = 4
+            idx += 1
+        for p in range(1, num_orbs - 2, 2):
+            # Double
+            qc = tups_double(p, num_orbs, qc, Parameter(f"p{idx:09d}"))
+            grad_param_R[f"p{idx:09d}"] = 2
+            idx += 1
+            # Single
             qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx:09d}"))
             grad_param_R[f"p{idx:09d}"] = 4
             idx += 1

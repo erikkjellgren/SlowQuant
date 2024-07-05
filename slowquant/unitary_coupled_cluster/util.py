@@ -218,6 +218,25 @@ class UpsStructure:
                 self.excitation_indicies.append((p,))
                 self.n_params += 3
 
+    def create_qnp(self, n_layers: int, num_active_orbs) -> None:
+        for _ in range(n_layers):
+            for p in range(0, num_active_orbs - 1, 2):
+                # Double
+                self.excitation_operator_type.append("tups_double")
+                self.excitation_indicies.append((p,))
+                # Single
+                self.excitation_operator_type.append("tups_single")
+                self.excitation_indicies.append((p,))
+                self.n_params += 2
+            for p in range(1, num_active_orbs - 2, 2):
+                # Double
+                self.excitation_operator_type.append("tups_double")
+                self.excitation_indicies.append((p,))
+                # Single
+                self.excitation_operator_type.append("tups_single")
+                self.excitation_indicies.append((p,))
+                self.n_params += 2
+
 
 def construct_ups_state(
     state: np.ndarray,
