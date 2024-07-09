@@ -104,7 +104,7 @@ def fUCCSD(
     num_elec: tuple[int, int],
     mapper: FermionicMapper,
 ) -> tuple[QuantumCircuit, dict[str, int]]:
-    """Efficient UCCSD ansatz.
+    """Factorized UCCSD ansatz.
 
     #. 10.1103/PhysRevA.102.062612
 
@@ -114,7 +114,7 @@ def fUCCSD(
         mapper: Fermioinc to qubit mapper.
 
     Returns:
-        Efficient UCCSD ansatz circuit and R parameters needed for gradients.
+        Factorized UCCSD ansatz circuit and R parameters needed for gradients.
     """
     if not isinstance(mapper, JordanWignerMapper):
         raise ValueError(f"efficientUCCSD only implemented for JW mapper, got: {type(mapper)}")
@@ -128,17 +128,14 @@ def fUCCSD(
     for _ in range(num_spin_orbs - np.sum(num_elec)):
         unocc.append(idx)
         idx += 1
-    print(occ, unocc)
     qc = HartreeFock(num_orbs, num_elec, mapper)
     grad_param_R = {}
     idx = 0
     for _, a, i, _ in iterate_t1(occ, unocc, 0, True):
-        print(a, i)
         qc = single_excitation(a, i, num_orbs, qc, Parameter(f"p{idx}"))
         grad_param_R[f"p{idx}"] = 2
         idx += 1
     for _, a, i, b, j, _ in iterate_t2(occ, unocc, 0, True):
-        print(a, b, i, j)
         qc = double_excitation(a, b, i, j, num_orbs, qc, Parameter(f"p{idx}"))
         grad_param_R[f"p{idx}"] = 2
         idx += 1
