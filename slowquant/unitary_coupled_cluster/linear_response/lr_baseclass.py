@@ -132,8 +132,8 @@ class LinearResponseBaseClass:
             _,
         ) = np.linalg.eig(E2)
         print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
-        # if np.min(hess_eigval) < 0:
-        #    raise ValueError("Negative eigenvalue in Hessian.")
+        if np.min(hess_eigval) < 0:
+            raise ValueError("Negative eigenvalue in Hessian.")
 
         S = np.zeros((size * 2, size * 2))
         S[:size, :size] = self.Sigma
