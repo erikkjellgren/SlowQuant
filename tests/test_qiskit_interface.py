@@ -2,11 +2,12 @@ import numpy as np
 import pyscf
 from qiskit.primitives import Estimator, Sampler
 from qiskit_aer.primitives import Sampler as SamplerAer
-from qiskit_nature.second_q.mappers import ParityMapper
+from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 
 import slowquant.qiskit_interface.linear_response.allprojected as q_allprojected  # pylint: disable=consider-using-from-import
 import slowquant.qiskit_interface.linear_response.naive as q_naive  # pylint: disable=consider-using-from-import
 import slowquant.qiskit_interface.linear_response.projected as q_projected  # pylint: disable=consider-using-from-import
+import slowquant.SlowQuant as sq
 import slowquant.unitary_coupled_cluster.linear_response.allprojected as allprojected  # pylint: disable=consider-using-from-import
 import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
 from slowquant.qiskit_interface.interface import QuantumInterface
@@ -43,7 +44,7 @@ def test_LiH_naive_estimator() -> None:
     estimator = Estimator()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "UCCSD", mapper)
+    QI = QuantumInterface(estimator, "tUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -104,7 +105,7 @@ def test_LiH_projected_estimator() -> None:
     estimator = Estimator()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "ErikSD", mapper)
+    QI = QuantumInterface(estimator, "tUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -159,7 +160,7 @@ def test_LiH_dumb_projected_estimator() -> None:
     estimator = Estimator()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "ErikSD", mapper)
+    QI = QuantumInterface(estimator, "tUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -227,7 +228,7 @@ def test_LiH_allprojected_estimator() -> None:
     estimator = Estimator()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "ErikSD", mapper)
+    QI = QuantumInterface(estimator, "tUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -290,7 +291,7 @@ def test_LiH_dumb_allprojected_estimator() -> None:
     estimator = Estimator()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "ErikSD", mapper)
+    QI = QuantumInterface(estimator, "tUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -360,7 +361,7 @@ def test_LiH_naive_sampler() -> None:
     sampler = Sampler()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(sampler, "ErikSD", mapper)
+    QI = QuantumInterface(sampler, "tUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -421,7 +422,7 @@ def test_LiH_naive_sampler_ISA() -> None:
     sampler = Sampler()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(sampler, "ErikSD", mapper, ISA=True)
+    QI = QuantumInterface(sampler, "tUCCSD", mapper, ISA=True)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -478,7 +479,7 @@ def test_LiH_oscillator_strength() -> None:
     estimator = Estimator()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "ErikSD", mapper)
+    QI = QuantumInterface(estimator, "tUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -500,19 +501,19 @@ def test_LiH_oscillator_strength() -> None:
     osc_strengths = qLR_naive.get_oscillator_strength([x, y, z])
 
     solution = [
-        0.04992951,
-        0.24117268,
-        0.24117268,
-        0.15818662,
-        0.16641953,
-        0.01035875,
-        0.01035875,
-        0.00625739,
-        0.06237985,
-        0.12886174,
-        0.12886174,
-        0.04602288,
-        0.0039073,
+        0.04993035,
+        0.24117267,
+        0.24117267,
+        0.15818932,
+        0.16642583,
+        0.01036042,
+        0.01036042,
+        0.00625735,
+        0.06238003,
+        0.12886178,
+        0.12886178,
+        0.04602256,
+        0.00390723,
     ]
 
     assert np.allclose(osc_strengths, solution, atol=10**-6)
@@ -525,19 +526,19 @@ def test_LiH_oscillator_strength() -> None:
     osc_strengths = qLR_proj.get_oscillator_strength([x, y, z])
 
     solution = [
-        0.04993107,
-        0.2411727,
-        0.2411727,
-        0.15817542,
-        0.16644054,
-        0.01035886,
-        0.01035886,
-        0.00626092,
-        0.06237985,
-        0.12886175,
-        0.12886175,
-        0.04602288,
-        0.00390731,
+        0.04993178,
+        0.24117267,
+        0.24117267,
+        0.15817858,
+        0.16644551,
+        0.01036042,
+        0.01036042,
+        0.00626061,
+        0.06238002,
+        0.12886178,
+        0.12886178,
+        0.04602259,
+        0.00390724,
     ]
 
     assert np.allclose(osc_strengths, solution, atol=10**-6)
@@ -550,19 +551,19 @@ def test_LiH_oscillator_strength() -> None:
     osc_strengths = qLR_allproj.get_oscillator_strength([x, y, z])
 
     solution = [
-        0.05008036,
-        0.25084185,
-        0.25084185,
-        0.16221444,
-        0.16126765,
-        0.01835595,
-        0.01835595,
-        0.00673977,
-        0.06319556,
-        0.1338435,
-        0.1338435,
+        0.05008157,
+        0.25084325,
+        0.25084325,
+        0.16221272,
+        0.16126769,
+        0.01835635,
+        0.01835635,
+        0.0067395,
+        0.06319573,
+        0.13384356,
+        0.13384356,
         0.04670223,
-        0.00384225,
+        0.00384224,
     ]
 
     assert np.allclose(osc_strengths, solution, atol=10**-6)
@@ -586,7 +587,7 @@ def test_LiH_oscillator_strength_sampler() -> None:
     estimator = Sampler()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "ErikSD", mapper)
+    QI = QuantumInterface(estimator, "tUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -608,19 +609,19 @@ def test_LiH_oscillator_strength_sampler() -> None:
     osc_strengths = qLR_naive.get_oscillator_strength([x, y, z])
 
     solution = [
-        0.04992951,
-        0.24117268,
-        0.24117268,
-        0.15818662,
-        0.16641953,
-        0.01035875,
-        0.01035875,
-        0.00625739,
-        0.06237985,
-        0.12886174,
-        0.12886174,
-        0.04602288,
-        0.0039073,
+        0.04993035,
+        0.24117267,
+        0.24117267,
+        0.15818932,
+        0.16642583,
+        0.01036042,
+        0.01036042,
+        0.00625735,
+        0.06238003,
+        0.12886178,
+        0.12886178,
+        0.04602256,
+        0.00390723,
     ]
 
     assert np.allclose(osc_strengths, solution, atol=10**-6)
@@ -633,19 +634,19 @@ def test_LiH_oscillator_strength_sampler() -> None:
     osc_strengths = qLR_proj.get_oscillator_strength([x, y, z])
 
     solution = [
-        0.04993107,
-        0.2411727,
-        0.2411727,
-        0.15817542,
-        0.16644054,
-        0.01035886,
-        0.01035886,
-        0.00626092,
-        0.06237985,
-        0.12886175,
-        0.12886175,
-        0.04602288,
-        0.00390731,
+        0.04993178,
+        0.24117267,
+        0.24117267,
+        0.15817858,
+        0.16644551,
+        0.01036042,
+        0.01036042,
+        0.00626061,
+        0.06238002,
+        0.12886178,
+        0.12886178,
+        0.04602259,
+        0.00390724,
     ]
 
     assert np.allclose(osc_strengths, solution, atol=10**-6)
@@ -658,19 +659,19 @@ def test_LiH_oscillator_strength_sampler() -> None:
     osc_strengths = qLR_allproj.get_oscillator_strength([x, y, z])
 
     solution = [
-        0.05008036,
-        0.25084185,
-        0.25084185,
-        0.16221444,
-        0.16126765,
-        0.01835595,
-        0.01835595,
-        0.00673977,
-        0.06319556,
-        0.1338435,
-        0.1338435,
+        0.05008157,
+        0.25084325,
+        0.25084325,
+        0.16221272,
+        0.16126769,
+        0.01835635,
+        0.01835635,
+        0.0067395,
+        0.06319573,
+        0.13384356,
+        0.13384356,
         0.04670223,
-        0.00384225,
+        0.00384224,
     ]
 
     assert np.allclose(osc_strengths, solution, atol=10**-6)
@@ -688,7 +689,7 @@ def test_gradient_optimizer_H2() -> None:
 
     estimator = Sampler()
     mapper = ParityMapper(num_particles=(1, 1))
-    QI = QuantumInterface(estimator, "UCCD", mapper)
+    QI = QuantumInterface(estimator, "tUCCD", mapper)
 
     WF = WaveFunction(
         mol.nao * 2,
@@ -720,7 +721,7 @@ def test_sampler_changes() -> None:
 
     # Ideal Estimator
     estimator = Estimator()
-    QI = QuantumInterface(estimator, "ErikSD", mapper)
+    QI = QuantumInterface(estimator, "tUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -789,7 +790,7 @@ def test_qiskit_aer() -> None:
     sampler = SamplerAer(run_options={"shots": 10}, transpile_options={"optimization_level": 0})
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(sampler, "ErikSD", mapper)
+    QI = QuantumInterface(sampler, "tUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -802,3 +803,36 @@ def test_qiskit_aer() -> None:
     )
 
     print(qWF.energy_elec)
+
+
+def test_fUCC_h2o() -> None:
+    """Test fUCC for a (4,4) active space."""
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """O   0.0  0.0           0.1035174918;
+    H   0.0  0.7955612117 -0.4640237459;
+    H   0.0 -0.7955612117 -0.46402374590;""",
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("STO-3G")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
+
+    estimator = Estimator()
+    mapper = JordanWignerMapper()
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
+
+    WF = WaveFunction(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (4, 4),
+        SQobj.hartree_fock.mo_coeff,
+        h_core,
+        g_eri,
+        QI,
+    )
+
+    WF.run_vqe_2step("RotoSolve", False)
+    assert abs(WF.energy_elec - -83.96650295692562) < 10**-6

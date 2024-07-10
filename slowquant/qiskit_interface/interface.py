@@ -13,10 +13,7 @@ from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
 from slowquant.qiskit_interface.base import FermionicOperator
-from slowquant.qiskit_interface.custom_ansatz import (
-    fUCCSD,
-    tUPS,
-)
+from slowquant.qiskit_interface.custom_ansatz import fUCCSD, tUPS
 from slowquant.qiskit_interface.util import (
     Clique,
     correct_distribution,

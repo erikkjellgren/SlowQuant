@@ -26,8 +26,7 @@ def f2q(i: int, num_orbs: int) -> int:
     """
     if i % 2 == 0:
         return i // 2
-    else:
-        return i // 2 + num_orbs
+    return i // 2 + num_orbs
 
 
 def tups_single(p: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter) -> QuantumCircuit:
@@ -191,7 +190,7 @@ def single_excitation(k: int, i: int, num_orbs: int, qc: QuantumCircuit, theta: 
     Implementation of the following operator,
 
     .. math::
-       \boldsymbol{U} = \exp\left(\right)
+       \boldsymbol{U} = \exp\left(\theta\hat{a}^\dagger_k\hat{a}_i\right)
 
     #. 10.1103/PhysRevA.102.062612, Fig. 3 and Fig. 8
 
@@ -242,7 +241,7 @@ def double_excitation(
     Implementation of the following operator,
 
     .. math::
-       \boldsymbol{U} = \exp\left(\right)
+       \boldsymbol{U} = \exp\left(\theta\hat{a}^\dagger_k\hat{a}_i\hat{a}^\dagger_l\hat{a}_j\right)
 
     #. 10.1103/PhysRevA.102.062612, Fig. 6 and Fig. 9
 
@@ -256,6 +255,10 @@ def double_excitation(
     Returns:
         Double excitation circuit.
     """
+    if k < i or k < j:
+        raise ValueError(f"Operator only implemented for k, {k}, larger than i, {i}, and j, {j}")
+    if l < i or l < j:
+        raise ValueError(f"Operator only implemented for l, {l}, larger than i, {i}, and j, {j}")
     n_alpha = 0
     n_beta = 0
     if i % 2 == 0:
@@ -276,11 +279,13 @@ def double_excitation(
         n_beta += 1
     if n_alpha % 2 != 0 or n_beta % 2 != 0:
         raise ValueError("Operator only implemented for spin conserving operators.")
+    fac = -1
+    if k % 2 == l % 2 and k % 2 == 0 and i % 2 != 0:
+        fac *= -1
     k = f2q(k, num_orbs)
     l = f2q(l, num_orbs)
     i = f2q(i, num_orbs)
     j = f2q(j, num_orbs)
-    fac = -1
     if k > l:
         l, k = k, l
         fac *= -1
@@ -293,7 +298,7 @@ def double_excitation(
     if k < i:
         k, i = i, k
         fac *= -1
-    # cnot ladder is easier to implement if the indicies are sorted.
+    # cnot ladder is easier to implement if the indices are sorted.
     i_z, k_z, j_z, l_z = np.sort((k, l, i, j))
     theta = 2 * theta * fac
 
@@ -304,8 +309,9 @@ def double_excitation(
     if l_z != j_z + 1:
         for t in range(i_z + 1, k_z - 1):
             qc.cx(t, t + 1)
-        if i_z + 1 != k_z:
+        if i_z + 1 != k_z:  # and j+1 != k and k-1 != j+1:
             qc.cx(k_z - 1, j_z + 1)
+        # if j+1 != k:
         for t in range(j_z + 1, l_z - 1):
             qc.cx(t, t + 1)
         qc.cz(l_z, l_z - 1)
@@ -353,7 +359,6 @@ def double_excitation(
         qc.cz(l_z, k_z - 1)
         for t in range(k_z - 1, i_z + 1, -1):
             qc.cx(t - 1, t)
-
     qc.cx(l, j)
     qc.cx(l, k)
     qc.cx(j, i)
