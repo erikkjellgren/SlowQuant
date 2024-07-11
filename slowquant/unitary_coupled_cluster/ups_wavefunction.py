@@ -36,6 +36,7 @@ class WaveFunctionUPS:
         c_orthonormal: np.ndarray,
         h_ao: np.ndarray,
         g_ao: np.ndarray,
+        ansatz: str,
         n_layers: int,
         include_active_kappa: bool = False,
     ) -> None:
@@ -198,7 +199,12 @@ class WaveFunctionUPS:
         self.hf_coeffs[self.det2idx[hf_det]] = 1
         self.ci_coeffs = np.copy(self.hf_coeffs)
         self.ups_layout = UpsStructure()
-        self.ups_layout.create_tups(n_layers, self.num_active_orbs)
+        if ansatz.lower() == "tups":
+            self.ups_layout.create_tups(n_layers, self.num_active_orbs)
+        elif ansatz.lower() == "qnp":
+            self.ups_layout.create_qnp(n_layers, self.num_active_orbs)
+        else:
+            raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
 
     @property

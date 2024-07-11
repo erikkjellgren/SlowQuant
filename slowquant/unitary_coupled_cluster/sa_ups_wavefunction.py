@@ -42,6 +42,7 @@ class WaveFunctionSAUPS:
         h_ao: np.ndarray,
         g_ao: np.ndarray,
         states: list[Any],
+        ansatz: str,
         n_layers: int,
         include_active_kappa: bool = False,
     ) -> None:
@@ -217,7 +218,12 @@ class WaveFunctionSAUPS:
                             f"state {i} and {j} are not otrhogonal got overlap of {coeff_i@coeff_j}"
                         )
         self.ups_layout = UpsStructure()
-        self.ups_layout.create_tups(n_layers, self.num_active_orbs)
+        if ansatz.lower() == "tups":
+            self.ups_layout.create_tups(n_layers, self.num_active_orbs)
+        elif ansatz.lower() == "qnp":
+            self.ups_layout.create_qnp(n_layers, self.num_active_orbs)
+        else:
+            raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
 
     @property
