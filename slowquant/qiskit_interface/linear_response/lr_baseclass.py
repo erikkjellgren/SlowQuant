@@ -113,7 +113,7 @@ class quantumLRBaseClass:
         """Get standard deviation in matrix elements of LR equation.
 
         Args:
-            no_coeffs:  Boolean to no include coefficiants
+            no_coeffs:  Boolean to no include coefficients
             verbose:    Boolean to print more info
             cv:         Boolean to calculate coefficient of variance
             save:       Boolean to save operator-specific standard deviations
