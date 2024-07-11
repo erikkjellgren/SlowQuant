@@ -473,7 +473,14 @@ class quantumLRBaseClass:
     def _get_std_trend(
         self, re_calc: bool = False
     ) -> tuple[list[list[float]], list[list[float]], list[list[float]]]:
-        """Analyze standard deviation trend across excited states."""
+        """Analyze standard deviation trend across excited states.
+
+        Args:
+            re_calc: Force recalculation of standard deviations.
+
+        Returns:
+            Weighted standard deviation for A, B and Sigma.
+        """
         # result vectors
         A_trend = np.zeros(self.num_params)
         B_trend = np.zeros(self.num_params)
