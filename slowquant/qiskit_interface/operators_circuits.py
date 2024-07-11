@@ -8,7 +8,7 @@ def f2q(i: int, num_orbs: int) -> int:
     The fermionic index is assumed to follow the convention,
 
     .. math::
-        \left|0_\alpha 0_\beta 1_\alpha 1_\beta ... N_\alpha N_beta\right>
+        \left|0_\alpha 0_\beta 1_\alpha 1_\beta ... N_\alpha N_\beta\right>
 
     The qubit index follows,
 
