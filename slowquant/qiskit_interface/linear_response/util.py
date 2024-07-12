@@ -4,7 +4,7 @@ from collections.abc import Generator, Sequence
 def iterate_t1_sa(
     active_occ_idx: Sequence[int],
     active_unocc_idx: Sequence[int],
-) -> Generator[tuple[int, int, int, int, float], None, None]:
+) -> Generator[tuple[int, int, int, float, int], None, None]:
     """Iterate over T1 spin-adapted operators.
 
     Args:
@@ -22,7 +22,7 @@ def iterate_t1_sa(
 def iterate_t2_sa(
     active_occ_idx: Sequence[int],
     active_unocc_idx: Sequence[int],
-) -> Generator[tuple[int, int, int, int, int, int, float], None, None]:
+) -> Generator[tuple[int, int, int, int, int, float, int], None, None]:
     """Iterate over T2 spin-adapted operators.
 
     Args:
