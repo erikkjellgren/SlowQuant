@@ -173,6 +173,8 @@ def single_excitation(k: int, i: int, num_orbs: int, qc: QuantumCircuit, theta: 
         k: Weakly occupied spin orbital index.
         i: Strongly occupied spin orbital index.
         num_spin_orbs: Number of spatial orbitals.
+        qc: Quantum circuit.
+        theta: Circuit parameter.
 
     Returns:
         Single excitation circuit.
@@ -226,6 +228,8 @@ def double_excitation(
         i: Strongly occupied spin orbital index.
         j: Strongly occupied spin orbital index.
         num_orbs: Number of spatial orbitals.
+        qc: Quantum circuit.
+        theta: Circuit parameter.
 
     Returns:
         Double excitation circuit.
