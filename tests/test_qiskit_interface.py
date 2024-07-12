@@ -7,7 +7,6 @@ from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 import slowquant.qiskit_interface.linear_response.allprojected as q_allprojected  # pylint: disable=consider-using-from-import
 import slowquant.qiskit_interface.linear_response.naive as q_naive  # pylint: disable=consider-using-from-import
 import slowquant.qiskit_interface.linear_response.projected as q_projected  # pylint: disable=consider-using-from-import
-import slowquant.SlowQuant as sq
 import slowquant.unitary_coupled_cluster.linear_response.allprojected as allprojected  # pylint: disable=consider-using-from-import
 import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
 from slowquant.qiskit_interface.interface import QuantumInterface
@@ -807,30 +806,22 @@ def test_qiskit_aer() -> None:
 
 def test_fUCC_h2o() -> None:
     """Test fUCC for a (4,4) active space."""
-    SQobj = sq.SlowQuant()
-    SQobj.set_molecule(
-        """O   0.0  0.0           0.1035174918;
-    H   0.0  0.7955612117 -0.4640237459;
-    H   0.0 -0.7955612117 -0.46402374590;""",
-        distance_unit="angstrom",
-    )
-    SQobj.set_basis_set("STO-3G")
-    SQobj.init_hartree_fock()
-    SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
+    atom = "O .0 .0 0.1035174918; H .0 0.7955612117 -0.4640237459; H .0 -0.7955612117 -0.46402374590;"
+    basis = "sto-3g"
+    mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
+    rhf = pyscf.scf.RHF(mol).run()
 
     estimator = Estimator()
     mapper = JordanWignerMapper()
     QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
     WF = WaveFunction(
-        SQobj.molecule.number_bf * 2,
-        SQobj.molecule.number_electrons,
+        mol.nao * 2,
+        mol.nelectron,
         (4, 4),
-        SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        rhf.mo_coeff,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
         QI,
     )
 
