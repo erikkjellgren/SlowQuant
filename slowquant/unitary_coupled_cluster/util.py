@@ -4,10 +4,11 @@ import numpy as np
 import scipy.linalg
 
 from slowquant.unitary_coupled_cluster.operator_matrix import (
-    G1_matrix,
     G1_sa_matrix,
     G2_1_sa_matrix,
     G2_2_sa_matrix,
+    T1_matrix,
+    T2_1_sa_matrix,
 )
 
 
@@ -246,7 +247,6 @@ def construct_ups_state(
     thetas: Sequence[float],
     ups_struct: UpsStructure,
 ) -> np.ndarray:
-    n_det = len(state)
     tmp = state.copy()
     for exc_type, exc_indices, theta in zip(
         ups_struct.excitation_operator_type, ups_struct.excitation_indicies, thetas
@@ -255,33 +255,27 @@ def construct_ups_state(
             continue
         if exc_type == "tups_single":
             (p,) = exc_indices
-            ta = G1_matrix(p * 2, (p + 1) * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
-            tb = G1_matrix(
+            Ta = T1_matrix(p * 2, (p + 1) * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            Tb = T1_matrix(
                 p * 2 + 1, (p + 1) * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta
             ).todense()
-            Ta = ta - ta.conjugate().transpose()
-            Tb = tb - tb.conjugate().transpose()
-            vec = tmp.copy()
             tmp = (
-                np.matmul(np.eye(n_det), vec)
-                + np.sin(2 ** (-1 / 2) * theta) * np.matmul(Ta, vec)
-                + (1 - np.cos(2 ** (-1 / 2) * theta)) * np.matmul(Ta, np.matmul(Ta, vec))
+                tmp
+                + np.sin(2 ** (-1 / 2) * theta) * np.matmul(Ta, tmp)
+                + (1 - np.cos(2 ** (-1 / 2) * theta)) * np.matmul(Ta, np.matmul(Ta, tmp))
             )
-            vec = tmp.copy()
             tmp = (
-                np.matmul(np.eye(n_det), vec)
-                + np.sin(2 ** (-1 / 2) * theta) * np.matmul(Tb, vec)
-                + (1 - np.cos(2 ** (-1 / 2) * theta)) * np.matmul(Tb, np.matmul(Tb, vec))
+                tmp
+                + np.sin(2 ** (-1 / 2) * theta) * np.matmul(Tb, tmp)
+                + (1 - np.cos(2 ** (-1 / 2) * theta)) * np.matmul(Tb, np.matmul(Tb, tmp))
             )
         elif exc_type == "tups_double":
             (p,) = exc_indices
-            t = G2_1_sa_matrix(p, p, p + 1, p + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
-            T = t - t.conjugate().transpose()
-            vec = tmp.copy()
+            T = T2_1_sa_matrix(p, p, p + 1, p + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
             tmp = (
-                np.matmul(np.eye(n_det), vec)
-                + np.sin(theta) * np.matmul(T, vec)
-                + (1 - np.cos(theta)) * np.matmul(T, np.matmul(T, vec))
+                tmp
+                + np.sin(theta) * np.matmul(T, tmp)
+                + (1 - np.cos(theta)) * np.matmul(T, np.matmul(T, tmp))
             )
         else:
             raise ValueError(f"Got unknown excitation type, {exc_type}")

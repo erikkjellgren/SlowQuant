@@ -175,3 +175,46 @@ def G2_matrix(
 ) -> ss.lil_array:
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
     return ss.lil_array(build_operator_matrix(G2(i, j, a, b), idx2det, det2idx, num_active_orbs))
+
+
+@functools.cache
+def T1_sa_matrix(
+    i: int, a: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
+) -> ss.lil_array:
+    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
+    op_mat = build_operator_matrix(G1_sa(i, a), idx2det, det2idx, num_active_orbs)
+    return ss.lil_array(op_mat - op_mat.conjugate().transpose())
+
+
+@functools.cache
+def T2_1_sa_matrix(
+    i: int, j: int, a: int, b: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
+) -> ss.lil_array:
+    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
+    op_mat = build_operator_matrix(G2_1_sa(i, j, a, b), idx2det, det2idx, num_active_orbs)
+    return ss.lil_array(op_mat - op_mat.conjugate().transpose())
+
+
+@functools.cache
+def T2_2_sa_matrix(
+    i: int, j: int, a: int, b: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
+) -> ss.lil_array:
+    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
+    op_mat = build_operator_matrix(G2_2_sa(i, j, a, b), idx2det, det2idx, num_active_orbs)
+    return ss.lil_array(op_mat - op_mat.conjugate().transpose())
+
+
+@functools.cache
+def T1_matrix(i: int, a: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int) -> ss.lil_array:
+    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
+    op_mat = build_operator_matrix(G1(i, a), idx2det, det2idx, num_active_orbs)
+    return ss.lil_array(op_mat - op_mat.conjugate().transpose())
+
+
+@functools.cache
+def T2_matrix(
+    i: int, j: int, a: int, b: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
+) -> ss.lil_array:
+    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
+    op_mat = build_operator_matrix(G2(i, j, a, b), idx2det, det2idx, num_active_orbs)
+    return ss.lil_array(op_mat - op_mat.conjugate().transpose())

@@ -206,7 +206,7 @@ class WaveFunctionSAUPS:
             for coeff, on_vec in zip(coeffs, on_vecs):
                 idx = self.det2idx[int(on_vec, 2)]
                 self.csf_coeffs[i, idx] = coeff
-        self.ci_coeffs = np.copy(self.csf_coeffs)
+        self._ci_coeffs = np.copy(self.csf_coeffs)
         for i, coeff_i in enumerate(self.ci_coeffs):
             for j, coeff_j in enumerate(self.ci_coeffs):
                 if i == j:
@@ -249,6 +249,24 @@ class WaveFunctionSAUPS:
         self._c_orthonormal = c
 
     @property
+    def ci_coeffs(self) -> list[np.ndarray]:
+        if self._ci_coeffs is None:
+            tmp = []
+            for coeffs in self.csf_coeffs:
+                tmp.append(
+                    construct_ups_state(
+                        coeffs,
+                        self.num_active_orbs,
+                        self.num_active_elec_alpha,
+                        self.num_active_elec_beta,
+                        self.thetas,
+                        self.ups_layout,
+                    )
+                )
+                self._ci_coeffs = np.array(tmp)
+        return self._ci_coeffs
+
+    @property
     def thetas(self) -> list[float]:
         """Get theta values.
 
@@ -271,16 +289,8 @@ class WaveFunctionSAUPS:
         self._u = None
         self._state_energies = None
         self._state_ci_coeffs = None
+        self._ci_coeffs = None
         self._thetas = theta_vals.copy()
-        for i, coeffs in enumerate(self.csf_coeffs):
-            self.ci_coeffs[i] = construct_ups_state(
-                coeffs,
-                self.num_active_orbs,
-                self.num_active_elec_alpha,
-                self.num_active_elec_beta,
-                self.thetas,
-                self.ups_layout,
-            )
 
     @property
     def c_trans(self) -> np.ndarray:
