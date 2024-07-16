@@ -247,6 +247,10 @@ def construct_ups_state(
     thetas: Sequence[float],
     ups_struct: UpsStructure,
 ) -> np.ndarray:
+    r"""
+
+    #. 10.48550/arXiv.2303.10825, Eq. 15
+    """
     tmp = state.copy()
     for exc_type, exc_indices, theta in zip(
         ups_struct.excitation_operator_type, ups_struct.excitation_indicies, thetas
