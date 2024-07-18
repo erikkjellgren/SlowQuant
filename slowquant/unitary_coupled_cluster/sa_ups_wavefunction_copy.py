@@ -29,7 +29,12 @@ from slowquant.unitary_coupled_cluster.operators import (
     hamiltonian_0i_0a,
     one_elec_op_0i_0a,
 )
-from slowquant.unitary_coupled_cluster.util import UpsStructure, construct_ups_state
+from slowquant.unitary_coupled_cluster.util import (
+    UpsStructure,
+    construct_ups_state,
+    propagate_unitary,
+    propagate_diff_unitary,
+)
 
 
 class WaveFunctionSAUPS:
@@ -753,17 +758,55 @@ def active_space_parameter_gradient(
 
     gradient_theta = np.zeros_like(wf.thetas)
     bra_vec = np.copy(wf.ci_coeffs)
-    for i, coeffs in bra_vec:
+    for i, coeffs in enumerate(bra_vec):
         bra_vec[i] = construct_ups_state(
-            np.matmul(coeffs, Hamiltonian),
+            np.matmul(Hamiltonian, coeffs),
             wf.num_active_orbs,
             wf.num_active_elec_alpha,
             wf.num_active_elec_beta,
             wf.thetas,
             wf.ups_layout,
+            dagger=True,
         )
     ket_vec = np.copy(wf.csf_coeffs)
+    ket_vec_tmp = np.copy(wf.csf_coeffs)
+    # print(wf.thetas)
+    # for bra, ket in zip(bra_vec, ket_vec):
+    #    print(np.matmul(bra, ket))
     for i in range(len(wf.thetas)):
-        for coeffs in wf.ci_coeffs:
-            gradient_theta[i] += expectation_value_mat(coeffs, Hamiltonian, coeffs)
-    return gradient_theta
+        for j in range(len(bra_vec)):
+            bra_vec[j] = propagate_unitary(
+                bra_vec[j],
+                i,
+                False,
+                wf.num_active_orbs,
+                wf.num_active_elec_alpha,
+                wf.num_active_elec_beta,
+                wf.thetas,
+                wf.ups_layout,
+            )
+            ket_vec_tmp[j] = propagate_diff_unitary(
+                ket_vec[j],
+                i,
+                wf.num_active_orbs,
+                wf.num_active_elec_alpha,
+                wf.num_active_elec_beta,
+                wf.thetas,
+                wf.ups_layout,
+            )
+            ket_vec[j] = propagate_unitary(
+                ket_vec[j],
+                i,
+                False,
+                wf.num_active_orbs,
+                wf.num_active_elec_alpha,
+                wf.num_active_elec_beta,
+                wf.thetas,
+                wf.ups_layout,
+            )
+        # print("Theta",wf.thetas[i],wf.ups_layout.excitation_operator_type[i])
+        for bra, ket, ket_debug in zip(bra_vec, ket_vec_tmp, ket_vec):
+            # print(np.matmul(bra, ket_debug))
+            gradient_theta[i] += 2 * np.matmul(bra, ket)
+    # print(gradient_theta / len(bra_vec))
+    return gradient_theta / len(bra_vec)

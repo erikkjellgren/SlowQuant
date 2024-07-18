@@ -766,11 +766,12 @@ def active_space_parameter_gradient(
         wf.det2idx,
         wf.num_active_orbs,
     )
-
+    # print(theta)
     gradient_theta = np.zeros_like(theta)
     eps = np.finfo(np.float64).eps ** (1 / 2)
     E = 0.0
     for coeffs in wf.ci_coeffs:
+        # print(expectation_value_mat(coeffs, Hamiltonian, coeffs))
         E += expectation_value_mat(coeffs, Hamiltonian, coeffs)
     E = E / len(wf.ci_coeffs)
     for i, _ in enumerate(theta):
@@ -785,4 +786,5 @@ def active_space_parameter_gradient(
         theta[i] -= step_size
         wf.thetas = theta
         gradient_theta[i] = (E_plus - E) / step_size
+    # print(gradient_theta)
     return gradient_theta
