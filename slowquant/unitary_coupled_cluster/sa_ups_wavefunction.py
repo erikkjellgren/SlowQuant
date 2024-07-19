@@ -29,7 +29,12 @@ from slowquant.unitary_coupled_cluster.operators import (
     hamiltonian_0i_0a,
     one_elec_op_0i_0a,
 )
-from slowquant.unitary_coupled_cluster.util import UpsStructure, construct_ups_state
+from slowquant.unitary_coupled_cluster.util import (
+    UpsStructure,
+    construct_ups_state,
+    get_grad_action,
+    propagate_unitary,
+)
 
 
 class WaveFunctionSAUPS:
@@ -698,8 +703,6 @@ def gradient_saups(
         )
     gradient[number_kappas:] = active_space_parameter_gradient(
         wf,
-        parameters,
-        orbital_optimized,
     )
     return gradient
 
@@ -730,31 +733,17 @@ def orbital_rotation_gradient(
 
 def active_space_parameter_gradient(
     wf: WaveFunctionSAUPS,
-    parameters: Sequence[float],
-    orbital_optimized: bool,
 ) -> np.ndarray:
-    """Calcuate electronic gradient with respect to active space parameters.
+    r"""Calcuate electronic gradient with respect to active space parameters.
+
+    #. 10.48550/arXiv.2303.10825, Eq. 17-21
 
     Args:
         wf: Wave function object.
-        parameters: Sequence of all parameters.
-                    Ordered as orbital rotations, active-space singles, active-space doubles, ...
-        orbital_optimized: Do orbital optimization.
 
     Returns:
         Electronic gradient with respect to active space parameters.
     """
-    kappa = []
-    theta = []
-    idx_counter = 0
-    if orbital_optimized:
-        for _ in range(len(wf.kappa_idx)):
-            kappa.append(0 * parameters[idx_counter])
-            idx_counter += 1
-    for par in parameters[idx_counter:]:
-        theta.append(par)
-    assert len(parameters) == len(kappa) + len(theta)
-
     Hamiltonian = build_operator_matrix(
         hamiltonian_0i_0a(
             wf.h_mo,
@@ -766,25 +755,50 @@ def active_space_parameter_gradient(
         wf.det2idx,
         wf.num_active_orbs,
     )
-    # print(theta)
-    gradient_theta = np.zeros_like(theta)
-    eps = np.finfo(np.float64).eps ** (1 / 2)
-    E = 0.0
-    for coeffs in wf.ci_coeffs:
-        # print(expectation_value_mat(coeffs, Hamiltonian, coeffs))
-        E += expectation_value_mat(coeffs, Hamiltonian, coeffs)
-    E = E / len(wf.ci_coeffs)
-    for i, _ in enumerate(theta):
-        sign_step = (theta[i] >= 0).astype(float) * 2 - 1  # type: ignore [attr-defined]
-        step_size = eps * sign_step * max(1, abs(theta[i]))
-        theta[i] += step_size
-        wf.thetas = theta
-        E_plus = 0.0
-        for coeffs in wf.ci_coeffs:
-            E_plus += expectation_value_mat(coeffs, Hamiltonian, coeffs)
-        E_plus = E_plus / len(wf.ci_coeffs)
-        theta[i] -= step_size
-        wf.thetas = theta
-        gradient_theta[i] = (E_plus - E) / step_size
-    # print(gradient_theta)
-    return gradient_theta
+
+    gradient_theta = np.zeros_like(wf.thetas)
+    bra_vec = np.copy(wf.ci_coeffs)
+    for i, coeffs in enumerate(bra_vec):
+        bra_vec[i] = construct_ups_state(
+            np.matmul(Hamiltonian, coeffs),
+            wf.num_active_orbs,
+            wf.num_active_elec_alpha,
+            wf.num_active_elec_beta,
+            wf.thetas,
+            wf.ups_layout,
+            dagger=True,
+        )
+    ket_vec = np.copy(wf.csf_coeffs)
+    ket_vec_tmp = np.copy(wf.csf_coeffs)
+    for i in range(len(wf.thetas)):
+        for j in range(len(bra_vec)):
+            ket_vec_tmp[j] = get_grad_action(
+                ket_vec[j],
+                i,
+                wf.num_active_orbs,
+                wf.num_active_elec_alpha,
+                wf.num_active_elec_beta,
+                wf.ups_layout,
+            )
+        for bra, ket in zip(bra_vec, ket_vec_tmp):
+            gradient_theta[i] += 2 * np.matmul(bra, ket)
+        for j in range(len(bra_vec)):
+            bra_vec[j] = propagate_unitary(
+                bra_vec[j],
+                i,
+                wf.num_active_orbs,
+                wf.num_active_elec_alpha,
+                wf.num_active_elec_beta,
+                wf.thetas,
+                wf.ups_layout,
+            )
+            ket_vec[j] = propagate_unitary(
+                ket_vec[j],
+                i,
+                wf.num_active_orbs,
+                wf.num_active_elec_alpha,
+                wf.num_active_elec_beta,
+                wf.thetas,
+                wf.ups_layout,
+            )
+    return gradient_theta / len(bra_vec)
