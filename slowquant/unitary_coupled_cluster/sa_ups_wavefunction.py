@@ -19,6 +19,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_gradient,
 )
 from slowquant.unitary_coupled_cluster.operator_matrix import (
+    Epq_matrix,
     build_operator_matrix,
     expectation_value,
     expectation_value_mat,
@@ -353,16 +354,18 @@ class WaveFunctionSAUPS:
                 for q in range(self.num_inactive_orbs, p + 1):
                     q_idx = q - self.num_inactive_orbs
                     val = 0.0
+                    Epq_mat = Epq_matrix(
+                        p_idx,
+                        q_idx,
+                        self.num_active_orbs,
+                        self.num_active_elec_alpha,
+                        self.num_active_elec_beta,
+                    ).todense()
                     for coeffs in self.ci_coeffs:
-                        val += expectation_value(
+                        val += expectation_value_mat(
                             coeffs,
-                            Epq(p, q),
+                            Epq_mat,
                             coeffs,
-                            self.idx2det,
-                            self.det2idx,
-                            self.num_inactive_orbs,
-                            self.num_active_orbs,
-                            self.num_inactive_orbs,
                         )
                     val = val / len(self.ci_coeffs)
                     self._rdm1[p_idx, q_idx] = val  # type: ignore
@@ -385,10 +388,20 @@ class WaveFunctionSAUPS:
                     self.num_active_orbs,
                 )
             )
+            bra_pq = np.zeros_like(self.ci_coeffs)
             for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 p_idx = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
                     q_idx = q - self.num_inactive_orbs
+                    Epq_mat = Epq_matrix(
+                        p_idx,
+                        q_idx,
+                        self.num_active_orbs,
+                        self.num_active_elec_alpha,
+                        self.num_active_elec_beta,
+                    ).todense()
+                    for i, coeff in enumerate(self.ci_coeffs):
+                        bra_pq[i] = np.matmul(coeff, Epq_mat)
                     for r in range(self.num_inactive_orbs, p + 1):
                         r_idx = r - self.num_inactive_orbs
                         if p == q:
@@ -401,17 +414,19 @@ class WaveFunctionSAUPS:
                             s_lim = p + 1
                         for s in range(self.num_inactive_orbs, s_lim):
                             s_idx = s - self.num_inactive_orbs
+                            Ers_mat = Epq_matrix(
+                                r_idx,
+                                s_idx,
+                                self.num_active_orbs,
+                                self.num_active_elec_alpha,
+                                self.num_active_elec_beta,
+                            ).todense()
                             val = 0.0
-                            for coeffs in self.ci_coeffs:
-                                val += expectation_value(
+                            for i, coeffs in enumerate(self.ci_coeffs):
+                                val += expectation_value_mat(
+                                    bra_pq[i],
+                                    Ers_mat,
                                     coeffs,
-                                    Epq(p, q) * Epq(r, s),
-                                    coeffs,
-                                    self.idx2det,
-                                    self.det2idx,
-                                    self.num_inactive_orbs,
-                                    self.num_active_orbs,
-                                    self.num_inactive_orbs,
                                 )
                             val = val / len(self.ci_coeffs)
                             if q == r:

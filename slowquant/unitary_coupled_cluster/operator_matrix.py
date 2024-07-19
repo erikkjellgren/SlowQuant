@@ -6,7 +6,14 @@ import scipy.sparse as ss
 from sympy.utilities.iterables import multiset_permutations
 
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
-from slowquant.unitary_coupled_cluster.operators import G1, G2, G1_sa, G2_1_sa, G2_2_sa
+from slowquant.unitary_coupled_cluster.operators import (
+    G1,
+    G2,
+    Epq,
+    G1_sa,
+    G2_1_sa,
+    G2_2_sa,
+)
 
 
 def get_indexing(num_orbs: int, num_elec_alpha: int, num_elec_beta: int) -> tuple[list[int], dict[int, int]]:
@@ -69,7 +76,7 @@ def build_operator_matrix(
             else:  # nobreak
                 val = op.factors[fermi_label] * (-1) ** phase_changes
                 if abs(val) > 10**-14:
-                    op_mat[i, det2idx[det]] += val
+                    op_mat[det2idx[det], i] += val
     return op_mat
 
 
@@ -137,6 +144,12 @@ def expectation_value_double_commutator(
 
 def expectation_value_mat(bra: np.ndarray, op: np.ndarray, ket: np.ndarray) -> float:
     return np.matmul(bra, np.matmul(op, ket))
+
+
+@functools.cache
+def Epq_matrix(p: int, q: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int) -> ss.lil_array:
+    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
+    return ss.lil_array(build_operator_matrix(Epq(p, q), idx2det, det2idx, num_active_orbs))
 
 
 @functools.cache
