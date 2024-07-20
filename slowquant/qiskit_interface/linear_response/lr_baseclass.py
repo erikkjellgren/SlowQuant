@@ -140,7 +140,7 @@ class quantumLRBaseClass:
         print(f"B      : {np.linalg.cond(self.B)}")
         print(f"Metric : {np.linalg.cond(self.metric)}")
         print(f"Sigma  : {np.linalg.cond(self.Sigma)}")
-        print(f"S-1E   : {np.linalg.cond(np.linalg.inv(self.metric)@self.hessian)}")
+        print(f"S-1E   : {np.linalg.cond(np.linalg.inv(self.metric) @ self.hessian)}")
 
         print("\n Quantum variance analysis:")
         matrix_name = ["A", "B", "Sigma"]
@@ -160,7 +160,7 @@ class quantumLRBaseClass:
                     area += "q"
                 else:
                     area += "G"
-                print(f"Indices {indices[0][i],indices[1][i]}. Part of matrix block {area}")
+                print(f"Indices {indices[0][i], indices[1][i]}. Part of matrix block {area}")
         if verbose:
             A_row = np.sum(A, axis=1) / self.num_params
             B_row = np.sum(B, axis=1) / self.num_params
@@ -175,7 +175,7 @@ class quantumLRBaseClass:
                     if nr < self.num_q:
                         print(
                             f"q{str(nr):<{3}}:"
-                            + f"{(A_row[nr]+B_row[nr])/2:3.6f}".center(10)
+                            + f"{(A_row[nr] + B_row[nr]) / 2:3.6f}".center(10)
                             + " | "
                             + f"{A_row[nr]:3.6f}".center(10)
                             + " | "
@@ -185,8 +185,8 @@ class quantumLRBaseClass:
                         )
                     else:
                         print(
-                            f"G{str(nr-self.num_q):<{3}}:"
-                            + f"{(A_row[nr]+B_row[nr])/2:3.6f}".center(10)
+                            f"G{str(nr - self.num_q):<{3}}:"
+                            + f"{(A_row[nr] + B_row[nr]) / 2:3.6f}".center(10)
                             + " | "
                             + f"{A_row[nr]:3.6f}".center(10)
                             + " | "
@@ -231,7 +231,7 @@ class quantumLRBaseClass:
                             area += "q"
                         else:
                             area += "G"
-                        print(f"Indices {indices[0][i],indices[1][i]}. Part of matrix block {area}")
+                        print(f"Indices {indices[0][i], indices[1][i]}. Part of matrix block {area}")
 
             if verbose:
                 if np.all(mask):
@@ -263,7 +263,7 @@ class quantumLRBaseClass:
                         if nr < self.num_q:
                             print(
                                 f"q{str(nr):<{3}}:"
-                                + f"{(A_row[nr]+B_row[nr])/2:3.6f}".center(10)
+                                + f"{(A_row[nr] + B_row[nr]) / 2:3.6f}".center(10)
                                 + " | "
                                 + f"{A_row[nr]:3.6f}".center(10)
                                 + " | "
@@ -273,8 +273,8 @@ class quantumLRBaseClass:
                             )
                         else:
                             print(
-                                f"G{str(nr-self.num_q):<{3}}:"
-                                + f"{(A_row[nr]+B_row[nr])/2:3.6f}".center(10)
+                                f"G{str(nr - self.num_q):<{3}}:"
+                                + f"{(A_row[nr] + B_row[nr]) / 2:3.6f}".center(10)
                                 + " | "
                                 + f"{A_row[nr]:3.6f}".center(10)
                                 + " | "

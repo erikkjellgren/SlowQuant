@@ -15,9 +15,12 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
 from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
     LinearResponseBaseClass,
 )
-from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
-from slowquant.unitary_coupled_cluster.operator_matrix import expectation_value, propagate_state
+from slowquant.unitary_coupled_cluster.operator_matrix import (
+    expectation_value,
+    propagate_state,
+)
 from slowquant.unitary_coupled_cluster.operators import one_elec_op_0i_0a
+from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
 class LinearResponseUCC(LinearResponseBaseClass):
@@ -259,8 +262,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     self.wf.num_active_orbs,
                     self.wf.num_virtual_orbs,
                 )
-                print(val, i,j)
-                val += - expectation_value(
+                print(val, i, j)
+                val += -expectation_value(
                     stateIJ,
                     self.H_0i_0a,
                     self.wf.ci_coeffs,

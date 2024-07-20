@@ -12,10 +12,13 @@ Documentation can be found at:
 
 http://slowquant.readthedocs.io/en/latest/
 
-## Quantum Computing, VQE
+## Quantum Computing, Variational Quantum Eigensolver
 
-- UCCSD (using hand-crafted Ansatz or through Qiskit)
-- Linear Response SD, spin-adapted operators
+- tUCCSD (trotterized UCCSD through Qiskit)
+- fUCCSD (factorized UCCSD)
+- tUPS (tiled Unitary Product State)
+- Naive Linear Response SD, with singlet spin-adapted operators
+- Projected Linear Response SD, with singlet spin-adapted operators
 
 These features are also implemented with the active-space approximation and orbital-optimization.
 Suitable for ideal simulator, shot noise simulator, or quantum hardware via IBM Quantum Hub (Interface via Qiskit)

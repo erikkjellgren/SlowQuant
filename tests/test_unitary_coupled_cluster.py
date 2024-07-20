@@ -2,7 +2,6 @@
 import numpy as np
 
 import slowquant.SlowQuant as sq
-
 import slowquant.unitary_coupled_cluster.linear_response.naive as naiveLR
 import slowquant.unitary_coupled_cluster.linear_response.selfconsistent as selfconsistentLR
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import (
