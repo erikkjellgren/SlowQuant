@@ -212,6 +212,22 @@ class WaveFunctionUCC:
         self._theta2 = []
         for _ in self.singlet_excitation_operator_generator.get_t2_generator_sa():
             self._theta2.append(0.0)
+        # Construct theta3
+        self._theta3 = []
+        for _ in self.singlet_excitation_operator_generator.get_t3_generator():
+            self._theta3.append(0.0)
+        # Construct theta4
+        self._theta4 = []
+        for _ in self.singlet_excitation_operator_generator.get_t4_generator():
+            self._theta4.append(0.0)
+        # Construct theta5
+        self._theta5 = []
+        for _ in self.singlet_excitation_operator_generator.get_t5_generator():
+            self._theta5.append(0.0)
+        # Construct theta6
+        self._theta6 = []
+        for _ in self.singlet_excitation_operator_generator.get_t6_generator():
+            self._theta6.append(0.0)
 
     def save_wavefunction(self, filename: str, force_overwrite: bool = False) -> None:
         """Save the wave function to a compressed NumPy object.
@@ -973,19 +989,19 @@ class WaveFunctionUCC:
                 parameters += [self.theta2[num_theta2]]
                 num_theta2 += 1
         if "t" in excitations:
-            for _ in self.singlet_excitation_operator_generator.get_t3_generator(0):
+            for _ in self.singlet_excitation_operator_generator.get_t3_generator():
                 parameters += [self.theta3[num_theta3]]
                 num_theta3 += 1
         if "q" in excitations:
-            for _ in self.singlet_excitation_operator_generator.get_t4_generator(0):
+            for _ in self.singlet_excitation_operator_generator.get_t4_generator():
                 parameters += [self.theta4[num_theta4]]
                 num_theta4 += 1
         if "5" in excitations:
-            for _ in self.singlet_excitation_operator_generator.get_t5_generator(0):
+            for _ in self.singlet_excitation_operator_generator.get_t5_generator():
                 parameters += [self.theta5[num_theta5]]
                 num_theta5 += 1
         if "6" in excitations:
-            for _ in self.singlet_excitation_operator_generator.get_t6_generator(0):
+            for _ in self.singlet_excitation_operator_generator.get_t6_generator():
                 parameters += [self.theta6[num_theta6]]
                 num_theta6 += 1
         if is_silent:
@@ -1052,7 +1068,7 @@ class WaveFunctionUCC:
             param_idx += len(thetas)
             counter = 0
             idx = 0
-            for _ in self.singlet_excitation_operator_generator.get_t3_generator(0):
+            for _ in self.singlet_excitation_operator_generator.get_t3_generator():
                 self.theta3[idx] = thetas[counter]
                 counter += 1
                 idx += 1
@@ -1061,7 +1077,7 @@ class WaveFunctionUCC:
             param_idx += len(thetas)
             counter = 0
             idx = 0
-            for _ in self.singlet_excitation_operator_generator.get_t4_generator(0):
+            for _ in self.singlet_excitation_operator_generator.get_t4_generator():
                 self.theta4[idx] = thetas[counter]
                 counter += 1
                 idx += 1
@@ -1070,7 +1086,7 @@ class WaveFunctionUCC:
             param_idx += len(thetas)
             counter = 0
             idx = 0
-            for _ in self.singlet_excitation_operator_generator.get_t5_generator(0):
+            for _ in self.singlet_excitation_operator_generator.get_t5_generator():
                 self.theta5[idx] = thetas[counter]
                 counter += 1
                 idx += 1
@@ -1079,7 +1095,7 @@ class WaveFunctionUCC:
             param_idx += len(thetas)
             counter = 0
             idx = 0
-            for _ in self.singlet_excitation_operator_generator.get_t6_generator(0):
+            for _ in self.singlet_excitation_operator_generator.get_t6_generator():
                 self.theta6[idx] = thetas[counter]
                 counter += 1
                 idx += 1
@@ -1127,19 +1143,19 @@ def energy_ucc(
             theta2.append(parameters[idx_counter])
             idx_counter += 1
     if "t" in excitations:
-        for _ in wf.singlet_excitation_operator_generator.get_t3_generator(0):
+        for _ in wf.singlet_excitation_operator_generator.get_t3_generator():
             theta3.append(parameters[idx_counter])
             idx_counter += 1
     if "q" in excitations:
-        for _ in wf.singlet_excitation_operator_generator.get_t4_generator(0):
+        for _ in wf.singlet_excitation_operator_generator.get_t4_generator():
             theta4.append(parameters[idx_counter])
             idx_counter += 1
     if "5" in excitations:
-        for _ in wf.singlet_excitation_operator_generator.get_t5_generator(0):
+        for _ in wf.singlet_excitation_operator_generator.get_t5_generator():
             theta5.append(parameters[idx_counter])
             idx_counter += 1
     if "6" in excitations:
-        for _ in wf.singlet_excitation_operator_generator.get_t6_generator(0):
+        for _ in wf.singlet_excitation_operator_generator.get_t6_generator():
             theta6.append(parameters[idx_counter])
             idx_counter += 1
     assert len(parameters) == len(kappa) + len(theta1) + len(theta2) + len(theta3) + len(theta4) + len(
@@ -1298,19 +1314,19 @@ def active_space_parameter_gradient(
             theta2.append(parameters[idx_counter])
             idx_counter += 1
     if "t" in excitations:
-        for _ in wf.singlet_excitation_operator_generator.get_t3_generator(0):
+        for _ in wf.singlet_excitation_operator_generator.get_t3_generator():
             theta3.append(parameters[idx_counter])
             idx_counter += 1
     if "q" in excitations:
-        for _ in wf.singlet_excitation_operator_generator.get_t4_generator(0):
+        for _ in wf.singlet_excitation_operator_generator.get_t4_generator():
             theta4.append(parameters[idx_counter])
             idx_counter += 1
     if "5" in excitations:
-        for _ in wf.singlet_excitation_operator_generator.get_t5_generator(0):
+        for _ in wf.singlet_excitation_operator_generator.get_t5_generator():
             theta5.append(parameters[idx_counter])
             idx_counter += 1
     if "6" in excitations:
-        for _ in wf.singlet_excitation_operator_generator.get_t6_generator(0):
+        for _ in wf.singlet_excitation_operator_generator.get_t6_generator():
             theta6.append(parameters[idx_counter])
             idx_counter += 1
     assert len(parameters) == len(kappa) + len(theta1) + len(theta2) + len(theta3) + len(theta4) + len(

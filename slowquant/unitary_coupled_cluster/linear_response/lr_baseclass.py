@@ -5,6 +5,10 @@ import scipy
 
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.operators import (
+    G3,
+    G4,
+    G5,
+    G6,
     Epq,
     G1_sa,
     G2_1_sa,
@@ -36,7 +40,6 @@ class LinearResponseBaseClass:
 
         self.G_ops: list[FermionicOperator] = []
         self.q_ops: list[FermionicOperator] = []
-        num_spin_orbs = self.wf.num_spin_orbs
         excitations = excitations.lower()
 
         if "s" in excitations:
@@ -49,36 +52,24 @@ class LinearResponseBaseClass:
                 elif type_idx == 2:
                     self.G_ops.append(G2_2_sa(i, j, a, b))
         if "t" in excitations:
-            for _, _, _, _, _, _, op_ in self.theta_picker.get_t3_generator(num_spin_orbs):
-                op = convert_pauli_to_hybrid_form(
-                    op_,
-                    self.wf.num_inactive_spin_orbs,
-                    self.wf.num_active_spin_orbs,
-                )
+            for (
+                a,
+                i,
+                b,
+                j,
+                c,
+                k,
+            ) in self.theta_picker.get_t3_generator():
+                self.G_ops.append(G3(i, j, k, a, b, c))
         if "q" in excitations:
-            for _, _, _, _, _, _, _, _, op_ in self.theta_picker.get_t4_generator(num_spin_orbs):
-                op = convert_pauli_to_hybrid_form(
-                    op_,
-                    self.wf.num_inactive_spin_orbs,
-                    self.wf.num_active_spin_orbs,
-                )
-                self.G_ops.append(op)
+            for a, i, b, j, c, k, d, l in self.theta_picker.get_t4_generator():
+                self.G_ops.append(G4(i, j, k, l, a, b, c, d))
         if "5" in excitations:
-            for _, _, _, _, _, _, _, _, _, _, op_ in self.theta_picker.get_t5_generator(num_spin_orbs):
-                op = convert_pauli_to_hybrid_form(
-                    op_,
-                    self.wf.num_inactive_spin_orbs,
-                    self.wf.num_active_spin_orbs,
-                )
-                self.G_ops.append(op)
+            for a, i, b, j, c, k, d, l, e, m in self.theta_picker.get_t5_generator():
+                self.G_ops.append(G5(i, j, k, l, m, a, b, c, d, e))
         if "6" in excitations:
-            for _, _, _, _, _, _, _, _, _, _, _, _, op_ in self.theta_picker.get_t6_generator(num_spin_orbs):
-                op = convert_pauli_to_hybrid_form(
-                    op_,
-                    self.wf.num_inactive_spin_orbs,
-                    self.wf.num_active_spin_orbs,
-                )
-                self.G_ops.append(op)
+            for a, i, b, j, c, k, d, l, e, m, f, n in self.theta_picker.get_t6_generator():
+                self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
         for i, a in self.wf.kappa_idx:
             op = 2 ** (-1 / 2) * Epq(a, i)
             self.q_ops.append(op)

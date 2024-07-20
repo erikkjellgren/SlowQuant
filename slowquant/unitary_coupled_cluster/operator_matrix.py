@@ -6,7 +6,17 @@ import scipy.sparse as ss
 from sympy.utilities.iterables import multiset_permutations
 
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
-from slowquant.unitary_coupled_cluster.operators import G1, G2, G1_sa, G2_1_sa, G2_2_sa
+from slowquant.unitary_coupled_cluster.operators import (
+    G1,
+    G2,
+    G3,
+    G4,
+    G5,
+    G6,
+    G1_sa,
+    G2_1_sa,
+    G2_2_sa,
+)
 
 
 def get_indexing(
@@ -409,4 +419,84 @@ def T2_matrix(
 ) -> ss.lil_array:
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
     op = build_operator_matrix(G2(i, j, a, b), idx2det, det2idx, num_active_orbs)
+    return ss.lil_array(op - op.conjugate().transpose())
+
+
+@functools.cache
+def T3_matrix(
+    i: int,
+    j: int,
+    k: int,
+    a: int,
+    b: int,
+    c: int,
+    num_active_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
+) -> ss.lil_array:
+    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
+    op = build_operator_matrix(G3(i, j, k, a, b, c), idx2det, det2idx, num_active_orbs)
+    return ss.lil_array(op - op.conjugate().transpose())
+
+
+@functools.cache
+def T4_matrix(
+    i: int,
+    j: int,
+    k: int,
+    l: int,
+    a: int,
+    b: int,
+    c: int,
+    d: int,
+    num_active_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
+) -> ss.lil_array:
+    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
+    op = build_operator_matrix(G4(i, j, k, l, a, b, c, d), idx2det, det2idx, num_active_orbs)
+    return ss.lil_array(op - op.conjugate().transpose())
+
+
+@functools.cache
+def T5_matrix(
+    i: int,
+    j: int,
+    k: int,
+    l: int,
+    m: int,
+    a: int,
+    b: int,
+    c: int,
+    d: int,
+    e: int,
+    num_active_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
+) -> ss.lil_array:
+    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
+    op = build_operator_matrix(G5(i, j, k, l, m, a, b, c, d, e), idx2det, det2idx, num_active_orbs)
+    return ss.lil_array(op - op.conjugate().transpose())
+
+
+@functools.cache
+def T6_matrix(
+    i: int,
+    j: int,
+    k: int,
+    l: int,
+    m: int,
+    n: int,
+    a: int,
+    b: int,
+    c: int,
+    d: int,
+    e: int,
+    f: int,
+    num_active_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
+) -> ss.lil_array:
+    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
+    op = build_operator_matrix(G6(i, j, k, l, m, n, a, b, c, d, e, f), idx2det, det2idx, num_active_orbs)
     return ss.lil_array(op - op.conjugate().transpose())

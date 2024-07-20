@@ -98,16 +98,74 @@ def double_commutator(A: FermionicOperator, B: FermionicOperator, C: FermionicOp
     return A * B * C - A * C * B - B * C * A + C * B * A
 
 
-def G1(i: int, a: int):
+def G1(i: int, a: int) -> FermionicOperator:
     return FermionicOperator(a_op_spin(a, dagger=True), 1) * FermionicOperator(a_op_spin(i, dagger=False), 1)
 
 
-def G2(i: int, j: int, a: int, b: int):
+def G2(i: int, j: int, a: int, b: int) -> FermionicOperator:
     return (
         FermionicOperator(a_op_spin(a, dagger=True), 1)
         * FermionicOperator(a_op_spin(b, dagger=True), 1)
-        * FermionicOperator(a_op_spin(i, dagger=False), 1)
         * FermionicOperator(a_op_spin(j, dagger=False), 1)
+        * FermionicOperator(a_op_spin(i, dagger=False), 1)
+    )
+
+
+def G3(i: int, j: int, k: int, a: int, b: int, c: int) -> FermionicOperator:
+    return (
+        FermionicOperator(a_op_spin(a, dagger=True), 1)
+        * FermionicOperator(a_op_spin(b, dagger=True), 1)
+        * FermionicOperator(a_op_spin(c, dagger=True), 1)
+        * FermionicOperator(a_op_spin(k, dagger=False), 1)
+        * FermionicOperator(a_op_spin(j, dagger=False), 1)
+        * FermionicOperator(a_op_spin(i, dagger=False), 1)
+    )
+
+
+def G4(i: int, j: int, k: int, l: int, a: int, b: int, c: int, d: int) -> FermionicOperator:
+    return (
+        FermionicOperator(a_op_spin(a, dagger=True), 1)
+        * FermionicOperator(a_op_spin(b, dagger=True), 1)
+        * FermionicOperator(a_op_spin(c, dagger=True), 1)
+        * FermionicOperator(a_op_spin(d, dagger=True), 1)
+        * FermionicOperator(a_op_spin(l, dagger=False), 1)
+        * FermionicOperator(a_op_spin(k, dagger=False), 1)
+        * FermionicOperator(a_op_spin(j, dagger=False), 1)
+        * FermionicOperator(a_op_spin(i, dagger=False), 1)
+    )
+
+
+def G5(i: int, j: int, k: int, l: int, m: int, a: int, b: int, c: int, d: int, e: int) -> FermionicOperator:
+    return (
+        FermionicOperator(a_op_spin(a, dagger=True), 1)
+        * FermionicOperator(a_op_spin(b, dagger=True), 1)
+        * FermionicOperator(a_op_spin(c, dagger=True), 1)
+        * FermionicOperator(a_op_spin(d, dagger=True), 1)
+        * FermionicOperator(a_op_spin(e, dagger=True), 1)
+        * FermionicOperator(a_op_spin(m, dagger=False), 1)
+        * FermionicOperator(a_op_spin(l, dagger=False), 1)
+        * FermionicOperator(a_op_spin(k, dagger=False), 1)
+        * FermionicOperator(a_op_spin(j, dagger=False), 1)
+        * FermionicOperator(a_op_spin(i, dagger=False), 1)
+    )
+
+
+def G6(
+    i: int, j: int, k: int, l: int, m: int, n: int, a: int, b: int, c: int, d: int, e: int, f: int
+) -> FermionicOperator:
+    return (
+        FermionicOperator(a_op_spin(a, dagger=True), 1)
+        * FermionicOperator(a_op_spin(b, dagger=True), 1)
+        * FermionicOperator(a_op_spin(c, dagger=True), 1)
+        * FermionicOperator(a_op_spin(d, dagger=True), 1)
+        * FermionicOperator(a_op_spin(e, dagger=True), 1)
+        * FermionicOperator(a_op_spin(f, dagger=True), 1)
+        * FermionicOperator(a_op_spin(n, dagger=False), 1)
+        * FermionicOperator(a_op_spin(m, dagger=False), 1)
+        * FermionicOperator(a_op_spin(l, dagger=False), 1)
+        * FermionicOperator(a_op_spin(k, dagger=False), 1)
+        * FermionicOperator(a_op_spin(j, dagger=False), 1)
+        * FermionicOperator(a_op_spin(i, dagger=False), 1)
     )
 
 
