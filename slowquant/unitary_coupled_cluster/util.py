@@ -4,9 +4,9 @@ import numpy as np
 import scipy.linalg
 
 from slowquant.unitary_coupled_cluster.operator_matrix import (
-    G1_sa_matrix,
-    G2_1_sa_matrix,
-    G2_2_sa_matrix,
+    T1_sa_matrix,
+    T2_1_sa_matrix,
+    T2_2_sa_matrix,
 )
 
 
@@ -58,7 +58,7 @@ class ThetaPicker:
 
     def get_t1_generator_sa(
         self,
-    ) -> Generator[tuple[int, int, int, float], None, None]:
+    ) -> Generator[tuple[int, int, float], None, None]:
         """Get generate over T1 spin-adapted operators.
 
         Returns:
@@ -68,7 +68,7 @@ class ThetaPicker:
 
     def get_t2_generator_sa(
         self,
-    ) -> Generator[tuple[int, int, int, int, int, float, int], None, None]:
+    ) -> Generator[tuple[int, int, int, int, float, int], None, None]:
         """Get generate over T2 spin-adapted operators.
 
         Returns:
@@ -80,7 +80,7 @@ class ThetaPicker:
 def iterate_t1_sa(
     active_occ_idx: Sequence[int],
     active_unocc_idx: Sequence[int],
-) -> Generator[tuple[int, int, int, float], None, None]:
+) -> Generator[tuple[int, int, float], None, None]:
     """Iterate over T1 spin-adapted operators.
 
     Args:
@@ -91,18 +91,16 @@ def iterate_t1_sa(
     Returns:
         T1 operator iteration.
     """
-    theta_idx = -1
     for i in active_occ_idx:
         for a in active_unocc_idx:
-            theta_idx += 1
             fac = 2 ** (-1 / 2)
-            yield theta_idx, a, i, fac
+            yield a, i, fac
 
 
 def iterate_t2_sa(
     active_occ_idx: Sequence[int],
     active_unocc_idx: Sequence[int],
-) -> Generator[tuple[int, int, int, int, int, float, int], None, None]:
+) -> Generator[tuple[int, int, int, int, float, int], None, None]:
     """Iterate over T2 spin-adapted operators.
 
     Args:
@@ -113,24 +111,21 @@ def iterate_t2_sa(
     Returns:
         T2 operator iteration.
     """
-    theta_idx = -1
     for idx_i, i in enumerate(active_occ_idx):
         for j in active_occ_idx[idx_i:]:
             for idx_a, a in enumerate(active_unocc_idx):
                 for b in active_unocc_idx[idx_a:]:
-                    theta_idx += 1
                     fac = 1
                     if a == b:
                         fac *= 2
                     if i == j:
                         fac *= 2
                     fac = 1 / 2 * (fac) ** (-1 / 2)
-                    yield theta_idx, a, i, b, j, fac, 1
+                    yield a, i, b, j, fac, 1
                     if i == j or a == b:
                         continue
-                    theta_idx += 1
                     fac = 1 / (2 * 3 ** (1 / 2))
-                    yield theta_idx, a, i, b, j, fac, 2
+                    yield a, i, b, j, fac, 2
 
 
 def construct_ucc_u(
@@ -154,33 +149,32 @@ def construct_ucc_u(
     Returns:
         Unitary transformation matrix.
     """
-    t = np.zeros((num_det, num_det))
+    T = np.zeros((num_det, num_det))
     counter = 0
     if "s" in excitations:
-        for _, a, i, _ in theta_picker.get_t1_generator_sa():
+        for a, i, _ in theta_picker.get_t1_generator_sa():
             if theta[counter] != 0.0:
-                t += (
+                T += (
                     theta[counter]
-                    * G1_sa_matrix(i, a, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+                    * T1_sa_matrix(i, a, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
                 )
             counter += 1
     if "d" in excitations:
-        for _, a, i, b, j, _, type_idx in theta_picker.get_t2_generator_sa():
+        for a, i, b, j, _, type_idx in theta_picker.get_t2_generator_sa():
             if theta[counter] != 0.0:
                 if type_idx == 1:
-                    t += (
+                    T += (
                         theta[counter]
-                        * G2_1_sa_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+                        * T2_1_sa_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
                     )
                 elif type_idx == 2:
-                    t += (
+                    T += (
                         theta[counter]
-                        * G2_2_sa_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+                        * T2_2_sa_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
                     )
                 else:
                     raise ValueError(f"Expected type_idx to be in (1,2) got {type_idx}")
             counter += 1
     assert counter == len(theta)
-    T = t - t.conjugate().transpose()
     A = scipy.linalg.expm(T)
     return A

@@ -294,7 +294,14 @@ def propagate_state(
     num_active_orbs: int,
     num_virtual_orbs: int,
 ) -> np.ndarray:
-    return apply_op_to_vec(op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs), state, idx2det, det2idx, num_active_orbs)
+    return apply_op_to_vec(
+        op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs),
+        state,
+        idx2det,
+        det2idx,
+        num_active_orbs,
+    )
+
 
 def expectation_value(
     bra: np.ndarray,
@@ -363,38 +370,43 @@ def expectation_value_mat(bra: np.ndarray, op: np.ndarray, ket: np.ndarray) -> f
 
 
 @functools.cache
-def G1_sa_matrix(
+def T1_sa_matrix(
     i: int, a: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
 ) -> ss.lil_array:
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
-    return ss.lil_array(build_operator_matrix(G1_sa(i, a), idx2det, det2idx, num_active_orbs))
+    op = build_operator_matrix(G1_sa(i, a), idx2det, det2idx, num_active_orbs)
+    return ss.lil_array(op - op.conjugate().transpose())
 
 
 @functools.cache
-def G2_1_sa_matrix(
+def T2_1_sa_matrix(
     i: int, j: int, a: int, b: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
 ) -> ss.lil_array:
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
-    return ss.lil_array(build_operator_matrix(G2_1_sa(i, j, a, b), idx2det, det2idx, num_active_orbs))
+    op = build_operator_matrix(G2_1_sa(i, j, a, b), idx2det, det2idx, num_active_orbs)
+    return ss.lil_array(op - op.conjugate().transpose())
 
 
 @functools.cache
-def G2_2_sa_matrix(
+def T2_2_sa_matrix(
     i: int, j: int, a: int, b: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
 ) -> ss.lil_array:
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
-    return ss.lil_array(build_operator_matrix(G2_2_sa(i, j, a, b), idx2det, det2idx, num_active_orbs))
+    op = build_operator_matrix(G2_2_sa(i, j, a, b), idx2det, det2idx, num_active_orbs)
+    return ss.lil_array(op - op.conjugate().transpose())
 
 
 @functools.cache
-def G1_matrix(i: int, a: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int) -> ss.lil_array:
+def T1_matrix(i: int, a: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int) -> ss.lil_array:
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
-    return ss.lil_array(build_operator_matrix(G1(i, a), idx2det, det2idx, num_active_orbs))
+    op = build_operator_matrix(G1(i, a), idx2det, det2idx, num_active_orbs)
+    return ss.lil_array(op - op.conjugate().transpose())
 
 
 @functools.cache
-def G2_matrix(
+def T2_matrix(
     i: int, j: int, a: int, b: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
 ) -> ss.lil_array:
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
-    return ss.lil_array(build_operator_matrix(G2(i, j, a, b), idx2det, det2idx, num_active_orbs))
+    op = build_operator_matrix(G2(i, j, a, b), idx2det, det2idx, num_active_orbs)
+    return ss.lil_array(op - op.conjugate().transpose())

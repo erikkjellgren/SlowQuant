@@ -40,23 +40,23 @@ class LinearResponseBaseClass:
         excitations = excitations.lower()
 
         if "s" in excitations:
-            for _, a, i, _ in self.theta_picker.get_t1_generator_sa():
+            for a, i, _ in self.theta_picker.get_t1_generator_sa():
                 self.G_ops.append(G1_sa(i, a))
         if "d" in excitations:
-            for _, a, i, b, j, _, type_idx in self.theta_picker.get_t2_generator_sa():
+            for a, i, b, j, _, type_idx in self.theta_picker.get_t2_generator_sa():
                 if type_idx == 1:
                     self.G_ops.append(G2_1_sa(i, j, a, b))
                 elif type_idx == 2:
                     self.G_ops.append(G2_2_sa(i, j, a, b))
         if "t" in excitations:
-            for _, _, _, _, _, _, _, op_ in self.theta_picker.get_t3_generator(num_spin_orbs):
+            for _, _, _, _, _, _, op_ in self.theta_picker.get_t3_generator(num_spin_orbs):
                 op = convert_pauli_to_hybrid_form(
                     op_,
                     self.wf.num_inactive_spin_orbs,
                     self.wf.num_active_spin_orbs,
                 )
         if "q" in excitations:
-            for _, _, _, _, _, _, _, _, _, op_ in self.theta_picker.get_t4_generator(num_spin_orbs):
+            for _, _, _, _, _, _, _, _, op_ in self.theta_picker.get_t4_generator(num_spin_orbs):
                 op = convert_pauli_to_hybrid_form(
                     op_,
                     self.wf.num_inactive_spin_orbs,
@@ -64,7 +64,7 @@ class LinearResponseBaseClass:
                 )
                 self.G_ops.append(op)
         if "5" in excitations:
-            for _, _, _, _, _, _, _, _, _, _, _, op_ in self.theta_picker.get_t5_generator(num_spin_orbs):
+            for _, _, _, _, _, _, _, _, _, _, op_ in self.theta_picker.get_t5_generator(num_spin_orbs):
                 op = convert_pauli_to_hybrid_form(
                     op_,
                     self.wf.num_inactive_spin_orbs,
@@ -72,9 +72,7 @@ class LinearResponseBaseClass:
                 )
                 self.G_ops.append(op)
         if "6" in excitations:
-            for _, _, _, _, _, _, _, _, _, _, _, _, _, op_ in self.theta_picker.get_t6_generator(
-                num_spin_orbs
-            ):
+            for _, _, _, _, _, _, _, _, _, _, _, _, op_ in self.theta_picker.get_t6_generator(num_spin_orbs):
                 op = convert_pauli_to_hybrid_form(
                     op_,
                     self.wf.num_inactive_spin_orbs,
