@@ -169,11 +169,11 @@ def iterate_t2_sa(
         for j in active_occ_idx[idx_i:]:
             for idx_a, a in enumerate(active_unocc_idx):
                 for b in active_unocc_idx[idx_a:]:
-                    fac = 1
+                    fac = 1.0
                     if a == b:
-                        fac *= 2
+                        fac *= 2.0
                     if i == j:
-                        fac *= 2
+                        fac *= 2.0
                     fac = 1 / 2 * (fac) ** (-1 / 2)
                     yield a, i, b, j, fac, 1
                     if i == j or a == b:
@@ -528,11 +528,14 @@ def construct_ucc_u(
     """Contruct unitary transformation matrix.
 
     Args:
-       num_spin_orbs: Number of spin orbitals.
-       theta: Active-space parameters.
-              Ordered as (S, D, T, ...).
-       theta_picker: Helper class to pick the parameters in the right order.
-       excitations: Excitation orders to include.
+        num_det: Number of determinants.
+        num_active_orbs: Number of active spatial orbitals.
+        num_elec_alpha: Number of active alpha electrons.
+        num_elec_beta: Number of active beta electrons.
+        theta: Active-space parameters.
+               Ordered as (S, D, T, ...).
+        theta_picker: Helper class to pick the parameters in the right order.
+        excitations: Excitation orders to include.
 
     Returns:
         Unitary transformation matrix.

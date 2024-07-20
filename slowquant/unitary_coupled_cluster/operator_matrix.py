@@ -41,10 +41,10 @@ def get_indexing(
         for beta_string in multiset_permutations(
             [1] * num_active_elec_beta + [0] * (num_active_orbs - num_active_elec_beta)
         ):
-            det = ""
+            det_str = ""
             for a, b in zip(alpha_string, beta_string):
-                det += str(a) + str(b)
-            det = int(det, 2)
+                det_str += str(a) + str(b)
+            det = int(det_str, 2)
             idx2det.append(det)
             det2idx[det] = idx
             idx += 1
@@ -81,13 +81,13 @@ def get_indexing_extended(
             [1] * num_active_elec_beta + [0] * (num_active_orbs - num_active_elec_beta)
         ):
             print(alpha_string, beta_string)
-            det = ""
+            det_str = ""
             for a, b in zip(
                 [1] * num_inactive_orbs + alpha_string + [0] * num_virtual_orbs,
                 [1] * num_inactive_orbs + beta_string + [0] * num_virtual_orbs,
             ):
-                det += str(a) + str(b)
-            det = int(det, 2)
+                det_str += str(a) + str(b)
+            det = int(det_str, 2)
             if det in idx2det:
                 continue
             idx2det.append(det)
@@ -106,13 +106,13 @@ def get_indexing_extended(
             for beta_string in multiset_permutations(
                 [1] * num_active_elec_beta + [0] * (num_active_orbs - num_active_elec_beta)
             ):
-                det = ""
+                det_str = ""
                 for a, b in zip(
                     alpha_inactive + alpha_string + alpha_virtual,
                     [1] * num_inactive_orbs + beta_string + [0] * num_virtual_orbs,
                 ):
-                    det += str(a) + str(b)
-                det = int(det, 2)
+                    det_str += str(a) + str(b)
+                det = int(det_str, 2)
                 if det in idx2det:
                     continue
                 idx2det.append(det)
@@ -131,13 +131,13 @@ def get_indexing_extended(
             for beta_string in multiset_permutations(
                 [1] * active_beta_elec + [0] * (num_active_orbs - active_beta_elec)
             ):
-                det = ""
+                det_str = ""
                 for a, b in zip(
                     [1] * num_inactive_orbs + alpha_string + [0] * num_virtual_orbs,
                     beta_inactive + beta_string + beta_virtual,
                 ):
-                    det += str(a) + str(b)
-                det = int(det, 2)
+                    det_str += str(a) + str(b)
+                det = int(det_str, 2)
                 if det in idx2det:
                     continue
                 idx2det.append(det)
@@ -159,13 +159,13 @@ def get_indexing_extended(
                     for beta_string in multiset_permutations(
                         [1] * active_beta_elec + [0] * (num_active_orbs - active_beta_elec)
                     ):
-                        det = ""
+                        det_str = ""
                         for a, b in zip(
                             alpha_inactive + alpha_string + alpha_virtual,
                             beta_inactive + beta_string + beta_virtual,
                         ):
-                            det += str(a) + str(b)
-                        det = int(det, 2)
+                            det_str += str(a) + str(b)
+                        det = int(det_str, 2)
                         if det in idx2det:
                             continue
                         idx2det.append(det)
@@ -222,6 +222,17 @@ def build_operator_matrix(
     det2idx: dict[int, int],
     num_active_orbs: int,
 ) -> np.ndarray:
+    """Build matrix representation of operator.
+
+    Args:
+        op: Fermionic number and spin conserving operator.
+        idx2det: Index to determinant.
+        det2idx: Determinant to index.
+        num_active_orbs: Number of active spatial orbitals.
+
+    Returns:
+        Matrix representation of operator.
+    """
     num_dets = len(idx2det)
     op_mat = np.zeros((num_dets, num_dets))
     parity_check = {0: 0}
@@ -383,6 +394,18 @@ def expectation_value_mat(bra: np.ndarray, op: np.ndarray, ket: np.ndarray) -> f
 def T1_sa_matrix(
     i: int, a: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
 ) -> ss.lil_array:
+    """Get matrix representation of anti-Hermitian T1 spin-adapted cluster operator.
+
+    Args:
+        i: Strongly occupied spatial orbital index.
+        a: Weakly occupied spatial orbital index.
+        num_active_orbs: Number of active spatial orbitals.
+        num_elec_alpha: Number of active alpha electrons.
+        num_elec_beta: Number of active beta electrons.
+
+    Returns:
+        Matrix representation of anti-Hermitian cluster operator.
+    """
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
     op = build_operator_matrix(G1_sa(i, a), idx2det, det2idx, num_active_orbs)
     return ss.lil_array(op - op.conjugate().transpose())
@@ -392,6 +415,20 @@ def T1_sa_matrix(
 def T2_1_sa_matrix(
     i: int, j: int, a: int, b: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
 ) -> ss.lil_array:
+    """Get matrix representation of anti-Hermitian T2 spin-adapted cluster operator.
+
+    Args:
+        i: Strongly occupied spatial orbital index.
+        j: Strongly occupied spatial orbital index.
+        a: Weakly occupied spatial orbital index.
+        b: Weakly occupied spatial orbital index.
+        num_active_orbs: Number of active spatial orbitals.
+        num_elec_alpha: Number of active alpha electrons.
+        num_elec_beta: Number of active beta electrons.
+
+    Returns:
+        Matrix representation of anti-Hermitian cluster operator.
+    """
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
     op = build_operator_matrix(G2_1_sa(i, j, a, b), idx2det, det2idx, num_active_orbs)
     return ss.lil_array(op - op.conjugate().transpose())
@@ -401,6 +438,20 @@ def T2_1_sa_matrix(
 def T2_2_sa_matrix(
     i: int, j: int, a: int, b: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
 ) -> ss.lil_array:
+    """Get matrix representation of anti-Hermitian T2 spin-adapted cluster operator.
+
+    Args:
+        i: Strongly occupied spatial orbital index.
+        j: Strongly occupied spatial orbital index.
+        a: Weakly occupied spatial orbital index.
+        b: Weakly occupied spatial orbital index.
+        num_active_orbs: Number of active spatial orbitals.
+        num_elec_alpha: Number of active alpha electrons.
+        num_elec_beta: Number of active beta electrons.
+
+    Returns:
+        Matrix representation of anti-Hermitian cluster operator.
+    """
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
     op = build_operator_matrix(G2_2_sa(i, j, a, b), idx2det, det2idx, num_active_orbs)
     return ss.lil_array(op - op.conjugate().transpose())
@@ -408,6 +459,18 @@ def T2_2_sa_matrix(
 
 @functools.cache
 def T1_matrix(i: int, a: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int) -> ss.lil_array:
+    """Get matrix representation of anti-Hermitian T1 spin-conserving cluster operator.
+
+    Args:
+        i: Strongly occupied spin orbital index.
+        a: Weakly occupied spin orbital index.
+        num_active_orbs: Number of active spatial orbitals.
+        num_elec_alpha: Number of active alpha electrons.
+        num_elec_beta: Number of active beta electrons.
+
+    Returns:
+        Matrix representation of anti-Hermitian cluster operator.
+    """
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
     op = build_operator_matrix(G1(i, a), idx2det, det2idx, num_active_orbs)
     return ss.lil_array(op - op.conjugate().transpose())
@@ -417,6 +480,20 @@ def T1_matrix(i: int, a: int, num_active_orbs: int, num_elec_alpha: int, num_ele
 def T2_matrix(
     i: int, j: int, a: int, b: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
 ) -> ss.lil_array:
+    """Get matrix representation of anti-Hermitian T2 spin-conserving cluster operator.
+
+    Args:
+        i: Strongly occupied spin orbital index.
+        j: Strongly occupied spin orbital index.
+        a: Weakly occupied spin orbital index.
+        b: Weakly occupied spin orbital index.
+        num_active_orbs: Number of active spatial orbitals.
+        num_elec_alpha: Number of active alpha electrons.
+        num_elec_beta: Number of active beta electrons.
+
+    Returns:
+        Matrix representation of anti-Hermitian cluster operator.
+    """
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
     op = build_operator_matrix(G2(i, j, a, b), idx2det, det2idx, num_active_orbs)
     return ss.lil_array(op - op.conjugate().transpose())
@@ -434,6 +511,22 @@ def T3_matrix(
     num_elec_alpha: int,
     num_elec_beta: int,
 ) -> ss.lil_array:
+    """Get matrix representation of anti-Hermitian T3 spin-conserving cluster operator.
+
+    Args:
+        i: Strongly occupied spin orbital index.
+        j: Strongly occupied spin orbital index.
+        k: Strongly occupied spin orbital index.
+        a: Weakly occupied spin orbital index.
+        b: Weakly occupied spin orbital index.
+        c: Weakly occupied spin orbital index.
+        num_active_orbs: Number of active spatial orbitals.
+        num_elec_alpha: Number of active alpha electrons.
+        num_elec_beta: Number of active beta electrons.
+
+    Returns:
+        Matrix representation of anti-Hermitian cluster operator.
+    """
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
     op = build_operator_matrix(G3(i, j, k, a, b, c), idx2det, det2idx, num_active_orbs)
     return ss.lil_array(op - op.conjugate().transpose())
@@ -453,6 +546,24 @@ def T4_matrix(
     num_elec_alpha: int,
     num_elec_beta: int,
 ) -> ss.lil_array:
+    """Get matrix representation of anti-Hermitian T4 spin-conserving cluster operator.
+
+    Args:
+        i: Strongly occupied spin orbital index.
+        j: Strongly occupied spin orbital index.
+        k: Strongly occupied spin orbital index.
+        l: Strongly occupied spin orbital index.
+        a: Weakly occupied spin orbital index.
+        b: Weakly occupied spin orbital index.
+        c: Weakly occupied spin orbital index.
+        d: Weakly occupied spin orbital index.
+        num_active_orbs: Number of active spatial orbitals.
+        num_elec_alpha: Number of active alpha electrons.
+        num_elec_beta: Number of active beta electrons.
+
+    Returns:
+        Matrix representation of anti-Hermitian cluster operator.
+    """
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
     op = build_operator_matrix(G4(i, j, k, l, a, b, c, d), idx2det, det2idx, num_active_orbs)
     return ss.lil_array(op - op.conjugate().transpose())
@@ -474,6 +585,26 @@ def T5_matrix(
     num_elec_alpha: int,
     num_elec_beta: int,
 ) -> ss.lil_array:
+    """Get matrix representation of anti-Hermitian T5 spin-conserving cluster operator.
+
+    Args:
+        i: Strongly occupied spin orbital index.
+        j: Strongly occupied spin orbital index.
+        k: Strongly occupied spin orbital index.
+        l: Strongly occupied spin orbital index.
+        m: Strongly occupied spin orbital index.
+        a: Weakly occupied spin orbital index.
+        b: Weakly occupied spin orbital index.
+        c: Weakly occupied spin orbital index.
+        d: Weakly occupied spin orbital index.
+        e: Weakly occupied spin orbital index.
+        num_active_orbs: Number of active spatial orbitals.
+        num_elec_alpha: Number of active alpha electrons.
+        num_elec_beta: Number of active beta electrons.
+
+    Returns:
+        Matrix representation of anti-Hermitian cluster operator.
+    """
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
     op = build_operator_matrix(G5(i, j, k, l, m, a, b, c, d, e), idx2det, det2idx, num_active_orbs)
     return ss.lil_array(op - op.conjugate().transpose())
@@ -497,6 +628,28 @@ def T6_matrix(
     num_elec_alpha: int,
     num_elec_beta: int,
 ) -> ss.lil_array:
+    """Get matrix representation of anti-Hermitian T6 spin-conserving cluster operator.
+
+    Args:
+        i: Strongly occupied spin orbital index.
+        j: Strongly occupied spin orbital index.
+        k: Strongly occupied spin orbital index.
+        l: Strongly occupied spin orbital index.
+        m: Strongly occupied spin orbital index.
+        n: Strongly occupied spin orbital index.
+        a: Weakly occupied spin orbital index.
+        b: Weakly occupied spin orbital index.
+        c: Weakly occupied spin orbital index.
+        d: Weakly occupied spin orbital index.
+        e: Weakly occupied spin orbital index.
+        f: Weakly occupied spin orbital index.
+        num_active_orbs: Number of active spatial orbitals.
+        num_elec_alpha: Number of active alpha electrons.
+        num_elec_beta: Number of active beta electrons.
+
+    Returns:
+        Matrix representation of anti-Hermitian cluster operator.
+    """
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
     op = build_operator_matrix(G6(i, j, k, l, m, n, a, b, c, d, e, f), idx2det, det2idx, num_active_orbs)
     return ss.lil_array(op - op.conjugate().transpose())
