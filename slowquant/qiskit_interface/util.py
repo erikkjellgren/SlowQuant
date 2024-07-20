@@ -241,15 +241,15 @@ def postselection(
 ) -> dict[str, float]:
     r"""Perform post-selection on distribution in computational basis.
 
-    For the Jordan-Wigner mapper the postselection ensure that,
+    For the Jordan-Wigner mapper the post-selection ensure that,
 
     .. math::
-        \text{sum}\left(\left|\alpha\right>) = N_\alpha
+        \text{sum}\left(\left|\alpha\right>\right) = N_\alpha
 
     and,
 
     .. math::
-        \text{sum}\left(\left|\beta\right>) = N_\beta
+        \text{sum}\left(\left|\beta\right>\right) = N_\beta
 
     For the Parity mapper it is counted how many times bitstring changes between 0 and 1.
     For the bitstring :math:`\left|01\right>` the counting is done by padding the string before counting.
