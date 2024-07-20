@@ -1,6 +1,8 @@
 import numpy as np
 from qiskit.circuit import Parameter, QuantumCircuit
 
+from slowquant.qiskit_interface.util import f2q
+
 
 def tups_single(p: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter) -> QuantumCircuit:
     r"""Spin-adapted single excitation as used in the tUPS ansatz.
@@ -154,4 +156,189 @@ def tups_double(p: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter) -> 
     qc.x(i)
     qc.cx(j, i)
     qc.cx(l, k)
+    return qc
+
+
+def single_excitation(k: int, i: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter) -> QuantumCircuit:
+    r"""Exact circuit for single excitation.
+
+    Implementation of the following operator,
+
+    .. math::
+       \boldsymbol{U} = \exp\left(\theta\hat{a}^\dagger_k\hat{a}_i\right)
+
+    #. 10.1103/PhysRevA.102.062612, Fig. 3 and Fig. 8
+
+    Args:
+        k: Weakly occupied spin orbital index.
+        i: Strongly occupied spin orbital index.
+        num_spin_orbs: Number of spatial orbitals.
+        qc: Quantum circuit.
+        theta: Circuit parameter.
+
+    Returns:
+        Single excitation circuit.
+    """
+    k = f2q(k, num_orbs)
+    i = f2q(i, num_orbs)
+    if k <= i:
+        raise ValueError(f"k={k}, must be larger than i={i}")
+    if k - 1 == i:
+        qc.rz(np.pi / 2, i)
+        qc.rx(np.pi / 2, i)
+        qc.rx(np.pi / 2, k)
+        qc.cx(i, k)
+        qc.rx(theta, i)
+        qc.rz(theta, k)
+        qc.cx(i, k)
+        qc.rx(-np.pi / 2, k)
+        qc.rx(-np.pi / 2, i)
+        qc.rz(-np.pi / 2, i)
+    else:
+        qc.cx(k, i)
+        for t in range(k - 2, i, -1):
+            qc.cx(t + 1, t)
+        qc.cz(i + 1, k)
+        qc.ry(theta, k)
+        qc.cx(i, k)
+        qc.ry(-theta, k)
+        qc.cx(i, k)
+        qc.cz(i + 1, k)
+        for t in range(i + 1, k - 1):
+            qc.cx(t + 1, t)
+        qc.cx(k, i)
+    return qc
+
+
+def double_excitation(
+    k: int, l: int, i: int, j: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter
+) -> QuantumCircuit:
+    r"""Exact circuit for double excitation.
+
+    Implementation of the following operator,
+
+    .. math::
+       \boldsymbol{U} = \exp\left(\theta\hat{a}^\dagger_k\hat{a}_i\hat{a}^\dagger_l\hat{a}_j\right)
+
+    #. 10.1103/PhysRevA.102.062612, Fig. 6 and Fig. 9
+
+    Args:
+        k: Weakly occupied spin orbital index.
+        l: Weakly occupied spin orbital index.
+        i: Strongly occupied spin orbital index.
+        j: Strongly occupied spin orbital index.
+        num_orbs: Number of spatial orbitals.
+        qc: Quantum circuit.
+        theta: Circuit parameter.
+
+    Returns:
+        Double excitation circuit.
+    """
+    if k < i or k < j:
+        raise ValueError(f"Operator only implemented for k, {k}, larger than i, {i}, and j, {j}")
+    if l < i or l < j:
+        raise ValueError(f"Operator only implemented for l, {l}, larger than i, {i}, and j, {j}")
+    n_alpha = 0
+    n_beta = 0
+    if i % 2 == 0:
+        n_alpha += 1
+    else:
+        n_beta += 1
+    if j % 2 == 0:
+        n_alpha += 1
+    else:
+        n_beta += 1
+    if k % 2 == 0:
+        n_alpha += 1
+    else:
+        n_beta += 1
+    if l % 2 == 0:
+        n_alpha += 1
+    else:
+        n_beta += 1
+    if n_alpha % 2 != 0 or n_beta % 2 != 0:
+        raise ValueError("Operator only implemented for spin conserving operators.")
+    fac = -1
+    if k % 2 == l % 2 and k % 2 == 0 and i % 2 != 0:
+        fac *= -1
+    k = f2q(k, num_orbs)
+    l = f2q(l, num_orbs)
+    i = f2q(i, num_orbs)
+    j = f2q(j, num_orbs)
+    if k > l:
+        l, k = k, l
+        fac *= -1
+    if i > j:
+        j, i = i, j
+        fac *= -1
+    if l < j:
+        l, j = j, l
+        fac *= -1
+    if k < i:
+        k, i = i, k
+        fac *= -1
+    # cnot ladder is easier to implement if the indices are sorted.
+    i_z, k_z, j_z, l_z = np.sort((k, l, i, j))
+    theta = 2 * theta * fac
+
+    qc.cx(l, k)
+    qc.cx(j, i)
+    qc.cx(l, j)
+
+    if l_z != j_z + 1:
+        for t in range(i_z + 1, k_z - 1):
+            qc.cx(t, t + 1)
+        if i_z + 1 != k_z:  # and j+1 != k and k-1 != j+1:
+            qc.cx(k_z - 1, j_z + 1)
+        # if j+1 != k:
+        for t in range(j_z + 1, l_z - 1):
+            qc.cx(t, t + 1)
+        qc.cz(l_z, l_z - 1)
+    elif i_z != k_z - 1:
+        for t in range(i_z + 1, k_z - 1):
+            qc.cx(t, t + 1)
+        qc.cz(l_z, k_z - 1)
+    qc.x(k)
+    qc.x(i)
+
+    qc.ry(theta / 8, l)
+    qc.h(k)
+    qc.cx(l, k)
+    qc.ry(-theta / 8, l)
+    qc.h(i)
+    qc.cx(l, i)
+    qc.ry(theta / 8, l)
+    qc.cx(l, k)
+    qc.ry(-theta / 8, l)
+    qc.h(j)
+    qc.cx(l, j)
+    qc.ry(theta / 8, l)
+    qc.cx(l, k)
+    qc.ry(-theta / 8, l)
+    qc.cx(l, i)
+    qc.ry(theta / 8, l)
+    qc.h(i)
+    qc.cx(l, k)
+    qc.ry(-theta / 8, l)
+    qc.h(k)
+    qc.cx(l, j)
+    qc.h(j)
+
+    qc.x(k)
+    qc.x(i)
+    if l_z != j_z + 1:
+        qc.cz(l_z, l_z - 1)
+        for t in range(l_z - 1, j_z + 1, -1):
+            qc.cx(t - 1, t)
+        if i_z + 1 != k_z:
+            qc.cx(k_z - 1, j_z + 1)
+        for t in range(k_z - 1, i_z + 1, -1):
+            qc.cx(t - 1, t)
+    elif i_z != k_z - 1:
+        qc.cz(l_z, k_z - 1)
+        for t in range(k_z - 1, i_z + 1, -1):
+            qc.cx(t - 1, t)
+    qc.cx(l, j)
+    qc.cx(l, k)
+    qc.cx(j, i)
     return qc
