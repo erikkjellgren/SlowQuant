@@ -38,6 +38,7 @@ Just use [PySCF](https://github.com/pyscf/pyscf) instead.
 
 ## Cited in
 
+- Kjellgren, Erik Rosendahl, et al. "Divergences in classical and quantum linear response and equation of motion formulations." arXiv preprint arXiv:2406.17141 (2024).
 - von Buchwald, Theo Juncker, et al. "Reduced density matrix formulation of quantum linear response." arXiv preprint arXiv:2404.16586 (2024).
 - Chan, Matthew, et al. "The tale of HORTON: Lessons learned in a decade of scientific software development." The Journal of Chemical Physics 160.16 (2024).
 - Ziems, Karl Michael, et al. "Which options exist for NISQ-friendly linear response formulations?." Journal of Chemical Theory and Computation (2024).
