@@ -195,7 +195,6 @@ def expectation_value_commutator(
         idx2det,
         det2idx,
         num_active_orbs,
-        True,
     )
     return np.matmul(bra, np.matmul(op_mat, ket))
 

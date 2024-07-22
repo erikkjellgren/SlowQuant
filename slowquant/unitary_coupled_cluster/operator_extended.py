@@ -22,22 +22,15 @@ from slowquant.unitary_coupled_cluster.util import ThetaPicker
 def get_indexing_extended(
     num_inactive_orbs: int,
     num_active_orbs: int,
-    num_virtual_orbs,
+    num_virtual_orbs: int,
     num_active_elec_alpha: int,
     num_active_elec_beta: int,
-    order: int,
 ) -> tuple[list[int], dict[int, int]]:
     inactive_singles = []
     virtual_singles = []
     for inactive, virtual in generate_singles(num_inactive_orbs, num_virtual_orbs):
         inactive_singles.append(inactive)
         virtual_singles.append(virtual)
-    inactive_doubles = []
-    virtual_doubles = []
-    if order >= 2:
-        for inactive, virtual in generate_doubles(num_inactive_orbs, num_virtual_orbs):
-            inactive_doubles.append(inactive)
-            virtual_doubles.append(virtual)
     idx = 0
     idx2det = []
     det2idx = {}
@@ -48,7 +41,6 @@ def get_indexing_extended(
         for beta_string in multiset_permutations(
             [1] * num_active_elec_beta + [0] * (num_active_orbs - num_active_elec_beta)
         ):
-            print(alpha_string, beta_string)
             det_str = ""
             for a, b in zip(
                 [1] * num_inactive_orbs + alpha_string + [0] * num_virtual_orbs,
@@ -61,10 +53,8 @@ def get_indexing_extended(
             idx2det.append(det)
             det2idx[det] = idx
             idx += 1
-    # Generate 1,2 exc alpha space
-    for alpha_inactive, alpha_virtual in zip(
-        inactive_singles + inactive_doubles, virtual_singles + virtual_doubles
-    ):
+    # Generate 1 exc alpha space
+    for alpha_inactive, alpha_virtual in zip(inactive_singles, virtual_singles):
         active_alpha_elec = int(
             num_active_elec_alpha - np.sum(alpha_virtual) + num_inactive_orbs - np.sum(alpha_inactive)
         )
@@ -86,10 +76,8 @@ def get_indexing_extended(
                 idx2det.append(det)
                 det2idx[det] = idx
                 idx += 1
-    # Generate 1,2 exc beta space
-    for beta_inactive, beta_virtual in zip(
-        inactive_singles + inactive_doubles, virtual_singles + virtual_doubles
-    ):
+    # Generate 1 exc beta space
+    for beta_inactive, beta_virtual in zip(inactive_singles, virtual_singles):
         active_beta_elec = int(
             num_active_elec_beta - np.sum(beta_virtual) + num_inactive_orbs - np.sum(beta_inactive)
         )
@@ -111,34 +99,6 @@ def get_indexing_extended(
                 idx2det.append(det)
                 det2idx[det] = idx
                 idx += 1
-    # Generate 1 exc alpha 1 exc beta space
-    if order >= 2:
-        for alpha_inactive, alpha_virtual in zip(inactive_singles, virtual_singles):
-            active_alpha_elec = (
-                num_active_elec_alpha - np.sum(alpha_virtual) + num_inactive_orbs - np.sum(alpha_inactive)
-            )
-            for beta_inactive, beta_virtual in zip(inactive_singles, virtual_singles):
-                active_beta_elec = (
-                    num_active_elec_beta - np.sum(beta_virtual) + num_inactive_orbs - np.sum(beta_inactive)
-                )
-                for alpha_string in multiset_permutations(
-                    [1] * active_alpha_elec + [0] * (num_active_orbs - active_alpha_elec)
-                ):
-                    for beta_string in multiset_permutations(
-                        [1] * active_beta_elec + [0] * (num_active_orbs - active_beta_elec)
-                    ):
-                        det_str = ""
-                        for a, b in zip(
-                            alpha_inactive + alpha_string + alpha_virtual,
-                            beta_inactive + beta_string + beta_virtual,
-                        ):
-                            det_str += str(a) + str(b)
-                        det = int(det_str, 2)
-                        if det in idx2det:
-                            continue
-                        idx2det.append(det)
-                        det2idx[det] = idx
-                        idx += 1
     return idx2det, det2idx
 
 
@@ -154,32 +114,6 @@ def generate_singles(num_inactive_orbs: int, num_virtual_orbs: int):
             yield inactive.copy(), virtual.copy()
             if j != num_virtual_orbs:
                 virtual[j] = 0
-        if i != num_inactive_orbs:
-            inactive[i] = 1
-
-
-def generate_doubles(num_inactive_orbs: int, num_virtual_orbs: int):
-    inactive = [1] * num_inactive_orbs
-    virtual = [0] * num_virtual_orbs
-    for i in range(num_inactive_orbs + 1):
-        if i != num_inactive_orbs:
-            inactive[i] = 0
-        for i2 in range(min(i + 1, num_inactive_orbs), num_inactive_orbs + 1):
-            if i2 != num_inactive_orbs:
-                inactive[i2] = 0
-            for j in range(num_virtual_orbs + 1):
-                if j != num_virtual_orbs:
-                    virtual[j] = 1
-                for j2 in range(min(j + 1, num_virtual_orbs), num_virtual_orbs + 1):
-                    if j2 != num_virtual_orbs:
-                        virtual[j2] = 1
-                    yield inactive.copy(), virtual.copy()
-                    if j2 != num_virtual_orbs:
-                        virtual[j2] = 0
-                if j != num_virtual_orbs:
-                    virtual[j] = 0
-            if i2 != num_inactive_orbs:
-                inactive[i2] = 1
         if i != num_inactive_orbs:
             inactive[i] = 1
 
@@ -294,21 +228,26 @@ def propagate_state_extended(
     )
 
 
-def expectation_value_extended(
+def expectation_value_propagate_extended(
     bra: np.ndarray,
-    op: FermionicOperator,
+    ops: list[FermionicOperator | np.ndarray],
     ket: np.ndarray,
     idx2det: Sequence[int],
     det2idx: dict[int, int],
     num_orbs: int,
 ) -> float:
-    op_mat = build_operator_matrix_extended(
-        op,
-        idx2det,
-        det2idx,
-        num_orbs,
-    )
-    return np.matmul(bra, np.matmul(op_mat, ket))
+    ket_copy = np.copy(ket)
+    for op in ops[::-1]:
+        if isinstance(op, FermionicOperator):
+            ket_copy = propagate_state_extended(op, ket_copy, idx2det, det2idx, num_orbs)
+        elif isinstance(op, np.ndarray):
+            ket_copy = np.matmul(op, ket_copy)
+        else:
+            raise ValueError(f"Got unknown operator type, {type(op)}")
+    val = bra @ ket_copy
+    if not isinstance(val, float):
+        raise ValueError(f"Expected function to calculate float got type, {type(val)}")
+    return val
 
 
 @functools.cache
@@ -326,7 +265,9 @@ def T1_sa_extended_matrix(
     Args:
         i: Strongly occupied spatial orbital index.
         a: Weakly occupied spatial orbital index.
+        num_inactive_orbs: Number of inactive spatial orbitals.
         num_active_orbs: Number of active spatial orbitals.
+        num_virtual_orbs: Number of virtual spatial orbitals.
         num_elec_alpha: Number of active alpha electrons.
         num_elec_beta: Number of active beta electrons.
 
@@ -334,7 +275,11 @@ def T1_sa_extended_matrix(
         Matrix representation of anti-Hermitian cluster operator.
     """
     idx2det, det2idx = get_indexing_extended(
-        num_inactive_orbs, num_active_orbs, num_virtual_orbs, num_elec_alpha, num_elec_beta, 1
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+        num_elec_alpha,
+        num_elec_beta,
     )
     op = build_operator_matrix_extended(
         G1_sa(i, a), idx2det, det2idx, num_inactive_orbs + num_active_orbs + num_virtual_orbs
@@ -361,7 +306,9 @@ def T2_1_sa_extended_matrix(
         j: Strongly occupied spatial orbital index.
         a: Weakly occupied spatial orbital index.
         b: Weakly occupied spatial orbital index.
+        num_inactive_orbs: Number of inactive spatial orbitals.
         num_active_orbs: Number of active spatial orbitals.
+        num_virtual_orbs: Number of virtual spatial orbitals.
         num_elec_alpha: Number of active alpha electrons.
         num_elec_beta: Number of active beta electrons.
 
@@ -369,7 +316,11 @@ def T2_1_sa_extended_matrix(
         Matrix representation of anti-Hermitian cluster operator.
     """
     idx2det, det2idx = get_indexing_extended(
-        num_inactive_orbs, num_active_orbs, num_virtual_orbs, num_elec_alpha, num_elec_beta, 1
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+        num_elec_alpha,
+        num_elec_beta,
     )
     op = build_operator_matrix_extended(
         G2_1_sa(i, j, a, b), idx2det, det2idx, num_inactive_orbs + num_active_orbs + num_virtual_orbs
@@ -396,7 +347,9 @@ def T2_2_sa_extended_matrix(
         j: Strongly occupied spatial orbital index.
         a: Weakly occupied spatial orbital index.
         b: Weakly occupied spatial orbital index.
+        num_inactive_orbs: Number of inactive spatial orbitals.
         num_active_orbs: Number of active spatial orbitals.
+        num_virtual_orbs: Number of virtual spatial orbitals.
         num_elec_alpha: Number of active alpha electrons.
         num_elec_beta: Number of active beta electrons.
 
@@ -404,10 +357,224 @@ def T2_2_sa_extended_matrix(
         Matrix representation of anti-Hermitian cluster operator.
     """
     idx2det, det2idx = get_indexing_extended(
-        num_inactive_orbs, num_active_orbs, num_virtual_orbs, num_elec_alpha, num_elec_beta, 1
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+        num_elec_alpha,
+        num_elec_beta,
     )
     op = build_operator_matrix_extended(
         G2_2_sa(i, j, a, b), idx2det, det2idx, num_inactive_orbs + num_active_orbs + num_virtual_orbs
+    )
+    return ss.lil_array(op - op.conjugate().transpose())
+
+
+@functools.cache
+def T3_extended_matrix(
+    i: int,
+    j: int,
+    k: int,
+    a: int,
+    b: int,
+    c: int,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
+) -> ss.lil_array:
+    """Get matrix representation of anti-Hermitian T3 spin-conserving cluster operator.
+
+    Args:
+        i: Strongly occupied spin orbital index.
+        j: Strongly occupied spin orbital index.
+        k: Strongly occupied spin orbital index.
+        a: Weakly occupied spin orbital index.
+        b: Weakly occupied spin orbital index.
+        c: Weakly occupied spin orbital index.
+        num_inactive_orbs: Number of inactive spatial orbitals.
+        num_active_orbs: Number of active spatial orbitals.
+        num_virtual_orbs: Number of virtual spatial orbitals.
+        num_elec_alpha: Number of active alpha electrons.
+        num_elec_beta: Number of active beta electrons.
+
+    Returns:
+        Matrix representation of anti-Hermitian cluster operator.
+    """
+    idx2det, det2idx = get_indexing_extended(
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+        num_elec_alpha,
+        num_elec_beta,
+    )
+    op = build_operator_matrix_extended(
+        G3(i, j, k, a, b, c), idx2det, det2idx, num_inactive_orbs + num_active_orbs + num_virtual_orbs
+    )
+    return ss.lil_array(op - op.conjugate().transpose())
+
+
+@functools.cache
+def T4_extended_matrix(
+    i: int,
+    j: int,
+    k: int,
+    l: int,
+    a: int,
+    b: int,
+    c: int,
+    d: int,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
+) -> ss.lil_array:
+    """Get matrix representation of anti-Hermitian T4 spin-conserving cluster operator.
+
+    Args:
+        i: Strongly occupied spin orbital index.
+        j: Strongly occupied spin orbital index.
+        k: Strongly occupied spin orbital index.
+        l: Strongly occupied spin orbital index.
+        a: Weakly occupied spin orbital index.
+        b: Weakly occupied spin orbital index.
+        c: Weakly occupied spin orbital index.
+        d: Weakly occupied spin orbital index.
+        num_inactive_orbs: Number of inactive spatial orbitals.
+        num_active_orbs: Number of active spatial orbitals.
+        num_virtual_orbs: Number of virtual spatial orbitals.
+        num_elec_alpha: Number of active alpha electrons.
+        num_elec_beta: Number of active beta electrons.
+
+    Returns:
+        Matrix representation of anti-Hermitian cluster operator.
+    """
+    idx2det, det2idx = get_indexing_extended(
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+        num_elec_alpha,
+        num_elec_beta,
+    )
+    op = build_operator_matrix_extended(
+        G4(i, j, k, l, a, b, c, d), idx2det, det2idx, num_inactive_orbs + num_active_orbs + num_virtual_orbs
+    )
+    return ss.lil_array(op - op.conjugate().transpose())
+
+
+@functools.cache
+def T5_extended_matrix(
+    i: int,
+    j: int,
+    k: int,
+    l: int,
+    m: int,
+    a: int,
+    b: int,
+    c: int,
+    d: int,
+    e: int,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
+) -> ss.lil_array:
+    """Get matrix representation of anti-Hermitian T5 spin-conserving cluster operator.
+
+    Args:
+        i: Strongly occupied spin orbital index.
+        j: Strongly occupied spin orbital index.
+        k: Strongly occupied spin orbital index.
+        l: Strongly occupied spin orbital index.
+        m: Strongly occupied spin orbital index.
+        a: Weakly occupied spin orbital index.
+        b: Weakly occupied spin orbital index.
+        c: Weakly occupied spin orbital index.
+        d: Weakly occupied spin orbital index.
+        e: Weakly occupied spin orbital index.
+        num_inactive_orbs: Number of inactive spatial orbitals.
+        num_active_orbs: Number of active spatial orbitals.
+        num_virtual_orbs: Number of virtual spatial orbitals.
+        num_elec_alpha: Number of active alpha electrons.
+        num_elec_beta: Number of active beta electrons.
+
+    Returns:
+        Matrix representation of anti-Hermitian cluster operator.
+    """
+    idx2det, det2idx = get_indexing_extended(
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+        num_elec_alpha,
+        num_elec_beta,
+    )
+    op = build_operator_matrix_extended(
+        G5(i, j, k, l, m, a, b, c, d, e),
+        idx2det,
+        det2idx,
+        num_inactive_orbs + num_active_orbs + num_virtual_orbs,
+    )
+    return ss.lil_array(op - op.conjugate().transpose())
+
+
+@functools.cache
+def T6_extended_matrix(
+    i: int,
+    j: int,
+    k: int,
+    l: int,
+    m: int,
+    n: int,
+    a: int,
+    b: int,
+    c: int,
+    d: int,
+    e: int,
+    f: int,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
+) -> ss.lil_array:
+    """Get matrix representation of anti-Hermitian T6 spin-conserving cluster operator.
+
+    Args:
+        i: Strongly occupied spin orbital index.
+        j: Strongly occupied spin orbital index.
+        k: Strongly occupied spin orbital index.
+        l: Strongly occupied spin orbital index.
+        m: Strongly occupied spin orbital index.
+        n: Strongly occupied spin orbital index.
+        a: Weakly occupied spin orbital index.
+        b: Weakly occupied spin orbital index.
+        c: Weakly occupied spin orbital index.
+        d: Weakly occupied spin orbital index.
+        e: Weakly occupied spin orbital index.
+        f: Weakly occupied spin orbital index.
+        num_inactive_orbs: Number of inactive spatial orbitals.
+        num_active_orbs: Number of active spatial orbitals.
+        num_virtual_orbs: Number of virtual spatial orbitals.
+        num_elec_alpha: Number of active alpha electrons.
+        num_elec_beta: Number of active beta electrons.
+
+    Returns:
+        Matrix representation of anti-Hermitian cluster operator.
+    """
+    idx2det, det2idx = get_indexing_extended(
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+        num_elec_alpha,
+        num_elec_beta,
+    )
+    op = build_operator_matrix_extended(
+        G6(i, j, k, l, m, n, a, b, c, d, e, f),
+        idx2det,
+        det2idx,
+        num_inactive_orbs + num_active_orbs + num_virtual_orbs,
     )
     return ss.lil_array(op - op.conjugate().transpose())
 
@@ -497,7 +664,9 @@ def construct_ucc_u_extended(
             if theta[counter] != 0.0:
                 T += (
                     theta[counter]
-                    * T3_matrix(i, j, k, a, b, c, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+                    * T3_extended_matrix(
+                        i, j, k, a, b, c, num_active_orbs, num_elec_alpha, num_elec_beta
+                    ).todense()
                 )
             counter += 1
     if "q" in excitations:
@@ -505,7 +674,7 @@ def construct_ucc_u_extended(
             if theta[counter] != 0.0:
                 T += (
                     theta[counter]
-                    * T4_matrix(
+                    * T4_extended_matrix(
                         i,
                         j,
                         k,
@@ -525,7 +694,7 @@ def construct_ucc_u_extended(
             if theta[counter] != 0.0:
                 T += (
                     theta[counter]
-                    * T5_matrix(
+                    * T5_extended_matrix(
                         i,
                         j,
                         k,
@@ -547,7 +716,7 @@ def construct_ucc_u_extended(
             if theta[counter] != 0.0:
                 T += (
                     theta[counter]
-                    * T6_matrix(
+                    * T6_extended_matrix(
                         i,
                         j,
                         k,
