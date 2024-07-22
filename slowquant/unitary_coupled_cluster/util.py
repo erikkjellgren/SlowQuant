@@ -580,7 +580,17 @@ def construct_ucc_u(
                 T += (
                     theta[counter]
                     * T4_matrix(
-                        i, j, k, l, a, b, c, d, num_active_orbs, num_elec_alpha, num_elec_beta
+                        i,
+                        j,
+                        k,
+                        l,
+                        a,
+                        b,
+                        c,
+                        d,
+                        num_active_orbs,
+                        num_elec_alpha,
+                        num_elec_beta,
                     ).todense()
                 )
             counter += 1
@@ -590,7 +600,19 @@ def construct_ucc_u(
                 T += (
                     theta[counter]
                     * T5_matrix(
-                        i, j, k, l, m, a, b, c, d, e, num_active_orbs, num_elec_alpha, num_elec_beta
+                        i,
+                        j,
+                        k,
+                        l,
+                        m,
+                        a,
+                        b,
+                        c,
+                        d,
+                        e,
+                        num_active_orbs,
+                        num_elec_alpha,
+                        num_elec_beta,
                     ).todense()
                 )
             counter += 1
@@ -600,7 +622,21 @@ def construct_ucc_u(
                 T += (
                     theta[counter]
                     * T6_matrix(
-                        i, j, k, l, m, n, a, b, c, d, e, f, num_active_orbs, num_elec_alpha, num_elec_beta
+                        i,
+                        j,
+                        k,
+                        l,
+                        m,
+                        n,
+                        a,
+                        b,
+                        c,
+                        d,
+                        e,
+                        f,
+                        num_active_orbs,
+                        num_elec_alpha,
+                        num_elec_beta,
                     ).todense()
                 )
             counter += 1

@@ -1,25 +1,25 @@
-import copy
 from collections.abc import Sequence
 
 import numpy as np
-import scipy.sparse as ss
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
+from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
     LinearResponseBaseClass,
 )
-from slowquant.unitary_coupled_cluster.operator_hybrid import (
-    OperatorHybrid,
-    OperatorHybridData,
-    convert_pauli_to_hybrid_form,
-    expectation_value_hybrid_flow,
-    hamiltonian_hybrid_2i_2a,
-    one_elec_op_hybrid_0i_0a,
-    one_elec_op_hybrid_1i_1a,
+from slowquant.unitary_coupled_cluster.operator_extended import (
+    construct_ucc_u_extended,
+    expectation_value_extended,
+    get_indexing_extended,
+    propagate_state_extended,
 )
-from slowquant.unitary_coupled_cluster.operator_pauli import epq_pauli
+from slowquant.unitary_coupled_cluster.operators import (
+    Epq,
+    hamiltonian_2i_2a,
+    one_elec_op_0i_0a,
+)
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
@@ -28,26 +28,61 @@ class LinearResponseUCC(LinearResponseBaseClass):
         self,
         wave_function: WaveFunctionUCC,
         excitations: str,
-        is_spin_conserving: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
-            is_spin_conserving: Use spin-conseving operators.
         """
-        super().__init__(wave_function, excitations, is_spin_conserving)
+        super().__init__(wave_function, excitations)
+        idx2det, det2idx = get_indexing_extended(
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
+            self.wf.num_active_elec_alpha,
+            self.wf.num_active_elec_beta,
+            1,
+        )
+        self.index_info = (
+            idx2det,
+            det2idx,
+            self.wf.num_orbs,
+        )
+        thetas = []
+        if "s" in self.wf._excitations:
+            thetas += self.wf.theta1
+        if "d" in self.wf._excitations:
+            thetas += self.wf.theta2
+        if "t" in self.wf._excitations:
+            thetas += self.wf.theta3
+        if "q" in self.wf._excitations:
+            thetas += self.wf.theta4
+        if "5" in self.wf._excitations:
+            thetas += self.wf.theta5
+        if "6" in self.wf._excitations:
+            thetas += self.wf.theta6
+        self.u = construct_ucc_u_extended(
+            len(idx2det),
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
+            self.wf.num_active_elec_alpha,
+            self.wf.num_active_elec_beta,
+            thetas,
+            self.wf.singlet_excitation_operator_generator,
+            self.wf._excitations,
+        )
+        num_det = len(idx2det)
+        self.csf_coeffs = np.zeros(num_det)
+        hf_det = int("1" * self.wf.num_elec + "0" * (self.wf.num_spin_orbs - self.wf.num_elec), 2)
+        self.csf_coeffs[det2idx[hf_det]] = 1
+        self.ci_coeffs = np.matmul(self.u, self.csf_coeffs)
 
         # Overwrite Superclass
-        self.q_ops: list[OperatorHybrid] = []
+        self.q_ops: list[FermionicOperator] = []
         for i, a in self.wf.kappa_hf_like_idx:
-            op_ = 2 ** (-1 / 2) * epq_pauli(a, i, self.wf.num_spin_orbs)
-            op = convert_pauli_to_hybrid_form(
-                op_,
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-            )
+            op = 2 ** (-1 / 2) * Epq(a, i)
             self.q_ops.append(op)
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
@@ -56,13 +91,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
         self.Sigma = np.zeros((num_parameters, num_parameters))
         self.Delta = np.zeros((num_parameters, num_parameters))
 
-        inactive_str = "I" * self.wf.num_inactive_spin_orbs
-        virtual_str = "I" * self.wf.num_virtual_spin_orbs
-        self.U = OperatorHybrid(
-            {inactive_str + virtual_str: OperatorHybridData(inactive_str, self.wf.u, virtual_str)}
-        )
-
-        H_2i_2a = hamiltonian_hybrid_2i_2a(
+        H_2i_2a = hamiltonian_2i_2a(
             self.wf.h_mo,
             self.wf.g_mo,
             self.wf.num_inactive_orbs,
@@ -71,9 +100,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
         )
 
         idx_shift = len(self.q_ops)
-        self.csf = copy.deepcopy(self.wf.state_vector)
-        self.csf.active = self.csf._active
-        self.csf.active_csr = ss.csr_matrix(self.csf._active)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
         grad = np.zeros(2 * len(self.q_ops))
@@ -85,22 +111,49 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
         grad = np.zeros(2 * len(self.G_ops))
         for i, op in enumerate(self.G_ops):
-            grad[i] = -expectation_value_hybrid_flow(
-                self.wf.state_vector, [self.H_0i_0a, self.U, op], self.csf
+            state = propagate_state_extended(
+                op,
+                self.csf_coeffs,
+                *self.index_info,
             )
-            grad[i + len(self.G_ops)] = expectation_value_hybrid_flow(
-                self.csf, [op.dagger, self.U.dagger, self.H_0i_0a], self.wf.state_vector
+            state = np.matmul(self.u, state)
+            grad[i] = -expectation_value_extended(
+                self.ci_coeffs,
+                self.H_0i_0a,
+                state,
+                *self.index_info,
+            )
+            grad[i + len(self.G_ops)] = expectation_value_extended(
+                state,
+                self.H_0i_0a,
+                self.ci_coeffs,
+                *self.index_info,
             )
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
                 raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
         for j, qJ in enumerate(self.q_ops):
+            stateJH = propagate_state_extended(
+                qJ,
+                self.csf_coeffs,
+                *self.index_info,
+            )
+            stateJH = np.matmul(self.u, stateJH)
+            stateJH = propagate_state_extended(
+                H_2i_2a,
+                stateJH,
+                *self.index_info,
+            )
             for i, qI in enumerate(self.q_ops[j:], j):
-                # Make A
-                val = expectation_value_hybrid_flow(
-                    self.csf, [qI.dagger, self.U.dagger, H_2i_2a, self.U, qJ], self.csf
+                stateI = propagate_state_extended(
+                    qI,
+                    self.csf_coeffs,
+                    *self.index_info,
                 )
+                stateI = np.matmul(self.u, stateI)
+                # Make A
+                val = stateI @ stateJH
                 if i == j:
                     val -= self.wf.energy_elec
                 self.A[i, j] = self.A[j, i] = val
@@ -108,16 +161,46 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 if i == j:
                     self.Sigma[i, j] = self.Sigma[j, i] = 1
         for j, qJ in enumerate(self.q_ops):
+            stateJH = propagate_state_extended(
+                qJ,
+                self.csf_coeffs,
+                *self.index_info,
+            )
+            stateJH = np.matmul(self.u, stateJH)
+            stateJH = propagate_state_extended(
+                self.H_1i_1a,
+                stateJH,
+                *self.index_info,
+            )
             for i, GI in enumerate(self.G_ops):
-                # Make A
-                self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = expectation_value_hybrid_flow(
-                    self.csf, [GI.dagger, self.U.dagger, self.H_1i_1a, self.U, qJ], self.csf
+                stateI = propagate_state_extended(
+                    GI,
+                    self.csf_coeffs,
+                    *self.index_info,
                 )
-        for j, GJ in enumerate(self.G_ops):
-            for i, GI in enumerate(self.G_ops[j:], j):
+                stateI = np.matmul(self.u, stateI)
                 # Make A
-                val = expectation_value_hybrid_flow(
-                    self.csf, [GI.dagger, self.U.dagger, self.H_0i_0a, self.U, GJ], self.csf
+                self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = stateI @ stateJH
+        for j, GJ in enumerate(self.G_ops):
+            stateJ = propagate_state_extended(
+                GJ,
+                self.csf_coeffs,
+                *self.index_info,
+            )
+            stateJ = np.matmul(self.u, stateJ)
+            for i, GI in enumerate(self.G_ops[j:], j):
+                stateI = propagate_state_extended(
+                    GI,
+                    self.csf_coeffs,
+                    *self.index_info,
+                )
+                stateI = np.matmul(self.u, stateI)
+                # Make A
+                val = expectation_value_extended(
+                    stateI,
+                    self.H_0i_0a,
+                    stateJ,
+                    *self.index_info,
                 )
                 if i == j:
                     val -= self.wf.energy_elec
@@ -125,6 +208,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 # Make Sigma
                 if i == j:
                     self.Sigma[i + idx_shift, j + idx_shift] = 1
+        print(self.A)
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.

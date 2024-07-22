@@ -59,14 +59,7 @@ class LinearResponseBaseClass:
                 elif type_idx == 2:
                     self.G_ops.append(G2_2_sa(i, j, a, b))
         if "t" in excitations:
-            for (
-                a,
-                i,
-                b,
-                j,
-                c,
-                k,
-            ) in self.theta_picker.get_t3_generator():
+            for a, i, b, j, c, k in self.theta_picker.get_t3_generator():
                 self.G_ops.append(G3(i, j, k, a, b, c))
         if "q" in excitations:
             for a, i, b, j, c, k, d, l in self.theta_picker.get_t4_generator():

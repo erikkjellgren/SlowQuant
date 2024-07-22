@@ -51,171 +51,6 @@ def get_indexing(
     return idx2det, det2idx
 
 
-def get_indexing_extended(
-    num_inactive_orbs: int,
-    num_active_orbs: int,
-    num_virtual_orbs,
-    num_active_elec_alpha: int,
-    num_active_elec_beta,
-    order: int,
-) -> tuple[list[int], dict[int, int]]:
-    inactive_singles = []
-    virtual_singles = []
-    for inactive, virtual in generate_singles(num_inactive_orbs, num_virtual_orbs):
-        inactive_singles.append(inactive)
-        virtual_singles.append(virtual)
-    inactive_doubles = []
-    virtual_doubles = []
-    if order >= 2:
-        for inactive, virtual in generate_doubles(num_inactive_orbs, num_virtual_orbs):
-            inactive_doubles.append(inactive)
-            virtual_doubles.append(virtual)
-    idx = 0
-    idx2det = []
-    det2idx = {}
-    # Generate 0th space
-    for alpha_string in multiset_permutations(
-        [1] * num_active_elec_alpha + [0] * (num_active_orbs - num_active_elec_alpha)
-    ):
-        for beta_string in multiset_permutations(
-            [1] * num_active_elec_beta + [0] * (num_active_orbs - num_active_elec_beta)
-        ):
-            print(alpha_string, beta_string)
-            det_str = ""
-            for a, b in zip(
-                [1] * num_inactive_orbs + alpha_string + [0] * num_virtual_orbs,
-                [1] * num_inactive_orbs + beta_string + [0] * num_virtual_orbs,
-            ):
-                det_str += str(a) + str(b)
-            det = int(det_str, 2)
-            if det in idx2det:
-                continue
-            idx2det.append(det)
-            det2idx[det] = idx
-            idx += 1
-    # Generate 1,2 exc alpha space
-    for alpha_inactive, alpha_virtual in zip(
-        inactive_singles + inactive_doubles, virtual_singles + virtual_doubles
-    ):
-        active_alpha_elec = (
-            num_active_elec_alpha - np.sum(alpha_virtual) + num_inactive_orbs - np.sum(alpha_inactive)
-        )
-        for alpha_string in multiset_permutations(
-            [1] * active_alpha_elec + [0] * (num_active_orbs - active_alpha_elec)
-        ):
-            for beta_string in multiset_permutations(
-                [1] * num_active_elec_beta + [0] * (num_active_orbs - num_active_elec_beta)
-            ):
-                det_str = ""
-                for a, b in zip(
-                    alpha_inactive + alpha_string + alpha_virtual,
-                    [1] * num_inactive_orbs + beta_string + [0] * num_virtual_orbs,
-                ):
-                    det_str += str(a) + str(b)
-                det = int(det_str, 2)
-                if det in idx2det:
-                    continue
-                idx2det.append(det)
-                det2idx[det] = idx
-                idx += 1
-    # Generate 1,2 exc beta space
-    for beta_inactive, beta_virtual in zip(
-        inactive_singles + inactive_doubles, virtual_singles + virtual_doubles
-    ):
-        active_beta_elec = (
-            num_active_elec_beta - np.sum(beta_virtual) + num_inactive_orbs - np.sum(beta_inactive)
-        )
-        for alpha_string in multiset_permutations(
-            [1] * num_active_elec_alpha + [0] * (num_active_orbs - num_active_elec_alpha)
-        ):
-            for beta_string in multiset_permutations(
-                [1] * active_beta_elec + [0] * (num_active_orbs - active_beta_elec)
-            ):
-                det_str = ""
-                for a, b in zip(
-                    [1] * num_inactive_orbs + alpha_string + [0] * num_virtual_orbs,
-                    beta_inactive + beta_string + beta_virtual,
-                ):
-                    det_str += str(a) + str(b)
-                det = int(det_str, 2)
-                if det in idx2det:
-                    continue
-                idx2det.append(det)
-                det2idx[det] = idx
-                idx += 1
-    # Generate 1 exc alpha 1 exc beta space
-    if order >= 2:
-        for alpha_inactive, alpha_virtual in zip(inactive_singles, virtual_singles):
-            active_alpha_elec = (
-                num_active_elec_alpha - np.sum(alpha_virtual) + num_inactive_orbs - np.sum(alpha_inactive)
-            )
-            for beta_inactive, beta_virtual in zip(inactive_singles, virtual_singles):
-                active_beta_elec = (
-                    num_active_elec_beta - np.sum(beta_virtual) + num_inactive_orbs - np.sum(beta_inactive)
-                )
-                for alpha_string in multiset_permutations(
-                    [1] * active_alpha_elec + [0] * (num_active_orbs - active_alpha_elec)
-                ):
-                    for beta_string in multiset_permutations(
-                        [1] * active_beta_elec + [0] * (num_active_orbs - active_beta_elec)
-                    ):
-                        det_str = ""
-                        for a, b in zip(
-                            alpha_inactive + alpha_string + alpha_virtual,
-                            beta_inactive + beta_string + beta_virtual,
-                        ):
-                            det_str += str(a) + str(b)
-                        det = int(det_str, 2)
-                        if det in idx2det:
-                            continue
-                        idx2det.append(det)
-                        det2idx[det] = idx
-                        idx += 1
-    return idx2det, det2idx
-
-
-def generate_singles(num_inactive_orbs: int, num_virtual_orbs: int):
-    inactive = [1] * num_inactive_orbs
-    virtual = [0] * num_virtual_orbs
-    for i in range(num_inactive_orbs + 1):
-        if i != num_inactive_orbs:
-            inactive[i] = 0
-        for j in range(num_virtual_orbs + 1):
-            if j != num_virtual_orbs:
-                virtual[j] = 1
-            yield inactive.copy(), virtual.copy()
-            if j != num_virtual_orbs:
-                virtual[j] = 0
-        if i != num_inactive_orbs:
-            inactive[i] = 1
-
-
-def generate_doubles(num_inactive_orbs: int, num_virtual_orbs: int):
-    inactive = [1] * num_inactive_orbs
-    virtual = [0] * num_virtual_orbs
-    for i in range(num_inactive_orbs + 1):
-        if i != num_inactive_orbs:
-            inactive[i] = 0
-        for i2 in range(min(i + 1, num_inactive_orbs), num_inactive_orbs + 1):
-            if i2 != num_inactive_orbs:
-                inactive[i2] = 0
-            for j in range(num_virtual_orbs + 1):
-                if j != num_virtual_orbs:
-                    virtual[j] = 1
-                for j2 in range(min(j + 1, num_virtual_orbs), num_virtual_orbs + 1):
-                    if j2 != num_virtual_orbs:
-                        virtual[j2] = 1
-                    yield inactive.copy(), virtual.copy()
-                    if j2 != num_virtual_orbs:
-                        virtual[j2] = 0
-                if j != num_virtual_orbs:
-                    virtual[j] = 0
-            if i2 != num_inactive_orbs:
-                inactive[i2] = 1
-        if i != num_inactive_orbs:
-            inactive[i] = 1
-
-
 def build_operator_matrix(
     op: FermionicOperator,
     idx2det: Sequence[int],
@@ -360,6 +195,7 @@ def expectation_value_commutator(
         idx2det,
         det2idx,
         num_active_orbs,
+        True,
     )
     return np.matmul(bra, np.matmul(op_mat, ket))
 
@@ -392,7 +228,11 @@ def expectation_value_mat(bra: np.ndarray, op: np.ndarray, ket: np.ndarray) -> f
 
 @functools.cache
 def T1_sa_matrix(
-    i: int, a: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
+    i: int,
+    a: int,
+    num_active_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
 ) -> ss.lil_array:
     """Get matrix representation of anti-Hermitian T1 spin-adapted cluster operator.
 
@@ -413,7 +253,13 @@ def T1_sa_matrix(
 
 @functools.cache
 def T2_1_sa_matrix(
-    i: int, j: int, a: int, b: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
+    i: int,
+    j: int,
+    a: int,
+    b: int,
+    num_active_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
 ) -> ss.lil_array:
     """Get matrix representation of anti-Hermitian T2 spin-adapted cluster operator.
 
@@ -436,7 +282,13 @@ def T2_1_sa_matrix(
 
 @functools.cache
 def T2_2_sa_matrix(
-    i: int, j: int, a: int, b: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
+    i: int,
+    j: int,
+    a: int,
+    b: int,
+    num_active_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
 ) -> ss.lil_array:
     """Get matrix representation of anti-Hermitian T2 spin-adapted cluster operator.
 
@@ -478,7 +330,13 @@ def T1_matrix(i: int, a: int, num_active_orbs: int, num_elec_alpha: int, num_ele
 
 @functools.cache
 def T2_matrix(
-    i: int, j: int, a: int, b: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int
+    i: int,
+    j: int,
+    a: int,
+    b: int,
+    num_active_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
 ) -> ss.lil_array:
     """Get matrix representation of anti-Hermitian T2 spin-conserving cluster operator.
 
