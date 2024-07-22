@@ -70,32 +70,20 @@ class LinearResponseUCC(LinearResponseBaseClass):
             state = propagate_state(
                 op,
                 self.wf.csf_coeffs,
-                self.wf.idx2det,
-                self.wf.det2idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.num_virtual_orbs,
+                *self.index_info,
             )
             state = np.matmul(self.wf.u, state)
             grad[i] = -expectation_value(
                 self.wf.ci_coeffs,
                 self.H_0i_0a,
                 state,
-                self.wf.idx2det,
-                self.wf.det2idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.num_virtual_orbs,
+                *self.index_info,
             )
             grad[i + len(self.G_ops)] = expectation_value(
                 state,
                 self.H_0i_0a,
                 self.wf.ci_coeffs,
-                self.wf.idx2det,
-                self.wf.det2idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.num_virtual_orbs,
+                *self.index_info,
             )
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
@@ -128,11 +116,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 state = propagate_state(
                     GI,
                     self.wf.csf_coeffs,
-                    self.wf.idx2det,
-                    self.wf.det2idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
+                    *self.index_info,
                 )
                 state = np.matmul(self.wf.u, state)
                 if do_approximate_hermitification:
@@ -141,31 +125,19 @@ class LinearResponseUCC(LinearResponseBaseClass):
                         state,
                         self.H_1i_1a * qJ,
                         self.wf.ci_coeffs,
-                        self.wf.idx2det,
-                        self.wf.det2idx,
-                        self.wf.num_inactive_orbs,
-                        self.wf.num_active_orbs,
-                        self.wf.num_virtual_orbs,
+                        *self.index_info,
                     ) + expectation_value(
                         state,
                         qJ.dagger * self.H_1i_1a,
                         self.wf.ci_coeffs,
-                        self.wf.idx2det,
-                        self.wf.det2idx,
-                        self.wf.num_inactive_orbs,
-                        self.wf.num_active_orbs,
-                        self.wf.num_virtual_orbs,
+                        *self.index_info,
                     )  # added an assumed zero (approximation)
                     # Make B
                     self.B_tracked[j, i + idx_shift] = self.B_tracked[i + idx_shift, j] = -expectation_value(
                         state,
                         qJ.dagger * self.H_1i_1a,
                         self.wf.ci_coeffs,
-                        self.wf.idx2det,
-                        self.wf.det2idx,
-                        self.wf.num_inactive_orbs,
-                        self.wf.num_active_orbs,
-                        self.wf.num_virtual_orbs,
+                        *self.index_info,
                     )
                 else:
                     # Make A
@@ -173,105 +145,63 @@ class LinearResponseUCC(LinearResponseBaseClass):
                         state,
                         self.H_1i_1a * qJ,
                         self.wf.ci_coeffs,
-                        self.wf.idx2det,
-                        self.wf.det2idx,
-                        self.wf.num_inactive_orbs,
-                        self.wf.num_active_orbs,
-                        self.wf.num_virtual_orbs,
+                        *self.index_info,
                     )
                     # Make B
                     self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = -expectation_value(
                         state,
                         qJ.dagger * self.H_1i_1a,
                         self.wf.ci_coeffs,
-                        self.wf.idx2det,
-                        self.wf.det2idx,
-                        self.wf.num_inactive_orbs,
-                        self.wf.num_active_orbs,
-                        self.wf.num_virtual_orbs,
+                        *self.index_info,
                     )
         for j, GJ in enumerate(self.G_ops):
             stateJ = propagate_state(
                 GJ,
                 self.wf.csf_coeffs,
-                self.wf.idx2det,
-                self.wf.det2idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.num_virtual_orbs,
+                *self.index_info,
             )
             stateJ = np.matmul(self.wf.u, stateJ)
             for i, GI in enumerate(self.G_ops[j:], j):
                 stateI = propagate_state(
                     GI,
                     self.wf.csf_coeffs,
-                    self.wf.idx2det,
-                    self.wf.det2idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
+                    *self.index_info,
                 )
                 stateI = np.matmul(self.wf.u, stateI)
                 stateIJ = propagate_state(
                     GI,
                     self.wf.csf_coeffs,
-                    self.wf.idx2det,
-                    self.wf.det2idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
+                    *self.index_info,
                 )
                 stateIJ = propagate_state(
                     GJ,
                     stateIJ,
-                    self.wf.idx2det,
-                    self.wf.det2idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
+                    *self.index_info,
                 )
                 stateIJ = np.matmul(self.wf.u, stateIJ)
                 stateIJd = propagate_state(
                     GI,
                     self.wf.csf_coeffs,
-                    self.wf.idx2det,
-                    self.wf.det2idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
+                    *self.index_info,
                 )
                 stateIJd = propagate_state(
                     GJ.dagger,
                     stateIJd,
-                    self.wf.idx2det,
-                    self.wf.det2idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
+                    *self.index_info,
                 )
                 stateIJd = np.matmul(self.wf.u, stateIJd)
                 # Make A
-                print(stateI, stateJ)
                 val = expectation_value(
                     stateI,
                     self.H_0i_0a,
                     stateJ,
-                    self.wf.idx2det,
-                    self.wf.det2idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
+                    *self.index_info,
                 )
-                print(val, i, j)
                 val += -expectation_value(
-                    stateIJ,
+                    stateIJd,
                     self.H_0i_0a,
                     self.wf.ci_coeffs,
-                    self.wf.idx2det,
-                    self.wf.det2idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
+                    *self.index_info,
                 )
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
                 # Make B
@@ -280,11 +210,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                         stateIJ,
                         self.H_0i_0a,
                         self.wf.ci_coeffs,
-                        self.wf.idx2det,
-                        self.wf.det2idx,
-                        self.wf.num_inactive_orbs,
-                        self.wf.num_active_orbs,
-                        self.wf.num_virtual_orbs,
+                        *self.index_info,
                     )
                 )
                 # Make Sigma
@@ -367,72 +293,44 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 state = propagate_state(
                     G,
                     self.wf.csf_coeffs,
-                    self.wf.idx2det,
-                    self.wf.det2idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
+                    *self.index_info,
                 )
                 state = np.matmul(self.wf.u, state)
                 g_part_x -= self.Z_G_normed[i, state_number] * expectation_value(
                     self.wf.ci_coeffs,
                     mux_op,
                     state,
-                    self.wf.idx2det,
-                    self.wf.det2idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
+                    *self.index_info,
                 )
                 g_part_x += self.Y_G_normed[i, state_number] * expectation_value(
                     state,
                     mux_op,
                     self.wf.ci_coeffs,
-                    self.wf.idx2det,
-                    self.wf.det2idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
+                    *self.index_info,
                 )
                 g_part_y -= self.Z_G_normed[i, state_number] * expectation_value(
                     self.wf.ci_coeffs,
                     muy_op,
                     state,
-                    self.wf.idx2det,
-                    self.wf.det2idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
+                    *self.index_info,
                 )
                 g_part_y += self.Y_G_normed[i, state_number] * expectation_value(
                     state,
                     muy_op,
                     self.wf.ci_coeffs,
-                    self.wf.idx2det,
-                    self.wf.det2idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
+                    *self.index_info,
                 )
                 g_part_z -= self.Z_G_normed[i, state_number] * expectation_value(
                     self.wf.ci_coeffs,
                     muz_op,
                     state,
-                    self.wf.idx2det,
-                    self.wf.det2idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
+                    *self.index_info,
                 )
                 g_part_z += self.Y_G_normed[i, state_number] * expectation_value(
                     state,
                     muz_op,
                     self.wf.ci_coeffs,
-                    self.wf.idx2det,
-                    self.wf.det2idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
+                    *self.index_info,
                 )
             transition_dipoles[state_number, 0] = q_part_x + g_part_x
             transition_dipoles[state_number, 1] = q_part_y + g_part_y

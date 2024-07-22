@@ -37,6 +37,13 @@ class LinearResponseBaseClass:
             self.wf.active_occ_spin_idx,
             self.wf.active_unocc_spin_idx,
         )
+        self.index_info = (
+            self.wf.idx2det,
+            self.wf.det2idx,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
+        )
 
         self.G_ops: list[FermionicOperator] = []
         self.q_ops: list[FermionicOperator] = []
