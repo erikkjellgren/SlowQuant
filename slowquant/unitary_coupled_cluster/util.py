@@ -206,7 +206,7 @@ def iterate_t1(
             if i % 2 == 0:
                 num_alpha -= 1
             else:
-                num_beta = 1
+                num_beta -= 1
             if num_alpha != 0 or num_beta != 0:
                 continue
             yield a, i
