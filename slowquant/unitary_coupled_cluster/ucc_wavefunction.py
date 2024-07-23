@@ -80,6 +80,7 @@ class WaveFunctionUCC:
         self._rdm4 = None
         self._h_mo = None
         self._g_mo = None
+        self._u = None
         active_space = []
         orbital_counter = 0
         for i in range(num_elec - cas[0], num_elec):

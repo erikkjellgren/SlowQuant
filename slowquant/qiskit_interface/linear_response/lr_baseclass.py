@@ -3,7 +3,6 @@ from collections.abc import Sequence
 import numpy as np
 import scipy
 
-from slowquant.qiskit_interface.linear_response.util import iterate_t1_sa, iterate_t2_sa
 from slowquant.qiskit_interface.wavefunction import WaveFunction
 from slowquant.unitary_coupled_cluster.operators import (
     G1_sa,
@@ -12,6 +11,7 @@ from slowquant.unitary_coupled_cluster.operators import (
     hamiltonian_0i_0a,
     hamiltonian_1i_1a,
 )
+from slowquant.unitary_coupled_cluster.util import iterate_t1_sa, iterate_t2_sa
 
 
 class quantumLRBaseClass:
@@ -34,16 +34,16 @@ class quantumLRBaseClass:
 
         self.G_ops = []
         # G1
-        for a, i, _, _, _ in iterate_t1_sa(wf.active_occ_idx, wf.active_unocc_idx):
-            self.G_ops.append(G1_sa(a, i))
+        for a, i, _ in iterate_t1_sa(wf.active_occ_idx, wf.active_unocc_idx):
+            self.G_ops.append(G1_sa(i, a))
         # G2
-        for a, i, b, j, _, _, op_id in iterate_t2_sa(wf.active_occ_idx, wf.active_unocc_idx):
-            if op_id > 0:
+        for a, i, b, j, _, type_idx in iterate_t2_sa(wf.active_occ_idx, wf.active_unocc_idx):
+            if type_idx == 1:
                 # G2_1
-                self.G_ops.append(G2_1_sa(a, b, i, j))
-            else:
+                self.G_ops.append(G2_1_sa(i, j, a, b))
+            elif type_idx == 2:
                 # G2_2
-                self.G_ops.append(G2_2_sa(a, b, i, j))
+                self.G_ops.append(G2_2_sa(i, j, a, b))
 
         # q
         self.q_ops = []
