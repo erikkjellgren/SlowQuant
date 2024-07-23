@@ -204,10 +204,10 @@ def iterate_t1(
             else:
                 num_beta += 1
             if i % 2 == 0:
-                num_alpha += 1
+                num_alpha -= 1
             else:
-                num_beta += 1
-            if num_alpha % 2 != 0 or num_beta % 2 != 0:
+                num_beta = 1
+            if num_alpha != 0 or num_beta != 0:
                 continue
             yield a, i
 
@@ -240,14 +240,14 @@ def iterate_t2(
                     else:
                         num_beta += 1
                     if i % 2 == 0:
-                        num_alpha += 1
+                        num_alpha -= 1
                     else:
-                        num_beta += 1
+                        num_beta -= 1
                     if j % 2 == 0:
-                        num_alpha += 1
+                        num_alpha -= 1
                     else:
-                        num_beta += 1
-                    if num_alpha % 2 != 0 or num_beta % 2 != 0:
+                        num_beta -= 1
+                    if num_alpha != 0 or num_beta != 0:
                         continue
                     yield a, i, b, j
 
@@ -286,18 +286,18 @@ def iterate_t3(
                             else:
                                 num_beta += 1
                             if i % 2 == 0:
-                                num_alpha += 1
+                                num_alpha -= 1
                             else:
-                                num_beta += 1
+                                num_beta -= 1
                             if j % 2 == 0:
-                                num_alpha += 1
+                                num_alpha -= 1
                             else:
-                                num_beta += 1
+                                num_beta -= 1
                             if k % 2 == 0:
-                                num_alpha += 1
+                                num_alpha -= 1
                             else:
-                                num_beta += 1
-                            if num_alpha % 2 != 0 or num_beta % 2 != 0:
+                                num_beta -= 1
+                            if num_alpha != 0 or num_beta != 0:
                                 continue
                             yield a, i, b, j, c, k
 
@@ -342,22 +342,22 @@ def iterate_t4(
                                     else:
                                         num_beta += 1
                                     if i % 2 == 0:
-                                        num_alpha += 1
+                                        num_alpha -= 1
                                     else:
-                                        num_beta += 1
+                                        num_beta -= 1
                                     if j % 2 == 0:
-                                        num_alpha += 1
+                                        num_alpha -= 1
                                     else:
-                                        num_beta += 1
+                                        num_beta -= 1
                                     if k % 2 == 0:
-                                        num_alpha += 1
+                                        num_alpha -= 1
                                     else:
-                                        num_beta += 1
+                                        num_beta -= 1
                                     if l % 2 == 0:
-                                        num_alpha += 1
+                                        num_alpha -= 1
                                     else:
-                                        num_beta += 1
-                                    if num_alpha % 2 != 0 or num_beta % 2 != 0:
+                                        num_beta -= 1
+                                    if num_alpha != 0 or num_beta != 0:
                                         continue
                                     yield a, i, b, j, c, k, d, l
 
@@ -408,26 +408,26 @@ def iterate_t5(
                                             else:
                                                 num_beta += 1
                                             if i % 2 == 0:
-                                                num_alpha += 1
+                                                num_alpha -= 1
                                             else:
-                                                num_beta += 1
+                                                num_beta -= 1
                                             if j % 2 == 0:
-                                                num_alpha += 1
+                                                num_alpha -= 1
                                             else:
-                                                num_beta += 1
+                                                num_beta -= 1
                                             if k % 2 == 0:
-                                                num_alpha += 1
+                                                num_alpha -= 1
                                             else:
-                                                num_beta += 1
+                                                num_beta -= 1
                                             if l % 2 == 0:
-                                                num_alpha += 1
+                                                num_alpha -= 1
                                             else:
-                                                num_beta += 1
+                                                num_beta -= 1
                                             if m % 2 == 0:
-                                                num_alpha += 1
+                                                num_alpha -= 1
                                             else:
-                                                num_beta += 1
-                                            if num_alpha % 2 != 0 or num_beta % 2 != 0:
+                                                num_beta -= 1
+                                            if num_alpha != 0 or num_beta != 0:
                                                 continue
                                             yield a, i, b, j, c, k, d, l, e, m
 
@@ -488,30 +488,30 @@ def iterate_t6(
                                                     else:
                                                         num_beta += 1
                                                     if i % 2 == 0:
-                                                        num_alpha += 1
+                                                        num_alpha -= 1
                                                     else:
-                                                        num_beta += 1
+                                                        num_beta -= 1
                                                     if j % 2 == 0:
-                                                        num_alpha += 1
+                                                        num_alpha -= 1
                                                     else:
-                                                        num_beta += 1
+                                                        num_beta -= 1
                                                     if k % 2 == 0:
-                                                        num_alpha += 1
+                                                        num_alpha -= 1
                                                     else:
-                                                        num_beta += 1
+                                                        num_beta -= 1
                                                     if l % 2 == 0:
-                                                        num_alpha += 1
+                                                        num_alpha -= 1
                                                     else:
-                                                        num_beta += 1
+                                                        num_beta -= 1
                                                     if m % 2 == 0:
-                                                        num_alpha += 1
+                                                        num_alpha -= 1
                                                     else:
-                                                        num_beta += 1
+                                                        num_beta -= 1
                                                     if n % 2 == 0:
-                                                        num_alpha += 1
+                                                        num_alpha -= 1
                                                     else:
-                                                        num_beta += 1
-                                                    if num_alpha % 2 != 0 or num_beta % 2 != 0:
+                                                        num_beta -= 1
+                                                    if num_alpha != 0 or num_beta != 0:
                                                         continue
                                                     yield a, i, b, j, c, k, d, l, e, m, f, n
 
