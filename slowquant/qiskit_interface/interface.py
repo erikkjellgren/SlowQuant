@@ -12,7 +12,7 @@ from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFoc
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
-from slowquant.qiskit_interface.custom_ansatz import QNP, fUCCSD, tUPS
+from slowquant.qiskit_interface.custom_ansatz import fUCC, tUPS
 from slowquant.qiskit_interface.util import (
     Clique,
     correct_distribution,
@@ -142,9 +142,10 @@ class QuantumInterface:
         elif self.ansatz == "tUPS":
             self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
         elif self.ansatz == "QNP":
-            self.circuit, self.grad_param_R = QNP(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
+            self.ansatz_options["do_qnp"] = True
+            self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
         elif self.ansatz == "fUCCSD":
-            self.circuit, self.grad_param_R = fUCCSD(num_orbs, self.num_elec, self.mapper)
+            self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
 
         # Check that R parameter for gradient is consistent with the paramter names.
         if len(self.grad_param_R) == 0:

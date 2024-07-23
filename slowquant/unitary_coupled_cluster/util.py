@@ -1,4 +1,5 @@
 from collections.abc import Generator, Sequence
+from typing import Any
 
 import numpy as np
 import scipy.linalg
@@ -8,6 +9,7 @@ from slowquant.unitary_coupled_cluster.operator_matrix import (
     T1_sa_matrix,
     T2_1_sa_matrix,
     T2_2_sa_matrix,
+    T2_matrix,
     T3_matrix,
     T4_matrix,
     T5_matrix,
@@ -205,10 +207,10 @@ def iterate_t1(
             else:
                 num_beta += 1
             if i % 2 == 0:
-                num_alpha += 1
+                num_alpha -= 1
             else:
-                num_beta += 1
-            if num_alpha % 2 != 0 or num_beta % 2 != 0:
+                num_beta -= 1
+            if num_alpha != 0 or num_beta != 0:
                 continue
             yield a, i
 
@@ -241,14 +243,14 @@ def iterate_t2(
                     else:
                         num_beta += 1
                     if i % 2 == 0:
-                        num_alpha += 1
+                        num_alpha -= 1
                     else:
-                        num_beta += 1
+                        num_beta -= 1
                     if j % 2 == 0:
-                        num_alpha += 1
+                        num_alpha -= 1
                     else:
-                        num_beta += 1
-                    if num_alpha % 2 != 0 or num_beta % 2 != 0:
+                        num_beta -= 1
+                    if num_alpha != 0 or num_beta != 0:
                         continue
                     yield a, i, b, j
 
@@ -287,18 +289,18 @@ def iterate_t3(
                             else:
                                 num_beta += 1
                             if i % 2 == 0:
-                                num_alpha += 1
+                                num_alpha -= 1
                             else:
-                                num_beta += 1
+                                num_beta -= 1
                             if j % 2 == 0:
-                                num_alpha += 1
+                                num_alpha -= 1
                             else:
-                                num_beta += 1
+                                num_beta -= 1
                             if k % 2 == 0:
-                                num_alpha += 1
+                                num_alpha -= 1
                             else:
-                                num_beta += 1
-                            if num_alpha % 2 != 0 or num_beta % 2 != 0:
+                                num_beta -= 1
+                            if num_alpha != 0 or num_beta != 0:
                                 continue
                             yield a, i, b, j, c, k
 
@@ -343,22 +345,22 @@ def iterate_t4(
                                     else:
                                         num_beta += 1
                                     if i % 2 == 0:
-                                        num_alpha += 1
+                                        num_alpha -= 1
                                     else:
-                                        num_beta += 1
+                                        num_beta -= 1
                                     if j % 2 == 0:
-                                        num_alpha += 1
+                                        num_alpha -= 1
                                     else:
-                                        num_beta += 1
+                                        num_beta -= 1
                                     if k % 2 == 0:
-                                        num_alpha += 1
+                                        num_alpha -= 1
                                     else:
-                                        num_beta += 1
+                                        num_beta -= 1
                                     if l % 2 == 0:
-                                        num_alpha += 1
+                                        num_alpha -= 1
                                     else:
-                                        num_beta += 1
-                                    if num_alpha % 2 != 0 or num_beta % 2 != 0:
+                                        num_beta -= 1
+                                    if num_alpha != 0 or num_beta != 0:
                                         continue
                                     yield a, i, b, j, c, k, d, l
 
@@ -409,26 +411,26 @@ def iterate_t5(
                                             else:
                                                 num_beta += 1
                                             if i % 2 == 0:
-                                                num_alpha += 1
+                                                num_alpha -= 1
                                             else:
-                                                num_beta += 1
+                                                num_beta -= 1
                                             if j % 2 == 0:
-                                                num_alpha += 1
+                                                num_alpha -= 1
                                             else:
-                                                num_beta += 1
+                                                num_beta -= 1
                                             if k % 2 == 0:
-                                                num_alpha += 1
+                                                num_alpha -= 1
                                             else:
-                                                num_beta += 1
+                                                num_beta -= 1
                                             if l % 2 == 0:
-                                                num_alpha += 1
+                                                num_alpha -= 1
                                             else:
-                                                num_beta += 1
+                                                num_beta -= 1
                                             if m % 2 == 0:
-                                                num_alpha += 1
+                                                num_alpha -= 1
                                             else:
-                                                num_beta += 1
-                                            if num_alpha % 2 != 0 or num_beta % 2 != 0:
+                                                num_beta -= 1
+                                            if num_alpha != 0 or num_beta != 0:
                                                 continue
                                             yield a, i, b, j, c, k, d, l, e, m
 
@@ -489,30 +491,30 @@ def iterate_t6(
                                                     else:
                                                         num_beta += 1
                                                     if i % 2 == 0:
-                                                        num_alpha += 1
+                                                        num_alpha -= 1
                                                     else:
-                                                        num_beta += 1
+                                                        num_beta -= 1
                                                     if j % 2 == 0:
-                                                        num_alpha += 1
+                                                        num_alpha -= 1
                                                     else:
-                                                        num_beta += 1
+                                                        num_beta -= 1
                                                     if k % 2 == 0:
-                                                        num_alpha += 1
+                                                        num_alpha -= 1
                                                     else:
-                                                        num_beta += 1
+                                                        num_beta -= 1
                                                     if l % 2 == 0:
-                                                        num_alpha += 1
+                                                        num_alpha -= 1
                                                     else:
-                                                        num_beta += 1
+                                                        num_beta -= 1
                                                     if m % 2 == 0:
-                                                        num_alpha += 1
+                                                        num_alpha -= 1
                                                     else:
-                                                        num_beta += 1
+                                                        num_beta -= 1
                                                     if n % 2 == 0:
-                                                        num_alpha += 1
+                                                        num_alpha -= 1
                                                     else:
-                                                        num_beta += 1
-                                                    if num_alpha % 2 != 0 or num_beta % 2 != 0:
+                                                        num_beta -= 1
+                                                    if num_alpha != 0 or num_beta != 0:
                                                         continue
                                                     yield a, i, b, j, c, k, d, l, e, m, f, n
 
@@ -652,49 +654,94 @@ class UpsStructure:
         self.excitation_operator_type: list[str] = []
         self.n_params = 0
 
-    def create_tups(self, n_layers: int, num_active_orbs: int) -> None:
-        for _ in range(n_layers):
-            for p in range(0, num_active_orbs - 1, 2):
-                # First single
-                self.excitation_operator_type.append("tups_single")
-                self.excitation_indicies.append((p,))
-                # Double
-                self.excitation_operator_type.append("tups_double")
-                self.excitation_indicies.append((p,))
-                # Second single
-                self.excitation_operator_type.append("tups_single")
-                self.excitation_indicies.append((p,))
-                self.n_params += 3
-            for p in range(1, num_active_orbs - 2, 2):
-                # First single
-                self.excitation_operator_type.append("tups_single")
-                self.excitation_indicies.append((p,))
-                # Double
-                self.excitation_operator_type.append("tups_double")
-                self.excitation_indicies.append((p,))
-                # Second single
-                self.excitation_operator_type.append("tups_single")
-                self.excitation_indicies.append((p,))
-                self.n_params += 3
+    def create_tups(self, num_active_orbs: int, ansatz_options: dict[str, Any]) -> None:
+        """tUPS ansatz.
 
-    def create_qnp(self, n_layers: int, num_active_orbs) -> None:
+        #. 10.1103/PhysRevResearch.6.023300
+        #. 10.1088/1367-2630/ac2cb3
+
+        Ansatz Options:
+            * n_layers [int]: Number of layers.
+            * do_qnp [bool]: Do QNP tiling.
+
+        Args:
+            num_active_orbs: Number of spatial active orbitals.
+            ansatz_options: Ansatz options.
+
+        Returns:
+            tUPS ansatz.
+        """
+        valid_options = ("n_layers", "do_qnp")
+        for option in ansatz_options:
+            if option not in valid_options:
+                raise ValueError(f"Got unknown option for tUPS, {option}. Valid options are: {valid_options}")
+        if "n_layers" not in ansatz_options.keys():
+            raise ValueError("tUPS require the option 'n_layers'")
+        n_layers = ansatz_options["n_layers"]
+        if "do_qnp" in ansatz_options.keys():
+            do_qnp = ansatz_options["do_qnp"]
+        else:
+            do_qnp = False
         for _ in range(n_layers):
             for p in range(0, num_active_orbs - 1, 2):
+                if not do_qnp:
+                    # First single
+                    self.excitation_operator_type.append("tups_single")
+                    self.excitation_indicies.append((p,))
+                    self.n_params += 1
                 # Double
                 self.excitation_operator_type.append("tups_double")
                 self.excitation_indicies.append((p,))
-                # Single
+                self.n_params += 1
+                # Second single
                 self.excitation_operator_type.append("tups_single")
                 self.excitation_indicies.append((p,))
-                self.n_params += 2
+                self.n_params += 1
             for p in range(1, num_active_orbs - 2, 2):
+                if not do_qnp:
+                    # First single
+                    self.excitation_operator_type.append("tups_single")
+                    self.excitation_indicies.append((p,))
+                    self.n_params += 1
                 # Double
                 self.excitation_operator_type.append("tups_double")
                 self.excitation_indicies.append((p,))
-                # Single
+                self.n_params += 1
+                # Second single
                 self.excitation_operator_type.append("tups_single")
                 self.excitation_indicies.append((p,))
-                self.n_params += 2
+                self.n_params += 1
+
+    def create_fUCC(self, states: list[list[str]], ansatz_options: dict[str, Any]) -> None:
+        valid_options = ()
+        for option in ansatz_options:
+            if option not in valid_options:
+                raise ValueError(f"Got unknown option for fUCC, {option}. Valid options are: {valid_options}")
+        occupied = []
+        unoccupied = []
+        for state in states:
+            occ_tmp = []
+            unocc_tmp = []
+            for det in state:
+                for i, occ in enumerate(det):
+                    if occ == "1":
+                        occ_tmp.append(i)
+                    else:
+                        unocc_tmp.append(i)
+            occupied.append(occ_tmp)
+            unoccupied.append(unocc_tmp)
+        for occ, unocc in zip(occupied, unoccupied):
+            for a, i in iterate_t1(occ, unocc):
+                if (i, a) not in self.excitation_indicies:
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indicies.append((i, a))
+                    self.n_params += 1
+        for occ, unocc in zip(occupied, unoccupied):
+            for a, i, b, j in iterate_t2(occ, unocc):
+                if (i, j, a, b) not in self.excitation_indicies:
+                    self.excitation_operator_type.append("double")
+                    self.excitation_indicies.append((i, j, a, b))
+                    self.n_params += 1
 
 
 def construct_ups_state(
@@ -737,9 +784,18 @@ def construct_ups_state(
                 + np.sin(2 ** (-1 / 2) * theta) * np.matmul(Tb, tmp)
                 + (1 - np.cos(2 ** (-1 / 2) * theta)) * np.matmul(Tb, np.matmul(Tb, tmp))
             )
-        elif exc_type == "tups_double":
-            (p,) = exc_indices
-            T = T2_1_sa_matrix(p, p, p + 1, p + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+        elif exc_type in ("tups_double", "single", "double"):
+            if exc_type == "tups_double":
+                (p,) = exc_indices
+                T = T2_1_sa_matrix(
+                    p, p, p + 1, p + 1, num_active_orbs, num_elec_alpha, num_elec_beta
+                ).todense()
+            elif exc_type == "single":
+                (i, a) = exc_indices
+                T = T1_matrix(i, a, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            elif exc_type == "double":
+                (i, j, a, b) = exc_indices
+                T = T2_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
             tmp = (
                 tmp
                 + np.sin(theta) * np.matmul(T, tmp)
@@ -808,9 +864,16 @@ def get_grad_action(
         Tb = T1_matrix(p * 2 + 1, (p + 1) * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
         A = 2 ** (-1 / 2)
         tmp = np.matmul(A * (Ta + Tb), state)
-    elif exc_type == "tups_double":
-        (p,) = exc_indices
-        T = T2_1_sa_matrix(p, p, p + 1, p + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+    elif exc_type in ("tups_double", "single", "double"):
+        if exc_type == "tups_double":
+            (p,) = exc_indices
+            T = T2_1_sa_matrix(p, p, p + 1, p + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+        elif exc_type == "single":
+            (i, a) = exc_indices
+            T = T1_matrix(i, a, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+        elif exc_type == "double":
+            (i, j, a, b) = exc_indices
+            T = T2_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
         tmp = np.matmul(T, state)
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")

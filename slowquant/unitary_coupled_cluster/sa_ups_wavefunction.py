@@ -227,7 +227,7 @@ class WaveFunctionSAUPS:
         if ansatz.lower() == "tups":
             self.ups_layout.create_tups(n_layers, self.num_active_orbs)
         elif ansatz.lower() == "qnp":
-            self.ups_layout.create_qnp(n_layers, self.num_active_orbs)
+            self.ups_layout.create_tups(n_layers, self.num_active_orbs, do_qnp=True)
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
