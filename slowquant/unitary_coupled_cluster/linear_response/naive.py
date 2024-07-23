@@ -69,22 +69,14 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.H_0i_0a,
                 op,
                 self.wf.ci_coeffs,
-                self.wf.idx2det,
-                self.wf.det2idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.num_virtual_orbs,
+                *self.index_info,
             )
             grad[i + len(self.G_ops)] = expectation_value_commutator(
                 self.wf.ci_coeffs,
                 op.dagger,
                 self.H_0i_0a,
                 self.wf.ci_coeffs,
-                self.wf.idx2det,
-                self.wf.det2idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.num_virtual_orbs,
+                *self.index_info,
             )
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
@@ -119,21 +111,13 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     self.wf.ci_coeffs,
                     GI.dagger * self.H_1i_1a * qJ,
                     self.wf.ci_coeffs,
-                    self.wf.idx2det,
-                    self.wf.det2idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
+                    *self.index_info,
                 )
                 val += -expectation_value(
                     self.wf.ci_coeffs,
                     self.H_1i_1a * qJ * GI.dagger,
                     self.wf.ci_coeffs,
-                    self.wf.idx2det,
-                    self.wf.det2idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
+                    *self.index_info,
                 )
                 self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
                 # Make B
@@ -141,21 +125,13 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     self.wf.ci_coeffs,
                     qJ.dagger * self.H_1i_1a * GI.dagger,
                     self.wf.ci_coeffs,
-                    self.wf.idx2det,
-                    self.wf.det2idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
+                    *self.index_info,
                 )
                 val += -expectation_value(
                     self.wf.ci_coeffs,
                     GI.dagger * qJ.dagger * self.H_1i_1a,
                     self.wf.ci_coeffs,
-                    self.wf.idx2det,
-                    self.wf.det2idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
+                    *self.index_info,
                 )
                 self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
         for j, GJ in enumerate(self.G_ops):
@@ -168,11 +144,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                         self.H_0i_0a,
                         GJ,
                         self.wf.ci_coeffs,
-                        self.wf.idx2det,
-                        self.wf.det2idx,
-                        self.wf.num_inactive_orbs,
-                        self.wf.num_active_orbs,
-                        self.wf.num_virtual_orbs,
+                        *self.index_info,
                     )
                 )
                 # Make B
@@ -183,11 +155,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                         self.H_0i_0a,
                         GJ.dagger,
                         self.wf.ci_coeffs,
-                        self.wf.idx2det,
-                        self.wf.det2idx,
-                        self.wf.num_inactive_orbs,
-                        self.wf.num_active_orbs,
-                        self.wf.num_virtual_orbs,
+                        *self.index_info,
                     )
                 )
                 # Make Sigma
@@ -197,11 +165,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                         GI.dagger,
                         GJ,
                         self.wf.ci_coeffs,
-                        self.wf.idx2det,
-                        self.wf.det2idx,
-                        self.wf.num_inactive_orbs,
-                        self.wf.num_active_orbs,
-                        self.wf.num_virtual_orbs,
+                        *self.index_info,
                     )
                 )
 
@@ -288,11 +252,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     mux_op,
                     transfer_op,
                     self.wf.ci_coeffs,
-                    self.wf.idx2det,
-                    self.wf.det2idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
+                    *self.index_info,
                 )
             if muy_op.operators != {}:
                 transition_dipole_y = expectation_value_commutator(
@@ -300,11 +260,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     muy_op,
                     transfer_op,
                     self.wf.ci_coeffs,
-                    self.wf.idx2det,
-                    self.wf.det2idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
+                    *self.index_info,
                 )
             if muz_op.operators != {}:
                 transition_dipole_z = expectation_value_commutator(
@@ -312,11 +268,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     muz_op,
                     transfer_op,
                     self.wf.ci_coeffs,
-                    self.wf.idx2det,
-                    self.wf.det2idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
+                    *self.index_info,
                 )
             transition_dipoles[state_number, 0] = q_part_x + transition_dipole_x
             transition_dipoles[state_number, 1] = q_part_y + transition_dipole_y

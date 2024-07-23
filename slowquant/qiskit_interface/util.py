@@ -96,7 +96,7 @@ class CliqueHead:
 class Clique:
     """Clique class.
 
-    #. https://arxiv.org/pdf/1907.13623.pdf, Sec. 4.1, 4.2, and 7.0
+    #. 10.1109/TQE.2020.3035814, Sec. IV. A, IV. B, and VIII.
     """
 
     def __init__(self) -> None:
@@ -241,15 +241,15 @@ def postselection(
 ) -> dict[str, float]:
     r"""Perform post-selection on distribution in computational basis.
 
-    For the Jordan-Wigner mapper the postselection ensure that,
+    For the Jordan-Wigner mapper the post-selection ensure that,
 
     .. math::
-        \text{sum}\left(\left|\alpha\right>) = N_\alpha
+        \text{sum}\left(\left|\alpha\right>\right) = N_\alpha
 
     and,
 
     .. math::
-        \text{sum}\left(\left|\beta\right>) = N_\beta
+        \text{sum}\left(\left|\beta\right>\right) = N_\beta
 
     For the Parity mapper it is counted how many times bitstring changes between 0 and 1.
     For the bitstring :math:`\left|01\right>` the counting is done by padding the string before counting.
@@ -274,16 +274,17 @@ def postselection(
     if isinstance(mapper, JordanWignerMapper):
         for bitstr, val in dist.items():
             num_a = len(bitstr) // 2
-            bitstr_a = bitstr[:num_a]
-            bitstr_b = bitstr[num_a:]
+            # Remember that in Qiskit notation you read |0101> from right to left.
+            bitstr_a = bitstr[num_a:]
+            bitstr_b = bitstr[:num_a]
             if bitstr_a.count("1") == num_elec[0] and bitstr_b.count("1") == num_elec[1]:
                 new_dist[bitstr] = val
                 prob_sum += val
     elif isinstance(mapper, ParityMapper):
         for bitstr, val in dist.items():
             num_a = len(bitstr) // 2
-            bitstr_a = bitstr[:num_a]
-            bitstr_b = bitstr[num_a:]
+            bitstr_a = bitstr[num_a:]
+            bitstr_b = bitstr[:num_a]
             current_parity = "0"
             change_counter = 0
             for bit in bitstr_a:
@@ -316,3 +317,30 @@ def postselection(
     for bitstr, val in new_dist.items():
         new_dist[bitstr] = val / prob_sum
     return new_dist
+
+
+def f2q(i: int, num_orbs: int) -> int:
+    r"""Convert fermionic index to qubit index.
+
+    The fermionic index is assumed to follow the convention,
+
+    .. math::
+        \left|0_\alpha 0_\beta 1_\alpha 1_\beta ... N_\alpha N_\beta\right>
+
+    The qubit index follows,
+
+    .. math::
+       \left|0_\alpha 1_\alpha ... N_\alpha 0_\beta 1_\beta ... N_\beta\right>
+
+    This function assumes Jordan-Wigner mapping.
+
+    Args:
+        i: Fermionic index.
+        num_orbs: Number of spatial orbitals.
+
+    Returns:
+        Qubit index.
+    """
+    if i % 2 == 0:
+        return i // 2
+    return i // 2 + num_orbs

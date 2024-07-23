@@ -12,7 +12,7 @@ from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFoc
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
-from slowquant.qiskit_interface.custom_ansatz import QNP, tUPS
+from slowquant.qiskit_interface.custom_ansatz import QNP, fUCCSD, tUPS
 from slowquant.qiskit_interface.util import (
     Clique,
     correct_distribution,
@@ -59,7 +59,7 @@ class QuantumInterface:
             do_M_ansatz0: Use the ansatz with theta=0 when constructing the read-out correlation matrix.
             do_postselection: Use postselection to preserve number of particles in the computational basis.
         """
-        allowed_ansatz = ("UCCSD", "PUCCD", "UCCD", "HF", "tUPS", "QNP")
+        allowed_ansatz = ("tUCCSD", "tPUCCD", "tUCCD", "tUPS", "fUCCSD", "QNP")
         if ansatz not in allowed_ansatz:
             raise ValueError("The chosen Ansatz is not available. Choose from: ", allowed_ansatz)
         self.ansatz = ansatz
@@ -95,9 +95,9 @@ class QuantumInterface:
             {}
         )  # Contains information about the parameterization needed for gradient evaluations.
 
-        if self.ansatz == "UCCSD":
+        if self.ansatz == "tUCCSD":
             if len(self.ansatz_options) != 0:
-                raise ValueError(f"No options available for UCCSD got {self.ansatz_options}")
+                raise ValueError(f"No options available for tUCCSD got {self.ansatz_options}")
             self.circuit = UCCSD(
                 num_orbs,
                 self.num_elec,
@@ -108,9 +108,9 @@ class QuantumInterface:
                     self.mapper,
                 ),
             )
-        elif self.ansatz == "PUCCD":
+        elif self.ansatz == "tPUCCD":
             if len(self.ansatz_options) != 0:
-                raise ValueError(f"No options available for PUCCD got {self.ansatz_options}")
+                raise ValueError(f"No options available for tPUCCD got {self.ansatz_options}")
             self.circuit = PUCCD(
                 num_orbs,
                 self.num_elec,
@@ -121,9 +121,9 @@ class QuantumInterface:
                     self.mapper,
                 ),
             )
-        elif self.ansatz == "UCCD":
+        elif self.ansatz == "tUCCD":
             if len(self.ansatz_options) != 0:
-                raise ValueError(f"No options available for UCCD got {self.ansatz_options}")
+                raise ValueError(f"No options available for tUCCD got {self.ansatz_options}")
             self.circuit = UCC(
                 num_orbs,
                 self.num_elec,
@@ -143,6 +143,8 @@ class QuantumInterface:
             self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
         elif self.ansatz == "QNP":
             self.circuit, self.grad_param_R = QNP(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
+        elif self.ansatz == "fUCCSD":
+            self.circuit, self.grad_param_R = fUCCSD(num_orbs, self.num_elec, self.mapper)
 
         # Check that R parameter for gradient is consistent with the paramter names.
         if len(self.grad_param_R) == 0:
@@ -694,10 +696,10 @@ class QuantumInterface:
             else:
                 p1 = self._sampler_distribution_p1(pauli, run_parameters)
             if self.shots is None:
-                sigma_p = 2 * np.abs(coeff.real) * ((p1 - p1**2) ** (1 / 2))
+                var_p = 4 * np.abs(coeff.real) ** 2 * np.abs(p1 - p1**2)
             else:
-                sigma_p = 2 * np.abs(coeff.real) * ((p1 - p1**2) ** (1 / 2)) / (self.shots ** (1 / 2))
-            result += sigma_p**2
+                var_p = 4 * np.abs(coeff.real) ** 2 * np.abs(p1 - p1**2) / (self.shots)
+            result += var_p
         return result
 
     def _one_call_sampler_distributions(

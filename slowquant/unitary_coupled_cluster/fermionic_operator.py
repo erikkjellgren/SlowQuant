@@ -24,6 +24,15 @@ class a_op:
 
 
 def a_op_spin(spin_idx: int, dagger: bool) -> a_op:
+    """Get fermionic annihilation operator.
+
+    Args:
+        spin_idx: Spin orbital index.
+        dagger: If creation operator.
+
+    Returns:
+        Annihilation operator.
+    """
     if spin_idx % 2 == 0:
         return a_op(spin_idx // 2, "alpha", dagger)
     return a_op(spin_idx // 2, "beta", dagger)
