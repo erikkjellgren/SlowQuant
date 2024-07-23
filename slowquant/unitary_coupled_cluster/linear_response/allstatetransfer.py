@@ -164,7 +164,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 # Make Sigma
                 if i == j:
                     self.Sigma[i + idx_shift, j + idx_shift] = 1
-        print(self.A)
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.

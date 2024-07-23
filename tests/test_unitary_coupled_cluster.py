@@ -308,7 +308,7 @@ def test_h2_631g_oouccsd_lr() -> None:
         h_core,
         g_eri,
     )
-    WF.run_ucc("SD", True)
+    WF.run_ucc("SD", True, convergence_threshold=10**-11)
     LR = selfconsistentLR.LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
     dipole_integrals = (
