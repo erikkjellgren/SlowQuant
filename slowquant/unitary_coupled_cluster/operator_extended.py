@@ -1,5 +1,5 @@
 import functools
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
 
 import numpy as np
 import scipy.linalg
@@ -26,6 +26,18 @@ def get_indexing_extended(
     num_active_elec_alpha: int,
     num_active_elec_beta: int,
 ) -> tuple[list[int], dict[int, int]]:
+    """Get indexing between index and determiant, extended to include full-space singles.
+
+    Args:
+        num_inactive_orbs: Number of inactive spatial orbitals.
+        num_active_orbs: Number of active spatial orbitals.
+        num_virtual_orbs: Number of virtual spatial orbitals.
+        num_active_elec_alpha: Number of active alpha electrons.
+        num_active_elec_beta: Number of active beta electrons.
+
+    Returns:
+        List to map index to determiant and dictionary to map determiant to index.
+    """
     inactive_singles = []
     virtual_singles = []
     for inactive, virtual in generate_singles(num_inactive_orbs, num_virtual_orbs):
@@ -102,7 +114,18 @@ def get_indexing_extended(
     return idx2det, det2idx
 
 
-def generate_singles(num_inactive_orbs: int, num_virtual_orbs: int):
+def generate_singles(
+    num_inactive_orbs: int, num_virtual_orbs: int
+) -> Generator[tuple[list[int], list[int]], None, None]:
+    """Generate single excited determinant between inactive and virtual space.
+
+    Args:
+        num_inactive_orbs: Number of inactive spatial orbitals.
+        num_virtual_orbs: Number of virtual spatial orbitals.
+
+    Returns:
+        Single excited determinants.
+    """
     inactive = [1] * num_inactive_orbs
     virtual = [0] * num_virtual_orbs
     for i in range(num_inactive_orbs + 1):
@@ -169,13 +192,27 @@ def build_operator_matrix_extended(
     return op_mat
 
 
-def apply_op_to_vec_extended(
+def propagate_state_extended(
     op: FermionicOperator,
     state: np.ndarray,
     idx2det: Sequence[int],
     det2idx: dict[int, int],
     num_orbs: int,
 ) -> np.ndarray:
+    r"""Propagate state by applying operator.
+
+    .. math::
+        \left|\tilde{0}\right> = \hat{O}\left|0\right>
+
+    Args:
+        op: Operator.
+        state: State.
+        idx2det: Index to determiant mapping.
+        det2idx: Determinant to index mapping.
+
+    Returns:
+        New state.
+    """
     num_dets = len(idx2det)
     new_state = np.zeros(num_dets)
     parity_check = {0: 0}
@@ -212,22 +249,6 @@ def apply_op_to_vec_extended(
     return new_state
 
 
-def propagate_state_extended(
-    op: FermionicOperator,
-    state: np.ndarray,
-    idx2det: Sequence[int],
-    det2idx: dict[int, int],
-    num_orbs: int,
-) -> np.ndarray:
-    return apply_op_to_vec_extended(
-        op,
-        state,
-        idx2det,
-        det2idx,
-        num_orbs,
-    )
-
-
 def expectation_value_propagate_extended(
     bra: np.ndarray,
     ops: list[FermionicOperator | np.ndarray],
@@ -236,6 +257,19 @@ def expectation_value_propagate_extended(
     det2idx: dict[int, int],
     num_orbs: int,
 ) -> float:
+    """Calculate expectation value by propagating the ket state by applying the operators.
+
+    Args:
+        bra: Bra state.
+        ops: Operators.
+        ket: Ket state.
+        idx2det: Index to determinant mapping.
+        det2idx: Determinant to index mapping.
+        num_orbs: Number of spatial orbitals.
+
+    Returns:
+        Expectation value.
+    """
     ket_copy = np.copy(ket)
     for op in ops[::-1]:
         if isinstance(op, FermionicOperator):
@@ -665,7 +699,17 @@ def construct_ucc_u_extended(
                 T += (
                     theta[counter]
                     * T3_extended_matrix(
-                        i, j, k, a, b, c, num_active_orbs, num_elec_alpha, num_elec_beta
+                        i,
+                        j,
+                        k,
+                        a,
+                        b,
+                        c,
+                        num_inactive_orbs,
+                        num_active_orbs,
+                        num_virtual_orbs,
+                        num_elec_alpha,
+                        num_elec_beta,
                     ).todense()
                 )
             counter += 1
@@ -683,7 +727,9 @@ def construct_ucc_u_extended(
                         b,
                         c,
                         d,
+                        num_inactive_orbs,
                         num_active_orbs,
+                        num_virtual_orbs,
                         num_elec_alpha,
                         num_elec_beta,
                     ).todense()
@@ -705,7 +751,9 @@ def construct_ucc_u_extended(
                         c,
                         d,
                         e,
+                        num_inactive_orbs,
                         num_active_orbs,
+                        num_virtual_orbs,
                         num_elec_alpha,
                         num_elec_beta,
                     ).todense()
@@ -729,7 +777,9 @@ def construct_ucc_u_extended(
                         d,
                         e,
                         f,
+                        num_inactive_orbs,
                         num_active_orbs,
+                        num_virtual_orbs,
                         num_elec_alpha,
                         num_elec_beta,
                     ).todense()
