@@ -720,16 +720,16 @@ class UpsStructure:
         occupied = []
         unoccupied = []
         for state in states:
-            occ_tmp = []
-            unocc_tmp = []
             for det in state:
+                occ_tmp = []
+                unocc_tmp = []
                 for i, occ in enumerate(det):
                     if occ == "1":
                         occ_tmp.append(i)
                     else:
                         unocc_tmp.append(i)
-            occupied.append(occ_tmp)
-            unoccupied.append(unocc_tmp)
+                occupied.append(occ_tmp)
+                unoccupied.append(unocc_tmp)
         for occ, unocc in zip(occupied, unoccupied):
             for a, i in iterate_t1(occ, unocc):
                 if (i, a) not in self.excitation_indicies:
@@ -835,9 +835,16 @@ def propagate_unitary(
             + np.sin(A * theta) * np.matmul(Tb, tmp)
             + (1 - np.cos(A * theta)) * np.matmul(Tb, np.matmul(Tb, tmp))
         )
-    elif exc_type == "tups_double":
-        (p,) = exc_indices
-        T = T2_1_sa_matrix(p, p, p + 1, p + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+    elif exc_type in ("tups_double", "single", "double"):
+        if exc_type == "tups_double":
+            (p,) = exc_indices
+            T = T2_1_sa_matrix(p, p, p + 1, p + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+        elif exc_type == "single":
+            (i, a) = exc_indices
+            T = T1_matrix(i, a, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+        elif exc_type == "double":
+            (i, j, a, b) = exc_indices
+            T = T2_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
         tmp = (
             state
             + np.sin(theta) * np.matmul(T, state)

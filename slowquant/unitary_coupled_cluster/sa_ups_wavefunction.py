@@ -21,12 +21,10 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
 from slowquant.unitary_coupled_cluster.operator_matrix import (
     Epq_matrix,
     build_operator_matrix,
-    expectation_value,
     expectation_value_mat,
     get_indexing,
 )
 from slowquant.unitary_coupled_cluster.operators import (
-    Epq,
     hamiltonian_0i_0a,
     one_elec_op_0i_0a,
 )
@@ -49,7 +47,7 @@ class WaveFunctionSAUPS:
         g_ao: np.ndarray,
         states: list[Any],
         ansatz: str,
-        n_layers: int,
+        ansatz_options: dict[str, Any] = {},
         include_active_kappa: bool = False,
     ) -> None:
         """Initialize for SA-UPS wave function.
@@ -62,6 +60,8 @@ class WaveFunctionSAUPS:
             c_orthonormal: Initial orbital coefficients.
             h_ao: One-electron integrals in AO for Hamiltonian.
             g_ao: Two-electron integrals in AO.
+            ansatz: Name of ansatz.
+            ansatz_options: Ansatz options.
             include_active_kappa: Include active-active orbital rotations.
         """
         if len(cas) != 2:
@@ -91,6 +91,7 @@ class WaveFunctionSAUPS:
         self._rdm2 = None
         self._h_mo = None
         self._g_mo = None
+        self.ansatz_options = ansatz_options
         active_space = []
         orbital_counter = 0
         for i in range(num_elec - cas[0], num_elec):
@@ -225,9 +226,12 @@ class WaveFunctionSAUPS:
                         )
         self.ups_layout = UpsStructure()
         if ansatz.lower() == "tups":
-            self.ups_layout.create_tups(n_layers, self.num_active_orbs)
+            self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
         elif ansatz.lower() == "qnp":
-            self.ups_layout.create_tups(n_layers, self.num_active_orbs, do_qnp=True)
+            self.ansatz_options["do_qnp"] = True
+            self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
+        elif ansatz.lower() == "fucc":
+            self.ups_layout.create_fUCC(states[1], self.ansatz_options)
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
