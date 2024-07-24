@@ -43,11 +43,15 @@ def read_basis(atom_name: str, basis_set: str) -> tuple[np.ndarray, np.ndarray, 
                 coefficients_primitive: list[float] = []
                 continue
             if number_primitives > 0:
-                exponents_primitive.append(float(line.split()[0].replace("D", "e")))
-                coefficients_primitive.append(float(line.split()[1].replace("D", "e")))
+                exponents_primitive.append(  # pylint: disable=possibly-used-before-assignment
+                    float(line.split()[0].replace("D", "e"))
+                )
+                coefficients_primitive.append(  # pylint: disable=possibly-used-before-assignment
+                    float(line.split()[1].replace("D", "e"))
+                )
                 number_primitives -= 1
             if number_primitives == 0:
-                if angular == "s":
+                if angular == "s":  # pylint: disable=possibly-used-before-assignment
                     angulars = [[0, 0, 0]]
                 elif angular == "p":
                     angulars = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]

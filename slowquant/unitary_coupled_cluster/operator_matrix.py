@@ -101,13 +101,35 @@ def build_operator_matrix(
     return op_mat
 
 
-def apply_op_to_vec(
+def propagate_state(
     op: FermionicOperator,
     state: np.ndarray,
     idx2det: Sequence[int],
     det2idx: dict[int, int],
+    num_inactive_orbs: int,
     num_active_orbs: int,
+    num_virtual_orbs: int,
 ) -> np.ndarray:
+    r"""Propagate state by applying operator.
+
+    The operator will be folded to only work on the active orbitals.
+
+    .. math::
+        \left|\tilde{0}\right> = \hat{O}\left|0\right>
+
+    Args:
+        op: Operator.
+        state: State.
+        idx2det: Index to determiant mapping.
+        det2idx: Determinant to index mapping.
+        num_inactive_orbs: Number of inactive spatial orbitals.
+        num_active_orbs: Number of active spatial orbitals.
+        num_virtual_orbs: Number of virtual spatial orbitals.
+
+    Returns:
+        New state.
+    """
+    op_folded = op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs)
     num_dets = len(idx2det)
     new_state = np.zeros(num_dets)
     parity_check = {0: 0}
@@ -119,10 +141,10 @@ def apply_op_to_vec(
         if abs(state[i]) < 10**-14:
             continue
         det_ = idx2det[i]
-        for fermi_label in op.factors:
+        for fermi_label in op_folded.factors:
             det = det_
             phase_changes = 0
-            for fermi_op in op.operators[fermi_label][::-1]:
+            for fermi_op in op_folded.operators[fermi_label][::-1]:
                 orb_idx = fermi_op.idx
                 nth_bit = (det >> 2 * num_active_orbs - 1 - orb_idx) & 1
                 if nth_bit == 0 and fermi_op.dagger:
@@ -136,28 +158,10 @@ def apply_op_to_vec(
                     det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
                     phase_changes += (det & parity_check[orb_idx]).bit_count()
             else:  # nobreak
-                val = op.factors[fermi_label] * (-1) ** phase_changes
+                val = op_folded.factors[fermi_label] * (-1) ** phase_changes
                 if abs(val) > 10**-14:
                     new_state[det2idx[det]] += val * state[i]
     return new_state
-
-
-def propagate_state(
-    op: FermionicOperator,
-    state: np.ndarray,
-    idx2det: Sequence[int],
-    det2idx: dict[int, int],
-    num_inactive_orbs: int,
-    num_active_orbs: int,
-    num_virtual_orbs: int,
-) -> np.ndarray:
-    return apply_op_to_vec(
-        op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs),
-        state,
-        idx2det,
-        det2idx,
-        num_active_orbs,
-    )
 
 
 def expectation_value(
@@ -170,6 +174,21 @@ def expectation_value(
     num_active_orbs: int,
     num_virtual_orbs: int,
 ) -> float:
+    """Calculate expectation value of operator.
+
+    Args:
+        bra: Bra state.
+        op: Operator.
+        ket: Ket state.
+        idx2det: Index to determinant mapping.
+        det2idx: Determinant to index mapping.
+        num_inactive_orbs: Number of inactive spatial orbitals.
+        num_active_orbs: Number of active spatial orbitals.
+        num_virtual_orbs: Number of virtual orbitals.
+
+    Returns:
+        Expectation value.
+    """
     op_mat = build_operator_matrix(
         op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs),
         idx2det,
@@ -190,6 +209,25 @@ def expectation_value_commutator(
     num_active_orbs: int,
     num_virtual_orbs: int,
 ) -> float:
+    r"""Calculate expecation value of commutator.
+
+    .. math::
+        E = \left<0\right|\left[\hat{A},\hat{B}\right]\left|0\right>
+
+    Args:
+        bra: Bra state.
+        A: First operator in commutator.
+        B: Second operator in commutator.
+        ket: Ket state.
+        idx2det: Index to determinant mapping.
+        det2idx: Determinant to index mapping.
+        num_inactive_orbs: Number of inactive spatial orbitals.
+        num_active_orbs: Number of active spatial orbitals.
+        num_virtual_orbs: Number of virtual orbitals.
+
+    Returns:
+        Expectation value.
+    """
     op = A * B - B * A
     op_mat = build_operator_matrix(
         op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs),
@@ -212,6 +250,26 @@ def expectation_value_double_commutator(
     num_active_orbs: int,
     num_virtual_orbs: int,
 ) -> float:
+    r"""Calculate expecation value of double commutator.
+
+    .. math::
+        E = \left<0\right|\left[\hat{A},\left[\hat{B},\hat{C}\right]\right]\left|0\right>
+
+    Args:
+        bra: Bra state.
+        A: First operator in commutator.
+        B: Second operator in commutator.
+        C: Third operator in commutator.
+        ket: Ket state.
+        idx2det: Index to determinant mapping.
+        det2idx: Determinant to index mapping.
+        num_inactive_orbs: Number of inactive spatial orbitals.
+        num_active_orbs: Number of active spatial orbitals.
+        num_virtual_orbs: Number of virtual orbitals.
+
+    Returns:
+        Expectation value.
+    """
     op = A * B * C - A * C * B - B * C * A + C * B * A
     op_mat = build_operator_matrix(
         op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs),
@@ -223,6 +281,16 @@ def expectation_value_double_commutator(
 
 
 def expectation_value_mat(bra: np.ndarray, op: np.ndarray, ket: np.ndarray) -> float:
+    """Calculate expectation value of operator in matrix form.
+
+    Args:
+        bra: Bra state.
+        op: Operator.
+        ket: Ket state.
+
+    Returns:
+        Expectation value.
+    """
     return np.matmul(bra, np.matmul(op, ket))
 
 

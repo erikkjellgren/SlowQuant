@@ -44,7 +44,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
             self.wf.num_active_elec_alpha,
             self.wf.num_active_elec_beta,
         )
-        self.index_info = (
+        self.index_info_extended = (
             idx2det,
             det2idx,
             self.wf.num_orbs,
@@ -113,13 +113,13 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.ci_coeffs,
                 [self.H_0i_0a, self.u, op],
                 self.csf_coeffs,
-                *self.index_info,
+                *self.index_info_extended,
             )
             grad[i + len(self.G_ops)] = expectation_value_propagate_extended(
                 self.csf_coeffs,
                 [op.dagger, self.u.conjugate().transpose(), self.H_0i_0a],
                 self.ci_coeffs,
-                *self.index_info,
+                *self.index_info_extended,
             )
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
@@ -132,7 +132,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     self.csf_coeffs,
                     [qI.dagger, self.u.conjugate().transpose(), H_2i_2a, self.u, qJ],
                     self.csf_coeffs,
-                    *self.index_info,
+                    *self.index_info_extended,
                 )
                 if i == j:
                     val -= self.wf.energy_elec
@@ -147,7 +147,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     self.csf_coeffs,
                     [GI.dagger, self.u.conjugate().transpose(), self.H_1i_1a, self.u, qJ],
                     self.csf_coeffs,
-                    *self.index_info,
+                    *self.index_info_extended,
                 )
         for j, GJ in enumerate(self.G_ops):
             for i, GI in enumerate(self.G_ops[j:], j):
@@ -156,7 +156,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     self.csf_coeffs,
                     [GI.dagger, self.u.conjugate().transpose(), self.H_0i_0a, self.u, GJ],
                     self.csf_coeffs,
-                    *self.index_info,
+                    *self.index_info_extended,
                 )
                 if i == j:
                     val -= self.wf.energy_elec
@@ -164,7 +164,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 # Make Sigma
                 if i == j:
                     self.Sigma[i + idx_shift, j + idx_shift] = 1
-        print(self.A)
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.
@@ -215,37 +214,37 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     self.ci_coeffs,
                     [mux_op_q, self.u, q],
                     self.csf_coeffs,
-                    *self.index_info,
+                    *self.index_info_extended,
                 )
                 q_part_x += self.Y_q_normed[i, state_number] * expectation_value_propagate_extended(
                     self.csf_coeffs,
                     [q.dagger, self.u.conjugate().transpose(), mux_op_q],
                     self.ci_coeffs,
-                    *self.index_info,
+                    *self.index_info_extended,
                 )
                 q_part_y -= self.Z_q_normed[i, state_number] * expectation_value_propagate_extended(
                     self.ci_coeffs,
                     [muy_op_q, self.u, q],
                     self.csf_coeffs,
-                    *self.index_info,
+                    *self.index_info_extended,
                 )
                 q_part_y += self.Y_q_normed[i, state_number] * expectation_value_propagate_extended(
                     self.csf_coeffs,
                     [q.dagger, self.u.conjugate().transpose(), muy_op_q],
                     self.ci_coeffs,
-                    *self.index_info,
+                    *self.index_info_extended,
                 )
                 q_part_z -= self.Z_q_normed[i, state_number] * expectation_value_propagate_extended(
                     self.ci_coeffs,
                     [muz_op_q, self.u, q],
                     self.csf_coeffs,
-                    *self.index_info,
+                    *self.index_info_extended,
                 )
                 q_part_z += self.Y_q_normed[i, state_number] * expectation_value_propagate_extended(
                     self.csf_coeffs,
                     [q.dagger, self.u.conjugate().transpose(), muz_op_q],
                     self.ci_coeffs,
-                    *self.index_info,
+                    *self.index_info_extended,
                 )
             g_part_x = 0.0
             g_part_y = 0.0
@@ -255,37 +254,37 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     self.ci_coeffs,
                     [mux_op_G, self.u, G],
                     self.csf_coeffs,
-                    *self.index_info,
+                    *self.index_info_extended,
                 )
                 g_part_x += self.Y_G_normed[i, state_number] * expectation_value_propagate_extended(
                     self.csf_coeffs,
                     [G.dagger, self.u.conjugate().transpose(), mux_op_G],
                     self.wf.ci_coeffs,
-                    *self.index_info,
+                    *self.index_info_extended,
                 )
                 g_part_y -= self.Z_G_normed[i, state_number] * expectation_value_propagate_extended(
                     self.ci_coeffs,
                     [muy_op_G, self.u, G],
                     self.csf_coeffs,
-                    *self.index_info,
+                    *self.index_info_extended,
                 )
                 g_part_y += self.Y_G_normed[i, state_number] * expectation_value_propagate_extended(
                     self.csf_coeffs,
                     [G.dagger, self.u.conjugate().transpose(), muy_op_G],
                     self.ci_coeffs,
-                    *self.index_info,
+                    *self.index_info_extended,
                 )
                 g_part_z -= self.Z_G_normed[i, state_number] * expectation_value_propagate_extended(
                     self.ci_coeffs,
                     [muz_op_G, self.u, G],
                     self.csf_coeffs,
-                    *self.index_info,
+                    *self.index_info_extended,
                 )
                 g_part_z += self.Y_G_normed[i, state_number] * expectation_value_propagate_extended(
                     self.csf_coeffs,
                     [G.dagger, self.u.conjugate().transpose(), muz_op_G],
                     self.ci_coeffs,
-                    *self.index_info,
+                    *self.index_info_extended,
                 )
             transition_dipoles[state_number, 0] = q_part_x + g_part_x
             transition_dipoles[state_number, 1] = q_part_y + g_part_y

@@ -236,7 +236,8 @@ def G6(
     r"""Construct six-electron excitation operator.
 
     .. math::
-        \hat{G}^{[6]}_{ijklmnabcdef} = \hat{a}_{a}^\dagger\hat{a}_{b}^\dagger\hat{a}_{c}^\dagger\hat{a}_{d}^\dagger\hat{a}_{e}^\dagger\hat{a}_{f}^\dagger\hat{a}_n\hat{a}_m\hat{a}_l\hat{a}_k\hat{a}_j\hat{a}_i
+        \hat{G}^{[6]}_{ijklmnabcdef} = \hat{a}_{a}^\dagger\hat{a}_{b}^\dagger\hat{a}_{c}^\dagger\hat{a}_{d}^\dagger\hat{a}_{e}^\dagger\hat{a}_{f}^\dagger
+        \hat{a}_n\hat{a}_m\hat{a}_l\hat{a}_k\hat{a}_j\hat{a}_i
 
     Args:
         i: Spin orbital index.

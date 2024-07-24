@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 import time
 from collections.abc import Sequence
 from functools import partial
