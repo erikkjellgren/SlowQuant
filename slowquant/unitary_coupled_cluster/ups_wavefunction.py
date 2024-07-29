@@ -224,8 +224,6 @@ class WaveFunctionUPS:
             self.ups_layout.create_fUCCSD([[state]], self.ansatz_options)
         elif ansatz.lower() == "ksafuccgsd":
             self.ups_layout.create_kSAfUpCCGSD(
-                self.active_occ_idx_shifted,
-                self.active_unocc_idx_shifted,
                 self.num_active_orbs,
                 self.ansatz_options,
             )

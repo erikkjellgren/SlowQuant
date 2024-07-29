@@ -764,6 +764,21 @@ class UpsStructure:
                 self.n_params += 1
 
     def create_fUCCSD(self, states: list[list[str]], ansatz_options: dict[str, Any]) -> None:
+        """Factorized UCCSD ansatz.
+
+        If used with a state-averaged wave function, the operator pool will be the union of all
+        possible singles and doubles from the determinants included in the states in the state-averaged wave function.
+
+        Ansatz Options:
+            * None
+
+        Args:
+            states: States to create excitation operators with respect to.
+            ansatz_options: Ansatz options.
+
+        Returns:
+            Factorized UCCSD ansatz.
+        """
         valid_options = ()
         for option in ansatz_options:
             if option not in valid_options:
@@ -808,41 +823,42 @@ class UpsStructure:
                     self.excitation_indicies.append((i, j, a, b))
                     self.n_params += 1
 
-    def create_kSAfUpCCGSD(
-        self, occ: list[int], unocc: list[int], num_orbs: int, ansatz_options: dict[str, Any]
-    ) -> None:
-        valid_options = ("do_generalized", "n_layers")
+    def create_kSAfUpCCGSD(self, num_orbs: int, ansatz_options: dict[str, Any]) -> None:
+        """Modified k-UpCCGSD ansatz.
+
+        The ansatz have been modifed to use exact fermionic operators,
+        and using spin-adapted singet single excitation operators.
+
+        #. 10.1021/acs.jctc.8b01004
+
+        Ansatz Options:
+            * n_layers [int]: Number of layers.
+
+        Args:
+            num_active_orbs: Number of spatial active orbitals.
+            ansatz_options: Ansatz options.
+
+        Returns:
+            Modified k-UpCCGSD ansatz.
+        """
+        valid_options = "n_layers"
         for option in ansatz_options:
             if option not in valid_options:
                 raise ValueError(
-                    f"Got unknown option for safUCCSpD, {option}. Valid options are: {valid_options}"
+                    f"Got unknown option for kSAfUpCCGSD, {option}. Valid options are: {valid_options}"
                 )
         if "n_layers" not in ansatz_options.keys():
-            raise ValueError("tUPS require the option 'n_layers'")
+            raise ValueError("kSAfUpCCGSD require the option 'n_layers'")
         n_layers = ansatz_options["n_layers"]
-        if "do_generalized" in ansatz_options.keys():
-            do_generalized = ansatz_options["do_generalized"]
-        else:
-            do_generalized = False
         for _ in range(n_layers):
-            if do_generalized:
-                for a, i, _ in iterate_t1_sa_generalized(num_orbs):
-                    self.excitation_operator_type.append("sa_single")
-                    self.excitation_indicies.append((i, a))
-                    self.n_params += 1
-                for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
-                    self.excitation_operator_type.append("double")
-                    self.excitation_indicies.append((i, j, a, b))
-                    self.n_params += 1
-            else:
-                for a, i, _ in iterate_t1_sa(occ, unocc):
-                    self.excitation_operator_type.append("sa_single")
-                    self.excitation_indicies.append((i, a))
-                    self.n_params += 1
-                for a, i, b, j in iterate_pair_t2(occ, unocc):
-                    self.excitation_operator_type.append("double")
-                    self.excitation_indicies.append((i, j, a, b))
-                    self.n_params += 1
+            for a, i, _ in iterate_t1_sa_generalized(num_orbs):
+                self.excitation_operator_type.append("sa_single")
+                self.excitation_indicies.append((i, a))
+                self.n_params += 1
+            for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
+                self.excitation_operator_type.append("double")
+                self.excitation_indicies.append((i, j, a, b))
+                self.n_params += 1
 
 
 def construct_ups_state(
