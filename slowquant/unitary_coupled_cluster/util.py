@@ -185,6 +185,23 @@ def iterate_t2_sa(
                     yield a, i, b, j, fac, 2
 
 
+def iterate_t1_sa_generalized(
+    num_orbs: int,
+) -> Generator[tuple[int, int, float], None, None]:
+    """Iterate over T1 spin-adapted operators.
+
+    Args:
+        num_orbs: Number of active spatial orbitals.
+
+    Returns:
+        T1 operator iteration.
+    """
+    for i in range(num_orbs):
+        for a in range(i + 1, num_orbs):
+            fac = 2 ** (-1 / 2)
+            yield a, i, fac
+
+
 def iterate_t1(
     active_occ_spin_idx: list[int],
     active_unocc_spin_idx: list[int],
@@ -519,6 +536,40 @@ def iterate_t6(
                                                     yield a, i, b, j, c, k, d, l, e, m, f, n
 
 
+def iterate_pair_t2(
+    active_occ_idx: Sequence[int],
+    active_unocc_idx: Sequence[int],
+) -> Generator[tuple[int, int, int, int], None, None]:
+    """Iterate over pair T2 operators.
+
+    Args:
+        active_occ_idx: Indices of strongly occupied orbitals.
+        active_unocc_idx: Indices of weakly occupied orbitals.
+
+    Returns:
+        T2 operator iteration.
+    """
+    for i in active_occ_idx:
+        for a in active_unocc_idx:
+            yield 2 * a, 2 * i, 2 * a + 1, 2 * i + 1
+
+
+def iterate_pair_t2_generalized(
+    num_orbs: int,
+) -> Generator[tuple[int, int, int, int], None, None]:
+    """Iterate over pair T2 operators.
+
+    Args:
+        num_orbs: Number of active spatial orbitals.
+
+    Returns:
+        T2 operator iteration.
+    """
+    for i in range(num_orbs):
+        for a in range(i + 1, num_orbs):
+            yield 2 * a, 2 * i, 2 * a + 1, 2 * i + 1
+
+
 def construct_ucc_u(
     num_det: int,
     num_active_orbs: int,
@@ -712,7 +763,7 @@ class UpsStructure:
                 self.excitation_indicies.append((p,))
                 self.n_params += 1
 
-    def create_fUCC(self, states: list[list[str]], ansatz_options: dict[str, Any]) -> None:
+    def create_fUCCSD(self, states: list[list[str]], ansatz_options: dict[str, Any]) -> None:
         valid_options = ()
         for option in ansatz_options:
             if option not in valid_options:
@@ -732,12 +783,62 @@ class UpsStructure:
                 unoccupied.append(unocc_tmp)
         for occ, unocc in zip(occupied, unoccupied):
             for a, i in iterate_t1(occ, unocc):
+                if a > i:
+                    i, a = a, i
                 if (i, a) not in self.excitation_indicies:
                     self.excitation_operator_type.append("single")
                     self.excitation_indicies.append((i, a))
                     self.n_params += 1
         for occ, unocc in zip(occupied, unoccupied):
             for a, i, b, j in iterate_t2(occ, unocc):
+                if i % 2 == j % 2 == a % 2 == b % 2:
+                    i, j, a, b = np.sort([i, j, a, b])
+                elif i % 2 == a % 2:
+                    if a < i:
+                        i, a = a, i
+                    if b < j:
+                        j, b = b, j
+                else:
+                    if a < j:
+                        j, a = a, j
+                    if b < i:
+                        i, b = b, i
+                if (i, j, a, b) not in self.excitation_indicies:
+                    self.excitation_operator_type.append("double")
+                    self.excitation_indicies.append((i, j, a, b))
+                    self.n_params += 1
+
+    def create_safUCCSpD(
+        self, occ: list[int], unocc: list[int], num_orbs: int, ansatz_options: dict[str, Any]
+    ) -> None:
+        valid_options = ("do_generalized",)
+        for option in ansatz_options:
+            if option not in valid_options:
+                raise ValueError(
+                    f"Got unknown option for safUCCSpD, {option}. Valid options are: {valid_options}"
+                )
+        if "do_generalized" in ansatz_options.keys():
+            do_generalized = ansatz_options["do_generalized"]
+        else:
+            do_generalized = False
+        if do_generalized:
+            for a, i, _ in iterate_t1_sa_generalized(num_orbs):
+                if (i, a) not in self.excitation_indicies:
+                    self.excitation_operator_type.append("sa_single")
+                    self.excitation_indicies.append((i, a))
+                    self.n_params += 1
+            for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
+                if (i, j, a, b) not in self.excitation_indicies:
+                    self.excitation_operator_type.append("double")
+                    self.excitation_indicies.append((i, j, a, b))
+                    self.n_params += 1
+        else:
+            for a, i, _ in iterate_t1_sa(occ, unocc):
+                if (i, a) not in self.excitation_indicies:
+                    self.excitation_operator_type.append("sa_single")
+                    self.excitation_indicies.append((i, a))
+                    self.n_params += 1
+            for a, i, b, j in iterate_pair_t2(occ, unocc):
                 if (i, j, a, b) not in self.excitation_indicies:
                     self.excitation_operator_type.append("double")
                     self.excitation_indicies.append((i, j, a, b))
@@ -768,12 +869,17 @@ def construct_ups_state(
             continue
         if dagger:
             theta = -theta
-        if exc_type == "tups_single":
-            (p,) = exc_indices
-            Ta = T1_matrix(p * 2, (p + 1) * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
-            Tb = T1_matrix(
-                p * 2 + 1, (p + 1) * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta
-            ).todense()
+        if exc_type in ("tups_single", "sa_single"):
+            if exc_type == "tups_single":
+                (p,) = exc_indices
+                Ta = T1_matrix(p * 2, (p + 1) * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+                Tb = T1_matrix(
+                    p * 2 + 1, (p + 1) * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta
+                ).todense()
+            elif exc_type == "sa_single":
+                (i, a) = exc_indices
+                Ta = T1_matrix(i * 2, a * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+                Tb = T1_matrix(i * 2 + 1, a * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
             tmp = (
                 tmp
                 + np.sin(2 ** (-1 / 2) * theta) * np.matmul(Ta, tmp)
@@ -820,10 +926,17 @@ def propagate_unitary(
     theta = thetas[idx]
     if abs(theta) < 10**-14:
         return np.copy(state)
-    if exc_type == "tups_single":
-        (p,) = exc_indices
-        Ta = T1_matrix(p * 2, (p + 1) * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
-        Tb = T1_matrix(p * 2 + 1, (p + 1) * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+    if exc_type in ("tups_single", "sa_single"):
+        if exc_type == "tups_single":
+            (p,) = exc_indices
+            Ta = T1_matrix(p * 2, (p + 1) * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            Tb = T1_matrix(
+                p * 2 + 1, (p + 1) * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta
+            ).todense()
+        elif exc_type == "sa_single":
+            (i, a) = exc_indices
+            Ta = T1_matrix(i * 2, a * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            Tb = T1_matrix(i * 2 + 1, a * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
         A = 2 ** (-1 / 2)
         tmp = (
             state
@@ -865,10 +978,17 @@ def get_grad_action(
 ) -> np.ndarray:
     exc_type = ups_struct.excitation_operator_type[idx]
     exc_indices = ups_struct.excitation_indicies[idx]
-    if exc_type == "tups_single":
-        (p,) = exc_indices
-        Ta = T1_matrix(p * 2, (p + 1) * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
-        Tb = T1_matrix(p * 2 + 1, (p + 1) * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+    if exc_type in ("tups_single", "sa_single"):
+        if exc_type == "tups_single":
+            (p,) = exc_indices
+            Ta = T1_matrix(p * 2, (p + 1) * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            Tb = T1_matrix(
+                p * 2 + 1, (p + 1) * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta
+            ).todense()
+        elif exc_type == "sa_single":
+            (i, a) = exc_indices
+            Ta = T1_matrix(i * 2, a * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            Tb = T1_matrix(i * 2 + 1, a * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
         A = 2 ** (-1 / 2)
         tmp = np.matmul(A * (Ta + Tb), state)
     elif exc_type in ("tups_double", "single", "double"):

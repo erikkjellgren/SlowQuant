@@ -68,6 +68,9 @@ class WaveFunctionUPS:
         self.active_spin_idx_shifted = []
         self.active_occ_spin_idx_shifted = []
         self.active_unocc_spin_idx_shifted = []
+        self.active_idx_shifted = []
+        self.active_occ_idx_shifted = []
+        self.active_unocc_idx_shifted = []
         self.num_elec = num_elec
         self.num_elec_alpha = num_elec // 2
         self.num_elec_beta = num_elec // 2
@@ -115,6 +118,14 @@ class WaveFunctionUPS:
                 self.active_occ_spin_idx_shifted.append(active_idx - active_shift)
             for active_idx in self.active_unocc_spin_idx:
                 self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
+        if len(self.active_idx) != 0:
+            active_shift = np.min(self.active_idx)
+            for active_idx in self.active_idx:
+                self.active_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_occ_idx:
+                self.active_occ_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_unocc_idx:
+                self.active_unocc_idx_shifted.append(active_idx - active_shift)
         self.num_active_elec_alpha = self.num_active_elec // 2
         self.num_active_elec_beta = self.num_active_elec // 2
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
@@ -210,7 +221,14 @@ class WaveFunctionUPS:
             self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
         elif ansatz.lower() == "fucc":
             state = "1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec)
-            self.ups_layout.create_fUCC([[state]], self.ansatz_options)
+            self.ups_layout.create_fUCCSD([[state]], self.ansatz_options)
+        elif ansatz.lower() == "safuccspd":
+            self.ups_layout.create_safUCCSpD(
+                self.active_occ_idx_shifted,
+                self.active_unocc_idx_shifted,
+                self.num_active_orbs,
+                self.ansatz_options,
+            )
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
