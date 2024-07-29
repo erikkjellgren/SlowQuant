@@ -827,26 +827,22 @@ class UpsStructure:
         for _ in range(n_layers):
             if do_generalized:
                 for a, i, _ in iterate_t1_sa_generalized(num_orbs):
-                    if (i, a) not in self.excitation_indicies:
-                        self.excitation_operator_type.append("sa_single")
-                        self.excitation_indicies.append((i, a))
-                        self.n_params += 1
+                    self.excitation_operator_type.append("sa_single")
+                    self.excitation_indicies.append((i, a))
+                    self.n_params += 1
                 for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
-                    if (i, j, a, b) not in self.excitation_indicies:
-                        self.excitation_operator_type.append("double")
-                        self.excitation_indicies.append((i, j, a, b))
-                        self.n_params += 1
+                    self.excitation_operator_type.append("double")
+                    self.excitation_indicies.append((i, j, a, b))
+                    self.n_params += 1
             else:
                 for a, i, _ in iterate_t1_sa(occ, unocc):
-                    if (i, a) not in self.excitation_indicies:
-                        self.excitation_operator_type.append("sa_single")
-                        self.excitation_indicies.append((i, a))
-                        self.n_params += 1
+                    self.excitation_operator_type.append("sa_single")
+                    self.excitation_indicies.append((i, a))
+                    self.n_params += 1
                 for a, i, b, j in iterate_pair_t2(occ, unocc):
-                    if (i, j, a, b) not in self.excitation_indicies:
-                        self.excitation_operator_type.append("double")
-                        self.excitation_indicies.append((i, j, a, b))
-                        self.n_params += 1
+                    self.excitation_operator_type.append("double")
+                    self.excitation_indicies.append((i, j, a, b))
+                    self.n_params += 1
 
 
 def construct_ups_state(
