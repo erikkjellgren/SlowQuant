@@ -783,7 +783,7 @@ class UpsStructure:
                 unoccupied.append(unocc_tmp)
         for occ, unocc in zip(occupied, unoccupied):
             for a, i in iterate_t1(occ, unocc):
-                if a > i:
+                if a < i:
                     i, a = a, i
                 if (i, a) not in self.excitation_indicies:
                     self.excitation_operator_type.append("single")
