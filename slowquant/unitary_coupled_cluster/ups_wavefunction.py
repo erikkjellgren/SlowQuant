@@ -222,8 +222,8 @@ class WaveFunctionUPS:
         elif ansatz.lower() == "fucc":
             state = "1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec)
             self.ups_layout.create_fUCCSD([[state]], self.ansatz_options)
-        elif ansatz.lower() == "safuccspd":
-            self.ups_layout.create_safUCCSpD(
+        elif ansatz.lower() == "ksafuccgsd":
+            self.ups_layout.create_kSAfUpCCGSD(
                 self.active_occ_idx_shifted,
                 self.active_unocc_idx_shifted,
                 self.num_active_orbs,

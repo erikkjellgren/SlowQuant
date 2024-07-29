@@ -808,7 +808,7 @@ class UpsStructure:
                     self.excitation_indicies.append((i, j, a, b))
                     self.n_params += 1
 
-    def create_safUCCSpD(
+    def create_kSAfUpCCGSD(
         self, occ: list[int], unocc: list[int], num_orbs: int, ansatz_options: dict[str, Any]
     ) -> None:
         valid_options = ("do_generalized", "n_layers")

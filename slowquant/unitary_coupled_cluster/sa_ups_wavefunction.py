@@ -232,11 +232,11 @@ class WaveFunctionSAUPS:
             self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
         elif ansatz.lower() == "fucc":
             self.ups_layout.create_fUCCSD(states[1], self.ansatz_options)
-        elif ansatz.lower() == "safuccspd":
+        elif ansatz.lower() == "ksafupccgsd":
             if "do_generalized" not in self.ansatz_options:
                 print(f"WRARNING: do_generalized have been set to true for {ansatz.lower()}")
                 self.ansatz_options["do_generalized"] = True
-            self.ups_layout.create_safUCCSpD([], [], self.num_active_orbs, self.ansatz_options)
+            self.ups_layout.create_kSAfUpCCGSD([], [], self.num_active_orbs, self.ansatz_options)
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
