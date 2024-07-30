@@ -4,7 +4,7 @@ from functools import partial
 
 import numpy as np
 import scipy
-from qiskit.primitives import BaseEstimator, BaseSampler
+from qiskit.primitives import BaseEstimator, BaseSampler, BaseSamplerV2, BaseEstimatorV2
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_algorithms.optimizers import COBYLA, L_BFGS_B, SLSQP, SPSA
 
@@ -277,13 +277,25 @@ class WaveFunction:
         self._energy_elec = None
         self.QI.parameters = parameters
 
-    def change_primitive(self, primitive: BaseEstimator | BaseSampler, verbose: bool = True) -> None:
+    def change_primitive(self, primitive: BaseEstimator | BaseSampler | BaseSamplerV2) -> None:
         """Change the primitive expectation value calculator.
 
         Args:
             primitive: Primitive object.
-            verbose: Print more info.
         """
+        if isinstance(primitive, BaseEstimatorV2):
+            raise ValueError("EstimatorV2 is not currently supported.")
+        if isinstance(primitive, BaseSamplerV2):
+            print("WARNING: Using SamplerV2 is an experimental feature.")
+            if self.QI.shots is None:
+                print("Changing to SamplerV2 needs the specification of number of shots.")
+                print("A default number of shots of 10,000 was set. Use change_shots() function to adapt.")
+                self.QI._primitive = primitive  # pylint: disable=protected-access
+                self.QI.shots = 10000
+            else:
+                self.QI._primitive = primitive  # pylint: disable=protected-access
+        else:
+            self.QI._primitive = primitive  # pylint: disable=protected-access
         self._rdm1 = None
         self._rdm2 = None
         self._rdm3 = None
@@ -294,19 +306,17 @@ class WaveFunction:
         self.QI.total_paulis_evaluated = 0
         self.QI.cliques = Clique()
         self.QI._Minv = None  # pylint: disable=protected-access
-        self.QI._primitive = primitive  # pylint: disable=protected-access
-        # IMPORTANT: Shot number in primitive gets always overwritten if a shot number is defined in QI!
-        if self.QI.shots is not None and verbose:
-            print(
-                "Number of shots defined in new primitive are ignored as there is a number defined in the QI of ",
-                self.QI.shots,
-            )
-            print("If you want to change the number of shots, do this manually.")
-            print("Set the number of shots manually to None if you run an ideal simulator.")
-        self.QI.shots = self.QI.shots  # Redo shot check with new primitive
         # Initiate re-transpiling if ISA is selected. 
         self.QI._transpiled = False # pylint: disable=protected-access 
         self.QI.ISA = self.QI.ISA  # Redo ISA parameter check
+
+    def change_shots(self, shots: int) -> None:
+        """Change the number of shots for QI interface.
+        
+        Args:
+            shots: Number of shots
+        """
+        self.QI.shots = shots
 
     @property
     def rdm1(self) -> np.ndarray:

@@ -743,15 +743,9 @@ def test_sampler_changes() -> None:
     assert QI.shots is None
 
     # Change to shot noise simulator reset shots
-    sampler = SamplerAer(run_options={"shots": 10000}, transpile_options={"optimization_level": 0})
+    sampler = SamplerAer(transpile_options={"optimization_level": 0})
     qWF.change_primitive(sampler)
-
-    assert QI.max_shots_per_run == 100000
-    assert QI.shots == 10000
-
-    # Change of sampler keeps defined shots in QI.
-    sampler = SamplerAer(run_options={"shots": 100000}, transpile_options={"optimization_level": 0})
-    qWF.change_primitive(sampler)
+    qWF.change_shots(10000)
 
     assert QI.max_shots_per_run == 100000
     assert QI.shots == 10000
@@ -786,10 +780,10 @@ def test_qiskit_aer() -> None:
     rhf = pyscf.scf.RHF(mol).run()
 
     # Optimize WF with QSQ
-    sampler = SamplerAer(run_options={"shots": 10}, transpile_options={"optimization_level": 0})
+    sampler = SamplerAer(transpile_options={"optimization_level": 0})
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(sampler, "tUCCSD", mapper)
+    QI = QuantumInterface(sampler, "tUCCSD", mapper, shots=10)
 
     qWF = WaveFunction(
         mol.nao * 2,

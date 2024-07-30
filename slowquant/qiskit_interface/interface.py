@@ -7,7 +7,7 @@ import numpy as np
 from qiskit import QuantumCircuit
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit.transpiler import PassManager
-from qiskit.primitives import BaseEstimator, BaseSampler
+from qiskit.primitives import BaseEstimator, BaseSampler, BaseSamplerV2, BaseEstimatorV2
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFock
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
@@ -32,7 +32,7 @@ class QuantumInterface:
 
     def __init__(  # pylint: disable=dangerous-default-value
         self,
-        primitive: BaseEstimator | BaseSampler,
+        primitive: BaseEstimator | BaseSampler | BaseSamplerV2,
         ansatz: str,
         mapper: FermionicMapper,
         ISA: bool = False,
@@ -55,7 +55,7 @@ class QuantumInterface:
             mapper: Qiskit mapper object.
             ISA: Use ISA for submitting to IBM quantum. Locally transpiling is performed.
             pass_manager: Pass custom PassManager for tranpilation.
-            shots: Number of shots. If not specified use shotnumber from primitive (default).
+            shots: Number of shots. None means ideal simulator.
             max_shots_per_run: Maximum number of shots allowed in a single run. Set to 100000 per IBM machines.
             do_M_mitigation: Do error mitigation via read-out correlation matrix.
             do_M_iqa: Use independent qubit approximation when constructing the read-out correlation matrix.
@@ -66,6 +66,10 @@ class QuantumInterface:
         if ansatz not in allowed_ansatz:
             raise ValueError("The chosen Ansatz is not available. Choose from: ", allowed_ansatz)
         self.ansatz = ansatz
+        if isinstance(primitive, BaseEstimatorV2):
+            raise ValueError("EstimatorV2 is not currently supported.")
+        if isinstance(primitive, BaseSamplerV2):
+            print("WARNING: Using SamplerV2 is an experimental feature.")
         self._primitive = primitive
         self.mapper = mapper
         self._transpiled = False # Check if circuit has been transpiled
@@ -342,30 +346,23 @@ class QuantumInterface:
         Args:
             shots: Number of shots.
         """
-        # IMPORTANT: Shot number in primitive gets always overwritten if a shot number is defined in QI!
+        # IMPORTANT: Shot number in primitive initialization gets always overwritten by QI!
         self._circuit_multipl = 1
         # Get shot number form primitive if none defined
         if shots is None:
-            if hasattr(self._primitive.options, "shots"):
-                # Shot-noise simulator
-                self._shots = self._primitive.options.shots
-                print("Number of shots has been set to value defined in primitive option: ", self._shots)
-            elif "execution" in self._primitive.options:
-                # Device
-                self._shots = self._primitive.options["execution"]["shots"]
-                print("Number of shots has been set to value defined in primitive option: ", self._shots)
-            else:
-                print(
-                    "WARNING: No number of shots option found in primitive. Ideal simulator is assumed and shots set to None / Zero"
-                )
-                self._shots = None
+            if isinstance(self._primitive,BaseSamplerV2):
+                raise ValueError("BaseSamplerV2 does not support ideal simulator. Set number of shots.")
+            print(
+                "Number of shots is None. Ideal simulator is assumed."
+            )
+            self._shots = None
         else:
             self._shots = shots
         # Check if shot number is allowed
         if self._shots is not None:
             if self._shots > self.max_shots_per_run:
                 if isinstance(self._primitive, BaseEstimator):
-                    self._primitive.set_options(shots=self.max_shots_per_run)
+                    self.shots = self.max_shots_per_run
                     print(
                         "WARNING: Number of shots specified exceed possibility for Estimator. Number of shots is set to ",
                         self.max_shots_per_run,
@@ -374,7 +371,6 @@ class QuantumInterface:
                     print("Number of requested shots exceed the limit of ", self.max_shots_per_run)
                     # Get number of circuits needed to fulfill shot number
                     self._circuit_multipl = math.floor(self._shots / self.max_shots_per_run)
-                    self._primitive.set_options(shots=self.max_shots_per_run)
                     print(
                         "Maximum shots are used and additional",
                         self._circuit_multipl - 1,
@@ -386,12 +382,6 @@ class QuantumInterface:
                             "WARNING: Requested shots must be multiple of max_shots_per_run. Total shots has been adjusted to ",
                             self._shots,
                         )
-            else:
-                if shots is not None:  # shots were defined in input and have to be written in primitive
-                    self._primitive.set_options(shots=self._shots)
-                    print(
-                        "Number of shots in primitive has been adapted as specified for QI to ", self._shots
-                    )
 
     @property
     def max_shots_per_run(self) -> int:
@@ -491,7 +481,7 @@ class QuantumInterface:
             circuits=self.circuit,
             parameter_values=run_parameters,
             observables=observables,
-            skip_tranpilation=self.ISA,# this might not be needed. But it is not very clear from the documentation. 
+            shots=self.shots
         )
         if self.shots is not None:  # check if ideal simulator
             self.total_shots_used += self.shots * len(observables)
@@ -768,6 +758,11 @@ class QuantumInterface:
         """
         if not isinstance(self._primitive, BaseSampler):
             raise TypeError(f"Expected primitive to be of type BaseSampler got, {type(self._primitive)}")
+        if self._circuit_multipl > 1:
+            shots: int | None = self.max_shots_per_run
+        else:
+            shots = self.shots
+
         if isinstance(paulis, str):
             paulis = [paulis]
         num_paulis = len(paulis)
@@ -794,11 +789,12 @@ class QuantumInterface:
         job = self._primitive.run(
             circuits,
             parameter_values=parameter_values,
+            shots=shots
         )
         if self.shots is not None:  # check if ideal simulator
-            self.total_shots_used += self.shots * num_paulis * num_circuits * self._circuit_multipl
+            self.total_shots_used += self.shots * num_paulis * num_circuits 
         self.total_device_calls += 1
-        self.total_paulis_evaluated += num_paulis * num_circuits * self._circuit_multipl
+        self.total_paulis_evaluated += num_paulis * num_circuits 
 
         # Get quasi-distribution in binary probabilities
         distr = [res.binary_probabilities() for res in job.result().quasi_dists]
@@ -860,6 +856,7 @@ class QuantumInterface:
         job = self._primitive.run(
             ansatz_w_obs,
             parameter_values=run_parameters,
+            shots=shots
         )
         if shots is not None:  # check if ideal simulator
             self.total_shots_used += shots
@@ -937,13 +934,6 @@ class QuantumInterface:
         self._save_layout = True
         if self.num_qubits > 12:
             raise ValueError("Current implementation does not scale above 12 qubits?")
-        if "transpilation" in self._primitive.options:
-            if self._primitive.options["transpilation"]["initial_layout"] is None:
-                raise ValueError(
-                    "Doing read-out correlation matrix requires qubits to be fixed. Got ['transpilation']['initial_layout'] as None"
-                )
-        else:
-            print("No transpilation option found in primitive. Run via simulator is assumed.")
         if self.do_M_ansatz0:
             ansatz = self.circuit
             # Negate the Hartree-Fock State
