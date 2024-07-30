@@ -304,6 +304,8 @@ class WaveFunction:
             print("If you want to change the number of shots, do this manually.")
             print("Set the number of shots manually to None if you run an ideal simulator.")
         self.QI.shots = self.QI.shots  # Redo shot check with new primitive
+        # Initiate re-transpiling if ISA is selected. 
+        self.QI._transpiled = False # pylint: disable=protected-access 
         self.QI.ISA = self.QI.ISA  # Redo ISA parameter check
 
     @property

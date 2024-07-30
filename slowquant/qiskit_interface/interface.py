@@ -5,7 +5,8 @@ from typing import Any
 
 import numpy as np
 from qiskit import QuantumCircuit
-from qiskit.compiler import transpile
+from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
+from qiskit.transpiler import PassManager
 from qiskit.primitives import BaseEstimator, BaseSampler
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFock
@@ -35,6 +36,7 @@ class QuantumInterface:
         ansatz: str,
         mapper: FermionicMapper,
         ISA: bool = False,
+        pass_manager: None | PassManager = None,
         ansatz_options: dict[str, Any] = {},
         shots: None | int = None,
         max_shots_per_run: int = 100000,
@@ -52,6 +54,7 @@ class QuantumInterface:
             ansatz_options: Ansatz options.
             mapper: Qiskit mapper object.
             ISA: Use ISA for submitting to IBM quantum. Locally transpiling is performed.
+            pass_manager: Pass custom PassManager for tranpilation.
             shots: Number of shots. If not specified use shotnumber from primitive (default).
             max_shots_per_run: Maximum number of shots allowed in a single run. Set to 100000 per IBM machines.
             do_M_mitigation: Do error mitigation via read-out correlation matrix.
@@ -62,10 +65,13 @@ class QuantumInterface:
         allowed_ansatz = ("tUCCSD", "tPUCCD", "tUCCD", "tUPS", "fUCCSD")
         if ansatz not in allowed_ansatz:
             raise ValueError("The chosen Ansatz is not available. Choose from: ", allowed_ansatz)
+        if pass_manager is not None and ISA == False:
+            raise ValueError("You need to enable ISA if you want to use a custom PassManager.")
         self.ansatz = ansatz
         self._primitive = primitive
         self.mapper = mapper
         self.ISA = ISA
+        self.pass_manager = pass_manager
         self.max_shots_per_run = max_shots_per_run
         self.shots = shots
         self.do_M_mitigation = do_M_mitigation
@@ -283,7 +289,11 @@ class QuantumInterface:
         """
         # Check if ISA is selected. If yes, pre-transpile circuit for later use.
         if self.ISA:
-            self._circuit = transpile(circuit, backend=self._ISA_backend, optimization_level=self._ISA_level)
+            if self.pass_manager is None:
+                pm = generate_preset_pass_manager(self._ISA_level, backend=self._ISA_backend)
+                self._circuit = pm.run(circuit)
+            else:
+                self.circuit = self.pass_manager.run(circuit)
             self._transpiled = True
         else:
             self._circuit = circuit
