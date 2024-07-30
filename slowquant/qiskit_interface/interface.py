@@ -190,27 +190,27 @@ class QuantumInterface:
         if ISA:
             # Get backend from primitive
             if hasattr(self._primitive, "_backend"):
-                self._ISA_backend = self._primitive._backend  # pylint: disable=protected-access
-                name = self._ISA_backend.name
+                self._primitive_backend = self._primitive._backend  # pylint: disable=protected-access
+                name = self._primitive_backend.name
             else:
-                self._ISA_backend = None
+                self._primitive_backend = None
                 name = "None"
 
             # Get optimization level from backend
             if hasattr(self._primitive, "_transpile_options") and hasattr(
                 self._primitive._transpile_options, "optimization_level"  # pylint: disable=protected-access
             ):
-                self._ISA_level = self._primitive._transpile_options[  # pylint: disable=protected-access
+                self._primitive_level = self._primitive._transpile_options[  # pylint: disable=protected-access
                     "optimization_level"
                 ]
             elif hasattr(self._primitive.options, "optimization_level"):
-                self._ISA_level = self._primitive.options["optimization_level"]
+                self._primitive_level = self._primitive.options["optimization_level"]
             else:
-                self._ISA_level = 1
+                self._primitive_level = 1
 
             self._ISA_layout = None
 
-            print(f"ISA uses backend {name} with optimization level {self._ISA_level}")
+            print(f"ISA uses backend {name} with optimization level {self._primitive_level}")
 
             # Check if circuit has been transpiled
             # In case of switching to ISA in later workflow
@@ -236,7 +236,7 @@ class QuantumInterface:
         if pass_manager is not None and self.ISA == False:
             raise ValueError("You need to enable ISA if you want to use a custom PassManager.")
         self._pass_manager = pass_manager
-        
+
         # Check if circuit has been transpiled
         # In case of switching to new PassManager in later workflow
         if self._transpiled == False and hasattr(self,"circuit"): 
@@ -315,7 +315,7 @@ class QuantumInterface:
         # Check if ISA is selected. If yes, pre-transpile circuit for later use.
         if self.ISA:
             if self.pass_manager is None:
-                pm = generate_preset_pass_manager(self._ISA_level, backend=self._ISA_backend)
+                pm = generate_preset_pass_manager(self._primitive_level, backend=self._primitive_backend)
                 self._circuit = pm.run(circuit)
             else:
                 self.circuit = self.pass_manager.run(circuit)
