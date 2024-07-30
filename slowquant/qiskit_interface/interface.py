@@ -80,6 +80,7 @@ class QuantumInterface:
         self._save_layout = False
         self._save_paulis = True  # hard switch to stop using Pauli saving (debugging tool).
         self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
+        self._transpiled = False # Check if circuit has been transpiled
 
     def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int]) -> None:
         """Construct qiskit circuit.
@@ -207,12 +208,18 @@ class QuantumInterface:
 
             print(f"ISA uses backend {name} with optimization level {self._ISA_level}")
 
+            # Check if circuit has been transpiled
+            # In case of switching to ISA in later workflow
+            if self._transpiled == False: 
+                self.circuit = self.circuit
+
     def _check_layout(self, circuit: QuantumCircuit) -> None:
         """Check if transpiled layout has changed.
 
         Args:
             circuit: Circuit whose layout is to be checked.
         """
+        # legacy function. Not needed anymore with one-time transpilation.
         if self._save_layout and circuit.layout is not None:
             if self._ISA_layout is None:
                 self._ISA_layout = circuit.layout.final_index_layout()
@@ -274,10 +281,10 @@ class QuantumInterface:
         Args:
             circuit: circuit
         """
-        # Check if estimator is primitve and ISA selected. If yes, pre-transpile circuit for later use.
-
-        if isinstance(self._primitive, BaseEstimator) and self.ISA:
+        # Check if ISA is selected. If yes, pre-transpile circuit for later use.
+        if self.ISA:
             self._circuit = transpile(circuit, backend=self._ISA_backend, optimization_level=self._ISA_level)
+            self._transpiled = True
         else:
             self._circuit = circuit
 
@@ -449,7 +456,7 @@ class QuantumInterface:
             circuits=self.circuit,
             parameter_values=run_parameters,
             observables=observables,
-            skip_tranpilation=self.ISA,
+            skip_tranpilation=self.ISA,# this might not be needed. But it is not very clear from the documentation. 
         )
         if self.shots is not None:  # check if ideal simulator
             self.total_shots_used += self.shots * len(observables)
@@ -735,6 +742,7 @@ class QuantumInterface:
 
         circuits = [None] * (num_paulis * num_circuits)
         # Create QuantumCircuits
+        # In case this function is used stand-alone, be aware: no ISA check is performed here!
         for nr_pauli, pauli in enumerate(paulis):
             pauli_circuit = to_CBS_measurement(pauli)
             for nr_circuit, circuit in enumerate(circuits_in):
@@ -748,24 +756,10 @@ class QuantumInterface:
             parameter_values = [run_parameters] * (num_paulis * self._circuit_multipl)
         else:
             parameter_values = run_parameters * (num_paulis * self._circuit_multipl)  # type: ignore
-        if self.ISA:
-            circuits = transpile(
-                circuits,
-                backend=self._ISA_backend,
-                optimization_level=self._ISA_level,
-                initial_layout=self._ISA_layout,
-            )
-            self._check_layout(circuits[0])
-            job = self._primitive.run(
-                circuits,
-                parameter_values=parameter_values,
-                skip_transpilation=True,
-            )
-        else:
-            job = self._primitive.run(
-                circuits,
-                parameter_values=parameter_values,
-            )
+        job = self._primitive.run(
+            circuits,
+            parameter_values=parameter_values,
+        )
         if self.shots is not None:  # check if ideal simulator
             self.total_shots_used += self.shots * num_paulis * num_circuits * self._circuit_multipl
         self.total_device_calls += 1
@@ -828,24 +822,10 @@ class QuantumInterface:
         ansatz_w_obs.measure_all()
 
         # Run sampler
-        if self.ISA:
-            circuit = transpile(
-                ansatz_w_obs,
-                backend=self._ISA_backend,
-                optimization_level=self._ISA_level,
-                initial_layout=self._ISA_layout,
-            )
-            self._check_layout(circuit)
-            job = self._primitive.run(
-                circuit,
-                parameter_values=run_parameters,
-                skip_transpilation=True,
-            )
-        else:
-            job = self._primitive.run(
-                ansatz_w_obs,
-                parameter_values=run_parameters,
-            )
+        job = self._primitive.run(
+            ansatz_w_obs,
+            parameter_values=run_parameters,
+        )
         if shots is not None:  # check if ideal simulator
             self.total_shots_used += shots
         self.total_device_calls += 1
