@@ -65,11 +65,10 @@ class QuantumInterface:
         allowed_ansatz = ("tUCCSD", "tPUCCD", "tUCCD", "tUPS", "fUCCSD")
         if ansatz not in allowed_ansatz:
             raise ValueError("The chosen Ansatz is not available. Choose from: ", allowed_ansatz)
-        if pass_manager is not None and ISA == False:
-            raise ValueError("You need to enable ISA if you want to use a custom PassManager.")
         self.ansatz = ansatz
         self._primitive = primitive
         self.mapper = mapper
+        self._transpiled = False # Check if circuit has been transpiled
         self.ISA = ISA
         self.pass_manager = pass_manager
         self.max_shots_per_run = max_shots_per_run
@@ -86,7 +85,6 @@ class QuantumInterface:
         self._save_layout = False
         self._save_paulis = True  # hard switch to stop using Pauli saving (debugging tool).
         self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
-        self._transpiled = False # Check if circuit has been transpiled
 
     def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int]) -> None:
         """Construct qiskit circuit.
@@ -216,8 +214,35 @@ class QuantumInterface:
 
             # Check if circuit has been transpiled
             # In case of switching to ISA in later workflow
-            if self._transpiled == False: 
+            if self._transpiled == False and hasattr(self,"circuit"): 
                 self.circuit = self.circuit
+        
+    @property
+    def pass_manager(self) -> PassManager:
+        """Get PassManager.
+
+        Returns:
+            PassManager
+        """
+        return self._pass_manager
+    
+    @pass_manager.setter
+    def pass_manager(self,pass_manager) -> None:
+        """Set PassManager.
+
+        Args:
+            pass_manager: PassManager object from Qiskit.
+        """
+        if pass_manager is not None and self.ISA == False:
+            raise ValueError("You need to enable ISA if you want to use a custom PassManager.")
+        self._pass_manager = pass_manager
+        
+        # Check if circuit has been transpiled
+        # In case of switching to new PassManager in later workflow
+        if self._transpiled == False and hasattr(self,"circuit"): 
+            self.circuit = self.circuit
+        
+
 
     def _check_layout(self, circuit: QuantumCircuit) -> None:
         """Check if transpiled layout has changed.
