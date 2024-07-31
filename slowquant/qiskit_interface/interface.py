@@ -12,6 +12,7 @@ from qiskit.quantum_info import SparsePauliOp
 from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFock
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
+from qiskit.result import QuasiDistribution
 
 from slowquant.qiskit_interface.base import FermionicOperator
 from slowquant.qiskit_interface.custom_ansatz import fUCCSD, tUPS
@@ -452,9 +453,9 @@ class QuantumInterface:
         # Check if estimator or sampler
         if isinstance(self._primitive, BaseEstimator):
             return self._estimator_quantum_expectation_value(op, run_parameters)
-        if isinstance(self._primitive, BaseSampler) and save_paulis:
+        if ( isinstance(self._primitive, BaseSampler) or isinstance(self._primitive, BaseSamplerV2) ) and save_paulis:
             return self._sampler_quantum_expectation_value(op)
-        if isinstance(self._primitive, BaseSampler):
+        if ( isinstance(self._primitive, BaseSampler) or isinstance(self._primitive, BaseSamplerV2) ):
             return self._sampler_quantum_expectation_value_nosave(
                 op, run_parameters, do_cliques=self._do_cliques
             )
@@ -756,8 +757,6 @@ class QuantumInterface:
             Array of quasi-distributions in order of all circuits results for a given Pauli String first.
             E.g.: [PauliString[0] for Circuit[0], PauliString[0] for Circuit[1], ...]
         """
-        if not isinstance(self._primitive, BaseSampler):
-            raise TypeError(f"Expected primitive to be of type BaseSampler got, {type(self._primitive)}")
         if self._circuit_multipl > 1:
             shots: int | None = self.max_shots_per_run
         else:
@@ -770,34 +769,62 @@ class QuantumInterface:
             circuits_in = [circuits_in]
         num_circuits = len(circuits_in)
 
-        circuits = [None] * (num_paulis * num_circuits)
-        # Create QuantumCircuits
-        # In case this function is used stand-alone, be aware: no ISA check is performed here!
-        for nr_pauli, pauli in enumerate(paulis):
-            pauli_circuit = to_CBS_measurement(pauli)
-            for nr_circuit, circuit in enumerate(circuits_in):
-                ansatz_w_obs = circuit.compose(pauli_circuit)
-                ansatz_w_obs.measure_all()
-                circuits[(nr_circuit + (nr_pauli * num_circuits))] = ansatz_w_obs
-        circuits = circuits * self._circuit_multipl
+        # Check V1 vs. V2
+        if isinstance(self._primitive,BaseSamplerV2):
+            # Create pubs for V2
+            pubs = []
+            for nr_pauli, pauli in enumerate(paulis):
+                pauli_circuit = to_CBS_measurement(pauli)
+                for nr_circuit, circuit in enumerate(circuits_in):
+                    ansatz_w_obs = circuit.compose(pauli_circuit)
+                    ansatz_w_obs.measure_all()
+                    pubs.append((ansatz_w_obs, run_parameters))
+            pubs = pubs * self._circuit_multipl
 
-        # Run sampler
-        if num_circuits == 1:
-            parameter_values = [run_parameters] * (num_paulis * self._circuit_multipl)
+            # Run sampler
+            job = self._primitive.run(
+                pubs,
+                shots=shots
+            )
         else:
-            parameter_values = run_parameters * (num_paulis * self._circuit_multipl)  # type: ignore
-        job = self._primitive.run(
-            circuits,
-            parameter_values=parameter_values,
-            shots=shots
-        )
+            circuits = [None] * (num_paulis * num_circuits)
+            # Create QuantumCircuits for V1
+            # In case this function is used stand-alone, be aware: no ISA check is performed here!
+            for nr_pauli, pauli in enumerate(paulis):
+                pauli_circuit = to_CBS_measurement(pauli)
+                for nr_circuit, circuit in enumerate(circuits_in):
+                    ansatz_w_obs = circuit.compose(pauli_circuit)
+                    ansatz_w_obs.measure_all()
+                    circuits[(nr_circuit + (nr_pauli * num_circuits))] = ansatz_w_obs
+            circuits = circuits * self._circuit_multipl
+
+            # Create parameters array for V1
+            if num_circuits == 1:
+                parameter_values = [run_parameters] * (num_paulis * self._circuit_multipl)
+            else:
+                parameter_values = run_parameters * (num_paulis * self._circuit_multipl)  # type: ignore
+
+            # Run sampler
+            job = self._primitive.run(
+                circuits,
+                parameter_values=parameter_values,
+                shots=shots
+            )
+
         if self.shots is not None:  # check if ideal simulator
             self.total_shots_used += self.shots * num_paulis * num_circuits 
         self.total_device_calls += 1
         self.total_paulis_evaluated += num_paulis * num_circuits 
 
         # Get quasi-distribution in binary probabilities
-        distr = [res.binary_probabilities() for res in job.result().quasi_dists]
+        if isinstance(self._primitive,BaseSamplerV2):
+            distr = [res.data.meas.get_counts() for res in job.result()]
+            print(distr)
+            return
+            #distr = [QuasiDistribution({outcome: freq / shots for outcome, freq in res.data.meas.get_counts()}).binary_probabilities() for res in job.result()]
+        else:
+            distr = [res.binary_probabilities() for res in job.result().quasi_dists]
+        
         if self._circuit_multipl == 1:
             return distr
 
@@ -832,8 +859,6 @@ class QuantumInterface:
         Returns:
             Quasi-distributions.
         """
-        if not isinstance(self._primitive, BaseSampler):
-            raise TypeError(f"Expected primitive to be of type BaseSampler got, {type(self._primitive)}")
         if self._circuit_multipl > 1:
             print(
                 "WARNING: The chosen function does not allow for appending circuits. Choose _one_call_sampler_distributions instead."
