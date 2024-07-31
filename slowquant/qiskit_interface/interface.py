@@ -68,7 +68,7 @@ class QuantumInterface:
         if isinstance(primitive, BaseEstimatorV2):
             raise ValueError("EstimatorV2 is not currently supported.")
         if isinstance(primitive, BaseSamplerV2):
-            raise ValueError("WARNING: Using SamplerV2 is an experimental feature.")
+            print("WARNING: Using SamplerV2 is an experimental feature.")
         self.ansatz = ansatz
         self._transpiled = False  # Check if circuit has been transpiled
         self.max_shots_per_run = max_shots_per_run
@@ -221,7 +221,7 @@ class QuantumInterface:
             # Check if circuit has been transpiled
             # In case of switching to ISA in later workflow
             if not self._transpiled and hasattr(self, "circuit"):
-                self.circuit = self._transpile_circuit(self.circuit)
+                self.circuit = self.circuit
 
     @property
     def pass_manager(self) -> PassManager:
@@ -246,7 +246,7 @@ class QuantumInterface:
         # Check if circuit has been set
         # In case of switching to new PassManager in later workflow
         if hasattr(self, "circuit"):
-            self.circuit = self._transpile_circuit(self.circuit)
+            self.circuit = self.circuit
 
     def _check_layout(self, circuit: QuantumCircuit) -> None:
         """Check if transpiled layout has changed.
@@ -366,8 +366,9 @@ class QuantumInterface:
                     "SamplerV2 does not support ideal simulator. Number of shots is set to 10,000 by default"
                 )
                 self._shots: int | None = 10000
-            print("Number of shots is None. Ideal simulator is assumed.")
-            self._shots = None
+            else:
+                print("Number of shots is None. Ideal simulator is assumed.")
+                self._shots = None
         else:
             self._shots = shots
         # Check if shot number is allowed
