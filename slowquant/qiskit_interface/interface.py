@@ -65,18 +65,18 @@ class QuantumInterface:
         allowed_ansatz = ("tUCCSD", "tPUCCD", "tUCCD", "tUPS", "fUCCSD")
         if ansatz not in allowed_ansatz:
             raise ValueError("The chosen Ansatz is not available. Choose from: ", allowed_ansatz)
-        self.ansatz = ansatz
         if isinstance(primitive, BaseEstimatorV2):
             raise ValueError("EstimatorV2 is not currently supported.")
         if isinstance(primitive, BaseSamplerV2):
-            print("WARNING: Using SamplerV2 is an experimental feature.")
-        self._primitive = primitive
-        self.mapper = mapper
+            raise ValueError("WARNING: Using SamplerV2 is an experimental feature.")
+        self.ansatz = ansatz
         self._transpiled = False  # Check if circuit has been transpiled
-        self.ISA = ISA
-        self.pass_manager = pass_manager
         self.max_shots_per_run = max_shots_per_run
+        self._primitive = primitive
+        self.ISA = ISA
         self.shots = shots
+        self.mapper = mapper
+        self.pass_manager = pass_manager
         self.do_M_mitigation = do_M_mitigation
         self.do_M_iqa = do_M_iqa
         self.do_M_ansatz0 = do_M_ansatz0
@@ -178,29 +178,31 @@ class QuantumInterface:
         """Get ISA setting.
 
         Returns:
-            ISA setting.
+            ISA setting
         """
         return self._ISA
 
     @ISA.setter
-    def ISA(self, ISA) -> None:
-        """Set ISA and handle tranpile arguments.
+    def ISA(self, ISA: bool) -> None:
+        """Set ISA and handle transpile arguments.
 
         Args:
             ISA: ISA bool
         """
-        self._ISA = ISA
+        if isinstance(self._primitive, BaseSamplerV2):
+            print("ISA is set automatically to True for SamplerV2.")
+            self._ISA: bool = True
+        else:
+            self._ISA = ISA
 
-        if ISA:
-            # Get backend from primitive
+        if self._ISA:
+            # Get backend from primitive.
             if hasattr(self._primitive, "_backend"):
                 self._primitive_backend = self._primitive._backend  # pylint: disable=protected-access
-                name = self._primitive_backend.name
             else:
                 self._primitive_backend = None
-                name = "None"
 
-            # Get optimization level from backend
+            # Get optimization level from backend. Only for v1 primitives.
             if hasattr(self._primitive, "_transpile_options") and hasattr(
                 self._primitive._transpile_options, "optimization_level"  # pylint: disable=protected-access
             ):
@@ -212,11 +214,9 @@ class QuantumInterface:
             elif hasattr(self._primitive.options, "optimization_level"):
                 self._primitive_level = self._primitive.options["optimization_level"]
             else:
-                self._primitive_level = 1
+                self._primitive_level = 3
 
             self._ISA_layout = None
-
-            print(f"ISA uses backend {name} with optimization level {self._primitive_level}")
 
             # Check if circuit has been transpiled
             # In case of switching to ISA in later workflow
@@ -331,6 +331,9 @@ class QuantumInterface:
 
         """
         if self.pass_manager is None:
+            print(
+                f"Internal transpilation uses backend {self._primitive_backend} with optimization level {self._primitive_level}"
+            )
             pm = generate_preset_pass_manager(self._primitive_level, backend=self._primitive_backend)
             return pm.run(circuit)
         return self.pass_manager.run(circuit)
@@ -359,7 +362,10 @@ class QuantumInterface:
         # Get shot number form primitive if none defined
         if shots is None:
             if isinstance(self._primitive, BaseSamplerV2):
-                raise ValueError("BaseSamplerV2 does not support ideal simulator. Set number of shots.")
+                print(
+                    "SamplerV2 does not support ideal simulator. Number of shots is set to 10,000 by default"
+                )
+                self._shots: int | None = 10000
             print("Number of shots is None. Ideal simulator is assumed.")
             self._shots = None
         else:

@@ -287,16 +287,8 @@ class WaveFunction:
             raise ValueError("EstimatorV2 is not currently supported.")
         if isinstance(primitive, BaseSamplerV2):
             print("WARNING: Using SamplerV2 is an experimental feature.")
-            if self.QI.shots is None:
-                print("Changing to SamplerV2 needs the specification of number of shots.")
-                print("A default number of shots of 10,000 was set. Use change_shots() function to adapt.")
-                self.QI._primitive = primitive  # pylint: disable=protected-access
-                self.QI.shots = 10000
-            else:
-                self.QI._primitive = primitive  # pylint: disable=protected-access
-        else:
-            self.QI._primitive = primitive  # pylint: disable=protected-access
-        print("Reset RDMs, energies, QI metrics, and correlation amtrix.")
+        self.QI._primitive = primitive  # pylint: disable=protected-access
+        print("Reset RDMs, energies, QI metrics, and correlation matrix.")
         self._rdm1 = None
         self._rdm2 = None
         self._rdm3 = None
@@ -310,6 +302,7 @@ class WaveFunction:
         # Initiate re-transpiling if ISA is selected.
         self.QI._transpiled = False  # pylint: disable=protected-access
         self.QI.ISA = self.QI.ISA  # Redo ISA parameter check
+        self.QI.shots = self.QI.shots  # Redo shots parameter check
 
     def change_shots(self, shots: int) -> None:
         """Change the number of shots for QI interface.
@@ -321,6 +314,13 @@ class WaveFunction:
         self.QI._reset_cliques()  # pylint: disable=protected-access
         print("Reset correlation matrix for M_Ansatz0")
         self.QI._Minv = None  # pylint: disable=protected-access
+
+    def _reconstruct_circuit(self) -> None:
+        """Construct circuit again."""
+        self.QI.construct_circuit(
+            self.num_active_orbs, (self.num_active_elec // 2, self.num_active_elec // 2)
+        )
+        self.QI._transpiled = False  # pylint: disable=protected-access
 
     @property
     def rdm1(self) -> np.ndarray:
