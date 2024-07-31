@@ -4,7 +4,7 @@ from functools import partial
 
 import numpy as np
 import scipy
-from qiskit.primitives import BaseEstimator, BaseSampler, BaseSamplerV2, BaseEstimatorV2
+from qiskit.primitives import BaseEstimator, BaseEstimatorV2, BaseSampler, BaseSamplerV2
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_algorithms.optimizers import COBYLA, L_BFGS_B, SLSQP, SPSA
 
@@ -13,7 +13,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     two_electron_integral_transform,
 )
 from slowquant.qiskit_interface.base import FermionicOperator
-from slowquant.qiskit_interface.interface import Clique, QuantumInterface
+from slowquant.qiskit_interface.interface import QuantumInterface
 from slowquant.qiskit_interface.operators import Epq, hamiltonian_pauli_0i_0a
 from slowquant.qiskit_interface.optimizers import RotoSolve
 from slowquant.unitary_coupled_cluster.density_matrix import (
@@ -296,6 +296,7 @@ class WaveFunction:
                 self.QI._primitive = primitive  # pylint: disable=protected-access
         else:
             self.QI._primitive = primitive  # pylint: disable=protected-access
+        print("Reset RDMs, energies, QI metrics, and correlation amtrix.")
         self._rdm1 = None
         self._rdm2 = None
         self._rdm3 = None
@@ -304,19 +305,22 @@ class WaveFunction:
         self.QI.total_device_calls = 0
         self.QI.total_shots_used = 0
         self.QI.total_paulis_evaluated = 0
-        self.QI.cliques = Clique()
+        self.QI._reset_cliques()  # pylint: disable=protected-access
         self.QI._Minv = None  # pylint: disable=protected-access
-        # Initiate re-transpiling if ISA is selected. 
-        self.QI._transpiled = False # pylint: disable=protected-access 
+        # Initiate re-transpiling if ISA is selected.
+        self.QI._transpiled = False  # pylint: disable=protected-access
         self.QI.ISA = self.QI.ISA  # Redo ISA parameter check
 
     def change_shots(self, shots: int) -> None:
         """Change the number of shots for QI interface.
-        
+
         Args:
             shots: Number of shots
         """
         self.QI.shots = shots
+        self.QI._reset_cliques()  # pylint: disable=protected-access
+        print("Reset correlation matrix for M_Ansatz0")
+        self.QI._Minv = None  # pylint: disable=protected-access
 
     @property
     def rdm1(self) -> np.ndarray:

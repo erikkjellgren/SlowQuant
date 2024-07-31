@@ -5,14 +5,13 @@ from typing import Any
 
 import numpy as np
 from qiskit import QuantumCircuit
-from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
-from qiskit.transpiler import PassManager
-from qiskit.primitives import BaseEstimator, BaseSampler, BaseSamplerV2, BaseEstimatorV2
+from qiskit.primitives import BaseEstimator, BaseEstimatorV2, BaseSampler, BaseSamplerV2
 from qiskit.quantum_info import SparsePauliOp
+from qiskit.transpiler import PassManager
+from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFock
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
-from qiskit.result import QuasiDistribution
 
 from slowquant.qiskit_interface.base import FermionicOperator
 from slowquant.qiskit_interface.custom_ansatz import fUCCSD, tUPS
@@ -73,7 +72,7 @@ class QuantumInterface:
             print("WARNING: Using SamplerV2 is an experimental feature.")
         self._primitive = primitive
         self.mapper = mapper
-        self._transpiled = False # Check if circuit has been transpiled
+        self._transpiled = False  # Check if circuit has been transpiled
         self.ISA = ISA
         self.pass_manager = pass_manager
         self.max_shots_per_run = max_shots_per_run
@@ -205,9 +204,11 @@ class QuantumInterface:
             if hasattr(self._primitive, "_transpile_options") and hasattr(
                 self._primitive._transpile_options, "optimization_level"  # pylint: disable=protected-access
             ):
-                self._primitive_level = self._primitive._transpile_options[  # pylint: disable=protected-access
-                    "optimization_level"
-                ]
+                self._primitive_level = (
+                    self._primitive._transpile_options[  # pylint: disable=protected-access
+                        "optimization_level"
+                    ]
+                )
             elif hasattr(self._primitive.options, "optimization_level"):
                 self._primitive_level = self._primitive.options["optimization_level"]
             else:
@@ -219,9 +220,9 @@ class QuantumInterface:
 
             # Check if circuit has been transpiled
             # In case of switching to ISA in later workflow
-            if self._transpiled == False and hasattr(self,"circuit"): 
-                self.circuit = self.circuit
-        
+            if not self._transpiled and hasattr(self, "circuit"):
+                self.circuit = self._transpile_circuit(self.circuit)
+
     @property
     def pass_manager(self) -> PassManager:
         """Get PassManager.
@@ -230,24 +231,22 @@ class QuantumInterface:
             PassManager
         """
         return self._pass_manager
-    
+
     @pass_manager.setter
-    def pass_manager(self,pass_manager) -> None:
+    def pass_manager(self, pass_manager) -> None:
         """Set PassManager.
 
         Args:
             pass_manager: PassManager object from Qiskit.
         """
-        if pass_manager is not None and self.ISA == False:
+        if pass_manager is not None and not self.ISA:
             raise ValueError("You need to enable ISA if you want to use a custom PassManager.")
         self._pass_manager = pass_manager
 
-        # Check if circuit has been transpiled
+        # Check if circuit has been set
         # In case of switching to new PassManager in later workflow
-        if self._transpiled == False and hasattr(self,"circuit"): 
-            self.circuit = self.circuit
-        
-
+        if hasattr(self, "circuit"):
+            self.circuit = self._transpile_circuit(self.circuit)
 
     def _check_layout(self, circuit: QuantumCircuit) -> None:
         """Check if transpiled layout has changed.
@@ -319,14 +318,22 @@ class QuantumInterface:
         """
         # Check if ISA is selected. If yes, pre-transpile circuit for later use.
         if self.ISA:
-            if self.pass_manager is None:
-                pm = generate_preset_pass_manager(self._primitive_level, backend=self._primitive_backend)
-                self._circuit = pm.run(circuit)
-            else:
-                self.circuit = self.pass_manager.run(circuit)
+            self._circuit = self._transpile_circuit(circuit)
             self._transpiled = True
         else:
             self._circuit = circuit
+
+    def _transpile_circuit(self, circuit: QuantumCircuit) -> QuantumCircuit:
+        """Transpile circuit with default or set PassManager.
+
+        Args:
+            circuit: circuit
+
+        """
+        if self.pass_manager is None:
+            pm = generate_preset_pass_manager(self._primitive_level, backend=self._primitive_backend)
+            return pm.run(circuit)
+        return self.pass_manager.run(circuit)
 
     @property
     def shots(self) -> int | None:
@@ -351,11 +358,9 @@ class QuantumInterface:
         self._circuit_multipl = 1
         # Get shot number form primitive if none defined
         if shots is None:
-            if isinstance(self._primitive,BaseSamplerV2):
+            if isinstance(self._primitive, BaseSamplerV2):
                 raise ValueError("BaseSamplerV2 does not support ideal simulator. Set number of shots.")
-            print(
-                "Number of shots is None. Ideal simulator is assumed."
-            )
+            print("Number of shots is None. Ideal simulator is assumed.")
             self._shots = None
         else:
             self._shots = shots
@@ -411,6 +416,7 @@ class QuantumInterface:
     def _reset_cliques(self) -> None:
         """Reset cliques to empty."""
         self.cliques = Clique()
+        print("Pauli saving has been reset.")
 
     def null_shots(self) -> None:
         """Set number of shots to None."""
@@ -453,9 +459,9 @@ class QuantumInterface:
         # Check if estimator or sampler
         if isinstance(self._primitive, BaseEstimator):
             return self._estimator_quantum_expectation_value(op, run_parameters)
-        if ( isinstance(self._primitive, BaseSampler) or isinstance(self._primitive, BaseSamplerV2) ) and save_paulis:
+        if isinstance(self._primitive, (BaseSampler, BaseSamplerV2)) and save_paulis:
             return self._sampler_quantum_expectation_value(op)
-        if ( isinstance(self._primitive, BaseSampler) or isinstance(self._primitive, BaseSamplerV2) ):
+        if isinstance(self._primitive, (BaseSampler, BaseSamplerV2)):
             return self._sampler_quantum_expectation_value_nosave(
                 op, run_parameters, do_cliques=self._do_cliques
             )
@@ -479,10 +485,7 @@ class QuantumInterface:
         if self.ISA:
             observables = observables.apply_layout(self.circuit.layout)
         job = self._primitive.run(
-            circuits=self.circuit,
-            parameter_values=run_parameters,
-            observables=observables,
-            shots=self.shots
+            circuits=self.circuit, parameter_values=run_parameters, observables=observables, shots=self.shots
         )
         if self.shots is not None:  # check if ideal simulator
             self.total_shots_used += self.shots * len(observables)
@@ -770,7 +773,7 @@ class QuantumInterface:
         num_circuits = len(circuits_in)
 
         # Check V1 vs. V2
-        if isinstance(self._primitive,BaseSamplerV2):
+        if isinstance(self._primitive, BaseSamplerV2):
             # Create pubs for V2
             pubs = []
             for nr_pauli, pauli in enumerate(paulis):
@@ -782,10 +785,7 @@ class QuantumInterface:
             pubs = pubs * self._circuit_multipl
 
             # Run sampler
-            job = self._primitive.run(
-                pubs,
-                shots=shots
-            )
+            job = self._primitive.run(pubs, shots=shots)
         else:
             circuits = [None] * (num_paulis * num_circuits)
             # Create QuantumCircuits for V1
@@ -805,26 +805,24 @@ class QuantumInterface:
                 parameter_values = run_parameters * (num_paulis * self._circuit_multipl)  # type: ignore
 
             # Run sampler
-            job = self._primitive.run(
-                circuits,
-                parameter_values=parameter_values,
-                shots=shots
-            )
+            job = self._primitive.run(circuits, parameter_values=parameter_values, shots=shots)
 
         if self.shots is not None:  # check if ideal simulator
-            self.total_shots_used += self.shots * num_paulis * num_circuits 
+            self.total_shots_used += self.shots * num_paulis * num_circuits
         self.total_device_calls += 1
-        self.total_paulis_evaluated += num_paulis * num_circuits 
+        self.total_paulis_evaluated += num_paulis * num_circuits
 
         # Get quasi-distribution in binary probabilities
-        if isinstance(self._primitive,BaseSamplerV2):
-            distr = [res.data.meas.get_counts() for res in job.result()]
-            print(distr)
-            return
-            #distr = [QuasiDistribution({outcome: freq / shots for outcome, freq in res.data.meas.get_counts()}).binary_probabilities() for res in job.result()]
+        if isinstance(self._primitive, BaseSamplerV2):
+            result = job.result()
+            distr = [{}] * len(result)  # type: list[dict]
+            for nr, job in enumerate(result):
+                distr[nr] = job.data.meas.get_counts()
+                for key in distr[nr]:
+                    distr[nr][key] /= shots
         else:
             distr = [res.binary_probabilities() for res in job.result().quasi_dists]
-        
+
         if self._circuit_multipl == 1:
             return distr
 
@@ -878,11 +876,7 @@ class QuantumInterface:
         ansatz_w_obs.measure_all()
 
         # Run sampler
-        job = self._primitive.run(
-            ansatz_w_obs,
-            parameter_values=run_parameters,
-            shots=shots
-        )
+        job = self._primitive.run(ansatz_w_obs, parameter_values=run_parameters, shots=shots)
         if shots is not None:  # check if ideal simulator
             self.total_shots_used += shots
         self.total_device_calls += 1
