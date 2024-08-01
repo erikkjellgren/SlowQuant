@@ -304,7 +304,7 @@ class WaveFunction:
         self.QI.ISA = self.QI.ISA  # Redo ISA parameter check
         self.QI.shots = self.QI.shots  # Redo shots parameter check
 
-    def change_shots(self, shots: int) -> None:
+    def change_shots(self, shots: int | None) -> None:
         """Change the number of shots for QI interface.
 
         Args:

@@ -2,6 +2,7 @@ import numpy as np
 import pyscf
 from qiskit.primitives import Estimator, Sampler
 from qiskit_aer.primitives import Sampler as SamplerAer
+from qiskit_aer.primitives import SamplerV2
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 
 import slowquant.qiskit_interface.linear_response.allprojected as q_allprojected  # pylint: disable=consider-using-from-import
@@ -764,6 +765,15 @@ def test_sampler_changes() -> None:
     assert QI.shots == 200000
     assert QI._circuit_multipl == 4  # pylint: disable=protected-access
 
+    qWF.change_shots(None)
+
+    sampler = SamplerV2()
+    qWF.change_primitive(sampler)
+
+    assert QI.shots == 10000
+    assert QI._transpiled is True  # pylint: disable=protected-access
+    assert QI.ISA is True
+
 
 def test_qiskit_aer() -> None:
     """
@@ -821,3 +831,36 @@ def test_fUCC_h2o() -> None:
 
     WF.run_vqe_2step("RotoSolve", False)
     assert abs(WF.energy_elec - -83.96650295692562) < 10**-6
+
+
+def test_samplerV2() -> None:
+    """
+    Test SamplerV2
+    This just runs a simulation with some shots, checking that nothing is broken.
+    No values are compared.
+    """
+    # Define molecule
+    atom = "Li .0 .0 .0; H .0 .0 1.672"
+    basis = "sto-3g"
+
+    # PySCF
+    mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
+    rhf = pyscf.scf.RHF(mol).run()
+
+    # Optimize WF with QSQ
+    sampler = SamplerV2()
+    mapper = ParityMapper(num_particles=(1, 1))
+
+    QI = QuantumInterface(sampler, "tUCCSD", mapper, shots=10)
+
+    qWF = WaveFunction(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 2),
+        rhf.mo_coeff,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        QI,
+    )
+
+    print(qWF.energy_elec)
