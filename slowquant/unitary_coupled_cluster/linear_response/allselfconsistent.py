@@ -290,7 +290,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 g_part_x += self.Y_G_normed[i, state_number] * expectation_value_propagate_extended(
                     self.csf_coeffs,
                     [G.dagger, self.u.conjugate().transpose(), mux_op_G],
-                    self.wf.ci_coeffs,
+                    self.ci_coeffs,
                     *self.index_info_extended,
                 )
                 g_part_y -= self.Z_G_normed[i, state_number] * expectation_value_propagate_extended(
