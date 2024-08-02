@@ -5,7 +5,7 @@ from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 
 
-def to_CBS_measurement(op: str) -> QuantumCircuit:
+def to_CBS_measurement(op: str, transpiled: None | list[QuantumCircuit] = None) -> QuantumCircuit:
     r"""Convert a Pauli string to Pauli measurement circuit.
 
     This is achived by the following transformation:
@@ -20,20 +20,31 @@ def to_CBS_measurement(op: str) -> QuantumCircuit:
 
     Args:
         op: Pauli string.
+        transpiled: List of transpiled X and Y gate.
 
     Returns:
         Pauli measuremnt quantum circuit.
     """
-    num_qubits = len(op)
-    qc = QuantumCircuit(num_qubits)
-    for i, pauli in enumerate(op[::-1]):
-        if pauli == "X":
-            qc.append(Pauli("X"), [i])
-            qc.h(i)
-        elif pauli == "Y":
-            qc.append(Pauli("Y"), [i])
-            qc.sdg(i)
-            qc.h(i)
+    if transpiled is None:
+        num_qubits = len(op)
+        qc = QuantumCircuit(num_qubits)
+        for i, pauli in enumerate(op[::-1]):
+            if pauli == "X":
+                qc.append(Pauli("X"), [i])
+                qc.h(i)
+            elif pauli == "Y":
+                qc.append(Pauli("Y"), [i])
+                qc.sdg(i)
+                qc.h(i)
+    else:
+        num_qubits = len(op)
+        qc = QuantumCircuit(num_qubits)
+        for i, pauli in enumerate(op[::-1]):
+            if pauli == "X":
+                qc.compose(transpiled[0], [i], inplace=True)
+            elif pauli == "Y":
+                qc.compose(transpiled[1], [i], inplace=True)
+
     return qc
 
 

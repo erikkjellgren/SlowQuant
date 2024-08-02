@@ -283,6 +283,11 @@ class WaveFunction:
         Args:
             primitive: Primitive object.
         """
+        print(
+            "Using this function is only recommended for switching from ideal simulator to shot-noise or quantum hardware.\n \
+            Multiple switching back and forth can lead to un-expected outcomes and is an experimental feature.\n"
+        )
+
         if isinstance(primitive, BaseEstimatorV2):
             raise ValueError("EstimatorV2 is not currently supported.")
         if isinstance(primitive, BaseSamplerV2):
@@ -302,10 +307,14 @@ class WaveFunction:
         self.QI.total_paulis_evaluated = 0
         self.QI._reset_cliques()  # pylint: disable=protected-access
         self.QI._Minv = None  # pylint: disable=protected-access
-        # Initiate re-transpiling if ISA is selected.
-        self.QI._transpiled = False  # pylint: disable=protected-access
-        self.QI.ISA = self.QI.ISA  # Redo ISA parameter check
+
+        # Reset circuit and initiate re-transpiling
+        ISA_old = self.QI.ISA
+        self._reconstruct_circuit()  # Reconstruct circuit but keeping parameters
+        self.QI.ISA = ISA_old  # Redo ISA including transpilation if requested
         self.QI.shots = self.QI.shots  # Redo shots parameter check
+
+        self.QI.get_info()
 
     def change_shots(self, shots: int | None) -> None:
         """Change the number of shots for QI interface.
@@ -321,8 +330,10 @@ class WaveFunction:
 
     def _reconstruct_circuit(self) -> None:
         """Construct circuit again."""
+        # force ISA = False
+        self.QI._ISA = False  # pylint: disable=protected-access
         self.QI.construct_circuit(
-            self.num_active_orbs, (self.num_active_elec // 2, self.num_active_elec // 2)
+            self.num_active_orbs, (self.num_active_elec // 2, self.num_active_elec // 2), reconstruct=True
         )
         self.QI._transpiled = False  # pylint: disable=protected-access
 

@@ -5,6 +5,7 @@ from typing import Any
 
 import numpy as np
 from qiskit import QuantumCircuit
+from qiskit.circuit import ClassicalRegister
 from qiskit.primitives import BaseEstimator, BaseEstimatorV2, BaseSampler, BaseSamplerV2
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler import PassManager
@@ -90,12 +91,13 @@ class QuantumInterface:
         self._save_paulis = True  # hard switch to stop using Pauli saving (debugging tool).
         self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
 
-    def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int]) -> None:
+    def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int], reconstruct: bool = False) -> None:
         """Construct qiskit circuit.
 
         Args:
             num_orbs: Number of orbitals in spatial basis.
             num_elec: Number of electrons (alpha, beta).
+            reconstruct: Boolean to not set parameters to zero (HF)
         """
         self.num_orbs = num_orbs
         self.num_spin_orbs = 2 * num_orbs
@@ -170,8 +172,9 @@ class QuantumInterface:
                 )
 
         self.num_qubits = self.circuit.num_qubits
-        # Set parameter to HarteeFock
-        self._parameters = [0.0] * self.circuit.num_parameters
+        if not reconstruct:
+            # Set parameter to HarteeFock
+            self._parameters = [0.0] * self.circuit.num_parameters
 
     @property
     def ISA(self) -> bool:
@@ -221,6 +224,13 @@ class QuantumInterface:
             # Check if circuit has been transpiled
             # In case of switching to ISA in later workflow
             if not self._transpiled and hasattr(self, "circuit"):
+                if self.pass_manager is None:
+                    # We have switched to ISA and had no PassManager before.
+                    # This will initialize the standard internal transpilation.
+                    self.pass_manager = None
+                elif self._internal_pm:
+                    # We have used internal PassManager before but re-transpilation was requested (probs via change_primitive in WF)
+                    self.pass_manager = None
                 self.circuit = self.circuit
 
     @property
@@ -239,9 +249,11 @@ class QuantumInterface:
         Args:
             pass_manager: PassManager object from Qiskit.
         """
+        self._internal_pm = False
         if pass_manager is not None and not self.ISA:
             raise ValueError("You need to enable ISA if you want to use a custom PassManager.")
         if pass_manager is None and self.ISA:
+            self._internal_pm = True
             self._pass_manager: None | PassManager = generate_preset_pass_manager(
                 self._primitive_level, backend=self._primitive_backend
             )
@@ -251,10 +263,10 @@ class QuantumInterface:
         else:
             self._pass_manager = pass_manager
 
-        # Check if circuit has been set
-        # In case of switching to new PassManager in later workflow
-        if hasattr(self, "circuit"):
-            self.circuit = self.circuit
+            # Check if circuit has been set
+            # In case of switching to new PassManager in later workflow
+            if hasattr(self, "circuit"):
+                self.circuit = self.circuit
 
     def _check_layout(self, circuit: QuantumCircuit) -> None:
         """Check if transpiled layout has changed.
@@ -338,15 +350,27 @@ class QuantumInterface:
             circuit: circuit
 
         """
-        if self.pass_manager is None and not self.ISA:
+        if self.pass_manager is None:
+            raise ValueError("Missing PassManager for transpilation.")
+        if self.pass_manager is None and not self.ISA:  # for init
             raise ValueError(
                 "You have not defined a PassManager but switched on ISA and try to transpile a circuit."
             )
-        if (
-            self.pass_manager is None and self.ISA
-        ):  # If you switch to ISA mid workflow you need to re-initate pass_manager
-            self.pass_manager = None
-        return self.pass_manager.run(circuit)  # type: ignore
+
+        circuit_return = self.pass_manager.run(circuit)
+        # Get layout indices
+        if circuit_return.layout is None:
+            self._layout_indices = np.arange(self.num_qubits)
+        else:
+            self._layout_indices = circuit_return.layout.final_index_layout()
+
+        # Transpile X and Y measurement gates: only translation to basis gates and optimization.
+        self._transp_xy = [
+            self.pass_manager.optimization.run(self.pass_manager.translation.run(to_CBS_measurement("X"))),
+            self.pass_manager.optimization.run(self.pass_manager.translation.run(to_CBS_measurement("Y"))),
+        ]
+
+        return circuit_return
 
     @property
     def shots(self) -> int | None:
@@ -794,26 +818,40 @@ class QuantumInterface:
             # Create pubs for V2
             pubs = []
             for nr_pauli, pauli in enumerate(paulis):
-                pauli_circuit = to_CBS_measurement(pauli)
+                pauli_circuit = to_CBS_measurement(pauli, self._transp_xy)
                 for nr_circuit, circuit in enumerate(circuits_in):
-                    ansatz_w_obs = circuit.compose(pauli_circuit)
-                    ansatz_w_obs.measure_all()
+                    # Add measurement in correct layout
+                    ansatz_w_obs = circuit.compose(pauli_circuit, qubits=self._layout_indices)
+                    # Create classic register and measure relevant qubits
+                    ansatz_w_obs.add_register(ClassicalRegister(self.num_qubits, name="meas"))
+                    ansatz_w_obs.measure(self._layout_indices, np.arange(self.num_qubits))
                     pubs.append((ansatz_w_obs, run_parameters))
             pubs = pubs * self._circuit_multipl
 
             # Run sampler
             job = self._primitive.run(pubs, shots=shots)
         else:
-            circuits = [None] * (num_paulis * num_circuits)
-            # Create QuantumCircuits for V1
-            # In case this function is used stand-alone, be aware: no ISA check is performed here!
-            for nr_pauli, pauli in enumerate(paulis):
-                pauli_circuit = to_CBS_measurement(pauli)
-                for nr_circuit, circuit in enumerate(circuits_in):
-                    ansatz_w_obs = circuit.compose(pauli_circuit)
-                    ansatz_w_obs.measure_all()
-                    circuits[(nr_circuit + (nr_pauli * num_circuits))] = ansatz_w_obs
-            circuits = circuits * self._circuit_multipl
+            if not self.ISA:  # No own layout-design needed: this might be faster. So we leave it for now.
+                circuits = [None] * (num_paulis * num_circuits)
+                # Create QuantumCircuits for V1
+                for nr_pauli, pauli in enumerate(paulis):
+                    pauli_circuit = to_CBS_measurement(pauli)
+                    for nr_circuit, circuit in enumerate(circuits_in):
+                        ansatz_w_obs = circuit.compose(pauli_circuit)
+                        ansatz_w_obs.measure_all()
+                        circuits[(nr_circuit + (nr_pauli * num_circuits))] = ansatz_w_obs
+                circuits = circuits * self._circuit_multipl
+            else:
+                circuits = [None] * (num_paulis * num_circuits)
+                # Create QuantumCircuits for V1
+                for nr_pauli, pauli in enumerate(paulis):
+                    pauli_circuit = to_CBS_measurement(pauli, self._transp_xy)
+                    for nr_circuit, circuit in enumerate(circuits_in):
+                        ansatz_w_obs = circuit.compose(pauli_circuit, qubits=self._layout_indices)
+                        ansatz_w_obs.add_register(ClassicalRegister(self.num_qubits))
+                        ansatz_w_obs.measure(self._layout_indices, np.arange(self.num_qubits))
+                        circuits[(nr_circuit + (nr_pauli * num_circuits))] = ansatz_w_obs
+                circuits = circuits * self._circuit_multipl
 
             # Create parameters array for V1
             if num_circuits == 1:
@@ -1024,3 +1062,16 @@ class QuantumInterface:
                     idx1 = int(bitstring[::-1], 2)
                     M[idx1, idx2] = prob
         self._Minv = np.linalg.inv(M)
+
+    def get_info(self) -> None:
+        """Get infos about settings."""
+        data = f"Your settings are:\n {'Ansatz:':<20} {self.ansatz}\n {'Number of shots:':<20} {self.shots}\n \
+            {'ISA':<20} {self.ISA}\n {'Transpiled circuit':<20} {self._transpiled}\n {'Primitive:':<20} {self._primitive.__class__.__name__}\n \
+            {'Post-processing:':<20} {self.do_postselection}"
+        if self.do_M_mitigation:
+            data += f"\n {'M mitigation:':<20} {self.do_M_mitigation}\n {'M Ansatz0:':<20} {self.do_M_ansatz0}\n {'M IQA:':<20} {self.do_M_iqa}"
+        if self.ISA:
+            data += f"\n {'Circuit layout:':<20} {self._layout_indices}"
+        if self._internal_pm:
+            data += f"\n {'Transpiled backend:':<20} {self._primitive_backend}\n {'Transpiled opt. level:':<20} {self._primitive_level}"
+        print(data)
