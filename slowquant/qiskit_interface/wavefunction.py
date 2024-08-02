@@ -288,7 +288,10 @@ class WaveFunction:
         if isinstance(primitive, BaseSamplerV2):
             print("WARNING: Using SamplerV2 is an experimental feature.")
         self.QI._primitive = primitive  # pylint: disable=protected-access
-        print("Reset RDMs, energies, QI metrics, and correlation matrix.")
+        if self.QI.do_M_ansatz0:
+            print("Reset RDMs, energies, QI metrics, and correlation matrix.")
+        else:
+            print("Reset RDMs, energies, and QI metrics.")
         self._rdm1 = None
         self._rdm2 = None
         self._rdm3 = None
@@ -312,7 +315,8 @@ class WaveFunction:
         """
         self.QI.shots = shots
         self.QI._reset_cliques()  # pylint: disable=protected-access
-        print("Reset correlation matrix for M_Ansatz0")
+        if self.QI.do_M_ansatz0:
+            print("Reset correlation matrix for M_Ansatz0")
         self.QI._Minv = None  # pylint: disable=protected-access
 
     def _reconstruct_circuit(self) -> None:

@@ -224,7 +224,7 @@ class QuantumInterface:
                 self.circuit = self.circuit
 
     @property
-    def pass_manager(self) -> PassManager:
+    def pass_manager(self) -> None | PassManager:
         """Get PassManager.
 
         Returns:
@@ -233,7 +233,7 @@ class QuantumInterface:
         return self._pass_manager
 
     @pass_manager.setter
-    def pass_manager(self, pass_manager) -> None:
+    def pass_manager(self, pass_manager: None | PassManager) -> None:
         """Set PassManager.
 
         Args:
@@ -241,7 +241,15 @@ class QuantumInterface:
         """
         if pass_manager is not None and not self.ISA:
             raise ValueError("You need to enable ISA if you want to use a custom PassManager.")
-        self._pass_manager = pass_manager
+        if pass_manager is None and self.ISA:
+            self._pass_manager: None | PassManager = generate_preset_pass_manager(
+                self._primitive_level, backend=self._primitive_backend
+            )
+            print(
+                f"You selected ISA but did not pass a PassManager. Standard internal transpilation will use backend {self._primitive_backend} with optimization level {self._primitive_level}"
+            )
+        else:
+            self._pass_manager = pass_manager
 
         # Check if circuit has been set
         # In case of switching to new PassManager in later workflow
@@ -330,13 +338,15 @@ class QuantumInterface:
             circuit: circuit
 
         """
-        if self.pass_manager is None:
-            print(
-                f"Internal transpilation uses backend {self._primitive_backend} with optimization level {self._primitive_level}"
+        if self.pass_manager is None and not self.ISA:
+            raise ValueError(
+                "You have not defined a PassManager but switched on ISA and try to transpile a circuit."
             )
-            pm = generate_preset_pass_manager(self._primitive_level, backend=self._primitive_backend)
-            return pm.run(circuit)
-        return self.pass_manager.run(circuit)
+        if (
+            self.pass_manager is None and self.ISA
+        ):  # If you switch to ISA mid workflow you need to re-initate pass_manager
+            self.pass_manager = None
+        return self.pass_manager.run(circuit)  # type: ignore
 
     @property
     def shots(self) -> int | None:
