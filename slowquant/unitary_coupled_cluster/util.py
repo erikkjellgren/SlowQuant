@@ -722,7 +722,7 @@ class UpsStructure:
         Returns:
             tUPS ansatz.
         """
-        valid_options = ("n_layers", "do_qnp")
+        valid_options = ("n_layers", "do_qnp", "skip_last_singles")
         for option in ansatz_options:
             if option not in valid_options:
                 raise ValueError(f"Got unknown option for tUPS, {option}. Valid options are: {valid_options}")
@@ -733,7 +733,11 @@ class UpsStructure:
             do_qnp = ansatz_options["do_qnp"]
         else:
             do_qnp = False
-        for _ in range(n_layers):
+        if "skip_last_singles" in ansatz_options.keys():
+            skip_last_singles = ansatz_options["skip_last_singles"]
+        else:
+            skip_last_singles = False
+        for n in range(n_layers):
             for p in range(0, num_active_orbs - 1, 2):
                 if not do_qnp:
                     # First single
@@ -748,7 +752,7 @@ class UpsStructure:
                 self.excitation_operator_type.append("tups_single")
                 self.excitation_indicies.append((p,))
                 self.n_params += 1
-            for p in range(1, num_active_orbs - 2, 2):
+            for p in range(1, num_active_orbs - 1, 2):
                 if not do_qnp:
                     # First single
                     self.excitation_operator_type.append("tups_single")
@@ -759,6 +763,8 @@ class UpsStructure:
                 self.excitation_indicies.append((p,))
                 self.n_params += 1
                 # Second single
+                if n + 1 == n_layers and skip_last_singles:
+                    continue
                 self.excitation_operator_type.append("tups_single")
                 self.excitation_indicies.append((p,))
                 self.n_params += 1

@@ -40,7 +40,7 @@ def tUPS(
     Returns:
         tUPS ansatz circuit and R parameters needed for gradients.
     """
-    valid_options = ("n_layers", "do_pp", "do_qnp")
+    valid_options = ("n_layers", "do_pp", "do_qnp", "skip_last_singles")
     for option in ansatz_options:
         if option not in valid_options:
             raise ValueError(f"Got unknown option for tUPS, {option}. Valid options are: {valid_options}")
@@ -58,12 +58,14 @@ def tUPS(
 
     if not isinstance(mapper, JordanWignerMapper):
         raise ValueError(f"tUPS only implemented for JW mapper, got: {type(mapper)}")
-    if num_orbs % 2 != 0:
-        raise ValueError(f"tUPS only implemented for even number of spatial orbitals, got: {num_orbs}")
     if do_pp and np.sum(num_elec) != num_orbs:
         raise ValueError(
             f"pp-tUPS only implemented for number of electrons and number of orbitals being the same, got: ({np.sum(num_elec)}, {num_orbs}), (elec, orbs)"
         )
+    if "skip_last_singles" in ansatz_options.keys():
+        skip_last_singles = ansatz_options["skip_last_singles"]
+    else:
+        skip_last_singles = False
 
     num_qubits = 2 * num_orbs  # qc.num_qubits
     if do_pp:
@@ -75,7 +77,7 @@ def tUPS(
         qc = HartreeFock(num_orbs, num_elec, mapper)
     grad_param_R = {}
     idx = 0
-    for _ in range(n_layers):
+    for n in range(n_layers):
         for p in range(0, num_orbs - 1, 2):
             if not do_qnp:
                 # First single
@@ -90,7 +92,7 @@ def tUPS(
             qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx:09d}"))
             grad_param_R[f"p{idx:09d}"] = 4
             idx += 1
-        for p in range(1, num_orbs - 2, 2):
+        for p in range(1, num_orbs - 1, 2):
             if not do_qnp:
                 # First single
                 qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx:09d}"))
@@ -101,6 +103,8 @@ def tUPS(
             grad_param_R[f"p{idx:09d}"] = 2
             idx += 1
             # Second single
+            if n + 1 == n_layers and skip_last_singles:
+                continue
             qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx:09d}"))
             grad_param_R[f"p{idx:09d}"] = 4
             idx += 1
