@@ -21,19 +21,17 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
 from slowquant.unitary_coupled_cluster.operator_matrix import (
     Epq_matrix,
     build_operator_matrix,
+    construct_ups_state,
     expectation_value_mat,
+    get_grad_action,
     get_indexing,
+    propagate_unitary,
 )
 from slowquant.unitary_coupled_cluster.operators import (
     hamiltonian_0i_0a,
     one_elec_op_0i_0a,
 )
-from slowquant.unitary_coupled_cluster.util import (
-    UpsStructure,
-    construct_ups_state,
-    get_grad_action,
-    propagate_unitary,
-)
+from slowquant.unitary_coupled_cluster.util import UpsStructure
 
 
 class WaveFunctionSAUPS:

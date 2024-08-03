@@ -20,12 +20,13 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
 )
 from slowquant.unitary_coupled_cluster.operator_matrix import (
     build_operator_matrix,
+    construct_ups_state,
     expectation_value,
     expectation_value_mat,
     get_indexing,
 )
 from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
-from slowquant.unitary_coupled_cluster.util import UpsStructure, construct_ups_state
+from slowquant.unitary_coupled_cluster.util import UpsStructure
 
 
 class WaveFunctionUPS:
@@ -110,14 +111,6 @@ class WaveFunctionUPS:
             else:
                 self.virtual_spin_idx.append(i)
                 self.num_virtual_spin_orbs += 1
-        if len(self.active_spin_idx) != 0:
-            active_shift = np.min(self.active_spin_idx)
-            for active_idx in self.active_spin_idx:
-                self.active_spin_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_occ_spin_idx:
-                self.active_occ_spin_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_unocc_spin_idx:
-                self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
         self.num_active_elec_alpha = self.num_active_elec // 2
         self.num_active_elec_beta = self.num_active_elec // 2
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2

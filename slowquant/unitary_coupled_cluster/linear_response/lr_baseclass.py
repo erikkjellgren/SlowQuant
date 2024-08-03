@@ -70,7 +70,7 @@ class LinearResponseBaseClass:
         if "6" in excitations:
             for a, i, b, j, c, k, d, l, e, m, f, n in self.theta_picker.get_t6_generator():
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
-        for i, a in self.wf.kappa_idx:
+        for i, a in self.wf.kappa_no_activeactive_idx:
             op = 2 ** (-1 / 2) * Epq(a, i)
             self.q_ops.append(op)
 

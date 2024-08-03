@@ -20,12 +20,13 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
 )
 from slowquant.unitary_coupled_cluster.operator_matrix import (
     build_operator_matrix,
+    construct_ucc_state,
     expectation_value,
     expectation_value_mat,
     get_indexing,
 )
 from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
-from slowquant.unitary_coupled_cluster.util import ThetaPicker, construct_ucc_u
+from slowquant.unitary_coupled_cluster.util import UccStructure
 
 
 class WaveFunctionUCC:
@@ -37,6 +38,7 @@ class WaveFunctionUCC:
         c_orthonormal: np.ndarray,
         h_ao: np.ndarray,
         g_ao: np.ndarray,
+        excitations: str,
         include_active_kappa: bool = False,
     ) -> None:
         """Initialize for UCC wave function.
@@ -64,6 +66,9 @@ class WaveFunctionUCC:
         self.active_spin_idx_shifted = []
         self.active_occ_spin_idx_shifted = []
         self.active_unocc_spin_idx_shifted = []
+        self.active_idx_shifted = []
+        self.active_occ_idx_shifted = []
+        self.active_unocc_idx_shifted = []
         self.num_elec = num_elec
         self.num_elec_alpha = num_elec // 2
         self.num_elec_beta = num_elec // 2
@@ -80,7 +85,6 @@ class WaveFunctionUCC:
         self._rdm4 = None
         self._h_mo = None
         self._g_mo = None
-        self._u = None
         active_space = []
         orbital_counter = 0
         for i in range(num_elec - cas[0], num_elec):
@@ -105,14 +109,6 @@ class WaveFunctionUCC:
             else:
                 self.virtual_spin_idx.append(i)
                 self.num_virtual_spin_orbs += 1
-        if len(self.active_spin_idx) != 0:
-            active_shift = np.min(self.active_spin_idx)
-            for active_idx in self.active_spin_idx:
-                self.active_spin_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_occ_spin_idx:
-                self.active_occ_spin_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_unocc_spin_idx:
-                self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
         self.num_active_elec_alpha = self.num_active_elec // 2
         self.num_active_elec_beta = self.num_active_elec // 2
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
@@ -139,9 +135,27 @@ class WaveFunctionUCC:
         for idx in self.active_unocc_spin_idx:
             if idx // 2 not in self.active_unocc_idx:
                 self.active_unocc_idx.append(idx // 2)
+        # Make shifted indecies
+        if len(self.active_spin_idx) != 0:
+            active_shift = np.min(self.active_spin_idx)
+            for active_idx in self.active_spin_idx:
+                self.active_spin_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_occ_spin_idx:
+                self.active_occ_spin_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_unocc_spin_idx:
+                self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
+        if len(self.active_idx) != 0:
+            active_shift = np.min(self.active_idx)
+            for active_idx in self.active_idx:
+                self.active_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_occ_idx:
+                self.active_occ_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_unocc_idx:
+                self.active_unocc_idx_shifted.append(active_idx - active_shift)
         # Find non-redundant kappas
         self.kappa = []
         self.kappa_idx = []
+        self.kappa_no_activeactive_idx = []
         self.kappa_idx_dagger = []
         self.kappa_redundant = []
         self.kappa_redundant_idx = []
@@ -177,6 +191,8 @@ class WaveFunctionUCC:
                         self._kappa_redundant_old.append(0.0)
                         self.kappa_redundant_idx.append([p, q])
                         continue
+                if not (p in self.active_idx and q in self.active_idx):
+                    self.kappa_no_activeactive_idx.append([p, q])
                 self.kappa.append(0.0)
                 self._kappa_old.append(0.0)
                 self.kappa_idx.append([p, q])
@@ -199,36 +215,28 @@ class WaveFunctionUCC:
         self.csf_coeffs = np.zeros(self.num_det)
         hf_det = int("1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec), 2)
         self.csf_coeffs[self.det2idx[hf_det]] = 1
-        self.ci_coeffs = np.copy(self.csf_coeffs)
-        # Allocate parameterization
-        self.singlet_excitation_operator_generator = ThetaPicker(
-            self.active_occ_spin_idx_shifted,
-            self.active_unocc_spin_idx_shifted,
-        )
-        # Construct theta1
-        self._theta1 = []
-        for _ in self.singlet_excitation_operator_generator.get_t1_generator_sa():
-            self._theta1.append(0.0)
-        # Construct theta2
-        self._theta2 = []
-        for _ in self.singlet_excitation_operator_generator.get_t2_generator_sa():
-            self._theta2.append(0.0)
-        # Construct theta3
-        self._theta3 = []
-        for _ in self.singlet_excitation_operator_generator.get_t3_generator():
-            self._theta3.append(0.0)
-        # Construct theta4
-        self._theta4 = []
-        for _ in self.singlet_excitation_operator_generator.get_t4_generator():
-            self._theta4.append(0.0)
-        # Construct theta5
-        self._theta5 = []
-        for _ in self.singlet_excitation_operator_generator.get_t5_generator():
-            self._theta5.append(0.0)
-        # Construct theta6
-        self._theta6 = []
-        for _ in self.singlet_excitation_operator_generator.get_t6_generator():
-            self._theta6.append(0.0)
+        self._ci_coeffs = np.copy(self.csf_coeffs)
+        # Construct UCC
+        self.ucc_layout = UccStructure()
+        if "s" in excitations.lower():
+            self.ucc_layout.add_sa_singles(self.active_occ_idx_shifted, self.active_unocc_idx_shifted)
+        if "d" in excitations.lower():
+            self.ucc_layout.add_sa_doubles(self.active_occ_idx_shifted, self.active_unocc_idx_shifted)
+        if "t" in excitations.lower():
+            self.ucc_layout.add_triples(self.active_occ_spin_idx_shifted, self.active_unocc_spin_idx_shifted)
+        if "q" in excitations.lower():
+            self.ucc_layout.add_quadruples(
+                self.active_occ_spin_idx_shifted, self.active_unocc_spin_idx_shifted
+            )
+        if "5" in excitations.lower():
+            self.ucc_layout.add_quintuples(
+                self.active_occ_spin_idx_shifted, self.active_unocc_spin_idx_shifted
+            )
+        if "6" in excitations.lower():
+            self.ucc_layout.add_sextuples(
+                self.active_occ_spin_idx_shifted, self.active_unocc_spin_idx_shifted
+            )
+        self._thetas = np.zeros(self.ucc_layout.n_params).tolist()
 
     def save_wavefunction(self, filename: str, force_overwrite: bool = False) -> None:
         """Save the wave function to a compressed NumPy object.
@@ -279,214 +287,42 @@ class WaveFunctionUCC:
         self._c_orthonormal = c
 
     @property
-    def u(self) -> np.ndarray:
-        """Get unitary ansatz.
-
-        Return:
-            Unitary ansatz.
-        """
-        if self._u is None:
-            thetas = []
-            if "s" in self._excitations:
-                thetas += self.theta1
-            if "d" in self._excitations:
-                thetas += self.theta2
-            if "t" in self._excitations:
-                thetas += self.theta3
-            if "q" in self._excitations:
-                thetas += self.theta4
-            if "5" in self._excitations:
-                thetas += self.theta5
-            if "6" in self._excitations:
-                thetas += self.theta6
-            self._u = construct_ucc_u(
-                self.num_det,
+    def ci_coeffs(self) -> np.ndarray:
+        if self._ci_coeffs is None:
+            self._ci_coeffs = construct_ucc_state(
+                self.csf_coeffs,
                 self.num_active_orbs,
                 self.num_active_elec_alpha,
                 self.num_active_elec_beta,
-                thetas,
-                self.singlet_excitation_operator_generator,
-                self._excitations,
+                self._thetas,
+                self.ucc_layout,
             )
-        return self._u
+        return self._ci_coeffs
 
     @property
-    def theta1(self) -> list[float]:
-        """Get theta1 values.
+    def thetas(self) -> list[float]:
+        """Get theta values.
 
         Returns:
-            theta1 values.
+            theta values.
         """
-        return self._theta1
+        return self._thetas.copy()
 
-    @theta1.setter
-    def theta1(self, theta: list[float]) -> None:
+    @thetas.setter
+    def thetas(self, theta: list[float]) -> None:
         """Set theta1 values.
 
         Args:
             theta: theta1 values.
         """
-        if len(theta) != len(self._theta1):
-            raise ValueError(f"Expected {len(self._theta1)} theta1 values got {len(theta)}")
+        if len(theta) != len(self._thetas):
+            raise ValueError(f"Expected {len(self._thetas)} theta1 values got {len(theta)}")
         self._rdm1 = None
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
-        self._u = None
-        self._theta1 = theta.copy()
-        self.ci_coeffs = np.matmul(self.u, self.csf_coeffs)
-
-    @property
-    def theta2(self) -> list[float]:
-        """Get theta2 values.
-
-        Returns:
-            theta2 values.
-        """
-        return self._theta2
-
-    @theta2.setter
-    def theta2(self, theta: list[float]) -> None:
-        """Set theta2 values.
-
-        Args:
-            theta: theta2 values.
-        """
-        if len(theta) != len(self._theta2):
-            raise ValueError(f"Expected {len(self._theta2)} theta2 values got {len(theta)}")
-        self._rdm1 = None
-        self._rdm2 = None
-        self._rdm3 = None
-        self._rdm4 = None
-        self._u = None
-        self._theta2 = theta.copy()
-        self.ci_coeffs = np.matmul(self.u, self.csf_coeffs)
-
-    @property
-    def theta3(self) -> list[float]:
-        """Get theta3 values.
-
-        Returns:
-            theta3 values.
-        """
-        return self._theta3
-
-    @theta3.setter
-    def theta3(self, theta: list[float]) -> None:
-        """Set theta3 values.
-
-        Args:
-            theta: theta3 values.
-        """
-        if len(theta) != len(self._theta3):
-            raise ValueError(f"Expected {len(self._theta3)} theta3 values got {len(theta)}")
-        self._rdm1 = None
-        self._rdm2 = None
-        self._rdm3 = None
-        self._rdm4 = None
-        self._u = None
-        self._theta3 = theta.copy()
-
-    @property
-    def theta4(self) -> list[float]:
-        """Get theta4 values.
-
-        Returns:
-            theta4 values.
-        """
-        return self._theta4
-
-    @theta4.setter
-    def theta4(self, theta: list[float]) -> None:
-        """Set theta4 values.
-
-        Args:
-            theta: theta4 values.
-        """
-        if len(theta) != len(self._theta4):
-            raise ValueError(f"Expected {len(self._theta4)} theta4 values got {len(theta)}")
-        self._rdm1 = None
-        self._rdm2 = None
-        self._rdm3 = None
-        self._rdm4 = None
-        self._u = None
-        self._theta4 = theta.copy()
-
-    @property
-    def theta5(self) -> list[float]:
-        """Get theta5 values.
-
-        Returns:
-            theta5 values.
-        """
-        return self._theta5
-
-    @theta5.setter
-    def theta5(self, theta: list[float]) -> None:
-        """Set theta5 values.
-
-        Args:
-            theta: theta5 values.
-        """
-        if len(theta) != len(self._theta5):
-            raise ValueError(f"Expected {len(self._theta5)} theta5 values got {len(theta)}")
-        self._rdm1 = None
-        self._rdm2 = None
-        self._rdm3 = None
-        self._rdm4 = None
-        self._u = None
-        self._theta5 = theta.copy()
-
-    @property
-    def theta6(self) -> list[float]:
-        """Get theta6 values.
-
-        Returns:
-            theta6 values.
-        """
-        return self._theta6
-
-    @theta6.setter
-    def theta6(self, theta: list[float]) -> None:
-        """Set theta6 values.
-
-        Args:
-            theta: theta6 values.
-        """
-        if len(theta) != len(self._theta6):
-            raise ValueError(f"Expected {len(self._theta6)} theta6 values got {len(theta)}")
-        self._rdm1 = None
-        self._rdm2 = None
-        self._rdm3 = None
-        self._rdm4 = None
-        self._u = None
-        self._theta6 = theta.copy()
-
-    def add_multiple_theta(self, theta: dict[str, list[float]], excitations: str) -> None:
-        """Add multiple ranks of thetas.
-
-        Args:
-            theta: Dictionary of thetas.
-            excitations: Excitations to be included.
-        """
-        if "s" in excitations:
-            self._theta1 = theta["theta1"].copy()
-        if "d" in excitations:
-            self._theta2 = theta["theta2"].copy()
-        if "t" in excitations:
-            self._theta3 = theta["theta3"].copy()
-        if "q" in excitations:
-            self._theta4 = theta["theta4"].copy()
-        if "5" in excitations:
-            self._theta5 = theta["theta5"].copy()
-        if "6" in excitations:
-            self._theta6 = theta["theta6"].copy()
-        self._rdm1 = None
-        self._rdm2 = None
-        self._rdm3 = None
-        self._rdm4 = None
-        self._u = None
-        self.ci_coeffs = np.matmul(self.u, self.csf_coeffs)
+        self._ci_coeffs = None
+        self._thetas = theta.copy()
 
     @property
     def c_trans(self) -> np.ndarray:
@@ -545,13 +381,18 @@ class WaveFunctionUCC:
                     q_idx = q - self.num_inactive_orbs
                     val = expectation_value(
                         self.ci_coeffs,
-                        Epq(p, q),
+                        [Epq(p, q)],
                         self.ci_coeffs,
                         self.idx2det,
                         self.det2idx,
                         self.num_inactive_orbs,
                         self.num_active_orbs,
                         self.num_virtual_orbs,
+                        self.num_active_elec_alpha,
+                        self.num_active_elec_beta,
+                        self.thetas,
+                        self.ucc_layout,
+                        "UCC",
                     )
                     self._rdm1[p_idx, q_idx] = val  # type: ignore
                     self._rdm1[q_idx, p_idx] = val  # type: ignore
@@ -591,13 +432,18 @@ class WaveFunctionUCC:
                             s_idx = s - self.num_inactive_orbs
                             val = expectation_value(
                                 self.ci_coeffs,
-                                Epq(p, q) * Epq(r, s),
+                                [Epq(p, q), Epq(r, s)],
                                 self.ci_coeffs,
                                 self.idx2det,
                                 self.det2idx,
                                 self.num_inactive_orbs,
                                 self.num_active_orbs,
                                 self.num_virtual_orbs,
+                                self.num_active_elec_alpha,
+                                self.num_active_elec_beta,
+                                self.thetas,
+                                self.ucc_layout,
+                                "UCC",
                             )
                             if q == r:
                                 val -= self.rdm1[p_idx, s_idx]
@@ -641,13 +487,18 @@ class WaveFunctionUCC:
                                     u_idx = u - self.num_inactive_orbs
                                     val = expectation_value(
                                         self.ci_coeffs,
-                                        Epq(p, q) * Epq(r, s) * Epq(t, u),
+                                        [Epq(p, q), Epq(r, s), Epq(t, u)],
                                         self.ci_coeffs,
                                         self.idx2det,
                                         self.det2idx,
                                         self.num_inactive_orbs,
                                         self.num_active_orbs,
                                         self.num_virtual_orbs,
+                                        self.num_active_elec_alpha,
+                                        self.num_active_elec_beta,
+                                        self.thetas,
+                                        self.ucc_layout,
+                                        "UCC",
                                     )
                                     if t == s:
                                         val -= self.rdm2[p_idx, q_idx, r_idx, u_idx]
@@ -711,13 +562,18 @@ class WaveFunctionUCC:
                                             n_idx = n - self.num_inactive_orbs
                                             val = expectation_value(
                                                 self.ci_coeffs,
-                                                Epq(p, q) * Epq(r, s) * Epq(t, u) * Epq(m, n),
+                                                [Epq(p, q), Epq(r, s), Epq(t, u), Epq(m, n)],
                                                 self.ci_coeffs,
                                                 self.idx2det,
                                                 self.det2idx,
                                                 self.num_inactive_orbs,
                                                 self.num_active_orbs,
                                                 self.num_virtual_orbs,
+                                                self.num_active_elec_alpha,
+                                                self.num_active_elec_beta,
+                                                self.thetas,
+                                                self.ucc_layout,
+                                                "UCC",
                                             )
                                             if r == q:
                                                 val -= self.rdm3[p_idx, s_idx, t_idx, u_idx, m_idx, n_idx]
@@ -909,7 +765,6 @@ class WaveFunctionUCC:
 
     def run_ucc(
         self,
-        excitations: str,
         orbital_optimization: bool = False,
         is_silent: bool = False,
         convergence_threshold: float = 10**-10,
@@ -918,23 +773,18 @@ class WaveFunctionUCC:
         """Run optimization of UCC wave function.
 
         Args:
-            excitations: Excitation orders to include.
             orbital_optimization: Do orbital optimization.
             is_silent: Do not print any output.
             convergence_threshold: Energy threshold for convergence.
             maxiter: Maximum number of iterations.
         """
-        excitations = excitations.lower()
-        self._excitations = excitations
         e_tot = partial(
             energy_ucc,
-            excitations=excitations,
             orbital_optimized=orbital_optimization,
             wf=self,
         )
         parameter_gradient = partial(
             gradient_ucc,
-            excitations=excitations,
             orbital_optimized=orbital_optimization,
             wf=self,
         )
@@ -943,7 +793,7 @@ class WaveFunctionUCC:
         iteration = 0  # type: ignore
         start = time.time()  # type: ignore
 
-        def print_progress(x: Sequence[float]) -> None:
+        def print_progress(x: list[float]) -> None:
             """Print progress during energy minimization of wave function.
 
             Args:
@@ -955,11 +805,9 @@ class WaveFunctionUCC:
             e_str = f"{e_tot(x):3.12f}"
             print(f"{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
             iteration += 1  # type: ignore [name-defined]
-            if iteration > 500:  # type: ignore [name-defined]
-                raise ValueError("Did not converge in 500 iterations in energy minimization.")
             start = time.time()  # type: ignore [name-defined]
 
-        def silent_progress(x: Sequence[float]) -> None:  # pylint: disable=unused-argument
+        def silent_progress(x: list[float]) -> None:  # pylint: disable=unused-argument
             """Print progress during energy minimization of wave function.
 
             Args:
@@ -967,8 +815,6 @@ class WaveFunctionUCC:
             """
             global iteration  # pylint: disable=global-variable-undefined
             iteration += 1  # type: ignore [name-defined]
-            if iteration > 500:  # type: ignore [name-defined]
-                raise ValueError("Did not converge in 500 iterations in energy minimization.")
 
         parameters: list[float] = []
         num_kappa = 0
@@ -981,30 +827,23 @@ class WaveFunctionUCC:
         if orbital_optimization:
             parameters += self.kappa
             num_kappa += len(self.kappa)
-        if "s" in excitations:
-            for _ in self.singlet_excitation_operator_generator.get_t1_generator_sa():
-                parameters += [self.theta1[num_theta1]]
+        for theta in self.thetas:
+            parameters.append(theta)
+        for exc_type in self.ucc_layout.excitation_operator_type:
+            if exc_type == "sa_single":
                 num_theta1 += 1
-        if "d" in excitations:
-            for _ in self.singlet_excitation_operator_generator.get_t2_generator_sa():
-                parameters += [self.theta2[num_theta2]]
+            elif exc_type in ("sa_double_1", "sa_double_2"):
                 num_theta2 += 1
-        if "t" in excitations:
-            for _ in self.singlet_excitation_operator_generator.get_t3_generator():
-                parameters += [self.theta3[num_theta3]]
+            elif exc_type == "triple":
                 num_theta3 += 1
-        if "q" in excitations:
-            for _ in self.singlet_excitation_operator_generator.get_t4_generator():
-                parameters += [self.theta4[num_theta4]]
+            elif exc_type == "quadruple":
                 num_theta4 += 1
-        if "5" in excitations:
-            for _ in self.singlet_excitation_operator_generator.get_t5_generator():
-                parameters += [self.theta5[num_theta5]]
+            elif exc_type == "quintuple":
                 num_theta5 += 1
-        if "6" in excitations:
-            for _ in self.singlet_excitation_operator_generator.get_t6_generator():
-                parameters += [self.theta6[num_theta6]]
+            elif exc_type == "sextuple":
                 num_theta6 += 1
+            else:
+                raise ValueError(f"Got unknown excitation type, {exc_type}")
         if is_silent:
             res = scipy.optimize.minimize(
                 e_tot,
@@ -1046,65 +885,11 @@ class WaveFunctionUCC:
             for i in range(len(self.kappa_redundant)):  # pylint: disable=consider-using-enumerate
                 self.kappa_redundant[i] = 0
                 self._kappa_redundant_old[i] = 0
-        if "s" in excitations:
-            thetas = res["x"][param_idx : num_theta1 + param_idx].tolist()
-            param_idx += len(thetas)
-            counter = 0
-            idx = 0
-            for _ in self.singlet_excitation_operator_generator.get_t1_generator_sa():
-                self.theta1[idx] = thetas[counter]
-                counter += 1
-                idx += 1
-        if "d" in excitations:
-            thetas = res["x"][param_idx : num_theta2 + param_idx].tolist()
-            param_idx += len(thetas)
-            counter = 0
-            idx = 0
-            for _ in self.singlet_excitation_operator_generator.get_t2_generator_sa():
-                self.theta2[idx] = thetas[counter]
-                counter += 1
-                idx += 1
-        if "t" in excitations:
-            thetas = res["x"][param_idx : num_theta3 + param_idx].tolist()
-            param_idx += len(thetas)
-            counter = 0
-            idx = 0
-            for _ in self.singlet_excitation_operator_generator.get_t3_generator():
-                self.theta3[idx] = thetas[counter]
-                counter += 1
-                idx += 1
-        if "q" in excitations:
-            thetas = res["x"][param_idx : num_theta4 + param_idx].tolist()
-            param_idx += len(thetas)
-            counter = 0
-            idx = 0
-            for _ in self.singlet_excitation_operator_generator.get_t4_generator():
-                self.theta4[idx] = thetas[counter]
-                counter += 1
-                idx += 1
-        if "5" in excitations:
-            thetas = res["x"][param_idx : num_theta5 + param_idx].tolist()
-            param_idx += len(thetas)
-            counter = 0
-            idx = 0
-            for _ in self.singlet_excitation_operator_generator.get_t5_generator():
-                self.theta5[idx] = thetas[counter]
-                counter += 1
-                idx += 1
-        if "6" in excitations:
-            thetas = res["x"][param_idx : num_theta6 + param_idx].tolist()
-            param_idx += len(thetas)
-            counter = 0
-            idx = 0
-            for _ in self.singlet_excitation_operator_generator.get_t6_generator():
-                self.theta6[idx] = thetas[counter]
-                counter += 1
-                idx += 1
+        self.thetas = res["x"][param_idx:].tolist()
 
 
 def energy_ucc(
-    parameters: Sequence[float],
-    excitations: str,
+    parameters: list[float],
     orbital_optimized: bool,
     wf: WaveFunctionUCC,
 ) -> float:
@@ -1116,7 +901,6 @@ def energy_ucc(
     Args:
         parameters: Sequence of all parameters.
                     Ordered as orbital rotations, active-space singles, active-space doubles, ...
-        excitations: Excitation orders to consider.
         orbital_optimized: Do orbital optimization.
         wf: Wave function object.
 
@@ -1124,44 +908,12 @@ def energy_ucc(
         Electronic energy.
     """
     kappa = []
-    theta1 = []
-    theta2 = []
-    theta3 = []
-    theta4 = []
-    theta5 = []
-    theta6 = []
     idx_counter = 0
     if orbital_optimized:
         for _ in range(len(wf.kappa_idx)):
             kappa.append(parameters[idx_counter])
             idx_counter += 1
-    if "s" in excitations:
-        for _ in wf.singlet_excitation_operator_generator.get_t1_generator_sa():
-            theta1.append(parameters[idx_counter])
-            idx_counter += 1
-    if "d" in excitations:
-        for _ in wf.singlet_excitation_operator_generator.get_t2_generator_sa():
-            theta2.append(parameters[idx_counter])
-            idx_counter += 1
-    if "t" in excitations:
-        for _ in wf.singlet_excitation_operator_generator.get_t3_generator():
-            theta3.append(parameters[idx_counter])
-            idx_counter += 1
-    if "q" in excitations:
-        for _ in wf.singlet_excitation_operator_generator.get_t4_generator():
-            theta4.append(parameters[idx_counter])
-            idx_counter += 1
-    if "5" in excitations:
-        for _ in wf.singlet_excitation_operator_generator.get_t5_generator():
-            theta5.append(parameters[idx_counter])
-            idx_counter += 1
-    if "6" in excitations:
-        for _ in wf.singlet_excitation_operator_generator.get_t6_generator():
-            theta6.append(parameters[idx_counter])
-            idx_counter += 1
-    assert len(parameters) == len(kappa) + len(theta1) + len(theta2) + len(theta3) + len(theta4) + len(
-        theta5
-    ) + len(theta6)
+    theta = parameters[idx_counter:]
 
     kappa_mat = np.zeros_like(wf.c_orthonormal)
     if orbital_optimized:
@@ -1186,40 +938,33 @@ def energy_ucc(
     # Moving expansion point of kappa
     wf.c_orthonormal = c_trans
     # Add thetas
-    theta_dict = {}
-    if "s" in excitations:
-        theta_dict["theta1"] = theta1
-    if "d" in excitations:
-        theta_dict["theta2"] = theta2
-    if "t" in excitations:
-        theta_dict["theta3"] = theta3
-    if "q" in excitations:
-        theta_dict["theta4"] = theta4
-    if "5" in excitations:
-        theta_dict["theta5"] = theta5
-    if "6" in excitations:
-        theta_dict["theta6"] = theta6
-    wf.add_multiple_theta(theta_dict, excitations)
+    wf.thetas = theta
     return expectation_value(
         wf.ci_coeffs,
-        hamiltonian_0i_0a(
-            wf.h_mo,
-            wf.g_mo,
-            wf.num_inactive_orbs,
-            wf.num_active_orbs,
-        ),
+        [
+            hamiltonian_0i_0a(
+                wf.h_mo,
+                wf.g_mo,
+                wf.num_inactive_orbs,
+                wf.num_active_orbs,
+            )
+        ],
         wf.ci_coeffs,
         wf.idx2det,
         wf.det2idx,
         wf.num_inactive_orbs,
         wf.num_active_orbs,
         wf.num_inactive_orbs,
+        wf.num_active_elec_alpha,
+        wf.num_active_elec_beta,
+        wf.thetas,
+        wf.ucc_layout,
+        "UCC",
     )
 
 
 def gradient_ucc(
-    parameters: Sequence[float],
-    excitations: str,
+    parameters: list[float],
     orbital_optimized: bool,
     wf: WaveFunctionUCC,
 ) -> np.ndarray:
@@ -1228,7 +973,6 @@ def gradient_ucc(
     Args:
         parameters: Sequence of all parameters.
                     Ordered as orbital rotations, active-space singles, active-space doubles, ...
-        excitations: Excitation orders to consider.
         orbital_optimized: Do orbital optimization.
         wf: Wave function object.
 
@@ -1246,7 +990,6 @@ def gradient_ucc(
     gradient[number_kappas:] = active_space_parameter_gradient(
         wf,
         parameters,
-        excitations,
         orbital_optimized,
     )
     return gradient
@@ -1278,8 +1021,7 @@ def orbital_rotation_gradient(
 
 def active_space_parameter_gradient(
     wf: WaveFunctionUCC,
-    parameters: Sequence[float],
-    excitations: str,
+    parameters: list[float],
     orbital_optimized: bool,
 ) -> np.ndarray:
     """Calcuate electronic gradient with respect to active space parameters.
@@ -1288,51 +1030,16 @@ def active_space_parameter_gradient(
         wf: Wave function object.
         parameters: Sequence of all parameters.
                     Ordered as orbital rotations, active-space singles, active-space doubles, ...
-        excitations: Excitation orders to consider.
         orbital_optimized: Do orbital optimization.
 
     Returns:
         Electronic gradient with respect to active spae parameters.
     """
-    kappa = []
-    theta1 = []
-    theta2 = []
-    theta3 = []
-    theta4 = []
-    theta5 = []
-    theta6 = []
     idx_counter = 0
     if orbital_optimized:
         for _ in range(len(wf.kappa_idx)):
-            kappa.append(0 * parameters[idx_counter])
             idx_counter += 1
-    if "s" in excitations:
-        for _ in wf.singlet_excitation_operator_generator.get_t1_generator_sa():
-            theta1.append(parameters[idx_counter])
-            idx_counter += 1
-    if "d" in excitations:
-        for _ in wf.singlet_excitation_operator_generator.get_t2_generator_sa():
-            theta2.append(parameters[idx_counter])
-            idx_counter += 1
-    if "t" in excitations:
-        for _ in wf.singlet_excitation_operator_generator.get_t3_generator():
-            theta3.append(parameters[idx_counter])
-            idx_counter += 1
-    if "q" in excitations:
-        for _ in wf.singlet_excitation_operator_generator.get_t4_generator():
-            theta4.append(parameters[idx_counter])
-            idx_counter += 1
-    if "5" in excitations:
-        for _ in wf.singlet_excitation_operator_generator.get_t5_generator():
-            theta5.append(parameters[idx_counter])
-            idx_counter += 1
-    if "6" in excitations:
-        for _ in wf.singlet_excitation_operator_generator.get_t6_generator():
-            theta6.append(parameters[idx_counter])
-            idx_counter += 1
-    assert len(parameters) == len(kappa) + len(theta1) + len(theta2) + len(theta3) + len(theta4) + len(
-        theta5
-    ) + len(theta6)
+    theta_params = parameters[idx_counter:]
 
     Hamiltonian = build_operator_matrix(
         hamiltonian_0i_0a(
@@ -1346,7 +1053,6 @@ def active_space_parameter_gradient(
         wf.num_active_orbs,
     )
 
-    theta_params = theta1 + theta2 + theta3 + theta4 + theta5 + theta6
     gradient_theta = np.zeros_like(theta_params)
     eps = np.finfo(np.float64).eps ** (1 / 2)
     E = expectation_value_mat(wf.ci_coeffs, Hamiltonian, wf.ci_coeffs)
@@ -1354,50 +1060,10 @@ def active_space_parameter_gradient(
         sign_step = (theta_params[i] >= 0).astype(float) * 2 - 1  # type: ignore [attr-defined]
         step_size = eps * sign_step * max(1, abs(theta_params[i]))
         theta_params[i] += step_size
-        theta_dict = {}
-        idx = 0
-        if "s" in excitations:
-            theta_dict["theta1"] = theta_params[idx : idx + len(theta1)]
-            idx += len(theta1)
-        if "d" in excitations:
-            theta_dict["theta2"] = theta_params[idx : idx + len(theta2)]
-            idx += len(theta2)
-        if "t" in excitations:
-            theta_dict["theta3"] = theta_params[idx : idx + len(theta3)]
-            idx += len(theta3)
-        if "q" in excitations:
-            theta_dict["theta4"] = theta_params[idx : idx + len(theta4)]
-            idx += len(theta4)
-        if "5" in excitations:
-            theta_dict["theta5"] = theta_params[idx : idx + len(theta5)]
-            idx += len(theta5)
-        if "6" in excitations:
-            theta_dict["theta6"] = theta_params[idx : idx + len(theta6)]
-            idx += len(theta6)
-        wf.add_multiple_theta(theta_dict, excitations)
+        wf.thetas = theta_params
         E_plus = expectation_value_mat(wf.ci_coeffs, Hamiltonian, wf.ci_coeffs)
         theta_params[i] -= step_size
-        theta_dict = {}
-        idx = 0
-        if "s" in excitations:
-            theta_dict["theta1"] = theta_params[idx : idx + len(theta1)]
-            idx += len(theta1)
-        if "d" in excitations:
-            theta_dict["theta2"] = theta_params[idx : idx + len(theta2)]
-            idx += len(theta2)
-        if "t" in excitations:
-            theta_dict["theta3"] = theta_params[idx : idx + len(theta3)]
-            idx += len(theta3)
-        if "q" in excitations:
-            theta_dict["theta4"] = theta_params[idx : idx + len(theta4)]
-            idx += len(theta4)
-        if "5" in excitations:
-            theta_dict["theta5"] = theta_params[idx : idx + len(theta5)]
-            idx += len(theta5)
-        if "6" in excitations:
-            theta_dict["theta6"] = theta_params[idx : idx + len(theta6)]
-            idx += len(theta6)
-        wf.add_multiple_theta(theta_dict, excitations)
+        wf.thetas = theta_params
         gradient_theta[i] = (E_plus - E) / step_size
     return gradient_theta
 

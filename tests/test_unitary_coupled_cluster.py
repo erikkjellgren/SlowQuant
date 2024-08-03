@@ -24,8 +24,10 @@ def test_heh_sto3g_hf() -> None:
     g_eri = A.integral.electron_repulsion_tensor
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
-    WF = WaveFunctionUCC(A.molecule.number_bf * 2, A.molecule.number_electrons, (2, 1), S_sqrt, h_core, g_eri)
-    WF.run_ucc("S", True)
+    WF = WaveFunctionUCC(
+        A.molecule.number_bf * 2, A.molecule.number_electrons, (2, 1), S_sqrt, h_core, g_eri, "S"
+    )
+    WF.run_ucc(True)
     assert abs(WF.energy_elec - (-4.262632309847)) < 10**-8
 
 
@@ -42,8 +44,10 @@ def test_lih_sto3g_hf() -> None:
     g_eri = A.integral.electron_repulsion_tensor
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
-    WF = WaveFunctionUCC(A.molecule.number_bf * 2, A.molecule.number_electrons, (2, 1), S_sqrt, h_core, g_eri)
-    WF.run_ucc("S", True)
+    WF = WaveFunctionUCC(
+        A.molecule.number_bf * 2, A.molecule.number_electrons, (2, 1), S_sqrt, h_core, g_eri, "S"
+    )
+    WF.run_ucc(True)
     assert abs(WF.energy_elec - (-8.862246324082243)) < 10**-8
 
 
@@ -61,8 +65,10 @@ def test_heh_sto3g_uccs() -> None:
     g_eri = A.integral.electron_repulsion_tensor
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
-    WF = WaveFunctionUCC(A.molecule.number_bf * 2, A.molecule.number_electrons, (2, 2), S_sqrt, h_core, g_eri)
-    WF.run_ucc("S")
+    WF = WaveFunctionUCC(
+        A.molecule.number_bf * 2, A.molecule.number_electrons, (2, 2), S_sqrt, h_core, g_eri, "S"
+    )
+    WF.run_ucc()
     assert abs(WF.energy_elec - (-4.262632309847)) < 10**-8
 
 
@@ -96,8 +102,9 @@ def test_h10_sto3g_uccsd() -> None:
         A.hartree_fock.mo_coeff,
         h_core,
         g_eri,
+        "SD",
     )
-    WF.run_ucc("SD", False)
+    WF.run_ucc(False)
     assert abs(WF.energy_elec - (-18.839645894737956)) < 10**-8
 
 

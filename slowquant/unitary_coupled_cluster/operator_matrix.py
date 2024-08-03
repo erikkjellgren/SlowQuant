@@ -18,6 +18,7 @@ from slowquant.unitary_coupled_cluster.operators import (
     G2_1_sa,
     G2_2_sa,
 )
+from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
 
 
 def get_indexing(
@@ -102,13 +103,18 @@ def build_operator_matrix(
 
 
 def propagate_state(
-    op: FermionicOperator,
+    operators: Sequence[FermionicOperator] | Sequence[str],
     state: np.ndarray,
     idx2det: Sequence[int],
     det2idx: dict[int, int],
     num_inactive_orbs: int,
     num_active_orbs: int,
     num_virtual_orbs: int,
+    num_active_elec_alpha: int,
+    num_active_elec_beta: int,
+    thetas: Sequence[float],
+    wf_struct: UpsStructure | UccStructure,
+    wave_function_type: str,
 ) -> np.ndarray:
     r"""Propagate state by applying operator.
 
@@ -118,61 +124,103 @@ def propagate_state(
         \left|\tilde{0}\right> = \hat{O}\left|0\right>
 
     Args:
-        op: Operator.
+        operators: Operator.
         state: State.
-        idx2det: Index to determiant mapping.
-        det2idx: Determinant to index mapping.
-        num_inactive_orbs: Number of inactive spatial orbitals.
-        num_active_orbs: Number of active spatial orbitals.
-        num_virtual_orbs: Number of virtual spatial orbitals.
 
     Returns:
         New state.
     """
-    op_folded = op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs)
+    if wave_function_type == "UPS":
+        if not isinstance(wf_struct, UpsStructure):
+            raise TypeError(
+                f"UPS wave function requires ups_struct of type UpsStructure got {type(wf_struct)}"
+            )
+    elif wave_function_type == "UCC":
+        if not isinstance(wf_struct, UccStructure):
+            raise TypeError(
+                f"UCC wave function requires ups_struct of type UccStructure got {type(wf_struct)}"
+            )
     num_dets = len(idx2det)
-    new_state = np.zeros(num_dets)
+    new_state = np.copy(state)
+    tmp_state = np.zeros(num_dets)
     parity_check = {0: 0}
     num = 0
     for i in range(2 * num_active_orbs - 1, -1, -1):
         num += 2**i
         parity_check[2 * num_active_orbs - i] = num
-    for i in range(num_dets):
-        if abs(state[i]) < 10**-14:
-            continue
-        det_ = idx2det[i]
-        for fermi_label in op_folded.factors:
-            det = det_
-            phase_changes = 0
-            for fermi_op in op_folded.operators[fermi_label][::-1]:
-                orb_idx = fermi_op.idx
-                nth_bit = (det >> 2 * num_active_orbs - 1 - orb_idx) & 1
-                if nth_bit == 0 and fermi_op.dagger:
-                    det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
-                    phase_changes += (det & parity_check[orb_idx]).bit_count()
-                elif nth_bit == 1 and fermi_op.dagger:
-                    break
-                elif nth_bit == 0 and not fermi_op.dagger:
-                    break
-                elif nth_bit == 1 and not fermi_op.dagger:
-                    det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
-                    phase_changes += (det & parity_check[orb_idx]).bit_count()
-            else:  # nobreak
-                val = op_folded.factors[fermi_label] * (-1) ** phase_changes
-                if abs(val) > 10**-14:
-                    new_state[det2idx[det]] += val * state[i]
+    for op in operators[::-1]:
+        tmp_state[:] = 0.0
+        if isinstance(op, str):
+            if op not in ("U", "Ud"):
+                raise ValueError(f"Unknown str operator, expected ('U', 'Ud') got {op}")
+            else:
+                dagger = False
+                if op == "Ud":
+                    dagger = True
+                if wave_function_type == "UPS":
+                    new_state = construct_ups_state(
+                        new_state,
+                        num_active_orbs,
+                        num_active_elec_alpha,
+                        num_active_elec_beta,
+                        thetas,
+                        wf_struct,
+                        dagger=dagger,
+                    )
+                elif wave_function_type == "UCC":
+                    new_state = construct_ucc_state(
+                        new_state,
+                        num_active_orbs,
+                        num_active_elec_beta,
+                        num_active_elec_alpha,
+                        thetas,
+                        wf_struct,
+                        dagger=dagger,
+                    )
+        else:
+            op_folded = op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs)
+            for i in range(num_dets):
+                if abs(new_state[i]) < 10**-14:
+                    continue
+                det_ = idx2det[i]
+                for fermi_label in op_folded.factors:
+                    det = det_
+                    phase_changes = 0
+                    for fermi_op in op_folded.operators[fermi_label][::-1]:
+                        orb_idx = fermi_op.idx
+                        nth_bit = (det >> 2 * num_active_orbs - 1 - orb_idx) & 1
+                        if nth_bit == 0 and fermi_op.dagger:
+                            det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
+                            phase_changes += (det & parity_check[orb_idx]).bit_count()
+                        elif nth_bit == 1 and fermi_op.dagger:
+                            break
+                        elif nth_bit == 0 and not fermi_op.dagger:
+                            break
+                        elif nth_bit == 1 and not fermi_op.dagger:
+                            det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
+                            phase_changes += (det & parity_check[orb_idx]).bit_count()
+                    else:  # nobreak
+                        val = op_folded.factors[fermi_label] * (-1) ** phase_changes
+                        if abs(val) > 10**-14:
+                            tmp_state[det2idx[det]] += val * new_state[i]
+            new_state = np.copy(tmp_state)
     return new_state
 
 
 def expectation_value(
     bra: np.ndarray,
-    op: FermionicOperator,
+    operators: Sequence[FermionicOperator] | Sequence[str],
     ket: np.ndarray,
     idx2det: Sequence[int],
     det2idx: dict[int, int],
     num_inactive_orbs: int,
     num_active_orbs: int,
     num_virtual_orbs: int,
+    num_active_elec_alpha: int,
+    num_active_elec_beta: int,
+    thetas: Sequence[float],
+    wf_struct: UpsStructure | UccStructure,
+    wave_function_type: str,
 ) -> float:
     """Calculate expectation value of operator.
 
@@ -189,13 +237,21 @@ def expectation_value(
     Returns:
         Expectation value.
     """
-    op_mat = build_operator_matrix(
-        op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs),
+    op_ket = propagate_state(
+        operators,
+        ket,
         idx2det,
         det2idx,
+        num_inactive_orbs,
         num_active_orbs,
+        num_virtual_orbs,
+        num_active_elec_alpha,
+        num_active_elec_beta,
+        thetas,
+        wf_struct,
+        wave_function_type,
     )
-    return np.matmul(bra, np.matmul(op_mat, ket))
+    return bra @ op_ket
 
 
 def expectation_value_commutator(
@@ -585,3 +641,290 @@ def T6_matrix(
     idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
     op = build_operator_matrix(G6(i, j, k, l, m, n, a, b, c, d, e, f), idx2det, det2idx, num_active_orbs)
     return ss.lil_array(op - op.conjugate().transpose())
+
+
+def construct_ucc_state(
+    state: np.ndarray,
+    num_active_orbs: int,
+    num_active_elec_alpha: int,
+    num_active_elec_beta: int,
+    thetas: Sequence[float],
+    ucc_struct: UccStructure,
+    dagger: bool = False,
+) -> np.ndarray:
+    """Contruct unitary transformation matrix.
+
+    Args:
+        num_det: Number of determinants.
+        num_active_orbs: Number of active spatial orbitals.
+        num_elec_alpha: Number of active alpha electrons.
+        num_elec_beta: Number of active beta electrons.
+        thetas: Active-space parameters.
+               Ordered as (S, D, T, ...).
+
+    Returns:
+        Unitary transformation matrix.
+    """
+    T = np.zeros((len(state), len(state)))
+    for exc_type, exc_indices, theta in zip(
+        ucc_struct.excitation_operator_type, ucc_struct.excitation_indicies, thetas
+    ):
+        if abs(theta) < 10**-14:
+            continue
+        if dagger:
+            theta = -theta
+        if exc_type == "sa_single":
+            (i, a) = exc_indices
+            T += (
+                theta
+                * T1_sa_matrix(i, a, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
+            )
+        elif exc_type == "sa_double_1":
+            (i, j, a, b) = exc_indices
+            T += (
+                theta
+                * T2_1_sa_matrix(
+                    i, j, a, b, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+                ).todense()
+            )
+        elif exc_type == "sa_double_2":
+            (i, j, a, b) = exc_indices
+            T += (
+                theta
+                * T2_2_sa_matrix(
+                    i, j, a, b, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+                ).todense()
+            )
+        elif exc_type == "triple":
+            (i, j, k, a, b, c) = exc_indices
+            T += (
+                theta
+                * T3_matrix(
+                    i, j, k, a, b, c, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+                ).todense()
+            )
+        elif exc_type == "quadruple":
+            (i, j, k, l, a, b, c, d) = exc_indices
+            T += (
+                theta
+                * T4_matrix(
+                    i,
+                    j,
+                    k,
+                    l,
+                    a,
+                    b,
+                    c,
+                    d,
+                    num_active_orbs,
+                    num_active_elec_alpha,
+                    num_active_elec_beta,
+                ).todense()
+            )
+        elif exc_type == "quintuple":
+            (i, j, k, l, m, a, b, c, d, e) = exc_indices
+            T += (
+                theta
+                * T5_matrix(
+                    i,
+                    j,
+                    k,
+                    l,
+                    m,
+                    a,
+                    b,
+                    c,
+                    d,
+                    e,
+                    num_active_orbs,
+                    num_active_elec_alpha,
+                    num_active_elec_beta,
+                ).todense()
+            )
+        elif exc_type == "sextuple":
+            (i, j, k, l, m, n, a, b, c, d, e, f) = exc_indices
+            T += (
+                theta
+                * T6_matrix(
+                    i,
+                    j,
+                    k,
+                    l,
+                    m,
+                    n,
+                    a,
+                    b,
+                    c,
+                    d,
+                    e,
+                    f,
+                    num_active_orbs,
+                    num_active_elec_alpha,
+                    num_active_elec_beta,
+                ).todense()
+            )
+        else:
+            raise ValueError(f"Got unknown excitation type, {exc_type}")
+    return ss.linalg.expm_multiply(T, state)
+
+
+def construct_ups_state(
+    state: np.ndarray,
+    num_active_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
+    thetas: Sequence[float],
+    ups_struct: UpsStructure,
+    dagger: bool = False,
+) -> np.ndarray:
+    r"""
+
+    #. 10.48550/arXiv.2303.10825, Eq. 15
+    """
+    tmp = state.copy()
+    order = 1
+    if dagger:
+        order = -1
+    for exc_type, exc_indices, theta in zip(
+        ups_struct.excitation_operator_type[::order], ups_struct.excitation_indicies[::order], thetas[::order]
+    ):
+        if abs(theta) < 10**-14:
+            continue
+        if dagger:
+            theta = -theta
+        if exc_type in ("tups_single", "sa_single"):
+            if exc_type == "tups_single":
+                (p,) = exc_indices
+                Ta = T1_matrix(p * 2, (p + 1) * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+                Tb = T1_matrix(
+                    p * 2 + 1, (p + 1) * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta
+                ).todense()
+            elif exc_type == "sa_single":
+                (i, a) = exc_indices
+                Ta = T1_matrix(i * 2, a * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+                Tb = T1_matrix(i * 2 + 1, a * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            tmp = (
+                tmp
+                + np.sin(2 ** (-1 / 2) * theta) * np.matmul(Ta, tmp)
+                + (1 - np.cos(2 ** (-1 / 2) * theta)) * np.matmul(Ta, np.matmul(Ta, tmp))
+            )
+            tmp = (
+                tmp
+                + np.sin(2 ** (-1 / 2) * theta) * np.matmul(Tb, tmp)
+                + (1 - np.cos(2 ** (-1 / 2) * theta)) * np.matmul(Tb, np.matmul(Tb, tmp))
+            )
+        elif exc_type in ("tups_double", "single", "double"):
+            if exc_type == "tups_double":
+                (p,) = exc_indices
+                T = T2_1_sa_matrix(
+                    p, p, p + 1, p + 1, num_active_orbs, num_elec_alpha, num_elec_beta
+                ).todense()
+            elif exc_type == "single":
+                (i, a) = exc_indices
+                T = T1_matrix(i, a, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            elif exc_type == "double":
+                (i, j, a, b) = exc_indices
+                T = T2_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            tmp = (
+                tmp
+                + np.sin(theta) * np.matmul(T, tmp)
+                + (1 - np.cos(theta)) * np.matmul(T, np.matmul(T, tmp))
+            )
+        else:
+            raise ValueError(f"Got unknown excitation type, {exc_type}")
+    return tmp
+
+
+def propagate_unitary(
+    state: np.ndarray,
+    idx: int,
+    num_active_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
+    thetas: Sequence[float],
+    ups_struct: UpsStructure,
+) -> np.ndarray:
+    exc_type = ups_struct.excitation_operator_type[idx]
+    exc_indices = ups_struct.excitation_indicies[idx]
+    theta = thetas[idx]
+    if abs(theta) < 10**-14:
+        return np.copy(state)
+    if exc_type in ("tups_single", "sa_single"):
+        if exc_type == "tups_single":
+            (p,) = exc_indices
+            Ta = T1_matrix(p * 2, (p + 1) * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            Tb = T1_matrix(
+                p * 2 + 1, (p + 1) * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta
+            ).todense()
+        elif exc_type == "sa_single":
+            (i, a) = exc_indices
+            Ta = T1_matrix(i * 2, a * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            Tb = T1_matrix(i * 2 + 1, a * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+        A = 2 ** (-1 / 2)
+        tmp = (
+            state
+            + np.sin(A * theta) * np.matmul(Ta, state)
+            + (1 - np.cos(A * theta)) * np.matmul(Ta, np.matmul(Ta, state))
+        )
+        tmp = (
+            tmp
+            + np.sin(A * theta) * np.matmul(Tb, tmp)
+            + (1 - np.cos(A * theta)) * np.matmul(Tb, np.matmul(Tb, tmp))
+        )
+    elif exc_type in ("tups_double", "single", "double"):
+        if exc_type == "tups_double":
+            (p,) = exc_indices
+            T = T2_1_sa_matrix(p, p, p + 1, p + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+        elif exc_type == "single":
+            (i, a) = exc_indices
+            T = T1_matrix(i, a, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+        elif exc_type == "double":
+            (i, j, a, b) = exc_indices
+            T = T2_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+        tmp = (
+            state
+            + np.sin(theta) * np.matmul(T, state)
+            + (1 - np.cos(theta)) * np.matmul(T, np.matmul(T, state))
+        )
+    else:
+        raise ValueError(f"Got unknown excitation type, {exc_type}")
+    return tmp
+
+
+def get_grad_action(
+    state: np.ndarray,
+    idx: int,
+    num_active_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
+    ups_struct: UpsStructure,
+) -> np.ndarray:
+    exc_type = ups_struct.excitation_operator_type[idx]
+    exc_indices = ups_struct.excitation_indicies[idx]
+    if exc_type in ("tups_single", "sa_single"):
+        if exc_type == "tups_single":
+            (p,) = exc_indices
+            Ta = T1_matrix(p * 2, (p + 1) * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            Tb = T1_matrix(
+                p * 2 + 1, (p + 1) * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta
+            ).todense()
+        elif exc_type == "sa_single":
+            (i, a) = exc_indices
+            Ta = T1_matrix(i * 2, a * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            Tb = T1_matrix(i * 2 + 1, a * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+        A = 2 ** (-1 / 2)
+        tmp = np.matmul(A * (Ta + Tb), state)
+    elif exc_type in ("tups_double", "single", "double"):
+        if exc_type == "tups_double":
+            (p,) = exc_indices
+            T = T2_1_sa_matrix(p, p, p + 1, p + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+        elif exc_type == "single":
+            (i, a) = exc_indices
+            T = T1_matrix(i, a, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+        elif exc_type == "double":
+            (i, j, a, b) = exc_indices
+            T = T2_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+        tmp = np.matmul(T, state)
+    else:
+        raise ValueError(f"Got unknown excitation type, {exc_type}")
+    return tmp
