@@ -264,6 +264,11 @@ def expectation_value_commutator(
     num_inactive_orbs: int,
     num_active_orbs: int,
     num_virtual_orbs: int,
+    num_active_elec_alpha: int,
+    num_active_elec_beta: int,
+    thetas: Sequence[float],
+    wf_struct: UpsStructure | UccStructure,
+    wave_function_type: str,
 ) -> float:
     r"""Calculate expecation value of commutator.
 
@@ -285,13 +290,21 @@ def expectation_value_commutator(
         Expectation value.
     """
     op = A * B - B * A
-    op_mat = build_operator_matrix(
-        op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs),
+    return expectation_value(
+        bra,
+        [op],
+        ket,
         idx2det,
         det2idx,
+        num_inactive_orbs,
         num_active_orbs,
+        num_virtual_orbs,
+        num_active_elec_alpha,
+        num_active_elec_beta,
+        thetas,
+        wf_struct,
+        wave_function_type,
     )
-    return np.matmul(bra, np.matmul(op_mat, ket))
 
 
 def expectation_value_double_commutator(
@@ -305,6 +318,11 @@ def expectation_value_double_commutator(
     num_inactive_orbs: int,
     num_active_orbs: int,
     num_virtual_orbs: int,
+    num_active_elec_alpha: int,
+    num_active_elec_beta: int,
+    thetas: Sequence[float],
+    wf_struct: UpsStructure | UccStructure,
+    wave_function_type: str,
 ) -> float:
     r"""Calculate expecation value of double commutator.
 
@@ -327,13 +345,21 @@ def expectation_value_double_commutator(
         Expectation value.
     """
     op = A * B * C - A * C * B - B * C * A + C * B * A
-    op_mat = build_operator_matrix(
-        op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs),
+    return expectation_value(
+        bra,
+        [op],
+        ket,
         idx2det,
         det2idx,
+        num_inactive_orbs,
         num_active_orbs,
+        num_virtual_orbs,
+        num_active_elec_alpha,
+        num_active_elec_beta,
+        thetas,
+        wf_struct,
+        wave_function_type,
     )
-    return np.matmul(bra, np.matmul(op_mat, ket))
 
 
 def expectation_value_mat(bra: np.ndarray, op: np.ndarray, ket: np.ndarray) -> float:

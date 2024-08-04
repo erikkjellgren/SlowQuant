@@ -217,6 +217,7 @@ class WaveFunctionUCC:
         self.csf_coeffs[self.det2idx[hf_det]] = 1
         self._ci_coeffs = np.copy(self.csf_coeffs)
         # Construct UCC
+        self._excitations = excitations  # Needed for saving the wave function
         self.ucc_layout = UccStructure()
         if "s" in excitations.lower():
             self.ucc_layout.add_sa_singles(self.active_occ_idx_shifted, self.active_unocc_idx_shifted)
@@ -249,15 +250,11 @@ class WaveFunctionUCC:
             raise ValueError(f"{filename}.npz already exists and force_overwrite is False.")
         np.savez_compressed(
             f"{filename}.npz",
-            theta1=self.theta1,
-            theta2=self.theta2,
-            theta3=self.theta3,
-            theta4=self.theta4,
-            theta5=self.theta5,
-            theta6=self.theta6,
+            thetas=self.thetas,
             c_trans=self.c_trans,
             h_ao=self.h_ao,
             g_ao=self.g_ao,
+            excitations=self._excitations,
             num_spin_orbs=self.num_spin_orbs,
             num_elec=self.num_elec,
             num_active_elec=self.num_active_elec,
@@ -1085,53 +1082,11 @@ def load_wavefunction(filename: str) -> WaveFunctionUCC:
         dat["c_trans"],
         dat["h_ao"],
         dat["g_ao"],
+        str(dat["excitations"]),
         bool(dat["include_active_kappa"]),
     )
-    excitations = ""
-    if len(dat["theta1"]) > 0:
-        if np.max(np.abs(dat["theta1"])) > 10**-6:
-            excitations += "s"
-    if len(dat["theta2"]) > 0:
-        if np.max(np.abs(dat["theta2"])) > 10**-6:
-            excitations += "d"
-    if len(dat["theta3"]) > 0:
-        if np.max(np.abs(dat["theta3"])) > 10**-6:
-            excitations += "t"
-    if len(dat["theta4"]) > 0:
-        if np.max(np.abs(dat["theta4"])) > 10**-6:
-            excitations += "q"
-    if len(dat["theta5"]) > 0:
-        if np.max(np.abs(dat["theta5"])) > 10**-6:
-            excitations += "5"
-    if len(dat["theta6"]) > 0:
-        if np.max(np.abs(dat["theta6"])) > 10**-6:
-            excitations += "6"
-    wf._excitations = excitations  # pylint: disable=protected-access
-    wf.add_multiple_theta(
-        {
-            "theta1": list(dat["theta1"]),
-            "theta2": list(dat["theta2"]),
-            "theta3": list(dat["theta3"]),
-            "theta4": list(dat["theta4"]),
-            "theta5": list(dat["theta5"]),
-            "theta6": list(dat["theta6"]),
-        },
-        wf._excitations,  # pylint: disable=protected-access
-    )
-    thetas = []
-    if "s" in wf._excitations:  # pylint: disable=protected-access
-        thetas += wf.theta1
-    if "d" in wf._excitations:  # pylint: disable=protected-access
-        thetas += wf.theta2
-    if "t" in wf._excitations:  # pylint: disable=protected-access
-        thetas += wf.theta3
-    if "q" in wf._excitations:  # pylint: disable=protected-access
-        thetas += wf.theta4
-    if "5" in wf._excitations:  # pylint: disable=protected-access
-        thetas += wf.theta5
-    if "6" in wf._excitations:  # pylint: disable=protected-access
-        thetas += wf.theta6
-    energy = energy_ucc(thetas, wf._excitations, False, wf)  # pylint: disable=protected-access
+    wf.thetas = dat["thetas"]
+    energy = energy_ucc(wf.thetas, False, wf)  # pylint: disable=protected-access
     if abs(energy - float(dat["energy_elec"])) > 10**-6:
         raise ValueError(
             f'Calculate energy is different from saved energy: {energy} and {float(dat["energy_elec"])}.'

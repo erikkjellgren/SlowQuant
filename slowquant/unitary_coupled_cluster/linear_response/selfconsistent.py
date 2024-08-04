@@ -68,20 +68,19 @@ class LinearResponseUCC(LinearResponseBaseClass):
         grad = np.zeros(2 * len(self.G_ops))
         for i, op in enumerate(self.G_ops):
             state = propagate_state(
-                op,
+                ["U", op],
                 self.wf.csf_coeffs,
                 *self.index_info,
             )
-            state = np.matmul(self.wf.u, state)
             grad[i] = -expectation_value(
                 self.wf.ci_coeffs,
-                self.H_0i_0a,
+                [self.H_0i_0a],
                 state,
                 *self.index_info,
             )
             grad[i + len(self.G_ops)] = expectation_value(
                 state,
-                self.H_0i_0a,
+                [self.H_0i_0a],
                 self.wf.ci_coeffs,
                 *self.index_info,
             )
@@ -114,28 +113,27 @@ class LinearResponseUCC(LinearResponseBaseClass):
         for j, qJ in enumerate(self.q_ops):
             for i, GI in enumerate(self.G_ops):
                 state = propagate_state(
-                    GI,
+                    ["U", GI],
                     self.wf.csf_coeffs,
                     *self.index_info,
                 )
-                state = np.matmul(self.wf.u, state)
                 if do_approximate_hermitification:
                     # Make A
                     self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = expectation_value(
                         state,
-                        self.H_1i_1a * qJ,
+                        [self.H_1i_1a * qJ],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     ) + expectation_value(
                         state,
-                        qJ.dagger * self.H_1i_1a,
+                        [qJ.dagger * self.H_1i_1a],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )  # added an assumed zero (approximation)
                     # Make B
                     self.B_tracked[j, i + idx_shift] = self.B_tracked[i + idx_shift, j] = -expectation_value(
                         state,
-                        qJ.dagger * self.H_1i_1a,
+                        [qJ.dagger * self.H_1i_1a],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
@@ -143,63 +141,49 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     # Make A
                     self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = expectation_value(
                         state,
-                        self.H_1i_1a * qJ,
+                        [self.H_1i_1a * qJ],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
                     # Make B
                     self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = -expectation_value(
                         state,
-                        qJ.dagger * self.H_1i_1a,
+                        [qJ.dagger * self.H_1i_1a],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
         for j, GJ in enumerate(self.G_ops):
             stateJ = propagate_state(
-                GJ,
+                ["U", GJ],
                 self.wf.csf_coeffs,
                 *self.index_info,
             )
-            stateJ = np.matmul(self.wf.u, stateJ)
             for i, GI in enumerate(self.G_ops[j:], j):
                 stateI = propagate_state(
-                    GI,
-                    self.wf.csf_coeffs,
-                    *self.index_info,
-                )
-                stateI = np.matmul(self.wf.u, stateI)
-                stateIJ = propagate_state(
-                    GI,
+                    ["U", GI],
                     self.wf.csf_coeffs,
                     *self.index_info,
                 )
                 stateIJ = propagate_state(
-                    GJ,
-                    stateIJ,
-                    *self.index_info,
-                )
-                stateIJ = np.matmul(self.wf.u, stateIJ)
-                stateIJd = propagate_state(
-                    GI,
+                    ["U", GJ, GI],
                     self.wf.csf_coeffs,
                     *self.index_info,
                 )
                 stateIJd = propagate_state(
-                    GJ.dagger,
-                    stateIJd,
+                    ["U", GJ.dagger, GI],
+                    self.wf.csf_coeffs,
                     *self.index_info,
                 )
-                stateIJd = np.matmul(self.wf.u, stateIJd)
                 # Make A
                 val = expectation_value(
                     stateI,
-                    self.H_0i_0a,
+                    [self.H_0i_0a],
                     stateJ,
                     *self.index_info,
                 )
                 val += -expectation_value(
                     stateIJd,
-                    self.H_0i_0a,
+                    [self.H_0i_0a],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
@@ -208,7 +192,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = (
                     -expectation_value(
                         stateIJ,
-                        self.H_0i_0a,
+                        [self.H_0i_0a],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
@@ -291,44 +275,43 @@ class LinearResponseUCC(LinearResponseBaseClass):
             g_part_z = 0.0
             for i, G in enumerate(self.G_ops):
                 state = propagate_state(
-                    G,
+                    ["U", G],
                     self.wf.csf_coeffs,
                     *self.index_info,
                 )
-                state = np.matmul(self.wf.u, state)
                 g_part_x -= self.Z_G_normed[i, state_number] * expectation_value(
                     self.wf.ci_coeffs,
-                    mux_op,
+                    [mux_op],
                     state,
                     *self.index_info,
                 )
                 g_part_x += self.Y_G_normed[i, state_number] * expectation_value(
                     state,
-                    mux_op,
+                    [mux_op],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
                 g_part_y -= self.Z_G_normed[i, state_number] * expectation_value(
                     self.wf.ci_coeffs,
-                    muy_op,
+                    [muy_op],
                     state,
                     *self.index_info,
                 )
                 g_part_y += self.Y_G_normed[i, state_number] * expectation_value(
                     state,
-                    muy_op,
+                    [muy_op],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
                 g_part_z -= self.Z_G_normed[i, state_number] * expectation_value(
                     self.wf.ci_coeffs,
-                    muz_op,
+                    [muz_op],
                     state,
                     *self.index_info,
                 )
                 g_part_z += self.Y_G_normed[i, state_number] * expectation_value(
                     state,
-                    muz_op,
+                    [muz_op],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )

@@ -157,6 +157,7 @@ class WaveFunctionUPS:
         # Find non-redundant kappas
         self.kappa = []
         self.kappa_idx = []
+        self.kappa_no_activeactive_idx = []
         self.kappa_idx_dagger = []
         self.kappa_redundant = []
         self.kappa_redundant_idx = []
@@ -192,6 +193,8 @@ class WaveFunctionUPS:
                         self._kappa_redundant_old.append(0.0)
                         self.kappa_redundant_idx.append([p, q])
                         continue
+                if not (p in self.active_idx and q in self.active_idx):
+                    self.kappa_no_activeactive_idx.append([p, q])
                 self.kappa.append(0.0)
                 self._kappa_old.append(0.0)
                 self.kappa_idx.append([p, q])
@@ -211,10 +214,10 @@ class WaveFunctionUPS:
             self.num_active_orbs, self.num_active_elec_alpha, self.num_active_elec_beta
         )
         self.num_det = len(self.idx2det)
-        self.hf_coeffs = np.zeros(self.num_det)
+        self.csf_coeffs = np.zeros(self.num_det)
         hf_det = int("1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec), 2)
-        self.hf_coeffs[self.det2idx[hf_det]] = 1
-        self.ci_coeffs = np.copy(self.hf_coeffs)
+        self.csf_coeffs[self.det2idx[hf_det]] = 1
+        self.ci_coeffs = np.copy(self.csf_coeffs)
         self.ups_layout = UpsStructure()
         if ansatz.lower() == "tups":
             self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
@@ -278,7 +281,7 @@ class WaveFunctionUPS:
         self._u = None
         self._thetas = theta_vals.copy()
         self.ci_coeffs = construct_ups_state(
-            self.hf_coeffs,
+            self.csf_coeffs,
             self.num_active_orbs,
             self.num_active_elec_alpha,
             self.num_active_elec_beta,

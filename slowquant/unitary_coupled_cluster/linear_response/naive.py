@@ -109,13 +109,13 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 # Make A
                 val = expectation_value(
                     self.wf.ci_coeffs,
-                    GI.dagger * self.H_1i_1a * qJ,
+                    [GI.dagger, self.H_1i_1a * qJ],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
                 val += -expectation_value(
                     self.wf.ci_coeffs,
-                    self.H_1i_1a * qJ * GI.dagger,
+                    [self.H_1i_1a * qJ, GI.dagger],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
@@ -123,13 +123,13 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 # Make B
                 val = expectation_value(
                     self.wf.ci_coeffs,
-                    qJ.dagger * self.H_1i_1a * GI.dagger,
+                    [qJ.dagger * self.H_1i_1a, GI.dagger],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
                 val += -expectation_value(
                     self.wf.ci_coeffs,
-                    GI.dagger * qJ.dagger * self.H_1i_1a,
+                    [GI.dagger, qJ.dagger * self.H_1i_1a],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
