@@ -29,17 +29,16 @@ class QuantumInterface:
     This class handles the interface with qiskit and the communication with quantum hardware.
     """
 
-    def __init__(  # pylint: disable=dangerous-default-value
+    def __init__(
         self,
         primitive: BaseEstimator | BaseSampler,
         ansatz: str,
         mapper: FermionicMapper,
         ISA: bool = False,
-        ansatz_options: dict[str, Any] = {},
+        ansatz_options: dict[str, Any] | None = None,
         shots: None | int = None,
         max_shots_per_run: int = 100000,
         do_M_mitigation: bool = False,
-        do_M_iqa: bool = False,
         do_M_ansatz0: bool = False,
         do_postselection: bool = True,
     ) -> None:
@@ -55,10 +54,11 @@ class QuantumInterface:
             shots: Number of shots. If not specified use shotnumber from primitive (default).
             max_shots_per_run: Maximum number of shots allowed in a single run. Set to 100000 per IBM machines.
             do_M_mitigation: Do error mitigation via read-out correlation matrix.
-            do_M_iqa: Use independent qubit approximation when constructing the read-out correlation matrix.
             do_M_ansatz0: Use the ansatz with theta=0 when constructing the read-out correlation matrix.
             do_postselection: Use postselection to preserve number of particles in the computational basis.
         """
+        if ansatz_options is None:
+            ansatz_options = {}
         allowed_ansatz = ("tUCCSD", "tPUCCD", "tUCCD", "tUPS", "fUCCSD")
         if ansatz not in allowed_ansatz:
             raise ValueError("The chosen Ansatz is not available. Choose from: ", allowed_ansatz)
@@ -69,7 +69,6 @@ class QuantumInterface:
         self.max_shots_per_run = max_shots_per_run
         self.shots = shots
         self.do_M_mitigation = do_M_mitigation
-        self.do_M_iqa = do_M_iqa
         self.do_M_ansatz0 = do_M_ansatz0
         self._Minv = None
         self.total_shots_used = 0
@@ -920,8 +919,8 @@ class QuantumInterface:
         """
         print("Measuring error mitigation read-out matrix.")
         self._save_layout = True
-        if self.num_qubits > 12:
-            raise ValueError("Current implementation does not scale above 12 qubits?")
+        if self.num_qubits > 8:
+            raise ValueError("Current implementation does not scale above 8 qubits?")
         if "transpilation" in self._primitive.options:
             if self._primitive.options["transpilation"]["initial_layout"] is None:
                 raise ValueError(
@@ -936,50 +935,23 @@ class QuantumInterface:
         else:
             ansatz = QuantumCircuit(self.num_qubits)
         M = np.zeros((2**self.num_qubits, 2**self.num_qubits))
-        if self.do_M_iqa:
+        ansatz_list = [None] * 2**self.num_qubits
+        for nr, comb in enumerate(itertools.product([0, 1], repeat=self.num_qubits)):
             ansatzX = ansatz.copy()
-            for i in range(self.num_qubits):
-                ansatzX.x(i)
-            [Pzero, Pone] = self._one_call_sampler_distributions(
-                "Z" * self.num_qubits,
-                [[10**-8] * len(ansatz.parameters)] * 2,
-                [ansatz.copy(), ansatzX],
-            )
-            for comb in itertools.product([0, 1], repeat=self.num_qubits):
-                idx2 = int("".join([str(x) for x in comb]), 2)
-                for comb_m in itertools.product([0, 1], repeat=self.num_qubits):
-                    P = 1.0
-                    idx1 = int("".join([str(x) for x in comb_m]), 2)
-                    for idx, (bit, bit_m) in enumerate(zip(comb[::-1], comb_m[::-1])):
-                        val = 0.0
-                        if bit == 0:
-                            Pout = Pzero
-                        else:
-                            Pout = Pone
-                        for bitstring, prob in Pout.items():
-                            if bitstring[idx] == str(bit_m):
-                                val += prob
-                        P *= val
-                    M[idx1, idx2] = P
-        else:
-            ansatz_list = [None] * 2**self.num_qubits
-            for nr, comb in enumerate(itertools.product([0, 1], repeat=self.num_qubits)):
-                ansatzX = ansatz.copy()
-                idx2 = int("".join([str(x) for x in comb]), 2)
-                for i, bit in enumerate(comb):
-                    if bit == 1:
-                        ansatzX.x(i)
-                # Make list of custom ansatz
-                ansatz_list[nr] = ansatzX
-            # Simulate all elements with one device call
-            Px_list = self._one_call_sampler_distributions(
-                "Z" * self.num_qubits,
-                [[10**-8] * len(ansatz.parameters)] * len(ansatz_list),
-                ansatz_list,
-            )
-            # Construct M
-            for idx2, Px in enumerate(Px_list):
-                for bitstring, prob in Px.items():
-                    idx1 = int(bitstring[::-1], 2)
-                    M[idx1, idx2] = prob
+            for i, bit in enumerate(comb):
+                if bit == 1:
+                    ansatzX.x(i)
+            # Make list of custom ansatz
+            ansatz_list[nr] = ansatzX
+        # Simulate all elements with one device call
+        Px_list = self._one_call_sampler_distributions(
+            "Z" * self.num_qubits,
+            [[10**-8] * len(ansatz.parameters)] * len(ansatz_list),
+            ansatz_list,
+        )
+        # Construct M
+        for idx2, Px in enumerate(Px_list):
+            for bitstring, prob in Px.items():
+                idx1 = int(bitstring[::-1], 2)
+                M[idx1, idx2] = prob
         self._Minv = np.linalg.inv(M)
