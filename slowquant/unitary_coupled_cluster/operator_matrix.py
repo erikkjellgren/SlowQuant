@@ -114,7 +114,6 @@ def propagate_state(
     num_active_elec_beta: int,
     thetas: Sequence[float],
     wf_struct: UpsStructure | UccStructure,
-    wave_function_type: str,
 ) -> np.ndarray:
     r"""Propagate state by applying operator.
 
@@ -130,16 +129,6 @@ def propagate_state(
     Returns:
         New state.
     """
-    if wave_function_type == "UPS":
-        if not isinstance(wf_struct, UpsStructure):
-            raise TypeError(
-                f"UPS wave function requires ups_struct of type UpsStructure got {type(wf_struct)}"
-            )
-    elif wave_function_type == "UCC":
-        if not isinstance(wf_struct, UccStructure):
-            raise TypeError(
-                f"UCC wave function requires ups_struct of type UccStructure got {type(wf_struct)}"
-            )
     num_dets = len(idx2det)
     new_state = np.copy(state)
     tmp_state = np.zeros(num_dets)
@@ -157,7 +146,7 @@ def propagate_state(
                 dagger = False
                 if op == "Ud":
                     dagger = True
-                if wave_function_type == "UPS":
+                if isinstance(wf_struct, UpsStructure):
                     new_state = construct_ups_state(
                         new_state,
                         num_active_orbs,
@@ -167,7 +156,7 @@ def propagate_state(
                         wf_struct,
                         dagger=dagger,
                     )
-                elif wave_function_type == "UCC":
+                elif isinstance(wf_struct, UccStructure):
                     new_state = construct_ucc_state(
                         new_state,
                         num_active_orbs,
@@ -177,6 +166,8 @@ def propagate_state(
                         wf_struct,
                         dagger=dagger,
                     )
+                else:
+                    raise TypeError(f"Got unknown wave function structure type, {type(wf_struct)}")
         else:
             op_folded = op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs)
             for i in range(num_dets):
@@ -220,7 +211,6 @@ def expectation_value(
     num_active_elec_beta: int,
     thetas: Sequence[float],
     wf_struct: UpsStructure | UccStructure,
-    wave_function_type: str,
 ) -> float:
     """Calculate expectation value of operator.
 
@@ -249,7 +239,6 @@ def expectation_value(
         num_active_elec_beta,
         thetas,
         wf_struct,
-        wave_function_type,
     )
     return bra @ op_ket
 
@@ -268,7 +257,6 @@ def expectation_value_commutator(
     num_active_elec_beta: int,
     thetas: Sequence[float],
     wf_struct: UpsStructure | UccStructure,
-    wave_function_type: str,
 ) -> float:
     r"""Calculate expecation value of commutator.
 
@@ -303,7 +291,6 @@ def expectation_value_commutator(
         num_active_elec_beta,
         thetas,
         wf_struct,
-        wave_function_type,
     )
 
 
@@ -322,7 +309,6 @@ def expectation_value_double_commutator(
     num_active_elec_beta: int,
     thetas: Sequence[float],
     wf_struct: UpsStructure | UccStructure,
-    wave_function_type: str,
 ) -> float:
     r"""Calculate expecation value of double commutator.
 
@@ -358,7 +344,6 @@ def expectation_value_double_commutator(
         num_active_elec_beta,
         thetas,
         wf_struct,
-        wave_function_type,
     )
 
 

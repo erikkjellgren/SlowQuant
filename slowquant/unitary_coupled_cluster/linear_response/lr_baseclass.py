@@ -52,7 +52,6 @@ class LinearResponseBaseClass:
                 self.wf.num_active_elec_beta,
                 self.wf.thetas,
                 self.wf.ucc_layout,
-                "UCC",
             )
         elif isinstance(self.wf, WaveFunctionUPS):
             self.index_info = (
@@ -65,7 +64,6 @@ class LinearResponseBaseClass:
                 self.wf.num_active_elec_beta,
                 self.wf.thetas,
                 self.wf.ups_layout,
-                "UPS",
             )
         else:
             raise ValueError(f"Got incompatible wave function type, {type(self.wf)}")

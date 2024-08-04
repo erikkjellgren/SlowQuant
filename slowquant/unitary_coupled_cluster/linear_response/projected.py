@@ -60,21 +60,21 @@ class LinearResponseUCC(LinearResponseBaseClass):
         for i, op in enumerate(self.G_ops):
             grad[i] = expectation_value(
                 self.wf.ci_coeffs,
-                self.H_0i_0a * op,
+                [self.H_0i_0a, op],
                 self.wf.ci_coeffs,
                 *self.index_info,
             ) - (
                 self.wf.energy_elec
-                * expectation_value(self.wf.ci_coeffs, op, self.wf.ci_coeffs, *self.index_info)
+                * expectation_value(self.wf.ci_coeffs, [op], self.wf.ci_coeffs, *self.index_info)
             )
             grad[i + len(self.G_ops)] = expectation_value(
                 self.wf.ci_coeffs,
-                op.dagger * self.H_0i_0a,
+                [op.dagger, self.H_0i_0a],
                 self.wf.ci_coeffs,
                 *self.index_info,
             ) - (
                 self.wf.energy_elec
-                * expectation_value(self.wf.ci_coeffs, op.dagger, self.wf.ci_coeffs, *self.index_info)
+                * expectation_value(self.wf.ci_coeffs, [op.dagger], self.wf.ci_coeffs, *self.index_info)
             )
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
@@ -107,14 +107,14 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 # Make A
                 self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = expectation_value(
                     self.wf.ci_coeffs,
-                    GI.dagger * self.H_1i_1a * qJ,
+                    [GI.dagger, self.H_1i_1a * qJ],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
                 # Make B
                 self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = -expectation_value(
                     self.wf.ci_coeffs,
-                    GI.dagger * qJ.dagger * self.H_1i_1a,
+                    [GI.dagger, qJ.dagger * self.H_1i_1a],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
@@ -123,41 +123,41 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 # Make A
                 val = expectation_value(
                     self.wf.ci_coeffs,
-                    GI.dagger * self.H_0i_0a * GJ,
+                    [GI.dagger, self.H_0i_0a, GJ],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
                 val -= (
-                    expectation_value(self.wf.ci_coeffs, GI.dagger * GJ, self.wf.ci_coeffs, *self.index_info)
+                    expectation_value(self.wf.ci_coeffs, [GI.dagger, GJ], self.wf.ci_coeffs, *self.index_info)
                     * self.wf.energy_elec
                 )
                 val -= expectation_value(
                     self.wf.ci_coeffs,
-                    GI.dagger,
+                    [GI.dagger],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 ) * expectation_value(
                     self.wf.ci_coeffs,
-                    self.H_0i_0a * GJ,
+                    [self.H_0i_0a, GJ],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
                 val += (
-                    expectation_value(self.wf.ci_coeffs, GI.dagger, self.wf.ci_coeffs, *self.index_info)
-                    * expectation_value(self.wf.ci_coeffs, GJ, self.wf.ci_coeffs, *self.index_info)
+                    expectation_value(self.wf.ci_coeffs, [GI.dagger], self.wf.ci_coeffs, *self.index_info)
+                    * expectation_value(self.wf.ci_coeffs, [GJ], self.wf.ci_coeffs, *self.index_info)
                     * self.wf.energy_elec
                 )
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
                 # Make B
                 val = expectation_value(
                     self.wf.ci_coeffs,
-                    GI.dagger * self.H_0i_0a,
+                    [GI.dagger, self.H_0i_0a],
                     self.wf.ci_coeffs,
                     *self.index_info,
-                ) * expectation_value(self.wf.ci_coeffs, GJ.dagger, self.wf.ci_coeffs, *self.index_info)
+                ) * expectation_value(self.wf.ci_coeffs, [GJ.dagger], self.wf.ci_coeffs, *self.index_info)
                 val -= (
-                    expectation_value(self.wf.ci_coeffs, GI.dagger, self.wf.ci_coeffs, *self.index_info)
-                    * expectation_value(self.wf.ci_coeffs, GJ.dagger, self.wf.ci_coeffs, *self.index_info)
+                    expectation_value(self.wf.ci_coeffs, [GI.dagger], self.wf.ci_coeffs, *self.index_info)
+                    * expectation_value(self.wf.ci_coeffs, [GJ.dagger], self.wf.ci_coeffs, *self.index_info)
                     * self.wf.energy_elec
                 )
                 self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
@@ -166,12 +166,12 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     j + idx_shift, i + idx_shift
                 ] = expectation_value(
                     self.wf.ci_coeffs,
-                    GI.dagger * GJ,
+                    [GI.dagger, GJ],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 ) - (
-                    expectation_value(self.wf.ci_coeffs, GI.dagger, self.wf.ci_coeffs, *self.index_info)
-                    * expectation_value(self.wf.ci_coeffs, GJ, self.wf.ci_coeffs, *self.index_info)
+                    expectation_value(self.wf.ci_coeffs, [GI.dagger], self.wf.ci_coeffs, *self.index_info)
+                    * expectation_value(self.wf.ci_coeffs, [GJ], self.wf.ci_coeffs, *self.index_info)
                 )
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
@@ -246,23 +246,23 @@ class LinearResponseUCC(LinearResponseBaseClass):
             g_part_x = 0.0
             g_part_y = 0.0
             g_part_z = 0.0
-            exp_mux = expectation_value(self.wf.ci_coeffs, mux_op, self.wf.ci_coeffs, *self.index_info)
-            exp_muy = expectation_value(self.wf.ci_coeffs, muy_op, self.wf.ci_coeffs, *self.index_info)
-            exp_muz = expectation_value(self.wf.ci_coeffs, muz_op, self.wf.ci_coeffs, *self.index_info)
+            exp_mux = expectation_value(self.wf.ci_coeffs, [mux_op], self.wf.ci_coeffs, *self.index_info)
+            exp_muy = expectation_value(self.wf.ci_coeffs, [muy_op], self.wf.ci_coeffs, *self.index_info)
+            exp_muz = expectation_value(self.wf.ci_coeffs, [muz_op], self.wf.ci_coeffs, *self.index_info)
             for i, G in enumerate(self.G_ops):
-                exp_G = expectation_value(self.wf.ci_coeffs, G, self.wf.ci_coeffs, *self.index_info)
+                exp_G = expectation_value(self.wf.ci_coeffs, [G], self.wf.ci_coeffs, *self.index_info)
                 exp_Gmux = expectation_value(
-                    self.wf.ci_coeffs, G.dagger * mux_op, self.wf.ci_coeffs, *self.index_info
+                    self.wf.ci_coeffs, [G.dagger, mux_op], self.wf.ci_coeffs, *self.index_info
                 )
                 exp_Gmuy = expectation_value(
                     self.wf.ci_coeffs,
-                    G.dagger * muy_op,
+                    [G.dagger, muy_op],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
                 exp_Gmuz = expectation_value(
                     self.wf.ci_coeffs,
-                    G.dagger * muz_op,
+                    [G.dagger, muz_op],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )

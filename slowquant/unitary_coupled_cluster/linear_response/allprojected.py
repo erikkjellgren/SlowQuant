@@ -69,25 +69,25 @@ class LinearResponseUCC(LinearResponseBaseClass):
         for i, op in enumerate(self.G_ops):
             grad[i] = expectation_value(
                 self.wf.ci_coeffs,
-                self.H_0i_0a * op,
+                [self.H_0i_0a, op],
                 self.wf.ci_coeffs,
                 *self.index_info,
             )
             grad[i] += -self.wf.energy_elec * expectation_value(
                 self.wf.ci_coeffs,
-                op,
+                [op],
                 self.wf.ci_coeffs,
                 *self.index_info,
             )
             grad[i + len(self.G_ops)] = expectation_value(
                 self.wf.ci_coeffs,
-                op.dagger * self.H_0i_0a,
+                [op.dagger, self.H_0i_0a],
                 self.wf.ci_coeffs,
                 *self.index_info,
             )
             grad[i + len(self.G_ops)] += -self.wf.energy_elec * expectation_value(
                 self.wf.ci_coeffs,
-                op.dagger,
+                [op.dagger],
                 self.wf.ci_coeffs,
                 *self.index_info,
             )
@@ -100,14 +100,14 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 # Make A
                 val = expectation_value(
                     self.wf.ci_coeffs,
-                    qI.dagger * H_2i_2a * qJ,
+                    [qI.dagger * H_2i_2a * qJ],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
                 val -= (
                     expectation_value(
                         self.wf.ci_coeffs,
-                        qI.dagger * qJ,
+                        [qI.dagger * qJ],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
@@ -117,7 +117,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 # Make Sigma
                 self.Sigma[i, j] = self.Sigma[j, i] = expectation_value(
                     self.wf.ci_coeffs,
-                    qI.dagger * qJ,
+                    [qI.dagger * qJ],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
@@ -126,7 +126,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 # Make A
                 self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = expectation_value(
                     self.wf.ci_coeffs,
-                    GI.dagger * self.H_1i_1a * qJ,
+                    [GI.dagger, self.H_1i_1a * qJ],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
@@ -135,14 +135,14 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 # Make A
                 val = expectation_value(
                     self.wf.ci_coeffs,
-                    GI.dagger * self.H_0i_0a * GJ,
+                    [GI.dagger, self.H_0i_0a, GJ],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
                 val -= (
                     expectation_value(
                         self.wf.ci_coeffs,
-                        GI.dagger * GJ,
+                        [GI.dagger, GJ],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
@@ -150,25 +150,25 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 )
                 val -= expectation_value(
                     self.wf.ci_coeffs,
-                    GI.dagger,
+                    [GI.dagger],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 ) * expectation_value(
                     self.wf.ci_coeffs,
-                    self.H_0i_0a * GJ,
+                    [self.H_0i_0a, GJ],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
                 val += (
                     expectation_value(
                         self.wf.ci_coeffs,
-                        GI.dagger,
+                        [GI.dagger],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
                     * expectation_value(
                         self.wf.ci_coeffs,
-                        GJ,
+                        [GJ],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
@@ -178,25 +178,25 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 # Make B
                 val = expectation_value(
                     self.wf.ci_coeffs,
-                    GI.dagger * self.H_0i_0a,
+                    [GI.dagger, self.H_0i_0a],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 ) * expectation_value(
                     self.wf.ci_coeffs,
-                    GJ.dagger,
+                    [GJ.dagger],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
                 val -= (
                     expectation_value(
                         self.wf.ci_coeffs,
-                        GI.dagger,
+                        [GI.dagger],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
                     * expectation_value(
                         self.wf.ci_coeffs,
-                        GJ.dagger,
+                        [GJ.dagger],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
@@ -208,19 +208,19 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     j + idx_shift, i + idx_shift
                 ] = expectation_value(
                     self.wf.ci_coeffs,
-                    GI.dagger * GJ,
+                    [GI.dagger, GJ],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 ) - (
                     expectation_value(
                         self.wf.ci_coeffs,
-                        GI.dagger,
+                        [GI.dagger],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
                     * expectation_value(
                         self.wf.ci_coeffs,
-                        GJ,
+                        [GJ],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
@@ -301,13 +301,13 @@ class LinearResponseUCC(LinearResponseBaseClass):
             for i, G in enumerate(self.G_ops):
                 exp_G = expectation_value(
                     self.wf.ci_coeffs,
-                    G,
+                    [G],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
                 exp_G_dagger = expectation_value(
                     self.wf.ci_coeffs,
-                    G.dagger,
+                    [G.dagger],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
@@ -316,14 +316,14 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     * exp_G_dagger
                     * expectation_value(
                         self.wf.ci_coeffs,
-                        mux_op,
+                        [mux_op],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
                 )
                 g_part_x -= self.Z_G_normed[i, state_number] * expectation_value(
                     self.wf.ci_coeffs,
-                    G.dagger * mux_op,
+                    [G.dagger, mux_op],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
@@ -332,14 +332,14 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     * exp_G
                     * expectation_value(
                         self.wf.ci_coeffs,
-                        mux_op,
+                        [mux_op],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
                 )
                 g_part_x += self.Y_G_normed[i, state_number] * expectation_value(
                     self.wf.ci_coeffs,
-                    mux_op * G,
+                    [mux_op, G],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
@@ -348,14 +348,14 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     * exp_G_dagger
                     * expectation_value(
                         self.wf.ci_coeffs,
-                        muy_op,
+                        [muy_op],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
                 )
                 g_part_y -= self.Z_G_normed[i, state_number] * expectation_value(
                     self.wf.ci_coeffs,
-                    G.dagger * muy_op,
+                    [G.dagger, muy_op],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
@@ -364,14 +364,14 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     * exp_G
                     * expectation_value(
                         self.wf.ci_coeffs,
-                        muy_op,
+                        [muy_op],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
                 )
                 g_part_y += self.Y_G_normed[i, state_number] * expectation_value(
                     self.wf.ci_coeffs,
-                    muy_op * G,
+                    [muy_op, G],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
@@ -380,14 +380,14 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     * exp_G_dagger
                     * expectation_value(
                         self.wf.ci_coeffs,
-                        muz_op,
+                        [muz_op],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
                 )
                 g_part_z -= self.Z_G_normed[i, state_number] * expectation_value(
                     self.wf.ci_coeffs,
-                    G.dagger * muz_op,
+                    [G.dagger, muz_op],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
@@ -396,14 +396,14 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     * exp_G
                     * expectation_value(
                         self.wf.ci_coeffs,
-                        muz_op,
+                        [muz_op],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
                 )
                 g_part_z += self.Y_G_normed[i, state_number] * expectation_value(
                     self.wf.ci_coeffs,
-                    muz_op * G,
+                    [muz_op, G],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )

@@ -389,7 +389,6 @@ class WaveFunctionUCC:
                         self.num_active_elec_beta,
                         self.thetas,
                         self.ucc_layout,
-                        "UCC",
                     )
                     self._rdm1[p_idx, q_idx] = val  # type: ignore
                     self._rdm1[q_idx, p_idx] = val  # type: ignore
@@ -440,7 +439,6 @@ class WaveFunctionUCC:
                                 self.num_active_elec_beta,
                                 self.thetas,
                                 self.ucc_layout,
-                                "UCC",
                             )
                             if q == r:
                                 val -= self.rdm1[p_idx, s_idx]
@@ -495,7 +493,6 @@ class WaveFunctionUCC:
                                         self.num_active_elec_beta,
                                         self.thetas,
                                         self.ucc_layout,
-                                        "UCC",
                                     )
                                     if t == s:
                                         val -= self.rdm2[p_idx, q_idx, r_idx, u_idx]
@@ -570,7 +567,6 @@ class WaveFunctionUCC:
                                                 self.num_active_elec_beta,
                                                 self.thetas,
                                                 self.ucc_layout,
-                                                "UCC",
                                             )
                                             if r == q:
                                                 val -= self.rdm3[p_idx, s_idx, t_idx, u_idx, m_idx, n_idx]
@@ -956,7 +952,6 @@ def energy_ucc(
         wf.num_active_elec_beta,
         wf.thetas,
         wf.ucc_layout,
-        "UCC",
     )
 
 
