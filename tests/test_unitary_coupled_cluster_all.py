@@ -80,11 +80,11 @@ def test_LiH_atmethods_energies() -> None:
     threshold = 10 ** (-3)
 
     # atSC
-    LR_naive = allselfconsistent.LinearResponseUCC(
+    LR_atSC = allselfconsistent.LinearResponseUCC(
         WF,
         excitations="SD",
     )
-    LR_naive.calc_excitation_energies()
+    LR_atSC.calc_excitation_energies()
 
     solutions = np.array(
         [
@@ -100,14 +100,14 @@ def test_LiH_atmethods_energies() -> None:
         ]
     )
 
-    assert np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)
+    assert np.allclose(LR_atSC.excitation_energies, solutions, atol=threshold)
 
     # atST
-    LR_naive = allstatetransfer.LinearResponseUCC(  # type: ignore [assignment]
+    LR_atST = allstatetransfer.LinearResponseUCC(
         WF,
         excitations="SD",
     )
-    LR_naive.calc_excitation_energies()
+    LR_atST.calc_excitation_energies()
 
     solutions = np.array(
         [
@@ -123,7 +123,7 @@ def test_LiH_atmethods_energies() -> None:
         ]
     )
 
-    assert np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)
+    assert np.allclose(LR_atST.excitation_energies, solutions, atol=threshold)
 
 
 def test_LiH_naiveq_methods_energies() -> None:

@@ -543,7 +543,6 @@ def test_LiH_sto3g_allST():
 
     # Get oscillator strength for each excited state
     osc_strengths = LR.get_oscillator_strength(dipole_integrals)
-    print(osc_strengths)
     assert abs(osc_strengths[0] - 0.06668878) < thresh
     assert abs(osc_strengths[1] - 0.33360367) < thresh
     assert abs(osc_strengths[2] - 0.33360367) < thresh

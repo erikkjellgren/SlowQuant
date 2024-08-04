@@ -25,6 +25,7 @@ def get_indexing_extended(
     num_virtual_orbs: int,
     num_active_elec_alpha: int,
     num_active_elec_beta: int,
+    order: int,
 ) -> tuple[list[int], dict[int, int]]:
     """Get indexing between index and determiant, extended to include full-space singles.
 
@@ -34,6 +35,7 @@ def get_indexing_extended(
         num_virtual_orbs: Number of virtual spatial orbitals.
         num_active_elec_alpha: Number of active alpha electrons.
         num_active_elec_beta: Number of active beta electrons.
+        order: Excitation order the space will be extnded with.
 
     Returns:
         List to map index to determiant and dictionary to map determiant to index.
@@ -43,6 +45,12 @@ def get_indexing_extended(
     for inactive, virtual in generate_singles(num_inactive_orbs, num_virtual_orbs):
         inactive_singles.append(inactive)
         virtual_singles.append(virtual)
+    inactive_doubles = []
+    virtual_doubles = []
+    if order >= 2:
+        for inactive, virtual in generate_doubles(num_inactive_orbs, num_virtual_orbs):
+            inactive_doubles.append(inactive)
+            virtual_doubles.append(virtual)
     idx = 0
     idx2det = []
     det2idx = {}
@@ -65,8 +73,10 @@ def get_indexing_extended(
             idx2det.append(det)
             det2idx[det] = idx
             idx += 1
-    # Generate 1 exc alpha space
-    for alpha_inactive, alpha_virtual in zip(inactive_singles, virtual_singles):
+    # Generate 1,2 exc alpha space
+    for alpha_inactive, alpha_virtual in zip(
+        inactive_singles + inactive_doubles, virtual_singles + virtual_doubles
+    ):
         active_alpha_elec = int(
             num_active_elec_alpha - np.sum(alpha_virtual) + num_inactive_orbs - np.sum(alpha_inactive)
         )
@@ -88,8 +98,10 @@ def get_indexing_extended(
                 idx2det.append(det)
                 det2idx[det] = idx
                 idx += 1
-    # Generate 1 exc beta space
-    for beta_inactive, beta_virtual in zip(inactive_singles, virtual_singles):
+    # Generate 1,2 exc beta space
+    for beta_inactive, beta_virtual in zip(
+        inactive_singles + inactive_doubles, virtual_singles + virtual_doubles
+    ):
         active_beta_elec = int(
             num_active_elec_beta - np.sum(beta_virtual) + num_inactive_orbs - np.sum(beta_inactive)
         )
@@ -111,6 +123,34 @@ def get_indexing_extended(
                 idx2det.append(det)
                 det2idx[det] = idx
                 idx += 1
+    # Generate 1 exc alpha 1 exc beta space
+    if order >= 2:
+        for alpha_inactive, alpha_virtual in zip(inactive_singles, virtual_singles):
+            active_alpha_elec = int(
+                num_active_elec_alpha - np.sum(alpha_virtual) + num_inactive_orbs - np.sum(alpha_inactive)
+            )
+            for beta_inactive, beta_virtual in zip(inactive_singles, virtual_singles):
+                active_beta_elec = int(
+                    num_active_elec_beta - np.sum(beta_virtual) + num_inactive_orbs - np.sum(beta_inactive)
+                )
+                for alpha_string in multiset_permutations(
+                    [1] * active_alpha_elec + [0] * (num_active_orbs - active_alpha_elec)
+                ):
+                    for beta_string in multiset_permutations(
+                        [1] * active_beta_elec + [0] * (num_active_orbs - active_beta_elec)
+                    ):
+                        det_str = ""
+                        for a, b in zip(
+                            alpha_inactive + alpha_string + alpha_virtual,
+                            beta_inactive + beta_string + beta_virtual,
+                        ):
+                            det_str += str(a) + str(b)
+                        det = int(det_str, 2)
+                        if det in idx2det:
+                            continue
+                        idx2det.append(det)
+                        det2idx[det] = idx
+                        idx += 1
     return idx2det, det2idx
 
 
@@ -137,6 +177,43 @@ def generate_singles(
             yield inactive.copy(), virtual.copy()
             if j != num_virtual_orbs:
                 virtual[j] = 0
+        if i != num_inactive_orbs:
+            inactive[i] = 1
+
+
+def generate_doubles(
+    num_inactive_orbs: int, num_virtual_orbs: int
+) -> Generator[tuple[list[int], list[int]], None, None]:
+    """Generate double excited determinant between inactive and virtual space.
+
+    Args:
+        num_inactive_orbs: Number of inactive spatial orbitals.
+        num_virtual_orbs: Number of virtual spatial orbitals.
+
+    Returns:
+        Double excited determinants.
+    """
+    inactive = [1] * num_inactive_orbs
+    virtual = [0] * num_virtual_orbs
+    for i in range(num_inactive_orbs + 1):
+        if i != num_inactive_orbs:
+            inactive[i] = 0
+        for i2 in range(min(i + 1, num_inactive_orbs), num_inactive_orbs + 1):
+            if i2 != num_inactive_orbs:
+                inactive[i2] = 0
+            for j in range(num_virtual_orbs + 1):
+                if j != num_virtual_orbs:
+                    virtual[j] = 1
+                for j2 in range(min(j + 1, num_virtual_orbs), num_virtual_orbs + 1):
+                    if j2 != num_virtual_orbs:
+                        virtual[j2] = 1
+                    yield inactive.copy(), virtual.copy()
+                    if j2 != num_virtual_orbs:
+                        virtual[j2] = 0
+                if j != num_virtual_orbs:
+                    virtual[j] = 0
+            if i2 != num_inactive_orbs:
+                inactive[i2] = 1
         if i != num_inactive_orbs:
             inactive[i] = 1
 
@@ -293,6 +370,7 @@ def T1_sa_extended_matrix(
     num_virtual_orbs: int,
     num_elec_alpha: int,
     num_elec_beta: int,
+    order: int,
 ) -> ss.lil_array:
     """Get matrix representation of anti-Hermitian T1 spin-adapted cluster operator.
 
@@ -304,6 +382,7 @@ def T1_sa_extended_matrix(
         num_virtual_orbs: Number of virtual spatial orbitals.
         num_elec_alpha: Number of active alpha electrons.
         num_elec_beta: Number of active beta electrons.
+        order: Excitation order of extended space.
 
     Returns:
         Matrix representation of anti-Hermitian cluster operator.
@@ -314,6 +393,7 @@ def T1_sa_extended_matrix(
         num_virtual_orbs,
         num_elec_alpha,
         num_elec_beta,
+        order,
     )
     op = build_operator_matrix_extended(
         G1_sa(i, a), idx2det, det2idx, num_inactive_orbs + num_active_orbs + num_virtual_orbs
@@ -332,6 +412,7 @@ def T2_1_sa_extended_matrix(
     num_virtual_orbs: int,
     num_elec_alpha: int,
     num_elec_beta: int,
+    order: int,
 ) -> ss.lil_array:
     """Get matrix representation of anti-Hermitian T2 spin-adapted cluster operator.
 
@@ -345,6 +426,7 @@ def T2_1_sa_extended_matrix(
         num_virtual_orbs: Number of virtual spatial orbitals.
         num_elec_alpha: Number of active alpha electrons.
         num_elec_beta: Number of active beta electrons.
+        order: Excitation order of extended space.
 
     Returns:
         Matrix representation of anti-Hermitian cluster operator.
@@ -355,6 +437,7 @@ def T2_1_sa_extended_matrix(
         num_virtual_orbs,
         num_elec_alpha,
         num_elec_beta,
+        order,
     )
     op = build_operator_matrix_extended(
         G2_1_sa(i, j, a, b), idx2det, det2idx, num_inactive_orbs + num_active_orbs + num_virtual_orbs
@@ -373,6 +456,7 @@ def T2_2_sa_extended_matrix(
     num_virtual_orbs: int,
     num_elec_alpha: int,
     num_elec_beta: int,
+    order: int,
 ) -> ss.lil_array:
     """Get matrix representation of anti-Hermitian T2 spin-adapted cluster operator.
 
@@ -386,6 +470,7 @@ def T2_2_sa_extended_matrix(
         num_virtual_orbs: Number of virtual spatial orbitals.
         num_elec_alpha: Number of active alpha electrons.
         num_elec_beta: Number of active beta electrons.
+        order: Excitation order of extended space.
 
     Returns:
         Matrix representation of anti-Hermitian cluster operator.
@@ -396,6 +481,7 @@ def T2_2_sa_extended_matrix(
         num_virtual_orbs,
         num_elec_alpha,
         num_elec_beta,
+        order,
     )
     op = build_operator_matrix_extended(
         G2_2_sa(i, j, a, b), idx2det, det2idx, num_inactive_orbs + num_active_orbs + num_virtual_orbs
@@ -416,6 +502,7 @@ def T3_extended_matrix(
     num_virtual_orbs: int,
     num_elec_alpha: int,
     num_elec_beta: int,
+    order: int,
 ) -> ss.lil_array:
     """Get matrix representation of anti-Hermitian T3 spin-conserving cluster operator.
 
@@ -431,6 +518,7 @@ def T3_extended_matrix(
         num_virtual_orbs: Number of virtual spatial orbitals.
         num_elec_alpha: Number of active alpha electrons.
         num_elec_beta: Number of active beta electrons.
+        order: Excitation order of extended space.
 
     Returns:
         Matrix representation of anti-Hermitian cluster operator.
@@ -441,6 +529,7 @@ def T3_extended_matrix(
         num_virtual_orbs,
         num_elec_alpha,
         num_elec_beta,
+        order,
     )
     op = build_operator_matrix_extended(
         G3(i, j, k, a, b, c), idx2det, det2idx, num_inactive_orbs + num_active_orbs + num_virtual_orbs
@@ -463,6 +552,7 @@ def T4_extended_matrix(
     num_virtual_orbs: int,
     num_elec_alpha: int,
     num_elec_beta: int,
+    order: int,
 ) -> ss.lil_array:
     """Get matrix representation of anti-Hermitian T4 spin-conserving cluster operator.
 
@@ -480,6 +570,7 @@ def T4_extended_matrix(
         num_virtual_orbs: Number of virtual spatial orbitals.
         num_elec_alpha: Number of active alpha electrons.
         num_elec_beta: Number of active beta electrons.
+        order: Excitation order of extended space.
 
     Returns:
         Matrix representation of anti-Hermitian cluster operator.
@@ -490,6 +581,7 @@ def T4_extended_matrix(
         num_virtual_orbs,
         num_elec_alpha,
         num_elec_beta,
+        order,
     )
     op = build_operator_matrix_extended(
         G4(i, j, k, l, a, b, c, d), idx2det, det2idx, num_inactive_orbs + num_active_orbs + num_virtual_orbs
@@ -514,6 +606,7 @@ def T5_extended_matrix(
     num_virtual_orbs: int,
     num_elec_alpha: int,
     num_elec_beta: int,
+    order: int,
 ) -> ss.lil_array:
     """Get matrix representation of anti-Hermitian T5 spin-conserving cluster operator.
 
@@ -533,6 +626,7 @@ def T5_extended_matrix(
         num_virtual_orbs: Number of virtual spatial orbitals.
         num_elec_alpha: Number of active alpha electrons.
         num_elec_beta: Number of active beta electrons.
+        order: Excitation order of extended space.
 
     Returns:
         Matrix representation of anti-Hermitian cluster operator.
@@ -543,6 +637,7 @@ def T5_extended_matrix(
         num_virtual_orbs,
         num_elec_alpha,
         num_elec_beta,
+        order,
     )
     op = build_operator_matrix_extended(
         G5(i, j, k, l, m, a, b, c, d, e),
@@ -572,6 +667,7 @@ def T6_extended_matrix(
     num_virtual_orbs: int,
     num_elec_alpha: int,
     num_elec_beta: int,
+    order: int,
 ) -> ss.lil_array:
     """Get matrix representation of anti-Hermitian T6 spin-conserving cluster operator.
 
@@ -593,6 +689,7 @@ def T6_extended_matrix(
         num_virtual_orbs: Number of virtual spatial orbitals.
         num_elec_alpha: Number of active alpha electrons.
         num_elec_beta: Number of active beta electrons.
+        order: Excitation order of extended space.
 
     Returns:
         Matrix representation of anti-Hermitian cluster operator.
@@ -603,6 +700,7 @@ def T6_extended_matrix(
         num_virtual_orbs,
         num_elec_alpha,
         num_elec_beta,
+        order,
     )
     op = build_operator_matrix_extended(
         G6(i, j, k, l, m, n, a, b, c, d, e, f),
@@ -623,6 +721,7 @@ def construct_ucc_u_extended(
     theta: Sequence[float],
     theta_picker: ThetaPicker,
     excitations: str,
+    order: int,
 ) -> np.ndarray:
     """Contruct unitary transformation matrix.
 
@@ -635,6 +734,7 @@ def construct_ucc_u_extended(
                Ordered as (S, D, T, ...).
         theta_picker: Helper class to pick the parameters in the right order.
         excitations: Excitation orders to include.
+        order: Excitation order of extended space.
 
     Returns:
         Unitary transformation matrix.
@@ -654,6 +754,7 @@ def construct_ucc_u_extended(
                         num_virtual_orbs,
                         num_elec_alpha,
                         num_elec_beta,
+                        order,
                     ).todense()
                 )
             counter += 1
@@ -673,6 +774,7 @@ def construct_ucc_u_extended(
                             num_virtual_orbs,
                             num_elec_alpha,
                             num_elec_beta,
+                            order,
                         ).todense()
                     )
                 elif type_idx == 2:
@@ -688,6 +790,7 @@ def construct_ucc_u_extended(
                             num_virtual_orbs,
                             num_elec_alpha,
                             num_elec_beta,
+                            order,
                         ).todense()
                     )
                 else:
@@ -710,6 +813,7 @@ def construct_ucc_u_extended(
                         num_virtual_orbs,
                         num_elec_alpha,
                         num_elec_beta,
+                        order,
                     ).todense()
                 )
             counter += 1
@@ -732,6 +836,7 @@ def construct_ucc_u_extended(
                         num_virtual_orbs,
                         num_elec_alpha,
                         num_elec_beta,
+                        order,
                     ).todense()
                 )
             counter += 1
@@ -756,6 +861,7 @@ def construct_ucc_u_extended(
                         num_virtual_orbs,
                         num_elec_alpha,
                         num_elec_beta,
+                        order,
                     ).todense()
                 )
             counter += 1
@@ -782,6 +888,7 @@ def construct_ucc_u_extended(
                         num_virtual_orbs,
                         num_elec_alpha,
                         num_elec_beta,
+                        order,
                     ).todense()
                 )
             counter += 1
