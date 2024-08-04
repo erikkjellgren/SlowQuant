@@ -43,6 +43,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
             self.wf.num_virtual_orbs,
             self.wf.num_active_elec_alpha,
             self.wf.num_active_elec_beta,
+            1,
         )
         self.index_info_extended = (
             idx2det,
@@ -72,6 +73,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
             thetas,
             self.wf.singlet_excitation_operator_generator,
             self.wf._excitations,
+            1,
         )
         num_det = len(idx2det)
         self.csf_coeffs = np.zeros(num_det)
