@@ -33,8 +33,9 @@ def test_H2_631g_naive():
         SQobj.hartree_fock.mo_coeff,
         h_core,
         g_eri,
+        "SD",
     )
-    WF.run_ucc("SD", True)
+    WF.run_ucc(True)
 
     # Linear Response
     LR = naive.LinearResponseUCC(WF, excitations="SD")
@@ -98,8 +99,9 @@ def test_LiH_sto3g_naive():
         SQobj.hartree_fock.mo_coeff,
         h_core,
         g_eri,
+        "SD",
     )
-    WF.run_ucc("SD", True)
+    WF.run_ucc(True)
 
     # Linear Response
     LR = naive.LinearResponseUCC(WF, excitations="SD")
@@ -177,8 +179,9 @@ def test_H2_631g_projLR():
         SQobj.hartree_fock.mo_coeff,
         h_core,
         g_eri,
+        "SD",
     )
-    WF.run_ucc("SD", True)
+    WF.run_ucc(True)
 
     # Linear Response
     LR = projected.LinearResponseUCC(WF, excitations="SD")
@@ -237,8 +240,9 @@ def test_LiH_sto3g_proj():
         SQobj.hartree_fock.mo_coeff,
         h_core,
         g_eri,
+        "SD",
     )
-    WF.run_ucc("SD", True)
+    WF.run_ucc(True)
 
     LR = projected.LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
@@ -309,8 +313,9 @@ def test_H2_631g_STLR():
         SQobj.hartree_fock.mo_coeff,
         h_core,
         g_eri,
+        "SD",
     )
-    WF.run_ucc("SD", True)
+    WF.run_ucc(True)
 
     # Linear Response
     LR = statetransfer.LinearResponseUCC(
@@ -371,8 +376,9 @@ def test_LiH_sto3g_st():
         SQobj.hartree_fock.mo_coeff,
         h_core,
         g_eri,
+        "SD",
     )
-    WF.run_ucc("SD", True)
+    WF.run_ucc(True)
 
     # Linear Response
     LR = statetransfer.LinearResponseUCC(
@@ -447,8 +453,9 @@ def test_H2_631g_allST():
         SQobj.hartree_fock.mo_coeff,
         h_core,
         g_eri,
+        "SD",
     )
-    WF.run_ucc("SD", True)
+    WF.run_ucc(True)
 
     # Linear Response
     LR = allstatetransfer.LinearResponseUCC(
@@ -505,8 +512,9 @@ def test_LiH_sto3g_allST():
         SQobj.hartree_fock.mo_coeff,
         h_core,
         g_eri,
+        "SD",
     )
-    WF.run_ucc("SD", True)
+    WF.run_ucc(True)
 
     # Linear Response
     LR = allstatetransfer.LinearResponseUCC(

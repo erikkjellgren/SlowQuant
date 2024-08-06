@@ -21,12 +21,13 @@ from slowquant.unitary_coupled_cluster.operators import (
     one_elec_op_1i_1a,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
+from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
 
 class LinearResponseUCC(LinearResponseBaseClass):
     def __init__(
         self,
-        wave_function: WaveFunctionUCC,
+        wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.

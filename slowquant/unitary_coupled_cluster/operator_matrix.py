@@ -103,7 +103,7 @@ def build_operator_matrix(
 
 
 def propagate_state(
-    operators: Sequence[FermionicOperator] | Sequence[str],
+    operators: list[FermionicOperator | str],
     state: np.ndarray,
     idx2det: Sequence[int],
     det2idx: dict[int, int],
@@ -129,6 +129,8 @@ def propagate_state(
     Returns:
         New state.
     """
+    if len(operators) == 0:
+        return np.copy(state)
     num_dets = len(idx2det)
     new_state = np.copy(state)
     tmp_state = np.zeros(num_dets)
@@ -200,7 +202,7 @@ def propagate_state(
 
 def expectation_value(
     bra: np.ndarray,
-    operators: Sequence[FermionicOperator] | Sequence[str],
+    operators: list[FermionicOperator | str],
     ket: np.ndarray,
     idx2det: Sequence[int],
     det2idx: dict[int, int],
@@ -241,110 +243,6 @@ def expectation_value(
         wf_struct,
     )
     return bra @ op_ket
-
-
-def expectation_value_commutator(
-    bra: np.ndarray,
-    A: FermionicOperator,
-    B: FermionicOperator,
-    ket: np.ndarray,
-    idx2det: Sequence[int],
-    det2idx: dict[int, int],
-    num_inactive_orbs: int,
-    num_active_orbs: int,
-    num_virtual_orbs: int,
-    num_active_elec_alpha: int,
-    num_active_elec_beta: int,
-    thetas: Sequence[float],
-    wf_struct: UpsStructure | UccStructure,
-) -> float:
-    r"""Calculate expecation value of commutator.
-
-    .. math::
-        E = \left<0\right|\left[\hat{A},\hat{B}\right]\left|0\right>
-
-    Args:
-        bra: Bra state.
-        A: First operator in commutator.
-        B: Second operator in commutator.
-        ket: Ket state.
-        idx2det: Index to determinant mapping.
-        det2idx: Determinant to index mapping.
-        num_inactive_orbs: Number of inactive spatial orbitals.
-        num_active_orbs: Number of active spatial orbitals.
-        num_virtual_orbs: Number of virtual orbitals.
-
-    Returns:
-        Expectation value.
-    """
-    op = A * B - B * A
-    return expectation_value(
-        bra,
-        [op],
-        ket,
-        idx2det,
-        det2idx,
-        num_inactive_orbs,
-        num_active_orbs,
-        num_virtual_orbs,
-        num_active_elec_alpha,
-        num_active_elec_beta,
-        thetas,
-        wf_struct,
-    )
-
-
-def expectation_value_double_commutator(
-    bra: np.ndarray,
-    A: FermionicOperator,
-    B: FermionicOperator,
-    C: FermionicOperator,
-    ket: np.ndarray,
-    idx2det: Sequence[int],
-    det2idx: dict[int, int],
-    num_inactive_orbs: int,
-    num_active_orbs: int,
-    num_virtual_orbs: int,
-    num_active_elec_alpha: int,
-    num_active_elec_beta: int,
-    thetas: Sequence[float],
-    wf_struct: UpsStructure | UccStructure,
-) -> float:
-    r"""Calculate expecation value of double commutator.
-
-    .. math::
-        E = \left<0\right|\left[\hat{A},\left[\hat{B},\hat{C}\right]\right]\left|0\right>
-
-    Args:
-        bra: Bra state.
-        A: First operator in commutator.
-        B: Second operator in commutator.
-        C: Third operator in commutator.
-        ket: Ket state.
-        idx2det: Index to determinant mapping.
-        det2idx: Determinant to index mapping.
-        num_inactive_orbs: Number of inactive spatial orbitals.
-        num_active_orbs: Number of active spatial orbitals.
-        num_virtual_orbs: Number of virtual orbitals.
-
-    Returns:
-        Expectation value.
-    """
-    op = A * B * C - A * C * B - B * C * A + C * B * A
-    return expectation_value(
-        bra,
-        [op],
-        ket,
-        idx2det,
-        det2idx,
-        num_inactive_orbs,
-        num_active_orbs,
-        num_virtual_orbs,
-        num_active_elec_alpha,
-        num_active_elec_beta,
-        thetas,
-        wf_struct,
-    )
 
 
 def expectation_value_mat(bra: np.ndarray, op: np.ndarray, ket: np.ndarray) -> float:
@@ -682,8 +580,6 @@ def construct_ucc_state(
     ):
         if abs(theta) < 10**-14:
             continue
-        if dagger:
-            theta = -theta
         if exc_type == "sa_single":
             (i, a) = exc_indices
             T += (
@@ -776,6 +672,8 @@ def construct_ucc_state(
             )
         else:
             raise ValueError(f"Got unknown excitation type, {exc_type}")
+    if dagger:
+        return ss.linalg.expm_multiply(-T, state)
     return ss.linalg.expm_multiply(T, state)
 
 
