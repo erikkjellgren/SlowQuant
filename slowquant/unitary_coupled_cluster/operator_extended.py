@@ -2,12 +2,13 @@ import functools
 from collections.abc import Generator, Sequence
 
 import numpy as np
-import scipy.linalg
 import scipy.sparse as ss
 from sympy.utilities.iterables import multiset_permutations
 
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.operators import (
+    G1,
+    G2,
     G3,
     G4,
     G5,
@@ -16,7 +17,7 @@ from slowquant.unitary_coupled_cluster.operators import (
     G2_1_sa,
     G2_2_sa,
 )
-from slowquant.unitary_coupled_cluster.util import ThetaPicker
+from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
 
 
 def get_indexing_extended(
@@ -270,11 +271,18 @@ def build_operator_matrix_extended(
 
 
 def propagate_state_extended(
-    op: FermionicOperator,
+    operators: list[FermionicOperator | str],
     state: np.ndarray,
     idx2det: Sequence[int],
     det2idx: dict[int, int],
-    num_orbs: int,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
+    thetas: Sequence[float],
+    wf_struct: UpsStructure | UccStructure,
+    order: int,
 ) -> np.ndarray:
     r"""Propagate state by applying operator.
 
@@ -290,75 +298,130 @@ def propagate_state_extended(
     Returns:
         New state.
     """
+    if len(operators) == 0:
+        return np.copy(state)
     num_dets = len(idx2det)
-    new_state = np.zeros(num_dets)
+    num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
+    new_state = np.copy(state)
+    tmp_state = np.zeros(num_dets)
     parity_check = {0: 0}
     num = 0
     for i in range(2 * num_orbs - 1, -1, -1):
         num += 2**i
         parity_check[2 * num_orbs - i] = num
-    for i in range(num_dets):
-        if abs(state[i]) < 10**-14:
-            continue
-        det_ = idx2det[i]
-        for fermi_label in op.factors:
-            det = det_
-            phase_changes = 0
-            for fermi_op in op.operators[fermi_label][::-1]:
-                orb_idx = fermi_op.idx
-                nth_bit = (det >> 2 * num_orbs - 1 - orb_idx) & 1
-                if nth_bit == 0 and fermi_op.dagger:
-                    det = det ^ 2 ** (2 * num_orbs - 1 - orb_idx)
-                    phase_changes += (det & parity_check[orb_idx]).bit_count()
-                elif nth_bit == 1 and fermi_op.dagger:
-                    break
-                elif nth_bit == 0 and not fermi_op.dagger:
-                    break
-                elif nth_bit == 1 and not fermi_op.dagger:
-                    det = det ^ 2 ** (2 * num_orbs - 1 - orb_idx)
-                    phase_changes += (det & parity_check[orb_idx]).bit_count()
-            else:  # nobreak
-                if det not in det2idx:
+    for op in operators[::-1]:
+        tmp_state[:] = 0.0
+        if isinstance(op, str):
+            if op not in ("U", "Ud"):
+                raise ValueError(f"Unknown str operator, expected ('U', 'Ud') got {op}")
+            else:
+                dagger = False
+                if op == "Ud":
+                    dagger = True
+                if isinstance(wf_struct, UpsStructure):
+                    new_state = construct_ups_state_extended(
+                        new_state,
+                        num_inactive_orbs,
+                        num_active_orbs,
+                        num_virtual_orbs,
+                        num_elec_alpha,
+                        num_elec_beta,
+                        thetas,
+                        wf_struct,
+                        order,
+                        dagger=dagger,
+                    )
+                elif isinstance(wf_struct, UccStructure):
+                    new_state = construct_ucc_state_extended(
+                        new_state,
+                        num_inactive_orbs,
+                        num_active_orbs,
+                        num_virtual_orbs,
+                        num_elec_alpha,
+                        num_elec_beta,
+                        thetas,
+                        wf_struct,
+                        order,
+                        dagger=dagger,
+                    )
+                else:
+                    raise TypeError(f"Got unknown wave function structure type, {type(wf_struct)}")
+        else:
+            for i in range(num_dets):
+                if abs(new_state[i]) < 10**-14:
                     continue
-                val = op.factors[fermi_label] * (-1) ** phase_changes
-                if abs(val) > 10**-14:
-                    new_state[det2idx[det]] += val * state[i]
+                det_ = idx2det[i]
+                for fermi_label in op.factors:
+                    det = det_
+                    phase_changes = 0
+                    for fermi_op in op.operators[fermi_label][::-1]:
+                        orb_idx = fermi_op.idx
+                        nth_bit = (det >> 2 * num_orbs - 1 - orb_idx) & 1
+                        if nth_bit == 0 and fermi_op.dagger:
+                            det = det ^ 2 ** (2 * num_orbs - 1 - orb_idx)
+                            phase_changes += (det & parity_check[orb_idx]).bit_count()
+                        elif nth_bit == 1 and fermi_op.dagger:
+                            break
+                        elif nth_bit == 0 and not fermi_op.dagger:
+                            break
+                        elif nth_bit == 1 and not fermi_op.dagger:
+                            det = det ^ 2 ** (2 * num_orbs - 1 - orb_idx)
+                            phase_changes += (det & parity_check[orb_idx]).bit_count()
+                    else:  # nobreak
+                        if det not in det2idx:
+                            continue
+                        val = op.factors[fermi_label] * (-1) ** phase_changes
+                        if abs(val) > 10**-14:
+                            tmp_state[det2idx[det]] += val * new_state[i]
+            new_state = np.copy(tmp_state)
     return new_state
 
 
-def expectation_value_propagate_extended(
+def expectation_value_extended(
     bra: np.ndarray,
-    ops: list[FermionicOperator | np.ndarray],
+    operators: list[FermionicOperator | str],
     ket: np.ndarray,
     idx2det: Sequence[int],
     det2idx: dict[int, int],
-    num_orbs: int,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+    num_active_elec_alpha: int,
+    num_active_elec_beta: int,
+    thetas: Sequence[float],
+    wf_struct: UpsStructure | UccStructure,
+    order: int,
 ) -> float:
-    """Calculate expectation value by propagating the ket state by applying the operators.
+    """Calculate expectation value of operator.
 
     Args:
         bra: Bra state.
-        ops: Operators.
+        op: Operator.
         ket: Ket state.
         idx2det: Index to determinant mapping.
         det2idx: Determinant to index mapping.
-        num_orbs: Number of spatial orbitals.
+        num_inactive_orbs: Number of inactive spatial orbitals.
+        num_active_orbs: Number of active spatial orbitals.
+        num_virtual_orbs: Number of virtual orbitals.
 
     Returns:
         Expectation value.
     """
-    ket_copy = np.copy(ket)
-    for op in ops[::-1]:
-        if isinstance(op, FermionicOperator):
-            ket_copy = propagate_state_extended(op, ket_copy, idx2det, det2idx, num_orbs)
-        elif isinstance(op, np.ndarray):
-            ket_copy = np.matmul(op, ket_copy)
-        else:
-            raise ValueError(f"Got unknown operator type, {type(op)}")
-    val = bra @ ket_copy
-    if not isinstance(val, float):
-        raise ValueError(f"Expected function to calculate float got type, {type(val)}")
-    return val
+    op_ket = propagate_state_extended(
+        operators,
+        ket,
+        idx2det,
+        det2idx,
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+        num_active_elec_alpha,
+        num_active_elec_beta,
+        thetas,
+        wf_struct,
+        order,
+    )
+    return bra @ op_ket
 
 
 @functools.cache
@@ -485,6 +548,90 @@ def T2_2_sa_extended_matrix(
     )
     op = build_operator_matrix_extended(
         G2_2_sa(i, j, a, b), idx2det, det2idx, num_inactive_orbs + num_active_orbs + num_virtual_orbs
+    )
+    return ss.lil_array(op - op.conjugate().transpose())
+
+
+@functools.cache
+def T1_extended_matrix(
+    i: int,
+    a: int,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
+    order: int,
+) -> ss.lil_array:
+    """Get matrix representation of anti-Hermitian T1 spin-conserving cluster operator.
+
+    Args:
+        i: Strongly occupied spin orbital index.
+        a: Weakly occupied spin orbital index.
+        num_inactive_orbs: Number of inactive spatial orbitals.
+        num_active_orbs: Number of active spatial orbitals.
+        num_virtual_orbs: Number of virtual spatial orbitals.
+        num_elec_alpha: Number of active alpha electrons.
+        num_elec_beta: Number of active beta electrons.
+        order: Excitation order of extended space.
+
+    Returns:
+        Matrix representation of anti-Hermitian cluster operator.
+    """
+    idx2det, det2idx = get_indexing_extended(
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+        num_elec_alpha,
+        num_elec_beta,
+        order,
+    )
+    op = build_operator_matrix_extended(
+        G1(i, a), idx2det, det2idx, num_inactive_orbs + num_active_orbs + num_virtual_orbs
+    )
+    return ss.lil_array(op - op.conjugate().transpose())
+
+
+@functools.cache
+def T2_extended_matrix(
+    i: int,
+    j: int,
+    a: int,
+    b: int,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
+    order: int,
+) -> ss.lil_array:
+    """Get matrix representation of anti-Hermitian T2 spin-conserving cluster operator.
+
+    Args:
+        i: Strongly occupied spin orbital index.
+        j: Strongly occupied spin orbital index.
+        a: Weakly occupied spin orbital index.
+        b: Weakly occupied spin orbital index.
+        num_inactive_orbs: Number of inactive spatial orbitals.
+        num_active_orbs: Number of active spatial orbitals.
+        num_virtual_orbs: Number of virtual spatial orbitals.
+        num_elec_alpha: Number of active alpha electrons.
+        num_elec_beta: Number of active beta electrons.
+        order: Excitation order of extended space.
+
+    Returns:
+        Matrix representation of anti-Hermitian cluster operator.
+    """
+    idx2det, det2idx = get_indexing_extended(
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+        num_elec_alpha,
+        num_elec_beta,
+        order,
+    )
+    op = build_operator_matrix_extended(
+        G2(i, j, a, b), idx2det, det2idx, num_inactive_orbs + num_active_orbs + num_virtual_orbs
     )
     return ss.lil_array(op - op.conjugate().transpose())
 
@@ -711,17 +858,17 @@ def T6_extended_matrix(
     return ss.lil_array(op - op.conjugate().transpose())
 
 
-def construct_ucc_u_extended(
-    num_det: int,
+def construct_ucc_state_extended(
+    state: np.ndarray,
     num_inactive_orbs: int,
     num_active_orbs: int,
     num_virtual_orbs: int,
     num_elec_alpha: int,
     num_elec_beta: int,
-    theta: Sequence[float],
-    theta_picker: ThetaPicker,
-    excitations: str,
+    thetas: Sequence[float],
+    ucc_struct: UccStructure,
     order: int,
+    dagger: bool = False,
 ) -> np.ndarray:
     """Contruct unitary transformation matrix.
 
@@ -739,159 +886,294 @@ def construct_ucc_u_extended(
     Returns:
         Unitary transformation matrix.
     """
-    T = np.zeros((num_det, num_det))
-    counter = 0
-    if "s" in excitations:
-        for a, i, _ in theta_picker.get_t1_generator_sa():
-            if theta[counter] != 0.0:
-                T += (
-                    theta[counter]
-                    * T1_sa_extended_matrix(
-                        i + num_inactive_orbs,
-                        a + num_inactive_orbs,
-                        num_inactive_orbs,
-                        num_active_orbs,
-                        num_virtual_orbs,
-                        num_elec_alpha,
-                        num_elec_beta,
-                        order,
-                    ).todense()
-                )
-            counter += 1
-    if "d" in excitations:
-        for a, i, b, j, _, type_idx in theta_picker.get_t2_generator_sa():
-            if theta[counter] != 0.0:
-                if type_idx == 1:
-                    T += (
-                        theta[counter]
-                        * T2_1_sa_extended_matrix(
-                            i + num_inactive_orbs,
-                            j + num_inactive_orbs,
-                            a + num_inactive_orbs,
-                            b + num_inactive_orbs,
-                            num_inactive_orbs,
-                            num_active_orbs,
-                            num_virtual_orbs,
-                            num_elec_alpha,
-                            num_elec_beta,
-                            order,
-                        ).todense()
-                    )
-                elif type_idx == 2:
-                    T += (
-                        theta[counter]
-                        * T2_2_sa_extended_matrix(
-                            i + num_inactive_orbs,
-                            j + num_inactive_orbs,
-                            a + num_inactive_orbs,
-                            b + num_inactive_orbs,
-                            num_inactive_orbs,
-                            num_active_orbs,
-                            num_virtual_orbs,
-                            num_elec_alpha,
-                            num_elec_beta,
-                            order,
-                        ).todense()
-                    )
-                else:
-                    raise ValueError(f"Expected type_idx to be in (1,2) got {type_idx}")
-            counter += 1
-    if "t" in excitations:
-        for a, i, b, j, c, k in theta_picker.get_t3_generator():
-            if theta[counter] != 0.0:
-                T += (
-                    theta[counter]
-                    * T3_extended_matrix(
-                        i,
-                        j,
-                        k,
-                        a,
-                        b,
-                        c,
-                        num_inactive_orbs,
-                        num_active_orbs,
-                        num_virtual_orbs,
-                        num_elec_alpha,
-                        num_elec_beta,
-                        order,
-                    ).todense()
-                )
-            counter += 1
-    if "q" in excitations:
-        for a, i, b, j, c, k, d, l in theta_picker.get_t4_generator():
-            if theta[counter] != 0.0:
-                T += (
-                    theta[counter]
-                    * T4_extended_matrix(
-                        i,
-                        j,
-                        k,
-                        l,
-                        a,
-                        b,
-                        c,
-                        d,
-                        num_inactive_orbs,
-                        num_active_orbs,
-                        num_virtual_orbs,
-                        num_elec_alpha,
-                        num_elec_beta,
-                        order,
-                    ).todense()
-                )
-            counter += 1
-    if "5" in excitations:
-        for a, i, b, j, c, k, d, l, e, m in theta_picker.get_t5_generator():
-            if theta[counter] != 0.0:
-                T += (
-                    theta[counter]
-                    * T5_extended_matrix(
-                        i,
-                        j,
-                        k,
-                        l,
-                        m,
-                        a,
-                        b,
-                        c,
-                        d,
-                        e,
-                        num_inactive_orbs,
-                        num_active_orbs,
-                        num_virtual_orbs,
-                        num_elec_alpha,
-                        num_elec_beta,
-                        order,
-                    ).todense()
-                )
-            counter += 1
-    if "6" in excitations:
-        for a, i, b, j, c, k, d, l, e, m, f, n in theta_picker.get_t6_generator():
-            if theta[counter] != 0.0:
-                T += (
-                    theta[counter]
-                    * T6_extended_matrix(
-                        i,
-                        j,
-                        k,
-                        l,
-                        m,
-                        n,
-                        a,
-                        b,
-                        c,
-                        d,
-                        e,
-                        f,
-                        num_inactive_orbs,
-                        num_active_orbs,
-                        num_virtual_orbs,
-                        num_elec_alpha,
-                        num_elec_beta,
-                        order,
-                    ).todense()
-                )
-            counter += 1
-    assert counter == len(theta)
-    A = scipy.linalg.expm(T)
-    return A
+    T = np.zeros((len(state), len(state)))
+    for exc_type, exc_indices, theta in zip(
+        ucc_struct.excitation_operator_type, ucc_struct.excitation_indicies, thetas
+    ):
+        if abs(theta) < 10**-14:
+            continue
+        if exc_type == "sa_single":
+            (i, a) = exc_indices
+            T += (
+                theta
+                * T1_sa_extended_matrix(
+                    i + num_inactive_orbs,
+                    a + num_inactive_orbs,
+                    num_inactive_orbs,
+                    num_active_orbs,
+                    num_virtual_orbs,
+                    num_elec_alpha,
+                    num_elec_beta,
+                    order,
+                ).todense()
+            )
+        elif exc_type == "sa_double_1":
+            (i, j, a, b) = exc_indices
+            T += (
+                theta
+                * T2_1_sa_extended_matrix(
+                    i + num_inactive_orbs,
+                    j + num_inactive_orbs,
+                    a + num_inactive_orbs,
+                    b + num_inactive_orbs,
+                    num_inactive_orbs,
+                    num_active_orbs,
+                    num_virtual_orbs,
+                    num_elec_alpha,
+                    num_elec_beta,
+                    order,
+                ).todense()
+            )
+        elif exc_type == "sa_double_2":
+            (i, j, a, b) = exc_indices
+            T += (
+                theta
+                * T2_2_sa_extended_matrix(
+                    i + num_inactive_orbs,
+                    j + num_inactive_orbs,
+                    a + num_inactive_orbs,
+                    b + num_inactive_orbs,
+                    num_inactive_orbs,
+                    num_active_orbs,
+                    num_virtual_orbs,
+                    num_elec_alpha,
+                    num_elec_beta,
+                    order,
+                ).todense()
+            )
+        elif exc_type == "triple":
+            (i, j, k, a, b, c) = exc_indices
+            T += (
+                theta
+                * T3_extended_matrix(
+                    i + 2 * num_inactive_orbs,
+                    j + 2 * num_inactive_orbs,
+                    k + 2 * num_inactive_orbs,
+                    a + 2 * num_inactive_orbs,
+                    b + 2 * num_inactive_orbs,
+                    c + 2 * num_inactive_orbs,
+                    num_inactive_orbs,
+                    num_active_orbs,
+                    num_virtual_orbs,
+                    num_elec_alpha,
+                    num_elec_beta,
+                    order,
+                ).todense()
+            )
+        elif exc_type == "quadruple":
+            (i, j, k, l, a, b, c, d) = exc_indices
+            T += (
+                theta
+                * T4_extended_matrix(
+                    i + 2 * num_inactive_orbs,
+                    j + 2 * num_inactive_orbs,
+                    k + 2 * num_inactive_orbs,
+                    l + 2 * num_inactive_orbs,
+                    a + 2 * num_inactive_orbs,
+                    b + 2 * num_inactive_orbs,
+                    c + 2 * num_inactive_orbs,
+                    d + 2 * num_inactive_orbs,
+                    num_inactive_orbs,
+                    num_active_orbs,
+                    num_virtual_orbs,
+                    num_elec_alpha,
+                    num_elec_beta,
+                    order,
+                ).todense()
+            )
+        elif exc_type == "quintuple":
+            (i, j, k, l, m, a, b, c, d, e) = exc_indices
+            T += (
+                theta
+                * T5_extended_matrix(
+                    i + 2 * num_inactive_orbs,
+                    j + 2 * num_inactive_orbs,
+                    k + 2 * num_inactive_orbs,
+                    l + 2 * num_inactive_orbs,
+                    m + 2 * num_inactive_orbs,
+                    a + 2 * num_inactive_orbs,
+                    b + 2 * num_inactive_orbs,
+                    c + 2 * num_inactive_orbs,
+                    d + 2 * num_inactive_orbs,
+                    e + 2 * num_inactive_orbs,
+                    num_inactive_orbs,
+                    num_active_orbs,
+                    num_virtual_orbs,
+                    num_elec_alpha,
+                    num_elec_beta,
+                    order,
+                ).todense()
+            )
+        elif exc_type == "sextuple":
+            (i, j, k, l, m, n, a, b, c, d, e, f) = exc_indices
+            T += (
+                theta
+                * T6_extended_matrix(
+                    i + 2 * num_inactive_orbs,
+                    j + 2 * num_inactive_orbs,
+                    k + 2 * num_inactive_orbs,
+                    l + 2 * num_inactive_orbs,
+                    m + 2 * num_inactive_orbs,
+                    n + 2 * num_inactive_orbs,
+                    a + 2 * num_inactive_orbs,
+                    b + 2 * num_inactive_orbs,
+                    c + 2 * num_inactive_orbs,
+                    d + 2 * num_inactive_orbs,
+                    e + 2 * num_inactive_orbs,
+                    f + 2 * num_inactive_orbs,
+                    num_inactive_orbs,
+                    num_active_orbs,
+                    num_virtual_orbs,
+                    num_elec_alpha,
+                    num_elec_beta,
+                    order,
+                ).todense()
+            )
+        else:
+            raise ValueError(f"Got unknown excitation type, {exc_type}")
+    if dagger:
+        return ss.linalg.expm_multiply(-T, state)
+    return ss.linalg.expm_multiply(T, state)
+
+
+def construct_ups_state_extended(
+    state: np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
+    thetas: Sequence[float],
+    ups_struct: UpsStructure,
+    order: int,
+    dagger: bool = False,
+) -> np.ndarray:
+    r"""
+
+    #. 10.48550/arXiv.2303.10825, Eq. 15
+    """
+    tmp = state.copy()
+    order = 1
+    if dagger:
+        order = -1
+    for exc_type, exc_indices, theta in zip(
+        ups_struct.excitation_operator_type[::order], ups_struct.excitation_indicies[::order], thetas[::order]
+    ):
+        if abs(theta) < 10**-14:
+            continue
+        if dagger:
+            theta = -theta
+        if exc_type in ("tups_single", "sa_single"):
+            if exc_type == "tups_single":
+                (p,) = exc_indices
+                p += num_inactive_orbs
+                Ta = T1_extended_matrix(
+                    p * 2,
+                    (p + 1) * 2,
+                    num_inactive_orbs,
+                    num_active_orbs,
+                    num_virtual_orbs,
+                    num_elec_alpha,
+                    num_elec_beta,
+                    order,
+                ).todense()
+                Tb = T1_extended_matrix(
+                    p * 2 + 1,
+                    (p + 1) * 2 + 1,
+                    num_inactive_orbs,
+                    num_active_orbs,
+                    num_virtual_orbs,
+                    num_elec_alpha,
+                    num_elec_beta,
+                    order,
+                ).todense()
+            elif exc_type == "sa_single":
+                (i, a) = exc_indices
+                i += num_inactive_orbs
+                a += num_inactive_orbs
+                Ta = T1_extended_matrix(
+                    i * 2,
+                    a * 2,
+                    num_inactive_orbs,
+                    num_active_orbs,
+                    num_virtual_orbs,
+                    num_elec_alpha,
+                    num_elec_beta,
+                    order,
+                ).todense()
+                Tb = T1_extended_matrix(
+                    i * 2 + 1,
+                    a * 2 + 1,
+                    num_inactive_orbs,
+                    num_active_orbs,
+                    num_virtual_orbs,
+                    num_elec_alpha,
+                    num_elec_beta,
+                    order,
+                ).todense()
+            tmp = (
+                tmp
+                + np.sin(2 ** (-1 / 2) * theta) * np.matmul(Ta, tmp)
+                + (1 - np.cos(2 ** (-1 / 2) * theta)) * np.matmul(Ta, np.matmul(Ta, tmp))
+            )
+            tmp = (
+                tmp
+                + np.sin(2 ** (-1 / 2) * theta) * np.matmul(Tb, tmp)
+                + (1 - np.cos(2 ** (-1 / 2) * theta)) * np.matmul(Tb, np.matmul(Tb, tmp))
+            )
+        elif exc_type in ("tups_double", "single", "double"):
+            if exc_type == "tups_double":
+                (p,) = exc_indices
+                p += num_inactive_orbs
+                T = T2_1_sa_extended_matrix(
+                    p,
+                    p,
+                    p + 1,
+                    p + 1,
+                    num_inactive_orbs,
+                    num_active_orbs,
+                    num_virtual_orbs,
+                    num_elec_alpha,
+                    num_elec_beta,
+                    order,
+                ).todense()
+            elif exc_type == "single":
+                (i, a) = exc_indices
+                i += num_inactive_orbs
+                a += num_inactive_orbs
+                T = T1_extended_matrix(
+                    i,
+                    a,
+                    num_inactive_orbs,
+                    num_active_orbs,
+                    num_virtual_orbs,
+                    num_elec_alpha,
+                    num_elec_beta,
+                    order,
+                ).todense()
+            elif exc_type == "double":
+                (i, j, a, b) = exc_indices
+                i += num_inactive_orbs
+                j += num_inactive_orbs
+                a += num_inactive_orbs
+                b += num_inactive_orbs
+                T = T2_extended_matrix(
+                    i,
+                    j,
+                    a,
+                    b,
+                    num_inactive_orbs,
+                    num_active_orbs,
+                    num_virtual_orbs,
+                    num_elec_alpha,
+                    num_elec_beta,
+                    order,
+                ).todense()
+            tmp = (
+                tmp
+                + np.sin(theta) * np.matmul(T, tmp)
+                + (1 - np.cos(theta)) * np.matmul(T, np.matmul(T, tmp))
+            )
+        else:
+            raise ValueError(f"Got unknown excitation type, {exc_type}")
+    return tmp
