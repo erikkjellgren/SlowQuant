@@ -505,7 +505,7 @@ class quantumLR(quantumLRBaseClass):
             q_part_x = get_orbital_response_property_gradient(
                 rdms,
                 mux,
-                self.wf.kappa_idx,
+                self.wf.kappa_no_activeactive_idx,
                 self.wf.num_inactive_orbs,
                 self.wf.num_active_orbs,
                 self.normed_excitation_vectors,
@@ -515,7 +515,7 @@ class quantumLR(quantumLRBaseClass):
             q_part_y = get_orbital_response_property_gradient(
                 rdms,
                 muy,
-                self.wf.kappa_idx,
+                self.wf.kappa_no_activeactive_idx,
                 self.wf.num_inactive_orbs,
                 self.wf.num_active_orbs,
                 self.normed_excitation_vectors,
@@ -525,7 +525,7 @@ class quantumLR(quantumLRBaseClass):
             q_part_z = get_orbital_response_property_gradient(
                 rdms,
                 muz,
-                self.wf.kappa_idx,
+                self.wf.kappa_no_activeactive_idx,
                 self.wf.num_inactive_orbs,
                 self.wf.num_active_orbs,
                 self.normed_excitation_vectors,

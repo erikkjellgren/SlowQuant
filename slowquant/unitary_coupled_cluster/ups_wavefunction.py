@@ -158,7 +158,7 @@ class WaveFunctionUPS:
         self.kappa = []
         self.kappa_idx = []
         self.kappa_no_activeactive_idx = []
-        self.kappa_idx_dagger = []
+        self.kappa_no_activeactive_idx_dagger = []
         self.kappa_redundant = []
         self.kappa_redundant_idx = []
         self._kappa_old = []
@@ -195,10 +195,10 @@ class WaveFunctionUPS:
                         continue
                 if not (p in self.active_idx and q in self.active_idx):
                     self.kappa_no_activeactive_idx.append([p, q])
+                    self.kappa_no_activeactive_idx_dagger.append([q, p])
                 self.kappa.append(0.0)
                 self._kappa_old.append(0.0)
                 self.kappa_idx.append([p, q])
-                self.kappa_idx_dagger.append([q, p])
         # HF like orbital rotation indecies
         self.kappa_hf_like_idx = []
         for p in range(0, self.num_orbs):
