@@ -178,7 +178,6 @@ class WaveFunction:
                 self.kappa.append(0.0)
                 self._kappa_old.append(0.0)
                 self.kappa_idx.append([p, q])
-                self.kappa_idx_dagger.append([q, p])
         # HF like orbital rotation indecies
         self.kappa_hf_like_idx = []
         for p in range(0, self.num_orbs):
