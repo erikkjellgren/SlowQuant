@@ -277,7 +277,9 @@ class WaveFunction:
         self._energy_elec = None
         self.QI.parameters = parameters
 
-    def change_primitive(self, primitive: BaseEstimator | BaseSampler | BaseSamplerV2) -> None:
+    def change_primitive(
+        self, primitive: BaseEstimator | BaseSampler | BaseSamplerV2, verbose: bool = True
+    ) -> None:
         """Change the primitive expectation value calculator.
 
         Args:
@@ -314,7 +316,8 @@ class WaveFunction:
         self.QI.ISA = ISA_old  # Redo ISA including transpilation if requested
         self.QI.shots = self.QI.shots  # Redo shots parameter check
 
-        self.QI.get_info()
+        if verbose:
+            self.QI.get_info()
 
     def change_shots(self, shots: int | None) -> None:
         """Change the number of shots for QI interface.

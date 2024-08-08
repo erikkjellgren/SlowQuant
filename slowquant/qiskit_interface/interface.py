@@ -1010,12 +1010,24 @@ class QuantumInterface:
             raise ValueError("Current implementation does not scale above 12 qubits?")
         if self.do_M_ansatz0:
             ansatz = self.circuit
-            # Negate the Hartree-Fock State
-            ansatz = ansatz.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
+            if self.ISA:
+                # Negate the Hartree-Fock State.
+                # Only X Gates. Should need no transpilation.
+                self.hf = HartreeFock(self.num_orbs, self.num_elec, self.mapper)
+                ansatz = ansatz.compose(
+                    HartreeFock(self.num_orbs, self.num_elec, self.mapper), qubits=self._layout_indices
+                )
+            else:
+                ansatz = ansatz.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
         else:
-            ansatz = QuantumCircuit(self.num_qubits)
+            if self.ISA:
+                raise ValueError("Standard M mitigation is not yet implemented with ISA=True")
+            ansatz = QuantumCircuit(self.num_qubits)  # empty circuit
+        self.ansatzM = ansatz
         M = np.zeros((2**self.num_qubits, 2**self.num_qubits))
         if self.do_M_iqa:
+            if self.ISA:
+                raise ValueError("IQA is not yet implemented with ISA=True")
             ansatzX = ansatz.copy()
             for i in range(self.num_qubits):
                 ansatzX.x(i)
@@ -1042,20 +1054,34 @@ class QuantumInterface:
                     M[idx1, idx2] = P
         else:
             ansatz_list = [None] * 2**self.num_qubits
-            for nr, comb in enumerate(itertools.product([0, 1], repeat=self.num_qubits)):
-                ansatzX = ansatz.copy()
-                idx2 = int("".join([str(x) for x in comb]), 2)
-                for i, bit in enumerate(comb):
-                    if bit == 1:
-                        ansatzX.x(i)
-                # Make list of custom ansatz
-                ansatz_list[nr] = ansatzX
-            # Simulate all elements with one device call
-            Px_list = self._one_call_sampler_distributions(
-                "Z" * self.num_qubits,
-                [[10**-8] * len(ansatz.parameters)] * len(ansatz_list),
-                ansatz_list,
-            )
+            if self.ISA:
+                for nr, comb in enumerate(itertools.product([0, 1], repeat=self.num_qubits)):
+                    ansatzX = ansatz.copy()
+                    for i, bit in enumerate(comb):
+                        if bit == 1:
+                            ansatzX.x(self._layout_indices[i])
+                    # Make list of custom ansatz
+                    ansatz_list[nr] = ansatzX
+                # Simulate all elements with one device call
+                Px_list = self._one_call_sampler_distributions(
+                    "Z" * self.num_qubits,
+                    [[10**-8] * len(ansatz.parameters)] * len(ansatz_list),
+                    ansatz_list,
+                )
+            else:
+                for nr, comb in enumerate(itertools.product([0, 1], repeat=self.num_qubits)):
+                    ansatzX = ansatz.copy()
+                    for i, bit in enumerate(comb):
+                        if bit == 1:
+                            ansatzX.x(i)
+                    # Make list of custom ansatz
+                    ansatz_list[nr] = ansatzX
+                # Simulate all elements with one device call
+                Px_list = self._one_call_sampler_distributions(
+                    "Z" * self.num_qubits,
+                    [[10**-8] * len(ansatz.parameters)] * len(ansatz_list),
+                    ansatz_list,
+                )
             # Construct M
             for idx2, Px in enumerate(Px_list):
                 for bitstring, prob in Px.items():
@@ -1065,9 +1091,9 @@ class QuantumInterface:
 
     def get_info(self) -> None:
         """Get infos about settings."""
-        data = f"Your settings are:\n {'Ansatz:':<20} {self.ansatz}\n {'Number of shots:':<20} {self.shots}\n \
-            {'ISA':<20} {self.ISA}\n {'Transpiled circuit':<20} {self._transpiled}\n {'Primitive:':<20} {self._primitive.__class__.__name__}\n \
-            {'Post-processing:':<20} {self.do_postselection}"
+        data = f"Your settings are:\n {'Ansatz:':<20} {self.ansatz}\n {'Number of shots:':<20} {self.shots}\n"
+        data += f" {'ISA':<20} {self.ISA}\n {'Transpiled circuit':<20} {self._transpiled}\n {'Primitive:':<20} {self._primitive.__class__.__name__}\n"
+        data += f" {'Post-processing:':<20} {self.do_postselection}"
         if self.do_M_mitigation:
             data += f"\n {'M mitigation:':<20} {self.do_M_mitigation}\n {'M Ansatz0:':<20} {self.do_M_ansatz0}\n {'M IQA:':<20} {self.do_M_iqa}"
         if self.ISA:
