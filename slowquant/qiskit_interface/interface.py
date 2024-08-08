@@ -1017,10 +1017,7 @@ class QuantumInterface:
             else:
                 ansatz = ansatz.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
         else:
-            if self.ISA:
-                raise ValueError("Standard M mitigation is not yet implemented with ISA=True")
-            ansatz = QuantumCircuit(self.num_qubits)  # empty circuit
-        self.ansatzM = ansatz
+            ansatz = QuantumCircuit(self.circuit.num_qubits)  # empty circuit
         M = np.zeros((2**self.num_qubits, 2**self.num_qubits))
         ansatz_list = [None] * 2**self.num_qubits
         if self.ISA:
