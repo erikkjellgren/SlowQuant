@@ -285,20 +285,22 @@ class WaveFunction:
         Args:
             primitive: Primitive object.
         """
-        print(
-            "Using this function is only recommended for switching from ideal simulator to shot-noise or quantum hardware.\n \
-            Multiple switching back and forth can lead to un-expected outcomes and is an experimental feature.\n"
-        )
+        if verbose:
+            print(
+                "Using this function is only recommended for switching from ideal simulator to shot-noise or quantum hardware.\n \
+                Multiple switching back and forth can lead to un-expected outcomes and is an experimental feature.\n"
+            )
 
         if isinstance(primitive, BaseEstimatorV2):
             raise ValueError("EstimatorV2 is not currently supported.")
-        if isinstance(primitive, BaseSamplerV2):
+        if isinstance(primitive, BaseSamplerV2) and verbose:
             print("WARNING: Using SamplerV2 is an experimental feature.")
         self.QI._primitive = primitive  # pylint: disable=protected-access
-        if self.QI.do_M_ansatz0:
-            print("Reset RDMs, energies, QI metrics, and correlation matrix.")
-        else:
-            print("Reset RDMs, energies, and QI metrics.")
+        if verbose:
+            if self.QI.do_M_ansatz0:
+                print("Reset RDMs, energies, QI metrics, and correlation matrix.")
+            else:
+                print("Reset RDMs, energies, and QI metrics.")
         self._rdm1 = None
         self._rdm2 = None
         self._rdm3 = None
@@ -307,7 +309,7 @@ class WaveFunction:
         self.QI.total_device_calls = 0
         self.QI.total_shots_used = 0
         self.QI.total_paulis_evaluated = 0
-        self.QI._reset_cliques()  # pylint: disable=protected-access
+        self.QI._reset_cliques(verbose=verbose)  # pylint: disable=protected-access
         self.QI._Minv = None  # pylint: disable=protected-access
 
         # Reset circuit and initiate re-transpiling

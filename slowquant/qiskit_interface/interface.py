@@ -451,10 +451,11 @@ class QuantumInterface:
         if hasattr(self, "_shots"):  # Check if it is initialization
             self.shots = self._shots
 
-    def _reset_cliques(self) -> None:
+    def _reset_cliques(self, verbose: bool = True) -> None:
         """Reset cliques to empty."""
         self.cliques = Clique()
-        print("Pauli saving has been reset.")
+        if verbose:
+            print("Pauli saving has been reset.")
 
     def null_shots(self) -> None:
         """Set number of shots to None."""
@@ -1066,6 +1067,6 @@ class QuantumInterface:
             )
         if self.ISA:
             data += f"\n {'Circuit layout:':<20} {self._layout_indices}"
-        if self._internal_pm:
-            data += f"\n {'Transpiled backend:':<20} {self._primitive_backend}\n {'Transpiled opt. level:':<20} {self._primitive_level}"
+            if self._internal_pm:
+                data += f"\n {'Transpiled backend:':<20} {self._primitive_backend}\n {'Transpiled opt. level:':<20} {self._primitive_level}"
         print(data)
