@@ -2,7 +2,6 @@ import numpy as np
 
 import slowquant.SlowQuant as sq
 import slowquant.unitary_coupled_cluster.linear_response.allstatetransfer as allstatetransfer  # pylint: disable=consider-using-from-import
-import slowquant.unitary_coupled_cluster.linear_response.generic as generic  # pylint: disable=consider-using-from-import
 import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
 import slowquant.unitary_coupled_cluster.linear_response.projected as projected  # pylint: disable=consider-using-from-import
 import slowquant.unitary_coupled_cluster.linear_response.statetransfer as statetransfer  # pylint: disable=consider-using-from-import
@@ -40,7 +39,7 @@ def test_H2_631g_naive():
     # Linear Response
     LR = naive.LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
-    genericLR = generic.LinearResponseUCC(WF, excitations="SD", operator_type="naive")
+    genericLR = naive.LinearResponseUCC(WF, excitations="SD")
     genericLR.calc_excitation_energies()
 
     thresh = 10**-4
@@ -105,7 +104,7 @@ def test_LiH_sto3g_naive():
     # Linear Response
     LR = naive.LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
-    genericLR = generic.LinearResponseUCC(WF, excitations="SD", operator_type="naive")
+    genericLR = naive.LinearResponseUCC(WF, excitations="SD")
     genericLR.calc_excitation_energies()
 
     thresh = 10**-4
@@ -544,7 +543,6 @@ def test_LiH_sto3g_allST():
 
     # Get oscillator strength for each excited state
     osc_strengths = LR.get_oscillator_strength(dipole_integrals)
-    print(osc_strengths)
     assert abs(osc_strengths[0] - 0.06668878) < thresh
     assert abs(osc_strengths[1] - 0.33360367) < thresh
     assert abs(osc_strengths[2] - 0.33360367) < thresh

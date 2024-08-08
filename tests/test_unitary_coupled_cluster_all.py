@@ -5,7 +5,6 @@ import slowquant.SlowQuant as sq
 import slowquant.unitary_coupled_cluster.linear_response.allprojected as allprojected  # pylint: disable=consider-using-from-import
 import slowquant.unitary_coupled_cluster.linear_response.allselfconsistent as allselfconsistent  # pylint: disable=consider-using-from-import
 import slowquant.unitary_coupled_cluster.linear_response.allstatetransfer as allstatetransfer  # pylint: disable=consider-using-from-import
-import slowquant.unitary_coupled_cluster.linear_response.generic as generic  # pylint: disable=consider-using-from-import
 import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
 import slowquant.unitary_coupled_cluster.linear_response.projected as projected  # pylint: disable=consider-using-from-import
 import slowquant.unitary_coupled_cluster.linear_response.projected_statetransfer as projected_statetransfer  # pylint: disable=consider-using-from-import
@@ -54,67 +53,6 @@ def test_h2_sto3g_uccsd_lr() -> None:
     assert abs(LR.excitation_energies[1] - 1.71950367) < 10**-3
 
 
-def test_h2_sto3g_uccsd_lr_matrices() -> None:
-    """Test matrices of Linear Response for uccsd with all transform methods."""
-    SQobj = sq.SlowQuant()
-    SQobj.set_molecule(
-        """H  0.0  0.0  0.0;
-            H  0.0  0.0  0.7;""",
-        distance_unit="angstrom",
-    )
-    SQobj.set_basis_set("sto-3g")
-    SQobj.init_hartree_fock()
-    SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
-    WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
-        SQobj.molecule.number_electrons,
-        (2, 2),
-        SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
-    )
-
-    WF.run_ucc("SD", False)
-
-    # SC
-    LR_naive = allselfconsistent.LinearResponseUCC(
-        WF,
-        excitations="SD",
-    )
-    LR_native = generic.LinearResponseUCC(
-        WF,
-        excitations="SD",
-        operator_type="selfconsistent",
-        do_transform_orbital_rotations=True,
-    )
-
-    threshold = 10 ** (-5)
-
-    assert np.allclose(LR_naive.A, LR_native.A, atol=threshold)
-    assert np.allclose(LR_naive.B, LR_native.B, atol=threshold)
-    assert np.allclose(LR_naive.Sigma, LR_native.Sigma, atol=threshold)
-    assert np.allclose(LR_naive.Delta, LR_native.Delta, atol=threshold)
-
-    # ST
-    LR_naive = allstatetransfer.LinearResponseUCC(  # type: ignore [assigment]
-        WF,
-        excitations="SD",
-    )
-    LR_native = generic.LinearResponseUCC(
-        WF,
-        excitations="SD",
-        operator_type="statetransfer",
-        do_transform_orbital_rotations=True,
-    )
-
-    assert np.allclose(LR_naive.A, LR_native.A, atol=threshold)
-    assert np.allclose(LR_naive.B, LR_native.B, atol=threshold)
-    assert np.allclose(LR_naive.Sigma, LR_native.Sigma, atol=threshold)
-    assert np.allclose(LR_naive.Delta, LR_native.Delta, atol=threshold)
-
-
 def test_LiH_atmethods_energies() -> None:
     """Test LiH at LR methods."""
 
@@ -142,11 +80,11 @@ def test_LiH_atmethods_energies() -> None:
     threshold = 10 ** (-3)
 
     # atSC
-    LR_naive = allselfconsistent.LinearResponseUCC(
+    LR_atSC = allselfconsistent.LinearResponseUCC(
         WF,
         excitations="SD",
     )
-    LR_naive.calc_excitation_energies()
+    LR_atSC.calc_excitation_energies()
 
     solutions = np.array(
         [
@@ -162,14 +100,14 @@ def test_LiH_atmethods_energies() -> None:
         ]
     )
 
-    assert np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)
+    assert np.allclose(LR_atSC.excitation_energies, solutions, atol=threshold)
 
     # atST
-    LR_naive = allstatetransfer.LinearResponseUCC(  # type: ignore [assignment]
+    LR_atST = allstatetransfer.LinearResponseUCC(
         WF,
         excitations="SD",
     )
-    LR_naive.calc_excitation_energies()
+    LR_atST.calc_excitation_energies()
 
     solutions = np.array(
         [
@@ -185,7 +123,7 @@ def test_LiH_atmethods_energies() -> None:
         ]
     )
 
-    assert np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)
+    assert np.allclose(LR_atST.excitation_energies, solutions, atol=threshold)
 
 
 def test_LiH_naiveq_methods_energies() -> None:
@@ -403,40 +341,16 @@ def test_LiH_naiveq_methods_matrices() -> None:
         WF,
         excitations="SD",
     )
-    LR_generic = generic.LinearResponseUCC(
-        WF,
-        excitations="SD",
-        operator_type="naive",
-    )
-
-    assert np.allclose(LR_naive.A, LR_generic.A, atol=threshold)
-    assert np.allclose(LR_naive.B, LR_generic.B, atol=threshold)
-    assert np.allclose(LR_naive.Sigma, LR_generic.Sigma, atol=threshold)
-    assert np.allclose(LR_naive.Delta, LR_generic.Delta, atol=threshold)
 
     assert np.allclose(LR_naive.A, LR_naive.A.T, atol=threshold)
     assert np.allclose(LR_naive.B, LR_naive.B.T, atol=threshold)
     assert np.allclose(LR_naive.Delta, np.zeros_like(LR_naive.Delta), atol=threshold)
-
-    assert np.allclose(LR_generic.A, LR_generic.A.T, atol=threshold)
-    assert np.allclose(LR_generic.B, LR_generic.B.T, atol=threshold)
-    assert np.allclose(LR_generic.Delta, np.zeros_like(LR_generic.Delta), atol=threshold)
 
     # SC
     LR_naive = selfconsistent.LinearResponseUCC(  # type: ignore [assigment]
         WF,
         excitations="SD",
     )
-    LR_generic = generic.LinearResponseUCC(
-        WF,
-        excitations="SD",
-        operator_type="selfconsistent",
-    )
-
-    assert np.allclose(LR_naive.A, LR_generic.A, atol=threshold)
-    assert np.allclose(LR_naive.B, LR_generic.B, atol=threshold)
-    assert np.allclose(LR_naive.Sigma, LR_generic.Sigma, atol=threshold)
-    assert np.allclose(LR_naive.Delta, LR_generic.Delta, atol=threshold)
 
     assert np.allclose(LR_naive.A, LR_naive.A.T, atol=threshold)
     assert np.allclose(LR_naive.B, LR_naive.B.T, atol=threshold)
@@ -448,16 +362,6 @@ def test_LiH_naiveq_methods_matrices() -> None:
         WF,
         excitations="SD",
     )
-    LR_generic = generic.LinearResponseUCC(
-        WF,
-        excitations="SD",
-        operator_type="projected",
-    )
-
-    assert np.allclose(LR_naive.A, LR_generic.A, atol=threshold)
-    assert np.allclose(LR_naive.B, LR_generic.B, atol=threshold)
-    assert np.allclose(LR_naive.Sigma, LR_generic.Sigma, atol=threshold)
-    assert np.allclose(LR_naive.Delta, LR_generic.Delta, atol=threshold)
 
     threshold = 10 ** (-5)
     assert np.allclose(LR_naive.A, LR_naive.A.T, atol=threshold)
@@ -469,16 +373,6 @@ def test_LiH_naiveq_methods_matrices() -> None:
         WF,
         excitations="SD",
     )
-    LR_generic = generic.LinearResponseUCC(
-        WF,
-        excitations="SD",
-        operator_type="statetransfer",
-    )
-
-    assert np.allclose(LR_naive.A, LR_generic.A, atol=threshold)
-    assert np.allclose(LR_naive.B, LR_generic.B, atol=threshold)
-    assert np.allclose(LR_naive.Sigma, LR_generic.Sigma, atol=threshold)
-    assert np.allclose(LR_naive.Delta, LR_generic.Delta, atol=threshold)
 
     assert np.allclose(LR_naive.A, LR_naive.A.T, atol=threshold)
     assert np.allclose(LR_naive.B, LR_naive.B.T, atol=threshold)

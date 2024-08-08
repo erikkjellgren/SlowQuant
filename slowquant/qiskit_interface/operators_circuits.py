@@ -258,7 +258,7 @@ def double_excitation(
         n_beta += 1
     if n_alpha % 2 != 0 or n_beta % 2 != 0:
         raise ValueError("Operator only implemented for spin conserving operators.")
-    fac = -1
+    fac = 1
     if k % 2 == l % 2 and k % 2 == 0 and i % 2 != 0:
         fac *= -1
     k = f2q(k, num_orbs)

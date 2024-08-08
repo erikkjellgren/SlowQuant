@@ -3,15 +3,15 @@ from collections.abc import Sequence
 import numpy as np
 import scipy
 
-from slowquant.qiskit_interface.linear_response.util import iterate_t1_sa, iterate_t2_sa
-from slowquant.qiskit_interface.operators import (
-    G1,
-    G2_1,
-    G2_2,
-    hamiltonian_pauli_0i_0a,
-    hamiltonian_pauli_1i_1a,
-)
 from slowquant.qiskit_interface.wavefunction import WaveFunction
+from slowquant.unitary_coupled_cluster.operators import (
+    G1_sa,
+    G2_1_sa,
+    G2_2_sa,
+    hamiltonian_0i_0a,
+    hamiltonian_1i_1a,
+)
+from slowquant.unitary_coupled_cluster.util import iterate_t1_sa, iterate_t2_sa
 
 
 class quantumLRBaseClass:
@@ -27,28 +27,28 @@ class quantumLRBaseClass:
         """
         self.wf = wf
         # Create operators
-        self.H_0i_0a = hamiltonian_pauli_0i_0a(wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs)
-        self.H_1i_1a = hamiltonian_pauli_1i_1a(
+        self.H_0i_0a = hamiltonian_0i_0a(wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs)
+        self.H_1i_1a = hamiltonian_1i_1a(
             wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs, wf.num_virtual_orbs
         )
 
         self.G_ops = []
         # G1
-        for a, i, _, _, _ in iterate_t1_sa(wf.active_occ_idx, wf.active_unocc_idx):
-            self.G_ops.append(G1(a, i))
+        for a, i, _ in iterate_t1_sa(wf.active_occ_idx, wf.active_unocc_idx):
+            self.G_ops.append(G1_sa(i, a))
         # G2
-        for a, i, b, j, _, _, op_id in iterate_t2_sa(wf.active_occ_idx, wf.active_unocc_idx):
-            if op_id > 0:
+        for a, i, b, j, _, type_idx in iterate_t2_sa(wf.active_occ_idx, wf.active_unocc_idx):
+            if type_idx == 1:
                 # G2_1
-                self.G_ops.append(G2_1(a, b, i, j))
-            else:
+                self.G_ops.append(G2_1_sa(i, j, a, b))
+            elif type_idx == 2:
                 # G2_2
-                self.G_ops.append(G2_2(a, b, i, j))
+                self.G_ops.append(G2_2_sa(i, j, a, b))
 
         # q
         self.q_ops = []
         for p, q in wf.kappa_idx:
-            self.q_ops.append(G1(p, q))
+            self.q_ops.append(G1_sa(p, q))
 
         num_parameters = len(self.q_ops) + len(self.G_ops)
         self.num_params = num_parameters
@@ -140,7 +140,7 @@ class quantumLRBaseClass:
         print(f"B      : {np.linalg.cond(self.B)}")
         print(f"Metric : {np.linalg.cond(self.metric)}")
         print(f"Sigma  : {np.linalg.cond(self.Sigma)}")
-        print(f"S-1E   : {np.linalg.cond(np.linalg.inv(self.metric)@self.hessian)}")
+        print(f"S-1E   : {np.linalg.cond(np.linalg.inv(self.metric) @ self.hessian)}")
 
         print("\n Quantum variance analysis:")
         matrix_name = ["A", "B", "Sigma"]
@@ -160,7 +160,7 @@ class quantumLRBaseClass:
                     area += "q"
                 else:
                     area += "G"
-                print(f"Indices {indices[0][i],indices[1][i]}. Part of matrix block {area}")
+                print(f"Indices {indices[0][i], indices[1][i]}. Part of matrix block {area}")
         if verbose:
             A_row = np.sum(A, axis=1) / self.num_params
             B_row = np.sum(B, axis=1) / self.num_params
@@ -175,7 +175,7 @@ class quantumLRBaseClass:
                     if nr < self.num_q:
                         print(
                             f"q{str(nr):<{3}}:"
-                            + f"{(A_row[nr]+B_row[nr])/2:3.6f}".center(10)
+                            + f"{(A_row[nr] + B_row[nr]) / 2:3.6f}".center(10)
                             + " | "
                             + f"{A_row[nr]:3.6f}".center(10)
                             + " | "
@@ -185,8 +185,8 @@ class quantumLRBaseClass:
                         )
                     else:
                         print(
-                            f"G{str(nr-self.num_q):<{3}}:"
-                            + f"{(A_row[nr]+B_row[nr])/2:3.6f}".center(10)
+                            f"G{str(nr - self.num_q):<{3}}:"
+                            + f"{(A_row[nr] + B_row[nr]) / 2:3.6f}".center(10)
                             + " | "
                             + f"{A_row[nr]:3.6f}".center(10)
                             + " | "
@@ -231,7 +231,7 @@ class quantumLRBaseClass:
                             area += "q"
                         else:
                             area += "G"
-                        print(f"Indices {indices[0][i],indices[1][i]}. Part of matrix block {area}")
+                        print(f"Indices {indices[0][i], indices[1][i]}. Part of matrix block {area}")
 
             if verbose:
                 if np.all(mask):
@@ -263,7 +263,7 @@ class quantumLRBaseClass:
                         if nr < self.num_q:
                             print(
                                 f"q{str(nr):<{3}}:"
-                                + f"{(A_row[nr]+B_row[nr])/2:3.6f}".center(10)
+                                + f"{(A_row[nr] + B_row[nr]) / 2:3.6f}".center(10)
                                 + " | "
                                 + f"{A_row[nr]:3.6f}".center(10)
                                 + " | "
@@ -273,8 +273,8 @@ class quantumLRBaseClass:
                             )
                         else:
                             print(
-                                f"G{str(nr-self.num_q):<{3}}:"
-                                + f"{(A_row[nr]+B_row[nr])/2:3.6f}".center(10)
+                                f"G{str(nr - self.num_q):<{3}}:"
+                                + f"{(A_row[nr] + B_row[nr]) / 2:3.6f}".center(10)
                                 + " | "
                                 + f"{A_row[nr]:3.6f}".center(10)
                                 + " | "
