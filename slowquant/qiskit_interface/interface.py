@@ -211,8 +211,9 @@ class QuantumInterface:
                         "optimization_level"
                     ]
                 )
-            elif hasattr(self._primitive.options, "optimization_level"):
-                self._primitive_level = self._primitive.options["optimization_level"]
+            elif hasattr(self._primitive, "options"):
+                if hasattr(self._primitive.options, "optimization_level"):
+                    self._primitive_level = self._primitive.options["optimization_level"]
             else:
                 self._primitive_level = 3
 
@@ -910,6 +911,8 @@ class QuantumInterface:
         Returns:
             Quasi-distributions.
         """
+        if self.ISA:
+            raise ValueError("Function _sampler_distribution does not work with ISA.")
         if self._circuit_multipl > 1:
             print(
                 "WARNING: The chosen function does not allow for appending circuits. Choose _one_call_sampler_distributions instead."
