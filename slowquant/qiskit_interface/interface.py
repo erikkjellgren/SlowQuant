@@ -203,6 +203,7 @@ class QuantumInterface:
                 self._primitive_backend = None
 
             # Get optimization level from backend. Only for v1 primitives.
+            self._primitive_level = 3
             if hasattr(self._primitive, "_transpile_options") and hasattr(
                 self._primitive._transpile_options, "optimization_level"  # pylint: disable=protected-access
             ):
@@ -214,8 +215,6 @@ class QuantumInterface:
             elif hasattr(self._primitive, "options"):
                 if hasattr(self._primitive.options, "optimization_level"):
                     self._primitive_level = self._primitive.options["optimization_level"]
-            else:
-                self._primitive_level = 3
 
             self._ISA_layout = None
 
