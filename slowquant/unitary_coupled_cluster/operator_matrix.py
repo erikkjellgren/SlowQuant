@@ -144,32 +144,31 @@ def propagate_state(
         if isinstance(op, str):
             if op not in ("U", "Ud"):
                 raise ValueError(f"Unknown str operator, expected ('U', 'Ud') got {op}")
+            dagger = False
+            if op == "Ud":
+                dagger = True
+            if isinstance(wf_struct, UpsStructure):
+                new_state = construct_ups_state(
+                    new_state,
+                    num_active_orbs,
+                    num_active_elec_alpha,
+                    num_active_elec_beta,
+                    thetas,
+                    wf_struct,
+                    dagger=dagger,
+                )
+            elif isinstance(wf_struct, UccStructure):
+                new_state = construct_ucc_state(
+                    new_state,
+                    num_active_orbs,
+                    num_active_elec_beta,
+                    num_active_elec_alpha,
+                    thetas,
+                    wf_struct,
+                    dagger=dagger,
+                )
             else:
-                dagger = False
-                if op == "Ud":
-                    dagger = True
-                if isinstance(wf_struct, UpsStructure):
-                    new_state = construct_ups_state(
-                        new_state,
-                        num_active_orbs,
-                        num_active_elec_alpha,
-                        num_active_elec_beta,
-                        thetas,
-                        wf_struct,
-                        dagger=dagger,
-                    )
-                elif isinstance(wf_struct, UccStructure):
-                    new_state = construct_ucc_state(
-                        new_state,
-                        num_active_orbs,
-                        num_active_elec_beta,
-                        num_active_elec_alpha,
-                        thetas,
-                        wf_struct,
-                        dagger=dagger,
-                    )
-                else:
-                    raise TypeError(f"Got unknown wave function structure type, {type(wf_struct)}")
+                raise TypeError(f"Got unknown wave function structure type, {type(wf_struct)}")
         else:
             op_folded = op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs)
             for i in range(num_dets):
@@ -242,7 +241,10 @@ def expectation_value(
         thetas,
         wf_struct,
     )
-    return bra @ op_ket
+    val = bra @ op_ket
+    if not isinstance(val, float):
+        raise ValueError(f"Calculated expectation value is not a float, got type {type(val)}")
+    return val
 
 
 def expectation_value_mat(bra: np.ndarray, op: np.ndarray, ket: np.ndarray) -> float:
@@ -260,8 +262,20 @@ def expectation_value_mat(bra: np.ndarray, op: np.ndarray, ket: np.ndarray) -> f
 
 
 @functools.cache
-def Epq_matrix(p: int, q: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int) -> ss.lil_array:
-    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
+def Epq_matrix(p: int, q: int, num_active_orbs: int, num_active_elec_alpha: int, num_active_elec_beta: int) -> ss.lil_array:
+    """Get matrix representation of Epq operator.
+
+    Args:
+        p: Spatial orbital index.
+        q: Spatial orbital index.
+        num_active_orbs: Number of active sptial orbitals.
+        num_active_elec_alpha: Number of active alpha electrons.
+        num_active_elec_beta: Number of active beta electrons.
+
+    Returns:
+        Matrix representation of Epq operator.
+    """
+    idx2det, det2idx = get_indexing(num_active_orbs, num_active_elec_alpha, num_active_elec_beta)
     return ss.lil_array(build_operator_matrix(Epq(p, q), idx2det, det2idx, num_active_orbs))
 
 
@@ -680,8 +694,8 @@ def construct_ucc_state(
 def construct_ups_state(
     state: np.ndarray,
     num_active_orbs: int,
-    num_elec_alpha: int,
-    num_elec_beta: int,
+    num_active_elec_alpha: int,
+    num_active_elec_beta: int,
     thetas: Sequence[float],
     ups_struct: UpsStructure,
     dagger: bool = False,
@@ -704,14 +718,20 @@ def construct_ups_state(
         if exc_type in ("tups_single", "sa_single"):
             if exc_type == "tups_single":
                 (p,) = exc_indices
-                Ta = T1_matrix(p * 2, (p + 1) * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+                Ta = T1_matrix(
+                    p * 2, (p + 1) * 2, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+                ).todense()
                 Tb = T1_matrix(
-                    p * 2 + 1, (p + 1) * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta
+                    p * 2 + 1, (p + 1) * 2 + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
                 ).todense()
             elif exc_type == "sa_single":
                 (i, a) = exc_indices
-                Ta = T1_matrix(i * 2, a * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
-                Tb = T1_matrix(i * 2 + 1, a * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+                Ta = T1_matrix(
+                    i * 2, a * 2, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+                ).todense()
+                Tb = T1_matrix(
+                    i * 2 + 1, a * 2 + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+                ).todense()
             tmp = (
                 tmp
                 + np.sin(2 ** (-1 / 2) * theta) * np.matmul(Ta, tmp)
@@ -726,14 +746,16 @@ def construct_ups_state(
             if exc_type == "tups_double":
                 (p,) = exc_indices
                 T = T2_1_sa_matrix(
-                    p, p, p + 1, p + 1, num_active_orbs, num_elec_alpha, num_elec_beta
+                    p, p, p + 1, p + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
                 ).todense()
             elif exc_type == "single":
                 (i, a) = exc_indices
-                T = T1_matrix(i, a, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+                T = T1_matrix(i, a, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
             elif exc_type == "double":
                 (i, j, a, b) = exc_indices
-                T = T2_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+                T = T2_matrix(
+                    i, j, a, b, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+                ).todense()
             tmp = (
                 tmp
                 + np.sin(theta) * np.matmul(T, tmp)
@@ -748,11 +770,25 @@ def propagate_unitary(
     state: np.ndarray,
     idx: int,
     num_active_orbs: int,
-    num_elec_alpha: int,
-    num_elec_beta: int,
+    num_active_elec_alpha: int,
+    num_active_elec_beta: int,
     thetas: Sequence[float],
     ups_struct: UpsStructure,
 ) -> np.ndarray:
+    """Apply unitary from operator number 'idx' to state.
+
+    Args:
+        state: State vector.
+        idx: Index of operator in the ups_struct.
+        num_active_orbs: Number of active spatial orbitals.
+        num_active_elec_alpha: Number of active alpha electrons.
+        num_active_elec_beta: Number of active beta electrons.
+        thetas: Values for ansatz parameters.
+        ups_struct: UPS structure object.
+
+    Returns:
+        State with unitary applied.
+    """
     exc_type = ups_struct.excitation_operator_type[idx]
     exc_indices = ups_struct.excitation_indicies[idx]
     theta = thetas[idx]
@@ -761,14 +797,20 @@ def propagate_unitary(
     if exc_type in ("tups_single", "sa_single"):
         if exc_type == "tups_single":
             (p,) = exc_indices
-            Ta = T1_matrix(p * 2, (p + 1) * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            Ta = T1_matrix(
+                p * 2, (p + 1) * 2, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+            ).todense()
             Tb = T1_matrix(
-                p * 2 + 1, (p + 1) * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta
+                p * 2 + 1, (p + 1) * 2 + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
             ).todense()
         elif exc_type == "sa_single":
             (i, a) = exc_indices
-            Ta = T1_matrix(i * 2, a * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
-            Tb = T1_matrix(i * 2 + 1, a * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            Ta = T1_matrix(
+                i * 2, a * 2, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+            ).todense()
+            Tb = T1_matrix(
+                i * 2 + 1, a * 2 + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+            ).todense()
         A = 2 ** (-1 / 2)
         tmp = (
             state
@@ -783,13 +825,15 @@ def propagate_unitary(
     elif exc_type in ("tups_double", "single", "double"):
         if exc_type == "tups_double":
             (p,) = exc_indices
-            T = T2_1_sa_matrix(p, p, p + 1, p + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            T = T2_1_sa_matrix(
+                p, p, p + 1, p + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+            ).todense()
         elif exc_type == "single":
             (i, a) = exc_indices
-            T = T1_matrix(i, a, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            T = T1_matrix(i, a, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
         elif exc_type == "double":
             (i, j, a, b) = exc_indices
-            T = T2_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            T = T2_matrix(i, j, a, b, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
         tmp = (
             state
             + np.sin(theta) * np.matmul(T, state)
@@ -804,35 +848,72 @@ def get_grad_action(
     state: np.ndarray,
     idx: int,
     num_active_orbs: int,
-    num_elec_alpha: int,
-    num_elec_beta: int,
+    num_active_elec_alpha: int,
+    num_active_elec_beta: int,
     ups_struct: UpsStructure,
 ) -> np.ndarray:
+    r"""Get effect of differentiation with respect to "idx" operator in the UPS expansion.
+
+    .. math::
+        \frac{\partial}{\partial \theta_i}\left(\left<\text{CSF}\right|\boldsymbol{U}(\theta_{i-1})\boldsymbol{U}(\theta_i)\right) =
+        \left<\text{CSF}\right|\boldsymbol{U}(\theta_{i-1})\frac{\partial \boldsymbol{U}(\theta_i)}{\partial \theta_i}
+
+    With,
+
+    .. math::
+        \begin{align}
+        \frac{\partial \boldsymbol{U}(\theta_i)}{\partial \theta_i} &= \frac{\partial}{\partial \theta_i}\exp\left(\theta_i \hat{T}_i\right)\\
+                &= \exp\left(\theta_i \hat{T}_i\right)\hat{T}_i
+        \end{align}
+
+    This function only applies the $\hat{T}_i$ part to the state.
+
+    #. 10.48550/arXiv.2303.10825, Eq. 20
+
+    Args:
+        state: State vector.
+        idx: Index of operator in the ups_struct.
+        num_active_orbs: Number of active spatial orbitals.
+        num_active_elec_alpha: Number of active alpha electrons.
+        num_active_elec_beta: Number of active beta electrons.
+        ups_struct: UPS structure object.
+
+    Returns:
+        State with derivative of the idx'th unitary applied.
+    """
     exc_type = ups_struct.excitation_operator_type[idx]
     exc_indices = ups_struct.excitation_indicies[idx]
     if exc_type in ("tups_single", "sa_single"):
         if exc_type == "tups_single":
             (p,) = exc_indices
-            Ta = T1_matrix(p * 2, (p + 1) * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            Ta = T1_matrix(
+                p * 2, (p + 1) * 2, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+            ).todense()
             Tb = T1_matrix(
-                p * 2 + 1, (p + 1) * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta
+                p * 2 + 1, (p + 1) * 2 + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
             ).todense()
         elif exc_type == "sa_single":
             (i, a) = exc_indices
-            Ta = T1_matrix(i * 2, a * 2, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
-            Tb = T1_matrix(i * 2 + 1, a * 2 + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            Ta = T1_matrix(
+                i * 2, a * 2, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+            ).todense()
+            Tb = T1_matrix(
+                i * 2 + 1, a * 2 + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+            ).todense()
         A = 2 ** (-1 / 2)
         tmp = np.matmul(A * (Ta + Tb), state)
     elif exc_type in ("tups_double", "single", "double"):
         if exc_type == "tups_double":
             (p,) = exc_indices
-            T = T2_1_sa_matrix(p, p, p + 1, p + 1, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            T = T2_1_sa_matrix(
+                p, p, p + 1, p + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+            ).todense()
         elif exc_type == "single":
             (i, a) = exc_indices
-            T = T1_matrix(i, a, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            T = T1_matrix(i, a, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
         elif exc_type == "double":
             (i, j, a, b) = exc_indices
-            T = T2_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+            T = T2_matrix(i, j, a, b, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
         tmp = np.matmul(T, state)
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")

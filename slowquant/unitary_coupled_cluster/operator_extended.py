@@ -314,38 +314,37 @@ def propagate_state_extended(
         if isinstance(op, str):
             if op not in ("U", "Ud"):
                 raise ValueError(f"Unknown str operator, expected ('U', 'Ud') got {op}")
+            dagger = False
+            if op == "Ud":
+                dagger = True
+            if isinstance(wf_struct, UpsStructure):
+                new_state = construct_ups_state_extended(
+                    new_state,
+                    num_inactive_orbs,
+                    num_active_orbs,
+                    num_virtual_orbs,
+                    num_elec_alpha,
+                    num_elec_beta,
+                    thetas,
+                    wf_struct,
+                    order,
+                    dagger=dagger,
+                )
+            elif isinstance(wf_struct, UccStructure):
+                new_state = construct_ucc_state_extended(
+                    new_state,
+                    num_inactive_orbs,
+                    num_active_orbs,
+                    num_virtual_orbs,
+                    num_elec_alpha,
+                    num_elec_beta,
+                    thetas,
+                    wf_struct,
+                    order,
+                    dagger=dagger,
+                )
             else:
-                dagger = False
-                if op == "Ud":
-                    dagger = True
-                if isinstance(wf_struct, UpsStructure):
-                    new_state = construct_ups_state_extended(
-                        new_state,
-                        num_inactive_orbs,
-                        num_active_orbs,
-                        num_virtual_orbs,
-                        num_elec_alpha,
-                        num_elec_beta,
-                        thetas,
-                        wf_struct,
-                        order,
-                        dagger=dagger,
-                    )
-                elif isinstance(wf_struct, UccStructure):
-                    new_state = construct_ucc_state_extended(
-                        new_state,
-                        num_inactive_orbs,
-                        num_active_orbs,
-                        num_virtual_orbs,
-                        num_elec_alpha,
-                        num_elec_beta,
-                        thetas,
-                        wf_struct,
-                        order,
-                        dagger=dagger,
-                    )
-                else:
-                    raise TypeError(f"Got unknown wave function structure type, {type(wf_struct)}")
+                raise TypeError(f"Got unknown wave function structure type, {type(wf_struct)}")
         else:
             for i in range(num_dets):
                 if abs(new_state[i]) < 10**-14:

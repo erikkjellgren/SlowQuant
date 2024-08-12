@@ -28,8 +28,9 @@ def tUPS(
 
     Ansatz Options:
         * n_layers [int]: Number of layers.
-        * do_pp [bool]: Do perfect pairing.
-        * do_qnp [bool]: Do QNP tiling.
+        * do_pp [bool]: Do perfect pairing. (default: False)
+        * do_qnp [bool]: Do QNP tiling. (default: False)
+        * skip_last_singles [bool]: Skip last layer of singles operators. (default: False)
 
     Args:
         num_orbs: Number of spatial orbitals.
