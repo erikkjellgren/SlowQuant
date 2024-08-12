@@ -462,17 +462,30 @@ def iterate_pair_t2_generalized(
 
 class UccStructure:
     def __init__(self) -> None:
-        self.excitation_indicies: list[tuple[int]] = []
+        """Intialize the unitary coupled cluster ansatz structure."""
+        self.excitation_indicies: list[tuple[int, ...]] = []
         self.excitation_operator_type: list[str] = []
         self.n_params = 0
 
     def add_sa_singles(self, active_occ_idx: Sequence[int], active_unocc_idx: Sequence[int]) -> None:
+        """Add spin-adapted singles.
+
+        Args:
+            active_occ_idx: Active strongly occupied spatial orbital indices.
+            active_unocc_idx: Active weakly occupied spatial orbital indices.
+        """
         for a, i, _ in iterate_t1_sa(active_occ_idx, active_unocc_idx):
             self.excitation_indicies.append((i, a))
             self.excitation_operator_type.append("sa_single")
             self.n_params += 1
 
     def add_sa_doubles(self, active_occ_idx: Sequence[int], active_unocc_idx: Sequence[int]) -> None:
+        """Add spin-adapted doubles.
+
+        Args:
+            active_occ_idx: Active strongly occupied spatial orbital indices.
+            active_unocc_idx: Active weakly occupied spatial orbital indices.
+        """
         for a, i, b, j, _, op_type in iterate_t2_sa(active_occ_idx, active_unocc_idx):
             self.excitation_indicies.append((i, j, a, b))
             if op_type == 1:
@@ -482,6 +495,12 @@ class UccStructure:
             self.n_params += 1
 
     def add_triples(self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int]) -> None:
+        """Add alpha-number and beta-number conserving triples.
+
+        Args:
+            active_occ_spin_idx: Active strongly occupied spin orbital indices.
+            active_unocc_spin_idx: Active weakly occupied spin orbital indices.
+        """
         for a, i, b, j, c, k in iterate_t3(active_occ_spin_idx, active_unocc_spin_idx):
             self.excitation_indicies.append((i, j, k, a, b, c))
             self.excitation_operator_type.append("triple")
@@ -490,6 +509,12 @@ class UccStructure:
     def add_quadruples(
         self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int]
     ) -> None:
+        """Add alpha-number and beta-number conserving quadruples.
+
+        Args:
+            active_occ_spin_idx: Active strongly occupied spin orbital indices.
+            active_unocc_spin_idx: Active weakly occupied spin orbital indices.
+        """
         for a, i, b, j, c, k, d, l in iterate_t4(active_occ_spin_idx, active_unocc_spin_idx):
             self.excitation_indicies.append((i, j, k, l, a, b, c, d))
             self.excitation_operator_type.append("quadruple")
@@ -498,12 +523,24 @@ class UccStructure:
     def add_quintuples(
         self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int]
     ) -> None:
+        """Add alpha-number and beta-number conserving quintuples.
+
+        Args:
+            active_occ_spin_idx: Active strongly occupied spin orbital indices.
+            active_unocc_spin_idx: Active weakly occupied spin orbital indices.
+        """
         for a, i, b, j, c, k, d, l, e, m in iterate_t5(active_occ_spin_idx, active_unocc_spin_idx):
             self.excitation_indicies.append((i, j, k, l, m, a, b, c, d, e))
             self.excitation_operator_type.append("quintuple")
             self.n_params += 1
 
     def add_sextuples(self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int]) -> None:
+        """Add alpha-number and beta-number conserving sextuples.
+
+        Args:
+            active_occ_spin_idx: Active strongly occupied spin orbital indices.
+            active_unocc_spin_idx: Active weakly occupied spin orbital indices.
+        """
         for a, i, b, j, c, k, d, l, e, m, f, n in iterate_t6(active_occ_spin_idx, active_unocc_spin_idx):
             self.excitation_indicies.append((i, j, k, l, m, n, a, b, c, d, e, f))
             self.excitation_operator_type.append("sextuple")
@@ -512,7 +549,8 @@ class UccStructure:
 
 class UpsStructure:
     def __init__(self) -> None:
-        self.excitation_indicies: list[tuple[int]] = []
+        """Intialize the unitary product state ansatz structure."""
+        self.excitation_indicies: list[tuple[int, ...]] = []
         self.excitation_operator_type: list[str] = []
         self.n_params = 0
 
@@ -520,11 +558,12 @@ class UpsStructure:
         """tUPS ansatz.
 
         #. 10.1103/PhysRevResearch.6.023300
-        #. 10.1088/1367-2630/ac2cb3
+        #. 10.1088/1367-2630/ac2cb3 (QNP)
 
         Ansatz Options:
             * n_layers [int]: Number of layers.
-            * do_qnp [bool]: Do QNP tiling.
+            * do_qnp [bool]: Do QNP tiling. (default: False)
+            * skip_last_singles [bool]: Skip last layer of singles operators. (default: False)
 
         Args:
             num_active_orbs: Number of spatial active orbitals.
