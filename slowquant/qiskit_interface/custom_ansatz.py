@@ -9,10 +9,16 @@ from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from slowquant.qiskit_interface.operators_circuits import (
     double_excitation,
     single_excitation,
+    single_sa_excitation,
     tups_double,
     tups_single,
 )
-from slowquant.unitary_coupled_cluster.util import iterate_t1, iterate_t2
+from slowquant.unitary_coupled_cluster.util import (
+    iterate_pair_t2_generalized,
+    iterate_t1,
+    iterate_t1_sa_generalized,
+    iterate_t2,
+)
 
 
 def tUPS(
@@ -89,6 +95,11 @@ def tUPS(
             grad_param_R[f"p{idx:09d}"] = 2
             idx += 1
             # Second single
+            if n + 1 == n_layers and skip_last_singles and num_orbs == 2:
+                # Special case for two orbital.
+                # Here the layer is only one block, thus, 
+                # the last single excitation is earlier than expected.
+                continue
             qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx:09d}"))
             grad_param_R[f"p{idx:09d}"] = 4
             idx += 1
@@ -157,4 +168,49 @@ def fUCC(
         qc = double_excitation(a, b, i, j, num_orbs, qc, Parameter(f"p{idx:09d}"))
         grad_param_R[f"p{idx:09d}"] = 2
         idx += 1
+    return qc, grad_param_R
+
+
+def create_kSAfUpCCGSD(
+    num_orbs: int, num_elec: tuple[int, int], mapper: FermionicMapper, ansatz_options: dict[str, Any]
+) -> tuple[QuantumCircuit, dict[str, int]]:
+    """Modified k-UpCCGSD ansatz.
+
+    The ansatz have been modifed to use spin-adapted singet single excitation operators.
+
+    #. 10.1021/acs.jctc.8b01004
+
+    Ansatz Options:
+        * n_layers [int]: Number of layers.
+
+    Args:
+        num_orbs: Number of spatial orbitals.
+        num_elec: Number of alpha and beta electrons.
+        mapper: Fermioinc to qubit mapper.
+        ansatz_options: Ansatz options.
+
+    Returns:
+        Modified k-UpCCGSD ansatz.
+    """
+    valid_options = "n_layers"
+    for option in ansatz_options:
+        if option not in valid_options:
+            raise ValueError(
+                f"Got unknown option for kSAfUpCCGSD, {option}. Valid options are: {valid_options}"
+            )
+    if "n_layers" not in ansatz_options.keys():
+        raise ValueError("kSAfUpCCGSD require the option 'n_layers'")
+    n_layers = ansatz_options["n_layers"]
+    qc = HartreeFock(num_orbs, num_elec, mapper)
+    grad_param_R = {}
+    idx = 0
+    for _ in range(n_layers):
+        for a, i, _ in iterate_t1_sa_generalized(num_orbs):
+            qc = single_sa_excitation(a, i, num_orbs, qc, Parameter(f"p{idx:09d}"))
+            grad_param_R[f"p{idx:09d}"] = 4
+            idx += 1
+        for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
+            qc = double_excitation(a, b, i, j, num_orbs, qc, Parameter(f"p{idx:09d}"))
+            grad_param_R[f"p{idx:09d}"] = 2
+            idx += 1
     return qc, grad_param_R

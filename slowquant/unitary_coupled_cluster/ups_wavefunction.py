@@ -39,7 +39,7 @@ class WaveFunctionUPS:
         h_ao: np.ndarray,
         g_ao: np.ndarray,
         ansatz: str,
-        ansatz_options: dict[str, Any] = {},
+        ansatz_options: dict[str, Any] | None = None,
         include_active_kappa: bool = False,
     ) -> None:
         """Initialize for UPS wave function.
@@ -56,6 +56,8 @@ class WaveFunctionUPS:
             ansatz_options: Ansatz options.
             include_active_kappa: Include active-active orbital rotations.
         """
+        if ansatz_options is None:
+            ansatz_options = {}
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
         self._c_orthonormal = c_orthonormal
@@ -346,13 +348,17 @@ class WaveFunctionUPS:
                     q_idx = q - self.num_inactive_orbs
                     val = expectation_value(
                         self.ci_coeffs,
-                        Epq(p, q),
+                        [Epq(p, q)],
                         self.ci_coeffs,
                         self.idx2det,
                         self.det2idx,
                         self.num_inactive_orbs,
                         self.num_active_orbs,
                         self.num_inactive_orbs,
+                        self.num_active_elec_alpha,
+                        self.num_active_elec_beta,
+                        self.thetas,
+                        self.ups_layout,
                     )
                     self._rdm1[p_idx, q_idx] = val  # type: ignore
                     self._rdm1[q_idx, p_idx] = val  # type: ignore
@@ -392,13 +398,17 @@ class WaveFunctionUPS:
                             s_idx = s - self.num_inactive_orbs
                             val = expectation_value(
                                 self.ci_coeffs,
-                                Epq(p, q) * Epq(r, s),
+                                [Epq(p, q) * Epq(r, s)],
                                 self.ci_coeffs,
                                 self.idx2det,
                                 self.det2idx,
                                 self.num_inactive_orbs,
                                 self.num_active_orbs,
                                 self.num_inactive_orbs,
+                        self.num_active_elec_alpha,
+                        self.num_active_elec_beta,
+                        self.thetas,
+                        self.ups_layout,
                             )
                             if q == r:
                                 val -= self.rdm1[p_idx, s_idx]
@@ -576,18 +586,22 @@ def energy_ups(
     wf.thetas = theta
     return expectation_value(
         wf.ci_coeffs,
-        hamiltonian_0i_0a(
+        [hamiltonian_0i_0a(
             wf.h_mo,
             wf.g_mo,
             wf.num_inactive_orbs,
             wf.num_active_orbs,
-        ),
+        )],
         wf.ci_coeffs,
         wf.idx2det,
         wf.det2idx,
         wf.num_inactive_orbs,
         wf.num_active_orbs,
         wf.num_inactive_orbs,
+                        wf.num_active_elec_alpha,
+                        wf.num_active_elec_beta,
+                        wf.thetas,
+                        wf.ups_layout,
     )
 
 
@@ -689,7 +703,7 @@ def active_space_parameter_gradient(
     gradient_theta = np.zeros_like(theta)
     eps = np.finfo(np.float64).eps ** (1 / 2)
     E = expectation_value_mat(wf.ci_coeffs, Hamiltonian, wf.ci_coeffs)
-    for i, _ in enumerate(theta):
+    for i in range(len(theta)):
         sign_step = (theta[i] >= 0).astype(float) * 2 - 1  # type: ignore [attr-defined]
         step_size = eps * sign_step * max(1, abs(theta[i]))
         theta[i] += step_size

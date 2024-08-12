@@ -1,4 +1,3 @@
-# pylint: disable=too-many-lines
 from __future__ import annotations
 
 import time
@@ -45,7 +44,7 @@ class WaveFunctionSAUPS:
         g_ao: np.ndarray,
         states: list[Any],
         ansatz: str,
-        ansatz_options: dict[str, Any] = {},
+        ansatz_options: dict[str, Any] | None = None,
         include_active_kappa: bool = False,
     ) -> None:
         """Initialize for SA-UPS wave function.
@@ -62,6 +61,8 @@ class WaveFunctionSAUPS:
             ansatz_options: Ansatz options.
             include_active_kappa: Include active-active orbital rotations.
         """
+        if ansatz_options is None:
+            ansatz_options = {}
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
         self._c_orthonormal = c_orthonormal
@@ -220,7 +221,15 @@ class WaveFunctionSAUPS:
         self.num_states = len(states[0])
         self.csf_coeffs = np.zeros((self.num_states, self.num_det))
         for i, (coeffs, on_vecs) in enumerate(zip(states[0], states[1])):
+            if len(coeffs) != len(on_vecs):
+                raise ValueError(
+                    f"Mismatch in number of coefficients, {len(coeffs)}, and number of determinants, {len(on_vecs)}. For {coeffs} and {on_vecs}"
+                )
             for coeff, on_vec in zip(coeffs, on_vecs):
+                if len(on_vec) != self.num_active_spin_orbs:
+                    raise ValueError(
+                        f"Lenght of determinant, {len(on_vec)}, does not match number of active spin orbitals, {self.num_active_spin_orbs}. For determinant, {on_vec}"
+                    )
                 idx = self.det2idx[int(on_vec, 2)]
                 self.csf_coeffs[i, idx] = coeff
         self._ci_coeffs = np.copy(self.csf_coeffs)
@@ -228,11 +237,11 @@ class WaveFunctionSAUPS:
             for j, coeff_j in enumerate(self.ci_coeffs):
                 if i == j:
                     if abs(1 - coeff_i @ coeff_j) > 10**-10:
-                        raise ValueError(f"state {i} is not normalized got overlap of {coeff_i@coeff_j}")
+                        raise ValueError(f"state {i} is not normalized got overlap of {coeff_i @ coeff_j}")
                 else:
                     if abs(coeff_i @ coeff_j) > 10**-10:
                         raise ValueError(
-                            f"state {i} and {j} are not otrhogonal got overlap of {coeff_i@coeff_j}"
+                            f"state {i} and {j} are not otrhogonal got overlap of {coeff_i @ coeff_j}"
                         )
         self.ups_layout = UpsStructure()
         if ansatz.lower() == "tups":
@@ -308,7 +317,6 @@ class WaveFunctionSAUPS:
             raise ValueError(f"Expected {len(self._thetas)} theta1 values got {len(theta_vals)}")
         self._rdm1 = None
         self._rdm2 = None
-        self._u = None
         self._state_energies = None
         self._state_ci_coeffs = None
         self._ci_coeffs = None

@@ -34,10 +34,11 @@ def test_LiH_naive_estimator() -> None:
         rhf.mo_coeff,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
+        "SD",
     )
 
     # Optimize WF
-    WF.run_ucc("SD", True)
+    WF.run_ucc(True)
 
     # Optimize WF with QSQ
     estimator = Estimator()
@@ -218,10 +219,11 @@ def test_LiH_allprojected_estimator() -> None:
         rhf.mo_coeff,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
+        "SD",
     )
 
     # Optimize WF
-    WF.run_ucc("SD", True)
+    WF.run_ucc(True)
 
     # Optimize WF with QSQ
     estimator = Estimator()
@@ -351,10 +353,11 @@ def test_LiH_naive_sampler() -> None:
         rhf.mo_coeff,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
+        "SD",
     )
 
     # Optimize WF
-    WF.run_ucc("SD", True)
+    WF.run_ucc(True)
 
     # Optimize WF with QSQ
     sampler = Sampler()

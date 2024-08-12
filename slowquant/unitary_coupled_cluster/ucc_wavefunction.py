@@ -51,6 +51,7 @@ class WaveFunctionUCC:
             c_orthonormal: Initial orbital coefficients.
             h_ao: One-electron integrals in AO for Hamiltonian.
             g_ao: Two-electron integrals in AO.
+            excitations: Unitary coupled cluster excitation operators.
             include_active_kappa: Include active-active orbital rotations.
         """
         if len(cas) != 2:

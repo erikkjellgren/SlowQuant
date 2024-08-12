@@ -560,6 +560,11 @@ class UpsStructure:
                 self.excitation_indicies.append((p,))
                 self.n_params += 1
                 # Second single
+                if n + 1 == n_layers and skip_last_singles and num_active_orbs == 2:
+                    # Special case for two orbital.
+                    # Here the layer is only one block, thus, 
+                    # the last single excitation is earlier than expected.
+                    continue
                 self.excitation_operator_type.append("tups_single")
                 self.excitation_indicies.append((p,))
                 self.n_params += 1
@@ -643,8 +648,7 @@ class UpsStructure:
     def create_kSAfUpCCGSD(self, num_orbs: int, ansatz_options: dict[str, Any]) -> None:
         """Modified k-UpCCGSD ansatz.
 
-        The ansatz have been modifed to use exact fermionic operators,
-        and using spin-adapted singet single excitation operators.
+        The ansatz have been modifed to use spin-adapted singet single excitation operators.
 
         #. 10.1021/acs.jctc.8b01004
 

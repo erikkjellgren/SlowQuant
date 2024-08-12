@@ -1,5 +1,5 @@
 import numpy as np
-from qiskit.circuit import Parameter, QuantumCircuit
+from qiskit.circuit import Parameter, ParameterExpression, QuantumCircuit
 
 from slowquant.qiskit_interface.util import f2q
 
@@ -159,7 +159,9 @@ def tups_double(p: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter) -> 
     return qc
 
 
-def single_excitation(k: int, i: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter) -> QuantumCircuit:
+def single_excitation(
+    k: int, i: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression
+) -> QuantumCircuit:
     r"""Exact circuit for single excitation.
 
     Implementation of the following operator,
@@ -172,7 +174,7 @@ def single_excitation(k: int, i: int, num_orbs: int, qc: QuantumCircuit, theta: 
     Args:
         k: Weakly occupied spin orbital index.
         i: Strongly occupied spin orbital index.
-        num_spin_orbs: Number of spatial orbitals.
+        num_orbs: Number of spatial orbitals.
         qc: Quantum circuit.
         theta: Circuit parameter.
 
@@ -341,4 +343,35 @@ def double_excitation(
     qc.cx(l, j)
     qc.cx(l, k)
     qc.cx(j, i)
+    return qc
+
+
+def single_sa_excitation(
+    k: int, i: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter
+) -> QuantumCircuit:
+    r"""Exact circuit for spin-adapted singlet single excitation.
+
+    Implementation of the following operator,
+
+    .. math::
+       \boldsymbol{U} = \exp\left(\frac{\theta}{\sqrt{2}}\left(\hat{E}_{ki} - \hat{E}_{ik}^\dagger\right)\right)
+
+    Implemented as,
+
+    .. math::
+       \boldsymbol{U} = \exp\left(\frac{\theta}{\sqrt{2}}\hat{a}^\dagger_{k,\alpha}\hat{a}_{i,\alpha}\right)
+                        \exp\left(\frac{\theta}{\sqrt{2}}\hat{a}^\dagger_{k,\beta}\hat{a}_{i,\beta}\right)
+
+    Args:
+        k: Weakly occupied spatial orbital index.
+        i: Strongly occupied spatial orbital index.
+        num_orbs: Number of spatial orbitals.
+        qc: Quantum circuit.
+        theta: Circuit parameter.
+
+    Returns:
+        Single singlet spin-adapted excitation circuit.
+    """
+    qc = single_excitation(2 * k, 2 * i, num_orbs, qc, 2 ** (-1 / 2) * theta)
+    qc = single_excitation(2 * k + 1, 2 * i + 1, num_orbs, qc, 2 ** (-1 / 2) * theta)
     return qc
