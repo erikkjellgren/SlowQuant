@@ -601,7 +601,7 @@ class UpsStructure:
                 # Second single
                 if n + 1 == n_layers and skip_last_singles and num_active_orbs == 2:
                     # Special case for two orbital.
-                    # Here the layer is only one block, thus, 
+                    # Here the layer is only one block, thus,
                     # the last single excitation is earlier than expected.
                     continue
                 self.excitation_operator_type.append("tups_single")
@@ -650,8 +650,8 @@ class UpsStructure:
             for det in state:
                 occ_tmp = []
                 unocc_tmp = []
-                for i, occ in enumerate(det):
-                    if occ == "1":
+                for i, occ_str in enumerate(det):
+                    if occ_str == "1":
                         occ_tmp.append(i)
                     else:
                         unocc_tmp.append(i)

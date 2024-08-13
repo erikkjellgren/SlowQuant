@@ -262,7 +262,9 @@ def expectation_value_mat(bra: np.ndarray, op: np.ndarray, ket: np.ndarray) -> f
 
 
 @functools.cache
-def Epq_matrix(p: int, q: int, num_active_orbs: int, num_active_elec_alpha: int, num_active_elec_beta: int) -> ss.lil_array:
+def Epq_matrix(
+    p: int, q: int, num_active_orbs: int, num_active_elec_alpha: int, num_active_elec_beta: int
+) -> ss.lil_array:
     """Get matrix representation of Epq operator.
 
     Args:
@@ -700,9 +702,24 @@ def construct_ups_state(
     ups_struct: UpsStructure,
     dagger: bool = False,
 ) -> np.ndarray:
-    r"""
+    r"""Construct unitary product state.
+
+    .. math::
+        \boldsymbol{U}_N...\boldsymbol{U}_0\left|\nu\right> = \left|\nu\right>
 
     #. 10.48550/arXiv.2303.10825, Eq. 15
+
+    Args:
+        state: Reference state vector.
+        num_active_orbs: Number of active spatial orbitals.
+        num_active_elec_alpha: Number of active alpha electrons.
+        num_active_elec_betaa: Number of active beta electrons.
+        thetas: Ansatz parameters values.
+        ups_struct: Unitary product state structure.
+        dagger: If do dagger unitaries.
+
+    Returns:
+        New state vector with unitaries applied.
     """
     tmp = state.copy()
     order = 1

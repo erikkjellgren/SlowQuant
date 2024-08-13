@@ -405,10 +405,10 @@ class WaveFunctionUPS:
                                 self.num_inactive_orbs,
                                 self.num_active_orbs,
                                 self.num_inactive_orbs,
-                        self.num_active_elec_alpha,
-                        self.num_active_elec_beta,
-                        self.thetas,
-                        self.ups_layout,
+                                self.num_active_elec_alpha,
+                                self.num_active_elec_beta,
+                                self.thetas,
+                                self.ups_layout,
                             )
                             if q == r:
                                 val -= self.rdm1[p_idx, s_idx]
@@ -586,22 +586,24 @@ def energy_ups(
     wf.thetas = theta
     return expectation_value(
         wf.ci_coeffs,
-        [hamiltonian_0i_0a(
-            wf.h_mo,
-            wf.g_mo,
-            wf.num_inactive_orbs,
-            wf.num_active_orbs,
-        )],
+        [
+            hamiltonian_0i_0a(
+                wf.h_mo,
+                wf.g_mo,
+                wf.num_inactive_orbs,
+                wf.num_active_orbs,
+            )
+        ],
         wf.ci_coeffs,
         wf.idx2det,
         wf.det2idx,
         wf.num_inactive_orbs,
         wf.num_active_orbs,
         wf.num_inactive_orbs,
-                        wf.num_active_elec_alpha,
-                        wf.num_active_elec_beta,
-                        wf.thetas,
-                        wf.ups_layout,
+        wf.num_active_elec_alpha,
+        wf.num_active_elec_beta,
+        wf.thetas,
+        wf.ups_layout,
     )
 
 

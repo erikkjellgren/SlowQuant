@@ -98,7 +98,7 @@ def tUPS(
             # Second single
             if n + 1 == n_layers and skip_last_singles and num_orbs == 2:
                 # Special case for two orbital.
-                # Here the layer is only one block, thus, 
+                # Here the layer is only one block, thus,
                 # the last single excitation is earlier than expected.
                 continue
             qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx:09d}"))

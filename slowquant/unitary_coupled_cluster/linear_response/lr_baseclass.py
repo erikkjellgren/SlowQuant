@@ -19,6 +19,8 @@ from slowquant.unitary_coupled_cluster.operators import (
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.util import (
+    UccStructure,
+    UpsStructure,
     iterate_t1_sa,
     iterate_t2_sa,
     iterate_t3,
@@ -29,6 +31,11 @@ from slowquant.unitary_coupled_cluster.util import (
 
 
 class LinearResponseBaseClass:
+    index_info: (
+        tuple[list[int], dict[int, int], int, int, int, int, int, list[float], UpsStructure]
+        | tuple[list[int], dict[int, int], int, int, int, int, int, list[float], UccStructure]
+    )
+
     def __init__(
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,
