@@ -42,7 +42,7 @@ class WaveFunctionSAUPS:
         c_orthonormal: np.ndarray,
         h_ao: np.ndarray,
         g_ao: np.ndarray,
-        states: list[Any],
+        states: tuple[list[list[float]], list[list[str]]],
         ansatz: str,
         ansatz_options: dict[str, Any] | None = None,
         include_active_kappa: bool = False,
@@ -57,6 +57,7 @@ class WaveFunctionSAUPS:
             c_orthonormal: Initial orbital coefficients.
             h_ao: One-electron integrals in AO for Hamiltonian.
             g_ao: Two-electron integrals in AO.
+            states: States to include in the state-averaged expansion.
             ansatz: Name of ansatz.
             ansatz_options: Ansatz options.
             include_active_kappa: Include active-active orbital rotations.
@@ -281,6 +282,11 @@ class WaveFunctionSAUPS:
 
     @property
     def ci_coeffs(self) -> list[np.ndarray]:
+        """Get CI coefficients.
+
+        Returns:
+            State vector.
+        """
         if self._ci_coeffs is None:
             tmp = []
             for coeffs in self.csf_coeffs:
@@ -295,7 +301,7 @@ class WaveFunctionSAUPS:
                     )
                 )
                 self._ci_coeffs = np.array(tmp)
-        return self._ci_coeffs
+        return self._ci_coeffs  # type: ignore[return-value]
 
     @property
     def thetas(self) -> list[float]:
@@ -525,7 +531,7 @@ class WaveFunctionSAUPS:
             Args:
                 x: Wave function parameters.
             """
-            pass
+            pass  # pylint: disable=unnecessary-pass
 
         parameters: list[float] = []
         num_kappa = 0
@@ -573,6 +579,10 @@ class WaveFunctionSAUPS:
         self._do_state_ci()
 
     def _do_state_ci(self) -> None:
+        r"""Do subspace diagonalisation.
+
+        #. 10.1103/PhysRevLett.122.230401, Eq. 2
+        """
         state_H = np.zeros((self.num_states, self.num_states))
         Hamiltonian = build_operator_matrix(
             hamiltonian_0i_0a(
@@ -597,6 +607,11 @@ class WaveFunctionSAUPS:
 
     @property
     def energy_states(self) -> np.ndarray:
+        """Get state specific energies.
+
+        Returns:
+            State specific energies.
+        """
         if self._state_energies is None:
             self._do_state_ci()
         if self._state_energies is None:
@@ -605,12 +620,31 @@ class WaveFunctionSAUPS:
 
     @property
     def excitation_energies(self) -> np.ndarray:
+        r"""Get excitation energies.
+
+        .. math::
+            \varepsilon_n = E_n - E_0
+
+        Returns:
+            Excitation energies.
+        """
         energies = np.zeros(self.num_states - 1)
         for i, energy in enumerate(self.energy_states[1:]):
             energies[i] = energy - self.energy_states[0]
         return energies
 
     def get_transition_property(self, ao_integral: np.ndarray) -> np.ndarray:
+        r"""Get transition property.
+
+        .. math::
+            t_n = \left<0\left|\hat{O}\right|n\right>
+
+        Args:
+            ao_integral: Operator integrals in AO basis.
+
+        Returns:
+            Transition property.
+        """
         if self._state_ci_coeffs is None:
             self._do_state_ci()
         if self._state_ci_coeffs is None:
@@ -634,6 +668,17 @@ class WaveFunctionSAUPS:
         return transition_property
 
     def get_oscillator_strenghts(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+        r"""Get oscillator strengths between ground state and excited states.
+
+        .. math::
+            f_n = \frac{2}{3}\varepsilon_n\left|\left<0\left|\hat{\boldsymbol{\mu}}\right|n\right>\right|^2
+
+        Args:
+            dipole_integrals: Dipole integrals in AO basis.
+
+        Returns:
+            Oscillator strengths.
+        """
         transition_dipole_x = self.get_transition_property(dipole_integrals[0])
         transition_dipole_y = self.get_transition_property(dipole_integrals[1])
         transition_dipole_z = self.get_transition_property(dipole_integrals[2])
@@ -821,7 +866,7 @@ def active_space_parameter_gradient(
             )
         for bra, ket in zip(bra_vec, ket_vec_tmp):
             gradient_theta[i] += 2 * np.matmul(bra, ket)
-        for j in range(len(bra_vec)):
+        for j in range(len(bra_vec)):  # pylint: disable=consider-using-enumerate
             bra_vec[j] = propagate_unitary(
                 bra_vec[j],
                 i,

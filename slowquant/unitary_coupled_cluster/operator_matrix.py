@@ -749,6 +749,8 @@ def construct_ups_state(
                 Tb = T1_matrix(
                     i * 2 + 1, a * 2 + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
                 ).todense()
+            else:
+                raise ValueError(f"Got unknown excitation type: {exc_type}")
             tmp = (
                 tmp
                 + np.sin(2 ** (-1 / 2) * theta) * np.matmul(Ta, tmp)
@@ -773,6 +775,8 @@ def construct_ups_state(
                 T = T2_matrix(
                     i, j, a, b, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
                 ).todense()
+            else:
+                raise ValueError(f"Got unknown excitation type: {exc_type}")
             tmp = (
                 tmp
                 + np.sin(theta) * np.matmul(T, tmp)
@@ -828,6 +832,8 @@ def propagate_unitary(
             Tb = T1_matrix(
                 i * 2 + 1, a * 2 + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
             ).todense()
+        else:
+            raise ValueError(f"Got unknown excitation type: {exc_type}")
         A = 2 ** (-1 / 2)
         tmp = (
             state
@@ -851,6 +857,8 @@ def propagate_unitary(
         elif exc_type == "double":
             (i, j, a, b) = exc_indices
             T = T2_matrix(i, j, a, b, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
+        else:
+            raise ValueError(f"Got unknown excitation type: {exc_type}")
         tmp = (
             state
             + np.sin(theta) * np.matmul(T, state)
@@ -917,6 +925,8 @@ def get_grad_action(
             Tb = T1_matrix(
                 i * 2 + 1, a * 2 + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
             ).todense()
+        else:
+            raise ValueError(f"Got unknown excitation type: {exc_type}")
         A = 2 ** (-1 / 2)
         tmp = np.matmul(A * (Ta + Tb), state)
     elif exc_type in ("tups_double", "single", "double"):
@@ -931,6 +941,8 @@ def get_grad_action(
         elif exc_type == "double":
             (i, j, a, b) = exc_indices
             T = T2_matrix(i, j, a, b, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
+        else:
+            raise ValueError(f"Got unknown excitation type: {exc_type}")
         tmp = np.matmul(T, state)
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")

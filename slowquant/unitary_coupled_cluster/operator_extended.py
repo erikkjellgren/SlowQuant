@@ -1048,9 +1048,27 @@ def construct_ups_state_extended(
     order: int,
     dagger: bool = False,
 ) -> np.ndarray:
-    r"""
+    r"""Construct unitary product state.
+
+    .. math::
+        \boldsymbol{U}_N...\boldsymbol{U}_0\left|\nu\right> = \left|\nu\right>
 
     #. 10.48550/arXiv.2303.10825, Eq. 15
+
+    Args:
+        state: Reference state vector.
+        num_inactive_orbs: Number of inactive spatial orbitals.
+        num_active_orbs: Number of active spatial orbitals.
+        num_virtual_orbs: Number of virtual spatial orbitals
+        num_active_elec_alpha: Number of active alpha electrons.
+        num_active_elec_betaa: Number of active beta electrons.
+        thetas: Ansatz parameters values.
+        ups_struct: Unitary product state structure.
+        order: Excitation order of extended space.
+        dagger: If do dagger unitaries.
+
+    Returns:
+        New state vector with unitaries applied.
     """
     tmp = state.copy()
     order = 1
@@ -1111,6 +1129,8 @@ def construct_ups_state_extended(
                     num_elec_beta,
                     order,
                 ).todense()
+            else:
+                raise ValueError(f"Got unknown excitation type: {exc_type}")
             tmp = (
                 tmp
                 + np.sin(2 ** (-1 / 2) * theta) * np.matmul(Ta, tmp)
@@ -1169,6 +1189,8 @@ def construct_ups_state_extended(
                     num_elec_beta,
                     order,
                 ).todense()
+            else:
+                raise ValueError(f"Got unknown excitation type: {exc_type}")
             tmp = (
                 tmp
                 + np.sin(theta) * np.matmul(T, tmp)

@@ -286,7 +286,11 @@ class WaveFunctionUCC:
 
     @property
     def ci_coeffs(self) -> np.ndarray:
-        """Get CI coefficients."""
+        """Get CI coefficients.
+
+        Returns:
+            State vector.
+        """
         if self._ci_coeffs is None:
             self._ci_coeffs = construct_ucc_state(
                 self.csf_coeffs,
@@ -1050,7 +1054,7 @@ def active_space_parameter_gradient(
     gradient_theta = np.zeros_like(theta_params)
     eps = np.finfo(np.float64).eps ** (1 / 2)
     E = expectation_value_mat(wf.ci_coeffs, Hamiltonian, wf.ci_coeffs)
-    for i in range(len(theta_params)):
+    for i in range(len(theta_params)):  # pylint: disable=consider-using-enumerate
         sign_step = (theta_params[i] >= 0).astype(float) * 2 - 1  # type: ignore [attr-defined]
         step_size = eps * sign_step * max(1, abs(theta_params[i]))
         theta_params[i] += step_size

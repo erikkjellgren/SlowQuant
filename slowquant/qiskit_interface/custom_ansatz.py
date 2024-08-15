@@ -27,7 +27,7 @@ def tUPS(
     mapper: FermionicMapper,
     ansatz_options: dict[str, Any],
 ) -> tuple[QuantumCircuit, dict[str, int]]:
-    """tUPS ansatz.
+    """Create tUPS ansatz.
 
     #. 10.1103/PhysRevResearch.6.023300
     #. 10.1088/1367-2630/ac2cb3 (QNP)
@@ -129,7 +129,7 @@ def fUCC(
     mapper: FermionicMapper,
     ansatz_options: dict[str, Any],
 ) -> tuple[QuantumCircuit, dict[str, int]]:
-    """Factorized UCCSD ansatz.
+    """Create factorized UCCSD ansatz.
 
     #. 10.1103/PhysRevA.102.062612
 
@@ -175,7 +175,7 @@ def fUCC(
 def create_kSAfUpCCGSD(
     num_orbs: int, num_elec: tuple[int, int], mapper: FermionicMapper, ansatz_options: dict[str, Any]
 ) -> tuple[QuantumCircuit, dict[str, int]]:
-    """Modified k-UpCCGSD ansatz.
+    """Create modified k-UpCCGSD ansatz.
 
     The ansatz have been modifed to use spin-adapted singet single excitation operators.
 

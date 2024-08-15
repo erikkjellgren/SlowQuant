@@ -482,7 +482,7 @@ class WaveFunctionUPS:
             Args:
                 x: Wave function parameters.
             """
-            pass
+            pass  # pylint: disable=unnecessary-pass
 
         parameters: list[float] = []
         num_kappa = 0
@@ -705,7 +705,7 @@ def active_space_parameter_gradient(
     gradient_theta = np.zeros_like(theta)
     eps = np.finfo(np.float64).eps ** (1 / 2)
     E = expectation_value_mat(wf.ci_coeffs, Hamiltonian, wf.ci_coeffs)
-    for i in range(len(theta)):
+    for i in range(len(theta)):  # pylint: disable=consider-using-enumerate
         sign_step = (theta[i] >= 0).astype(float) * 2 - 1  # type: ignore [attr-defined]
         step_size = eps * sign_step * max(1, abs(theta[i]))
         theta[i] += step_size

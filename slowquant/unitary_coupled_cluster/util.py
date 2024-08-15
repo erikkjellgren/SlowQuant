@@ -555,7 +555,7 @@ class UpsStructure:
         self.n_params = 0
 
     def create_tups(self, num_active_orbs: int, ansatz_options: dict[str, Any]) -> None:
-        """tUPS ansatz.
+        """Create tUPS ansatz.
 
         #. 10.1103/PhysRevResearch.6.023300
         #. 10.1088/1367-2630/ac2cb3 (QNP)
@@ -625,7 +625,7 @@ class UpsStructure:
                 self.n_params += 1
 
     def create_fUCCSD(self, states: list[list[str]], ansatz_options: dict[str, Any]) -> None:
-        """Factorized UCCSD ansatz.
+        """Create factorized UCCSD ansatz.
 
         If used with a state-averaged wave function, the operator pool will be the union of all
         possible singles and doubles from the determinants included in the states in the state-averaged wave function.
@@ -685,7 +685,7 @@ class UpsStructure:
                     self.n_params += 1
 
     def create_kSAfUpCCGSD(self, num_orbs: int, ansatz_options: dict[str, Any]) -> None:
-        """Modified k-UpCCGSD ansatz.
+        """Create modified k-UpCCGSD ansatz.
 
         The ansatz have been modifed to use spin-adapted singet single excitation operators.
 
