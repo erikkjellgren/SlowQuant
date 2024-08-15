@@ -890,25 +890,7 @@ class QuantumInterface:
 
         With :math:`P(AB|CD)` meaning the probability of reading :math:`AB` given the circuit is prepared to give :math:`CD`.
 
-        The construction also supports the independent qubit approximation, which for two qubits means that:
-
-        .. math::
-            P(\tilde{q}_1 \tilde{q}_0|q_1 q_0) = P(\tilde{q}_1|q_1)P(\tilde{q}_0|q_0)
-
-        Under this approximation only :math:`\left<00\right|` and :math:`\left<11\right|` need to be measured,
-        in order the gain enough information to construct :math:`M`.
-
-        The read-out correlation take the following form (for two qubits):
-
-        .. math::
-            M = \begin{pmatrix}
-                P_{q1}(0|0)P_{q0}(0|0) & P_{q1}(0|1)P_{q0}(0|0) & P_{q1}(0|0)P_{q0}(0|1) & P_{q1}(0|1)P_{q0}(0|1)\\
-                P_{q1}(1|0)P_{q0}(0|0) & P_{q1}(1|1)P_{q0}(0|0) & P_{q1}(1|0)P_{q0}(0|1) & P_{q1}(1|1)P_{q0}(0|1)\\
-                P_{q1}(0|0)P_{q0}(1|0) & P_{q1}(0|1)P_{q0}(1|0) & P_{q1}(0|0)P_{q0}(1|1) & P_{q1}(0|1)P_{q0}(1|1)\\
-                P_{q1}(1|0)P_{q0}(1|0) & P_{q1}(1|1)P_{q0}(1|0) & P_{q1}(1|0)P_{q0}(1|1) & P_{q1}(1|1)P_{q0}(1|1)
-                \end{pmatrix}
-
-        The construct also support the building of the read-out correlation matrix when the ansatz is included:
+        The construct of M support the building of the read-out correlation matrix when the ansatz is included:
 
         .. math::
             \left<00\right| \rightarrow \left<00\right|\boldsymbol{U}^\dagger\left(\boldsymbol{\theta}=\boldsymbol{0}\right)
