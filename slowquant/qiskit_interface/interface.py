@@ -825,6 +825,7 @@ class QuantumInterface:
                     ansatz_w_obs.measure(self._layout_indices, np.arange(self.num_qubits))
                     pubs.append((ansatz_w_obs, run_parameters))
             pubs = pubs * self._circuit_multipl
+            self.pubs = pubs
 
             # Run sampler
             job = self._primitive.run(pubs, shots=shots)
@@ -850,7 +851,7 @@ class QuantumInterface:
                         ansatz_w_obs.measure(self._layout_indices, np.arange(self.num_qubits))
                         circuits[(nr_circuit + (nr_pauli * num_circuits))] = ansatz_w_obs
                 circuits = circuits * self._circuit_multipl
-
+            
             # Create parameters array for V1
             if num_circuits == 1:
                 parameter_values = [run_parameters] * (num_paulis * self._circuit_multipl)
@@ -1032,6 +1033,7 @@ class QuantumInterface:
                 # Make list of custom ansatz
                 ansatz_list[nr] = ansatzX
             # Simulate all elements with one device call
+            self.ansatz_list = ansatz_list
             Px_list = self._one_call_sampler_distributions(
                 "Z" * self.num_qubits,
                 [[10**-8] * len(ansatz.parameters)] * len(ansatz_list),
