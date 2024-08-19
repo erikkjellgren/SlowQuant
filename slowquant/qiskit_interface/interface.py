@@ -87,6 +87,7 @@ class QuantumInterface:
         self._save_layout = False
         self._save_paulis = True  # hard switch to stop using Pauli saving (debugging tool).
         self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
+        self._M_shots = None  # define a separate number of shots for M
 
     def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int], reconstruct: bool = False) -> None:
         """Construct qiskit circuit.
@@ -279,10 +280,14 @@ class QuantumInterface:
                 if not np.array_equal(self._ISA_layout, circuit.layout.final_index_layout()):
                     print("WARNING: Transpiled layout has changed from readout error run.")
 
-    def redo_M_mitigation(self) -> None:
-        """Redo M_mitigation."""
+    def redo_M_mitigation(self, shots: int | None = None) -> None:
+        """Redo M_mitigation.
+
+        Args:
+            shots: If defined, overwrites QI internal shot number.
+        """
         self._ISA_layout = None
-        self._make_Minv()
+        self._make_Minv(shots=shots)
 
     @property
     def parameters(self) -> list[float]:
@@ -576,7 +581,7 @@ class QuantumInterface:
 
         # Check if error mitigation is requested and if read-out matrix already exists.
         if self.do_M_mitigation and self._Minv is None:
-            self._make_Minv()
+            self._make_Minv(shots=self._M_shots)
 
         if len(new_heads) != 0:
             # Simulate each clique head with one combined device call
@@ -639,7 +644,7 @@ class QuantumInterface:
 
         # Check if error mitigation is requested and if read-out matrix already exists.
         if self.do_M_mitigation and self._Minv is None:
-            self._make_Minv()
+            self._make_Minv(shots=self._M_shots)
 
         paulis_str = [str(x) for x in observables.paulis]
         if do_cliques:
@@ -780,6 +785,7 @@ class QuantumInterface:
         paulis: list[str] | str,
         run_parameters: list[list[float]] | list[float],
         circuits_in: list[QuantumCircuit] | QuantumCircuit,
+        overwrite_shots: int | None = None,
     ) -> list[dict[str, float]]:
         r"""Get results from a sampler distribution for several Pauli strings measured on several circuits.
 
@@ -794,6 +800,7 @@ class QuantumInterface:
             paulis: (List of) Pauli strings to measure.
             run_paramters: List of parameters of each circuit.
             circuits_in: List of circuits
+            overwrite_shots: overwrite QI shot number
 
         Returns:
             Array of quasi-distributions in order of all circuits results for a given Pauli String first.
@@ -803,6 +810,9 @@ class QuantumInterface:
             shots: int | None = self.max_shots_per_run
         else:
             shots = self.shots
+        if overwrite_shots is not None:
+            print("Warning: Overwriting QI shots has been used.")
+            shots = overwrite_shots
 
         if isinstance(paulis, str):
             paulis = [paulis]
@@ -966,7 +976,7 @@ class QuantumInterface:
                 p1 += value
         return p1
 
-    def _make_Minv(self) -> None:
+    def _make_Minv(self, shots: None | int = None) -> None:
         r"""Make inverse of read-out correlation matrix with one device call.
 
         The read-out correlation matrix is of the form (for two qubits):
@@ -1007,6 +1017,10 @@ class QuantumInterface:
         This way some of the gate-error can be build into the read-out correlation matrix.
 
         #. https://qiskit.org/textbook/ch-quantum-hardware/measurement-error-mitigation.html
+
+        Args:
+            shots: Number of shots if they are meant to differ from QI internal shot number.
+
         """
         print("Measuring error mitigation read-out matrix.")
         self._save_layout = True
@@ -1040,6 +1054,7 @@ class QuantumInterface:
                 "Z" * self.num_qubits,
                 [[10**-8] * len(ansatz.parameters)] * len(ansatz_list),
                 ansatz_list,
+                overwrite_shots=shots,
             )
         else:
             for nr, comb in enumerate(itertools.product([0, 1], repeat=self.num_qubits)):
@@ -1054,6 +1069,7 @@ class QuantumInterface:
                 "Z" * self.num_qubits,
                 [[10**-8] * len(ansatz.parameters)] * len(ansatz_list),
                 ansatz_list,
+                overwrite_shots=shots,
             )
         # Construct M
         for idx2, Px in enumerate(Px_list):
