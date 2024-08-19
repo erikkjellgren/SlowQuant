@@ -357,7 +357,7 @@ class QuantumInterface:
         circuit_return = self.pass_manager.run(circuit)
         # Get layout indices
         if circuit_return.layout is None:
-            self._layout_indices = np.arange(self.num_qubits)
+            self._layout_indices = np.arange(circuit_return.num_qubits)
         else:
             self._layout_indices = circuit_return.layout.final_index_layout()
 
@@ -813,6 +813,10 @@ class QuantumInterface:
 
         # Check V1 vs. V2
         if isinstance(self._primitive, BaseSamplerV2):
+            # make parameter list 2d for one circuit.
+            if num_circuits == 1:
+                run_parameters = [run_parameters] # type: ignore
+
             # Create pubs for V2
             pubs = []
             for nr_pauli, pauli in enumerate(paulis):
@@ -823,15 +827,14 @@ class QuantumInterface:
                     # Create classic register and measure relevant qubits
                     ansatz_w_obs.add_register(ClassicalRegister(self.num_qubits, name="meas"))
                     ansatz_w_obs.measure(self._layout_indices, np.arange(self.num_qubits))
-                    pubs.append((ansatz_w_obs, run_parameters))
+                    pubs.append((ansatz_w_obs, run_parameters[nr_circuit]))
             pubs = pubs * self._circuit_multipl
-            self.pubs = pubs
 
             # Run sampler
             job = self._primitive.run(pubs, shots=shots)
         else:
             if not self.ISA:  # No own layout-design needed: this might be faster. So we leave it for now.
-                circuits = [None] * (num_paulis * num_circuits)
+                circuits = [None] * (num_paulis * num_circuits) 
                 # Create QuantumCircuits for V1
                 for nr_pauli, pauli in enumerate(paulis):
                     pauli_circuit = to_CBS_measurement(pauli)
@@ -851,7 +854,7 @@ class QuantumInterface:
                         ansatz_w_obs.measure(self._layout_indices, np.arange(self.num_qubits))
                         circuits[(nr_circuit + (nr_pauli * num_circuits))] = ansatz_w_obs
                 circuits = circuits * self._circuit_multipl
-            
+
             # Create parameters array for V1
             if num_circuits == 1:
                 parameter_values = [run_parameters] * (num_paulis * self._circuit_multipl)
@@ -1033,7 +1036,6 @@ class QuantumInterface:
                 # Make list of custom ansatz
                 ansatz_list[nr] = ansatzX
             # Simulate all elements with one device call
-            self.ansatz_list = ansatz_list
             Px_list = self._one_call_sampler_distributions(
                 "Z" * self.num_qubits,
                 [[10**-8] * len(ansatz.parameters)] * len(ansatz_list),
