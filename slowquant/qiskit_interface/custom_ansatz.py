@@ -172,7 +172,7 @@ def fUCC(
     return qc, grad_param_R
 
 
-def create_kSAfUpCCGSD(
+def kSAfUpCCGSD(
     num_orbs: int, num_elec: tuple[int, int], mapper: FermionicMapper, ansatz_options: dict[str, Any]
 ) -> tuple[QuantumCircuit, dict[str, int]]:
     """Create modified k-UpCCGSD ansatz.
@@ -193,7 +193,7 @@ def create_kSAfUpCCGSD(
     Returns:
         Modified k-UpCCGSD ansatz.
     """
-    valid_options = "n_layers"
+    valid_options = ("n_layers",)
     for option in ansatz_options:
         if option not in valid_options:
             raise ValueError(
@@ -201,6 +201,8 @@ def create_kSAfUpCCGSD(
             )
     if "n_layers" not in ansatz_options.keys():
         raise ValueError("kSAfUpCCGSD require the option 'n_layers'")
+    if not isinstance(mapper, JordanWignerMapper):
+        raise ValueError(f"kSAfUpCCGSD only implemented for JW mapper, got: {type(mapper)}")
     n_layers = ansatz_options["n_layers"]
     qc = HartreeFock(num_orbs, num_elec, mapper)
     grad_param_R = {}

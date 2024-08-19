@@ -12,7 +12,7 @@ from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFoc
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
-from slowquant.qiskit_interface.custom_ansatz import fUCC, tUPS
+from slowquant.qiskit_interface.custom_ansatz import fUCC, kSAfUpCCGSD, tUPS
 from slowquant.qiskit_interface.util import (
     Clique,
     correct_distribution,
@@ -59,7 +59,7 @@ class QuantumInterface:
             do_M_ansatz0: Use the ansatz with theta=0 when constructing the read-out correlation matrix.
             do_postselection: Use postselection to preserve number of particles in the computational basis.
         """
-        allowed_ansatz = ("tUCCSD", "tPUCCD", "tUCCD", "tUPS", "fUCCSD", "QNP")
+        allowed_ansatz = ("tUCCSD", "tPUCCD", "tUCCD", "tUPS", "fUCCSD", "QNP", "kSAfUpCCGSD")
         if ansatz not in allowed_ansatz:
             raise ValueError("The chosen Ansatz is not available. Choose from: ", allowed_ansatz)
         self.ansatz = ansatz
@@ -146,6 +146,10 @@ class QuantumInterface:
             self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
         elif self.ansatz == "fUCCSD":
             self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
+        elif self.ansatz == "kSAfUpCCGSD":
+            self.circuit, self.grad_param_R = kSAfUpCCGSD(
+                num_orbs, self.num_elec, self.mapper, self.ansatz_options
+            )
 
         # Check that R parameter for gradient is consistent with the paramter names.
         if len(self.grad_param_R) == 0:

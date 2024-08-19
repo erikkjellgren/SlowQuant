@@ -489,7 +489,7 @@ def test_H2_631g_allST():
 
 def test_LiH_sto3g_allST():
     """
-    Test LiH Sto-3G projected LR oscialltor strength
+    Test LiH STO-3G all-statetransfer LR oscialltor strength
     """
     # Slowquant Object with parameters and setup
     SQobj = sq.SlowQuant()

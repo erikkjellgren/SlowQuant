@@ -372,6 +372,8 @@ def single_sa_excitation(
     Returns:
         Single singlet spin-adapted excitation circuit.
     """
-    qc = single_excitation(2 * k, 2 * i, num_orbs, qc, 2 ** (-1 / 2) * theta)
-    qc = single_excitation(2 * k + 1, 2 * i + 1, num_orbs, qc, 2 ** (-1 / 2) * theta)
+    # qc = single_excitation(2 * k, 2 * i, num_orbs, qc, 2 ** (-1 / 2) * theta)
+    # qc = single_excitation(2 * k + 1, 2 * i + 1, num_orbs, qc, 2 ** (-1 / 2) * theta)
+    qc = single_excitation(2 * k, 2 * i, num_orbs, qc, theta)
+    qc = single_excitation(2 * k + 1, 2 * i + 1, num_orbs, qc, theta)
     return qc

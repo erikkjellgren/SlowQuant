@@ -734,6 +734,7 @@ def construct_ups_state(
             theta = -theta
         if exc_type in ("tups_single", "sa_single"):
             if exc_type == "tups_single":
+                A = 1
                 (p,) = exc_indices
                 Ta = T1_matrix(
                     p * 2, (p + 1) * 2, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
@@ -742,6 +743,7 @@ def construct_ups_state(
                     p * 2 + 1, (p + 1) * 2 + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
                 ).todense()
             elif exc_type == "sa_single":
+                A = 1  # 2**(-1/2)
                 (i, a) = exc_indices
                 Ta = T1_matrix(
                     i * 2, a * 2, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
@@ -753,13 +755,13 @@ def construct_ups_state(
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
             tmp = (
                 tmp
-                + np.sin(2 ** (-1 / 2) * theta) * np.matmul(Ta, tmp)
-                + (1 - np.cos(2 ** (-1 / 2) * theta)) * np.matmul(Ta, np.matmul(Ta, tmp))
+                + np.sin(A * theta) * np.matmul(Ta, tmp)
+                + (1 - np.cos(A * theta)) * np.matmul(Ta, np.matmul(Ta, tmp))
             )
             tmp = (
                 tmp
-                + np.sin(2 ** (-1 / 2) * theta) * np.matmul(Tb, tmp)
-                + (1 - np.cos(2 ** (-1 / 2) * theta)) * np.matmul(Tb, np.matmul(Tb, tmp))
+                + np.sin(A * theta) * np.matmul(Tb, tmp)
+                + (1 - np.cos(A * theta)) * np.matmul(Tb, np.matmul(Tb, tmp))
             )
         elif exc_type in ("tups_double", "single", "double"):
             if exc_type == "tups_double":
@@ -817,6 +819,7 @@ def propagate_unitary(
         return np.copy(state)
     if exc_type in ("tups_single", "sa_single"):
         if exc_type == "tups_single":
+            A = 1
             (p,) = exc_indices
             Ta = T1_matrix(
                 p * 2, (p + 1) * 2, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
@@ -825,6 +828,7 @@ def propagate_unitary(
                 p * 2 + 1, (p + 1) * 2 + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
             ).todense()
         elif exc_type == "sa_single":
+            A = 1  # 2**(-1/2)
             (i, a) = exc_indices
             Ta = T1_matrix(
                 i * 2, a * 2, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
@@ -834,7 +838,6 @@ def propagate_unitary(
             ).todense()
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
-        A = 2 ** (-1 / 2)
         tmp = (
             state
             + np.sin(A * theta) * np.matmul(Ta, state)
@@ -910,6 +913,7 @@ def get_grad_action(
     exc_indices = ups_struct.excitation_indicies[idx]
     if exc_type in ("tups_single", "sa_single"):
         if exc_type == "tups_single":
+            A = 1
             (p,) = exc_indices
             Ta = T1_matrix(
                 p * 2, (p + 1) * 2, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
@@ -918,6 +922,7 @@ def get_grad_action(
                 p * 2 + 1, (p + 1) * 2 + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
             ).todense()
         elif exc_type == "sa_single":
+            A = 1  # 2**(-1/2)
             (i, a) = exc_indices
             Ta = T1_matrix(
                 i * 2, a * 2, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
@@ -927,7 +932,6 @@ def get_grad_action(
             ).todense()
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
-        A = 2 ** (-1 / 2)
         tmp = np.matmul(A * (Ta + Tb), state)
     elif exc_type in ("tups_double", "single", "double"):
         if exc_type == "tups_double":
