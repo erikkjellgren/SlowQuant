@@ -815,7 +815,7 @@ class QuantumInterface:
         if isinstance(self._primitive, BaseSamplerV2):
             # make parameter list 2d for one circuit.
             if num_circuits == 1:
-                run_parameters = [run_parameters] # type: ignore
+                run_parameters = [run_parameters]  # type: ignore
 
             # Create pubs for V2
             pubs = []
@@ -834,7 +834,7 @@ class QuantumInterface:
             job = self._primitive.run(pubs, shots=shots)
         else:
             if not self.ISA:  # No own layout-design needed: this might be faster. So we leave it for now.
-                circuits = [None] * (num_paulis * num_circuits) 
+                circuits = [None] * (num_paulis * num_circuits)
                 # Create QuantumCircuits for V1
                 for nr_pauli, pauli in enumerate(paulis):
                     pauli_circuit = to_CBS_measurement(pauli)
