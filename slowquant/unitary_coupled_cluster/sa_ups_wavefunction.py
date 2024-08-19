@@ -702,7 +702,7 @@ def energy_saups(
 
     Args:
         parameters: Sequence of all parameters.
-                    Ordered as orbital rotations, active-space singles, active-space doubles, ...
+                    Ordered as orbital rotations, active-space excitations.
         orbital_optimized: Do orbital optimization.
         wf: Wave function object.
 
@@ -770,7 +770,7 @@ def gradient_saups(
 
     Args:
         parameters: Sequence of all parameters.
-                    Ordered as orbital rotations, active-space singles, active-space doubles, ...
+                    Ordered as orbital rotations, active-space excitations.
         orbital_optimized: Do orbital optimization.
         wf: Wave function object.
 

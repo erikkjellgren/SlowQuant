@@ -9,6 +9,7 @@ from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
 
 def test_tups() -> None:
+    """Test tUPS is conventional <--> qiskit compatibile."""
     # Setup initial stuff
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -59,54 +60,7 @@ def test_tups() -> None:
 
 
 def test_fucc() -> None:
-    # Setup initial stuff
-    SQobj = sq.SlowQuant()
-    SQobj.set_molecule(
-        """Li 0.0           0.0  0.0;
-           H  1.6717072740  0.0  0.0;""",
-        distance_unit="angstrom",
-    )
-    SQobj.set_basis_set("STO-3G")
-    SQobj.init_hartree_fock()
-    SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
-
-    # Conventional UPS wave function
-    WF = WaveFunctionUPS(
-        SQobj.molecule.number_bf * 2,
-        SQobj.molecule.number_electrons,
-        (2, 2),
-        SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
-        "fUCC",
-        ansatz_options={},
-        include_active_kappa=True,
-    )
-    WF.run_ups(True)
-
-    assert abs(WF.energy_elec - -8.828916576513892) < 10**-8
-
-    # Circuit based UPS wave function
-    mapper = JordanWignerMapper()
-    primitive = Sampler(run_options={"shots": None})
-    QI = QuantumInterface(primitive, "fUCCSD", mapper, ansatz_options={})
-    qWF = WaveFunctionQC(
-        SQobj.molecule.number_bf * 2,
-        SQobj.molecule.number_electrons,
-        (2, 2),
-        WF.c_trans,
-        h_core,
-        g_eri,
-        QI,
-    )
-    qWF.ansatz_parameters = WF.thetas
-
-    assert abs(qWF.energy_elec - -8.828916576513892) < 10**-8
-
-
-def test_fucc() -> None:
+    """Test fUCC is conventional <--> qiskit compatibile."""
     # Setup initial stuff
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -155,6 +109,7 @@ def test_fucc() -> None:
 
 
 def test_ksafupccgsd() -> None:
+    """Test k-SAfUpCCGSD is conventional <--> qiskit compatibile."""
     # Setup initial stuff
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(

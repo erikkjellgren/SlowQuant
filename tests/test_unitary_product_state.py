@@ -158,6 +158,7 @@ def test_LiH_sto3g_allST():
 
 
 def test_ups_water_44() -> None:
+    """Test a larger active space."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """O   0.0  0.0           0.1035174918;
@@ -178,13 +179,13 @@ def test_ups_water_44() -> None:
         SQobj.hartree_fock.mo_coeff,
         h_core,
         g_eri,
-        "tUPS",
-        ansatz_options={"n_layers": 2, "skip_last_singles": True},
+        "fUCC",
+        ansatz_options={},
         include_active_kappa=True,
     )
 
     WF.run_ups(True)
-    assert abs(WF.energy_elec - -84.00398456629122) < 10**-8
+    assert abs(WF.energy_elec - -83.97256228053688) < 10**-8
 
 
 def test_saups_h2_3states() -> None:
@@ -243,6 +244,7 @@ def test_saups_h2_3states() -> None:
 
 
 def test_saups_h3_3states() -> None:
+    """Test a system where the subspace is not everything."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """H   -0.45  -0.3897114317  0.0;
