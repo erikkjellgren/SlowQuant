@@ -786,7 +786,7 @@ class QuantumInterface:
         run_parameters: list[list[float]] | list[float],
         circuits_in: list[QuantumCircuit] | QuantumCircuit,
         overwrite_shots: int | None = None,
-    ) -> list[dict[str, float]]:
+    ) -> list[dict[int, float]]:
         r"""Get results from a sampler distribution for several Pauli strings measured on several circuits.
 
         The expectation value of a Pauli string is calcuated as:
@@ -885,10 +885,10 @@ class QuantumInterface:
             distr = [{}] * len(result)  # type: list[dict]
             for nr, job in enumerate(result):
                 distr[nr] = job.data.meas.get_counts()
-                for key in distr[nr]:
-                    distr[nr][key] /= shots
+                for key in list(distr[nr].keys()):
+                    distr[nr][int(key, 2)] = distr[nr].pop(key) / shots
         else:
-            distr = [res.binary_probabilities() for res in job.result().quasi_dists]
+            distr = job.result().quasi_dists
 
         if self._circuit_multipl == 1:
             return distr
@@ -906,7 +906,7 @@ class QuantumInterface:
 
     def _sampler_distributions(
         self, pauli: str, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
-    ) -> dict[str, float]:
+    ) -> dict[int, float]:
         r"""Get results from a sampler distribution for one given Pauli string.
 
         The expectation value of a Pauli string is calcuated as:
@@ -952,7 +952,7 @@ class QuantumInterface:
         self.total_paulis_evaluated += 1
 
         # Get quasi-distribution in binary probabilities
-        distr = job.result().quasi_dists[0].binary_probabilities()
+        distr = job.result().quasi_dists[0]
         return distr
 
     def _sampler_distribution_p1(
@@ -1044,7 +1044,7 @@ class QuantumInterface:
         if self.ISA:
             for nr, comb in enumerate(itertools.product([0, 1], repeat=self.num_qubits)):
                 ansatzX = ansatz.copy()
-                for i, bit in enumerate(comb):
+                for i, bit in enumerate(comb[::-1]):  # because of Qiskit ordering
                     if bit == 1:
                         ansatzX.x(self._layout_indices[i])
                 # Make list of custom ansatz
@@ -1059,7 +1059,7 @@ class QuantumInterface:
         else:
             for nr, comb in enumerate(itertools.product([0, 1], repeat=self.num_qubits)):
                 ansatzX = ansatz.copy()
-                for i, bit in enumerate(comb):
+                for i, bit in enumerate(comb[::-1]):  # because of Qiskit ordering
                     if bit == 1:
                         ansatzX.x(i)
                 # Make list of custom ansatz
@@ -1073,8 +1073,7 @@ class QuantumInterface:
             )
         # Construct M
         for idx2, Px in enumerate(Px_list):
-            for bitstring, prob in Px.items():
-                idx1 = int(bitstring[::-1], 2)
+            for idx1, prob in Px.items():
                 M[idx1, idx2] = prob
         self._Minv = np.linalg.inv(M)
 
