@@ -4,6 +4,7 @@ from functools import partial
 
 import numpy as np
 import scipy
+from qiskit import QuantumCircuit
 from qiskit.primitives import BaseEstimator, BaseEstimatorV2, BaseSampler, BaseSamplerV2
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_algorithms.optimizers import COBYLA, L_BFGS_B, SLSQP, SPSA
@@ -50,6 +51,8 @@ class WaveFunction:
         """
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
+        if isinstance(quantum_interface.ansatz, QuantumCircuit):
+            print("WARNING: A QI with a custom Ansatz was passed. VQE will only work with COBYLA optimizer.")
         self._c_orthonormal = c_orthonormal
         self.h_ao = h_ao
         self.g_ao = g_ao
@@ -284,6 +287,7 @@ class WaveFunction:
 
         Args:
             primitive: Primitive object.
+            verbose: Print more info.
         """
         if verbose:
             print(
@@ -898,6 +902,9 @@ class WaveFunction:
         global iteration  # pylint: disable=global-variable-undefined
         global start  # pylint: disable=global-variable-undefined
 
+        if isinstance(self.QI.ansatz, QuantumCircuit) and not ansatz_optimizer.lower() == "cobyla":
+            raise ValueError("Custom Ansatz in QI only works with COBYLA as optimizer")
+
         def print_progress(x, energy_func, silent: bool) -> None:
             """Print progress during energy minimization of wave function.
 
@@ -1062,6 +1069,9 @@ class WaveFunction:
         global start  # pylint: disable=global-variable-undefined
         iteration = 0  # type: ignore
         start = time.time()  # type: ignore
+
+        if isinstance(self.QI.ansatz, QuantumCircuit) and not optimizer_name.lower() == "cobyla":
+            raise ValueError("Custom Ansatz in QI only works with COBYLA as optimizer")
 
         def print_progress(x, energy_func) -> None:
             """Print progress during energy minimization of wave function.

@@ -34,7 +34,7 @@ class QuantumInterface:
     def __init__(  # pylint: disable=dangerous-default-value
         self,
         primitive: BaseEstimator | BaseSampler | BaseSamplerV2,
-        ansatz: str,
+        ansatz: str | QuantumCircuit,
         mapper: FermionicMapper,
         ISA: bool = False,
         pass_manager: None | PassManager = None,
@@ -62,8 +62,12 @@ class QuantumInterface:
             do_postselection: Use postselection to preserve number of particles in the computational basis.
         """
         allowed_ansatz = ("tUCCSD", "tPUCCD", "tUCCD", "tUPS", "fUCCSD")
-        if ansatz not in allowed_ansatz:
-            raise ValueError("The chosen Ansatz is not available. Choose from: ", allowed_ansatz)
+        if not isinstance(ansatz, QuantumCircuit) and ansatz not in allowed_ansatz:
+            raise ValueError(
+                "The chosen Ansatz is not available. Choose from: ",
+                allowed_ansatz,
+                "or pass custom QuantumCircuit object",
+            )
         if isinstance(primitive, BaseEstimatorV2):
             raise ValueError("EstimatorV2 is not currently supported.")
         if isinstance(primitive, BaseSamplerV2):
@@ -104,7 +108,10 @@ class QuantumInterface:
             {}
         )  # Contains information about the parameterization needed for gradient evaluations.
 
-        if self.ansatz == "tUCCSD":
+        if isinstance(self.ansatz, QuantumCircuit):
+            print("QI was initialized with a custom QuantumCircuit object.")
+            self.circuit = self.ansatz
+        elif self.ansatz == "tUCCSD":
             if len(self.ansatz_options) != 0:
                 raise ValueError(f"No options available for tUCCSD got {self.ansatz_options}")
             self.circuit = UCCSD(
