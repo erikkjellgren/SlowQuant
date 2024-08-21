@@ -866,3 +866,52 @@ def test_samplerV2_ibm() -> None:
     )
 
     print(qWF.energy_elec)
+
+
+def test_custom() -> None:
+    """
+    Test custom Ansatz.
+    """
+    # Define molecule
+    atom = "H .0 .0 .0; H .0 .0 1.0"
+    basis = "sto-3g"
+
+    # PySCF
+    mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
+    rhf = pyscf.scf.RHF(mol).run()
+
+    # Optimize WF with QSQ
+    sampler = SamplerAer()
+    mapper = ParityMapper(num_particles=(1, 1))
+
+    QI = QuantumInterface(sampler, "tUCCSD", mapper, shots=None)
+
+    qWF = WaveFunction(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 2),
+        rhf.mo_coeff,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        QI,
+    )
+    qWF.run_vqe_2step("rotosolve", True, is_silent_subiterations=True)
+    energy = qWF._calc_energy_elec()  # pylint: disable=protected-access
+
+    qc = qWF.QI.circuit.copy()
+    qc_param = qWF.QI.parameters
+    qc_H = qWF._get_hamiltonian()  # pylint: disable=protected-access
+
+    # Define the Sampler
+    sampler = SamplerAer()
+
+    # Initialize QI with custom qc object and mapper (JW, see above)
+    QI = QuantumInterface(sampler, qc, mapper, shots=None)
+
+    # Construct circuit
+    QI.construct_circuit(2, (1, 1))
+
+    # Define parameters
+    QI.parameters = qc_param
+
+    assert abs(QI.quantum_expectation_value(qc_H) - energy) < 10**-8
