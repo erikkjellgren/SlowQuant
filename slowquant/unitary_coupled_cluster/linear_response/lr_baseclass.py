@@ -3,13 +3,19 @@ from collections.abc import Sequence
 import numpy as np
 import scipy
 
-from slowquant.unitary_coupled_cluster.operator_hybrid import (
-    OperatorHybrid,
-    convert_pauli_to_hybrid_form,
-    hamiltonian_hybrid_0i_0a,
-    hamiltonian_hybrid_1i_1a,
+from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
+from slowquant.unitary_coupled_cluster.operators import (
+    G3,
+    G4,
+    G5,
+    G6,
+    Epq,
+    G1_sa,
+    G2_1_sa,
+    G2_2_sa,
+    hamiltonian_0i_0a,
+    hamiltonian_1i_1a,
 )
-from slowquant.unitary_coupled_cluster.operator_pauli import epq_pauli
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.util import ThetaPicker
 
@@ -19,84 +25,53 @@ class LinearResponseBaseClass:
         self,
         wave_function: WaveFunctionUCC,
         excitations: str,
-        is_spin_conserving: bool = True,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
-            is_spin_conserving: Use spin-conseving operators.
         """
         self.wf = wave_function
         self.theta_picker = ThetaPicker(
             self.wf.active_occ_spin_idx,
             self.wf.active_unocc_spin_idx,
-            is_spin_conserving=is_spin_conserving,
+        )
+        self.index_info = (
+            self.wf.idx2det,
+            self.wf.det2idx,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
 
-        self.G_ops: list[OperatorHybrid] = []
-        self.q_ops: list[OperatorHybrid] = []
-        num_spin_orbs = self.wf.num_spin_orbs
+        self.G_ops: list[FermionicOperator] = []
+        self.q_ops: list[FermionicOperator] = []
         excitations = excitations.lower()
 
         if "s" in excitations:
-            for _, _, _, op_ in self.theta_picker.get_t1_generator_sa(num_spin_orbs):
-                op = convert_pauli_to_hybrid_form(
-                    op_,
-                    self.wf.num_inactive_spin_orbs,
-                    self.wf.num_active_spin_orbs,
-                )
-                self.G_ops.append(op)
+            for a, i, _ in self.theta_picker.get_t1_generator_sa():
+                self.G_ops.append(G1_sa(i, a))
         if "d" in excitations:
-            for _, _, _, _, _, op_ in self.theta_picker.get_t2_generator_sa(num_spin_orbs):
-                op = convert_pauli_to_hybrid_form(
-                    op_,
-                    self.wf.num_inactive_spin_orbs,
-                    self.wf.num_active_spin_orbs,
-                )
-                self.G_ops.append(op)
+            for a, i, b, j, _, type_idx in self.theta_picker.get_t2_generator_sa():
+                if type_idx == 1:
+                    self.G_ops.append(G2_1_sa(i, j, a, b))
+                elif type_idx == 2:
+                    self.G_ops.append(G2_2_sa(i, j, a, b))
         if "t" in excitations:
-            for _, _, _, _, _, _, _, op_ in self.theta_picker.get_t3_generator(num_spin_orbs):
-                op = convert_pauli_to_hybrid_form(
-                    op_,
-                    self.wf.num_inactive_spin_orbs,
-                    self.wf.num_active_spin_orbs,
-                )
-                self.G_ops.append(op)
+            for a, i, b, j, c, k in self.theta_picker.get_t3_generator():
+                self.G_ops.append(G3(i, j, k, a, b, c))
         if "q" in excitations:
-            for _, _, _, _, _, _, _, _, _, op_ in self.theta_picker.get_t4_generator(num_spin_orbs):
-                op = convert_pauli_to_hybrid_form(
-                    op_,
-                    self.wf.num_inactive_spin_orbs,
-                    self.wf.num_active_spin_orbs,
-                )
-                self.G_ops.append(op)
+            for a, i, b, j, c, k, d, l in self.theta_picker.get_t4_generator():
+                self.G_ops.append(G4(i, j, k, l, a, b, c, d))
         if "5" in excitations:
-            for _, _, _, _, _, _, _, _, _, _, _, op_ in self.theta_picker.get_t5_generator(num_spin_orbs):
-                op = convert_pauli_to_hybrid_form(
-                    op_,
-                    self.wf.num_inactive_spin_orbs,
-                    self.wf.num_active_spin_orbs,
-                )
-                self.G_ops.append(op)
+            for a, i, b, j, c, k, d, l, e, m in self.theta_picker.get_t5_generator():
+                self.G_ops.append(G5(i, j, k, l, m, a, b, c, d, e))
         if "6" in excitations:
-            for _, _, _, _, _, _, _, _, _, _, _, _, _, op_ in self.theta_picker.get_t6_generator(
-                num_spin_orbs
-            ):
-                op = convert_pauli_to_hybrid_form(
-                    op_,
-                    self.wf.num_inactive_spin_orbs,
-                    self.wf.num_active_spin_orbs,
-                )
-                self.G_ops.append(op)
+            for a, i, b, j, c, k, d, l, e, m, f, n in self.theta_picker.get_t6_generator():
+                self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
         for i, a in self.wf.kappa_idx:
-            op_ = 2 ** (-1 / 2) * epq_pauli(a, i, self.wf.num_spin_orbs)
-            op = convert_pauli_to_hybrid_form(
-                op_,
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-            )
+            op = 2 ** (-1 / 2) * Epq(a, i)
             self.q_ops.append(op)
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
@@ -104,19 +79,18 @@ class LinearResponseBaseClass:
         self.B = np.zeros((num_parameters, num_parameters))
         self.Sigma = np.zeros((num_parameters, num_parameters))
         self.Delta = np.zeros((num_parameters, num_parameters))
-        self.H_1i_1a = hamiltonian_hybrid_1i_1a(
+        self.H_1i_1a = hamiltonian_1i_1a(
             self.wf.h_mo,
             self.wf.g_mo,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
             self.wf.num_virtual_orbs,
         )
-        self.H_0i_0a = hamiltonian_hybrid_0i_0a(
+        self.H_0i_0a = hamiltonian_0i_0a(
             self.wf.h_mo,
             self.wf.g_mo,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
         )
 
     def calc_excitation_energies(self) -> None:
@@ -132,7 +106,9 @@ class LinearResponseBaseClass:
             _,
         ) = np.linalg.eig(E2)
         print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
-        if np.min(hess_eigval) < 0:
+        if np.abs(np.min(hess_eigval)) < 10**-8:
+            print("WARNING: Small eigenvalue in Hessian")
+        elif np.min(hess_eigval) < 0:
             raise ValueError("Negative eigenvalue in Hessian.")
 
         S = np.zeros((size * 2, size * 2))

@@ -131,11 +131,11 @@ def fUCCSD(
     qc = HartreeFock(num_orbs, num_elec, mapper)
     grad_param_R = {}
     idx = 0
-    for _, a, i, _ in iterate_t1(occ, unocc, 0, True):
+    for a, i in iterate_t1(occ, unocc):
         qc = single_excitation(a, i, num_orbs, qc, Parameter(f"p{idx}"))
         grad_param_R[f"p{idx}"] = 2
         idx += 1
-    for _, a, i, b, j, _ in iterate_t2(occ, unocc, 0, True):
+    for a, i, b, j in iterate_t2(occ, unocc):
         qc = double_excitation(a, b, i, j, num_orbs, qc, Parameter(f"p{idx}"))
         grad_param_R[f"p{idx}"] = 2
         idx += 1

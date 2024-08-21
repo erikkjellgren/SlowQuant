@@ -14,7 +14,6 @@ from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFoc
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
-from slowquant.qiskit_interface.base import FermionicOperator
 from slowquant.qiskit_interface.custom_ansatz import fUCCSD, tUPS
 from slowquant.qiskit_interface.util import (
     Clique,
@@ -23,6 +22,7 @@ from slowquant.qiskit_interface.util import (
     postselection,
     to_CBS_measurement,
 )
+from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 
 
 class QuantumInterface:

@@ -23,6 +23,21 @@ class a_op:
             self.idx += 1
 
 
+def a_op_spin(spin_idx: int, dagger: bool) -> a_op:
+    """Get fermionic annihilation operator.
+
+    Args:
+        spin_idx: Spin orbital index.
+        dagger: If creation operator.
+
+    Returns:
+        Annihilation operator.
+    """
+    if spin_idx % 2 == 0:
+        return a_op(spin_idx // 2, "alpha", dagger)
+    return a_op(spin_idx // 2, "beta", dagger)
+
+
 def operator_string_to_key(operator_string: list[a_op]) -> str:
     """Make key string to index a fermionic operator in a dict structure.
 
@@ -170,6 +185,7 @@ class FermionicOperator:
             raise ValueError(
                 f"Could not assign operator of {type(annihilation_operator)} with factor of {type(factor)}"
             )
+        self._operators_ab = None
 
     def __add__(self, fermistring: FermionicOperator) -> FermionicOperator:
         """Addition of two fermionic operators.
@@ -312,7 +328,7 @@ class FermionicOperator:
             num_orbs: Number of spatial orbitals.
 
         Returns:
-            Fermionic opetaros on qiskit form.
+            Fermionic operators on qiskit form.
         """
         qiskit_form = {}
         remapping = {}
@@ -413,7 +429,6 @@ class FermionicOperator:
         """Return operator excitation in ordered strings with coefficient."""
         excitations = list(self.factors.keys())
         coefficients = list(self.factors.values())
-
         creation = []
         annihilation = []
         for op_string in excitations:
@@ -424,5 +439,4 @@ class FermionicOperator:
             a = numbers[midpoint:]
             creation.append(c)
             annihilation.append(a)
-
         return annihilation, creation, coefficients

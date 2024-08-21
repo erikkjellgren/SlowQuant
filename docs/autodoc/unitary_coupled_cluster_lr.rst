@@ -13,9 +13,6 @@ Unitary Coupled Cluster Linear Response
 .. automodule:: slowquant.unitary_coupled_cluster.linear_response.allstatetransfer
     :members:
 
-.. automodule:: slowquant.unitary_coupled_cluster.linear_response.generic
-    :members:
-
 .. automodule:: slowquant.unitary_coupled_cluster.linear_response.naive
     :members:
 
