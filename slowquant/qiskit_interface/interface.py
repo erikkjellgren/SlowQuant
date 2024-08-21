@@ -176,7 +176,6 @@ class QuantumInterface:
                     f"Got parameter name, {name}, that is not in grad_param_R, {self.grad_param_R}"
                 )
 
-        self.num_qubits = self.circuit.num_qubits
         if not reconstruct:
             # Set parameter to HarteeFock
             self._parameters = [0.0] * self.circuit.num_parameters
@@ -345,6 +344,8 @@ class QuantumInterface:
         Args:
             circuit: circuit
         """
+        # Set the number of qubits before transpilation to (probably) device with larger number of qubits.
+        self.num_qubits = circuit.num_qubits
         # Check if ISA is selected. If yes, pre-transpile circuit for later use.
         if self.ISA:
             self._circuit = self._transpile_circuit(circuit)
@@ -468,6 +469,12 @@ class QuantumInterface:
         self.cliques = Clique()
         if verbose:
             print("Pauli saving has been reset.")
+
+    def _reset_M(self, verbose: bool = True) -> None:
+        """Reset M to None."""
+        self._Minv = None
+        if verbose:
+            print("M matrix for error mitigation has been reset.")
 
     def null_shots(self) -> None:
         """Set number of shots to None."""
@@ -1086,7 +1093,10 @@ class QuantumInterface:
 
     def get_info(self) -> None:
         """Get infos about settings."""
-        data = f"Your settings are:\n {'Ansatz:':<20} {self.ansatz}\n {'Number of shots:':<20} {self.shots}\n"
+        if isinstance(self.ansatz, QuantumCircuit):
+            data = f"Your settings are:\n {'Ansatz:':<20} {'custom circuit'}\n {'Number of shots:':<20} {self.shots}\n"
+        else:
+            data = f"Your settings are:\n {'Ansatz:':<20} {self.ansatz}\n {'Number of shots:':<20} {self.shots}\n"
         data += f" {'ISA':<20} {self.ISA}\n {'Transpiled circuit':<20} {self._transpiled}\n {'Primitive:':<20} {self._primitive.__class__.__name__}\n"
         data += f" {'Post-processing:':<20} {self.do_postselection}"
         if self.do_M_mitigation:
