@@ -1107,4 +1107,6 @@ class QuantumInterface:
             data += f"\n {'Circuit layout:':<20} {self._layout_indices}"
             if self._internal_pm:
                 data += f"\n {'Transpiled backend:':<20} {self._primitive_backend}\n {'Transpiled opt. level:':<20} {self._primitive_level}"
+            if isinstance(self._primitive, BaseSamplerV2):
+                data += f"\n {'Pauli twirling:':<20} {self._primitive.options.twirling.enable_gates}\n {'Dynamic decoupling:':<20} {self._primitive.options.dynamical_decoupling.enable}"
         print(data)
