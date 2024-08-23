@@ -69,7 +69,7 @@ class QuantumInterface:
                 "or pass custom QuantumCircuit object",
             )
         if isinstance(primitive, BaseEstimatorV2):
-            raise ValueError("EstimatorV2 is not currently supported.")
+            raise TypeError("EstimatorV2 is not currently supported.")
         if isinstance(primitive, BaseSamplerV2):
             print("WARNING: Using SamplerV2 is an experimental feature.")
         self.ansatz = ansatz
