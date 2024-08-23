@@ -54,7 +54,7 @@ class QuantumInterface:
             ansatz_options: Ansatz options.
             mapper: Qiskit mapper object.
             ISA: Use ISA for submitting to IBM quantum. Locally transpiling is performed.
-            pass_manager: Pass custom PassManager for tranpilation.
+            pass_manager: Custom PassManager for transpilation.
             shots: Number of shots. None means ideal simulator.
             max_shots_per_run: Maximum number of shots allowed in a single run. Set to 100000 per IBM machines.
             do_M_mitigation: Do error mitigation via read-out correlation matrix.
