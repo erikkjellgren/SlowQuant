@@ -762,7 +762,9 @@ class WaveFunction:
         Args:
             rdm_order: Max order RDM.
         """
-        if not isinstance(self.QI._primitive, BaseSampler):  # pylint: disable=protected-access
+        if not isinstance(
+            self.QI._primitive, (BaseSampler, BaseSamplerV2)  # pylint: disable=protected-access
+        ):
             raise TypeError(
                 f"This feature is only supported for Sampler got {type(self.QI._primitive)} from QuantumInterface"  # pylint: disable=protected-access
             )
