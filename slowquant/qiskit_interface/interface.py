@@ -223,8 +223,6 @@ class QuantumInterface:
                 if hasattr(self._primitive.options, "optimization_level"):
                     self._primitive_level = self._primitive.options["optimization_level"]
 
-            self._ISA_layout = None
-
             # Check if circuit has been transpiled
             # In case of switching to ISA in later workflow
             if not self._transpiled and hasattr(self, "circuit"):
@@ -272,27 +270,12 @@ class QuantumInterface:
             if hasattr(self, "circuit"):
                 self.circuit = self.circuit
 
-    def _check_layout(self, circuit: QuantumCircuit) -> None:
-        """Check if transpiled layout has changed.
-
-        Args:
-            circuit: Circuit whose layout is to be checked.
-        """
-        # legacy function. Not needed anymore with one-time transpilation.
-        if self._save_layout and circuit.layout is not None:
-            if self._ISA_layout is None:
-                self._ISA_layout = circuit.layout.final_index_layout()
-            else:
-                if not np.array_equal(self._ISA_layout, circuit.layout.final_index_layout()):
-                    print("WARNING: Transpiled layout has changed from readout error run.")
-
     def redo_M_mitigation(self, shots: int | None = None) -> None:
         """Redo M_mitigation.
 
         Args:
-            shots: If defined, overwrites QI internal shot number.
+            shots: Overwrites QI internal shot number if int is defined.
         """
-        self._ISA_layout = None
         self._make_Minv(shots=shots)
 
     @property
@@ -359,6 +342,8 @@ class QuantumInterface:
         Args:
             circuit: circuit
 
+        Returns:
+            Transpiled Circuit.
         """
         if self.pass_manager is None:
             raise ValueError("Missing PassManager for transpilation.")
@@ -814,7 +799,7 @@ class QuantumInterface:
             paulis: (List of) Pauli strings to measure.
             run_paramters: List of parameters of each circuit.
             circuits_in: List of circuits
-            overwrite_shots: overwrite QI shot number
+            overwrite_shots: Overwrite QI shot number.
 
         Returns:
             Array of quasi-distributions in order of all circuits results for a given Pauli String first.
