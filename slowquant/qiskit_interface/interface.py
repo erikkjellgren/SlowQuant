@@ -99,7 +99,7 @@ class QuantumInterface:
         Args:
             num_orbs: Number of orbitals in spatial basis.
             num_elec: Number of electrons (alpha, beta).
-            reconstruct: Boolean to not set parameters to zero (HF)
+            reconstruct: Boolean to not set parameters to zero (HF).
         """
         self.num_orbs = num_orbs
         self.num_spin_orbs = 2 * num_orbs
