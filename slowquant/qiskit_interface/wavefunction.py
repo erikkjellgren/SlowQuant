@@ -12,15 +12,15 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
     two_electron_integral_transform,
 )
-from slowquant.qiskit_interface.base import FermionicOperator
 from slowquant.qiskit_interface.interface import Clique, QuantumInterface
-from slowquant.qiskit_interface.operators import Epq, hamiltonian_pauli_0i_0a
 from slowquant.qiskit_interface.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_electronic_energy,
     get_orbital_gradient,
 )
+from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
+from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
 
 
 class WaveFunction:
@@ -277,11 +277,12 @@ class WaveFunction:
         self._energy_elec = None
         self.QI.parameters = parameters
 
-    def change_primitive(self, primitive: BaseEstimator | BaseSampler) -> None:
+    def change_primitive(self, primitive: BaseEstimator | BaseSampler, verbose: bool = True) -> None:
         """Change the primitive expectation value calculator.
 
         Args:
             primitive: Primitive object.
+            verbose: Print more info.
         """
         self._rdm1 = None
         self._rdm2 = None
@@ -295,7 +296,7 @@ class WaveFunction:
         self.QI._Minv = None  # pylint: disable=protected-access
         self.QI._primitive = primitive  # pylint: disable=protected-access
         # IMPORTANT: Shot number in primitive gets always overwritten if a shot number is defined in QI!
-        if self.QI.shots is not None:
+        if self.QI.shots is not None and verbose:
             print(
                 "Number of shots defined in new primitive are ignored as there is a number defined in the QI of ",
                 self.QI.shots,
@@ -303,6 +304,7 @@ class WaveFunction:
             print("If you want to change the number of shots, do this manually.")
             print("Set the number of shots manually to None if you run an ideal simulator.")
         self.QI.shots = self.QI.shots  # Redo shot check with new primitive
+        self.QI.ISA = self.QI.ISA  # Redo ISA parameter check
 
     @property
     def rdm1(self) -> np.ndarray:
@@ -820,7 +822,7 @@ class WaveFunction:
             Electronic energy.
         """
         if self._energy_elec is None:
-            H = hamiltonian_pauli_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+            H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             self._energy_elec = self.QI.quantum_expectation_value(H)
         return self._energy_elec
@@ -831,7 +833,7 @@ class WaveFunction:
         Returns:
             Electronic energy.
         """
-        H = hamiltonian_pauli_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+        H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
         H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
         energy_elec = self.QI.quantum_expectation_value(H)
 
@@ -843,7 +845,7 @@ class WaveFunction:
         Returns:
             FermionicOperator.
         """
-        H = hamiltonian_pauli_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+        H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
         H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
 
         return H
@@ -875,7 +877,7 @@ class WaveFunction:
             if not is_silent_subiterations:
                 print("--------Ansatz optimization")
                 print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
-            H = hamiltonian_pauli_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+            H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             energy_theta = partial(
                 calc_energy_theta,
@@ -1108,7 +1110,7 @@ def calc_energy_both(parameters, wf) -> float:
     wf.c_orthonormal = c_trans
     # Build operator
     wf.ansatz_parameters = theta.copy()  # Reset rdms
-    H = hamiltonian_pauli_0i_0a(wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs)
+    H = hamiltonian_0i_0a(wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs)
     H = H.get_folded_operator(wf.num_inactive_orbs, wf.num_active_orbs, wf.num_virtual_orbs)
     return wf.QI.quantum_expectation_value(H)
 
@@ -1210,7 +1212,7 @@ def calc_gradient_both(parameters: list[float], wf: WaveFunction) -> np.ndarray:
     assert len(theta) == len(wf.ansatz_parameters)
     kappa_grad = orbital_rotation_gradient(0, wf)
     gradient[: len(wf.kappa)] = kappa_grad
-    H = hamiltonian_pauli_0i_0a(wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs)
+    H = hamiltonian_0i_0a(wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs)
     H = H.get_folded_operator(wf.num_inactive_orbs, wf.num_active_orbs, wf.num_virtual_orbs)
     theta_grad = ansatz_parameters_gradient(theta, H, wf.QI)
     gradient[len(wf.kappa) :] = theta_grad

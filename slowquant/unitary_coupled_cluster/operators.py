@@ -1,6 +1,10 @@
 import numpy as np
 
-from slowquant.qiskit_interface.base import FermionicOperator, a_op
+from slowquant.unitary_coupled_cluster.fermionic_operator import (
+    FermionicOperator,
+    a_op,
+    a_op_spin,
+)
 
 
 def Epq(p: int, q: int) -> FermionicOperator:
@@ -95,6 +99,180 @@ def double_commutator(A: FermionicOperator, B: FermionicOperator, C: FermionicOp
 
 
 def G1(i: int, a: int) -> FermionicOperator:
+    r"""Construct one-electron excitation operator.
+
+    .. math::
+        \hat{G}^{[1]}_{ia} = \hat{a}_{a}^\dagger\hat{a}_i
+
+    Args:
+        i: Spin orbital index.
+        a: Spin orbital index.
+
+    Returns:
+        One-elecetron excitation operator.
+    """
+    return FermionicOperator(a_op_spin(a, dagger=True), 1) * FermionicOperator(a_op_spin(i, dagger=False), 1)
+
+
+def G2(i: int, j: int, a: int, b: int) -> FermionicOperator:
+    r"""Construct two-electron excitation operator.
+
+    .. math::
+        \hat{G}^{[2]}_{ijab} = \hat{a}_{a}^\dagger\hat{a}_{b}^\dagger\hat{a}_j\hat{a}_i
+
+    Args:
+        i: Spin orbital index.
+        j: Spin orbital index.
+        a: Spin orbital index.
+        b: Spin orbital index.
+
+    Returns:
+        Two-elecetron excitation operator.
+    """
+    return (
+        FermionicOperator(a_op_spin(a, dagger=True), 1)
+        * FermionicOperator(a_op_spin(b, dagger=True), 1)
+        * FermionicOperator(a_op_spin(j, dagger=False), 1)
+        * FermionicOperator(a_op_spin(i, dagger=False), 1)
+    )
+
+
+def G3(i: int, j: int, k: int, a: int, b: int, c: int) -> FermionicOperator:
+    r"""Construct three-electron excitation operator.
+
+    .. math::
+        \hat{G}^{[3]}_{ijkabc} = \hat{a}_{a}^\dagger\hat{a}_{b}^\dagger\hat{a}_{c}^\dagger\hat{a}_k\hat{a}_j\hat{a}_i
+
+    Args:
+        i: Spin orbital index.
+        j: Spin orbital index.
+        k: Spin orbital index.
+        a: Spin orbital index.
+        b: Spin orbital index.
+        c: Spin orbital index.
+
+    Returns:
+        Three-elecetron excitation operator.
+    """
+    return (
+        FermionicOperator(a_op_spin(a, dagger=True), 1)
+        * FermionicOperator(a_op_spin(b, dagger=True), 1)
+        * FermionicOperator(a_op_spin(c, dagger=True), 1)
+        * FermionicOperator(a_op_spin(k, dagger=False), 1)
+        * FermionicOperator(a_op_spin(j, dagger=False), 1)
+        * FermionicOperator(a_op_spin(i, dagger=False), 1)
+    )
+
+
+def G4(i: int, j: int, k: int, l: int, a: int, b: int, c: int, d: int) -> FermionicOperator:
+    r"""Construct four-electron excitation operator.
+
+    .. math::
+        \hat{G}^{[4]}_{ijklabcd} = \hat{a}_{a}^\dagger\hat{a}_{b}^\dagger\hat{a}_{c}^\dagger\hat{a}_{d}^\dagger\hat{a}_l\hat{a}_k\hat{a}_j\hat{a}_i
+
+    Args:
+        i: Spin orbital index.
+        j: Spin orbital index.
+        k: Spin orbital index.
+        l: Spin orbital index.
+        a: Spin orbital index.
+        b: Spin orbital index.
+        c: Spin orbital index.
+        d: Spin orbital index.
+
+    Returns:
+        Four-elecetron excitation operator.
+    """
+    return (
+        FermionicOperator(a_op_spin(a, dagger=True), 1)
+        * FermionicOperator(a_op_spin(b, dagger=True), 1)
+        * FermionicOperator(a_op_spin(c, dagger=True), 1)
+        * FermionicOperator(a_op_spin(d, dagger=True), 1)
+        * FermionicOperator(a_op_spin(l, dagger=False), 1)
+        * FermionicOperator(a_op_spin(k, dagger=False), 1)
+        * FermionicOperator(a_op_spin(j, dagger=False), 1)
+        * FermionicOperator(a_op_spin(i, dagger=False), 1)
+    )
+
+
+def G5(i: int, j: int, k: int, l: int, m: int, a: int, b: int, c: int, d: int, e: int) -> FermionicOperator:
+    r"""Construct five-electron excitation operator.
+
+    .. math::
+        \hat{G}^{[5]}_{ijklmabcde} = \hat{a}_{a}^\dagger\hat{a}_{b}^\dagger\hat{a}_{c}^\dagger\hat{a}_{d}^\dagger\hat{a}_{e}^\dagger\hat{a}_m\hat{a}_l\hat{a}_k\hat{a}_j\hat{a}_i
+
+    Args:
+        i: Spin orbital index.
+        j: Spin orbital index.
+        k: Spin orbital index.
+        l: Spin orbital index.
+        m: Spin orbital index.
+        a: Spin orbital index.
+        b: Spin orbital index.
+        c: Spin orbital index.
+        d: Spin orbital index.
+        e: Spin orbital index.
+
+    Returns:
+        Five-elecetron excitation operator.
+    """
+    return (
+        FermionicOperator(a_op_spin(a, dagger=True), 1)
+        * FermionicOperator(a_op_spin(b, dagger=True), 1)
+        * FermionicOperator(a_op_spin(c, dagger=True), 1)
+        * FermionicOperator(a_op_spin(d, dagger=True), 1)
+        * FermionicOperator(a_op_spin(e, dagger=True), 1)
+        * FermionicOperator(a_op_spin(m, dagger=False), 1)
+        * FermionicOperator(a_op_spin(l, dagger=False), 1)
+        * FermionicOperator(a_op_spin(k, dagger=False), 1)
+        * FermionicOperator(a_op_spin(j, dagger=False), 1)
+        * FermionicOperator(a_op_spin(i, dagger=False), 1)
+    )
+
+
+def G6(
+    i: int, j: int, k: int, l: int, m: int, n: int, a: int, b: int, c: int, d: int, e: int, f: int
+) -> FermionicOperator:
+    r"""Construct six-electron excitation operator.
+
+    .. math::
+        \hat{G}^{[6]}_{ijklmnabcdef} = \hat{a}_{a}^\dagger\hat{a}_{b}^\dagger\hat{a}_{c}^\dagger\hat{a}_{d}^\dagger\hat{a}_{e}^\dagger\hat{a}_{f}^\dagger
+        \hat{a}_n\hat{a}_m\hat{a}_l\hat{a}_k\hat{a}_j\hat{a}_i
+
+    Args:
+        i: Spin orbital index.
+        j: Spin orbital index.
+        k: Spin orbital index.
+        l: Spin orbital index.
+        m: Spin orbital index.
+        n: Spin orbital index.
+        a: Spin orbital index.
+        b: Spin orbital index.
+        c: Spin orbital index.
+        d: Spin orbital index.
+        e: Spin orbital index.
+        f: Spin orbital index.
+
+    Returns:
+        Six-elecetron excitation operator.
+    """
+    return (
+        FermionicOperator(a_op_spin(a, dagger=True), 1)
+        * FermionicOperator(a_op_spin(b, dagger=True), 1)
+        * FermionicOperator(a_op_spin(c, dagger=True), 1)
+        * FermionicOperator(a_op_spin(d, dagger=True), 1)
+        * FermionicOperator(a_op_spin(e, dagger=True), 1)
+        * FermionicOperator(a_op_spin(f, dagger=True), 1)
+        * FermionicOperator(a_op_spin(n, dagger=False), 1)
+        * FermionicOperator(a_op_spin(m, dagger=False), 1)
+        * FermionicOperator(a_op_spin(l, dagger=False), 1)
+        * FermionicOperator(a_op_spin(k, dagger=False), 1)
+        * FermionicOperator(a_op_spin(j, dagger=False), 1)
+        * FermionicOperator(a_op_spin(i, dagger=False), 1)
+    )
+
+
+def G1_sa(i: int, a: int) -> FermionicOperator:
     r"""Construct singlet one-electron spin-adapted excitation operator.
 
     .. math::
@@ -104,12 +282,13 @@ def G1(i: int, a: int) -> FermionicOperator:
         i: Spatial orbital index.
         a: Spatial orbital index.
 
-    Returns singlet one-elecetron spin-adapted exciation operator.
+    Returns:
+        Singlet one-elecetron spin-adapted excitation operator.
     """
     return 2 ** (-1 / 2) * Epq(a, i)
 
 
-def G2_1(i: int, j: int, a: int, b: int) -> FermionicOperator:
+def G2_1_sa(i: int, j: int, a: int, b: int) -> FermionicOperator:
     r"""Construct first singlet two-electron spin-adapted excitation operator.
 
     .. math::
@@ -121,7 +300,8 @@ def G2_1(i: int, j: int, a: int, b: int) -> FermionicOperator:
         a: Spatial orbital index.
         b: Spatial orbital index.
 
-    Returns first singlet two-elecetron spin-adapted exciation operator.
+    Returns:
+        First singlet two-elecetron spin-adapted excitation operator.
     """
     fac = 1
     if a == b:
@@ -131,7 +311,7 @@ def G2_1(i: int, j: int, a: int, b: int) -> FermionicOperator:
     return 1 / 2 * (fac) ** (-1 / 2) * (Epq(a, i) * Epq(b, j) + Epq(a, j) * Epq(b, i))
 
 
-def G2_2(i: int, j: int, a: int, b: int) -> FermionicOperator:
+def G2_2_sa(i: int, j: int, a: int, b: int) -> FermionicOperator:
     r"""Construct second singlet two-electron spin-adapted excitation operator.
 
     .. math::
@@ -143,7 +323,8 @@ def G2_2(i: int, j: int, a: int, b: int) -> FermionicOperator:
         a: Spatial orbital index.
         b: Spatial orbital index.
 
-    Returns second singlet two-elecetron spin-adapted exciation operator.
+    Returns:
+        Second singlet two-elecetron spin-adapted excitation operator.
     """
     return 1 / (2 * 3 ** (1 / 2)) * (Epq(a, i) * Epq(b, j) - Epq(a, j) * Epq(b, i))
 
@@ -178,7 +359,7 @@ def hamiltonian_full_space(h_mo: np.ndarray, g_mo: np.ndarray, num_orbs: int) ->
     return H_operator
 
 
-def hamiltonian_pauli_0i_0a(
+def hamiltonian_0i_0a(
     h_mo: np.ndarray,
     g_mo: np.ndarray,
     num_inactive_orbs: int,
@@ -234,7 +415,7 @@ def hamiltonian_pauli_0i_0a(
     return hamiltonian_operator
 
 
-def hamiltonian_pauli_1i_1a(
+def hamiltonian_1i_1a(
     h_mo: np.ndarray,
     g_mo: np.ndarray,
     num_inactive_orbs: int,
@@ -303,7 +484,7 @@ def hamiltonian_pauli_1i_1a(
     return hamiltonian_operator
 
 
-def hamiltonian_pauli_2i_2a(
+def hamiltonian_2i_2a(
     h_mo: np.ndarray,
     g_mo: np.ndarray,
     num_inactive_orbs: int,

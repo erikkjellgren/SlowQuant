@@ -5,27 +5,22 @@ from typing import Any
 
 import numpy as np
 from qiskit import QuantumCircuit
+from qiskit.compiler import transpile
 from qiskit.primitives import BaseEstimator, BaseSampler
-from qiskit.quantum_info import Pauli, PauliList, SparsePauliOp
+from qiskit.quantum_info import SparsePauliOp
 from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFock
-from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
-from slowquant.qiskit_interface.base import FermionicOperator
-from slowquant.qiskit_interface.custom_ansatz import (
-    ErikD_JW,
-    ErikD_Parity,
-    ErikSD_JW,
-    ErikSD_Parity,
-    tUPS,
-)
+from slowquant.qiskit_interface.custom_ansatz import fUCCSD, tUPS
 from slowquant.qiskit_interface.util import (
     Clique,
     correct_distribution,
     get_bitstring_sign,
+    postselection,
     to_CBS_measurement,
 )
+from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 
 
 class QuantumInterface:
@@ -39,12 +34,14 @@ class QuantumInterface:
         primitive: BaseEstimator | BaseSampler,
         ansatz: str,
         mapper: FermionicMapper,
+        ISA: bool = False,
         ansatz_options: dict[str, Any] = {},
         shots: None | int = None,
         max_shots_per_run: int = 100000,
         do_M_mitigation: bool = False,
         do_M_iqa: bool = False,
         do_M_ansatz0: bool = False,
+        do_postselection: bool = True,
     ) -> None:
         """Interface to Qiskit to use IBM quantum hardware or simulator.
 
@@ -54,28 +51,35 @@ class QuantumInterface:
             mapper: Qiskit mapper object, e.g. JW or Parity.
             ansatz_options: Ansatz options.
             mapper: Qiskit mapper object.
+            ISA: Use ISA for submitting to IBM quantum. Locally transpiling is performed.
             shots: Number of shots. If not specified use shotnumber from primitive (default).
             max_shots_per_run: Maximum number of shots allowed in a single run. Set to 100000 per IBM machines.
             do_M_mitigation: Do error mitigation via read-out correlation matrix.
             do_M_iqa: Use independent qubit approximation when constructing the read-out correlation matrix.
-            do_M_ansatz0: Use the ansatz with theta=0 when constructing the read-out correlation matrix
+            do_M_ansatz0: Use the ansatz with theta=0 when constructing the read-out correlation matrix.
+            do_postselection: Use postselection to preserve number of particles in the computational basis.
         """
-        allowed_ansatz = ("UCCSD", "PUCCD", "UCCD", "ErikD", "ErikSD", "HF", "tUPS")
+        allowed_ansatz = ("tUCCSD", "tPUCCD", "tUCCD", "tUPS", "fUCCSD")
         if ansatz not in allowed_ansatz:
             raise ValueError("The chosen Ansatz is not available. Choose from: ", allowed_ansatz)
         self.ansatz = ansatz
         self._primitive = primitive
         self.mapper = mapper
+        self.ISA = ISA
         self.max_shots_per_run = max_shots_per_run
         self.shots = shots
-        self._do_M_mitigation = do_M_mitigation
-        self._do_M_iqa = do_M_iqa
-        self._do_M_ansatz0 = do_M_ansatz0
+        self.do_M_mitigation = do_M_mitigation
+        self.do_M_iqa = do_M_iqa
+        self.do_M_ansatz0 = do_M_ansatz0
         self._Minv = None
         self.total_shots_used = 0
         self.total_device_calls = 0
         self.total_paulis_evaluated = 0
         self.ansatz_options = ansatz_options
+        self.do_postselection = do_postselection
+        self._save_layout = False
+        self._save_paulis = True  # hard switch to stop using Pauli saving (debugging tool).
+        self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
 
     def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int]) -> None:
         """Construct qiskit circuit.
@@ -91,9 +95,9 @@ class QuantumInterface:
             {}
         )  # Contains information about the parameterization needed for gradient evaluations.
 
-        if self.ansatz == "UCCSD":
+        if self.ansatz == "tUCCSD":
             if len(self.ansatz_options) != 0:
-                raise ValueError(f"No options available for UCCSD got {self.ansatz_options}")
+                raise ValueError(f"No options available for tUCCSD got {self.ansatz_options}")
             self.circuit = UCCSD(
                 num_orbs,
                 self.num_elec,
@@ -104,9 +108,9 @@ class QuantumInterface:
                     self.mapper,
                 ),
             )
-        elif self.ansatz == "PUCCD":
+        elif self.ansatz == "tPUCCD":
             if len(self.ansatz_options) != 0:
-                raise ValueError(f"No options available for PUCCD got {self.ansatz_options}")
+                raise ValueError(f"No options available for tPUCCD got {self.ansatz_options}")
             self.circuit = PUCCD(
                 num_orbs,
                 self.num_elec,
@@ -117,9 +121,9 @@ class QuantumInterface:
                     self.mapper,
                 ),
             )
-        elif self.ansatz == "UCCD":
+        elif self.ansatz == "tUCCD":
             if len(self.ansatz_options) != 0:
-                raise ValueError(f"No options available for UCCD got {self.ansatz_options}")
+                raise ValueError(f"No options available for tUCCD got {self.ansatz_options}")
             self.circuit = UCC(
                 num_orbs,
                 self.num_elec,
@@ -131,34 +135,14 @@ class QuantumInterface:
                     self.mapper,
                 ),
             )
-        elif self.ansatz == "ErikD":
-            if len(self.ansatz_options) != 0:
-                raise ValueError(f"No options available for ErikD got {self.ansatz_options}")
-            if num_orbs != 2 or self.num_elec != (1, 1):
-                raise ValueError(f"Chosen ansatz, {self.ansatz}, only works for (2,2)")
-            if isinstance(self.mapper, JordanWignerMapper):
-                self.circuit = ErikD_JW()
-            elif isinstance(self.mapper, ParityMapper):
-                self.circuit = ErikD_Parity()
-            else:
-                raise ValueError(f"Unsupported mapper, {type(self.mapper)}, for ansatz {self.ansatz}")
-        elif self.ansatz == "ErikSD":
-            if len(self.ansatz_options) != 0:
-                raise ValueError(f"No options available for ErikSD got {self.ansatz_options}")
-            if num_orbs != 2 or self.num_elec != (1, 1):
-                raise ValueError(f"Chosen ansatz, {self.ansatz}, only works for (2,2)")
-            if isinstance(self.mapper, JordanWignerMapper):
-                self.circuit = ErikSD_JW()
-            elif isinstance(self.mapper, ParityMapper):
-                self.circuit = ErikSD_Parity()
-            else:
-                raise ValueError(f"Unsupported mapper, {type(self.mapper)}, for ansatz {self.ansatz}")
         elif self.ansatz == "HF":
             if len(self.ansatz_options) != 0:
                 raise ValueError(f"No options available for HF got {self.ansatz_options}")
             self.circuit = HartreeFock(num_orbs, self.num_elec, self.mapper)
         elif self.ansatz == "tUPS":
             self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
+        elif self.ansatz == "fUCCSD":
+            self.circuit, self.grad_param_R = fUCCSD(num_orbs, self.num_elec, self.mapper)
 
         # Check that R parameter for gradient is consistent with the paramter names.
         if len(self.grad_param_R) == 0:
@@ -179,6 +163,67 @@ class QuantumInterface:
         self.num_qubits = self.circuit.num_qubits
         # Set parameter to HarteeFock
         self._parameters = [0.0] * self.circuit.num_parameters
+
+    @property
+    def ISA(self) -> bool:
+        """Get ISA setting.
+
+        Returns:
+            ISA setting.
+        """
+        return self._ISA
+
+    @ISA.setter
+    def ISA(self, ISA) -> None:
+        """Set ISA and handle tranpile arguments.
+
+        Args:
+            ISA: ISA bool
+        """
+        self._ISA = ISA
+
+        if ISA:
+            # Get backend from primitive
+            if hasattr(self._primitive, "_backend"):
+                self._ISA_backend = self._primitive._backend  # pylint: disable=protected-access
+                name = self._ISA_backend.name
+            else:
+                self._ISA_backend = None
+                name = "None"
+
+            # Get optimization level from backend
+            if hasattr(self._primitive, "_transpile_options") and hasattr(
+                self._primitive._transpile_options, "optimization_level"  # pylint: disable=protected-access
+            ):
+                self._ISA_level = self._primitive._transpile_options[  # pylint: disable=protected-access
+                    "optimization_level"
+                ]
+            elif hasattr(self._primitive.options, "optimization_level"):
+                self._ISA_level = self._primitive.options["optimization_level"]
+            else:
+                self._ISA_level = 1
+
+            self._ISA_layout = None
+
+            print(f"ISA uses backend {name} with optimization level {self._ISA_level}")
+
+    def _check_layout(self, circuit: QuantumCircuit) -> None:
+        """Check if transpiled layout has changed.
+
+        Args:
+            circuit: Circuit whose layout is to be checked.
+        """
+        if self._save_layout and circuit.layout is not None:
+            if self._ISA_layout is None:
+                self._ISA_layout = circuit.layout.final_index_layout()
+            else:
+                if not np.array_equal(self._ISA_layout, circuit.layout.final_index_layout()):
+                    print("WARNING: Transpiled layout has changed from readout error run.")
+
+    def redo_M_mitigation(self) -> None:
+        """Redo M_mitigation."""
+        self._ISA_layout = None
+        self._make_Minv()
 
     @property
     def parameters(self) -> list[float]:
@@ -209,6 +254,32 @@ class QuantumInterface:
             if not np.array_equal(self._parameters, parameters):
                 self.cliques = Clique()
         self._parameters = parameters.copy()
+
+    @property
+    def circuit(self) -> QuantumCircuit:
+        """Get circuit.
+
+        Returns:
+            circuit
+        """
+        return self._circuit
+
+    @circuit.setter
+    def circuit(
+        self,
+        circuit: QuantumCircuit,
+    ) -> None:
+        """Set circuit.
+
+        Args:
+            circuit: circuit
+        """
+        # Check if estimator is primitve and ISA selected. If yes, pre-transpile circuit for later use.
+
+        if isinstance(self._primitive, BaseEstimator) and self.ISA:
+            self._circuit = transpile(circuit, backend=self._ISA_backend, optimization_level=self._ISA_level)
+        else:
+            self._circuit = circuit
 
     @property
     def shots(self) -> int | None:
@@ -304,6 +375,15 @@ class QuantumInterface:
         if hasattr(self, "_shots"):  # Check if it is initialization
             self.shots = self._shots
 
+    def _reset_cliques(self) -> None:
+        """Reset cliques to empty."""
+        self.cliques = Clique()
+
+    def null_shots(self) -> None:
+        """Set number of shots to None."""
+        self._shots = None
+        self._circuit_multipl = 1
+
     def op_to_qbit(self, op: FermionicOperator) -> SparsePauliOp:
         """Fermionic operator to qbit rep.
 
@@ -330,18 +410,22 @@ class QuantumInterface:
         Returns:
             Expectation value of fermionic operator.
         """
+        save_paulis = self._save_paulis
         if custom_parameters is None:
             run_parameters = self.parameters
         else:
             run_parameters = custom_parameters
+            save_paulis = False
 
         # Check if estimator or sampler
         if isinstance(self._primitive, BaseEstimator):
             return self._estimator_quantum_expectation_value(op, run_parameters)
-        if isinstance(self._primitive, BaseSampler) and custom_parameters is None:
+        if isinstance(self._primitive, BaseSampler) and save_paulis:
             return self._sampler_quantum_expectation_value(op)
         if isinstance(self._primitive, BaseSampler):
-            return self._sampler_quantum_expectation_value_nosave(op, run_parameters)
+            return self._sampler_quantum_expectation_value_nosave(
+                op, run_parameters, do_cliques=self._do_cliques
+            )
         raise ValueError(
             "The Quantum Interface was initiated with an unknown Qiskit primitive, {type(self._primitive)}"
         )
@@ -359,10 +443,13 @@ class QuantumInterface:
             Expectation value of operator.
         """
         observables = self.op_to_qbit(op)
+        if self.ISA:
+            observables = observables.apply_layout(self.circuit.layout)
         job = self._primitive.run(
             circuits=self.circuit,
             parameter_values=run_parameters,
             observables=observables,
+            skip_tranpilation=self.ISA,
         )
         if self.shots is not None:  # check if ideal simulator
             self.total_shots_used += self.shots * len(observables)
@@ -409,23 +496,27 @@ class QuantumInterface:
         if not hasattr(self, "cliques"):
             self.cliques = Clique()
 
-        new_heads = self.cliques.add_paulis([str(x) for x in observables.paulis])
+        paulis_str = [str(x) for x in observables.paulis]
+        new_heads = self.cliques.add_paulis(paulis_str)
+
+        # Check if error mitigation is requested and if read-out matrix already exists.
+        if self.do_M_mitigation and self._Minv is None:
+            self._make_Minv()
 
         if len(new_heads) != 0:
-            # Check if error mitigation is requested and if read-out matrix already exists.
-            if self._do_M_mitigation and self._Minv is None:
-                self._make_Minv()
-
             # Simulate each clique head with one combined device call
             # and return a list of distributions
-            distr = self._one_call_sampler_distributions(PauliList(new_heads), self.parameters, self.circuit)
-            if self._do_M_mitigation:  # apply error mitigation if requested
+            distr = self._one_call_sampler_distributions(new_heads, self.parameters, self.circuit)
+            if self.do_M_mitigation:  # apply error mitigation if requested
                 for i, dist in enumerate(distr):
                     distr[i] = correct_distribution(dist, self._Minv)
+            if self.do_postselection:
+                for i, (dist, head) in enumerate(zip(distr, new_heads)):
+                    if "X" not in head and "Y" not in head:
+                        distr[i] = postselection(dist, self.mapper, self.num_elec)
             self.cliques.update_distr(new_heads, distr)
 
         # Loop over all Pauli strings in observable and build final result with coefficients
-        paulis_str = [str(x) for x in observables.paulis]
         for pauli, coeff in zip(paulis_str, observables.coeffs):
             result = 0.0
             for key, value in self.cliques.get_distr(pauli).items():  # build result from quasi-distribution
@@ -439,7 +530,7 @@ class QuantumInterface:
         return values.real
 
     def _sampler_quantum_expectation_value_nosave(
-        self, op: FermionicOperator, run_parameters: list[float]
+        self, op: FermionicOperator | SparsePauliOp, run_parameters: list[float], do_cliques: bool = True
     ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
 
@@ -462,31 +553,61 @@ class QuantumInterface:
         """
         values = 0.0
         # Map Fermionic to Qubit
-        observables = self.op_to_qbit(op)
-        # Obtain cliques for operator's Pauli strings
-        cliques = Clique()
-
-        new_heads = cliques.add_paulis([str(x) for x in observables.paulis])
+        if isinstance(op, FermionicOperator):
+            observables = self.op_to_qbit(op)
+        elif isinstance(op, SparsePauliOp):
+            observables = op
+        else:
+            raise ValueError(
+                f"Got unknown operator type {type(op)}, expected FermionicOperator or SparsePauliOp"
+            )
 
         # Check if error mitigation is requested and if read-out matrix already exists.
-        if self._do_M_mitigation and self._Minv is None:
+        if self.do_M_mitigation and self._Minv is None:
             self._make_Minv()
 
-        # Simulate each clique head with one combined device call
-        # and return a list of distributions
-        distr = self._one_call_sampler_distributions(PauliList(new_heads), run_parameters, self.circuit)
-        if self._do_M_mitigation:  # apply error mitigation if requested
-            for i, dist in enumerate(distr):
-                distr[i] = correct_distribution(dist, self._Minv)
-        cliques.update_distr(new_heads, distr)
-
-        # Loop over all Pauli strings in observable and build final result with coefficients
         paulis_str = [str(x) for x in observables.paulis]
-        for pauli, coeff in zip(paulis_str, observables.coeffs):
-            result = 0.0
-            for key, value in cliques.get_distr(pauli).items():  # build result from quasi-distribution
-                result += value * get_bitstring_sign(pauli, key)
-            values += result * coeff
+        if do_cliques:
+            # Obtain cliques for operator's Pauli strings
+            cliques = Clique()
+
+            new_heads = cliques.add_paulis(paulis_str)
+
+            # Simulate each clique head with one combined device call
+            # and return a list of distributions
+            distr = self._one_call_sampler_distributions(new_heads, run_parameters, self.circuit)
+            if self.do_M_mitigation:  # apply error mitigation if requested
+                for i, dist in enumerate(distr):
+                    distr[i] = correct_distribution(dist, self._Minv)
+            if self.do_postselection:
+                for i, (dist, head) in enumerate(zip(distr, new_heads)):
+                    if "X" not in head and "Y" not in head:
+                        distr[i] = postselection(dist, self.mapper, self.num_elec)
+            cliques.update_distr(new_heads, distr)
+
+            # Loop over all Pauli strings in observable and build final result with coefficients
+            for pauli, coeff in zip(paulis_str, observables.coeffs):
+                result = 0.0
+                for key, value in cliques.get_distr(pauli).items():  # build result from quasi-distribution
+                    result += value * get_bitstring_sign(pauli, key)
+                values += result * coeff
+        else:
+            # Simulate each Pauli string with one combined device call
+            distr = self._one_call_sampler_distributions(paulis_str, run_parameters, self.circuit)
+            if self.do_M_mitigation:  # apply error mitigation if requested
+                for i, dist in enumerate(distr):
+                    distr[i] = correct_distribution(dist, self._Minv)
+            if self.do_postselection:
+                for i, (dist, pauli) in enumerate(zip(distr, paulis_str)):
+                    if "X" not in pauli and "Y" not in pauli:
+                        distr[i] = postselection(dist, self.mapper, self.num_elec)
+
+            # Loop over all Pauli strings in observable and build final result with coefficients
+            for pauli, coeff, dist in zip(paulis_str, observables.coeffs, distr):
+                result = 0.0
+                for key, value in dist.items():  # build result from quasi-distribution
+                    result += value * get_bitstring_sign(pauli, key)
+                values += result * coeff
 
         if isinstance(values, complex):
             if abs(values.imag) > 10**-2:
@@ -496,7 +617,7 @@ class QuantumInterface:
 
     def quantum_variance(
         self,
-        op: FermionicOperator,
+        op: FermionicOperator | SparsePauliOp,
         do_cliques: bool = True,
         no_coeffs: bool = False,
         custom_parameters: list[float] | None = None,
@@ -519,7 +640,15 @@ class QuantumInterface:
         else:
             run_parameters = custom_parameters
 
-        observables = self.op_to_qbit(op)
+        # Map Fermionic to Qubit
+        if isinstance(op, FermionicOperator):
+            observables = self.op_to_qbit(op)
+        elif isinstance(op, SparsePauliOp):
+            observables = op
+        else:
+            raise ValueError(
+                f"Got unknown operator type {type(op)}, expected FermionicOperator or SparsePauliOp"
+            )
 
         if do_cliques:
             if not hasattr(self, "cliques"):
@@ -529,18 +658,24 @@ class QuantumInterface:
 
             if len(new_heads) != 0:
                 # Check if error mitigation is requested and if read-out matrix already exists.
-                if self._do_M_mitigation and self._Minv is None:
+                if self.do_M_mitigation and self._Minv is None:
                     self._make_Minv()
 
                 # Simulate each clique head with one combined device call
                 # and return a list of distributions
-                distr = self._one_call_sampler_distributions(
-                    PauliList(new_heads), run_parameters, self.circuit
-                )
-                if self._do_M_mitigation:  # apply error mitigation if requested
+                distr = self._one_call_sampler_distributions(new_heads, run_parameters, self.circuit)
+                if self.do_M_mitigation:  # apply error mitigation if requested
                     for i, dist in enumerate(distr):
                         distr[i] = correct_distribution(dist, self._Minv)
+                if self.do_postselection:
+                    for i, (dist, head) in enumerate(zip(distr, new_heads)):
+                        if "X" not in head and "Y" not in head:
+                            distr[i] = postselection(dist, self.mapper, self.num_elec)
                 self.cliques.update_distr(new_heads, distr)
+        else:
+            print(
+                "WARNING: REM and Post-Selection not implemented for quantum variance without the use of cliques."
+            )
 
         # Loop over all Pauli strings in observable and build final result with coefficients
         result = 0.0
@@ -559,15 +694,15 @@ class QuantumInterface:
             else:
                 p1 = self._sampler_distribution_p1(pauli, run_parameters)
             if self.shots is None:
-                sigma_p = 2 * np.abs(coeff.real) * ((p1 - p1**2) ** (1 / 2))
+                var_p = 4 * np.abs(coeff.real) ** 2 * np.abs(p1 - p1**2)
             else:
-                sigma_p = 2 * np.abs(coeff.real) * ((p1 - p1**2) ** (1 / 2)) / (self.shots ** (1 / 2))
-            result += sigma_p**2
+                var_p = 4 * np.abs(coeff.real) ** 2 * np.abs(p1 - p1**2) / (self.shots)
+            result += var_p
         return result
 
     def _one_call_sampler_distributions(
         self,
-        paulis: PauliList | Pauli,
+        paulis: list[str] | str,
         run_parameters: list[list[float]] | list[float],
         circuits_in: list[QuantumCircuit] | QuantumCircuit,
     ) -> list[dict[str, float]]:
@@ -590,9 +725,9 @@ class QuantumInterface:
             E.g.: [PauliString[0] for Circuit[0], PauliString[0] for Circuit[1], ...]
         """
         if not isinstance(self._primitive, BaseSampler):
-            raise TypeError(f"Expeccted primitive to be of type BaseSampler got, {type(self._primitive)}")
-        if isinstance(paulis, Pauli):
-            paulis = PauliList(paulis)
+            raise TypeError(f"Expected primitive to be of type BaseSampler got, {type(self._primitive)}")
+        if isinstance(paulis, str):
+            paulis = [paulis]
         num_paulis = len(paulis)
         if isinstance(circuits_in, QuantumCircuit):
             circuits_in = [circuits_in]
@@ -613,7 +748,24 @@ class QuantumInterface:
             parameter_values = [run_parameters] * (num_paulis * self._circuit_multipl)
         else:
             parameter_values = run_parameters * (num_paulis * self._circuit_multipl)  # type: ignore
-        job = self._primitive.run(circuits, parameter_values=parameter_values)
+        if self.ISA:
+            circuits = transpile(
+                circuits,
+                backend=self._ISA_backend,
+                optimization_level=self._ISA_level,
+                initial_layout=self._ISA_layout,
+            )
+            self._check_layout(circuits[0])
+            job = self._primitive.run(
+                circuits,
+                parameter_values=parameter_values,
+                skip_transpilation=True,
+            )
+        else:
+            job = self._primitive.run(
+                circuits,
+                parameter_values=parameter_values,
+            )
         if self.shots is not None:  # check if ideal simulator
             self.total_shots_used += self.shots * num_paulis * num_circuits * self._circuit_multipl
         self.total_device_calls += 1
@@ -636,7 +788,7 @@ class QuantumInterface:
         return dist_combined
 
     def _sampler_distributions(
-        self, pauli: PauliList | Pauli, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
+        self, pauli: str, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
     ) -> dict[str, float]:
         r"""Get results from a sampler distribution for one given Pauli string.
 
@@ -656,9 +808,7 @@ class QuantumInterface:
             Quasi-distributions.
         """
         if not isinstance(self._primitive, BaseSampler):
-            raise TypeError(f"Expeccted primitive to be of type BaseSampler got, {type(self._primitive)}")
-        if isinstance(pauli, Pauli):
-            pauli = PauliList(pauli)
+            raise TypeError(f"Expected primitive to be of type BaseSampler got, {type(self._primitive)}")
         if self._circuit_multipl > 1:
             print(
                 "WARNING: The chosen function does not allow for appending circuits. Choose _one_call_sampler_distributions instead."
@@ -678,7 +828,24 @@ class QuantumInterface:
         ansatz_w_obs.measure_all()
 
         # Run sampler
-        job = self._primitive.run(ansatz_w_obs, parameter_values=run_parameters)
+        if self.ISA:
+            circuit = transpile(
+                ansatz_w_obs,
+                backend=self._ISA_backend,
+                optimization_level=self._ISA_level,
+                initial_layout=self._ISA_layout,
+            )
+            self._check_layout(circuit)
+            job = self._primitive.run(
+                circuit,
+                parameter_values=run_parameters,
+                skip_transpilation=True,
+            )
+        else:
+            job = self._primitive.run(
+                ansatz_w_obs,
+                parameter_values=run_parameters,
+            )
         if shots is not None:  # check if ideal simulator
             self.total_shots_used += shots
         self.total_device_calls += 1
@@ -701,7 +868,7 @@ class QuantumInterface:
             p1 probability.
         """
         # Get quasi-distribution in binary probabilities
-        distr = self._sampler_distributions(Pauli(pauli), run_parameters, custom_circ)
+        distr = self._sampler_distributions(pauli, run_parameters, custom_circ)
 
         p1 = 0.0
         for key, value in distr.items():
@@ -752,6 +919,7 @@ class QuantumInterface:
         #. https://qiskit.org/textbook/ch-quantum-hardware/measurement-error-mitigation.html
         """
         print("Measuring error mitigation read-out matrix.")
+        self._save_layout = True
         if self.num_qubits > 12:
             raise ValueError("Current implementation does not scale above 12 qubits?")
         if "transpilation" in self._primitive.options:
@@ -761,19 +929,19 @@ class QuantumInterface:
                 )
         else:
             print("No transpilation option found in primitive. Run via simulator is assumed.")
-        if self._do_M_ansatz0:
+        if self.do_M_ansatz0:
             ansatz = self.circuit
             # Negate the Hartree-Fock State
             ansatz = ansatz.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
         else:
             ansatz = QuantumCircuit(self.num_qubits)
         M = np.zeros((2**self.num_qubits, 2**self.num_qubits))
-        if self._do_M_iqa:
+        if self.do_M_iqa:
             ansatzX = ansatz.copy()
             for i in range(self.num_qubits):
                 ansatzX.x(i)
             [Pzero, Pone] = self._one_call_sampler_distributions(
-                Pauli("Z" * self.num_qubits),
+                "Z" * self.num_qubits,
                 [[10**-8] * len(ansatz.parameters)] * 2,
                 [ansatz.copy(), ansatzX],
             )
@@ -805,7 +973,7 @@ class QuantumInterface:
                 ansatz_list[nr] = ansatzX
             # Simulate all elements with one device call
             Px_list = self._one_call_sampler_distributions(
-                Pauli("Z" * self.num_qubits),
+                "Z" * self.num_qubits,
                 [[10**-8] * len(ansatz.parameters)] * len(ansatz_list),
                 ansatz_list,
             )

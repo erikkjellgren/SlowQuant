@@ -2,17 +2,15 @@ from collections.abc import Generator, Sequence
 
 import numpy as np
 import scipy.linalg
-import scipy.sparse as ss
 
-import slowquant.unitary_coupled_cluster.linalg_wrapper as lw
 from slowquant.unitary_coupled_cluster.operator_matrix import (
-    a_op_spin_matrix,
-    epq_matrix,
-)
-from slowquant.unitary_coupled_cluster.operator_pauli import (
-    OperatorPauli,
-    a_spin_pauli,
-    epq_pauli,
+    T1_sa_matrix,
+    T2_1_sa_matrix,
+    T2_2_sa_matrix,
+    T3_matrix,
+    T4_matrix,
+    T5_matrix,
+    T6_matrix,
 )
 
 
@@ -42,20 +40,17 @@ class ThetaPicker:
         self,
         active_occ_spin_idx: Sequence[int],
         active_unocc_spin_idx: Sequence[int],
-        is_spin_conserving: bool = False,
     ) -> None:
         """Initialize helper class to iterate over active space parameters.
 
         Args:
             active_occ_spin_idx: Spin index of strongly occupied orbitals.
             active_unocc_spin_idx: Spin index of weakly occupied orbitals.
-            is_spin_conserving: Generate spin conserving operators.
         """
         self.active_occ_spin_idx: list[int] = []
         self.active_unocc_spin_idx: list[int] = []
         self.active_occ_idx: list[int] = []
         self.active_unocc_idx: list[int] = []
-        self.is_spin_conserving = is_spin_conserving
         for idx in active_occ_spin_idx:
             self.active_occ_spin_idx.append(idx)
             if idx // 2 not in self.active_occ_idx:
@@ -65,359 +60,141 @@ class ThetaPicker:
             if idx // 2 not in self.active_unocc_idx:
                 self.active_unocc_idx.append(idx // 2)
 
-    def get_t1_generator(
-        self, num_spin_orbs: int
-    ) -> Generator[tuple[int, int, int, OperatorPauli], None, None]:
-        """Get generate over T1 operators.
-
-        Args:
-            num_spin_orbs: Number of spin orbitals.
+    def get_t1_generator_sa(
+        self,
+    ) -> Generator[tuple[int, int, float], None, None]:
+        """Get generate over T1 spin-adapted operators.
 
         Returns:
             T1 operator generator.
         """
-        return iterate_t1(
-            self.active_occ_spin_idx,
-            self.active_unocc_spin_idx,
-            num_spin_orbs,
-            self.is_spin_conserving,
-        )
+        return iterate_t1_sa(self.active_occ_idx, self.active_unocc_idx)
 
-    def get_t2_generator(
-        self, num_spin_orbs: int
-    ) -> Generator[tuple[int, int, int, int, int, OperatorPauli], None, None]:
-        """Get generate over T2 operators.
-
-        Args:
-            num_spin_orbs: Number of spin orbitals.
+    def get_t2_generator_sa(
+        self,
+    ) -> Generator[tuple[int, int, int, int, float, int], None, None]:
+        """Get generate over T2 spin-adapted operators.
 
         Returns:
             T2 operator generator.
         """
-        return iterate_t2(
-            self.active_occ_spin_idx,
-            self.active_unocc_spin_idx,
-            num_spin_orbs,
-            self.is_spin_conserving,
-        )
+        return iterate_t2_sa(self.active_occ_idx, self.active_unocc_idx)
 
-    def get_t3_generator(
-        self, num_spin_orbs: int
-    ) -> Generator[tuple[int, int, int, int, int, int, int, OperatorPauli], None, None]:
-        """Get generate over T3 operators.
+    def get_t1_generator(self) -> Generator[tuple[int, int], None, None]:
+        """Get generate over T1 spin-conserving operators.
 
-        Args:
-            num_spin_orbs: Number of spin orbitals.
+        Returns:
+            T1 operator generator.
+        """
+        return iterate_t1(self.active_occ_spin_idx, self.active_unocc_spin_idx)
+
+    def get_t2_generator(self) -> Generator[tuple[int, int, int, int], None, None]:
+        """Get generate over T2 spin-conserving operators.
+
+        Returns:
+            T2 operator generator.
+        """
+        return iterate_t2(self.active_occ_spin_idx, self.active_unocc_spin_idx)
+
+    def get_t3_generator(self) -> Generator[tuple[int, int, int, int, int, int], None, None]:
+        """Get generate over T3 spin-conserving operators.
 
         Returns:
             T3 operator generator.
         """
-        return iterate_t3(
-            self.active_occ_spin_idx,
-            self.active_unocc_spin_idx,
-            num_spin_orbs,
-            self.is_spin_conserving,
-        )
+        return iterate_t3(self.active_occ_spin_idx, self.active_unocc_spin_idx)
 
-    def get_t4_generator(
-        self, num_spin_orbs: int
-    ) -> Generator[tuple[int, int, int, int, int, int, int, int, int, OperatorPauli], None, None]:
-        """Get generate over T4 operators.
-
-        Args:
-            num_spin_orbs: Number of spin orbitals.
+    def get_t4_generator(self) -> Generator[tuple[int, int, int, int, int, int, int, int], None, None]:
+        """Get generate over T4 spin-conserving operators.
 
         Returns:
             T4 operator generator.
         """
-        return iterate_t4(
-            self.active_occ_spin_idx,
-            self.active_unocc_spin_idx,
-            num_spin_orbs,
-            self.is_spin_conserving,
-        )
+        return iterate_t4(self.active_occ_spin_idx, self.active_unocc_spin_idx)
 
     def get_t5_generator(
-        self, num_spin_orbs: int
-    ) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int, int, OperatorPauli], None, None]:
-        """Get generate over T5 operators.
-
-        Args:
-            num_spin_orbs: Number of spin orbitals.
+        self,
+    ) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int], None, None]:
+        """Get generate over T5 spin-conserving operators.
 
         Returns:
             T5 operator generator.
         """
-        return iterate_t5(
-            self.active_occ_spin_idx,
-            self.active_unocc_spin_idx,
-            num_spin_orbs,
-            self.is_spin_conserving,
-        )
+        return iterate_t5(self.active_occ_spin_idx, self.active_unocc_spin_idx)
 
     def get_t6_generator(
-        self, num_spin_orbs: int
-    ) -> Generator[
-        tuple[int, int, int, int, int, int, int, int, int, int, int, int, int, OperatorPauli], None, None
-    ]:
-        """Get generate over T6 operators.
-
-        Args:
-            num_spin_orbs: Number of spin orbitals.
+        self,
+    ) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int, int, int], None, None]:
+        """Get generate over T6 spin-conserving operators.
 
         Returns:
             T6 operator generator.
         """
-        return iterate_t6(
-            self.active_occ_spin_idx,
-            self.active_unocc_spin_idx,
-            num_spin_orbs,
-            self.is_spin_conserving,
-        )
-
-    def get_t1_generator_sa(
-        self, num_spin_orbs: int
-    ) -> Generator[tuple[int, int, int, OperatorPauli], None, None]:
-        """Get generate over T1 spin-adapted operators.
-
-        Args:
-            num_spin_orbs: Number of spin orbitals.
-
-        Returns:
-            T1 operator generator.
-        """
-        return iterate_t1_sa(self.active_occ_idx, self.active_unocc_idx, num_spin_orbs)
-
-    def get_t2_generator_sa(
-        self, num_spin_orbs: int
-    ) -> Generator[tuple[int, int, int, int, int, OperatorPauli], None, None]:
-        """Get generate over T2 spin-adapted operators.
-
-        Args:
-            num_spin_orbs: Number of spin orbitals.
-
-        Returns:
-            T2 operator generator.
-        """
-        return iterate_t2_sa(self.active_occ_idx, self.active_unocc_idx, num_spin_orbs)
-
-    def get_t1_generator_sa_matrix(
-        self,
-        num_spin_orbs: int,
-        use_csr: int = 10,
-    ) -> Generator[tuple[int, int, int, OperatorPauli], None, None]:
-        """Get generate over T1 spin-adapted operators in matrix form.
-
-        Args:
-            num_spin_orbs: Number of spin orbitals.
-            use_csr: Orbital limit for which sparse matrices will be used.
-
-        Returns:
-            T1 operator generator.
-        """
-        return iterate_t1_sa_matrix(
-            self.active_occ_idx, self.active_unocc_idx, num_spin_orbs, use_csr=use_csr
-        )
-
-    def get_t2_generator_sa_matrix(
-        self,
-        num_spin_orbs: int,
-        use_csr: int = 10,
-    ) -> Generator[tuple[int, int, int, int, int, OperatorPauli], None, None]:
-        """Get generate over T2 spin-adapted operators in matrix form.
-
-        Args:
-            num_spin_orbs: Number of spin orbitals.
-            use_csr: Orbital limit for which sparse matrices will be used.
-
-        Returns:
-            T2 operator generator.
-        """
-        return iterate_t2_sa_matrix(
-            self.active_occ_idx, self.active_unocc_idx, num_spin_orbs, use_csr=use_csr
-        )
+        return iterate_t6(self.active_occ_spin_idx, self.active_unocc_spin_idx)
 
 
 def iterate_t1_sa(
     active_occ_idx: Sequence[int],
     active_unocc_idx: Sequence[int],
-    num_spin_orbs: int,
-) -> Generator[tuple[int, int, int, OperatorPauli], None, None]:
+) -> Generator[tuple[int, int, float], None, None]:
     """Iterate over T1 spin-adapted operators.
 
     Args:
         active_occ_idx: Indices of strongly occupied orbitals.
         active_unocc_idx: Indices of weakly occupied orbitals.
-        num_spin_orbs: Number of spin orbitals.
 
     Returns:
         T1 operator iteration.
     """
-    theta_idx = -1
     for i in active_occ_idx:
         for a in active_unocc_idx:
-            theta_idx += 1
-            operator = 2 ** (-1 / 2) * epq_pauli(a, i, num_spin_orbs)
-            yield theta_idx, a, i, operator
-
-
-def iterate_t1_sa_matrix(
-    active_occ_idx: Sequence[int],
-    active_unocc_idx: Sequence[int],
-    num_spin_orbs: int,
-    use_csr: int,
-) -> Generator[tuple[int, int, int, OperatorPauli], None, None]:
-    """Iterate over T1 spin-adapted operators in matrix form.
-
-    Args:
-        active_occ_idx: Indices of strongly occupied orbitals.
-        active_unocc_idx: Indices of weakly occupied orbitals.
-        num_spin_orbs: Number of spin orbitals.
-        use_csr: Use sparse matrices.
-
-    Returns:
-        T1 operator iteration.
-    """
-    theta_idx = -1
-    for i in active_occ_idx:
-        for a in active_unocc_idx:
-            theta_idx += 1
-            operator = 2 ** (-1 / 2) * epq_matrix(a, i, num_spin_orbs, use_csr=use_csr)
-            yield theta_idx, a, i, operator
+            fac = 2 ** (-1 / 2)
+            yield a, i, fac
 
 
 def iterate_t2_sa(
     active_occ_idx: Sequence[int],
     active_unocc_idx: Sequence[int],
-    num_spin_orbs: int,
-) -> Generator[tuple[int, int, int, int, int, OperatorPauli], None, None]:
+) -> Generator[tuple[int, int, int, int, float, int], None, None]:
     """Iterate over T2 spin-adapted operators.
 
     Args:
         active_occ_idx: Indices of strongly occupied orbitals.
         active_unocc_idx: Indices of weakly occupied orbitals.
-        num_spin_orbs: Number of spin orbitals.
 
     Returns:
         T2 operator iteration.
     """
-    theta_idx = -1
     for idx_i, i in enumerate(active_occ_idx):
         for j in active_occ_idx[idx_i:]:
             for idx_a, a in enumerate(active_unocc_idx):
                 for b in active_unocc_idx[idx_a:]:
-                    theta_idx += 1
-                    fac = 1
+                    fac = 1.0
                     if a == b:
-                        fac *= 2
+                        fac *= 2.0
                     if i == j:
-                        fac *= 2
-                    operator = (
-                        1
-                        / 2
-                        * (fac) ** (-1 / 2)
-                        * (
-                            epq_pauli(a, i, num_spin_orbs) * epq_pauli(b, j, num_spin_orbs)
-                            + epq_pauli(a, j, num_spin_orbs) * epq_pauli(b, i, num_spin_orbs)
-                        )
-                    )
-                    yield theta_idx, a, i, b, j, operator
+                        fac *= 2.0
+                    fac = 1 / 2 * (fac) ** (-1 / 2)
+                    yield a, i, b, j, fac, 1
                     if i == j or a == b:
                         continue
-                    theta_idx += 1
-                    operator = (
-                        1
-                        / (2 * 3 ** (1 / 2))
-                        * (
-                            epq_pauli(a, i, num_spin_orbs) * epq_pauli(b, j, num_spin_orbs)
-                            - epq_pauli(a, j, num_spin_orbs) * epq_pauli(b, i, num_spin_orbs)
-                        )
-                    )
-                    yield theta_idx, a, i, b, j, operator
-
-
-def iterate_t2_sa_matrix(
-    active_occ_idx: Sequence[int],
-    active_unocc_idx: Sequence[int],
-    num_spin_orbs: int,
-    use_csr: int,
-) -> Generator[tuple[int, int, int, int, int, OperatorPauli], None, None]:
-    """Iterate over T2 spin-adapted operators in matrix form.
-
-    Args:
-        active_occ_idx: Indices of strongly occupied orbitals.
-        active_unocc_idx: Indices of weakly occupied orbitals.
-        num_spin_orbs: Number of spin orbitals.
-        use_csr: Use sparse matrices.
-
-    Returns:
-        T2 operator iteration.
-    """
-    theta_idx = -1
-    for idx_i, i in enumerate(active_occ_idx):
-        for j in active_occ_idx[idx_i:]:
-            for idx_a, a in enumerate(active_unocc_idx):
-                for b in active_unocc_idx[idx_a:]:
-                    theta_idx += 1
-                    fac = 1
-                    if a == b:
-                        fac *= 2
-                    if i == j:
-                        fac *= 2
-                    operator = (
-                        1
-                        / 2
-                        * (fac) ** (-1 / 2)
-                        * (
-                            lw.matmul(
-                                epq_matrix(a, i, num_spin_orbs, use_csr=use_csr),
-                                epq_matrix(b, j, num_spin_orbs, use_csr=use_csr),
-                            )
-                            + lw.matmul(
-                                epq_matrix(a, j, num_spin_orbs, use_csr=use_csr),
-                                epq_matrix(b, i, num_spin_orbs, use_csr=use_csr),
-                            )
-                        )
-                    )
-                    yield theta_idx, a, i, b, j, operator
-                    if i == j or a == b:
-                        continue
-                    theta_idx += 1
-                    operator = (
-                        1
-                        / (2 * 3 ** (1 / 2))
-                        * (
-                            lw.matmul(
-                                epq_matrix(a, i, num_spin_orbs, use_csr=use_csr),
-                                epq_matrix(b, j, num_spin_orbs, use_csr=use_csr),
-                            )
-                            - lw.matmul(
-                                epq_matrix(a, j, num_spin_orbs, use_csr=use_csr),
-                                epq_matrix(b, i, num_spin_orbs, use_csr=use_csr),
-                            )
-                        )
-                    )
-                    yield theta_idx, a, i, b, j, operator
+                    fac = 1 / (2 * 3 ** (1 / 2))
+                    yield a, i, b, j, fac, 2
 
 
 def iterate_t1(
     active_occ_spin_idx: list[int],
     active_unocc_spin_idx: list[int],
-    num_spin_orbs: int,
-    is_spin_conserving: bool,
-) -> Generator[tuple[int, int, int, OperatorPauli], None, None]:
-    """Iterate over T1 operators.
+) -> Generator[tuple[int, int], None, None]:
+    """Iterate over T1 spin-conserving operators.
 
     Args:
         active_occ_idx: Spin indices of strongly occupied orbitals.
         active_unocc_idx: Spin indices of weakly occupied orbitals.
-        num_spin_orbs: Number of spin orbitals.
-        is_spin_conserving: Make spin conserving operators.
 
     Returns:
         T1 operator iteration.
     """
-    theta_idx = -1
     for a in active_unocc_spin_idx:
         for i in active_occ_spin_idx:
             num_alpha = 0
@@ -427,35 +204,27 @@ def iterate_t1(
             else:
                 num_beta += 1
             if i % 2 == 0:
-                num_alpha += 1
+                num_alpha -= 1
             else:
-                num_beta += 1
-            if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
+                num_beta -= 1
+            if num_alpha != 0 or num_beta != 0:
                 continue
-            theta_idx += 1
-            operator = a_spin_pauli(a, True, num_spin_orbs)
-            operator *= a_spin_pauli(i, False, num_spin_orbs)
-            yield theta_idx, a, i, operator
+            yield a, i
 
 
 def iterate_t2(
     active_occ_spin_idx: list[int],
     active_unocc_spin_idx: list[int],
-    num_spin_orbs: int,
-    is_spin_conserving: bool,
-) -> Generator[tuple[int, int, int, int, int, OperatorPauli], None, None]:
-    """Iterate over T2 operators.
+) -> Generator[tuple[int, int, int, int], None, None]:
+    """Iterate over T2 spin-conserving operators.
 
     Args:
         active_occ_idx: Spin indices of strongly occupied orbitals.
         active_unocc_idx: Spin indices of weakly occupied orbitals.
-        num_spin_orbs: Number of spin orbitals.
-        is_spin_conserving: Make spin conserving operators.
 
     Returns:
         T2 operator iteration.
     """
-    theta_idx = -1
     for idx_a, a in enumerate(active_unocc_spin_idx):
         for b in active_unocc_spin_idx[idx_a + 1 :]:
             for idx_i, i in enumerate(active_occ_spin_idx):
@@ -471,41 +240,31 @@ def iterate_t2(
                     else:
                         num_beta += 1
                     if i % 2 == 0:
-                        num_alpha += 1
+                        num_alpha -= 1
                     else:
-                        num_beta += 1
+                        num_beta -= 1
                     if j % 2 == 0:
-                        num_alpha += 1
+                        num_alpha -= 1
                     else:
-                        num_beta += 1
-                    if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
+                        num_beta -= 1
+                    if num_alpha != 0 or num_beta != 0:
                         continue
-                    theta_idx += 1
-                    operator = a_spin_pauli(a, True, num_spin_orbs)
-                    operator = operator * a_spin_pauli(b, True, num_spin_orbs)
-                    operator = operator * a_spin_pauli(j, False, num_spin_orbs)
-                    operator = operator * a_spin_pauli(i, False, num_spin_orbs)
-                    yield theta_idx, a, i, b, j, operator
+                    yield a, i, b, j
 
 
 def iterate_t3(
     active_occ_spin_idx: list[int],
     active_unocc_spin_idx: list[int],
-    num_spin_orbs: int,
-    is_spin_conserving: bool,
-) -> Generator[tuple[int, int, int, int, int, int, int, OperatorPauli], None, None]:
-    """Iterate over T3 operators.
+) -> Generator[tuple[int, int, int, int, int, int], None, None]:
+    """Iterate over T3 spin-conserving operators.
 
     Args:
         active_occ_idx: Spin indices of strongly occupied orbitals.
         active_unocc_idx: Spin indices of weakly occupied orbitals.
-        num_spin_orbs: Number of spin orbitals.
-        is_spin_conserving: Make spin conserving operators.
 
     Returns:
         T3 operator iteration.
     """
-    theta_idx = -1
     for idx_a, a in enumerate(active_unocc_spin_idx):
         for idx_b, b in enumerate(active_unocc_spin_idx[idx_a + 1 :], idx_a + 1):
             for c in active_unocc_spin_idx[idx_b + 1 :]:
@@ -527,48 +286,35 @@ def iterate_t3(
                             else:
                                 num_beta += 1
                             if i % 2 == 0:
-                                num_alpha += 1
+                                num_alpha -= 1
                             else:
-                                num_beta += 1
+                                num_beta -= 1
                             if j % 2 == 0:
-                                num_alpha += 1
+                                num_alpha -= 1
                             else:
-                                num_beta += 1
+                                num_beta -= 1
                             if k % 2 == 0:
-                                num_alpha += 1
+                                num_alpha -= 1
                             else:
-                                num_beta += 1
-                            if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
+                                num_beta -= 1
+                            if num_alpha != 0 or num_beta != 0:
                                 continue
-                            theta_idx += 1
-                            operator = a_spin_pauli(a, True, num_spin_orbs) * a_spin_pauli(
-                                b, True, num_spin_orbs
-                            )
-                            operator = operator * a_spin_pauli(c, True, num_spin_orbs)
-                            operator = operator * a_spin_pauli(k, False, num_spin_orbs)
-                            operator = operator * a_spin_pauli(j, False, num_spin_orbs)
-                            operator = operator * a_spin_pauli(i, False, num_spin_orbs)
-                            yield theta_idx, a, i, b, j, c, k, operator
+                            yield a, i, b, j, c, k
 
 
 def iterate_t4(
     active_occ_spin_idx: list[int],
     active_unocc_spin_idx: list[int],
-    num_spin_orbs: int,
-    is_spin_conserving: bool,
-) -> Generator[tuple[int, int, int, int, int, int, int, int, int, OperatorPauli], None, None]:
-    """Iterate over T4 operators.
+) -> Generator[tuple[int, int, int, int, int, int, int, int], None, None]:
+    """Iterate over T4 spin-conserving operators.
 
     Args:
         active_occ_idx: Spin indices of strongly occupied orbitals.
         active_unocc_idx: Spin indices of weakly occupied orbitals.
-        num_spin_orbs: Number of spin orbitals.
-        is_spin_conserving: Make spin conserving operators.
 
     Returns:
         T4 operator iteration.
     """
-    theta_idx = -1
     for idx_a, a in enumerate(active_unocc_spin_idx):
         for idx_b, b in enumerate(active_unocc_spin_idx[idx_a + 1 :], idx_a + 1):
             for idx_c, c in enumerate(active_unocc_spin_idx[idx_b + 1 :], idx_b + 1):
@@ -596,54 +342,39 @@ def iterate_t4(
                                     else:
                                         num_beta += 1
                                     if i % 2 == 0:
-                                        num_alpha += 1
+                                        num_alpha -= 1
                                     else:
-                                        num_beta += 1
+                                        num_beta -= 1
                                     if j % 2 == 0:
-                                        num_alpha += 1
+                                        num_alpha -= 1
                                     else:
-                                        num_beta += 1
+                                        num_beta -= 1
                                     if k % 2 == 0:
-                                        num_alpha += 1
+                                        num_alpha -= 1
                                     else:
-                                        num_beta += 1
+                                        num_beta -= 1
                                     if l % 2 == 0:
-                                        num_alpha += 1
+                                        num_alpha -= 1
                                     else:
-                                        num_beta += 1
-                                    if (num_alpha % 2 != 0 or num_beta % 2 != 0) and is_spin_conserving:
+                                        num_beta -= 1
+                                    if num_alpha != 0 or num_beta != 0:
                                         continue
-                                    theta_idx += 1
-                                    operator = a_spin_pauli(a, True, num_spin_orbs) * a_spin_pauli(
-                                        b, True, num_spin_orbs
-                                    )
-                                    operator = operator * a_spin_pauli(c, True, num_spin_orbs)
-                                    operator = operator * a_spin_pauli(d, True, num_spin_orbs)
-                                    operator = operator * a_spin_pauli(l, False, num_spin_orbs)
-                                    operator = operator * a_spin_pauli(k, False, num_spin_orbs)
-                                    operator = operator * a_spin_pauli(j, False, num_spin_orbs)
-                                    operator = operator * a_spin_pauli(i, False, num_spin_orbs)
-                                    yield theta_idx, a, i, b, j, c, k, d, l, operator
+                                    yield a, i, b, j, c, k, d, l
 
 
 def iterate_t5(
     active_occ_spin_idx: list[int],
     active_unocc_spin_idx: list[int],
-    num_spin_orbs: int,
-    is_spin_conserving: bool,
-) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int, int, OperatorPauli], None, None]:
-    """Iterate over T5 operators.
+) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int], None, None]:
+    """Iterate over T5 spin-conserving operators.
 
     Args:
         active_occ_idx: Spin indices of strongly occupied orbitals.
         active_unocc_idx: Spin indices of weakly occupied orbitals.
-        num_spin_orbs: Number of spin orbitals.
-        is_spin_conserving: Make spin conserving operators.
 
     Returns:
         T5 operator iteration.
     """
-    theta_idx = -1
     for idx_a, a in enumerate(active_unocc_spin_idx):
         for idx_b, b in enumerate(active_unocc_spin_idx[idx_a + 1 :], idx_a + 1):
             for idx_c, c in enumerate(active_unocc_spin_idx[idx_b + 1 :], idx_b + 1):
@@ -677,64 +408,43 @@ def iterate_t5(
                                             else:
                                                 num_beta += 1
                                             if i % 2 == 0:
-                                                num_alpha += 1
+                                                num_alpha -= 1
                                             else:
-                                                num_beta += 1
+                                                num_beta -= 1
                                             if j % 2 == 0:
-                                                num_alpha += 1
+                                                num_alpha -= 1
                                             else:
-                                                num_beta += 1
+                                                num_beta -= 1
                                             if k % 2 == 0:
-                                                num_alpha += 1
+                                                num_alpha -= 1
                                             else:
-                                                num_beta += 1
+                                                num_beta -= 1
                                             if l % 2 == 0:
-                                                num_alpha += 1
+                                                num_alpha -= 1
                                             else:
-                                                num_beta += 1
+                                                num_beta -= 1
                                             if m % 2 == 0:
-                                                num_alpha += 1
+                                                num_alpha -= 1
                                             else:
-                                                num_beta += 1
-                                            if (
-                                                num_alpha % 2 != 0 or num_beta % 2 != 0
-                                            ) and is_spin_conserving:
+                                                num_beta -= 1
+                                            if num_alpha != 0 or num_beta != 0:
                                                 continue
-                                            theta_idx += 1
-                                            operator = a_spin_pauli(a, True, num_spin_orbs) * a_spin_pauli(
-                                                b, True, num_spin_orbs
-                                            )
-                                            operator = operator * a_spin_pauli(c, True, num_spin_orbs)
-                                            operator = operator * a_spin_pauli(d, True, num_spin_orbs)
-                                            operator = operator * a_spin_pauli(e, True, num_spin_orbs)
-                                            operator = operator * a_spin_pauli(l, False, num_spin_orbs)
-                                            operator = operator * a_spin_pauli(k, False, num_spin_orbs)
-                                            operator = operator * a_spin_pauli(j, False, num_spin_orbs)
-                                            operator = operator * a_spin_pauli(i, False, num_spin_orbs)
-                                            operator = operator * a_spin_pauli(m, False, num_spin_orbs)
-                                            yield theta_idx, a, i, b, j, c, k, d, l, e, m, operator
+                                            yield a, i, b, j, c, k, d, l, e, m
 
 
 def iterate_t6(
     active_occ_spin_idx: list[int],
     active_unocc_spin_idx: list[int],
-    num_spin_orbs: int,
-    is_spin_conserving: bool,
-) -> Generator[
-    tuple[int, int, int, int, int, int, int, int, int, int, int, int, int, OperatorPauli], None, None
-]:
-    """Iterate over T6 operators.
+) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int, int, int], None, None]:
+    """Iterate over T6 spin-conserving operators.
 
     Args:
         active_occ_idx: Spin indices of strongly occupied orbitals.
         active_unocc_idx: Spin indices of weakly occupied orbitals.
-        num_spin_orbs: Number of spin orbitals.
-        is_spin_conserving: Make spin conserving operators.
 
     Returns:
         T6 operator iteration.
     """
-    theta_idx = -1
     for idx_a, a in enumerate(active_unocc_spin_idx):
         for idx_b, b in enumerate(active_unocc_spin_idx[idx_a + 1 :], idx_a + 1):
             for idx_c, c in enumerate(active_unocc_spin_idx[idx_b + 1 :], idx_b + 1):
@@ -778,166 +488,158 @@ def iterate_t6(
                                                     else:
                                                         num_beta += 1
                                                     if i % 2 == 0:
-                                                        num_alpha += 1
+                                                        num_alpha -= 1
                                                     else:
-                                                        num_beta += 1
+                                                        num_beta -= 1
                                                     if j % 2 == 0:
-                                                        num_alpha += 1
+                                                        num_alpha -= 1
                                                     else:
-                                                        num_beta += 1
+                                                        num_beta -= 1
                                                     if k % 2 == 0:
-                                                        num_alpha += 1
+                                                        num_alpha -= 1
                                                     else:
-                                                        num_beta += 1
+                                                        num_beta -= 1
                                                     if l % 2 == 0:
-                                                        num_alpha += 1
+                                                        num_alpha -= 1
                                                     else:
-                                                        num_beta += 1
+                                                        num_beta -= 1
                                                     if m % 2 == 0:
-                                                        num_alpha += 1
+                                                        num_alpha -= 1
                                                     else:
-                                                        num_beta += 1
+                                                        num_beta -= 1
                                                     if n % 2 == 0:
-                                                        num_alpha += 1
+                                                        num_alpha -= 1
                                                     else:
-                                                        num_beta += 1
-                                                    if (
-                                                        num_alpha % 2 != 0 or num_beta % 2 != 0
-                                                    ) and is_spin_conserving:
+                                                        num_beta -= 1
+                                                    if num_alpha != 0 or num_beta != 0:
                                                         continue
-                                                    theta_idx += 1
-                                                    operator = a_spin_pauli(
-                                                        a, True, num_spin_orbs
-                                                    ) * a_spin_pauli(b, True, num_spin_orbs)
-                                                    operator = operator * a_spin_pauli(c, True, num_spin_orbs)
-                                                    operator = operator * a_spin_pauli(d, True, num_spin_orbs)
-                                                    operator = operator * a_spin_pauli(e, True, num_spin_orbs)
-                                                    operator = operator * a_spin_pauli(f, True, num_spin_orbs)
-                                                    operator = operator * a_spin_pauli(
-                                                        l, False, num_spin_orbs
-                                                    )
-                                                    operator = operator * a_spin_pauli(
-                                                        k, False, num_spin_orbs
-                                                    )
-                                                    operator = operator * a_spin_pauli(
-                                                        j, False, num_spin_orbs
-                                                    )
-                                                    operator = operator * a_spin_pauli(
-                                                        i, False, num_spin_orbs
-                                                    )
-                                                    operator = operator * a_spin_pauli(
-                                                        m, False, num_spin_orbs
-                                                    )
-                                                    operator = operator * a_spin_pauli(
-                                                        n, False, num_spin_orbs
-                                                    )
-                                                    yield theta_idx, a, i, b, j, c, k, d, l, e, m, f, n, operator
+                                                    yield a, i, b, j, c, k, d, l, e, m, f, n
 
 
 def construct_ucc_u(
-    num_spin_orbs: int,
+    num_det: int,
+    num_active_orbs: int,
+    num_elec_alpha: int,
+    num_elec_beta: int,
     theta: Sequence[float],
     theta_picker: ThetaPicker,
     excitations: str,
-    allowed_states: np.ndarray | None = None,
-    use_csr: int = 10,
 ) -> np.ndarray:
     """Contruct unitary transformation matrix.
 
     Args:
-       num_spin_orbs: Number of spin orbitals.
-       theta: Active-space parameters.
-              Ordered as (S, D, T, ...).
-       theta_picker: Helper class to pick the parameters in the right order.
-       excitations: Excitation orders to include.
-       allowed_states: Allowed states to consider in the state-vector.
-       use_csr: Use sparse matrices after n spin orbitals.
+        num_det: Number of determinants.
+        num_active_orbs: Number of active spatial orbitals.
+        num_elec_alpha: Number of active alpha electrons.
+        num_elec_beta: Number of active beta electrons.
+        theta: Active-space parameters.
+               Ordered as (S, D, T, ...).
+        theta_picker: Helper class to pick the parameters in the right order.
+        excitations: Excitation orders to include.
 
     Returns:
         Unitary transformation matrix.
     """
-    if num_spin_orbs >= use_csr:
-        t = ss.csr_matrix((2**num_spin_orbs, 2**num_spin_orbs))
-    else:
-        t = np.zeros((2**num_spin_orbs, 2**num_spin_orbs))
+    T = np.zeros((num_det, num_det))
     counter = 0
     if "s" in excitations:
-        for _, a, i, operator in theta_picker.get_t1_generator_sa_matrix(num_spin_orbs, use_csr=use_csr):
+        for a, i, _ in theta_picker.get_t1_generator_sa():
             if theta[counter] != 0.0:
-                t += theta[counter] * operator
+                T += (
+                    theta[counter]
+                    * T1_sa_matrix(i, a, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+                )
             counter += 1
     if "d" in excitations:
-        for _, a, i, b, j, operator in theta_picker.get_t2_generator_sa_matrix(
-            num_spin_orbs, use_csr=use_csr
-        ):
+        for a, i, b, j, _, type_idx in theta_picker.get_t2_generator_sa():
             if theta[counter] != 0.0:
-                t += theta[counter] * operator
+                if type_idx == 1:
+                    T += (
+                        theta[counter]
+                        * T2_1_sa_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+                    )
+                elif type_idx == 2:
+                    T += (
+                        theta[counter]
+                        * T2_2_sa_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+                    )
+                else:
+                    raise ValueError(f"Expected type_idx to be in (1,2) got {type_idx}")
             counter += 1
     if "t" in excitations:
-        for _, a, i, b, j, c, k, _ in theta_picker.get_t3_generator(0):
+        for a, i, b, j, c, k in theta_picker.get_t3_generator():
             if theta[counter] != 0.0:
-                tmp = a_op_spin_matrix(a, True, num_spin_orbs, use_csr=use_csr).dot(
-                    a_op_spin_matrix(b, True, num_spin_orbs, use_csr=use_csr)
+                T += (
+                    theta[counter]
+                    * T3_matrix(i, j, k, a, b, c, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
                 )
-                tmp = tmp.dot(a_op_spin_matrix(c, True, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(k, False, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(j, False, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, use_csr=use_csr))
-                t += theta[counter] * tmp
             counter += 1
     if "q" in excitations:
-        for _, a, i, b, j, c, k, d, l, _ in theta_picker.get_t4_generator(0):
+        for a, i, b, j, c, k, d, l in theta_picker.get_t4_generator():
             if theta[counter] != 0.0:
-                tmp = a_op_spin_matrix(a, True, num_spin_orbs, use_csr=use_csr).dot(
-                    a_op_spin_matrix(b, True, num_spin_orbs, use_csr=use_csr)
+                T += (
+                    theta[counter]
+                    * T4_matrix(
+                        i,
+                        j,
+                        k,
+                        l,
+                        a,
+                        b,
+                        c,
+                        d,
+                        num_active_orbs,
+                        num_elec_alpha,
+                        num_elec_beta,
+                    ).todense()
                 )
-                tmp = tmp.dot(a_op_spin_matrix(c, True, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(d, True, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(l, False, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(k, False, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(j, False, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, use_csr=use_csr))
-                t += theta[counter] * tmp
             counter += 1
     if "5" in excitations:
-        for _, a, i, b, j, c, k, d, l, e, m, _ in theta_picker.get_t5_generator(0):
+        for a, i, b, j, c, k, d, l, e, m in theta_picker.get_t5_generator():
             if theta[counter] != 0.0:
-                tmp = a_op_spin_matrix(a, True, num_spin_orbs, use_csr=use_csr).dot(
-                    a_op_spin_matrix(b, True, num_spin_orbs, use_csr=use_csr)
+                T += (
+                    theta[counter]
+                    * T5_matrix(
+                        i,
+                        j,
+                        k,
+                        l,
+                        m,
+                        a,
+                        b,
+                        c,
+                        d,
+                        e,
+                        num_active_orbs,
+                        num_elec_alpha,
+                        num_elec_beta,
+                    ).todense()
                 )
-                tmp = tmp.dot(a_op_spin_matrix(c, True, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(d, True, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(e, True, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(l, False, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(k, False, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(j, False, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(m, False, num_spin_orbs, use_csr=use_csr))
-                t += theta[counter] * tmp
             counter += 1
     if "6" in excitations:
-        for _, a, i, b, j, c, k, d, l, e, m, f, n, _ in theta_picker.get_t6_generator(0):
+        for a, i, b, j, c, k, d, l, e, m, f, n in theta_picker.get_t6_generator():
             if theta[counter] != 0.0:
-                tmp = a_op_spin_matrix(a, True, num_spin_orbs, use_csr=use_csr).dot(
-                    a_op_spin_matrix(b, True, num_spin_orbs, use_csr=use_csr)
+                T += (
+                    theta[counter]
+                    * T6_matrix(
+                        i,
+                        j,
+                        k,
+                        l,
+                        m,
+                        n,
+                        a,
+                        b,
+                        c,
+                        d,
+                        e,
+                        f,
+                        num_active_orbs,
+                        num_elec_alpha,
+                        num_elec_beta,
+                    ).todense()
                 )
-                tmp = tmp.dot(a_op_spin_matrix(c, True, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(d, True, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(e, True, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(f, True, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(l, False, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(k, False, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(j, False, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(i, False, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(m, False, num_spin_orbs, use_csr=use_csr))
-                tmp = tmp.dot(a_op_spin_matrix(n, False, num_spin_orbs, use_csr=use_csr))
-                t += theta[counter] * tmp
             counter += 1
     assert counter == len(theta)
-
-    T = t - t.conjugate().transpose()
-    if allowed_states is not None:
-        T = T[allowed_states, :]
-        T = T[:, allowed_states]
-    A = lw.expm(T)
+    A = scipy.linalg.expm(T)
     return A

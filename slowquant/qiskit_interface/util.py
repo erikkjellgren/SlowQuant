@@ -1,9 +1,11 @@
 import numpy as np
 from qiskit import QuantumCircuit
-from qiskit.quantum_info import Pauli, PauliList
+from qiskit.quantum_info import Pauli
+from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
+from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 
 
-def to_CBS_measurement(op: PauliList) -> QuantumCircuit:
+def to_CBS_measurement(op: str) -> QuantumCircuit:
     r"""Convert a Pauli string to Pauli measurement circuit.
 
     This is achived by the following transformation:
@@ -17,19 +19,19 @@ def to_CBS_measurement(op: PauliList) -> QuantumCircuit:
         \end{align}
 
     Args:
-        op: Pauli string operator.
+        op: Pauli string.
 
     Returns:
         Pauli measuremnt quantum circuit.
     """
     num_qubits = len(op)
     qc = QuantumCircuit(num_qubits)
-    for i, pauli in enumerate(op):
-        if pauli == Pauli("X"):
-            qc.append(pauli, [i])
+    for i, pauli in enumerate(op[::-1]):
+        if pauli == "X":
+            qc.append(Pauli("X"), [i])
             qc.h(i)
-        elif pauli == Pauli("Y"):
-            qc.append(pauli, [i])
+        elif pauli == "Y":
+            qc.append(Pauli("Y"), [i])
             qc.sdg(i)
             qc.h(i)
     return qc
@@ -94,7 +96,7 @@ class CliqueHead:
 class Clique:
     """Clique class.
 
-    #. https://ieeexplore.ieee.org/abstract/document/9259964, Sec. III A, III B, and VI
+    #. 10.1109/TQE.2020.3035814, Sec. IV. A, IV. B, and VIII.
     """
 
     def __init__(self) -> None:
@@ -215,7 +217,7 @@ def correct_distribution(dist: dict[str, float], M: np.ndarray) -> dict[str, flo
 
     Args:
         dist: Quasi-distribution.
-        M:    Correlation martix.
+        M: Correlation martix.
 
     Returns:
         Quasi-distribution corrected by correlation matrix.
@@ -232,3 +234,113 @@ def correct_distribution(dist: dict[str, float], M: np.ndarray) -> dict[str, flo
         idx = int(bitstring[::-1], 2)
         dist[bitstring] = C_new[idx]
     return dist
+
+
+def postselection(
+    dist: dict[str, float], mapper: FermionicMapper, num_elec: tuple[int, int]
+) -> dict[str, float]:
+    r"""Perform post-selection on distribution in computational basis.
+
+    For the Jordan-Wigner mapper the post-selection ensure that,
+
+    .. math::
+        \text{sum}\left(\left|\alpha\right>\right) = N_\alpha
+
+    and,
+
+    .. math::
+        \text{sum}\left(\left|\beta\right>\right) = N_\beta
+
+    For the Parity mapper it is counted how many times bitstring changes between 0 and 1.
+    For the bitstring :math:`\left|01\right>` the counting is done by padding the string before counting.
+    I.e.
+
+    .. math::
+        \left|01\right> \rightarrow 0\left|01\right>p
+
+    Where :math:`p` is zero for even number of electrons and one for odd number of electrons.
+    This counting is done independtly for the :math:`\alpha` part and :math:`\beta` part.
+
+    Args:
+        dist: Measured quasi-distribution.
+        mapper: Fermionic to qubit mapper.
+        num_elec: Number of electrons (alpha, beta).
+
+    Returns:
+        Post-selected distribution.
+    """
+    new_dist = {}
+    prob_sum = 0.0
+    if isinstance(mapper, JordanWignerMapper):
+        for bitstr, val in dist.items():
+            num_a = len(bitstr) // 2
+            # Remember that in Qiskit notation you read |0101> from right to left.
+            bitstr_a = bitstr[num_a:]
+            bitstr_b = bitstr[:num_a]
+            if bitstr_a.count("1") == num_elec[0] and bitstr_b.count("1") == num_elec[1]:
+                new_dist[bitstr] = val
+                prob_sum += val
+    elif isinstance(mapper, ParityMapper):
+        for bitstr, val in dist.items():
+            num_a = len(bitstr) // 2
+            bitstr_a = bitstr[num_a:]
+            bitstr_b = bitstr[:num_a]
+            current_parity = "0"
+            change_counter = 0
+            for bit in bitstr_a:
+                if bit != current_parity:
+                    current_parity = bit
+                    change_counter += 1
+            if current_parity == "1" and num_elec[0] % 2 == 0:
+                change_counter += 1
+            elif current_parity == "0" and num_elec[0] % 2 == 1:
+                change_counter += 1
+            if change_counter != num_elec[0]:
+                break
+            current_parity = "0"
+            change_counter = 0
+            for bit in bitstr_b:
+                if bit != current_parity:
+                    current_parity = bit
+                    change_counter += 1
+            if current_parity == "1" and num_elec[1] % 2 == 0:
+                change_counter += 1
+            elif current_parity == "0" and num_elec[1] % 2 == 1:
+                change_counter += 1
+            if change_counter != num_elec[1]:
+                break
+            new_dist[bitstr] = val
+            prob_sum += val
+    else:
+        raise ValueError(f"Post-selection only supported for JW and parity mapper got, {type(mapper)}")
+    # Renormalize distribution
+    for bitstr, val in new_dist.items():
+        new_dist[bitstr] = val / prob_sum
+    return new_dist
+
+
+def f2q(i: int, num_orbs: int) -> int:
+    r"""Convert fermionic index to qubit index.
+
+    The fermionic index is assumed to follow the convention,
+
+    .. math::
+        \left|0_\alpha 0_\beta 1_\alpha 1_\beta ... N_\alpha N_\beta\right>
+
+    The qubit index follows,
+
+    .. math::
+       \left|0_\alpha 1_\alpha ... N_\alpha 0_\beta 1_\beta ... N_\beta\right>
+
+    This function assumes Jordan-Wigner mapping.
+
+    Args:
+        i: Fermionic index.
+        num_orbs: Number of spatial orbitals.
+
+    Returns:
+        Qubit index.
+    """
+    if i % 2 == 0:
+        return i // 2
+    return i // 2 + num_orbs

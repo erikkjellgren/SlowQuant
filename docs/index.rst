@@ -12,8 +12,7 @@ SlowQuant
    :caption: Qiskit Interface:
 
    autodoc/qiskit_interface.rst
-   autodoc/qiskit_base.rst
-   autodoc/qiskit_operators.rst
+   autodoc/qiskit_util.rst
    autodoc/qiskit_operators_circuits.rst
    autodoc/qiskit_wavefunction.rst
    autodoc/qiskit_linear_response.rst
@@ -26,7 +25,7 @@ SlowQuant
 
    autodoc/unitary_coupled_cluster_wf.rst
    autodoc/unitary_coupled_cluster_lr.rst
-   autodoc/unitary_coupled_cluster_base.rst
+   autodoc/unitary_coupled_cluster_util.rst
 
 .. toctree::
    :maxdepth: 2

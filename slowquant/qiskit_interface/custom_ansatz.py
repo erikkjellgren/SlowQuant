@@ -6,115 +6,13 @@ from qiskit_nature.second_q.circuit.library import HartreeFock
 from qiskit_nature.second_q.mappers import JordanWignerMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 
-from slowquant.qiskit_interface.operators_circuits import tups_double, tups_single
-
-
-def ErikD_JW():
-    """UCCD(2,2) circuit for JW.
-
-    Gate count, cx: 3, u: 3
-
-    .. code-block::
-
-             ┌──────────┐               ┌───┐
-        q_0: ┤ Ry(2*p1) ├──■────■────■──┤ X ├
-             └──────────┘┌─┴─┐  │    │  └───┘
-        q_1: ────────────┤ X ├──┼────┼───────
-                ┌───┐    └───┘┌─┴─┐  │
-        q_2: ───┤ X ├─────────┤ X ├──┼───────
-                └───┘         └───┘┌─┴─┐
-        q_3: ──────────────────────┤ X ├─────
-                                   └───┘
-    """
-    p1 = Parameter("p1")
-    qc = QuantumCircuit(4)
-    qc.ry(2 * p1, 0)
-    qc.x(2)
-    qc.cx(0, 1)
-    qc.cx(0, 2)
-    qc.cx(0, 3)
-    qc.x(0)
-    return qc
-
-
-def ErikSD_JW():
-    """UCCSD(2,2) circuit for JW.
-
-    Gate count, cx: 8, u: 7
-
-    .. code-block::
-
-             ┌──────────────┐                  ┌───┐┌───┐
-        q_0: ┤ Ry(2*p1 + π) ├────────■─────────┤ X ├┤ X ├──■───────────────────■───────
-             └──────────────┘        │         └───┘└─┬─┘┌─┴─┐                 │  ┌───┐
-        q_1: ────────────────────────┼────────────────┼──┤ X ├──■─────────■────┼──┤ X ├
-                             ┌───────┴────────┐┌───┐  │  └───┘┌─┴─┐       │  ┌─┴─┐└───┘
-        q_2: ────────────────┤ Ry(2*p2 - π/2) ├┤ H ├──■───────┤ X ├──■────┼──┤ X ├─────
-                             └────────────────┘└───┘          └───┘┌─┴─┐┌─┴─┐├───┤
-        q_3: ──────────────────────────────────────────────────────┤ X ├┤ X ├┤ X ├─────
-                                                                   └───┘└───┘└───┘
-    """
-    p1 = Parameter("p1")
-    p2 = Parameter("p2")
-    qc = QuantumCircuit(4)
-    qc.ry(np.pi + 2 * p1, 0)
-    qc.cry(-np.pi / 2 + 2 * p2, 0, 2)
-    qc.x(0)
-    qc.h(2)
-    qc.cx(2, 0)
-    qc.cx(0, 1)
-    qc.cx(1, 2)
-    qc.cx(2, 3)
-    qc.cx(1, 3)
-    qc.x(1)
-    qc.cx(0, 2)
-    qc.x(3)
-    return qc
-
-
-def ErikD_Parity():
-    """UCCD(2,2) circuit for Parity.
-
-    Gate count, cx: 1, u: 2
-
-    .. code-block::
-
-             ┌──────────┐     ┌───┐
-        q_0: ┤ Ry(2*p1) ├──■──┤ X ├
-             └──────────┘┌─┴─┐└───┘
-        q_1: ────────────┤ X ├─────
-                         └───┘
-
-    """
-    p1 = Parameter("p1")
-    qc = QuantumCircuit(2)
-    qc.ry(2 * p1, 0)
-    qc.cx(0, 1)
-    qc.x(0)
-    return qc
-
-
-def ErikSD_Parity():
-    """UCCSD(2,2) circuit for Parity.
-
-    Gate count, cx: 3, u: 4
-
-    .. code-block::
-
-             ┌──────────────┐                       ┌───┐
-        q_0: ┤ Ry(2*p1 + π) ├────────■──────────────┤ X ├
-             └──────────────┘┌───────┴────────┐┌───┐└─┬─┘
-        q_1: ────────────────┤ Ry(π/2 - 2*p2) ├┤ H ├──■──
-                             └────────────────┘└───┘
-    """
-    p1 = Parameter("p1")
-    p2 = Parameter("p2")
-    qc = QuantumCircuit(2)
-    qc.ry(np.pi + 2 * p1, 0)
-    qc.cry(np.pi / 2 - 2 * p2, 0, 1)
-    qc.h(1)
-    qc.cx(1, 0)
-    return qc
+from slowquant.qiskit_interface.operators_circuits import (
+    double_excitation,
+    single_excitation,
+    tups_double,
+    tups_single,
+)
+from slowquant.unitary_coupled_cluster.util import iterate_t1, iterate_t2
 
 
 def tUPS(
@@ -123,7 +21,7 @@ def tUPS(
     mapper: FermionicMapper,
     ansatz_options: dict[str, Any],
 ) -> tuple[QuantumCircuit, dict[str, int]]:
-    r"""tUPS ansatz.
+    """tUPS ansatz.
 
     #. 10.48550/arXiv.2312.09761
 
@@ -134,6 +32,7 @@ def tUPS(
     Args:
         num_orbs: Number of spatial orbitals.
         num_elec: Number of alpha and beta electrons.
+        mapper: Fermionic to qubit mapper.
         ansatz_options: Ansatz options.
 
     Returns:
@@ -197,4 +96,47 @@ def tUPS(
             qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx}"))
             grad_param_R[f"p{idx}"] = 4
             idx += 1
+    return qc, grad_param_R
+
+
+def fUCCSD(
+    num_orbs: int,
+    num_elec: tuple[int, int],
+    mapper: FermionicMapper,
+) -> tuple[QuantumCircuit, dict[str, int]]:
+    """Factorized UCCSD ansatz.
+
+    #. 10.1103/PhysRevA.102.062612
+
+    Args:
+        num_orbs: Number of spatial orbitals.
+        num_elec: Number of alpha and beta electrons.
+        mapper: Fermioinc to qubit mapper.
+
+    Returns:
+        Factorized UCCSD ansatz circuit and R parameters needed for gradients.
+    """
+    if not isinstance(mapper, JordanWignerMapper):
+        raise ValueError(f"efficientUCCSD only implemented for JW mapper, got: {type(mapper)}")
+    num_spin_orbs = 2 * num_orbs
+    occ = []
+    unocc = []
+    idx = 0
+    for _ in range(np.sum(num_elec)):
+        occ.append(idx)
+        idx += 1
+    for _ in range(num_spin_orbs - np.sum(num_elec)):
+        unocc.append(idx)
+        idx += 1
+    qc = HartreeFock(num_orbs, num_elec, mapper)
+    grad_param_R = {}
+    idx = 0
+    for a, i in iterate_t1(occ, unocc):
+        qc = single_excitation(a, i, num_orbs, qc, Parameter(f"p{idx}"))
+        grad_param_R[f"p{idx}"] = 2
+        idx += 1
+    for a, i, b, j in iterate_t2(occ, unocc):
+        qc = double_excitation(a, b, i, j, num_orbs, qc, Parameter(f"p{idx}"))
+        grad_param_R[f"p{idx}"] = 2
+        idx += 1
     return qc, grad_param_R
