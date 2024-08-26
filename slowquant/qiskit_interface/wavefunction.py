@@ -5,7 +5,8 @@ from functools import partial
 
 import numpy as np
 import scipy
-from qiskit.primitives import BaseEstimator, BaseSampler
+from qiskit import QuantumCircuit
+from qiskit.primitives import BaseEstimator, BaseEstimatorV2, BaseSampler, BaseSamplerV2
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_algorithms.optimizers import COBYLA, L_BFGS_B, SLSQP, SPSA
 
@@ -13,7 +14,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
     two_electron_integral_transform,
 )
-from slowquant.qiskit_interface.interface import Clique, QuantumInterface
+from slowquant.qiskit_interface.interface import QuantumInterface
 from slowquant.qiskit_interface.optimizers import RotoSolve
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
@@ -51,6 +52,8 @@ class WaveFunction:
         """
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
+        if isinstance(quantum_interface.ansatz, QuantumCircuit):
+            print("WARNING: A QI with a custom Ansatz was passed. VQE will only work with COBYLA optimizer.")
         self._c_orthonormal = c_orthonormal
         self.h_ao = h_ao
         self.g_ao = g_ao
@@ -278,13 +281,31 @@ class WaveFunction:
         self._energy_elec = None
         self.QI.parameters = parameters
 
-    def change_primitive(self, primitive: BaseEstimator | BaseSampler, verbose: bool = True) -> None:
+    def change_primitive(
+        self, primitive: BaseEstimator | BaseSampler | BaseSamplerV2, verbose: bool = True
+    ) -> None:
         """Change the primitive expectation value calculator.
 
         Args:
             primitive: Primitive object.
             verbose: Print more info.
         """
+        if verbose:
+            print(
+                "Using this function is only recommended for switching from ideal simulator to shot-noise or quantum hardware.\n \
+                Multiple switching back and forth can lead to un-expected outcomes and is an experimental feature.\n"
+            )
+
+        if isinstance(primitive, BaseEstimatorV2):
+            raise ValueError("EstimatorV2 is not currently supported.")
+        if isinstance(primitive, BaseSamplerV2) and verbose:
+            print("WARNING: Using SamplerV2 is an experimental feature.")
+        self.QI._primitive = primitive  # pylint: disable=protected-access
+        if verbose:
+            if self.QI.do_M_ansatz0:
+                print("Reset RDMs, energies, QI metrics, and correlation matrix.")
+            else:
+                print("Reset RDMs, energies, and QI metrics.")
         self._rdm1 = None
         self._rdm2 = None
         self._rdm3 = None
@@ -293,19 +314,24 @@ class WaveFunction:
         self.QI.total_device_calls = 0
         self.QI.total_shots_used = 0
         self.QI.total_paulis_evaluated = 0
-        self.QI.cliques = Clique()
-        self.QI._Minv = None  # pylint: disable=protected-access
-        self.QI._primitive = primitive  # pylint: disable=protected-access
-        # IMPORTANT: Shot number in primitive gets always overwritten if a shot number is defined in QI!
-        if self.QI.shots is not None and verbose:
-            print(
-                "Number of shots defined in new primitive are ignored as there is a number defined in the QI of ",
-                self.QI.shots,
-            )
-            print("If you want to change the number of shots, do this manually.")
-            print("Set the number of shots manually to None if you run an ideal simulator.")
-        self.QI.shots = self.QI.shots  # Redo shot check with new primitive
-        self.QI.ISA = self.QI.ISA  # Redo ISA parameter check
+
+        # Reset circuit and initiate re-transpiling
+        ISA_old = self.QI.ISA
+        self._reconstruct_circuit()  # Reconstruct circuit but keeping parameters
+        self.QI.ISA = ISA_old  # Redo ISA including transpilation if requested
+        self.QI.shots = self.QI.shots  # Redo shots parameter check
+
+        if verbose:
+            self.QI.get_info()
+
+    def _reconstruct_circuit(self) -> None:
+        """Construct circuit again."""
+        # force ISA = False
+        self.QI._ISA = False  # pylint: disable=protected-access
+        self.QI.construct_circuit(
+            self.num_active_orbs, (self.num_active_elec // 2, self.num_active_elec // 2)
+        )
+        self.QI._transpiled = False  # pylint: disable=protected-access
 
     @property
     def rdm1(self) -> np.ndarray:
@@ -722,7 +748,9 @@ class WaveFunction:
         Args:
             rdm_order: Max order RDM.
         """
-        if not isinstance(self.QI._primitive, BaseSampler):  # pylint: disable=protected-access
+        if not isinstance(
+            self.QI._primitive, (BaseSampler, BaseSamplerV2)  # pylint: disable=protected-access
+        ):
             raise TypeError(
                 f"This feature is only supported for Sampler got {type(self.QI._primitive)} from QuantumInterface"  # pylint: disable=protected-access
             )
@@ -862,6 +890,9 @@ class WaveFunction:
         """Run VQE of wave function."""
         global iteration  # pylint: disable=global-variable-undefined
         global start  # pylint: disable=global-variable-undefined
+
+        if isinstance(self.QI.ansatz, QuantumCircuit) and not ansatz_optimizer.lower() == "cobyla":
+            raise ValueError("Custom Ansatz in QI only works with COBYLA as optimizer")
 
         def print_progress(x, energy_func, silent: bool) -> None:
             """Print progress during energy minimization of wave function.
@@ -1027,6 +1058,9 @@ class WaveFunction:
         global start  # pylint: disable=global-variable-undefined
         iteration = 0  # type: ignore
         start = time.time()  # type: ignore
+
+        if isinstance(self.QI.ansatz, QuantumCircuit) and not optimizer_name.lower() == "cobyla":
+            raise ValueError("Custom Ansatz in QI only works with COBYLA as optimizer")
 
         def print_progress(x, energy_func) -> None:
             """Print progress during energy minimization of wave function.
