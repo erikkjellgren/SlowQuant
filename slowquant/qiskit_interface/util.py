@@ -5,7 +5,7 @@ from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 
 
-def to_CBS_measurement(op: str) -> QuantumCircuit:
+def to_CBS_measurement(op: str, transpiled: None | list[QuantumCircuit] = None) -> QuantumCircuit:
     r"""Convert a Pauli string to Pauli measurement circuit.
 
     This is achived by the following transformation:
@@ -20,24 +20,35 @@ def to_CBS_measurement(op: str) -> QuantumCircuit:
 
     Args:
         op: Pauli string.
+        transpiled: List of transpiled X and Y gate.
 
     Returns:
         Pauli measuremnt quantum circuit.
     """
-    num_qubits = len(op)
-    qc = QuantumCircuit(num_qubits)
-    for i, pauli in enumerate(op[::-1]):
-        if pauli == "X":
-            qc.append(Pauli("X"), [i])
-            qc.h(i)
-        elif pauli == "Y":
-            qc.append(Pauli("Y"), [i])
-            qc.sdg(i)
-            qc.h(i)
+    if transpiled is None:
+        num_qubits = len(op)
+        qc = QuantumCircuit(num_qubits)
+        for i, pauli in enumerate(op[::-1]):
+            if pauli == "X":
+                qc.append(Pauli("X"), [i])
+                qc.h(i)
+            elif pauli == "Y":
+                qc.append(Pauli("Y"), [i])
+                qc.sdg(i)
+                qc.h(i)
+    else:
+        num_qubits = len(op)
+        qc = QuantumCircuit(num_qubits)
+        for i, pauli in enumerate(op[::-1]):
+            if pauli == "X":
+                qc.compose(transpiled[0], [i], inplace=True)
+            elif pauli == "Y":
+                qc.compose(transpiled[1], [i], inplace=True)
+
     return qc
 
 
-def get_bitstring_sign(op: str, binary: str) -> int:
+def get_bitstring_sign(op: str, binary: int) -> int:
     r"""Convert Pauli string and bit-string measurement to expectation value.
 
     Takes Pauli String and a state in binary form and returns the sign based on the expectation value of the Pauli string with each single qubit state.
@@ -75,14 +86,14 @@ def get_bitstring_sign(op: str, binary: str) -> int:
     opbit = int(op.replace("I", "0").replace("Z", "1").replace("X", "1").replace("Y", "1"), 2)
     # There can only be sign change when the binary-string is 1.
     # Now a binary-and can be performed to calculate number of sign changes.
-    count = (opbit & int(binary, 2)).bit_count()
+    count = (opbit & binary).bit_count()
     if count % 2 == 1:
         return -1
     return 1
 
 
 class CliqueHead:
-    def __init__(self, head: str, distr: dict[str, float] | None) -> None:
+    def __init__(self, head: str, distr: dict[int, float] | None) -> None:
         """Initialize clique head dataclass.
 
         Args:
@@ -140,7 +151,7 @@ class Clique:
                 new_heads.append(clique_head.head)
         return new_heads
 
-    def update_distr(self, new_heads: list[str], new_distr: list[dict[str, float]]) -> None:
+    def update_distr(self, new_heads: list[str], new_distr: list[dict[int, float]]) -> None:
         """Update sample state distributions of clique heads.
 
         Args:
@@ -161,7 +172,7 @@ class Clique:
             if clique_head.distr is None:
                 raise ValueError(f"Head, {clique_head.head}, has a distr that is None")
 
-    def get_distr(self, pauli: str) -> dict[str, float]:
+    def get_distr(self, pauli: str) -> dict[int, float]:
         """Get sample state distribution for a Pauli string.
 
         Args:
@@ -212,7 +223,7 @@ def fit_in_clique(pauli: str, head: str) -> tuple[bool, str]:
     return is_commuting, new_head
 
 
-def correct_distribution(dist: dict[str, float], M: np.ndarray) -> dict[str, float]:
+def correct_distribution(dist: dict[int, float], M: np.ndarray) -> dict[int, float]:
     r"""Corrects a quasi-distribution of bitstrings based on a correlation matrix in statevector notation.
 
     Args:
@@ -224,21 +235,19 @@ def correct_distribution(dist: dict[str, float], M: np.ndarray) -> dict[str, flo
     """
     C = np.zeros(np.shape(M)[0])
     # Convert bitstring distribution to columnvector of probabilities
-    for bitstring, prob in dist.items():
-        idx = int(bitstring[::-1], 2)
-        C[idx] = prob
+    for bitint, prob in dist.items():
+        C[bitint] = prob
     # Apply M error mitigation matrix
     C_new = M @ C
     # Convert columnvector of probabilities to bitstring distribution
-    for bitstring, prob in dist.items():
-        idx = int(bitstring[::-1], 2)
-        dist[bitstring] = C_new[idx]
+    for bitint, prob in dist.items():
+        dist[bitint] = C_new[bitint]
     return dist
 
 
 def postselection(
-    dist: dict[str, float], mapper: FermionicMapper, num_elec: tuple[int, int]
-) -> dict[str, float]:
+    dist: dict[int, float], mapper: FermionicMapper, num_elec: tuple[int, int]
+) -> dict[int, float]:
     r"""Perform post-selection on distribution in computational basis.
 
     For the Jordan-Wigner mapper the post-selection ensure that,
@@ -272,16 +281,18 @@ def postselection(
     new_dist = {}
     prob_sum = 0.0
     if isinstance(mapper, JordanWignerMapper):
-        for bitstr, val in dist.items():
+        for bitint, val in dist.items():
+            bitstr = bin(bitint)[2:]
             num_a = len(bitstr) // 2
             # Remember that in Qiskit notation you read |0101> from right to left.
             bitstr_a = bitstr[num_a:]
             bitstr_b = bitstr[:num_a]
             if bitstr_a.count("1") == num_elec[0] and bitstr_b.count("1") == num_elec[1]:
-                new_dist[bitstr] = val
+                new_dist[int(bitstr, 2)] = val
                 prob_sum += val
     elif isinstance(mapper, ParityMapper):
-        for bitstr, val in dist.items():
+        for bitint, val in dist.items():
+            bitstr = bin(bitint)[2:]
             num_a = len(bitstr) // 2
             bitstr_a = bitstr[num_a:]
             bitstr_b = bitstr[:num_a]
@@ -309,13 +320,13 @@ def postselection(
                 change_counter += 1
             if change_counter != num_elec[1]:
                 break
-            new_dist[bitstr] = val
+            new_dist[int(bitstr, 2)] = val
             prob_sum += val
     else:
         raise ValueError(f"Post-selection only supported for JW and parity mapper got, {type(mapper)}")
     # Renormalize distribution
-    for bitstr, val in new_dist.items():
-        new_dist[bitstr] = val / prob_sum
+    for bitint, val in new_dist.items():
+        new_dist[bitint] = val / prob_sum
     return new_dist
 
 

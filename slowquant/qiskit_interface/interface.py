@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 import copy
 import itertools
 import math
@@ -5,9 +6,11 @@ from typing import Any
 
 import numpy as np
 from qiskit import QuantumCircuit
-from qiskit.compiler import transpile
-from qiskit.primitives import BaseEstimator, BaseSampler
+from qiskit.circuit import ClassicalRegister
+from qiskit.primitives import BaseEstimator, BaseEstimatorV2, BaseSampler, BaseSamplerV2
 from qiskit.quantum_info import SparsePauliOp
+from qiskit.transpiler import PassManager
+from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFock
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
@@ -31,15 +34,15 @@ class QuantumInterface:
 
     def __init__(  # pylint: disable=dangerous-default-value
         self,
-        primitive: BaseEstimator | BaseSampler,
-        ansatz: str,
+        primitive: BaseEstimator | BaseSampler | BaseSamplerV2,
+        ansatz: str | QuantumCircuit,
         mapper: FermionicMapper,
         ISA: bool = False,
+        pass_manager: None | PassManager = None,
         ansatz_options: dict[str, Any] = {},
         shots: None | int = None,
         max_shots_per_run: int = 100000,
         do_M_mitigation: bool = False,
-        do_M_iqa: bool = False,
         do_M_ansatz0: bool = False,
         do_postselection: bool = True,
     ) -> None:
@@ -52,24 +55,33 @@ class QuantumInterface:
             ansatz_options: Ansatz options.
             mapper: Qiskit mapper object.
             ISA: Use ISA for submitting to IBM quantum. Locally transpiling is performed.
-            shots: Number of shots. If not specified use shotnumber from primitive (default).
+            pass_manager: Custom PassManager for transpilation.
+            shots: Number of shots. None means ideal simulator.
             max_shots_per_run: Maximum number of shots allowed in a single run. Set to 100000 per IBM machines.
             do_M_mitigation: Do error mitigation via read-out correlation matrix.
-            do_M_iqa: Use independent qubit approximation when constructing the read-out correlation matrix.
             do_M_ansatz0: Use the ansatz with theta=0 when constructing the read-out correlation matrix.
             do_postselection: Use postselection to preserve number of particles in the computational basis.
         """
         allowed_ansatz = ("tUCCSD", "tPUCCD", "tUCCD", "tUPS", "fUCCSD", "QNP", "kSAfUpCCGSD")
-        if ansatz not in allowed_ansatz:
-            raise ValueError("The chosen Ansatz is not available. Choose from: ", allowed_ansatz)
+        if not isinstance(ansatz, QuantumCircuit) and ansatz not in allowed_ansatz:
+            raise ValueError(
+                "The chosen Ansatz is not available. Choose from: ",
+                allowed_ansatz,
+                "or pass custom QuantumCircuit object",
+            )
+        if isinstance(primitive, BaseEstimatorV2):
+            raise TypeError("EstimatorV2 is not currently supported.")
+        if isinstance(primitive, BaseSamplerV2):
+            print("WARNING: Using SamplerV2 is an experimental feature.")
         self.ansatz = ansatz
-        self._primitive = primitive
-        self.mapper = mapper
-        self.ISA = ISA
+        self._transpiled = False  # Check if circuit has been transpiled
         self.max_shots_per_run = max_shots_per_run
+        self._primitive = primitive
+        self.ISA = ISA
         self.shots = shots
+        self.mapper = mapper
+        self.pass_manager = pass_manager
         self.do_M_mitigation = do_M_mitigation
-        self.do_M_iqa = do_M_iqa
         self.do_M_ansatz0 = do_M_ansatz0
         self._Minv = None
         self.total_shots_used = 0
@@ -80,6 +92,7 @@ class QuantumInterface:
         self._save_layout = False
         self._save_paulis = True  # hard switch to stop using Pauli saving (debugging tool).
         self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
+        self._M_shots = None  # define a separate number of shots for M
 
     def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int]) -> None:
         """Construct qiskit circuit.
@@ -95,7 +108,10 @@ class QuantumInterface:
             {}
         )  # Contains information about the parameterization needed for gradient evaluations.
 
-        if self.ansatz == "tUCCSD":
+        if isinstance(self.ansatz, QuantumCircuit):
+            print("QI was initialized with a custom QuantumCircuit object.")
+            self.circuit = self.ansatz
+        elif self.ansatz == "tUCCSD":
             if len(self.ansatz_options) != 0:
                 raise ValueError(f"No options available for tUCCSD got {self.ansatz_options}")
             self.circuit = UCCSD(
@@ -167,70 +183,107 @@ class QuantumInterface:
                     f"Got parameter name, {name}, that is not in grad_param_R, {self.grad_param_R}"
                 )
 
-        self.num_qubits = self.circuit.num_qubits
-        # Set parameter to HarteeFock
-        self._parameters = [0.0] * self.circuit.num_parameters
+        if not hasattr(self, "_parameters"):
+            # Set parameter to HarteeFock
+            self._parameters = [0.0] * self.circuit.num_parameters
 
     @property
     def ISA(self) -> bool:
         """Get ISA setting.
 
         Returns:
-            ISA setting.
+            ISA setting
         """
         return self._ISA
 
     @ISA.setter
-    def ISA(self, ISA) -> None:
-        """Set ISA and handle tranpile arguments.
+    def ISA(self, ISA: bool) -> None:
+        """Set ISA and handle transpile arguments.
 
         Args:
             ISA: ISA bool
         """
-        self._ISA = ISA
+        if isinstance(self._primitive, BaseSamplerV2):
+            print("ISA is set automatically to True for SamplerV2.")
+            self._ISA: bool = True
+        else:
+            self._ISA = ISA
 
-        if ISA:
-            # Get backend from primitive
+        if self._ISA:
+            # Get backend from primitive.
             if hasattr(self._primitive, "_backend"):
-                self._ISA_backend = self._primitive._backend  # pylint: disable=protected-access
-                name = self._ISA_backend.name
+                self._primitive_backend = self._primitive._backend  # pylint: disable=protected-access
             else:
-                self._ISA_backend = None
-                name = "None"
+                self._primitive_backend = None
 
-            # Get optimization level from backend
+            # Get optimization level from backend. Only for v1 primitives.
+            self._primitive_level = 3
             if hasattr(self._primitive, "_transpile_options") and hasattr(
                 self._primitive._transpile_options, "optimization_level"  # pylint: disable=protected-access
             ):
-                self._ISA_level = self._primitive._transpile_options[  # pylint: disable=protected-access
-                    "optimization_level"
-                ]
-            elif hasattr(self._primitive.options, "optimization_level"):
-                self._ISA_level = self._primitive.options["optimization_level"]
-            else:
-                self._ISA_level = 1
+                self._primitive_level = (
+                    self._primitive._transpile_options[  # pylint: disable=protected-access
+                        "optimization_level"
+                    ]
+                )
+            elif hasattr(self._primitive, "options"):
+                if hasattr(self._primitive.options, "optimization_level"):
+                    self._primitive_level = self._primitive.options["optimization_level"]
 
-            self._ISA_layout = None
+            # Check if circuit has been transpiled
+            # In case of switching to ISA in later workflow
+            if not self._transpiled and hasattr(self, "circuit"):
+                if self.pass_manager is None:
+                    # We have switched to ISA and had no PassManager before.
+                    # This will initialize the standard internal transpilation.
+                    self.pass_manager = None
+                elif self._internal_pm:
+                    # We have used internal PassManager before but re-transpilation was requested (probs via change_primitive in WF)
+                    self.pass_manager = None
+                self.circuit = self.circuit
 
-            print(f"ISA uses backend {name} with optimization level {self._ISA_level}")
+    @property
+    def pass_manager(self) -> None | PassManager:
+        """Get PassManager.
 
-    def _check_layout(self, circuit: QuantumCircuit) -> None:
-        """Check if transpiled layout has changed.
+        Returns:
+            PassManager
+        """
+        return self._pass_manager
+
+    @pass_manager.setter
+    def pass_manager(self, pass_manager: None | PassManager) -> None:
+        """Set PassManager.
 
         Args:
-            circuit: Circuit whose layout is to be checked.
+            pass_manager: PassManager object from Qiskit.
         """
-        if self._save_layout and circuit.layout is not None:
-            if self._ISA_layout is None:
-                self._ISA_layout = circuit.layout.final_index_layout()
-            else:
-                if not np.array_equal(self._ISA_layout, circuit.layout.final_index_layout()):
-                    print("WARNING: Transpiled layout has changed from readout error run.")
+        self._internal_pm = False
+        if pass_manager is not None and not self.ISA:
+            raise ValueError("You need to enable ISA if you want to use a custom PassManager.")
+        if pass_manager is None and self.ISA:
+            self._internal_pm = True
+            self._pass_manager: None | PassManager = generate_preset_pass_manager(
+                self._primitive_level, backend=self._primitive_backend
+            )
+            print(
+                f"You selected ISA but did not pass a PassManager. Standard internal transpilation will use backend {self._primitive_backend} with optimization level {self._primitive_level}"
+            )
+        else:
+            self._pass_manager = pass_manager
 
-    def redo_M_mitigation(self) -> None:
-        """Redo M_mitigation."""
-        self._ISA_layout = None
-        self._make_Minv()
+            # Check if circuit has been set
+            # In case of switching to new PassManager in later workflow
+            if hasattr(self, "circuit"):
+                self.circuit = self.circuit
+
+    def redo_M_mitigation(self, shots: int | None = None) -> None:
+        """Redo M_mitigation.
+
+        Args:
+            shots: Overwrites QI internal shot number if int is defined.
+        """
+        self._make_Minv(shots=shots)
 
     @property
     def parameters(self) -> list[float]:
@@ -281,12 +334,45 @@ class QuantumInterface:
         Args:
             circuit: circuit
         """
-        # Check if estimator is primitve and ISA selected. If yes, pre-transpile circuit for later use.
-
-        if isinstance(self._primitive, BaseEstimator) and self.ISA:
-            self._circuit = transpile(circuit, backend=self._ISA_backend, optimization_level=self._ISA_level)
+        # Set the number of qubits before transpilation to (probably) device with larger number of qubits.
+        self.num_qubits = circuit.num_qubits
+        # Check if ISA is selected. If yes, pre-transpile circuit for later use.
+        if self.ISA:
+            self._circuit = self._transpile_circuit(circuit)
+            self._transpiled = True
         else:
             self._circuit = circuit
+
+    def _transpile_circuit(self, circuit: QuantumCircuit) -> QuantumCircuit:
+        """Transpile circuit with default or set PassManager.
+
+        Args:
+            circuit: circuit
+
+        Returns:
+            Transpiled Circuit.
+        """
+        if self.pass_manager is None:
+            raise ValueError("Missing PassManager for transpilation.")
+        if self.pass_manager is None and not self.ISA:  # for init
+            raise ValueError(
+                "You have not defined a PassManager but switched on ISA and try to transpile a circuit."
+            )
+
+        circuit_return = self.pass_manager.run(circuit)
+        # Get layout indices
+        if circuit_return.layout is None:
+            self._layout_indices = np.arange(circuit_return.num_qubits)
+        else:
+            self._layout_indices = circuit_return.layout.final_index_layout()
+
+        # Transpile X and Y measurement gates: only translation to basis gates and optimization.
+        self._transp_xy = [
+            self.pass_manager.optimization.run(self.pass_manager.translation.run(to_CBS_measurement("X"))),
+            self.pass_manager.optimization.run(self.pass_manager.translation.run(to_CBS_measurement("Y"))),
+        ]
+
+        return circuit_return
 
     @property
     def shots(self) -> int | None:
@@ -307,22 +393,21 @@ class QuantumInterface:
         Args:
             shots: Number of shots.
         """
-        # IMPORTANT: Shot number in primitive gets always overwritten if a shot number is defined in QI!
+        # IMPORTANT: Shot number in primitive initialization gets always overwritten by QI!
         self._circuit_multipl = 1
+        if hasattr(self, "cliques"):
+            self._reset_cliques()
+        if hasattr(self, "_Minv") and self._Minv is not None:
+            self._reset_M()
         # Get shot number form primitive if none defined
         if shots is None:
-            if hasattr(self._primitive.options, "shots"):
-                # Shot-noise simulator
-                self._shots = self._primitive.options.shots
-                print("Number of shots has been set to value defined in primitive option: ", self._shots)
-            elif "execution" in self._primitive.options:
-                # Device
-                self._shots = self._primitive.options["execution"]["shots"]
-                print("Number of shots has been set to value defined in primitive option: ", self._shots)
-            else:
+            if isinstance(self._primitive, BaseSamplerV2):
                 print(
-                    "WARNING: No number of shots option found in primitive. Ideal simulator is assumed and shots set to None / Zero"
+                    "SamplerV2 does not support ideal simulator. Number of shots is set to 10,000 by default"
                 )
+                self._shots: int | None = 10000
+            else:
+                print("Number of shots is None. Ideal simulator is assumed.")
                 self._shots = None
         else:
             self._shots = shots
@@ -330,7 +415,7 @@ class QuantumInterface:
         if self._shots is not None:
             if self._shots > self.max_shots_per_run:
                 if isinstance(self._primitive, BaseEstimator):
-                    self._primitive.set_options(shots=self.max_shots_per_run)
+                    self.shots = self.max_shots_per_run
                     print(
                         "WARNING: Number of shots specified exceed possibility for Estimator. Number of shots is set to ",
                         self.max_shots_per_run,
@@ -339,7 +424,6 @@ class QuantumInterface:
                     print("Number of requested shots exceed the limit of ", self.max_shots_per_run)
                     # Get number of circuits needed to fulfill shot number
                     self._circuit_multipl = math.floor(self._shots / self.max_shots_per_run)
-                    self._primitive.set_options(shots=self.max_shots_per_run)
                     print(
                         "Maximum shots are used and additional",
                         self._circuit_multipl - 1,
@@ -351,12 +435,6 @@ class QuantumInterface:
                             "WARNING: Requested shots must be multiple of max_shots_per_run. Total shots has been adjusted to ",
                             self._shots,
                         )
-            else:
-                if shots is not None:  # shots were defined in input and have to be written in primitive
-                    self._primitive.set_options(shots=self._shots)
-                    print(
-                        "Number of shots in primitive has been adapted as specified for QI to ", self._shots
-                    )
 
     @property
     def max_shots_per_run(self) -> int:
@@ -382,14 +460,17 @@ class QuantumInterface:
         if hasattr(self, "_shots"):  # Check if it is initialization
             self.shots = self._shots
 
-    def _reset_cliques(self) -> None:
+    def _reset_cliques(self, verbose: bool = True) -> None:
         """Reset cliques to empty."""
         self.cliques = Clique()
+        if verbose:
+            print("Pauli saving has been reset.")
 
-    def null_shots(self) -> None:
-        """Set number of shots to None."""
-        self._shots = None
-        self._circuit_multipl = 1
+    def _reset_M(self, verbose: bool = True) -> None:
+        """Reset M to None."""
+        self._Minv = None
+        if verbose:
+            print("M matrix for error mitigation has been reset.")
 
     def op_to_qbit(self, op: FermionicOperator) -> SparsePauliOp:
         """Fermionic operator to qbit rep.
@@ -427,9 +508,9 @@ class QuantumInterface:
         # Check if estimator or sampler
         if isinstance(self._primitive, BaseEstimator):
             return self._estimator_quantum_expectation_value(op, run_parameters)
-        if isinstance(self._primitive, BaseSampler) and save_paulis:
+        if isinstance(self._primitive, (BaseSampler, BaseSamplerV2)) and save_paulis:
             return self._sampler_quantum_expectation_value(op)
-        if isinstance(self._primitive, BaseSampler):
+        if isinstance(self._primitive, (BaseSampler, BaseSamplerV2)):
             return self._sampler_quantum_expectation_value_nosave(
                 op, run_parameters, do_cliques=self._do_cliques
             )
@@ -453,10 +534,7 @@ class QuantumInterface:
         if self.ISA:
             observables = observables.apply_layout(self.circuit.layout)
         job = self._primitive.run(
-            circuits=self.circuit,
-            parameter_values=run_parameters,
-            observables=observables,
-            skip_tranpilation=self.ISA,
+            circuits=self.circuit, parameter_values=run_parameters, observables=observables, shots=self.shots
         )
         if self.shots is not None:  # check if ideal simulator
             self.total_shots_used += self.shots * len(observables)
@@ -508,7 +586,7 @@ class QuantumInterface:
 
         # Check if error mitigation is requested and if read-out matrix already exists.
         if self.do_M_mitigation and self._Minv is None:
-            self._make_Minv()
+            self._make_Minv(shots=self._M_shots)
 
         if len(new_heads) != 0:
             # Simulate each clique head with one combined device call
@@ -571,7 +649,7 @@ class QuantumInterface:
 
         # Check if error mitigation is requested and if read-out matrix already exists.
         if self.do_M_mitigation and self._Minv is None:
-            self._make_Minv()
+            self._make_Minv(shots=self._M_shots)
 
         paulis_str = [str(x) for x in observables.paulis]
         if do_cliques:
@@ -712,7 +790,8 @@ class QuantumInterface:
         paulis: list[str] | str,
         run_parameters: list[list[float]] | list[float],
         circuits_in: list[QuantumCircuit] | QuantumCircuit,
-    ) -> list[dict[str, float]]:
+        overwrite_shots: int | None = None,
+    ) -> list[dict[int, float]]:
         r"""Get results from a sampler distribution for several Pauli strings measured on several circuits.
 
         The expectation value of a Pauli string is calcuated as:
@@ -726,13 +805,20 @@ class QuantumInterface:
             paulis: (List of) Pauli strings to measure.
             run_paramters: List of parameters of each circuit.
             circuits_in: List of circuits
+            overwrite_shots: Overwrite QI shot number.
 
         Returns:
             Array of quasi-distributions in order of all circuits results for a given Pauli String first.
             E.g.: [PauliString[0] for Circuit[0], PauliString[0] for Circuit[1], ...]
         """
-        if not isinstance(self._primitive, BaseSampler):
-            raise TypeError(f"Expected primitive to be of type BaseSampler got, {type(self._primitive)}")
+        if self._circuit_multipl > 1:
+            shots: int | None = self.max_shots_per_run
+        else:
+            shots = self.shots
+        if overwrite_shots is not None:
+            print("Warning: Overwriting QI shots has been used.")
+            shots = overwrite_shots
+
         if isinstance(paulis, str):
             paulis = [paulis]
         num_paulis = len(paulis)
@@ -740,46 +826,75 @@ class QuantumInterface:
             circuits_in = [circuits_in]
         num_circuits = len(circuits_in)
 
-        circuits = [None] * (num_paulis * num_circuits)
-        # Create QuantumCircuits
-        for nr_pauli, pauli in enumerate(paulis):
-            pauli_circuit = to_CBS_measurement(pauli)
-            for nr_circuit, circuit in enumerate(circuits_in):
-                ansatz_w_obs = circuit.compose(pauli_circuit)
-                ansatz_w_obs.measure_all()
-                circuits[(nr_circuit + (nr_pauli * num_circuits))] = ansatz_w_obs
-        circuits = circuits * self._circuit_multipl
+        # Check V1 vs. V2
+        if isinstance(self._primitive, BaseSamplerV2):
+            # make parameter list 2d for one circuit.
+            if num_circuits == 1:
+                run_parameters = [run_parameters]  # type: ignore
 
-        # Run sampler
-        if num_circuits == 1:
-            parameter_values = [run_parameters] * (num_paulis * self._circuit_multipl)
+            # Create pubs for V2
+            pubs = []
+            for nr_pauli, pauli in enumerate(paulis):
+                pauli_circuit = to_CBS_measurement(pauli, self._transp_xy)
+                for nr_circuit, circuit in enumerate(circuits_in):
+                    # Add measurement in correct layout
+                    ansatz_w_obs = circuit.compose(pauli_circuit, qubits=self._layout_indices)
+                    # Create classic register and measure relevant qubits
+                    ansatz_w_obs.add_register(ClassicalRegister(self.num_qubits, name="meas"))
+                    ansatz_w_obs.measure(self._layout_indices, np.arange(self.num_qubits))
+                    pubs.append((ansatz_w_obs, run_parameters[nr_circuit]))
+            pubs = pubs * self._circuit_multipl
+
+            # Run sampler
+            job = self._primitive.run(pubs, shots=shots)
         else:
-            parameter_values = run_parameters * (num_paulis * self._circuit_multipl)  # type: ignore
-        if self.ISA:
-            circuits = transpile(
-                circuits,
-                backend=self._ISA_backend,
-                optimization_level=self._ISA_level,
-                initial_layout=self._ISA_layout,
-            )
-            self._check_layout(circuits[0])
-            job = self._primitive.run(
-                circuits,
-                parameter_values=parameter_values,
-                skip_transpilation=True,
-            )
-        else:
-            job = self._primitive.run(
-                circuits,
-                parameter_values=parameter_values,
-            )
+            if not self.ISA:  # No own layout-design needed: this might be faster. So we leave it for now.
+                circuits = [None] * (num_paulis * num_circuits)
+                # Create QuantumCircuits for V1
+                for nr_pauli, pauli in enumerate(paulis):
+                    pauli_circuit = to_CBS_measurement(pauli)
+                    for nr_circuit, circuit in enumerate(circuits_in):
+                        ansatz_w_obs = circuit.compose(pauli_circuit)
+                        ansatz_w_obs.measure_all()
+                        circuits[(nr_circuit + (nr_pauli * num_circuits))] = ansatz_w_obs
+                circuits = circuits * self._circuit_multipl
+            else:
+                circuits = [None] * (num_paulis * num_circuits)
+                # Create QuantumCircuits for V1
+                for nr_pauli, pauli in enumerate(paulis):
+                    pauli_circuit = to_CBS_measurement(pauli, self._transp_xy)
+                    for nr_circuit, circuit in enumerate(circuits_in):
+                        ansatz_w_obs = circuit.compose(pauli_circuit, qubits=self._layout_indices)
+                        ansatz_w_obs.add_register(ClassicalRegister(self.num_qubits))
+                        ansatz_w_obs.measure(self._layout_indices, np.arange(self.num_qubits))
+                        circuits[(nr_circuit + (nr_pauli * num_circuits))] = ansatz_w_obs
+                circuits = circuits * self._circuit_multipl
+
+            # Create parameters array for V1
+            if num_circuits == 1:
+                parameter_values = [run_parameters] * (num_paulis * self._circuit_multipl)
+            else:
+                parameter_values = run_parameters * (num_paulis * self._circuit_multipl)  # type: ignore
+
+            # Run sampler
+            job = self._primitive.run(circuits, parameter_values=parameter_values, shots=shots)
+
         if self.shots is not None:  # check if ideal simulator
-            self.total_shots_used += self.shots * num_paulis * num_circuits * self._circuit_multipl
+            self.total_shots_used += self.shots * num_paulis * num_circuits
         self.total_device_calls += 1
-        self.total_paulis_evaluated += num_paulis * num_circuits * self._circuit_multipl
+        self.total_paulis_evaluated += num_paulis * num_circuits
 
         # Get quasi-distribution in binary probabilities
-        distr = [res.binary_probabilities() for res in job.result().quasi_dists]
+        if isinstance(self._primitive, BaseSamplerV2):
+            result = job.result()
+            distr = [{}] * len(result)  # type: list[dict]
+            for nr, job in enumerate(result):
+                distr[nr] = job.data.meas.get_counts()
+                for key in list(distr[nr].keys()):
+                    distr[nr][int(key, 2)] = distr[nr].pop(key) / shots
+        else:
+            distr = job.result().quasi_dists
+
         if self._circuit_multipl == 1:
             return distr
 
@@ -796,7 +911,7 @@ class QuantumInterface:
 
     def _sampler_distributions(
         self, pauli: str, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
-    ) -> dict[str, float]:
+    ) -> dict[int, float]:
         r"""Get results from a sampler distribution for one given Pauli string.
 
         The expectation value of a Pauli string is calcuated as:
@@ -814,8 +929,8 @@ class QuantumInterface:
         Returns:
             Quasi-distributions.
         """
-        if not isinstance(self._primitive, BaseSampler):
-            raise TypeError(f"Expected primitive to be of type BaseSampler got, {type(self._primitive)}")
+        if self.ISA:
+            raise ValueError("Function _sampler_distribution does not work with ISA.")
         if self._circuit_multipl > 1:
             print(
                 "WARNING: The chosen function does not allow for appending circuits. Choose _one_call_sampler_distributions instead."
@@ -835,31 +950,14 @@ class QuantumInterface:
         ansatz_w_obs.measure_all()
 
         # Run sampler
-        if self.ISA:
-            circuit = transpile(
-                ansatz_w_obs,
-                backend=self._ISA_backend,
-                optimization_level=self._ISA_level,
-                initial_layout=self._ISA_layout,
-            )
-            self._check_layout(circuit)
-            job = self._primitive.run(
-                circuit,
-                parameter_values=run_parameters,
-                skip_transpilation=True,
-            )
-        else:
-            job = self._primitive.run(
-                ansatz_w_obs,
-                parameter_values=run_parameters,
-            )
+        job = self._primitive.run(ansatz_w_obs, parameter_values=run_parameters, shots=shots)
         if shots is not None:  # check if ideal simulator
             self.total_shots_used += shots
         self.total_device_calls += 1
         self.total_paulis_evaluated += 1
 
         # Get quasi-distribution in binary probabilities
-        distr = job.result().quasi_dists[0].binary_probabilities()
+        distr = job.result().quasi_dists[0]
         return distr
 
     def _sampler_distribution_p1(
@@ -883,7 +981,7 @@ class QuantumInterface:
                 p1 += value
         return p1
 
-    def _make_Minv(self) -> None:
+    def _make_Minv(self, shots: None | int = None) -> None:
         r"""Make inverse of read-out correlation matrix with one device call.
 
         The read-out correlation matrix is of the form (for two qubits):
@@ -924,56 +1022,49 @@ class QuantumInterface:
         This way some of the gate-error can be build into the read-out correlation matrix.
 
         #. https://qiskit.org/textbook/ch-quantum-hardware/measurement-error-mitigation.html
+
+        Args:
+            shots: Number of shots if they are meant to differ from QI internal shot number.
+
         """
         print("Measuring error mitigation read-out matrix.")
         self._save_layout = True
-        if self.num_qubits > 12:
-            raise ValueError("Current implementation does not scale above 12 qubits?")
-        if "transpilation" in self._primitive.options:
-            if self._primitive.options["transpilation"]["initial_layout"] is None:
-                raise ValueError(
-                    "Doing read-out correlation matrix requires qubits to be fixed. Got ['transpilation']['initial_layout'] as None"
-                )
-        else:
-            print("No transpilation option found in primitive. Run via simulator is assumed.")
+        if self.num_qubits > 8:
+            raise ValueError("Current implementation does not scale above 8 qubits?")
         if self.do_M_ansatz0:
             ansatz = self.circuit
-            # Negate the Hartree-Fock State
-            ansatz = ansatz.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
+            if self.ISA:
+                # Negate the Hartree-Fock State.
+                # Only X Gates. Should need no transpilation.
+                self.hf = HartreeFock(self.num_orbs, self.num_elec, self.mapper)
+                ansatz = ansatz.compose(
+                    HartreeFock(self.num_orbs, self.num_elec, self.mapper), qubits=self._layout_indices
+                )
+            else:
+                ansatz = ansatz.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
         else:
-            ansatz = QuantumCircuit(self.num_qubits)
+            ansatz = QuantumCircuit(self.circuit.num_qubits)  # empty circuit
         M = np.zeros((2**self.num_qubits, 2**self.num_qubits))
-        if self.do_M_iqa:
-            ansatzX = ansatz.copy()
-            for i in range(self.num_qubits):
-                ansatzX.x(i)
-            [Pzero, Pone] = self._one_call_sampler_distributions(
-                "Z" * self.num_qubits,
-                [[10**-8] * len(ansatz.parameters)] * 2,
-                [ansatz.copy(), ansatzX],
-            )
-            for comb in itertools.product([0, 1], repeat=self.num_qubits):
-                idx2 = int("".join([str(x) for x in comb]), 2)
-                for comb_m in itertools.product([0, 1], repeat=self.num_qubits):
-                    P = 1.0
-                    idx1 = int("".join([str(x) for x in comb_m]), 2)
-                    for idx, (bit, bit_m) in enumerate(zip(comb[::-1], comb_m[::-1])):
-                        val = 0.0
-                        if bit == 0:
-                            Pout = Pzero
-                        else:
-                            Pout = Pone
-                        for bitstring, prob in Pout.items():
-                            if bitstring[idx] == str(bit_m):
-                                val += prob
-                        P *= val
-                    M[idx1, idx2] = P
-        else:
-            ansatz_list = [None] * 2**self.num_qubits
+        ansatz_list = [None] * 2**self.num_qubits
+        if self.ISA:
             for nr, comb in enumerate(itertools.product([0, 1], repeat=self.num_qubits)):
                 ansatzX = ansatz.copy()
-                idx2 = int("".join([str(x) for x in comb]), 2)
-                for i, bit in enumerate(comb):
+                for i, bit in enumerate(comb[::-1]):  # because of Qiskit ordering
+                    if bit == 1:
+                        ansatzX.x(self._layout_indices[i])
+                # Make list of custom ansatz
+                ansatz_list[nr] = ansatzX
+            # Simulate all elements with one device call
+            Px_list = self._one_call_sampler_distributions(
+                "Z" * self.num_qubits,
+                [[10**-8] * len(ansatz.parameters)] * len(ansatz_list),
+                ansatz_list,
+                overwrite_shots=shots,
+            )
+        else:
+            for nr, comb in enumerate(itertools.product([0, 1], repeat=self.num_qubits)):
+                ansatzX = ansatz.copy()
+                for i, bit in enumerate(comb[::-1]):  # because of Qiskit ordering
                     if bit == 1:
                         ansatzX.x(i)
                 # Make list of custom ansatz
@@ -983,10 +1074,30 @@ class QuantumInterface:
                 "Z" * self.num_qubits,
                 [[10**-8] * len(ansatz.parameters)] * len(ansatz_list),
                 ansatz_list,
+                overwrite_shots=shots,
             )
-            # Construct M
-            for idx2, Px in enumerate(Px_list):
-                for bitstring, prob in Px.items():
-                    idx1 = int(bitstring[::-1], 2)
-                    M[idx1, idx2] = prob
+        # Construct M
+        for idx2, Px in enumerate(Px_list):
+            for idx1, prob in Px.items():
+                M[idx1, idx2] = prob
         self._Minv = np.linalg.inv(M)
+
+    def get_info(self) -> None:
+        """Get infos about settings."""
+        if isinstance(self.ansatz, QuantumCircuit):
+            data = f"Your settings are:\n {'Ansatz:':<20} {'custom circuit'}\n {'Number of shots:':<20} {self.shots}\n"
+        else:
+            data = f"Your settings are:\n {'Ansatz:':<20} {self.ansatz}\n {'Number of shots:':<20} {self.shots}\n"
+        data += f" {'ISA':<20} {self.ISA}\n {'Transpiled circuit':<20} {self._transpiled}\n {'Primitive:':<20} {self._primitive.__class__.__name__}\n"
+        data += f" {'Post-processing:':<20} {self.do_postselection}"
+        if self.do_M_mitigation:
+            data += (
+                f"\n {'M mitigation:':<20} {self.do_M_mitigation}\n {'M Ansatz0:':<20} {self.do_M_ansatz0}"
+            )
+        if self.ISA:
+            data += f"\n {'Circuit layout:':<20} {self._layout_indices}"
+            if self._internal_pm:
+                data += f"\n {'Transpiled backend:':<20} {self._primitive_backend}\n {'Transpiled opt. level:':<20} {self._primitive_level}"
+            if isinstance(self._primitive, BaseSamplerV2) and hasattr(self._primitive.options, "twirling"):
+                data += f"\n {'Pauli twirling:':<20} {self._primitive.options.twirling.enable_gates}\n {'Dynamic decoupling:':<20} {self._primitive.options.dynamical_decoupling.enable}"
+        print(data)
