@@ -389,7 +389,7 @@ class QuantumInterface:
         self._circuit_multipl = 1
         if hasattr(self, "cliques"):
             self._reset_cliques()
-        if self._Minv is not None:
+        if hasattr(self, "_Minv") and self._Minv is not None:
             self._reset_M()
         # Get shot number form primitive if none defined
         if shots is None:
