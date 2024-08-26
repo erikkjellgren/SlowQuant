@@ -314,8 +314,6 @@ class WaveFunction:
         self.QI.total_device_calls = 0
         self.QI.total_shots_used = 0
         self.QI.total_paulis_evaluated = 0
-        self.QI._reset_cliques(verbose=verbose)  # pylint: disable=protected-access
-        self.QI._Minv = None  # pylint: disable=protected-access
 
         # Reset circuit and initiate re-transpiling
         ISA_old = self.QI.ISA
@@ -326,24 +324,12 @@ class WaveFunction:
         if verbose:
             self.QI.get_info()
 
-    def change_shots(self, shots: int | None) -> None:
-        """Change the number of shots for QI interface.
-
-        Args:
-            shots: Number of shots
-        """
-        self.QI.shots = shots
-        self.QI._reset_cliques()  # pylint: disable=protected-access
-        if self.QI.do_M_ansatz0:
-            print("Reset correlation matrix for M_Ansatz0")
-        self.QI._Minv = None  # pylint: disable=protected-access
-
     def _reconstruct_circuit(self) -> None:
         """Construct circuit again."""
         # force ISA = False
         self.QI._ISA = False  # pylint: disable=protected-access
         self.QI.construct_circuit(
-            self.num_active_orbs, (self.num_active_elec // 2, self.num_active_elec // 2), reconstruct=True
+            self.num_active_orbs, (self.num_active_elec // 2, self.num_active_elec // 2)
         )
         self.QI._transpiled = False  # pylint: disable=protected-access
 

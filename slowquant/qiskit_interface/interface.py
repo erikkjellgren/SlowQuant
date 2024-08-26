@@ -93,13 +93,12 @@ class QuantumInterface:
         self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
         self._M_shots = None  # define a separate number of shots for M
 
-    def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int], reconstruct: bool = False) -> None:
+    def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int]) -> None:
         """Construct qiskit circuit.
 
         Args:
             num_orbs: Number of orbitals in spatial basis.
             num_elec: Number of electrons (alpha, beta).
-            reconstruct: Boolean to not set parameters to zero (HF).
         """
         self.num_orbs = num_orbs
         self.num_spin_orbs = 2 * num_orbs
@@ -176,7 +175,7 @@ class QuantumInterface:
                     f"Got parameter name, {name}, that is not in grad_param_R, {self.grad_param_R}"
                 )
 
-        if not reconstruct:
+        if not hasattr(self, "_parameters"):
             # Set parameter to HarteeFock
             self._parameters = [0.0] * self.circuit.num_parameters
 
@@ -388,6 +387,10 @@ class QuantumInterface:
         """
         # IMPORTANT: Shot number in primitive initialization gets always overwritten by QI!
         self._circuit_multipl = 1
+        if hasattr(self, "cliques"):
+            self._reset_cliques()
+        if self._Minv is not None:
+            self._reset_M()
         # Get shot number form primitive if none defined
         if shots is None:
             if isinstance(self._primitive, BaseSamplerV2):
