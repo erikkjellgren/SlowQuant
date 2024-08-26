@@ -177,7 +177,7 @@ def kSAfUpCCGSD(
 ) -> tuple[QuantumCircuit, dict[str, int]]:
     """Create modified k-UpCCGSD ansatz.
 
-    The ansatz have been modifed to use spin-adapted singet single excitation operators.
+    The ansatz has been modified to use spin-adapted singlet single excitation operators.
 
     #. 10.1021/acs.jctc.8b01004
 
