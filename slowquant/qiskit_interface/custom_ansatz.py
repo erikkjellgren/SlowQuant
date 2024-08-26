@@ -97,7 +97,7 @@ def tUPS(
             idx += 1
             # Second single
             if n + 1 == n_layers and skip_last_singles and num_orbs == 2:
-                # Special case for two orbital.
+                # Special case for two orbitals.
                 # Here the layer is only one block, thus,
                 # the last single excitation is earlier than expected.
                 continue
