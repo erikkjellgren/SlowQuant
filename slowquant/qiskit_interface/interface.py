@@ -464,11 +464,6 @@ class QuantumInterface:
         if verbose:
             print("M matrix for error mitigation has been reset.")
 
-    def null_shots(self) -> None:
-        """Set number of shots to None."""
-        self._shots = None
-        self._circuit_multipl = 1
-
     def op_to_qbit(self, op: FermionicOperator) -> SparsePauliOp:
         """Fermionic operator to qbit rep.
 

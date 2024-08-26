@@ -714,7 +714,7 @@ def test_sampler_changes() -> None:
     # Change to shot noise simulator reset shots
     sampler = SamplerAer(transpile_options={"optimization_level": 0})
     qWF.change_primitive(sampler)
-    qWF.change_shots(10000)
+    QI.shots = 10000
 
     assert QI.max_shots_per_run == 100000
     assert QI.shots == 10000
@@ -733,7 +733,7 @@ def test_sampler_changes() -> None:
     assert QI.shots == 200000
     assert QI._circuit_multipl == 4  # pylint: disable=protected-access
 
-    qWF.change_shots(None)
+    QI.shots = None
 
     sampler = SamplerV2Aer()
     qWF.change_primitive(sampler)
