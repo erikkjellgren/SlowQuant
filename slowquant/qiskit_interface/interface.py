@@ -7,7 +7,12 @@ from typing import Any
 import numpy as np
 from qiskit import QuantumCircuit
 from qiskit.circuit import ClassicalRegister
-from qiskit.primitives import BaseEstimator, BaseEstimatorV2, BaseSampler, BaseSamplerV2
+from qiskit.primitives import (
+    BaseEstimator,
+    BaseEstimatorV2,
+    BaseSamplerV1,
+    BaseSamplerV2,
+)
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler import PassManager
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
@@ -34,7 +39,7 @@ class QuantumInterface:
 
     def __init__(  # pylint: disable=dangerous-default-value
         self,
-        primitive: BaseEstimator | BaseSampler | BaseSamplerV2,
+        primitive: BaseEstimator | BaseSamplerV1 | BaseSamplerV2,
         ansatz: str | QuantumCircuit,
         mapper: FermionicMapper,
         ISA: bool = False,
@@ -508,9 +513,9 @@ class QuantumInterface:
         # Check if estimator or sampler
         if isinstance(self._primitive, BaseEstimator):
             return self._estimator_quantum_expectation_value(op, run_parameters)
-        if isinstance(self._primitive, (BaseSampler, BaseSamplerV2)) and save_paulis:
+        if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)) and save_paulis:
             return self._sampler_quantum_expectation_value(op)
-        if isinstance(self._primitive, (BaseSampler, BaseSamplerV2)):
+        if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
             return self._sampler_quantum_expectation_value_nosave(
                 op, run_parameters, do_cliques=self._do_cliques
             )
