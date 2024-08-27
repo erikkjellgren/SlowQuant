@@ -1038,13 +1038,16 @@ class WaveFunction:
         res = optimizer.minimize(
             parameters, extra_options={"R": self.QI.grad_param_R, "param_names": self.QI.param_names}
         )
-        self.ansatz_parameters = res.x[len(self.kappa) :].tolist()
-        for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
-            self.kappa[i] = 0.0
-            self._kappa_old[i] = 0.0
-        for i in range(len(self.kappa_redundant)):  # pylint: disable=consider-using-enumerate
-            self.kappa_redundant[i] = 0.0
-            self._kappa_redundant_old[i] = 0.0
+        if orbital_optimization:
+            self.ansatz_parameters = res.x[len(self.kappa) :].tolist()
+            for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
+                self.kappa[i] = 0.0
+                self._kappa_old[i] = 0.0
+            for i in range(len(self.kappa_redundant)):  # pylint: disable=consider-using-enumerate
+                self.kappa_redundant[i] = 0.0
+                self._kappa_redundant_old[i] = 0.0
+        else:
+            self.ansatz_parameters = res.x.tolist()
         self._energy_elec = res.fun
 
 
