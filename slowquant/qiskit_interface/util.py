@@ -1,6 +1,7 @@
 import numpy as np
 from qiskit import QuantumCircuit
 from qiskit.quantum_info import Pauli
+from qiskit_nature.second_q.circuit.library import HartreeFock
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 
@@ -355,3 +356,21 @@ def f2q(i: int, num_orbs: int) -> int:
     if i % 2 == 0:
         return i // 2
     return i // 2 + num_orbs
+
+
+def get_csf_reference(
+    csf: list[str], num_orbs: int, num_elec: tuple[int, int], mapper: JordanWignerMapper
+) -> QuantumCircuit:
+    if not isinstance(mapper, JordanWignerMapper):
+        raise TypeError("Only implemented for JordanWignerMapper. Got: {type(mapper)}")
+    qc = HartreeFock(num_orbs, num_elec, mapper)
+    return qc
+
+
+def get_determinant_superposition_reference(
+    det1: str, det2: str, num_orbs: int, num_elec: tuple[int, int], mapper: JordanWignerMapper
+) -> QuantumCircuit:
+    if not isinstance(mapper, JordanWignerMapper):
+        raise TypeError("Only implemented for JordanWignerMapper. Got: {type(mapper)}")
+    qc = HartreeFock(num_orbs, num_elec, mapper)
+    return qc

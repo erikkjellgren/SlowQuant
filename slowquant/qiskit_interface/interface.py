@@ -17,6 +17,7 @@ from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler import PassManager
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFock
+from qiskit_nature.second_q.mappers import JordanWignerMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
@@ -25,6 +26,8 @@ from slowquant.qiskit_interface.util import (
     Clique,
     correct_distribution,
     get_bitstring_sign,
+    get_csf_reference,
+    get_determinant_superposition_reference,
     postselection,
     to_CBS_measurement,
 )
@@ -512,19 +515,112 @@ class QuantumInterface:
 
         # Check if estimator or sampler
         if isinstance(self._primitive, BaseEstimator):
-            return self._estimator_quantum_expectation_value(op, run_parameters)
+            return self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
         if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)) and save_paulis:
             return self._sampler_quantum_expectation_value(op)
         if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
             return self._sampler_quantum_expectation_value_nosave(
-                op, run_parameters, do_cliques=self._do_cliques
+                op,
+                run_parameters,
+                self.circuit,
+                do_cliques=self._do_cliques,
             )
         raise ValueError(
             "The Quantum Interface was initiated with an unknown Qiskit primitive, {type(self._primitive)}"
         )
 
+    def quantum_expectation_value_csfs(
+        self,
+        bra_csf: list[str],
+        op: FermionicOperator,
+        ket_csf: list[str],
+        custom_parameters: list[float] | None = None,
+    ) -> float:
+        if not isinstance(self.mapper, JordanWignerMapper):
+            raise TypeError(
+                f"Expectation values for custom CSFs only implemented for JordanWignerMapper. Got; {type(self.mapper)}"
+            )
+        if not isinstance(self._primitive, (BaseEstimator, BaseSamplerV1, BaseSamplerV2)):
+            raise ValueError(
+                "quantum_expectation_value_csfs got unsupported Qiskit primitive, {type(self._primitive)}"
+            )
+        if custom_parameters is None:
+            run_parameters = self.parameters
+        else:
+            run_parameters = custom_parameters
+        is_identical = True
+        for bra_det, ket_det in zip(bra_csf, ket_csf):
+            if bra_det != ket_det:
+                is_identical = False
+                break
+
+        if is_identical:
+            circuit = get_csf_reference(bra_csf)
+            # negate HF in ansatz
+            circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
+            circuit = circuit.compose(self.circuit)
+            circuit = self._transpile_circuit(circuit)
+            if isinstance(self._primitive, BaseEstimator):
+                return self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
+            if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                return self._sampler_quantum_expectation_value_nosave(
+                    op,
+                    run_parameters,
+                    self.circuit,
+                    do_cliques=self._do_cliques,
+                )
+        else:
+            val = 0.0
+            for bra_det, ket_det in zip(bra_csf, ket_csf):
+                circuit = get_determinant_superposition_reference(bra_csf, ket_csf)
+                # negate HF in ansatz
+                circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
+                circuit = circuit.compose(self.circuit)
+                circuit = self._transpile_circuit(circuit)
+                if isinstance(self._primitive, BaseEstimator):
+                    val += self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
+                if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                    val += self._sampler_quantum_expectation_value_nosave(
+                        op,
+                        run_parameters,
+                        self.circuit,
+                        do_cliques=self._do_cliques,
+                    )
+                circuit = get_csf_reference(bra_det)
+                # negate HF in ansatz
+                circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
+                circuit = circuit.compose(self.circuit)
+                circuit = self._transpile_circuit(circuit)
+                if isinstance(self._primitive, BaseEstimator):
+                    val -= self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
+                if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                    val -= self._sampler_quantum_expectation_value_nosave(
+                        op,
+                        run_parameters,
+                        self.circuit,
+                        do_cliques=self._do_cliques,
+                    )
+                circuit = get_csf_reference(ket_det)
+                # negate HF in ansatz
+                circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
+                circuit = circuit.compose(self.circuit)
+                circuit = self._transpile_circuit(circuit)
+                if isinstance(self._primitive, BaseEstimator):
+                    val -= self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
+                if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                    val -= self._sampler_quantum_expectation_value_nosave(
+                        op,
+                        run_parameters,
+                        self.circuit,
+                        do_cliques=self._do_cliques,
+                    )
+            return 0.5 * val
+
     def _estimator_quantum_expectation_value(
-        self, op: FermionicOperator, run_parameters: list[float]
+        self,
+        op: FermionicOperator,
+        run_parameters: list[float],
+        run_circuit: QuantumCircuit,
     ) -> float:
         """Calculate expectation value of circuit and observables via Estimator.
 
@@ -539,7 +635,7 @@ class QuantumInterface:
         if self.ISA:
             observables = observables.apply_layout(self.circuit.layout)
         job = self._primitive.run(
-            circuits=self.circuit, parameter_values=run_parameters, observables=observables, shots=self.shots
+            circuits=run_circuit, parameter_values=run_parameters, observables=observables, shots=self.shots
         )
         if self.shots is not None:  # check if ideal simulator
             self.total_shots_used += self.shots * len(observables)
@@ -620,7 +716,11 @@ class QuantumInterface:
         return values.real
 
     def _sampler_quantum_expectation_value_nosave(
-        self, op: FermionicOperator | SparsePauliOp, run_parameters: list[float], do_cliques: bool = True
+        self,
+        op: FermionicOperator | SparsePauliOp,
+        run_parameters: list[float],
+        run_circuit: QuantumCircuit,
+        do_cliques: bool = True,
     ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
 
@@ -665,7 +765,7 @@ class QuantumInterface:
 
             # Simulate each clique head with one combined device call
             # and return a list of distributions
-            distr = self._one_call_sampler_distributions(new_heads, run_parameters, self.circuit)
+            distr = self._one_call_sampler_distributions(new_heads, run_parameters, run_circuit)
             if self.do_M_mitigation:  # apply error mitigation if requested
                 for i, dist in enumerate(distr):
                     distr[i] = correct_distribution(dist, self._Minv)
@@ -683,7 +783,7 @@ class QuantumInterface:
                 values += result * coeff
         else:
             # Simulate each Pauli string with one combined device call
-            distr = self._one_call_sampler_distributions(paulis_str, run_parameters, self.circuit)
+            distr = self._one_call_sampler_distributions(paulis_str, run_parameters, run_circuit)
             if self.do_M_mitigation:  # apply error mitigation if requested
                 for i, dist in enumerate(distr):
                     distr[i] = correct_distribution(dist, self._Minv)
