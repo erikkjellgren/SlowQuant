@@ -47,7 +47,7 @@ class quantumLRBaseClass:
 
         # q
         self.q_ops = []
-        for p, q in wf.kappa_idx:
+        for p, q in wf.kappa_no_activeactive_idx:
             self.q_ops.append(G1_sa(p, q))
 
         num_parameters = len(self.q_ops) + len(self.G_ops)

@@ -1,17 +1,8 @@
 from collections.abc import Generator, Sequence
+from typing import Any
 
 import numpy as np
 import scipy.linalg
-
-from slowquant.unitary_coupled_cluster.operator_matrix import (
-    T1_sa_matrix,
-    T2_1_sa_matrix,
-    T2_2_sa_matrix,
-    T3_matrix,
-    T4_matrix,
-    T5_matrix,
-    T6_matrix,
-)
 
 
 def construct_integral_trans_mat(
@@ -33,104 +24,6 @@ def construct_integral_trans_mat(
         kappa_mat[q, p] = -kappa_val
     c_trans = np.matmul(c_orthonormal, scipy.linalg.expm(-kappa_mat))
     return c_trans
-
-
-class ThetaPicker:
-    def __init__(
-        self,
-        active_occ_spin_idx: Sequence[int],
-        active_unocc_spin_idx: Sequence[int],
-    ) -> None:
-        """Initialize helper class to iterate over active space parameters.
-
-        Args:
-            active_occ_spin_idx: Spin index of strongly occupied orbitals.
-            active_unocc_spin_idx: Spin index of weakly occupied orbitals.
-        """
-        self.active_occ_spin_idx: list[int] = []
-        self.active_unocc_spin_idx: list[int] = []
-        self.active_occ_idx: list[int] = []
-        self.active_unocc_idx: list[int] = []
-        for idx in active_occ_spin_idx:
-            self.active_occ_spin_idx.append(idx)
-            if idx // 2 not in self.active_occ_idx:
-                self.active_occ_idx.append(idx // 2)
-        for idx in active_unocc_spin_idx:
-            self.active_unocc_spin_idx.append(idx)
-            if idx // 2 not in self.active_unocc_idx:
-                self.active_unocc_idx.append(idx // 2)
-
-    def get_t1_generator_sa(
-        self,
-    ) -> Generator[tuple[int, int, float], None, None]:
-        """Get generate over T1 spin-adapted operators.
-
-        Returns:
-            T1 operator generator.
-        """
-        return iterate_t1_sa(self.active_occ_idx, self.active_unocc_idx)
-
-    def get_t2_generator_sa(
-        self,
-    ) -> Generator[tuple[int, int, int, int, float, int], None, None]:
-        """Get generate over T2 spin-adapted operators.
-
-        Returns:
-            T2 operator generator.
-        """
-        return iterate_t2_sa(self.active_occ_idx, self.active_unocc_idx)
-
-    def get_t1_generator(self) -> Generator[tuple[int, int], None, None]:
-        """Get generate over T1 spin-conserving operators.
-
-        Returns:
-            T1 operator generator.
-        """
-        return iterate_t1(self.active_occ_spin_idx, self.active_unocc_spin_idx)
-
-    def get_t2_generator(self) -> Generator[tuple[int, int, int, int], None, None]:
-        """Get generate over T2 spin-conserving operators.
-
-        Returns:
-            T2 operator generator.
-        """
-        return iterate_t2(self.active_occ_spin_idx, self.active_unocc_spin_idx)
-
-    def get_t3_generator(self) -> Generator[tuple[int, int, int, int, int, int], None, None]:
-        """Get generate over T3 spin-conserving operators.
-
-        Returns:
-            T3 operator generator.
-        """
-        return iterate_t3(self.active_occ_spin_idx, self.active_unocc_spin_idx)
-
-    def get_t4_generator(self) -> Generator[tuple[int, int, int, int, int, int, int, int], None, None]:
-        """Get generate over T4 spin-conserving operators.
-
-        Returns:
-            T4 operator generator.
-        """
-        return iterate_t4(self.active_occ_spin_idx, self.active_unocc_spin_idx)
-
-    def get_t5_generator(
-        self,
-    ) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int], None, None]:
-        """Get generate over T5 spin-conserving operators.
-
-        Returns:
-            T5 operator generator.
-        """
-        return iterate_t5(self.active_occ_spin_idx, self.active_unocc_spin_idx)
-
-    def get_t6_generator(
-        self,
-    ) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int, int, int], None, None]:
-        """Get generate over T6 spin-conserving operators.
-
-        Returns:
-            T6 operator generator.
-        """
-        return iterate_t6(self.active_occ_spin_idx, self.active_unocc_spin_idx)
 
 
 def iterate_t1_sa(
@@ -182,9 +75,26 @@ def iterate_t2_sa(
                     yield a, i, b, j, fac, 2
 
 
+def iterate_t1_sa_generalized(
+    num_orbs: int,
+) -> Generator[tuple[int, int, float], None, None]:
+    """Iterate over T1 spin-adapted operators.
+
+    Args:
+        num_orbs: Number of active spatial orbitals.
+
+    Returns:
+        T1 operator iteration.
+    """
+    for i in range(num_orbs):
+        for a in range(i + 1, num_orbs):
+            fac = 2 ** (-1 / 2)
+            yield a, i, fac
+
+
 def iterate_t1(
-    active_occ_spin_idx: list[int],
-    active_unocc_spin_idx: list[int],
+    active_occ_spin_idx: Sequence[int],
+    active_unocc_spin_idx: Sequence[int],
 ) -> Generator[tuple[int, int], None, None]:
     """Iterate over T1 spin-conserving operators.
 
@@ -213,8 +123,8 @@ def iterate_t1(
 
 
 def iterate_t2(
-    active_occ_spin_idx: list[int],
-    active_unocc_spin_idx: list[int],
+    active_occ_spin_idx: Sequence[int],
+    active_unocc_spin_idx: Sequence[int],
 ) -> Generator[tuple[int, int, int, int], None, None]:
     """Iterate over T2 spin-conserving operators.
 
@@ -253,8 +163,8 @@ def iterate_t2(
 
 
 def iterate_t3(
-    active_occ_spin_idx: list[int],
-    active_unocc_spin_idx: list[int],
+    active_occ_spin_idx: Sequence[int],
+    active_unocc_spin_idx: Sequence[int],
 ) -> Generator[tuple[int, int, int, int, int, int], None, None]:
     """Iterate over T3 spin-conserving operators.
 
@@ -303,8 +213,8 @@ def iterate_t3(
 
 
 def iterate_t4(
-    active_occ_spin_idx: list[int],
-    active_unocc_spin_idx: list[int],
+    active_occ_spin_idx: Sequence[int],
+    active_unocc_spin_idx: Sequence[int],
 ) -> Generator[tuple[int, int, int, int, int, int, int, int], None, None]:
     """Iterate over T4 spin-conserving operators.
 
@@ -363,8 +273,8 @@ def iterate_t4(
 
 
 def iterate_t5(
-    active_occ_spin_idx: list[int],
-    active_unocc_spin_idx: list[int],
+    active_occ_spin_idx: Sequence[int],
+    active_unocc_spin_idx: Sequence[int],
 ) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int], None, None]:
     """Iterate over T5 spin-conserving operators.
 
@@ -433,8 +343,8 @@ def iterate_t5(
 
 
 def iterate_t6(
-    active_occ_spin_idx: list[int],
-    active_unocc_spin_idx: list[int],
+    active_occ_spin_idx: Sequence[int],
+    active_unocc_spin_idx: Sequence[int],
 ) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int, int, int], None, None]:
     """Iterate over T6 spin-conserving operators.
 
@@ -516,130 +426,296 @@ def iterate_t6(
                                                     yield a, i, b, j, c, k, d, l, e, m, f, n
 
 
-def construct_ucc_u(
-    num_det: int,
-    num_active_orbs: int,
-    num_elec_alpha: int,
-    num_elec_beta: int,
-    theta: Sequence[float],
-    theta_picker: ThetaPicker,
-    excitations: str,
-) -> np.ndarray:
-    """Contruct unitary transformation matrix.
+def iterate_pair_t2(
+    active_occ_idx: Sequence[int],
+    active_unocc_idx: Sequence[int],
+) -> Generator[tuple[int, int, int, int], None, None]:
+    """Iterate over pair T2 operators.
 
     Args:
-        num_det: Number of determinants.
-        num_active_orbs: Number of active spatial orbitals.
-        num_elec_alpha: Number of active alpha electrons.
-        num_elec_beta: Number of active beta electrons.
-        theta: Active-space parameters.
-               Ordered as (S, D, T, ...).
-        theta_picker: Helper class to pick the parameters in the right order.
-        excitations: Excitation orders to include.
+        active_occ_idx: Indices of strongly occupied orbitals.
+        active_unocc_idx: Indices of weakly occupied orbitals.
 
     Returns:
-        Unitary transformation matrix.
+        T2 operator iteration.
     """
-    T = np.zeros((num_det, num_det))
-    counter = 0
-    if "s" in excitations:
-        for a, i, _ in theta_picker.get_t1_generator_sa():
-            if theta[counter] != 0.0:
-                T += (
-                    theta[counter]
-                    * T1_sa_matrix(i, a, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
-                )
-            counter += 1
-    if "d" in excitations:
-        for a, i, b, j, _, type_idx in theta_picker.get_t2_generator_sa():
-            if theta[counter] != 0.0:
-                if type_idx == 1:
-                    T += (
-                        theta[counter]
-                        * T2_1_sa_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
-                    )
-                elif type_idx == 2:
-                    T += (
-                        theta[counter]
-                        * T2_2_sa_matrix(i, j, a, b, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
-                    )
+    for i in active_occ_idx:
+        for a in active_unocc_idx:
+            yield 2 * a, 2 * i, 2 * a + 1, 2 * i + 1
+
+
+def iterate_pair_t2_generalized(
+    num_orbs: int,
+) -> Generator[tuple[int, int, int, int], None, None]:
+    """Iterate over pair T2 operators.
+
+    Args:
+        num_orbs: Number of active spatial orbitals.
+
+    Returns:
+        T2 operator iteration.
+    """
+    for i in range(num_orbs):
+        for a in range(i + 1, num_orbs):
+            yield 2 * a, 2 * i, 2 * a + 1, 2 * i + 1
+
+
+class UccStructure:
+    def __init__(self) -> None:
+        """Intialize the unitary coupled cluster ansatz structure."""
+        self.excitation_indicies: list[tuple[int, ...]] = []
+        self.excitation_operator_type: list[str] = []
+        self.n_params = 0
+
+    def add_sa_singles(self, active_occ_idx: Sequence[int], active_unocc_idx: Sequence[int]) -> None:
+        """Add spin-adapted singles.
+
+        Args:
+            active_occ_idx: Active strongly occupied spatial orbital indices.
+            active_unocc_idx: Active weakly occupied spatial orbital indices.
+        """
+        for a, i, _ in iterate_t1_sa(active_occ_idx, active_unocc_idx):
+            self.excitation_indicies.append((i, a))
+            self.excitation_operator_type.append("sa_single")
+            self.n_params += 1
+
+    def add_sa_doubles(self, active_occ_idx: Sequence[int], active_unocc_idx: Sequence[int]) -> None:
+        """Add spin-adapted doubles.
+
+        Args:
+            active_occ_idx: Active strongly occupied spatial orbital indices.
+            active_unocc_idx: Active weakly occupied spatial orbital indices.
+        """
+        for a, i, b, j, _, op_type in iterate_t2_sa(active_occ_idx, active_unocc_idx):
+            self.excitation_indicies.append((i, j, a, b))
+            if op_type == 1:
+                self.excitation_operator_type.append("sa_double_1")
+            elif op_type == 2:
+                self.excitation_operator_type.append("sa_double_2")
+            self.n_params += 1
+
+    def add_triples(self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int]) -> None:
+        """Add alpha-number and beta-number conserving triples.
+
+        Args:
+            active_occ_spin_idx: Active strongly occupied spin orbital indices.
+            active_unocc_spin_idx: Active weakly occupied spin orbital indices.
+        """
+        for a, i, b, j, c, k in iterate_t3(active_occ_spin_idx, active_unocc_spin_idx):
+            self.excitation_indicies.append((i, j, k, a, b, c))
+            self.excitation_operator_type.append("triple")
+            self.n_params += 1
+
+    def add_quadruples(
+        self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int]
+    ) -> None:
+        """Add alpha-number and beta-number conserving quadruples.
+
+        Args:
+            active_occ_spin_idx: Active strongly occupied spin orbital indices.
+            active_unocc_spin_idx: Active weakly occupied spin orbital indices.
+        """
+        for a, i, b, j, c, k, d, l in iterate_t4(active_occ_spin_idx, active_unocc_spin_idx):
+            self.excitation_indicies.append((i, j, k, l, a, b, c, d))
+            self.excitation_operator_type.append("quadruple")
+            self.n_params += 1
+
+    def add_quintuples(
+        self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int]
+    ) -> None:
+        """Add alpha-number and beta-number conserving quintuples.
+
+        Args:
+            active_occ_spin_idx: Active strongly occupied spin orbital indices.
+            active_unocc_spin_idx: Active weakly occupied spin orbital indices.
+        """
+        for a, i, b, j, c, k, d, l, e, m in iterate_t5(active_occ_spin_idx, active_unocc_spin_idx):
+            self.excitation_indicies.append((i, j, k, l, m, a, b, c, d, e))
+            self.excitation_operator_type.append("quintuple")
+            self.n_params += 1
+
+    def add_sextuples(self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int]) -> None:
+        """Add alpha-number and beta-number conserving sextuples.
+
+        Args:
+            active_occ_spin_idx: Active strongly occupied spin orbital indices.
+            active_unocc_spin_idx: Active weakly occupied spin orbital indices.
+        """
+        for a, i, b, j, c, k, d, l, e, m, f, n in iterate_t6(active_occ_spin_idx, active_unocc_spin_idx):
+            self.excitation_indicies.append((i, j, k, l, m, n, a, b, c, d, e, f))
+            self.excitation_operator_type.append("sextuple")
+            self.n_params += 1
+
+
+class UpsStructure:
+    def __init__(self) -> None:
+        """Intialize the unitary product state ansatz structure."""
+        self.excitation_indicies: list[tuple[int, ...]] = []
+        self.excitation_operator_type: list[str] = []
+        self.n_params = 0
+
+    def create_tups(self, num_active_orbs: int, ansatz_options: dict[str, Any]) -> None:
+        """Create tUPS ansatz.
+
+        #. 10.1103/PhysRevResearch.6.023300
+        #. 10.1088/1367-2630/ac2cb3 (QNP)
+
+        Ansatz Options:
+            * n_layers [int]: Number of layers.
+            * do_qnp [bool]: Do QNP tiling. (default: False)
+            * skip_last_singles [bool]: Skip last layer of singles operators. (default: False)
+
+        Args:
+            num_active_orbs: Number of spatial active orbitals.
+            ansatz_options: Ansatz options.
+
+        Returns:
+            tUPS ansatz.
+        """
+        valid_options = ("n_layers", "do_qnp", "skip_last_singles")
+        for option in ansatz_options:
+            if option not in valid_options:
+                raise ValueError(f"Got unknown option for tUPS, {option}. Valid options are: {valid_options}")
+        if "n_layers" not in ansatz_options.keys():
+            raise ValueError("tUPS require the option 'n_layers'")
+        n_layers = ansatz_options["n_layers"]
+        if "do_qnp" in ansatz_options.keys():
+            do_qnp = ansatz_options["do_qnp"]
+        else:
+            do_qnp = False
+        if "skip_last_singles" in ansatz_options.keys():
+            skip_last_singles = ansatz_options["skip_last_singles"]
+        else:
+            skip_last_singles = False
+        for n in range(n_layers):
+            for p in range(0, num_active_orbs - 1, 2):
+                if not do_qnp:
+                    # First single
+                    self.excitation_operator_type.append("tups_single")
+                    self.excitation_indicies.append((p,))
+                    self.n_params += 1
+                # Double
+                self.excitation_operator_type.append("tups_double")
+                self.excitation_indicies.append((p,))
+                self.n_params += 1
+                # Second single
+                if n + 1 == n_layers and skip_last_singles and num_active_orbs == 2:
+                    # Special case for two orbital.
+                    # Here the layer is only one block, thus,
+                    # the last single excitation is earlier than expected.
+                    continue
+                self.excitation_operator_type.append("tups_single")
+                self.excitation_indicies.append((p,))
+                self.n_params += 1
+            for p in range(1, num_active_orbs - 1, 2):
+                if not do_qnp:
+                    # First single
+                    self.excitation_operator_type.append("tups_single")
+                    self.excitation_indicies.append((p,))
+                    self.n_params += 1
+                # Double
+                self.excitation_operator_type.append("tups_double")
+                self.excitation_indicies.append((p,))
+                self.n_params += 1
+                # Second single
+                if n + 1 == n_layers and skip_last_singles:
+                    continue
+                self.excitation_operator_type.append("tups_single")
+                self.excitation_indicies.append((p,))
+                self.n_params += 1
+
+    def create_fUCCSD(self, states: list[list[str]], ansatz_options: dict[str, Any]) -> None:
+        """Create factorized UCCSD ansatz.
+
+        If used with a state-averaged wave function, the operator pool will be the union of all
+        possible singles and doubles from the determinants included in the states in the state-averaged wave function.
+
+        Ansatz Options:
+            * None
+
+        Args:
+            states: States to create excitation operators with respect to.
+            ansatz_options: Ansatz options.
+
+        Returns:
+            Factorized UCCSD ansatz.
+        """
+        valid_options = ()
+        for option in ansatz_options:
+            if option not in valid_options:
+                raise ValueError(f"Got unknown option for fUCC, {option}. Valid options are: {valid_options}")
+        occupied = []
+        unoccupied = []
+        for state in states:
+            for det in state:
+                occ_tmp = []
+                unocc_tmp = []
+                for i, occ_str in enumerate(det):
+                    if occ_str == "1":
+                        occ_tmp.append(i)
+                    else:
+                        unocc_tmp.append(i)
+                occupied.append(occ_tmp)
+                unoccupied.append(unocc_tmp)
+        for occ, unocc in zip(occupied, unoccupied):
+            for a, i in iterate_t1(occ, unocc):
+                if a < i:
+                    i, a = a, i
+                if (i, a) not in self.excitation_indicies:
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indicies.append((i, a))
+                    self.n_params += 1
+        for occ, unocc in zip(occupied, unoccupied):
+            for a, i, b, j in iterate_t2(occ, unocc):
+                if i % 2 == j % 2 == a % 2 == b % 2:
+                    i, j, a, b = np.sort([i, j, a, b])
+                elif i % 2 == a % 2:
+                    if a < i:
+                        i, a = a, i
+                    if b < j:
+                        j, b = b, j
                 else:
-                    raise ValueError(f"Expected type_idx to be in (1,2) got {type_idx}")
-            counter += 1
-    if "t" in excitations:
-        for a, i, b, j, c, k in theta_picker.get_t3_generator():
-            if theta[counter] != 0.0:
-                T += (
-                    theta[counter]
-                    * T3_matrix(i, j, k, a, b, c, num_active_orbs, num_elec_alpha, num_elec_beta).todense()
+                    if a < j:
+                        j, a = a, j
+                    if b < i:
+                        i, b = b, i
+                if (i, j, a, b) not in self.excitation_indicies:
+                    self.excitation_operator_type.append("double")
+                    self.excitation_indicies.append((i, j, a, b))
+                    self.n_params += 1
+
+    def create_kSAfUpCCGSD(self, num_orbs: int, ansatz_options: dict[str, Any]) -> None:
+        """Create modified k-UpCCGSD ansatz.
+
+        The ansatz have been modifed to use spin-adapted singet single excitation operators.
+
+        #. 10.1021/acs.jctc.8b01004
+
+        Ansatz Options:
+            * n_layers [int]: Number of layers.
+
+        Args:
+            num_active_orbs: Number of spatial active orbitals.
+            ansatz_options: Ansatz options.
+
+        Returns:
+            Modified k-UpCCGSD ansatz.
+        """
+        valid_options = "n_layers"
+        for option in ansatz_options:
+            if option not in valid_options:
+                raise ValueError(
+                    f"Got unknown option for kSAfUpCCGSD, {option}. Valid options are: {valid_options}"
                 )
-            counter += 1
-    if "q" in excitations:
-        for a, i, b, j, c, k, d, l in theta_picker.get_t4_generator():
-            if theta[counter] != 0.0:
-                T += (
-                    theta[counter]
-                    * T4_matrix(
-                        i,
-                        j,
-                        k,
-                        l,
-                        a,
-                        b,
-                        c,
-                        d,
-                        num_active_orbs,
-                        num_elec_alpha,
-                        num_elec_beta,
-                    ).todense()
-                )
-            counter += 1
-    if "5" in excitations:
-        for a, i, b, j, c, k, d, l, e, m in theta_picker.get_t5_generator():
-            if theta[counter] != 0.0:
-                T += (
-                    theta[counter]
-                    * T5_matrix(
-                        i,
-                        j,
-                        k,
-                        l,
-                        m,
-                        a,
-                        b,
-                        c,
-                        d,
-                        e,
-                        num_active_orbs,
-                        num_elec_alpha,
-                        num_elec_beta,
-                    ).todense()
-                )
-            counter += 1
-    if "6" in excitations:
-        for a, i, b, j, c, k, d, l, e, m, f, n in theta_picker.get_t6_generator():
-            if theta[counter] != 0.0:
-                T += (
-                    theta[counter]
-                    * T6_matrix(
-                        i,
-                        j,
-                        k,
-                        l,
-                        m,
-                        n,
-                        a,
-                        b,
-                        c,
-                        d,
-                        e,
-                        f,
-                        num_active_orbs,
-                        num_elec_alpha,
-                        num_elec_beta,
-                    ).todense()
-                )
-            counter += 1
-    assert counter == len(theta)
-    A = scipy.linalg.expm(T)
-    return A
+        if "n_layers" not in ansatz_options.keys():
+            raise ValueError("kSAfUpCCGSD require the option 'n_layers'")
+        n_layers = ansatz_options["n_layers"]
+        for _ in range(n_layers):
+            for a, i, _ in iterate_t1_sa_generalized(num_orbs):
+                self.excitation_operator_type.append("sa_single")
+                self.excitation_indicies.append((i, a))
+                self.n_params += 1
+            for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
+                self.excitation_operator_type.append("double")
+                self.excitation_indicies.append((i, j, a, b))
+                self.n_params += 1

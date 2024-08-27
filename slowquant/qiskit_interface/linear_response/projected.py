@@ -59,7 +59,7 @@ class quantumLR(quantumLRBaseClass):
                         rdms,
                         self.wf.h_mo,
                         self.wf.g_mo,
-                        self.wf.kappa_idx,
+                        self.wf.kappa_no_activeactive_idx,
                         self.wf.num_inactive_orbs,
                         self.wf.num_active_orbs,
                     )
@@ -104,8 +104,8 @@ class quantumLR(quantumLRBaseClass):
                     rdms,
                     self.wf.h_mo,
                     self.wf.g_mo,
-                    self.wf.kappa_idx_dagger,
-                    self.wf.kappa_idx,
+                    self.wf.kappa_no_activeactive_idx_dagger,
+                    self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
                     self.wf.num_active_orbs,
                 )
@@ -113,13 +113,13 @@ class quantumLR(quantumLRBaseClass):
                     rdms,
                     self.wf.h_mo,
                     self.wf.g_mo,
-                    self.wf.kappa_idx_dagger,
-                    self.wf.kappa_idx_dagger,
+                    self.wf.kappa_no_activeactive_idx_dagger,
+                    self.wf.kappa_no_activeactive_idx_dagger,
                     self.wf.num_inactive_orbs,
                     self.wf.num_active_orbs,
                 )
                 self.Sigma[: self.num_q, : self.num_q] = get_orbital_response_metric_sigma(
-                    rdms, self.wf.kappa_idx
+                    rdms, self.wf.kappa_no_activeactive_idx
                 )
             else:
                 self.H_2i_2a = hamiltonian_2i_2a(
@@ -220,7 +220,7 @@ class quantumLR(quantumLRBaseClass):
                         rdms,
                         self.wf.h_mo,
                         self.wf.g_mo,
-                        self.wf.kappa_idx,
+                        self.wf.kappa_no_activeactive_idx,
                         self.wf.num_inactive_orbs,
                         self.wf.num_active_orbs,
                     )
@@ -261,8 +261,8 @@ class quantumLR(quantumLRBaseClass):
                     rdms,
                     self.wf.h_mo,
                     self.wf.g_mo,
-                    self.wf.kappa_idx_dagger,
-                    self.wf.kappa_idx,
+                    self.wf.kappa_no_activeactive_idx_dagger,
+                    self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
                     self.wf.num_active_orbs,
                 )
@@ -270,13 +270,13 @@ class quantumLR(quantumLRBaseClass):
                     rdms,
                     self.wf.h_mo,
                     self.wf.g_mo,
-                    self.wf.kappa_idx_dagger,
-                    self.wf.kappa_idx_dagger,
+                    self.wf.kappa_no_activeactive_idx_dagger,
+                    self.wf.kappa_no_activeactive_idx_dagger,
                     self.wf.num_inactive_orbs,
                     self.wf.num_active_orbs,
                 )
                 self.Sigma[: self.num_q, : self.num_q] = get_orbital_response_metric_sigma(
-                    rdms, self.wf.kappa_idx
+                    rdms, self.wf.kappa_no_activeactive_idx
                 )
             else:
                 self.H_2i_2a = hamiltonian_2i_2a(
@@ -662,7 +662,7 @@ class quantumLR(quantumLRBaseClass):
             q_part_x = get_orbital_response_property_gradient(
                 rdms,
                 mux,
-                self.wf.kappa_idx,
+                self.wf.kappa_no_activeactive_idx,
                 self.wf.num_inactive_orbs,
                 self.wf.num_active_orbs,
                 self.normed_excitation_vectors,
@@ -672,7 +672,7 @@ class quantumLR(quantumLRBaseClass):
             q_part_y = get_orbital_response_property_gradient(
                 rdms,
                 muy,
-                self.wf.kappa_idx,
+                self.wf.kappa_no_activeactive_idx,
                 self.wf.num_inactive_orbs,
                 self.wf.num_active_orbs,
                 self.normed_excitation_vectors,
@@ -682,7 +682,7 @@ class quantumLR(quantumLRBaseClass):
             q_part_z = get_orbital_response_property_gradient(
                 rdms,
                 muz,
-                self.wf.kappa_idx,
+                self.wf.kappa_no_activeactive_idx,
                 self.wf.num_inactive_orbs,
                 self.wf.num_active_orbs,
                 self.normed_excitation_vectors,
