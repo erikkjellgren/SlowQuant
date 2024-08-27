@@ -6,7 +6,12 @@ from functools import partial
 import numpy as np
 import scipy
 from qiskit import QuantumCircuit
-from qiskit.primitives import BaseEstimator, BaseEstimatorV2, BaseSampler, BaseSamplerV2
+from qiskit.primitives import (
+    BaseEstimator,
+    BaseEstimatorV2,
+    BaseSamplerV1,
+    BaseSamplerV2,
+)
 from qiskit.quantum_info import SparsePauliOp
 
 from slowquant.molecularintegrals.integralfunctions import (
@@ -284,7 +289,7 @@ class WaveFunction:
         self.QI.parameters = parameters
 
     def change_primitive(
-        self, primitive: BaseEstimator | BaseSampler | BaseSamplerV2, verbose: bool = True
+        self, primitive: BaseEstimator | BaseSamplerV1 | BaseSamplerV2, verbose: bool = True
     ) -> None:
         """Change the primitive expectation value calculator.
 
@@ -751,7 +756,7 @@ class WaveFunction:
             rdm_order: Max order RDM.
         """
         if not isinstance(
-            self.QI._primitive, (BaseSampler, BaseSamplerV2)  # pylint: disable=protected-access
+            self.QI._primitive, (BaseSamplerV1, BaseSamplerV2)  # pylint: disable=protected-access
         ):
             raise TypeError(
                 f"This feature is only supported for Sampler got {type(self.QI._primitive)} from QuantumInterface"  # pylint: disable=protected-access
