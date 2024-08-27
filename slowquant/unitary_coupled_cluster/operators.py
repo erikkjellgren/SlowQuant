@@ -7,6 +7,20 @@ from slowquant.unitary_coupled_cluster.fermionic_operator import (
 )
 
 
+def anni(p: int, spin: str, dagger: bool) -> FermionicOperator:
+    """Construct annihilation/creation operator.
+
+    Args:
+        p: Spatial orbital index.
+        spin: Spin 'alpha' or 'beta'.
+        dagger: If creation operator.
+
+    Returns:
+        Annihilation/creation operator.
+    """
+    return FermionicOperator(a_op(p, spin, dagger=dagger), 1)
+
+
 def Epq(p: int, q: int) -> FermionicOperator:
     r"""Construct the singlet one-electron excitation operator.
 

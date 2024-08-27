@@ -209,3 +209,24 @@ def two_electron_integral_transform(C: np.ndarray, int2e: np.ndarray) -> np.ndar
     return np.einsum(
         "ai,bj,ck,dl,abcd->ijkl", C, C, C, C, int2e, optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)]
     )
+
+
+def two_electron_integral_transform_split(C1: np.ndarray, C2: np.ndarray, int2e: np.ndarray) -> np.ndarray:
+    """Transform two-electron integrals from AO to MO.
+
+    Args:
+        C: MO coefficients.
+        int2e: Two-electron integrals in AO.
+
+    Returns:
+        Two-electron integrals in MO.
+    """
+    return np.einsum(
+        "ai,bj,ck,dl,abcd->ijkl",
+        C1,
+        C1,
+        C2,
+        C2,
+        int2e,
+        optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
+    )
