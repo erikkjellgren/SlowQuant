@@ -21,12 +21,13 @@ from slowquant.unitary_coupled_cluster.operator_matrix import (
 )
 from slowquant.unitary_coupled_cluster.operators import one_elec_op_0i_0a
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
+from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
 
 class LinearResponseUCC(LinearResponseBaseClass):
     def __init__(
         self,
-        wave_function: WaveFunctionUCC,
+        wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
         do_approximate_hermitification: bool = False,
     ) -> None:
@@ -57,7 +58,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
             rdms,
             self.wf.h_mo,
             self.wf.g_mo,
-            self.wf.kappa_idx,
+            self.wf.kappa_no_activeactive_idx,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
         )
@@ -66,23 +67,25 @@ class LinearResponseUCC(LinearResponseBaseClass):
             if np.max(np.abs(grad)) > 10**-3:
                 raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
         grad = np.zeros(2 * len(self.G_ops))
+        UdH00_ket = propagate_state(["Ud", self.H_0i_0a], self.wf.ci_coeffs, *self.index_info)
         for i, op in enumerate(self.G_ops):
-            state = propagate_state(
-                op,
+            G_ket = propagate_state(
+                [op],
                 self.wf.csf_coeffs,
                 *self.index_info,
             )
-            state = np.matmul(self.wf.u, state)
+            # <0| H U G |CSF>
             grad[i] = -expectation_value(
-                self.wf.ci_coeffs,
-                self.H_0i_0a,
-                state,
+                UdH00_ket,
+                [],
+                G_ket,
                 *self.index_info,
             )
+            # <CSF| Gd Ud H |0>
             grad[i + len(self.G_ops)] = expectation_value(
-                state,
-                self.H_0i_0a,
-                self.wf.ci_coeffs,
+                G_ket,
+                [],
+                UdH00_ket,
                 *self.index_info,
             )
         if len(grad) != 0:
@@ -94,8 +97,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
             rdms,
             self.wf.h_mo,
             self.wf.g_mo,
-            self.wf.kappa_idx_dagger,
-            self.wf.kappa_idx,
+            self.wf.kappa_no_activeactive_idx_dagger,
+            self.wf.kappa_no_activeactive_idx,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
         )
@@ -103,116 +106,109 @@ class LinearResponseUCC(LinearResponseBaseClass):
             rdms,
             self.wf.h_mo,
             self.wf.g_mo,
-            self.wf.kappa_idx_dagger,
-            self.wf.kappa_idx_dagger,
+            self.wf.kappa_no_activeactive_idx_dagger,
+            self.wf.kappa_no_activeactive_idx_dagger,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
         )
         self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
-            rdms, self.wf.kappa_idx
+            rdms, self.wf.kappa_no_activeactive_idx
         )
         for j, qJ in enumerate(self.q_ops):
+            UdHq_ket = propagate_state(["Ud", self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info)
+            UdqdH_ket = propagate_state(["Ud", qJ.dagger * self.H_1i_1a], self.wf.ci_coeffs, *self.index_info)
             for i, GI in enumerate(self.G_ops):
-                state = propagate_state(
-                    GI,
+                G_ket = propagate_state(
+                    [GI],
                     self.wf.csf_coeffs,
                     *self.index_info,
                 )
-                state = np.matmul(self.wf.u, state)
                 if do_approximate_hermitification:
                     # Make A
-                    self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = expectation_value(
-                        state,
-                        self.H_1i_1a * qJ,
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    ) + expectation_value(
-                        state,
-                        qJ.dagger * self.H_1i_1a,
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )  # added an assumed zero (approximation)
-                    # Make B
-                    self.B_tracked[j, i + idx_shift] = self.B_tracked[i + idx_shift, j] = -expectation_value(
-                        state,
-                        qJ.dagger * self.H_1i_1a,
-                        self.wf.ci_coeffs,
+                    # <CSF| Gd Ud H q |0>
+                    val = expectation_value(
+                        G_ket,
+                        [],
+                        UdHq_ket,
                         *self.index_info,
                     )
+                    # <CSF| Gd Ud qd H |0>
+                    tmp = expectation_value(
+                        G_ket,
+                        [],
+                        UdqdH_ket,
+                        *self.index_info,
+                    )
+                    self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = val + tmp
+                    # Make B
+                    # - <CSF| Gd Ud qd H |0>
+                    self.B_tracked[j, i + idx_shift] = self.B_tracked[i + idx_shift, j] = -tmp
                 else:
                     # Make A
-                    self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = expectation_value(
-                        state,
-                        self.H_1i_1a * qJ,
-                        self.wf.ci_coeffs,
+                    # <CSF| Gd Ud H q |0>
+                    val = expectation_value(
+                        G_ket,
+                        [],
+                        UdHq_ket,
                         *self.index_info,
                     )
+                    self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
                     # Make B
-                    self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = -expectation_value(
-                        state,
-                        qJ.dagger * self.H_1i_1a,
-                        self.wf.ci_coeffs,
+                    # - <CSF| Gd Ud qd H |0>
+                    val = -expectation_value(
+                        G_ket,
+                        [],
+                        UdqdH_ket,
                         *self.index_info,
                     )
+                    self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
         for j, GJ in enumerate(self.G_ops):
-            stateJ = propagate_state(
-                GJ,
+            UdHUGJ_ket = propagate_state(
+                ["Ud", self.H_0i_0a, "U", GJ],
                 self.wf.csf_coeffs,
                 *self.index_info,
             )
-            stateJ = np.matmul(self.wf.u, stateJ)
+            GJUdH_ket = propagate_state(
+                [GJ],
+                UdH00_ket,
+                *self.index_info,
+            )
+            GJdUdH_ket = propagate_state(
+                [GJ.dagger],
+                UdH00_ket,
+                *self.index_info,
+            )
             for i, GI in enumerate(self.G_ops[j:], j):
-                stateI = propagate_state(
-                    GI,
+                GI_ket = propagate_state(
+                    [GI],
                     self.wf.csf_coeffs,
                     *self.index_info,
                 )
-                stateI = np.matmul(self.wf.u, stateI)
-                stateIJ = propagate_state(
-                    GI,
-                    self.wf.csf_coeffs,
-                    *self.index_info,
-                )
-                stateIJ = propagate_state(
-                    GJ,
-                    stateIJ,
-                    *self.index_info,
-                )
-                stateIJ = np.matmul(self.wf.u, stateIJ)
-                stateIJd = propagate_state(
-                    GI,
-                    self.wf.csf_coeffs,
-                    *self.index_info,
-                )
-                stateIJd = propagate_state(
-                    GJ.dagger,
-                    stateIJd,
-                    *self.index_info,
-                )
-                stateIJd = np.matmul(self.wf.u, stateIJd)
                 # Make A
+                # <CSF| GId Ud H U GJ |CSF>
                 val = expectation_value(
-                    stateI,
-                    self.H_0i_0a,
-                    stateJ,
+                    GI_ket,
+                    [],
+                    UdHUGJ_ket,
                     *self.index_info,
                 )
-                val += -expectation_value(
-                    stateIJd,
-                    self.H_0i_0a,
-                    self.wf.ci_coeffs,
+                # <CSF| GId GJ Ud H |0>
+                val -= expectation_value(
+                    GI_ket,
+                    [],
+                    GJUdH_ket,
                     *self.index_info,
                 )
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
                 # Make B
-                self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = (
-                    -expectation_value(
-                        stateIJ,
-                        self.H_0i_0a,
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
+                # - <CSF| GId GJd Ud H |0>
+                val = -expectation_value(
+                    GI_ket,
+                    [],
+                    GJdUdH_ket,
+                    *self.index_info,
                 )
+                self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
                 # Make Sigma
                 if i == j:
                     self.Sigma[i + idx_shift, j + idx_shift] = 1
@@ -254,12 +250,18 @@ class LinearResponseUCC(LinearResponseBaseClass):
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
         )
+        Udmuxd_ket = propagate_state(["Ud", mux_op.dagger], self.wf.ci_coeffs, *self.index_info)
+        Udmuyd_ket = propagate_state(["Ud", muy_op.dagger], self.wf.ci_coeffs, *self.index_info)
+        Udmuzd_ket = propagate_state(["Ud", muz_op.dagger], self.wf.ci_coeffs, *self.index_info)
+        Udmux_ket = propagate_state(["Ud", mux_op], self.wf.ci_coeffs, *self.index_info)
+        Udmuy_ket = propagate_state(["Ud", muy_op], self.wf.ci_coeffs, *self.index_info)
+        Udmuz_ket = propagate_state(["Ud", muz_op], self.wf.ci_coeffs, *self.index_info)
         transition_dipoles = np.zeros((len(self.normed_response_vectors[0]), 3))
         for state_number in range(len(self.normed_response_vectors[0])):
             q_part_x = get_orbital_response_property_gradient(
                 rdms,
                 mux,
-                self.wf.kappa_idx,
+                self.wf.kappa_no_activeactive_idx,
                 self.wf.num_inactive_orbs,
                 self.wf.num_active_orbs,
                 self.normed_response_vectors,
@@ -269,7 +271,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
             q_part_y = get_orbital_response_property_gradient(
                 rdms,
                 muy,
-                self.wf.kappa_idx,
+                self.wf.kappa_no_activeactive_idx,
                 self.wf.num_inactive_orbs,
                 self.wf.num_active_orbs,
                 self.normed_response_vectors,
@@ -279,7 +281,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
             q_part_z = get_orbital_response_property_gradient(
                 rdms,
                 muz,
-                self.wf.kappa_idx,
+                self.wf.kappa_no_activeactive_idx,
                 self.wf.num_inactive_orbs,
                 self.wf.num_active_orbs,
                 self.normed_response_vectors,
@@ -290,46 +292,51 @@ class LinearResponseUCC(LinearResponseBaseClass):
             g_part_y = 0.0
             g_part_z = 0.0
             for i, G in enumerate(self.G_ops):
-                state = propagate_state(
-                    G,
+                G_ket = propagate_state(
+                    [G],
                     self.wf.csf_coeffs,
                     *self.index_info,
                 )
-                state = np.matmul(self.wf.u, state)
+                # -Z * <0| mux U G | CSF>
                 g_part_x -= self.Z_G_normed[i, state_number] * expectation_value(
-                    self.wf.ci_coeffs,
-                    mux_op,
-                    state,
+                    Udmuxd_ket,
+                    [],
+                    G_ket,
                     *self.index_info,
                 )
+                # Y * <0| Gd Ud mux | CSF>
                 g_part_x += self.Y_G_normed[i, state_number] * expectation_value(
-                    state,
-                    mux_op,
-                    self.wf.ci_coeffs,
+                    G_ket,
+                    [],
+                    Udmux_ket,
                     *self.index_info,
                 )
+                # -Z * <0| muy U G | CSF>
                 g_part_y -= self.Z_G_normed[i, state_number] * expectation_value(
-                    self.wf.ci_coeffs,
-                    muy_op,
-                    state,
+                    Udmuyd_ket,
+                    [],
+                    G_ket,
                     *self.index_info,
                 )
+                # Y * <0| Gd Ud muy | CSF>
                 g_part_y += self.Y_G_normed[i, state_number] * expectation_value(
-                    state,
-                    muy_op,
-                    self.wf.ci_coeffs,
+                    G_ket,
+                    [],
+                    Udmuy_ket,
                     *self.index_info,
                 )
+                # -Z * <0| muz U G | CSF>
                 g_part_z -= self.Z_G_normed[i, state_number] * expectation_value(
-                    self.wf.ci_coeffs,
-                    muz_op,
-                    state,
+                    Udmuzd_ket,
+                    [],
+                    G_ket,
                     *self.index_info,
                 )
+                # Y * <0| Gd Ud muz | CSF>
                 g_part_z += self.Y_G_normed[i, state_number] * expectation_value(
-                    state,
-                    muz_op,
-                    self.wf.ci_coeffs,
+                    G_ket,
+                    [],
+                    Udmuz_ket,
                     *self.index_info,
                 )
             transition_dipoles[state_number, 0] = q_part_x + g_part_x

@@ -17,13 +17,28 @@ from slowquant.unitary_coupled_cluster.operators import (
     hamiltonian_1i_1a,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
-from slowquant.unitary_coupled_cluster.util import ThetaPicker
+from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
+from slowquant.unitary_coupled_cluster.util import (
+    UccStructure,
+    UpsStructure,
+    iterate_t1_sa,
+    iterate_t2_sa,
+    iterate_t3,
+    iterate_t4,
+    iterate_t5,
+    iterate_t6,
+)
 
 
 class LinearResponseBaseClass:
+    index_info: (
+        tuple[list[int], dict[int, int], int, int, int, int, int, list[float], UpsStructure]
+        | tuple[list[int], dict[int, int], int, int, int, int, int, list[float], UccStructure]
+    )
+
     def __init__(
         self,
-        wave_function: WaveFunctionUCC,
+        wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
@@ -33,44 +48,65 @@ class LinearResponseBaseClass:
             excitations: Which excitation orders to include in response.
         """
         self.wf = wave_function
-        self.theta_picker = ThetaPicker(
-            self.wf.active_occ_spin_idx,
-            self.wf.active_unocc_spin_idx,
-        )
-        self.index_info = (
-            self.wf.idx2det,
-            self.wf.det2idx,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-        )
+        if isinstance(self.wf, WaveFunctionUCC):
+            self.index_info = (
+                self.wf.idx2det,
+                self.wf.det2idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.num_virtual_orbs,
+                self.wf.num_active_elec_alpha,
+                self.wf.num_active_elec_beta,
+                self.wf.thetas,
+                self.wf.ucc_layout,
+            )
+        elif isinstance(self.wf, WaveFunctionUPS):
+            self.index_info = (
+                self.wf.idx2det,
+                self.wf.det2idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.num_virtual_orbs,
+                self.wf.num_active_elec_alpha,
+                self.wf.num_active_elec_beta,
+                self.wf.thetas,
+                self.wf.ups_layout,
+            )
+        else:
+            raise ValueError(f"Got incompatible wave function type, {type(self.wf)}")
 
         self.G_ops: list[FermionicOperator] = []
         self.q_ops: list[FermionicOperator] = []
         excitations = excitations.lower()
 
         if "s" in excitations:
-            for a, i, _ in self.theta_picker.get_t1_generator_sa():
+            for a, i, _ in iterate_t1_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
                 self.G_ops.append(G1_sa(i, a))
         if "d" in excitations:
-            for a, i, b, j, _, type_idx in self.theta_picker.get_t2_generator_sa():
-                if type_idx == 1:
+            for a, i, b, j, _, op_type in iterate_t2_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
+                if op_type == 1:
                     self.G_ops.append(G2_1_sa(i, j, a, b))
-                elif type_idx == 2:
+                elif op_type == 2:
                     self.G_ops.append(G2_2_sa(i, j, a, b))
         if "t" in excitations:
-            for a, i, b, j, c, k in self.theta_picker.get_t3_generator():
+            for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
                 self.G_ops.append(G3(i, j, k, a, b, c))
         if "q" in excitations:
-            for a, i, b, j, c, k, d, l in self.theta_picker.get_t4_generator():
+            for a, i, b, j, c, k, d, l in iterate_t4(
+                self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx
+            ):
                 self.G_ops.append(G4(i, j, k, l, a, b, c, d))
         if "5" in excitations:
-            for a, i, b, j, c, k, d, l, e, m in self.theta_picker.get_t5_generator():
+            for a, i, b, j, c, k, d, l, e, m in iterate_t5(
+                self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx
+            ):
                 self.G_ops.append(G5(i, j, k, l, m, a, b, c, d, e))
         if "6" in excitations:
-            for a, i, b, j, c, k, d, l, e, m, f, n in self.theta_picker.get_t6_generator():
+            for a, i, b, j, c, k, d, l, e, m, f, n in iterate_t6(
+                self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx
+            ):
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
-        for i, a in self.wf.kappa_idx:
+        for i, a in self.wf.kappa_no_activeactive_idx:
             op = 2 ** (-1 / 2) * Epq(a, i)
             self.q_ops.append(op)
 
