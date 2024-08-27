@@ -73,9 +73,21 @@ def test_LiH_naive_estimator() -> None:
 
     assert np.allclose(excitation_energies, LR.excitation_energies, atol=10**-4)
 
-    solution = [0.12945826, 0.17872954, 0.17872954, 0.60460094, 0.64662905,
-       0.74056115, 0.74056115, 1.00273293, 2.07482709, 2.13719974,
-       2.13719974, 2.45509448, 2.95423197]
+    solution = [
+        0.12945826,
+        0.17872954,
+        0.17872954,
+        0.60460094,
+        0.64662905,
+        0.74056115,
+        0.74056115,
+        1.00273293,
+        2.07482709,
+        2.13719974,
+        2.13719974,
+        2.45509448,
+        2.95423197,
+    ]
 
     assert np.allclose(excitation_energies, solution, atol=10**-6)
 
@@ -136,9 +148,21 @@ def test_LiH_naive_samplerQiskit() -> None:
 
     assert np.allclose(excitation_energies, LR.excitation_energies, atol=10**-4)
 
-    solution = [0.12945846, 0.17872984, 0.17872984, 0.60460091, 0.64662826,
-       0.74055997, 0.74055997, 1.00273236, 2.074827  , 2.13719972,
-       2.13719972, 2.45509362, 2.95423092]
+    solution = [
+        0.12945846,
+        0.17872984,
+        0.17872984,
+        0.60460091,
+        0.64662826,
+        0.74055997,
+        0.74055997,
+        1.00273236,
+        2.074827,
+        2.13719972,
+        2.13719972,
+        2.45509362,
+        2.95423092,
+    ]
 
     assert np.allclose(excitation_energies, solution, atol=10**-6)
 
@@ -199,9 +223,21 @@ def test_LiH_naive() -> None:
 
     assert np.allclose(excitation_energies, LR.excitation_energies, atol=10**-4)
 
-    solution = [0.12945857, 0.17873002, 0.17873002, 0.60460103, 0.64662807,
-       0.7405599 , 0.7405599 , 1.00273234, 2.07482701, 2.13719975,
-       2.13719975, 2.45509343, 2.95423121]
+    solution = [
+        0.12945857,
+        0.17873002,
+        0.17873002,
+        0.60460103,
+        0.64662807,
+        0.7405599,
+        0.7405599,
+        1.00273234,
+        2.07482701,
+        2.13719975,
+        2.13719975,
+        2.45509343,
+        2.95423121,
+    ]
 
     assert np.allclose(excitation_energies, solution, atol=10**-6)
 
@@ -226,10 +262,11 @@ def test_LiH_projected() -> None:
         rhf.mo_coeff,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
+        "SD",
     )
 
     # Optimize WF
-    WF.run_ucc("SD", True)
+    WF.run_ucc(True)
 
     # Optimize WF with QSQ
     estimator = SamplerAer()
@@ -255,9 +292,21 @@ def test_LiH_projected() -> None:
     qLR.run(do_rdm=True)
     excitation_energies = qLR.get_excitation_energies()
 
-    solution = [0.1294585 , 0.17872992, 0.17872992, 0.60460117, 0.64662822,
-       0.74056037, 0.74056037, 1.00273275, 2.07482698, 2.13719974,
-       2.13719974, 2.45509396, 2.95423188]
+    solution = [
+        0.1294585,
+        0.17872992,
+        0.17872992,
+        0.60460117,
+        0.64662822,
+        0.74056037,
+        0.74056037,
+        1.00273275,
+        2.07482698,
+        2.13719974,
+        2.13719974,
+        2.45509396,
+        2.95423188,
+    ]
 
     assert np.allclose(excitation_energies, solution, atol=10**-6)
 
