@@ -128,8 +128,8 @@ class Clique:
         if len(self.cliques) == 0:
             self.cliques.append(CliqueHead("Z" * len(paulis[0]), None))
 
-        # Loop over Pauli strings (passed via observable)
-        for pauli in paulis:
+        # Loop over Pauli strings (passed via observable) in reverse sorted order
+        for pauli in sorted(paulis, reverse=True):
             # Loop over Clique heads simulated so far
             for clique_head in self.cliques:
                 # Check if Pauli string belongs to any already simulated Clique head.
