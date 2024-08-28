@@ -11,7 +11,7 @@ def to_CBS_measurement(op: str, transpiled: None | list[QuantumCircuit] = None) 
     This is achived by the following transformation:
 
     .. math::
-        \begin{align}cli
+        \begin{align}
         I &\rightarrow I\\
         Z &\rightarrow Z\\
         X &\rightarrow XH\\
@@ -128,7 +128,7 @@ class Clique:
         if len(self.cliques) == 0:
             self.cliques.append(CliqueHead("Z" * len(paulis[0]), None))
 
-        # Loop over Pauli strings (passed via observable)
+        # Loop over Pauli strings (passed via observable) in reverse sorted order
         for pauli in sorted(paulis, reverse=True):
             # Loop over Clique heads simulated so far
             for clique_head in self.cliques:
