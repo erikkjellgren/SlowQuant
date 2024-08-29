@@ -323,6 +323,20 @@ def test_LiH_dumb_projected() -> None:
     mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
     rhf = pyscf.scf.RHF(mol).run()
 
+    # SlowQuant
+    WF = WaveFunctionUCC(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 2),
+        rhf.mo_coeff,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        "SD",
+    )
+
+    # Optimize WF
+    WF.run_ucc(True)
+
     # Optimize WF with QSQ
     estimator = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
@@ -333,7 +347,7 @@ def test_LiH_dumb_projected() -> None:
         mol.nao * 2,
         mol.nelectron,
         (2, 2),
-        rhf.mo_coeff,
+        WF.c_trans,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
         QI,
@@ -348,19 +362,19 @@ def test_LiH_dumb_projected() -> None:
     excitation_energies = qLR.get_excitation_energies()
 
     solution = [
-        0.12947075,
-        0.17874853,
-        0.17874853,
-        0.60462373,
-        0.64663037,
-        0.74060052,
-        0.74060052,
-        1.00275465,
-        2.0748271,
-        2.13720201,
-        2.13720201,
-        2.45509667,
-        2.95432578,
+        0.1294586,
+        0.17873008,
+        0.17873008,
+        0.60460128,
+        0.64662825,
+        0.74056057,
+        0.74056057,
+        1.0027328,
+        2.07482697,
+        2.13719977,
+        2.13719977,
+        2.45509398,
+        2.95423213,
     ]
 
     assert np.allclose(excitation_energies, solution, atol=10**-6)
@@ -402,7 +416,7 @@ def test_LiH_allprojected() -> None:
         mol.nao * 2,
         mol.nelectron,
         (2, 2),
-        rhf.mo_coeff,
+        WF.c_trans,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
         QI,
@@ -423,19 +437,19 @@ def test_LiH_allprojected() -> None:
     assert np.allclose(excitation_energies, LR.excitation_energies, atol=10**-4)
 
     solution = [
-        0.12961625,
-        0.18079147,
-        0.18079147,
-        0.60483322,
-        0.6469466,
-        0.74931037,
-        0.74931037,
-        1.00301551,
-        2.07493174,
-        2.13725269,
-        2.13725269,
-        2.45535992,
-        2.95516418,
+        0.12961665,
+        0.18079167,
+        0.18079167,
+        0.60483162,
+        0.6469434,
+        0.74930517,
+        0.74930517,
+        1.00301143,
+        2.07493044,
+        2.13725045,
+        2.13725045,
+        2.45535443,
+        2.95513784,
     ]
 
     assert np.allclose(excitation_energies, solution, atol=10**-6)
@@ -453,6 +467,20 @@ def test_LiH_dumb_allprojected() -> None:
     mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
     rhf = pyscf.scf.RHF(mol).run()
 
+    # SlowQuant
+    WF = WaveFunctionUCC(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 2),
+        rhf.mo_coeff,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        "SD",
+    )
+
+    # Optimize WF
+    WF.run_ucc(True)
+
     # Optimize WF with QSQ
     estimator = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
@@ -463,7 +491,7 @@ def test_LiH_dumb_allprojected() -> None:
         mol.nao * 2,
         mol.nelectron,
         (2, 2),
-        rhf.mo_coeff,
+        WF.c_trans,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
         QI,
@@ -478,19 +506,19 @@ def test_LiH_dumb_allprojected() -> None:
     excitation_energies = qLR.get_excitation_energies()
 
     solution = [
-        0.12961625,
-        0.18079147,
-        0.18079147,
-        0.60483322,
-        0.6469466,
-        0.74931037,
-        0.74931037,
-        1.00301551,
-        2.07493174,
-        2.13725269,
-        2.13725269,
-        2.45535992,
-        2.95516418,
+        0.12961659,
+        0.18079162,
+        0.18079162,
+        0.60483121,
+        0.64694295,
+        0.74930422,
+        0.74930422,
+        1.00301035,
+        2.07493039,
+        2.13725044,
+        2.13725044,
+        2.45535349,
+        2.95513469,
     ]
 
     assert np.allclose(excitation_energies, solution, atol=10**-6)
@@ -508,6 +536,20 @@ def test_LiH_naive_sampler_ISA() -> None:
     mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
     rhf = pyscf.scf.RHF(mol).run()
 
+    # SlowQuant
+    WF = WaveFunctionUCC(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 2),
+        rhf.mo_coeff,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        "SD",
+    )
+
+    # Optimize WF
+    WF.run_ucc(True)
+
     # Optimize WF with QSQ
     sampler = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
@@ -518,7 +560,7 @@ def test_LiH_naive_sampler_ISA() -> None:
         mol.nao * 2,
         mol.nelectron,
         (2, 2),
-        rhf.mo_coeff,
+        WF.c_trans,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
         QI,
