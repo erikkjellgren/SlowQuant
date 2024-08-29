@@ -624,65 +624,46 @@ class UpsStructure:
                 self.excitation_indicies.append((p,))
                 self.n_params += 1
 
-    def create_fUCCSD(self, states: list[list[str]], ansatz_options: dict[str, Any]) -> None:
+    def create_fUCC(self, num_orbs: int, num_elec: int, ansatz_options: dict[str, Any]) -> None:
         """Create factorized UCCSD ansatz.
 
-        If used with a state-averaged wave function, the operator pool will be the union of all
-        possible singles and doubles from the determinants included in the states in the state-averaged wave function.
-
         Ansatz Options:
-            * None
+            * n_layers [int]: Number of layers.
 
         Args:
-            states: States to create excitation operators with respect to.
+            num_orbs: Number of active spatial orbitals.
+            num_elec: Number of active electrons.
             ansatz_options: Ansatz options.
 
         Returns:
             Factorized UCCSD ansatz.
         """
-        valid_options = ()
+        valid_options = ("n_layers",)
         for option in ansatz_options:
             if option not in valid_options:
                 raise ValueError(f"Got unknown option for fUCC, {option}. Valid options are: {valid_options}")
-        occupied = []
-        unoccupied = []
-        for state in states:
-            for det in state:
-                occ_tmp = []
-                unocc_tmp = []
-                for i, occ_str in enumerate(det):
-                    if occ_str == "1":
-                        occ_tmp.append(i)
-                    else:
-                        unocc_tmp.append(i)
-                occupied.append(occ_tmp)
-                unoccupied.append(unocc_tmp)
-        for occ, unocc in zip(occupied, unoccupied):
+        if "n_layers" not in ansatz_options.keys():
+            raise ValueError("fUCC require the option 'n_layers'")
+        n_layers = ansatz_options["n_layers"]
+        num_spin_orbs = 2 * num_orbs
+        occ = []
+        unocc = []
+        idx = 0
+        for _ in range(np.sum(num_elec)):
+            occ.append(idx)
+            idx += 1
+        for _ in range(num_spin_orbs - np.sum(num_elec)):
+            unocc.append(idx)
+            idx += 1
+        for _ in range(n_layers):
             for a, i in iterate_t1(occ, unocc):
-                if a < i:
-                    i, a = a, i
-                if (i, a) not in self.excitation_indicies:
-                    self.excitation_operator_type.append("single")
-                    self.excitation_indicies.append((i, a))
-                    self.n_params += 1
-        for occ, unocc in zip(occupied, unoccupied):
+                self.excitation_operator_type.append("single")
+                self.excitation_indicies.append((i, a))
+                self.n_params += 1
             for a, i, b, j in iterate_t2(occ, unocc):
-                if i % 2 == j % 2 == a % 2 == b % 2:
-                    i, j, a, b = np.sort([i, j, a, b])
-                elif i % 2 == a % 2:
-                    if a < i:
-                        i, a = a, i
-                    if b < j:
-                        j, b = b, j
-                else:
-                    if a < j:
-                        j, a = a, j
-                    if b < i:
-                        i, b = b, i
-                if (i, j, a, b) not in self.excitation_indicies:
-                    self.excitation_operator_type.append("double")
-                    self.excitation_indicies.append((i, j, a, b))
-                    self.n_params += 1
+                self.excitation_operator_type.append("double")
+                self.excitation_indicies.append((i, j, a, b))
+                self.n_params += 1
 
     def create_kSAfUpCCGSD(self, num_orbs: int, ansatz_options: dict[str, Any]) -> None:
         """Create modified k-UpCCGSD ansatz.
@@ -695,13 +676,13 @@ class UpsStructure:
             * n_layers [int]: Number of layers.
 
         Args:
-            num_active_orbs: Number of spatial active orbitals.
+            num_orbs: Number of spatial active orbitals.
             ansatz_options: Ansatz options.
 
         Returns:
             Modified k-UpCCGSD ansatz.
         """
-        valid_options = "n_layers"
+        valid_options = ("n_layers",)
         for option in ansatz_options:
             if option not in valid_options:
                 raise ValueError(
@@ -718,4 +699,98 @@ class UpsStructure:
             for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
                 self.excitation_operator_type.append("double")
                 self.excitation_indicies.append((i, j, a, b))
+                self.n_params += 1
+
+    def create_dUCCSD(self, num_orbs: int, num_elec: int, ansatz_options: dict[str, Any]) -> None:
+        r"""Create disentangled UCCSD ansatz with SDS operator ordering.
+
+        The operator ordering of this implementation is,
+
+        .. math::
+            \boldsymbol{U}\left|\text{CSF}\right> = \prod_{ijab}\exp\left(\theta_{jb}\left(\hat{T}_{jb}-\hat{T}_{jb}^\dagger\right)\right)
+            \exp\left(\theta_{ijab}\left(\hat{T}_{ijab}-\hat{T}_{ijab}^\dagger\right)\right)
+            \exp\left(\theta_{ia}\left(\hat{T}_{ia}-\hat{T}_{ia}^\dagger\right)\right)\left|\text{CSF}\right>
+
+        #. 10.1063/1.5133059, Eq. 25, Eq. 35
+
+        Ansatz Options:
+            * n_layers [int]: Number of layers.
+
+        Args:
+            num_orbs: Number of active spatial orbitals.
+            num_elec: Number of active electrons.
+            ansatz_options: Ansatz options.
+
+        Returns:
+            Disentaglned UCCSD ansatz.
+        """
+        valid_options = ("n_layers",)
+        for option in ansatz_options:
+            if option not in valid_options:
+                raise ValueError(
+                    f"Got unknown option for dUCCSD, {option}. Valid options are: {valid_options}"
+                )
+        if "n_layers" not in ansatz_options.keys():
+            raise ValueError("dUCCSD require the option 'n_layers'")
+        n_layers = ansatz_options["n_layers"]
+        num_spin_orbs = 2 * num_orbs
+        occ = []
+        unocc = []
+        idx = 0
+        for _ in range(np.sum(num_elec)):
+            occ.append(idx)
+            idx += 1
+        for _ in range(num_spin_orbs - np.sum(num_elec)):
+            unocc.append(idx)
+            idx += 1
+        for _ in range(n_layers):
+            for a, i, b, j in iterate_t2(occ, unocc):
+                self.excitation_operator_type.append("single")
+                self.excitation_indicies.append((i, a))
+                self.n_params += 1
+                self.excitation_operator_type.append("double")
+                self.excitation_indicies.append((i, j, a, b))
+                self.n_params += 1
+                self.excitation_operator_type.append("single")
+                self.excitation_indicies.append((j, b))
+                self.n_params += 1
+
+    def create_kSAdUpCCGSD(self, num_orbs: int, ansatz_options: dict[str, Any]) -> None:
+        """Create modified k-UpCCGSD ansatz.
+
+        The ansatz have been modifed to use spin-adapted singet single excitation operators.
+        This ansatz has also been modified to follow the operator ordering as dUCCSD.
+
+        #. 10.1021/acs.jctc.8b01004
+        #. 10.1063/1.5133059, Eq. 25, Eq. 35 (for ordering)
+
+        Ansatz Options:
+            * n_layers [int]: Number of layers.
+
+        Args:
+            num_orbs: Number of spatial active orbitals.
+            ansatz_options: Ansatz options.
+
+        Returns:
+            Modified k-UpCCGSD ansatz.
+        """
+        valid_options = "n_layers"
+        for option in ansatz_options:
+            if option not in valid_options:
+                raise ValueError(
+                    f"Got unknown option for kSAdUpCCGSD, {option}. Valid options are: {valid_options}"
+                )
+        if "n_layers" not in ansatz_options.keys():
+            raise ValueError("kSAdUpCCGSD require the option 'n_layers'")
+        n_layers = ansatz_options["n_layers"]
+        for _ in range(n_layers):
+            for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
+                self.excitation_operator_type.append("sa_single")
+                self.excitation_indicies.append((i // 2, a // 2))
+                self.n_params += 1
+                self.excitation_operator_type.append("double")
+                self.excitation_indicies.append((i, j, a, b))
+                self.n_params += 1
+                self.excitation_operator_type.append("sa_single")
+                self.excitation_indicies.append((i // 2, a // 2))
                 self.n_params += 1
