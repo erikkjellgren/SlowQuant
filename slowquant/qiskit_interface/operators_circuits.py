@@ -2,7 +2,10 @@ import numpy as np
 from qiskit.circuit import Parameter, ParameterExpression, QuantumCircuit
 
 from slowquant.qiskit_interface.util import f2q
-
+from qiskit_nature.second_q.operators import FermionicOp
+from qiskit.circuit.library import PauliEvolutionGate
+from qiskit.quantum_info import Pauli
+from slowquant.unitary_coupled_cluster.operators import anni_spin
 
 def tups_single(p: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter) -> QuantumCircuit:
     r"""Spin-adapted single excitation as used in the tUPS ansatz.
@@ -376,4 +379,46 @@ def single_sa_excitation(
     # qc = single_excitation(2 * k + 1, 2 * i + 1, num_orbs, qc, 2 ** (-1 / 2) * theta)
     qc = single_excitation(2 * k, 2 * i, num_orbs, qc, theta)
     qc = single_excitation(2 * k + 1, 2 * i + 1, num_orbs, qc, theta)
+    return qc
+
+
+def trotter_single_excitation(i, a, num_orbs, qc, theta, mapper) -> QuantumCircuit:
+    num_spin_orbs = 2*num_orbs
+    print(a,i)
+    op = anni_spin(a, True) * anni_spin(i, False)
+    T = op - op.dagger
+    op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
+    ops = np.array([str(pauli) for pauli in op_mapped.paulis])
+    factors = np.array([(-1.0j * x).real for x in op_mapped.coeffs])
+    sort_idx = np.argsort(ops)
+    ops = ops[sort_idx]
+    factors = factors[sort_idx]
+    num_qubits = qc.num_qubits
+    for pauli, fac in zip(ops, factors):
+        qc.append(
+            PauliEvolutionGate(Pauli(pauli), fac * theta),
+            np.linspace(0, num_qubits - 1, num_qubits, dtype=int).tolist(),
+        )
+    return qc
+
+
+def trotter_double_excitation(i, j, a, b, num_orbs, qc, theta, mapper) -> QuantumCircuit:
+    num_spin_orbs = 2*num_orbs
+    ops = []
+    factors = []
+    print(a, b, j, i)
+    op = anni_spin(a, True) * anni_spin(b, True) * anni_spin(j, False) * anni_spin(i, False)
+    T = op - op.dagger
+    op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
+    ops = np.array([str(pauli) for pauli in op_mapped.paulis])
+    factors = np.array([(-1.0j * x).real for x in op_mapped.coeffs])
+    sort_idx = np.argsort(ops)
+    ops = ops[sort_idx]
+    factors = factors[sort_idx]
+    num_qubits = qc.num_qubits
+    for pauli, fac in zip(ops, factors):
+        qc.append(
+            PauliEvolutionGate(Pauli(pauli), fac * theta),
+            np.linspace(0, num_qubits - 1, num_qubits, dtype=int).tolist(),
+        )
     return qc

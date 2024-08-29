@@ -23,6 +23,7 @@ from qiskit_nature.second_q.operators import FermionicOp
 from slowquant.qiskit_interface.custom_ansatz import (
     dUCCSD,
     fUCC,
+    tUCC,
     kSAdUpCCGSD,
     kSAfUpCCGSD,
     tUPS,
@@ -135,18 +136,10 @@ class QuantumInterface:
             print("QI was initialized with a custom QuantumCircuit object.")
             self.circuit = self.ansatz
         elif self.ansatz == "tUCCSD":
-            if len(self.ansatz_options) != 0:
-                raise ValueError(f"No options available for tUCCSD got {self.ansatz_options}")
-            self.circuit = UCCSD(
-                num_orbs,
-                self.num_elec,
-                self.mapper,
-                initial_state=HartreeFock(
-                    num_orbs,
-                    self.num_elec,
-                    self.mapper,
-                ),
-            )
+            if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
+            self.circuit, self.grad_param_R = tUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
         elif self.ansatz == "tPUCCD":
             if len(self.ansatz_options) != 0:
                 raise ValueError(f"No options available for tPUCCD got {self.ansatz_options}")

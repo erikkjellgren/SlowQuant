@@ -12,6 +12,8 @@ from slowquant.qiskit_interface.operators_circuits import (
     single_sa_excitation,
     tups_double,
     tups_single,
+    trotter_double_excitation,
+    trotter_single_excitation,
 )
 from slowquant.unitary_coupled_cluster.util import (
     iterate_pair_t2_generalized,
@@ -338,5 +340,43 @@ def kSAdUpCCGSD(
             idx += 1
             qc = single_sa_excitation(a // 2, i // 2, num_orbs, qc, Parameter(f"p{idx:09d}"))
             grad_param_R[f"p{idx:09d}"] = 4
+            idx += 1
+    return qc, grad_param_R
+
+
+def tUCC(
+    num_orbs: int,
+    num_elec: tuple[int, int],
+    mapper: FermionicMapper,
+    ansatz_options: dict[str, Any],
+) -> tuple[QuantumCircuit, dict[str, int]]:
+    valid_options = ("n_layers",)
+    for option in ansatz_options:
+        if option not in valid_options:
+            raise ValueError(f"Got unknown option for fUCC, {option}. Valid options are: {valid_options}")
+    if "n_layers" not in ansatz_options.keys():
+        raise ValueError("fUCC require the option 'n_layers'")
+    n_layers = ansatz_options["n_layers"]
+    num_spin_orbs = 2 * num_orbs
+    occ = []
+    unocc = []
+    idx = 0
+    for _ in range(np.sum(num_elec)):
+        occ.append(idx)
+        idx += 1
+    for _ in range(num_spin_orbs - np.sum(num_elec)):
+        unocc.append(idx)
+        idx += 1
+    qc = HartreeFock(num_orbs, num_elec, mapper)
+    grad_param_R = {}
+    idx = 0
+    for _ in range(n_layers):
+        for a, i in iterate_t1(occ, unocc):
+            qc = trotter_single_excitation(a, i, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
+            grad_param_R[f"p{idx:09d}"] = 2
+            idx += 1
+        for a, i, b, j in iterate_t2(occ, unocc):
+            qc = trotter_double_excitation(a, b, i, j, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
+            grad_param_R[f"p{idx:09d}"] = 2
             idx += 1
     return qc, grad_param_R
