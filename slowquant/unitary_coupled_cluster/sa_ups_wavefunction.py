@@ -250,8 +250,6 @@ class WaveFunctionSAUPS:
         elif ansatz.lower() == "qnp":
             self.ansatz_options["do_qnp"] = True
             self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
-        elif ansatz.lower() == "fucc":
-            self.ups_layout.create_fUCCSD(states[1], self.ansatz_options)
         elif ansatz.lower() == "ksafupccgsd":
             self.ups_layout.create_kSAfUpCCGSD(self.num_active_orbs, self.ansatz_options)
         else:

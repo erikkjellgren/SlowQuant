@@ -228,13 +228,14 @@ class WaveFunctionUPS:
             self.ansatz_options["do_qnp"] = True
             self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
         elif ansatz.lower() == "fucc":
-            state = "1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec)
-            self.ups_layout.create_fUCCSD([[state]], self.ansatz_options)
+            self.ups_layout.create_fUCCSD(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
         elif ansatz.lower() == "ksafupccgsd":
             self.ups_layout.create_kSAfUpCCGSD(
                 self.num_active_orbs,
                 self.ansatz_options,
             )
+        elif ansatz.lower() == "duccsd":
+            self.ups_layout.create_dUCCSD(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()

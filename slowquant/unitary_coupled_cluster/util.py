@@ -624,7 +624,7 @@ class UpsStructure:
                 self.excitation_indicies.append((p,))
                 self.n_params += 1
 
-    def create_fUCCSD(self, states: list[list[str]], ansatz_options: dict[str, Any]) -> None:
+    def create_fUCCSD(self, num_orbs: int, num_elec: int, ansatz_options: dict[str, Any]) -> None:
         """Create factorized UCCSD ansatz.
 
         If used with a state-averaged wave function, the operator pool will be the union of all
@@ -634,7 +634,6 @@ class UpsStructure:
             * None
 
         Args:
-            states: States to create excitation operators with respect to.
             ansatz_options: Ansatz options.
 
         Returns:
@@ -644,45 +643,24 @@ class UpsStructure:
         for option in ansatz_options:
             if option not in valid_options:
                 raise ValueError(f"Got unknown option for fUCC, {option}. Valid options are: {valid_options}")
-        occupied = []
-        unoccupied = []
-        for state in states:
-            for det in state:
-                occ_tmp = []
-                unocc_tmp = []
-                for i, occ_str in enumerate(det):
-                    if occ_str == "1":
-                        occ_tmp.append(i)
-                    else:
-                        unocc_tmp.append(i)
-                occupied.append(occ_tmp)
-                unoccupied.append(unocc_tmp)
-        for occ, unocc in zip(occupied, unoccupied):
-            for a, i in iterate_t1(occ, unocc):
-                if a < i:
-                    i, a = a, i
-                if (i, a) not in self.excitation_indicies:
-                    self.excitation_operator_type.append("single")
-                    self.excitation_indicies.append((i, a))
-                    self.n_params += 1
-        for occ, unocc in zip(occupied, unoccupied):
-            for a, i, b, j in iterate_t2(occ, unocc):
-                if i % 2 == j % 2 == a % 2 == b % 2:
-                    i, j, a, b = np.sort([i, j, a, b])
-                elif i % 2 == a % 2:
-                    if a < i:
-                        i, a = a, i
-                    if b < j:
-                        j, b = b, j
-                else:
-                    if a < j:
-                        j, a = a, j
-                    if b < i:
-                        i, b = b, i
-                if (i, j, a, b) not in self.excitation_indicies:
-                    self.excitation_operator_type.append("double")
-                    self.excitation_indicies.append((i, j, a, b))
-                    self.n_params += 1
+        num_spin_orbs = 2 * num_orbs
+        occ = []
+        unocc = []
+        idx = 0
+        for _ in range(np.sum(num_elec)):
+            occ.append(idx)
+            idx += 1
+        for _ in range(num_spin_orbs - np.sum(num_elec)):
+            unocc.append(idx)
+            idx += 1
+        for a, i in iterate_t1(occ, unocc):
+            self.excitation_operator_type.append("single")
+            self.excitation_indicies.append((i, a))
+            self.n_params += 1
+        for a, i, b, j in iterate_t2(occ, unocc):
+            self.excitation_operator_type.append("double")
+            self.excitation_indicies.append((i, j, a, b))
+            self.n_params += 1
 
     def create_kSAfUpCCGSD(self, num_orbs: int, ansatz_options: dict[str, Any]) -> None:
         """Create modified k-UpCCGSD ansatz.
@@ -719,3 +697,43 @@ class UpsStructure:
                 self.excitation_operator_type.append("double")
                 self.excitation_indicies.append((i, j, a, b))
                 self.n_params += 1
+
+    def create_dUCCSD(self, num_orbs: int, num_elec: int, ansatz_options: dict[str, Any]) -> None:
+        """Create factorized UCCSD ansatz.
+
+        If used with a state-averaged wave function, the operator pool will be the union of all
+        possible singles and doubles from the determinants included in the states in the state-averaged wave function.
+
+        Ansatz Options:
+            * None
+
+        Args:
+            ansatz_options: Ansatz options.
+
+        Returns:
+            Factorized UCCSD ansatz.
+        """
+        valid_options = ()
+        for option in ansatz_options:
+            if option not in valid_options:
+                raise ValueError(f"Got unknown option for dUCC, {option}. Valid options are: {valid_options}")
+        num_spin_orbs = 2 * num_orbs
+        occ = []
+        unocc = []
+        idx = 0
+        for _ in range(np.sum(num_elec)):
+            occ.append(idx)
+            idx += 1
+        for _ in range(num_spin_orbs - np.sum(num_elec)):
+            unocc.append(idx)
+            idx += 1
+        for a, i, b, j in iterate_t2(occ, unocc):
+            self.excitation_operator_type.append("single")
+            self.excitation_indicies.append((i, a))
+            self.n_params += 1
+            self.excitation_operator_type.append("double")
+            self.excitation_indicies.append((i, j, a, b))
+            self.n_params += 1
+            self.excitation_operator_type.append("single")
+            self.excitation_indicies.append((j, b))
+            self.n_params += 1
