@@ -252,6 +252,8 @@ class WaveFunctionSAUPS:
             self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
         elif ansatz.lower() == "ksafupccgsd":
             self.ups_layout.create_kSAfUpCCGSD(self.num_active_orbs, self.ansatz_options)
+        elif ansatz.lower() == "ksadupccgsd":
+            self.ups_layout.create_kSAdUpCCGSD(self.num_active_orbs, self.ansatz_options)
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()

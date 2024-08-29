@@ -20,7 +20,13 @@ from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFoc
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
-from slowquant.qiskit_interface.custom_ansatz import dUCCSD, fUCC, kSAfUpCCGSD, tUPS
+from slowquant.qiskit_interface.custom_ansatz import (
+    dUCCSD,
+    fUCC,
+    kSAdUpCCGSD,
+    kSAfUpCCGSD,
+    tUPS,
+)
 from slowquant.qiskit_interface.util import (
     Clique,
     correct_distribution,
@@ -44,7 +50,7 @@ class QuantumInterface:
         mapper: FermionicMapper,
         ISA: bool = False,
         pass_manager: None | PassManager = None,
-        ansatz_options: dict[str, Any] = {},
+        ansatz_options: dict[str, Any] | None = None,
         shots: None | int = None,
         max_shots_per_run: int = 100000,
         do_M_mitigation: bool = False,
@@ -67,7 +73,19 @@ class QuantumInterface:
             do_M_ansatz0: Use the ansatz with theta=0 when constructing the read-out correlation matrix.
             do_postselection: Use postselection to preserve number of particles in the computational basis.
         """
-        allowed_ansatz = ("tUCCSD", "tPUCCD", "tUCCD", "tUPS", "fUCCSD", "QNP", "kSAfUpCCGSD", "dUCCSD")
+        if ansatz_options is None:
+            ansatz_options = {}
+        allowed_ansatz = (
+            "tUCCSD",
+            "tPUCCD",
+            "tUCCD",
+            "tUPS",
+            "fUCCSD",
+            "QNP",
+            "kSAfUpCCGSD",
+            "dUCCSD",
+            "kSAdUpCCGSD",
+        )
         if not isinstance(ansatz, QuantumCircuit) and ansatz not in allowed_ansatz:
             raise ValueError(
                 "The chosen Ansatz is not available. Choose from: ",
@@ -166,13 +184,23 @@ class QuantumInterface:
             self.ansatz_options["do_qnp"] = True
             self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
         elif self.ansatz == "fUCCSD":
+            if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
             self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
         elif self.ansatz == "kSAfUpCCGSD":
             self.circuit, self.grad_param_R = kSAfUpCCGSD(
                 num_orbs, self.num_elec, self.mapper, self.ansatz_options
             )
         elif self.ansatz == "dUCCSD":
+            if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
             self.circuit, self.grad_param_R = dUCCSD(
+                num_orbs, self.num_elec, self.mapper, self.ansatz_options
+            )
+        elif self.ansatz == "kSAdUpCCGSD":
+            self.circuit, self.grad_param_R = kSAdUpCCGSD(
                 num_orbs, self.num_elec, self.mapper, self.ansatz_options
             )
 
