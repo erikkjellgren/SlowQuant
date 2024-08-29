@@ -262,7 +262,7 @@ def dUCCSD(
     if not isinstance(mapper, JordanWignerMapper):
         raise ValueError(f"dUCCSD only implemented for JW mapper, got: {type(mapper)}")
     if "n_layers" not in ansatz_options.keys():
-        raise ValueError("kSAdUpCCGSD require the option 'n_layers'")
+        raise ValueError("dUCCSD require the option 'n_layers'")
     n_layers = ansatz_options["n_layers"]
     num_spin_orbs = 2 * num_orbs
     occ = []
