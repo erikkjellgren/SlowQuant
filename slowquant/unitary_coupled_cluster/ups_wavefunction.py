@@ -89,6 +89,7 @@ class WaveFunctionUPS:
         self._rdm2 = None
         self._h_mo = None
         self._g_mo = None
+        self._energy_elec = None
         self.ansatz_options = ansatz_options
         active_space = []
         orbital_counter = 0
@@ -263,6 +264,7 @@ class WaveFunctionUPS:
         """
         self._h_mo = None
         self._g_mo = None
+        self._energy_elec = None
         self._c_orthonormal = c
 
     @property
@@ -287,7 +289,7 @@ class WaveFunctionUPS:
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
-        self._u = None
+        self._energy_elec = None
         self._thetas = theta_vals.copy()
         self.ci_coeffs = construct_ups_state(
             self.csf_coeffs,
@@ -439,6 +441,12 @@ class WaveFunctionUPS:
         diff = np.abs(S_ortho - one)
         print("Max ortho-normal diff:", np.max(diff))
 
+    @property
+    def energy_elec(self) -> float:
+        if self._energy_elec is None:
+            self._energy_elec = energy_ups(self.thetas, False, self)
+        return self._energy_elec
+
     def run_ups(
         self,
         orbital_optimization: bool = False,
@@ -524,7 +532,7 @@ class WaveFunctionUPS:
                 jac=parameter_gradient,
                 options={"maxiter": maxiter},
             )
-        self.energy_elec = res["fun"]
+        self._energy_elec = res["fun"]
         param_idx = 0
         if orbital_optimization:
             param_idx += len(self.kappa)
