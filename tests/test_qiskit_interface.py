@@ -47,7 +47,7 @@ def test_LiH_naive_estimator() -> None:
     estimator = Estimator()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -122,7 +122,7 @@ def test_LiH_naive_samplerQiskit() -> None:
     estimator = Sampler()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -197,7 +197,7 @@ def test_LiH_naive() -> None:
     estimator = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -258,7 +258,7 @@ def test_LiH_projected() -> None:
     estimator = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -313,7 +313,7 @@ def test_LiH_dumb_projected() -> None:
     estimator = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -382,7 +382,7 @@ def test_LiH_allprojected() -> None:
     estimator = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -445,7 +445,7 @@ def test_LiH_dumb_allprojected() -> None:
     estimator = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -502,7 +502,7 @@ def test_LiH_naive_sampler_ISA() -> None:
     sampler = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(sampler, "tUCCSD", mapper, ISA=True)
+    QI = QuantumInterface(sampler, "fUCCSD", mapper, ISA=True)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -559,7 +559,7 @@ def test_LiH_oscillator_strength() -> None:
     estimator = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -661,7 +661,7 @@ def test_gradient_optimizer_H2() -> None:
 
     estimator = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
-    QI = QuantumInterface(estimator, "tUCCD", mapper)
+    QI = QuantumInterface(estimator, "fUCCD", mapper)
 
     WF = WaveFunction(
         mol.nao * 2,
@@ -693,7 +693,7 @@ def test_sampler_changes() -> None:
 
     # Ideal Estimator
     estimator = Estimator()
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -765,7 +765,7 @@ def test_shots() -> None:
     sampler = SamplerAer(transpile_options={"optimization_level": 0})
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(sampler, "tUCCSD", mapper, shots=10)
+    QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=10)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -823,7 +823,7 @@ def test_samplerV2() -> None:
     sampler = SamplerV2Aer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(sampler, "tUCCSD", mapper, shots=10)
+    QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=10)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -857,7 +857,7 @@ def test_samplerV2_ibm() -> None:
     sampler = SamplerV2IBM(mode=aer)
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(sampler, "tUCCSD", mapper, shots=10)
+    QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=10)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -888,7 +888,7 @@ def test_custom() -> None:
     sampler = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(sampler, "tUCCSD", mapper, shots=None)
+    QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=None)
 
     qWF = WaveFunction(
         mol.nao * 2,
