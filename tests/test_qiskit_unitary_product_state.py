@@ -1,4 +1,6 @@
 # type: ignore
+import numpy as np
+import pyscf
 from qiskit_aer.primitives import Sampler
 from qiskit_nature.second_q.mappers import JordanWignerMapper
 
@@ -253,3 +255,46 @@ def test_ksadupccgsd() -> None:
     qWF.ansatz_parameters = WF.thetas
 
     assert abs(qWF.energy_elec - -8.828916576542285) < 10**-8
+
+
+def test_lih_fucc_allparameters() -> None:
+    """Tests that a change in all parameters in fucc works.
+    This example was used to test a bug in post-selection.
+    """
+    atom = "Li .0 .0 .0; H .0 .0 1.672"
+    basis = "sto3g"
+
+    # PySCF
+    mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
+    rhf = pyscf.scf.RHF(mol).run()
+
+    # SlowQuant
+    WF = WaveFunctionUPS(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 3),
+        rhf.mo_coeff,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        "fUCC",
+    )
+    sampler = Sampler()
+    mapper = JordanWignerMapper()
+
+    QI = QuantumInterface(sampler, "fUCCSD", mapper)
+
+    qWF = WaveFunctionQC(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 3),
+        WF.c_trans,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        QI,
+    )
+    for n in range(len(WF.thetas)):
+        thetas = np.zeros(len(WF.thetas))
+        thetas[n] = 1
+        WF.thetas = thetas
+        qWF.ansatz_parameters = thetas
+        assert abs(qWF.energy_elec - WF.energy_elec) < 10**-12
