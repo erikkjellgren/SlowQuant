@@ -186,6 +186,8 @@ def fUCC(
     if "G_p_D" in ansatz_options.keys():
         if ansatz_options["G_p_D"]:
             do_G_p_D = True
+    if True not in (do_S, do_SA_S, do_SA_G_S, do_D, do_p_D, do_G_p_D):
+        raise ValueError("fUCC requires some excitations got none.")
     n_layers = ansatz_options["n_layers"]
     num_spin_orbs = 2 * num_orbs
     occ = []
@@ -228,9 +230,7 @@ def fUCC(
                 idx += 1
         if do_G_p_D:
             for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
-                qc = double_excitation(
-                    2 * i, 2 * j + 1, 2 * a, 2 * b + 1, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper
-                )
+                qc = double_excitation(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 2
                 idx += 1
     return qc, grad_param_R
@@ -288,6 +288,8 @@ def SDSfUCC(
     if "G_p_D" in ansatz_options.keys():
         if ansatz_options["G_p_D"]:
             do_G_p_D = True
+    if True not in (do_D, do_p_D, do_G_p_D):
+        raise ValueError("SDSfUCC requires some excitations got none.")
     n_layers = ansatz_options["n_layers"]
     num_spin_orbs = 2 * num_orbs
     occ = []
@@ -305,25 +307,31 @@ def SDSfUCC(
     for _ in range(n_layers):
         if do_D:
             for a, i, b, j in iterate_t2(occ, unocc):
-                qc = single_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
+                if i % 2 == a % 2:
+                    qc = single_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
+                else:
+                    qc = single_excitation(i, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 2
                 idx += 1
                 qc = double_excitation(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 2
                 idx += 1
-                qc = single_excitation(j, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
+                if i % 2 == a % 2:
+                    qc = single_excitation(j, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
+                else:
+                    qc = single_excitation(j, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 2
                 idx += 1
         if do_p_D:
             for a, i, b, j in iterate_pair_t2(occ, unocc):
-                qc = single_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
-                grad_param_R[f"p{idx:09d}"] = 2
+                qc = sa_single_excitation(i // 2, a // 2, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
+                grad_param_R[f"p{idx:09d}"] = 4
                 idx += 1
                 qc = double_excitation(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 2
                 idx += 1
-                qc = single_excitation(j, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
-                grad_param_R[f"p{idx:09d}"] = 2
+                qc = sa_single_excitation(i // 2, a // 2, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
+                grad_param_R[f"p{idx:09d}"] = 4
                 idx += 1
         if do_G_p_D:
             for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
