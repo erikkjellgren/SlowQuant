@@ -635,7 +635,7 @@ class QuantumInterface:
             if self.do_postselection:
                 for i, (dist, head) in enumerate(zip(distr, new_heads)):
                     if "X" not in head and "Y" not in head:
-                        distr[i] = postselection(dist, self.mapper, self.num_elec)
+                        distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
             self.cliques.update_distr(new_heads, distr)
 
         # Loop over all Pauli strings in observable and build final result with coefficients
@@ -704,7 +704,7 @@ class QuantumInterface:
             if self.do_postselection:
                 for i, (dist, head) in enumerate(zip(distr, new_heads)):
                     if "X" not in head and "Y" not in head:
-                        distr[i] = postselection(dist, self.mapper, self.num_elec)
+                        distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
             cliques.update_distr(new_heads, distr)
 
             # Loop over all Pauli strings in observable and build final result with coefficients
@@ -722,7 +722,7 @@ class QuantumInterface:
             if self.do_postselection:
                 for i, (dist, pauli) in enumerate(zip(distr, paulis_str)):
                     if "X" not in pauli and "Y" not in pauli:
-                        distr[i] = postselection(dist, self.mapper, self.num_elec)
+                        distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
 
             # Loop over all Pauli strings in observable and build final result with coefficients
             for pauli, coeff, dist in zip(paulis_str, observables.coeffs, distr):
@@ -792,7 +792,7 @@ class QuantumInterface:
                 if self.do_postselection:
                     for i, (dist, head) in enumerate(zip(distr, new_heads)):
                         if "X" not in head and "Y" not in head:
-                            distr[i] = postselection(dist, self.mapper, self.num_elec)
+                            distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
                 self.cliques.update_distr(new_heads, distr)
         else:
             print(
