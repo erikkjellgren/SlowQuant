@@ -1,168 +1,63 @@
 import numpy as np
 from qiskit.circuit import Parameter, ParameterExpression, QuantumCircuit
-
-from slowquant.qiskit_interface.util import f2q
-from qiskit_nature.second_q.operators import FermionicOp
 from qiskit.circuit.library import PauliEvolutionGate
 from qiskit.quantum_info import Pauli
+from qiskit_nature.second_q.mappers import JordanWignerMapper
+from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
+from qiskit_nature.second_q.operators import FermionicOp
+
+from slowquant.qiskit_interface.util import f2q
 from slowquant.unitary_coupled_cluster.operators import anni_spin
-
-def tups_single(p: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter) -> QuantumCircuit:
-    r"""Spin-adapted single excitation as used in the tUPS ansatz.
-
-    Exact implementation of,
-
-    .. math::
-        \boldsymbol{U} = \exp\left(\theta\hat{\kappa}_{p,p+1}\right)
-
-    With, :math:`\hat{\kappa}_{p,p+1}=\hat{E}_{p,p+1}-\hat{E}_{p+1,p}`
-
-    .. code-block:
-
-             ┌─────────┐┌─────────┐     ┌───────┐     ┌──────────┐┌──────────┐
-        q_0: ┤ Rz(π/2) ├┤ Rx(π/2) ├──■──┤ Rx(θ) ├──■──┤ Rx(-π/2) ├┤ Rz(-π/2) ├
-             ├─────────┤└─────────┘┌─┴─┐├───────┤┌─┴─┐├──────────┤└──────────┘
-        q_1: ┤ Rx(π/2) ├───────────┤ X ├┤ Rz(θ) ├┤ X ├┤ Rx(-π/2) ├────────────
-             ├─────────┤┌─────────┐└───┘├───────┤└───┘├──────────┤┌──────────┐
-        q_2: ┤ Rz(π/2) ├┤ Rx(π/2) ├──■──┤ Rx(θ) ├──■──┤ Rx(-π/2) ├┤ Rz(-π/2) ├
-             ├─────────┤└─────────┘┌─┴─┐├───────┤┌─┴─┐├──────────┤└──────────┘
-        q_3: ┤ Rx(π/2) ├───────────┤ X ├┤ Rz(θ) ├┤ X ├┤ Rx(-π/2) ├────────────
-             └─────────┘           └───┘└───────┘└───┘└──────────┘
-
-    #. 10.48550/arXiv.2312.09761
-    #. 10.1038/s42005-021-00730-0, Fig. 1
-
-    Args:
-        p: Occupied spatial index.
-        num_orbs: Number of spatial orbitals.
-        qc: Quantum circuit.
-        theta: Circuit parameter.
-
-    Returns:
-        Modified quantum circuit.
-    """
-    pa = p
-    pb = p + num_orbs
-    qc.rz(np.pi / 2, pa)
-    qc.rx(np.pi / 2, pa)
-    qc.rx(np.pi / 2, pa + 1)
-    qc.cx(pa, pa + 1)
-    qc.rx(theta, pa)
-    qc.rz(theta, pa + 1)
-    qc.cx(pa, pa + 1)
-    qc.rx(-np.pi / 2, pa + 1)
-    qc.rx(-np.pi / 2, pa)
-    qc.rz(-np.pi / 2, pa)
-    qc.rz(np.pi / 2, pb)
-    qc.rx(np.pi / 2, pb)
-    qc.rx(np.pi / 2, pb + 1)
-    qc.cx(pb, pb + 1)
-    qc.rx(theta, pb)
-    qc.rz(theta, pb + 1)
-    qc.cx(pb, pb + 1)
-    qc.rx(-np.pi / 2, pb + 1)
-    qc.rx(-np.pi / 2, pb)
-    qc.rz(-np.pi / 2, pb)
-    return qc
-
-
-def tups_double(p: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter) -> QuantumCircuit:
-    r"""Spin-adapted pair double excitation as used in the tUPS ansatz.
-
-    Exact implementation of,
-
-    .. math::
-        \boldsymbol{U} = \exp\left(\frac{\theta}{2}\hat{\kappa}_{p,p+1}\right)
-
-    With, :math:`\hat{\kappa}_{p,p+1}=\hat{E}_{p,p+1}^2-\hat{E}_{p+1,p}^2`
-
-    .. code-block::
-
-                            ┌─────────────┐     ┌─────────┐     ┌─────────────┐     »
-        q_0: ──■─────────■──┤ Ry(-0.25*θ) ├──■──┤ Ry(θ/4) ├──■──┤ Ry(-0.25*θ) ├──■──»
-               │       ┌─┴─┐└────┬───┬────┘  │  └─────────┘  │  └─────────────┘  │  »
-        q_1: ──┼────■──┤ X ├─────┤ H ├───────┼───────────────┼───────────────────┼──»
-             ┌─┴─┐  │  ├───┤     ├───┤     ┌─┴─┐             │                 ┌─┴─┐»
-        q_2: ┤ X ├──┼──┤ X ├─────┤ H ├─────┤ X ├─────────────┼─────────────────┤ X ├»
-             └───┘┌─┴─┐├───┤     ├───┤     └───┘           ┌─┴─┐               └───┘»
-        q_3: ─────┤ X ├┤ X ├─────┤ H ├─────────────────────┤ X ├────────────────────»
-                  └───┘└───┘     └───┘                     └───┘                    »
-        «     ┌─────────┐     ┌─────────────┐     ┌─────────┐               »
-        «q_0: ┤ Ry(θ/4) ├──■──┤ Ry(-0.25*θ) ├──■──┤ Ry(θ/4) ├────────────■──»
-        «     └─────────┘┌─┴─┐└────┬───┬────┘  │  ├─────────┤┌────────┐  │  »
-        «q_1: ───────────┤ X ├─────┤ H ├───────┼──┤ Ry(π/2) ├┤ P(π/2) ├──┼──»
-        «                └───┘     └───┘     ┌─┴─┐└─────────┘└────────┘  │  »
-        «q_2: ───────────────────────────────┤ X ├───────────────────────┼──»
-        «                                    └───┘                     ┌─┴─┐»
-        «q_3: ─────────────────────────────────────────────────────────┤ X ├»
-        «                                                              └───┘»
-        «     ┌─────────────┐     ┌─────────┐      ┌────────┐
-        «q_0: ┤ Ry(-0.25*θ) ├──■──┤ Ry(θ/4) ├──■───┤ P(π/2) ├──────────────■───────
-        «     └─────────────┘  │  └─────────┘┌─┴─┐┌┴────────┤┌──────────┐  │
-        «q_1: ─────────────────┼─────────────┤ X ├┤ P(-π/2) ├┤ Ry(-π/2) ├──┼────■──
-        «                    ┌─┴─┐   ┌───┐   ├───┤└─────────┘└──────────┘┌─┴─┐  │
-        «q_2: ───────────────┤ X ├───┤ H ├───┤ X ├───────────────────────┤ X ├──┼──
-        «          ┌───┐     ├───┤   └───┘   └───┘                       └───┘┌─┴─┐
-        «q_3: ─────┤ H ├─────┤ X ├────────────────────────────────────────────┤ X ├
-        «          └───┘     └───┘                                            └───┘
-
-    #. 10.48550/arXiv.2312.09761
-    #. 10.1103/PhysRevA.102.062612, Fig. 7
-    #. 10.1038/s42005-021-00730-0, Fig. 2
-
-    Args:
-        p: Occupied spatial index.
-        num_orbs: Number of spatial orbitals.
-        qc: Quantum circuit.
-        theta: Circuit parameter.
-
-    Returns:
-        Modified quantum circuit.
-    """
-    l = p
-    j = p + 1
-    k = p + num_orbs
-    i = p + num_orbs + 1
-    qc.cx(l, k)
-    qc.cx(j, i)
-    qc.cx(l, j)
-    qc.x(k)
-    qc.x(i)
-    qc.ry(-theta / 4, l)
-    qc.h(k)
-    qc.cx(l, k)
-    qc.ry(theta / 4, l)
-    qc.h(i)
-    qc.cx(l, i)
-    qc.ry(-theta / 4, l)
-    qc.cx(l, k)
-    qc.ry(theta / 4, l)
-    qc.h(j)
-    qc.cx(l, j)
-    qc.ry(-theta / 4, l)
-    qc.cx(l, k)
-    qc.ry(theta / 4, l)
-    qc.cx(l, i)
-    qc.ry(-theta / 4, l)
-    qc.h(i)
-    qc.cx(l, k)
-    qc.ry(theta / 4, l)
-    qc.h(k)
-    qc.h(j)
-    qc.ry(np.pi / 2, j)
-    qc.p(np.pi / 2, j)
-    qc.cx(l, j)
-    qc.p(np.pi / 2, l)
-    qc.p(-np.pi / 2, j)
-    qc.ry(-np.pi / 2, j)
-    qc.x(k)
-    qc.x(i)
-    qc.cx(j, i)
-    qc.cx(l, k)
-    return qc
 
 
 def single_excitation(
+    i: int,
+    a: int,
+    num_orbs: int,
+    qc: QuantumCircuit,
+    theta: Parameter | ParameterExpression,
+    mapper: FermionicMapper,
+) -> QuantumCircuit:
+    if isinstance(mapper, JordanWignerMapper):
+        qc = single_excitation_efficient(a, i, num_orbs, qc, theta)
+    else:
+        qc = single_excitation_trotter(i, a, num_orbs, qc, theta, mapper)
+    return qc
+
+
+def double_excitation(
+    i: int,
+    j: int,
+    a: int,
+    b: int,
+    num_orbs: int,
+    qc: QuantumCircuit,
+    theta: Parameter | ParameterExpression,
+    mapper: FermionicMapper,
+) -> QuantumCircuit:
+    if isinstance(mapper, JordanWignerMapper):
+        qc = double_excitation_efficient(a, b, i, j, num_orbs, qc, theta)
+    else:
+        qc = double_excitation_trotter(i, j, a, b, num_orbs, qc, theta, mapper)
+    return qc
+
+
+def sa_single_excitation(
+    i: int,
+    a: int,
+    num_orbs: int,
+    qc: QuantumCircuit,
+    theta: Parameter | ParameterExpression,
+    mapper: FermionicMapper,
+) -> QuantumCircuit:
+    if isinstance(mapper, JordanWignerMapper):
+        qc = sa_single_excitation_efficient(a, i, num_orbs, qc, theta)
+    else:
+        qc = sa_single_excitation_trotter(i, a, num_orbs, qc, theta, mapper)
+    return qc
+
+
+def single_excitation_efficient(
     k: int, i: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression
 ) -> QuantumCircuit:
     r"""Exact circuit for single excitation.
@@ -215,8 +110,8 @@ def single_excitation(
     return qc
 
 
-def double_excitation(
-    k: int, l: int, i: int, j: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter
+def double_excitation_efficient(
+    k: int, l: int, i: int, j: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression
 ) -> QuantumCircuit:
     r"""Exact circuit for double excitation.
 
@@ -349,8 +244,8 @@ def double_excitation(
     return qc
 
 
-def single_sa_excitation(
-    k: int, i: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter
+def sa_single_excitation_efficient(
+    k: int, i: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression
 ) -> QuantumCircuit:
     r"""Exact circuit for spin-adapted singlet single excitation.
 
@@ -377,14 +272,13 @@ def single_sa_excitation(
     """
     # qc = single_excitation(2 * k, 2 * i, num_orbs, qc, 2 ** (-1 / 2) * theta)
     # qc = single_excitation(2 * k + 1, 2 * i + 1, num_orbs, qc, 2 ** (-1 / 2) * theta)
-    qc = single_excitation(2 * k, 2 * i, num_orbs, qc, theta)
-    qc = single_excitation(2 * k + 1, 2 * i + 1, num_orbs, qc, theta)
+    qc = single_excitation_efficient(2 * k, 2 * i, num_orbs, qc, theta)
+    qc = single_excitation_efficient(2 * k + 1, 2 * i + 1, num_orbs, qc, theta)
     return qc
 
 
-def trotter_single_excitation(i, a, num_orbs, qc, theta, mapper) -> QuantumCircuit:
-    num_spin_orbs = 2*num_orbs
-    print(a,i)
+def single_excitation_trotter(i, a, num_orbs, qc, theta, mapper) -> QuantumCircuit:
+    num_spin_orbs = 2 * num_orbs
     op = anni_spin(a, True) * anni_spin(i, False)
     T = op - op.dagger
     op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
@@ -402,11 +296,10 @@ def trotter_single_excitation(i, a, num_orbs, qc, theta, mapper) -> QuantumCircu
     return qc
 
 
-def trotter_double_excitation(i, j, a, b, num_orbs, qc, theta, mapper) -> QuantumCircuit:
-    num_spin_orbs = 2*num_orbs
+def double_excitation_trotter(i, j, a, b, num_orbs, qc, theta, mapper) -> QuantumCircuit:
+    num_spin_orbs = 2 * num_orbs
     ops = []
     factors = []
-    print(a, b, j, i)
     op = anni_spin(a, True) * anni_spin(b, True) * anni_spin(j, False) * anni_spin(i, False)
     T = op - op.dagger
     op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
@@ -421,4 +314,17 @@ def trotter_double_excitation(i, j, a, b, num_orbs, qc, theta, mapper) -> Quantu
             PauliEvolutionGate(Pauli(pauli), fac * theta),
             np.linspace(0, num_qubits - 1, num_qubits, dtype=int).tolist(),
         )
+    return qc
+
+
+def sa_single_excitation_trotter(
+    i: int,
+    a: int,
+    num_orbs: int,
+    qc: QuantumCircuit,
+    theta: Parameter | ParameterExpression,
+    mapper: FermionicMapper,
+) -> QuantumCircuit:
+    qc = single_excitation_trotter(2 * i, 2 * a, num_orbs, qc, theta, mapper)
+    qc = single_excitation_trotter(2 * i + 1, 2 * a + 1, num_orbs, qc, theta, mapper)
     return qc

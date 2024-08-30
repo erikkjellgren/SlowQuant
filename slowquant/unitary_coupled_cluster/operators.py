@@ -6,6 +6,7 @@ from slowquant.unitary_coupled_cluster.fermionic_operator import (
     a_op_spin,
 )
 
+
 def anni_spin(p: int, dagger: bool) -> FermionicOperator:
     """Construct annihilation/creation operator.
 
@@ -123,7 +124,6 @@ def G1(i: int, a: int) -> FermionicOperator:
     Returns:
         One-elecetron excitation operator.
     """
-    print(a, i)
     return FermionicOperator(a_op_spin(a, dagger=True), 1) * FermionicOperator(a_op_spin(i, dagger=False), 1)
 
 
@@ -142,7 +142,6 @@ def G2(i: int, j: int, a: int, b: int) -> FermionicOperator:
     Returns:
         Two-elecetron excitation operator.
     """
-    print(a, b, j, i)
     return (
         FermionicOperator(a_op_spin(a, dagger=True), 1)
         * FermionicOperator(a_op_spin(b, dagger=True), 1)
