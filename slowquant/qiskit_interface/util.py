@@ -246,7 +246,7 @@ def correct_distribution(dist: dict[int, float], M: np.ndarray) -> dict[int, flo
 
 
 def postselection(
-    dist: dict[int, float], mapper: FermionicMapper, num_elec: tuple[int, int]
+        dist: dict[int, float], mapper: FermionicMapper, num_elec: tuple[int, int], num_qubits: int,
 ) -> dict[int, float]:
     r"""Perform post-selection on distribution in computational basis.
 
@@ -274,6 +274,7 @@ def postselection(
         dist: Measured quasi-distribution.
         mapper: Fermionic to qubit mapper.
         num_elec: Number of electrons (alpha, beta).
+        num_qubits: Number of qubits.
 
     Returns:
         Post-selected distribution.
@@ -282,7 +283,7 @@ def postselection(
     prob_sum = 0.0
     if isinstance(mapper, JordanWignerMapper):
         for bitint, val in dist.items():
-            bitstr = bin(bitint)[2:]
+            bitstr = format(bitint, f"0{num_qubits}b")
             num_a = len(bitstr) // 2
             # Remember that in Qiskit notation you read |0101> from right to left.
             bitstr_a = bitstr[num_a:]
@@ -291,23 +292,14 @@ def postselection(
                 new_dist[int(bitstr, 2)] = val
                 prob_sum += val
     elif isinstance(mapper, ParityMapper):
+        print(num_qubits)
+        print(dist.items())
         for bitint, val in dist.items():
-            bitstr = bin(bitint)[2:]
+            bitstr = format(bitint, f"0{num_qubits}b")
+            print(bitstr)
             num_a = len(bitstr) // 2
             bitstr_a = bitstr[num_a:]
             bitstr_b = bitstr[:num_a]
-            current_parity = "0"
-            change_counter = 0
-            for bit in bitstr_a:
-                if bit != current_parity:
-                    current_parity = bit
-                    change_counter += 1
-            if current_parity == "1" and num_elec[0] % 2 == 0:
-                change_counter += 1
-            elif current_parity == "0" and num_elec[0] % 2 == 1:
-                change_counter += 1
-            if change_counter != num_elec[0]:
-                break
             current_parity = "0"
             change_counter = 0
             for bit in bitstr_b:
@@ -316,10 +308,23 @@ def postselection(
                     change_counter += 1
             if current_parity == "1" and num_elec[1] % 2 == 0:
                 change_counter += 1
+                current_parity = "0"
             elif current_parity == "0" and num_elec[1] % 2 == 1:
                 change_counter += 1
+                current_parity = "1"
+            if change_counter != num_elec[0]:
+                continue
+            change_counter = 0
+            for bit in bitstr_a:
+                if bit != current_parity:
+                    current_parity = bit
+                    change_counter += 1
+            if current_parity == "1" and (num_elec[0] + num_elec[1]) % 2 == 0:
+                change_counter += 1
+            elif current_parity == "0" and (num_elec[0] + num_elec[1]) % 2 == 1:
+                change_counter += 1
             if change_counter != num_elec[1]:
-                break
+                continue
             new_dist[int(bitstr, 2)] = val
             prob_sum += val
     else:
