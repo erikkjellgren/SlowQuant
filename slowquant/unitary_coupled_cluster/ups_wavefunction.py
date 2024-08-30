@@ -89,7 +89,7 @@ class WaveFunctionUPS:
         self._rdm2 = None
         self._h_mo = None
         self._g_mo = None
-        self._energy_elec = None
+        self._energy_elec: float | None = None
         self.ansatz_options = ansatz_options
         active_space = []
         orbital_counter = 0
@@ -443,6 +443,11 @@ class WaveFunctionUPS:
 
     @property
     def energy_elec(self) -> float:
+        """Get the electronic energy.
+
+        Returns:
+            Electronic energy.
+        """
         if self._energy_elec is None:
             self._energy_elec = energy_ups(self.thetas, False, self)
         return self._energy_elec

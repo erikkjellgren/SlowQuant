@@ -246,7 +246,10 @@ def correct_distribution(dist: dict[int, float], M: np.ndarray) -> dict[int, flo
 
 
 def postselection(
-        dist: dict[int, float], mapper: FermionicMapper, num_elec: tuple[int, int], num_qubits: int,
+    dist: dict[int, float],
+    mapper: FermionicMapper,
+    num_elec: tuple[int, int],
+    num_qubits: int,
 ) -> dict[int, float]:
     r"""Perform post-selection on distribution in computational basis.
 
@@ -292,11 +295,8 @@ def postselection(
                 new_dist[int(bitstr, 2)] = val
                 prob_sum += val
     elif isinstance(mapper, ParityMapper):
-        print(num_qubits)
-        print(dist.items())
         for bitint, val in dist.items():
             bitstr = format(bitint, f"0{num_qubits}b")
-            print(bitstr)
             num_a = len(bitstr) // 2
             bitstr_a = bitstr[num_a:]
             bitstr_b = bitstr[:num_a]
