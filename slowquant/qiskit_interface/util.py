@@ -302,28 +302,29 @@ def postselection(
             bitstr_b = bitstr[:num_a]
             current_parity = "0"
             change_counter = 0
-            for bit in bitstr_a:
-                if bit != current_parity:
-                    current_parity = bit
-                    change_counter += 1
-            if current_parity == "1" and num_elec[0] % 2 == 0:
-                change_counter += 1
-            elif current_parity == "0" and num_elec[0] % 2 == 1:
-                change_counter += 1
-            if change_counter != num_elec[0]:
-                break
-            current_parity = "0"
-            change_counter = 0
             for bit in bitstr_b:
                 if bit != current_parity:
                     current_parity = bit
                     change_counter += 1
             if current_parity == "1" and num_elec[1] % 2 == 0:
                 change_counter += 1
+                current_parity = "0"
             elif current_parity == "0" and num_elec[1] % 2 == 1:
                 change_counter += 1
+                current_parity = "1"
+            if change_counter != num_elec[0]:
+                continue
+            change_counter = 0
+            for bit in bitstr_a:
+                if bit != current_parity:
+                    current_parity = bit
+                    change_counter += 1
+            if current_parity == "1" and (num_elec[0] + num_elec[1]) % 2 == 0:
+                change_counter += 1
+            elif current_parity == "0" and (num_elec[0] + num_elec[1]) % 2 == 1:
+                change_counter += 1
             if change_counter != num_elec[1]:
-                break
+                continue
             new_dist[int(bitstr, 2)] = val
             prob_sum += val
     else:
