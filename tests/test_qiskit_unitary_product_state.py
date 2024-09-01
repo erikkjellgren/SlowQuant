@@ -84,7 +84,7 @@ def test_fucc() -> None:
         SQobj.hartree_fock.mo_coeff,
         h_core,
         g_eri,
-        "fUCC",
+        "fUCCSD",
         ansatz_options={},
         include_active_kappa=True,
     )
@@ -182,7 +182,7 @@ def test_sdsfuccsd() -> None:
         SQobj.hartree_fock.mo_coeff,
         h_core,
         g_eri,
-        "dUCCSD",
+        "SDSfUCCSD",
         ansatz_options={},
         include_active_kappa=True,
     )
@@ -209,7 +209,7 @@ def test_sdsfuccsd() -> None:
 
 
 def test_ksasdsfupccgsd() -> None:
-    """Test k-SAdUpCCGSD is conventional <--> qiskit compatibile."""
+    """Test k-SASDSfUpCCGSD is conventional <--> qiskit compatibile."""
     # Setup initial stuff
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -231,7 +231,7 @@ def test_ksasdsfupccgsd() -> None:
         SQobj.hartree_fock.mo_coeff,
         h_core,
         g_eri,
-        "kSAdUpCCGSD",
+        "kSASDSfUpCCGSD",
         ansatz_options={"n_layers": 1},
         include_active_kappa=True,
     )
@@ -276,7 +276,7 @@ def test_lih_fucc_allparameters() -> None:
         rhf.mo_coeff,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
-        "fUCC",
+        "fUCCSD",
     )
     sampler = Sampler()
     mapper = JordanWignerMapper()
@@ -317,7 +317,7 @@ def test_lih_fucc_mappings() -> None:
         rhf.mo_coeff,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
-        "fUCC",
+        "fUCCSD",
     )
     assert abs(WF.energy_elec - -8.808220920154708) < 10**-10
 
@@ -369,7 +369,7 @@ def test_lih_sdsfucc_mappings() -> None:
         rhf.mo_coeff,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
-        "dUCCSD",
+        "SDSfUCCSD",
     )
     assert abs(WF.energy_elec - -8.808220920154705) < 10**-10
 

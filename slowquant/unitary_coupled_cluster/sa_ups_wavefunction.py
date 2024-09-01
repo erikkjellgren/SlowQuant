@@ -251,9 +251,12 @@ class WaveFunctionSAUPS:
             self.ansatz_options["do_qnp"] = True
             self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
         elif ansatz.lower() == "ksafupccgsd":
-            self.ups_layout.create_kSAfUpCCGSD(self.num_active_orbs, self.ansatz_options)
-        elif ansatz.lower() == "ksadupccgsd":
-            self.ups_layout.create_kSAdUpCCGSD(self.num_active_orbs, self.ansatz_options)
+            self.ansatz_options["SAGS"] = True
+            self.ansatz_options["GpD"] = True
+            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
+        elif ansatz.lower() == "ksasdsfupccgsd":
+            self.ansatz_options["GpD"] = True
+            self.ups_layout.create_SDSfUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()

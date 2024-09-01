@@ -1081,32 +1081,8 @@ def construct_ups_state_extended(
             continue
         if dagger:
             theta = -theta
-        if exc_type in ("tups_single", "sa_single"):
-            if exc_type == "tups_single":
-                A = 1
-                (p,) = exc_indices
-                p += num_inactive_orbs
-                Ta = T1_extended_matrix(
-                    p * 2,
-                    (p + 1) * 2,
-                    num_inactive_orbs,
-                    num_active_orbs,
-                    num_virtual_orbs,
-                    num_elec_alpha,
-                    num_elec_beta,
-                    order,
-                ).todense()
-                Tb = T1_extended_matrix(
-                    p * 2 + 1,
-                    (p + 1) * 2 + 1,
-                    num_inactive_orbs,
-                    num_active_orbs,
-                    num_virtual_orbs,
-                    num_elec_alpha,
-                    num_elec_beta,
-                    order,
-                ).todense()
-            elif exc_type == "sa_single":
+        if exc_type in ("sa_single",):
+            if exc_type == "sa_single":
                 A = 1  # 2**(-1/2)
                 (i, a) = exc_indices
                 i += num_inactive_orbs
@@ -1143,26 +1119,11 @@ def construct_ups_state_extended(
                 + np.sin(A * theta) * np.matmul(Tb, tmp)
                 + (1 - np.cos(A * theta)) * np.matmul(Tb, np.matmul(Tb, tmp))
             )
-        elif exc_type in ("tups_double", "single", "double"):
-            if exc_type == "tups_double":
-                (p,) = exc_indices
-                p += num_inactive_orbs
-                T = T2_1_sa_extended_matrix(
-                    p,
-                    p,
-                    p + 1,
-                    p + 1,
-                    num_inactive_orbs,
-                    num_active_orbs,
-                    num_virtual_orbs,
-                    num_elec_alpha,
-                    num_elec_beta,
-                    order,
-                ).todense()
-            elif exc_type == "single":
+        elif exc_type in ("single", "double"):
+            if exc_type == "single":
                 (i, a) = exc_indices
-                i += num_inactive_orbs
-                a += num_inactive_orbs
+                i += 2 * num_inactive_orbs
+                a += 2 * num_inactive_orbs
                 T = T1_extended_matrix(
                     i,
                     a,
@@ -1175,10 +1136,10 @@ def construct_ups_state_extended(
                 ).todense()
             elif exc_type == "double":
                 (i, j, a, b) = exc_indices
-                i += num_inactive_orbs
-                j += num_inactive_orbs
-                a += num_inactive_orbs
-                b += num_inactive_orbs
+                i += 2 * num_inactive_orbs
+                j += 2 * num_inactive_orbs
+                a += 2 * num_inactive_orbs
+                b += 2 * num_inactive_orbs
                 T = T2_extended_matrix(
                     i,
                     j,

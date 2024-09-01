@@ -141,11 +141,11 @@ def fUCC(
     Ansatz Options:
         * n_layers [int]: Number of layers.
         * S [bool]: Add single excitations.
-        * SA_S [bool]: Add spin-adapted single excitations.
-        * SA_G_S [bool]: Add generalized spin-adapted single excitations.
+        * SAS [bool]: Add spin-adapted single excitations.
+        * SAGS [bool]: Add generalized spin-adapted single excitations.
         * D [bool]: Add double excitations.
-        * p_D [bool]: Add pair double excitations.
-        * G_p_D [bool]: Add generalized pair double excitations.
+        * pD [bool]: Add pair double excitations.
+        * GpD [bool]: Add generalized pair double excitations.
 
     Args:
         num_orbs: Number of spatial orbitals.
@@ -156,37 +156,37 @@ def fUCC(
     Returns:
         Factorized UCC ansatz circuit and R parameters needed for gradients.
     """
-    valid_options = ("n_layers", "S", "D", "SA_G_S", "p_D", "G_p_D", "SA_S")
+    valid_options = ("n_layers", "S", "D", "SAGS", "pD", "GpD", "SAS")
     for option in ansatz_options:
         if option not in valid_options:
             raise ValueError(f"Got unknown option for fUCC, {option}. Valid options are: {valid_options}")
     if "n_layers" not in ansatz_options.keys():
         raise ValueError("fUCC require the option 'n_layers'")
     do_S = False
-    do_SA_S = False
-    do_SA_G_S = False
+    do_SAS = False
+    do_SAGS = False
     do_D = False
-    do_p_D = False
-    do_G_p_D = False
+    do_pD = False
+    do_GpD = False
     if "S" in ansatz_options.keys():
         if ansatz_options["S"]:
             do_S = True
-    if "SA_S" in ansatz_options.keys():
-        if ansatz_options["SA_S"]:
-            do_SA_S = True
-    if "SA_G_S" in ansatz_options.keys():
-        if ansatz_options["SA_G_S"]:
-            do_SA_G_S = True
+    if "SAS" in ansatz_options.keys():
+        if ansatz_options["SAS"]:
+            do_SAS = True
+    if "SAGS" in ansatz_options.keys():
+        if ansatz_options["SAGS"]:
+            do_SAGS = True
     if "D" in ansatz_options.keys():
         if ansatz_options["D"]:
             do_D = True
-    if "p_D" in ansatz_options.keys():
-        if ansatz_options["p_D"]:
-            do_p_D = True
-    if "G_p_D" in ansatz_options.keys():
-        if ansatz_options["G_p_D"]:
-            do_G_p_D = True
-    if True not in (do_S, do_SA_S, do_SA_G_S, do_D, do_p_D, do_G_p_D):
+    if "pD" in ansatz_options.keys():
+        if ansatz_options["pD"]:
+            do_pD = True
+    if "GpD" in ansatz_options.keys():
+        if ansatz_options["GpD"]:
+            do_GpD = True
+    if True not in (do_S, do_SAS, do_SAGS, do_D, do_pD, do_GpD):
         raise ValueError("fUCC requires some excitations got none.")
     n_layers = ansatz_options["n_layers"]
     num_spin_orbs = 2 * num_orbs
@@ -208,12 +208,12 @@ def fUCC(
                 qc = single_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 2
                 idx += 1
-        if do_SA_S:
+        if do_SAS:
             for a, i, _ in iterate_t1_sa(occ, unocc):
                 qc = sa_single_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 4
                 idx += 1
-        if do_SA_G_S:
+        if do_SAGS:
             for a, i, _ in iterate_t1_sa_generalized(num_orbs):
                 qc = sa_single_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 4
@@ -223,12 +223,12 @@ def fUCC(
                 qc = double_excitation(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 2
                 idx += 1
-        if do_p_D:
+        if do_pD:
             for a, i, b, j in iterate_pair_t2(occ, unocc):
                 qc = double_excitation(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 2
                 idx += 1
-        if do_G_p_D:
+        if do_GpD:
             for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
                 qc = double_excitation(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 2
@@ -258,8 +258,8 @@ def SDSfUCC(
     Ansatz Options:
         * n_layers [int]: Number of layers.
         * D [bool]: Add double excitations.
-        * p_D [bool]: Add pair double excitations.
-        * G_p_D [bool]: Add generalized pair double excitations.
+        * pD [bool]: Add pair double excitations.
+        * GpD [bool]: Add generalized pair double excitations.
 
     Args:
         num_orbs: Number of spatial orbitals.
@@ -270,25 +270,25 @@ def SDSfUCC(
     Returns:
         SDS ordered UCC ansatz circuit and R parameters needed for gradients.
     """
-    valid_options = ("n_layers", "D", "p_D", "G_p_D")
+    valid_options = ("n_layers", "D", "pD", "GpD")
     for option in ansatz_options:
         if option not in valid_options:
             raise ValueError(f"Got unknown option for SDSfUCC, {option}. Valid options are: {valid_options}")
     if "n_layers" not in ansatz_options.keys():
         raise ValueError("SDSfUCC require the option 'n_layers'")
     do_D = False
-    do_p_D = False
-    do_G_p_D = False
+    do_pD = False
+    do_GpD = False
     if "D" in ansatz_options.keys():
         if ansatz_options["D"]:
             do_D = True
-    if "p_D" in ansatz_options.keys():
-        if ansatz_options["p_D"]:
-            do_p_D = True
-    if "G_p_D" in ansatz_options.keys():
-        if ansatz_options["G_p_D"]:
-            do_G_p_D = True
-    if True not in (do_D, do_p_D, do_G_p_D):
+    if "pD" in ansatz_options.keys():
+        if ansatz_options["pD"]:
+            do_pD = True
+    if "GpD" in ansatz_options.keys():
+        if ansatz_options["GpD"]:
+            do_GpD = True
+    if True not in (do_D, do_pD, do_GpD):
         raise ValueError("SDSfUCC requires some excitations got none.")
     n_layers = ansatz_options["n_layers"]
     num_spin_orbs = 2 * num_orbs
@@ -322,7 +322,7 @@ def SDSfUCC(
                     qc = single_excitation(j, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 2
                 idx += 1
-        if do_p_D:
+        if do_pD:
             for a, i, b, j in iterate_pair_t2(occ, unocc):
                 qc = sa_single_excitation(i // 2, a // 2, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 4
@@ -333,7 +333,7 @@ def SDSfUCC(
                 qc = sa_single_excitation(i // 2, a // 2, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 4
                 idx += 1
-        if do_G_p_D:
+        if do_GpD:
             for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
                 qc = sa_single_excitation(i // 2, a // 2, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 4

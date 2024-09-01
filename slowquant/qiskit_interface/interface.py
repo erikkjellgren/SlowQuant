@@ -130,7 +130,7 @@ class QuantumInterface:
             print("QI was initialized with a custom QuantumCircuit object.")
             self.circuit = self.ansatz
         elif self.ansatz == "fpUCCD":
-            self.ansatz_options["p_D"] = True
+            self.ansatz_options["pD"] = True
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
@@ -158,8 +158,8 @@ class QuantumInterface:
                 self.ansatz_options["n_layers"] = 1
             self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
         elif self.ansatz == "kSAfUpCCGSD":
-            self.ansatz_options["SA_G_S"] = True
-            self.ansatz_options["G_p_D"] = True
+            self.ansatz_options["SAGS"] = True
+            self.ansatz_options["GpD"] = True
             self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
         elif self.ansatz == "SDSfUCCSD":
             self.ansatz_options["D"] = True
@@ -170,7 +170,7 @@ class QuantumInterface:
                 num_orbs, self.num_elec, self.mapper, self.ansatz_options
             )
         elif self.ansatz == "kSASDSfUpCCGSD":
-            self.ansatz_options["G_p_D"] = True
+            self.ansatz_options["GpD"] = True
             self.circuit, self.grad_param_R = SDSfUCC(
                 num_orbs, self.num_elec, self.mapper, self.ansatz_options
             )
