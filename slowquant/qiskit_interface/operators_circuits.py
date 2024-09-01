@@ -160,7 +160,7 @@ def double_excitation_efficient(
     Implementation of the following operator,
 
     .. math::
-       \boldsymbol{U} = \exp\left(\theta\hat{a}^\dagger_k\hat{a}_i\hat{a}^\dagger_l\hat{a}_j\right)
+       \boldsymbol{U} = \exp\left(\theta\hat{a}^\dagger_k\hat{a}^\dagger_l\hat{a}_j\hat{a}_i\right)
 
     #. 10.1103/PhysRevA.102.062612, Fig. 6, Fig. 7, and, Fig. 9
     #. 10.1038/s42005-021-00730-0, Fig. 2

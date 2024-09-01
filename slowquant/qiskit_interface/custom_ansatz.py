@@ -29,7 +29,7 @@ def tUPS(
 ) -> tuple[QuantumCircuit, dict[str, int]]:
     """Create tUPS ansatz.
 
-    #. 10.1103/PhysRevResearch.6.023300
+    #. 10.1103/PhysRevResearch.6.023300 (tUPS)
     #. 10.1088/1367-2630/ac2cb3 (QNP)
 
     Ansatz Options:
