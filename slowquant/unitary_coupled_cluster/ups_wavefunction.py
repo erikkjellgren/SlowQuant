@@ -89,6 +89,7 @@ class WaveFunctionUPS:
         self._rdm2 = None
         self._h_mo = None
         self._g_mo = None
+        self._energy_elec: float | None = None
         self.ansatz_options = ansatz_options
         active_space = []
         orbital_counter = 0
@@ -228,13 +229,19 @@ class WaveFunctionUPS:
             self.ansatz_options["do_qnp"] = True
             self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
         elif ansatz.lower() == "fucc":
-            state = "1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec)
-            self.ups_layout.create_fUCCSD([[state]], self.ansatz_options)
+            if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
+            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
         elif ansatz.lower() == "ksafupccgsd":
-            self.ups_layout.create_kSAfUpCCGSD(
-                self.num_active_orbs,
-                self.ansatz_options,
-            )
+            self.ups_layout.create_kSAfUpCCGSD(self.num_active_orbs, self.ansatz_options)
+        elif ansatz.lower() == "duccsd":
+            if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
+            self.ups_layout.create_dUCCSD(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
+        elif ansatz.lower() == "ksadupccgsd":
+            self.ups_layout.create_kSAdUpCCGSD(self.num_active_orbs, self.ansatz_options)
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
@@ -257,6 +264,7 @@ class WaveFunctionUPS:
         """
         self._h_mo = None
         self._g_mo = None
+        self._energy_elec = None
         self._c_orthonormal = c
 
     @property
@@ -281,7 +289,7 @@ class WaveFunctionUPS:
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
-        self._u = None
+        self._energy_elec = None
         self._thetas = theta_vals.copy()
         self.ci_coeffs = construct_ups_state(
             self.csf_coeffs,
@@ -433,6 +441,17 @@ class WaveFunctionUPS:
         diff = np.abs(S_ortho - one)
         print("Max ortho-normal diff:", np.max(diff))
 
+    @property
+    def energy_elec(self) -> float:
+        """Get the electronic energy.
+
+        Returns:
+            Electronic energy.
+        """
+        if self._energy_elec is None:
+            self._energy_elec = energy_ups(self.thetas, False, self)
+        return self._energy_elec
+
     def run_ups(
         self,
         orbital_optimization: bool = False,
@@ -518,7 +537,7 @@ class WaveFunctionUPS:
                 jac=parameter_gradient,
                 options={"maxiter": maxiter},
             )
-        self.energy_elec = res["fun"]
+        self._energy_elec = res["fun"]
         param_idx = 0
         if orbital_optimization:
             param_idx += len(self.kappa)
