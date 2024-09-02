@@ -319,7 +319,7 @@ class UnrestrictedWaveFunctionUPS:
         Returns:
             Orthonormalization coefficients.
         """
-        return (self._c_a_orthonormal, self._c_b_orthonormal)
+        return (self.c_a_orthonormal, self.c_b_orthonormal)
 
     @c_orthonormal.setter
     def c_orthonormal(self, c: tuple[np.ndarray, np.ndarray]) -> None:
@@ -328,6 +328,7 @@ class UnrestrictedWaveFunctionUPS:
         Args:
             c: Orthonormalization coefficients.
         """
+        self._energy_elec = None
         self._haa_mo = None
         self._hbb_mo = None
         self._gaaaa_mo = None

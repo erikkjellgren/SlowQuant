@@ -1,0 +1,1050 @@
+# pylint: disable=too-many-lines
+import time
+from functools import partial
+
+import numpy as np
+import scipy
+from qiskit import QuantumCircuit
+from qiskit.primitives import (
+    BaseEstimator,
+    BaseEstimatorV2,
+    BaseSamplerV1,
+    BaseSamplerV2,
+)
+from qiskit.quantum_info import SparsePauliOp
+from qiskit_algorithms.optimizers import COBYLA, L_BFGS_B, SLSQP, SPSA
+
+from slowquant.molecularintegrals.integralfunctions import (
+    one_electron_integral_transform,
+    two_electron_integral_transform,
+    two_electron_integral_transform_split,
+)
+from slowquant.qiskit_interface.interface import QuantumInterface
+from slowquant.qiskit_interface.optimizers import RotoSolve
+from slowquant.unitary_coupled_cluster.density_matrix import (
+    ReducedDenstiyMatrix,
+    get_electronic_energy,
+    get_orbital_gradient,
+)
+from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
+from slowquant.unitary_coupled_cluster.unrestricted_operators import (
+    unrestricted_hamiltonian_0i_0a,
+)
+
+
+class UnrestrictedWaveFunction:
+    def __init__(
+        self,
+        num_spin_orbs: int,
+        num_elec: int,
+        cas: tuple[tuple[int, int], int],
+        c_orthonormal: np.ndarray,
+        h_ao: np.ndarray,
+        g_ao: np.ndarray,
+        quantum_interface: QuantumInterface,
+        include_active_kappa: bool = False,
+    ) -> None:
+        """Initialize for UCC wave function.
+
+        Args:
+            num_spin_orbs: Number of spin orbitals.
+            num_elec: Number of electrons.
+            cas: CAS(num_active_elec, num_active_orbs),
+                 orbitals are counted in spatial basis.
+            c_orthonormal: Initial orbital coefficients.
+            h_ao: One-electron integrals in AO for Hamiltonian.
+            g_ao: Two-electron integrals in AO.
+            quantum_interface: QuantumInterface.
+            include_active_kappa: Include active-active orbital rotations.
+        """
+        if len(cas) != 2:
+            raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
+        if isinstance(quantum_interface.ansatz, QuantumCircuit):
+            print("WARNING: A QI with a custom Ansatz was passed. VQE will only work with COBYLA optimizer.")
+        self._c_a_orthonormal = c_orthonormal[0]
+        self._c_b_orthonormal = c_orthonormal[1]
+        self.h_ao = h_ao
+        self.g_ao = g_ao
+        self.inactive_spin_idx = []
+        self.virtual_spin_idx = []
+        self.active_spin_idx = []
+        self.active_occ_spin_idx = []
+        self.active_unocc_spin_idx = []
+        self.active_spin_idx_shifted = []
+        self.active_occ_spin_idx_shifted = []
+        self.active_unocc_spin_idx_shifted = []
+        self.num_elec = num_elec
+        self.num_elec_alpha = (num_elec - np.sum(cas[0])) // 2 + cas[0][0]
+        self.num_elec_beta = (num_elec - np.sum(cas[0])) // 2 + cas[0][1]
+        self.num_spin_orbs = num_spin_orbs
+        self.num_orbs = num_spin_orbs // 2
+        self._include_active_kappa = include_active_kappa
+        self.num_active_elec = np.sum(cas[0])
+        self.num_active_elec_alpha = cas[0][0]
+        self.num_active_elec_beta = cas[0][1]
+        self.num_active_spin_orbs = 0
+        self.num_inactive_spin_orbs = 0
+        self.num_virtual_spin_orbs = 0
+        self._rdm1aa = None
+        self._rdm1bb = None
+        self._rdm2aaaa = None
+        self._rdm2bbbb = None
+        self._rdm2aabb = None
+        self._haa_mo = None
+        self._hbb_mo = None
+        self._gaaaa_mo = None
+        self._gbbbb_mo = None
+        self._gaabb_mo = None
+        self.do_trace_corrected = True
+        active_space = []
+        orbital_counter = 0
+        for i in range(
+            2
+            * min(
+                self.num_elec_alpha - self.num_active_elec_alpha,
+                self.num_elec_beta - self.num_active_elec_beta,
+            ),
+            2 * max(self.num_elec_alpha, self.num_elec_beta),
+        ):
+            active_space.append(i)
+            orbital_counter += 1
+        for i in range(
+            2 * max(self.num_elec_alpha, self.num_elec_beta),
+            2 * max(self.num_elec_alpha, self.num_elec_beta) + 2 * cas[1] - orbital_counter,
+        ):
+            active_space.append(i)
+        for i in range(2 * max(self.num_elec_alpha, self.num_elec_beta)):
+            if i in active_space:
+                self.active_spin_idx.append(i)
+                self.active_occ_spin_idx.append(i)
+                self.num_active_spin_orbs += 1
+                self.num_active_elec += 1
+            else:
+                self.inactive_spin_idx.append(i)
+                self.num_inactive_spin_orbs += 1
+        for i in range(2 * max(self.num_elec_alpha, self.num_elec_beta), num_spin_orbs):
+            if i in active_space:
+                self.active_spin_idx.append(i)
+                self.active_unocc_spin_idx.append(i)
+                self.num_active_spin_orbs += 1
+            else:
+                self.virtual_spin_idx.append(i)
+                self.num_virtual_spin_orbs += 1
+        if len(self.active_spin_idx) != 0:
+            active_shift = np.min(self.active_spin_idx)
+            for active_idx in self.active_spin_idx:
+                self.active_spin_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_occ_spin_idx:
+                self.active_occ_spin_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_unocc_spin_idx:
+                self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
+        self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
+        self.num_active_orbs = self.num_active_spin_orbs // 2
+        self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
+        # Contruct spatial idx
+        self.inactive_idx: list[int] = []
+        self.virtual_idx: list[int] = []
+        self.active_idx: list[int] = []
+        self.active_occ_idx: list[int] = []
+        self.active_unocc_idx: list[int] = []
+        for idx in self.inactive_spin_idx:
+            if idx // 2 not in self.inactive_idx:
+                self.inactive_idx.append(idx // 2)
+        for idx in self.active_spin_idx:
+            if idx // 2 not in self.active_idx:
+                self.active_idx.append(idx // 2)
+        for idx in self.virtual_spin_idx:
+            if idx // 2 not in self.virtual_idx:
+                self.virtual_idx.append(idx // 2)
+        for idx in self.active_occ_spin_idx:
+            if idx // 2 not in self.active_occ_idx:
+                self.active_occ_idx.append(idx // 2)
+        for idx in self.active_unocc_spin_idx:
+            if idx // 2 not in self.active_unocc_idx:
+                self.active_unocc_idx.append(idx // 2)
+        # Find non-redundant kappas
+        self.kappa_a = []
+        self.kappa_b = []
+        self.kappa_idx = []
+        self.kappa_no_activeactive_idx = []
+        self.kappa_no_activeactive_idx_dagger = []
+        self.kappa_a_redundant = []
+        self.kappa_b_redundant = []
+        self.kappa_redundant_idx = []
+        self._kappa_a_old = []
+        self._kappa_b_old = []
+        self._kappa_a_redundant_old = []
+        self._kappa_b_redundant_old = []
+        # kappa can be optimized in spatial basis
+        for p in range(0, self.num_orbs):
+            for q in range(p + 1, self.num_orbs):
+                if p in self.inactive_idx and q in self.inactive_idx:
+                    self.kappa_a_redundant.append(0.0)
+                    self.kappa_b_redundant.append(0.0)
+                    self._kappa_a_redundant_old.append(0.0)
+                    self._kappa_b_redundant_old.append(0.0)
+                    self.kappa_redundant_idx.append([p, q])
+                    continue
+                if p in self.virtual_idx and q in self.virtual_idx:
+                    self.kappa_a_redundant.append(0.0)
+                    self.kappa_b_redundant.append(0.0)
+                    self._kappa_a_redundant_old.append(0.0)
+                    self._kappa_b_redundant_old.append(0.0)
+                    self.kappa_redundant_idx.append([p, q])
+                    continue
+                if not include_active_kappa:
+                    if p in self.active_idx and q in self.active_idx:
+                        self.kappa_a_redundant.append(0.0)
+                        self.kappa_b_redundant.append(0.0)
+                        self._kappa_a_redundant_old.append(0.0)
+                        self._kappa_b_redundant_old.append(0.0)
+                        self.kappa_redundant_idx.append([p, q])
+                        continue
+                if include_active_kappa:
+                    if p in self.active_occ_idx and q in self.active_occ_idx:
+                        self.kappa_a_redundant.append(0.0)
+                        self.kappa_b_redundant.append(0.0)
+                        self._kappa_a_redundant_old.append(0.0)
+                        self._kappa_b_redundant_old.append(0.0)
+                        self.kappa_redundant_idx.append([p, q])
+                        continue
+                    if p in self.active_unocc_idx and q in self.active_unocc_idx:
+                        self.kappa_a_redundant.append(0.0)
+                        self.kappa_b_redundant.append(0.0)
+                        self._kappa_a_redundant_old.append(0.0)
+                        self._kappa_b_redundant_old.append(0.0)
+                        self.kappa_redundant_idx.append([p, q])
+                        continue
+                if not (p in self.active_idx and q in self.active_idx):
+                    self.kappa_no_activeactive_idx.append([p, q])
+                    self.kappa_no_activeactive_idx_dagger.append([q, p])
+                self.kappa_a.append(0.0)
+                self.kappa_b.append(0.0)
+                self._kappa_a_old.append(0.0)
+                self._kappa_b_old.append(0.0)
+                self.kappa_idx.append([p, q])
+        # HF like orbital rotation indecies
+        self.kappa_hf_like_idx = []
+        for p in range(0, self.num_orbs):
+            for q in range(p + 1, self.num_orbs):
+                if p in self.inactive_idx and q in self.virtual_idx:
+                    self.kappa_hf_like_idx.append([p, q])
+                elif p in self.inactive_idx and q in self.active_unocc_idx:
+                    self.kappa_hf_like_idx.append([p, q])
+                elif p in self.active_occ_idx and q in self.virtual_idx:
+                    self.kappa_hf_like_idx.append([p, q])
+        self._energy_elec: float | None = None
+        # Setup Qiskit stuff
+        self.QI = quantum_interface
+        self.QI.construct_circuit(
+            self.num_active_orbs, (self.num_active_elec_beta, self.num_active_elec_beta)
+        )
+
+    @property
+    def c_a_orthonormal(self) -> np.ndarray:
+        """Get orthonormalization coefficients (MO coefficients).
+
+        Returns:
+            Orthonormalization coefficients.
+        """
+        return self._c_a_orthonormal
+
+    @property
+    def c_b_orthonormal(self) -> np.ndarray:
+        """Get orthonormalization coefficients (MO coefficients).
+
+        Returns:
+            Orthonormalization coefficients.
+        """
+        return self._c_b_orthonormal
+
+    @property
+    def c_orthonormal(self) -> tuple[np.ndarray, np.ndarray]:
+        """Get orthonormalization coefficients (MO coefficients).
+
+        Returns:
+            Orthonormalization coefficients.
+        """
+        return (self.c_a_orthonormal, self.c_b_orthonormal)
+
+    @c_orthonormal.setter
+    def c_orthonormal(self, c: np.ndarray) -> None:
+        """Set orthonormalization coefficients.
+
+        Args:
+            c: Orthonormalization coefficients.
+        """
+        self._energy_elec = None
+        self._haa_mo = None
+        self._hbb_mo = None
+        self._gaaaa_mo = None
+        self._gbbbb_mo = None
+        self._gaabb_mo = None
+        self._c_a_orthonormal = c[0]
+        self._c_b_orthonormal = c[1]
+
+    @property
+    def c_a_trans(self) -> np.ndarray:
+        """Get orbital coefficients.
+
+        Returns:
+            Orbital coefficients.
+        """
+        kappa_a_mat = np.zeros_like(self.c_a_orthonormal)
+        if len(self.kappa_a) != 0:
+            if np.max(np.abs(self.kappa_a)) > 0.0:
+                for kappa_a_val, (p, q) in zip(self.kappa_a, self.kappa_idx):
+                    kappa_a_mat[p, q] = kappa_a_val
+                    kappa_a_mat[q, p] = -kappa_a_val
+        if len(self.kappa_a_redundant) != 0:
+            if np.max(np.abs(self.kappa_a_redundant)) > 0.0:
+                for kappa_a_val, (p, q) in zip(self.kappa_a_redundant, self.kappa_redundant_idx):
+                    kappa_a_mat[p, q] = kappa_a_val
+                    kappa_a_mat[q, p] = -kappa_a_val
+        return np.matmul(self.c_a_orthonormal, scipy.linalg.expm(-kappa_a_mat))
+
+    @property
+    def c_b_trans(self) -> np.ndarray:
+        """Get orbital coefficients.
+
+        Returns:
+            Orbital coefficients.
+        """
+        kappa_b_mat = np.zeros_like(self.c_b_orthonormal)
+        if len(self.kappa_b) != 0:
+            if np.max(np.abs(self.kappa_b)) > 0.0:
+                for kappa_b_val, (p, q) in zip(self.kappa_b, self.kappa_idx):
+                    kappa_b_mat[p, q] = kappa_b_val
+                    kappa_b_mat[q, p] = -kappa_b_val
+        if len(self.kappa_b_redundant) != 0:
+            if np.max(np.abs(self.kappa_b_redundant)) > 0.0:
+                for kappa_b_val, (p, q) in zip(self.kappa_b_redundant, self.kappa_redundant_idx):
+                    kappa_b_mat[p, q] = kappa_b_val
+                    kappa_b_mat[q, p] = -kappa_b_val
+        return np.matmul(self.c_b_orthonormal, scipy.linalg.expm(-kappa_b_mat))
+
+    @property
+    def c_trans(self) -> tuple[np.ndarray, np.ndarray]:
+        """Get orbital coefficients.
+
+        Returns:
+            Orbital coefficients.
+        """
+        return (self.c_a_trans, self.c_b_trans)
+
+    @property
+    def haa_mo(self) -> np.ndarray:
+        """Get one-electron Hamiltonian integrals in MO basis.
+
+        Returns:
+            One-electron Hamiltonian integrals in MO basis.
+        """
+        if self._haa_mo is None:
+            self._haa_mo = one_electron_integral_transform(self.c_a_trans, self.h_ao)
+        return self._haa_mo
+
+    @property
+    def hbb_mo(self) -> np.ndarray:
+        """Get one-electron Hamiltonian integrals in MO basis.
+
+        Returns:
+            One-electron Hamiltonian integrals in MO basis.
+        """
+        if self._hbb_mo is None:
+            self._hbb_mo = one_electron_integral_transform(self.c_b_trans, self.h_ao)
+        return self._hbb_mo
+
+    @property
+    def h_mo(self) -> tuple[np.ndarray, np.ndarray]:
+        """Get one-electron Hamiltonian integrals in MO basis.
+
+        Returns:
+            One-electron Hamiltonian integrals in MO basis.
+        """
+        return (self.haa_mo, self.hbb_mo)
+
+    @property
+    def gaaaa_mo(self) -> np.ndarray:
+        """Get two-electron Hamiltonian integrals in MO basis.
+
+        Returns:
+            Two-electron Hamiltonian integrals in MO basis.
+        """
+        if self._gaaaa_mo is None:
+            self._gaaaa_mo = two_electron_integral_transform(self.c_a_trans, self.g_ao)
+        return self._gaaaa_mo
+
+    @property
+    def gbbbb_mo(self) -> np.ndarray:
+        """Get two-electron Hamiltonian integrals in MO basis.
+
+        Returns:
+            Two-electron Hamiltonian integrals in MO basis.
+        """
+        if self._gbbbb_mo is None:
+            self._gbbbb_mo = two_electron_integral_transform(self.c_b_trans, self.g_ao)
+        return self._gbbbb_mo
+
+    @property
+    def gaabb_mo(self) -> np.ndarray:
+        """Get two-electron Hamiltonian integrals in MO basis.
+
+        Returns:
+            Two-electron Hamiltonian integrals in MO basis.
+        """
+        if self._gaabb_mo is None:
+            self._gaabb_mo = two_electron_integral_transform_split(self.c_a_trans, self.c_b_trans, self.g_ao)
+        return self._gaabb_mo
+
+    @property
+    def g_mo(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Get two-electron Hamiltonian integrals in MO basis.
+
+        Returns:
+            Two-electron Hamiltonian integrals in MO basis.
+        """
+        return (self.gaaaa_mo, self.gbbbb_mo, self.gaabb_mo)
+
+    @property
+    def ansatz_parameters(self) -> list[float]:
+        """Getter for ansatz parameters.
+
+        Returns:
+            Ansatz parameters.
+        """
+        return self.QI.parameters
+
+    @ansatz_parameters.setter
+    def ansatz_parameters(self, parameters: list[float]) -> None:
+        """Setter for ansatz paramters.
+
+        Args:
+            parameters: New ansatz paramters.
+        """
+        self._rdm1 = None
+        self._rdm2 = None
+        self._rdm3 = None
+        self._rdm4 = None
+        self._energy_elec = None
+        self.QI.parameters = parameters
+
+    def change_primitive(
+        self, primitive: BaseEstimator | BaseSamplerV1 | BaseSamplerV2, verbose: bool = True
+    ) -> None:
+        """Change the primitive expectation value calculator.
+
+        Args:
+            primitive: Primitive object.
+            verbose: Print more info.
+        """
+        if verbose:
+            print(
+                "Using this function is only recommended for switching from ideal simulator to shot-noise or quantum hardware.\n \
+                Multiple switching back and forth can lead to un-expected outcomes and is an experimental feature.\n"
+            )
+
+        if isinstance(primitive, BaseEstimatorV2):
+            raise ValueError("EstimatorV2 is not currently supported.")
+        if isinstance(primitive, BaseSamplerV2) and verbose:
+            print("WARNING: Using SamplerV2 is an experimental feature.")
+        self.QI._primitive = primitive  # pylint: disable=protected-access
+        if verbose:
+            if self.QI.do_M_ansatz0:
+                print("Reset RDMs, energies, QI metrics, and correlation matrix.")
+            else:
+                print("Reset RDMs, energies, and QI metrics.")
+        self._rdm1 = None
+        self._rdm2 = None
+        self._energy_elec = None
+        self.QI.total_device_calls = 0
+        self.QI.total_shots_used = 0
+        self.QI.total_paulis_evaluated = 0
+
+        # Reset circuit and initiate re-transpiling
+        ISA_old = self.QI.ISA
+        self._reconstruct_circuit()  # Reconstruct circuit but keeping parameters
+        self.QI.ISA = ISA_old  # Redo ISA including transpilation if requested
+        self.QI.shots = self.QI.shots  # Redo shots parameter check
+
+        if verbose:
+            self.QI.get_info()
+
+    def _reconstruct_circuit(self) -> None:
+        """Construct circuit again."""
+        # force ISA = False
+        self.QI._ISA = False  # pylint: disable=protected-access
+        self.QI.construct_circuit(
+            self.num_active_orbs, (self.num_active_elec // 2, self.num_active_elec // 2)
+        )
+        self.QI._transpiled = False  # pylint: disable=protected-access
+
+    @property
+    def rdm1(self) -> np.ndarray:
+        raise NotImplementedError
+
+    @property
+    def rdm2(self) -> np.ndarray:
+        raise NotImplementedError
+
+    def precalc_rdm_paulis(self, rdm_order: int) -> None:
+        """Pre-calculate all Paulis used to contruct RDMs up to a certain order.
+
+        This utilizes the saving feature in QuantumInterface when using the Sampler primitive.
+        If saving is turned up in QuantumInterface this function will do nothing but waste device time.
+
+        Args:
+            rdm_order: Max order RDM.
+        """
+        if not isinstance(
+            self.QI._primitive, (BaseSamplerV1, BaseSamplerV2)  # pylint: disable=protected-access
+        ):
+            raise TypeError(
+                f"This feature is only supported for Sampler got {type(self.QI._primitive)} from QuantumInterface"  # pylint: disable=protected-access
+            )
+        if rdm_order > 2:
+            raise ValueError(f"Precalculation only supported up to order 2 got {rdm_order}")
+        if rdm_order < 1:
+            raise ValueError(f"Precalculation need atleast an order of 1 got {rdm_order}")
+        cumulated_paulis = None
+        if rdm_order >= 1:
+            raise NotImplementedError
+        if rdm_order >= 2:
+            raise NotImplementedError
+        # Calling expectation value to put all Paulis in cliques
+        # and compute distributions for the cliques.
+        # The coefficients are set to one, so the Paulis cannot cancel out.
+        _ = self.QI._sampler_quantum_expectation_value(  # pylint: disable=protected-access
+            SparsePauliOp(cumulated_paulis, np.ones(len(cumulated_paulis)))  # type: ignore[arg-type]
+        )
+
+    @property
+    def energy_elec(self) -> float:
+        """Get electronic energy.
+
+        Returns:
+            Electronic energy.
+        """
+        if self._energy_elec is None:
+            H = unrestricted_hamiltonian_0i_0a(
+                self.haa_mo,
+                self.hbb_mo,
+                self.gaaaa_mo,
+                self.gbbbb_mo,
+                self.gaabb_mo,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+            )
+            H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+            self._energy_elec = self.QI.quantum_expectation_value(H)
+        return self._energy_elec
+
+    def _calc_energy_elec(self) -> float:
+        """Run electronic energy simulation, regardless of self.energy_elec variable.
+
+        Returns:
+            Electronic energy.
+        """
+        H = unrestricted_hamiltonian_0i_0a(
+            self.haa_mo,
+            self.hbb_mo,
+            self.gaaaa_mo,
+            self.gbbbb_mo,
+            self.gaabb_mo,
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+        )
+        H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+        energy_elec = self.QI.quantum_expectation_value(H)
+
+        return energy_elec
+
+    def _get_hamiltonian(self) -> FermionicOperator:
+        """Return electronic Hamiltonian as FermionicOperator.
+
+        Returns:
+            FermionicOperator.
+        """
+        H = unrestricted_hamiltonian_0i_0a(
+            self.haa_mo,
+            self.hbb_mo,
+            self.gaaaa_mo,
+            self.gbbbb_mo,
+            self.gaabb_mo,
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+        )
+        H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+        return H
+
+    def run_vqe_2step(
+        self,
+        ansatz_optimizer: str,
+        orbital_optimization: bool = False,
+        tol: float = 1e-8,
+        maxiter: int = 1000,
+        is_silent_subiterations: bool = False,
+    ) -> None:
+        """Run VQE of wave function."""
+        global iteration  # pylint: disable=global-variable-undefined
+        global start  # pylint: disable=global-variable-undefined
+
+        if isinstance(self.QI.ansatz, QuantumCircuit) and not ansatz_optimizer.lower() == "cobyla":
+            raise ValueError("Custom Ansatz in QI only works with COBYLA as optimizer")
+
+        def print_progress(x, energy_func, silent: bool) -> None:
+            """Print progress during energy minimization of wave function.
+
+            Args:
+                x: Wave function parameters.
+                energy_func: Function to calculate energy.
+                silent: Supress print.
+            """
+            global iteration  # pylint: disable=global-variable-undefined
+            global start  # pylint: disable=global-variable-undefined
+            time_str = f"{time.time() - start:7.2f}"  # type: ignore [name-defined] # pylint: disable=used-before-assignment
+            if not silent:
+                e_str = f"{energy_func(x):3.16f}"
+                print(
+                    f"--------{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}"  # type: ignore [name-defined] # pylint: disable=used-before-assignment
+                )
+            iteration += 1  # type: ignore
+            start = time.time()  # type: ignore
+
+        def print_progress_SPSA(
+            ___,
+            theta,  # pylint: disable=unused-argument
+            f_val,
+            _,
+            __,
+            silent: bool,
+        ) -> None:
+            """Print progress during energy minimization of wave function.
+
+            Args:
+                theta: Wave function parameters.
+                f_val: Function value at theta.
+                silent: Supress print.
+            """
+            global iteration  # pylint: disable=global-variable-undefined
+            global start  # pylint: disable=global-variable-undefined
+            time_str = f"{time.time() - start:7.2f}"  # type: ignore
+            e_str = f"{f_val:3.12f}"
+            if not silent:
+                print(f"--------{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+            iteration += 1  # type: ignore
+            start = time.time()  # type: ignore
+
+        e_old = 1e12
+        print("Full optimization")
+        print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+        for full_iter in range(0, int(maxiter)):
+            full_start = time.time()
+            iteration = 0  # type: ignore
+            start = time.time()  # type: ignore
+
+            # Do ansatz optimization
+            if not is_silent_subiterations:
+                print("--------Ansatz optimization")
+                print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+            H = unrestricted_hamiltonian_0i_0a(
+                self.haa_mo,
+                self.hbb_mo,
+                self.gaaaa_mo,
+                self.gbbbb_mo,
+                self.gaabb_mo,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+            )
+            H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+            energy_theta = partial(
+                calc_energy_theta,
+                operator=H,
+                quantum_interface=self.QI,
+            )
+            gradient_theta = partial(ansatz_parameters_gradient, operator=H, quantum_interface=self.QI)
+            if ansatz_optimizer.lower() == "slsqp":
+                print_progress_ = partial(
+                    print_progress, energy_func=energy_theta, silent=is_silent_subiterations
+                )
+                optimizer = SLSQP(maxiter=maxiter, ftol=tol, callback=print_progress_)
+            elif ansatz_optimizer.lower() == "slsqp_nograd":
+                print_progress_ = partial(
+                    print_progress, energy_func=energy_theta, silent=is_silent_subiterations
+                )
+                optimizer = SLSQP(maxiter=maxiter, ftol=tol, callback=print_progress_)
+            elif ansatz_optimizer.lower() == "l_bfgs_b":
+                print_progress_ = partial(
+                    print_progress, energy_func=energy_theta, silent=is_silent_subiterations
+                )
+                optimizer = L_BFGS_B(maxiter=maxiter, tol=tol, callback=print_progress_)
+            elif ansatz_optimizer.lower() == "cobyla":
+                print_progress_ = partial(
+                    print_progress, energy_func=energy_theta, silent=is_silent_subiterations
+                )
+                optimizer = COBYLA(maxiter=maxiter, tol=tol, callback=print_progress_)
+            elif ansatz_optimizer.lower() == "rotosolve":
+                print_progress_ = partial(
+                    print_progress, energy_func=energy_theta, silent=is_silent_subiterations
+                )
+                optimizer = RotoSolve(
+                    self.QI.grad_param_R,
+                    self.QI.param_names,
+                    maxiter=maxiter,
+                    tol=tol,
+                    callback=print_progress_,
+                )
+            elif ansatz_optimizer.lower() == "spsa":
+                print("WARNING: Convergence tolerence cannot be set for SPSA; using qiskit default")
+                print_progress_SPSA_ = partial(print_progress_SPSA, silent=is_silent_subiterations)
+                optimizer = SPSA(maxiter=maxiter, callback=print_progress_SPSA_)
+            else:
+                raise ValueError(f"Unknown optimizer: {ansatz_optimizer}")
+            if ansatz_optimizer.lower() == "slsqp_nograd":
+                res = optimizer.minimize(energy_theta, self.ansatz_parameters)
+            else:
+                res = optimizer.minimize(energy_theta, self.ansatz_parameters, jac=gradient_theta)
+            self.ansatz_parameters = res.x.tolist()
+
+            if orbital_optimization and len(self.kappa) != 0:
+                iteration = 0  # type: ignore
+                start = time.time()  # type: ignore
+                if not is_silent_subiterations:
+                    print("--------Orbital optimization")
+                    print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+                energy_oo = partial(
+                    calc_energy_oo,
+                    wf=self,
+                )
+                gradiet_oo = partial(
+                    orbital_rotation_gradient,
+                    wf=self,
+                )
+
+                print_progress_ = partial(
+                    print_progress, energy_func=energy_oo, silent=is_silent_subiterations
+                )
+                optimizer = L_BFGS_B(maxiter=maxiter, tol=tol, callback=print_progress_)
+                res = optimizer.minimize(energy_oo, [0.0] * len(self.kappa_idx), jac=gradiet_oo)
+                for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
+                    self.kappa[i] = 0.0
+                    self._kappa_old[i] = 0.0
+                for i in range(len(self.kappa_redundant)):  # pylint: disable=consider-using-enumerate
+                    self.kappa_redundant[i] = 0.0
+                    self._kappa_redundant_old[i] = 0.0
+            else:
+                # If theres is no orbital optimization, then the algorithm is already converged.
+                e_new = res.fun
+                if orbital_optimization and len(self.kappa) == 0:
+                    print(
+                        "WARNING: No orbital optimization performed, because there is no non-redundant orbital parameters"
+                    )
+                break
+
+            e_new = res.fun
+            time_str = f"{time.time() - full_start:7.2f}"  # type: ignore
+            e_str = f"{e_new:3.12f}"
+            print(f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+            if abs(e_new - e_old) < tol:
+                break
+            e_old = e_new
+        self._energy_elec = e_new
+
+    def run_vqe_1step(
+        self,
+        optimizer_name: str,
+        orbital_optimization: bool = False,
+        tol: float = 1e-8,
+        maxiter: int = 1000,
+    ) -> None:
+        """Run VQE of wave function."""
+        if not orbital_optimization:
+            raise ValueError("Does only work with orbital optimization right now")
+        global iteration  # pylint: disable=global-variable-undefined
+        global start  # pylint: disable=global-variable-undefined
+        iteration = 0  # type: ignore
+        start = time.time()  # type: ignore
+
+        if isinstance(self.QI.ansatz, QuantumCircuit) and not optimizer_name.lower() == "cobyla":
+            raise ValueError("Custom Ansatz in QI only works with COBYLA as optimizer")
+
+        def print_progress(x, energy_func) -> None:
+            """Print progress during energy minimization of wave function.
+
+            Args:
+                x: Wave function parameters.
+                energy_func: Function to calculate energy.
+            """
+            global iteration  # pylint: disable=global-variable-undefined
+            global start  # pylint: disable=global-variable-undefined
+            time_str = f"{time.time() - start:7.2f}"  # type: ignore
+            e_str = f"{energy_func(x):3.12f}"
+            print(f"{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+            iteration += 1  # type: ignore
+            start = time.time()  # type: ignore
+
+        def print_progress_SPSA(
+            ___,
+            theta,  # pylint: disable=unused-argument
+            f_val,
+            _,
+            __,
+        ) -> None:
+            """Print progress during energy minimization of wave function.
+
+            Args:
+                theta: Wave function parameters.
+                f_val: Function value at theta.
+            """
+            global iteration  # pylint: disable=global-variable-undefined
+            global start  # pylint: disable=global-variable-undefined
+            time_str = f"{time.time() - start:7.2f}"  # type: ignore
+            e_str = f"{f_val:3.12f}"
+            print(f"{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+            iteration += 1  # type: ignore
+            start = time.time()  # type: ignore
+
+        print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+        energy_both = partial(
+            calc_energy_both,
+            wf=self,
+        )
+        gradient_both = partial(
+            calc_gradient_both,
+            wf=self,
+        )
+        if optimizer_name.lower() == "slsqp":
+            print_progress_ = partial(print_progress, energy_func=energy_both)
+            optimizer = SLSQP(maxiter=maxiter, ftol=tol, callback=print_progress_)
+        elif optimizer_name.lower() == "l_bfgs_b":
+            print_progress_ = partial(print_progress, energy_func=energy_both)
+            optimizer = L_BFGS_B(maxiter=maxiter, tol=tol, callback=print_progress_)
+        elif optimizer_name.lower() == "cobyla":
+            print_progress_ = partial(print_progress, energy_func=energy_both)
+            optimizer = COBYLA(maxiter=maxiter, tol=tol, callback=print_progress_)
+        elif optimizer_name.lower() == "rotosolve":
+            if orbital_optimization and len(self.kappa) != 0:
+                raise ValueError(
+                    "Cannot use rotosolve together with orbital optimization in the one-step solver."
+                )
+            print_progress_ = partial(print_progress, energy_func=energy_both)
+            optimizer = RotoSolve(
+                self.QI.grad_param_R, self.QI.param_names, maxiter=maxiter, tol=tol, callback=print_progress_
+            )
+        elif optimizer_name.lower() == "spsa":
+            print("WARNING: Convergence tolerence cannot be set for SPSA; using qiskit default")
+            optimizer = SPSA(maxiter=maxiter, callback=print_progress_SPSA)
+        else:
+            raise ValueError(f"Unknown optimizer: {optimizer_name}")
+        parameters = self.kappa + self.ansatz_parameters
+        res = optimizer.minimize(energy_both, parameters, jac=gradient_both)
+        self.ansatz_parameters = res.x[len(self.kappa) :].tolist()
+        for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
+            self.kappa[i] = 0.0
+            self._kappa_old[i] = 0.0
+        for i in range(len(self.kappa_redundant)):  # pylint: disable=consider-using-enumerate
+            self.kappa_redundant[i] = 0.0
+            self._kappa_redundant_old[i] = 0.0
+        self._energy_elec = res.fun
+
+
+def calc_energy_theta(
+    parameters: list[float], operator: FermionicOperator, quantum_interface: QuantumInterface
+) -> float:
+    """Calculate electronic energy using expectation values.
+
+    Args:
+        paramters: Ansatz paramters.
+        operator: Hamiltonian operator.
+        quantum_interface: QuantumInterface.
+
+    Returns:
+        Electronic energy.
+    """
+    quantum_interface.parameters = parameters
+    return quantum_interface.quantum_expectation_value(operator)
+
+
+def calc_energy_oo(kappa: list[float], wf: WaveFunction) -> float:
+    """Calculate electronic energy using RDMs.
+
+    Args:
+        kappa: Orbital rotation parameters.
+        wf: Wave function object.
+
+    Returns:
+        Electronic energy.
+    """
+    kappa_mat = np.zeros_like(wf.c_orthonormal)
+    for kappa_val, (p, q) in zip(
+        np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx  # pylint: disable=protected-access
+    ):
+        kappa_mat[p, q] = kappa_val
+        kappa_mat[q, p] = -kappa_val
+    if len(wf.kappa_redundant) != 0:
+        if np.max(np.abs(wf.kappa_redundant)) > 0.0:
+            for kappa_val, (p, q) in zip(
+                np.array(wf.kappa_redundant)
+                - np.array(wf._kappa_redundant_old),  # pylint: disable=protected-access
+                wf.kappa_redundant_idx,
+            ):
+                kappa_mat[p, q] = kappa_val
+                kappa_mat[q, p] = -kappa_val
+    c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
+    wf._kappa_old = kappa.copy()  # pylint: disable=protected-access
+    wf._kappa_redundant_old = wf.kappa_redundant.copy()  # pylint: disable=protected-access
+    # Moving expansion point of kappa
+    wf.c_orthonormal = c_trans
+    rdms = ReducedDenstiyMatrix(
+        wf.num_inactive_orbs,
+        wf.num_active_orbs,
+        wf.num_active_orbs,
+        rdm1=wf.rdm1,
+        rdm2=wf.rdm2,
+    )
+    energy = get_electronic_energy(rdms, wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs)
+    return energy
+
+
+def calc_energy_both(parameters, wf) -> float:
+    """Calculate electronic energy.
+
+    Args:
+        parameters: Ansatz and orbital rotation parameters.
+        wf: Wave function object.
+
+    Returns:
+        Electronic energy.
+    """
+    kappa = parameters[: len(wf.kappa)]
+    theta = parameters[len(wf.kappa) :]
+    assert len(theta) == len(wf.ansatz_parameters)
+    # Do orbital partial
+    kappa_mat = np.zeros_like(wf.c_orthonormal)
+    for kappa_val, (p, q) in zip(
+        np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx  # pylint: disable=protected-access
+    ):
+        kappa_mat[p, q] = kappa_val
+        kappa_mat[q, p] = -kappa_val
+    if len(wf.kappa_redundant) != 0:
+        if np.max(np.abs(wf.kappa_redundant)) > 0.0:
+            for kappa_val, (p, q) in zip(
+                np.array(wf.kappa_redundant)
+                - np.array(wf._kappa_redundant_old),  # pylint: disable=protected-access
+                wf.kappa_redundant_idx,
+            ):
+                kappa_mat[p, q] = kappa_val
+                kappa_mat[q, p] = -kappa_val
+    c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
+    wf._kappa_old = kappa.copy()  # pylint: disable=protected-access
+    wf._kappa_redundant_old = wf.kappa_redundant.copy()  # pylint: disable=protected-access
+    # Moving expansion point of kappa
+    wf.c_orthonormal = c_trans
+    # Build operator
+    wf.ansatz_parameters = theta.copy()  # Reset rdms
+    H = hamiltonian_0i_0a(wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs)
+    H = H.get_folded_operator(wf.num_inactive_orbs, wf.num_active_orbs, wf.num_virtual_orbs)
+    return wf.QI.quantum_expectation_value(H)
+
+
+def orbital_rotation_gradient(
+    placeholder,  # pylint: disable=unused-argument
+    wf,
+) -> np.ndarray:
+    """Calcuate electronic gradient with respect to orbital rotations.
+
+    Args:
+        placeholder: Placeholder for kappa parameters, these are fetched OOP style instead.
+        wf: Wave function object.
+
+    Return:
+        Electronic gradient with respect to orbital rotations.
+    """
+    rdms = ReducedDenstiyMatrix(
+        wf.num_inactive_orbs,
+        wf.num_active_orbs,
+        wf.num_active_orbs,
+        rdm1=wf.rdm1,
+        rdm2=wf.rdm2,
+    )
+    gradient = get_orbital_gradient(
+        rdms, wf.h_mo, wf.g_mo, wf.kappa_idx, wf.num_inactive_orbs, wf.num_active_orbs
+    )
+    return gradient
+
+
+def ansatz_parameters_gradient(
+    parameters: list[float], operator: FermionicOperator, quantum_interface: QuantumInterface
+) -> np.ndarray:
+    r"""Calculate gradient with respect to ansatz parameters.
+
+    Args:
+        parameters: Ansatz parameters.
+        operator: Operator which the derivative is with respect to.
+        quantum_interface: Interface to call quantum device.
+
+    Returns:
+        Gradient with repsect to ansatz parameters.
+    """
+    gradient = np.zeros(len(parameters))
+    for i in range(len(parameters)):  # pylint: disable=consider-using-enumerate
+        R = quantum_interface.grad_param_R[quantum_interface.param_names[i]]
+        e_vals_grad = get_energy_evals_for_grad(operator, quantum_interface, parameters, i, R)
+        grad = 0.0
+        for j, mu in enumerate(list(range(1, 2 * R + 1))):
+            x_mu = (2 * mu - 1) / (2 * R) * np.pi
+            grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R * (np.sin(1 / 2 * x_mu)) ** 2)
+        gradient[i] = grad
+    return gradient
+
+
+def get_energy_evals_for_grad(
+    operator: FermionicOperator,
+    quantum_interface: QuantumInterface,
+    parameters: list[float],
+    idx: int,
+    R: int,
+) -> list[float]:
+    r"""Get energy evaluations needed for the gradient calculation.
+
+    The gradient formula is defined for x=0,
+    so x_shift is used to shift ensure we can get the energy in the point we actually want.
+
+    Args:
+        operator: Operator which the derivative is with respect to.
+        parameters: Paramters.
+        idx: Parameter idx.
+        R: Parameter to control we get the needed points.
+
+    Returns:
+        Energies in a few fixed points.
+    """
+    e_vals = []
+    x = parameters.copy()
+    x_shift = x[idx]
+    for mu in range(1, 2 * R + 1):
+        x_mu = (2 * mu - 1) / (2 * R) * np.pi
+        x[idx] = x_mu + x_shift
+        e_vals.append(quantum_interface.quantum_expectation_value(operator, custom_parameters=x))
+    return e_vals
+
+
+def calc_gradient_both(parameters: list[float], wf: WaveFunction) -> np.ndarray:
+    """Calculate electronic gradient.
+
+    Args:
+        parameters: Ansatz and orbital rotation parameters.
+        wf: Wave function object.
+
+    Returns:
+        Electronic gradient.
+    """
+    gradient = np.zeros(len(parameters))
+    theta = parameters[len(wf.kappa) :]
+    assert len(theta) == len(wf.ansatz_parameters)
+    kappa_grad = orbital_rotation_gradient(0, wf)
+    gradient[: len(wf.kappa)] = kappa_grad
+    H = hamiltonian_0i_0a(wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs)
+    H = H.get_folded_operator(wf.num_inactive_orbs, wf.num_active_orbs, wf.num_virtual_orbs)
+    theta_grad = ansatz_parameters_gradient(theta, H, wf.QI)
+    gradient[len(wf.kappa) :] = theta_grad
+    return gradient
