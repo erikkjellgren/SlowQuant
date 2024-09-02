@@ -129,7 +129,7 @@ def unrestricted_hamiltonian_0i_0a(
                     * anni(i, "beta", False)
                 )
                 hamiltonian_operator += (
-                    gbbbb_mo[i, i, j, j]
+                    gaabb_mo[i, i, j, j]
                     * anni(i, "alpha", True)
                     * anni(j, "beta", True)
                     * anni(j, "beta", False)
@@ -159,7 +159,7 @@ def unrestricted_hamiltonian_0i_0a(
                     * anni(i, "beta", False)
                 )
                 hamiltonian_operator += (
-                    gbbbb_mo[j, i, i, j]
+                    gaabb_mo[j, i, i, j]
                     * anni(j, "alpha", True)
                     * anni(i, "beta", True)
                     * anni(j, "beta", False)
@@ -252,13 +252,6 @@ def unrestricted_hamiltonian_0i_0a(
                         * anni(q, "beta", False)
                         * anni(i, "beta", False)
                     )
-                    hamiltonian_operator += (
-                        gaabb_mo[p, i, i, q]
-                        * anni(p, "alpha", True)
-                        * anni(i, "beta", True)
-                        * anni(q, "beta", False)
-                        * anni(i, "alpha", False)
-                    )
                 if (
                     abs(gaaaa_mo[i, p, q, i]) > 10**-14
                     or abs(gbbbb_mo[i, p, q, i]) > 10**-14
@@ -281,13 +274,6 @@ def unrestricted_hamiltonian_0i_0a(
                         * anni(q, "beta", True)
                         * anni(i, "beta", False)
                         * anni(p, "beta", False)
-                    )
-                    hamiltonian_operator += (
-                        gaabb_mo[i, p, q, i]
-                        * anni(i, "alpha", True)
-                        * anni(q, "beta", True)
-                        * anni(i, "beta", False)
-                        * anni(p, "alpha", False)
                     )
     # Active two-electron
     for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):

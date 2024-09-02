@@ -38,7 +38,7 @@ class UnrestrictedWaveFunctionUPS:
         self,
         num_spin_orbs: int,
         num_elec: int,
-        cas: Sequence[int],
+        cas: tuple[tuple[int, int], int],
         c_orthonormal: np.ndarray,
         h_ao: np.ndarray,
         g_ao: np.ndarray,
@@ -64,7 +64,12 @@ class UnrestrictedWaveFunctionUPS:
             ansatz_options = {}
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
-        self._c_orthonormal = c_orthonormal
+        if len(cas) != 2:
+            raise ValueError(
+                "Number of electrons in the active space must be specified as a tuple of (alpha, beta)."
+            )
+        self._c_a_orthonormal = c_orthonormal[0]
+        self._c_b_orthonormal = c_orthonormal[1]
         self.h_ao = h_ao
         self.g_ao = g_ao
         self.inactive_spin_idx = []
@@ -79,12 +84,14 @@ class UnrestrictedWaveFunctionUPS:
         self.active_occ_idx_shifted = []
         self.active_unocc_idx_shifted = []
         self.num_elec = num_elec
-        self.num_elec_alpha = num_elec // 2
-        self.num_elec_beta = num_elec // 2
+        self.num_elec_alpha = (num_elec - np.sum(cas[0])) // 2 + cas[0][0]
+        self.num_elec_beta = (num_elec - np.sum(cas[0])) // 2 + cas[0][1]
         self.num_spin_orbs = num_spin_orbs
         self.num_orbs = num_spin_orbs // 2
         self._include_active_kappa = include_active_kappa
-        self.num_active_elec = 0
+        self.num_active_elec = np.sum(cas[0])
+        self.num_active_elec_alpha = cas[0][0]
+        self.num_active_elec_beta = cas[0][1]
         self.num_active_spin_orbs = 0
         self.num_inactive_spin_orbs = 0
         self.num_virtual_spin_orbs = 0
@@ -101,21 +108,30 @@ class UnrestrictedWaveFunctionUPS:
         self.ansatz_options = ansatz_options
         active_space = []
         orbital_counter = 0
-        for i in range(num_elec - cas[0], num_elec):
+        for i in range(
+            2
+            * min(
+                self.num_elec_alpha - self.num_active_elec_alpha,
+                self.num_elec_beta - self.num_active_elec_beta,
+            ),
+            2 * max(self.num_elec_alpha, self.num_elec_beta),
+        ):
             active_space.append(i)
             orbital_counter += 1
-        for i in range(num_elec, num_elec + 2 * cas[1] - orbital_counter):
+        for i in range(
+            2 * max(self.num_elec_alpha, self.num_elec_beta),
+            2 * max(self.num_elec_alpha, self.num_elec_beta) + 2 * cas[1] - orbital_counter,
+        ):
             active_space.append(i)
-        for i in range(num_elec):
+        for i in range(2 * max(self.num_elec_alpha, self.num_elec_beta)):
             if i in active_space:
                 self.active_spin_idx.append(i)
                 self.active_occ_spin_idx.append(i)
                 self.num_active_spin_orbs += 1
-                self.num_active_elec += 1
             else:
                 self.inactive_spin_idx.append(i)
                 self.num_inactive_spin_orbs += 1
-        for i in range(num_elec, num_spin_orbs):
+        for i in range(2 * max(self.num_elec_alpha, self.num_elec_beta), num_spin_orbs):
             if i in active_space:
                 self.active_spin_idx.append(i)
                 self.active_unocc_spin_idx.append(i)
@@ -123,8 +139,6 @@ class UnrestrictedWaveFunctionUPS:
             else:
                 self.virtual_spin_idx.append(i)
                 self.num_virtual_spin_orbs += 1
-        self.num_active_elec_alpha = self.num_active_elec // 2
-        self.num_active_elec_beta = self.num_active_elec // 2
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
         self.num_active_orbs = self.num_active_spin_orbs // 2
         self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
@@ -243,7 +257,17 @@ class UnrestrictedWaveFunctionUPS:
         )
         self.num_det = len(self.idx2det)
         self.csf_coeffs = np.zeros(self.num_det)
-        hf_det = int("1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec), 2)
+        hf_string = ""
+        for i in range(self.num_active_orbs):
+            if i < self.num_active_elec_alpha:
+                hf_string += "1"
+            else:
+                hf_string += "0"
+            if i < self.num_active_elec_beta:
+                hf_string += "1"
+            else:
+                hf_string += "0"
+        hf_det = int(hf_string, 2)
         self.csf_coeffs[self.det2idx[hf_det]] = 1
         self.ci_coeffs = np.copy(self.csf_coeffs)
         self.ups_layout = UpsStructure()
@@ -352,7 +376,7 @@ class UnrestrictedWaveFunctionUPS:
         Returns:
             Orbital coefficients.
         """
-        kappa_a_mat = np.zeros_like(self._c_orthonormal[0])
+        kappa_a_mat = np.zeros_like(self.c_a_orthonormal)
         if len(self.kappa_a) != 0:
             if np.max(np.abs(self.kappa_a)) > 0.0:
                 for kappa_a_val, (p, q) in zip(self.kappa_a, self.kappa_idx):
@@ -363,7 +387,7 @@ class UnrestrictedWaveFunctionUPS:
                 for kappa_a_val, (p, q) in zip(self.kappa_a_redundant, self.kappa_redundant_idx):
                     kappa_a_mat[p, q] = kappa_a_val
                     kappa_a_mat[q, p] = -kappa_a_val
-        return np.matmul(self._c_orthonormal[0], scipy.linalg.expm(-kappa_a_mat))
+        return np.matmul(self.c_a_orthonormal, scipy.linalg.expm(-kappa_a_mat))
 
     @property
     def c_b_trans(self) -> np.ndarray:
@@ -372,7 +396,7 @@ class UnrestrictedWaveFunctionUPS:
         Returns:
             Orbital coefficients.
         """
-        kappa_b_mat = np.zeros_like(self._c_orthonormal[1])
+        kappa_b_mat = np.zeros_like(self.c_b_orthonormal)
         if len(self.kappa_b) != 0:
             if np.max(np.abs(self.kappa_b)) > 0.0:
                 for kappa_b_val, (p, q) in zip(self.kappa_b, self.kappa_idx):
@@ -383,7 +407,7 @@ class UnrestrictedWaveFunctionUPS:
                 for kappa_b_val, (p, q) in zip(self.kappa_b_redundant, self.kappa_redundant_idx):
                     kappa_b_mat[p, q] = kappa_b_val
                     kappa_b_mat[q, p] = -kappa_b_val
-        return np.matmul(self._c_orthonormal[1], scipy.linalg.expm(-kappa_b_mat))
+        return np.matmul(self.c_b_orthonormal, scipy.linalg.expm(-kappa_b_mat))
 
     @property
     def c_trans(self) -> tuple[np.ndarray, np.ndarray]:
@@ -676,7 +700,7 @@ def energy_ups(
         wf.det2idx,
         wf.num_inactive_orbs,
         wf.num_active_orbs,
-        wf.num_inactive_orbs,
+        wf.num_virtual_orbs,
         wf.num_active_elec_alpha,
         wf.num_active_elec_beta,
         wf.thetas,

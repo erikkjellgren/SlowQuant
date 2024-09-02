@@ -9,3 +9,6 @@ Unitary Coupled Cluster Wave Function
 
 .. automodule:: slowquant.unitary_coupled_cluster.sa_ups_wavefunction
     :members:
+
+.. automodule:: slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction
+    :members:
