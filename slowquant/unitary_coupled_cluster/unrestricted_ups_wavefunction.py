@@ -253,16 +253,40 @@ class UnrestrictedWaveFunctionUPS:
             self.ansatz_options["do_qnp"] = True
             self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
         elif ansatz.lower() == "fucc":
-            state = "1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec)
-            self.ups_layout.create_fUCCSD([[state]], self.ansatz_options)
+            if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
+            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
         elif ansatz.lower() == "ksafupccgsd":
-            self.ups_layout.create_kSAfUpCCGSD(
-                self.num_active_orbs,
-                self.ansatz_options,
-            )
+            self.ups_layout.create_kSAfUpCCGSD(self.num_active_orbs, self.ansatz_options)
+        elif ansatz.lower() == "duccsd":
+            if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
+            self.ups_layout.create_dUCCSD(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
+        elif ansatz.lower() == "ksadupccgsd":
+            self.ups_layout.create_kSAdUpCCGSD(self.num_active_orbs, self.ansatz_options)
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
+
+    @property
+    def c_a_orthonormal(self) -> np.ndarray:
+        """Get orthonormalization coefficients (MO coefficients).
+
+        Returns:
+            Orthonormalization coefficients.
+        """
+        return self._c_a_orthonormal
+
+    @property
+    def c_b_orthonormal(self) -> np.ndarray:
+        """Get orthonormalization coefficients (MO coefficients).
+
+        Returns:
+            Orthonormalization coefficients.
+        """
+        return self._c_b_orthonormal
 
     @property
     def c_orthonormal(self) -> tuple[np.ndarray, np.ndarray]:
@@ -271,7 +295,7 @@ class UnrestrictedWaveFunctionUPS:
         Returns:
             Orthonormalization coefficients.
         """
-        return self._c_orthonormal
+        return (self._c_a_orthonormal, self._c_b_orthonormal)
 
     @c_orthonormal.setter
     def c_orthonormal(self, c: tuple[np.ndarray, np.ndarray]) -> None:
@@ -285,7 +309,8 @@ class UnrestrictedWaveFunctionUPS:
         self._gaaaa_mo = None
         self._gbbbb_mo = None
         self._gaabb_mo = None
-        self._c_orthonormal = c
+        self._c_a_orthonormal = c[0]
+        self._c_b_orthonormal = c[1]
 
     @property
     def thetas(self) -> list[float]:
@@ -370,10 +395,6 @@ class UnrestrictedWaveFunctionUPS:
         return (self.c_a_trans, self.c_b_trans)
 
     @property
-    def h_mo(self) -> tuple[np.ndarray, np.ndarray]:
-        return (self.haa_mo, self.hbb_mo)
-
-    @property
     def haa_mo(self) -> np.ndarray:
         """Get one-electron Hamiltonian integrals in MO basis.
 
@@ -394,6 +415,15 @@ class UnrestrictedWaveFunctionUPS:
         if self._hbb_mo is None:
             self._hbb_mo = one_electron_integral_transform(self.c_b_trans, self.h_ao)
         return self._hbb_mo
+
+    @property
+    def h_mo(self) -> tuple[np.ndarray, np.ndarray]:
+        """Get one-electron Hamiltonian integrals in MO basis.
+
+        Returns:
+            One-electron Hamiltonian integrals in MO basis.
+        """
+        return (self.haa_mo, self.hbb_mo)
 
     @property
     def gaaaa_mo(self) -> np.ndarray:
@@ -577,39 +607,55 @@ def energy_ups(
     Returns:
         Electronic energy.
     """
-    kappa = []
+    kappa_a = []
+    kappa_b = []
     theta = []
     idx_counter = 0
     if orbital_optimized:
         for _ in range(len(wf.kappa_idx)):
-            kappa.append(parameters[idx_counter])
+            kappa_a.append(parameters[idx_counter])
+            idx_counter += 1
+        for _ in range(len(wf.kappa_idx)):
+            kappa_b.append(parameters[idx_counter])
             idx_counter += 1
     for par in parameters[idx_counter:]:
         theta.append(par)
-    assert len(parameters) == len(kappa) + len(theta)
+    assert len(parameters) == len(kappa_a) + len(kappa_b) + len(theta)
 
-    kappa_mat = np.zeros_like(wf.c_orthonormal)
+    kappa_a_mat = np.zeros_like(wf.c_a_orthonormal)
+    kappa_b_mat = np.zeros_like(wf.c_b_orthonormal)
     if orbital_optimized:
-        for kappa_val, (p, q) in zip(
-            np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx  # pylint: disable=protected-access
+        for kappa_a_val, kappa_b_val, (p, q) in zip(
+            np.array(kappa_a) - np.array(wf._kappa_a_old),  # pylint: disable=protected-access
+            np.array(kappa_b) - np.array(wf._kappa_b_old),  # pylint: disable=protected-access
+            wf.kappa_idx,
         ):
-            kappa_mat[p, q] = kappa_val
-            kappa_mat[q, p] = -kappa_val
-    if len(wf.kappa_redundant) != 0:
-        if np.max(np.abs(wf.kappa_redundant)) > 0.0:
-            for kappa_val, (p, q) in zip(
-                np.array(wf.kappa_redundant)
-                - np.array(wf._kappa_redundant_old),  # pylint: disable=protected-access
+            kappa_a_mat[p, q] = kappa_a_val
+            kappa_a_mat[q, p] = -kappa_a_val
+            kappa_a_mat[p, q] = kappa_b_val
+            kappa_a_mat[q, p] = -kappa_b_val
+    if len(wf.kappa_a_redundant) + len(wf.kappa_b_redundant) != 0:
+        if np.max(np.abs(wf.kappa_a_redundant)) > 0.0 or np.max(np.abs(wf.kappa_b_redundant)) > 0.0:
+            for kappa_a_val, kappa_b_val, (p, q) in zip(
+                np.array(wf.kappa_a_redundant)
+                - np.array(wf._kappa_a_redundant_old),  # pylint: disable=protected-access
+                np.array(wf.kappa_b_redundant)
+                - np.array(wf._kappa_b_redundant_old),  # pylint: disable=protected-access
                 wf.kappa_redundant_idx,
             ):
-                kappa_mat[p, q] = kappa_val
-                kappa_mat[q, p] = -kappa_val
-    c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
+                kappa_a_mat[p, q] = kappa_a_val
+                kappa_a_mat[q, p] = -kappa_a_val
+                kappa_b_mat[p, q] = kappa_b_val
+                kappa_b_mat[q, p] = -kappa_b_val
+    c_a_trans = np.matmul(wf.c_a_orthonormal, scipy.linalg.expm(-kappa_a_mat))
+    c_b_trans = np.matmul(wf.c_b_orthonormal, scipy.linalg.expm(-kappa_b_mat))
     if orbital_optimized:
-        wf._kappa_old = kappa.copy()  # pylint: disable=protected-access
-        wf._kappa_redundant_old = wf.kappa_redundant.copy()  # pylint: disable=protected-access
+        wf._kappa_a_old = kappa_a.copy()  # pylint: disable=protected-access
+        wf._kappa_b_old = kappa_b.copy()  # pylint: disable=protected-access
+        wf._kappa_a_redundant_old = wf.kappa_a_redundant.copy()  # pylint: disable=protected-access
+        wf._kappa_b_redundant_old = wf.kappa_b_redundant.copy()  # pylint: disable=protected-access
     # Moving expansion point of kappa
-    wf.c_orthonormal = c_trans
+    wf.c_orthonormal = (c_a_trans, c_b_trans)
     # Add thetas
     wf.thetas = theta
     return expectation_value(
