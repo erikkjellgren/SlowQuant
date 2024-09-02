@@ -953,7 +953,7 @@ def energy_ucc(
         wf.det2idx,
         wf.num_inactive_orbs,
         wf.num_active_orbs,
-        wf.num_inactive_orbs,
+        wf.num_virtual_orbs,
         wf.num_active_elec_alpha,
         wf.num_active_elec_beta,
         wf.thetas,
