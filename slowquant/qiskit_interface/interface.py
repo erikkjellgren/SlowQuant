@@ -587,9 +587,10 @@ class QuantumInterface:
                 break
 
         if is_identical:
-            circuit = get_csf_reference(bra_csf)
-            # negate HF in ansatz
+            circuit = get_csf_reference(bra_csf, self.num_orbs, self.num_elec, self.mapper)
+            # Negate HF in ansatz
             circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
+            # Append ansatz
             circuit = circuit.compose(self.circuit)
             circuit = self._transpile_circuit(circuit)
             if isinstance(self._primitive, BaseEstimator):
@@ -604,9 +605,12 @@ class QuantumInterface:
         else:
             val = 0.0
             for bra_det, ket_det in zip(bra_csf, ket_csf):
-                circuit = get_determinant_superposition_reference(bra_csf, ket_csf)
-                # negate HF in ansatz
+                circuit = get_determinant_superposition_reference(
+                    bra_det, ket_det, self.num_orbs, self.num_elec, self.mapper
+                )
+                # Negate HF in ansatz
                 circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
+                # Append ansatz
                 circuit = circuit.compose(self.circuit)
                 circuit = self._transpile_circuit(circuit)
                 if isinstance(self._primitive, BaseEstimator):
@@ -618,9 +622,10 @@ class QuantumInterface:
                         self.circuit,
                         do_cliques=self._do_cliques,
                     )
-                circuit = get_csf_reference(bra_det)
-                # negate HF in ansatz
+                circuit = get_csf_reference(bra_det, self.num_orbs, self.num_elec, self.mapper)
+                # Negate HF in ansatz
                 circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
+                # Append ansatz
                 circuit = circuit.compose(self.circuit)
                 circuit = self._transpile_circuit(circuit)
                 if isinstance(self._primitive, BaseEstimator):
@@ -632,9 +637,10 @@ class QuantumInterface:
                         self.circuit,
                         do_cliques=self._do_cliques,
                     )
-                circuit = get_csf_reference(ket_det)
-                # negate HF in ansatz
+                circuit = get_csf_reference(ket_det, self.num_orbs, self.num_elec, self.mapper)
+                # Negate HF in ansatz
                 circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
+                # Append ansatz
                 circuit = circuit.compose(self.circuit)
                 circuit = self._transpile_circuit(circuit)
                 if isinstance(self._primitive, BaseEstimator):

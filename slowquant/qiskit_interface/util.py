@@ -1,7 +1,6 @@
 import numpy as np
 from qiskit import QuantumCircuit
 from qiskit.quantum_info import Pauli
-from qiskit_nature.second_q.circuit.library import HartreeFock
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 
@@ -363,11 +362,44 @@ def f2q(i: int, num_orbs: int) -> int:
 
 
 def get_csf_reference(
-    csf: list[str], num_orbs: int, num_elec: tuple[int, int], mapper: JordanWignerMapper
+    csf: list[str] | str, num_orbs: int, num_elec: tuple[int, int], mapper: JordanWignerMapper
 ) -> QuantumCircuit:
+    """Get CSF reference state.
+
+    Args:
+        csf: CSF as a list of determinants.
+        num_orbs: Number of spatial orbitals.
+        num_elec: Number of alpha,beta electrons.
+
+    Returns:
+        CSF reference.
+    """
+    if isinstance(csf, str):
+        csf = [csf]
     if not isinstance(mapper, JordanWignerMapper):
         raise TypeError("Only implemented for JordanWignerMapper. Got: {type(mapper)}")
-    qc = HartreeFock(num_orbs, num_elec, mapper)
+    if len(csf) > 2:
+        raise ValueError(f"Only up to single excited CSFs supported. Got {csf}")
+    for det in csf:
+        diffs = 0
+        for i, occ in enumerate(det):
+            if i < np.sum(num_elec):
+                if occ != "1":
+                    diffs += 1
+            else:
+                if occ != "0":
+                    diffs += 1
+        if diffs > 2:
+            raise ValueError(f"Only up to single excited determinants supported. Got {det}")
+    if len(csf) == 1:
+        qc = QuantumCircuit(2 * num_orbs)
+        for i, occ in enumerate(csf[0]):
+            if i % 2 == 0 and occ == "1":
+                qc.x(i // 2)
+            elif occ == "1":
+                qc.x(i // 2 + num_orbs)
+    else:
+        qc = get_determinant_superposition_reference(csf[0], csf[1], num_orbs, num_elec, mapper)
     return qc
 
 
@@ -376,5 +408,21 @@ def get_determinant_superposition_reference(
 ) -> QuantumCircuit:
     if not isinstance(mapper, JordanWignerMapper):
         raise TypeError("Only implemented for JordanWignerMapper. Got: {type(mapper)}")
-    qc = HartreeFock(num_orbs, num_elec, mapper)
+    for det in (det1, det2):
+        diffs = 0
+        for i, occ in enumerate(det):
+            if i < np.sum(num_elec):
+                if occ != "1":
+                    diffs += 1
+            else:
+                if occ != "0":
+                    diffs += 1
+        if diffs > 2:
+            raise ValueError(f"Only up to single excited determinants supported. Got {det}")
+    qc = QuantumCircuit(2 * num_orbs)
+    for i, occ in enumerate(det1):
+        if i % 2 == 0 and occ == "1":
+            qc.x(i // 2)
+        elif occ == "1":
+            qc.x(i // 2 + num_orbs)
     return qc

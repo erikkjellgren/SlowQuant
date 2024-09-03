@@ -33,6 +33,7 @@ class WaveFunctionSA:
         c_orthonormal: np.ndarray,
         h_ao: np.ndarray,
         g_ao: np.ndarray,
+        states: tuple[list[list[float]], list[list[str]]],
         quantum_interface: QuantumInterface,
         include_active_kappa: bool = False,
     ) -> None:
@@ -189,6 +190,8 @@ class WaveFunctionSA:
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     self.kappa_hf_like_idx.append([p, q])
         self._energy_elec: float | None = None
+        self.num_states = len(states)
+        self.states = states
         # Setup Qiskit stuff
         self.QI = quantum_interface
         self.QI.construct_circuit(
@@ -350,7 +353,9 @@ class WaveFunctionSA:
                     rdm1_op = Epq(p, q).get_folded_operator(
                         self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                     )
-                    val = self.QI.quantum_expectation_value_csfs(bra_csf, rdm1_op, ket_csf)
+                    for csf in self.states:
+                        val += self.QI.quantum_expectation_value_csfs(csf, rdm1_op, csf)
+                    val = val / self.num_states
                     self._rdm1[p_idx, q_idx] = val  # type: ignore [index]
                     self._rdm1[q_idx, p_idx] = val  # type: ignore [index]
             if self.do_trace_corrected:
