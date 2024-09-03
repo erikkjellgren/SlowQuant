@@ -129,8 +129,8 @@ class Clique:
         if len(self.cliques) == 0:
             self.cliques.append(CliqueHead("Z" * len(paulis[0]), None))
 
-        # Loop over Pauli strings (passed via observable)
-        for pauli in paulis:
+        # Loop over Pauli strings (passed via observable) in reverse sorted order
+        for pauli in sorted(paulis, reverse=True):
             # Loop over Clique heads simulated so far
             for clique_head in self.cliques:
                 # Check if Pauli string belongs to any already simulated Clique head.
@@ -247,7 +247,10 @@ def correct_distribution(dist: dict[int, float], M: np.ndarray) -> dict[int, flo
 
 
 def postselection(
-    dist: dict[int, float], mapper: FermionicMapper, num_elec: tuple[int, int]
+    dist: dict[int, float],
+    mapper: FermionicMapper,
+    num_elec: tuple[int, int],
+    num_qubits: int,
 ) -> dict[int, float]:
     r"""Perform post-selection on distribution in computational basis.
 
@@ -275,6 +278,7 @@ def postselection(
         dist: Measured quasi-distribution.
         mapper: Fermionic to qubit mapper.
         num_elec: Number of electrons (alpha, beta).
+        num_qubits: Number of qubits.
 
     Returns:
         Post-selected distribution.
@@ -283,7 +287,7 @@ def postselection(
     prob_sum = 0.0
     if isinstance(mapper, JordanWignerMapper):
         for bitint, val in dist.items():
-            bitstr = bin(bitint)[2:]
+            bitstr = format(bitint, f"0{num_qubits}b")
             num_a = len(bitstr) // 2
             # Remember that in Qiskit notation you read |0101> from right to left.
             bitstr_a = bitstr[num_a:]
@@ -293,7 +297,7 @@ def postselection(
                 prob_sum += val
     elif isinstance(mapper, ParityMapper):
         for bitint, val in dist.items():
-            bitstr = bin(bitint)[2:]
+            bitstr = format(bitint, f"0{num_qubits}b")
             num_a = len(bitstr) // 2
             bitstr_a = bitstr[num_a:]
             bitstr_b = bitstr[:num_a]
