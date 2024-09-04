@@ -394,10 +394,9 @@ def get_csf_reference(
     if len(csf) == 1:
         qc = QuantumCircuit(2 * num_orbs)
         for i, occ in enumerate(csf[0]):
-            if i % 2 == 0 and occ == "1":
-                qc.x(i // 2)
-            elif occ == "1":
-                qc.x(i // 2 + num_orbs)
+            idx = i // 2 + num_orbs * i % 2
+            if occ == "1":
+                qc.x(idx)
     else:
         qc = get_determinant_superposition_reference(csf[0], csf[1], num_orbs, num_elec, mapper)
     return qc
@@ -421,8 +420,23 @@ def get_determinant_superposition_reference(
             raise ValueError(f"Only up to single excited determinants supported. Got {det}")
     qc = QuantumCircuit(2 * num_orbs)
     for i, occ in enumerate(det1):
-        if i % 2 == 0 and occ == "1":
-            qc.x(i // 2)
-        elif occ == "1":
-            qc.x(i // 2 + num_orbs)
+        idx = f2q(i, num_orbs)
+        if occ == "1":
+            qc.x(idx)
+    for i, (occ1, occ2) in enumerate(zip(det1, det2)):
+        idx = f2q(i, num_orbs)
+        if occ1 == 0 and occ2 == 1:
+            hadamard_idx = idx
+            qc.h(idx)
+            break
+    else:  # No break
+        raise ValueError("Failed to find idx for Hadarmard gate")
+    for i, (occ1, occ2) in enumerate(zip(det1, det2)):
+        idx = f2q(i, num_orbs)
+        if occ1 == occ2:
+            continue
+        if occ1 == "1":
+            qc.cx(idx, hadamard_idx)
+        if occ2 == "1":
+            qc.cx(idx, hadamard_idx)
     return qc
