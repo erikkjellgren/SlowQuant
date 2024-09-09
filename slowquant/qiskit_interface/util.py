@@ -361,47 +361,6 @@ def f2q(i: int, num_orbs: int) -> int:
     return i // 2 + num_orbs
 
 
-def get_csf_reference(
-    csf: list[str] | str, num_orbs: int, num_elec: tuple[int, int], mapper: JordanWignerMapper
-) -> QuantumCircuit:
-    """Get CSF reference state.
-
-    Args:
-        csf: CSF as a list of determinants.
-        num_orbs: Number of spatial orbitals.
-        num_elec: Number of alpha,beta electrons.
-
-    Returns:
-        CSF reference.
-    """
-    if isinstance(csf, str):
-        csf = [csf]
-    if not isinstance(mapper, JordanWignerMapper):
-        raise TypeError("Only implemented for JordanWignerMapper. Got: {type(mapper)}")
-    if len(csf) > 2:
-        raise ValueError(f"Only up to single excited CSFs supported. Got {csf}")
-    for det in csf:
-        diffs = 0
-        for i, occ in enumerate(det):
-            if i < np.sum(num_elec):
-                if occ != "1":
-                    diffs += 1
-            else:
-                if occ != "0":
-                    diffs += 1
-        if diffs > 2:
-            raise ValueError(f"Only up to single excited determinants supported. Got {det}")
-    if len(csf) == 1:
-        qc = QuantumCircuit(2 * num_orbs)
-        for i, occ in enumerate(csf[0]):
-            idx = i // 2 + num_orbs * i % 2
-            if occ == "1":
-                qc.x(idx)
-    else:
-        qc = get_determinant_superposition_reference(csf[0], csf[1], num_orbs, num_elec, mapper)
-    return qc
-
-
 def get_determinant_superposition_reference(
     det1: str, det2: str, num_orbs: int, num_elec: tuple[int, int], mapper: JordanWignerMapper
 ) -> QuantumCircuit:
@@ -419,13 +378,16 @@ def get_determinant_superposition_reference(
         if diffs > 2:
             raise ValueError(f"Only up to single excited determinants supported. Got {det}")
     qc = QuantumCircuit(2 * num_orbs)
+    tmp = [det1, det2]
+    tmp.sort()
+    det1, det2 = tmp
     for i, occ in enumerate(det1):
         idx = f2q(i, num_orbs)
         if occ == "1":
             qc.x(idx)
     for i, (occ1, occ2) in enumerate(zip(det1, det2)):
         idx = f2q(i, num_orbs)
-        if occ1 == 0 and occ2 == 1:
+        if occ1 == "0" and occ2 == "1":
             hadamard_idx = idx
             qc.h(idx)
             break
@@ -433,10 +395,19 @@ def get_determinant_superposition_reference(
         raise ValueError("Failed to find idx for Hadarmard gate")
     for i, (occ1, occ2) in enumerate(zip(det1, det2)):
         idx = f2q(i, num_orbs)
-        if occ1 == occ2:
+        if occ1 == occ2 or idx == hadamard_idx:
             continue
-        if occ1 == "1":
-            qc.cx(idx, hadamard_idx)
-        if occ2 == "1":
-            qc.cx(idx, hadamard_idx)
+        if occ1 == "1" or occ2 == "1":
+            qc.cx(hadamard_idx, idx)
+    return qc
+
+
+def get_determinant_reference(det, num_orbs, mapper) -> QuantumCircuit:
+    if not isinstance(mapper, JordanWignerMapper):
+        raise TypeError("Only implemented for JordanWignerMapper. Got: {type(mapper)}")
+    qc = QuantumCircuit(2 * num_orbs)
+    for i, occ in enumerate(det):
+        idx = f2q(i, num_orbs)
+        if occ == "1":
+            qc.x(idx)
     return qc

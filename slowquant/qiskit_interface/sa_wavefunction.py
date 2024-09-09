@@ -353,8 +353,9 @@ class WaveFunctionSA:
                     rdm1_op = Epq(p, q).get_folded_operator(
                         self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                     )
-                    for csf in self.states:
-                        val += self.QI.quantum_expectation_value_csfs(csf, rdm1_op, csf)
+                    val = 0.0
+                    for coeffs, csf in zip(self.states[0], self.states[1]):
+                        val += self.QI.quantum_expectation_value_csfs((coeffs, csf), rdm1_op, (coeffs, csf))
                     val = val / self.num_states
                     self._rdm1[p_idx, q_idx] = val  # type: ignore [index]
                     self._rdm1[q_idx, p_idx] = val  # type: ignore [index]

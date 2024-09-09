@@ -32,7 +32,7 @@ from slowquant.qiskit_interface.util import (
     Clique,
     correct_distribution,
     get_bitstring_sign,
-    get_csf_reference,
+    get_determinant_reference,
     get_determinant_superposition_reference,
     postselection,
     to_CBS_measurement,
@@ -563,9 +563,9 @@ class QuantumInterface:
 
     def quantum_expectation_value_csfs(
         self,
-        bra_csf: list[str],
+        bra_csf: tuple[list[float], list[str]],
         op: FermionicOperator,
-        ket_csf: list[str],
+        ket_csf: tuple[list[float], list[str]],
         custom_parameters: list[float] | None = None,
     ) -> float:
         if not isinstance(self.mapper, JordanWignerMapper):
@@ -586,73 +586,78 @@ class QuantumInterface:
                 is_identical = False
                 break
 
-        if is_identical:
-            circuit = get_csf_reference(bra_csf, self.num_orbs, self.num_elec, self.mapper)
-            # Negate HF in ansatz
-            circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
-            # Append ansatz
-            circuit = circuit.compose(self.circuit)
-            circuit = self._transpile_circuit(circuit)
-            if isinstance(self._primitive, BaseEstimator):
-                return self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
-            if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
-                return self._sampler_quantum_expectation_value_nosave(
-                    op,
-                    run_parameters,
-                    self.circuit,
-                    do_cliques=self._do_cliques,
-                )
-        else:
-            val = 0.0
-            for bra_det, ket_det in zip(bra_csf, ket_csf):
-                circuit = get_determinant_superposition_reference(
-                    bra_det, ket_det, self.num_orbs, self.num_elec, self.mapper
-                )
-                # Negate HF in ansatz
-                circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
-                # Append ansatz
-                circuit = circuit.compose(self.circuit)
-                circuit = self._transpile_circuit(circuit)
-                if isinstance(self._primitive, BaseEstimator):
-                    val += self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
-                if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
-                    val += self._sampler_quantum_expectation_value_nosave(
-                        op,
-                        run_parameters,
-                        self.circuit,
-                        do_cliques=self._do_cliques,
+        val = 0.0
+        for bra_coeff, bra_det in zip(bra_csf[0], bra_csf[1]):
+            for ket_coeff, ket_det in zip(ket_csf[0], ket_csf[1]):
+                if bra_det == ket_det:
+                    circuit = get_determinant_reference(bra_det, self.num_orbs, self.mapper)
+                    # Negate HF in ansatz
+                    circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
+                    # Append ansatz
+                    circuit = circuit.compose(self.circuit)
+                    # circuit = self._transpile_circuit(circuit)
+                    if isinstance(self._primitive, BaseEstimator):
+                        val += self._estimator_quantum_expectation_value(op, run_parameters, circuit)
+                    if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                        val += self._sampler_quantum_expectation_value_nosave(
+                            op,
+                            run_parameters,
+                            circuit,
+                            do_cliques=self._do_cliques,
+                        )
+                    print("identical", val)
+                else:
+                    circuit = get_determinant_superposition_reference(
+                        bra_det, ket_det, self.num_orbs, self.num_elec, self.mapper
                     )
-                circuit = get_csf_reference(bra_det, self.num_orbs, self.num_elec, self.mapper)
-                # Negate HF in ansatz
-                circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
-                # Append ansatz
-                circuit = circuit.compose(self.circuit)
-                circuit = self._transpile_circuit(circuit)
-                if isinstance(self._primitive, BaseEstimator):
-                    val -= self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
-                if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
-                    val -= self._sampler_quantum_expectation_value_nosave(
-                        op,
-                        run_parameters,
-                        self.circuit,
-                        do_cliques=self._do_cliques,
-                    )
-                circuit = get_csf_reference(ket_det, self.num_orbs, self.num_elec, self.mapper)
-                # Negate HF in ansatz
-                circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
-                # Append ansatz
-                circuit = circuit.compose(self.circuit)
-                circuit = self._transpile_circuit(circuit)
-                if isinstance(self._primitive, BaseEstimator):
-                    val -= self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
-                if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
-                    val -= self._sampler_quantum_expectation_value_nosave(
-                        op,
-                        run_parameters,
-                        self.circuit,
-                        do_cliques=self._do_cliques,
-                    )
-            return 0.5 * val
+                    # Negate HF in ansatz
+                    circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
+                    # Append ansatz
+                    circuit = circuit.compose(self.circuit)
+                    # circuit = self._transpile_circuit(circuit)
+                    if isinstance(self._primitive, BaseEstimator):
+                        val += self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
+                    if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                        val += self._sampler_quantum_expectation_value_nosave(
+                            op,
+                            run_parameters,
+                            circuit,
+                            do_cliques=self._do_cliques,
+                        )
+                    print(val)
+                    circuit = get_determinant_reference(bra_det, self.num_orbs, self.mapper)
+                    # Negate HF in ansatz
+                    circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
+                    # Append ansatz
+                    circuit = circuit.compose(self.circuit)
+                    # circuit = self._transpile_circuit(circuit)
+                    if isinstance(self._primitive, BaseEstimator):
+                        val -= 0.5 * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
+                    if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                        val -= 0.5 * self._sampler_quantum_expectation_value_nosave(
+                            op,
+                            run_parameters,
+                            circuit,
+                            do_cliques=self._do_cliques,
+                        )
+                    print(val)
+                    circuit = get_determinant_reference(ket_det, self.num_orbs, self.mapper)
+                    # Negate HF in ansatz
+                    circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
+                    # Append ansatz
+                    circuit = circuit.compose(self.circuit)
+                    # circuit = self._transpile_circuit(circuit)
+                    if isinstance(self._primitive, BaseEstimator):
+                        val -= 0.5 * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
+                    if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                        val -= 0.5 * self._sampler_quantum_expectation_value_nosave(
+                            op,
+                            run_parameters,
+                            circuit,
+                            do_cliques=self._do_cliques,
+                        )
+                    print(val)
+            return val
 
     def _estimator_quantum_expectation_value(
         self,
