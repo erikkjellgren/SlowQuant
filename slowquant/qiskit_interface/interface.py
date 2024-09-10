@@ -605,10 +605,9 @@ class QuantumInterface:
                             circuit,
                             do_cliques=self._do_cliques,
                         )
-                    print("identical", val)
                 else:
                     circuit = get_determinant_superposition_reference(
-                        bra_det, ket_det, self.num_orbs, self.num_elec, self.mapper
+                        bra_det, ket_det, self.num_orbs, self.mapper
                     )
                     # Negate HF in ansatz
                     circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
@@ -624,7 +623,6 @@ class QuantumInterface:
                             circuit,
                             do_cliques=self._do_cliques,
                         )
-                    print(val)
                     circuit = get_determinant_reference(bra_det, self.num_orbs, self.mapper)
                     # Negate HF in ansatz
                     circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
@@ -640,7 +638,6 @@ class QuantumInterface:
                             circuit,
                             do_cliques=self._do_cliques,
                         )
-                    print(val)
                     circuit = get_determinant_reference(ket_det, self.num_orbs, self.mapper)
                     # Negate HF in ansatz
                     circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
@@ -656,7 +653,6 @@ class QuantumInterface:
                             circuit,
                             do_cliques=self._do_cliques,
                         )
-                    print(val)
             return val
 
     def _estimator_quantum_expectation_value(

@@ -21,7 +21,11 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_gradient,
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
-from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
+from slowquant.unitary_coupled_cluster.operators import (
+    Epq,
+    hamiltonian_0i_0a,
+    one_elec_op_0i_0a,
+)
 
 
 class WaveFunctionSA:
@@ -216,6 +220,7 @@ class WaveFunctionSA:
         """
         self._h_mo = None
         self._g_mo = None
+        self._state_energies = None
         self._energy_elec = None
         self._c_orthonormal = c
 
@@ -279,7 +284,9 @@ class WaveFunctionSA:
         """
         self._rdm1 = None
         self._rdm2 = None
-        self._energy_elec = None
+        self._state_energies = None
+        self._state_ci_coeffs = None
+        self._ci_coeffs = None
         self.QI.parameters = parameters
 
     def change_primitive(
@@ -407,7 +414,12 @@ class WaveFunctionSA:
                             pdm2_op = (Epq(p, q) * Epq(r, s)).get_folded_operator(
                                 self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                             )
-                            val = self.QI.quantum_expectation_value(pdm2_op)
+                            val = 0.0
+                            for coeffs, csf in zip(self.states[0], self.states[1]):
+                                val += self.QI.quantum_expectation_value_csfs(
+                                    (coeffs, csf), pdm2_op, (coeffs, csf)
+                                )
+                            val = val / self.num_states
                             if q == r:
                                 val -= self.rdm1[p_idx, s_idx]
                             self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore [index]
@@ -737,6 +749,111 @@ class WaveFunctionSA:
             self.kappa_redundant[i] = 0.0
             self._kappa_redundant_old[i] = 0.0
         self._energy_elec = res.fun
+
+    def _do_state_ci(self) -> None:
+        r"""Do subspace diagonalisation.
+
+        #. 10.1103/PhysRevLett.122.230401, Eq. 2
+        """
+        state_H = np.zeros((self.num_states, self.num_states))
+        H = hamiltonian_0i_0a(
+            self.h_mo,
+            self.g_mo,
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+        ).get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+        for i, (coeffs_i, csf_i) in enumerate(zip(self.states[0], self.states[1])):
+            for j, (coeffs_j, csf_j) in enumerate(zip(self.states[0], self.states[1])):
+                if j > i:
+                    continue
+                state_H[i, j] = state_H[j, i] = self.QI.quantum_expectation_value_csfs(
+                    (coeffs_i, csf_i), H, (coeffs_j, csf_j)
+                )
+        eigval, eigvec = scipy.linalg.eig(state_H)
+        sorting = np.argsort(eigval)
+        self._state_energies = np.real(eigval[sorting])
+        self._state_ci_coeffs = np.real(eigvec[:, sorting])
+
+    @property
+    def energy_states(self) -> np.ndarray:
+        """Get state specific energies.
+
+        Returns:
+            State specific energies.
+        """
+        if self._state_energies is None:
+            self._do_state_ci()
+        if self._state_energies is None:
+            raise ValueError("_state_energies is None")
+        return self._state_energies
+
+    @property
+    def excitation_energies(self) -> np.ndarray:
+        r"""Get excitation energies.
+
+        .. math::
+            \varepsilon_n = E_n - E_0
+
+        Returns:
+            Excitation energies.
+        """
+        energies = np.zeros(self.num_states - 1)
+        for i, energy in enumerate(self.energy_states[1:]):
+            energies[i] = energy - self.energy_states[0]
+        return energies
+
+    def get_transition_property(self, ao_integral: np.ndarray) -> np.ndarray:
+        r"""Get transition property.
+
+        .. math::
+            t_n = \left<0\left|\hat{O}\right|n\right>
+
+        Args:
+            ao_integral: Operator integrals in AO basis.
+
+        Returns:
+            Transition property.
+        """
+        if self._state_ci_coeffs is None:
+            self._do_state_ci()
+        if self._state_ci_coeffs is None:
+            raise ValueError("_state_ci_coeffs is None")
+        mo_integral = one_electron_integral_transform(self.c_trans, ao_integral)
+        transition_property = np.zeros(self.num_states - 1)
+        state_op = np.zeros((self.num_states, self.num_states))
+        op = one_elec_op_0i_0a(mo_integral, self.num_inactive_orbs, self.num_active_orbs).get_folded_operator(
+            self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+        )
+        for i, (coeffs_i, csf_i) in enumerate(zip(self.states[0], self.states[1])):
+            for j, (coeffs_j, csf_j) in enumerate(zip(self.states[0], self.states[1])):
+                state_op[i, j] = self.QI.quantum_expectation_value_csfs(
+                    (coeffs_i, csf_i), op, (coeffs_j, csf_j)
+                )
+        for i in range(self.num_states - 1):
+            transition_property[i] = self._state_ci_coeffs[:, i + 1] @ state_op @ self._state_ci_coeffs[:, 0]
+        return transition_property
+
+    def get_oscillator_strenghts(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+        r"""Get oscillator strengths between ground state and excited states.
+
+        .. math::
+            f_n = \frac{2}{3}\varepsilon_n\left|\left<0\left|\hat{\boldsymbol{\mu}}\right|n\right>\right|^2
+
+        Args:
+            dipole_integrals: Dipole integrals in AO basis.
+
+        Returns:
+            Oscillator strengths.
+        """
+        transition_dipole_x = self.get_transition_property(dipole_integrals[0])
+        transition_dipole_y = self.get_transition_property(dipole_integrals[1])
+        transition_dipole_z = self.get_transition_property(dipole_integrals[2])
+        osc_strs = np.zeros(self.num_states - 1)
+        for idx, (excitation_energy, td_x, td_y, td_z) in enumerate(
+            zip(self.excitation_energies, transition_dipole_x, transition_dipole_y, transition_dipole_z)
+        ):
+            osc_strs[idx] = 2 / 3 * excitation_energy * (td_x**2 + td_y**2 + td_z**2)
+        return osc_strs
 
 
 def calc_energy_theta(

@@ -4,6 +4,8 @@ from qiskit.quantum_info import Pauli
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 
+from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
+
 
 def to_CBS_measurement(op: str, transpiled: None | list[QuantumCircuit] = None) -> QuantumCircuit:
     r"""Convert a Pauli string to Pauli measurement circuit.
@@ -362,21 +364,10 @@ def f2q(i: int, num_orbs: int) -> int:
 
 
 def get_determinant_superposition_reference(
-    det1: str, det2: str, num_orbs: int, num_elec: tuple[int, int], mapper: JordanWignerMapper
+    det1: str, det2: str, num_orbs: int, mapper: JordanWignerMapper
 ) -> QuantumCircuit:
     if not isinstance(mapper, JordanWignerMapper):
         raise TypeError("Only implemented for JordanWignerMapper. Got: {type(mapper)}")
-    for det in (det1, det2):
-        diffs = 0
-        for i, occ in enumerate(det):
-            if i < np.sum(num_elec):
-                if occ != "1":
-                    diffs += 1
-            else:
-                if occ != "0":
-                    diffs += 1
-        if diffs > 2:
-            raise ValueError(f"Only up to single excited determinants supported. Got {det}")
     qc = QuantumCircuit(2 * num_orbs)
     tmp = [det1, det2]
     tmp.sort()

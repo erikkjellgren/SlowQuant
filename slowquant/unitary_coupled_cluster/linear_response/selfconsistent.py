@@ -192,7 +192,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     UdHUGJ_ket,
                     *self.index_info,
                 )
-                # <CSF| GId GJ Ud H |0>
+                # - <CSF| GId GJ Ud H |0>
                 val -= expectation_value(
                     GI_ket,
                     [],
@@ -304,7 +304,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     G_ket,
                     *self.index_info,
                 )
-                # Y * <0| Gd Ud mux | CSF>
+                # Y * <CSF| Gd Ud mux | 0>
                 g_part_x += self.Y_G_normed[i, state_number] * expectation_value(
                     G_ket,
                     [],
@@ -318,7 +318,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     G_ket,
                     *self.index_info,
                 )
-                # Y * <0| Gd Ud muy | CSF>
+                # Y * <CSF| Gd Ud muy | 0>
                 g_part_y += self.Y_G_normed[i, state_number] * expectation_value(
                     G_ket,
                     [],
@@ -332,7 +332,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     G_ket,
                     *self.index_info,
                 )
-                # Y * <0| Gd Ud muz | CSF>
+                # Y * <CSF| Gd Ud muz | 0>
                 g_part_z += self.Y_G_normed[i, state_number] * expectation_value(
                     G_ket,
                     [],

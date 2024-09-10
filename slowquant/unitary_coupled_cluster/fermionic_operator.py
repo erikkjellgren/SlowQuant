@@ -440,3 +440,47 @@ class FermionicOperator:
             creation.append(c)
             annihilation.append(a)
         return annihilation, creation, coefficients
+
+
+def get_determinant_expansion_from_operator_on_HF(
+    operator: FermionicOperator, num_active_orbs: int, num_active_elec_alpha: int, num_active_elec_beta: int
+) -> tuple[list[float], list[str]]:
+    hf_det_ = ""
+    for i in range(2 * num_active_orbs):
+        if i % 2 == 0 and i // 2 < num_active_elec_alpha:
+            hf_det_ += "1"
+            continue
+        if i % 2 == 1 and i // 2 < num_active_elec_beta:
+            hf_det_ += "1"
+            continue
+        hf_det_ += "0"
+    hf_det = int(hf_det_, 2)
+
+    coeffs = []
+    dets = []
+    parity_check = {0: 0}
+    num = 0
+    for i in range(2 * num_active_orbs - 1, -1, -1):
+        num += 2**i
+        parity_check[2 * num_active_orbs - i] = num
+    for fermi_label in operator.factors:
+        det = hf_det
+        phase_changes = 0
+        for fermi_op in operator.operators[fermi_label][::-1]:
+            orb_idx = fermi_op.idx
+            nth_bit = (det >> 2 * num_active_orbs - 1 - orb_idx) & 1
+            if nth_bit == 0 and fermi_op.dagger:
+                det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
+                phase_changes += (det & parity_check[orb_idx]).bit_count()
+            elif nth_bit == 1 and fermi_op.dagger:
+                break
+            elif nth_bit == 0 and not fermi_op.dagger:
+                break
+            elif nth_bit == 1 and not fermi_op.dagger:
+                det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
+                phase_changes += (det & parity_check[orb_idx]).bit_count()
+        else:  # nobreak
+            val = operator.factors[fermi_label] * (-1) ** phase_changes
+            coeffs.append(val)
+            dets.append(format(det, f"0{2*num_active_orbs}b"))
+    return coeffs, dets
