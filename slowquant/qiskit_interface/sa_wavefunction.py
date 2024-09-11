@@ -452,42 +452,6 @@ class WaveFunctionSA:
         diff = np.abs(S_ortho - one)
         print("Max ortho-normal diff:", np.max(diff))
 
-    @property
-    def energy_elec(self) -> float:
-        """Get electronic energy.
-
-        Returns:
-            Electronic energy.
-        """
-        if self._energy_elec is None:
-            H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
-            H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-            self._energy_elec = self.QI.quantum_expectation_value(H)
-        return self._energy_elec
-
-    def _calc_energy_elec(self) -> float:
-        """Run electronic energy simulation, regardless of self.energy_elec variable.
-
-        Returns:
-            Electronic energy.
-        """
-        H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
-        H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-        energy_elec = self.QI.quantum_expectation_value(H)
-
-        return energy_elec
-
-    def _get_hamiltonian(self) -> FermionicOperator:
-        """Return electronic Hamiltonian as FermionicOperator.
-
-        Returns:
-            FermionicOperator.
-        """
-        H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
-        H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-
-        return H
-
     def run_vqe_2step(
         self,
         ansatz_optimizer: str,
@@ -766,6 +730,7 @@ class WaveFunctionSA:
             for j, (coeffs_j, csf_j) in enumerate(zip(self.states[0], self.states[1])):
                 if j > i:
                     continue
+                print("HAM IJ", i,j)
                 state_H[i, j] = state_H[j, i] = self.QI.quantum_expectation_value_csfs(
                     (coeffs_i, csf_i), H, (coeffs_j, csf_j)
                 )

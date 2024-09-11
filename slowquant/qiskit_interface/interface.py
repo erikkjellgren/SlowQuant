@@ -584,7 +584,8 @@ class QuantumInterface:
         .. math::
             \begin{align}
             m_{ij} &= \left<\text{det}_i\left|\boldsymbol{U}^\dagger\hat{O}_\text{H}\boldsymbol{U}\right|\text{det}_j\right>\\
-                   &= \left<\frac{1}{\sqrt{2}}\left(\text{det}_i+\text{det}_j\right)\left|\boldsymbol{U}^\dagger\hat{O}_\text{H}\boldsymbol{U}\right|\frac{1}{\sqrt{2}}\left(\text{det}_i+\text{det}_j\right)\right>
+                   &= \left<\frac{1}{\sqrt{2}}
+                   \left(\text{det}_i+\text{det}_j\right)\left|\boldsymbol{U}^\dagger\hat{O}_\text{H}\boldsymbol{U}\right|\frac{1}{\sqrt{2}}\left(\text{det}_i+\text{det}_j\right)\right>
                    - \frac{1}{2}\left<\text{det}_i\left|\boldsymbol{U}^\dagger\hat{O}_\text{H}\boldsymbol{U}\right|\text{det}_i\right>
                    - \frac{1}{2}\left<\text{det}_j\left|\boldsymbol{U}^\dagger\hat{O}_\text{H}\boldsymbol{U}\right|\text{det}_j\right>
             \end{align}
@@ -616,6 +617,7 @@ class QuantumInterface:
         val = 0.0
         for bra_coeff, bra_det in zip(bra_csf[0], bra_csf[1]):
             for ket_coeff, ket_det in zip(ket_csf[0], ket_csf[1]):
+                N = bra_coeff*ket_coeff
                 if bra_det == ket_det:
                     circuit = get_determinant_reference(bra_det, self.num_orbs, self.mapper)
                     # Negate HF in ansatz
@@ -624,14 +626,15 @@ class QuantumInterface:
                     circuit = circuit.compose(self.circuit)
                     # circuit = self._transpile_circuit(circuit)
                     if isinstance(self._primitive, BaseEstimator):
-                        val += self._estimator_quantum_expectation_value(op, run_parameters, circuit)
+                        val += N*self._estimator_quantum_expectation_value(op, run_parameters, circuit)
                     if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
-                        val += self._sampler_quantum_expectation_value_nosave(
+                        val += N*self._sampler_quantum_expectation_value_nosave(
                             op,
                             run_parameters,
                             circuit,
                             do_cliques=self._do_cliques,
                         )
+                    print("IDENTICAL", val)
                 else:
                     circuit = get_determinant_superposition_reference(
                         bra_det, ket_det, self.num_orbs, self.mapper
@@ -642,14 +645,15 @@ class QuantumInterface:
                     circuit = circuit.compose(self.circuit)
                     # circuit = self._transpile_circuit(circuit)
                     if isinstance(self._primitive, BaseEstimator):
-                        val += self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
+                        val += N*self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
                     if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
-                        val += self._sampler_quantum_expectation_value_nosave(
+                        val += N*self._sampler_quantum_expectation_value_nosave(
                             op,
                             run_parameters,
                             circuit,
                             do_cliques=self._do_cliques,
                         )
+                    print(val)
                     circuit = get_determinant_reference(bra_det, self.num_orbs, self.mapper)
                     # Negate HF in ansatz
                     circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
@@ -657,14 +661,15 @@ class QuantumInterface:
                     circuit = circuit.compose(self.circuit)
                     # circuit = self._transpile_circuit(circuit)
                     if isinstance(self._primitive, BaseEstimator):
-                        val -= 0.5 * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
+                        val -= 0.5 * N*self._estimator_quantum_expectation_value(op, run_parameters, circuit)
                     if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
-                        val -= 0.5 * self._sampler_quantum_expectation_value_nosave(
+                        val -= 0.5 * N*self._sampler_quantum_expectation_value_nosave(
                             op,
                             run_parameters,
                             circuit,
                             do_cliques=self._do_cliques,
                         )
+                    print(val)
                     circuit = get_determinant_reference(ket_det, self.num_orbs, self.mapper)
                     # Negate HF in ansatz
                     circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
@@ -672,15 +677,16 @@ class QuantumInterface:
                     circuit = circuit.compose(self.circuit)
                     # circuit = self._transpile_circuit(circuit)
                     if isinstance(self._primitive, BaseEstimator):
-                        val -= 0.5 * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
+                        val -= 0.5 * N*self._estimator_quantum_expectation_value(op, run_parameters, circuit)
                     if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
-                        val -= 0.5 * self._sampler_quantum_expectation_value_nosave(
+                        val -= 0.5 * N*self._sampler_quantum_expectation_value_nosave(
                             op,
                             run_parameters,
                             circuit,
                             do_cliques=self._do_cliques,
                         )
-            return val
+                    print(val)
+        return val
 
     def _estimator_quantum_expectation_value(
         self,

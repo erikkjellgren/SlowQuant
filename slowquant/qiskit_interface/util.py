@@ -369,9 +369,6 @@ def get_determinant_superposition_reference(
     if not isinstance(mapper, JordanWignerMapper):
         raise TypeError("Only implemented for JordanWignerMapper. Got: {type(mapper)}")
     qc = QuantumCircuit(2 * num_orbs)
-    tmp = [det1, det2]
-    tmp.sort()
-    det1, det2 = tmp
     for i, occ in enumerate(det1):
         idx = f2q(i, num_orbs)
         if occ == "1":
@@ -383,7 +380,7 @@ def get_determinant_superposition_reference(
             qc.h(idx)
             break
     else:  # No break
-        raise ValueError("Failed to find idx for Hadarmard gate")
+        raise ValueError("Failed to find idx for Hadamard gate")
     for i, (occ1, occ2) in enumerate(zip(det1, det2)):
         idx = f2q(i, num_orbs)
         if occ1 == occ2 or idx == hadamard_idx:
