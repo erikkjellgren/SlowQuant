@@ -443,7 +443,10 @@ class FermionicOperator:
 
 
 def get_determinant_expansion_from_operator_on_HF(
-    operator: FermionicOperator, num_active_orbs: int, num_active_elec_alpha: int, num_active_elec_beta: int
+    operator: FermionicOperator,
+    num_active_orbs: int,
+    num_active_elec_alpha: int,
+    num_active_elec_beta: int,
 ) -> tuple[list[float], list[str]]:
     hf_det_ = ""
     for i in range(2 * num_active_orbs):

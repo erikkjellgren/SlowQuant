@@ -568,6 +568,38 @@ class QuantumInterface:
         ket_csf: tuple[list[float], list[str]],
         custom_parameters: list[float] | None = None,
     ) -> float:
+        r"""Calculate expectation value using different bra and ket of a Hermitian operator.
+        I.e. expectation values of the type,
+
+        .. math::
+            M_{IJ} = \left<\text{CSF}_I\left|\boldsymbol{U}^\dagger\hat{O}_\text{H}\boldsymbol{U}\right|\text{CSF}_J\right>
+
+        The expectation value is calculated as:
+
+        .. math::
+            M_{IJ} = \sum_{\text{det}_i\in\text{CSF}_I}\sum_{\text{det}_j\in\text{CSF}_J}\left<\text{det}_i\left|\boldsymbol{U}^\dagger\hat{O}_\text{H}\boldsymbol{U}\right|\text{det}_j\right>
+
+        with,
+
+        .. math::
+            \begin{align}
+            m_{ij} &= \left<\text{det}_i\left|\boldsymbol{U}^\dagger\hat{O}_\text{H}\boldsymbol{U}\right|\text{det}_j\right>\\
+                   &= \left<\frac{1}{\sqrt{2}}\left(\text{det}_i+\text{det}_j\right)\left|\boldsymbol{U}^\dagger\hat{O}_\text{H}\boldsymbol{U}\right|\frac{1}{\sqrt{2}}\left(\text{det}_i+\text{det}_j\right)\right>
+                   - \frac{1}{2}\left<\text{det}_i\left|\boldsymbol{U}^\dagger\hat{O}_\text{H}\boldsymbol{U}\right|\text{det}_i\right>
+                   - \frac{1}{2}\left<\text{det}_j\left|\boldsymbol{U}^\dagger\hat{O}_\text{H}\boldsymbol{U}\right|\text{det}_j\right>
+            \end{align}
+
+        #. 10.1103/PhysRevResearch.1.033062, Eq. (1)
+
+        Args:
+            bra_csf: Bra CSF.
+            op: Hermitian fermionic operator.
+            ket_csf: Ket CSF.
+            custom_parameters: Non-default run parameters.
+
+        Returns:
+            Expectation value of operator.
+        """
         if not isinstance(self.mapper, JordanWignerMapper):
             raise TypeError(
                 f"Expectation values for custom CSFs only implemented for JordanWignerMapper. Got; {type(self.mapper)}"
@@ -580,11 +612,6 @@ class QuantumInterface:
             run_parameters = self.parameters
         else:
             run_parameters = custom_parameters
-        is_identical = True
-        for bra_det, ket_det in zip(bra_csf, ket_csf):
-            if bra_det != ket_det:
-                is_identical = False
-                break
 
         val = 0.0
         for bra_coeff, bra_det in zip(bra_csf[0], bra_csf[1]):
