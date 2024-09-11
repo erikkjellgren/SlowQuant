@@ -4,8 +4,6 @@ from qiskit.quantum_info import Pauli
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 
-from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
-
 
 def to_CBS_measurement(op: str, transpiled: None | list[QuantumCircuit] = None) -> QuantumCircuit:
     r"""Convert a Pauli string to Pauli measurement circuit.
@@ -399,3 +397,17 @@ def get_determinant_reference(det, num_orbs, mapper) -> QuantumCircuit:
         if occ == "1":
             qc.x(idx)
     return qc
+
+
+def get_reordering_sign(det) -> int:
+    sign = 1
+    alphas = 0
+    for i, occ in enumerate(det[::-1]):
+        # Doing reverse thus alpha are the uneven
+        if i % 2 == 1 and occ == "1":
+            alphas += 1
+        # Doing the reverse thus beta are the even
+        elif i % 2 == 0 and occ == "1":
+            if alphas % 2 == 1:
+                sign *= -1
+    return sign
