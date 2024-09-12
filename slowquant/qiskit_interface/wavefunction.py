@@ -59,6 +59,10 @@ class WaveFunction:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
         if isinstance(quantum_interface.ansatz, QuantumCircuit):
             print("WARNING: A QI with a custom Ansatz was passed. VQE will only work with COBYLA optimizer.")
+        if cas[0] % 2 == 1:
+            raise ValueError(
+                f"Wave function only implemented for an even number of active electrons. Got; {cas[0]}"
+            )
         self._c_orthonormal = c_orthonormal
         self.h_ao = h_ao
         self.g_ao = g_ao
@@ -74,7 +78,9 @@ class WaveFunction:
         self.num_spin_orbs = num_spin_orbs
         self.num_orbs = num_spin_orbs // 2
         self._include_active_kappa = include_active_kappa
-        self.num_active_elec = 0
+        self.num_active_elec = cas[0]
+        self.num_active_elec_alpha = self.num_active_elec // 2
+        self.num_active_elec_beta = self.num_active_elec // 2
         self.num_active_spin_orbs = 0
         self.num_inactive_spin_orbs = 0
         self.num_virtual_spin_orbs = 0
@@ -97,7 +103,6 @@ class WaveFunction:
                 self.active_spin_idx.append(i)
                 self.active_occ_spin_idx.append(i)
                 self.num_active_spin_orbs += 1
-                self.num_active_elec += 1
             else:
                 self.inactive_spin_idx.append(i)
                 self.num_inactive_spin_orbs += 1
@@ -200,7 +205,7 @@ class WaveFunction:
         # Setup Qiskit stuff
         self.QI = quantum_interface
         self.QI.construct_circuit(
-            self.num_active_orbs, (self.num_active_elec // 2, self.num_active_elec // 2)
+            self.num_active_orbs, (self.num_active_elec_alpha, self.num_active_elec_beta)
         )
 
     @property

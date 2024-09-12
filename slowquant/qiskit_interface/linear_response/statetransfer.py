@@ -47,22 +47,6 @@ class quantumLR(quantumLRBaseClass):
                 self.wf.num_active_elec_beta,
             )
             self.states[f"G{i}"] = (coeffs, dets)
-        for j, GJ in enumerate(self.G_ops):
-            for i, GI in enumerate(self.G_ops[j:], j):
-                coeffs, dets = get_determinant_expansion_from_operator_on_HF(
-                    GJ.get_folded_operator(*self.orbs) * GI.get_folded_operator(*self.orbs),
-                    self.wf.num_active_orbs,
-                    self.wf.num_active_elec_alpha,
-                    self.wf.num_active_elec_beta,
-                )
-                self.states[f"G{j}G{i}"] = (coeffs, dets)
-                coeffs, dets = get_determinant_expansion_from_operator_on_HF(
-                    (GJ.dagger).get_folded_operator(*self.orbs) * GI.get_folded_operator(*self.orbs),
-                    self.wf.num_active_orbs,
-                    self.wf.num_active_elec_alpha,
-                    self.wf.num_active_elec_beta,
-                )
-                self.states[f"Gd{j}G{i}"] = (coeffs, dets)
 
         if self.num_q != 0 and not skip_orbital_rotations:
             raise NotImplementedError(
@@ -93,20 +77,10 @@ class quantumLR(quantumLRBaseClass):
                 val = self.wf.QI.quantum_expectation_value_csfs(
                     self.states[f"G{i}"], H_active, self.states[f"G{j}"]
                 )
-                # - <CSF| GId GJ Ud H U |CSF>
-                if self.states[f"Gd{j}G{i}"] != ([], []):
-                    val -= self.wf.QI.quantum_expectation_value_csfs(
-                        self.states[f"Gd{j}G{i}"], H_active, self.states["HF"]
-                    )
+                # - delta_IJ E0
+                if i == j:
+                    val -= self.wf.energy_elec
                 self.A[i, j] = self.A[j, i] = val
-                # Make B
-                # - <CSF| GId GJd Ud H U |CSF>
-                val = 0.0
-                if self.states[f"G{j}G{i}"] != ([], []):
-                    val -= self.wf.QI.quantum_expectation_value_csfs(
-                        self.states[f"G{j}G{i}"], H_active, self.states["HF"]
-                    )
-                self.B[i, j] = self.B[j, i] = val
                 # Make Sigma
                 if i == j:
                     self.Sigma[i, j] = 1
