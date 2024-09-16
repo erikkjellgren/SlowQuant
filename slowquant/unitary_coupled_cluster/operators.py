@@ -573,7 +573,7 @@ def one_elec_op_full_space(ints_mo: np.ndarray, num_orbs: int) -> FermionicOpera
         num_orbs: Number of spatial orbitals.
 
     Returns:
-        Hamiltonian operator in full-space.
+        One-electron operator in full-space.
     """
     one_elec_op = FermionicOperator({}, {})
     for p in range(num_orbs):
