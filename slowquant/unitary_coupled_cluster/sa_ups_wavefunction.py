@@ -189,17 +189,6 @@ class WaveFunctionSAUPS:
                         self._kappa_redundant_old.append(0.0)
                         self.kappa_redundant_idx.append([p, q])
                         continue
-                if include_active_kappa:
-                    if p in self.active_occ_idx and q in self.active_occ_idx:
-                        self.kappa_redundant.append(0.0)
-                        self._kappa_redundant_old.append(0.0)
-                        self.kappa_redundant_idx.append([p, q])
-                        continue
-                    if p in self.active_unocc_idx and q in self.active_unocc_idx:
-                        self.kappa_redundant.append(0.0)
-                        self._kappa_redundant_old.append(0.0)
-                        self.kappa_redundant_idx.append([p, q])
-                        continue
                 self.kappa.append(0.0)
                 self._kappa_old.append(0.0)
                 self.kappa_idx.append([p, q])
