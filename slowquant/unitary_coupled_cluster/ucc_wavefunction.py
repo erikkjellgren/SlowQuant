@@ -838,7 +838,7 @@ class WaveFunctionUCC:
                 parameters,
                 tol=convergence_threshold,
                 callback=silent_progress,
-                method="SLSQP",
+                method="L-BFGS-B",
                 jac=parameter_gradient,
             )
         else:
@@ -859,7 +859,7 @@ class WaveFunctionUCC:
                 parameters,
                 tol=convergence_threshold,
                 callback=print_progress,
-                method="SLSQP",
+                method="L-BFGS-B",
                 jac=parameter_gradient,
                 options={"maxiter": maxiter},
             )
