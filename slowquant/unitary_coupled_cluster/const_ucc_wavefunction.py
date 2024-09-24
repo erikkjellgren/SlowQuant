@@ -601,78 +601,46 @@ class LagWaveFunctionUCC:
             f"### Total parameters: {num_kappa + num_theta1 + num_theta2 + num_theta3 + num_theta4 + num_theta5 + num_theta6}\n"
         )
         print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
-        lag_val = 10**6
-        lam = 0
-        k = 10**4
-        for _ in range(1000):
-            print("lam, k", lam, k)
-            e_tot = partial(
-                energy_lagucc,
-                wf=self,
-                E0=E0,
-                lam=lam,
-                k=k,
-                
-            )
-            parameter_gradient = partial(
-                gradient_lagucc,
-                wf=self,
-                E0=E0,
-                lam=lam,
-                k=k,
-            )
-            parameters = []
-            parameters += self.kappa
-            for theta in self.thetas:
-                parameters.append(theta)
-            res = scipy.optimize.minimize(
-                e_tot,
-                parameters,
-                tol=convergence_threshold,
-                callback=print_progress,
-                method="L-BFGS-B",
-                jac=parameter_gradient,
-                options={"maxiter": maxiter},
-            )
-            param_idx = len(self.kappa)
-            for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
-                self.kappa[i] = 0
-                self._kappa_old[i] = 0
-            self.thetas = res["x"][param_idx:].tolist()
-            H = hamiltonian_0i_0a(
-                        self.h_mo,
-                        self.g_mo,
-                        self.num_inactive_orbs,
-                        self.num_active_orbs,
-                    )
-            E_elec = expectation_value(
-                self.ci_coeffs,
-                [H],
-                self.ci_coeffs,
-                self.idx2det,
-                self.det2idx,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.num_inactive_orbs,
-                self.num_active_elec_alpha,
-                self.num_active_elec_beta,
-                self.thetas,
-                self.ucc_layout,
-            )
-            print("Constraint error", abs(E_elec - E0))
-            if abs(lag_val - res.fun) < 10**-4 and abs(E_elec - E0) < 10**-6:
-                break
-            lag_val = res.fun
-            lam += k*abs(E_elec - E0)
-            k *= 5
-
+        e_tot = partial(
+            energy_lagucc,
+            wf=self,
+        )
+        parameter_gradient = partial(
+            gradient_lagucc,
+            wf=self,
+        )
+        e_constr = partial(
+            energy_constr,
+            wf=self,
+            E0=E0,
+        )
+        parameter_gradient_constr = partial(
+            gradient_constr,
+            wf=self,
+        )
+        parameters = []
+        parameters += self.kappa
+        for theta in self.thetas:
+            parameters.append(theta)
+        res = scipy.optimize.minimize(
+            e_tot,
+            parameters,
+            tol=convergence_threshold,
+            callback=print_progress,
+            method="SLSQP",
+            jac=parameter_gradient,
+            options={"maxiter": maxiter},
+            constraints={"type": "eq", "fun": e_constr}#, "jac": parameter_gradient_constr}
+        )
+        param_idx = len(self.kappa)
+        for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
+            self.kappa[i] = 0
+            self._kappa_old[i] = 0
+        self.thetas = res["x"][param_idx:].tolist()
 
 def energy_lagucc(
     parameters: list[float],
     wf: LagWaveFunctionUCC,
-    E0: float,
-    lam: float,
-    k: float,
 ) -> float:
     r"""Calculate electronic energy of UCC wave function.
 
@@ -718,11 +686,6 @@ def energy_lagucc(
         wf.det2idx,
         wf.num_active_orbs,
     )
-    E_elec = expectation_value_mat(
-        wf.ci_coeffs,
-        Hamiltonian,
-        wf.ci_coeffs,
-    )
     E_lag = 0.0
     for state in wf.excited_states:
         E_lag += expectation_value_mat(
@@ -730,15 +693,12 @@ def energy_lagucc(
             Hamiltonian,
             state,
         )
-    return E_lag + lam*(E_elec - E0) + 0.5*k*(E_elec - E0)**2
+    return E_lag
 
 
 def gradient_lagucc(
     parameters: list[float],
     wf: LagWaveFunctionUCC,
-    E0: float,
-    lam: float,
-    k: float,
 ) -> np.ndarray:
     """Calcuate electronic gradient.
 
@@ -755,20 +715,17 @@ def gradient_lagucc(
     number_kappas = len(wf.kappa_idx)
     gradient = np.zeros_like(parameters)
     gradient[:number_kappas] = orbital_rotation_gradient(
-        wf,E0,lam,k,
+        wf,
     )
     gradient[number_kappas:] = active_space_parameter_gradient(
         wf,
-        parameters,E0,lam,k,
+        parameters,
     )
     return gradient
 
 
 def orbital_rotation_gradient(
     wf: LagWaveFunctionUCC,
-    E0: float,
-    lam: float,
-    k: float,
 ) -> np.ndarray:
     """Calcuate electronic gradient with respect to orbital rotations.
 
@@ -778,13 +735,6 @@ def orbital_rotation_gradient(
     Return:
         Electronic gradient with respect to orbital rotations.
     """
-    rdms_elec = ReducedDenstiyMatrix(
-        wf.num_inactive_orbs,
-        wf.num_active_orbs,
-        wf.num_active_orbs,
-        rdm1=wf.rdm1,
-        rdm2=wf.rdm2,
-    )
     rdms_lag = ReducedDenstiyMatrix(
         wf.num_inactive_orbs,
         wf.num_active_orbs,
@@ -792,22 +742,15 @@ def orbital_rotation_gradient(
         rdm1=wf.rdm1_lag,
         rdm2=wf.rdm2_lag,
     )
-    dg = get_orbital_gradient(
-        rdms_elec, wf.h_mo, wf.g_mo, wf.kappa_idx, wf.num_inactive_orbs, wf.num_active_orbs
-    )
     df = get_orbital_gradient(
         rdms_lag, wf.h_mo, wf.g_mo, wf.kappa_idx, wf.num_inactive_orbs, wf.num_active_orbs
     )
-    E_elec = get_electronic_energy(rdms_elec, wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs)
-    return df + lam*dg + k*dg*(E_elec - E0)
+    return df
 
 
 def active_space_parameter_gradient(
     wf: LagWaveFunctionUCC,
     parameters: list[float],
-    E0: float,
-    lam: float,
-    k: float,
 ) -> np.ndarray:
     """Calcuate electronic gradient with respect to active space parameters.
 
@@ -838,7 +781,6 @@ def active_space_parameter_gradient(
     )
     gradient_theta = np.zeros_like(theta_params)
     eps = np.finfo(np.float64).eps ** (1 / 2)
-    E_elec = expectation_value_mat(wf.ci_coeffs, Hamiltonian, wf.ci_coeffs)
     E_lag = 0.0
     for state in wf.excited_states:
         E_lag += expectation_value_mat(
@@ -851,7 +793,6 @@ def active_space_parameter_gradient(
         step_size = eps * sign_step * max(1, abs(theta_params[i]))
         theta_params[i] += step_size
         wf.thetas = theta_params
-        E_elec_plus = expectation_value_mat(wf.ci_coeffs, Hamiltonian, wf.ci_coeffs)
         E_lag_plus = 0.0
         for state in wf.excited_states:
             E_lag_plus += expectation_value_mat(
@@ -862,6 +803,165 @@ def active_space_parameter_gradient(
         theta_params[i] -= step_size
         wf.thetas = theta_params
         df = (E_lag_plus - E_lag) / step_size
-        dg = (E_elec_plus - E_elec) / step_size
-        gradient_theta[i] = df + lam*dg + k*dg*(E_elec - E0)
+        gradient_theta[i] = df
+    return gradient_theta
+
+
+def energy_constr(
+    parameters: list[float],
+    wf: LagWaveFunctionUCC,
+    E0,
+) -> float:
+    r"""Calculate electronic energy of UCC wave function.
+
+    .. math::
+        E = \left<0\left|\hat{H}\right|0\right>
+
+    Args:
+        parameters: Sequence of all parameters.
+                    Ordered as orbital rotations, active-space singles, active-space doubles, ...
+        orbital_optimized: Do orbital optimization.
+        wf: Wave function object.
+
+    Returns:
+        Electronic energy.
+    """
+    kappa = []
+    idx_counter = 0
+    for _ in range(len(wf.kappa_idx)):
+        kappa.append(parameters[idx_counter])
+        idx_counter += 1
+    theta = parameters[idx_counter:]
+
+    kappa_mat = np.zeros_like(wf.c_orthonormal)
+    for kappa_val, (p, q) in zip(
+        np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx  # pylint: disable=protected-access
+    ):
+        kappa_mat[p, q] = kappa_val
+        kappa_mat[q, p] = -kappa_val
+    c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
+    wf._kappa_old = kappa.copy()  # pylint: disable=protected-access
+    # Moving expansion point of kappa
+    wf.c_orthonormal = c_trans
+    # Add thetas
+    wf.thetas = theta
+    return expectation_value(
+        wf.ci_coeffs,
+        [
+            hamiltonian_0i_0a(
+                wf.h_mo,
+                wf.g_mo,
+                wf.num_inactive_orbs,
+                wf.num_active_orbs,
+            )
+        ],
+        wf.ci_coeffs,
+        wf.idx2det,
+        wf.det2idx,
+        wf.num_inactive_orbs,
+        wf.num_active_orbs,
+        wf.num_inactive_orbs,
+        wf.num_active_elec_alpha,
+        wf.num_active_elec_beta,
+        wf.thetas,
+        wf.ucc_layout,
+    ) - E0
+
+
+def gradient_constr(
+    parameters: list[float],
+    wf: LagWaveFunctionUCC,
+) -> np.ndarray:
+    """Calcuate electronic gradient.
+
+    Args:
+        parameters: Sequence of all parameters.
+                    Ordered as orbital rotations, active-space singles, active-space doubles, ...
+        orbital_optimized: Do orbital optimization.
+        wf: Wave function object.
+
+    Returns:
+        Electronic gradient.
+    """
+    number_kappas = 0
+    number_kappas = len(wf.kappa_idx)
+    gradient = np.zeros_like(parameters)
+    gradient[:number_kappas] = orbital_rotation_gradient_constr(
+            wf,
+        )
+    gradient[number_kappas:] = active_space_parameter_gradient_constr(
+        wf,
+        parameters,
+    )
+    return gradient
+
+
+def orbital_rotation_gradient_constr(
+    wf: LagWaveFunctionUCC,
+) -> np.ndarray:
+    """Calcuate electronic gradient with respect to orbital rotations.
+
+    Args:
+        wf: Wave function object.
+
+    Return:
+        Electronic gradient with respect to orbital rotations.
+    """
+    rdms = ReducedDenstiyMatrix(
+        wf.num_inactive_orbs,
+        wf.num_active_orbs,
+        wf.num_active_orbs,
+        rdm1=wf.rdm1,
+        rdm2=wf.rdm2,
+    )
+    gradient = get_orbital_gradient(
+        rdms, wf.h_mo, wf.g_mo, wf.kappa_idx, wf.num_inactive_orbs, wf.num_active_orbs
+    )
+    return gradient
+
+
+def active_space_parameter_gradient_constr(
+    wf: LagWaveFunctionUCC,
+    parameters: list[float],
+) -> np.ndarray:
+    """Calcuate electronic gradient with respect to active space parameters.
+
+    Args:
+        wf: Wave function object.
+        parameters: Sequence of all parameters.
+                    Ordered as orbital rotations, active-space singles, active-space doubles, ...
+        orbital_optimized: Do orbital optimization.
+
+    Returns:
+        Electronic gradient with respect to active spae parameters.
+    """
+    idx_counter = 0
+    for _ in range(len(wf.kappa_idx)):
+        idx_counter += 1
+    theta_params = parameters[idx_counter:]
+
+    Hamiltonian = build_operator_matrix(
+        hamiltonian_0i_0a(
+            wf.h_mo,
+            wf.g_mo,
+            wf.num_inactive_orbs,
+            wf.num_active_orbs,
+        ).get_folded_operator(wf.num_inactive_orbs, wf.num_active_orbs, wf.num_virtual_orbs),
+        wf.idx2det,
+        wf.det2idx,
+        wf.num_active_orbs,
+    )
+
+    gradient_theta = np.zeros_like(theta_params)
+    eps = np.finfo(np.float64).eps ** (1 / 2)
+    E = expectation_value_mat(wf.ci_coeffs, Hamiltonian, wf.ci_coeffs)
+    for i in range(len(theta_params)):  # pylint: disable=consider-using-enumerate
+        sign_step = (theta_params[i] >= 0).astype(float) * 2 - 1  # type: ignore [attr-defined]
+        step_size = eps * sign_step * max(1, abs(theta_params[i]))
+        theta_params[i] += step_size
+        wf.thetas = theta_params
+        E_plus = expectation_value_mat(wf.ci_coeffs, Hamiltonian, wf.ci_coeffs)
+        theta_params[i] -= step_size
+        wf.thetas = theta_params
+        gradient_theta[i] = (E_plus - E) / step_size
     return gradient_theta
