@@ -630,7 +630,7 @@ class LagWaveFunctionUCC:
             method="SLSQP",
             jac=parameter_gradient,
             options={"maxiter": maxiter},
-            constraints={"type": "eq", "fun": e_constr}#, "jac": parameter_gradient_constr}
+            constraints={"type": "eq", "fun": e_constr, "jac": parameter_gradient_constr}
         )
         param_idx = len(self.kappa)
         for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
