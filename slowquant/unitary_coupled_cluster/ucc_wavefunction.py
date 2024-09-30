@@ -185,17 +185,6 @@ class WaveFunctionUCC:
                         self._kappa_redundant_old.append(0.0)
                         self.kappa_redundant_idx.append([p, q])
                         continue
-                if include_active_kappa:
-                    if p in self.active_occ_idx and q in self.active_occ_idx:
-                        self.kappa_redundant.append(0.0)
-                        self._kappa_redundant_old.append(0.0)
-                        self.kappa_redundant_idx.append([p, q])
-                        continue
-                    if p in self.active_unocc_idx and q in self.active_unocc_idx:
-                        self.kappa_redundant.append(0.0)
-                        self._kappa_redundant_old.append(0.0)
-                        self.kappa_redundant_idx.append([p, q])
-                        continue
                 if not (p in self.active_idx and q in self.active_idx):
                     self.kappa_no_activeactive_idx.append([p, q])
                     self.kappa_no_activeactive_idx_dagger.append([q, p])
