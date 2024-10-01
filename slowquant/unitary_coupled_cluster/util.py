@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 from collections.abc import Generator, Sequence
 from typing import Any
 
@@ -597,6 +598,9 @@ class UpsStructure:
         # Layer loop
         print("Layers", n_layers)
         print("TS", tile_shifting)
+        self.num_nn = 0
+        self.num_nnn = 0
+        self.num_nnnn = 0
         for n in range(n_layers):
             # NN (standard tUPS/QNP) - tiles of size 2
             for p in range(0, num_active_orbs - 1, 2):  # first column of brick-wall
@@ -618,6 +622,7 @@ class UpsStructure:
                 self.excitation_operator_type.append("sa_single")
                 self.excitation_indicies.append((p, p + 1))
                 self.n_params += 1
+                self.num_nn += 1
             for p in range(1, num_active_orbs - 1, 2):  # second column of brick-wall
                 if not do_qnp:
                     # First single
@@ -634,6 +639,7 @@ class UpsStructure:
                 self.excitation_operator_type.append("sa_single")
                 self.excitation_indicies.append((p, p + 1))
                 self.n_params += 1
+                self.num_nn += 1
 
             # NNN - tiles of size 4
             for p in range(0, num_active_orbs - 3, 4):  # first column of brick-wall
@@ -659,6 +665,7 @@ class UpsStructure:
                 self.excitation_operator_type.append("sa_single")
                 self.excitation_indicies.append((p, p + 2))
                 self.n_params += 1
+                self.num_nnn += 1
 
                 # Second size-2 tile with NNN
                 if not do_qnp:
@@ -681,6 +688,7 @@ class UpsStructure:
                 self.excitation_operator_type.append("sa_single")
                 self.excitation_indicies.append((p + 1, p + 3))
                 self.n_params += 1
+                self.num_nnn += 1
 
             for p in range(2, num_active_orbs - 3, 4):  # second column of brick-wall
 
@@ -700,6 +708,7 @@ class UpsStructure:
                 self.excitation_operator_type.append("sa_single")
                 self.excitation_indicies.append((p, p + 2))
                 self.n_params += 1
+                self.num_nnn += 1
 
                 # Second size-2 tile with NNN
                 if not do_qnp:
@@ -717,8 +726,135 @@ class UpsStructure:
                 self.excitation_operator_type.append("sa_single")
                 self.excitation_indicies.append((p + 1, p + 3))
                 self.n_params += 1
+                self.num_nnn += 1
 
             # NNNN - tiles of size 6
+            for p in range(0, num_active_orbs - 5, 6):  # first column of brick-wall
+
+                # First size-2 tile with NNNN
+                if not do_qnp:
+                    # First single
+                    self.excitation_operator_type.append("sa_single")
+                    self.excitation_indicies.append((p, p + 3))  # spatial basis
+                    self.n_params += 1
+                # Double
+                self.excitation_operator_type.append("double")
+                self.excitation_indicies.append(
+                    (2 * p, 2 * p + 1, 2 * (p + 3), 2 * (p + 3) + 1)
+                )  # spin basis
+                self.n_params += 1
+                # Second single
+                if n + 1 == n_layers and skip_last_singles and num_active_orbs == 2:
+                    # Special case for two orbital.
+                    # Here the layer is only one block, thus,
+                    # the last single excitation is earlier than expected.
+                    continue
+                self.excitation_operator_type.append("sa_single")
+                self.excitation_indicies.append((p, p + 3))
+                self.n_params += 1
+                self.num_nnnn += 1
+
+                # Second size-2 tile with NNNN
+                if not do_qnp:
+                    # First single
+                    self.excitation_operator_type.append("sa_single")
+                    self.excitation_indicies.append((p + 1, p + 4))  # spatial basis
+                    self.n_params += 1
+                # Double
+                self.excitation_operator_type.append("double")
+                self.excitation_indicies.append(
+                    (2 * (p + 1), 2 * (p + 1) + 1, 2 * (p + 4), 2 * (p + 4) + 1)
+                )  # spin basis
+                self.n_params += 1
+                # Second single
+                if n + 1 == n_layers and skip_last_singles and num_active_orbs == 2:
+                    # Special case for two orbital.
+                    # Here the layer is only one block, thus,
+                    # the last single excitation is earlier than expected.
+                    continue
+                self.excitation_operator_type.append("sa_single")
+                self.excitation_indicies.append((p + 1, p + 4))
+                self.n_params += 1
+                self.num_nnnn += 1
+
+                # Third size-2 tile with NNNN
+                if not do_qnp:
+                    # First single
+                    self.excitation_operator_type.append("sa_single")
+                    self.excitation_indicies.append((p + 2, p + 5))  # spatial basis
+                    self.n_params += 1
+                # Double
+                self.excitation_operator_type.append("double")
+                self.excitation_indicies.append(
+                    (2 * (p + 2), 2 * (p + 2) + 1, 2 * (p + 5), 2 * (p + 5) + 1)
+                )  # spin basis
+                self.n_params += 1
+                # Second single
+                if n + 1 == n_layers and skip_last_singles and num_active_orbs == 2:
+                    # Special case for two orbital.
+                    # Here the layer is only one block, thus,
+                    # the last single excitation is earlier than expected.
+                    continue
+                self.excitation_operator_type.append("sa_single")
+                self.excitation_indicies.append((p + 2, p + 5))
+                self.n_params += 1
+                self.num_nnnn += 1
+
+            for p in range(3, num_active_orbs - 5, 6):  # second column of brick-wall
+
+                # First size-2 tile with NNNN
+                if not do_qnp:
+                    # First single
+                    self.excitation_operator_type.append("sa_single")
+                    self.excitation_indicies.append((p, p + 3))
+                    self.n_params += 1
+                # Double
+                self.excitation_operator_type.append("double")
+                self.excitation_indicies.append((2 * p, 2 * p + 1, 2 * (p + 3), 2 * (p + 3) + 1))
+                self.n_params += 1
+                # Second single
+                if n + 1 == n_layers and skip_last_singles:
+                    continue
+                self.excitation_operator_type.append("sa_single")
+                self.excitation_indicies.append((p, p + 3))
+                self.n_params += 1
+                self.num_nnnn += 1
+
+                # Second size-2 tile with NNNN
+                if not do_qnp:
+                    # First single
+                    self.excitation_operator_type.append("sa_single")
+                    self.excitation_indicies.append((p + 1, p + 4))
+                    self.n_params += 1
+                # Double
+                self.excitation_operator_type.append("double")
+                self.excitation_indicies.append((2 * (p + 1), 2 * (p + 1) + 1, 2 * (p + 4), 2 * (p + 4) + 1))
+                self.n_params += 1
+                # Second single
+                if n + 1 == n_layers and skip_last_singles:
+                    continue
+                self.excitation_operator_type.append("sa_single")
+                self.excitation_indicies.append((p + 1, p + 4))
+                self.n_params += 1
+                self.num_nnnn += 1
+
+                # Third size-2 tile with NNNN
+                if not do_qnp:
+                    # First single
+                    self.excitation_operator_type.append("sa_single")
+                    self.excitation_indicies.append((p + 2, p + 5))
+                    self.n_params += 1
+                # Double
+                self.excitation_operator_type.append("double")
+                self.excitation_indicies.append((2 * (p + 2), 2 * (p + 2) + 1, 2 * (p + 5), 2 * (p + 5) + 1))
+                self.n_params += 1
+                # Second single
+                if n + 1 == n_layers and skip_last_singles:
+                    continue
+                self.excitation_operator_type.append("sa_single")
+                self.excitation_indicies.append((p + 2, p + 5))
+                self.n_params += 1
+                self.num_nnnn += 1
 
     def create_fUCC(self, num_orbs: int, num_elec: int, ansatz_options: dict[str, Any]) -> None:
         """Create factorized UCC ansatz.
