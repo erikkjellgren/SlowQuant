@@ -825,8 +825,7 @@ class WaveFunctionUCC:
         if orbital_optimization:
             parameters += self.kappa
             num_kappa += len(self.kappa)
-        for theta in self.thetas:
-            parameters.append(theta)
+        parameters = parameters + self.thetas
         for exc_type in self.ucc_layout.excitation_operator_type:
             if exc_type == "sa_single":
                 num_theta1 += 1
@@ -908,13 +907,9 @@ def energy_ucc(
         Electronic energy.
     """
     # Get kappa and theta parameters separately
-    kappa = []
-    idx_counter = 0
     if orbital_optimized:
-        for _ in range(len(wf.kappa_idx)):
-            kappa.append(parameters[idx_counter])
-            idx_counter += 1
-    theta = parameters[idx_counter:]
+        kappa = parameters[: len(wf.kappa_idx)]
+    theta = parameters[len(wf.kappa_idx) :]
 
     kappa_mat = np.zeros_like(wf.c_orthonormal)
     if orbital_optimized:

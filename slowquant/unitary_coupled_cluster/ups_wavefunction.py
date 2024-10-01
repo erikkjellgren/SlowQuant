@@ -526,9 +526,8 @@ class WaveFunctionUPS:
         if orbital_optimization:
             parameters += self.kappa
             num_kappa += len(self.kappa)
-        for theta in self.thetas:
-            parameters.append(theta)
-            num_theta += 1
+        parameters = parameters + self.thetas
+        num_theta = len(self.thetas)
         # Optimization
         if is_silent:
             res = scipy.optimize.minimize(
@@ -589,14 +588,9 @@ def energy_ups(
     """
     # Get kappa and theta parameters separately
     kappa = []
-    theta = []
-    idx_counter = 0
     if orbital_optimized:
-        for _ in range(len(wf.kappa_idx)):
-            kappa.append(parameters[idx_counter])
-            idx_counter += 1
-    for par in parameters[idx_counter:]:
-        theta.append(par)
+        kappa = list(parameters[: len(wf.kappa_idx)])
+    theta = list(parameters[len(wf.kappa_idx) :])
     assert len(parameters) == len(kappa) + len(theta)
 
     kappa_mat = np.zeros_like(wf.c_orthonormal)
