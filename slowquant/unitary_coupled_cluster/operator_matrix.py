@@ -905,7 +905,7 @@ def get_grad_action(
 
     This function only applies the $\hat{T}_i$ part to the state.
 
-    #. 10.48550/arXiv.2303.10825, Eq. 20
+    #. 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
 
     Args:
         state: State vector.

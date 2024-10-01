@@ -334,7 +334,7 @@ class WaveFunctionUCC:
             if np.max(np.abs(self.kappa)) > 0.0:
                 for kappa_val, (p, q) in zip(self.kappa, self.kappa_idx):
                     kappa_mat[p, q] = kappa_val
-                    kappa_mat[q, p] = -kappa_val  # Legacy redundant kappa scans
+                    kappa_mat[q, p] = -kappa_val
         # Legacy redundant kappa scans
         if len(self.kappa_redundant) != 0:
             if np.max(np.abs(self.kappa_redundant)) > 0.0:
@@ -368,7 +368,7 @@ class WaveFunctionUCC:
 
     @property
     def rdm1(self) -> np.ndarray:
-        """Calcuate one-electron reduced density matrix in the active space.
+        """Calculate one-electron reduced density matrix in the active space.
 
         Returns:
             One-electron reduced density matrix.
@@ -399,7 +399,7 @@ class WaveFunctionUCC:
 
     @property
     def rdm2(self) -> np.ndarray:
-        """Calcuate two-electron reduced density matrix in the actice space.
+        """Calculate two-electron reduced density matrix in the actice space.
 
         Returns:
             Two-electron reduced density matrix.
@@ -453,7 +453,7 @@ class WaveFunctionUCC:
 
     @property
     def rdm3(self) -> np.ndarray:
-        """Calcuate three-electron reduced density matrix in the actice space.
+        """Calculate three-electron reduced density matrix in the actice space.
 
         Currently not utilizing the full symmetry.
 
@@ -521,7 +521,7 @@ class WaveFunctionUCC:
 
     @property
     def rdm4(self) -> np.ndarray:
-        """Calcuate four-electron reduced density matrix in the active space.
+        """Calculate four-electron reduced density matrix in the active space.
 
         Currently not utilizing the full symmetry.
 
@@ -973,7 +973,7 @@ def gradient_ucc(
     orbital_optimized: bool,
     wf: WaveFunctionUCC,
 ) -> np.ndarray:
-    """Calcuate electronic gradient.
+    """Calculate electronic gradient.
 
     Args:
         parameters: Sequence of all parameters.
@@ -1003,7 +1003,7 @@ def gradient_ucc(
 def orbital_rotation_gradient(
     wf: WaveFunctionUCC,
 ) -> np.ndarray:
-    """Calcuate electronic gradient with respect to orbital rotations using RDMs.
+    """Calculate electronic gradient with respect to orbital rotations using RDMs.
 
     Args:
         wf: Wave function object.
@@ -1030,7 +1030,7 @@ def active_space_parameter_gradient(
     parameters: list[float],
     orbital_optimized: bool,
 ) -> np.ndarray:
-    """Calcuate electronic gradient with respect to active space parameters.
+    """Calculate electronic gradient with respect to active space parameters.
 
     Args:
         wf: Wave function object.
@@ -1039,7 +1039,7 @@ def active_space_parameter_gradient(
         orbital_optimized: Do orbital optimization.
 
     Returns:
-        Electronic gradient with respect to active spae parameters.
+        Electronic gradient with respect to active space parameters.
     """
     # Get theta parameters
     idx_counter = 0
