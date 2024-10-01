@@ -631,8 +631,6 @@ class WaveFunctionSAUPS:
         """
         if self._state_energies is None:
             self._do_state_ci()
-        if self._state_energies is None:
-            raise ValueError("_state_energies is None")
         return self._state_energies
 
     @property
