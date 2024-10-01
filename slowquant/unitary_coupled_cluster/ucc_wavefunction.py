@@ -907,9 +907,13 @@ def energy_ucc(
         Electronic energy.
     """
     # Get kappa and theta parameters separately
+    kappa = []
+    idx_counter = 0
     if orbital_optimized:
-        kappa = parameters[: len(wf.kappa_idx)]
-    theta = parameters[len(wf.kappa_idx) :]
+        idx_counter = len(wf.kappa_idx)
+        kappa = list(parameters[:idx_counter])
+    theta = list(parameters[idx_counter:])
+    assert len(parameters) == len(kappa) + len(theta)
 
     kappa_mat = np.zeros_like(wf.c_orthonormal)
     if orbital_optimized:
