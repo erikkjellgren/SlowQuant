@@ -32,9 +32,9 @@ def single_excitation(
         Single excitation circuit.
     """
     if isinstance(mapper, JordanWignerMapper):
-        qc = single_excitation_efficient(a, i, num_orbs, qc, theta)
+        qc = _single_excitation_efficient(a, i, num_orbs, qc, theta)
     else:
-        qc = single_excitation_trotter(i, a, num_orbs, qc, theta, mapper)
+        qc = _single_excitation_trotter(i, a, num_orbs, qc, theta, mapper)
     return qc
 
 
@@ -64,9 +64,9 @@ def double_excitation(
         Single excitation circuit.
     """
     if isinstance(mapper, JordanWignerMapper):
-        qc = double_excitation_efficient(a, b, i, j, num_orbs, qc, theta)
+        qc = _double_excitation_efficient(a, b, i, j, num_orbs, qc, theta)
     else:
-        qc = double_excitation_trotter(i, j, a, b, num_orbs, qc, theta, mapper)
+        qc = _double_excitation_trotter(i, j, a, b, num_orbs, qc, theta, mapper)
     return qc
 
 
@@ -92,13 +92,13 @@ def sa_single_excitation(
         Spin-adpated singlet single excitation circuit.
     """
     if isinstance(mapper, JordanWignerMapper):
-        qc = sa_single_excitation_efficient(a, i, num_orbs, qc, theta)
+        qc = _sa_single_excitation_efficient(a, i, num_orbs, qc, theta)
     else:
-        qc = sa_single_excitation_trotter(i, a, num_orbs, qc, theta, mapper)
+        qc = _sa_single_excitation_trotter(i, a, num_orbs, qc, theta, mapper)
     return qc
 
 
-def single_excitation_efficient(
+def _single_excitation_efficient(
     k: int, i: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression
 ) -> QuantumCircuit:
     r"""Exact circuit for single excitation.
@@ -152,7 +152,7 @@ def single_excitation_efficient(
     return qc
 
 
-def double_excitation_efficient(
+def _double_excitation_efficient(
     k: int, l: int, i: int, j: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression
 ) -> QuantumCircuit:
     r"""Exact circuit for double excitation.
@@ -287,7 +287,7 @@ def double_excitation_efficient(
     return qc
 
 
-def sa_single_excitation_efficient(
+def _sa_single_excitation_efficient(
     k: int, i: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression
 ) -> QuantumCircuit:
     r"""Exact circuit for spin-adapted singlet single excitation.
@@ -315,12 +315,19 @@ def sa_single_excitation_efficient(
     """
     # qc = single_excitation(2 * k, 2 * i, num_orbs, qc, 2 ** (-1 / 2) * theta)
     # qc = single_excitation(2 * k + 1, 2 * i + 1, num_orbs, qc, 2 ** (-1 / 2) * theta)
-    qc = single_excitation_efficient(2 * k, 2 * i, num_orbs, qc, theta)
-    qc = single_excitation_efficient(2 * k + 1, 2 * i + 1, num_orbs, qc, theta)
+    qc = _single_excitation_efficient(2 * k, 2 * i, num_orbs, qc, theta)
+    qc = _single_excitation_efficient(2 * k + 1, 2 * i + 1, num_orbs, qc, theta)
     return qc
 
 
-def single_excitation_trotter(i, a, num_orbs, qc, theta, mapper) -> QuantumCircuit:
+def _single_excitation_trotter(
+    i: int,
+    a: int,
+    num_orbs: int,
+    qc: QuantumCircuit,
+    theta: Parameter | ParameterExpression,
+    mapper: FermionicMapper,
+) -> QuantumCircuit:
     """Get single excitation as a trotterized fermionic operator.
 
     The Pauli string from the mapped fermionic operator are sorted
@@ -355,7 +362,16 @@ def single_excitation_trotter(i, a, num_orbs, qc, theta, mapper) -> QuantumCircu
     return qc
 
 
-def double_excitation_trotter(i, j, a, b, num_orbs, qc, theta, mapper) -> QuantumCircuit:
+def _double_excitation_trotter(
+    i: int,
+    j: int,
+    a: int,
+    b: int,
+    num_orbs: int,
+    qc: QuantumCircuit,
+    theta: Parameter | ParameterExpression,
+    mapper: FermionicMapper,
+) -> QuantumCircuit:
     """Get double excitation as a trotterized fermionic operator.
 
     The Pauli string from the mapped fermionic operator are sorted
@@ -394,7 +410,7 @@ def double_excitation_trotter(i, j, a, b, num_orbs, qc, theta, mapper) -> Quantu
     return qc
 
 
-def sa_single_excitation_trotter(
+def _sa_single_excitation_trotter(
     i: int,
     a: int,
     num_orbs: int,
@@ -415,6 +431,6 @@ def sa_single_excitation_trotter(
     Returns:
         Trotterized fermionic spin-adapted singlet single excitation circuit.
     """
-    qc = single_excitation_trotter(2 * i, 2 * a, num_orbs, qc, theta, mapper)
-    qc = single_excitation_trotter(2 * i + 1, 2 * a + 1, num_orbs, qc, theta, mapper)
+    qc = _single_excitation_trotter(2 * i, 2 * a, num_orbs, qc, theta, mapper)
+    qc = _single_excitation_trotter(2 * i + 1, 2 * a + 1, num_orbs, qc, theta, mapper)
     return qc
