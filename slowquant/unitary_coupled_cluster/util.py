@@ -565,6 +565,7 @@ class UpsStructure:
             * n_layers [int]: Number of layers.
             * do_qnp [bool]: Do QNP tiling. (default: False)
             * skip_last_singles [bool]: Skip last layer of singles operators. (default: False)
+            * tile_shifting: TBD
 
         Args:
             num_active_orbs: Number of spatial active orbitals.
@@ -574,7 +575,7 @@ class UpsStructure:
             tUPS ansatz.
         """
         # Options
-        valid_options = ("n_layers", "do_qnp", "skip_last_singles")
+        valid_options = ("n_layers", "do_qnp", "skip_last_singles", "tile_shifting")
         for option in ansatz_options:
             if option not in valid_options:
                 raise ValueError(f"Got unknown option for tUPS, {option}. Valid options are: {valid_options}")
@@ -589,17 +590,24 @@ class UpsStructure:
             skip_last_singles = ansatz_options["skip_last_singles"]
         else:
             skip_last_singles = False
+        if "tile_shifting" in ansatz_options.keys():
+            tile_shifting = ansatz_options["tile_shifting"]
+        else:
+            tile_shifting = 0  # standard tUPS/QNP
         # Layer loop
+        print("Layers", n_layers)
+        print("TS", tile_shifting)
         for n in range(n_layers):
+            # NN (standard tUPS/QNP) - tiles of size 2
             for p in range(0, num_active_orbs - 1, 2):  # first column of brick-wall
                 if not do_qnp:
                     # First single
                     self.excitation_operator_type.append("sa_single")
-                    self.excitation_indicies.append((p, p + 1))
+                    self.excitation_indicies.append((p, p + 1))  # spatial basis
                     self.n_params += 1
                 # Double
                 self.excitation_operator_type.append("double")
-                self.excitation_indicies.append((2 * p, 2 * p + 1, 2 * p + 2, 2 * p + 3))
+                self.excitation_indicies.append((2 * p, 2 * p + 1, 2 * p + 2, 2 * p + 3))  # spin basis
                 self.n_params += 1
                 # Second single
                 if n + 1 == n_layers and skip_last_singles and num_active_orbs == 2:
@@ -626,6 +634,91 @@ class UpsStructure:
                 self.excitation_operator_type.append("sa_single")
                 self.excitation_indicies.append((p, p + 1))
                 self.n_params += 1
+
+            # NNN - tiles of size 4
+            for p in range(0, num_active_orbs - 3, 4):  # first column of brick-wall
+
+                # First size-2 tile with NNN
+                if not do_qnp:
+                    # First single
+                    self.excitation_operator_type.append("sa_single")
+                    self.excitation_indicies.append((p, p + 2))  # spatial basis
+                    self.n_params += 1
+                # Double
+                self.excitation_operator_type.append("double")
+                self.excitation_indicies.append(
+                    (2 * p, 2 * p + 1, 2 * (p + 2), 2 * (p + 2) + 1)
+                )  # spin basis
+                self.n_params += 1
+                # Second single
+                if n + 1 == n_layers and skip_last_singles and num_active_orbs == 2:
+                    # Special case for two orbital.
+                    # Here the layer is only one block, thus,
+                    # the last single excitation is earlier than expected.
+                    continue
+                self.excitation_operator_type.append("sa_single")
+                self.excitation_indicies.append((p, p + 2))
+                self.n_params += 1
+
+                # Second size-2 tile with NNN
+                if not do_qnp:
+                    # First single
+                    self.excitation_operator_type.append("sa_single")
+                    self.excitation_indicies.append((p + 1, p + 3))  # spatial basis
+                    self.n_params += 1
+                # Double
+                self.excitation_operator_type.append("double")
+                self.excitation_indicies.append(
+                    (2 * (p + 1), 2 * (p + 1) + 1, 2 * (p + 3), 2 * (p + 3) + 1)
+                )  # spin basis
+                self.n_params += 1
+                # Second single
+                if n + 1 == n_layers and skip_last_singles and num_active_orbs == 2:
+                    # Special case for two orbital.
+                    # Here the layer is only one block, thus,
+                    # the last single excitation is earlier than expected.
+                    continue
+                self.excitation_operator_type.append("sa_single")
+                self.excitation_indicies.append((p + 1, p + 3))
+                self.n_params += 1
+
+            for p in range(2, num_active_orbs - 3, 4):  # second column of brick-wall
+
+                # First size-2 tile with NNN
+                if not do_qnp:
+                    # First single
+                    self.excitation_operator_type.append("sa_single")
+                    self.excitation_indicies.append((p, p + 2))
+                    self.n_params += 1
+                # Double
+                self.excitation_operator_type.append("double")
+                self.excitation_indicies.append((2 * p, 2 * p + 1, 2 * (p + 2), 2 * (p + 2) + 1))
+                self.n_params += 1
+                # Second single
+                if n + 1 == n_layers and skip_last_singles:
+                    continue
+                self.excitation_operator_type.append("sa_single")
+                self.excitation_indicies.append((p, p + 2))
+                self.n_params += 1
+
+                # Second size-2 tile with NNN
+                if not do_qnp:
+                    # First single
+                    self.excitation_operator_type.append("sa_single")
+                    self.excitation_indicies.append((p + 1, p + 3))
+                    self.n_params += 1
+                # Double
+                self.excitation_operator_type.append("double")
+                self.excitation_indicies.append((2 * (p + 1), 2 * (p + 1) + 1, 2 * (p + 3), 2 * (p + 3) + 1))
+                self.n_params += 1
+                # Second single
+                if n + 1 == n_layers and skip_last_singles:
+                    continue
+                self.excitation_operator_type.append("sa_single")
+                self.excitation_indicies.append((p + 1, p + 3))
+                self.n_params += 1
+
+            # NNNN - tiles of size 6
 
     def create_fUCC(self, num_orbs: int, num_elec: int, ansatz_options: dict[str, Any]) -> None:
         """Create factorized UCC ansatz.
