@@ -179,7 +179,7 @@ def test_ups_water_44() -> None:
         SQobj.hartree_fock.mo_coeff,
         h_core,
         g_eri,
-        "fUCC",
+        "fUCCSD",
         ansatz_options={},
         include_active_kappa=True,
     )

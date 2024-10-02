@@ -22,12 +22,12 @@ class ReducedDenstiyMatrix:
             rdm2: Two-electron reduced density matrix in the active space.
         """
         self.inactive_idx = []
-        self.actitve_idx = []
+        self.active_idx = []
         self.virtual_idx = []
         for idx in range(num_inactive_orbs):
             self.inactive_idx.append(idx)
         for idx in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
-            self.actitve_idx.append(idx)
+            self.active_idx.append(idx)
         for idx in range(
             num_inactive_orbs + num_active_orbs,
             num_inactive_orbs + num_active_orbs + num_virtual_orbs,
@@ -38,7 +38,7 @@ class ReducedDenstiyMatrix:
         self.rdm2 = rdm2
 
     def RDM1(self, p: int, q: int) -> float:
-        r"""Get one-electron reduced density matrix element.
+        r"""Get full space one-electron reduced density matrix element.
 
         The only non-zero elements are:
 
@@ -56,9 +56,9 @@ class ReducedDenstiyMatrix:
             q: Spatial orbital index.
 
         Returns:
-            One-electron reduved density matrix element.
+            One-electron reduced density matrix element.
         """
-        if p in self.actitve_idx and q in self.actitve_idx:
+        if p in self.active_idx and q in self.active_idx:
             return self.rdm1[p - self.idx_shift, q - self.idx_shift]
         if p in self.inactive_idx and q in self.inactive_idx:
             if p == q:
@@ -67,7 +67,7 @@ class ReducedDenstiyMatrix:
         return 0
 
     def RDM2(self, p: int, q: int, r: int, s: int) -> float:  # pylint: disable=R0911
-        r"""Get two-electron reduced density matrix element.
+        r"""Get full space two-electron reduced density matrix element.
 
         .. math::
             \Gamma^{[2]}_{pqrs} = \left\{\begin{array}{ll}
@@ -87,16 +87,11 @@ class ReducedDenstiyMatrix:
             s: Spatial orbital index.
 
         Returns:
-            Two-electron reduved density matrix element.
+            Two-electron reduced density matrix element.
         """
         if self.rdm2 is None:
             raise ValueError("RDM2 is not given.")
-        if (
-            p in self.actitve_idx
-            and q in self.actitve_idx
-            and r in self.actitve_idx
-            and s in self.actitve_idx
-        ):
+        if p in self.active_idx and q in self.active_idx and r in self.active_idx and s in self.active_idx:
             return self.rdm2[
                 p - self.idx_shift,
                 q - self.idx_shift,
@@ -105,25 +100,25 @@ class ReducedDenstiyMatrix:
             ]
         if (
             p in self.inactive_idx
-            and q in self.actitve_idx
-            and r in self.actitve_idx
+            and q in self.active_idx
+            and r in self.active_idx
             and s in self.inactive_idx
         ):
             if p == s:
                 return -self.rdm1[q - self.idx_shift, r - self.idx_shift]
             return 0
         if (
-            p in self.actitve_idx
+            p in self.active_idx
             and q in self.inactive_idx
             and r in self.inactive_idx
-            and s in self.actitve_idx
+            and s in self.active_idx
         ):
             if q == r:
                 return -self.rdm1[p - self.idx_shift, s - self.idx_shift]
             return 0
         if (
-            p in self.actitve_idx
-            and q in self.actitve_idx
+            p in self.active_idx
+            and q in self.active_idx
             and r in self.inactive_idx
             and s in self.inactive_idx
         ):
@@ -133,8 +128,8 @@ class ReducedDenstiyMatrix:
         if (
             p in self.inactive_idx
             and q in self.inactive_idx
-            and r in self.actitve_idx
-            and s in self.actitve_idx
+            and r in self.active_idx
+            and s in self.active_idx
         ):
             if p == q:
                 return 2 * self.rdm1[r - self.idx_shift, s - self.idx_shift]

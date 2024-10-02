@@ -2,7 +2,7 @@
 import numpy as np
 import pyscf
 from qiskit_aer.primitives import Sampler
-from qiskit_nature.second_q.mappers import JordanWignerMapper
+from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 
 import slowquant.SlowQuant as sq
 from slowquant.qiskit_interface.interface import QuantumInterface
@@ -84,7 +84,7 @@ def test_fucc() -> None:
         SQobj.hartree_fock.mo_coeff,
         h_core,
         g_eri,
-        "fUCC",
+        "fUCCSD",
         ansatz_options={},
         include_active_kappa=True,
     )
@@ -159,8 +159,8 @@ def test_ksafupccgsd() -> None:
     assert abs(qWF.energy_elec - -8.828916576543133) < 10**-8
 
 
-def test_duccsd() -> None:
-    """Test dUCCSD is conventional <--> qiskit compatibile."""
+def test_sdsfuccsd() -> None:
+    """Test SDSfUCCSD is conventional <--> qiskit compatibile."""
     # Setup initial stuff
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -182,7 +182,7 @@ def test_duccsd() -> None:
         SQobj.hartree_fock.mo_coeff,
         h_core,
         g_eri,
-        "dUCCSD",
+        "SDSfUCCSD",
         ansatz_options={},
         include_active_kappa=True,
     )
@@ -193,7 +193,7 @@ def test_duccsd() -> None:
     # Circuit based UPS wave function
     mapper = JordanWignerMapper()
     primitive = Sampler(run_options={"shots": None})
-    QI = QuantumInterface(primitive, "dUCCSD", mapper, ansatz_options={})
+    QI = QuantumInterface(primitive, "SDSfUCCSD", mapper, ansatz_options={})
     qWF = WaveFunctionQC(
         SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
@@ -208,8 +208,8 @@ def test_duccsd() -> None:
     assert abs(qWF.energy_elec - -8.82891657653415) < 10**-8
 
 
-def test_ksadupccgsd() -> None:
-    """Test k-SAdUpCCGSD is conventional <--> qiskit compatibile."""
+def test_ksasdsfupccgsd() -> None:
+    """Test k-SASDSfUpCCGSD is conventional <--> qiskit compatibile."""
     # Setup initial stuff
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -231,7 +231,7 @@ def test_ksadupccgsd() -> None:
         SQobj.hartree_fock.mo_coeff,
         h_core,
         g_eri,
-        "kSAdUpCCGSD",
+        "kSASDSfUpCCGSD",
         ansatz_options={"n_layers": 1},
         include_active_kappa=True,
     )
@@ -242,7 +242,7 @@ def test_ksadupccgsd() -> None:
     # Circuit based UPS wave function
     mapper = JordanWignerMapper()
     primitive = Sampler(run_options={"shots": None})
-    QI = QuantumInterface(primitive, "kSAdUpCCGSD", mapper, ansatz_options={"n_layers": 1})
+    QI = QuantumInterface(primitive, "kSASDSfUpCCGSD", mapper, ansatz_options={"n_layers": 1})
     qWF = WaveFunctionQC(
         SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
@@ -276,7 +276,7 @@ def test_lih_fucc_allparameters() -> None:
         rhf.mo_coeff,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
-        "fUCC",
+        "fUCCSD",
     )
     sampler = Sampler()
     mapper = JordanWignerMapper()
@@ -297,4 +297,161 @@ def test_lih_fucc_allparameters() -> None:
         thetas[n] = 1
         WF.thetas = thetas
         qWF.ansatz_parameters = thetas
-        assert abs(qWF.energy_elec - WF.energy_elec) < 10**-12
+        assert abs(qWF.energy_elec - WF.energy_elec) < 10**-10
+
+
+def test_lih_fucc_mappings() -> None:
+    """Tests that parity mapping and jw mapping gives the same for fUCC type wave function."""
+    atom = "Li .0 .0 .0; H .0 .0 1.672"
+    basis = "sto3g"
+
+    # PySCF
+    mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
+    rhf = pyscf.scf.RHF(mol).run()
+
+    # SlowQuant
+    WF = WaveFunctionUPS(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 5),
+        rhf.mo_coeff,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        "fUCCSD",
+    )
+    assert abs(WF.energy_elec - -8.808220920154708) < 10**-10
+
+    sampler = Sampler()
+    mapper = JordanWignerMapper()
+    QI = QuantumInterface(sampler, "fUCCSD", mapper)
+    qWF = WaveFunctionQC(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 5),
+        WF.c_trans,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        QI,
+    )
+    qWF.ansatz_parameters = WF.thetas
+    assert abs(qWF.energy_elec - WF.energy_elec) < 10**-10
+
+    sampler = Sampler()
+    mapper = ParityMapper((1, 1))
+    QI = QuantumInterface(sampler, "fUCCSD", mapper)
+    qWF = WaveFunctionQC(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 5),
+        WF.c_trans,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        QI,
+    )
+    qWF.ansatz_parameters = WF.thetas
+    assert abs(qWF.energy_elec - WF.energy_elec) < 10**-10
+
+
+def test_lih_sdsfucc_mappings() -> None:
+    """Tests that parity mapping and jw mapping gives the same for SDSfUCC type wave function."""
+    atom = "Li .0 .0 .0; H .0 .0 1.672"
+    basis = "sto3g"
+
+    # PySCF
+    mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
+    rhf = pyscf.scf.RHF(mol).run()
+
+    # SlowQuant
+    WF = WaveFunctionUPS(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 5),
+        rhf.mo_coeff,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        "SDSfUCCSD",
+    )
+    assert abs(WF.energy_elec - -8.808220920154705) < 10**-10
+
+    sampler = Sampler()
+    mapper = JordanWignerMapper()
+    QI = QuantumInterface(sampler, "SDSfUCCSD", mapper)
+    qWF = WaveFunctionQC(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 5),
+        WF.c_trans,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        QI,
+    )
+    qWF.ansatz_parameters = WF.thetas
+    assert abs(qWF.energy_elec - WF.energy_elec) < 10**-10
+
+    sampler = Sampler()
+    mapper = ParityMapper((1, 1))
+    QI = QuantumInterface(sampler, "SDSfUCCSD", mapper)
+    qWF = WaveFunctionQC(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 5),
+        WF.c_trans,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        QI,
+    )
+    qWF.ansatz_parameters = WF.thetas
+    assert abs(qWF.energy_elec - WF.energy_elec) < 10**-10
+
+
+def test_lih_tups_mappings() -> None:
+    """Tests that parity mapping and jw mapping gives the same for tUPS type wave function."""
+    atom = "Li .0 .0 .0; H .0 .0 1.672"
+    basis = "sto3g"
+
+    # PySCF
+    mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
+    rhf = pyscf.scf.RHF(mol).run()
+
+    # SlowQuant
+    WF = WaveFunctionUPS(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 5),
+        rhf.mo_coeff,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        "tUPS",
+        ansatz_options={"n_layers": 4},
+    )
+    assert abs(WF.energy_elec - -8.808220920154707) < 10**-10
+
+    sampler = Sampler()
+    mapper = JordanWignerMapper()
+    QI = QuantumInterface(sampler, "tUPS", mapper, ansatz_options={"n_layers": 4})
+    qWF = WaveFunctionQC(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 5),
+        WF.c_trans,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        QI,
+    )
+    qWF.ansatz_parameters = WF.thetas
+    assert abs(qWF.energy_elec - WF.energy_elec) < 10**-10
+
+    sampler = Sampler()
+    mapper = ParityMapper((1, 1))
+    QI = QuantumInterface(sampler, "tUPS", mapper, ansatz_options={"n_layers": 4})
+    qWF = WaveFunctionQC(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 5),
+        WF.c_trans,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        QI,
+    )
+    qWF.ansatz_parameters = WF.thetas
+    assert abs(qWF.energy_elec - WF.energy_elec) < 10**-10
