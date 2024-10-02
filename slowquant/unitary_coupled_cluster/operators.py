@@ -7,6 +7,19 @@ from slowquant.unitary_coupled_cluster.fermionic_operator import (
 )
 
 
+def anni_spin(p: int, dagger: bool) -> FermionicOperator:
+    """Construct annihilation/creation operator.
+
+    Args:
+        p: Spin orbital index.
+        dagger: If creation operator.
+
+    Returns:
+        Annihilation/creation operator.
+    """
+    return FermionicOperator(a_op_spin(p, dagger=dagger), 1)
+
+
 def Epq(p: int, q: int) -> FermionicOperator:
     r"""Construct the singlet one-electron excitation operator.
 
@@ -560,7 +573,7 @@ def one_elec_op_full_space(ints_mo: np.ndarray, num_orbs: int) -> FermionicOpera
         num_orbs: Number of spatial orbitals.
 
     Returns:
-        Hamiltonian operator in full-space.
+        One-electron operator in full-space.
     """
     one_elec_op = FermionicOperator({}, {})
     for p in range(num_orbs):

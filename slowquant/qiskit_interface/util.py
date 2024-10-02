@@ -302,28 +302,29 @@ def postselection(
             bitstr_b = bitstr[:num_a]
             current_parity = "0"
             change_counter = 0
-            for bit in bitstr_a:
-                if bit != current_parity:
-                    current_parity = bit
-                    change_counter += 1
-            if current_parity == "1" and num_elec[0] % 2 == 0:
-                change_counter += 1
-            elif current_parity == "0" and num_elec[0] % 2 == 1:
-                change_counter += 1
-            if change_counter != num_elec[0]:
-                break
-            current_parity = "0"
-            change_counter = 0
             for bit in bitstr_b:
                 if bit != current_parity:
                     current_parity = bit
                     change_counter += 1
             if current_parity == "1" and num_elec[1] % 2 == 0:
                 change_counter += 1
+                current_parity = "0"
             elif current_parity == "0" and num_elec[1] % 2 == 1:
                 change_counter += 1
+                current_parity = "1"
+            if change_counter != num_elec[0]:
+                continue
+            change_counter = 0
+            for bit in bitstr_a:
+                if bit != current_parity:
+                    current_parity = bit
+                    change_counter += 1
+            if current_parity == "1" and (num_elec[0] + num_elec[1]) % 2 == 0:
+                change_counter += 1
+            elif current_parity == "0" and (num_elec[0] + num_elec[1]) % 2 == 1:
+                change_counter += 1
             if change_counter != num_elec[1]:
-                break
+                continue
             new_dist[int(bitstr, 2)] = val
             prob_sum += val
     else:
@@ -364,6 +365,7 @@ def f2q(i: int, num_orbs: int) -> int:
 def get_determinant_superposition_reference(
     det1: str, det2: str, num_orbs: int, mapper: JordanWignerMapper
 ) -> QuantumCircuit:
+    """Erik could have descriped the function."""
     if not isinstance(mapper, JordanWignerMapper):
         raise TypeError("Only implemented for JordanWignerMapper. Got: {type(mapper)}")
     qc = QuantumCircuit(2 * num_orbs)
@@ -389,6 +391,7 @@ def get_determinant_superposition_reference(
 
 
 def get_determinant_reference(det, num_orbs, mapper) -> QuantumCircuit:
+    """Erik could have descriped the function."""
     if not isinstance(mapper, JordanWignerMapper):
         raise TypeError("Only implemented for JordanWignerMapper. Got: {type(mapper)}")
     qc = QuantumCircuit(2 * num_orbs)
@@ -400,6 +403,7 @@ def get_determinant_reference(det, num_orbs, mapper) -> QuantumCircuit:
 
 
 def get_reordering_sign(det) -> int:
+    """Erik could have descriped the function."""
     sign = 1
     alphas = 0
     for i, occ in enumerate(det[::-1]):

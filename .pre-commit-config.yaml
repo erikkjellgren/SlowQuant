@@ -34,7 +34,7 @@ repos:
         args: ["--profile", "black"]
 
   - repo: https://github.com/PyCQA/pylint
-    rev: v3.2.6
+    rev: v3.3.1
     hooks:
       - id: pylint
         args: ["--rcfile=.pylintrc"]
