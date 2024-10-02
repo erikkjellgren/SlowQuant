@@ -1084,7 +1084,7 @@ class QuantumInterface:
         if self.do_M_ansatz0:
             ansatz = self.ansatz_circuit
         else:
-            ansatz = QuantumCircuit(self.circuit.num_qubits)  # empty circuit
+            ansatz = QuantumCircuit(self.num_qubits)  # empty circuit
         M = np.zeros((2**self.num_qubits, 2**self.num_qubits))
         ansatz_list = [None] * 2**self.num_qubits
         if self.ISA:
