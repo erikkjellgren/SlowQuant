@@ -80,7 +80,7 @@ class QuantumInterface:
             "kSASDSfUpCCGSD",
             "fUCC",
             "SDSfUCC",
-        "HF",
+            "HF",
         )
         if not isinstance(ansatz, QuantumCircuit) and ansatz not in allowed_ansatz:
             raise ValueError(
