@@ -365,7 +365,7 @@ def f2q(i: int, num_orbs: int) -> int:
 def get_determinant_superposition_reference(
     det1: str, det2: str, num_orbs: int, mapper: JordanWignerMapper
 ) -> QuantumCircuit:
-    """Erik could have descriped the function."""
+    """Erik could have described the function."""
     if not isinstance(mapper, JordanWignerMapper):
         raise TypeError("Only implemented for JordanWignerMapper. Got: {type(mapper)}")
     qc = QuantumCircuit(2 * num_orbs)
@@ -391,7 +391,7 @@ def get_determinant_superposition_reference(
 
 
 def get_determinant_reference(det, num_orbs, mapper) -> QuantumCircuit:
-    """Erik could have descriped the function."""
+    """Erik could have described the function."""
     if not isinstance(mapper, JordanWignerMapper):
         raise TypeError("Only implemented for JordanWignerMapper. Got: {type(mapper)}")
     qc = QuantumCircuit(2 * num_orbs)
@@ -403,7 +403,7 @@ def get_determinant_reference(det, num_orbs, mapper) -> QuantumCircuit:
 
 
 def get_reordering_sign(det) -> int:
-    """Erik could have descriped the function."""
+    """Erik could have described the function."""
     sign = 1
     alphas = 0
     for i, occ in enumerate(det[::-1]):

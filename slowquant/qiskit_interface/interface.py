@@ -565,7 +565,7 @@ class QuantumInterface:
         The expectation value is calculated as:
 
         .. math::
-            M_{IJ} = \sum_{\text{det}_i\in\text{CSF}_I}\sum_{\text{det}_j\in\text{CSF}_J}\left<\text{det}_i\left|\boldsymbol{U}^\dagger\hat{O}_\text{H}\boldsymbol{U}\right|\text{det}_j\right>
+            M_{IJ} = \sum_{\text{det}_i\in\text{CSF}_I}\sum_{\text{det}_j\in\text{CSF}_J}m_{ij}
 
         with,
 
@@ -603,18 +603,20 @@ class QuantumInterface:
             run_parameters = custom_parameters
 
         val = 0.0
+        # Loop over dets in bra CSF
         for bra_coeff, bra_det in zip(bra_csf[0], bra_csf[1]):
             sign_bra = get_reordering_sign(bra_det)
+            # Loop over dets in ket CSF
             for ket_coeff, ket_det in zip(ket_csf[0], ket_csf[1]):
                 sign_ket = get_reordering_sign(ket_det)
-                N = bra_coeff * ket_coeff * sign_bra * sign_ket
+                N = bra_coeff * ket_coeff * sign_bra * sign_ket  # pre-factor
+                # I == J (diagonals)
                 if bra_det == ket_det:
                     circuit = get_determinant_reference(bra_det, self.num_orbs, self.mapper)
                     # Negate HF in ansatz
                     circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
                     # Append ansatz
                     circuit = circuit.compose(self.circuit)
-                    # circuit = self._transpile_circuit(circuit)
                     if isinstance(self._primitive, BaseEstimator):
                         val += N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
                     if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
@@ -624,6 +626,7 @@ class QuantumInterface:
                             circuit,
                             do_cliques=self._do_cliques,
                         )
+                # I != J (off-diagonals)
                 else:
                     circuit = get_determinant_superposition_reference(
                         bra_det, ket_det, self.num_orbs, self.mapper
@@ -1211,7 +1214,6 @@ class QuantumInterface:
             if self.ISA:
                 # Negate the Hartree-Fock State.
                 # Only X Gates. Should need no transpilation.
-                self.hf = HartreeFock(self.num_orbs, self.num_elec, self.mapper)
                 ansatz = ansatz.compose(
                     HartreeFock(self.num_orbs, self.num_elec, self.mapper), qubits=self._layout_indices
                 )

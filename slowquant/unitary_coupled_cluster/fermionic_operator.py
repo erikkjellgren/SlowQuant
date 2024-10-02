@@ -473,7 +473,7 @@ def get_determinant_expansion_from_operator_on_HF(
     num_active_elec_alpha: int,
     num_active_elec_beta: int,
 ) -> tuple[list[float], list[str]]:
-    """Erik could have descriped the function.
+    """Erik could have described the function.
 
     Args:
         operator: Fermionic operator.
