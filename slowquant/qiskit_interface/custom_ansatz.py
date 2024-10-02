@@ -84,8 +84,9 @@ def tUPS(
         qc = HartreeFock(num_orbs, num_elec, mapper)
     grad_param_R = {}
     idx = 0
+    # Layer loop
     for n in range(n_layers):
-        for p in range(0, num_orbs - 1, 2):
+        for p in range(0, num_orbs - 1, 2):  # first column of brick-wall
             if not do_qnp:
                 # First single
                 qc = sa_single_excitation(p, p + 1, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
@@ -106,7 +107,7 @@ def tUPS(
             qc = sa_single_excitation(p, p + 1, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
             grad_param_R[f"p{idx:09d}"] = 4
             idx += 1
-        for p in range(1, num_orbs - 1, 2):
+        for p in range(1, num_orbs - 1, 2):  # second column of brick-wall
             if not do_qnp:
                 # First single
                 qc = sa_single_excitation(p, p + 1, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
@@ -202,6 +203,7 @@ def fUCC(
     qc = HartreeFock(num_orbs, num_elec, mapper)
     grad_param_R = {}
     idx = 0
+    # Layer loop
     for _ in range(n_layers):
         if do_S:
             for a, i in iterate_t1(occ, unocc):
@@ -268,7 +270,7 @@ def SDSfUCC(
         ansatz_options: Ansatz options.
 
     Returns:
-        SDS ordered UCC ansatz circuit and R parameters needed for gradients.
+        SDS ordered fUCC ansatz circuit and R parameters needed for gradients.
     """
     valid_options = ("n_layers", "D", "pD", "GpD")
     for option in ansatz_options:
@@ -304,7 +306,9 @@ def SDSfUCC(
     qc = HartreeFock(num_orbs, num_elec, mapper)
     grad_param_R = {}
     idx = 0
+    # Layer loop
     for _ in range(n_layers):
+        # Kind of D excitation determines indices for complete SDS block
         if do_D:
             for a, i, b, j in iterate_t2(occ, unocc):
                 if i % 2 == a % 2:

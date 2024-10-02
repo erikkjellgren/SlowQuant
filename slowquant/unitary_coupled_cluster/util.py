@@ -8,7 +8,7 @@ import scipy.linalg
 def construct_integral_trans_mat(
     c_orthonormal: np.ndarray, kappa: Sequence[float], kappa_idx: Sequence[Sequence[int]]
 ) -> np.ndarray:
-    """Contruct orbital transformation matrix.
+    """Construct orbital transformation matrix.
 
     Args:
         c_orthonormal: Initial orbital coefficients.
@@ -18,6 +18,7 @@ def construct_integral_trans_mat(
     Returns:
         Orbital transformation matrix.
     """
+    # Construct anti-hermitian kappa matrix
     kappa_mat = np.zeros_like(c_orthonormal)
     for kappa_val, (p, q) in zip(kappa, kappa_idx):
         kappa_mat[p, q] = kappa_val
@@ -37,7 +38,7 @@ def iterate_t1_sa(
         active_unocc_idx: Indices of weakly occupied orbitals.
 
     Returns:
-        T1 operator iteration.
+        Spin-adapted T1 operator iteration.
     """
     for i in active_occ_idx:
         for a in active_unocc_idx:
@@ -56,7 +57,7 @@ def iterate_t2_sa(
         active_unocc_idx: Indices of weakly occupied orbitals.
 
     Returns:
-        T2 operator iteration.
+        Spin-adapted T2 operator iteration.
     """
     for idx_i, i in enumerate(active_occ_idx):
         for j in active_occ_idx[idx_i:]:
@@ -84,7 +85,7 @@ def iterate_t1_sa_generalized(
         num_orbs: Number of active spatial orbitals.
 
     Returns:
-        T1 operator iteration.
+        Generalized spin-adapted T1 operator iteration.
     """
     for i in range(num_orbs):
         for a in range(i + 1, num_orbs):
@@ -437,7 +438,7 @@ def iterate_pair_t2(
         active_unocc_idx: Indices of weakly occupied orbitals.
 
     Returns:
-        T2 operator iteration.
+        Pair T2 operator iteration.
     """
     for i in active_occ_idx:
         for a in active_unocc_idx:
@@ -447,13 +448,13 @@ def iterate_pair_t2(
 def iterate_pair_t2_generalized(
     num_orbs: int,
 ) -> Generator[tuple[int, int, int, int], None, None]:
-    """Iterate over pair T2 operators.
+    """Iterate over generalized pair T2 operators.
 
     Args:
         num_orbs: Number of active spatial orbitals.
 
     Returns:
-        T2 operator iteration.
+        Generlaized pair T2 operator iteration.
     """
     for i in range(num_orbs):
         for a in range(i + 1, num_orbs):
@@ -572,6 +573,7 @@ class UpsStructure:
         Returns:
             tUPS ansatz.
         """
+        # Options
         valid_options = ("n_layers", "do_qnp", "skip_last_singles")
         for option in ansatz_options:
             if option not in valid_options:
@@ -587,8 +589,9 @@ class UpsStructure:
             skip_last_singles = ansatz_options["skip_last_singles"]
         else:
             skip_last_singles = False
+        # Layer loop
         for n in range(n_layers):
-            for p in range(0, num_active_orbs - 1, 2):
+            for p in range(0, num_active_orbs - 1, 2):  # first column of brick-wall
                 if not do_qnp:
                     # First single
                     self.excitation_operator_type.append("sa_single")
@@ -607,7 +610,7 @@ class UpsStructure:
                 self.excitation_operator_type.append("sa_single")
                 self.excitation_indicies.append((p, p + 1))
                 self.n_params += 1
-            for p in range(1, num_active_orbs - 1, 2):
+            for p in range(1, num_active_orbs - 1, 2):  # second column of brick-wall
                 if not do_qnp:
                     # First single
                     self.excitation_operator_type.append("sa_single")
@@ -646,6 +649,7 @@ class UpsStructure:
         Returns:
             Factorized UCC ansatz.
         """
+        # Options
         valid_options = ("n_layers", "S", "D", "SAGS", "pD", "GpD", "SAS")
         for option in ansatz_options:
             if option not in valid_options:
@@ -689,6 +693,7 @@ class UpsStructure:
         for _ in range(num_spin_orbs - np.sum(num_elec)):
             unocc.append(idx)
             idx += 1
+        # Layer loop
         for _ in range(n_layers):
             if do_S:
                 for a, i in iterate_t1(occ, unocc):
@@ -746,8 +751,9 @@ class UpsStructure:
             ansatz_options: Ansatz options.
 
         Returns:
-            SDS ordered UCC ansatz.
+            SDS ordered fUCC ansatz.
         """
+        # Options
         valid_options = ("n_layers", "D", "pD", "GpD")
         for option in ansatz_options:
             if option not in valid_options:
@@ -781,7 +787,9 @@ class UpsStructure:
         for _ in range(num_spin_orbs - np.sum(num_elec)):
             unocc.append(idx)
             idx += 1
+        # Layer loop
         for _ in range(n_layers):
+            # Kind of D excitation determines indices for complete SDS block
             if do_D:
                 for a, i, b, j in iterate_t2(occ, unocc):
                     if i % 2 == a % 2:

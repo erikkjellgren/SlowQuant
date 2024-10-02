@@ -24,7 +24,7 @@ from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
 def get_indexing(
     num_active_orbs: int, num_active_elec_alpha: int, num_active_elec_beta: int
 ) -> tuple[list[int], dict[int, int]]:
-    """Get indexing between index and determiant.
+    """Get relation between index and determiant.
 
     Args:
         num_active_orbs: Number of active spatial orbitals.
@@ -37,6 +37,7 @@ def get_indexing(
     idx = 0
     idx2det = []
     det2idx = {}
+    # Loop over all possible particle and spin conserving determinant combinations
     for alpha_string in multiset_permutations(
         [1] * num_active_elec_alpha + [0] * (num_active_orbs - num_active_elec_alpha)
     ):
@@ -46,9 +47,9 @@ def get_indexing(
             det_str = ""
             for a, b in zip(alpha_string, beta_string):
                 det_str += str(a) + str(b)
-            det = int(det_str, 2)
-            idx2det.append(det)
-            det2idx[det] = idx
+            det = int(det_str, 2)  # save determinant as int
+            idx2det.append(det)  # relate index to determinant
+            det2idx[det] = idx  # relate determinant to index
             idx += 1
     return idx2det, det2idx
 
@@ -70,18 +71,22 @@ def build_operator_matrix(
     Returns:
         Matrix representation of operator.
     """
-    num_dets = len(idx2det)
-    op_mat = np.zeros((num_dets, num_dets))
+    num_dets = len(idx2det)  # number of spin and particle conserving determinants
+    op_mat = np.zeros((num_dets, num_dets))  # basis
+    # Create bitstrings for parity check. Key=orbital index. Value=det as int
     parity_check = {0: 0}
     num = 0
     for i in range(2 * num_active_orbs - 1, -1, -1):
         num += 2**i
         parity_check[2 * num_active_orbs - i] = num
+    # loop over all determinants
     for i in range(num_dets):
-        det_ = idx2det[i]
+        # loop over all strings of annihilation operators in FermionicOperator sum
         for fermi_label in op.factors:
-            det = det_
+            det = idx2det[i]
             phase_changes = 0
+            # evaluate how string of annihilation operator change det
+            # take care of phases using parity_check
             for fermi_op in op.operators[fermi_label][::-1]:
                 orb_idx = fermi_op.idx
                 nth_bit = (det >> 2 * num_active_orbs - 1 - orb_idx) & 1
@@ -118,13 +123,26 @@ def propagate_state(
     r"""Propagate state by applying operator.
 
     The operator will be folded to only work on the active orbitals.
+    The resulting state should not be acted on with another folded operator.
+    This would violate the "do not multiply folded operators" rule.
+    It is the first step to a faster matrix multiplication for expectation values.
 
     .. math::
         \left|\tilde{0}\right> = \hat{O}\left|0\right>
 
     Args:
-        operators: Operator.
+        operators: List of operators.
         state: State.
+        idx2det: Index to determinant.
+        det2idx: Determinant to index.
+        num_inactive_orbs: Number of inactive spatial orbitals.
+        num_active_orbs: Number of active spatial orbitals.
+        num_virtual_orbs: Number of active spatial orbitals.
+        num_active_elec_alpha: Number of active alpha electrons.
+        num_active_elec_beta: Number of active beta electrons.
+        thetas: Active-space parameters.
+               Ordered as (S, D, T, ...).
+        wf_struct: wave function structure object
 
     Returns:
         New state.
@@ -134,13 +152,16 @@ def propagate_state(
     num_dets = len(idx2det)
     new_state = np.copy(state)
     tmp_state = np.zeros(num_dets)
+    # Create bitstrings for parity check. Key=orbital index. Value=det as int
     parity_check = {0: 0}
     num = 0
     for i in range(2 * num_active_orbs - 1, -1, -1):
         num += 2**i
         parity_check[2 * num_active_orbs - i] = num
+
     for op in operators[::-1]:
         tmp_state[:] = 0.0
+        # Ansatz unitary in operators
         if isinstance(op, str):
             if op not in ("U", "Ud"):
                 raise ValueError(f"Unknown str operator, expected ('U', 'Ud') got {op}")
@@ -169,15 +190,20 @@ def propagate_state(
                 )
             else:
                 raise TypeError(f"Got unknown wave function structure type, {type(wf_struct)}")
+        # FermionicOperator in operators
         else:
+            # Fold operator to only get active contributions
             op_folded = op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs)
+            # loop over all determinants
             for i in range(num_dets):
                 if abs(new_state[i]) < 10**-14:
                     continue
-                det_ = idx2det[i]
+                # loop over all strings of annihilation operators in FermionicOperator sum
                 for fermi_label in op_folded.factors:
-                    det = det_
+                    det = idx2det[i]
                     phase_changes = 0
+                    # evaluate how string of annihilation operator change det
+                    # take care of phases using parity_check
                     for fermi_op in op_folded.operators[fermi_label][::-1]:
                         orb_idx = fermi_op.idx
                         nth_bit = (det >> 2 * num_active_orbs - 1 - orb_idx) & 1
@@ -194,7 +220,7 @@ def propagate_state(
                     else:  # nobreak
                         val = op_folded.factors[fermi_label] * (-1) ** phase_changes
                         if abs(val) > 10**-14:
-                            tmp_state[det2idx[det]] += val * new_state[i]
+                            tmp_state[det2idx[det]] += val * new_state[i]  # Update value
             new_state = np.copy(tmp_state)
     return new_state
 
@@ -224,10 +250,16 @@ def expectation_value(
         num_inactive_orbs: Number of inactive spatial orbitals.
         num_active_orbs: Number of active spatial orbitals.
         num_virtual_orbs: Number of virtual orbitals.
+        num_active_elec_alpha: Number of active alpha electrons.
+        num_active_elec_beta: Number of active beta electrons.
+        thetas: Active-space parameters.
+               Ordered as (S, D, T, ...).
+        wf_struct: wave function structure object
 
     Returns:
         Expectation value.
     """
+    # build state vector of operator on ket
     op_ket = propagate_state(
         operators,
         ket,
@@ -270,7 +302,7 @@ def Epq_matrix(
     Args:
         p: Spatial orbital index.
         q: Spatial orbital index.
-        num_active_orbs: Number of active sptial orbitals.
+        num_active_orbs: Number of active spatial orbitals.
         num_active_elec_alpha: Number of active alpha electrons.
         num_active_elec_beta: Number of active beta electrons.
 
@@ -316,7 +348,7 @@ def T2_1_sa_matrix(
     num_elec_alpha: int,
     num_elec_beta: int,
 ) -> ss.lil_array:
-    """Get matrix representation of anti-Hermitian T2 spin-adapted cluster operator.
+    """Get matrix representation of anti-Hermitian T2 spin-adapted cluster operator - G2_1 part.
 
     Args:
         i: Strongly occupied spatial orbital index.
@@ -345,7 +377,7 @@ def T2_2_sa_matrix(
     num_elec_alpha: int,
     num_elec_beta: int,
 ) -> ss.lil_array:
-    """Get matrix representation of anti-Hermitian T2 spin-adapted cluster operator.
+    """Get matrix representation of anti-Hermitian T2 spin-adapted cluster operator - G2_2 part.
 
     Args:
         i: Strongly occupied spatial orbital index.
@@ -577,19 +609,22 @@ def construct_ucc_state(
     ucc_struct: UccStructure,
     dagger: bool = False,
 ) -> np.ndarray:
-    """Contruct unitary transformation matrix.
+    """Construct UCC state by applying UCC unitary to reference state.
 
     Args:
-        num_det: Number of determinants.
+        state: Reference state vector.
         num_active_orbs: Number of active spatial orbitals.
         num_elec_alpha: Number of active alpha electrons.
         num_elec_beta: Number of active beta electrons.
         thetas: Active-space parameters.
                Ordered as (S, D, T, ...).
+        ucc_struct: UCCStructure object.
+        dagger: If true, do dagger unitaries.
 
     Returns:
-        Unitary transformation matrix.
+        New state vector with unitaries applied.
     """
+    # Build up T matrix based on excitations in ucc_struct and given thetas
     T = np.zeros((len(state), len(state)))
     for exc_type, exc_indices, theta in zip(
         ucc_struct.excitation_operator_type, ucc_struct.excitation_indicies, thetas
@@ -702,10 +737,10 @@ def construct_ups_state(
     ups_struct: UpsStructure,
     dagger: bool = False,
 ) -> np.ndarray:
-    r"""Construct unitary product state.
+    r"""Construct unitary product state by applying UPS unitary to reference state.
 
     .. math::
-        \boldsymbol{U}_N...\boldsymbol{U}_0\left|\nu\right> = \left|\nu\right>
+        \boldsymbol{U}_N...\boldsymbol{U}_0\left|\nu\right> = \left|\tilde\nu\right>
 
     #. 10.48550/arXiv.2303.10825, Eq. 15
 
@@ -716,7 +751,7 @@ def construct_ups_state(
         num_active_elec_betaa: Number of active beta electrons.
         thetas: Ansatz parameters values.
         ups_struct: Unitary product state structure.
-        dagger: If do dagger unitaries.
+        dagger: If true, do dagger unitaries.
 
     Returns:
         New state vector with unitaries applied.
@@ -725,6 +760,7 @@ def construct_ups_state(
     order = 1
     if dagger:
         order = -1
+    # Loop over all excitation in UPSStructure
     for exc_type, exc_indices, theta in zip(
         ups_struct.excitation_operator_type[::order], ups_struct.excitation_indicies[::order], thetas[::order]
     ):
@@ -733,17 +769,16 @@ def construct_ups_state(
         if dagger:
             theta = -theta
         if exc_type in ("sa_single",):
-            if exc_type == "sa_single":
-                A = 1  # 2**(-1/2)
-                (i, a) = exc_indices
-                Ta = T1_matrix(
-                    i * 2, a * 2, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
-                ).todense()
-                Tb = T1_matrix(
-                    i * 2 + 1, a * 2 + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
-                ).todense()
-            else:
-                raise ValueError(f"Got unknown excitation type: {exc_type}")
+            A = 1  # 2**(-1/2)
+            (i, a) = exc_indices
+            # Create T matrices
+            Ta = T1_matrix(
+                i * 2, a * 2, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+            ).todense()
+            Tb = T1_matrix(
+                i * 2 + 1, a * 2 + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+            ).todense()
+            # Analytical application on state vector
             tmp = (
                 tmp
                 + np.sin(A * theta) * np.matmul(Ta, tmp)
@@ -755,6 +790,7 @@ def construct_ups_state(
                 + (1 - np.cos(A * theta)) * np.matmul(Tb, np.matmul(Tb, tmp))
             )
         elif exc_type in ("single", "double"):
+            # Create T matrix
             if exc_type == "single":
                 (i, a) = exc_indices
                 T = T1_matrix(i, a, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
@@ -765,6 +801,7 @@ def construct_ups_state(
                 ).todense()
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
+            # Analytical application on state vector
             tmp = (
                 tmp
                 + np.sin(theta) * np.matmul(T, tmp)
@@ -784,7 +821,7 @@ def propagate_unitary(
     thetas: Sequence[float],
     ups_struct: UpsStructure,
 ) -> np.ndarray:
-    """Apply unitary from operator number 'idx' to state.
+    """Apply unitary from UPS operator number 'idx' to state.
 
     Args:
         state: State vector.
@@ -798,23 +835,21 @@ def propagate_unitary(
     Returns:
         State with unitary applied.
     """
+    # Select unitary operation based on idx
     exc_type = ups_struct.excitation_operator_type[idx]
     exc_indices = ups_struct.excitation_indicies[idx]
     theta = thetas[idx]
     if abs(theta) < 10**-14:
         return np.copy(state)
     if exc_type in ("sa_single",):
-        if exc_type == "sa_single":
-            A = 1  # 2**(-1/2)
-            (i, a) = exc_indices
-            Ta = T1_matrix(
-                i * 2, a * 2, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
-            ).todense()
-            Tb = T1_matrix(
-                i * 2 + 1, a * 2 + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
-            ).todense()
-        else:
-            raise ValueError(f"Got unknown excitation type: {exc_type}")
+        A = 1  # 2**(-1/2)
+        (i, a) = exc_indices
+        # Create T matrix
+        Ta = T1_matrix(i * 2, a * 2, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
+        Tb = T1_matrix(
+            i * 2 + 1, a * 2 + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+        ).todense()
+        # Analytical application on state vector
         tmp = (
             state
             + np.sin(A * theta) * np.matmul(Ta, state)
@@ -826,6 +861,7 @@ def propagate_unitary(
             + (1 - np.cos(A * theta)) * np.matmul(Tb, np.matmul(Tb, tmp))
         )
     elif exc_type in ("single", "double"):
+        # Create T matrix
         if exc_type == "single":
             (i, a) = exc_indices
             T = T1_matrix(i, a, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
@@ -834,6 +870,7 @@ def propagate_unitary(
             T = T2_matrix(i, j, a, b, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
+        # Analytical application on state vector
         tmp = (
             state
             + np.sin(theta) * np.matmul(T, state)
@@ -868,7 +905,7 @@ def get_grad_action(
 
     This function only applies the $\hat{T}_i$ part to the state.
 
-    #. 10.48550/arXiv.2303.10825, Eq. 20
+    #. 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
 
     Args:
         state: State vector.
@@ -881,22 +918,21 @@ def get_grad_action(
     Returns:
         State with derivative of the idx'th unitary applied.
     """
+    # Select unitary operation based on idx
     exc_type = ups_struct.excitation_operator_type[idx]
     exc_indices = ups_struct.excitation_indicies[idx]
     if exc_type in ("sa_single",):
-        if exc_type == "sa_single":
-            A = 1  # 2**(-1/2)
-            (i, a) = exc_indices
-            Ta = T1_matrix(
-                i * 2, a * 2, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
-            ).todense()
-            Tb = T1_matrix(
-                i * 2 + 1, a * 2 + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
-            ).todense()
-        else:
-            raise ValueError(f"Got unknown excitation type: {exc_type}")
+        # Create T matrix
+        A = 1  # 2**(-1/2)
+        (i, a) = exc_indices
+        Ta = T1_matrix(i * 2, a * 2, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
+        Tb = T1_matrix(
+            i * 2 + 1, a * 2 + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+        ).todense()
+        # Apply missing T factor of derivative
         tmp = np.matmul(A * (Ta + Tb), state)
     elif exc_type in ("single", "double"):
+        # Create T matrix
         if exc_type == "single":
             (i, a) = exc_indices
             T = T1_matrix(i, a, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
@@ -905,6 +941,7 @@ def get_grad_action(
             T = T2_matrix(i, j, a, b, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
+        # Apply missing T factor of derivative
         tmp = np.matmul(T, state)
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")

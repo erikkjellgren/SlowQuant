@@ -58,6 +58,8 @@ class WaveFunctionSAUPS:
             h_ao: One-electron integrals in AO for Hamiltonian.
             g_ao: Two-electron integrals in AO.
             states: States to include in the state-averaged expansion.
+                    Tuple of lists containing weights and determinants.
+                    Each state in SA can be constructed of several dets.
             ansatz: Name of ansatz.
             ansatz_options: Ansatz options.
             include_active_kappa: Include active-active orbital rotations.
@@ -66,6 +68,7 @@ class WaveFunctionSAUPS:
             ansatz_options = {}
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
+        # Init stuff
         self._c_orthonormal = c_orthonormal
         self.h_ao = h_ao
         self.g_ao = g_ao
@@ -95,6 +98,7 @@ class WaveFunctionSAUPS:
         self._h_mo = None
         self._g_mo = None
         self.ansatz_options = ansatz_options
+        # Construct spin orbital spaces and indices
         active_space = []
         orbital_counter = 0
         for i in range(num_elec - cas[0], num_elec):
@@ -145,7 +149,7 @@ class WaveFunctionSAUPS:
         for idx in self.active_unocc_spin_idx:
             if idx // 2 not in self.active_unocc_idx:
                 self.active_unocc_idx.append(idx // 2)
-        # Make shifted indecies
+        # Make shifted indices
         if len(self.active_spin_idx) != 0:
             active_shift = np.min(self.active_spin_idx)
             for active_idx in self.active_spin_idx:
@@ -171,8 +175,10 @@ class WaveFunctionSAUPS:
         self._kappa_old = []
         self._kappa_redundant_old = []
         # kappa can be optimized in spatial basis
+        # Loop over all q>p orb combinations and find redundant kappas
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
+                # find redundant kappas
                 if p in self.inactive_idx and q in self.inactive_idx:
                     self.kappa_redundant.append(0.0)
                     self._kappa_redundant_old.append(0.0)
@@ -189,6 +195,7 @@ class WaveFunctionSAUPS:
                         self._kappa_redundant_old.append(0.0)
                         self.kappa_redundant_idx.append([p, q])
                         continue
+                # the rest is non-redundant
                 self.kappa.append(0.0)
                 self._kappa_old.append(0.0)
                 self.kappa_idx.append([p, q])
@@ -208,17 +215,20 @@ class WaveFunctionSAUPS:
             self.num_active_orbs, self.num_active_elec_alpha, self.num_active_elec_beta
         )
         self.num_det = len(self.idx2det)
+        # SA details
         self.num_states = len(states[0])
-        self.csf_coeffs = np.zeros((self.num_states, self.num_det))
+        self.csf_coeffs = np.zeros((self.num_states, self.num_det))  # state vector for each state in SA
+        # Loop over all states in SA procedure
         for i, (coeffs, on_vecs) in enumerate(zip(states[0], states[1])):
             if len(coeffs) != len(on_vecs):
                 raise ValueError(
                     f"Mismatch in number of coefficients, {len(coeffs)}, and number of determinants, {len(on_vecs)}. For {coeffs} and {on_vecs}"
                 )
+            # Loop over all determinants of a given state
             for coeff, on_vec in zip(coeffs, on_vecs):
                 if len(on_vec) != self.num_active_spin_orbs:
                     raise ValueError(
-                        f"Lenght of determinant, {len(on_vec)}, does not match number of active spin orbitals, {self.num_active_spin_orbs}. For determinant, {on_vec}"
+                        f"Length of determinant, {len(on_vec)}, does not match number of active spin orbitals, {self.num_active_spin_orbs}. For determinant, {on_vec}"
                     )
                 idx = self.det2idx[int(on_vec, 2)]
                 self.csf_coeffs[i, idx] = coeff
@@ -233,6 +243,7 @@ class WaveFunctionSAUPS:
                         raise ValueError(
                             f"state {i} and {j} are not otrhogonal got overlap of {coeff_i @ coeff_j}"
                         )
+        # Construct UPS Structure
         self.ups_layout = UpsStructure()
         if ansatz.lower() == "tups":
             self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
@@ -292,7 +303,7 @@ class WaveFunctionSAUPS:
                         self.ups_layout,
                     )
                 )
-                self._ci_coeffs = np.array(tmp)
+            self._ci_coeffs = np.array(tmp)
         return self._ci_coeffs  # type: ignore[return-value]
 
     @property
@@ -327,17 +338,20 @@ class WaveFunctionSAUPS:
         Returns:
             Orbital coefficients.
         """
+        # Construct anti-hermitian kappa matrix
         kappa_mat = np.zeros_like(self._c_orthonormal)
         if len(self.kappa) != 0:
             if np.max(np.abs(self.kappa)) > 0.0:
                 for kappa_val, (p, q) in zip(self.kappa, self.kappa_idx):
                     kappa_mat[p, q] = kappa_val
                     kappa_mat[q, p] = -kappa_val
+        # Legacy redundant kappa scans
         if len(self.kappa_redundant) != 0:
             if np.max(np.abs(self.kappa_redundant)) > 0.0:
                 for kappa_val, (p, q) in zip(self.kappa_redundant, self.kappa_redundant_idx):
                     kappa_mat[p, q] = kappa_val
                     kappa_mat[q, p] = -kappa_val
+        # Apply orbital rotation unitary to MO coefficients
         return np.matmul(self._c_orthonormal, scipy.linalg.expm(-kappa_mat))
 
     @property
@@ -364,7 +378,7 @@ class WaveFunctionSAUPS:
 
     @property
     def rdm1(self) -> np.ndarray:
-        """Calcuate one-electron reduced density matrix.
+        """Calculate one-electron reduced density matrix in the active space.
 
         Returns:
             One-electron reduced density matrix.
@@ -383,6 +397,7 @@ class WaveFunctionSAUPS:
                         self.num_active_elec_alpha,
                         self.num_active_elec_beta,
                     ).todense()
+                    # Loop over each state in SA
                     for coeffs in self.ci_coeffs:
                         val += expectation_value_mat(
                             coeffs,
@@ -396,7 +411,7 @@ class WaveFunctionSAUPS:
 
     @property
     def rdm2(self) -> np.ndarray:
-        """Calcuate two-electron reduced density matrix.
+        """Calculate two-electron reduced density matrix in the active space.
 
         Returns:
             Two-electron reduced density matrix.
@@ -422,6 +437,7 @@ class WaveFunctionSAUPS:
                         self.num_active_elec_alpha,
                         self.num_active_elec_beta,
                     ).todense()
+                    # Loop over each state in SA
                     for i, coeff in enumerate(self.ci_coeffs):
                         bra_pq[i] = np.matmul(coeff, Epq_mat)
                     for r in range(self.num_inactive_orbs, p + 1):
@@ -444,6 +460,7 @@ class WaveFunctionSAUPS:
                                 self.num_active_elec_beta,
                             ).todense()
                             val = 0.0
+                            # Loop over each state in SA
                             for i, coeffs in enumerate(self.ci_coeffs):
                                 val += expectation_value_mat(
                                     bra_pq[i],
@@ -488,6 +505,7 @@ class WaveFunctionSAUPS:
             convergence_threshold: Energy threshold for convergence.
             maxiter: Maximum number of iterations.
         """
+        # Define energy and gradient (partial) functions with parameters as free argument
         e_tot = partial(
             energy_saups,
             orbital_optimized=orbital_optimization,
@@ -525,15 +543,16 @@ class WaveFunctionSAUPS:
             """
             pass  # pylint: disable=unnecessary-pass
 
+        # Init parameters
         parameters: list[float] = []
         num_kappa = 0
         num_theta = 0
         if orbital_optimization:
             parameters += self.kappa
             num_kappa += len(self.kappa)
-        for theta in self.thetas:
-            parameters.append(theta)
-            num_theta += 1
+        parameters = parameters + self.thetas
+        num_theta = len(self.thetas)
+        # Optimization
         if is_silent:
             res = scipy.optimize.minimize(
                 e_tot,
@@ -558,6 +577,7 @@ class WaveFunctionSAUPS:
                 jac=parameter_gradient,
                 options={"maxiter": maxiter},
             )
+        # Set kappas to zero (orbitals have been optimized)
         param_idx = 0
         if orbital_optimization:
             param_idx += len(self.kappa)
@@ -568,6 +588,7 @@ class WaveFunctionSAUPS:
                 self.kappa_redundant[i] = 0
                 self._kappa_redundant_old[i] = 0
         self.thetas = res["x"][param_idx : num_theta + param_idx].tolist()
+        # Subspace diagonalization
         self._do_state_ci()
 
     def _do_state_ci(self) -> None:
@@ -576,6 +597,7 @@ class WaveFunctionSAUPS:
         #. 10.1103/PhysRevLett.122.230401, Eq. 2
         """
         state_H = np.zeros((self.num_states, self.num_states))
+        # Hamiltonian matrix
         Hamiltonian = build_operator_matrix(
             hamiltonian_0i_0a(
                 self.h_mo,
@@ -587,11 +609,13 @@ class WaveFunctionSAUPS:
             self.det2idx,
             self.num_active_orbs,
         )
+        # Create SA H matrix
         for i, coeff_i in enumerate(self.ci_coeffs):
             for j, coeff_j in enumerate(self.ci_coeffs):
                 if j > i:
                     continue
                 state_H[i, j] = state_H[j, i] = expectation_value_mat(coeff_i, Hamiltonian, coeff_j)
+        # Diagonalize
         eigval, eigvec = scipy.linalg.eig(state_H)
         sorting = np.argsort(eigval)
         self._state_energies = np.real(eigval[sorting])
@@ -606,8 +630,6 @@ class WaveFunctionSAUPS:
         """
         if self._state_energies is None:
             self._do_state_ci()
-        if self._state_energies is None:
-            raise ValueError("_state_energies is None")
         return self._state_energies
 
     @property
@@ -626,7 +648,7 @@ class WaveFunctionSAUPS:
         return energies
 
     def get_transition_property(self, ao_integral: np.ndarray) -> np.ndarray:
-        r"""Get transition property.
+        r"""Get transition property with one-electron operator.
 
         .. math::
             t_n = \left<0\left|\hat{O}\right|n\right>
@@ -641,9 +663,11 @@ class WaveFunctionSAUPS:
             self._do_state_ci()
         if self._state_ci_coeffs is None:
             raise ValueError("_state_ci_coeffs is None")
+        # MO integrals
         mo_integral = one_electron_integral_transform(self.c_trans, ao_integral)
         transition_property = np.zeros(self.num_states - 1)
         state_op = np.zeros((self.num_states, self.num_states))
+        # One-electron operator matrix
         op = build_operator_matrix(
             one_elec_op_0i_0a(mo_integral, self.num_inactive_orbs, self.num_active_orbs).get_folded_operator(
                 self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
@@ -655,6 +679,7 @@ class WaveFunctionSAUPS:
         for i, coeff_i in enumerate(self.ci_coeffs):
             for j, coeff_j in enumerate(self.ci_coeffs):
                 state_op[i, j] = expectation_value_mat(coeff_i, op, coeff_j)
+        # Transition between SA states (after diagonalization)
         for i in range(self.num_states - 1):
             transition_property[i] = self._state_ci_coeffs[:, i + 1] @ state_op @ self._state_ci_coeffs[:, 0]
         return transition_property
@@ -701,24 +726,24 @@ def energy_saups(
     Returns:
         Electronic energy.
     """
+    # Get kappa and theta parameters separately
     kappa = []
-    theta = []
     idx_counter = 0
     if orbital_optimized:
-        for _ in range(len(wf.kappa_idx)):
-            kappa.append(parameters[idx_counter])
-            idx_counter += 1
-    for par in parameters[idx_counter:]:
-        theta.append(par)
+        idx_counter = len(wf.kappa_idx)
+        kappa = list(parameters[:idx_counter])
+    theta = list(parameters[idx_counter:])
     assert len(parameters) == len(kappa) + len(theta)
 
     kappa_mat = np.zeros_like(wf.c_orthonormal)
     if orbital_optimized:
+        # Build kappa matrix
         for kappa_val, (p, q) in zip(
             np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx  # pylint: disable=protected-access
         ):
             kappa_mat[p, q] = kappa_val
             kappa_mat[q, p] = -kappa_val
+    # Legacy redundant kappa scans
     if len(wf.kappa_redundant) != 0:
         if np.max(np.abs(wf.kappa_redundant)) > 0.0:
             for kappa_val, (p, q) in zip(
@@ -728,14 +753,17 @@ def energy_saups(
             ):
                 kappa_mat[p, q] = kappa_val
                 kappa_mat[q, p] = -kappa_val
+    # Apply orbital rotation unitary
     c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
     if orbital_optimized:
+        # Update kappas
         wf._kappa_old = kappa.copy()  # pylint: disable=protected-access
         wf._kappa_redundant_old = wf.kappa_redundant.copy()  # pylint: disable=protected-access
     # Moving expansion point of kappa
     wf.c_orthonormal = c_trans
     # Add thetas
     wf.thetas = theta
+    # Hamiltonian matrix
     Hamiltonian = build_operator_matrix(
         hamiltonian_0i_0a(
             wf.h_mo,
@@ -748,6 +776,7 @@ def energy_saups(
         wf.num_active_orbs,
     )
     energy = 0.0
+    # Energy for each state in SA
     for coeffs in wf.ci_coeffs:
         energy += expectation_value_mat(coeffs, Hamiltonian, coeffs)
     return energy / len(wf.ci_coeffs)
@@ -758,7 +787,7 @@ def gradient_saups(
     orbital_optimized: bool,
     wf: WaveFunctionSAUPS,
 ) -> np.ndarray:
-    """Calcuate electronic gradient.
+    """Calculate electronic gradient.
 
     Args:
         parameters: Sequence of all parameters.
@@ -786,7 +815,7 @@ def gradient_saups(
 def orbital_rotation_gradient(
     wf: WaveFunctionSAUPS,
 ) -> np.ndarray:
-    """Calcuate electronic gradient with respect to orbital rotations.
+    """Calculate electronic gradient with respect to orbital rotations using RDMs.
 
     Args:
         wf: Wave function object.
@@ -794,6 +823,7 @@ def orbital_rotation_gradient(
     Return:
         Electronic gradient with respect to orbital rotations.
     """
+    # Analytical gradient via RDMs
     rdms = ReducedDenstiyMatrix(
         wf.num_inactive_orbs,
         wf.num_active_orbs,
@@ -810,9 +840,9 @@ def orbital_rotation_gradient(
 def active_space_parameter_gradient(
     wf: WaveFunctionSAUPS,
 ) -> np.ndarray:
-    r"""Calcuate electronic gradient with respect to active space parameters.
+    r"""Calculate electronic gradient with respect to active space parameters.
 
-    #. 10.48550/arXiv.2303.10825, Eq. 17-21
+    #. 10.48550/arXiv.2303.10825, Eq. 17-21 (appendix - v1)
 
     Args:
         wf: Wave function object.
@@ -820,6 +850,7 @@ def active_space_parameter_gradient(
     Returns:
         Electronic gradient with respect to active space parameters.
     """
+    # Hamiltonian matrix
     Hamiltonian = build_operator_matrix(
         hamiltonian_0i_0a(
             wf.h_mo,
@@ -833,6 +864,7 @@ def active_space_parameter_gradient(
     )
 
     gradient_theta = np.zeros_like(wf.thetas)
+    # Reference bra state (no differentiations)
     bra_vec = np.copy(wf.ci_coeffs)
     for i, coeffs in enumerate(bra_vec):
         bra_vec[i] = construct_ups_state(
@@ -844,9 +876,12 @@ def active_space_parameter_gradient(
             wf.ups_layout,
             dagger=True,
         )
+    # CSF reference state on ket
     ket_vec = np.copy(wf.csf_coeffs)
     ket_vec_tmp = np.copy(wf.csf_coeffs)
+    # Calculate analytical derivatice w.r.t. each theta using gradient_action function
     for i in range(len(wf.thetas)):
+        # Loop over each state in SA
         for j in range(len(bra_vec)):
             ket_vec_tmp[j] = get_grad_action(
                 ket_vec[j],
@@ -858,6 +893,8 @@ def active_space_parameter_gradient(
             )
         for bra, ket in zip(bra_vec, ket_vec_tmp):
             gradient_theta[i] += 2 * np.matmul(bra, ket)
+        # Product rule implications on reference bra and CSF ket
+        # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
         for j in range(len(bra_vec)):  # pylint: disable=consider-using-enumerate
             bra_vec[j] = propagate_unitary(
                 bra_vec[j],
