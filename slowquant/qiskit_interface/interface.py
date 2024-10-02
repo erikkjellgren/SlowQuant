@@ -17,6 +17,7 @@ from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler import PassManager
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_nature.second_q.circuit.library import HartreeFock
+from qiskit_nature.second_q.mappers import JordanWignerMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
@@ -127,6 +128,28 @@ class QuantumInterface:
             {}
         )  # Contains information about the parameterization needed for gradient evaluations.
 
+        # State prep circuit
+        if isinstance(self.ansatz, QuantumCircuit):
+            self.state_circuit: QuantumCircuit = QuantumCircuit(
+                self.ansatz.num_qubits
+            )  # empty state as custom circuit is passed
+        elif self.ansatz == "tUPS" and "do_pp" in self.ansatz_options.keys() and self.ansatz_options["do_pp"]:
+            # HF in pp-tUPS ordering
+            if not isinstance(self.mapper, JordanWignerMapper):
+                raise ValueError(f"pp-tUPS only implemented for JW mapper, got: {type(self.mapper)}")
+            if np.sum(num_elec) != num_orbs:
+                raise ValueError(
+                    f"pp-tUPS only implemented for number of electrons and number of orbitals being the same, got: ({np.sum(num_elec)}, {num_orbs}), (elec, orbs)"
+                )
+            self.state_circuit = QuantumCircuit(2 * num_orbs)
+            for p in range(0, 2 * num_orbs):
+                if p % 2 == 0:
+                    self.state_circuit.x(p)
+        else:
+            self.state_circuit = HartreeFock(num_orbs, self.num_elec, self.mapper)
+        self.num_qubits = self.state_circuit.num_qubits
+
+        # Ansatz Circuit
         if isinstance(self.ansatz, QuantumCircuit):
             print("QI was initialized with a custom QuantumCircuit object.")
             self.circuit = self.ansatz
@@ -145,7 +168,7 @@ class QuantumInterface:
         elif self.ansatz == "HF":
             if len(self.ansatz_options) != 0:
                 raise ValueError(f"No options available for HF got {self.ansatz_options}")
-            self.circuit = HartreeFock(num_orbs, self.num_elec, self.mapper)
+            self.circuit = QuantumCircuit(self.num_qubits)  # empty ansatz circuit
         elif self.ansatz == "tUPS":
             self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
         elif self.ansatz == "QNP":
@@ -343,28 +366,32 @@ class QuantumInterface:
         """Get circuit.
 
         Returns:
-            circuit
+            circuit (State + Ansatz circuit)
         """
         return self._circuit
 
     @circuit.setter
     def circuit(
         self,
-        circuit: QuantumCircuit,
+        ansatz_circuit: QuantumCircuit,
     ) -> None:
         """Set circuit.
 
         Args:
-            circuit: circuit
+            ansatz_circuit: Ansatz circuit
         """
-        # Set the number of qubits before transpilation to (probably) device with larger number of qubits.
-        self.num_qubits = circuit.num_qubits
         # Check if ISA is selected. If yes, pre-transpile circuit for later use.
         if self.ISA:
-            self._circuit = self._transpile_circuit(circuit)
+            self.ansatz_circuit: QuantumCircuit = self._transpile_circuit(ansatz_circuit)
             self._transpiled = True
+            # Add state preparation circuit (e.g. HF)
+            self._circuit: QuantumCircuit = self.ansatz_circuit.compose(
+                self.state_circuit, qubits=self._layout_indices, front=True
+            )
         else:
-            self._circuit = circuit
+            self.ansatz_circuit = ansatz_circuit
+            # Add state preparation circuit (e.g. HF)
+            self._circuit = self.ansatz_circuit.compose(self.state_circuit, front=True)
 
     def _transpile_circuit(self, circuit: QuantumCircuit) -> QuantumCircuit:
         """Transpile circuit with default or set PassManager.
@@ -1055,16 +1082,7 @@ class QuantumInterface:
         if self.num_qubits > 8:
             raise ValueError("Current implementation does not scale above 8 qubits?")
         if self.do_M_ansatz0:
-            ansatz = self.circuit
-            if self.ISA:
-                # Negate the Hartree-Fock State.
-                # Only X Gates. Should need no transpilation.
-                self.hf = HartreeFock(self.num_orbs, self.num_elec, self.mapper)
-                ansatz = ansatz.compose(
-                    HartreeFock(self.num_orbs, self.num_elec, self.mapper), qubits=self._layout_indices
-                )
-            else:
-                ansatz = ansatz.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
+            ansatz = self.ansatz_circuit
         else:
             ansatz = QuantumCircuit(self.circuit.num_qubits)  # empty circuit
         M = np.zeros((2**self.num_qubits, 2**self.num_qubits))
