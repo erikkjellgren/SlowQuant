@@ -146,7 +146,7 @@ class QuantumInterface:
                 if p % 2 == 0:
                     self.state_circuit.x(p)
         else:
-            self.state_circuit = HartreeFock(num_orbs, self.num_elec, self.mapper)
+            self.state_circuit = HartreeFock(num_orbs, num_elec, self.mapper)
         self.num_qubits = self.state_circuit.num_qubits
 
         # Ansatz Circuit
