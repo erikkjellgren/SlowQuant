@@ -384,11 +384,11 @@ class QuantumInterface:
         """
         # Check if ISA is selected. If yes, pre-transpile circuit for later use.
         if self.ISA:
-            self.ansatz_circuit: QuantumCircuit = copy.deepcopy(self._transpile_circuit(ansatz_circuit))
+            self.ansatz_circuit: QuantumCircuit = self._transpile_circuit(ansatz_circuit)
             self._transpiled = True
             # Add state preparation circuit (e.g. HF)
-            self._circuit: QuantumCircuit = copy.deepcopy(
-                self.ansatz_circuit.compose(self.state_circuit, qubits=self._layout_indices, front=True)
+            self._circuit: QuantumCircuit = self.ansatz_circuit.compose(
+                self.state_circuit, qubits=self._circuit_indices, front=True
             )
         else:
             self.ansatz_circuit = ansatz_circuit
@@ -414,9 +414,11 @@ class QuantumInterface:
         circuit_return = self.pass_manager.run(circuit)
         # Get layout indices
         if circuit_return.layout is None:
-            self._layout_indices = np.arange(circuit_return.num_qubits)
+            self._measurement_indices = np.arange(circuit_return.num_qubits)
+            self._circuit_indices = np.arange(circuit_return.num_qubits)
         else:
-            self._layout_indices = circuit_return.layout.final_index_layout()
+            self._measurement_indices = circuit_return.layout.final_index_layout()
+            self._circuit_indices = circuit_return.layout.initial_index_layout(filter_ancillas=True)
 
         # Transpile X and Y measurement gates: only translation to basis gates and optimization.
         self._transp_xy = [
@@ -875,7 +877,7 @@ class QuantumInterface:
             paulis = [paulis]
         num_paulis = len(paulis)
         if isinstance(circuits_in, QuantumCircuit):
-            circuits_in = [copy.deepcopy(circuits_in)]
+            circuits_in = [circuits_in]
         num_circuits = len(circuits_in)
 
         # Check V1 vs. V2
@@ -890,10 +892,10 @@ class QuantumInterface:
                 pauli_circuit = to_CBS_measurement(pauli, self._transp_xy)
                 for nr_circuit, circuit in enumerate(circuits_in):
                     # Add measurement in correct layout
-                    ansatz_w_obs = copy.deepcopy(circuit.compose(pauli_circuit, qubits=self._layout_indices))
+                    ansatz_w_obs = circuit.compose(pauli_circuit, qubits=self._measurement_indices)
                     # Create classic register and measure relevant qubits
                     ansatz_w_obs.add_register(ClassicalRegister(self.num_qubits, name="meas"))
-                    ansatz_w_obs.measure(self._layout_indices, np.arange(self.num_qubits))
+                    ansatz_w_obs.measure(self._measurement_indices, np.arange(self.num_qubits))
                     pubs.append((ansatz_w_obs, run_parameters[nr_circuit]))
             pubs = pubs * self._circuit_multipl
 
@@ -916,9 +918,9 @@ class QuantumInterface:
                 for nr_pauli, pauli in enumerate(paulis):
                     pauli_circuit = to_CBS_measurement(pauli, self._transp_xy)
                     for nr_circuit, circuit in enumerate(circuits_in):
-                        ansatz_w_obs = circuit.compose(pauli_circuit, qubits=self._layout_indices)
+                        ansatz_w_obs = circuit.compose(pauli_circuit, qubits=self._measurement_indices)
                         ansatz_w_obs.add_register(ClassicalRegister(self.num_qubits))
-                        ansatz_w_obs.measure(self._layout_indices, np.arange(self.num_qubits))
+                        ansatz_w_obs.measure(self._measurement_indices, np.arange(self.num_qubits))
                         circuits[(nr_circuit + (nr_pauli * num_circuits))] = ansatz_w_obs
                 circuits = circuits * self._circuit_multipl
 
@@ -1094,7 +1096,7 @@ class QuantumInterface:
                 ansatzX = ansatz.copy()
                 for i, bit in enumerate(comb[::-1]):  # because of Qiskit ordering
                     if bit == 1:
-                        ansatzX.x(self._layout_indices[i])
+                        ansatzX.x(self._measurement_indices[i])
                 # Make list of custom ansatz
                 ansatz_list[nr] = ansatzX
             # Simulate all elements with one device call
@@ -1138,7 +1140,7 @@ class QuantumInterface:
                 f"\n {'M mitigation:':<20} {self.do_M_mitigation}\n {'M Ansatz0:':<20} {self.do_M_ansatz0}"
             )
         if self.ISA:
-            data += f"\n {'Circuit layout:':<20} {self._layout_indices}"
+            data += f"\n {'Circuit layout:':<20} {self._measurement_indices}"
             if self._internal_pm:
                 data += f"\n {'Transpiled backend:':<20} {self._primitive_backend}\n {'Transpiled opt. level:':<20} {self._primitive_level}"
             if isinstance(self._primitive, BaseSamplerV2) and hasattr(self._primitive.options, "twirling"):
