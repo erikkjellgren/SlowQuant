@@ -417,7 +417,6 @@ class QuantumInterface:
             self._layout_indices = np.arange(circuit_return.num_qubits)
         else:
             self._layout_indices = circuit_return.layout.final_index_layout()
-            # self._layout_indices = circuit_return.layout.initial_index_layout(filter_ancillas=True)
 
         # Transpile X and Y measurement gates: only translation to basis gates and optimization.
         self._transp_xy = [
@@ -889,16 +888,12 @@ class QuantumInterface:
             pubs = []
             for nr_pauli, pauli in enumerate(paulis):
                 pauli_circuit = to_CBS_measurement(pauli, self._transp_xy)
-                print(pauli_circuit.draw())
                 for nr_circuit, circuit in enumerate(circuits_in):
                     # Add measurement in correct layout
                     ansatz_w_obs = copy.deepcopy(circuit.compose(pauli_circuit, qubits=self._layout_indices))
-                    print(ansatz_w_obs.draw())
                     # Create classic register and measure relevant qubits
                     ansatz_w_obs.add_register(ClassicalRegister(self.num_qubits, name="meas"))
-                    print(ansatz_w_obs.draw())
                     ansatz_w_obs.measure(self._layout_indices, np.arange(self.num_qubits))
-                    print(ansatz_w_obs.draw())
                     pubs.append((ansatz_w_obs, run_parameters[nr_circuit]))
             pubs = pubs * self._circuit_multipl
 
