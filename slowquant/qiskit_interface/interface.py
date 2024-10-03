@@ -286,8 +286,7 @@ class QuantumInterface:
                 elif self._internal_pm:
                     # We have used internal PassManager before but re-transpilation was requested (probs via change_primitive in WF)
                     self.pass_manager = None
-                self.circuit = self.ansatz_circuit  # problem!
-                # self.construct_circuit(self.num_orbs,self.num_elec)
+                self.construct_circuit(self.num_orbs, self.num_elec)
 
     @property
     def pass_manager(self) -> None | PassManager:
@@ -322,8 +321,7 @@ class QuantumInterface:
             # Check if circuit has been set
             # In case of switching to new PassManager in later workflow
             if hasattr(self, "circuit"):
-                self.circuit = self.ansatz_circuit
-                # self.construct_circuit(self.num_orbs,self.num_elec)
+                self.construct_circuit(self.num_orbs, self.num_elec)
 
     def redo_M_mitigation(self, shots: int | None = None) -> None:
         """Redo M_mitigation.
