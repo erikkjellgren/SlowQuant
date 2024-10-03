@@ -286,7 +286,8 @@ class QuantumInterface:
                 elif self._internal_pm:
                     # We have used internal PassManager before but re-transpilation was requested (probs via change_primitive in WF)
                     self.pass_manager = None
-                self.circuit = self.circuit
+                self.circuit = self.ansatz_circuit  # problem!
+                # self.construct_circuit(self.num_orbs,self.num_elec)
 
     @property
     def pass_manager(self) -> None | PassManager:
@@ -321,7 +322,8 @@ class QuantumInterface:
             # Check if circuit has been set
             # In case of switching to new PassManager in later workflow
             if hasattr(self, "circuit"):
-                self.circuit = self.circuit
+                self.circuit = self.ansatz_circuit
+                # self.construct_circuit(self.num_orbs,self.num_elec)
 
     def redo_M_mitigation(self, shots: int | None = None) -> None:
         """Redo M_mitigation.
@@ -414,7 +416,8 @@ class QuantumInterface:
         if circuit_return.layout is None:
             self._layout_indices = np.arange(circuit_return.num_qubits)
         else:
-            self._layout_indices = circuit_return.layout.final_index_layout()
+            # self._layout_indices = circuit_return.layout.final_index_layout()
+            self._layout_indices = circuit_return.layout.initial_index_layout(filter_ancillas=True)
 
         # Transpile X and Y measurement gates: only translation to basis gates and optimization.
         self._transp_xy = [
