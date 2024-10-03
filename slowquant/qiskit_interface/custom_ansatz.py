@@ -74,14 +74,7 @@ def tUPS(
     else:
         skip_last_singles = False
 
-    num_qubits = 2 * num_orbs  # qc.num_qubits
-    if do_pp:
-        qc = QuantumCircuit(num_qubits)
-        for p in range(0, 2 * num_orbs):
-            if p % 2 == 0:
-                qc.x(p)
-    else:
-        qc = HartreeFock(num_orbs, num_elec, mapper)
+    qc = HartreeFock(num_orbs, (0, 0), mapper)  # empty circuit with qubit number based on mapper
     grad_param_R = {}
     idx = 0
     # Layer loop
@@ -200,7 +193,7 @@ def fUCC(
     for _ in range(num_spin_orbs - np.sum(num_elec)):
         unocc.append(idx)
         idx += 1
-    qc = HartreeFock(num_orbs, num_elec, mapper)
+    qc = HartreeFock(num_orbs, (0, 0), mapper)  # empty circuit with qubit number based on mapper
     grad_param_R = {}
     idx = 0
     # Layer loop
@@ -303,7 +296,7 @@ def SDSfUCC(
     for _ in range(num_spin_orbs - np.sum(num_elec)):
         unocc.append(idx)
         idx += 1
-    qc = HartreeFock(num_orbs, num_elec, mapper)
+    qc = HartreeFock(num_orbs, (0, 0), mapper)  # empty circuit with qubit number based on mapper
     grad_param_R = {}
     idx = 0
     # Layer loop
