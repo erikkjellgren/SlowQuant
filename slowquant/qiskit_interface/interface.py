@@ -317,22 +317,23 @@ class QuantumInterface:
                 "Warning: Using custom pass manager is an experimental feature if used together with the quantum_expectation_value_csfs function, as requiered for SA wave functions."
             )
             self._pass_manager: None | PassManager = pass_manager[0]
-            self._layoutfree_pm = generate_preset_pass_manager(
-                self._primitive_level,
-                backend=pass_manager[1],
-                layout_method="trivial",
-            )
+            self._backend = pass_manager[1]
+            # self._layoutfree_pm = generate_preset_pass_manager(
+            #     self._primitive_level,
+            #     backend=pass_manager[1],
+            #     layout_method="trivial",
+            # )
         # Default pass manager
         elif self.ISA and not isinstance(pass_manager, tuple):
             self._internal_pm = True
             self._pass_manager = generate_preset_pass_manager(
                 self._primitive_level, backend=self._primitive_backend
             )
-            self._layoutfree_pm = generate_preset_pass_manager(
-                self._primitive_level,
-                backend=self._primitive_backend,
-                layout_method="trivial",
-            )
+            # self._layoutfree_pm = generate_preset_pass_manager(
+            #     self._primitive_level,
+            #     backend=self._primitive_backend,
+            #     layout_method="trivial",
+            # )
             print(
                 f"You selected ISA but did not pass a PassManager. Standard internal transpilation will use backend {self._primitive_backend} with optimization level {self._primitive_level}"
             )
@@ -444,6 +445,9 @@ class QuantumInterface:
             self.pass_manager.optimization.run(self.pass_manager.translation.run(to_CBS_measurement("X"))),
             self.pass_manager.optimization.run(self.pass_manager.translation.run(to_CBS_measurement("Y"))),
         ]
+
+        # Create a pass manager that always maps on the Ansatz Circuit qubits!
+        # Open Question: Which indices?
 
         return circuit_return
 
