@@ -13,6 +13,7 @@ from qiskit.primitives import (
     BaseSamplerV1,
     BaseSamplerV2,
 )
+from qiskit.providers import Backend
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler import PassManager
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
@@ -47,7 +48,7 @@ class QuantumInterface:
         ansatz: str | QuantumCircuit,
         mapper: FermionicMapper,
         ISA: bool = False,
-        pass_manager: None | PassManager = None,
+        pass_manager: None | tuple[PassManager, Backend] = None,
         ansatz_options: dict[str, Any] | None = None,
         shots: None | int = None,
         max_shots_per_run: int = 100000,
@@ -64,7 +65,7 @@ class QuantumInterface:
             ansatz_options: Ansatz options.
             mapper: Qiskit mapper object.
             ISA: Use ISA for submitting to IBM quantum. Locally transpiling is performed.
-            pass_manager: Custom PassManager for transpilation.
+            pass_manager: Tuple of custom PassManager and backend for transpilation.
             shots: Number of shots. None means ideal simulator.
             max_shots_per_run: Maximum number of shots allowed in a single run. Set to 100000 per IBM machines.
             do_M_mitigation: Do error mitigation via read-out correlation matrix.
@@ -301,44 +302,47 @@ class QuantumInterface:
         return self._pass_manager
 
     @pass_manager.setter
-    def pass_manager(self, pass_manager: None | PassManager) -> None:
+    def pass_manager(self, pass_manager: None | tuple[PassManager, Backend]) -> None:
         """Set PassManager.
 
         Args:
             pass_manager: PassManager object from Qiskit.
         """
         self._internal_pm = False
-        if self.ISA and pass_manager is not None:
+        if not self.ISA and isinstance(pass_manager, tuple):
+            raise ValueError("You need to enable ISA if you want to use a custom PassManager.")
+        # Custom pass manager
+        if self.ISA and isinstance(pass_manager, tuple):
             print(
                 "Warning: Using custom pass manager is an experimental feature if used together with the quantum_expectation_value_csfs function, as requiered for SA wave functions."
             )
-        if pass_manager is not None and not self.ISA:
-            raise ValueError("You need to enable ISA if you want to use a custom PassManager.")
-        if pass_manager is None and self.ISA:
+            self._pass_manager: None | PassManager = pass_manager[0]
+            self._layoutfree_pm = generate_preset_pass_manager(
+                self._primitive_level,
+                backend=pass_manager[1],
+                layout_method="trivial",
+            )
+        # Default pass manager
+        elif self.ISA and not isinstance(pass_manager, tuple):
             self._internal_pm = True
-            self._pass_manager: None | PassManager = generate_preset_pass_manager(
+            self._pass_manager = generate_preset_pass_manager(
                 self._primitive_level, backend=self._primitive_backend
+            )
+            self._layoutfree_pm = generate_preset_pass_manager(
+                self._primitive_level,
+                backend=self._primitive_backend,
+                layout_method="trivial",
             )
             print(
                 f"You selected ISA but did not pass a PassManager. Standard internal transpilation will use backend {self._primitive_backend} with optimization level {self._primitive_level}"
             )
         else:
-            self._pass_manager = pass_manager
+            self._pass_manager = None
 
-            # Check if circuit has been set
-            # In case of switching to new PassManager in later workflow
-            if hasattr(self, "circuit"):
-                self.construct_circuit(self.num_orbs, self.num_elec)
-
-        if self.ISA:
-            # Transpiler without layout optimization - needed for csfs routine.
-            # Might clash with custom pass manager - use with care.
-            self._layoutfree_pm = generate_preset_pass_manager(
-                self._primitive_level,
-                backend=self._primitive_backend,
-                initial_layout=np.arange(self.num_qubits),
-                layout_method="trivial",
-            )
+        # Check if circuit has been set
+        # In case of switching to new PassManager in later workflow
+        if hasattr(self, "circuit"):
+            self.construct_circuit(self.num_orbs, self.num_elec)
 
     def redo_M_mitigation(self, shots: int | None = None) -> None:
         """Redo M_mitigation.
@@ -681,9 +685,11 @@ class QuantumInterface:
                     )
                     # Transpile superposition state. All stages needed due to H and CNOTs
                     if self.ISA:
+                        self.circuit_superpos = circuit
                         circuit = self._layoutfree_pm.run(
                             circuit
                         )  # this is automatically in measurement index order
+                        self.circuit_superpos_transp = circuit
                         # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
                         circuit = self.ansatz_circuit.compose(
                             circuit, qubits=self._measurement_indices, front=True
