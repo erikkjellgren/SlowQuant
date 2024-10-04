@@ -308,6 +308,10 @@ class QuantumInterface:
             pass_manager: PassManager object from Qiskit.
         """
         self._internal_pm = False
+        if self.ISA and pass_manager is not None:
+            print(
+                "Warning: Using custom pass manager is an experimental feature if used together with the quantum_expectation_value_csfs function, as requiered for SA wave functions."
+            )
         if pass_manager is not None and not self.ISA:
             raise ValueError("You need to enable ISA if you want to use a custom PassManager.")
         if pass_manager is None and self.ISA:
@@ -320,23 +324,21 @@ class QuantumInterface:
             )
         else:
             self._pass_manager = pass_manager
-            print(
-                "Warning: Using custom pass manager is an experimental feature if used together with the quantum_expectation_value_csfs function, as requiered for SA wave functions."
-            )
 
             # Check if circuit has been set
             # In case of switching to new PassManager in later workflow
             if hasattr(self, "circuit"):
                 self.construct_circuit(self.num_orbs, self.num_elec)
 
-        # Transpiler without layout optimization - needed for csfs routine.
-        # Might clash with custom pass manager - use with care.
-        self._layoutfree_pm = generate_preset_pass_manager(
-            self._primitive_level,
-            backend=self._primitive_backend,
-            initial_layout=np.arange(self.num_qubits),
-            layout_method="trivial",
-        )
+        if self.ISA:
+            # Transpiler without layout optimization - needed for csfs routine.
+            # Might clash with custom pass manager - use with care.
+            self._layoutfree_pm = generate_preset_pass_manager(
+                self._primitive_level,
+                backend=self._primitive_backend,
+                initial_layout=np.arange(self.num_qubits),
+                layout_method="trivial",
+            )
 
     def redo_M_mitigation(self, shots: int | None = None) -> None:
         """Redo M_mitigation.
@@ -673,11 +675,11 @@ class QuantumInterface:
                 # I != J (off-diagonals)
                 else:
                     # First term of off-diagonal element involving I and J
-                    # I and J superposition state of determinants: not only X Gates -> transpilation needed
+                    # I and J superposition state of determinants
                     circuit = get_determinant_superposition_reference(
                         bra_det, ket_det, self.num_orbs, self.mapper
                     )
-                    # Transpile superposition state
+                    # Transpile superposition state. All stages needed due to H and CNOTs
                     if self.ISA:
                         circuit = self._layoutfree_pm.run(
                             circuit
