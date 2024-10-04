@@ -630,6 +630,11 @@ class QuantumInterface:
         else:
             run_parameters = custom_parameters
 
+        # Check if ISA beforehand.
+        if self.ISA:
+            connection_order = self._circuit_indices
+        else:
+            connection_order = np.arange(self.num_qubits)
         val = 0.0
         # Loop over dets in bra CSF
         for bra_coeff, bra_det in zip(bra_csf[0], bra_csf[1]):
@@ -640,11 +645,10 @@ class QuantumInterface:
                 N = bra_coeff * ket_coeff * sign_bra * sign_ket  # pre-factor
                 # I == J (diagonals)
                 if bra_det == ket_det:
+                    # Get det circuit. Only X-Gates -> no transpilation.
                     circuit = get_determinant_reference(bra_det, self.num_orbs, self.mapper)
-                    # Negate HF in ansatz
-                    circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
-                    # Append ansatz
-                    circuit = circuit.compose(self.circuit)
+                    # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
+                    circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
                     if isinstance(self._primitive, BaseEstimator):
                         val += N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
                     if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
@@ -656,14 +660,19 @@ class QuantumInterface:
                         )
                 # I != J (off-diagonals)
                 else:
+                    # First term of off-diagonal element involving I and J
+                    # I and J superposition state of determinants: not only X Gates -> transpilation needed
                     circuit = get_determinant_superposition_reference(
                         bra_det, ket_det, self.num_orbs, self.mapper
                     )
-                    # Negate HF in ansatz
-                    circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
-                    # Append ansatz
-                    circuit = circuit.compose(self.circuit)
-                    # circuit = self._transpile_circuit(circuit)
+                    ###
+                    # Hard part. Transpile superposition state
+                    ###
+                    circuit = (
+                        self.pass_manager.optimization.run(self.pass_manager.translation.run(circuit)),  # type: ignore
+                    )  # problem now measuring indices!
+                    # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
+                    circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
                     if isinstance(self._primitive, BaseEstimator):
                         val += N * self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
                     if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
@@ -673,12 +682,12 @@ class QuantumInterface:
                             circuit,
                             do_cliques=self._do_cliques,
                         )
+
+                    # Second term of off-diagonal element involving only I
+                    # Get det circuit. Only X-Gates -> no transpilation.
                     circuit = get_determinant_reference(bra_det, self.num_orbs, self.mapper)
-                    # Negate HF in ansatz
-                    circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
-                    # Append ansatz
-                    circuit = circuit.compose(self.circuit)
-                    # circuit = self._transpile_circuit(circuit)
+                    # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
+                    circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
                     if isinstance(self._primitive, BaseEstimator):
                         val -= (
                             0.5 * N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
@@ -694,12 +703,12 @@ class QuantumInterface:
                                 do_cliques=self._do_cliques,
                             )
                         )
+
+                    # Third term of off-diagonal element involving only J
+                    # Get det circuit. Only X-Gates -> no transpilation.
                     circuit = get_determinant_reference(ket_det, self.num_orbs, self.mapper)
-                    # Negate HF in ansatz
-                    circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
-                    # Append ansatz
-                    circuit = circuit.compose(self.circuit)
-                    # circuit = self._transpile_circuit(circuit)
+                    # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
+                    circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
                     if isinstance(self._primitive, BaseEstimator):
                         val -= (
                             0.5 * N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
