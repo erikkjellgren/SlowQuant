@@ -315,11 +315,21 @@ class QuantumInterface:
             self._pass_manager: None | PassManager = generate_preset_pass_manager(
                 self._primitive_level, backend=self._primitive_backend
             )
+            self._layoutfree_pm = generate_preset_pass_manager(
+                self._primitive_level,
+                backend=self._primitive_backend,
+                initial_layout=np.arange(self.num_qubits),
+                layout_method="trivial",
+            )
             print(
                 f"You selected ISA but did not pass a PassManager. Standard internal transpilation will use backend {self._primitive_backend} with optimization level {self._primitive_level}"
             )
         else:
             self._pass_manager = pass_manager
+            # need for hard-coded optimization level via
+            # self._layoutfree_pm = generate_preset_pass_manager(
+            #    3, backend=<problem>, initial_layout=np.arange(self.num_qubits),layout_method='trivial'
+            # )
 
             # Check if circuit has been set
             # In case of switching to new PassManager in later workflow
@@ -668,9 +678,10 @@ class QuantumInterface:
                     ###
                     # Hard part. Transpile superposition state
                     ###
-                    circuit = (
-                        self.pass_manager.optimization.run(self.pass_manager.translation.run(circuit)),  # type: ignore
-                    )  # problem now measuring indices!
+                    if self.ISA:
+                        circuit = (
+                            self.pass_manager.optimization.run(self.pass_manager.translation.run(circuit)),  # type: ignore
+                        )  # problem now measuring indices!
                     # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
                     circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
                     if isinstance(self._primitive, BaseEstimator):
