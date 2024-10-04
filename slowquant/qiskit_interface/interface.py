@@ -315,26 +315,28 @@ class QuantumInterface:
             self._pass_manager: None | PassManager = generate_preset_pass_manager(
                 self._primitive_level, backend=self._primitive_backend
             )
-            self._layoutfree_pm = generate_preset_pass_manager(
-                self._primitive_level,
-                backend=self._primitive_backend,
-                initial_layout=np.arange(self.num_qubits),
-                layout_method="trivial",
-            )
             print(
                 f"You selected ISA but did not pass a PassManager. Standard internal transpilation will use backend {self._primitive_backend} with optimization level {self._primitive_level}"
             )
         else:
             self._pass_manager = pass_manager
-            # need for hard-coded optimization level via
-            # self._layoutfree_pm = generate_preset_pass_manager(
-            #    3, backend=<problem>, initial_layout=np.arange(self.num_qubits),layout_method='trivial'
-            # )
+            print(
+                "Warning: Using custom pass manager is an experimental feature if used together with the quantum_expectation_value_csfs function, as requiered for SA wave functions."
+            )
 
             # Check if circuit has been set
             # In case of switching to new PassManager in later workflow
             if hasattr(self, "circuit"):
                 self.construct_circuit(self.num_orbs, self.num_elec)
+
+        # Transpiler without layout optimization - needed for csfs routine.
+        # Might clash with custom pass manager - use with care.
+        self._layoutfree_pm = generate_preset_pass_manager(
+            self._primitive_level,
+            backend=self._primitive_backend,
+            initial_layout=np.arange(self.num_qubits),
+            layout_method="trivial",
+        )
 
     def redo_M_mitigation(self, shots: int | None = None) -> None:
         """Redo M_mitigation.
@@ -675,15 +677,17 @@ class QuantumInterface:
                     circuit = get_determinant_superposition_reference(
                         bra_det, ket_det, self.num_orbs, self.mapper
                     )
-                    ###
-                    # Hard part. Transpile superposition state
-                    ###
+                    # Transpile superposition state
                     if self.ISA:
-                        circuit = (
-                            self.pass_manager.optimization.run(self.pass_manager.translation.run(circuit)),  # type: ignore
-                        )  # problem now measuring indices!
-                    # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
-                    circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
+                        circuit = self._layoutfree_pm.run(
+                            circuit
+                        )  # this is automatically in measurement index order
+                        # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
+                        circuit = self.ansatz_circuit.compose(
+                            circuit, qubits=self._measurement_indices, front=True
+                        )
+                    else:
+                        circuit = self.ansatz_circuit.compose(circuit, front=True)
                     if isinstance(self._primitive, BaseEstimator):
                         val += N * self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
                     if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
