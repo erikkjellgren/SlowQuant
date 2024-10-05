@@ -1,10 +1,12 @@
 import numpy as np
 import pyscf
 from qiskit.primitives import Estimator, Sampler
+from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_aer import AerSimulator
 from qiskit_aer.primitives import Sampler as SamplerAer
 from qiskit_aer.primitives import SamplerV2 as SamplerV2Aer
 from qiskit_ibm_runtime import SamplerV2 as SamplerV2IBM
+from qiskit_ibm_runtime.fake_provider import FakeTorino
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 
 import slowquant.qiskit_interface.linear_response.allprojected as q_allprojected  # pylint: disable=consider-using-from-import
@@ -919,3 +921,44 @@ def test_custom() -> None:
     QI.parameters = qc_param
 
     assert abs(QI.quantum_expectation_value(qc_H) - energy) < 10**-8
+
+
+def test_H2_sampler_couplingmap() -> None:
+    """
+    Test coupling map.
+    """
+    # Define molecule
+    atom = "H .0 .0 .0; H .0 .0 1.0"
+    basis = "sto-3g"
+
+    # PySCF
+    mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
+    rhf = pyscf.scf.RHF(mol).run()
+
+    # Optimize WF with QSQ
+    sampler = SamplerAer()
+    mapper = JordanWignerMapper()
+
+    QI = QuantumInterface(sampler, "fUCCSD", mapper, ISA=True)
+
+    qWF = WaveFunction(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 2),
+        rhf.mo_coeff,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        QI,
+    )
+
+    qWF.run_vqe_2step("rotosolve", True)
+
+    pm = generate_preset_pass_manager(3, backend=FakeTorino())
+    QI.ISA = True
+    QI.pass_manager = pm
+
+    QI._reset_cliques()  # pylint: disable=protected-access
+
+    assert np.allclose(
+        qWF._calc_energy_elec(), -1.6303275411526188, atol=10**-6  # pylint: disable=protected-access
+    )
