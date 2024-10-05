@@ -448,6 +448,7 @@ class QuantumInterface:
 
         # Create a pass manager that always maps on the Ansatz Circuit qubits!
         # Open Question: Which indices?
+        # Or do it on spot? - How did I do it in past? -> initial layout pass. 
 
         return circuit_return
 
