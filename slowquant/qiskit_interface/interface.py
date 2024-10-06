@@ -267,7 +267,7 @@ class QuantumInterface:
                 self._primitive_backend = None
 
             # Get optimization level from backend. Only for v1 primitives.
-            self._primitive_level = 3
+            self._primitive_level = 2
             if hasattr(self._primitive, "_transpile_options") and hasattr(
                 self._primitive._transpile_options, "optimization_level"  # pylint: disable=protected-access
             ):
@@ -434,6 +434,7 @@ class QuantumInterface:
 
         circuit_return = self.pass_manager.run(circuit)
         # Get layout indices
+        # Routing can introduce swaps. this is a problem and can change initial vs final layout. 
         if circuit_return.layout is None:
             self._measurement_indices = np.arange(circuit_return.num_qubits)
             self._circuit_indices = np.arange(circuit_return.num_qubits)
@@ -452,13 +453,13 @@ class QuantumInterface:
             self._fixedlayout_pm = generate_preset_pass_manager(
                 self._primitive_level,
                 backend=self._pm_backend,
-                initial_layout=self._circuit_indices,
+                initial_layout=self._measurement_indices,
             )
         else:
             self._fixedlayout_pm = generate_preset_pass_manager(
                 self._primitive_level,
                 backend=self._primitive_backend,
-                initial_layout=self._circuit_indices,
+                initial_layout=self._measurement_indices,
             )
 
         return circuit_return
@@ -700,13 +701,16 @@ class QuantumInterface:
                         bra_det, ket_det, self.num_orbs, self.mapper
                     )
                     # Transpile superposition state. All stages needed due to H and CNOTs
-                    all_in_one = True
+                    all_in_one = True # check which is faster! 
                     if self.ISA:
                         if all_in_one:
                             circuit = self._ansatz_circuit_raw.compose(circuit, front=True)
                             circuit = self._fixedlayout_pm.run(
                                 circuit
                             )  # this could also fix the AerSimulator problem?
+                            print("final: ", circuit.layout.final_index_layout())
+                            print("inital: ", circuit.layout.initial_index_layout(filter_ancillas=True))
+                            self.circuit_whole = circuit
                         else:
                             self.circuit_superpos = circuit
                             circuit = self._fixedlayout_pm.run(circuit)
