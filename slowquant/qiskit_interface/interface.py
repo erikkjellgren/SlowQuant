@@ -317,7 +317,7 @@ class QuantumInterface:
                 "Warning: Using custom pass manager is an experimental feature if used together with the quantum_expectation_value_csfs function, as requiered for SA wave functions."
             )
             self._pass_manager: None | PassManager = pass_manager[0]
-            self._backend = pass_manager[1]
+            self._pm_backend = pass_manager[1]
             # self._layoutfree_pm = generate_preset_pass_manager(
             #     self._primitive_level,
             #     backend=pass_manager[1],
@@ -404,6 +404,7 @@ class QuantumInterface:
         """
         # Check if ISA is selected. If yes, pre-transpile circuit for later use.
         if self.ISA:
+            self._ansatz_circuit_raw = ansatz_circuit  # needed for csfs functionality
             self.ansatz_circuit: QuantumCircuit = self._transpile_circuit(ansatz_circuit)
             self._transpiled = True
             # Add state preparation circuit (e.g. HF)
@@ -446,9 +447,19 @@ class QuantumInterface:
             self.pass_manager.optimization.run(self.pass_manager.translation.run(to_CBS_measurement("Y"))),
         ]
 
-        # Create a pass manager that always maps on the Ansatz Circuit qubits!
-        # Open Question: Which indices?
-        # Or do it on spot? - How did I do it in past? -> initial layout pass. 
+        # Create a pass manager that maps on the Ansatz Circuit qubits
+        if hasattr(self, "_pm_backend"):
+            self._fixedlayout_pm = generate_preset_pass_manager(
+                self._primitive_level,
+                backend=self._pm_backend,
+                initial_layout=self._circuit_indices,
+            )
+        else:
+            self._fixedlayout_pm = generate_preset_pass_manager(
+                self._primitive_level,
+                backend=self._primitive_backend,
+                initial_layout=self._circuit_indices,
+            )
 
         return circuit_return
 
@@ -689,16 +700,28 @@ class QuantumInterface:
                         bra_det, ket_det, self.num_orbs, self.mapper
                     )
                     # Transpile superposition state. All stages needed due to H and CNOTs
+                    all_in_one = True
                     if self.ISA:
-                        self.circuit_superpos = circuit
-                        circuit = self._layoutfree_pm.run(
-                            circuit
-                        )  # this is automatically in measurement index order
-                        self.circuit_superpos_transp = circuit
-                        # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
-                        circuit = self.ansatz_circuit.compose(
-                            circuit, qubits=self._measurement_indices, front=True
-                        )
+                        if all_in_one:
+                            circuit = self._ansatz_circuit_raw.compose(circuit, front=True)
+                            circuit = self._fixedlayout_pm.run(
+                                circuit
+                            )  # this could also fix the AerSimulator problem?
+                        else:
+                            self.circuit_superpos = circuit
+                            circuit = self._fixedlayout_pm.run(circuit)
+                            self.circuit_superpos_transp = circuit
+                            # This is a very specific bug-fix for the very specific case of
+                            # using ISA with ideal AerSimulator without any pass manager
+                            # Maybe this can done better
+                            if circuit.num_qubits > self.ansatz_circuit.num_qubits:
+                                circuit = get_determinant_superposition_reference(
+                                    bra_det, ket_det, self.num_orbs, self.mapper
+                                )
+                                circuit = self.ansatz_circuit.compose(circuit, front=True)
+                            else:
+                                # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
+                                circuit = self.ansatz_circuit.compose(circuit, front=True)
                     else:
                         circuit = self.ansatz_circuit.compose(circuit, front=True)
                     if isinstance(self._primitive, BaseEstimator):
