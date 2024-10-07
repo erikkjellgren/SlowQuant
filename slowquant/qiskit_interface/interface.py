@@ -434,7 +434,7 @@ class QuantumInterface:
 
         circuit_return = self.pass_manager.run(circuit)
         # Get layout indices
-        # Routing can introduce swaps. this is a problem and can change initial vs final layout. 
+        # Routing can introduce swaps. this is a problem and can change initial vs final layout.
         if circuit_return.layout is None:
             self._measurement_indices = np.arange(circuit_return.num_qubits)
             self._circuit_indices = np.arange(circuit_return.num_qubits)
@@ -701,19 +701,21 @@ class QuantumInterface:
                         bra_det, ket_det, self.num_orbs, self.mapper
                     )
                     # Transpile superposition state. All stages needed due to H and CNOTs
-                    all_in_one = True # check which is faster! 
+                    all_in_one = True  # check which is faster!
                     if self.ISA:
                         if all_in_one:
-                            circuit = self._ansatz_circuit_raw.compose(circuit, front=True)
+                            circuit = self.compose(circuit, front=True)
                             circuit = self._fixedlayout_pm.run(
                                 circuit
                             )  # this could also fix the AerSimulator problem?
+                            # Problem: Might change layout from final layout for measurement!
+                            # I need to be able to supress this swapping between initial and final layout!
                             print("final: ", circuit.layout.final_index_layout())
                             print("inital: ", circuit.layout.initial_index_layout(filter_ancillas=True))
                             self.circuit_whole = circuit
                         else:
                             self.circuit_superpos = circuit
-                            circuit = self._fixedlayout_pm.run(circuit)
+                            circuit = self._fixedlayout_pm.run(circuit)  # swap make also a problem here!
                             self.circuit_superpos_transp = circuit
                             # This is a very specific bug-fix for the very specific case of
                             # using ISA with ideal AerSimulator without any pass manager
