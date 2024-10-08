@@ -308,6 +308,8 @@ class QuantumInterface:
         Args:
             pass_manager: PassManager object from Qiskit.
         """
+        if pass_manager is not None and isinstance(pass_manager, PassManager):
+            raise ValueError("The pass_manager argument has to be a tuple of PassManager and Backend.")
         self._internal_pm = False
         if not self.ISA and isinstance(pass_manager, tuple):
             raise ValueError("You need to enable ISA if you want to use a custom PassManager.")

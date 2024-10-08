@@ -955,7 +955,7 @@ def test_H2_sampler_couplingmap() -> None:
 
     pm = generate_preset_pass_manager(3, backend=FakeTorino())
     QI.ISA = True
-    QI.pass_manager = pm
+    QI.pass_manager = (pm, FakeTorino())
 
     QI._reset_cliques()  # pylint: disable=protected-access
 
