@@ -26,6 +26,7 @@ from slowquant.qiskit_interface.custom_ansatz import SDSfUCC, fUCC, tUPS
 from slowquant.qiskit_interface.util import (
     Clique,
     correct_distribution,
+    correct_distribution_with_layout,
     get_bitstring_sign,
     get_determinant_reference,
     get_determinant_superposition_reference,
@@ -425,7 +426,7 @@ class QuantumInterface:
             )
 
         circuit_return = self.pass_manager.run(circuit)
-        # Get layout indices
+        # Get layout indices. Ordered q0, q1, ... qN
         # Routing can introduce swaps. this is a problem and can change initial vs final layout.
         if circuit_return.layout is None:
             self._measurement_indices = np.arange(circuit_return.num_qubits)
@@ -559,6 +560,8 @@ class QuantumInterface:
     def op_to_qbit(self, op: FermionicOperator) -> SparsePauliOp:
         """Fermionic operator to qbit rep.
 
+        The Pauli string representation is in qiskit's format of qN,qN-1,...,q0.
+
         Args:
             op: Operator as SlowQuant's FermionicOperator object
 
@@ -569,6 +572,27 @@ class QuantumInterface:
         if not isinstance(mapped_op, SparsePauliOp):
             raise TypeError(f"The qubit form of the operator is not SparsePauliOp got, {type(mapped_op)}")
         return mapped_op
+
+    def _check_layout_conflict(self, circuit_in: QuantumCircuit) -> bool:
+        """Check if a circuit has same layout as ansatz circuit/M.
+
+        Args:
+            circuit_in: Quantum Circuit
+
+        Returns:
+            Boolean
+        """
+        if not self.ISA:
+            if circuit_in.layout is None:
+                return True
+            raise ValueError("ISA is switched off but circuit with layout was found.")
+        if circuit_in.layout is None:
+            circuit_in_layout = np.arange(self.num_qubits)
+        else:
+            circuit_in_layout = circuit_in.layout.final_index_layout()
+        if not np.array_equal(np.sort(circuit_in_layout), np.sort(self._measurement_indices)):
+            raise ValueError("Qubit in circuit is not in initial layout.")
+        return np.array_equal(circuit_in_layout, self._measurement_indices)
 
     def quantum_expectation_value(
         self, op: FermionicOperator, custom_parameters: list[float] | None = None
@@ -911,8 +935,19 @@ class QuantumInterface:
             # and return a list of distributions
             distr = self._one_call_sampler_distributions(new_heads, run_parameters, run_circuit)
             if self.do_M_mitigation:  # apply error mitigation if requested
-                for i, dist in enumerate(distr):
-                    distr[i] = correct_distribution(dist, self._Minv)
+                # Check if layout conflict in M and current circuit
+                if self._check_layout_conflict(run_circuit):
+                    for i, dist in enumerate(distr):
+                        distr[i] = correct_distribution(dist, self._Minv)
+                else:
+                    print("Layout mismatch between M and circuit")
+                    for i, dist in enumerate(distr):
+                        distr[i] = correct_distribution_with_layout(
+                            dist,
+                            self._Minv,
+                            self._measurement_indices,
+                            run_circuit.layout.final_index_layout(),
+                        )
             if self.do_postselection:
                 for i, (dist, head) in enumerate(zip(distr, new_heads)):
                     if "X" not in head and "Y" not in head:
@@ -929,8 +964,19 @@ class QuantumInterface:
             # Simulate each Pauli string with one combined device call
             distr = self._one_call_sampler_distributions(paulis_str, run_parameters, run_circuit)
             if self.do_M_mitigation:  # apply error mitigation if requested
-                for i, dist in enumerate(distr):
-                    distr[i] = correct_distribution(dist, self._Minv)
+                # Check if layout conflict in M and current circuit
+                if self._check_layout_conflict(run_circuit):
+                    for i, dist in enumerate(distr):
+                        distr[i] = correct_distribution(dist, self._Minv)
+                else:
+                    print("Layout mismatch between M and circuit")
+                    for i, dist in enumerate(distr):
+                        distr[i] = correct_distribution_with_layout(
+                            dist,
+                            self._Minv,
+                            self._measurement_indices,
+                            run_circuit.layout.final_index_layout(),
+                        )
             if self.do_postselection:
                 for i, (dist, pauli) in enumerate(zip(distr, paulis_str)):
                     if "X" not in pauli and "Y" not in pauli:
@@ -1142,7 +1188,7 @@ class QuantumInterface:
         self.total_device_calls += 1
         self.total_paulis_evaluated += num_paulis * num_circuits
 
-        # Get quasi-distribution in binary probabilities
+        # Get quasi-distribution in binary probabilities ordered qN, qN-1, ..., q0
         if isinstance(self._primitive, BaseSamplerV2):
             result = job.result()
             distr = [{}] * len(result)  # type: list[dict]

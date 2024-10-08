@@ -28,7 +28,7 @@ def to_CBS_measurement(op: str, transpiled: None | list[QuantumCircuit] = None) 
     if transpiled is None:
         num_qubits = len(op)
         qc = QuantumCircuit(num_qubits)
-        for i, pauli in enumerate(op[::-1]):
+        for i, pauli in enumerate(op[::-1]):  # turn order to q0,q1,...,qN
             if pauli == "X":
                 qc.append(Pauli("X"), [i])
                 qc.h(i)
@@ -90,6 +90,60 @@ def get_bitstring_sign(op: str, binary: int) -> int:
     if count % 2 == 1:
         return -1
     return 1
+
+
+def swap_indices(num_qubits: int, swap: tuple[int, int]) -> list[int]:
+    """Find new bit ordering based on a bit swap.
+
+    Args:
+        num_qubits: Number of qubits
+        swap: Swap to be performed
+
+    Returns:
+        List of new ordering in qubit basis based on swap.
+    """
+    number = 2**num_qubits
+    pos1, pos2 = swap
+
+    # original list in decimals
+    decimal_list = np.arange(number)
+
+    # Generate the binary representation matrix
+    binary_matrix = ((decimal_list[:, None] & (1 << np.arange(num_qubits)[::-1])) > 0).astype(int)
+
+    # Swap the bits at pos1 and pos2 for each row (each binary number)
+    swapped_binary_matrix = binary_matrix.copy()
+    swapped_binary_matrix[:, [pos1, pos2]] = swapped_binary_matrix[:, [pos2, pos1]]
+
+    # Convert the new swapped binary matrix back to decimal
+    powers_of_two = 2 ** np.arange(num_qubits)[::-1]  # [2^(num_bits-1), ..., 2^0]
+    swapped_decimal_list = swapped_binary_matrix.dot(powers_of_two)
+
+    return np.argsort(swapped_decimal_list)
+
+
+def find_swaps(new: list[int], ref: list[int]) -> list[tuple[int, int]]:
+    """Find swaps to turn list into ref.
+
+    Args:
+        new: List to be changed
+        ref: Reference list
+
+    Returns:
+        Swaps to turn list into ref
+    """
+    swaps = []
+    list_in = new.copy()
+
+    for i in range(len(list_in)):
+        if list_in[i] != ref[i]:
+            # Find where the element from ref[i] is in list_in and swap it
+            swap_idx = list_in.index(ref[i], i)
+            swaps.append((i, swap_idx))
+            # Perform the swap in list_in
+            list_in[i], list_in[swap_idx] = list_in[swap_idx], list_in[i]
+
+    return swaps
 
 
 class CliqueHead:
@@ -239,6 +293,43 @@ def correct_distribution(dist: dict[int, float], M: np.ndarray) -> dict[int, flo
         C[bitint] = prob
     # Apply M error mitigation matrix
     C_new = M @ C
+    # Convert columnvector of probabilities to bitstring distribution
+    for bitint, prob in dist.items():
+        dist[bitint] = C_new[bitint]
+    return dist
+
+
+def correct_distribution_with_layout(
+    dist: dict[int, float], M: np.ndarray, ref_layout: list[int], new_layout: list[int]
+) -> dict[int, float]:
+    r"""Corrects a quasi-distribution of bitstrings based on a correlation matrix in statevector notation.
+
+    Args:
+        dist: Quasi-distribution.
+        M: Correlation martix.
+        ref_layout: Reference layout of M measurement.
+        new_layout: Layout of current to be corrected circuit measurement.
+
+    Returns:
+        Quasi-distribution corrected by correlation matrix with corrected layout
+    """
+    # Find swaps that map new layout to reference layout
+    # Layout indices need to be inverted due to qiskit saving layout indices q0->qN and distribtions qN->q0.
+    swaps = find_swaps(new_layout[::-1], ref_layout[::-1])
+    num_qubits = len(ref_layout)
+
+    C = np.zeros(np.shape(M)[0])
+    # Convert bitstring distribution to columnvector of probabilities
+    for bitint, prob in dist.items():
+        C[bitint] = prob
+    # Forward correction of layout
+    for swap in swaps:
+        C = C[swap_indices(num_qubits, swap)]
+    # Apply M error mitigation matrix
+    C_new = M @ C
+    # Backward correction of layout
+    for swap in swaps[::-1]:
+        C_new = C_new[swap_indices(num_qubits, swap)]
     # Convert columnvector of probabilities to bitstring distribution
     for bitint, prob in dist.items():
         dist[bitint] = C_new[bitint]
