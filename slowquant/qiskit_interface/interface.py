@@ -712,7 +712,6 @@ class QuantumInterface:
                             run_parameters,
                             circuit,
                             do_cliques=self._do_cliques,
-                            overwrite_indices=circuit.layout.final_index_layout(),
                         )
 
                     # Second term of off-diagonal element involving only I
@@ -864,7 +863,6 @@ class QuantumInterface:
         run_parameters: list[float],
         run_circuit: QuantumCircuit,
         do_cliques: bool = True,
-        overwrite_indices: list[int] | None = None,
     ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
 
@@ -883,7 +881,6 @@ class QuantumInterface:
             run_parameters: Circuit parameters.
             run_circuit: Quantum Circuit
             do_cliques: If True, use cliques (QWC)
-            overwrite_indices: Overwrite the measurement indices with custom list.
 
         Returns:
             Expectation value of operator.
@@ -912,9 +909,7 @@ class QuantumInterface:
 
             # Simulate each clique head with one combined device call
             # and return a list of distributions
-            distr = self._one_call_sampler_distributions(
-                new_heads, run_parameters, run_circuit, overwrite_indices=overwrite_indices
-            )
+            distr = self._one_call_sampler_distributions(new_heads, run_parameters, run_circuit)
             if self.do_M_mitigation:  # apply error mitigation if requested
                 for i, dist in enumerate(distr):
                     distr[i] = correct_distribution(dist, self._Minv)
@@ -932,9 +927,7 @@ class QuantumInterface:
                 values += result * coeff
         else:
             # Simulate each Pauli string with one combined device call
-            distr = self._one_call_sampler_distributions(
-                paulis_str, run_parameters, run_circuit, overwrite_indices=overwrite_indices
-            )
+            distr = self._one_call_sampler_distributions(paulis_str, run_parameters, run_circuit)
             if self.do_M_mitigation:  # apply error mitigation if requested
                 for i, dist in enumerate(distr):
                     distr[i] = correct_distribution(dist, self._Minv)
@@ -1047,7 +1040,6 @@ class QuantumInterface:
         run_parameters: list[list[float]] | list[float],
         circuits_in: list[QuantumCircuit] | QuantumCircuit,
         overwrite_shots: int | None = None,
-        overwrite_indices: list[int] | None = None,
     ) -> list[dict[int, float]]:
         r"""Get results from a sampler distribution for several Pauli strings measured on several circuits.
 
@@ -1063,7 +1055,6 @@ class QuantumInterface:
             run_paramters: List of parameters of each circuit.
             circuits_in: List of circuits
             overwrite_shots: Overwrite QI shot number.
-            overwrite_indices: Overwrite the measurement indices with custom list.
 
         Returns:
             Array of quasi-distributions in order of all circuits results for a given Pauli String first.
@@ -1084,14 +1075,8 @@ class QuantumInterface:
             circuits_in = [circuits_in]
         num_circuits = len(circuits_in)
 
-        if overwrite_indices is not None:
-            measurement_indices = overwrite_indices
-        else:
-            if self.ISA:
-                measurement_indices = self._measurement_indices
-
         # Check V1 vs. V2
-        if isinstance(self._primitive, BaseSamplerV2):
+        if isinstance(self._primitive, BaseSamplerV2):  # means ISA=True by default
             # make parameter list 2d for one circuit.
             if num_circuits == 1:
                 run_parameters = [run_parameters]  # type: ignore
@@ -1102,12 +1087,14 @@ class QuantumInterface:
                 pauli_circuit = to_CBS_measurement(pauli, self._transp_xy)
                 for nr_circuit, circuit in enumerate(circuits_in):
                     # Add measurement in correct layout
-                    ansatz_w_obs = circuit.compose(
-                        pauli_circuit, qubits=measurement_indices  # pylint: disable=E0606
-                    )
+                    if circuit.layout is not None:
+                        measurement_indices = circuit.layout.final_index_layout()
+                    else:
+                        measurement_indices = np.arange(self.num_qubits)
+                    ansatz_w_obs = circuit.compose(pauli_circuit, qubits=measurement_indices)
                     # Create classic register and measure relevant qubits
                     ansatz_w_obs.add_register(ClassicalRegister(self.num_qubits, name="meas"))
-                    ansatz_w_obs.measure(measurement_indices, np.arange(self.num_qubits))
+                    ansatz_w_obs.measure(circuit.layout.final_index_layout(), np.arange(self.num_qubits))
                     pubs.append((ansatz_w_obs, run_parameters[nr_circuit]))
             pubs = pubs * self._circuit_multipl
 
@@ -1130,6 +1117,11 @@ class QuantumInterface:
                 for nr_pauli, pauli in enumerate(paulis):
                     pauli_circuit = to_CBS_measurement(pauli, self._transp_xy)
                     for nr_circuit, circuit in enumerate(circuits_in):
+                        # Add measurement in correct layout
+                        if circuit.layout is not None:
+                            measurement_indices = circuit.layout.final_index_layout()
+                        else:
+                            measurement_indices = np.arange(self.num_qubits)
                         ansatz_w_obs = circuit.compose(pauli_circuit, qubits=measurement_indices)
                         ansatz_w_obs.add_register(ClassicalRegister(self.num_qubits))
                         ansatz_w_obs.measure(measurement_indices, np.arange(self.num_qubits))
