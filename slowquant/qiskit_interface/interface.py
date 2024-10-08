@@ -1085,7 +1085,8 @@ class QuantumInterface:
         if overwrite_indices is not None:
             measurement_indices = overwrite_indices
         else:
-            measurement_indices = self._measurement_indices
+            if self.ISA:
+                measurement_indices = self._measurement_indices
 
         # Check V1 vs. V2
         if isinstance(self._primitive, BaseSamplerV2):
@@ -1099,7 +1100,9 @@ class QuantumInterface:
                 pauli_circuit = to_CBS_measurement(pauli, self._transp_xy)
                 for nr_circuit, circuit in enumerate(circuits_in):
                     # Add measurement in correct layout
-                    ansatz_w_obs = circuit.compose(pauli_circuit, qubits=measurement_indices)
+                    ansatz_w_obs = circuit.compose(
+                        pauli_circuit, qubits=measurement_indices  # pylint: disable=E0606
+                    )
                     # Create classic register and measure relevant qubits
                     ansatz_w_obs.add_register(ClassicalRegister(self.num_qubits, name="meas"))
                     ansatz_w_obs.measure(measurement_indices, np.arange(self.num_qubits))
