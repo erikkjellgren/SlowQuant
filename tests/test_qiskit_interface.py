@@ -1,5 +1,7 @@
+# pylint: disable=too-many-lines
 import numpy as np
 import pyscf
+from numpy.testing import assert_allclose
 from qiskit.primitives import Estimator, Sampler
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_aer import AerSimulator
@@ -12,10 +14,13 @@ from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 import slowquant.qiskit_interface.linear_response.allprojected as q_allprojected  # pylint: disable=consider-using-from-import
 import slowquant.qiskit_interface.linear_response.naive as q_naive  # pylint: disable=consider-using-from-import
 import slowquant.qiskit_interface.linear_response.projected as q_projected  # pylint: disable=consider-using-from-import
+import slowquant.SlowQuant as sq
 import slowquant.unitary_coupled_cluster.linear_response.allprojected as allprojected  # pylint: disable=consider-using-from-import
 import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
 from slowquant.qiskit_interface.interface import QuantumInterface
+from slowquant.qiskit_interface.sa_wavefunction import WaveFunctionSA
 from slowquant.qiskit_interface.wavefunction import WaveFunction
+from slowquant.unitary_coupled_cluster.sa_ups_wavefunction import WaveFunctionSAUPS
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
@@ -962,3 +967,79 @@ def test_H2_sampler_couplingmap() -> None:
     assert np.allclose(
         qWF._calc_energy_elec(), -1.6303275411526188, atol=10**-6  # pylint: disable=protected-access
     )
+
+
+def test_state_average() -> None:
+    """
+    Test RDM1 calculation with SA.
+    """
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """H  0.0           0.0  0.0;
+        H  0.735           0.0  0.0;
+        """,
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("6-31G")
+    SQobj.init_hartree_fock()
+
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    c_mo = SQobj.hartree_fock.mo_coeff
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
+
+    WF = WaveFunctionSAUPS(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 4),
+        c_mo,
+        h_core,
+        g_eri,
+        (
+            [
+                [1],
+                [2 ** (-1 / 2), -(2 ** (-1 / 2))],
+            ],
+            [
+                ["11000000"],
+                ["10010000", "01100000"],
+            ],
+        ),
+        "tUPS",
+        ansatz_options={"n_layers": 1},
+    )
+    WF.run_saups(False)
+
+    sampler = SamplerAer()
+    mapper = JordanWignerMapper()
+    QI = QuantumInterface(
+        sampler,
+        "tUPS",
+        mapper,
+        ansatz_options={"n_layers": 1},
+        ISA=True,
+        pass_manager=(generate_preset_pass_manager(3, backend=FakeTorino()), FakeTorino()),
+    )
+
+    QWF = WaveFunctionSA(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 4),
+        c_mo,
+        h_core,
+        g_eri,
+        (
+            [
+                [1],
+                [2 ** (-1 / 2), -(2 ** (-1 / 2))],
+            ],
+            [
+                ["11000000"],
+                ["10010000", "01100000"],
+            ],
+        ),
+        QI,
+    )
+    QWF.ansatz_parameters = WF.thetas
+
+    assert_allclose(QWF.rdm1, WF.rdm1, atol=10**-6)
