@@ -267,7 +267,7 @@ class QuantumInterface:
                 self._primitive_backend = None
 
             # Get optimization level from backend. Only for v1 primitives.
-            self._primitive_level = 2
+            self._primitive_level = 3
             if hasattr(self._primitive, "_transpile_options") and hasattr(
                 self._primitive._transpile_options, "optimization_level"  # pylint: disable=protected-access
             ):
@@ -318,22 +318,12 @@ class QuantumInterface:
             )
             self._pass_manager: None | PassManager = pass_manager[0]
             self._pm_backend = pass_manager[1]
-            # self._layoutfree_pm = generate_preset_pass_manager(
-            #     self._primitive_level,
-            #     backend=pass_manager[1],
-            #     layout_method="trivial",
-            # )
         # Default pass manager
         elif self.ISA and not isinstance(pass_manager, tuple):
             self._internal_pm = True
             self._pass_manager = generate_preset_pass_manager(
                 self._primitive_level, backend=self._primitive_backend
             )
-            # self._layoutfree_pm = generate_preset_pass_manager(
-            #     self._primitive_level,
-            #     backend=self._primitive_backend,
-            #     layout_method="trivial",
-            # )
             print(
                 f"You selected ISA but did not pass a PassManager. Standard internal transpilation will use backend {self._primitive_backend} with optimization level {self._primitive_level}"
             )
@@ -439,8 +429,10 @@ class QuantumInterface:
             self._measurement_indices = np.arange(circuit_return.num_qubits)
             self._circuit_indices = np.arange(circuit_return.num_qubits)
         else:
-            self._measurement_indices = circuit_return.layout.final_index_layout()
-            self._circuit_indices = circuit_return.layout.initial_index_layout(filter_ancillas=True)
+            self._measurement_indices = circuit_return.layout.final_index_layout()  # with swaps from routing
+            self._circuit_indices = circuit_return.layout.initial_index_layout(
+                filter_ancillas=True
+            )  # no swaps from routing
 
         # Transpile X and Y measurement gates: only translation to basis gates and optimization.
         self._transp_xy = [
@@ -701,33 +693,13 @@ class QuantumInterface:
                         bra_det, ket_det, self.num_orbs, self.mapper
                     )
                     # Transpile superposition state. All stages needed due to H and CNOTs
-                    all_in_one = True  # check which is faster!
                     if self.ISA:
-                        if all_in_one:
-                            circuit = self.compose(circuit, front=True)
-                            circuit = self._fixedlayout_pm.run(
-                                circuit
-                            )  # this could also fix the AerSimulator problem?
-                            # Problem: Might change layout from final layout for measurement!
-                            # I need to be able to supress this swapping between initial and final layout!
-                            print("final: ", circuit.layout.final_index_layout())
-                            print("inital: ", circuit.layout.initial_index_layout(filter_ancillas=True))
-                            self.circuit_whole = circuit
-                        else:
-                            self.circuit_superpos = circuit
-                            circuit = self._fixedlayout_pm.run(circuit)  # swap make also a problem here!
-                            self.circuit_superpos_transp = circuit
-                            # This is a very specific bug-fix for the very specific case of
-                            # using ISA with ideal AerSimulator without any pass manager
-                            # Maybe this can done better
-                            if circuit.num_qubits > self.ansatz_circuit.num_qubits:
-                                circuit = get_determinant_superposition_reference(
-                                    bra_det, ket_det, self.num_orbs, self.mapper
-                                )
-                                circuit = self.ansatz_circuit.compose(circuit, front=True)
-                            else:
-                                # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
-                                circuit = self.ansatz_circuit.compose(circuit, front=True)
+                        # Use untranspiled ansatz and compose with superposition state
+                        circuit = self._ansatz_circuit_raw.compose(circuit, front=True)
+                        # Transpile the composed circuit together using the correct layout
+                        # This will however still introduce routing swaps
+                        circuit = self._fixedlayout_pm.run(circuit)
+                        self.circuit_whole = circuit
                     else:
                         circuit = self.ansatz_circuit.compose(circuit, front=True)
                     if isinstance(self._primitive, BaseEstimator):
@@ -738,6 +710,7 @@ class QuantumInterface:
                             run_parameters,
                             circuit,
                             do_cliques=self._do_cliques,
+                            overwrite_indices=circuit.layout.final_index_layout(),
                         )
 
                     # Second term of off-diagonal element involving only I
@@ -794,13 +767,14 @@ class QuantumInterface:
         Args:
             op: SlowQuant fermionic operator.
             run_parameters: Circuit parameters.
+            run_circuit: Quantum circuit
 
         Returns:
             Expectation value of operator.
         """
         observables = self.op_to_qbit(op)
         if self.ISA:
-            observables = observables.apply_layout(self.circuit.layout)
+            observables = observables.apply_layout(run_circuit.layout)
         job = self._primitive.run(
             circuits=run_circuit, parameter_values=run_parameters, observables=observables, shots=self.shots
         )
@@ -888,6 +862,7 @@ class QuantumInterface:
         run_parameters: list[float],
         run_circuit: QuantumCircuit,
         do_cliques: bool = True,
+        overwrite_indices: list[int] | None = None,
     ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
 
@@ -904,6 +879,9 @@ class QuantumInterface:
         Args:
             op: SlowQuant fermionic operator.
             run_parameters: Circuit parameters.
+            run_circuit: Quantum Circuit
+            do_cliques: If True, use cliques (QWC)
+            overwrite_indices: Overwrite the measurement indices with custom list.
 
         Returns:
             Expectation value of operator.
@@ -932,7 +910,9 @@ class QuantumInterface:
 
             # Simulate each clique head with one combined device call
             # and return a list of distributions
-            distr = self._one_call_sampler_distributions(new_heads, run_parameters, run_circuit)
+            distr = self._one_call_sampler_distributions(
+                new_heads, run_parameters, run_circuit, overwrite_indices=overwrite_indices
+            )
             if self.do_M_mitigation:  # apply error mitigation if requested
                 for i, dist in enumerate(distr):
                     distr[i] = correct_distribution(dist, self._Minv)
@@ -950,7 +930,9 @@ class QuantumInterface:
                 values += result * coeff
         else:
             # Simulate each Pauli string with one combined device call
-            distr = self._one_call_sampler_distributions(paulis_str, run_parameters, run_circuit)
+            distr = self._one_call_sampler_distributions(
+                paulis_str, run_parameters, run_circuit, overwrite_indices=overwrite_indices
+            )
             if self.do_M_mitigation:  # apply error mitigation if requested
                 for i, dist in enumerate(distr):
                     distr[i] = correct_distribution(dist, self._Minv)
@@ -1063,6 +1045,7 @@ class QuantumInterface:
         run_parameters: list[list[float]] | list[float],
         circuits_in: list[QuantumCircuit] | QuantumCircuit,
         overwrite_shots: int | None = None,
+        overwrite_indices: list[int] | None = None,
     ) -> list[dict[int, float]]:
         r"""Get results from a sampler distribution for several Pauli strings measured on several circuits.
 
@@ -1078,6 +1061,7 @@ class QuantumInterface:
             run_paramters: List of parameters of each circuit.
             circuits_in: List of circuits
             overwrite_shots: Overwrite QI shot number.
+            overwrite_indices: Overwrite the measurement indices with custom list.
 
         Returns:
             Array of quasi-distributions in order of all circuits results for a given Pauli String first.
@@ -1098,6 +1082,11 @@ class QuantumInterface:
             circuits_in = [circuits_in]
         num_circuits = len(circuits_in)
 
+        if overwrite_indices is not None:
+            measurement_indices = overwrite_indices
+        else:
+            measurement_indices = self._measurement_indices
+
         # Check V1 vs. V2
         if isinstance(self._primitive, BaseSamplerV2):
             # make parameter list 2d for one circuit.
@@ -1110,10 +1099,10 @@ class QuantumInterface:
                 pauli_circuit = to_CBS_measurement(pauli, self._transp_xy)
                 for nr_circuit, circuit in enumerate(circuits_in):
                     # Add measurement in correct layout
-                    ansatz_w_obs = circuit.compose(pauli_circuit, qubits=self._measurement_indices)
+                    ansatz_w_obs = circuit.compose(pauli_circuit, qubits=measurement_indices)
                     # Create classic register and measure relevant qubits
                     ansatz_w_obs.add_register(ClassicalRegister(self.num_qubits, name="meas"))
-                    ansatz_w_obs.measure(self._measurement_indices, np.arange(self.num_qubits))
+                    ansatz_w_obs.measure(measurement_indices, np.arange(self.num_qubits))
                     pubs.append((ansatz_w_obs, run_parameters[nr_circuit]))
             pubs = pubs * self._circuit_multipl
 
@@ -1136,9 +1125,9 @@ class QuantumInterface:
                 for nr_pauli, pauli in enumerate(paulis):
                     pauli_circuit = to_CBS_measurement(pauli, self._transp_xy)
                     for nr_circuit, circuit in enumerate(circuits_in):
-                        ansatz_w_obs = circuit.compose(pauli_circuit, qubits=self._measurement_indices)
+                        ansatz_w_obs = circuit.compose(pauli_circuit, qubits=measurement_indices)
                         ansatz_w_obs.add_register(ClassicalRegister(self.num_qubits))
-                        ansatz_w_obs.measure(self._measurement_indices, np.arange(self.num_qubits))
+                        ansatz_w_obs.measure(measurement_indices, np.arange(self.num_qubits))
                         circuits[(nr_circuit + (nr_pauli * num_circuits))] = ansatz_w_obs
                 circuits = circuits * self._circuit_multipl
 
