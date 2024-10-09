@@ -928,9 +928,9 @@ def test_custom() -> None:
     assert abs(QI.quantum_expectation_value(qc_H) - energy) < 10**-8
 
 
-def test_H2_sampler_couplingmap() -> None:
+def test_H2_sampler_layout() -> None:
     """
-    Test coupling map.
+    Test composing of circuits when complicated layout is applied.
     """
     # Define molecule
     atom = "H .0 .0 .0; H .0 .0 1.0"
@@ -969,9 +969,9 @@ def test_H2_sampler_couplingmap() -> None:
     )
 
 
-def test_state_average() -> None:
+def test_state_average_layout() -> None:
     """
-    Test RDM1 calculation with SA.
+    Test RDM1 calculation with SA in the presence of complicated layout.
     """
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(

@@ -941,13 +941,16 @@ class QuantumInterface:
                         distr[i] = correct_distribution(dist, self._Minv)
                 else:
                     print("Layout mismatch between M and circuit")
+                    print(run_circuit.layout.final_index_layout())
+                    # for i, dist in enumerate(distr):
+                    #     distr[i] = correct_distribution_with_layout(
+                    #         dist,
+                    #         self._Minv,
+                    #         self._measurement_indices,
+                    #         run_circuit.layout.final_index_layout(),
+                    #     )
                     for i, dist in enumerate(distr):
-                        distr[i] = correct_distribution_with_layout(
-                            dist,
-                            self._Minv,
-                            self._measurement_indices,
-                            run_circuit.layout.final_index_layout(),
-                        )
+                        distr[i] = correct_distribution(dist, self._Minv)
             if self.do_postselection:
                 for i, (dist, head) in enumerate(zip(distr, new_heads)):
                     if "X" not in head and "Y" not in head:
@@ -970,6 +973,7 @@ class QuantumInterface:
                         distr[i] = correct_distribution(dist, self._Minv)
                 else:
                     print("Layout mismatch between M and circuit")
+                    print(run_circuit.layout.final_index_layout())
                     for i, dist in enumerate(distr):
                         distr[i] = correct_distribution_with_layout(
                             dist,
@@ -1140,7 +1144,7 @@ class QuantumInterface:
                     ansatz_w_obs = circuit.compose(pauli_circuit, qubits=measurement_indices)
                     # Create classic register and measure relevant qubits
                     ansatz_w_obs.add_register(ClassicalRegister(self.num_qubits, name="meas"))
-                    ansatz_w_obs.measure(circuit.layout.final_index_layout(), np.arange(self.num_qubits))
+                    ansatz_w_obs.measure(measurement_indices, np.arange(self.num_qubits))
                     pubs.append((ansatz_w_obs, run_parameters[nr_circuit]))
             pubs = pubs * self._circuit_multipl
 
