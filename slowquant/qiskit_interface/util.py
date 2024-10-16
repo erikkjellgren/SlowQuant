@@ -123,7 +123,7 @@ def swap_indices(num_qubits: int, swap: tuple[int, int]) -> list[int]:
 
 
 def find_swaps(new: list[int], ref: list[int]) -> list[tuple[int, int]]:
-    """Find swaps to turn list into ref.
+    """Find swaps to turn new into ref.
 
     Args:
         new: List to be changed
@@ -282,7 +282,7 @@ def correct_distribution(dist: dict[int, float], M: np.ndarray) -> dict[int, flo
 
     Args:
         dist: Quasi-distribution.
-        M: Correlation martix.
+        M: Correlation martix (inverse).
 
     Returns:
         Quasi-distribution corrected by correlation matrix.
@@ -299,14 +299,15 @@ def correct_distribution(dist: dict[int, float], M: np.ndarray) -> dict[int, flo
     return dist
 
 
-def correct_distribution_with_layout(
+def correct_distribution_with_layout_v2(
     dist: dict[int, float], M: np.ndarray, ref_layout: list[int], new_layout: list[int]
 ) -> dict[int, float]:
     r"""Corrects a quasi-distribution of bitstrings based on a correlation matrix in statevector notation.
+    Uses layout correction via distribution mapping.
 
     Args:
         dist: Quasi-distribution.
-        M: Correlation martix.
+        M: Correlation martix (inverse).
         ref_layout: Reference layout of M measurement.
         new_layout: Layout of current to be corrected circuit measurement.
 
@@ -331,7 +332,47 @@ def correct_distribution_with_layout(
     for swap in swaps[::-1]:
         C_new = C_new[swap_indices(num_qubits, swap)]
     # Convert columnvector of probabilities to bitstring distribution
+    for bitint, prob in dist.items():  # is this missing sth? Can I have new numbers?
+        dist[bitint] = C_new[bitint]
+    return dist
+
+
+def correct_distribution_with_layout(
+    dist: dict[int, float], M_in: np.ndarray, ref_layout: list[int], new_layout: list[int]
+) -> dict[int, float]:
+    r"""Corrects a quasi-distribution of bitstrings based on a correlation matrix in statevector notation.
+    Uses layout correction via M mapping.
+
+    Args:
+        dist: Quasi-distribution.
+        M: Correlation martix (not inverse).
+        ref_layout: Reference layout of M measurement.
+        new_layout: Layout of current to be corrected circuit measurement.
+
+    Returns:
+        Quasi-distribution corrected by correlation matrix with corrected layout
+    """
+    # Find swaps that map new layout to reference layout
+    # Layout indices need to be inverted due to qiskit saving layout indices q0->qN and distribtions qN->q0.
+    swaps = find_swaps(new_layout[::-1], ref_layout[::-1])
+    num_qubits = len(ref_layout)
+
+    # Create new M
+    M = M_in.copy()
+    for swap in swaps:
+        idx = np.array(swap_indices(num_qubits, swap))
+        print(idx)
+        M = M[idx, :][:, idx]
+    M_inv = np.linalg.inv(M)
+
+    C = np.zeros(np.shape(M)[0])
+    # Convert bitstring distribution to columnvector of probabilities
     for bitint, prob in dist.items():
+        C[bitint] = prob
+    # Apply M error mitigation matrix
+    C_new = M_inv @ C
+    # Convert columnvector of probabilities to bitstring distribution
+    for bitint, prob in dist.items():  # is this missing sth? Can I have new numbers?
         dist[bitint] = C_new[bitint]
     return dist
 

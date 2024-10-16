@@ -27,6 +27,7 @@ from slowquant.qiskit_interface.util import (
     Clique,
     correct_distribution,
     correct_distribution_with_layout,
+    correct_distribution_with_layout_v2,
     get_bitstring_sign,
     get_determinant_reference,
     get_determinant_superposition_reference,
@@ -291,6 +292,7 @@ class QuantumInterface:
                 elif self._internal_pm:
                     # We have used internal PassManager before but re-transpilation was requested (probs via change_primitive in WF)
                     self.pass_manager = None
+                print("Change in ISA. Reconstructing circuit.")
                 self.construct_circuit(self.num_orbs, self.num_elec)
 
     @property
@@ -336,6 +338,7 @@ class QuantumInterface:
         # Check if circuit has been set
         # In case of switching to new PassManager in later workflow
         if hasattr(self, "circuit"):
+            print("Change in PassManager. Reconstructing circuit.")
             self.construct_circuit(self.num_orbs, self.num_elec)
 
     def redo_M_mitigation(self, shots: int | None = None) -> None:
@@ -718,14 +721,21 @@ class QuantumInterface:
                     circuit = get_determinant_superposition_reference(
                         bra_det, ket_det, self.num_orbs, self.mapper
                     )
+                    self.state_superpos = circuit
                     # Transpile superposition state. All stages needed due to H and CNOTs
                     if self.ISA:
                         # Use untranspiled ansatz and compose with superposition state
-                        circuit = self._ansatz_circuit_raw.compose(circuit, front=True)
+                        circuit = self._ansatz_circuit_raw.compose(circuit)  # , front=True)
                         # Transpile the composed circuit together using the correct layout
                         # This will however still introduce routing swaps
                         circuit = self._fixedlayout_pm.run(circuit)
-                        self.circuit_whole = circuit
+                        if self._measurement_indices != circuit.layout.final_index_layout():
+                            print("New layout in superposition state")
+                            print(bra_det, "   ", ket_det)
+                            print("New layout: ", circuit.layout.final_index_layout())
+                        else:
+                            print("Layout is consistent")
+                            print(bra_det, "   ", ket_det)
                     else:
                         circuit = self.ansatz_circuit.compose(circuit, front=True)
                     if isinstance(self._primitive, BaseEstimator):
@@ -942,15 +952,13 @@ class QuantumInterface:
                 else:
                     print("Layout mismatch between M and circuit")
                     print(run_circuit.layout.final_index_layout())
-                    # for i, dist in enumerate(distr):
-                    #     distr[i] = correct_distribution_with_layout(
-                    #         dist,
-                    #         self._Minv,
-                    #         self._measurement_indices,
-                    #         run_circuit.layout.final_index_layout(),
-                    #     )
                     for i, dist in enumerate(distr):
-                        distr[i] = correct_distribution(dist, self._Minv)
+                        distr[i] = correct_distribution_with_layout(
+                            dist,
+                            self._M,
+                            self._measurement_indices,
+                            run_circuit.layout.final_index_layout(),
+                        )
             if self.do_postselection:
                 for i, (dist, head) in enumerate(zip(distr, new_heads)):
                     if "X" not in head and "Y" not in head:
@@ -977,7 +985,7 @@ class QuantumInterface:
                     for i, dist in enumerate(distr):
                         distr[i] = correct_distribution_with_layout(
                             dist,
-                            self._Minv,
+                            self._M,
                             self._measurement_indices,
                             run_circuit.layout.final_index_layout(),
                         )
@@ -1296,31 +1304,13 @@ class QuantumInterface:
 
         .. math::
             M = \begin{pmatrix}
-                P(00|00) & P(00|10) & P(00|01) & P(00|11)\\
-                P(10|00) & P(10|10) & P(10|01) & P(10|11)\\
-                P(01|00) & P(01|10) & P(01|01) & P(01|11)\\
-                P(11|00) & P(11|10) & P(11|01) & P(11|11)
+                P(00|00) & P(00|01) & P(00|10) & P(00|11)\\
+                P(01|00) & P(01|01) & P(01|10) & P(01|11)\\
+                P(10|00) & P(10|01) & P(10|10) & P(10|11)\\
+                P(11|00) & P(11|01) & P(11|10) & P(11|11)
                 \end{pmatrix}
 
         With :math:`P(AB|CD)` meaning the probability of reading :math:`AB` given the circuit is prepared to give :math:`CD`.
-
-        The construction also supports the independent qubit approximation, which for two qubits means that:
-
-        .. math::
-            P(\tilde{q}_1 \tilde{q}_0|q_1 q_0) = P(\tilde{q}_1|q_1)P(\tilde{q}_0|q_0)
-
-        Under this approximation only :math:`\left<00\right|` and :math:`\left<11\right|` need to be measured,
-        in order the gain enough information to construct :math:`M`.
-
-        The read-out correlation take the following form (for two qubits):
-
-        .. math::
-            M = \begin{pmatrix}
-                P_{q1}(0|0)P_{q0}(0|0) & P_{q1}(0|1)P_{q0}(0|0) & P_{q1}(0|0)P_{q0}(0|1) & P_{q1}(0|1)P_{q0}(0|1)\\
-                P_{q1}(1|0)P_{q0}(0|0) & P_{q1}(1|1)P_{q0}(0|0) & P_{q1}(1|0)P_{q0}(0|1) & P_{q1}(1|1)P_{q0}(0|1)\\
-                P_{q1}(0|0)P_{q0}(1|0) & P_{q1}(0|1)P_{q0}(1|0) & P_{q1}(0|0)P_{q0}(1|1) & P_{q1}(0|1)P_{q0}(1|1)\\
-                P_{q1}(1|0)P_{q0}(1|0) & P_{q1}(1|1)P_{q0}(1|0) & P_{q1}(1|0)P_{q0}(1|1) & P_{q1}(1|1)P_{q0}(1|1)
-                \end{pmatrix}
 
         The construct also support the building of the read-out correlation matrix when the ansatz is included:
 
@@ -1343,12 +1333,15 @@ class QuantumInterface:
             ansatz = self.ansatz_circuit
         else:
             ansatz = QuantumCircuit(self.num_qubits)  # empty circuit
+            if self.ISA:  # needs correct layout
+                ansatz = self._fixedlayout_pm.run(ansatz)
         M = np.zeros((2**self.num_qubits, 2**self.num_qubits))
         ansatz_list = [None] * 2**self.num_qubits
         if self.ISA:
             for nr, comb in enumerate(itertools.product([0, 1], repeat=self.num_qubits)):
                 ansatzX = ansatz.copy()
-                for i, bit in enumerate(comb[::-1]):  # because of Qiskit ordering
+                # comb is in qN,qN-1,...,q0
+                for i, bit in enumerate(comb[::-1]):  # get q0 first
                     if bit == 1:
                         ansatzX.x(self._measurement_indices[i])
                 # Make list of custom ansatz
@@ -1363,7 +1356,7 @@ class QuantumInterface:
         else:
             for nr, comb in enumerate(itertools.product([0, 1], repeat=self.num_qubits)):
                 ansatzX = ansatz.copy()
-                for i, bit in enumerate(comb[::-1]):  # because of Qiskit ordering
+                for i, bit in enumerate(comb[::-1]):
                     if bit == 1:
                         ansatzX.x(i)
                 # Make list of custom ansatz
@@ -1376,9 +1369,10 @@ class QuantumInterface:
                 overwrite_shots=shots,
             )
         # Construct M
-        for idx2, Px in enumerate(Px_list):
-            for idx1, prob in Px.items():
+        for idx2, Px in enumerate(Px_list):  # prepared circuits
+            for idx1, prob in Px.items():  # measured outcomes
                 M[idx1, idx2] = prob
+        self._M = M
         self._Minv = np.linalg.inv(M)
 
     def get_info(self) -> None:
