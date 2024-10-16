@@ -1,6 +1,7 @@
 import numpy as np
 from qiskit import QuantumCircuit
 from qiskit.quantum_info import Pauli
+from qiskit.transpiler import PassManager
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 
@@ -303,6 +304,7 @@ def correct_distribution_with_layout_v2(
     dist: dict[int, float], M: np.ndarray, ref_layout: list[int], new_layout: list[int]
 ) -> dict[int, float]:
     r"""Corrects a quasi-distribution of bitstrings based on a correlation matrix in statevector notation.
+
     Uses layout correction via distribution mapping.
 
     Args:
@@ -341,6 +343,7 @@ def correct_distribution_with_layout(
     dist: dict[int, float], M_in: np.ndarray, ref_layout: list[int], new_layout: list[int]
 ) -> dict[int, float]:
     r"""Corrects a quasi-distribution of bitstrings based on a correlation matrix in statevector notation.
+
     Uses layout correction via M mapping.
 
     Args:
@@ -375,6 +378,54 @@ def correct_distribution_with_layout(
     for bitint, prob in dist.items():  # is this missing sth? Can I have new numbers?
         dist[bitint] = C_new[bitint]
     return dist
+
+
+def layout_conserving_compose(
+    ansatz: QuantumCircuit, state: QuantumCircuit, pm: PassManager, optimization: bool = False
+) -> QuantumCircuit:
+    """Composing an un-transpiled state circuit to the front of a transpiled Ansatz circuit.
+
+    Args:
+        ansatz: Transpiled Ansatz circuit
+        state: Un-transpiled state circuit
+        pm: PassManager that produces Ansatz's initial layout indices
+        optimization: Boolean for optimizing composed circuit.
+            Note that optimization can lead to change in Ansatz's gates and CX count.
+            This can be problematic together with M_Ansatz0.
+
+    Returns:
+        Composed QuantumCircuit.
+    """
+    state_tmp = pm.translation.run(pm.layout.run(state))
+    state_tmp._layout = ansatz.layout  # pylint: disable=protected-access
+    state_tmp = pm.optimization.run(state_tmp)
+
+    composed = ansatz.compose(state_tmp, front=True)
+
+    if composed.layout.initial_index_layout(filter_ancillas=True) != ansatz.layout.initial_index_layout(
+        filter_ancillas=True
+    ):
+        raise ValueError("Something went wrong with layout conserving composing. Initial layout changed.")
+    if composed.layout.final_index_layout != ansatz.layout.final_index_layout:
+        raise ValueError("Something went wrong with layout conserving composing. Final layout changed.")
+
+    if optimization:
+        composed_opt = pm.optimization.run(composed)
+        composed_opt._layout = ansatz.layout  # pylint: disable=protected-access
+
+        if composed_opt.layout.initial_index_layout(
+            filter_ancillas=True
+        ) != ansatz.layout.initial_index_layout(filter_ancillas=True):
+            raise ValueError(
+                "Something went wrong with layout conserving composing. Initial layout changed in optimization."
+            )
+        if composed_opt.layout.final_index_layout != ansatz.layout.final_index_layout:
+            raise ValueError(
+                "Something went wrong with layout conserving composing. Final layout changed in optimization."
+            )
+
+        return composed_opt
+    return composed
 
 
 def postselection(
