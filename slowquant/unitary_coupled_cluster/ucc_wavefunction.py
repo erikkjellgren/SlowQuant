@@ -155,37 +155,29 @@ class WaveFunctionUCC:
             for active_idx in self.active_unocc_idx:
                 self.active_unocc_idx_shifted.append(active_idx - active_shift)
         # Find non-redundant kappas
-        self.kappa = []
+        self._kappa = []
         self.kappa_idx = []
         self.kappa_no_activeactive_idx = []
         self.kappa_no_activeactive_idx_dagger = []
-        self.kappa_redundant = []
         self.kappa_redundant_idx = []
         self._kappa_old = []
-        self._kappa_redundant_old = []
         # kappa can be optimized in spatial basis
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
                 if p in self.inactive_idx and q in self.inactive_idx:
-                    self.kappa_redundant.append(0.0)
-                    self._kappa_redundant_old.append(0.0)
                     self.kappa_redundant_idx.append([p, q])
                     continue
                 if p in self.virtual_idx and q in self.virtual_idx:
-                    self.kappa_redundant.append(0.0)
-                    self._kappa_redundant_old.append(0.0)
                     self.kappa_redundant_idx.append([p, q])
                     continue
                 if not include_active_kappa:
                     if p in self.active_idx and q in self.active_idx:
-                        self.kappa_redundant.append(0.0)
-                        self._kappa_redundant_old.append(0.0)
                         self.kappa_redundant_idx.append([p, q])
                         continue
                 if not (p in self.active_idx and q in self.active_idx):
                     self.kappa_no_activeactive_idx.append([p, q])
                     self.kappa_no_activeactive_idx_dagger.append([q, p])
-                self.kappa.append(0.0)
+                self._kappa.append(0.0)
                 self._kappa_old.append(0.0)
                 self.kappa_idx.append([p, q])
         # HF like orbital rotation indecies
@@ -276,6 +268,17 @@ class WaveFunctionUCC:
         self._c_orthonormal = c
 
     @property
+    def kappa(self) -> list[float]:
+        return self._kappa.copy()
+
+    @kappa.setter
+    def kappa(self, k: list[float]) -> None:
+        self._h_mo = None
+        self._g_mo = None
+        self._energy_elec = None
+        self._kappa = k.copy()
+
+    @property
     def ci_coeffs(self) -> np.ndarray:
         """Get CI coefficients.
 
@@ -329,14 +332,9 @@ class WaveFunctionUCC:
         kappa_mat = np.zeros_like(self._c_orthonormal)
         if len(self.kappa) != 0:
             if np.max(np.abs(self.kappa)) > 0.0:
-                for kappa_val, (p, q) in zip(self.kappa, self.kappa_idx):
-                    kappa_mat[p, q] = kappa_val
-                    kappa_mat[q, p] = -kappa_val
-        if len(self.kappa_redundant) != 0:
-            if np.max(np.abs(self.kappa_redundant)) > 0.0:
-                for kappa_val, (p, q) in zip(self.kappa_redundant, self.kappa_redundant_idx):
-                    kappa_mat[p, q] = kappa_val
-                    kappa_mat[q, p] = -kappa_val
+                for kappa_val, kappa_val_old, (p, q) in zip(self.kappa, self._kappa_old, self.kappa_idx):
+                    kappa_mat[p, q] = kappa_val - kappa_val_old
+                    kappa_mat[q, p] = -(kappa_val - kappa_val_old)
         return np.matmul(self._c_orthonormal, scipy.linalg.expm(-kappa_mat))
 
     @property
@@ -765,6 +763,12 @@ class WaveFunctionUCC:
             self._energy_elec = energy_ucc(self.thetas, False, self)
         return self._energy_elec
 
+    def _move_cep(self) -> None:
+        """Move current expansion point."""
+        c = self.c_trans
+        self._c_orthonormal = c
+        self._kappa_old = self.kappa
+
     def run_ucc(
         self,
         orbital_optimization: bool = False,
@@ -881,12 +885,8 @@ class WaveFunctionUCC:
         param_idx = 0
         if orbital_optimization:
             param_idx += len(self.kappa)
-            for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
-                self.kappa[i] = 0
-                self._kappa_old[i] = 0
-            for i in range(len(self.kappa_redundant)):  # pylint: disable=consider-using-enumerate
-                self.kappa_redundant[i] = 0
-                self._kappa_redundant_old[i] = 0
+            self.kappa = np.zeros_like(self.kappa).tolist()
+            self._kappa_old = np.zeros_like(self.kappa).tolist()
         self.thetas = res["x"][param_idx:].tolist()
 
 
@@ -915,33 +915,10 @@ def energy_ucc(
         for _ in range(len(wf.kappa_idx)):
             kappa.append(parameters[idx_counter])
             idx_counter += 1
+        wf.kappa = kappa
     theta = parameters[idx_counter:]
-
-    kappa_mat = np.zeros_like(wf.c_orthonormal)
-    if orbital_optimized:
-        for kappa_val, (p, q) in zip(
-            np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx  # pylint: disable=protected-access
-        ):
-            kappa_mat[p, q] = kappa_val
-            kappa_mat[q, p] = -kappa_val
-    if len(wf.kappa_redundant) != 0:
-        if np.max(np.abs(wf.kappa_redundant)) > 0.0:
-            for kappa_val, (p, q) in zip(
-                np.array(wf.kappa_redundant)
-                - np.array(wf._kappa_redundant_old),  # pylint: disable=protected-access
-                wf.kappa_redundant_idx,
-            ):
-                kappa_mat[p, q] = kappa_val
-                kappa_mat[q, p] = -kappa_val
-    c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
-    if orbital_optimized:
-        wf._kappa_old = kappa.copy()  # pylint: disable=protected-access
-        wf._kappa_redundant_old = wf.kappa_redundant.copy()  # pylint: disable=protected-access
-    # Moving expansion point of kappa
-    wf.c_orthonormal = c_trans
-    # Add thetas
     wf.thetas = theta
-    return expectation_value(
+    E = expectation_value(
         wf.ci_coeffs,
         [
             hamiltonian_0i_0a(
@@ -962,6 +939,8 @@ def energy_ucc(
         wf.thetas,
         wf.ucc_layout,
     )
+    # print(E)
+    return E
 
 
 def gradient_ucc(
@@ -983,7 +962,10 @@ def gradient_ucc(
     number_kappas = 0
     if orbital_optimized:
         number_kappas = len(wf.kappa_idx)
+        wf.kappa = parameters[:number_kappas]
     gradient = np.zeros_like(parameters)
+    wf.thetas = parameters[number_kappas:]
+    wf._move_cep()
     if orbital_optimized:
         gradient[:number_kappas] = orbital_rotation_gradient(
             wf,
@@ -993,6 +975,7 @@ def gradient_ucc(
         parameters,
         orbital_optimized,
     )
+    # print(gradient)
     return gradient
 
 
