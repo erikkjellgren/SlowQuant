@@ -52,8 +52,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
             rdm2=self.wf.rdm2,
         )
         idx_shift = len(self.q_ops)
-        print("Gs", len(self.G_ops))
-        print("qs", len(self.q_ops))
+        #print("Gs", len(self.G_ops))
+        #print("qs", len(self.q_ops))
         grad = get_orbital_gradient_response(
             rdms,
             self.wf.h_mo,

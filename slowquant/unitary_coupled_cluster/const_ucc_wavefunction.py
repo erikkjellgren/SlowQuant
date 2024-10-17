@@ -534,6 +534,7 @@ class LagWaveFunctionUCC:
         excitations: str,
         convergence_threshold: float = 10**-10,
         maxiter: int = 10000,
+        save_orbs: None | str = None,
     ) -> None:
         """Run optimization of UCC wave function.
 

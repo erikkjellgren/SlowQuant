@@ -86,6 +86,7 @@ class WaveFunctionUCC:
         self._rdm4 = None
         self._h_mo = None
         self._g_mo = None
+        self._energy_elec = None
         active_space = []
         orbital_counter = 0
         for i in range(num_elec - cas[0], num_elec):
@@ -271,6 +272,7 @@ class WaveFunctionUCC:
         """
         self._h_mo = None
         self._g_mo = None
+        self._energy_elec = None
         self._c_orthonormal = c
 
     @property
@@ -313,6 +315,7 @@ class WaveFunctionUCC:
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
+        self._energy_elec = None
         self._ci_coeffs = None
         self._thetas = theta.copy()
 
@@ -751,6 +754,17 @@ class WaveFunctionUCC:
         diff = np.abs(S_ortho - one)
         print("Max ortho-normal diff:", np.max(diff))
 
+    @property
+    def energy_elec(self) -> float:
+        """Get the electronic energy.
+
+        Returns:
+            Electronic energy.
+        """
+        if self._energy_elec is None:
+            self._energy_elec = energy_ucc(self.thetas, False, self)
+        return self._energy_elec
+
     def run_ucc(
         self,
         orbital_optimization: bool = False,
@@ -863,7 +877,7 @@ class WaveFunctionUCC:
                 jac=parameter_gradient,
                 options={"maxiter": maxiter},
             )
-        self.energy_elec = res["fun"]
+        self._energy_elec = res["fun"]
         param_idx = 0
         if orbital_optimization:
             param_idx += len(self.kappa)
@@ -1081,6 +1095,6 @@ def load_wavefunction(filename: str) -> WaveFunctionUCC:
         raise ValueError(
             f'Calculate energy is different from saved energy: {energy} and {float(dat["energy_elec"])}.'
         )
-    wf.energy_elec = energy
+    wf._energy_elec = energy
     print(f"Electronic energy of loaded wave function is {energy}")
     return wf

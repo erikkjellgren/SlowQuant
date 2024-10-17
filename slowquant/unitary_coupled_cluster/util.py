@@ -572,7 +572,7 @@ class UpsStructure:
         Returns:
             tUPS ansatz.
         """
-        valid_options = ("n_layers", "do_qnp", "skip_last_singles")
+        valid_options = ("n_layers", "do_qnp", "skip_last_singles", "reverse_tiling")
         for option in ansatz_options:
             if option not in valid_options:
                 raise ValueError(f"Got unknown option for tUPS, {option}. Valid options are: {valid_options}")
@@ -587,8 +587,18 @@ class UpsStructure:
             skip_last_singles = ansatz_options["skip_last_singles"]
         else:
             skip_last_singles = False
+        if "reverse_tiling" in ansatz_options.keys():
+            reverse_tiling = ansatz_options["reverse_tiling"]
+        else:
+            reverse_tiling = False
+        if reverse_tiling:
+            l1_start = 1
+            l2_start = 0
+        else:
+            l1_start = 0
+            l2_start = 1
         for n in range(n_layers):
-            for p in range(0, num_active_orbs - 1, 2):
+            for p in range(l1_start, num_active_orbs - 1, 2):
                 if not do_qnp:
                     # First single
                     self.excitation_operator_type.append("tups_single")
@@ -607,7 +617,7 @@ class UpsStructure:
                 self.excitation_operator_type.append("tups_single")
                 self.excitation_indicies.append((p,))
                 self.n_params += 1
-            for p in range(1, num_active_orbs - 1, 2):
+            for p in range(l2_start, num_active_orbs - 1, 2):
                 if not do_qnp:
                     # First single
                     self.excitation_operator_type.append("tups_single")

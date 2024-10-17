@@ -1117,6 +1117,7 @@ class QuantumInterface:
         for idx2, Px in enumerate(Px_list):
             for idx1, prob in Px.items():
                 M[idx1, idx2] = prob
+        np.save("M0", M)
         self._Minv = np.linalg.inv(M)
 
     def get_info(self) -> None:

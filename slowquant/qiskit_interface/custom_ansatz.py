@@ -47,7 +47,7 @@ def tUPS(
     Returns:
         tUPS ansatz circuit and R parameters needed for gradients.
     """
-    valid_options = ("n_layers", "do_pp", "do_qnp", "skip_last_singles")
+    valid_options = ("n_layers", "do_pp", "do_qnp", "skip_last_singles", "reverse_tiling")
     for option in ansatz_options:
         if option not in valid_options:
             raise ValueError(f"Got unknown option for tUPS, {option}. Valid options are: {valid_options}")
@@ -82,10 +82,22 @@ def tUPS(
                 qc.x(p)
     else:
         qc = HartreeFock(num_orbs, num_elec, mapper)
+    if "reverse_tiling" in ansatz_options.keys():
+        reverse_tiling = ansatz_options["reverse_tiling"]
+    else:
+        reverse_tiling = False
+
+
     grad_param_R = {}
     idx = 0
+    if reverse_tiling:
+        l1_start = 1
+        l2_start = 0
+    else:
+        l1_start = 0
+        l2_start = 1
     for n in range(n_layers):
-        for p in range(0, num_orbs - 1, 2):
+        for p in range(l1_start, num_orbs - 1, 2):
             if not do_qnp:
                 # First single
                 qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx:09d}"))
@@ -104,7 +116,7 @@ def tUPS(
             qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx:09d}"))
             grad_param_R[f"p{idx:09d}"] = 4
             idx += 1
-        for p in range(1, num_orbs - 1, 2):
+        for p in range(l2_start, num_orbs - 1, 2):
             if not do_qnp:
                 # First single
                 qc = tups_single(p, num_orbs, qc, Parameter(f"p{idx:09d}"))

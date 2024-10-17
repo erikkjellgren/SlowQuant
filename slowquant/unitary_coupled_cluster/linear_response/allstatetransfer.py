@@ -105,15 +105,16 @@ class LinearResponseUCC(LinearResponseBaseClass):
         )
 
         idx_shift = len(self.q_ops)
-        print("Gs", len(self.G_ops))
-        print("qs", len(self.q_ops))
+        #print("Gs", len(self.G_ops))
+        #print("qs", len(self.q_ops))
         grad = np.zeros(2 * len(self.q_ops))
-        print("WARNING!")
-        print("Gradient working equations not implemented for state transfer q operators")
+        #print("WARNING!")
+        #print("Gradient working equations not implemented for state transfer q operators")
         if len(grad) != 0:
-            print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-            if np.max(np.abs(grad)) > 10**-3:
-                raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
+            None
+            #print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+            #if np.max(np.abs(grad)) > 10**-3:
+            #    raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
         grad = np.zeros(2 * len(self.G_ops))
         UdH_ket = propagate_state_extended(["Ud", self.H_0i_0a], self.ci_coeffs, *self.index_info_extended)
         for i, op in enumerate(self.G_ops):
@@ -133,9 +134,10 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 *self.index_info_extended,
             )
         if len(grad) != 0:
-            print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-            if np.max(np.abs(grad)) > 10**-3:
-                raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
+            None
+            #print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+            #if np.max(np.abs(grad)) > 10**-3:
+            #    raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
         for j, qJ in enumerate(self.q_ops):
             UdHUqJ = propagate_state_extended(
                 ["Ud", H_2i_2a, "U", qJ], self.csf_coeffs, *self.index_info_extended

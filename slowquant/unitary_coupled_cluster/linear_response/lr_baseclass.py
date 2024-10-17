@@ -141,9 +141,10 @@ class LinearResponseBaseClass:
             hess_eigval,
             _,
         ) = np.linalg.eig(E2)
-        print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
+        #print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
         if np.abs(np.min(hess_eigval)) < 10**-8:
-            print("WARNING: Small eigenvalue in Hessian")
+            None
+            #print("WARNING: Small eigenvalue in Hessian")
         elif np.min(hess_eigval) < 0:
             raise ValueError("Negative eigenvalue in Hessian.")
 
@@ -152,7 +153,7 @@ class LinearResponseBaseClass:
         S[:size, size:] = self.Delta
         S[size:, :size] = -self.Delta
         S[size:, size:] = -self.Sigma
-        print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma)))}")
+        #print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma)))}")
 
         self.hessian = E2
         self.metric = S

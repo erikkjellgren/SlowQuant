@@ -534,6 +534,7 @@ class LagWaveFunctionUCC:
         excitations: str,
         convergence_threshold: float = 10**-10,
         maxiter: int = 10000,
+        save_orbs: None | str = None,
     ) -> None:
         """Run optimization of UCC wave function.
 
@@ -603,7 +604,7 @@ class LagWaveFunctionUCC:
         print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
         lag_val = 10**6
         lam = 0
-        k = 10**4
+        k = 10**12
         for _ in range(1000):
             print("lam, k", lam, k)
             e_tot = partial(
@@ -632,7 +633,7 @@ class LagWaveFunctionUCC:
                 callback=print_progress,
                 method="L-BFGS-B",
                 jac=parameter_gradient,
-                options={"maxiter": maxiter},
+                options={"maxiter": 500},
             )
             param_idx = len(self.kappa)
             for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
@@ -659,12 +660,24 @@ class LagWaveFunctionUCC:
                 self.thetas,
                 self.ucc_layout,
             )
+            print("Energy elec", E_elec)
             print("Constraint error", abs(E_elec - E0))
             if abs(lag_val - res.fun) < 10**-4 and abs(E_elec - E0) < 10**-6:
                 break
             lag_val = res.fun
-            lam += k*abs(E_elec - E0)
-            k *= 5
+            if res.nfev < 500:
+                lam += k*abs(E_elec - E0)
+                k *= 1.1
+            param_idx = len(self.kappa)
+            for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
+                self.kappa[i] = 0
+                self._kappa_old[i] = 0
+            self.thetas = res["x"][param_idx:].tolist()
+            if save_orbs is not None:
+                np.save(f"{save_orbs}_{iteration}", self.c_trans)
+                print("thetas:", self.thetas)
+            if res.nfev < 500:
+                break
 
 
 def energy_lagucc(
@@ -730,7 +743,7 @@ def energy_lagucc(
             Hamiltonian,
             state,
         )
-    return E_lag + lam*(E_elec - E0) + 0.5*k*(E_elec - E0)**2
+    return E_lag + lam*(E_elec - E0) + 0.5*k*(E_elec - E0)**2 - E0*len(wf.excited_states)
 
 
 def gradient_lagucc(

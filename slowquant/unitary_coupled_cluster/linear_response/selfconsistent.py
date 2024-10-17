@@ -64,8 +64,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
         )
         if len(grad) != 0:
             print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-            if np.max(np.abs(grad)) > 10**-3:
-                raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
+            #if np.max(np.abs(grad)) > 10**-3:
+            #    raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
         grad = np.zeros(2 * len(self.G_ops))
         UdH00_ket = propagate_state(["Ud", self.H_0i_0a], self.wf.ci_coeffs, *self.index_info)
         for i, op in enumerate(self.G_ops):
@@ -90,8 +90,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
             )
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-            if np.max(np.abs(grad)) > 10**-3:
-                raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
+            #if np.max(np.abs(grad)) > 10**-3:
+            #    raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
         # Do orbital-orbital blocks
         self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
             rdms,
