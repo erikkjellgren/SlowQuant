@@ -51,6 +51,9 @@ class WaveFunctionSA:
             c_orthonormal: Initial orbital coefficients.
             h_ao: One-electron integrals in AO for Hamiltonian.
             g_ao: Two-electron integrals in AO.
+            states: States to include in the state-averaged expansion.
+                    Tuple of lists containing weights and determinants.
+                    Each state in SA can be constructed of several dets.
             quantum_interface: QuantumInterface.
             include_active_kappa: Include active-active orbital rotations.
         """
@@ -824,6 +827,25 @@ class WaveFunctionSA:
         ):
             osc_strs[idx] = 2 / 3 * excitation_energy * (td_x**2 + td_y**2 + td_z**2)
         return osc_strs
+
+    def _calc_energy_elec(self, ISA_csfs_option: int = 0) -> float:
+        """Run electronic energy simulation.
+
+        Args:
+            ISA_csfs_option: Option for how to deal with superposition state circuits.
+
+        Returns:
+            Electronic energy.
+        """
+        H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+        H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+        energy = 0.0
+        for coeffs, csf in zip(self.states[0], self.states[1]):
+            energy += self.QI.quantum_expectation_value_csfs(
+                (coeffs, csf), H, (coeffs, csf), ISA_csfs_option=ISA_csfs_option
+            )
+
+        return energy / self.num_states
 
 
 def calc_energy_theta(

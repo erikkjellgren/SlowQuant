@@ -588,6 +588,7 @@ class WaveFunctionSAUPS:
                 self.kappa_redundant[i] = 0
                 self._kappa_redundant_old[i] = 0
         self.thetas = res["x"][param_idx : num_theta + param_idx].tolist()
+        self._sa_energy = res["fun"]
         # Subspace diagonalization
         self._do_state_ci()
 

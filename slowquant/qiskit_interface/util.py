@@ -396,33 +396,38 @@ def layout_conserving_compose(
     Returns:
         Composed QuantumCircuit.
     """
-    state_tmp = pm.translation.run(pm.layout.run(state))
-    state_tmp._layout = ansatz.layout  # pylint: disable=protected-access
-    state_tmp = pm.optimization.run(state_tmp)
+    if pm.layout is not None:  # pm could be without layout. Maybe just use ISA_csfs_option = 1 here.
+        state_tmp = pm.translation.run(pm.layout.run(state))
+        state_tmp._layout = ansatz.layout  # pylint: disable=protected-access
+    else:
+        state_tmp = pm.translation.run(state)
+    state_tmp = pm.optimization.run(state_tmp)  # only work with opt. level 1
 
     composed = ansatz.compose(state_tmp, front=True)
 
-    if composed.layout.initial_index_layout(filter_ancillas=True) != ansatz.layout.initial_index_layout(
-        filter_ancillas=True
-    ):
-        raise ValueError("Something went wrong with layout conserving composing. Initial layout changed.")
-    if composed.layout.final_index_layout != ansatz.layout.final_index_layout:
-        raise ValueError("Something went wrong with layout conserving composing. Final layout changed.")
+    if pm.layout is not None:
+        if composed.layout.initial_index_layout(filter_ancillas=True) != ansatz.layout.initial_index_layout(
+            filter_ancillas=True
+        ):
+            raise ValueError("Something went wrong with layout conserving composing. Initial layout changed.")
+        if composed.layout.final_index_layout != ansatz.layout.final_index_layout:
+            raise ValueError("Something went wrong with layout conserving composing. Final layout changed.")
 
     if optimization:
-        composed_opt = pm.optimization.run(composed)
-        composed_opt._layout = ansatz.layout  # pylint: disable=protected-access
+        composed_opt = pm.optimization.run(composed)  # only work with opt. level 1
+        if pm.layout is not None:
+            composed_opt._layout = ansatz.layout  # pylint: disable=protected-access
 
-        if composed_opt.layout.initial_index_layout(
-            filter_ancillas=True
-        ) != ansatz.layout.initial_index_layout(filter_ancillas=True):
-            raise ValueError(
-                "Something went wrong with layout conserving composing. Initial layout changed in optimization."
-            )
-        if composed_opt.layout.final_index_layout != ansatz.layout.final_index_layout:
-            raise ValueError(
-                "Something went wrong with layout conserving composing. Final layout changed in optimization."
-            )
+            if composed_opt.layout.initial_index_layout(
+                filter_ancillas=True
+            ) != ansatz.layout.initial_index_layout(filter_ancillas=True):
+                raise ValueError(
+                    "Something went wrong with layout conserving composing. Initial layout changed in optimization."
+                )
+            if composed_opt.layout.final_index_layout != ansatz.layout.final_index_layout:
+                raise ValueError(
+                    "Something went wrong with layout conserving composing. Final layout changed in optimization."
+                )
 
         return composed_opt
     return composed

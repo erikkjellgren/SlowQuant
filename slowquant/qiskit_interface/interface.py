@@ -434,45 +434,50 @@ class QuantumInterface:
         if circuit_return.layout is None:
             self._measurement_indices = np.arange(circuit_return.num_qubits)
             self._circuit_indices = np.arange(circuit_return.num_qubits)
+
+            # No layout - no problem. We still need these defined
+            self._finalfixedlayout_pm = self.pass_manager
+            self._initialfixedlayout_pm = self.pass_manager
+
         else:
             self._measurement_indices = circuit_return.layout.final_index_layout()  # with swaps from routing
             self._circuit_indices = circuit_return.layout.initial_index_layout(
                 filter_ancillas=True
             )  # no swaps from routing
 
+            # Create a pass manager that maps on the Ansatz Circuit qubits in the final layout (with swaps)
+            if hasattr(self, "_pm_backend"):
+                self._finalfixedlayout_pm = generate_preset_pass_manager(
+                    self._primitive_level,
+                    backend=self._pm_backend,
+                    initial_layout=self._measurement_indices,
+                )
+            else:
+                self._finalfixedlayout_pm = generate_preset_pass_manager(
+                    self._primitive_level,
+                    backend=self._primitive_backend,
+                    initial_layout=self._measurement_indices,
+                )
+
+            # Create a pass manager that maps on the Ansatz Circuit qubits in the initial layout (no swaps)
+            if hasattr(self, "_pm_backend"):
+                self._initialfixedlayout_pm = generate_preset_pass_manager(
+                    1,  # needs level 1 to work with layout-conserving composing
+                    backend=self._pm_backend,
+                    initial_layout=self._circuit_indices,
+                )
+            else:
+                self._initialfixedlayout_pm = generate_preset_pass_manager(
+                    1,  # needs level 1 to work with layout-conserving composing
+                    backend=self._primitive_backend,
+                    initial_layout=self._circuit_indices,
+                )
+
         # Transpile X and Y measurement gates: only translation to basis gates and optimization.
         self._transp_xy = [
             self.pass_manager.optimization.run(self.pass_manager.translation.run(to_CBS_measurement("X"))),
             self.pass_manager.optimization.run(self.pass_manager.translation.run(to_CBS_measurement("Y"))),
         ]
-
-        # Create a pass manager that maps on the Ansatz Circuit qubits in the final layout (with swaps)
-        if hasattr(self, "_pm_backend"):
-            self._finalfixedlayout_pm = generate_preset_pass_manager(
-                self._primitive_level,
-                backend=self._pm_backend,
-                initial_layout=self._measurement_indices,
-            )
-        else:
-            self._finalfixedlayout_pm = generate_preset_pass_manager(
-                self._primitive_level,
-                backend=self._primitive_backend,
-                initial_layout=self._measurement_indices,
-            )
-
-        # Create a pass manager that maps on the Ansatz Circuit qubits in the initial layout (no swaps)
-        if hasattr(self, "_pm_backend"):
-            self._initialfixedlayout_pm = generate_preset_pass_manager(
-                self._primitive_level,
-                backend=self._pm_backend,
-                initial_layout=self._circuit_indices,
-            )
-        else:
-            self._initialfixedlayout_pm = generate_preset_pass_manager(
-                self._primitive_level,
-                backend=self._primitive_backend,
-                initial_layout=self._circuit_indices,
-            )
 
         return circuit_return
 
@@ -692,7 +697,7 @@ class QuantumInterface:
             ket_csf: Ket CSF.
             custom_parameters: Non-default run parameters.
             ISA_csfs_option: Option on how to treat the composing of superposition state and Ansatz:
-                0: Find default fitting error mitigation. Default without EM: 1
+                0: Find default basedon on error mitigation. Default without EM: 1
                 1: Allow flexible (changing) layout
                 2: Fixed layout but allow change in order (swaps)
                 3: Fixed layout, fixed order, without optimizing circuit after composing
@@ -715,6 +720,7 @@ class QuantumInterface:
                 ISA_csfs_option = 4  # could also use 2
                 if self.do_M_ansatz0:
                     ISA_csfs_option = 3
+        print("ISA csfs option: ", ISA_csfs_option)
         if custom_parameters is None:
             run_parameters = self.parameters
         else:
@@ -755,7 +761,6 @@ class QuantumInterface:
                     circuit = get_determinant_superposition_reference(
                         bra_det, ket_det, self.num_orbs, self.mapper
                     )
-                    self.state_superpos = circuit
                     # Superposition state contains non-native gates for ISA -> transpilatio needed.
                     if self.ISA:
                         match ISA_csfs_option:
@@ -776,15 +781,6 @@ class QuantumInterface:
                                 circuit = layout_conserving_compose(self.ansatz_circuit, circuit, self._initialfixedlayout_pm, optimization=True)
                             case _:
                                 raise ValueError("Wrong ISA_csfs_option specified. Needs to be 1,2,3,4.")
-
-                        # For debugging:
-                        if self._measurement_indices != circuit.layout.final_index_layout():
-                            print("New layout in superposition state")
-                            print(bra_det, "   ", ket_det)
-                            print("New layout: ", circuit.layout.final_index_layout())
-                        else:
-                            print("Layout is consistent")
-                            print(bra_det, "   ", ket_det)
                     else:
                         circuit = self.ansatz_circuit.compose(circuit, front=True)
                     if isinstance(self._primitive, BaseEstimator):
@@ -1447,7 +1443,11 @@ class QuantumInterface:
         if self.ISA:
             data += f"\n {'Circuit layout:':<20} {self._measurement_indices}"
             if self._internal_pm:
+                data += f"\n {'Transpilation strategy:':<20} {'Default / internal'}"
                 data += f"\n {'Transpiled backend:':<20} {self._primitive_backend}\n {'Transpiled opt. level:':<20} {self._primitive_level}"
+            else:
+                data += f"\n {'Transpilation strategy:':<20} {'External PassManager'}"
+                data += f"\n {'Transpiled backend:':<20} {self._pm_backend}\n"
             if isinstance(self._primitive, BaseSamplerV2) and hasattr(self._primitive.options, "twirling"):
                 data += f"\n {'Pauli twirling:':<20} {self._primitive.options.twirling.enable_gates}\n {'Dynamic decoupling:':<20} {self._primitive.options.dynamical_decoupling.enable}"
         print(data)
