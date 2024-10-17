@@ -659,7 +659,7 @@ class QuantumInterface:
         op: FermionicOperator,
         ket_csf: tuple[list[float], list[str]],
         custom_parameters: list[float] | None = None,
-        ISA_csfs_option: int = 1,
+        ISA_csfs_option: int = 0,
     ) -> float:
         r"""Calculate expectation value using different bra and ket of a Hermitian operator.
 
@@ -692,6 +692,7 @@ class QuantumInterface:
             ket_csf: Ket CSF.
             custom_parameters: Non-default run parameters.
             ISA_csfs_option: Option on how to treat the composing of superposition state and Ansatz:
+                0: Find default fitting error mitigation. Default without EM: 1
                 1: Allow flexible (changing) layout
                 2: Fixed layout but allow change in order (swaps)
                 3: Fixed layout, fixed order, without optimizing circuit after composing
@@ -708,6 +709,12 @@ class QuantumInterface:
             raise ValueError(
                 "quantum_expectation_value_csfs got unsupported Qiskit primitive, {type(self._primitive)}"
             )
+        if ISA_csfs_option == 0:
+            ISA_csfs_option = 1
+            if self.do_M_mitigation:
+                ISA_csfs_option = 4  # could also use 2
+                if self.do_M_ansatz0:
+                    ISA_csfs_option = 3
         if custom_parameters is None:
             run_parameters = self.parameters
         else:
