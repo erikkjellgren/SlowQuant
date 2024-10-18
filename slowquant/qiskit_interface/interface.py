@@ -760,6 +760,7 @@ class QuantumInterface:
                     circuit = get_determinant_superposition_reference(
                         bra_det, ket_det, self.num_orbs, self.mapper
                     )
+                    self.superpos = circuit
                     # Superposition state contains non-native gates for ISA -> transpilatio needed.
                     if self.ISA:
                         match ISA_csfs_option:
@@ -782,6 +783,7 @@ class QuantumInterface:
                                 raise ValueError("Wrong ISA_csfs_option specified. Needs to be 1,2,3,4.")
                     else:
                         circuit = self.ansatz_circuit.compose(circuit, front=True)
+                    self.composed = circuit
                     if isinstance(self._primitive, BaseEstimator):
                         val += N * self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
                     if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
