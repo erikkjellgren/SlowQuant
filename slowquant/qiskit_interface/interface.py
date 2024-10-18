@@ -720,7 +720,6 @@ class QuantumInterface:
                 ISA_csfs_option = 4  # could also use 2
                 if self.do_M_ansatz0:
                     ISA_csfs_option = 3
-        print("ISA csfs option: ", ISA_csfs_option)
         if custom_parameters is None:
             run_parameters = self.parameters
         else:
