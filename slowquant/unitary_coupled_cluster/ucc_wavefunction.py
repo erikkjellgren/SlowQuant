@@ -856,7 +856,7 @@ class WaveFunctionUCC:
                 parameters,
                 tol=convergence_threshold,
                 callback=silent_progress,
-                method="L-BFGS-B",
+                method="BFGS",
                 jac=parameter_gradient,
             )
         else:
@@ -877,7 +877,7 @@ class WaveFunctionUCC:
                 parameters,
                 tol=convergence_threshold,
                 callback=print_progress,
-                method="L-BFGS-B",
+                method="BFGS",
                 jac=parameter_gradient,
                 options={"maxiter": maxiter},
             )
@@ -909,15 +909,12 @@ def energy_ucc(
     Returns:
         Electronic energy.
     """
-    kappa = []
-    idx_counter = 0
+    number_kappas = 0
     if orbital_optimized:
-        for _ in range(len(wf.kappa_idx)):
-            kappa.append(parameters[idx_counter])
-            idx_counter += 1
-        wf.kappa = kappa
-    theta = parameters[idx_counter:]
-    wf.thetas = theta
+        number_kappas = len(wf.kappa_idx)
+        wf.kappa = parameters[:number_kappas]
+    wf.thetas = parameters[number_kappas:]
+    wf._move_cep()
     E = expectation_value(
         wf.ci_coeffs,
         [
