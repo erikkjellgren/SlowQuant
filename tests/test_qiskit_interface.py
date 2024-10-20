@@ -1,10 +1,12 @@
 import numpy as np
 import pyscf
 from qiskit.primitives import Estimator, Sampler
+from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_aer import AerSimulator
 from qiskit_aer.primitives import Sampler as SamplerAer
 from qiskit_aer.primitives import SamplerV2 as SamplerV2Aer
 from qiskit_ibm_runtime import SamplerV2 as SamplerV2IBM
+from qiskit_ibm_runtime.fake_provider import FakeTorino
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 
 import slowquant.qiskit_interface.linear_response.allprojected as q_allprojected  # pylint: disable=consider-using-from-import
@@ -47,7 +49,7 @@ def test_LiH_naive_estimator() -> None:
     estimator = Estimator()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -122,7 +124,7 @@ def test_LiH_naive_samplerQiskit() -> None:
     estimator = Sampler()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -197,7 +199,7 @@ def test_LiH_naive() -> None:
     estimator = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -272,7 +274,7 @@ def test_LiH_projected() -> None:
     estimator = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -341,7 +343,7 @@ def test_LiH_dumb_projected() -> None:
     estimator = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -410,7 +412,7 @@ def test_LiH_allprojected() -> None:
     estimator = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -485,7 +487,7 @@ def test_LiH_dumb_allprojected() -> None:
     estimator = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -554,7 +556,7 @@ def test_LiH_naive_sampler_ISA() -> None:
     sampler = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(sampler, "tUCCSD", mapper, ISA=True)
+    QI = QuantumInterface(sampler, "fUCCSD", mapper, ISA=True)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -611,7 +613,7 @@ def test_LiH_oscillator_strength() -> None:
     estimator = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -713,7 +715,7 @@ def test_gradient_optimizer_H2() -> None:
 
     estimator = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
-    QI = QuantumInterface(estimator, "tUCCD", mapper)
+    QI = QuantumInterface(estimator, "fUCCD", mapper)
 
     WF = WaveFunction(
         mol.nao * 2,
@@ -745,7 +747,7 @@ def test_sampler_changes() -> None:
 
     # Ideal Estimator
     estimator = Estimator()
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -817,7 +819,7 @@ def test_shots() -> None:
     sampler = SamplerAer(transpile_options={"optimization_level": 0})
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(sampler, "tUCCSD", mapper, shots=10)
+    QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=10)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -875,7 +877,7 @@ def test_samplerV2() -> None:
     sampler = SamplerV2Aer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(sampler, "tUCCSD", mapper, shots=10)
+    QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=10)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -909,7 +911,7 @@ def test_samplerV2_ibm() -> None:
     sampler = SamplerV2IBM(mode=aer)
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(sampler, "tUCCSD", mapper, shots=10)
+    QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=10)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -940,7 +942,7 @@ def test_custom() -> None:
     sampler = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(sampler, "tUCCSD", mapper, shots=None)
+    QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=None)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -971,3 +973,44 @@ def test_custom() -> None:
     QI.parameters = qc_param
 
     assert abs(QI.quantum_expectation_value(qc_H) - energy) < 10**-8
+
+
+def test_H2_sampler_couplingmap() -> None:
+    """
+    Test coupling map.
+    """
+    # Define molecule
+    atom = "H .0 .0 .0; H .0 .0 1.0"
+    basis = "sto-3g"
+
+    # PySCF
+    mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
+    rhf = pyscf.scf.RHF(mol).run()
+
+    # Optimize WF with QSQ
+    sampler = SamplerAer()
+    mapper = JordanWignerMapper()
+
+    QI = QuantumInterface(sampler, "fUCCSD", mapper, ISA=True)
+
+    qWF = WaveFunction(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 2),
+        rhf.mo_coeff,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        QI,
+    )
+
+    qWF.run_vqe_2step("rotosolve", True)
+
+    pm = generate_preset_pass_manager(3, backend=FakeTorino())
+    QI.ISA = True
+    QI.pass_manager = pm
+
+    QI._reset_cliques()  # pylint: disable=protected-access
+
+    assert np.allclose(
+        qWF._calc_energy_elec(), -1.6303275411526188, atol=10**-6  # pylint: disable=protected-access
+    )

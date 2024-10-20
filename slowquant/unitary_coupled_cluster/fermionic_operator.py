@@ -87,7 +87,7 @@ def do_extended_normal_ordering(
     will be first and the ordering will be descending.
 
     Returns:
-        Reoreder operator dict and factor dict.
+        Reordered operator dict and factor dict.
     """
     operator_queue = []
     factor_queue = []
@@ -164,6 +164,10 @@ class FermionicOperator:
     ) -> None:
         """Initialize fermionic operator class.
 
+        Fermionic operators are defined via an annihilation_operator dictionary where each entry is one addend of the operator.
+        Each entry is a strings of annihilation operator specified via its string (key) and list of a_op (item).
+        The dictionary factor contains the factor for each of the addend of the fermionic operator.
+
         Args:
             annihilation_operator: Annihilation operator.
             factor: Factor in front of operator.
@@ -196,6 +200,7 @@ class FermionicOperator:
         Returns:
             New fermionic operator.
         """
+        # Combine annihilation string entries of two FermionicOperators.
         operators = copy.copy(self.operators)
         factors = copy.copy(self.factors)
         for string_key in fermistring.operators.keys():
@@ -218,6 +223,7 @@ class FermionicOperator:
         Returns:
             New fermionic operator.
         """
+        # Combine annihilation string entries of two FermionicOperators with relevant sign flip.
         operators = copy.copy(self.operators)
         factors = copy.copy(self.factors)
         for string_key in fermistring.operators.keys():
@@ -242,8 +248,10 @@ class FermionicOperator:
         """
         operators: dict[str, list[a_op]] = {}
         factors: dict[str, float] = {}
+        # Iterate over all strings in both FermionicOperators
         for string_key1 in fermistring.operators.keys():
             for string_key2 in self.operators.keys():
+                # Build new strings and factors via normal ordering of product of two strings
                 new_ops, new_facs = do_extended_normal_ordering(
                     FermionicOperator(
                         {
@@ -332,6 +340,7 @@ class FermionicOperator:
         """
         qiskit_form = {}
         remapping = {}
+        #  Map indices from alpha,beta,alpha,beta to alpha,alpha,beta,beta.
         for i in range(2 * num_orbs):
             if i < num_orbs:
                 remapping[2 * i] = i
@@ -345,7 +354,21 @@ class FermionicOperator:
     def get_folded_operator(
         self, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int
     ) -> FermionicOperator:
-        """Get folded operator.
+        r"""Get folded operator.
+
+        Operator is split into spaces
+
+        .. math::
+            \hat{O} = \hat{O}_I\otimes \hat{O}_A\otimes \hat{O}_V
+
+        giving the expectation values as
+
+        .. math::
+            \left<0\left(\boldsymbol{\theta}\right)\left|\hat{O}\right|0\left(\boldsymbol{\theta}\right)\right>
+            = \left<I\left|\hat{O}_{I}\right|I\right>\otimes \left<A\left(\boldsymbol{\theta}\right)\left|\hat{O}_{A}\right|A\left(\boldsymbol{\theta}\right)\right>
+                \otimes\left<V\left|\hat{O}_{V}\right|V\right>
+
+        where the inactive and virtual parts follow simple annihilation operator arguments, leaving just the active part.
 
         Warning, multiplication of folded operators, might give wrong operators.
         (I have not quite figured out a good programming structure that will not allow multiplication after folding)
@@ -365,6 +388,7 @@ class FermionicOperator:
         inactive_idx = []
         active_idx = []
         virtual_idx = []
+        # Get indices of spaces
         for i in range(2 * num_inactive_orbs + 2 * num_active_orbs + 2 * num_virtual_orbs):
             if i < 2 * num_inactive_orbs:
                 inactive_idx.append(i)
@@ -373,6 +397,7 @@ class FermionicOperator:
             else:
                 virtual_idx.append(i)
 
+        # Loop over string of annihilation operators
         for key_string in self.operators.keys():
             virtual = []
             virtual_dagger = []
@@ -381,6 +406,7 @@ class FermionicOperator:
             active = []
             active_dagger = []
             fac = 1
+            # Loop over individual annihilation operator and sort into spaces
             for anni in self.operators[key_string]:
                 if anni.dagger:
                     if anni.idx in inactive_idx:
@@ -398,14 +424,13 @@ class FermionicOperator:
                         active.append(a_op(anni.spinless_idx - num_inactive_orbs, anni.spin, anni.dagger))
                     elif anni.idx in virtual_idx:
                         virtual.append(anni.idx)
-            # Any virtual indices will make the operator evaulate to zero.
+            # Any virtual indices will make the operator evaluate to zero.
             if len(virtual) != 0 or len(virtual_dagger) != 0:
                 continue
-            active_op = active_dagger + active
+            active_op = active_dagger + active  # list
             bra_side = inactive_dagger
             ket_side = inactive
-            # The virtual + inactive bra and ket side must end up giving
-            # identical state vectors outside of the active space.
+            # The inactive bra and ket side must end up giving identical state vectors.
             if bra_side != ket_side:
                 continue
             if len(inactive_dagger) % 2 == 1 and len(active_dagger) % 2 == 1:

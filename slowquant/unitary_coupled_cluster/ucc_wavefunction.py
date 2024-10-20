@@ -56,6 +56,7 @@ class WaveFunctionUCC:
         """
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
+        # Init stuff
         self._c_orthonormal = c_orthonormal
         self.h_ao = h_ao
         self.g_ao = g_ao
@@ -86,6 +87,7 @@ class WaveFunctionUCC:
         self._rdm4 = None
         self._h_mo = None
         self._g_mo = None
+        # Construct spin orbital spaces and indices
         active_space = []
         orbital_counter = 0
         for i in range(num_elec - cas[0], num_elec):
@@ -115,7 +117,7 @@ class WaveFunctionUCC:
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
         self.num_active_orbs = self.num_active_spin_orbs // 2
         self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
-        # Contruct spatial idx
+        # Construct spatial idx
         self.inactive_idx: list[int] = []
         self.virtual_idx: list[int] = []
         self.active_idx: list[int] = []
@@ -136,7 +138,7 @@ class WaveFunctionUCC:
         for idx in self.active_unocc_spin_idx:
             if idx // 2 not in self.active_unocc_idx:
                 self.active_unocc_idx.append(idx // 2)
-        # Make shifted indecies
+        # Make shifted indices
         if len(self.active_spin_idx) != 0:
             active_shift = np.min(self.active_spin_idx)
             for active_idx in self.active_spin_idx:
@@ -161,8 +163,10 @@ class WaveFunctionUCC:
         self.kappa_redundant_idx = []
         self._kappa_old = []
         # kappa can be optimized in spatial basis
+        # Loop over all q>p orb combinations and find redundant kappas
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
+                # find redundant kappas
                 if p in self.inactive_idx and q in self.inactive_idx:
                     self.kappa_redundant_idx.append([p, q])
                     continue
@@ -173,20 +177,14 @@ class WaveFunctionUCC:
                     if p in self.active_idx and q in self.active_idx:
                         self.kappa_redundant_idx.append([p, q])
                         continue
-                if include_active_kappa:
-                    if p in self.active_occ_idx and q in self.active_occ_idx:
-                        self.kappa_redundant_idx.append([p, q])
-                        continue
-                    if p in self.active_unocc_idx and q in self.active_unocc_idx:
-                        self.kappa_redundant_idx.append([p, q])
-                        continue
                 if not (p in self.active_idx and q in self.active_idx):
                     self.kappa_no_activeactive_idx.append([p, q])
                     self.kappa_no_activeactive_idx_dagger.append([q, p])
+                # the rest is non-redundant
                 self.kappa.append(0.0)
                 self._kappa_old.append(0.0)
                 self.kappa_idx.append([p, q])
-        # HF like orbital rotation indecies
+        # HF like orbital rotation indices
         self.kappa_hf_like_idx = []
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
@@ -205,7 +203,7 @@ class WaveFunctionUCC:
         hf_det = int("1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec), 2)
         self.csf_coeffs[self.det2idx[hf_det]] = 1
         self._ci_coeffs = np.copy(self.csf_coeffs)
-        # Construct UCC
+        # Construct UCC Structure
         self._excitations = excitations  # Needed for saving the wave function
         self.ucc_layout = UccStructure()
         if "s" in excitations.lower():
@@ -322,12 +320,14 @@ class WaveFunctionUCC:
         Returns:
             Orbital coefficients.
         """
+        # Construct anti-hermitian kappa matrix
         kappa_mat = np.zeros_like(self._c_orthonormal)
         if len(self.kappa) != 0:
             if np.max(np.abs(self.kappa)) > 0.0:
                 for kappa_val, (p, q) in zip(self.kappa, self.kappa_idx):
                     kappa_mat[p, q] = kappa_val
                     kappa_mat[q, p] = -kappa_val
+        # Apply orbital rotation unitary to MO coefficients
         return np.matmul(self._c_orthonormal, scipy.linalg.expm(-kappa_mat))
 
     @property
@@ -354,7 +354,7 @@ class WaveFunctionUCC:
 
     @property
     def rdm1(self) -> np.ndarray:
-        """Calcuate one-electron reduced density matrix.
+        """Calculate one-electron reduced density matrix in the active space.
 
         Returns:
             One-electron reduced density matrix.
@@ -385,7 +385,7 @@ class WaveFunctionUCC:
 
     @property
     def rdm2(self) -> np.ndarray:
-        """Calcuate two-electron reduced density matrix.
+        """Calculate two-electron reduced density matrix in the actice space.
 
         Returns:
             Two-electron reduced density matrix.
@@ -439,7 +439,7 @@ class WaveFunctionUCC:
 
     @property
     def rdm3(self) -> np.ndarray:
-        """Calcuate three-electron reduced density matrix.
+        """Calculate three-electron reduced density matrix in the actice space.
 
         Currently not utilizing the full symmetry.
 
@@ -507,7 +507,7 @@ class WaveFunctionUCC:
 
     @property
     def rdm4(self) -> np.ndarray:
-        """Calcuate four-electron reduced density matrix.
+        """Calculate four-electron reduced density matrix in the active space.
 
         Currently not utilizing the full symmetry.
 
@@ -760,6 +760,7 @@ class WaveFunctionUCC:
             convergence_threshold: Energy threshold for convergence.
             maxiter: Maximum number of iterations.
         """
+        # Define energy and gradient (partial) functions with parameters as free argument
         e_tot = partial(
             energy_ucc,
             orbital_optimized=orbital_optimization,
@@ -798,6 +799,7 @@ class WaveFunctionUCC:
             global iteration  # pylint: disable=global-variable-undefined
             iteration += 1  # type: ignore [name-defined]
 
+        # Init parameters
         parameters: list[float] = []
         num_kappa = 0
         num_theta1 = 0
@@ -809,8 +811,7 @@ class WaveFunctionUCC:
         if orbital_optimization:
             parameters += self.kappa
             num_kappa += len(self.kappa)
-        for theta in self.thetas:
-            parameters.append(theta)
+        parameters = parameters + self.thetas
         for exc_type in self.ucc_layout.excitation_operator_type:
             if exc_type == "sa_single":
                 num_theta1 += 1
@@ -826,6 +827,7 @@ class WaveFunctionUCC:
                 num_theta6 += 1
             else:
                 raise ValueError(f"Got unknown excitation type, {exc_type}")
+        # Optimization
         if is_silent:
             res = scipy.optimize.minimize(
                 e_tot,
@@ -858,6 +860,7 @@ class WaveFunctionUCC:
                 options={"maxiter": maxiter},
             )
         self.energy_elec = res["fun"]
+        # Set kappas to zero (orbitals have been optimized)
         param_idx = 0
         if orbital_optimization:
             param_idx += len(self.kappa)
@@ -886,28 +889,33 @@ def energy_ucc(
     Returns:
         Electronic energy.
     """
+    # Get kappa and theta parameters separately
     kappa = []
     idx_counter = 0
     if orbital_optimized:
-        for _ in range(len(wf.kappa_idx)):
-            kappa.append(parameters[idx_counter])
-            idx_counter += 1
-    theta = parameters[idx_counter:]
+        idx_counter = len(wf.kappa_idx)
+        kappa = list(parameters[:idx_counter])
+    theta = list(parameters[idx_counter:])
+    assert len(parameters) == len(kappa) + len(theta)
 
     kappa_mat = np.zeros_like(wf.c_orthonormal)
     if orbital_optimized:
+        # Build kappa matrix
         for kappa_val, (p, q) in zip(
             np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx  # pylint: disable=protected-access
         ):
             kappa_mat[p, q] = kappa_val
             kappa_mat[q, p] = -kappa_val
+    # Apply orbital rotation unitary
     c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
     if orbital_optimized:
+        # Update kappas
         wf._kappa_old = kappa.copy()  # pylint: disable=protected-access
     # Moving expansion point of kappa
     wf.c_orthonormal = c_trans
     # Add thetas
     wf.thetas = theta
+    # Energy calculation via expectation value fct (using propagate state)
     return expectation_value(
         wf.ci_coeffs,
         [
@@ -923,7 +931,7 @@ def energy_ucc(
         wf.det2idx,
         wf.num_inactive_orbs,
         wf.num_active_orbs,
-        wf.num_inactive_orbs,
+        wf.num_virtual_orbs,
         wf.num_active_elec_alpha,
         wf.num_active_elec_beta,
         wf.thetas,
@@ -936,7 +944,7 @@ def gradient_ucc(
     orbital_optimized: bool,
     wf: WaveFunctionUCC,
 ) -> np.ndarray:
-    """Calcuate electronic gradient.
+    """Calculate electronic gradient.
 
     Args:
         parameters: Sequence of all parameters.
@@ -966,7 +974,7 @@ def gradient_ucc(
 def orbital_rotation_gradient(
     wf: WaveFunctionUCC,
 ) -> np.ndarray:
-    """Calcuate electronic gradient with respect to orbital rotations.
+    """Calculate electronic gradient with respect to orbital rotations using RDMs.
 
     Args:
         wf: Wave function object.
@@ -974,6 +982,7 @@ def orbital_rotation_gradient(
     Return:
         Electronic gradient with respect to orbital rotations.
     """
+    # Analytical gradient via RDMs
     rdms = ReducedDenstiyMatrix(
         wf.num_inactive_orbs,
         wf.num_active_orbs,
@@ -992,7 +1001,7 @@ def active_space_parameter_gradient(
     parameters: list[float],
     orbital_optimized: bool,
 ) -> np.ndarray:
-    """Calcuate electronic gradient with respect to active space parameters.
+    """Calculate electronic gradient with respect to active space parameters.
 
     Args:
         wf: Wave function object.
@@ -1001,14 +1010,16 @@ def active_space_parameter_gradient(
         orbital_optimized: Do orbital optimization.
 
     Returns:
-        Electronic gradient with respect to active spae parameters.
+        Electronic gradient with respect to active space parameters.
     """
+    # Get theta parameters
     idx_counter = 0
     if orbital_optimized:
         for _ in range(len(wf.kappa_idx)):
             idx_counter += 1
     theta_params = parameters[idx_counter:]
 
+    # Hamiltonian matrix
     Hamiltonian = build_operator_matrix(
         hamiltonian_0i_0a(
             wf.h_mo,
@@ -1021,8 +1032,9 @@ def active_space_parameter_gradient(
         wf.num_active_orbs,
     )
 
+    # Numerical finite difference gradient
     gradient_theta = np.zeros_like(theta_params)
-    eps = np.finfo(np.float64).eps ** (1 / 2)
+    eps = np.finfo(np.float64).eps ** (1 / 2)  # half-precision of double-precision floating-point numbers
     E = expectation_value_mat(wf.ci_coeffs, Hamiltonian, wf.ci_coeffs)
     for i in range(len(theta_params)):  # pylint: disable=consider-using-enumerate
         sign_step = (theta_params[i] >= 0).astype(float) * 2 - 1  # type: ignore [attr-defined]
