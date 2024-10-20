@@ -15,9 +15,10 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
-    get_orbital_gradient,
     get_electronic_energy,
+    get_orbital_gradient,
 )
+from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.operator_matrix import (
     Epq_matrix,
     build_operator_matrix,
@@ -27,18 +28,19 @@ from slowquant.unitary_coupled_cluster.operator_matrix import (
     get_indexing,
     propagate_state,
 )
-from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
-from slowquant.unitary_coupled_cluster.util import UccStructure
-from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.operators import (
+    Epq,
     G1_sa,
     G2_1_sa,
     G2_2_sa,
+    hamiltonian_0i_0a,
 )
 from slowquant.unitary_coupled_cluster.util import (
+    UccStructure,
     iterate_t1_sa,
     iterate_t2_sa,
 )
+
 
 class LagWaveFunctionUCC:
     def __init__(
@@ -166,13 +168,13 @@ class LagWaveFunctionUCC:
             for active_idx in self.active_unocc_idx:
                 self.active_unocc_idx_shifted.append(active_idx - active_shift)
         # Find non-redundant kappas
-        self.kappa = []
+        self._kappa = []
         self.kappa_idx = []
         self._kappa_old = []
         # kappa can be optimized in spatial basis
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
-                self.kappa.append(0.0)
+                self._kappa.append(0.0)
                 self._kappa_old.append(0.0)
                 self.kappa_idx.append([p, q])
         # Construct determinant basis
@@ -227,6 +229,17 @@ class LagWaveFunctionUCC:
         self._c_orthonormal = c
 
     @property
+    def kappa(self) -> list[float]:
+        return self._kappa.copy()
+
+    @kappa.setter
+    def kappa(self, k: list[float]) -> None:
+        self._h_mo = None
+        self._g_mo = None
+        self._energy_elec = None
+        self._kappa = k.copy()
+
+    @property
     def ci_coeffs(self) -> np.ndarray:
         """Get CI coefficients.
 
@@ -278,11 +291,9 @@ class LagWaveFunctionUCC:
             Orbital coefficients.
         """
         kappa_mat = np.zeros_like(self._c_orthonormal)
-        if len(self.kappa) != 0:
-            if np.max(np.abs(self.kappa)) > 0.0:
-                for kappa_val, (p, q) in zip(self.kappa, self.kappa_idx):
-                    kappa_mat[p, q] = kappa_val
-                    kappa_mat[q, p] = -kappa_val
+        for kappa_val, kappa_val_old, (p, q) in zip(self.kappa, self._kappa_old, self.kappa_idx):
+            kappa_mat[p, q] = kappa_val - kappa_val_old
+            kappa_mat[q, p] = -(kappa_val - kappa_val_old)
         return np.matmul(self._c_orthonormal, scipy.linalg.expm(-kappa_mat))
 
     @property
@@ -487,7 +498,6 @@ class LagWaveFunctionUCC:
                             self._rdm2_lag[s_idx, r_idx, q_idx, p_idx] = val  # type: ignore
         return self._rdm2_lag
 
-
     def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
         r"""Check orthonormality of orbitals.
 
@@ -517,16 +527,28 @@ class LagWaveFunctionUCC:
                         G_ops.append(G2_2_sa(i, j, a, b))
             self._excited_states = []
             for G in G_ops:
-                self._excited_states.append(propagate_state(["U", G], self.csf_coeffs, self.idx2det,
-                    self.det2idx,
-                    self.num_inactive_orbs,
-                    self.num_active_orbs,
-                    self.num_inactive_orbs,
-                    self.num_active_elec_alpha,
-                    self.num_active_elec_beta,
-                    self.thetas,
-                    self.ucc_layout))
+                self._excited_states.append(
+                    propagate_state(
+                        ["U", G],
+                        self.csf_coeffs,
+                        self.idx2det,
+                        self.det2idx,
+                        self.num_inactive_orbs,
+                        self.num_active_orbs,
+                        self.num_inactive_orbs,
+                        self.num_active_elec_alpha,
+                        self.num_active_elec_beta,
+                        self.thetas,
+                        self.ucc_layout,
+                    )
+                )
         return self._excited_states
+
+    def _move_cep(self) -> None:
+        """Move current expansion point."""
+        c = self.c_trans
+        self._c_orthonormal = c
+        self._kappa_old = self.kappa
 
     def run_lagucc(
         self,
@@ -603,23 +625,18 @@ class LagWaveFunctionUCC:
         )
         print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
         lag_val = 10**6
-        lam = 0
         k = 10**12
         for _ in range(1000):
-            print("lam, k", lam, k)
             e_tot = partial(
                 energy_lagucc,
                 wf=self,
                 E0=E0,
-                lam=lam,
                 k=k,
-                
             )
             parameter_gradient = partial(
                 gradient_lagucc,
                 wf=self,
                 E0=E0,
-                lam=lam,
                 k=k,
             )
             parameters = []
@@ -631,7 +648,7 @@ class LagWaveFunctionUCC:
                 parameters,
                 tol=convergence_threshold,
                 callback=print_progress,
-                method="L-BFGS-B",
+                method="BFGS",
                 jac=parameter_gradient,
                 options={"maxiter": 500},
             )
@@ -641,11 +658,11 @@ class LagWaveFunctionUCC:
                 self._kappa_old[i] = 0
             self.thetas = res["x"][param_idx:].tolist()
             H = hamiltonian_0i_0a(
-                        self.h_mo,
-                        self.g_mo,
-                        self.num_inactive_orbs,
-                        self.num_active_orbs,
-                    )
+                self.h_mo,
+                self.g_mo,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+            )
             E_elec = expectation_value(
                 self.ci_coeffs,
                 [H],
@@ -662,16 +679,9 @@ class LagWaveFunctionUCC:
             )
             print("Energy elec", E_elec)
             print("Constraint error", abs(E_elec - E0))
-            if abs(lag_val - res.fun) < 10**-4 and abs(E_elec - E0) < 10**-8:
-                break
-            lag_val = res.fun
-            if res.nfev < 500:
-                lam += k*abs(E_elec - E0)
-                k = k*1.1
             param_idx = len(self.kappa)
-            for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
-                self.kappa[i] = 0
-                self._kappa_old[i] = 0
+            self.kappa = np.zeros_like(self.kappa).tolist()
+            self._kappa_old = np.zeros_like(self.kappa).tolist()
             self.thetas = res["x"][param_idx:].tolist()
             if save_orbs is not None:
                 np.save(f"{save_orbs}_{iteration}", self.c_trans)
@@ -684,7 +694,6 @@ def energy_lagucc(
     parameters: list[float],
     wf: LagWaveFunctionUCC,
     E0: float,
-    lam: float,
     k: float,
 ) -> float:
     r"""Calculate electronic energy of UCC wave function.
@@ -701,25 +710,11 @@ def energy_lagucc(
     Returns:
         Electronic energy.
     """
-    kappa = []
-    idx_counter = 0
-    for _ in range(len(wf.kappa_idx)):
-        kappa.append(parameters[idx_counter])
-        idx_counter += 1
-    theta = parameters[idx_counter:]
-
-    kappa_mat = np.zeros_like(wf.c_orthonormal)
-    for kappa_val, (p, q) in zip(
-        np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx  # pylint: disable=protected-access
-    ):
-        kappa_mat[p, q] = kappa_val
-        kappa_mat[q, p] = -kappa_val
-    c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
-    wf._kappa_old = kappa.copy()  # pylint: disable=protected-access
-    # Moving expansion point of kappa
-    wf.c_orthonormal = c_trans
-    # Add thetas
-    wf.thetas = theta
+    number_kappas = 0
+    number_kappas = len(wf.kappa_idx)
+    wf.kappa = parameters[:number_kappas]
+    wf.thetas = parameters[number_kappas:]
+    wf._move_cep()
     Hamiltonian = build_operator_matrix(
         hamiltonian_0i_0a(
             wf.h_mo,
@@ -743,14 +738,13 @@ def energy_lagucc(
             Hamiltonian,
             state,
         )
-    return -E_lag + lam*(E_elec - E0) + 0.5*k*(E_elec - E0)**2
+    return -E_lag + k * (E_elec - E0) ** 2
 
 
 def gradient_lagucc(
     parameters: list[float],
     wf: LagWaveFunctionUCC,
     E0: float,
-    lam: float,
     k: float,
 ) -> np.ndarray:
     """Calcuate electronic gradient.
@@ -766,13 +760,20 @@ def gradient_lagucc(
     """
     number_kappas = 0
     number_kappas = len(wf.kappa_idx)
+    wf.kappa = parameters[:number_kappas]
     gradient = np.zeros_like(parameters)
+    wf.thetas = parameters[number_kappas:]
+    wf._move_cep()
     gradient[:number_kappas] = orbital_rotation_gradient(
-        wf,E0,lam,k,
+        wf,
+        E0,
+        k,
     )
     gradient[number_kappas:] = active_space_parameter_gradient(
         wf,
-        parameters,E0,lam,k,
+        parameters,
+        E0,
+        k,
     )
     return gradient
 
@@ -780,7 +781,6 @@ def gradient_lagucc(
 def orbital_rotation_gradient(
     wf: LagWaveFunctionUCC,
     E0: float,
-    lam: float,
     k: float,
 ) -> np.ndarray:
     """Calcuate electronic gradient with respect to orbital rotations.
@@ -812,14 +812,13 @@ def orbital_rotation_gradient(
         rdms_lag, wf.h_mo, wf.g_mo, wf.kappa_idx, wf.num_inactive_orbs, wf.num_active_orbs
     )
     E_elec = get_electronic_energy(rdms_elec, wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs)
-    return -df + lam*dg + k*dg*(E_elec - E0)
+    return -df + 2 * k * dg * (E_elec - E0)
 
 
 def active_space_parameter_gradient(
     wf: LagWaveFunctionUCC,
     parameters: list[float],
     E0: float,
-    lam: float,
     k: float,
 ) -> np.ndarray:
     """Calcuate electronic gradient with respect to active space parameters.
@@ -876,5 +875,5 @@ def active_space_parameter_gradient(
         wf.thetas = theta_params
         df = (E_lag_plus - E_lag) / step_size
         dg = (E_elec_plus - E_elec) / step_size
-        gradient_theta[i] = -df + lam*dg + k*dg*(E_elec - E0)
+        gradient_theta[i] = -df + 2 * k * dg * (E_elec - E0)
     return gradient_theta

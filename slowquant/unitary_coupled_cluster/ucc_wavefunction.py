@@ -330,11 +330,9 @@ class WaveFunctionUCC:
             Orbital coefficients.
         """
         kappa_mat = np.zeros_like(self._c_orthonormal)
-        if len(self.kappa) != 0:
-            if np.max(np.abs(self.kappa)) > 0.0:
-                for kappa_val, kappa_val_old, (p, q) in zip(self.kappa, self._kappa_old, self.kappa_idx):
-                    kappa_mat[p, q] = kappa_val - kappa_val_old
-                    kappa_mat[q, p] = -(kappa_val - kappa_val_old)
+        for kappa_val, kappa_val_old, (p, q) in zip(self.kappa, self._kappa_old, self.kappa_idx):
+            kappa_mat[p, q] = kappa_val - kappa_val_old
+            kappa_mat[q, p] = -(kappa_val - kappa_val_old)
         return np.matmul(self._c_orthonormal, scipy.linalg.expm(-kappa_mat))
 
     @property
