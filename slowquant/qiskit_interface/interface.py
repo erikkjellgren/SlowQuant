@@ -323,6 +323,9 @@ class QuantumInterface:
             )
             self._pass_manager: None | PassManager = pass_manager[0]
             self._pm_backend = pass_manager[1]
+            # Way to extract coupling map and basis gates. Not noise!
+            # It is needed to create the init_indices and final_indices off-spring pass_managers.
+            # It would be great if this info could get extracted. For now - not possible.
         # Default pass manager
         elif self.ISA and not isinstance(pass_manager, tuple):
             self._internal_pm = True
@@ -462,13 +465,13 @@ class QuantumInterface:
             # Create a pass manager that maps on the Ansatz Circuit qubits in the initial layout (no swaps)
             if hasattr(self, "_pm_backend"):
                 self._initialfixedlayout_pm = generate_preset_pass_manager(
-                    1,  # needs level 1 to work with layout-conserving composing
+                    3,  # needs level 1 to work with layout-conserving composing
                     backend=self._pm_backend,
                     initial_layout=self._circuit_indices,
                 )
             else:
                 self._initialfixedlayout_pm = generate_preset_pass_manager(
-                    1,  # needs level 1 to work with layout-conserving composing
+                    3,  # needs level 1 to work with layout-conserving composing
                     backend=self._primitive_backend,
                     initial_layout=self._circuit_indices,
                 )
@@ -720,6 +723,7 @@ class QuantumInterface:
                 ISA_csfs_option = 4  # could also use 2
                 if self.do_M_ansatz0:
                     ISA_csfs_option = 3
+        print(ISA_csfs_option)
         if custom_parameters is None:
             run_parameters = self.parameters
         else:

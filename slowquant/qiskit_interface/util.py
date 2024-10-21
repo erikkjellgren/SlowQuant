@@ -1,5 +1,6 @@
 import numpy as np
 from qiskit import QuantumCircuit
+from qiskit.circuit.library import PermutationGate
 from qiskit.quantum_info import Pauli
 from qiskit.transpiler import PassManager
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
@@ -380,7 +381,7 @@ def correct_distribution_with_layout(
     return dist
 
 
-def layout_conserving_compose(
+def layout_conserving_compose_old(
     ansatz: QuantumCircuit, state: QuantumCircuit, pm: PassManager, optimization: bool = False
 ) -> QuantumCircuit:
     """Composing an un-transpiled state circuit to the front of a transpiled Ansatz circuit.
@@ -441,6 +442,41 @@ def layout_conserving_compose(
             composed_opt = pm.optimization.run(composed)  # only work with opt. level 1
 
             return composed_opt
+    return composed
+
+
+def layout_conserving_compose(
+    ansatz: QuantumCircuit, state: QuantumCircuit, pm: PassManager, optimization: bool = False
+) -> QuantumCircuit:
+    """Composing an un-transpiled state circuit to the front of a transpiled Ansatz circuit.
+
+    Args:
+        ansatz: Transpiled Ansatz circuit
+        state: Un-transpiled state circuit
+        pm: PassManager that produces Ansatz's initial layout indices
+        optimization: Boolean for optimizing composed circuit.
+            Note that optimization can lead to change in Ansatz's gates and CX count.
+            This can be problematic together with M_Ansatz0.
+
+    Returns:
+        Composed QuantumCircuit.
+    """
+    state_tmp = pm.run(state)
+    if state_tmp.layout.initial_index_layout(filter_ancillas=True) != state_tmp.layout.final_index_layout():
+        # Qiskit wants to change the layout? Not with me. Change it back!
+        perm = PermutationGate(state_tmp.layout.routing_permutation())
+        state_tmp.append(perm, list(range(ansatz.num_qubits)))
+        state_tmp = pm.optimization.run(pm.translation.run(state_tmp))
+
+    composed = ansatz.compose(state_tmp, front=True)
+
+    if optimization:
+        print(composed.count_ops())
+        composed_opt = pm.optimization.run(composed)
+        composed_opt._layout = ansatz.layout  # pylint: disable=protected-access
+        print(composed_opt.count_ops())
+
+        return composed_opt
     return composed
 
 
