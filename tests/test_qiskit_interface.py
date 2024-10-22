@@ -1122,4 +1122,6 @@ def test_state_average_M() -> None:
     )
     QWF.ansatz_parameters = WF.thetas
 
+    # This might fail if the noise model of FakeTorinto changes.
+    # But if it fails check if the Noise mode is the issue. Do NOT ignore this failing!
     assert abs(QWF._calc_energy_elec() == -1.3733093217175516) < 10**-6  # pylint: disable=protected-access
