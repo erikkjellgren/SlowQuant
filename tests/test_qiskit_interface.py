@@ -5,6 +5,7 @@ from numpy.testing import assert_allclose
 from qiskit.primitives import Estimator, Sampler
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_aer import AerSimulator
+from qiskit_aer.noise import NoiseModel
 from qiskit_aer.primitives import Sampler as SamplerAer
 from qiskit_aer.primitives import SamplerV2 as SamplerV2Aer
 from qiskit_ibm_runtime import SamplerV2 as SamplerV2IBM
@@ -1043,3 +1044,82 @@ def test_state_average_layout() -> None:
     QWF.ansatz_parameters = WF.thetas
 
     assert_allclose(QWF.rdm1, WF.rdm1, atol=10**-6)
+
+
+def test_state_average_M() -> None:
+    """
+    Test Energy calculation with SA in the presence of complicated layout and M_Ansatz0
+    """
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """H  0.0           0.0  0.0;
+        H  0.735           0.0  0.0;
+        """,
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("sto-3g")
+    SQobj.init_hartree_fock()
+
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    c_mo = SQobj.hartree_fock.mo_coeff
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
+
+    WF = WaveFunctionSAUPS(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 2),
+        c_mo,
+        h_core,
+        g_eri,
+        (
+            [
+                [1],
+                [2 ** (-1 / 2), -(2 ** (-1 / 2))],
+            ],
+            [
+                ["1100"],
+                ["1001", "0110"],
+            ],
+        ),
+        "tUPS",
+        ansatz_options={"n_layers": 1},
+    )
+    WF.run_saups(False)
+
+    noise_model = NoiseModel.from_backend(FakeTorino())  # That might change
+    sampler = SamplerAer(backend_options={"noise_model": noise_model})
+    mapper = JordanWignerMapper()
+    QI = QuantumInterface(
+        sampler,
+        "tUPS",
+        mapper,
+        ansatz_options={"n_layers": 1},
+        ISA=True,
+        do_M_mitigation=True,
+        do_M_ansatz0=True,
+        pass_manager=(generate_preset_pass_manager(3, backend=FakeTorino()), FakeTorino()),
+    )
+
+    QWF = WaveFunctionSA(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 2),
+        c_mo,
+        h_core,
+        g_eri,
+        (
+            [
+                [1],
+                [2 ** (-1 / 2), -(2 ** (-1 / 2))],
+            ],
+            [
+                ["1100"],
+                ["1001", "0110"],
+            ],
+        ),
+        QI,
+    )
+    QWF.ansatz_parameters = WF.thetas
+
+    assert abs(QWF._calc_energy_elec() == -1.3733093217175516) < 10**-6  # pylint: disable=protected-access
