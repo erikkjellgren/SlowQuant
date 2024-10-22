@@ -463,12 +463,15 @@ def layout_conserving_compose(
     """
     print("\nLayout-conserving circuit composing requested.")
     print("Superposition state contains ", state.num_nonlocal_gates(), "non-local gates")
-    if ansatz.layout is not None: # or just use ISA_option 1
+    if ansatz.layout is not None:  # or just use ISA_option 1
         state_tmp = pm.run(state)
         nlg_state = state_tmp.num_nonlocal_gates()
         print("Transpiled superposition state contains ", nlg_state, "non-local gates")
 
-        if state_tmp.layout.initial_index_layout(filter_ancillas=True) != state_tmp.layout.final_index_layout():
+        if (
+            state_tmp.layout.initial_index_layout(filter_ancillas=True)
+            != state_tmp.layout.final_index_layout()
+        ):
             # Qiskit wants to change the layout? Not with me. Change it back!
             perm = PermutationGate(state_tmp.layout.routing_permutation())
             state_tmp.append(perm, list(range(ansatz.num_qubits)))
@@ -480,7 +483,11 @@ def layout_conserving_compose(
         if optimization:
             composed_opt = pm.optimization.run(composed)
             composed_opt._layout = ansatz.layout  # pylint: disable=protected-access
-            print("Optimization eliminated ", composed.num_nonlocal_gates() - composed_opt.num_nonlocal_gates(), "non-local gates")
+            print(
+                "Optimization eliminated ",
+                composed.num_nonlocal_gates() - composed_opt.num_nonlocal_gates(),
+                "non-local gates",
+            )
 
             return composed_opt
     else:
@@ -490,8 +497,12 @@ def layout_conserving_compose(
         composed = ansatz.compose(state_tmp, front=True)
         if optimization:
             composed_opt = pm.optimization.run(composed)
-            print("Optimization eliminated ", composed.num_nonlocal_gates() - composed_opt.num_nonlocal_gates(), "non-local gates")
-            
+            print(
+                "Optimization eliminated ",
+                composed.num_nonlocal_gates() - composed_opt.num_nonlocal_gates(),
+                "non-local gates",
+            )
+
             return composed_opt
 
     return composed
