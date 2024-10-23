@@ -381,73 +381,13 @@ def correct_distribution_with_layout(
     return dist
 
 
-def layout_conserving_compose_old(
-    ansatz: QuantumCircuit, state: QuantumCircuit, pm: PassManager, optimization: bool = False
-) -> QuantumCircuit:
-    """Composing an un-transpiled state circuit to the front of a transpiled Ansatz circuit.
-
-    Args:
-        ansatz: Transpiled Ansatz circuit
-        state: Un-transpiled state circuit
-        pm: PassManager that produces Ansatz's initial layout indices
-        optimization: Boolean for optimizing composed circuit.
-            Note that optimization can lead to change in Ansatz's gates and CX count.
-            This can be problematic together with M_Ansatz0.
-
-    Returns:
-        Composed QuantumCircuit.
-    """
-    if pm.layout is not None:  # pm could be without layout. Maybe just use ISA_csfs_option = 1 here.
-        state_tmp = pm.translation.run(pm.layout.run(state))
-        # state_tmp = pm.translation.run(pm.routing.run(pm.layout.run(state)))
-        state_tmp._layout = ansatz.layout  # pylint: disable=protected-access
-
-        state_tmp = pm.optimization.run(state_tmp)  # only work with opt. level 1
-        # This works not on real device because of unphysical connection.
-        # Maybe try the Permutation Gate game, but only on the state part.
-
-        composed = ansatz.compose(state_tmp, front=True)
-
-        if composed.layout.initial_index_layout(filter_ancillas=True) != ansatz.layout.initial_index_layout(
-            filter_ancillas=True
-        ):
-            raise ValueError("Something went wrong with layout conserving composing. Initial layout changed.")
-        if composed.layout.final_index_layout != ansatz.layout.final_index_layout:
-            raise ValueError("Something went wrong with layout conserving composing. Final layout changed.")
-
-        if optimization:
-            composed_opt = pm.optimization.run(composed)  # only work with opt. level 1
-
-            composed_opt._layout = ansatz.layout  # pylint: disable=protected-access
-
-            if composed_opt.layout.initial_index_layout(
-                filter_ancillas=True
-            ) != ansatz.layout.initial_index_layout(filter_ancillas=True):
-                raise ValueError(
-                    "Something went wrong with layout conserving composing. Initial layout changed in optimization."
-                )
-            if composed_opt.layout.final_index_layout != ansatz.layout.final_index_layout:
-                raise ValueError(
-                    "Something went wrong with layout conserving composing. Final layout changed in optimization."
-                )
-
-            return composed_opt
-    else:
-        state_tmp = pm.translation.run(state)
-        state_tmp = pm.optimization.run(state_tmp)  # only work with opt. level 1
-
-        composed = ansatz.compose(state_tmp, front=True)
-
-        if optimization:
-            composed_opt = pm.optimization.run(composed)  # only work with opt. level 1
-
-            return composed_opt
-    return composed
-
-
 def layout_conserving_compose(
-    ansatz: QuantumCircuit, state: QuantumCircuit, pm: PassManager, optimization: bool = False
-) -> QuantumCircuit:
+    ansatz: QuantumCircuit,
+    state: QuantumCircuit,
+    pm: PassManager,
+    optimization: bool = False,
+    M_circuit: bool = False,
+) -> QuantumCircuit | tuple[QuantumCircuit, QuantumCircuit]:
     """Composing an un-transpiled state circuit to the front of a transpiled Ansatz circuit.
 
     Args:
@@ -481,29 +421,45 @@ def layout_conserving_compose(
         composed = ansatz.compose(state_tmp, front=True)
 
         if optimization:
-            composed_opt = pm.optimization.run(composed)
-            composed_opt._layout = ansatz.layout  # pylint: disable=protected-access
+            nlg_composed = composed.num_nonlocal_gates()
+            composed = pm.optimization.run(composed)
+            composed._layout = ansatz.layout  # pylint: disable=protected-access
             print(
                 "Optimization eliminated ",
-                composed.num_nonlocal_gates() - composed_opt.num_nonlocal_gates(),
+                nlg_composed - composed.num_nonlocal_gates(),
                 "non-local gates",
             )
-
-            return composed_opt
     else:
         state_tmp = pm.run(state)
         nlg_state = state_tmp.num_nonlocal_gates()
         print("Transpiled superposition state contains ", nlg_state, "non-local gates")
         composed = ansatz.compose(state_tmp, front=True)
         if optimization:
-            composed_opt = pm.optimization.run(composed)
+            nlg_composed = composed.num_nonlocal_gates()
+            composed = pm.optimization.run(composed)
             print(
                 "Optimization eliminated ",
-                composed.num_nonlocal_gates() - composed_opt.num_nonlocal_gates(),
+                nlg_composed - composed.num_nonlocal_gates(),
                 "non-local gates",
             )
 
-            return composed_opt
+    if M_circuit:
+        state_corr = state.copy()
+        # Get state circuit without non-local gates
+        for idx, instruction in reversed(list(enumerate(state_corr.data))):
+            if instruction.is_controlled_gate():
+                del state_corr.data[idx]
+        # Translate and optimize
+        state_corr = pm.optimization.run(pm.translation.run(state_corr))
+        # Negate
+        if ansatz.layout is not None:
+            composed_M = composed.compose(
+                state_corr, front=True, qubits=composed.layout.initial_index_layout(filter_ancillas=True)
+            )
+        else:
+            composed_M = composed.compose(state_corr, front=True)
+
+        return (composed, composed_M)
 
     return composed
 
@@ -641,6 +597,39 @@ def get_determinant_superposition_reference(
         if occ1 == "0" and occ2 == "1":
             hadamard_idx = idx
             qc.h(idx)
+            break
+    else:  # No break
+        raise ValueError("Failed to find idx for Hadamard gate")
+    for i, (occ1, occ2) in enumerate(zip(det1, det2)):
+        idx = f2q(i, num_orbs)
+        if occ1 == occ2 or idx == hadamard_idx:
+            continue
+        if occ1 == "1" or occ2 == "1":
+            qc.cx(hadamard_idx, idx)
+    return qc
+
+
+def get_determinant_superposition_reference_MAnsatz0(
+    det1: str, det2: str, num_orbs: int, mapper: JordanWignerMapper
+) -> QuantumCircuit:
+    """Get superposition state for MAnsatz_0.
+
+    Args:
+        det1: determinant string 1
+        det2: determinant string 2
+        num_orbs: Number of orbitals
+        mapper: Fermionic to qubit mapper
+
+    Returns:
+        Quantum circuit
+    """
+    if not isinstance(mapper, JordanWignerMapper):
+        raise TypeError("Only implemented for JordanWignerMapper. Got: {type(mapper)}")
+    qc = QuantumCircuit(2 * num_orbs)
+    for i, (occ1, occ2) in enumerate(zip(det1, det2)):
+        idx = f2q(i, num_orbs)
+        if occ1 == "0" and occ2 == "1":
+            hadamard_idx = idx
             break
     else:  # No break
         raise ValueError("Failed to find idx for Hadamard gate")

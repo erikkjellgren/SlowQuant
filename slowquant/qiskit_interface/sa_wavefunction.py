@@ -828,7 +828,7 @@ class WaveFunctionSA:
             osc_strs[idx] = 2 / 3 * excitation_energy * (td_x**2 + td_y**2 + td_z**2)
         return osc_strs
 
-    def _calc_energy_elec(self, ISA_csfs_option: int = 0) -> float:
+    def _calc_energy_elec(self, ISA_csfs_option: int = 0, M_per_superpos: bool = False) -> float:
         """Run electronic energy simulation.
 
         Args:
@@ -842,7 +842,11 @@ class WaveFunctionSA:
         energy = 0.0
         for coeffs, csf in zip(self.states[0], self.states[1]):
             energy += self.QI.quantum_expectation_value_csfs(
-                (coeffs, csf), H, (coeffs, csf), ISA_csfs_option=ISA_csfs_option
+                (coeffs, csf),
+                H,
+                (coeffs, csf),
+                ISA_csfs_option=ISA_csfs_option,
+                M_per_superpos=M_per_superpos,
             )
 
         return energy / self.num_states
