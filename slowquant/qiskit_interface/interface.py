@@ -720,7 +720,7 @@ class QuantumInterface:
             )
         if M_per_superpos and isinstance(self._primitive, BaseEstimator):
             raise ValueError("Base estimator does not support M_Ansatz0")
-        if M_per_superpos + self.do_M_ansatz0 + self.do_M_mitigation < 3:
+        if M_per_superpos and (self.do_M_ansatz0 + self.do_M_mitigation) != 2:
             raise ValueError("You requested M_per_superpos but M error mitigation / M_Ansatz0 was not selected in QI settings.")
         # Option handling
         if ISA_csfs_option == 0:
