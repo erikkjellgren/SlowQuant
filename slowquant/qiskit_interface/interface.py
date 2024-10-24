@@ -1446,7 +1446,7 @@ class QuantumInterface:
             ansatz = custom_ansatz
         M = np.zeros((2**self.num_qubits, 2**self.num_qubits))
         ansatz_list = [None] * 2**self.num_qubits
-        if self.ISA:
+        if ansatz.layout is not None:
             for nr, comb in enumerate(itertools.product([0, 1], repeat=self.num_qubits)):
                 ansatzX = ansatz.copy()
                 # comb is in qN,qN-1,...,q0
