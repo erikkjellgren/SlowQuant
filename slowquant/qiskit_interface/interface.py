@@ -725,7 +725,7 @@ class QuantumInterface:
         # Option handling
         if ISA_csfs_option == 0:
             ISA_csfs_option = 1
-            if self.do_M_mitigation:
+            if self.do_M_mitigation and self.ansatz_circuit.layout is not None:
                 ISA_csfs_option = 2
                 if self.do_M_ansatz0:
                     ISA_csfs_option = 3  # could also be 4
