@@ -170,29 +170,21 @@ class WaveFunctionSAUPS:
         self.kappa = []
         self.kappa_idx = []
         self.kappa_idx_dagger = []
-        self.kappa_redundant = []
         self.kappa_redundant_idx = []
         self._kappa_old = []
-        self._kappa_redundant_old = []
         # kappa can be optimized in spatial basis
         # Loop over all q>p orb combinations and find redundant kappas
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
                 # find redundant kappas
                 if p in self.inactive_idx and q in self.inactive_idx:
-                    self.kappa_redundant.append(0.0)
-                    self._kappa_redundant_old.append(0.0)
                     self.kappa_redundant_idx.append([p, q])
                     continue
                 if p in self.virtual_idx and q in self.virtual_idx:
-                    self.kappa_redundant.append(0.0)
-                    self._kappa_redundant_old.append(0.0)
                     self.kappa_redundant_idx.append([p, q])
                     continue
                 if not include_active_kappa:
                     if p in self.active_idx and q in self.active_idx:
-                        self.kappa_redundant.append(0.0)
-                        self._kappa_redundant_old.append(0.0)
                         self.kappa_redundant_idx.append([p, q])
                         continue
                 # the rest is non-redundant
@@ -343,12 +335,6 @@ class WaveFunctionSAUPS:
         if len(self.kappa) != 0:
             if np.max(np.abs(self.kappa)) > 0.0:
                 for kappa_val, (p, q) in zip(self.kappa, self.kappa_idx):
-                    kappa_mat[p, q] = kappa_val
-                    kappa_mat[q, p] = -kappa_val
-        # Legacy redundant kappa scans
-        if len(self.kappa_redundant) != 0:
-            if np.max(np.abs(self.kappa_redundant)) > 0.0:
-                for kappa_val, (p, q) in zip(self.kappa_redundant, self.kappa_redundant_idx):
                     kappa_mat[p, q] = kappa_val
                     kappa_mat[q, p] = -kappa_val
         # Apply orbital rotation unitary to MO coefficients
@@ -584,9 +570,6 @@ class WaveFunctionSAUPS:
             for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
                 self.kappa[i] = 0
                 self._kappa_old[i] = 0
-            for i in range(len(self.kappa_redundant)):  # pylint: disable=consider-using-enumerate
-                self.kappa_redundant[i] = 0
-                self._kappa_redundant_old[i] = 0
         self.thetas = res["x"][param_idx : num_theta + param_idx].tolist()
         # Subspace diagonalization
         self._do_state_ci()
@@ -743,22 +726,11 @@ def energy_saups(
         ):
             kappa_mat[p, q] = kappa_val
             kappa_mat[q, p] = -kappa_val
-    # Legacy redundant kappa scans
-    if len(wf.kappa_redundant) != 0:
-        if np.max(np.abs(wf.kappa_redundant)) > 0.0:
-            for kappa_val, (p, q) in zip(
-                np.array(wf.kappa_redundant)
-                - np.array(wf._kappa_redundant_old),  # pylint: disable=protected-access
-                wf.kappa_redundant_idx,
-            ):
-                kappa_mat[p, q] = kappa_val
-                kappa_mat[q, p] = -kappa_val
     # Apply orbital rotation unitary
     c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
     if orbital_optimized:
         # Update kappas
         wf._kappa_old = kappa.copy()  # pylint: disable=protected-access
-        wf._kappa_redundant_old = wf.kappa_redundant.copy()  # pylint: disable=protected-access
     # Moving expansion point of kappa
     wf.c_orthonormal = c_trans
     # Add thetas
