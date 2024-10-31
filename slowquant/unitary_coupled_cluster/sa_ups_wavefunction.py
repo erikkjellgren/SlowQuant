@@ -70,8 +70,8 @@ class WaveFunctionSAUPS:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
         # Init stuff
         self._c_orthonormal = c_orthonormal
-        self.h_ao = h_ao
-        self.g_ao = g_ao
+        self._h_ao = h_ao
+        self._g_ao = g_ao
         self.inactive_spin_idx = []
         self.virtual_spin_idx = []
         self.active_spin_idx = []
@@ -88,7 +88,6 @@ class WaveFunctionSAUPS:
         self.num_elec_beta = num_elec // 2
         self.num_spin_orbs = num_spin_orbs
         self.num_orbs = num_spin_orbs // 2
-        self._include_active_kappa = include_active_kappa
         self.num_active_elec = 0
         self.num_active_spin_orbs = 0
         self.num_inactive_spin_orbs = 0
@@ -348,7 +347,7 @@ class WaveFunctionSAUPS:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._h_mo is None:
-            self._h_mo = one_electron_integral_transform(self.c_trans, self.h_ao)
+            self._h_mo = one_electron_integral_transform(self.c_trans, self._h_ao)
         return self._h_mo
 
     @property
@@ -359,7 +358,7 @@ class WaveFunctionSAUPS:
             Two-electron Hamiltonian integrals in MO basis.
         """
         if self._g_mo is None:
-            self._g_mo = two_electron_integral_transform(self.c_trans, self.g_ao)
+            self._g_mo = two_electron_integral_transform(self.c_trans, self._g_ao)
         return self._g_mo
 
     @property

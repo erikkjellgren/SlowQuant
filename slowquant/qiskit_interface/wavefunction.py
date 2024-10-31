@@ -59,8 +59,8 @@ class WaveFunction:
         if isinstance(quantum_interface.ansatz, QuantumCircuit):
             print("WARNING: A QI with a custom Ansatz was passed. VQE will only work with COBYLA optimizer.")
         self._c_orthonormal = c_orthonormal
-        self.h_ao = h_ao
-        self.g_ao = g_ao
+        self._h_ao = h_ao
+        self._g_ao = g_ao
         self.inactive_spin_idx = []
         self.virtual_spin_idx = []
         self.active_spin_idx = []
@@ -72,7 +72,6 @@ class WaveFunction:
         self.num_elec = num_elec
         self.num_spin_orbs = num_spin_orbs
         self.num_orbs = num_spin_orbs // 2
-        self._include_active_kappa = include_active_kappa
         self.num_active_elec = 0
         self.num_active_spin_orbs = 0
         self.num_inactive_spin_orbs = 0
@@ -227,7 +226,7 @@ class WaveFunction:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._h_mo is None:
-            self._h_mo = one_electron_integral_transform(self.c_trans, self.h_ao)
+            self._h_mo = one_electron_integral_transform(self.c_trans, self._h_ao)
         return self._h_mo
 
     @property
@@ -238,7 +237,7 @@ class WaveFunction:
             Two-electron Hamiltonian integrals in MO basis.
         """
         if self._g_mo is None:
-            self._g_mo = two_electron_integral_transform(self.c_trans, self.g_ao)
+            self._g_mo = two_electron_integral_transform(self.c_trans, self._g_ao)
         return self._g_mo
 
     @property
@@ -834,9 +833,7 @@ class WaveFunction:
             Electronic energy.
         """
         if self._energy_elec is None:
-            H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
-            H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-            self._energy_elec = self.QI.quantum_expectation_value(H)
+            self._energy_elec = self._calc_energy_elec()
         return self._energy_elec
 
     def _calc_energy_elec(self) -> float:
@@ -848,19 +845,7 @@ class WaveFunction:
         H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
         H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
         energy_elec = self.QI.quantum_expectation_value(H)
-
         return energy_elec
-
-    def _get_hamiltonian(self) -> FermionicOperator:
-        """Return electronic Hamiltonian as FermionicOperator.
-
-        Returns:
-            FermionicOperator.
-        """
-        H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
-        H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-
-        return H
 
     def run_vqe_2step(
         self,

@@ -58,8 +58,8 @@ class WaveFunctionUCC:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
         # Init stuff
         self._c_orthonormal = c_orthonormal
-        self.h_ao = h_ao
-        self.g_ao = g_ao
+        self._h_ao = h_ao
+        self._g_ao = g_ao
         self.inactive_spin_idx = []
         self.virtual_spin_idx = []
         self.active_spin_idx = []
@@ -239,8 +239,8 @@ class WaveFunctionUCC:
             f"{filename}.npz",
             thetas=self.thetas,
             c_trans=self.c_trans,
-            h_ao=self.h_ao,
-            g_ao=self.g_ao,
+            h_ao=self._h_ao,
+            g_ao=self._g_ao,
             excitations=self._excitations,
             num_spin_orbs=self.num_spin_orbs,
             num_elec=self.num_elec,
@@ -338,7 +338,7 @@ class WaveFunctionUCC:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._h_mo is None:
-            self._h_mo = one_electron_integral_transform(self.c_trans, self.h_ao)
+            self._h_mo = one_electron_integral_transform(self.c_trans, self._h_ao)
         return self._h_mo
 
     @property
@@ -349,7 +349,7 @@ class WaveFunctionUCC:
             Two-electron Hamiltonian integrals in MO basis.
         """
         if self._g_mo is None:
-            self._g_mo = two_electron_integral_transform(self.c_trans, self.g_ao)
+            self._g_mo = two_electron_integral_transform(self.c_trans, self._g_ao)
         return self._g_mo
 
     @property
