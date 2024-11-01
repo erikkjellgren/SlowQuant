@@ -1,4 +1,3 @@
-# pylint: disable=too-many-lines
 import copy
 import itertools
 import math
