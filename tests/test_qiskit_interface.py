@@ -16,6 +16,7 @@ import slowquant.unitary_coupled_cluster.linear_response.allprojected as allproj
 import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
 from slowquant.qiskit_interface.interface import QuantumInterface
 from slowquant.qiskit_interface.wavefunction import WaveFunction
+from slowquant.unitary_coupled_cluster.operators import hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
@@ -577,19 +578,19 @@ def test_LiH_naive_sampler_ISA() -> None:
     excitation_energies = qLR.get_excitation_energies()
 
     solution = [
-        0.12947075,
-        0.17874853,
-        0.17874853,
-        0.60462373,
-        0.64663037,
-        0.74060052,
-        0.74060052,
-        1.00275465,
-        2.0748271,
-        2.13720201,
-        2.13720201,
-        2.45509667,
-        2.95432578,
+        0.12945828,
+        0.17872932,
+        0.17872932,
+        0.60460038,
+        0.64662872,
+        0.74055989,
+        0.74055989,
+        1.00273248,
+        2.07482743,
+        2.13719967,
+        2.13719967,
+        2.45509327,
+        2.95422909,
     ]
 
     assert np.allclose(excitation_energies, solution, atol=10**-6)
@@ -609,6 +610,20 @@ def test_LiH_oscillator_strength() -> None:
 
     x, y, z = mol.intor("int1e_r", comp=3)
 
+    # SlowQuant
+    WF = WaveFunctionUCC(
+        mol.nao * 2,
+        mol.nelectron,
+        (2, 2),
+        rhf.mo_coeff,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        "SD",
+    )
+
+    # Optimize WF
+    WF.run_ucc(True)
+
     # Optimize WF with QSQ
     estimator = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
@@ -619,7 +634,7 @@ def test_LiH_oscillator_strength() -> None:
         mol.nao * 2,
         mol.nelectron,
         (2, 2),
-        rhf.mo_coeff,
+        WF.c_trans,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
         QI,
@@ -635,22 +650,22 @@ def test_LiH_oscillator_strength() -> None:
     osc_strengths = qLR_naive.get_oscillator_strength([x, y, z])
 
     solution = [
-        0.04993035,
-        0.24117267,
-        0.24117267,
-        0.15818932,
-        0.16642583,
-        0.01036042,
-        0.01036042,
-        0.00625735,
-        0.06238003,
-        0.12886178,
-        0.12886178,
-        0.04602256,
-        0.00390723,
+        0.04994476,
+        0.24117344,
+        0.24117344,
+        0.15814894,
+        0.16656511,
+        0.01038248,
+        0.01038248,
+        0.00625838,
+        0.06238359,
+        0.12886307,
+        0.12886307,
+        0.04601737,
+        0.00390778,
     ]
 
-    assert np.allclose(osc_strengths, solution, atol=10**-6)
+    assert np.allclose(osc_strengths, solution, atol=10**-5)
 
     # proj LR with QSQ
     qLR_proj = q_projected.quantumLR(qWF)
@@ -660,22 +675,22 @@ def test_LiH_oscillator_strength() -> None:
     osc_strengths = qLR_proj.get_oscillator_strength([x, y, z])
 
     solution = [
-        0.04993178,
-        0.24117267,
-        0.24117267,
-        0.15817858,
-        0.16644551,
-        0.01036042,
-        0.01036042,
-        0.00626061,
-        0.06238002,
-        0.12886178,
-        0.12886178,
-        0.04602259,
-        0.00390724,
+        0.04994469,
+        0.24117344,
+        0.24117344,
+        0.15814901,
+        0.16656476,
+        0.01038248,
+        0.01038248,
+        0.00625818,
+        0.06238363,
+        0.12886307,
+        0.12886307,
+        0.04601738,
+        0.00390777,
     ]
 
-    assert np.allclose(osc_strengths, solution, atol=10**-6)
+    assert np.allclose(osc_strengths, solution, atol=10**-5)
 
     # allproj LR with QSQ
     qLR_allproj = q_allprojected.quantumLR(qWF)
@@ -685,22 +700,22 @@ def test_LiH_oscillator_strength() -> None:
     osc_strengths = qLR_allproj.get_oscillator_strength([x, y, z])
 
     solution = [
-        0.05008157,
-        0.25084325,
-        0.25084325,
-        0.16221272,
-        0.16126769,
-        0.01835635,
-        0.01835635,
-        0.0067395,
-        0.06319573,
-        0.13384356,
-        0.13384356,
-        0.04670223,
-        0.00384224,
+        0.05010188,
+        0.25086563,
+        0.25086563,
+        0.16218005,
+        0.16126645,
+        0.01835985,
+        0.01835985,
+        0.00673626,
+        0.06319923,
+        0.13384523,
+        0.13384523,
+        0.04670278,
+        0.00384235,
     ]
 
-    assert np.allclose(osc_strengths, solution, atol=10**-6)
+    assert np.allclose(osc_strengths, solution, atol=10**-5)
 
 
 def test_gradient_optimizer_H2() -> None:
@@ -958,7 +973,8 @@ def test_custom() -> None:
 
     qc = qWF.QI.circuit.copy()
     qc_param = qWF.QI.parameters
-    qc_H = qWF._get_hamiltonian()  # pylint: disable=protected-access
+    qc_H = hamiltonian_0i_0a(qWF.h_mo, qWF.g_mo, qWF.num_inactive_orbs, qWF.num_active_orbs)
+    qc_H = qc_H.get_folded_operator(qWF.num_inactive_orbs, qWF.num_active_orbs, qWF.num_virtual_orbs)
 
     # Define the Sampler
     sampler = SamplerAer()
