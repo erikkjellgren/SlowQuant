@@ -1087,6 +1087,8 @@ class QuantumInterface:
             ansatz = self.ansatz_circuit
         else:
             ansatz = QuantumCircuit(self.num_qubits)  # empty circuit
+            if self.ISA:  # needs correct layout
+                ansatz = self.pass_manager.run(ansatz)  # type: ignore
         M = np.zeros((2**self.num_qubits, 2**self.num_qubits))
         ansatz_list = [None] * 2**self.num_qubits
         if self.ISA:
