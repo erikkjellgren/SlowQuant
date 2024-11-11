@@ -1086,6 +1086,8 @@ class QuantumInterface:
             ansatz = self.ansatz_circuit
         else:
             ansatz = QuantumCircuit(self.num_qubits)  # empty circuit
+            if self.ISA:  # needs correct layout
+                ansatz = self.pass_manager.run(ansatz)  # type: ignore
         M = np.zeros((2**self.num_qubits, 2**self.num_qubits))
         ansatz_list = [None] * 2**self.num_qubits
         if self.ISA:
@@ -1138,8 +1140,14 @@ class QuantumInterface:
             )
         if self.ISA:
             data += f"\n {'Circuit layout:':<20} {self._measurement_indices}"
+            data += f"\n {'Non-local gates:':<20} {self.ansatz_circuit.num_nonlocal_gates()}"
             if self._internal_pm:
-                data += f"\n {'Transpiled backend:':<20} {self._primitive_backend}\n {'Transpiled opt. level:':<20} {self._primitive_level}"
+                data += f"\n {'Transpilation strategy:':<20} {'Default / internal'}"
+                data += f"\n {'Backend:':<20} {self._primitive_backend}\n {'Transpiled opt. level:':<20} {self._primitive_level}"
+            else:
+                data += f"\n {'Transpilation strategy:':<20} {'External PassManager'}"
+                if hasattr(self, "_primitive_backend"):
+                    data += f"\n {'Primitive backend:':<20} {self._primitive_backend}\n"
             if isinstance(self._primitive, BaseSamplerV2) and hasattr(self._primitive.options, "twirling"):
                 data += f"\n {'Pauli twirling:':<20} {self._primitive.options.twirling.enable_gates}\n {'Dynamic decoupling:':<20} {self._primitive.options.dynamical_decoupling.enable}"
         print(data)
