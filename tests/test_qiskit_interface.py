@@ -62,7 +62,7 @@ def test_LiH_naive_estimator() -> None:
         QI,
     )
 
-    qWF.run_vqe_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", True)
 
     # LR with SQ
     LR = naive.LinearResponseUCC(WF, excitations="SD")
@@ -137,7 +137,7 @@ def test_LiH_naive_samplerQiskit() -> None:
         QI,
     )
 
-    qWF.run_vqe_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", True)
 
     # LR with SQ
     LR = naive.LinearResponseUCC(WF, excitations="SD")
@@ -212,7 +212,7 @@ def test_LiH_naive() -> None:
         QI,
     )
 
-    qWF.run_vqe_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", True)
 
     # LR with SQ
     LR = naive.LinearResponseUCC(WF, excitations="SD")
@@ -287,7 +287,7 @@ def test_LiH_projected() -> None:
         QI,
     )
 
-    qWF.run_vqe_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", True)
 
     # LR with QSQ
     qLR = q_projected.quantumLR(qWF)
@@ -356,7 +356,7 @@ def test_LiH_dumb_projected() -> None:
         QI,
     )
 
-    qWF.run_vqe_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", True)
 
     # LR with QSQ
     qLR = q_projected.quantumLR(qWF)
@@ -425,7 +425,7 @@ def test_LiH_allprojected() -> None:
         QI,
     )
 
-    qWF.run_vqe_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", True)
 
     # LR with SQ
     LR = allprojected.LinearResponseUCC(WF, excitations="SD")
@@ -500,7 +500,7 @@ def test_LiH_dumb_allprojected() -> None:
         QI,
     )
 
-    qWF.run_vqe_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", True)
 
     # LR with QSQ
     qLR = q_allprojected.quantumLR(qWF)
@@ -569,7 +569,7 @@ def test_LiH_naive_sampler_ISA() -> None:
         QI,
     )
 
-    qWF.run_vqe_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", True)
 
     # LR with QSQ
     qLR = q_naive.quantumLR(qWF)
@@ -640,7 +640,7 @@ def test_LiH_oscillator_strength() -> None:
         QI,
     )
 
-    qWF.run_vqe_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", True)
 
     # naive LR with QSQ
     qLR_naive = q_naive.quantumLR(qWF)
@@ -742,7 +742,7 @@ def test_gradient_optimizer_H2() -> None:
         QI,
     )
 
-    WF.run_vqe_2step("SLSQP", False)
+    WF.run_wf_optimization_2step("SLSQP", False)
     assert abs(WF.energy_elec - -1.8572750819575072) < 10**-6
 
 
@@ -870,7 +870,7 @@ def test_fUCC_h2o() -> None:
         QI,
     )
 
-    WF.run_vqe_2step("RotoSolve", False)
+    WF.run_wf_optimization_2step("RotoSolve", False)
     assert abs(WF.energy_elec - -83.96650295692562) < 10**-6
 
 
@@ -968,7 +968,7 @@ def test_custom() -> None:
         mol.intor("int2e"),
         QI,
     )
-    qWF.run_vqe_2step("rotosolve", True, is_silent_subiterations=True)
+    qWF.run_wf_optimization_2step("rotosolve", True, is_silent_subiterations=True)
     energy = qWF._calc_energy_elec()  # pylint: disable=protected-access
 
     qc = qWF.QI.circuit.copy()
@@ -1019,7 +1019,7 @@ def test_H2_sampler_couplingmap() -> None:
         QI,
     )
 
-    qWF.run_vqe_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", True)
 
     pm = generate_preset_pass_manager(3, backend=FakeTorino())
     QI.ISA = True

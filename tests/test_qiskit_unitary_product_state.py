@@ -37,7 +37,7 @@ def test_tups() -> None:
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
         include_active_kappa=True,
     )
-    WF.run_ups(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     assert abs(WF.energy_elec - -8.82891657651419) < 10**-8
 
@@ -88,7 +88,7 @@ def test_fucc() -> None:
         ansatz_options={},
         include_active_kappa=True,
     )
-    WF.run_ups(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     assert abs(WF.energy_elec - -8.828916576513892) < 10**-8
 
@@ -137,7 +137,7 @@ def test_ksafupccgsd() -> None:
         ansatz_options={"n_layers": 1},
         include_active_kappa=True,
     )
-    WF.run_ups(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     assert abs(WF.energy_elec - -8.828916576543133) < 10**-8
 
@@ -186,7 +186,7 @@ def test_sdsfuccsd() -> None:
         ansatz_options={},
         include_active_kappa=True,
     )
-    WF.run_ups(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     assert abs(WF.energy_elec - -8.82891657653415) < 10**-8
 
@@ -235,7 +235,7 @@ def test_ksasdsfupccgsd() -> None:
         ansatz_options={"n_layers": 1},
         include_active_kappa=True,
     )
-    WF.run_ups(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     assert abs(WF.energy_elec - -8.828916576542285) < 10**-8
 

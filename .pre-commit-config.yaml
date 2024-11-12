@@ -4,6 +4,7 @@ repos:
     rev: 24.10.0
     hooks:
       - id: black
+        args: ["--target-version", "py312"]
         additional_dependencies:
           - toml
 

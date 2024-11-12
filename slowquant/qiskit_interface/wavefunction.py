@@ -222,10 +222,10 @@ class WaveFunction:
         """
         kappa_mat = np.zeros_like(self._c_orthonormal)
         if len(self.kappa) != 0:
-            if np.max(np.abs(self.kappa)) > 0.0:
-                for kappa_val, (p, q) in zip(self.kappa, self.kappa_idx):
-                    kappa_mat[p, q] = kappa_val
-                    kappa_mat[q, p] = -kappa_val
+            if np.max(np.abs(np.array(self.kappa) - np.array(self._kappa_old))) > 0.0:
+                for kappa_val, kappa_old, (p, q) in zip(self.kappa, self._kappa_old, self.kappa_idx):
+                    kappa_mat[p, q] = kappa_val - kappa_old
+                    kappa_mat[q, p] = -(kappa_val - kappa_old)
         return np.matmul(self._c_orthonormal, scipy.linalg.expm(-kappa_mat))
 
     @property
@@ -251,7 +251,7 @@ class WaveFunction:
         return self._g_mo
 
     @property
-    def ansatz_parameters(self) -> list[float]:
+    def thetas(self) -> list[float]:
         """Getter for ansatz parameters.
 
         Returns:
@@ -259,8 +259,8 @@ class WaveFunction:
         """
         return self.QI.parameters
 
-    @ansatz_parameters.setter
-    def ansatz_parameters(self, parameters: list[float]) -> None:
+    @thetas.setter
+    def thetas(self, parameters: list[float]) -> None:
         """Setter for ansatz paramters.
 
         Args:
@@ -863,7 +863,7 @@ class WaveFunction:
         energy_elec = self.QI.quantum_expectation_value(H)
         return energy_elec
 
-    def run_vqe_2step(
+    def run_wf_optimization_2step(
         self,
         optimizer_name: str,
         orbital_optimization: bool = False,
@@ -892,8 +892,6 @@ class WaveFunction:
             if not is_silent_subiterations:
                 print("--------Ansatz optimization")
                 print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
-            H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
-            H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             energy_theta = partial(
                 self._calc_energy_optimization,
                 theta_optimization=True,
@@ -913,10 +911,10 @@ class WaveFunction:
                 is_silent=is_silent_subiterations,
             )
             res = optimizer.minimize(
-                self.ansatz_parameters,
+                self.thetas,
                 extra_options={"R": self.QI.grad_param_R, "param_names": self.QI.param_names},
             )
-            self.ansatz_parameters = res.x.tolist()
+            self.thetas = res.x.tolist()
 
             if orbital_optimization and len(self.kappa) != 0:
                 if not is_silent_subiterations:
@@ -943,7 +941,7 @@ class WaveFunction:
                 )
                 res = optimizer.minimize([0.0] * len(self.kappa_idx))
                 for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
-                    self.kappa[i] = 0.0
+                    self._kappa[i] = 0.0
                     self._kappa_old[i] = 0.0
             else:
                 # If theres is no orbital optimization, then the algorithm is already converged.
@@ -963,7 +961,7 @@ class WaveFunction:
             e_old = e_new
         self._energy_elec = e_new
 
-    def run_vqe_1step(
+    def run_wf_optimization_1step(
         self,
         optimizer_name: str,
         orbital_optimization: bool = False,
@@ -988,7 +986,7 @@ class WaveFunction:
 
         print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
         if orbital_optimization:
-            if len(self.ansatz_parameters) > 0:
+            if len(self.thetas) > 0:
                 energy = partial(
                     self._calc_energy_optimization,
                     theta_optimization=True,
@@ -1022,23 +1020,23 @@ class WaveFunction:
                 kappa_optimization=False,
             )
         if orbital_optimization:
-            if len(self.ansatz_parameters) > 0:
-                parameters = self.kappa + self.ansatz_parameters
+            if len(self.thetas) > 0:
+                parameters = self.kappa + self.thetas
             else:
                 parameters = self.kappa
         else:
-            parameters = self.ansatz_parameters
+            parameters = self.thetas
         optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
         res = optimizer.minimize(
             parameters, extra_options={"R": self.QI.grad_param_R, "param_names": self.QI.param_names}
         )
         if orbital_optimization:
-            self.ansatz_parameters = res.x[len(self.kappa) :].tolist()
+            self.thetas = res.x[len(self.kappa) :].tolist()
             for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
                 self.kappa[i] = 0.0
                 self._kappa_old[i] = 0.0
         else:
-            self.ansatz_parameters = res.x.tolist()
+            self.thetas = res.x.tolist()
         self._energy_elec = res.fun
 
     def _calc_energy_optimization(
@@ -1057,7 +1055,7 @@ class WaveFunction:
             self._move_cep()
             number_kappas = len(self.kappa_idx)
         if theta_optimization:
-            self.ansatz_parameters = parameters[number_kappas:]
+            self.thetas = parameters[number_kappas:]
         # Build operator
         if theta_optimization:
             H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
@@ -1081,7 +1079,7 @@ class WaveFunction:
             self._move_cep()
             number_kappas = len(self.kappa_idx)
         if theta_optimization:
-            self.ansatz_parameters = parameters[number_kappas:]
+            self.thetas = parameters[number_kappas:]
         if kappa_optimization:
             rdms = ReducedDenstiyMatrix(
                 self.num_inactive_orbs,
