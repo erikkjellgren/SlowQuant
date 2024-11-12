@@ -139,7 +139,7 @@ class WaveFunction:
             if idx // 2 not in self.active_unocc_idx:
                 self.active_unocc_idx.append(idx // 2)
         # Find non-redundant kappas
-        self.kappa = []
+        self._kappa = []
         self.kappa_idx = []
         self.kappa_no_activeactive_idx = []
         self.kappa_no_activeactive_idx_dagger = []
@@ -149,31 +149,31 @@ class WaveFunction:
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
                 if p in self.inactive_idx and q in self.inactive_idx:
-                    self.kappa_redundant_idx.append([p, q])
+                    self.kappa_redundant_idx.append((p, q))
                     continue
                 if p in self.virtual_idx and q in self.virtual_idx:
-                    self.kappa_redundant_idx.append([p, q])
+                    self.kappa_redundant_idx.append((p, q))
                     continue
                 if not include_active_kappa:
                     if p in self.active_idx and q in self.active_idx:
-                        self.kappa_redundant_idx.append([p, q])
+                        self.kappa_redundant_idx.append((p, q))
                         continue
                 if not (p in self.active_idx and q in self.active_idx):
-                    self.kappa_no_activeactive_idx.append([p, q])
-                    self.kappa_no_activeactive_idx_dagger.append([q, p])
-                self.kappa.append(0.0)
+                    self.kappa_no_activeactive_idx.append((p, q))
+                    self.kappa_no_activeactive_idx_dagger.append((q, p))
+                self._kappa.append(0.0)
                 self._kappa_old.append(0.0)
-                self.kappa_idx.append([p, q])
+                self.kappa_idx.append((p, q))
         # HF like orbital rotation indecies
         self.kappa_hf_like_idx = []
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
                 if p in self.inactive_idx and q in self.virtual_idx:
-                    self.kappa_hf_like_idx.append([p, q])
+                    self.kappa_hf_like_idx.append((p, q))
                 elif p in self.inactive_idx and q in self.active_unocc_idx:
-                    self.kappa_hf_like_idx.append([p, q])
+                    self.kappa_hf_like_idx.append((p, q))
                 elif p in self.active_occ_idx and q in self.virtual_idx:
-                    self.kappa_hf_like_idx.append([p, q])
+                    self.kappa_hf_like_idx.append((p, q))
         self._energy_elec: float | None = None
         # Setup Qiskit stuff
         self.QI = quantum_interface
@@ -201,6 +201,17 @@ class WaveFunction:
         self._g_mo = None
         self._energy_elec = None
         self._c_orthonormal = c
+
+    @property
+    def kappa(self) -> list[float]:
+        return self._kappa.copy()
+
+    @kappa.setter
+    def kappa(self, k: list[float]) -> None:
+        self._h_mo = None
+        self._g_mo = None
+        self._energy_elec = None
+        self._kappa = k.copy()
 
     @property
     def c_trans(self) -> np.ndarray:
@@ -261,6 +272,12 @@ class WaveFunction:
         self._rdm4 = None
         self._energy_elec = None
         self.QI.parameters = parameters
+
+    def _move_cep(self) -> None:
+        """Move current expansion point."""
+        c = self.c_trans
+        self._c_orthonormal = c
+        self._kappa_old = self.kappa
 
     def change_primitive(
         self, primitive: BaseEstimator | BaseSamplerV1 | BaseSamplerV2, verbose: bool = True
@@ -878,11 +895,15 @@ class WaveFunction:
             H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             energy_theta = partial(
-                calc_energy_theta,
-                operator=H,
-                quantum_interface=self.QI,
+                self._calc_energy_optimization,
+                theta_optimization=True,
+                kappa_optimization=False,
             )
-            gradient_theta = partial(ansatz_parameters_gradient, operator=H, quantum_interface=self.QI)
+            gradient_theta = partial(
+                self._calc_gradient_optimization,
+                theta_optimization=True,
+                kappa_optimization=False,
+            )
             optimizer = Optimizers(
                 energy_theta,
                 optimizer_name,
@@ -902,12 +923,14 @@ class WaveFunction:
                     print("--------Orbital optimization")
                     print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
                 energy_oo = partial(
-                    calc_energy_oo,
-                    wf=self,
+                    self._calc_energy_optimization,
+                    theta_optimization=False,
+                    kappa_optimization=True,
                 )
                 gradient_oo = partial(
-                    orbital_rotation_gradient,
-                    wf=self,
+                    self._calc_gradient_optimization,
+                    theta_optimization=False,
+                    kappa_optimization=True,
                 )
 
                 optimizer = Optimizers(
@@ -967,31 +990,37 @@ class WaveFunction:
         if orbital_optimization:
             if len(self.ansatz_parameters) > 0:
                 energy = partial(
-                    calc_energy_both,
-                    wf=self,
+                    self._calc_energy_optimization,
+                    theta_optimization=True,
+                    kappa_optimization=True,
                 )
                 gradient = partial(
-                    calc_gradient_both,
-                    wf=self,
+                    self._calc_gradient_optimization,
+                    theta_optimization=True,
+                    kappa_optimization=True,
                 )
             else:
                 energy = partial(
-                    calc_energy_oo,
-                    wf=self,
+                    self._calc_energy_optimization,
+                    theta_optimization=False,
+                    kappa_optimization=True,
                 )
                 gradient = partial(
-                    orbital_rotation_gradient,
-                    wf=self,
+                    self._calc_gradient_optimization,
+                    theta_optimization=False,
+                    kappa_optimization=True,
                 )
         else:
-            H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
-            H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             energy = partial(
-                calc_energy_theta,
-                operator=H,
-                quantum_interface=self.QI,
+                self._calc_energy_optimization,
+                theta_optimization=True,
+                kappa_optimization=False,
             )
-            gradient = partial(ansatz_parameters_gradient, operator=H, quantum_interface=self.QI)
+            gradient = partial(
+                self._calc_gradient_optimization,
+                theta_optimization=True,
+                kappa_optimization=False,
+            )
         if orbital_optimization:
             if len(self.ansatz_parameters) > 0:
                 parameters = self.kappa + self.ansatz_parameters
@@ -1012,138 +1041,73 @@ class WaveFunction:
             self.ansatz_parameters = res.x.tolist()
         self._energy_elec = res.fun
 
+    def _calc_energy_optimization(
+        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
+    ) -> float:
+        """Calculate electronic energy.
 
-def calc_energy_theta(
-    parameters: list[float], operator: FermionicOperator, quantum_interface: QuantumInterface
-) -> float:
-    """Calculate electronic energy using expectation values.
+        Args:
+            parameters: Ansatz and orbital rotation parameters.
 
-    Args:
-        paramters: Ansatz paramters.
-        operator: Hamiltonian operator.
-        quantum_interface: QuantumInterface.
+        Returns:
+            Electronic energy.
+        """
+        number_kappas = 0
+        if kappa_optimization:
+            self._move_cep()
+            number_kappas = len(self.kappa_idx)
+        if theta_optimization:
+            self.ansatz_parameters = parameters[number_kappas:]
+        # Build operator
+        if theta_optimization:
+            H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+            H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+            return self.QI.quantum_expectation_value(H)
+        rdms = ReducedDenstiyMatrix(
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+            self.num_virtual_orbs,
+            rdm1=self.rdm1,
+            rdm2=self.rdm2,
+        )
+        return get_electronic_energy(rdms, self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
 
-    Returns:
-        Electronic energy.
-    """
-    quantum_interface.parameters = parameters
-    return quantum_interface.quantum_expectation_value(operator)
-
-
-def calc_energy_oo(kappa: list[float], wf: WaveFunction) -> float:
-    """Calculate electronic energy using RDMs.
-
-    Args:
-        kappa: Orbital rotation parameters.
-        wf: Wave function object.
-
-    Returns:
-        Electronic energy.
-    """
-    kappa_mat = np.zeros_like(wf.c_orthonormal)
-    for kappa_val, (p, q) in zip(
-        np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx  # pylint: disable=protected-access
-    ):
-        kappa_mat[p, q] = kappa_val
-        kappa_mat[q, p] = -kappa_val
-    c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
-    wf._kappa_old = kappa.copy()  # pylint: disable=protected-access
-    # Moving expansion point of kappa
-    wf.c_orthonormal = c_trans
-    rdms = ReducedDenstiyMatrix(
-        wf.num_inactive_orbs,
-        wf.num_active_orbs,
-        wf.num_active_orbs,
-        rdm1=wf.rdm1,
-        rdm2=wf.rdm2,
-    )
-    energy = get_electronic_energy(rdms, wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs)
-    return energy
-
-
-def calc_energy_both(parameters, wf) -> float:
-    """Calculate electronic energy.
-
-    Args:
-        parameters: Ansatz and orbital rotation parameters.
-        wf: Wave function object.
-
-    Returns:
-        Electronic energy.
-    """
-    kappa = parameters[: len(wf.kappa)]
-    theta = parameters[len(wf.kappa) :]
-    assert len(theta) == len(wf.ansatz_parameters)
-    # Do orbital partial
-    kappa_mat = np.zeros_like(wf.c_orthonormal)
-    for kappa_val, (p, q) in zip(
-        np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx  # pylint: disable=protected-access
-    ):
-        kappa_mat[p, q] = kappa_val
-        kappa_mat[q, p] = -kappa_val
-    c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
-    wf._kappa_old = kappa.copy()  # pylint: disable=protected-access
-    # Moving expansion point of kappa
-    wf.c_orthonormal = c_trans
-    # Build operator
-    wf.ansatz_parameters = theta.copy()  # Reset rdms
-    H = hamiltonian_0i_0a(wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs)
-    H = H.get_folded_operator(wf.num_inactive_orbs, wf.num_active_orbs, wf.num_virtual_orbs)
-    return wf.QI.quantum_expectation_value(H)
+    def _calc_gradient_optimization(
+        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
+    ) -> np.ndarray:
+        gradient = np.zeros(len(parameters))
+        number_kappas = 0
+        if kappa_optimization:
+            self._move_cep()
+            number_kappas = len(self.kappa_idx)
+        if theta_optimization:
+            self.ansatz_parameters = parameters[number_kappas:]
+        if kappa_optimization:
+            rdms = ReducedDenstiyMatrix(
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.num_virtual_orbs,
+                rdm1=self.rdm1,
+                rdm2=self.rdm2,
+            )
+            gradient[:number_kappas] = get_orbital_gradient(
+                rdms, self.h_mo, self.g_mo, self.kappa_idx, self.num_inactive_orbs, self.num_active_orbs
+            )
+        if theta_optimization:
+            H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+            H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+            for i in range(len(parameters[number_kappas:])):  # pylint: disable=consider-using-enumerate
+                R = self.QI.grad_param_R[self.QI.param_names[i]]
+                e_vals_grad = _get_energy_evals_for_grad(H, self.QI, parameters, i, R)
+                grad = 0.0
+                for j, mu in enumerate(list(range(1, 2 * R + 1))):
+                    x_mu = (2 * mu - 1) / (2 * R) * np.pi
+                    grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R * (np.sin(1 / 2 * x_mu)) ** 2)
+                gradient[number_kappas + i] = grad
+        return gradient
 
 
-def orbital_rotation_gradient(
-    placeholder,  # pylint: disable=unused-argument
-    wf,
-) -> np.ndarray:
-    """Calcuate electronic gradient with respect to orbital rotations.
-
-    Args:
-        placeholder: Placeholder for kappa parameters, these are fetched OOP style instead.
-        wf: Wave function object.
-
-    Return:
-        Electronic gradient with respect to orbital rotations.
-    """
-    rdms = ReducedDenstiyMatrix(
-        wf.num_inactive_orbs,
-        wf.num_active_orbs,
-        wf.num_active_orbs,
-        rdm1=wf.rdm1,
-        rdm2=wf.rdm2,
-    )
-    gradient = get_orbital_gradient(
-        rdms, wf.h_mo, wf.g_mo, wf.kappa_idx, wf.num_inactive_orbs, wf.num_active_orbs
-    )
-    return gradient
-
-
-def ansatz_parameters_gradient(
-    parameters: list[float], operator: FermionicOperator, quantum_interface: QuantumInterface
-) -> np.ndarray:
-    r"""Calculate gradient with respect to ansatz parameters.
-
-    Args:
-        parameters: Ansatz parameters.
-        operator: Operator which the derivative is with respect to.
-        quantum_interface: Interface to call quantum device.
-
-    Returns:
-        Gradient with repsect to ansatz parameters.
-    """
-    gradient = np.zeros(len(parameters))
-    for i in range(len(parameters)):  # pylint: disable=consider-using-enumerate
-        R = quantum_interface.grad_param_R[quantum_interface.param_names[i]]
-        e_vals_grad = get_energy_evals_for_grad(operator, quantum_interface, parameters, i, R)
-        grad = 0.0
-        for j, mu in enumerate(list(range(1, 2 * R + 1))):
-            x_mu = (2 * mu - 1) / (2 * R) * np.pi
-            grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R * (np.sin(1 / 2 * x_mu)) ** 2)
-        gradient[i] = grad
-    return gradient
-
-
-def get_energy_evals_for_grad(
+def _get_energy_evals_for_grad(
     operator: FermionicOperator,
     quantum_interface: QuantumInterface,
     parameters: list[float],
@@ -1172,25 +1136,3 @@ def get_energy_evals_for_grad(
         x[idx] = x_mu + x_shift
         e_vals.append(quantum_interface.quantum_expectation_value(operator, custom_parameters=x))
     return e_vals
-
-
-def calc_gradient_both(parameters: list[float], wf: WaveFunction) -> np.ndarray:
-    """Calculate electronic gradient.
-
-    Args:
-        parameters: Ansatz and orbital rotation parameters.
-        wf: Wave function object.
-
-    Returns:
-        Electronic gradient.
-    """
-    gradient = np.zeros(len(parameters))
-    theta = parameters[len(wf.kappa) :]
-    assert len(theta) == len(wf.ansatz_parameters)
-    kappa_grad = orbital_rotation_gradient(0, wf)
-    gradient[: len(wf.kappa)] = kappa_grad
-    H = hamiltonian_0i_0a(wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs)
-    H = H.get_folded_operator(wf.num_inactive_orbs, wf.num_active_orbs, wf.num_virtual_orbs)
-    theta_grad = ansatz_parameters_gradient(theta, H, wf.QI)
-    gradient[len(wf.kappa) :] = theta_grad
-    return gradient
