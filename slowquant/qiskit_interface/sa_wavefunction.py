@@ -332,6 +332,7 @@ class WaveFunctionSA:
         # Reset circuit and initiate re-transpiling
         ISA_old = self.QI.ISA
         self._reconstruct_circuit()  # Reconstruct circuit but keeping parameters
+        self.QI._transpiled = False  # pylint: disable=protected-access
         self.QI.ISA = ISA_old  # Redo ISA including transpilation if requested
         self.QI.shots = self.QI.shots  # Redo shots parameter check
 
@@ -340,12 +341,9 @@ class WaveFunctionSA:
 
     def _reconstruct_circuit(self) -> None:
         """Construct circuit again."""
-        # force ISA = False
-        self.QI._ISA = False  # pylint: disable=protected-access
         self.QI.construct_circuit(
             self.num_active_orbs, (self.num_active_elec // 2, self.num_active_elec // 2)
         )
-        self.QI._transpiled = False  # pylint: disable=protected-access
 
     @property
     def rdm1(self) -> np.ndarray:
@@ -828,28 +826,50 @@ class WaveFunctionSA:
             osc_strs[idx] = 2 / 3 * excitation_energy * (td_x**2 + td_y**2 + td_z**2)
         return osc_strs
 
-    def _calc_energy_elec(self, ISA_csfs_option: int = 0, M_per_superpos: bool = False) -> float:
+    def _calc_energy_elec(
+        self, ISA_csfs_option: int = 0, M_per_superpos: bool = False, rep: int = 1
+    ) -> list[float] | float:
         """Run electronic energy simulation.
 
         Args:
             ISA_csfs_option: Option for how to deal with superposition state circuits.
+            M_per_superpos: Switch on M0 per superposition state
+            rep: Repeat energy calculation for statistics
 
         Returns:
             Electronic energy.
         """
         H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
         H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-        energy = 0.0
-        for coeffs, csf in zip(self.states[0], self.states[1]):
-            energy += self.QI.quantum_expectation_value_csfs(
-                (coeffs, csf),
-                H,
-                (coeffs, csf),
-                ISA_csfs_option=ISA_csfs_option,
-                M_per_superpos=M_per_superpos,
-            )
+        if rep == 1:
+            energy = 0.0
+            for coeffs, csf in zip(self.states[0], self.states[1]):
+                energy += self.QI.quantum_expectation_value_csfs(
+                    (coeffs, csf),
+                    H,
+                    (coeffs, csf),
+                    ISA_csfs_option=ISA_csfs_option,
+                    M_per_superpos=M_per_superpos,
+                )
 
-        return energy / self.num_states
+            return energy / self.num_states
+        energies = []
+        for _ in range(rep):
+            energy = 0.0
+            for coeffs, csf in zip(self.states[0], self.states[1]):
+                energy += self.QI.quantum_expectation_value_csfs(
+                    (coeffs, csf),
+                    H,
+                    (coeffs, csf),
+                    ISA_csfs_option=ISA_csfs_option,
+                    M_per_superpos=M_per_superpos,
+                )
+            energy = energy / self.num_states
+            energies.append(energy)
+        print("Mean: ", np.mean(energies))
+        print("Std: ", np.std(energies))
+
+        return energies
 
 
 def calc_energy_theta(

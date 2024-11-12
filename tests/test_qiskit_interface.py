@@ -3,7 +3,6 @@ import numpy as np
 import pyscf
 from numpy.testing import assert_allclose
 from qiskit.primitives import Estimator, Sampler
-from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel
 from qiskit_aer.primitives import Sampler as SamplerAer
@@ -959,9 +958,7 @@ def test_H2_sampler_layout() -> None:
 
     qWF.run_vqe_2step("rotosolve", True)
 
-    pm = generate_preset_pass_manager(3, backend=FakeTorino())
-    QI.ISA = True
-    QI.pass_manager = (pm, FakeTorino())
+    QI.update_pass_manager({"backend": FakeTorino()})
 
     QI._reset_cliques()  # pylint: disable=protected-access
 
@@ -1019,7 +1016,7 @@ def test_state_average_layout() -> None:
         mapper,
         ansatz_options={"n_layers": 1},
         ISA=True,
-        pass_manager=(generate_preset_pass_manager(3, backend=FakeTorino()), FakeTorino()),
+        pass_manager_options={"backend": FakeTorino()},
     )
 
     QWF = WaveFunctionSA(
@@ -1098,7 +1095,7 @@ def test_state_average_M() -> None:
         ISA=True,
         do_M_mitigation=True,
         do_M_ansatz0=True,
-        pass_manager=(generate_preset_pass_manager(3, backend=FakeTorino()), FakeTorino()),
+        pass_manager_options={"backend": FakeTorino()},
     )
 
     QWF = WaveFunctionSA(

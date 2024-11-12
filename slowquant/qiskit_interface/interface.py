@@ -13,7 +13,6 @@ from qiskit.primitives import (
     BaseSamplerV1,
     BaseSamplerV2,
 )
-from qiskit.providers import Backend
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler import PassManager
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
@@ -50,7 +49,7 @@ class QuantumInterface:
         ansatz: str | QuantumCircuit,
         mapper: FermionicMapper,
         ISA: bool = False,
-        pass_manager: None | tuple[PassManager, Backend] = None,
+        pass_manager_options: dict[str, Any] | None = None,
         ansatz_options: dict[str, Any] | None = None,
         shots: None | int = None,
         max_shots_per_run: int = 100000,
@@ -67,7 +66,7 @@ class QuantumInterface:
             ansatz_options: Ansatz options.
             mapper: Qiskit mapper object.
             ISA: Use ISA for submitting to IBM quantum. Locally transpiling is performed.
-            pass_manager: Tuple of custom PassManager and backend for transpilation.
+            pass_manager_options: Dictionary to define custom pass manager.
             shots: Number of shots. None means ideal simulator.
             max_shots_per_run: Maximum number of shots allowed in a single run. Set to 100000 per IBM machines.
             do_M_mitigation: Do error mitigation via read-out correlation matrix.
@@ -95,6 +94,8 @@ class QuantumInterface:
                 allowed_ansatz,
                 "or pass custom QuantumCircuit object",
             )
+        if pass_manager_options is None:
+            pass_manager_options = {}
         if isinstance(primitive, BaseEstimatorV2):
             raise TypeError("EstimatorV2 is not currently supported.")
         if isinstance(primitive, BaseSamplerV2):
@@ -103,10 +104,10 @@ class QuantumInterface:
         self._transpiled = False  # Check if circuit has been transpiled
         self.max_shots_per_run = max_shots_per_run
         self._primitive = primitive
+        self.pass_manager_options = pass_manager_options
         self.ISA = ISA
         self.shots = shots
         self.mapper = mapper
-        self.pass_manager = pass_manager
         self.do_M_mitigation = do_M_mitigation
         self.do_M_ansatz0 = do_M_ansatz0
         self._Minv = None
@@ -115,6 +116,7 @@ class QuantumInterface:
         self.total_paulis_evaluated = 0
         self.ansatz_options = ansatz_options
         self.do_postselection = do_postselection
+        self._pass_manager: PassManager = None
         self._save_paulis = True  # hard switch to stop using Pauli saving (debugging tool).
         self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
         self._M_shots = None  # define a separate number of shots for M
@@ -135,6 +137,8 @@ class QuantumInterface:
 
         # State prep circuit
         if isinstance(self.ansatz, QuantumCircuit):
+            if self.do_M_ansatz0:
+                raise ValueError("M0 does currently not work with custom ansatz")
             self.state_circuit: QuantumCircuit = QuantumCircuit(
                 self.ansatz.num_qubits
             )  # empty state as custom circuit is passed
@@ -261,87 +265,108 @@ class QuantumInterface:
             self._ISA = ISA
 
         if self._ISA:
-            # Get backend from primitive.
+            # Get backend from primitive. Needed for default pass manager
             if hasattr(self._primitive, "_backend"):
-                self._primitive_backend = self._primitive._backend  # pylint: disable=protected-access
-            else:
-                self._primitive_backend = None
+                if self.pass_manager_options.get("backend") is None:
+                    print(
+                        "Backend",
+                        self._primitive._backend,  # pylint: disable=protected-access
+                        "detected in primitive and added to pass manager options.",
+                    )
+                else:
+                    if (
+                        self.pass_manager_options.get("backend")
+                        != self._primitive._backend  # pylint: disable=protected-access
+                    ):
+                        print(
+                            "Backend",
+                            self._primitive._backend,  # pylint: disable=protected-access
+                            "detected in primitive and overwrites previous pass manager option item",
+                            self.pass_manager_options.get("backend"),
+                        )
+                self.pass_manager_options["backend"] = (
+                    self._primitive._backend  # pylint: disable=protected-access
+                )
 
-            # Get optimization level from backend. Only for v1 primitives.
-            self._primitive_level = 3
+            # Get optimization level from backend. Only for v1 primitives. Needed for default pass manager
+            overwrite = False
+            if self.pass_manager_options.get("optimization_level") is not None:
+                overwrite = True
+            self.pass_manager_options["optimization_level"] = 3
             if hasattr(self._primitive, "_transpile_options") and hasattr(
                 self._primitive._transpile_options, "optimization_level"  # pylint: disable=protected-access
             ):
-                self._primitive_level = (
+                self.pass_manager_options["optimization_level"] = (
                     self._primitive._transpile_options[  # pylint: disable=protected-access
                         "optimization_level"
                     ]
-                )
+                )  # pylint: disable=protected-access
             elif hasattr(self._primitive, "options"):
                 if hasattr(self._primitive.options, "optimization_level"):
-                    self._primitive_level = self._primitive.options["optimization_level"]
+                    self.pass_manager_options["optimization_level"] = self._primitive.options[
+                        "optimization_level"
+                    ]
+            if overwrite:
+                print(
+                    "Optimization level in pass manager options was updated to ",
+                    self.pass_manager_options.get("optimization_level"),
+                )
 
-            # Check if circuit has been transpiled
+            # Check if circuit exist and has to be transpiled
             # In case of switching to ISA in later workflow
-            if not self._transpiled and hasattr(self, "circuit"):
-                if self.pass_manager is None:
-                    # We have switched to ISA and had no PassManager before.
-                    # This will initialize the standard internal transpilation.
-                    self.pass_manager = None
-                elif self._internal_pm:
-                    # We have used internal PassManager before but re-transpilation was requested (probs via change_primitive in WF)
-                    self.pass_manager = None
-                print("Change in ISA. Reconstructing circuit.")
-                self.construct_circuit(self.num_orbs, self.num_elec)
+            if hasattr(self, "circuit"):
+                self.update_pass_manager(self.pass_manager_options)
 
-    @property
-    def pass_manager(self) -> None | PassManager:
-        """Get PassManager.
-
-        Returns:
-            PassManager
-        """
-        return self._pass_manager
-
-    @pass_manager.setter
-    def pass_manager(self, pass_manager: None | tuple[PassManager, Backend]) -> None:
-        """Set PassManager.
+    def update_pass_manager(self, pass_manager_options: dict[str, Any]) -> None:
+        """Pass new pass manager options and set pass manager.
 
         Args:
-            pass_manager: PassManager object from Qiskit.
+            pass_manager_options: Dictionary with pass manager options to update.
+
         """
-        if pass_manager is not None and isinstance(pass_manager, PassManager):
-            raise ValueError("The pass_manager argument has to be a tuple of PassManager and Backend.")
-        self._internal_pm = False
-        if not self.ISA and isinstance(pass_manager, tuple):
-            raise ValueError("You need to enable ISA if you want to use a custom PassManager.")
-        # Custom pass manager
-        if self.ISA and isinstance(pass_manager, tuple):
-            print(
-                "Warning: Using custom pass manager is an experimental feature if used together with the quantum_expectation_value_csfs function, as requiered for SA wave functions."
-            )
-            self._pass_manager: None | PassManager = pass_manager[0]
-            self._pm_backend = pass_manager[1]
-            # Way to extract coupling map and basis gates. Not noise!
-            # It is needed to create the init_indices and final_indices off-spring pass_managers.
-            # It would be great if this info could get extracted. For now - not possible.
-        # Default pass manager
-        elif self.ISA and not isinstance(pass_manager, tuple):
-            self._internal_pm = True
-            self._pass_manager = generate_preset_pass_manager(
-                self._primitive_level, backend=self._primitive_backend
-            )
-            print(
-                f"You selected ISA but did not pass a PassManager. Standard internal transpilation will use backend {self._primitive_backend} with optimization level {self._primitive_level}"
-            )
-        else:
-            self._pass_manager = None
+        # Update pass_manager_options
+        self.pass_manager_options.update(pass_manager_options)
+        self.set_pass_manager()
 
         # Check if circuit has been set
         # In case of switching to new PassManager in later workflow
         if hasattr(self, "circuit"):
             print("Change in PassManager. Reconstructing circuit.")
             self.construct_circuit(self.num_orbs, self.num_elec)
+
+    def set_pass_manager(self) -> None:
+        """Create pass manager based on pass manager options."""
+        allowed_pm_options = (
+            "optimization_level",
+            "backend",
+            "initial_layout",
+            "layout_method",
+            "routing_method",
+            "translation_method",
+            "seed_transpiler",
+            "optimization_method",
+        )
+        wrong_items = [
+            item for item in list(self.pass_manager_options.keys()) if item not in allowed_pm_options
+        ]
+        if len(wrong_items) > 0:
+            raise ValueError(
+                "The specified pass manager options do not exists. YOu have specified",
+                wrong_items,
+                " which is not in allowed options",
+                allowed_pm_options,
+            )
+
+        self._pass_manager = generate_preset_pass_manager(
+            optimization_level=self.pass_manager_options.get("optimization_level"),
+            backend=self.pass_manager_options.get("backend"),
+            initial_layout=self.pass_manager_options.get("initial_layout"),
+            layout_method=self.pass_manager_options.get("layout_method"),
+            routing_method=self.pass_manager_options.get("routing_method"),
+            translation_method=self.pass_manager_options.get("translation_method"),
+            seed_transpiler=self.pass_manager_options.get("seed_transpiler"),
+            optimization_method=self.pass_manager_options.get("optimization_method"),
+        )
 
     def redo_M_mitigation(self, shots: int | None = None) -> None:
         """Redo M_mitigation.
@@ -407,7 +432,7 @@ class QuantumInterface:
             self._transpiled = True
             # Add state preparation circuit (e.g. HF)
             self._circuit: QuantumCircuit = self.ansatz_circuit.compose(
-                self.state_circuit, qubits=self._circuit_indices, front=True
+                self.state_circuit, qubits=self._initial_ansatz_indices, front=True
             )
         else:
             self.ansatz_circuit = ansatz_circuit
@@ -423,62 +448,54 @@ class QuantumInterface:
         Returns:
             Transpiled Circuit.
         """
-        if self.pass_manager is None:
-            raise ValueError("Missing PassManager for transpilation.")
-        if self.pass_manager is None and not self.ISA:  # for init
-            raise ValueError(
-                "You have not defined a PassManager but switched on ISA and try to transpile a circuit."
-            )
+        if self._pass_manager is None:
+            self.set_pass_manager()
+            assert self._pass_manager is not None
 
-        circuit_return = self.pass_manager.run(circuit)
+        circuit_return = self._pass_manager.run(circuit)
         # Get layout indices. Ordered q0, q1, ... qN
         # Routing can introduce swaps. this is a problem and can change initial vs final layout.
         if circuit_return.layout is None:
-            self._measurement_indices = np.arange(circuit_return.num_qubits)
-            self._circuit_indices = np.arange(circuit_return.num_qubits)
+            self._final_ansatz_indices: np.ndarray = np.arange(circuit_return.num_qubits)
+            self._initial_ansatz_indices: np.ndarray = np.arange(circuit_return.num_qubits)
 
             # No layout - no problem. We still need these defined
-            self._finalfixedlayout_pm = self.pass_manager
-            self._initialfixedlayout_pm = self.pass_manager
+            self._finalfixedlayout_pm = self._pass_manager
+            self._initialfixedlayout_pm = self._pass_manager
 
         else:
-            self._measurement_indices = circuit_return.layout.final_index_layout()  # with swaps from routing
-            self._circuit_indices = circuit_return.layout.initial_index_layout(
+            self._final_ansatz_indices = circuit_return.layout.final_index_layout()  # with swaps from routing
+            self._initial_ansatz_indices = circuit_return.layout.initial_index_layout(
                 filter_ancillas=True
             )  # no swaps from routing
 
             # Create a pass manager that maps on the Ansatz Circuit qubits in the final layout (with swaps)
-            if hasattr(self, "_pm_backend"):
-                self._finalfixedlayout_pm = generate_preset_pass_manager(
-                    self._primitive_level,
-                    backend=self._pm_backend,
-                    initial_layout=self._measurement_indices,
-                )
-            else:
-                self._finalfixedlayout_pm = generate_preset_pass_manager(
-                    self._primitive_level,
-                    backend=self._primitive_backend,
-                    initial_layout=self._measurement_indices,
-                )
-
+            self._finalfixedlayout_pm = generate_preset_pass_manager(
+                optimization_level=self.pass_manager_options.get("optimization_level"),
+                backend=self.pass_manager_options.get("backend"),
+                initial_layout=self._final_ansatz_indices,
+                layout_method=self.pass_manager_options.get("layout_method"),
+                routing_method=self.pass_manager_options.get("routing_method"),
+                translation_method=self.pass_manager_options.get("translation_method"),
+                seed_transpiler=self.pass_manager_options.get("seed_transpiler"),
+                optimization_method=self.pass_manager_options.get("optimization_method"),
+            )
             # Create a pass manager that maps on the Ansatz Circuit qubits in the initial layout (no swaps)
-            if hasattr(self, "_pm_backend"):
-                self._initialfixedlayout_pm = generate_preset_pass_manager(
-                    3,  # needs level 1 to work with layout-conserving composing
-                    backend=self._pm_backend,
-                    initial_layout=self._circuit_indices,
-                )
-            else:
-                self._initialfixedlayout_pm = generate_preset_pass_manager(
-                    3,  # needs level 1 to work with layout-conserving composing
-                    backend=self._primitive_backend,
-                    initial_layout=self._circuit_indices,
-                )
+            self._initialfixedlayout_pm = generate_preset_pass_manager(
+                optimization_level=self.pass_manager_options.get("optimization_level"),
+                backend=self.pass_manager_options.get("backend"),
+                initial_layout=self._initial_ansatz_indices,
+                layout_method=self.pass_manager_options.get("layout_method"),
+                routing_method=self.pass_manager_options.get("routing_method"),
+                translation_method=self.pass_manager_options.get("translation_method"),
+                seed_transpiler=self.pass_manager_options.get("seed_transpiler"),
+                optimization_method=self.pass_manager_options.get("optimization_method"),
+            )
 
         # Transpile X and Y measurement gates: only translation to basis gates and optimization.
         self._transp_xy = [
-            self.pass_manager.optimization.run(self.pass_manager.translation.run(to_CBS_measurement("X"))),
-            self.pass_manager.optimization.run(self.pass_manager.translation.run(to_CBS_measurement("Y"))),
+            self._pass_manager.optimization.run(self._pass_manager.translation.run(to_CBS_measurement("X"))),
+            self._pass_manager.optimization.run(self._pass_manager.translation.run(to_CBS_measurement("Y"))),
         ]
 
         return circuit_return
@@ -617,11 +634,11 @@ class QuantumInterface:
             circuit_in_layout = np.arange(self.num_qubits)
         else:
             circuit_in_layout = circuit_in.layout.final_index_layout()
-        if not np.array_equal(np.sort(circuit_in_layout), np.sort(self._measurement_indices)):
+        if not np.array_equal(np.sort(circuit_in_layout), np.sort(self._final_ansatz_indices)):
             raise ValueError("Qubit in circuit is not in initial layout.")
-        if np.array_equal(circuit_in_layout, self._measurement_indices):
+        if np.array_equal(circuit_in_layout, self._final_ansatz_indices):
             return 0
-        if np.array_equal(sorted(circuit_in_layout), sorted(self._measurement_indices)):
+        if np.array_equal(sorted(circuit_in_layout), sorted(self._final_ansatz_indices)):
             return 1
         return 2
 
@@ -721,7 +738,9 @@ class QuantumInterface:
         if M_per_superpos and isinstance(self._primitive, BaseEstimator):
             raise ValueError("Base estimator does not support M_Ansatz0")
         if M_per_superpos and (self.do_M_ansatz0 + self.do_M_mitigation) != 2:
-            raise ValueError("You requested M_per_superpos but M error mitigation / M_Ansatz0 was not selected in QI settings.")
+            raise ValueError(
+                "You requested M_per_superpos but M error mitigation / M_Ansatz0 was not selected in QI settings."
+            )
         # Option handling
         if ISA_csfs_option == 0:
             ISA_csfs_option = 1
@@ -738,7 +757,7 @@ class QuantumInterface:
 
         # Check if ISA beforehand.
         if self.ISA:
-            connection_order = self._circuit_indices
+            connection_order = self._initial_ansatz_indices
         else:
             connection_order = np.arange(self.num_qubits)
         val = 0.0
@@ -772,24 +791,36 @@ class QuantumInterface:
                         bra_det, ket_det, self.num_orbs, self.mapper
                     )
                     self.superpos = state  # debug
-                    # Superposition state contains non-native gates for ISA -> transpilatio needed.
+                    # Superposition state contains non-native gates for ISA -> transpilation needed.
                     if self.ISA:
                         match ISA_csfs_option:
                             case 1:  # Option 1: flexible layout
                                 # Use untranspiled ansatz and compose with superposition state
                                 circuit = self._ansatz_circuit_raw.compose(state, front=True)
                                 # Transpile freely
-                                circuit = self.pass_manager.run(circuit)  # type: ignore
+                                circuit = self._pass_manager.run(circuit)  # type: ignore
+                                # print(circuit.layout.final_index_layout())
                             case 2:  # Option 2: fixed layout - flexible order (needed with M)
                                 # Use untranspiled ansatz and compose with superposition state
                                 circuit = self._ansatz_circuit_raw.compose(state, front=True)
                                 # Transpile the composed circuit together using the correct layout
                                 # This will however still introduce routing swaps (flexible order)
-                                circuit = self._finalfixedlayout_pm.run(circuit)
-                            case 3:  # Option 3: fixed layout - fixed order without optimization (needed with M_Ansatz0)
-                                circuit = layout_conserving_compose(self.ansatz_circuit, state, self._initialfixedlayout_pm, optimization=False)
-                            case 4:  # Option 4: fixed layout - fixed order with optimization (needed with M_Ansatz0)
-                                circuit = layout_conserving_compose(self.ansatz_circuit, state, self._initialfixedlayout_pm, optimization=True)
+                                circuit = self._initialfixedlayout_pm.run(circuit)
+                            case (
+                                3
+                            ):  # Option 3: fixed layout - fixed order without optimization (needed with M_Ansatz0)
+                                circuit = layout_conserving_compose(
+                                    self.ansatz_circuit,
+                                    state,
+                                    self._initialfixedlayout_pm,
+                                    optimization=False,
+                                )
+                            case (
+                                4
+                            ):  # Option 4: fixed layout - fixed order with optimization (needed with M_Ansatz0)
+                                circuit = layout_conserving_compose(
+                                    self.ansatz_circuit, state, self._initialfixedlayout_pm, optimization=True
+                                )
                             case _:
                                 raise ValueError("Wrong ISA_csfs_option specified. Needs to be 1,2,3,4.")
                     else:
@@ -804,10 +835,14 @@ class QuantumInterface:
                                 del state_corr.data[idx]
                         if self.ISA:
                             # Translate and optimize
-                            state_corr = self.pass_manager.optimization.run(self.pass_manager.translation.run(state_corr))  # type: ignore
+                            state_corr = self._pass_manager.optimization.run(self._pass_manager.translation.run(state_corr))  # type: ignore
                         # Negate
                         if circuit.layout is not None:
-                            circuit_M = circuit.compose(state_corr, front=True, qubits=circuit.layout.initial_index_layout(filter_ancillas=True))
+                            circuit_M = circuit.compose(
+                                state_corr,
+                                front=True,
+                                qubits=circuit.layout.initial_index_layout(filter_ancillas=True),
+                            )
                         else:
                             circuit_M = circuit.compose(state_corr, front=True)
                         self.composed_M = circuit_M  # debug
@@ -821,7 +856,9 @@ class QuantumInterface:
                         )
                     else:
                         if isinstance(self._primitive, BaseEstimator):
-                            val += N * self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
+                            val += N * self._estimator_quantum_expectation_value(
+                                op, run_parameters, self.circuit
+                            )
                         if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
                             val += N * self._sampler_quantum_expectation_value_nosave(
                                 op,
@@ -1047,7 +1084,7 @@ class QuantumInterface:
                                 distr[i] = correct_distribution_with_layout_v2(  # maybe v1 is better.
                                     dist,
                                     self._Minv,
-                                    self._measurement_indices,
+                                    self._final_ansatz_indices,
                                     run_circuit.layout.final_index_layout(),
                                 )
                         case 2:  # layout conflict
@@ -1086,7 +1123,7 @@ class QuantumInterface:
                                 distr[i] = correct_distribution_with_layout_v2(  # maybe v1 is better.
                                     dist,
                                     self._Minv,
-                                    self._measurement_indices,
+                                    self._final_ansatz_indices,
                                     run_circuit.layout.final_index_layout(),
                                 )
                         case 2:  # layout conflict
@@ -1490,23 +1527,15 @@ class QuantumInterface:
             data = f"Your settings are:\n {'Ansatz:':<20} {'custom circuit'}\n {'Number of shots:':<20} {self.shots}\n"
         else:
             data = f"Your settings are:\n {'Ansatz:':<20} {self.ansatz}\n {'Number of shots:':<20} {self.shots}\n"
-        data += f" {'ISA':<20} {self.ISA}\n {'Transpiled circuit':<20} {self._transpiled}\n {'Primitive:':<20} {self._primitive.__class__.__name__}\n"
+        data += f" {'ISA':<20} {self.ISA}\n {'Primitive:':<20} {self._primitive.__class__.__name__}\n"
         data += f" {'Post-processing:':<20} {self.do_postselection}"
-        if self.do_M_mitigation:
-            data += (
-                f"\n {'M mitigation:':<20} {self.do_M_mitigation}\n {'M Ansatz0:':<20} {self.do_M_ansatz0}"
-            )
+        data += f"\n {'M mitigation:':<20} {self.do_M_mitigation}\n {'M Ansatz0:':<20} {self.do_M_ansatz0}"
         if self.ISA:
-            data += f"\n {'Circuit layout:':<20} {self._measurement_indices}"
+            data += f"\n {'Final layout:':<20} {self._final_ansatz_indices}"
             data += f"\n {'Non-local gates:':<20} {self.ansatz_circuit.num_nonlocal_gates()}"
-            if self._internal_pm:
-                data += f"\n {'Transpilation strategy:':<20} {'Default / internal'}"
-                data += f"\n {'Backend:':<20} {self._primitive_backend}\n {'Transpiled opt. level:':<20} {self._primitive_level}"
-            else:
-                data += f"\n {'Transpilation strategy:':<20} {'External PassManager'}"
-                data += f"\n {'Transpilation backend:':<20} {self._pm_backend}"
-                if hasattr(self, "_primitive_backend"):
-                    data += f"\n {'Primitive backend:':<20} {self._primitive_backend}\n"
+            data += f"\n{'Transpiler settings:'}"
+            for key, value in self.pass_manager_options.items():
+                data += f"\n {key:<20} {value}"
             if isinstance(self._primitive, BaseSamplerV2) and hasattr(self._primitive.options, "twirling"):
                 data += f"\n {'Pauli twirling:':<20} {self._primitive.options.twirling.enable_gates}\n {'Dynamic decoupling:':<20} {self._primitive.options.dynamical_decoupling.enable}"
         print(data)
