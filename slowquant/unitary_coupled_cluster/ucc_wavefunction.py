@@ -15,6 +15,7 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
+    get_electronic_energy,
     get_orbital_gradient,
 )
 from slowquant.unitary_coupled_cluster.operator_matrix import (
@@ -25,6 +26,7 @@ from slowquant.unitary_coupled_cluster.operator_matrix import (
     get_indexing,
 )
 from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
+from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import UccStructure
 
 
@@ -86,6 +88,7 @@ class WaveFunctionUCC:
         self._rdm4 = None
         self._h_mo = None
         self._g_mo = None
+        self._energy_elec: float | None = None
         # Construct spin orbital spaces and indices
         active_space = []
         orbital_counter = 0
@@ -267,6 +270,7 @@ class WaveFunctionUCC:
         """
         self._h_mo = None
         self._g_mo = None
+        self._energy_elec = None
         self._c_orthonormal = c
 
     @property
@@ -767,60 +771,54 @@ class WaveFunctionUCC:
         diff = np.abs(S_ortho - one)
         print("Max ortho-normal diff:", np.max(diff))
 
-    def run_ucc(
+    @property
+    def energy_elec(self) -> float:
+        """Get the electronic energy.
+
+        Returns:
+            Electronic energy.
+        """
+        if self._energy_elec is None:
+            self._energy_elec = expectation_value(
+                self.ci_coeffs,
+                [
+                    hamiltonian_0i_0a(
+                        self.h_mo,
+                        self.g_mo,
+                        self.num_inactive_orbs,
+                        self.num_active_orbs,
+                    )
+                ],
+                self.ci_coeffs,
+                self.idx2det,
+                self.det2idx,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.num_virtual_orbs,
+                self.num_active_elec_alpha,
+                self.num_active_elec_beta,
+                self.thetas,
+                self.ucc_layout,
+            )
+        return self._energy_elec
+
+    def run_wf_optimization_2step(
         self,
+        optimizer_name: str,
         orbital_optimization: bool = False,
-        is_silent: bool = False,
-        convergence_threshold: float = 10**-10,
-        maxiter: int = 10000,
+        tol: float = 1e-8,
+        maxiter: int = 1000,
+        is_silent_subiterations: bool = False,
     ) -> None:
-        """Run optimization of UCC wave function.
+        """Run VQE of wave function.
 
         Args:
-            orbital_optimization: Do orbital optimization.
-            is_silent: Do not print any output.
-            convergence_threshold: Energy threshold for convergence.
+            optimizer_name: Name of optimizer.
+            orbital_optimization: Perform orbital optimization.
+            tol: Convergence tolerance.
             maxiter: Maximum number of iterations.
+            is_silent_subiterations: Silence subiterations.
         """
-        # Define energy and gradient (partial) functions with parameters as free argument
-        e_tot = partial(
-            energy_ucc,
-            orbital_optimized=orbital_optimization,
-            wf=self,
-        )
-        parameter_gradient = partial(
-            gradient_ucc,
-            orbital_optimized=orbital_optimization,
-            wf=self,
-        )
-        global iteration  # pylint: disable=global-variable-undefined
-        global start  # pylint: disable=global-variable-undefined
-        iteration = 0  # type: ignore
-        start = time.time()  # type: ignore
-
-        def print_progress(x: list[float]) -> None:
-            """Print progress during energy minimization of wave function.
-
-            Args:
-                x: Wave function parameters.
-            """
-            global iteration  # pylint: disable=global-variable-undefined
-            global start  # pylint: disable=global-variable-undefined
-            time_str = f"{time.time() - start:7.2f}"  # type: ignore
-            e_str = f"{e_tot(x):3.12f}"
-            print(f"{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
-            iteration += 1  # type: ignore [name-defined]
-            start = time.time()  # type: ignore [name-defined]
-
-        def silent_progress(x: list[float]) -> None:  # pylint: disable=unused-argument
-            """Print progress during energy minimization of wave function.
-
-            Args:
-                x: Wave function parameters.
-            """
-            global iteration  # pylint: disable=global-variable-undefined
-            iteration += 1  # type: ignore [name-defined]
-
         # Init parameters
         parameters: list[float] = []
         num_kappa = 0
@@ -850,224 +848,322 @@ class WaveFunctionUCC:
             else:
                 raise ValueError(f"Got unknown excitation type, {exc_type}")
         # Optimization
-        if is_silent:
-            res = scipy.optimize.minimize(
-                e_tot,
-                parameters,
-                tol=convergence_threshold,
-                callback=silent_progress,
-                method="SLSQP",
-                jac=parameter_gradient,
-            )
-        else:
-            print("### Parameters information:")
-            print(f"### Number kappa: {num_kappa}")
-            print(f"### Number theta1: {num_theta1}")
-            print(f"### Number theta2: {num_theta2}")
-            print(f"### Number theta3: {num_theta3}")
-            print(f"### Number theta4: {num_theta4}")
-            print(f"### Number theta5: {num_theta5}")
-            print(f"### Number theta6: {num_theta6}")
-            print(
-                f"### Total parameters: {num_kappa + num_theta1 + num_theta2 + num_theta3 + num_theta4 + num_theta5 + num_theta6}\n"
-            )
-            print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
-            res = scipy.optimize.minimize(
-                e_tot,
-                parameters,
-                tol=convergence_threshold,
-                callback=print_progress,
-                method="SLSQP",
-                jac=parameter_gradient,
-                options={"maxiter": maxiter},
-            )
-        self.energy_elec = res["fun"]
-        # Set kappas to zero (orbitals have been optimized)
-        param_idx = 0
-        if orbital_optimization:
-            param_idx += len(self.kappa)
-            for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
-                self.kappa[i] = 0
-                self._kappa_old[i] = 0
-        self.thetas = res["x"][param_idx:].tolist()
-
-
-def energy_ucc(
-    parameters: list[float],
-    orbital_optimized: bool,
-    wf: WaveFunctionUCC,
-) -> float:
-    r"""Calculate electronic energy of UCC wave function.
-
-    .. math::
-        E = \left<0\left|\hat{H}\right|0\right>
-
-    Args:
-        parameters: Sequence of all parameters.
-                    Ordered as orbital rotations, active-space singles, active-space doubles, ...
-        orbital_optimized: Do orbital optimization.
-        wf: Wave function object.
-
-    Returns:
-        Electronic energy.
-    """
-    # Get kappa and theta parameters separately
-    kappa = []
-    idx_counter = 0
-    if orbital_optimized:
-        idx_counter = len(wf.kappa_idx)
-        kappa = list(parameters[:idx_counter])
-    theta = list(parameters[idx_counter:])
-    assert len(parameters) == len(kappa) + len(theta)
-
-    kappa_mat = np.zeros_like(wf.c_orthonormal)
-    if orbital_optimized:
-        # Build kappa matrix
-        for kappa_val, (p, q) in zip(
-            np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx  # pylint: disable=protected-access
-        ):
-            kappa_mat[p, q] = kappa_val
-            kappa_mat[q, p] = -kappa_val
-    # Apply orbital rotation unitary
-    c_trans = np.matmul(wf.c_orthonormal, scipy.linalg.expm(-kappa_mat))
-    if orbital_optimized:
-        # Update kappas
-        wf._kappa_old = kappa.copy()  # pylint: disable=protected-access
-    # Moving expansion point of kappa
-    wf.c_orthonormal = c_trans
-    # Add thetas
-    wf.thetas = theta
-    # Energy calculation via expectation value fct (using propagate state)
-    return expectation_value(
-        wf.ci_coeffs,
-        [
-            hamiltonian_0i_0a(
-                wf.h_mo,
-                wf.g_mo,
-                wf.num_inactive_orbs,
-                wf.num_active_orbs,
-            )
-        ],
-        wf.ci_coeffs,
-        wf.idx2det,
-        wf.det2idx,
-        wf.num_inactive_orbs,
-        wf.num_active_orbs,
-        wf.num_virtual_orbs,
-        wf.num_active_elec_alpha,
-        wf.num_active_elec_beta,
-        wf.thetas,
-        wf.ucc_layout,
-    )
-
-
-def gradient_ucc(
-    parameters: list[float],
-    orbital_optimized: bool,
-    wf: WaveFunctionUCC,
-) -> np.ndarray:
-    """Calculate electronic gradient.
-
-    Args:
-        parameters: Sequence of all parameters.
-                    Ordered as orbital rotations, active-space singles, active-space doubles, ...
-        orbital_optimized: Do orbital optimization.
-        wf: Wave function object.
-
-    Returns:
-        Electronic gradient.
-    """
-    number_kappas = 0
-    if orbital_optimized:
-        number_kappas = len(wf.kappa_idx)
-    gradient = np.zeros_like(parameters)
-    if orbital_optimized:
-        gradient[:number_kappas] = orbital_rotation_gradient(
-            wf,
+        print("### Parameters information:")
+        print(f"### Number kappa: {num_kappa}")
+        print(f"### Number theta1: {num_theta1}")
+        print(f"### Number theta2: {num_theta2}")
+        print(f"### Number theta3: {num_theta3}")
+        print(f"### Number theta4: {num_theta4}")
+        print(f"### Number theta5: {num_theta5}")
+        print(f"### Number theta6: {num_theta6}")
+        print(
+            f"### Total parameters: {num_kappa + num_theta1 + num_theta2 + num_theta3 + num_theta4 + num_theta5 + num_theta6}\n"
         )
-    gradient[number_kappas:] = active_space_parameter_gradient(
-        wf,
-        parameters,
-        orbital_optimized,
-    )
-    return gradient
+        e_old = 1e12
+        print("Full optimization")
+        print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+        for full_iter in range(0, int(maxiter)):
+            full_start = time.time()
 
+            # Do ansatz optimization
+            if not is_silent_subiterations:
+                print("--------UCC optimization")
+                print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+            energy_theta = partial(
+                self._calc_energy_optimization,
+                theta_optimization=True,
+                kappa_optimization=False,
+            )
+            gradient_theta = partial(
+                self._calc_gradient_optimization,
+                theta_optimization=True,
+                kappa_optimization=False,
+            )
+            optimizer = Optimizers(
+                energy_theta,
+                optimizer_name,
+                grad=gradient_theta,
+                maxiter=maxiter,
+                tol=tol,
+                is_silent=is_silent_subiterations,
+            )
+            res = optimizer.minimize(self.thetas)
+            self.thetas = res.x.tolist()
 
-def orbital_rotation_gradient(
-    wf: WaveFunctionUCC,
-) -> np.ndarray:
-    """Calculate electronic gradient with respect to orbital rotations using RDMs.
+            if orbital_optimization and len(self.kappa) != 0:
+                if not is_silent_subiterations:
+                    print("--------Orbital optimization")
+                    print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+                energy_oo = partial(
+                    self._calc_energy_optimization,
+                    theta_optimization=False,
+                    kappa_optimization=True,
+                )
+                gradient_oo = partial(
+                    self._calc_gradient_optimization,
+                    theta_optimization=False,
+                    kappa_optimization=True,
+                )
 
-    Args:
-        wf: Wave function object.
+                optimizer = Optimizers(
+                    energy_oo,
+                    "l-bfgs-b",
+                    grad=gradient_oo,
+                    maxiter=maxiter,
+                    tol=tol,
+                    is_silent=is_silent_subiterations,
+                )
+                res = optimizer.minimize([0.0] * len(self.kappa_idx))
+                for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
+                    self.kappa[i] = 0.0
+                    self._kappa_old[i] = 0.0
+            else:
+                # If theres is no orbital optimization, then the algorithm is already converged.
+                e_new = res.fun
+                if orbital_optimization and len(self.kappa) == 0:
+                    print(
+                        "WARNING: No orbital optimization performed, because there is no non-redundant orbital parameters"
+                    )
+                break
 
-    Return:
-        Electronic gradient with respect to orbital rotations.
-    """
-    # Analytical gradient via RDMs
-    rdms = ReducedDenstiyMatrix(
-        wf.num_inactive_orbs,
-        wf.num_active_orbs,
-        wf.num_active_orbs,
-        rdm1=wf.rdm1,
-        rdm2=wf.rdm2,
-    )
-    gradient = get_orbital_gradient(
-        rdms, wf.h_mo, wf.g_mo, wf.kappa_idx, wf.num_inactive_orbs, wf.num_active_orbs
-    )
-    return gradient
+            e_new = res.fun
+            time_str = f"{time.time() - full_start:7.2f}"  # type: ignore
+            e_str = f"{e_new:3.12f}"
+            print(f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+            if abs(e_new - e_old) < tol:
+                break
+            e_old = e_new
+        self._energy_elec = e_new
 
+    def run_wf_optimization_1step(
+        self,
+        optimizer_name: str,
+        orbital_optimization: bool = False,
+        tol: float = 1e-8,
+        maxiter: int = 1000,
+    ) -> None:
+        """Run VQE of wave function.
 
-def active_space_parameter_gradient(
-    wf: WaveFunctionUCC,
-    parameters: list[float],
-    orbital_optimized: bool,
-) -> np.ndarray:
-    """Calculate electronic gradient with respect to active space parameters.
+        Args:
+            optimizer_name: Name of optimizer.
+            orbital_optimization: Perform orbital optimization.
+            tol: Convergence tolerance.
+            maxiter: Maximum number of iterations.
+        """
+        # Init parameters
+        parameters: list[float] = []
+        num_kappa = 0
+        num_theta1 = 0
+        num_theta2 = 0
+        num_theta3 = 0
+        num_theta4 = 0
+        num_theta5 = 0
+        num_theta6 = 0
+        if orbital_optimization:
+            parameters += self.kappa
+            num_kappa += len(self.kappa)
+        parameters = parameters + self.thetas
+        for exc_type in self.ucc_layout.excitation_operator_type:
+            if exc_type == "sa_single":
+                num_theta1 += 1
+            elif exc_type in ("sa_double_1", "sa_double_2"):
+                num_theta2 += 1
+            elif exc_type == "triple":
+                num_theta3 += 1
+            elif exc_type == "quadruple":
+                num_theta4 += 1
+            elif exc_type == "quintuple":
+                num_theta5 += 1
+            elif exc_type == "sextuple":
+                num_theta6 += 1
+            else:
+                raise ValueError(f"Got unknown excitation type, {exc_type}")
+        # Optimization
+        print("### Parameters information:")
+        print(f"### Number kappa: {num_kappa}")
+        print(f"### Number theta1: {num_theta1}")
+        print(f"### Number theta2: {num_theta2}")
+        print(f"### Number theta3: {num_theta3}")
+        print(f"### Number theta4: {num_theta4}")
+        print(f"### Number theta5: {num_theta5}")
+        print(f"### Number theta6: {num_theta6}")
+        print(
+            f"### Total parameters: {num_kappa + num_theta1 + num_theta2 + num_theta3 + num_theta4 + num_theta5 + num_theta6}\n"
+        )
+        print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+        if orbital_optimization:
+            if len(self.thetas) > 0:
+                energy = partial(
+                    self._calc_energy_optimization,
+                    theta_optimization=True,
+                    kappa_optimization=True,
+                )
+                gradient = partial(
+                    self._calc_gradient_optimization,
+                    theta_optimization=True,
+                    kappa_optimization=True,
+                )
+            else:
+                energy = partial(
+                    self._calc_energy_optimization,
+                    theta_optimization=False,
+                    kappa_optimization=True,
+                )
+                gradient = partial(
+                    self._calc_gradient_optimization,
+                    theta_optimization=False,
+                    kappa_optimization=True,
+                )
+        else:
+            energy = partial(
+                self._calc_energy_optimization,
+                theta_optimization=True,
+                kappa_optimization=False,
+            )
+            gradient = partial(
+                self._calc_gradient_optimization,
+                theta_optimization=True,
+                kappa_optimization=False,
+            )
+        if orbital_optimization:
+            if len(self.thetas) > 0:
+                parameters = self.kappa + self.thetas
+            else:
+                parameters = self.kappa
+        else:
+            parameters = self.thetas
+        optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
+        res = optimizer.minimize(
+            parameters,
+        )
+        if orbital_optimization:
+            self.thetas = res.x[len(self.kappa) :].tolist()
+            for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
+                self._kappa[i] = 0.0
+                self._kappa_old[i] = 0.0
+        else:
+            self.thetas = res.x.tolist()
+        self._energy_elec = res.fun
 
-    Args:
-        wf: Wave function object.
-        parameters: Sequence of all parameters.
-                    Ordered as orbital rotations, active-space singles, active-space doubles, ...
-        orbital_optimized: Do orbital optimization.
+    def _calc_energy_optimization(
+        self,
+        parameters: list[float],
+        theta_optimization: bool,
+        kappa_optimization: bool,
+    ) -> float:
+        r"""Calculate electronic energy of UCC wave function.
 
-    Returns:
-        Electronic gradient with respect to active space parameters.
-    """
-    # Get theta parameters
-    idx_counter = 0
-    if orbital_optimized:
-        for _ in range(len(wf.kappa_idx)):
-            idx_counter += 1
-    theta_params = parameters[idx_counter:]
+        .. math::
+            E = \left<0\left|\hat{H}\right|0\right>
 
-    # Hamiltonian matrix
-    Hamiltonian = build_operator_matrix(
-        hamiltonian_0i_0a(
-            wf.h_mo,
-            wf.g_mo,
-            wf.num_inactive_orbs,
-            wf.num_active_orbs,
-        ).get_folded_operator(wf.num_inactive_orbs, wf.num_active_orbs, wf.num_virtual_orbs),
-        wf.idx2det,
-        wf.det2idx,
-        wf.num_active_orbs,
-    )
+        Args:
+            parameters: Sequence of all parameters.
+                        Ordered as orbital rotations, active-space singles, active-space doubles, ...
+            theta_optimization: If used in theta optimization.
+            kappa_optimization: If used in kappa optimization.
 
-    # Numerical finite difference gradient
-    gradient_theta = np.zeros_like(theta_params)
-    eps = np.finfo(np.float64).eps ** (1 / 2)  # half-precision of double-precision floating-point numbers
-    E = expectation_value_mat(wf.ci_coeffs, Hamiltonian, wf.ci_coeffs)
-    for i in range(len(theta_params)):  # pylint: disable=consider-using-enumerate
-        sign_step = (theta_params[i] >= 0).astype(float) * 2 - 1  # type: ignore [attr-defined]
-        step_size = eps * sign_step * max(1, abs(theta_params[i]))
-        theta_params[i] += step_size
-        wf.thetas = theta_params
-        E_plus = expectation_value_mat(wf.ci_coeffs, Hamiltonian, wf.ci_coeffs)
-        theta_params[i] -= step_size
-        wf.thetas = theta_params
-        gradient_theta[i] = (E_plus - E) / step_size
-    return gradient_theta
+        Returns:
+            Electronic energy.
+        """
+        number_kappas = 0
+        if kappa_optimization:
+            number_kappas = len(self.kappa_idx)
+            self.kappa = parameters[:number_kappas]
+            self._move_cep()
+        if theta_optimization:
+            self.thetas = parameters[number_kappas:]
+        if theta_optimization:
+            return expectation_value(
+                self.ci_coeffs,
+                [
+                    hamiltonian_0i_0a(
+                        self.h_mo,
+                        self.g_mo,
+                        self.num_inactive_orbs,
+                        self.num_active_orbs,
+                    )
+                ],
+                self.ci_coeffs,
+                self.idx2det,
+                self.det2idx,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.num_virtual_orbs,
+                self.num_active_elec_alpha,
+                self.num_active_elec_beta,
+                self.thetas,
+                self.ucc_layout,
+            )
+        rdms = ReducedDenstiyMatrix(
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+            self.num_virtual_orbs,
+            rdm1=self.rdm1,
+            rdm2=self.rdm2,
+        )
+        return get_electronic_energy(rdms, self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+
+    def _calc_gradient_optimization(
+        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
+    ) -> np.ndarray:
+        """Calculate electronic gradient.
+
+        Args:
+            parameters: Ansatz and orbital rotation parameters.
+            theta_optimization: If used in theta optimization.
+            kappa_optimization: If used in kappa optimization.
+
+        Returns:
+            Gradient energy.
+        """
+        gradient = np.zeros(len(parameters))
+        number_kappas = 0
+        if kappa_optimization:
+            number_kappas = len(self.kappa_idx)
+            self.kappa = parameters[:number_kappas]
+            self._move_cep()
+        if theta_optimization:
+            self.thetas = parameters[number_kappas:]
+        if kappa_optimization:
+            rdms = ReducedDenstiyMatrix(
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.num_virtual_orbs,
+                rdm1=self.rdm1,
+                rdm2=self.rdm2,
+            )
+            gradient[:number_kappas] = get_orbital_gradient(
+                rdms, self.h_mo, self.g_mo, self.kappa_idx, self.num_inactive_orbs, self.num_active_orbs
+            )
+        if theta_optimization:
+            # Hamiltonian matrix
+            Hamiltonian = build_operator_matrix(
+                hamiltonian_0i_0a(
+                    self.h_mo,
+                    self.g_mo,
+                    self.num_inactive_orbs,
+                    self.num_active_orbs,
+                ).get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs),
+                self.idx2det,
+                self.det2idx,
+                self.num_active_orbs,
+            )
+            # Numerical finite difference gradient
+            eps = np.finfo(np.float64).eps ** (
+                1 / 2
+            )  # half-precision of double-precision floating-point numbers
+            E = expectation_value_mat(self.ci_coeffs, Hamiltonian, self.ci_coeffs)
+            theta_params = self.thetas
+            for i in range(len(theta_params)):  # pylint: disable=consider-using-enumerate
+                sign_step = (theta_params[i] >= 0).astype(float) * 2 - 1  # type: ignore [attr-defined]
+                step_size = eps * sign_step * max(1, abs(theta_params[i]))
+                theta_params[i] += step_size
+                self.thetas = theta_params
+                E_plus = expectation_value_mat(self.ci_coeffs, Hamiltonian, self.ci_coeffs)
+                theta_params[i] -= step_size
+                self.thetas = theta_params
+                gradient[i + number_kappas] = (E_plus - E) / step_size
+        return gradient
 
 
 def load_wavefunction(filename: str) -> WaveFunctionUCC:
@@ -1091,11 +1187,9 @@ def load_wavefunction(filename: str) -> WaveFunctionUCC:
         bool(dat["include_active_kappa"]),
     )
     wf.thetas = dat["thetas"]
-    energy = energy_ucc(wf.thetas, False, wf)  # pylint: disable=protected-access
-    if abs(energy - float(dat["energy_elec"])) > 10**-6:
+    if abs(wf.energy_elec - float(dat["energy_elec"])) > 10**-6:
         raise ValueError(
-            f'Calculate energy is different from saved energy: {energy} and {float(dat["energy_elec"])}.'
+            f'Calculate energy is different from saved energy: {wf.energy_elec} and {float(dat["energy_elec"])}.'
         )
-    wf.energy_elec = energy
-    print(f"Electronic energy of loaded wave function is {energy}")
+    print(f"Electronic energy of loaded wave function is {wf.energy_elec}")
     return wf

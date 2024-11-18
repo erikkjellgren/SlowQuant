@@ -668,6 +668,8 @@ class WaveFunctionUPS:
 
         Args:
             parameters: Ansatz and orbital rotation parameters.
+            theta_optimization: If used in theta optimization.
+            kappa_optimization: If used in kappa optimization.
 
         Returns:
             Electronic energy.
@@ -706,6 +708,16 @@ class WaveFunctionUPS:
     def _calc_gradient_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
     ) -> np.ndarray:
+        """Calculate electronic gradient.
+
+        Args:
+            parameters: Ansatz and orbital rotation parameters.
+            theta_optimization: If used in theta optimization.
+            kappa_optimization: If used in kappa optimization.
+
+        Returns:
+            Gradient energy.
+        """
         gradient = np.zeros(len(parameters))
         number_kappas = 0
         if kappa_optimization:
@@ -737,7 +749,6 @@ class WaveFunctionUPS:
                 self.det2idx,
                 self.num_active_orbs,
             )
-
             # Reference bra state (no differentiations)
             bra_vec = construct_ups_state(
                 np.matmul(Hamiltonian, self.ci_coeffs),

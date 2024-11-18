@@ -2,29 +2,6 @@ from collections.abc import Generator, Sequence
 from typing import Any
 
 import numpy as np
-import scipy.linalg
-
-
-def construct_integral_trans_mat(
-    c_orthonormal: np.ndarray, kappa: Sequence[float], kappa_idx: Sequence[Sequence[int]]
-) -> np.ndarray:
-    """Construct orbital transformation matrix.
-
-    Args:
-        c_orthonormal: Initial orbital coefficients.
-        kappa: Orbital rotation parameters.
-        kappa_idx: Non-redundant orbital rotation parameters indices.
-
-    Returns:
-        Orbital transformation matrix.
-    """
-    # Construct anti-hermitian kappa matrix
-    kappa_mat = np.zeros_like(c_orthonormal)
-    for kappa_val, (p, q) in zip(kappa, kappa_idx):
-        kappa_mat[p, q] = kappa_val
-        kappa_mat[q, p] = -kappa_val
-    c_trans = np.matmul(c_orthonormal, scipy.linalg.expm(-kappa_mat))
-    return c_trans
 
 
 def iterate_t1_sa(

@@ -177,30 +177,30 @@ class WaveFunctionSAUPS:
             for q in range(p + 1, self.num_orbs):
                 # find redundant kappas
                 if p in self.inactive_idx and q in self.inactive_idx:
-                    self.kappa_redundant_idx.append([p, q])
+                    self.kappa_redundant_idx.append((p, q))
                     continue
                 if p in self.virtual_idx and q in self.virtual_idx:
-                    self.kappa_redundant_idx.append([p, q])
+                    self.kappa_redundant_idx.append((p, q))
                     continue
                 if not include_active_kappa:
                     if p in self.active_idx and q in self.active_idx:
-                        self.kappa_redundant_idx.append([p, q])
+                        self.kappa_redundant_idx.append((p, q))
                         continue
                 # the rest is non-redundant
                 self.kappa.append(0.0)
                 self._kappa_old.append(0.0)
-                self.kappa_idx.append([p, q])
-                self.kappa_idx_dagger.append([q, p])
+                self.kappa_idx.append((p, q))
+                self.kappa_idx_dagger.append((q, p))
         # HF like orbital rotation indecies
         self.kappa_hf_like_idx = []
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
                 if p in self.inactive_idx and q in self.virtual_idx:
-                    self.kappa_hf_like_idx.append([p, q])
+                    self.kappa_hf_like_idx.append((p, q))
                 elif p in self.inactive_idx and q in self.active_unocc_idx:
-                    self.kappa_hf_like_idx.append([p, q])
+                    self.kappa_hf_like_idx.append((p, q))
                 elif p in self.active_occ_idx and q in self.virtual_idx:
-                    self.kappa_hf_like_idx.append([p, q])
+                    self.kappa_hf_like_idx.append((p, q))
         # Construct determinant basis
         self.idx2det, self.det2idx = get_indexing(
             self.num_active_orbs, self.num_active_elec_alpha, self.num_active_elec_beta
