@@ -155,7 +155,7 @@ class WaveFunctionUCC:
             for active_idx in self.active_unocc_idx:
                 self.active_unocc_idx_shifted.append(active_idx - active_shift)
         # Find non-redundant kappas
-        self.kappa = []
+        self._kappa = []
         self.kappa_idx = []
         self.kappa_no_activeactive_idx = []
         self.kappa_no_activeactive_idx_dagger = []
@@ -167,32 +167,32 @@ class WaveFunctionUCC:
             for q in range(p + 1, self.num_orbs):
                 # find redundant kappas
                 if p in self.inactive_idx and q in self.inactive_idx:
-                    self.kappa_redundant_idx.append([p, q])
+                    self.kappa_redundant_idx.append((p, q))
                     continue
                 if p in self.virtual_idx and q in self.virtual_idx:
-                    self.kappa_redundant_idx.append([p, q])
+                    self.kappa_redundant_idx.append((p, q))
                     continue
                 if not include_active_kappa:
                     if p in self.active_idx and q in self.active_idx:
-                        self.kappa_redundant_idx.append([p, q])
+                        self.kappa_redundant_idx.append((p, q))
                         continue
                 if not (p in self.active_idx and q in self.active_idx):
-                    self.kappa_no_activeactive_idx.append([p, q])
-                    self.kappa_no_activeactive_idx_dagger.append([q, p])
+                    self.kappa_no_activeactive_idx.append((p, q))
+                    self.kappa_no_activeactive_idx_dagger.append((q, p))
                 # the rest is non-redundant
-                self.kappa.append(0.0)
+                self._kappa.append(0.0)
                 self._kappa_old.append(0.0)
-                self.kappa_idx.append([p, q])
+                self.kappa_idx.append((p, q))
         # HF like orbital rotation indices
         self.kappa_hf_like_idx = []
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
                 if p in self.inactive_idx and q in self.virtual_idx:
-                    self.kappa_hf_like_idx.append([p, q])
+                    self.kappa_hf_like_idx.append((p, q))
                 elif p in self.inactive_idx and q in self.active_unocc_idx:
-                    self.kappa_hf_like_idx.append([p, q])
+                    self.kappa_hf_like_idx.append((p, q))
                 elif p in self.active_occ_idx and q in self.virtual_idx:
-                    self.kappa_hf_like_idx.append([p, q])
+                    self.kappa_hf_like_idx.append((p, q))
         # Construct determinant basis
         self.idx2det, self.det2idx = get_indexing(
             self.num_active_orbs, self.num_active_elec_alpha, self.num_active_elec_beta
@@ -268,6 +268,23 @@ class WaveFunctionUCC:
         self._h_mo = None
         self._g_mo = None
         self._c_orthonormal = c
+
+    @property
+    def kappa(self) -> list[float]:
+        """Get orbital roation parameters."""
+        return self._kappa.copy()
+
+    @kappa.setter
+    def kappa(self, k: list[float]) -> None:
+        """Set orbital rotation parameters.
+
+        Args:
+            k: orbital rotation parameters.
+        """
+        self._h_mo = None
+        self._g_mo = None
+        self._energy_elec = None
+        self._kappa = k.copy()
 
     @property
     def ci_coeffs(self) -> np.ndarray:
@@ -350,6 +367,12 @@ class WaveFunctionUCC:
         if self._g_mo is None:
             self._g_mo = two_electron_integral_transform(self.c_trans, self._g_ao)
         return self._g_mo
+
+    def _move_cep(self) -> None:
+        """Move current expansion point."""
+        c = self.c_trans
+        self.c_orthonormal = c
+        self._kappa_old = self.kappa
 
     @property
     def rdm1(self) -> np.ndarray:

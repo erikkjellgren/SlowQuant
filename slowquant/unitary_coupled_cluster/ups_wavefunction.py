@@ -272,10 +272,16 @@ class WaveFunctionUPS:
 
     @property
     def kappa(self) -> list[float]:
+        """Get orbital roation parameters."""
         return self._kappa.copy()
 
     @kappa.setter
     def kappa(self, k: list[float]) -> None:
+        """Set orbital rotation parameters.
+
+        Args:
+            k: orbital rotation parameters.
+        """
         self._h_mo = None
         self._g_mo = None
         self._energy_elec = None
