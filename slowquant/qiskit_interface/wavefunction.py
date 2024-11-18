@@ -276,7 +276,7 @@ class WaveFunction:
     def _move_cep(self) -> None:
         """Move current expansion point."""
         c = self.c_trans
-        self._c_orthonormal = c
+        self.c_orthonormal = c
         self._kappa_old = self.kappa
 
     def change_primitive(
@@ -1052,8 +1052,9 @@ class WaveFunction:
         """
         number_kappas = 0
         if kappa_optimization:
-            self._move_cep()
             number_kappas = len(self.kappa_idx)
+            self.kappa = parameters[:number_kappas]
+            self._move_cep()
         if theta_optimization:
             self.thetas = parameters[number_kappas:]
         # Build operator
@@ -1076,8 +1077,9 @@ class WaveFunction:
         gradient = np.zeros(len(parameters))
         number_kappas = 0
         if kappa_optimization:
-            self._move_cep()
             number_kappas = len(self.kappa_idx)
+            self.kappa = parameters[:number_kappas]
+            self._move_cep()
         if theta_optimization:
             self.thetas = parameters[number_kappas:]
         if kappa_optimization:
