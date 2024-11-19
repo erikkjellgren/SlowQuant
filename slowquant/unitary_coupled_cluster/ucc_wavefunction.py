@@ -33,10 +33,9 @@ from slowquant.unitary_coupled_cluster.util import UccStructure
 class WaveFunctionUCC:
     def __init__(
         self,
-        num_spin_orbs: int,
         num_elec: int,
         cas: Sequence[int],
-        c_orthonormal: np.ndarray,
+        mo_coeffs: np.ndarray,
         h_ao: np.ndarray,
         g_ao: np.ndarray,
         excitations: str,
@@ -45,11 +44,10 @@ class WaveFunctionUCC:
         """Initialize for UCC wave function.
 
         Args:
-            num_spin_orbs: Number of spin orbitals.
             num_elec: Number of electrons.
             cas: CAS(num_active_elec, num_active_orbs),
                  orbitals are counted in spatial basis.
-            c_orthonormal: Initial orbital coefficients.
+            mo_coeffs: Initial orbital coefficients.
             h_ao: One-electron integrals in AO for Hamiltonian.
             g_ao: Two-electron integrals in AO.
             excitations: Unitary coupled cluster excitation operators.
@@ -58,7 +56,7 @@ class WaveFunctionUCC:
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
         # Init stuff
-        self._c_orthonormal = c_orthonormal
+        self._c_orthonormal_ = mo_coeffs
         self._h_ao = h_ao
         self._g_ao = g_ao
         self.inactive_spin_idx = []
@@ -75,8 +73,8 @@ class WaveFunctionUCC:
         self.num_elec = num_elec
         self.num_elec_alpha = num_elec // 2
         self.num_elec_beta = num_elec // 2
-        self.num_spin_orbs = num_spin_orbs
-        self.num_orbs = num_spin_orbs // 2
+        self.num_spin_orbs = 2 * len(h_ao)
+        self.num_orbs = len(h_ao)
         self._include_active_kappa = include_active_kappa
         self.num_active_elec = 0
         self.num_active_spin_orbs = 0
@@ -106,7 +104,7 @@ class WaveFunctionUCC:
             else:
                 self.inactive_spin_idx.append(i)
                 self.num_inactive_spin_orbs += 1
-        for i in range(num_elec, num_spin_orbs):
+        for i in range(num_elec, self.num_spin_orbs):
             if i in active_space:
                 self.active_spin_idx.append(i)
                 self.active_unocc_spin_idx.append(i)
@@ -240,11 +238,10 @@ class WaveFunctionUCC:
         np.savez_compressed(
             f"{filename}.npz",
             thetas=self.thetas,
-            c_trans=self.c_trans,
+            c_mo=self.c_mo,
             h_ao=self._h_ao,
             g_ao=self._g_ao,
             excitations=self._excitations,
-            num_spin_orbs=self.num_spin_orbs,
             num_elec=self.num_elec,
             num_active_elec=self.num_active_elec,
             num_active_orbs=self.num_active_orbs,
@@ -253,16 +250,16 @@ class WaveFunctionUCC:
         )
 
     @property
-    def c_orthonormal(self) -> np.ndarray:
+    def _c_orthonormal(self) -> np.ndarray:
         """Get orthonormalization coefficients (MO coefficients).
 
         Returns:
             Orthonormalization coefficients.
         """
-        return self._c_orthonormal
+        return self._c_orthonormal_
 
-    @c_orthonormal.setter
-    def c_orthonormal(self, c: np.ndarray) -> None:
+    @_c_orthonormal.setter
+    def _c_orthonormal(self, c: np.ndarray) -> None:
         """Set orthonormalization coefficients.
 
         Args:
@@ -271,11 +268,11 @@ class WaveFunctionUCC:
         self._h_mo = None
         self._g_mo = None
         self._energy_elec = None
-        self._c_orthonormal = c
+        self._c_orthonormal_ = c
 
     @property
     def kappa(self) -> list[float]:
-        """Get orbital roation parameters."""
+        """Get orbital rotation parameters."""
         return self._kappa.copy()
 
     @kappa.setter
@@ -330,23 +327,24 @@ class WaveFunctionUCC:
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
+        self._energy_elec = None
         self._ci_coeffs = None
         self._thetas = theta.copy()
 
     @property
-    def c_trans(self) -> np.ndarray:
-        """Get orbital coefficients.
+    def c_mo(self) -> np.ndarray:
+        """Get molecular orbital coefficients.
 
         Returns:
-            Orbital coefficients.
+            Molecular orbital coefficients.
         """
         # Construct anti-hermitian kappa matrix
         kappa_mat = np.zeros_like(self._c_orthonormal)
         if len(self.kappa) != 0:
-            if np.max(np.abs(self.kappa)) > 0.0:
-                for kappa_val, (p, q) in zip(self.kappa, self.kappa_idx):
-                    kappa_mat[p, q] = kappa_val
-                    kappa_mat[q, p] = -kappa_val
+            if np.max(np.abs(np.array(self.kappa) - np.array(self._kappa_old))) > 0.0:
+                for kappa_val, kappa_old, (p, q) in zip(self.kappa, self._kappa_old, self.kappa_idx):
+                    kappa_mat[p, q] = kappa_val - kappa_old
+                    kappa_mat[q, p] = -(kappa_val - kappa_old)
         # Apply orbital rotation unitary to MO coefficients
         return np.matmul(self._c_orthonormal, scipy.linalg.expm(-kappa_mat))
 
@@ -358,7 +356,7 @@ class WaveFunctionUCC:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._h_mo is None:
-            self._h_mo = one_electron_integral_transform(self.c_trans, self._h_ao)
+            self._h_mo = one_electron_integral_transform(self.c_mo, self._h_ao)
         return self._h_mo
 
     @property
@@ -369,13 +367,13 @@ class WaveFunctionUCC:
             Two-electron Hamiltonian integrals in MO basis.
         """
         if self._g_mo is None:
-            self._g_mo = two_electron_integral_transform(self.c_trans, self._g_ao)
+            self._g_mo = two_electron_integral_transform(self.c_mo, self._g_ao)
         return self._g_mo
 
     def _move_cep(self) -> None:
         """Move current expansion point."""
-        c = self.c_trans
-        self.c_orthonormal = c
+        c = self.c_mo
+        self._c_orthonormal = c
         self._kappa_old = self.kappa
 
     @property
@@ -766,7 +764,7 @@ class WaveFunctionUCC:
         Args:
             overlap_integral: Overlap integral in AO basis.
         """
-        S_ortho = one_electron_integral_transform(self.c_trans, overlap_integral)
+        S_ortho = one_electron_integral_transform(self.c_mo, overlap_integral)
         one = np.identity(len(S_ortho))
         diff = np.abs(S_ortho - one)
         print("Max ortho-normal diff:", np.max(diff))
@@ -820,18 +818,15 @@ class WaveFunctionUCC:
             is_silent_subiterations: Silence subiterations.
         """
         # Init parameters
-        parameters: list[float] = []
         num_kappa = 0
+        if orbital_optimization:
+            num_kappa = len(self.kappa)
         num_theta1 = 0
         num_theta2 = 0
         num_theta3 = 0
         num_theta4 = 0
         num_theta5 = 0
         num_theta6 = 0
-        if orbital_optimization:
-            parameters += self.kappa
-            num_kappa += len(self.kappa)
-        parameters = parameters + self.thetas
         for exc_type in self.ucc_layout.excitation_operator_type:
             if exc_type == "sa_single":
                 num_theta1 += 1
@@ -951,18 +946,15 @@ class WaveFunctionUCC:
             maxiter: Maximum number of iterations.
         """
         # Init parameters
-        parameters: list[float] = []
         num_kappa = 0
+        if orbital_optimization:
+            num_kappa = len(self.kappa)
         num_theta1 = 0
         num_theta2 = 0
         num_theta3 = 0
         num_theta4 = 0
         num_theta5 = 0
         num_theta6 = 0
-        if orbital_optimization:
-            parameters += self.kappa
-            num_kappa += len(self.kappa)
-        parameters = parameters + self.thetas
         for exc_type in self.ucc_layout.excitation_operator_type:
             if exc_type == "sa_single":
                 num_theta1 += 1
@@ -1065,13 +1057,13 @@ class WaveFunctionUCC:
         Returns:
             Electronic energy.
         """
-        number_kappas = 0
+        num_kappa = 0
         if kappa_optimization:
-            number_kappas = len(self.kappa_idx)
-            self.kappa = parameters[:number_kappas]
+            num_kappa = len(self.kappa_idx)
+            self.kappa = parameters[:num_kappa]
             self._move_cep()
         if theta_optimization:
-            self.thetas = parameters[number_kappas:]
+            self.thetas = parameters[num_kappa:]
         if theta_optimization:
             return expectation_value(
                 self.ci_coeffs,
@@ -1117,13 +1109,13 @@ class WaveFunctionUCC:
             Gradient energy.
         """
         gradient = np.zeros(len(parameters))
-        number_kappas = 0
+        num_kappa = 0
         if kappa_optimization:
-            number_kappas = len(self.kappa_idx)
-            self.kappa = parameters[:number_kappas]
+            num_kappa = len(self.kappa_idx)
+            self.kappa = parameters[:num_kappa]
             self._move_cep()
         if theta_optimization:
-            self.thetas = parameters[number_kappas:]
+            self.thetas = parameters[num_kappa:]
         if kappa_optimization:
             rdms = ReducedDenstiyMatrix(
                 self.num_inactive_orbs,
@@ -1132,7 +1124,7 @@ class WaveFunctionUCC:
                 rdm1=self.rdm1,
                 rdm2=self.rdm2,
             )
-            gradient[:number_kappas] = get_orbital_gradient(
+            gradient[:num_kappa] = get_orbital_gradient(
                 rdms, self.h_mo, self.g_mo, self.kappa_idx, self.num_inactive_orbs, self.num_active_orbs
             )
         if theta_optimization:
@@ -1162,7 +1154,7 @@ class WaveFunctionUCC:
                 E_plus = expectation_value_mat(self.ci_coeffs, Hamiltonian, self.ci_coeffs)
                 theta_params[i] -= step_size
                 self.thetas = theta_params
-                gradient[i + number_kappas] = (E_plus - E) / step_size
+                gradient[i + num_kappa] = (E_plus - E) / step_size
         return gradient
 
 
@@ -1177,10 +1169,9 @@ def load_wavefunction(filename: str) -> WaveFunctionUCC:
     """
     dat = np.load(f"{filename}.npz")
     wf = WaveFunctionUCC(
-        int(dat["num_spin_orbs"]),
         int(dat["num_elec"]),
         (int(dat["num_active_elec"]), int(dat["num_active_orbs"])),
-        dat["c_trans"],
+        dat["c_mo"],
         dat["h_ao"],
         dat["g_ao"],
         str(dat["excitations"]),

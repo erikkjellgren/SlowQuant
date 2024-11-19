@@ -14,8 +14,8 @@ import slowquant.qiskit_interface.linear_response.naive as q_naive  # pylint: di
 import slowquant.qiskit_interface.linear_response.projected as q_projected  # pylint: disable=consider-using-from-import
 import slowquant.unitary_coupled_cluster.linear_response.allprojected as allprojected  # pylint: disable=consider-using-from-import
 import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
+from slowquant.qiskit_interface.circuit_wavefunction import WaveFunctionCircuit
 from slowquant.qiskit_interface.interface import QuantumInterface
-from slowquant.qiskit_interface.wavefunction import WaveFunction
 from slowquant.unitary_coupled_cluster.operators import hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
@@ -34,7 +34,6 @@ def test_LiH_naive_estimator() -> None:
 
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nao * 2,
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -44,7 +43,7 @@ def test_LiH_naive_estimator() -> None:
     )
 
     # Optimize WF
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Optimize WF with QSQ
     estimator = Estimator()
@@ -52,11 +51,10 @@ def test_LiH_naive_estimator() -> None:
 
     QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
-        WF.c_trans,
+        WF.c_mo,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
         QI,
@@ -109,7 +107,6 @@ def test_LiH_naive_samplerQiskit() -> None:
 
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nao * 2,
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -119,7 +116,7 @@ def test_LiH_naive_samplerQiskit() -> None:
     )
 
     # Optimize WF
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Optimize WF with QSQ
     estimator = Sampler()
@@ -127,11 +124,10 @@ def test_LiH_naive_samplerQiskit() -> None:
 
     QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
-        WF.c_trans,
+        WF.c_mo,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
         QI,
@@ -184,7 +180,6 @@ def test_LiH_naive() -> None:
 
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nao * 2,
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -194,7 +189,7 @@ def test_LiH_naive() -> None:
     )
 
     # Optimize WF
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Optimize WF with QSQ
     estimator = SamplerAer()
@@ -202,11 +197,10 @@ def test_LiH_naive() -> None:
 
     QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
-        WF.c_trans,
+        WF.c_mo,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
         QI,
@@ -259,7 +253,6 @@ def test_LiH_projected() -> None:
 
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nao * 2,
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -269,7 +262,7 @@ def test_LiH_projected() -> None:
     )
 
     # Optimize WF
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Optimize WF with QSQ
     estimator = SamplerAer()
@@ -277,11 +270,10 @@ def test_LiH_projected() -> None:
 
     QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
-        WF.c_trans,
+        WF.c_mo,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
         QI,
@@ -328,7 +320,6 @@ def test_LiH_dumb_projected() -> None:
 
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nao * 2,
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -338,7 +329,7 @@ def test_LiH_dumb_projected() -> None:
     )
 
     # Optimize WF
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Optimize WF with QSQ
     estimator = SamplerAer()
@@ -346,11 +337,10 @@ def test_LiH_dumb_projected() -> None:
 
     QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
-        WF.c_trans,
+        WF.c_mo,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
         QI,
@@ -397,7 +387,6 @@ def test_LiH_allprojected() -> None:
 
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nao * 2,
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -407,7 +396,7 @@ def test_LiH_allprojected() -> None:
     )
 
     # Optimize WF
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Optimize WF with QSQ
     estimator = SamplerAer()
@@ -415,11 +404,10 @@ def test_LiH_allprojected() -> None:
 
     QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
-        WF.c_trans,
+        WF.c_mo,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
         QI,
@@ -472,7 +460,6 @@ def test_LiH_dumb_allprojected() -> None:
 
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nao * 2,
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -482,7 +469,7 @@ def test_LiH_dumb_allprojected() -> None:
     )
 
     # Optimize WF
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Optimize WF with QSQ
     estimator = SamplerAer()
@@ -490,11 +477,10 @@ def test_LiH_dumb_allprojected() -> None:
 
     QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
-        WF.c_trans,
+        WF.c_mo,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
         QI,
@@ -541,7 +527,6 @@ def test_LiH_naive_sampler_ISA() -> None:
 
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nao * 2,
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -551,7 +536,7 @@ def test_LiH_naive_sampler_ISA() -> None:
     )
 
     # Optimize WF
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Optimize WF with QSQ
     sampler = SamplerAer()
@@ -559,11 +544,10 @@ def test_LiH_naive_sampler_ISA() -> None:
 
     QI = QuantumInterface(sampler, "fUCCSD", mapper, ISA=True)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
-        WF.c_trans,
+        WF.c_mo,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
         QI,
@@ -612,7 +596,6 @@ def test_LiH_oscillator_strength() -> None:
 
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nao * 2,
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -622,7 +605,7 @@ def test_LiH_oscillator_strength() -> None:
     )
 
     # Optimize WF
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Optimize WF with QSQ
     estimator = SamplerAer()
@@ -630,11 +613,10 @@ def test_LiH_oscillator_strength() -> None:
 
     QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
-        WF.c_trans,
+        WF.c_mo,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
         QI,
@@ -732,8 +714,7 @@ def test_gradient_optimizer_H2() -> None:
     mapper = ParityMapper(num_particles=(1, 1))
     QI = QuantumInterface(estimator, "fUCCD", mapper)
 
-    WF = WaveFunction(
-        mol.nao * 2,
+    WF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -764,8 +745,7 @@ def test_sampler_changes() -> None:
     estimator = Estimator()
     QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -836,8 +816,7 @@ def test_shots() -> None:
 
     QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=10)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -860,8 +839,7 @@ def test_fUCC_h2o() -> None:
     mapper = JordanWignerMapper()
     QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
-    WF = WaveFunction(
-        mol.nao * 2,
+    WF = WaveFunctionCircuit(
         mol.nelectron,
         (4, 4),
         rhf.mo_coeff,
@@ -894,8 +872,7 @@ def test_samplerV2() -> None:
 
     QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=10)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -928,8 +905,7 @@ def test_samplerV2_ibm() -> None:
 
     QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=10)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -959,8 +935,7 @@ def test_custom() -> None:
 
     QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=None)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -1009,8 +984,7 @@ def test_H2_sampler_couplingmap() -> None:
 
     QI = QuantumInterface(sampler, "fUCCSD", mapper, ISA=True)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,

@@ -28,13 +28,12 @@ from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 
 
-class WaveFunction:
+class WaveFunctionCircuit:
     def __init__(
         self,
-        num_spin_orbs: int,
         num_elec: int,
         cas: Sequence[int],
-        c_orthonormal: np.ndarray,
+        mo_coeffs: np.ndarray,
         h_ao: np.ndarray,
         g_ao: np.ndarray,
         quantum_interface: QuantumInterface,
@@ -43,11 +42,10 @@ class WaveFunction:
         """Initialize for UCC wave function.
 
         Args:
-            num_spin_orbs: Number of spin orbitals.
             num_elec: Number of electrons.
             cas: CAS(num_active_elec, num_active_orbs),
                  orbitals are counted in spatial basis.
-            c_orthonormal: Initial orbital coefficients.
+            mo_coeffs: Initial orbital coefficients.
             h_ao: One-electron integrals in AO for Hamiltonian.
             g_ao: Two-electron integrals in AO.
             quantum_interface: QuantumInterface.
@@ -57,7 +55,7 @@ class WaveFunction:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
         if isinstance(quantum_interface.ansatz, QuantumCircuit):
             print("WARNING: A QI with a custom Ansatz was passed. VQE will only work with COBYLA optimizer.")
-        self._c_orthonormal = c_orthonormal
+        self._c_orthonormal_ = mo_coeffs
         self._h_ao = h_ao
         self._g_ao = g_ao
         self.inactive_spin_idx = []
@@ -69,8 +67,8 @@ class WaveFunction:
         self.active_occ_spin_idx_shifted = []
         self.active_unocc_spin_idx_shifted = []
         self.num_elec = num_elec
-        self.num_spin_orbs = num_spin_orbs
-        self.num_orbs = num_spin_orbs // 2
+        self.num_spin_orbs = 2 * len(h_ao)
+        self.num_orbs = len(h_ao)
         self.num_active_elec = 0
         self.num_active_spin_orbs = 0
         self.num_inactive_spin_orbs = 0
@@ -81,6 +79,7 @@ class WaveFunction:
         self._rdm4 = None
         self._h_mo = None
         self._g_mo = None
+        self._energy_elec: float | None = None
         self.do_trace_corrected = True
         active_space = []
         orbital_counter = 0
@@ -98,7 +97,7 @@ class WaveFunction:
             else:
                 self.inactive_spin_idx.append(i)
                 self.num_inactive_spin_orbs += 1
-        for i in range(num_elec, num_spin_orbs):
+        for i in range(num_elec, self.num_spin_orbs):
             if i in active_space:
                 self.active_spin_idx.append(i)
                 self.active_unocc_spin_idx.append(i)
@@ -174,7 +173,6 @@ class WaveFunction:
                     self.kappa_hf_like_idx.append((p, q))
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     self.kappa_hf_like_idx.append((p, q))
-        self._energy_elec: float | None = None
         # Setup Qiskit stuff
         self.QI = quantum_interface
         self.QI.construct_circuit(
@@ -182,16 +180,16 @@ class WaveFunction:
         )
 
     @property
-    def c_orthonormal(self) -> np.ndarray:
-        """Get orthonormalization coefficients (MO coefficients).
+    def _c_orthonormal(self) -> np.ndarray:
+        """Get orthonormalization coefficients.
 
         Returns:
             Orthonormalization coefficients.
         """
-        return self._c_orthonormal
+        return self._c_orthonormal_
 
-    @c_orthonormal.setter
-    def c_orthonormal(self, c: np.ndarray) -> None:
+    @_c_orthonormal.setter
+    def _c_orthonormal(self, c: np.ndarray) -> None:
         """Set orthonormalization coefficients.
 
         Args:
@@ -200,25 +198,31 @@ class WaveFunction:
         self._h_mo = None
         self._g_mo = None
         self._energy_elec = None
-        self._c_orthonormal = c
+        self._c_orthonormal_ = c
 
     @property
     def kappa(self) -> list[float]:
+        """Get orbital rotation parameters."""
         return self._kappa.copy()
 
     @kappa.setter
     def kappa(self, k: list[float]) -> None:
+        """Set orbital rotation parameters.
+
+        Args:
+            k: orbital rotation parameters.
+        """
         self._h_mo = None
         self._g_mo = None
         self._energy_elec = None
         self._kappa = k.copy()
 
     @property
-    def c_trans(self) -> np.ndarray:
-        """Get orbital coefficients.
+    def c_mo(self) -> np.ndarray:
+        """Get molecular orbital coefficients.
 
         Returns:
-            Orbital coefficients.
+            Molecular orbital coefficients.
         """
         kappa_mat = np.zeros_like(self._c_orthonormal)
         if len(self.kappa) != 0:
@@ -236,7 +240,7 @@ class WaveFunction:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._h_mo is None:
-            self._h_mo = one_electron_integral_transform(self.c_trans, self._h_ao)
+            self._h_mo = one_electron_integral_transform(self.c_mo, self._h_ao)
         return self._h_mo
 
     @property
@@ -247,7 +251,7 @@ class WaveFunction:
             Two-electron Hamiltonian integrals in MO basis.
         """
         if self._g_mo is None:
-            self._g_mo = two_electron_integral_transform(self.c_trans, self._g_ao)
+            self._g_mo = two_electron_integral_transform(self.c_mo, self._g_ao)
         return self._g_mo
 
     @property
@@ -275,7 +279,7 @@ class WaveFunction:
 
     def _move_cep(self) -> None:
         """Move current expansion point."""
-        c = self.c_trans
+        c = self.c_mo
         self.c_orthonormal = c
         self._kappa_old = self.kappa
 
@@ -836,7 +840,7 @@ class WaveFunction:
         Args:
             overlap_integral: Overlap integral in AO basis.
         """
-        S_ortho = one_electron_integral_transform(self.c_trans, overlap_integral)
+        S_ortho = one_electron_integral_transform(self.c_mo, overlap_integral)
         one = np.identity(len(S_ortho))
         diff = np.abs(S_ortho - one)
         print("Max ortho-normal diff:", np.max(diff))
@@ -1033,7 +1037,7 @@ class WaveFunction:
         if orbital_optimization:
             self.thetas = res.x[len(self.kappa) :].tolist()
             for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
-                self.kappa[i] = 0.0
+                self._kappa[i] = 0.0
                 self._kappa_old[i] = 0.0
         else:
             self.thetas = res.x.tolist()
@@ -1050,13 +1054,13 @@ class WaveFunction:
         Returns:
             Electronic energy.
         """
-        number_kappas = 0
+        num_kappa = 0
         if kappa_optimization:
-            number_kappas = len(self.kappa_idx)
-            self.kappa = parameters[:number_kappas]
+            num_kappa = len(self.kappa_idx)
+            self.kappa = parameters[:num_kappa]
             self._move_cep()
         if theta_optimization:
-            self.thetas = parameters[number_kappas:]
+            self.thetas = parameters[num_kappa:]
         # Build operator
         if theta_optimization:
             H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
@@ -1075,13 +1079,13 @@ class WaveFunction:
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
     ) -> np.ndarray:
         gradient = np.zeros(len(parameters))
-        number_kappas = 0
+        num_kappa = 0
         if kappa_optimization:
-            number_kappas = len(self.kappa_idx)
-            self.kappa = parameters[:number_kappas]
+            num_kappa = len(self.kappa_idx)
+            self.kappa = parameters[:num_kappa]
             self._move_cep()
         if theta_optimization:
-            self.thetas = parameters[number_kappas:]
+            self.thetas = parameters[num_kappa:]
         if kappa_optimization:
             rdms = ReducedDenstiyMatrix(
                 self.num_inactive_orbs,
@@ -1090,20 +1094,20 @@ class WaveFunction:
                 rdm1=self.rdm1,
                 rdm2=self.rdm2,
             )
-            gradient[:number_kappas] = get_orbital_gradient(
+            gradient[:num_kappa] = get_orbital_gradient(
                 rdms, self.h_mo, self.g_mo, self.kappa_idx, self.num_inactive_orbs, self.num_active_orbs
             )
         if theta_optimization:
             H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-            for i in range(len(parameters[number_kappas:])):  # pylint: disable=consider-using-enumerate
+            for i in range(len(parameters[num_kappa:])):  # pylint: disable=consider-using-enumerate
                 R = self.QI.grad_param_R[self.QI.param_names[i]]
                 e_vals_grad = _get_energy_evals_for_grad(H, self.QI, parameters, i, R)
                 grad = 0.0
                 for j, mu in enumerate(list(range(1, 2 * R + 1))):
                     x_mu = (2 * mu - 1) / (2 * R) * np.pi
                     grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R * (np.sin(1 / 2 * x_mu)) ** 2)
-                gradient[number_kappas + i] = grad
+                gradient[num_kappa + i] = grad
         return gradient
 
 

@@ -23,7 +23,6 @@ def test_ups_naivelr() -> None:
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUPS(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -38,9 +37,7 @@ def test_ups_naivelr() -> None:
         SQobj.integral.get_multipole_matrix([0, 1, 0]),
         SQobj.integral.get_multipole_matrix([0, 0, 1]),
     )
-
-    WF.run_ups(True)
-
+    WF.run_wf_optimization_1step("SLSQP", True)
     LR = naiveLR.LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.129476) < 10**-4
@@ -90,7 +87,6 @@ def test_LiH_sto3g_allST():
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -98,19 +94,17 @@ def test_LiH_sto3g_allST():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
     WF2 = WaveFunctionUPS(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
-        WF.c_trans,
+        WF.c_mo,
         h_core,
         g_eri,
         "tUPS",
         ansatz_options={"n_layers": 1},
     )
-    WF2.run_ups(False)
-
+    WF2.run_wf_optimization_1step("SLSQP", False)
     # Linear Response
     LR = allstLR.LinearResponseUCC(
         WF2,
@@ -171,9 +165,7 @@ def test_ups_water_44() -> None:
     SQobj.hartree_fock.run_restricted_hartree_fock()
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
-
     WF = WaveFunctionUPS(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (4, 4),
         SQobj.hartree_fock.mo_coeff,
@@ -183,8 +175,7 @@ def test_ups_water_44() -> None:
         ansatz_options={},
         include_active_kappa=True,
     )
-
-    WF.run_ups(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
     assert abs(WF.energy_elec - -83.97256228053688) < 10**-8
 
 
@@ -205,7 +196,6 @@ def test_saups_h2_3states() -> None:
     g_eri = SQobj.integral.electron_repulsion_tensor
 
     WF = WaveFunctionSAUPS(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -228,7 +218,7 @@ def test_saups_h2_3states() -> None:
         include_active_kappa=True,
     )
 
-    WF.run_saups(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     dipole_integrals = (
         SQobj.integral.get_multipole_matrix([1, 0, 0]),
@@ -260,7 +250,6 @@ def test_saups_h3_3states() -> None:
     g_eri = SQobj.integral.electron_repulsion_tensor
 
     WF = WaveFunctionSAUPS(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 3),
         SQobj.hartree_fock.mo_coeff,
@@ -283,7 +272,7 @@ def test_saups_h3_3states() -> None:
         include_active_kappa=True,
     )
 
-    WF.run_saups(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     dipole_integrals = (
         SQobj.integral.get_multipole_matrix([1, 0, 0]),

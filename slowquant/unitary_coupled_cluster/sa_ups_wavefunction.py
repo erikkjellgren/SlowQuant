@@ -36,10 +36,9 @@ from slowquant.unitary_coupled_cluster.util import UpsStructure
 class WaveFunctionSAUPS:
     def __init__(
         self,
-        num_spin_orbs: int,
         num_elec: int,
         cas: Sequence[int],
-        c_orthonormal: np.ndarray,
+        mo_coeffs: np.ndarray,
         h_ao: np.ndarray,
         g_ao: np.ndarray,
         states: tuple[list[list[float]], list[list[str]]],
@@ -50,11 +49,10 @@ class WaveFunctionSAUPS:
         """Initialize for SA-UPS wave function.
 
         Args:
-            num_spin_orbs: Number of spin orbitals.
             num_elec: Number of electrons.
             cas: CAS(num_active_elec, num_active_orbs),
                  orbitals are counted in spatial basis.
-            c_orthonormal: Initial orbital coefficients.
+            mo_coeffs: Initial orbital coefficients.
             h_ao: One-electron integrals in AO for Hamiltonian.
             g_ao: Two-electron integrals in AO.
             states: States to include in the state-averaged expansion.
@@ -69,7 +67,7 @@ class WaveFunctionSAUPS:
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
         # Init stuff
-        self._c_orthonormal = c_orthonormal
+        self._c_orthonormal = mo_coeffs
         self._h_ao = h_ao
         self._g_ao = g_ao
         self.inactive_spin_idx = []
@@ -86,8 +84,8 @@ class WaveFunctionSAUPS:
         self.num_elec = num_elec
         self.num_elec_alpha = num_elec // 2
         self.num_elec_beta = num_elec // 2
-        self.num_spin_orbs = num_spin_orbs
-        self.num_orbs = num_spin_orbs // 2
+        self.num_spin_orbs = 2 * len(h_ao)
+        self.num_orbs = len(h_ao)
         self.num_active_elec = 0
         self.num_active_spin_orbs = 0
         self.num_inactive_spin_orbs = 0
@@ -114,7 +112,7 @@ class WaveFunctionSAUPS:
             else:
                 self.inactive_spin_idx.append(i)
                 self.num_inactive_spin_orbs += 1
-        for i in range(num_elec, num_spin_orbs):
+        for i in range(num_elec, self.num_spin_orbs):
             if i in active_space:
                 self.active_spin_idx.append(i)
                 self.active_unocc_spin_idx.append(i)
