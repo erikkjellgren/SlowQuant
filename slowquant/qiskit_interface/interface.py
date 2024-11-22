@@ -743,7 +743,7 @@ class QuantumInterface:
             )
         # Option handling
         if ISA_csfs_option == 0:
-            ISA_csfs_option = 1
+            ISA_csfs_option = 1  # could also be 2
             if self.do_M_mitigation and self.ansatz_circuit.layout is not None:
                 ISA_csfs_option = 2
                 if self.do_M_ansatz0:
@@ -761,6 +761,8 @@ class QuantumInterface:
         else:
             connection_order = np.arange(self.num_qubits)
         val = 0.0
+        # print("bras: ", bra_csf[1])  # debug
+        # print("kets: ", ket_csf[1])  # debug
         # Loop over dets in bra CSF
         for bra_coeff, bra_det in zip(bra_csf[0], bra_csf[1]):
             sign_bra = get_reordering_sign(bra_det)
@@ -768,12 +770,14 @@ class QuantumInterface:
             for ket_coeff, ket_det in zip(ket_csf[0], ket_csf[1]):
                 sign_ket = get_reordering_sign(ket_det)
                 N = bra_coeff * ket_coeff * sign_bra * sign_ket  # pre-factor
+                # print("Expectation value of dets: ", bra_det, ket_det)  # debug
                 # I == J (diagonals)
                 if bra_det == ket_det:
                     # Get det circuit. Only X-Gates -> no transpilation.
                     circuit = get_determinant_reference(bra_det, self.num_orbs, self.mapper)
                     # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
                     circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
+                    # val_old = val  # debug
                     if isinstance(self._primitive, BaseEstimator):
                         val += N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
                     if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
@@ -783,6 +787,7 @@ class QuantumInterface:
                             circuit,
                             do_cliques=self._do_cliques,
                         )
+                    # print("I == J, val = ",val-val_old)  # debug
                 # I != J (off-diagonals)
                 else:
                     # First term of off-diagonal element involving I and J
@@ -790,9 +795,9 @@ class QuantumInterface:
                     state = get_determinant_superposition_reference(
                         bra_det, ket_det, self.num_orbs, self.mapper
                     )
-                    self.superpos = state  # debug
                     # Superposition state contains non-native gates for ISA -> transpilation needed.
                     if self.ISA:
+                        # print("Doing a superpos simulation")  # debug
                         match ISA_csfs_option:
                             case 1:  # Option 1: flexible layout
                                 # Use untranspiled ansatz and compose with superposition state
@@ -813,19 +818,24 @@ class QuantumInterface:
                                     self.ansatz_circuit,
                                     state,
                                     self._initialfixedlayout_pm,
+                                    coupling_map=self.pass_manager_options.get("backend").coupling_map,  # type: ignore
                                     optimization=False,
                                 )
                             case (
                                 4
                             ):  # Option 4: fixed layout - fixed order with optimization (needed with M_Ansatz0)
                                 circuit = layout_conserving_compose(
-                                    self.ansatz_circuit, state, self._initialfixedlayout_pm, optimization=True
+                                    self.ansatz_circuit,
+                                    state,
+                                    self._initialfixedlayout_pm,
+                                    coupling_map=self.pass_manager_options.get("backend").coupling_map,  # type: ignore
+                                    optimization=True,
                                 )
                             case _:
                                 raise ValueError("Wrong ISA_csfs_option specified. Needs to be 1,2,3,4.")
                     else:
                         circuit = self.ansatz_circuit.compose(state, front=True)
-                    self.composed = circuit  # debug
+                    # val_old = val  # debug
                     # Check if M per superposition circuit is requested
                     if M_per_superpos:
                         state_corr = state.copy()
@@ -845,7 +855,6 @@ class QuantumInterface:
                             )
                         else:
                             circuit_M = circuit.compose(state_corr, front=True)
-                        self.composed_M = circuit_M  # debug
 
                         val += N * self._sampler_quantum_expectation_value_nosave(
                             op,
@@ -866,12 +875,14 @@ class QuantumInterface:
                                 circuit,
                                 do_cliques=self._do_cliques,
                             )
+                    # print("I != J, superpos, val = ",val-val_old)  # debug
 
                     # Second term of off-diagonal element involving only I
                     # Get det circuit. Only X-Gates -> no transpilation.
                     circuit = get_determinant_reference(bra_det, self.num_orbs, self.mapper)
                     # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
                     circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
+                    # val_old = val  # debug
                     if isinstance(self._primitive, BaseEstimator):
                         val -= (
                             0.5 * N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
@@ -887,12 +898,14 @@ class QuantumInterface:
                                 do_cliques=self._do_cliques,
                             )
                         )
+                    # print("I != J, I, val = ",-(val-val_old))  # debug
 
                     # Third term of off-diagonal element involving only J
                     # Get det circuit. Only X-Gates -> no transpilation.
                     circuit = get_determinant_reference(ket_det, self.num_orbs, self.mapper)
                     # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
                     circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
+                    # val_old = val  # debug
                     if isinstance(self._primitive, BaseEstimator):
                         val -= (
                             0.5 * N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
@@ -908,6 +921,7 @@ class QuantumInterface:
                                 do_cliques=self._do_cliques,
                             )
                         )
+                    # print("I != J, J, val = ",-(val-val_old))  # debug
         return val
 
     def _estimator_quantum_expectation_value(

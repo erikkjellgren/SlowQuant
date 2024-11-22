@@ -1,8 +1,8 @@
+import networkx as nx
 import numpy as np
 from qiskit import QuantumCircuit
-from qiskit.circuit.library import PermutationGate
 from qiskit.quantum_info import Pauli
-from qiskit.transpiler import PassManager
+from qiskit.transpiler import CouplingMap, PassManager
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 
@@ -381,10 +381,81 @@ def correct_distribution_with_layout(
     return dist
 
 
+def find_best_path(coupling_map: CouplingMap, start: int, target: int) -> list[int]:
+    """Find the best path between two qubits using the coupling map.
+
+    Args:
+        coupling_map (CouplingMap): The coupling map defining valid connections.
+        start (int): Starting qubit.
+        target (int): Target qubit.
+
+    Returns:
+        list: List of qubits representing the path from start to target.
+    """
+    # Convert the coupling map to a NetworkX graph
+    graph = nx.Graph()
+    graph.add_edges_from(coupling_map.get_edges())
+
+    # Find the shortest path between start and target
+    try:
+        path = nx.shortest_path(graph, source=start, target=target)
+    except nx.NetworkXNoPath as e:
+        raise ValueError(f"No valid path between qubit {start} and qubit {target}") from e
+
+    return path
+
+
+def add_permutation_gate(circuit: QuantumCircuit, permutation: list[int], coupling_map: CouplingMap) -> None:
+    """Add a permutation gate to a circuit, adhering to a given coupling map.
+
+    Args:
+        circuit (QuantumCircuit): The quantum circuit to modify.
+        permutation (list): A list defining the new positions of qubits.
+                            E.g., [2, 0, 1] means qubit 0 goes to 2, 1 goes to 0, and 2 goes to 1.
+        coupling_map (CouplingMap): The coupling map that defines valid qubit connections.
+
+    Returns:
+        QuantumCircuit: The modified circuit with the permutation gate added.
+    """
+    # Get the number of qubits
+    num_qubits = len(permutation)
+
+    # Validate input
+    if num_qubits != circuit.num_qubits:
+        raise ValueError("Permutation size must match the number of qubits in the circuit.")
+
+    # Current positions of qubits
+    current_positions = list(range(num_qubits))
+
+    # Self-consistent approach to finding all swaps
+    while current_positions != permutation:
+        # Generate SWAP gates to achieve the permutation
+        # Loop over all positions in array (num_qubits)
+        for target_position in range(num_qubits):
+            # Find the current qubit that needs to be swapped to the target position
+            correct_qubit = permutation[target_position]  # qubit meant to be in target_position
+            current_qubit_position = current_positions.index(correct_qubit)  # position of correct_qubit
+
+            if current_qubit_position != target_position:
+                # Find the full path from the current position to the target position
+                path = find_best_path(coupling_map, current_qubit_position, target_position)
+
+                # Apply SWAP gates along the path
+                for i in range(len(path) - 1):
+                    circuit.swap(path[i], path[i + 1])
+
+                    # Update current positions after each SWAP
+                    current_positions[path[i]], current_positions[path[i + 1]] = (
+                        current_positions[path[i + 1]],
+                        current_positions[path[i]],
+                    )
+
+
 def layout_conserving_compose(
     ansatz: QuantumCircuit,
     state: QuantumCircuit,
     pm: PassManager,
+    coupling_map: CouplingMap,
     optimization: bool = False,
     M_circuit: bool = False,
 ) -> QuantumCircuit | tuple[QuantumCircuit, QuantumCircuit]:
@@ -413,10 +484,24 @@ def layout_conserving_compose(
             != state_tmp.layout.final_index_layout()
         ):
             # Qiskit wants to change the layout? Not with me. Change it back!
-            perm = PermutationGate(state_tmp.layout.routing_permutation())
-            state_tmp.append(perm, list(range(ansatz.num_qubits)))
-            state_tmp = pm.optimization.run(pm.translation.run(state_tmp))
-            print("Layout correction added ", state_tmp.num_nonlocal_gates() - nlg_state, " non-local gates")
+
+            if coupling_map is None:
+                raise ValueError("No coupling map defined for layout conserving circuit composing.")
+
+            print("Starting self-consistent permutation circuit search...")
+            add_permutation_gate(state_tmp, state_tmp.layout.routing_permutation(), coupling_map)
+            state_tmp = pm.translation.run(state_tmp)
+            print(
+                "Layout correction added ",
+                state_tmp.num_nonlocal_gates() - nlg_state,
+                " non-local gates (without swap optimization)",
+            )
+            state_tmp = pm.optimization.run(state_tmp)
+            print(
+                "Layout correction added ",
+                state_tmp.num_nonlocal_gates() - nlg_state,
+                " non-local gates (with swap optimization)",
+            )
 
         composed = ansatz.compose(state_tmp, front=True)
 
@@ -425,7 +510,7 @@ def layout_conserving_compose(
             composed = pm.optimization.run(composed)
             composed._layout = ansatz.layout  # pylint: disable=protected-access
             print(
-                "Optimization eliminated ",
+                "Composed circuit optimization eliminated ",
                 nlg_composed - composed.num_nonlocal_gates(),
                 "non-local gates",
             )
@@ -443,7 +528,7 @@ def layout_conserving_compose(
                 "non-local gates",
             )
 
-    if M_circuit:
+    if M_circuit:  # deprecated?
         state_corr = state.copy()
         # Get state circuit without non-local gates
         for idx, instruction in reversed(list(enumerate(state_corr.data))):

@@ -54,6 +54,7 @@ class WaveFunctionSA:
             states: States to include in the state-averaged expansion.
                     Tuple of lists containing weights and determinants.
                     Each state in SA can be constructed of several dets.
+                    Ordering: left-to-right, alpha-beta alternating
             quantum_interface: QuantumInterface.
             include_active_kappa: Include active-active orbital rotations.
         """
