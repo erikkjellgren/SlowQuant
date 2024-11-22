@@ -2,6 +2,7 @@
 import copy
 import itertools
 import math
+from collections import defaultdict
 from typing import Any
 
 import numpy as np
@@ -761,167 +762,170 @@ class QuantumInterface:
         else:
             connection_order = np.arange(self.num_qubits)
         val = 0.0
-        # print("bras: ", bra_csf[1])  # debug
-        # print("kets: ", ket_csf[1])  # debug
-        # Loop over dets in bra CSF
-        for bra_coeff, bra_det in zip(bra_csf[0], bra_csf[1]):
-            sign_bra = get_reordering_sign(bra_det)
-            # Loop over dets in ket CSF
-            for ket_coeff, ket_det in zip(ket_csf[0], ket_csf[1]):
-                sign_ket = get_reordering_sign(ket_det)
-                N = bra_coeff * ket_coeff * sign_bra * sign_ket  # pre-factor
-                # print("Expectation value of dets: ", bra_det, ket_det)  # debug
-                # I == J (diagonals)
-                if bra_det == ket_det:
-                    # Get det circuit. Only X-Gates -> no transpilation.
-                    circuit = get_determinant_reference(bra_det, self.num_orbs, self.mapper)
-                    # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
-                    circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
-                    # val_old = val  # debug
-                    if isinstance(self._primitive, BaseEstimator):
-                        val += N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
-                    if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
-                        val += N * self._sampler_quantum_expectation_value_nosave(
-                            op,
-                            run_parameters,
-                            circuit,
-                            do_cliques=self._do_cliques,
-                        )
-                    # print("I == J, val = ",val-val_old)  # debug
-                # I != J (off-diagonals)
-                else:
-                    # First term of off-diagonal element involving I and J
-                    # I and J superposition state of determinants
-                    state = get_determinant_superposition_reference(
-                        bra_det, ket_det, self.num_orbs, self.mapper
+        print("bras: ", bra_csf[1])  # debug
+        print("kets: ", ket_csf[1])  # debug
+
+        # Create list of all combinations with their weight consisting of coefficient and reordering sign
+        all_combinations = [
+            (
+                tuple(sorted((bra_csf[1][i], ket_csf[1][j]))),
+                bra_csf[0][i]
+                * ket_csf[0][j]
+                * get_reordering_sign(bra_csf[1][i])
+                * get_reordering_sign(ket_csf[1][j]),
+            )
+            for i, j in itertools.product(range(len(bra_csf[1])), range(len(ket_csf[1])))
+        ]
+        # Only unique combinations
+        unique_combinations: dict = defaultdict(float)
+        for combo, weight in all_combinations:
+            unique_combinations[combo] += weight
+
+        # Calculate all unique combinations
+        for (bra_det, ket_det), N in unique_combinations.items():
+            print("Expectation value of dets: ", bra_det, ket_det)  # debug
+            # I == J (diagonals)
+            if bra_det == ket_det:
+                # Get det circuit. Only X-Gates -> no transpilation.
+                circuit = get_determinant_reference(bra_det, self.num_orbs, self.mapper)
+                # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
+                circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
+                val_old = val  # debug
+                if isinstance(self._primitive, BaseEstimator):
+                    val += N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
+                if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                    val += N * self._sampler_quantum_expectation_value_nosave(
+                        op,
+                        run_parameters,
+                        circuit,
+                        do_cliques=self._do_cliques,
                     )
-                    # Superposition state contains non-native gates for ISA -> transpilation needed.
-                    if self.ISA:
-                        # print("Doing a superpos simulation")  # debug
-                        match ISA_csfs_option:
-                            case 1:  # Option 1: flexible layout
-                                # Use untranspiled ansatz and compose with superposition state
-                                circuit = self._ansatz_circuit_raw.compose(state, front=True)
-                                # Transpile freely
-                                circuit = self._pass_manager.run(circuit)  # type: ignore
-                                # print(circuit.layout.final_index_layout())
-                            case 2:  # Option 2: fixed layout - flexible order (needed with M)
-                                # Use untranspiled ansatz and compose with superposition state
-                                circuit = self._ansatz_circuit_raw.compose(state, front=True)
-                                # Transpile the composed circuit together using the correct layout
-                                # This will however still introduce routing swaps (flexible order)
-                                circuit = self._initialfixedlayout_pm.run(circuit)
-                            case (
-                                3
-                            ):  # Option 3: fixed layout - fixed order without optimization (needed with M_Ansatz0)
-                                circuit = layout_conserving_compose(
-                                    self.ansatz_circuit,
-                                    state,
-                                    self._initialfixedlayout_pm,
-                                    coupling_map=self.pass_manager_options.get("backend").coupling_map,  # type: ignore
-                                    optimization=False,
-                                )
-                            case (
-                                4
-                            ):  # Option 4: fixed layout - fixed order with optimization (needed with M_Ansatz0)
-                                circuit = layout_conserving_compose(
-                                    self.ansatz_circuit,
-                                    state,
-                                    self._initialfixedlayout_pm,
-                                    coupling_map=self.pass_manager_options.get("backend").coupling_map,  # type: ignore
-                                    optimization=True,
-                                )
-                            case _:
-                                raise ValueError("Wrong ISA_csfs_option specified. Needs to be 1,2,3,4.")
-                    else:
-                        circuit = self.ansatz_circuit.compose(state, front=True)
-                    # val_old = val  # debug
-                    # Check if M per superposition circuit is requested
-                    if M_per_superpos:
-                        state_corr = state.copy()
-                        # Get state circuit without non-local gates
-                        for idx, instruction in reversed(list(enumerate(state_corr.data))):
-                            if instruction.is_controlled_gate():
-                                del state_corr.data[idx]
-                        if self.ISA:
-                            # Translate and optimize
-                            state_corr = self._pass_manager.optimization.run(self._pass_manager.translation.run(state_corr))  # type: ignore
-                        # Negate
-                        if circuit.layout is not None:
-                            circuit_M = circuit.compose(
-                                state_corr,
-                                front=True,
-                                qubits=circuit.layout.initial_index_layout(filter_ancillas=True),
+                print("I == J, val = ", val - val_old)  # debug
+            # I != J (off-diagonals)
+            else:
+                # First term of off-diagonal element involving I and J
+                # I and J superposition state of determinants
+                state = get_determinant_superposition_reference(bra_det, ket_det, self.num_orbs, self.mapper)
+                # Superposition state contains non-native gates for ISA -> transpilation needed.
+                if self.ISA:
+                    print("Doing a superpos simulation")  # debug
+                    match ISA_csfs_option:
+                        case 1:  # Option 1: flexible layout
+                            # Use untranspiled ansatz and compose with superposition state
+                            circuit = self._ansatz_circuit_raw.compose(state, front=True)
+                            # Transpile freely
+                            circuit = self._pass_manager.run(circuit)  # type: ignore
+                        case 2:  # Option 2: fixed layout - flexible order (needed with M)
+                            # Use untranspiled ansatz and compose with superposition state
+                            circuit = self._ansatz_circuit_raw.compose(state, front=True)
+                            # Transpile the composed circuit together using the correct layout
+                            # This will however still introduce routing swaps (flexible order)
+                            circuit = self._initialfixedlayout_pm.run(circuit)
+                        case (
+                            3
+                        ):  # Option 3: fixed layout - fixed order without optimization (needed with M_Ansatz0)
+                            circuit = layout_conserving_compose(
+                                self.ansatz_circuit,
+                                state,
+                                self._initialfixedlayout_pm,
+                                coupling_map=self.pass_manager_options.get("backend").coupling_map,  # type: ignore
+                                optimization=False,
                             )
-                        else:
-                            circuit_M = circuit.compose(state_corr, front=True)
+                        case (
+                            4
+                        ):  # Option 4: fixed layout - fixed order with optimization (needed with M_Ansatz0)
+                            circuit = layout_conserving_compose(
+                                self.ansatz_circuit,
+                                state,
+                                self._initialfixedlayout_pm,
+                                coupling_map=self.pass_manager_options.get("backend").coupling_map,  # type: ignore
+                                optimization=True,
+                            )
+                        case _:
+                            raise ValueError("Wrong ISA_csfs_option specified. Needs to be 1,2,3,4.")
+                else:
+                    circuit = self.ansatz_circuit.compose(state, front=True)
+                val_old = val  # debug
+                # Check if M per superposition circuit is requested
+                if M_per_superpos:
+                    state_corr = state.copy()
+                    # Get state circuit without non-local gates
+                    for idx, instruction in reversed(list(enumerate(state_corr.data))):
+                        if instruction.is_controlled_gate():
+                            del state_corr.data[idx]
+                    if self.ISA:
+                        # Translate and optimize
+                        state_corr = self._pass_manager.optimization.run(self._pass_manager.translation.run(state_corr))  # type: ignore
+                    # Negate
+                    if circuit.layout is not None:
+                        circuit_M = circuit.compose(
+                            state_corr,
+                            front=True,
+                            qubits=circuit.layout.initial_index_layout(filter_ancillas=True),
+                        )
+                    else:
+                        circuit_M = circuit.compose(state_corr, front=True)
 
+                    val += N * self._sampler_quantum_expectation_value_nosave(
+                        op,
+                        run_parameters,
+                        circuit,
+                        do_cliques=self._do_cliques,
+                        circuit_M=circuit_M,
+                    )
+                else:
+                    if isinstance(self._primitive, BaseEstimator):
+                        val += N * self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
+                    if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
                         val += N * self._sampler_quantum_expectation_value_nosave(
                             op,
                             run_parameters,
                             circuit,
                             do_cliques=self._do_cliques,
-                            circuit_M=circuit_M,
                         )
-                    else:
-                        if isinstance(self._primitive, BaseEstimator):
-                            val += N * self._estimator_quantum_expectation_value(
-                                op, run_parameters, self.circuit
-                            )
-                        if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
-                            val += N * self._sampler_quantum_expectation_value_nosave(
-                                op,
-                                run_parameters,
-                                circuit,
-                                do_cliques=self._do_cliques,
-                            )
-                    # print("I != J, superpos, val = ",val-val_old)  # debug
+                print("I != J, superpos, val = ", val - val_old)  # debug
 
-                    # Second term of off-diagonal element involving only I
-                    # Get det circuit. Only X-Gates -> no transpilation.
-                    circuit = get_determinant_reference(bra_det, self.num_orbs, self.mapper)
-                    # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
-                    circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
-                    # val_old = val  # debug
-                    if isinstance(self._primitive, BaseEstimator):
-                        val -= (
-                            0.5 * N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
+                # Second term of off-diagonal element involving only I
+                # Get det circuit. Only X-Gates -> no transpilation.
+                circuit = get_determinant_reference(bra_det, self.num_orbs, self.mapper)
+                # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
+                circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
+                val_old = val  # debug
+                if isinstance(self._primitive, BaseEstimator):
+                    val -= 0.5 * N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
+                if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                    val -= (
+                        0.5
+                        * N
+                        * self._sampler_quantum_expectation_value_nosave(
+                            op,
+                            run_parameters,
+                            circuit,
+                            do_cliques=self._do_cliques,
                         )
-                    if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
-                        val -= (
-                            0.5
-                            * N
-                            * self._sampler_quantum_expectation_value_nosave(
-                                op,
-                                run_parameters,
-                                circuit,
-                                do_cliques=self._do_cliques,
-                            )
-                        )
-                    # print("I != J, I, val = ",-(val-val_old))  # debug
+                    )
+                print("I != J, I, val = ", -(val - val_old))  # debug
 
-                    # Third term of off-diagonal element involving only J
-                    # Get det circuit. Only X-Gates -> no transpilation.
-                    circuit = get_determinant_reference(ket_det, self.num_orbs, self.mapper)
-                    # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
-                    circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
-                    # val_old = val  # debug
-                    if isinstance(self._primitive, BaseEstimator):
-                        val -= (
-                            0.5 * N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
+                # Third term of off-diagonal element involving only J
+                # Get det circuit. Only X-Gates -> no transpilation.
+                circuit = get_determinant_reference(ket_det, self.num_orbs, self.mapper)
+                # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
+                circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
+                val_old = val  # debug
+                if isinstance(self._primitive, BaseEstimator):
+                    val -= 0.5 * N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
+                if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                    val -= (
+                        0.5
+                        * N
+                        * self._sampler_quantum_expectation_value_nosave(
+                            op,
+                            run_parameters,
+                            circuit,
+                            do_cliques=self._do_cliques,
                         )
-                    if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
-                        val -= (
-                            0.5
-                            * N
-                            * self._sampler_quantum_expectation_value_nosave(
-                                op,
-                                run_parameters,
-                                circuit,
-                                do_cliques=self._do_cliques,
-                            )
-                        )
-                    # print("I != J, J, val = ",-(val-val_old))  # debug
+                    )
+                print("I != J, J, val = ", -(val - val_old))  # debug
         return val
 
     def _estimator_quantum_expectation_value(
