@@ -118,6 +118,7 @@ class QuantumInterface:
         self.ansatz_options = ansatz_options
         self.do_postselection = do_postselection
         self._pass_manager: PassManager = None
+        self.saver: dict[int, Clique] = {}
         self._save_paulis = True  # hard switch to stop using Pauli saving (debugging tool).
         self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
         self._M_shots = None  # define a separate number of shots for M
@@ -404,7 +405,7 @@ class QuantumInterface:
         if hasattr(self, "cliques"):
             # The distributions should only reset if the parameters are actually changed.
             if not np.array_equal(self._parameters, parameters):
-                self.cliques = Clique()
+                self.saver = {}
         self._parameters = parameters.copy()
 
     @property
@@ -589,7 +590,7 @@ class QuantumInterface:
 
     def _reset_cliques(self, verbose: bool = True) -> None:
         """Reset cliques to empty."""
-        self.cliques = Clique()
+        self.saver = {}
         if verbose:
             print("Pauli saving has been reset.")
 
@@ -686,6 +687,7 @@ class QuantumInterface:
         custom_parameters: list[float] | None = None,
         ISA_csfs_option: int = 0,
         M_per_superpos: bool = False,
+        reverse_csfs_order: bool = False,
     ) -> float:
         r"""Calculate expectation value using different bra and ket of a Hermitian operator.
 
@@ -724,6 +726,8 @@ class QuantumInterface:
                 3: Fixed layout, fixed order, without optimizing circuit after composing
                 4: Fixed layout, fixed order, with optimizing circuit after composing
             M_per_superpos: A new M_Ansatz0 matrix for each superposition state.
+            reverse_csfs_order: If true, the pair-entangled superposition states' order is reversed.
+                This might be relevant as the order can influence the circuit depths.
 
         Returns:
             Expectation value of operator.
@@ -748,7 +752,7 @@ class QuantumInterface:
             if self.do_M_mitigation and self.ansatz_circuit.layout is not None:
                 ISA_csfs_option = 2
                 if self.do_M_ansatz0:
-                    ISA_csfs_option = 3  # could also be 4
+                    ISA_csfs_option = 4  # could also be 3
         print("CSFS expectation value with circuit composing option: ", ISA_csfs_option)
 
         if custom_parameters is None:
@@ -768,7 +772,7 @@ class QuantumInterface:
         # Create list of all combinations with their weight consisting of coefficient and reordering sign
         all_combinations = [
             (
-                tuple(sorted((bra_csf[1][i], ket_csf[1][j]))),
+                tuple(sorted((bra_csf[1][i], ket_csf[1][j]), reverse=reverse_csfs_order)),
                 bra_csf[0][i]
                 * ket_csf[0][j]
                 * get_reordering_sign(bra_csf[1][i])
@@ -963,7 +967,9 @@ class QuantumInterface:
 
         return values.real
 
-    def _sampler_quantum_expectation_value(self, op: FermionicOperator | SparsePauliOp) -> float:
+    def _sampler_quantum_expectation_value(
+        self, op: FermionicOperator | SparsePauliOp, det: str | None = None
+    ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
 
         Calculated Pauli expectation values will be saved in memory.
@@ -977,10 +983,18 @@ class QuantumInterface:
 
         Args:
             op: SlowQuant fermionic operator.
+            det: Classify state (determinant) of circuit for Pauli saving.
+                Specified in chemistry form, i.e. left-to-right, alternating alpha and beta.
 
         Returns:
             Expectation value of operator.
         """
+        # Get HF determinant string
+        if det is None:
+            det = "1" * (self.num_elec[0] + self.num_elec[1]) + "0" * (
+                self.num_spin_orbs - (self.num_elec[0] + self.num_elec[1])
+            )
+        det_int = int(det, 2)
         values = 0.0
         # Map Fermionic to Qubit
         if isinstance(op, FermionicOperator):
@@ -992,11 +1006,11 @@ class QuantumInterface:
                 f"Got unknown operator type {type(op)}, expected FermionicOperator or SparsePauliOp"
             )
 
-        if not hasattr(self, "cliques"):
-            self.cliques = Clique()
+        if det_int not in self.saver:
+            self.saver[det_int] = Clique()
 
         paulis_str = [str(x) for x in observables.paulis]
-        new_heads = self.cliques.add_paulis(paulis_str)
+        new_heads = self.saver[det_int].add_paulis(paulis_str)
 
         # Check if error mitigation is requested and if read-out matrix already exists.
         if self.do_M_mitigation and self._Minv is None:
@@ -1013,12 +1027,14 @@ class QuantumInterface:
                 for i, (dist, head) in enumerate(zip(distr, new_heads)):
                     if "X" not in head and "Y" not in head:
                         distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
-            self.cliques.update_distr(new_heads, distr)
+            self.saver[det_int].update_distr(new_heads, distr)
 
         # Loop over all Pauli strings in observable and build final result with coefficients
         for pauli, coeff in zip(paulis_str, observables.coeffs):
             result = 0.0
-            for key, value in self.cliques.get_distr(pauli).items():  # build result from quasi-distribution
+            for key, value in (
+                self.saver[det_int].get_distr(pauli).items()
+            ):  # build result from quasi-distribution
                 result += value * get_bitstring_sign(pauli, key)
             values += result * coeff
 
@@ -1186,6 +1202,11 @@ class QuantumInterface:
         Returns:
             Variance of expectation value.
         """
+        det_int = int(
+            "1" * (self.num_elec[0] + self.num_elec[1])
+            + "0" * (self.num_spin_orbs - (self.num_elec[0] + self.num_elec[1])),
+            2,
+        )
         if isinstance(self._primitive, BaseEstimator):
             raise ValueError("This function does not work with Estimator.")
         if custom_parameters is None:
@@ -1204,10 +1225,10 @@ class QuantumInterface:
             )
 
         if do_cliques:
-            if not hasattr(self, "cliques"):
-                self.cliques = Clique()
+            if det_int not in self.saver:
+                self.saver[det_int] = Clique()
 
-            new_heads = self.cliques.add_paulis([str(x) for x in observables.paulis])
+            new_heads = self.saver[det_int].add_paulis([str(x) for x in observables.paulis])
 
             if len(new_heads) != 0:
                 # Check if error mitigation is requested and if read-out matrix already exists.
@@ -1224,7 +1245,7 @@ class QuantumInterface:
                     for i, (dist, head) in enumerate(zip(distr, new_heads)):
                         if "X" not in head and "Y" not in head:
                             distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
-                self.cliques.update_distr(new_heads, distr)
+                self.saver[det_int].update_distr(new_heads, distr)
         else:
             print(
                 "WARNING: REM and Post-Selection not implemented for quantum variance without the use of cliques."
@@ -1238,7 +1259,7 @@ class QuantumInterface:
                 coeff = 1
             # Get distribution from cliques
             if do_cliques:
-                dist = self.cliques.get_distr(pauli)
+                dist = self.saver[det_int].get_distr(pauli)
                 # Calculate p1: Probability of measuring one
                 p1 = 0.0
                 for key, value in dist.items():
