@@ -402,10 +402,9 @@ class QuantumInterface:
                 "The length of the parameter list does not fit the chosen circuit for the Ansatz ",
                 self.ansatz,
             )
-        if hasattr(self, "cliques"):
-            # The distributions should only reset if the parameters are actually changed.
-            if not np.array_equal(self._parameters, parameters):
-                self.saver = {}
+        # The distributions should only reset if the parameters are actually changed.
+        if not np.array_equal(self._parameters, parameters):
+            self.saver = {}
         self._parameters = parameters.copy()
 
     @property
@@ -523,8 +522,7 @@ class QuantumInterface:
         """
         # IMPORTANT: Shot number in primitive initialization gets always overwritten by QI!
         self._circuit_multipl = 1
-        if hasattr(self, "cliques"):
-            self._reset_cliques()
+        self._reset_cliques()
         if hasattr(self, "_Minv") and self._Minv is not None:
             self._reset_M()
         # Get shot number form primitive if none defined
