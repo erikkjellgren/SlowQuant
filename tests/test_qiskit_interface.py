@@ -1,4 +1,6 @@
 # pylint: disable=too-many-lines
+from typing import cast
+
 import numpy as np
 import pyscf
 from numpy.testing import assert_allclose
@@ -1122,3 +1124,117 @@ def test_state_average_M() -> None:
     # This might fail if the noise model of FakeTorinto changes.
     # But if it fails check if the Noise mode is the issue. Do NOT ignore this failing!
     assert abs(QWF._calc_energy_elec() == -1.3733093217175516) < 10**-6  # pylint: disable=protected-access
+
+
+def test_state_average_Mplus() -> None:
+    """
+    Test Energy calculation with SA in the presence of complicated layout and with M_Ansatz0+
+    """
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """Li  0.0           0.0  0.0;
+        H  0.735           0.0  0.0;
+        """,
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("sto-3g")
+    SQobj.init_hartree_fock()
+
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    c_mo = SQobj.hartree_fock.mo_coeff
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
+
+    WF = WaveFunctionSAUPS(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 2),
+        c_mo,
+        h_core,
+        g_eri,
+        (
+            [
+                [1],
+                [2 ** (-1 / 2), -(2 ** (-1 / 2))],
+            ],
+            [
+                ["1100"],
+                ["1001", "0110"],
+            ],
+        ),
+        "tUPS",
+        ansatz_options={"n_layers": 1},
+    )
+    WF.run_saups(False)
+
+    sampler = SamplerAer()
+    mapper = JordanWignerMapper()
+    QI = QuantumInterface(sampler, "tUPS", mapper, ansatz_options={"n_layers": 1})
+
+    QWF = WaveFunctionSA(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 2),
+        c_mo,
+        h_core,
+        g_eri,
+        (
+            [
+                [1],
+                [2 ** (-1 / 2), -(2 ** (-1 / 2))],
+            ],
+            [
+                ["1100"],
+                ["1001", "0110"],
+            ],
+        ),
+        QI,
+    )
+    QWF.ansatz_parameters = WF.thetas
+
+    assert abs(WF._sa_energy - QWF._calc_energy_elec()) < 10**-6  # pylint: disable=protected-access
+
+    noise_model = NoiseModel.from_backend(FakeTorino())
+    sampler = SamplerAer(backend_options={"noise_model": noise_model})
+    QWF.change_primitive(sampler)
+
+    QI.shots = None
+    QI.ISA = True
+    QI.do_postselection = False
+
+    QI.update_pass_manager({"backend": FakeTorino(), "seed_transpiler": 1234})
+
+    QI.do_M_mitigation = False
+    QI.do_M_ansatz0 = False
+
+    QI._reset_cliques()  # pylint: disable=protected-access
+    assert (
+        abs(cast(float, QWF._calc_energy_elec()) + 9.60851106217584)  # pylint: disable=protected-access
+        < 10**-6
+    )  # CSFs option 1
+
+    QI.do_M_mitigation = True
+    QI.do_M_ansatz0 = True
+    QI.redo_M_mitigation()
+
+    QI._reset_cliques()  # pylint: disable=protected-access
+    assert (
+        abs(cast(float, QWF._calc_energy_elec()) + 9.633426170009107)  # pylint: disable=protected-access
+        < 10**-6
+    )  # CSFs option 4
+
+    QI._reset_cliques()  # pylint: disable=protected-access
+    assert (
+        abs(
+            cast(float, QWF._calc_energy_elec(M_per_superpos=True))  # pylint: disable=protected-access
+            + 9.635276750167002
+        )
+        < 10**-6
+    )  # CSFs option 1
+
+    QI.do_postselection = True
+    QI._reset_cliques()  # pylint: disable=protected-access
+    assert (
+        abs(cast(float, QWF._calc_energy_elec()) + 9.636464216617595)  # pylint: disable=protected-access
+        < 10**-6
+    )  # CSFs option 4
