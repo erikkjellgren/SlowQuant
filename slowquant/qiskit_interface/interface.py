@@ -730,6 +730,7 @@ class QuantumInterface:
         Returns:
             Expectation value of operator.
         """
+        save_paulis = self._save_paulis
         if not isinstance(self.mapper, JordanWignerMapper):
             raise TypeError(
                 f"Expectation values for custom CSFs only implemented for JordanWignerMapper. Got; {type(self.mapper)}"
@@ -757,6 +758,7 @@ class QuantumInterface:
             run_parameters = self.parameters
         else:
             run_parameters = custom_parameters
+            save_paulis = False
 
         # Check if ISA beforehand.
         if self.ISA:
@@ -795,13 +797,18 @@ class QuantumInterface:
                 val_old = val  # debug
                 if isinstance(self._primitive, BaseEstimator):
                     val += N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
-                if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
-                    val += N * self._sampler_quantum_expectation_value_nosave(
-                        op,
-                        run_parameters,
-                        circuit,
-                        do_cliques=self._do_cliques,
-                    )
+                elif isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                    if save_paulis:
+                        val += N * self._sampler_quantum_expectation_value(
+                            op, run_circuit=circuit, det=bra_det
+                        )
+                    else:
+                        val += N * self._sampler_quantum_expectation_value_nosave(
+                            op,
+                            run_parameters,
+                            circuit,
+                            do_cliques=self._do_cliques,
+                        )
                 print("I == J, val = ", val - val_old)  # debug
             # I != J (off-diagonals)
             else:
@@ -868,23 +875,33 @@ class QuantumInterface:
                     else:
                         circuit_M = circuit.compose(state_corr, front=True)
 
-                    val += N * self._sampler_quantum_expectation_value_nosave(
-                        op,
-                        run_parameters,
-                        circuit,
-                        do_cliques=self._do_cliques,
-                        circuit_M=circuit_M,
-                    )
-                else:
-                    if isinstance(self._primitive, BaseEstimator):
-                        val += N * self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
-                    if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                    if save_paulis:
+                        val += N * self._sampler_quantum_expectation_value(
+                            op, run_circuit=circuit, det=bra_det + ket_det
+                        )
+                    else:
                         val += N * self._sampler_quantum_expectation_value_nosave(
                             op,
                             run_parameters,
                             circuit,
                             do_cliques=self._do_cliques,
+                            circuit_M=circuit_M,
                         )
+                else:
+                    if isinstance(self._primitive, BaseEstimator):
+                        val += N * self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
+                    elif isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                        if save_paulis:
+                            val += N * self._sampler_quantum_expectation_value(
+                                op, run_circuit=circuit, det=bra_det + ket_det
+                            )
+                        else:
+                            val += N * self._sampler_quantum_expectation_value_nosave(
+                                op,
+                                run_parameters,
+                                circuit,
+                                do_cliques=self._do_cliques,
+                            )
                 print("I != J, superpos, val = ", val - val_old)  # debug
 
                 # Second term of off-diagonal element involving only I
@@ -895,17 +912,24 @@ class QuantumInterface:
                 val_old = val  # debug
                 if isinstance(self._primitive, BaseEstimator):
                     val -= 0.5 * N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
-                if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
-                    val -= (
-                        0.5
-                        * N
-                        * self._sampler_quantum_expectation_value_nosave(
-                            op,
-                            run_parameters,
-                            circuit,
-                            do_cliques=self._do_cliques,
+                elif isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                    if save_paulis:
+                        val -= (
+                            0.5
+                            * N
+                            * self._sampler_quantum_expectation_value(op, run_circuit=circuit, det=bra_det)
                         )
-                    )
+                    else:
+                        val -= (
+                            0.5
+                            * N
+                            * self._sampler_quantum_expectation_value_nosave(
+                                op,
+                                run_parameters,
+                                circuit,
+                                do_cliques=self._do_cliques,
+                            )
+                        )
                 print("I != J, I, val = ", -(val - val_old))  # debug
 
                 # Third term of off-diagonal element involving only J
@@ -916,17 +940,24 @@ class QuantumInterface:
                 val_old = val  # debug
                 if isinstance(self._primitive, BaseEstimator):
                     val -= 0.5 * N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
-                if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
-                    val -= (
-                        0.5
-                        * N
-                        * self._sampler_quantum_expectation_value_nosave(
-                            op,
-                            run_parameters,
-                            circuit,
-                            do_cliques=self._do_cliques,
+                elif isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                    if save_paulis:
+                        val -= (
+                            0.5
+                            * N
+                            * self._sampler_quantum_expectation_value(op, run_circuit=circuit, det=ket_det)
                         )
-                    )
+                    else:
+                        val -= (
+                            0.5
+                            * N
+                            * self._sampler_quantum_expectation_value_nosave(
+                                op,
+                                run_parameters,
+                                circuit,
+                                do_cliques=self._do_cliques,
+                            )
+                        )
                 print("I != J, J, val = ", -(val - val_old))  # debug
         return val
 
@@ -966,7 +997,11 @@ class QuantumInterface:
         return values.real
 
     def _sampler_quantum_expectation_value(
-        self, op: FermionicOperator | SparsePauliOp, det: str | None = None
+        self,
+        op: FermionicOperator | SparsePauliOp,
+        run_circuit: QuantumCircuit | None = None,
+        det: str | None = None,
+        circuit_M: None | QuantumCircuit = None,
     ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
 
@@ -981,8 +1016,10 @@ class QuantumInterface:
 
         Args:
             op: SlowQuant fermionic operator.
+            run_circuit: custum circuit to be run. If not specified, HF+Ansatz circuit is used
             det: Classify state (determinant) of circuit for Pauli saving.
                 Specified in chemistry form, i.e. left-to-right, alternating alpha and beta.
+            circuit_M: custom circuit for M_Ansatz0 (correlation matrix is not stored). If not specified, M0 of Ansatz is used.
 
         Returns:
             Expectation value of operator.
@@ -993,6 +1030,8 @@ class QuantumInterface:
                 self.num_spin_orbs - (self.num_elec[0] + self.num_elec[1])
             )
         det_int = int(det, 2)
+        if run_circuit is None:
+            run_circuit = self.circuit
         values = 0.0
         # Map Fermionic to Qubit
         if isinstance(op, FermionicOperator):
@@ -1010,17 +1049,44 @@ class QuantumInterface:
         paulis_str = [str(x) for x in observables.paulis]
         new_heads = self.saver[det_int].add_paulis(paulis_str)
 
-        # Check if error mitigation is requested and if read-out matrix already exists.
-        if self.do_M_mitigation and self._Minv is None:
-            self._Minv = self._make_Minv(shots=self._M_shots)
-
         if len(new_heads) != 0:
+            # Check if error mitigation is requested and if read-out matrix already exists.
+            if self.do_M_mitigation:
+                if circuit_M is None:
+                    if self._Minv is None:
+                        self._Minv = self._make_Minv(shots=self._M_shots)
+                else:
+                    Minv = self._make_Minv(shots=self._M_shots, custom_ansatz=circuit_M)
+
             # Simulate each clique head with one combined device call
             # and return a list of distributions
-            distr = self._one_call_sampler_distributions(new_heads, self.parameters, self.circuit)
+            distr = self._one_call_sampler_distributions(new_heads, self.parameters, run_circuit)
+
             if self.do_M_mitigation:  # apply error mitigation if requested
-                for i, dist in enumerate(distr):
-                    distr[i] = correct_distribution(dist, self._Minv)
+                if circuit_M is None:
+                    # Check if layout conflict in M and current circuit
+                    match self._check_layout_conflict(run_circuit):
+                        case 0:  # no layout - no order conflict
+                            for i, dist in enumerate(distr):
+                                distr[i] = correct_distribution(dist, self._Minv)
+                        case 1:  # no layout, but order conflict
+                            if self.do_M_ansatz0:
+                                raise ValueError("Detected order conflict. Not possile to do M Ansatz0")
+                            print("Detected order conflict. Applying M re-ordering.")
+                            for i, dist in enumerate(distr):
+                                distr[i] = correct_distribution_with_layout_v2(  # maybe v1 is better.
+                                    dist,
+                                    self._Minv,
+                                    self._final_ansatz_indices,
+                                    run_circuit.layout.final_index_layout(),
+                                )
+                        case 2:  # layout conflict
+                            raise ValueError("Detected layout conflict. Cannot do M mitigation.")
+                else:
+                    # custom M -> no layout check needed / possible
+                    for i, dist in enumerate(distr):
+                        distr[i] = correct_distribution(dist, Minv)
+
             if self.do_postselection:
                 for i, (dist, head) in enumerate(zip(distr, new_heads)):
                     if "X" not in head and "Y" not in head:
