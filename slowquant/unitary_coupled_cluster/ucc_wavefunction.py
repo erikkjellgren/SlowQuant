@@ -804,7 +804,7 @@ class WaveFunctionUCC:
         self,
         optimizer_name: str,
         orbital_optimization: bool = False,
-        tol: float = 1e-8,
+        tol: float = 1e-10,
         maxiter: int = 1000,
         is_silent_subiterations: bool = False,
     ) -> None:
@@ -934,7 +934,7 @@ class WaveFunctionUCC:
         self,
         optimizer_name: str,
         orbital_optimization: bool = False,
-        tol: float = 1e-8,
+        tol: float = 1e-10,
         maxiter: int = 1000,
     ) -> None:
         """Run VQE of wave function.

@@ -54,7 +54,7 @@ def test_tups() -> None:
         g_eri,
         QI,
     )
-    qWF.ansatz_parameters = WF.thetas
+    qWF.thetas = WF.thetas
 
     assert abs(qWF.energy_elec - -8.82891657651419) < 10**-8
 
@@ -101,7 +101,7 @@ def test_fucc() -> None:
         g_eri,
         QI,
     )
-    qWF.ansatz_parameters = WF.thetas
+    qWF.thetas = WF.thetas
 
     assert abs(qWF.energy_elec - -8.828916576513892) < 10**-8
 
@@ -148,7 +148,7 @@ def test_ksafupccgsd() -> None:
         g_eri,
         QI,
     )
-    qWF.ansatz_parameters = WF.thetas
+    qWF.thetas = WF.thetas
 
     assert abs(qWF.energy_elec - -8.828916576543133) < 10**-8
 
@@ -195,7 +195,7 @@ def test_sdsfuccsd() -> None:
         g_eri,
         QI,
     )
-    qWF.ansatz_parameters = WF.thetas
+    qWF.thetas = WF.thetas
 
     assert abs(qWF.energy_elec - -8.82891657653415) < 10**-8
 
@@ -242,7 +242,7 @@ def test_ksasdsfupccgsd() -> None:
         g_eri,
         QI,
     )
-    qWF.ansatz_parameters = WF.thetas
+    qWF.thetas = WF.thetas
 
     assert abs(qWF.energy_elec - -8.828916576542285) < 10**-8
 
@@ -284,7 +284,7 @@ def test_lih_fucc_allparameters() -> None:
         thetas = np.zeros(len(WF.thetas))
         thetas[n] = 1
         WF.thetas = thetas
-        qWF.ansatz_parameters = thetas
+        qWF.thetas = thetas
         assert abs(qWF.energy_elec - WF.energy_elec) < 10**-10
 
 
@@ -319,7 +319,7 @@ def test_lih_fucc_mappings() -> None:
         mol.intor("int2e"),
         QI,
     )
-    qWF.ansatz_parameters = WF.thetas
+    qWF.thetas = WF.thetas
     assert abs(qWF.energy_elec - WF.energy_elec) < 10**-10
 
     sampler = Sampler()
@@ -333,7 +333,7 @@ def test_lih_fucc_mappings() -> None:
         mol.intor("int2e"),
         QI,
     )
-    qWF.ansatz_parameters = WF.thetas
+    qWF.thetas = WF.thetas
     assert abs(qWF.energy_elec - WF.energy_elec) < 10**-10
 
 
@@ -368,7 +368,7 @@ def test_lih_sdsfucc_mappings() -> None:
         mol.intor("int2e"),
         QI,
     )
-    qWF.ansatz_parameters = WF.thetas
+    qWF.thetas = WF.thetas
     assert abs(qWF.energy_elec - WF.energy_elec) < 10**-10
 
     sampler = Sampler()
@@ -382,7 +382,7 @@ def test_lih_sdsfucc_mappings() -> None:
         mol.intor("int2e"),
         QI,
     )
-    qWF.ansatz_parameters = WF.thetas
+    qWF.thetas = WF.thetas
     assert abs(qWF.energy_elec - WF.energy_elec) < 10**-10
 
 
@@ -418,7 +418,7 @@ def test_lih_tups_mappings() -> None:
         mol.intor("int2e"),
         QI,
     )
-    qWF.ansatz_parameters = WF.thetas
+    qWF.thetas = WF.thetas
     assert abs(qWF.energy_elec - WF.energy_elec) < 10**-10
 
     sampler = Sampler()
@@ -432,5 +432,5 @@ def test_lih_tups_mappings() -> None:
         mol.intor("int2e"),
         QI,
     )
-    qWF.ansatz_parameters = WF.thetas
+    qWF.thetas = WF.thetas
     assert abs(qWF.energy_elec - WF.energy_elec) < 10**-10

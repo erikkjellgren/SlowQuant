@@ -90,7 +90,7 @@ def test_LiH_sto3g_naive():
     SQobj.hartree_fock.run_restricted_hartree_fock()
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
-    # OO-UCCSD
+    # oo-UCCSD
     WF = WaveFunctionUCC(
         SQobj.molecule.number_electrons,
         (2, 2),
@@ -229,7 +229,7 @@ def test_LiH_sto3g_proj():
     SQobj.hartree_fock.run_restricted_hartree_fock()
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
-    # OO-UCCSD
+    # oo-UCCSD
     WF = WaveFunctionUCC(
         SQobj.molecule.number_electrons,
         (2, 2),

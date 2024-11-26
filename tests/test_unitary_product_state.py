@@ -272,7 +272,7 @@ def test_saups_h3_3states() -> None:
         include_active_kappa=True,
     )
 
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_2step("SLSQP", True)
 
     dipole_integrals = (
         SQobj.integral.get_multipole_matrix([1, 0, 0]),

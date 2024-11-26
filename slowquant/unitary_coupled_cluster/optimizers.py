@@ -81,7 +81,7 @@ class Optimizers:
         self._start = time.time()
         self._iteration = 0
         print_progress = partial(self._print_progress, fun=self.fun, silent=self.is_silent)
-        if self.method in ("slsqp", "l-bfgs-b"):
+        if self.method in ("slsqp", "l-bfgs-b", "bfgs"):
             if self.grad is not None:
                 res = scipy.optimize.minimize(
                     self.fun,
@@ -101,7 +101,7 @@ class Optimizers:
                     callback=print_progress,
                     options={"maxiter": self.maxiter},
                 )
-        elif self.method in ("cobyla",):
+        elif self.method in ("cobyla", "cobyqa"):
             res = scipy.optimize.minimize(
                 self.fun,
                 x0,
