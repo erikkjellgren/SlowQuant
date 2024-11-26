@@ -81,7 +81,7 @@ class Optimizers:
         self._start = time.time()
         self._iteration = 0
         print_progress = partial(self._print_progress, fun=self.fun, silent=self.is_silent)
-        if self.method in ("slsqp", "l-bfgs-b", "bfgs"):
+        if self.method in ("bfgs", "l-bfgs-b", "slsqp"):
             if self.grad is not None:
                 res = scipy.optimize.minimize(
                     self.fun,
