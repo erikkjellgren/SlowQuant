@@ -657,6 +657,15 @@ class WaveFunctionSAUPS:
                 parameters = self.kappa
         else:
             parameters = self.thetas
+        if optimizer_name.lower() in ("rotosolve",):
+            # For RotoSolve type solvers the energy per state is needed in the optimzation,
+            # instead of only the state-averaged energy.
+            energy = partial(
+                self._calc_energy_optimization,
+                theta_optimization=True,
+                kappa_optimization=False,
+                return_all_states = True,
+            )
         optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
         res = optimizer.minimize(
             parameters,
@@ -788,8 +797,8 @@ class WaveFunctionSAUPS:
         return osc_strs
 
     def _calc_energy_optimization(
-        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
-    ) -> float:
+            self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool, return_all_states: bool = False,
+    ) -> float | list[float]:
         r"""Calculate electronic energy of SA-UPS wave function.
 
         .. math::
@@ -821,11 +830,13 @@ class WaveFunctionSAUPS:
             self.det2idx,
             self.num_active_orbs,
         )
-        energy = 0.0
+        energies = []
         # Energy for each state in SA
         for coeffs in self.ci_coeffs:
-            energy += expectation_value_mat(coeffs, Hamiltonian, coeffs)
-        return energy / len(self.ci_coeffs)
+            energies.append(expectation_value_mat(coeffs, Hamiltonian, coeffs))
+        if return_all_states:
+            return energies
+        return float(np.mean(energies))
 
     def _calc_gradient_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool

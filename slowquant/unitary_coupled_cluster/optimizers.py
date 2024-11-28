@@ -24,7 +24,7 @@ class Optimizers:
 
     def __init__(
         self,
-        fun: Callable[[list[float]], float],
+        fun: Callable[[list[float]], float] | Callable[[list[float]], list[float]],
         method: str,
         grad: Callable[[list[float]], np.ndarray] | None = None,
         maxiter: int = 1000,
@@ -49,7 +49,7 @@ class Optimizers:
         self.is_silent = is_silent
 
     def _print_progress(
-        self, x: Sequence[float], fun: Callable[[list[float]], float], silent: bool = False
+        self, x: Sequence[float], fun: Callable[[list[float]], float] | Callable[[list[float]], list[float]], silent: bool = False
     ) -> None:
         """Print progress during optimization.
 
@@ -187,7 +187,7 @@ class RotoSolve:
         self._R = R
         self._param_names = param_names
 
-    def minimize(self, f: Callable[[list[float]], float], x0: Sequence[float]) -> Result:
+    def minimize(self, f: Callable[[list[float]], float] | Callable[[list[float]], list[float]], x0: Sequence[float]) -> Result:
         """Run minimization.
 
         Args:
@@ -215,7 +215,13 @@ class RotoSolve:
                     x[i] += 2 * np.pi
                 while x[i] > np.pi:
                     x[i] -= 2 * np.pi
-            f_new = f(x)
+            f_tmp = f(x)
+            if isinstance(f_tmp, list):
+                # State-averaged case
+                f_new = float(np.mean(f_tmp))
+            else:
+                # Single state case
+                f_new = f_tmp
             if abs(f_best - f_new) < self.threshold:
                 f_best = f_new
                 x_best = x.copy()
@@ -234,7 +240,7 @@ class RotoSolve:
         return res
 
 
-def get_energy_evals(f: Callable[[list[float]], float], x: list[float], idx: int, R: int) -> list[float]:
+def get_energy_evals(f: Callable[[list[float]], float] | Callable[[list[float]], list[float]], x: list[float], idx: int, R: int) -> list[float] | list[list[float]]:
     """Evaluate the function in all points needed for the reconstrucing in Rotosolve.
 
     Args:
@@ -255,7 +261,7 @@ def get_energy_evals(f: Callable[[list[float]], float], x: list[float], idx: int
     return e_vals
 
 
-def reconstructed_f(x: float, energy_vals: list[float], R: int) -> float:
+def reconstructed_f(x: float, energy_vals: list[float] | list[list[float]], R: int) -> float:
     r"""Reconstructed the function in terms of sin-functions.
 
     .. math::
@@ -278,11 +284,24 @@ def reconstructed_f(x: float, energy_vals: list[float], R: int) -> float:
         Function value in x.
     """
     e = 0.0
-    for i, mu in enumerate(list(range(-R, R + 1))):
-        x_mu = 2 * mu / (2 * R + 1) * np.pi
-        e += (
-            energy_vals[i]
-            * np.sinc((2 * R + 1) / 2 * (x - x_mu) / np.pi)
-            / (np.sinc(1 / 2 * (x - x_mu) / np.pi))
-        )
+    if isinstance(energy_vals[0], list):
+        # State-averaged case
+        for j in range(len(energy_vals)):
+            for i, mu in enumerate(list(range(-R, R + 1))):
+                x_mu = 2 * mu / (2 * R + 1) * np.pi
+                e += (
+                    energy_vals[j][i]
+                    * np.sinc((2 * R + 1) / 2 * (x - x_mu) / np.pi)
+                    / (np.sinc(1 / 2 * (x - x_mu) / np.pi))
+                )
+        e = e / len(energy_vals)
+    elif isinstance(energy_vals[0], float):
+        # Single state case
+        for i, mu in enumerate(list(range(-R, R + 1))):
+            x_mu = 2 * mu / (2 * R + 1) * np.pi
+            e += (
+                energy_vals[i]
+                * np.sinc((2 * R + 1) / 2 * (x - x_mu) / np.pi)
+                / (np.sinc(1 / 2 * (x - x_mu) / np.pi))
+            )
     return e
