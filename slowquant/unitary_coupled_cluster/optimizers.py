@@ -3,6 +3,7 @@ from collections.abc import Callable, Sequence
 from functools import partial
 from typing import Any
 
+import numba as nb
 import numpy as np
 import scipy
 
@@ -24,7 +25,7 @@ class Optimizers:
 
     def __init__(
         self,
-        fun: Callable[[list[float]], float] | Callable[[list[float]], list[float]],
+        fun: Callable[[list[float]], float | list[float]],
         method: str,
         grad: Callable[[list[float]], np.ndarray] | None = None,
         maxiter: int = 1000,
@@ -49,7 +50,7 @@ class Optimizers:
         self.is_silent = is_silent
 
     def _print_progress(
-        self, x: Sequence[float], fun: Callable[[list[float]], float] | Callable[[list[float]], list[float]], silent: bool = False
+        self, x: Sequence[float], fun: Callable[[list[float]], float | list[float]], silent: bool = False
     ) -> None:
         """Print progress during optimization.
 
@@ -187,7 +188,7 @@ class RotoSolve:
         self._R = R
         self._param_names = param_names
 
-    def minimize(self, f: Callable[[list[float]], float] | Callable[[list[float]], list[float]], x0: Sequence[float]) -> Result:
+    def minimize(self, f: Callable[[list[float]], float | list[float]], x0: Sequence[float]) -> Result:
         """Run minimization.
 
         Args:
@@ -206,8 +207,7 @@ class RotoSolve:
             for i, par_name in enumerate(self._param_names):
                 e_vals = get_energy_evals(f, x, i, self._R[par_name])
                 f_reconstructed = partial(reconstructed_f, energy_vals=e_vals, R=self._R[par_name])
-                vecf = np.vectorize(f_reconstructed)
-                values = vecf(np.linspace(-np.pi, np.pi, int(1e4)))
+                values = f_reconstructed(np.linspace(-np.pi, np.pi, int(1e4)))
                 theta = np.linspace(-np.pi, np.pi, int(1e4))[np.argmin(values)]
                 res = scipy.optimize.minimize(f_reconstructed, x0=[theta], method="BFGS", tol=1e-12)
                 x[i] = res.x[0]
@@ -240,7 +240,9 @@ class RotoSolve:
         return res
 
 
-def get_energy_evals(f: Callable[[list[float]], float] | Callable[[list[float]], list[float]], x: list[float], idx: int, R: int) -> list[float] | list[list[float]]:
+def get_energy_evals(
+    f: Callable[[list[float]], float | list[float]], x: list[float], idx: int, R: int
+) -> list[float] | list[list[float]]:
     """Evaluate the function in all points needed for the reconstrucing in Rotosolve.
 
     Args:
@@ -258,10 +260,11 @@ def get_energy_evals(f: Callable[[list[float]], float] | Callable[[list[float]],
         x_mu = 2 * mu / (2 * R + 1) * np.pi
         x[idx] = x_mu
         e_vals.append(f(x))
-    return e_vals
+    return e_vals  # type: ignore
 
 
-def reconstructed_f(x: float, energy_vals: list[float] | list[list[float]], R: int) -> float:
+@nb.jit(nopython=True)
+def reconstructed_f(x_vals: np.ndarray, energy_vals: list[float] | list[list[float]], R: int) -> np.ndarray:
     r"""Reconstructed the function in terms of sin-functions.
 
     .. math::
@@ -276,32 +279,34 @@ def reconstructed_f(x: float, energy_vals: list[float] | list[list[float]], R: i
     #. https://pennylane.ai/qml/demos/tutorial_general_parshift/, 2024-03-14
 
     Args:
-        x: Function variable.
+        x_vals: List of points to evaluate the function in.
         energy_vals: Pre-calculated points of original function.
         R: Parameter to control how many points are needed.
 
     Returns:
-        Function value in x.
+        Function value in list of points.
     """
-    e = 0.0
+    e = np.zeros(len(x_vals))
     if isinstance(energy_vals[0], list):
         # State-averaged case
-        for j in range(len(energy_vals)):
+        for energy_val in energy_vals:
             for i, mu in enumerate(list(range(-R, R + 1))):
                 x_mu = 2 * mu / (2 * R + 1) * np.pi
-                e += (
-                    energy_vals[j][i]
-                    * np.sinc((2 * R + 1) / 2 * (x - x_mu) / np.pi)
-                    / (np.sinc(1 / 2 * (x - x_mu) / np.pi))
-                )
+                for j, x in enumerate(x_vals):
+                    e[j] += (
+                        energy_val[i]  # type: ignore
+                        * np.sinc((2 * R + 1) / 2 * (x - x_mu) / np.pi)
+                        / (np.sinc(1 / 2 * (x - x_mu) / np.pi))
+                    )
         e = e / len(energy_vals)
     elif isinstance(energy_vals[0], float):
         # Single state case
         for i, mu in enumerate(list(range(-R, R + 1))):
             x_mu = 2 * mu / (2 * R + 1) * np.pi
-            e += (
-                energy_vals[i]
-                * np.sinc((2 * R + 1) / 2 * (x - x_mu) / np.pi)
-                / (np.sinc(1 / 2 * (x - x_mu) / np.pi))
-            )
+            for j, x in enumerate(x_vals):
+                e[j] += (
+                    energy_vals[i]
+                    * np.sinc((2 * R + 1) / 2 * (x - x_mu) / np.pi)
+                    / (np.sinc(1 / 2 * (x - x_mu) / np.pi))
+                )
     return e

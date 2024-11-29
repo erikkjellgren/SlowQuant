@@ -664,7 +664,7 @@ class WaveFunctionSAUPS:
                 self._calc_energy_optimization,
                 theta_optimization=True,
                 kappa_optimization=False,
-                return_all_states = True,
+                return_all_states=True,
             )
         optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
         res = optimizer.minimize(
@@ -797,7 +797,11 @@ class WaveFunctionSAUPS:
         return osc_strs
 
     def _calc_energy_optimization(
-            self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool, return_all_states: bool = False,
+        self,
+        parameters: list[float],
+        theta_optimization: bool,
+        kappa_optimization: bool,
+        return_all_states: bool = False,
     ) -> float | list[float]:
         r"""Calculate electronic energy of SA-UPS wave function.
 
@@ -836,6 +840,8 @@ class WaveFunctionSAUPS:
             energies.append(expectation_value_mat(coeffs, Hamiltonian, coeffs))
         if return_all_states:
             return energies
+        if kappa_optimization:
+            print(float(np.mean(energies)), self.kappa)
         return float(np.mean(energies))
 
     def _calc_gradient_optimization(
@@ -874,6 +880,7 @@ class WaveFunctionSAUPS:
             gradient[:num_kappa] = get_orbital_gradient(
                 rdms, self.h_mo, self.g_mo, self.kappa_idx, self.num_inactive_orbs, self.num_active_orbs
             )
+            print(gradient)
         if theta_optimization:
             Hamiltonian = build_operator_matrix(
                 hamiltonian_0i_0a(
