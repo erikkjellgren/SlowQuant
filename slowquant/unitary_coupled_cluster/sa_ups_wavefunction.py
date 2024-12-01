@@ -95,6 +95,7 @@ class WaveFunctionSAUPS:
         self._rdm2 = None
         self._h_mo = None
         self._g_mo = None
+        self._sa_energy: float | None = None
         self._state_energies = None
         self.ansatz_options = ansatz_options
         # Construct spin orbital spaces and indices
@@ -270,6 +271,7 @@ class WaveFunctionSAUPS:
         """
         self._h_mo = None
         self._g_mo = None
+        self._sa_energy = None
         self._state_energies = None
         self._state_ci_coeffs = None
         self._c_orthonormal_ = c
@@ -288,6 +290,7 @@ class WaveFunctionSAUPS:
         """
         self._h_mo = None
         self._g_mo = None
+        self._sa_energy = None
         self._state_energies = None
         self._kappa = k.copy()
 
@@ -334,6 +337,7 @@ class WaveFunctionSAUPS:
             raise ValueError(f"Expected {len(self._thetas)} theta1 values got {len(theta_vals)}")
         self._rdm1 = None
         self._rdm2 = None
+        self._sa_energy = None
         self._state_energies = None
         self._state_ci_coeffs = None
         self._ci_coeffs = None
@@ -497,6 +501,31 @@ class WaveFunctionSAUPS:
         diff = np.abs(S_ortho - one)
         print("Max ortho-normal diff:", np.max(diff))
 
+    @property
+    def sa_energy(self) -> float:
+        """Get the state-averaged electronic energy.
+
+        Returns:
+            State-averaged electronic energy.
+        """
+        if self._sa_energy is None:
+            self._sa_energy = 0.0
+            Hamiltonian = build_operator_matrix(
+                hamiltonian_0i_0a(
+                    self.h_mo,
+                    self.g_mo,
+                    self.num_inactive_orbs,
+                    self.num_active_orbs,
+                ).get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs),
+                self.idx2det,
+                self.det2idx,
+                self.num_active_orbs,
+            )
+            for coeffs in self.ci_coeffs:
+                self._sa_energy += expectation_value_mat(coeffs, Hamiltonian, coeffs)
+            self._sa_energy = self._sa_energy / len(self.ci_coeffs)
+        return self._sa_energy
+
     def run_wf_optimization_2step(
         self,
         optimizer_name: str,
@@ -505,7 +534,7 @@ class WaveFunctionSAUPS:
         maxiter: int = 1000,
         is_silent_subiterations: bool = False,
     ) -> None:
-        """Run VQE of wave function.
+        """Run two step optimization of wave function.
 
         Args:
             optimizer_name: Name of optimizer.
@@ -593,6 +622,7 @@ class WaveFunctionSAUPS:
             e_old = e_new
         # Subspace diagonalization
         self._do_state_ci()
+        self._sa_energy = res.fun
 
     def run_wf_optimization_1step(
         self,
@@ -601,7 +631,7 @@ class WaveFunctionSAUPS:
         tol: float = 1e-10,
         maxiter: int = 1000,
     ) -> None:
-        """Run VQE of wave function.
+        """Run one step optimization of wave function.
 
         Args:
             optimizer_name: Name of optimizer.
@@ -680,6 +710,7 @@ class WaveFunctionSAUPS:
             self.thetas = res.x.tolist()
         # Subspace diagonalization
         self._do_state_ci()
+        self._sa_energy = res.fun
 
     def _do_state_ci(self) -> None:
         r"""Do subspace diagonalisation.

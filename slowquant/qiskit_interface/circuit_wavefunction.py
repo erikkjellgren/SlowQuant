@@ -875,7 +875,7 @@ class WaveFunctionCircuit:
         maxiter: int = 1000,
         is_silent_subiterations: bool = False,
     ) -> None:
-        """Run VQE of wave function.
+        """Run two step optimization of wave function.
 
         Args:
             optimizer_name: Name of optimizer.
@@ -972,7 +972,7 @@ class WaveFunctionCircuit:
         tol: float = 1e-10,
         maxiter: int = 1000,
     ) -> None:
-        """Run VQE of wave function.
+        """Run one step optimization of wave function.
 
         Args:
             optimizer_name: Name of optimizer.
@@ -1050,6 +1050,8 @@ class WaveFunctionCircuit:
 
         Args:
             parameters: Ansatz and orbital rotation parameters.
+            theta_optimization: Doing theta optimization.
+            kappa_optimization: Doing kappa optimization.
 
         Returns:
             Electronic energy.
@@ -1078,6 +1080,17 @@ class WaveFunctionCircuit:
     def _calc_gradient_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
     ) -> np.ndarray:
+        """Calculate electronic gradient.
+
+        Args:
+            parameters: Ansatz and orbital rotation parameters.
+            theta_optimization: Doing theta optimization.
+            kappa_optimization: Doing kappa optimization.
+
+        Returns:
+            Electronic gradient.
+        """
+        num_kappa = 0
         gradient = np.zeros(len(parameters))
         num_kappa = 0
         if kappa_optimization:
@@ -1118,7 +1131,7 @@ def _get_energy_evals_for_grad(
     idx: int,
     R: int,
 ) -> list[float]:
-    r"""Get energy evaluations needed for the gradient calculation.
+    """Get energy evaluations needed for the gradient calculation.
 
     The gradient formula is defined for x=0,
     so x_shift is used to shift ensure we can get the energy in the point we actually want.

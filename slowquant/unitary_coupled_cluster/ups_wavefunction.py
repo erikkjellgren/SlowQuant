@@ -788,7 +788,7 @@ class WaveFunctionUPS:
         maxiter: int = 1000,
         is_silent_subiterations: bool = False,
     ) -> None:
-        """Run VQE of wave function.
+        """Run two step optimization of wave function.
 
         Args:
             optimizer_name: Name of optimizer.
@@ -883,7 +883,7 @@ class WaveFunctionUPS:
         tol: float = 1e-10,
         maxiter: int = 1000,
     ) -> None:
-        """Run VQE of wave function.
+        """Run one step optimization of wave function.
 
         Args:
             optimizer_name: Name of optimizer.
@@ -1008,7 +1008,7 @@ class WaveFunctionUPS:
             kappa_optimization: If used in kappa optimization.
 
         Returns:
-            Gradient energy.
+            Electronic gradient.
         """
         gradient = np.zeros(len(parameters))
         num_kappa = 0
