@@ -815,7 +815,11 @@ def construct_ups_state(
 def propagate_unitary(
     state: np.ndarray,
     idx: int,
+    idx2det: Sequence[int],
+    det2idx: dict[int, int],
+    num_inactive_orbs,
     num_active_orbs: int,
+    num_virtual_orbs,
     num_active_elec_alpha: int,
     num_active_elec_beta: int,
     thetas: Sequence[float],
@@ -845,36 +849,112 @@ def propagate_unitary(
         A = 1  # 2**(-1/2)
         (i, a) = exc_indices
         # Create T matrix
-        Ta = T1_matrix(i * 2, a * 2, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
-        Tb = T1_matrix(
-            i * 2 + 1, a * 2 + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
-        ).todense()
+        Ta = G1(i * 2, a * 2, True)
+        Tb = G1(i * 2 + 1, a * 2 + 1, True)
         # Analytical application on state vector
         tmp = (
             state
-            + np.sin(A * theta) * np.matmul(Ta, state)
-            + (1 - np.cos(A * theta)) * np.matmul(Ta, np.matmul(Ta, state))
+            + np.sin(A * theta)
+            * propagate_state(
+                [Ta],
+                state,
+                idx2det,
+                det2idx,
+                num_inactive_orbs,
+                num_active_orbs,
+                num_virtual_orbs,
+                num_active_elec_alpha,
+                num_active_elec_beta,
+                thetas,
+                ups_struct,
+            )
+            + (1 - np.cos(A * theta))
+            * propagate_state(
+                [Ta, Ta],
+                state,
+                idx2det,
+                det2idx,
+                num_inactive_orbs,
+                num_active_orbs,
+                num_virtual_orbs,
+                num_active_elec_alpha,
+                num_active_elec_beta,
+                thetas,
+                ups_struct,
+            )
         )
         tmp = (
             tmp
-            + np.sin(A * theta) * np.matmul(Tb, tmp)
-            + (1 - np.cos(A * theta)) * np.matmul(Tb, np.matmul(Tb, tmp))
+            + np.sin(A * theta)
+            * propagate_state(
+                [Tb],
+                tmp,
+                idx2det,
+                det2idx,
+                num_inactive_orbs,
+                num_active_orbs,
+                num_virtual_orbs,
+                num_active_elec_alpha,
+                num_active_elec_beta,
+                thetas,
+                ups_struct,
+            )
+            + (1 - np.cos(A * theta))
+            * propagate_state(
+                [Tb, Tb],
+                tmp,
+                idx2det,
+                det2idx,
+                num_inactive_orbs,
+                num_active_orbs,
+                num_virtual_orbs,
+                num_active_elec_alpha,
+                num_active_elec_beta,
+                thetas,
+                ups_struct,
+            )
         )
     elif exc_type in ("single", "double"):
         # Create T matrix
         if exc_type == "single":
             (i, a) = exc_indices
-            T = T1_matrix(i, a, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
+            T = G1(i, a, True)
         elif exc_type == "double":
             (i, j, a, b) = exc_indices
-            T = T2_matrix(i, j, a, b, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
+            T = G2(i, j, a, b, True)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Analytical application on state vector
         tmp = (
             state
-            + np.sin(theta) * np.matmul(T, state)
-            + (1 - np.cos(theta)) * np.matmul(T, np.matmul(T, state))
+            + np.sin(theta)
+            * propagate_state(
+                [T],
+                state,
+                idx2det,
+                det2idx,
+                num_inactive_orbs,
+                num_active_orbs,
+                num_virtual_orbs,
+                num_active_elec_alpha,
+                num_active_elec_beta,
+                thetas,
+                ups_struct,
+            )
+            + (1 - np.cos(theta))
+            * propagate_state(
+                [T, T],
+                state,
+                idx2det,
+                det2idx,
+                num_inactive_orbs,
+                num_active_orbs,
+                num_virtual_orbs,
+                num_active_elec_alpha,
+                num_active_elec_beta,
+                thetas,
+                ups_struct,
+            )
         )
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")

@@ -4,6 +4,8 @@ import numpy as np
 class ReducedDenstiyMatrix:
     """Reduced density matrix class."""
 
+    __slots__ = ("inactive_idx", "virtual_idx", "active_idx", "idx_shift", "rdm1", "rdm2")
+
     def __init__(
         self,
         num_inactive_orbs: int,

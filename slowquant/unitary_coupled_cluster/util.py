@@ -462,6 +462,8 @@ def iterate_pair_t2_generalized(
 
 
 class UccStructure:
+    __slots__ = ("excitation_indicies", "excitation_operator_type", "n_params")
+
     def __init__(self) -> None:
         """Intialize the unitary coupled cluster ansatz structure."""
         self.excitation_indicies: list[tuple[int, ...]] = []
@@ -549,6 +551,8 @@ class UccStructure:
 
 
 class UpsStructure:
+    __slots__ = ("excitation_indicies", "excitation_operator_type", "n_params")
+
     def __init__(self) -> None:
         """Intialize the unitary product state ansatz structure."""
         self.excitation_indicies: list[tuple[int, ...]] = []
