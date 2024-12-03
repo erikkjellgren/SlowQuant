@@ -22,7 +22,6 @@ from slowquant.unitary_coupled_cluster.operator_matrix import (
     build_operator_matrix,
     construct_ucc_state,
     expectation_value,
-    expectation_value_mat,
     get_indexing,
 )
 from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
@@ -1144,14 +1143,14 @@ class WaveFunctionUCC:
             eps = np.finfo(np.float64).eps ** (
                 1 / 2
             )  # half-precision of double-precision floating-point numbers
-            E = expectation_value_mat(self.ci_coeffs, Hamiltonian, self.ci_coeffs)
+            E = self.ci_coeffs @ Hamiltonian @ self.ci_coeffs
             theta_params = self.thetas
             for i in range(len(theta_params)):  # pylint: disable=consider-using-enumerate
                 sign_step = (theta_params[i] >= 0).astype(float) * 2 - 1  # type: ignore [attr-defined]
                 step_size = eps * sign_step * max(1, abs(theta_params[i]))
                 theta_params[i] += step_size
                 self.thetas = theta_params
-                E_plus = expectation_value_mat(self.ci_coeffs, Hamiltonian, self.ci_coeffs)
+                E_plus = self.ci_coeffs @ Hamiltonian @ self.ci_coeffs
                 theta_params[i] -= step_size
                 self.thetas = theta_params
                 gradient[i + num_kappa] = (E_plus - E) / step_size

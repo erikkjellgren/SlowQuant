@@ -119,6 +119,7 @@ def propagate_state(
     num_active_elec_beta: int,
     thetas: Sequence[float],
     wf_struct: UpsStructure | UccStructure,
+    do_folding: bool = True,
 ) -> np.ndarray:
     r"""Propagate state by applying operator.
 
@@ -193,7 +194,10 @@ def propagate_state(
         # FermionicOperator in operators
         else:
             # Fold operator to only get active contributions
-            op_folded = op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs)
+            if do_folding:
+                op_folded = op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs)
+            else:
+                op_folded = op
             # loop over all determinants
             for i in range(num_dets):
                 if abs(new_state[i]) < 10**-14:
@@ -277,20 +281,6 @@ def expectation_value(
     if not isinstance(val, float):
         raise ValueError(f"Calculated expectation value is not a float, got type {type(val)}")
     return val
-
-
-def expectation_value_mat(bra: np.ndarray, op: np.ndarray, ket: np.ndarray) -> float:
-    """Calculate expectation value of operator in matrix form.
-
-    Args:
-        bra: Bra state.
-        op: Operator.
-        ket: Ket state.
-
-    Returns:
-        Expectation value.
-    """
-    return np.matmul(bra, np.matmul(op, ket))
 
 
 @functools.cache
@@ -867,6 +857,7 @@ def propagate_unitary(
                 num_active_elec_beta,
                 thetas,
                 ups_struct,
+                do_folding=False,
             )
             + (1 - np.cos(A * theta))
             * propagate_state(
@@ -881,6 +872,7 @@ def propagate_unitary(
                 num_active_elec_beta,
                 thetas,
                 ups_struct,
+                do_folding=False,
             )
         )
         tmp = (
@@ -898,6 +890,7 @@ def propagate_unitary(
                 num_active_elec_beta,
                 thetas,
                 ups_struct,
+                do_folding=False,
             )
             + (1 - np.cos(A * theta))
             * propagate_state(
@@ -912,6 +905,7 @@ def propagate_unitary(
                 num_active_elec_beta,
                 thetas,
                 ups_struct,
+                do_folding=False,
             )
         )
     elif exc_type in ("single", "double"):
@@ -940,6 +934,7 @@ def propagate_unitary(
                 num_active_elec_beta,
                 thetas,
                 ups_struct,
+                do_folding=False,
             )
             + (1 - np.cos(theta))
             * propagate_state(
@@ -954,6 +949,7 @@ def propagate_unitary(
                 num_active_elec_beta,
                 thetas,
                 ups_struct,
+                do_folding=False,
             )
         )
     else:
@@ -964,7 +960,11 @@ def propagate_unitary(
 def get_grad_action(
     state: np.ndarray,
     idx: int,
+    idx2det: Sequence[int],
+    det2idx: dict[int, int],
+    num_inactive_orbs,
     num_active_orbs: int,
+    num_virtual_orbs,
     num_active_elec_alpha: int,
     num_active_elec_beta: int,
     ups_struct: UpsStructure,
@@ -1005,24 +1005,48 @@ def get_grad_action(
         # Create T matrix
         A = 1  # 2**(-1/2)
         (i, a) = exc_indices
-        Ta = T1_matrix(i * 2, a * 2, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
-        Tb = T1_matrix(
-            i * 2 + 1, a * 2 + 1, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
-        ).todense()
+        Ta = G1(i * 2, a * 2, True)
+        Tb = G1(i * 2 + 1, a * 2 + 1, True)
         # Apply missing T factor of derivative
-        tmp = np.matmul(A * (Ta + Tb), state)
+        tmp = propagate_state(
+            [A * (Ta + Tb)],
+            state,
+            idx2det,
+            det2idx,
+            num_inactive_orbs,
+            num_active_orbs,
+            num_virtual_orbs,
+            num_active_elec_alpha,
+            num_active_elec_beta,
+            (0.0,),
+            ups_struct,
+            do_folding=False,
+        )
     elif exc_type in ("single", "double"):
         # Create T matrix
         if exc_type == "single":
             (i, a) = exc_indices
-            T = T1_matrix(i, a, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
+            T = G1(i, a, True)
         elif exc_type == "double":
             (i, j, a, b) = exc_indices
-            T = T2_matrix(i, j, a, b, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
+            T = G2(i, j, a, b, True)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Apply missing T factor of derivative
-        tmp = np.matmul(T, state)
+        tmp = propagate_state(
+            [T],
+            state,
+            idx2det,
+            det2idx,
+            num_inactive_orbs,
+            num_active_orbs,
+            num_virtual_orbs,
+            num_active_elec_alpha,
+            num_active_elec_beta,
+            (0.0,),
+            ups_struct,
+            do_folding=False,
+        )
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")
     return tmp

@@ -528,7 +528,7 @@ class UccStructure:
 
 
 class UpsStructure:
-    __slots__ = ("excitation_indicies", "excitation_operator_type", "n_params")
+    __slots__ = ("excitation_indicies", "excitation_operator_type", "n_params", "grad_param_R", "param_names")
 
     def __init__(self) -> None:
         """Intialize the unitary product state ansatz structure."""
