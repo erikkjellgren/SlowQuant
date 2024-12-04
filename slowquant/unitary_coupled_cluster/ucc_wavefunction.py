@@ -19,7 +19,6 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_gradient,
 )
 from slowquant.unitary_coupled_cluster.operator_matrix import (
-    build_operator_matrix,
     construct_ucc_state,
     expectation_value,
     get_indexing,
@@ -1128,29 +1127,52 @@ class WaveFunctionUCC:
             )
         if theta_optimization:
             # Hamiltonian matrix
-            Hamiltonian = build_operator_matrix(
-                hamiltonian_0i_0a(
-                    self.h_mo,
-                    self.g_mo,
-                    self.num_inactive_orbs,
-                    self.num_active_orbs,
-                ).get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs),
-                self.idx2det,
-                self.det2idx,
+            Hamiltonian = hamiltonian_0i_0a(
+                self.h_mo,
+                self.g_mo,
+                self.num_inactive_orbs,
                 self.num_active_orbs,
-            )
+            ).get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             # Numerical finite difference gradient
             eps = np.finfo(np.float64).eps ** (
                 1 / 2
             )  # half-precision of double-precision floating-point numbers
-            E = self.ci_coeffs @ Hamiltonian @ self.ci_coeffs
+            E = expectation_value(
+                self.ci_coeffs,
+                [Hamiltonian],
+                self.ci_coeffs,
+                self.idx2det,
+                self.det2idx,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.num_virtual_orbs,
+                self.num_active_elec_alpha,
+                self.num_active_elec_beta,
+                self.thetas,
+                self.ucc_layout,
+                do_folding=False,
+            )
             theta_params = self.thetas
             for i in range(len(theta_params)):  # pylint: disable=consider-using-enumerate
                 sign_step = (theta_params[i] >= 0).astype(float) * 2 - 1  # type: ignore [attr-defined]
                 step_size = eps * sign_step * max(1, abs(theta_params[i]))
                 theta_params[i] += step_size
                 self.thetas = theta_params
-                E_plus = self.ci_coeffs @ Hamiltonian @ self.ci_coeffs
+                E_plus = expectation_value(
+                    self.ci_coeffs,
+                    [Hamiltonian],
+                    self.ci_coeffs,
+                    self.idx2det,
+                    self.det2idx,
+                    self.num_inactive_orbs,
+                    self.num_active_orbs,
+                    self.num_virtual_orbs,
+                    self.num_active_elec_alpha,
+                    self.num_active_elec_beta,
+                    self.thetas,
+                    self.ucc_layout,
+                    do_folding=False,
+                )
                 theta_params[i] -= step_size
                 self.thetas = theta_params
                 gradient[i + num_kappa] = (E_plus - E) / step_size

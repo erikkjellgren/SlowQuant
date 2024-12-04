@@ -242,6 +242,7 @@ def expectation_value(
     num_active_elec_beta: int,
     thetas: Sequence[float],
     wf_struct: UpsStructure | UccStructure,
+    do_folding: bool = True,
 ) -> float:
     """Calculate expectation value of operator.
 
@@ -276,6 +277,7 @@ def expectation_value(
         num_active_elec_beta,
         thetas,
         wf_struct,
+        do_folding=do_folding,
     )
     val = bra @ op_ket
     if not isinstance(val, float):
