@@ -295,10 +295,14 @@ class WaveFunctionUCC:
         if self._ci_coeffs is None:
             self._ci_coeffs = construct_ucc_state(
                 self.csf_coeffs,
+                self.idx2det,
+                self.det2idx,
+                self.num_inactive_orbs,
                 self.num_active_orbs,
+                self.num_virtual_orbs,
                 self.num_active_elec_alpha,
                 self.num_active_elec_beta,
-                self._thetas,
+                self.thetas,
                 self.ucc_layout,
             )
         return self._ci_coeffs

@@ -229,6 +229,41 @@ def propagate_state(
     return new_state
 
 
+def _propagate_state(
+    state: np.ndarray,
+    operators: list[FermionicOperator | str],
+    idx2det: Sequence[int],
+    det2idx: dict[int, int],
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+    num_active_elec_alpha: int,
+    num_active_elec_beta: int,
+    thetas: Sequence[float],
+    wf_struct: UpsStructure | UccStructure,
+    do_folding: bool = True,
+) -> np.ndarray:
+    """A function that calls propagate_state.
+
+    _propagate_state has another order of the arguments,
+    which is needed when using functools.partial.
+    """
+    return propagate_state(
+        operators,
+        state,
+        idx2det,
+        det2idx,
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+        num_active_elec_alpha,
+        num_active_elec_beta,
+        thetas,
+        wf_struct,
+        do_folding=do_folding,
+    )
+
+
 def expectation_value(
     bra: np.ndarray,
     operators: list[FermionicOperator | str],
@@ -305,296 +340,13 @@ def Epq_matrix(
     return ss.lil_array(build_operator_matrix(Epq(p, q), idx2det, det2idx, num_active_orbs))
 
 
-@functools.cache
-def T1_sa_matrix(
-    i: int,
-    a: int,
-    num_active_orbs: int,
-    num_elec_alpha: int,
-    num_elec_beta: int,
-) -> ss.lil_array:
-    """Get matrix representation of anti-Hermitian T1 spin-adapted cluster operator.
-
-    Args:
-        i: Strongly occupied spatial orbital index.
-        a: Weakly occupied spatial orbital index.
-        num_active_orbs: Number of active spatial orbitals.
-        num_elec_alpha: Number of active alpha electrons.
-        num_elec_beta: Number of active beta electrons.
-
-    Returns:
-        Matrix representation of anti-Hermitian cluster operator.
-    """
-    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
-    op = build_operator_matrix(G1_sa(i, a), idx2det, det2idx, num_active_orbs)
-    return ss.lil_array(op - op.conjugate().transpose())
-
-
-@functools.cache
-def T2_1_sa_matrix(
-    i: int,
-    j: int,
-    a: int,
-    b: int,
-    num_active_orbs: int,
-    num_elec_alpha: int,
-    num_elec_beta: int,
-) -> ss.lil_array:
-    """Get matrix representation of anti-Hermitian T2 spin-adapted cluster operator - G2_1 part.
-
-    Args:
-        i: Strongly occupied spatial orbital index.
-        j: Strongly occupied spatial orbital index.
-        a: Weakly occupied spatial orbital index.
-        b: Weakly occupied spatial orbital index.
-        num_active_orbs: Number of active spatial orbitals.
-        num_elec_alpha: Number of active alpha electrons.
-        num_elec_beta: Number of active beta electrons.
-
-    Returns:
-        Matrix representation of anti-Hermitian cluster operator.
-    """
-    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
-    op = build_operator_matrix(G2_1_sa(i, j, a, b), idx2det, det2idx, num_active_orbs)
-    return ss.lil_array(op - op.conjugate().transpose())
-
-
-@functools.cache
-def T2_2_sa_matrix(
-    i: int,
-    j: int,
-    a: int,
-    b: int,
-    num_active_orbs: int,
-    num_elec_alpha: int,
-    num_elec_beta: int,
-) -> ss.lil_array:
-    """Get matrix representation of anti-Hermitian T2 spin-adapted cluster operator - G2_2 part.
-
-    Args:
-        i: Strongly occupied spatial orbital index.
-        j: Strongly occupied spatial orbital index.
-        a: Weakly occupied spatial orbital index.
-        b: Weakly occupied spatial orbital index.
-        num_active_orbs: Number of active spatial orbitals.
-        num_elec_alpha: Number of active alpha electrons.
-        num_elec_beta: Number of active beta electrons.
-
-    Returns:
-        Matrix representation of anti-Hermitian cluster operator.
-    """
-    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
-    op = build_operator_matrix(G2_2_sa(i, j, a, b), idx2det, det2idx, num_active_orbs)
-    return ss.lil_array(op - op.conjugate().transpose())
-
-
-@functools.cache
-def T1_matrix(i: int, a: int, num_active_orbs: int, num_elec_alpha: int, num_elec_beta: int) -> ss.lil_array:
-    """Get matrix representation of anti-Hermitian T1 spin-conserving cluster operator.
-
-    Args:
-        i: Strongly occupied spin orbital index.
-        a: Weakly occupied spin orbital index.
-        num_active_orbs: Number of active spatial orbitals.
-        num_elec_alpha: Number of active alpha electrons.
-        num_elec_beta: Number of active beta electrons.
-
-    Returns:
-        Matrix representation of anti-Hermitian cluster operator.
-    """
-    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
-    op = build_operator_matrix(G1(i, a), idx2det, det2idx, num_active_orbs)
-    return ss.lil_array(op - op.conjugate().transpose())
-
-
-@functools.cache
-def T2_matrix(
-    i: int,
-    j: int,
-    a: int,
-    b: int,
-    num_active_orbs: int,
-    num_elec_alpha: int,
-    num_elec_beta: int,
-) -> ss.lil_array:
-    """Get matrix representation of anti-Hermitian T2 spin-conserving cluster operator.
-
-    Args:
-        i: Strongly occupied spin orbital index.
-        j: Strongly occupied spin orbital index.
-        a: Weakly occupied spin orbital index.
-        b: Weakly occupied spin orbital index.
-        num_active_orbs: Number of active spatial orbitals.
-        num_elec_alpha: Number of active alpha electrons.
-        num_elec_beta: Number of active beta electrons.
-
-    Returns:
-        Matrix representation of anti-Hermitian cluster operator.
-    """
-    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
-    op = build_operator_matrix(G2(i, j, a, b), idx2det, det2idx, num_active_orbs)
-    return ss.lil_array(op - op.conjugate().transpose())
-
-
-@functools.cache
-def T3_matrix(
-    i: int,
-    j: int,
-    k: int,
-    a: int,
-    b: int,
-    c: int,
-    num_active_orbs: int,
-    num_elec_alpha: int,
-    num_elec_beta: int,
-) -> ss.lil_array:
-    """Get matrix representation of anti-Hermitian T3 spin-conserving cluster operator.
-
-    Args:
-        i: Strongly occupied spin orbital index.
-        j: Strongly occupied spin orbital index.
-        k: Strongly occupied spin orbital index.
-        a: Weakly occupied spin orbital index.
-        b: Weakly occupied spin orbital index.
-        c: Weakly occupied spin orbital index.
-        num_active_orbs: Number of active spatial orbitals.
-        num_elec_alpha: Number of active alpha electrons.
-        num_elec_beta: Number of active beta electrons.
-
-    Returns:
-        Matrix representation of anti-Hermitian cluster operator.
-    """
-    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
-    op = build_operator_matrix(G3(i, j, k, a, b, c), idx2det, det2idx, num_active_orbs)
-    return ss.lil_array(op - op.conjugate().transpose())
-
-
-@functools.cache
-def T4_matrix(
-    i: int,
-    j: int,
-    k: int,
-    l: int,
-    a: int,
-    b: int,
-    c: int,
-    d: int,
-    num_active_orbs: int,
-    num_elec_alpha: int,
-    num_elec_beta: int,
-) -> ss.lil_array:
-    """Get matrix representation of anti-Hermitian T4 spin-conserving cluster operator.
-
-    Args:
-        i: Strongly occupied spin orbital index.
-        j: Strongly occupied spin orbital index.
-        k: Strongly occupied spin orbital index.
-        l: Strongly occupied spin orbital index.
-        a: Weakly occupied spin orbital index.
-        b: Weakly occupied spin orbital index.
-        c: Weakly occupied spin orbital index.
-        d: Weakly occupied spin orbital index.
-        num_active_orbs: Number of active spatial orbitals.
-        num_elec_alpha: Number of active alpha electrons.
-        num_elec_beta: Number of active beta electrons.
-
-    Returns:
-        Matrix representation of anti-Hermitian cluster operator.
-    """
-    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
-    op = build_operator_matrix(G4(i, j, k, l, a, b, c, d), idx2det, det2idx, num_active_orbs)
-    return ss.lil_array(op - op.conjugate().transpose())
-
-
-@functools.cache
-def T5_matrix(
-    i: int,
-    j: int,
-    k: int,
-    l: int,
-    m: int,
-    a: int,
-    b: int,
-    c: int,
-    d: int,
-    e: int,
-    num_active_orbs: int,
-    num_elec_alpha: int,
-    num_elec_beta: int,
-) -> ss.lil_array:
-    """Get matrix representation of anti-Hermitian T5 spin-conserving cluster operator.
-
-    Args:
-        i: Strongly occupied spin orbital index.
-        j: Strongly occupied spin orbital index.
-        k: Strongly occupied spin orbital index.
-        l: Strongly occupied spin orbital index.
-        m: Strongly occupied spin orbital index.
-        a: Weakly occupied spin orbital index.
-        b: Weakly occupied spin orbital index.
-        c: Weakly occupied spin orbital index.
-        d: Weakly occupied spin orbital index.
-        e: Weakly occupied spin orbital index.
-        num_active_orbs: Number of active spatial orbitals.
-        num_elec_alpha: Number of active alpha electrons.
-        num_elec_beta: Number of active beta electrons.
-
-    Returns:
-        Matrix representation of anti-Hermitian cluster operator.
-    """
-    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
-    op = build_operator_matrix(G5(i, j, k, l, m, a, b, c, d, e), idx2det, det2idx, num_active_orbs)
-    return ss.lil_array(op - op.conjugate().transpose())
-
-
-@functools.cache
-def T6_matrix(
-    i: int,
-    j: int,
-    k: int,
-    l: int,
-    m: int,
-    n: int,
-    a: int,
-    b: int,
-    c: int,
-    d: int,
-    e: int,
-    f: int,
-    num_active_orbs: int,
-    num_elec_alpha: int,
-    num_elec_beta: int,
-) -> ss.lil_array:
-    """Get matrix representation of anti-Hermitian T6 spin-conserving cluster operator.
-
-    Args:
-        i: Strongly occupied spin orbital index.
-        j: Strongly occupied spin orbital index.
-        k: Strongly occupied spin orbital index.
-        l: Strongly occupied spin orbital index.
-        m: Strongly occupied spin orbital index.
-        n: Strongly occupied spin orbital index.
-        a: Weakly occupied spin orbital index.
-        b: Weakly occupied spin orbital index.
-        c: Weakly occupied spin orbital index.
-        d: Weakly occupied spin orbital index.
-        e: Weakly occupied spin orbital index.
-        f: Weakly occupied spin orbital index.
-        num_active_orbs: Number of active spatial orbitals.
-        num_elec_alpha: Number of active alpha electrons.
-        num_elec_beta: Number of active beta electrons.
-
-    Returns:
-        Matrix representation of anti-Hermitian cluster operator.
-    """
-    idx2det, det2idx = get_indexing(num_active_orbs, num_elec_alpha, num_elec_beta)
-    op = build_operator_matrix(G6(i, j, k, l, m, n, a, b, c, d, e, f), idx2det, det2idx, num_active_orbs)
-    return ss.lil_array(op - op.conjugate().transpose())
-
-
 def construct_ucc_state(
     state: np.ndarray,
+    idx2det: Sequence[int],
+    det2idx: dict[int, int],
+    num_inactive_orbs: int,
     num_active_orbs: int,
+    num_virtual_orbs: int,
     num_active_elec_alpha: int,
     num_active_elec_beta: int,
     thetas: Sequence[float],
@@ -617,7 +369,7 @@ def construct_ucc_state(
         New state vector with unitaries applied.
     """
     # Build up T matrix based on excitations in ucc_struct and given thetas
-    T = np.zeros((len(state), len(state)))
+    T = FermionicOperator({}, {})
     for exc_type, exc_indices, theta in zip(
         ucc_struct.excitation_operator_type, ucc_struct.excitation_indicies, thetas
     ):
@@ -625,99 +377,60 @@ def construct_ucc_state(
             continue
         if exc_type == "sa_single":
             (i, a) = exc_indices
-            T += (
-                theta
-                * T1_sa_matrix(i, a, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
-            )
+            T += theta * G1_sa(i, a, True)
         elif exc_type == "sa_double_1":
             (i, j, a, b) = exc_indices
-            T += (
-                theta
-                * T2_1_sa_matrix(
-                    i, j, a, b, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
-                ).todense()
-            )
+            T += theta * G2_1_sa(i, j, a, b, True)
         elif exc_type == "sa_double_2":
             (i, j, a, b) = exc_indices
-            T += (
-                theta
-                * T2_2_sa_matrix(
-                    i, j, a, b, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
-                ).todense()
-            )
+            T += theta * G2_2_sa(i, j, a, b, True)
         elif exc_type == "triple":
             (i, j, k, a, b, c) = exc_indices
-            T += (
-                theta
-                * T3_matrix(
-                    i, j, k, a, b, c, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
-                ).todense()
-            )
+            T += theta * G3(i, j, k, a, b, c, True)
         elif exc_type == "quadruple":
             (i, j, k, l, a, b, c, d) = exc_indices
-            T += (
-                theta
-                * T4_matrix(
-                    i,
-                    j,
-                    k,
-                    l,
-                    a,
-                    b,
-                    c,
-                    d,
-                    num_active_orbs,
-                    num_active_elec_alpha,
-                    num_active_elec_beta,
-                ).todense()
-            )
+            T += theta * G4(i, j, k, l, a, b, c, d, True)
         elif exc_type == "quintuple":
             (i, j, k, l, m, a, b, c, d, e) = exc_indices
-            T += (
-                theta
-                * T5_matrix(
-                    i,
-                    j,
-                    k,
-                    l,
-                    m,
-                    a,
-                    b,
-                    c,
-                    d,
-                    e,
-                    num_active_orbs,
-                    num_active_elec_alpha,
-                    num_active_elec_beta,
-                ).todense()
-            )
+            T += theta * G5(i, j, k, l, m, a, b, c, d, e, True)
         elif exc_type == "sextuple":
             (i, j, k, l, m, n, a, b, c, d, e, f) = exc_indices
-            T += (
-                theta
-                * T6_matrix(
-                    i,
-                    j,
-                    k,
-                    l,
-                    m,
-                    n,
-                    a,
-                    b,
-                    c,
-                    d,
-                    e,
-                    f,
-                    num_active_orbs,
-                    num_active_elec_alpha,
-                    num_active_elec_beta,
-                ).todense()
-            )
+            T += theta * G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
         else:
             raise ValueError(f"Got unknown excitation type, {exc_type}")
+    mv = functools.partial(
+        _propagate_state,
+        operators=[T],
+        idx2det=idx2det,
+        det2idx=det2idx,
+        num_inactive_orbs=num_inactive_orbs,
+        num_active_orbs=num_active_orbs,
+        num_virtual_orbs=num_virtual_orbs,
+        num_active_elec_alpha=num_active_elec_alpha,
+        num_active_elec_beta=num_active_elec_beta,
+        thetas=thetas,
+        wf_struct=ucc_struct,
+        do_folding=False,
+    )
+    rmv = functools.partial(
+        _propagate_state,
+        operators=[T],
+        idx2det=idx2det,
+        det2idx=det2idx,
+        num_inactive_orbs=num_inactive_orbs,
+        num_active_orbs=num_active_orbs,
+        num_virtual_orbs=num_virtual_orbs,
+        num_active_elec_alpha=num_active_elec_alpha,
+        num_active_elec_beta=num_active_elec_beta,
+        thetas=thetas,
+        wf_struct=ucc_struct,
+        do_folding=False,
+    )
+
+    linopT = ss.linalg.LinearOperator((len(state), len(state)), matvec=mv, rmatvec=rmv)
     if dagger:
-        return ss.linalg.expm_multiply(-T, state)
-    return ss.linalg.expm_multiply(T, state)
+        return ss.linalg.expm_multiply(-linopT, state, traceA=0)
+    return ss.linalg.expm_multiply(linopT, state, traceA=0)
 
 
 def construct_ups_state(
