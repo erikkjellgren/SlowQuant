@@ -55,7 +55,7 @@ class WaveFunctionCircuit:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
         if isinstance(quantum_interface.ansatz, QuantumCircuit):
             print("WARNING: A QI with a custom Ansatz was passed. VQE will only work with COBYLA optimizer.")
-        self._c_orthonormal_ = mo_coeffs
+        self._c_mo = mo_coeffs
         self._h_ao = h_ao
         self._g_ao = g_ao
         self.inactive_spin_idx = []
@@ -180,27 +180,6 @@ class WaveFunctionCircuit:
         )
 
     @property
-    def _c_orthonormal(self) -> np.ndarray:
-        """Get orthonormalization coefficients.
-
-        Returns:
-            Orthonormalization coefficients.
-        """
-        return self._c_orthonormal_
-
-    @_c_orthonormal.setter
-    def _c_orthonormal(self, c: np.ndarray) -> None:
-        """Set orthonormalization coefficients.
-
-        Args:
-            c: Orthonormalization coefficients.
-        """
-        self._h_mo = None
-        self._g_mo = None
-        self._energy_elec = None
-        self._c_orthonormal_ = c
-
-    @property
     def kappa(self) -> list[float]:
         """Get orbital rotation parameters."""
         return self._kappa.copy()
@@ -224,13 +203,13 @@ class WaveFunctionCircuit:
         Returns:
             Molecular orbital coefficients.
         """
-        kappa_mat = np.zeros_like(self._c_orthonormal)
+        kappa_mat = np.zeros_like(self._c_mo)
         if len(self.kappa) != 0:
             if np.max(np.abs(np.array(self.kappa) - np.array(self._kappa_old))) > 0.0:
                 for kappa_val, kappa_old, (p, q) in zip(self.kappa, self._kappa_old, self.kappa_idx):
                     kappa_mat[p, q] = kappa_val - kappa_old
                     kappa_mat[q, p] = -(kappa_val - kappa_old)
-        return np.matmul(self._c_orthonormal, scipy.linalg.expm(-kappa_mat))
+        return np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
 
     @property
     def h_mo(self) -> np.ndarray:
@@ -279,8 +258,11 @@ class WaveFunctionCircuit:
 
     def _move_cep(self) -> None:
         """Move current expansion point."""
+        self._h_mo = None
+        self._g_mo = None
+        self._energy_elec = None
         c = self.c_mo
-        self.c_orthonormal = c
+        self._c_mo = c
         self._kappa_old = self.kappa
 
     def change_primitive(

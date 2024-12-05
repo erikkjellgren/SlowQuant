@@ -68,7 +68,7 @@ class WaveFunctionSAUPS:
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
         # Init stuff
-        self._c_orthonormal_ = mo_coeffs
+        self._c_mo = mo_coeffs
         self._h_ao = h_ao
         self._g_ao = g_ao
         self.inactive_spin_idx = []
@@ -254,29 +254,6 @@ class WaveFunctionSAUPS:
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
 
     @property
-    def _c_orthonormal(self) -> np.ndarray:
-        """Get orthonormalization coefficients (MO coefficients).
-
-        Returns:
-            Orthonormalization coefficients.
-        """
-        return self._c_orthonormal_
-
-    @_c_orthonormal.setter
-    def _c_orthonormal(self, c: np.ndarray) -> None:
-        """Set orthonormalization coefficients.
-
-        Args:
-            c: Orthonormalization coefficients.
-        """
-        self._h_mo = None
-        self._g_mo = None
-        self._sa_energy = None
-        self._state_energies = None
-        self._state_ci_coeffs = None
-        self._c_orthonormal_ = c
-
-    @property
     def kappa(self) -> list[float]:
         """Get orbital rotation parameters."""
         return self._kappa.copy()
@@ -351,14 +328,14 @@ class WaveFunctionSAUPS:
             Orbital coefficients.
         """
         # Construct anti-hermitian kappa matrix
-        kappa_mat = np.zeros_like(self._c_orthonormal)
+        kappa_mat = np.zeros_like(self._c_mo)
         if len(self.kappa) != 0:
             if np.max(np.abs(np.array(self.kappa) - np.array(self._kappa_old))) > 0.0:
                 for kappa_val, kappa_old, (p, q) in zip(self.kappa, self._kappa_old, self.kappa_idx):
                     kappa_mat[p, q] = kappa_val - kappa_old
                     kappa_mat[q, p] = -(kappa_val - kappa_old)
         # Apply orbital rotation unitary to MO coefficients
-        return np.matmul(self._c_orthonormal, scipy.linalg.expm(-kappa_mat))
+        return np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
 
     @property
     def h_mo(self) -> np.ndarray:
@@ -384,7 +361,12 @@ class WaveFunctionSAUPS:
 
     def _move_cep(self) -> None:
         """Move current expansion point."""
-        self._c_orthonormal = self.c_mo
+        self._h_mo = None
+        self._g_mo = None
+        self._sa_energy = None
+        self._state_energies = None
+        self._state_ci_coeffs = None
+        self._c_mo = self.c_mo
         self._kappa_old = self.kappa
 
     @property
