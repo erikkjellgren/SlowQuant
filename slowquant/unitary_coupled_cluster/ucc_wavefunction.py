@@ -22,6 +22,7 @@ from slowquant.unitary_coupled_cluster.operator_matrix import (
     construct_ucc_state,
     expectation_value,
     get_indexing,
+    propagate_state,
 )
 from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
@@ -1100,7 +1101,14 @@ class WaveFunctionUCC:
     def _calc_gradient_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
     ) -> np.ndarray:
-        """Calculate electronic gradient.
+        r"""Calculate electronic gradient.
+
+        The gradient with respect to the thetas is calculated with finite-difference after applying the product rule.
+
+        .. math::
+            \frac{\partial E}{\partial \theta} = 2\left<\frac{\partial \Psi}{\partial \theta}\left|\hat{H}\right|\Psi\right>
+
+        The bra :math:`\left<\frac{\partial \Psi}{\partial \theta}\right|` is constructed using finite-difference.
 
         Args:
             parameters: Ansatz and orbital rotation parameters.
@@ -1141,10 +1149,7 @@ class WaveFunctionUCC:
             eps = np.finfo(np.float64).eps ** (
                 1 / 2
             )  # half-precision of double-precision floating-point numbers
-            E = expectation_value(
-                self.ci_coeffs,
-                [Hamiltonian],
-                self.ci_coeffs,
+            Hket = propagate_state([Hamiltonian], self.ci_coeffs,
                 self.idx2det,
                 self.det2idx,
                 self.num_inactive_orbs,
@@ -1156,30 +1161,17 @@ class WaveFunctionUCC:
                 self.ucc_layout,
                 do_folding=False,
             )
+            E = self.ci_coeffs @ Hket
             theta_params = self.thetas
             for i in range(len(theta_params)):  # pylint: disable=consider-using-enumerate
                 sign_step = (theta_params[i] >= 0).astype(float) * 2 - 1  # type: ignore [attr-defined]
                 step_size = eps * sign_step * max(1, abs(theta_params[i]))
                 theta_params[i] += step_size
                 self.thetas = theta_params
-                E_plus = expectation_value(
-                    self.ci_coeffs,
-                    [Hamiltonian],
-                    self.ci_coeffs,
-                    self.idx2det,
-                    self.det2idx,
-                    self.num_inactive_orbs,
-                    self.num_active_orbs,
-                    self.num_virtual_orbs,
-                    self.num_active_elec_alpha,
-                    self.num_active_elec_beta,
-                    self.thetas,
-                    self.ucc_layout,
-                    do_folding=False,
-                )
+                E_plus = self.ci_coeffs @ Hket
                 theta_params[i] -= step_size
                 self.thetas = theta_params
-                gradient[i + num_kappa] = (E_plus - E) / step_size
+                gradient[i + num_kappa] = 2 * (E_plus - E) / step_size
         return gradient
 
 

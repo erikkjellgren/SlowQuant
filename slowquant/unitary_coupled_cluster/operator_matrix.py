@@ -415,10 +415,15 @@ def construct_ucc_state(
         do_folding=False,
     )
 
-    linopT = ss.linalg.LinearOperator((len(state), len(state)), matvec=mv, rmatvec=rmv)
+    #linopT = ss.linalg.LinearOperator((len(state), len(state)), matvec=mv, rmatvec=rmv)
+    #if dagger:
+    #    return ss.linalg.expm_multiply(-linopT, state, traceA=0.0)
+    #return ss.linalg.expm_multiply(linopT, state, traceA=0.0)
+    # Evil matrix construction
+    Tmat = build_operator_matrix(T, idx2det, det2idx, num_active_orbs)
     if dagger:
-        return ss.linalg.expm_multiply(-linopT, state, traceA=0.0)
-    return ss.linalg.expm_multiply(linopT, state, traceA=0.0)
+        return ss.linalg.expm_multiply(-Tmat, state, traceA=0.0)
+    return ss.linalg.expm_multiply(Tmat, state, traceA=0.0)
 
 
 def construct_ups_state(
