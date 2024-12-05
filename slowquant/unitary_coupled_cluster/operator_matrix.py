@@ -172,7 +172,11 @@ def propagate_state(
             if isinstance(wf_struct, UpsStructure):
                 new_state = construct_ups_state(
                     new_state,
+                    idx2det,
+                    det2idx,
+                    num_inactive_orbs,
                     num_active_orbs,
+                    num_virtual_orbs,
                     num_active_elec_alpha,
                     num_active_elec_beta,
                     thetas,
@@ -182,9 +186,13 @@ def propagate_state(
             elif isinstance(wf_struct, UccStructure):
                 new_state = construct_ucc_state(
                     new_state,
+                    idx2det,
+                    det2idx,
+                    num_inactive_orbs,
                     num_active_orbs,
-                    num_active_elec_beta,
+                    num_virtual_orbs,
                     num_active_elec_alpha,
+                    num_active_elec_beta,
                     thetas,
                     wf_struct,
                     dagger=dagger,
