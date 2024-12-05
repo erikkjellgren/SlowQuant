@@ -27,7 +27,6 @@ def test_H2_631g_naive():
     g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -35,7 +34,7 @@ def test_H2_631g_naive():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
     LR = naive.LinearResponseUCC(WF, excitations="SD")
@@ -91,9 +90,8 @@ def test_LiH_sto3g_naive():
     SQobj.hartree_fock.run_restricted_hartree_fock()
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
-    # OO-UCCSD
+    # oo-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -101,7 +99,7 @@ def test_LiH_sto3g_naive():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
     LR = naive.LinearResponseUCC(WF, excitations="SD")
@@ -173,7 +171,6 @@ def test_H2_631g_projLR():
     g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -181,7 +178,7 @@ def test_H2_631g_projLR():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
     LR = projected.LinearResponseUCC(WF, excitations="SD")
@@ -232,9 +229,8 @@ def test_LiH_sto3g_proj():
     SQobj.hartree_fock.run_restricted_hartree_fock()
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
-    # OO-UCCSD
+    # oo-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -242,7 +238,7 @@ def test_LiH_sto3g_proj():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     LR = projected.LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
@@ -307,7 +303,6 @@ def test_H2_631g_STLR():
     g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -315,7 +310,7 @@ def test_H2_631g_STLR():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
     LR = statetransfer.LinearResponseUCC(
@@ -370,7 +365,6 @@ def test_LiH_sto3g_st():
     g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -378,7 +372,7 @@ def test_LiH_sto3g_st():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
     LR = statetransfer.LinearResponseUCC(
@@ -447,7 +441,6 @@ def test_H2_631g_allST():
     g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -455,7 +448,7 @@ def test_H2_631g_allST():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
     LR = allstatetransfer.LinearResponseUCC(
@@ -506,7 +499,6 @@ def test_LiH_sto3g_allST():
     g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -514,7 +506,7 @@ def test_LiH_sto3g_allST():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
     LR = allstatetransfer.LinearResponseUCC(

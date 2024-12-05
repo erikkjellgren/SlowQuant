@@ -24,10 +24,8 @@ def test_heh_sto3g_hf() -> None:
     g_eri = A.integral.electron_repulsion_tensor
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
-    WF = WaveFunctionUCC(
-        A.molecule.number_bf * 2, A.molecule.number_electrons, (2, 1), S_sqrt, h_core, g_eri, "S"
-    )
-    WF.run_ucc(True)
+    WF = WaveFunctionUCC(A.molecule.number_electrons, (2, 1), S_sqrt, h_core, g_eri, "S")
+    WF.run_wf_optimization_1step("SLSQP", True)
     assert abs(WF.energy_elec - (-4.262632309847)) < 10**-8
 
 
@@ -44,10 +42,8 @@ def test_lih_sto3g_hf() -> None:
     g_eri = A.integral.electron_repulsion_tensor
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
-    WF = WaveFunctionUCC(
-        A.molecule.number_bf * 2, A.molecule.number_electrons, (2, 1), S_sqrt, h_core, g_eri, "S"
-    )
-    WF.run_ucc(True)
+    WF = WaveFunctionUCC(A.molecule.number_electrons, (2, 1), S_sqrt, h_core, g_eri, "S")
+    WF.run_wf_optimization_1step("SLSQP", True)
     assert abs(WF.energy_elec - (-8.862246324082243)) < 10**-8
 
 
@@ -65,10 +61,8 @@ def test_heh_sto3g_uccs() -> None:
     g_eri = A.integral.electron_repulsion_tensor
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
-    WF = WaveFunctionUCC(
-        A.molecule.number_bf * 2, A.molecule.number_electrons, (2, 2), S_sqrt, h_core, g_eri, "S"
-    )
-    WF.run_ucc()
+    WF = WaveFunctionUCC(A.molecule.number_electrons, (2, 2), S_sqrt, h_core, g_eri, "S")
+    WF.run_wf_optimization_1step("SLSQP", False)
     assert abs(WF.energy_elec - (-4.262632309847)) < 10**-8
 
 
@@ -96,7 +90,6 @@ def test_h10_sto3g_uccsd() -> None:
     h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
     g_eri = A.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        A.molecule.number_bf * 2,
         A.molecule.number_electrons,
         (2, 2),
         A.hartree_fock.mo_coeff,
@@ -104,7 +97,7 @@ def test_h10_sto3g_uccsd() -> None:
         g_eri,
         "SD",
     )
-    WF.run_ucc(False)
+    WF.run_wf_optimization_1step("SLSQP", False)
     assert abs(WF.energy_elec - (-18.839645894737956)) < 10**-8
 
 
@@ -122,7 +115,6 @@ def test_h2_431g_oouccd() -> None:
     h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
     g_eri = A.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        A.molecule.number_bf * 2,
         A.molecule.number_electrons,
         (2, 2),
         A.hartree_fock.mo_coeff,
@@ -131,7 +123,7 @@ def test_h2_431g_oouccd() -> None:
         "D",
         include_active_kappa=True,
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
     assert abs(WF.energy_elec - (-1.860533598715)) < 10**-8
 
 
@@ -151,7 +143,6 @@ def test_h4_sto3g_oouccsd() -> None:
     h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
     g_eri = A.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        A.molecule.number_bf * 2,
         A.molecule.number_electrons,
         (2, 2),
         A.hartree_fock.mo_coeff,
@@ -159,7 +150,7 @@ def test_h4_sto3g_oouccsd() -> None:
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
     assert abs(WF.energy_elec - (-5.211066791547)) < 10**-8
 
 
@@ -179,7 +170,6 @@ def test_h4_sto3g_oouccd() -> None:
     h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
     g_eri = A.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        A.molecule.number_bf * 2,
         A.molecule.number_electrons,
         (2, 2),
         A.hartree_fock.mo_coeff,
@@ -188,7 +178,7 @@ def test_h4_sto3g_oouccd() -> None:
         "D",
         include_active_kappa=True,
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
     assert abs(WF.energy_elec - (-5.211066791547)) < 10**-8
 
 
@@ -206,7 +196,6 @@ def test_h2_sto3g_uccsd_lr() -> None:
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -219,7 +208,7 @@ def test_h2_sto3g_uccsd_lr() -> None:
         SQobj.integral.get_multipole_matrix([0, 1, 0]),
         SQobj.integral.get_multipole_matrix([0, 0, 1]),
     )
-    WF.run_ucc(False)
+    WF.run_wf_optimization_1step("SLSQP", False)
     LR = selfconsistentLR.LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 1.015738) < 10**-4
@@ -248,21 +237,19 @@ def test_h4_sto3g_uccdq() -> None:
     h_core = A.integral.kinetic_energy_matrix + A.integral.nuclear_attraction_matrix
     g_eri = A.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        A.molecule.number_bf * 2,
         A.molecule.number_electrons,
         (4, 4),
         A.hartree_fock.mo_coeff,
         h_core,
         g_eri,
         "DQ",
-        include_active_kappa=True,
     )
-    WF.run_ucc(False)
+    WF.run_wf_optimization_1step("SLSQP", False)
     assert abs(WF.energy_elec + A.molecule.nuclear_repulsion - (-1.968914822185857)) < 10**-7
 
 
 def test_h2_631g_hf_lr() -> None:
-    """Test Linear Response for OO-uccsd(2,2)."""
+    """Test Linear Response for oo-UCCSD(2,2)."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """H  0.0   0.0  0.0;
@@ -275,7 +262,6 @@ def test_h2_631g_hf_lr() -> None:
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 1),
         SQobj.hartree_fock.mo_coeff,
@@ -283,7 +269,7 @@ def test_h2_631g_hf_lr() -> None:
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
     LR = selfconsistentLR.LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
     dipole_integrals = (
@@ -301,7 +287,7 @@ def test_h2_631g_hf_lr() -> None:
 
 
 def test_h2_631g_oouccsd_lr() -> None:
-    """Test Linear Response for OO-uccsd(2,2)."""
+    """Test Linear Response for oo-UCCSD(2,2)."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """H  0.0   0.0  0.0;
@@ -314,7 +300,6 @@ def test_h2_631g_oouccsd_lr() -> None:
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -322,7 +307,7 @@ def test_h2_631g_oouccsd_lr() -> None:
         g_eri,
         "SD",
     )
-    WF.run_ucc(True, convergence_threshold=10**-11)
+    WF.run_wf_optimization_1step("SLSQP", True, tol=10**-11)
     LR = selfconsistentLR.LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
     dipole_integrals = (
@@ -346,7 +331,7 @@ def test_h2_631g_oouccsd_lr() -> None:
 
 
 def test_h4_sto3g_uccsd_lr_naive() -> None:
-    """Test Linear Response for uccsd(4,4)."""
+    """Test Linear Response for UCCSD(4,4)."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """H  0.0  0.0  0.0;
@@ -361,7 +346,6 @@ def test_h4_sto3g_uccsd_lr_naive() -> None:
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (4, 4),
         SQobj.hartree_fock.mo_coeff,
@@ -369,7 +353,7 @@ def test_h4_sto3g_uccsd_lr_naive() -> None:
         g_eri,
         "SD",
     )
-    WF.run_ucc(False)
+    WF.run_wf_optimization_1step("SLSQP", False)
     LR = naiveLR.LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
     dipole_integrals = (
@@ -440,7 +424,7 @@ def test_h4_sto3g_uccsd_lr_naive() -> None:
 
 
 def test_be_sto3g_uccsd_lr_naive() -> None:
-    """Test Linear Response for uccsd(2,2)."""
+    """Test Linear Response for UCCSD(2,2)."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """Be  0.0  0.0  0.0;""",
@@ -452,7 +436,6 @@ def test_be_sto3g_uccsd_lr_naive() -> None:
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -460,7 +443,7 @@ def test_be_sto3g_uccsd_lr_naive() -> None:
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
     LR = selfconsistentLR.LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
     dipole_integrals = (
@@ -515,7 +498,7 @@ def test_be_sto3g_uccsd_lr_naive() -> None:
 
 
 def test_lih_sto3g_uccsd_lr_naive() -> None:
-    """Test Linear Response for uccsd.
+    """Test Linear Response for UCCSD.
     This examples was used to find and fix a bug :)
     """
     SQobj = sq.SlowQuant()
@@ -530,7 +513,6 @@ def test_lih_sto3g_uccsd_lr_naive() -> None:
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -543,7 +525,7 @@ def test_lih_sto3g_uccsd_lr_naive() -> None:
         SQobj.integral.get_multipole_matrix([0, 1, 0]),
         SQobj.integral.get_multipole_matrix([0, 0, 1]),
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
     LR = selfconsistentLR.LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.129476) < 10**-4
@@ -618,7 +600,6 @@ def test_LiH_sto3g_uccsd_lr() -> None:
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -631,9 +612,7 @@ def test_LiH_sto3g_uccsd_lr() -> None:
         SQobj.integral.get_multipole_matrix([0, 1, 0]),
         SQobj.integral.get_multipole_matrix([0, 0, 1]),
     )
-
-    WF.run_ucc(True)
-
+    WF.run_wf_optimization_1step("SLSQP", True)
     LR = naiveLR.LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.129476) < 10**-4
@@ -710,7 +689,6 @@ def test_H4_sto3g_uccsdtq() -> None:
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (4, 4),
         SQobj.hartree_fock.mo_coeff,
@@ -718,8 +696,7 @@ def test_H4_sto3g_uccsdtq() -> None:
         g_eri,
         "SDTQ",
     )
-
-    WF.run_ucc(False)
+    WF.run_wf_optimization_1step("SLSQP", False)
     assert abs(WF.energy_elec - (-3.714153922167)) < 10**-8
 
 
@@ -737,7 +714,6 @@ def test_H2_sto3g_uccsd_saveload() -> None:
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -745,8 +721,7 @@ def test_H2_sto3g_uccsd_saveload() -> None:
         g_eri,
         "SD",
     )
-
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
     WF.save_wavefunction("test_h2_save", force_overwrite=True)
     WF2 = load_wavefunction("test_h2_save")
     LR = naiveLR.LinearResponseUCC(WF2, "SD")

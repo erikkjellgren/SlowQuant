@@ -27,7 +27,6 @@ def test_h2_sto3g_uccsd_lr() -> None:
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -35,7 +34,7 @@ def test_h2_sto3g_uccsd_lr() -> None:
         g_eri,
         "SD",
     )
-    WF.run_ucc(False)
+    WF.run_wf_optimization_1step("SLSQP", False)
     # SC
     LR = allselfconsistent.LinearResponseUCC(
         WF,
@@ -69,7 +68,6 @@ def test_LiH_atmethods_energies() -> None:
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -77,7 +75,7 @@ def test_LiH_atmethods_energies() -> None:
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     threshold = 10 ** (-3)
 
@@ -143,7 +141,6 @@ def test_LiH_naiveq_methods_energies() -> None:
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -151,7 +148,7 @@ def test_LiH_naiveq_methods_energies() -> None:
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     threshold = 10 ** (-5)
 
@@ -328,7 +325,6 @@ def test_LiH_naiveq_methods_matrices() -> None:
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -336,7 +332,7 @@ def test_LiH_naiveq_methods_matrices() -> None:
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     threshold = 10 ** (-5)
 
@@ -408,7 +404,6 @@ def test_LiH_allproj_energies() -> None:
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -416,7 +411,7 @@ def test_LiH_allproj_energies() -> None:
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     threshold = 10 ** (-5)
 
@@ -461,7 +456,6 @@ def test_LiH_STproj_energies() -> None:
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -469,7 +463,7 @@ def test_LiH_STproj_energies() -> None:
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     threshold = 10 ** (-5)
 
