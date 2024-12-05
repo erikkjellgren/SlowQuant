@@ -328,26 +328,6 @@ def expectation_value(
     return val
 
 
-@functools.cache
-def Epq_matrix(
-    p: int, q: int, num_active_orbs: int, num_active_elec_alpha: int, num_active_elec_beta: int
-) -> ss.lil_array:
-    """Get matrix representation of Epq operator.
-
-    Args:
-        p: Spatial orbital index.
-        q: Spatial orbital index.
-        num_active_orbs: Number of active spatial orbitals.
-        num_active_elec_alpha: Number of active alpha electrons.
-        num_active_elec_beta: Number of active beta electrons.
-
-    Returns:
-        Matrix representation of Epq operator.
-    """
-    idx2det, det2idx = get_indexing(num_active_orbs, num_active_elec_alpha, num_active_elec_beta)
-    return ss.lil_array(build_operator_matrix(Epq(p, q), idx2det, det2idx, num_active_orbs))
-
-
 def construct_ucc_state(
     state: np.ndarray,
     idx2det: Sequence[int],

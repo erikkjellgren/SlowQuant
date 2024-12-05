@@ -18,16 +18,16 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_gradient,
 )
 from slowquant.unitary_coupled_cluster.operator_matrix import (
-    Epq_matrix,
-    build_operator_matrix,
     construct_ups_state,
     get_grad_action,
     get_indexing,
     propagate_unitary,
+    expectation_value,
 )
 from slowquant.unitary_coupled_cluster.operators import (
     hamiltonian_0i_0a,
     one_elec_op_0i_0a,
+    Epq,
 )
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import UpsStructure
@@ -306,7 +306,11 @@ class WaveFunctionSAUPS:
                 tmp.append(
                     construct_ups_state(
                         coeffs,
+                        self.idx2det,
+                        self.det2idx,
+                        self.num_inactive_orbs,
                         self.num_active_orbs,
+                        self.num_virtual_orbs,
                         self.num_active_elec_alpha,
                         self.num_active_elec_beta,
                         self.thetas,
@@ -400,16 +404,27 @@ class WaveFunctionSAUPS:
                 for q in range(self.num_inactive_orbs, p + 1):
                     q_idx = q - self.num_inactive_orbs
                     val = 0.0
-                    Epq_mat = Epq_matrix(
+                    Epq_op = Epq(
                         p_idx,
                         q_idx,
-                        self.num_active_orbs,
-                        self.num_active_elec_alpha,
-                        self.num_active_elec_beta,
-                    ).todense()
+                    )
                     # Loop over each state in SA
                     for coeffs in self.ci_coeffs:
-                        val += coeffs @ Epq_mat @ coeffs
+                        val +=expectation_value(
+                            coeffs,
+                            [Epq_op],
+                            coeffs,
+                            self.idx2det,
+                            self.det2idx,
+                            self.num_inactive_orbs,
+                            self.num_active_orbs,
+                            self.num_virtual_orbs,
+                            self.num_active_elec_alpha,
+                            self.num_active_elec_beta,
+                            self.thetas,
+                            self.ups_layout,
+                            do_folding=False,
+                        )
                     val = val / len(self.ci_coeffs)
                     self._rdm1[p_idx, q_idx] = val  # type: ignore
                     self._rdm1[q_idx, p_idx] = val  # type: ignore
@@ -501,19 +516,28 @@ class WaveFunctionSAUPS:
         """
         if self._sa_energy is None:
             self._sa_energy = 0.0
-            Hamiltonian = build_operator_matrix(
-                hamiltonian_0i_0a(
+            Hamiltonian = hamiltonian_0i_0a(
                     self.h_mo,
                     self.g_mo,
                     self.num_inactive_orbs,
                     self.num_active_orbs,
-                ).get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs),
-                self.idx2det,
-                self.det2idx,
-                self.num_active_orbs,
-            )
+                ).get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             for coeffs in self.ci_coeffs:
-                self._sa_energy += coeffs @ Hamiltonian @ coeffs
+                self._sa_energy +=expectation_value(
+                    coeffs,
+                    [Hamiltonian],
+                    coeffs,
+                    self.idx2det,
+                    self.det2idx,
+                    self.num_inactive_orbs,
+                    self.num_active_orbs,
+                    self.num_virtual_orbs,
+                    self.num_active_elec_alpha,
+                    self.num_active_elec_beta,
+                    self.thetas,
+                    self.ups_layout,
+                    do_folding=False,
+                )
             self._sa_energy = self._sa_energy / len(self.ci_coeffs)
         return self._sa_energy
 
