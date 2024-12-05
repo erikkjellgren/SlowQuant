@@ -1,0 +1,676 @@
+import numpy as np
+
+from slowquant.unitary_coupled_cluster.fermionic_operator import (
+    FermionicOperator,
+    a_op,
+    a_op_spin,
+)
+
+
+def anni_spin(p: int, dagger: bool) -> FermionicOperator:
+    """Construct annihilation/creation operator.
+
+    Args:
+        p: Spin orbital index.
+        dagger: If creation operator.
+
+    Returns:
+        Annihilation/creation operator.
+    """
+    return FermionicOperator(a_op_spin(p, dagger=dagger), 1)
+
+
+def Epq(p: int, q: int) -> FermionicOperator:
+    r"""Construct the singlet one-electron excitation operator.
+
+    .. math::
+        \hat{E}_{pq} = \hat{a}^\dagger_{p,\alpha}\hat{a}_{q,\alpha} + \hat{a}^\dagger_{p,\beta}\hat{a}_{q,\beta}
+
+    Args:
+        p: Spatial orbital index.
+        q: Spatial orbital index.
+
+    Returns:
+        Singlet one-electron excitation operator.
+    """
+    E = FermionicOperator(a_op(p, "alpha", dagger=True), 1) * FermionicOperator(
+        a_op(q, "alpha", dagger=False), 1
+    )
+    E += FermionicOperator(a_op(p, "beta", dagger=True), 1) * FermionicOperator(
+        a_op(q, "beta", dagger=False), 1
+    )
+    return E
+
+
+def Tpq(p: int, q: int) -> FermionicOperator:
+    r"""Construct the triplet one-electron excitation operator.
+
+    .. math::
+        \hat{T}_{pq} = \hat{a}^\dagger_{p,\alpha}\hat{a}_{q,\alpha} - \hat{a}^\dagger_{p,\beta}\hat{a}_{q,\beta}
+
+    Args:
+        p: Spatial orbital index.
+        q: Spatial orbital index.
+
+    Returns:
+        Triplet one-electron excitation operator.
+    """
+    T = FermionicOperator(a_op(p, "alpha", dagger=True), 1) * FermionicOperator(
+        a_op(q, "alpha", dagger=False), 1
+    )
+    T -= FermionicOperator(a_op(p, "beta", dagger=True), 1) * FermionicOperator(
+        a_op(q, "beta", dagger=False), 1
+    )
+    return T
+
+
+def epqrs(p: int, q: int, r: int, s: int) -> FermionicOperator:
+    r"""Construct the singlet two-electron excitation operator.
+
+    .. math::
+        \hat{e}_{pqrs} = \hat{E}_{pq}\hat{E}_{rs} - \delta_{qr}\hat{E}_{ps}
+
+    Args:
+        p: Spatial orbital index.
+        q: Spatial orbital index.
+        r: Spatial orbital index.
+        s: Spatial orbital index.
+
+    Returns:
+        Singlet two-electron excitation operator.
+    """
+    if q == r:
+        return Epq(p, q) * Epq(r, s) - Epq(p, s)
+    return Epq(p, q) * Epq(r, s)
+
+
+def Eminuspq(p: int, q: int) -> FermionicOperator:
+    r"""Construct Hermitian singlet one-electron excitation operator.
+
+    .. math::
+        \hat{E}^-_{pq} = \hat{E}_{pq} - \hat{E}_{qp}
+
+    Args:
+        p: Spatial orbital index.
+        q: Spatial orbital index.
+
+    Returns:
+        Singlet one-electron excitation operator.
+    """
+    return Epq(p, q) - Epq(q, p)
+
+
+def commutator(A: FermionicOperator, B: FermionicOperator) -> FermionicOperator:
+    r"""Construct operator commutator.
+
+    .. math::
+        \left[\hat{A},\hat{B}\right] = \hat{A}\hat{B} - \hat{B}\hat{A}
+
+    Args:
+        A: Fermionic operator.
+        B: Fermionic operator.
+
+    Returns:
+        Operator from commutator.
+    """
+    return A * B - B * A
+
+
+def double_commutator(A: FermionicOperator, B: FermionicOperator, C: FermionicOperator) -> FermionicOperator:
+    r"""Construct operator double commutator.
+
+    .. math::
+        \left[\hat{A},\left[\hat{B},\hat{C}\right]\right] = \hat{A}\hat{B}\hat{C} - \hat{A}\hat{C}\hat{B} - \hat{B}\hat{C}\hat{A} + \hat{C}\hat{B}\hat{A}
+
+    Args:
+        A: Fermionic operator.
+        B: Fermionic operator.
+        C: Fermionic operator.
+
+    Returns:
+        Operator from double commutator.
+    """
+    return A * B * C - A * C * B - B * C * A + C * B * A
+
+
+def G1(i: int, a: int) -> FermionicOperator:
+    r"""Construct one-electron excitation operator.
+
+    .. math::
+        \hat{G}^{[1]}_{ia} = \hat{a}_{a}^\dagger\hat{a}_i
+
+    Args:
+        i: Spin orbital index.
+        a: Spin orbital index.
+
+    Returns:
+        One-elecetron excitation operator.
+    """
+    return FermionicOperator(a_op_spin(a, dagger=True), 1) * FermionicOperator(a_op_spin(i, dagger=False), 1)
+
+
+def G2(i: int, j: int, a: int, b: int) -> FermionicOperator:
+    r"""Construct two-electron excitation operator.
+
+    .. math::
+        \hat{G}^{[2]}_{ijab} = \hat{a}_{a}^\dagger\hat{a}_{b}^\dagger\hat{a}_j\hat{a}_i
+
+    Args:
+        i: Spin orbital index.
+        j: Spin orbital index.
+        a: Spin orbital index.
+        b: Spin orbital index.
+
+    Returns:
+        Two-elecetron excitation operator.
+    """
+    return (
+        FermionicOperator(a_op_spin(a, dagger=True), 1)
+        * FermionicOperator(a_op_spin(b, dagger=True), 1)
+        * FermionicOperator(a_op_spin(j, dagger=False), 1)
+        * FermionicOperator(a_op_spin(i, dagger=False), 1)
+    )
+
+
+def G3(i: int, j: int, k: int, a: int, b: int, c: int) -> FermionicOperator:
+    r"""Construct three-electron excitation operator.
+
+    .. math::
+        \hat{G}^{[3]}_{ijkabc} = \hat{a}_{a}^\dagger\hat{a}_{b}^\dagger\hat{a}_{c}^\dagger\hat{a}_k\hat{a}_j\hat{a}_i
+
+    Args:
+        i: Spin orbital index.
+        j: Spin orbital index.
+        k: Spin orbital index.
+        a: Spin orbital index.
+        b: Spin orbital index.
+        c: Spin orbital index.
+
+    Returns:
+        Three-elecetron excitation operator.
+    """
+    return (
+        FermionicOperator(a_op_spin(a, dagger=True), 1)
+        * FermionicOperator(a_op_spin(b, dagger=True), 1)
+        * FermionicOperator(a_op_spin(c, dagger=True), 1)
+        * FermionicOperator(a_op_spin(k, dagger=False), 1)
+        * FermionicOperator(a_op_spin(j, dagger=False), 1)
+        * FermionicOperator(a_op_spin(i, dagger=False), 1)
+    )
+
+
+def G4(i: int, j: int, k: int, l: int, a: int, b: int, c: int, d: int) -> FermionicOperator:
+    r"""Construct four-electron excitation operator.
+
+    .. math::
+        \hat{G}^{[4]}_{ijklabcd} = \hat{a}_{a}^\dagger\hat{a}_{b}^\dagger\hat{a}_{c}^\dagger\hat{a}_{d}^\dagger\hat{a}_l\hat{a}_k\hat{a}_j\hat{a}_i
+
+    Args:
+        i: Spin orbital index.
+        j: Spin orbital index.
+        k: Spin orbital index.
+        l: Spin orbital index.
+        a: Spin orbital index.
+        b: Spin orbital index.
+        c: Spin orbital index.
+        d: Spin orbital index.
+
+    Returns:
+        Four-elecetron excitation operator.
+    """
+    return (
+        FermionicOperator(a_op_spin(a, dagger=True), 1)
+        * FermionicOperator(a_op_spin(b, dagger=True), 1)
+        * FermionicOperator(a_op_spin(c, dagger=True), 1)
+        * FermionicOperator(a_op_spin(d, dagger=True), 1)
+        * FermionicOperator(a_op_spin(l, dagger=False), 1)
+        * FermionicOperator(a_op_spin(k, dagger=False), 1)
+        * FermionicOperator(a_op_spin(j, dagger=False), 1)
+        * FermionicOperator(a_op_spin(i, dagger=False), 1)
+    )
+
+
+def G5(i: int, j: int, k: int, l: int, m: int, a: int, b: int, c: int, d: int, e: int) -> FermionicOperator:
+    r"""Construct five-electron excitation operator.
+
+    .. math::
+        \hat{G}^{[5]}_{ijklmabcde} = \hat{a}_{a}^\dagger\hat{a}_{b}^\dagger\hat{a}_{c}^\dagger\hat{a}_{d}^\dagger\hat{a}_{e}^\dagger\hat{a}_m\hat{a}_l\hat{a}_k\hat{a}_j\hat{a}_i
+
+    Args:
+        i: Spin orbital index.
+        j: Spin orbital index.
+        k: Spin orbital index.
+        l: Spin orbital index.
+        m: Spin orbital index.
+        a: Spin orbital index.
+        b: Spin orbital index.
+        c: Spin orbital index.
+        d: Spin orbital index.
+        e: Spin orbital index.
+
+    Returns:
+        Five-elecetron excitation operator.
+    """
+    return (
+        FermionicOperator(a_op_spin(a, dagger=True), 1)
+        * FermionicOperator(a_op_spin(b, dagger=True), 1)
+        * FermionicOperator(a_op_spin(c, dagger=True), 1)
+        * FermionicOperator(a_op_spin(d, dagger=True), 1)
+        * FermionicOperator(a_op_spin(e, dagger=True), 1)
+        * FermionicOperator(a_op_spin(m, dagger=False), 1)
+        * FermionicOperator(a_op_spin(l, dagger=False), 1)
+        * FermionicOperator(a_op_spin(k, dagger=False), 1)
+        * FermionicOperator(a_op_spin(j, dagger=False), 1)
+        * FermionicOperator(a_op_spin(i, dagger=False), 1)
+    )
+
+
+def G6(
+    i: int, j: int, k: int, l: int, m: int, n: int, a: int, b: int, c: int, d: int, e: int, f: int
+) -> FermionicOperator:
+    r"""Construct six-electron excitation operator.
+
+    .. math::
+        \hat{G}^{[6]}_{ijklmnabcdef} = \hat{a}_{a}^\dagger\hat{a}_{b}^\dagger\hat{a}_{c}^\dagger\hat{a}_{d}^\dagger\hat{a}_{e}^\dagger\hat{a}_{f}^\dagger
+        \hat{a}_n\hat{a}_m\hat{a}_l\hat{a}_k\hat{a}_j\hat{a}_i
+
+    Args:
+        i: Spin orbital index.
+        j: Spin orbital index.
+        k: Spin orbital index.
+        l: Spin orbital index.
+        m: Spin orbital index.
+        n: Spin orbital index.
+        a: Spin orbital index.
+        b: Spin orbital index.
+        c: Spin orbital index.
+        d: Spin orbital index.
+        e: Spin orbital index.
+        f: Spin orbital index.
+
+    Returns:
+        Six-elecetron excitation operator.
+    """
+    return (
+        FermionicOperator(a_op_spin(a, dagger=True), 1)
+        * FermionicOperator(a_op_spin(b, dagger=True), 1)
+        * FermionicOperator(a_op_spin(c, dagger=True), 1)
+        * FermionicOperator(a_op_spin(d, dagger=True), 1)
+        * FermionicOperator(a_op_spin(e, dagger=True), 1)
+        * FermionicOperator(a_op_spin(f, dagger=True), 1)
+        * FermionicOperator(a_op_spin(n, dagger=False), 1)
+        * FermionicOperator(a_op_spin(m, dagger=False), 1)
+        * FermionicOperator(a_op_spin(l, dagger=False), 1)
+        * FermionicOperator(a_op_spin(k, dagger=False), 1)
+        * FermionicOperator(a_op_spin(j, dagger=False), 1)
+        * FermionicOperator(a_op_spin(i, dagger=False), 1)
+    )
+
+
+def G1_sa_t(i: int, a: int) -> FermionicOperator:
+    r"""Construct triplet one-electron spin-adapted excitation operator.
+
+    .. math::
+        ^T\hat{G}^{[1]}_{ia} = \frac{1}{\sqrt{2}}\hat{T}_{ai}
+
+    Args:
+        i: Spatial orbital index.
+        a: Spatial orbital index.
+
+    Returns:
+        Triplet one-elecetron spin-adapted excitation operator.
+    """
+    return 2 ** (-1 / 2) * Tpq(a, i)
+
+
+def G2_1_sa_t(i: int, j: int, a: int, b: int) -> FermionicOperator:
+    r"""Construct first triplet two-electron spin-adapted excitation operator.
+
+    .. math::
+        ^T\hat{G}^{[1]}_{aibj} = \frac{1}{2\sqrt{2}}\left(\hat{E}_{aj}\hat{T}_{bi} + \hat{E}_{bi}\hat{T}_{aj}\right)
+
+    Args:
+        i: Spatial orbital index.
+        j: Spatial orbital index.
+        a: Spatial orbital index.
+        b: Spatial orbital index.
+
+    Returns:
+        First triplet two-elecetron spin-adapted excitation operator. 
+    """
+    return 1 / (2 * 2 ** (1 / 2)) * (Epq(a, j) * Tpq(b, i) + Epq(b, i) * Tpq(a, j))
+
+
+def G2_2_sa_t(i: int, j: int, a: int, b: int) -> FermionicOperator:
+    r"""Construct second triplet two-electron spin-adapted excitation operator.
+
+    .. math::
+        ^T\hat{G}^{[2]}_{aibj} = \frac{1}{2\sqrt{\left(1+\delta_{ab}\right)}}\left(\hat{E}_{bj}\hat{T}_{ai} + \hat{E}_{aj}\hat{T}_{bi}\right)
+
+    Args:
+        i: Spatial orbital index.
+        j: Spatial orbital index.
+        a: Spatial orbital index.
+        b: Spatial orbital index.
+
+    Returns:
+        Second triplet two-elecetron spin-adapted excitation operator. 
+    """
+    fac = 1
+    if a == b:
+        fac *= 2
+    return 1 / (2 * fac ** (1 / 2)) * (Epq(b, j) * Tpq(a, i) + Epq(a, j) * Tpq(b, i))
+
+
+def G2_3_sa_t(i: int, j: int, a: int, b: int) -> FermionicOperator:
+    r"""Construct third triplet two-electron spin-adapted excitation operator.
+
+    .. math::
+        ^T\hat{G}^{[3]}_{aibj} = \frac{1}{2\sqrt{\left(1+\delta_{ij}\right)}}\left(\hat{E}_{bj}\hat{T}_{ai} + \hat{E}_{bi}\hat{T}_{aj}\right)
+
+    Args:
+        i: Spatial orbital index.
+        j: Spatial orbital index.
+        a: Spatial orbital index.
+        b: Spatial orbital index.
+
+    Returns:
+        Third triplet two-elecetron spin-adapted excitation operator. 
+    """
+    fac = 1
+    if i == j:
+        fac *= 2
+    return 1 / (2 * 2 ** (1 / 2)) * (Epq(b, j) * Tpq(a, i) + Epq(b, i) * Tpq(a, j))
+
+
+def hamiltonian_full_space(h_mo: np.ndarray, g_mo: np.ndarray, num_orbs: int) -> FermionicOperator:
+    r"""Construct full-space electronic Hamiltonian.
+
+    .. math::
+        \hat{H} = \sum_{pq}h_{pq}\hat{E}_{pq} + \frac{1}{2}\sum_{pqrs}g_{pqrs}\hat{e}_{pqrs}
+
+    Args:
+        h_mo: Core one-electron integrals in MO basis.
+        g_mo: Two-electron integrals in MO basis.
+        num_orbs: Number of spatial orbitals.
+
+    Returns:
+        Hamiltonian operator in full-space.
+    """
+    H_operator = FermionicOperator({}, {})
+    for p in range(num_orbs):
+        for q in range(num_orbs):
+            if abs(h_mo[p, q]) < 10**-14:
+                continue
+            H_operator += h_mo[p, q] * Epq(p, q)
+    for p in range(num_orbs):
+        for q in range(num_orbs):
+            for r in range(num_orbs):
+                for s in range(num_orbs):
+                    if abs(g_mo[p, q, r, s]) < 10**-14:
+                        continue
+                    H_operator += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s)
+    return H_operator
+
+
+def hamiltonian_0i_0a(
+    h_mo: np.ndarray,
+    g_mo: np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+) -> FermionicOperator:
+    """Get energy Hamiltonian operator.
+
+    Args:
+        h_mo: One-electron Hamiltonian integrals in MO.
+        g_mo: Two-electron Hamiltonian integrals in MO.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+
+    Returns:
+        Energy Hamilonian fermionic operator.
+    """
+    hamiltonian_operator = FermionicOperator({}, {})
+    # Inactive one-electron
+    for i in range(num_inactive_orbs):
+        if abs(h_mo[i, i]) > 10**-14:
+            hamiltonian_operator += h_mo[i, i] * Epq(i, i)
+    # Active one-electron
+    for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+        for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+            if abs(h_mo[p, q]) > 10**-14:
+                hamiltonian_operator += h_mo[p, q] * Epq(p, q)
+    # Inactive two-electron
+    for i in range(num_inactive_orbs):
+        for j in range(num_inactive_orbs):
+            if abs(g_mo[i, i, j, j]) > 10**-14:
+                hamiltonian_operator += 1 / 2 * g_mo[i, i, j, j] * epqrs(i, i, j, j)
+            if i != j and abs(g_mo[j, i, i, j]) > 10**-14:
+                hamiltonian_operator += 1 / 2 * g_mo[j, i, i, j] * epqrs(j, i, i, j)
+    # Inactive-Active two-electron
+    for i in range(num_inactive_orbs):
+        for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+            for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+                if abs(g_mo[i, i, p, q]) > 10**-14:
+                    hamiltonian_operator += 1 / 2 * g_mo[i, i, p, q] * epqrs(i, i, p, q)
+                if abs(g_mo[p, q, i, i]) > 10**-14:
+                    hamiltonian_operator += 1 / 2 * g_mo[p, q, i, i] * epqrs(p, q, i, i)
+                if abs(g_mo[p, i, i, q]) > 10**-14:
+                    hamiltonian_operator += 1 / 2 * g_mo[p, i, i, q] * epqrs(p, i, i, q)
+                if abs(g_mo[i, p, q, i]) > 10**-14:
+                    hamiltonian_operator += 1 / 2 * g_mo[i, p, q, i] * epqrs(i, p, q, i)
+    # Active two-electron
+    for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+        for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+            for r in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+                for s in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+                    if abs(g_mo[p, q, r, s]) > 10**-14:
+                        hamiltonian_operator += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s)
+    return hamiltonian_operator
+
+
+def hamiltonian_1i_1a(
+    h_mo: np.ndarray,
+    g_mo: np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+) -> FermionicOperator:
+    """Get Hamiltonian operator that works together with an extra inactive and an extra virtual index.
+
+    Args:
+        h_mo: One-electron Hamiltonian integrals in MO.
+        g_mo: Two-electron Hamiltonian integrals in MO.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
+
+    Returns:
+        Modified Hamilonian fermionic operator.
+    """
+    num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
+    hamiltonian_operator = FermionicOperator({}, {})
+    virtual_start = num_inactive_orbs + num_active_orbs
+    for p in range(num_orbs):
+        for q in range(num_orbs):
+            if p >= virtual_start and q >= virtual_start:
+                continue
+            if p < num_inactive_orbs and q < num_inactive_orbs and p != q:
+                continue
+            if abs(h_mo[p, q]) > 10**-14:
+                hamiltonian_operator += h_mo[p, q] * Epq(p, q)
+    for p in range(num_orbs):
+        for q in range(num_orbs):
+            for r in range(num_orbs):
+                for s in range(num_orbs):
+                    num_virt = 0
+                    if p >= virtual_start:
+                        num_virt += 1
+                    if q >= virtual_start:
+                        num_virt += 1
+                    if r >= virtual_start:
+                        num_virt += 1
+                    if s >= virtual_start:
+                        num_virt += 1
+                    if num_virt > 1:
+                        continue
+                    num_act = 0
+                    if p < num_inactive_orbs:
+                        num_act += 1
+                    if q < num_inactive_orbs:
+                        num_act += 1
+                    if r < num_inactive_orbs:
+                        num_act += 1
+                    if s < num_inactive_orbs:
+                        num_act += 1
+                    if p < num_inactive_orbs and q < num_inactive_orbs and p == q:
+                        num_act -= 2
+                    if r < num_inactive_orbs and s < num_inactive_orbs and r == s:
+                        num_act -= 2
+                    if p < num_inactive_orbs and s < num_inactive_orbs and p == s:
+                        num_act -= 2
+                    if q < num_inactive_orbs and r < num_inactive_orbs and q == r:
+                        num_act -= 2
+                    if num_act > 1:
+                        continue
+                    if abs(g_mo[p, q, r, s]) > 10**-14:
+                        hamiltonian_operator += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s)
+    return hamiltonian_operator
+
+
+def hamiltonian_2i_2a(
+    h_mo: np.ndarray,
+    g_mo: np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+) -> FermionicOperator:
+    """Get Hamiltonian operator that works together with two extra inactive and two extra virtual index.
+
+    Args:
+        h_mo: One-electron Hamiltonian integrals in MO.
+        g_mo: Two-electron Hamiltonian integrals in MO.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
+
+    Returns:
+        Modified Hamilonian fermionic operator.
+    """
+    num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
+    hamiltonian_operator = FermionicOperator({}, {})
+    virtual_start = num_inactive_orbs + num_active_orbs
+    for p in range(num_orbs):
+        for q in range(num_orbs):
+            if abs(h_mo[p, q]) > 10**-14:
+                hamiltonian_operator += h_mo[p, q] * Epq(p, q)
+    for p in range(num_orbs):
+        for q in range(num_orbs):
+            for r in range(num_orbs):
+                for s in range(num_orbs):
+                    num_virt = 0
+                    if p >= virtual_start:
+                        num_virt += 1
+                    if q >= virtual_start:
+                        num_virt += 1
+                    if r >= virtual_start:
+                        num_virt += 1
+                    if s >= virtual_start:
+                        num_virt += 1
+                    if num_virt > 2:
+                        continue
+                    num_act = 0
+                    if p < num_inactive_orbs:
+                        num_act += 1
+                    if q < num_inactive_orbs:
+                        num_act += 1
+                    if r < num_inactive_orbs:
+                        num_act += 1
+                    if s < num_inactive_orbs:
+                        num_act += 1
+                    if p < num_inactive_orbs and q < num_inactive_orbs and p == q:
+                        num_act -= 2
+                    if r < num_inactive_orbs and s < num_inactive_orbs and r == s:
+                        num_act -= 2
+                    if p < num_inactive_orbs and s < num_inactive_orbs and p == s:
+                        num_act -= 2
+                    if q < num_inactive_orbs and r < num_inactive_orbs and q == r:
+                        num_act -= 2
+                    if num_act > 2:
+                        continue
+                    if abs(g_mo[p, q, r, s]) > 10**-14:
+                        hamiltonian_operator += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s)
+    return hamiltonian_operator
+
+
+def one_elec_op_full_space(ints_mo: np.ndarray, num_orbs: int) -> FermionicOperator:
+    r"""Construct full-space one-electron operator.
+
+    .. math::
+        \hat{O} = \sum_{pq}h_{pq}\hat{E}_{pq}
+
+    Args:
+        ints_mo: One-electron integrals for operator in MO basis.
+        num_orbs: Number of spatial orbitals.
+
+    Returns:
+        One-electron operator in full-space.
+    """
+    one_elec_op = FermionicOperator({}, {})
+    for p in range(num_orbs):
+        for q in range(num_orbs):
+            if abs(ints_mo[p, q]) > 10**-14:
+                one_elec_op += ints_mo[p, q] * Epq(p, q)
+    return one_elec_op
+
+
+def one_elec_op_0i_0a(ints_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int) -> FermionicOperator:
+    """Create one-electron operator that makes no changes in the inactive and virtual orbitals.
+
+    Args:
+        ints_mo: One-electron integrals for operator in MO basis.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+
+    Returns:
+        One-electron operator for active-space.
+    """
+    one_elec_op = FermionicOperator({}, {})
+    # Inactive one-electron
+    for i in range(num_inactive_orbs):
+        if abs(ints_mo[i, i]) > 10**-14:
+            one_elec_op += ints_mo[i, i] * Epq(i, i)
+    # Active one-electron
+    for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+        for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+            if abs(ints_mo[p, q]) > 10**-14:
+                one_elec_op += ints_mo[p, q] * Epq(p, q)
+    return one_elec_op
+
+
+def one_elec_op_1i_1a(
+    ints_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int
+) -> FermionicOperator:
+    """Create one-electron operator that makes up to one change in the inactive and virtual orbitals.
+
+    Args:
+        ints_mo: One-electron integrals for operator in MO basis.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
+
+    Returns:
+        Modified one-electron operator.
+    """
+    num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
+    one_elec_op = FermionicOperator({}, {})
+    virtual_start = num_inactive_orbs + num_active_orbs
+    for p in range(num_orbs):
+        for q in range(num_orbs):
+            if p >= virtual_start and q >= virtual_start:
+                continue
+            if p < num_inactive_orbs and q < num_inactive_orbs and p != q:
+                continue
+            if abs(ints_mo[p, q]) > 10**-14:
+                one_elec_op += ints_mo[p, q] * Epq(p, q)
+    return one_elec_op
