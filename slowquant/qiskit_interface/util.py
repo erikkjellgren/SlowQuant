@@ -98,8 +98,8 @@ def swap_indices(num_qubits: int, swap: tuple[int, int]) -> list[int]:
     """Find new bit ordering based on a bit swap.
 
     Args:
-        num_qubits: Number of qubits
-        swap: Swap to be performed
+        num_qubits: Number of qubits.
+        swap: Swap to be performed.
 
     Returns:
         List of new ordering in qubit basis based on swap.
@@ -128,11 +128,11 @@ def find_swaps(new: list[int], ref: list[int]) -> list[tuple[int, int]]:
     """Find swaps to turn new into ref.
 
     Args:
-        new: List to be changed
-        ref: Reference list
+        new: List to be changed.
+        ref: Reference list.
 
     Returns:
-        Swaps to turn list into ref
+        Swaps to turn list into ref.
     """
     swaps = []
     list_in = new.copy()
@@ -284,7 +284,7 @@ def correct_distribution(dist: dict[int, float], M: np.ndarray) -> dict[int, flo
 
     Args:
         dist: Quasi-distribution.
-        M: Correlation martix (inverse).
+        M: Correlation matrix (inverse).
 
     Returns:
         Quasi-distribution corrected by correlation matrix.
@@ -304,18 +304,18 @@ def correct_distribution(dist: dict[int, float], M: np.ndarray) -> dict[int, flo
 def correct_distribution_with_layout_v2(
     dist: dict[int, float], M: np.ndarray, ref_layout: list[int], new_layout: list[int]
 ) -> dict[int, float]:
-    r"""Corrects a quasi-distribution of bitstrings based on a correlation matrix in statevector notation.
+    """Corrects a quasi-distribution of bitstrings based on a correlation matrix in statevector notation.
 
     Uses layout correction via distribution mapping.
 
     Args:
         dist: Quasi-distribution.
-        M: Correlation martix (inverse).
+        M: Correlation matrix (inverse).
         ref_layout: Reference layout of M measurement.
         new_layout: Layout of current to be corrected circuit measurement.
 
     Returns:
-        Quasi-distribution corrected by correlation matrix with corrected layout
+        Quasi-distribution corrected by correlation matrix with corrected layout.
     """
     # Find swaps that map new layout to reference layout
     # Layout indices need to be inverted due to qiskit saving layout indices q0->qN and distribtions qN->q0.
@@ -335,26 +335,26 @@ def correct_distribution_with_layout_v2(
     for swap in swaps[::-1]:
         C_new = C_new[swap_indices(num_qubits, swap)]
     # Convert columnvector of probabilities to bitstring distribution
-    for bitint, prob in dist.items():  # is this missing sth? Can I have new numbers?
-        dist[bitint] = C_new[bitint]
+    for bitint, prob in enumerate(C_new): 
+        dist[bitint] = prob
     return dist
 
 
 def correct_distribution_with_layout(
     dist: dict[int, float], M_in: np.ndarray, ref_layout: list[int], new_layout: list[int]
 ) -> dict[int, float]:
-    r"""Corrects a quasi-distribution of bitstrings based on a correlation matrix in statevector notation.
+    """Corrects a quasi-distribution of bitstrings based on a correlation matrix in statevector notation.
 
     Uses layout correction via M mapping.
 
     Args:
         dist: Quasi-distribution.
-        M: Correlation martix (not inverse).
+        M: Correlation matrix (not inverse).
         ref_layout: Reference layout of M measurement.
         new_layout: Layout of current to be corrected circuit measurement.
 
     Returns:
-        Quasi-distribution corrected by correlation matrix with corrected layout
+        Quasi-distribution corrected by correlation matrix with corrected layout.
     """
     # Find swaps that map new layout to reference layout
     # Layout indices need to be inverted due to qiskit saving layout indices q0->qN and distribtions qN->q0.
@@ -376,8 +376,8 @@ def correct_distribution_with_layout(
     # Apply M error mitigation matrix
     C_new = M_inv @ C
     # Convert columnvector of probabilities to bitstring distribution
-    for bitint, prob in dist.items():  # is this missing sth? Can I have new numbers?
-        dist[bitint] = C_new[bitint]
+    for bitint, prob in enumerate(C_new): 
+        dist[bitint] = prob
     return dist
 
 
@@ -385,12 +385,12 @@ def find_best_path(coupling_map: CouplingMap, start: int, target: int) -> list[i
     """Find the best path between two qubits using the coupling map.
 
     Args:
-        coupling_map (CouplingMap): The coupling map defining valid connections.
-        start (int): Starting qubit.
-        target (int): Target qubit.
+        coupling_map: The coupling map defining valid connections.
+        start: Starting qubit.
+        target: Target qubit.
 
     Returns:
-        list: List of qubits representing the path from start to target.
+        List of qubits representing the path from start to target.
     """
     # Convert the coupling map to a NetworkX graph
     graph = nx.Graph()
@@ -409,13 +409,10 @@ def add_permutation_gate(circuit: QuantumCircuit, permutation: list[int], coupli
     """Add a permutation gate to a circuit, adhering to a given coupling map.
 
     Args:
-        circuit (QuantumCircuit): The quantum circuit to modify.
-        permutation (list): A list defining the new positions of qubits.
+        circuit: The quantum circuit to modify.
+        permutation: A list defining the new positions of qubits.
                             E.g., [2, 0, 1] means qubit 0 goes to 2, 1 goes to 0, and 2 goes to 1.
-        coupling_map (CouplingMap): The coupling map that defines valid qubit connections.
-
-    Returns:
-        QuantumCircuit: The modified circuit with the permutation gate added.
+        coupling_map: The coupling map that defines valid qubit connections.
     """
     # Get the number of qubits
     num_qubits = len(permutation)
@@ -462,11 +459,11 @@ def layout_conserving_compose(
     """Composing an un-transpiled state circuit to the front of a transpiled Ansatz circuit.
 
     Args:
-        ansatz: Transpiled Ansatz circuit
-        state: Un-transpiled state circuit
-        pm: PassManager that produces Ansatz's initial layout indices
+        ansatz: Transpiled Ansatz circuit.
+        state: Un-transpiled state circuit.
+        pm: PassManager that produces Ansatz's initial layout indices.
         optimization: Boolean for optimizing composed circuit.
-            Note that optimization can lead to change in Ansatz's gates and CX count.
+            Note that optimization can lead to changes in Ansatz's gates and CX count.
             This can be problematic together with M_Ansatz0.
 
     Returns:
@@ -700,13 +697,13 @@ def get_determinant_superposition_reference_MAnsatz0(
     """Get superposition state for MAnsatz_0.
 
     Args:
-        det1: determinant string 1
-        det2: determinant string 2
-        num_orbs: Number of orbitals
-        mapper: Fermionic to qubit mapper
+        det1: determinant string 1.
+        det2: determinant string 2.
+        num_orbs: Number of spin orbitals.
+        mapper: Fermionic to qubit mapper.
 
     Returns:
-        Quantum circuit
+        Quantum circuit.
     """
     if not isinstance(mapper, JordanWignerMapper):
         raise TypeError("Only implemented for JordanWignerMapper. Got: {type(mapper)}")

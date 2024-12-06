@@ -54,7 +54,7 @@ class WaveFunctionSA:
             states: States to include in the state-averaged expansion.
                     Tuple of lists containing weights and determinants.
                     Each state in SA can be constructed of several dets.
-                    Ordering: left-to-right, alpha-beta alternating
+                    Ordering: left-to-right, alpha-beta alternating.
             quantum_interface: QuantumInterface.
             include_active_kappa: Include active-active orbital rotations.
         """
@@ -834,8 +834,8 @@ class WaveFunctionSA:
 
         Args:
             ISA_csfs_option: Option for how to deal with superposition state circuits.
-            M_per_superpos: Switch on M0 per superposition state
-            rep: Repeat energy calculation for statistics
+            M_per_superpos: Switch on M0 per superposition state.
+            rep: Repeat energy calculation for statistics.
 
         Returns:
             Electronic energy.

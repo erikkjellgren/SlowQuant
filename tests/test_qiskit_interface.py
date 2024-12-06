@@ -1,6 +1,4 @@
 # pylint: disable=too-many-lines
-from typing import cast
-
 import numpy as np
 import pyscf
 from numpy.testing import assert_allclose
@@ -1123,7 +1121,7 @@ def test_state_average_M() -> None:
 
     # This might fail if the noise model of FakeTorinto changes.
     # But if it fails check if the Noise mode is the issue. Do NOT ignore this failing!
-    assert abs(QWF._calc_energy_elec() == -1.3733093217175516) < 10**-6  # pylint: disable=protected-access
+    assert abs(QWF._calc_energy_elec() - -1.3733093217175516) < 10**-6  # pylint: disable=protected-access
 
 
 def test_state_average_Mplus() -> None:
@@ -1209,7 +1207,7 @@ def test_state_average_Mplus() -> None:
 
     QI._reset_cliques()  # pylint: disable=protected-access
     assert (
-        abs(cast(float, QWF._calc_energy_elec()) + 9.60851106217584)  # pylint: disable=protected-access
+        abs(QWF._calc_energy_elec() + 9.60851106217584)  # pylint: disable=protected-access # type: ignore
         < 10**-6
     )  # CSFs option 1
 
@@ -1219,14 +1217,14 @@ def test_state_average_Mplus() -> None:
 
     QI._reset_cliques()  # pylint: disable=protected-access
     assert (
-        abs(cast(float, QWF._calc_energy_elec()) + 9.633426170009107)  # pylint: disable=protected-access
+        abs(QWF._calc_energy_elec() + 9.633426170009107)  # pylint: disable=protected-access # type: ignore
         < 10**-6
     )  # CSFs option 4
 
     QI._reset_cliques()  # pylint: disable=protected-access
     assert (
         abs(
-            cast(float, QWF._calc_energy_elec(M_per_superpos=True))  # pylint: disable=protected-access
+            QWF._calc_energy_elec(M_per_superpos=True)  # pylint: disable=protected-access # type: ignore
             + 9.635276750167002
         )
         < 10**-6
@@ -1235,6 +1233,6 @@ def test_state_average_Mplus() -> None:
     QI.do_postselection = True
     QI._reset_cliques()  # pylint: disable=protected-access
     assert (
-        abs(cast(float, QWF._calc_energy_elec()) + 9.636464216617595)  # pylint: disable=protected-access
+        abs(QWF._calc_energy_elec() + 9.636464216617595)  # pylint: disable=protected-access # type: ignore
         < 10**-6
     )  # CSFs option 4

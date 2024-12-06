@@ -324,7 +324,6 @@ class QuantumInterface:
 
         Args:
             pass_manager_options: Dictionary with pass manager options to update.
-
         """
         if pass_manager_options is not None:
             # Update pass_manager_options
@@ -346,7 +345,7 @@ class QuantumInterface:
         ]
         if len(wrong_items) > 0:
             raise ValueError(
-                "The specified pass manager options do not exists. YOu have specified",
+                "The specified pass manager options do not exist. You have specified",
                 wrong_items,
                 " which is not in allowed options",
                 allowed_pm_options,
@@ -616,13 +615,12 @@ class QuantumInterface:
         """Check if a circuit has same layout as ansatz circuit/M.
 
         Args:
-            circuit_in: Quantum Circuit
+            circuit_in: Quantum Circuit.
 
         Returns:
-            Integer.
-                0 = no layout - no order conflict
-                1 = no layout, but order conflict
-                2 = layout conflict
+            0 = no layout - no order conflict.
+            1 = no layout, but order conflict.
+            2 = layout conflict.
         """
         if not self.ISA:
             if circuit_in.layout is None:
@@ -716,11 +714,11 @@ class QuantumInterface:
             ket_csf: Ket CSF.
             custom_parameters: Non-default run parameters.
             ISA_csfs_option: Option on how to treat the composing of superposition state and Ansatz:
-                0: Find default basedon on error mitigation. Default without EM: 1
-                1: Allow flexible (changing) layout
-                2: Fixed layout but allow change in order (swaps)
-                3: Fixed layout, fixed order, without optimizing circuit after composing
-                4: Fixed layout, fixed order, with optimizing circuit after composing
+                0: Find default based on error mitigation. Default without EM: 1.
+                1: Allow flexible (changing) layout.
+                2: Fixed layout but allow change in order (swaps).
+                3: Fixed layout, fixed order, without optimizing circuit after composing.
+                4: Fixed layout, fixed order, with optimizing circuit after composing.
             M_per_superpos: A new M_Ansatz0 matrix for each superposition state.
             reverse_csfs_order: If true, the pair-entangled superposition states' order is reversed.
                 This might be relevant as the order can influence the circuit depths.
@@ -750,7 +748,7 @@ class QuantumInterface:
                 ISA_csfs_option = 2
                 if self.do_M_ansatz0:
                     ISA_csfs_option = 4  # could also be 3
-        print("CSFS expectation value with circuit composing option: ", ISA_csfs_option)
+        print("CSFs expectation value with circuit composing option: ", ISA_csfs_option)
 
         if custom_parameters is None:
             run_parameters = self.parameters
@@ -973,7 +971,7 @@ class QuantumInterface:
         Args:
             op: SlowQuant fermionic operator.
             run_parameters: Circuit parameters.
-            run_circuit: Quantum circuit
+            run_circuit: Quantum circuit.
 
         Returns:
             Expectation value of operator.
@@ -1017,7 +1015,7 @@ class QuantumInterface:
 
         Args:
             op: SlowQuant fermionic operator.
-            run_circuit: custum circuit to be run. If not specified, HF+Ansatz circuit is used
+            run_circuit: custom circuit to be run. If not specified, HF+Ansatz circuit is used.
             det: Classify state (determinant) of circuit for Pauli saving.
                 Specified in chemistry form, i.e. left-to-right, alternating alpha and beta.
             circuit_M: custom circuit for M_Ansatz0 (correlation matrix is not stored). If not specified, M0 of Ansatz is used.
@@ -1133,9 +1131,9 @@ class QuantumInterface:
         Args:
             op: SlowQuant fermionic operator.
             run_parameters: Circuit parameters.
-            run_circuit: Quantum Circuit
-            do_cliques: If True, use cliques (QWC)
-            circuit_M: custom circuit for M_Ansatz0
+            run_circuit: Quantum Circuit.
+            do_cliques: If True, use cliques (QWC).
+            circuit_M: Custom circuit for M_Ansatz0.
 
         Returns:
             Expectation value of operator.
@@ -1178,7 +1176,7 @@ class QuantumInterface:
                                 distr[i] = correct_distribution(dist, self._Minv)
                         case 1:  # no layout, but order conflict
                             if self.do_M_ansatz0:
-                                raise ValueError("Detected order conflict. Not possile to do M Ansatz0")
+                                raise ValueError("Detected order conflict. Not possible to do M Ansatz0.")
                             print("Detected order conflict. Applying M re-ordering.")
                             for i, dist in enumerate(distr):
                                 distr[i] = correct_distribution_with_layout_v2(  # maybe v1 is better.
@@ -1571,7 +1569,7 @@ class QuantumInterface:
 
         Args:
             shots: Number of shots if they are meant to differ from QI internal shot number.
-            custom_ansatz: specify custom Ansatz to be used.
+            custom_ansatz: Specify custom Ansatz to be used.
         """
         if self.num_qubits > 8:
             raise ValueError("Current implementation does not scale above 8 qubits?")
