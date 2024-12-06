@@ -317,10 +317,7 @@ class WaveFunction:
         self.QI.total_shots_used = 0
         self.QI.total_paulis_evaluated = 0
 
-        # Reset circuit and initiate re-transpiling
-        ISA_old = self.QI.ISA
-        self._reconstruct_circuit()  # Reconstruct circuit but keeping parameters
-        self.QI.ISA = ISA_old  # Redo ISA including transpilation if requested
+        self.QI.ISA = self.QI.ISA  # Redo ISA including potential transpilation
         self.QI.shots = self.QI.shots  # Redo shots parameter check
 
         if verbose:
@@ -328,12 +325,9 @@ class WaveFunction:
 
     def _reconstruct_circuit(self) -> None:
         """Construct circuit again."""
-        # force ISA = False
-        self.QI._ISA = False  # pylint: disable=protected-access
         self.QI.construct_circuit(
             self.num_active_orbs, (self.num_active_elec // 2, self.num_active_elec // 2)
         )
-        self.QI._transpiled = False  # pylint: disable=protected-access
 
     @property
     def rdm1(self) -> np.ndarray:

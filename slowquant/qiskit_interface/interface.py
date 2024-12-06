@@ -2,6 +2,7 @@
 import copy
 import itertools
 import math
+from collections import defaultdict
 from typing import Any
 
 import numpy as np
@@ -22,13 +23,15 @@ from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
 from slowquant.qiskit_interface.custom_ansatz import SDSfUCC, fUCC, tUPS
-from slowquant.qiskit_interface.util import (
+from slowquant.qiskit_interface.util import (  # correct_distribution_with_layout,
     Clique,
     correct_distribution,
+    correct_distribution_with_layout_v2,
     get_bitstring_sign,
     get_determinant_reference,
     get_determinant_superposition_reference,
     get_reordering_sign,
+    layout_conserving_compose,
     postselection,
     to_CBS_measurement,
 )
@@ -47,7 +50,7 @@ class QuantumInterface:
         ansatz: str | QuantumCircuit,
         mapper: FermionicMapper,
         ISA: bool = False,
-        pass_manager: None | PassManager = None,
+        pass_manager_options: dict[str, Any] | None = None,
         ansatz_options: dict[str, Any] | None = None,
         shots: None | int = None,
         max_shots_per_run: int = 100000,
@@ -61,10 +64,9 @@ class QuantumInterface:
             primitive: Qiskit Estimator or Sampler object.
             ansatz: Name of ansatz to be used.
             mapper: Qiskit mapper object, e.g. JW or Parity.
-            ansatz_options: Ansatz options.
-            mapper: Qiskit mapper object.
             ISA: Use ISA for submitting to IBM quantum. Locally transpiling is performed.
-            pass_manager: Custom PassManager for transpilation.
+            pass_manager_options: Dictionary to define custom pass manager.
+            ansatz_options: Ansatz options.
             shots: Number of shots. None means ideal simulator.
             max_shots_per_run: Maximum number of shots allowed in a single run. Set to 100000 per IBM machines.
             do_M_mitigation: Do error mitigation via read-out correlation matrix.
@@ -92,6 +94,8 @@ class QuantumInterface:
                 allowed_ansatz,
                 "or pass custom QuantumCircuit object",
             )
+        if pass_manager_options is None:
+            pass_manager_options = {}
         if isinstance(primitive, BaseEstimatorV2):
             raise TypeError("EstimatorV2 is not currently supported.")
         if isinstance(primitive, BaseSamplerV2):
@@ -100,10 +104,10 @@ class QuantumInterface:
         self._transpiled = False  # Check if circuit has been transpiled
         self.max_shots_per_run = max_shots_per_run
         self._primitive = primitive
+        self.pass_manager_options = pass_manager_options
         self.ISA = ISA
         self.shots = shots
         self.mapper = mapper
-        self.pass_manager = pass_manager
         self.do_M_mitigation = do_M_mitigation
         self.do_M_ansatz0 = do_M_ansatz0
         self._Minv = None
@@ -112,7 +116,8 @@ class QuantumInterface:
         self.total_paulis_evaluated = 0
         self.ansatz_options = ansatz_options
         self.do_postselection = do_postselection
-        self._save_layout = False
+        self._pass_manager: PassManager = None
+        self.saver: dict[int, Clique] = {}
         self._save_paulis = True  # hard switch to stop using Pauli saving (debugging tool).
         self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
         self._M_shots = None  # define a separate number of shots for M
@@ -132,11 +137,7 @@ class QuantumInterface:
         )  # Contains information about the parameterization needed for gradient evaluations.
 
         # State prep circuit
-        if isinstance(self.ansatz, QuantumCircuit):
-            self.state_circuit: QuantumCircuit = QuantumCircuit(
-                self.ansatz.num_qubits
-            )  # empty state as custom circuit is passed
-        elif self.ansatz == "tUPS" and "do_pp" in self.ansatz_options.keys() and self.ansatz_options["do_pp"]:
+        if self.ansatz == "tUPS" and "do_pp" in self.ansatz_options.keys() and self.ansatz_options["do_pp"]:
             # HF in pp-tUPS ordering
             if not isinstance(self.mapper, JordanWignerMapper):
                 raise ValueError(f"pp-tUPS only implemented for JW mapper, got: {type(self.mapper)}")
@@ -154,7 +155,9 @@ class QuantumInterface:
 
         # Ansatz Circuit
         if isinstance(self.ansatz, QuantumCircuit):
-            print("QI was initialized with a custom QuantumCircuit object.")
+            print(
+                "QI was initialized with a custom QuantumCircuit object. This is assumed to be the Ansatz (without state preparation circuit)"
+            )
             self.circuit = self.ansatz
         elif self.ansatz == "fpUCCD":
             self.ansatz_options["pD"] = True
@@ -259,72 +262,106 @@ class QuantumInterface:
             self._ISA = ISA
 
         if self._ISA:
-            # Get backend from primitive.
+            # Get backend from primitive. Needed for default pass manager
             if hasattr(self._primitive, "_backend"):
-                self._primitive_backend = self._primitive._backend  # pylint: disable=protected-access
-            else:
-                self._primitive_backend = None
+                if self.pass_manager_options.get("backend") is None:
+                    print(
+                        "Backend",
+                        self._primitive._backend,  # pylint: disable=protected-access
+                        "detected in primitive and added to pass manager options.",
+                    )
+                    self.pass_manager_options["backend"] = (
+                        self._primitive._backend  # pylint: disable=protected-access
+                    )
+                else:
+                    if (
+                        self.pass_manager_options.get("backend")
+                        != self._primitive._backend  # pylint: disable=protected-access
+                    ):
+                        print(
+                            "WARNING: Backend ",
+                            self._primitive._backend,  # pylint: disable=protected-access
+                            "detected in primitive.\nPass manager uses ",
+                            self.pass_manager_options.get("backend"),
+                            ".\nEnsure compatibility manually.\n",
+                        )
 
-            # Get optimization level from backend. Only for v1 primitives.
-            self._primitive_level = 3
+            # Get optimization level from backend. Only for v1 primitives. Needed for default pass manager
+            overwrite = False
+            if self.pass_manager_options.get("optimization_level") is not None:
+                overwrite = True
+            self.pass_manager_options["optimization_level"] = 3
             if hasattr(self._primitive, "_transpile_options") and hasattr(
                 self._primitive._transpile_options, "optimization_level"  # pylint: disable=protected-access
             ):
-                self._primitive_level = (
+                self.pass_manager_options["optimization_level"] = (
                     self._primitive._transpile_options[  # pylint: disable=protected-access
                         "optimization_level"
                     ]
-                )
+                )  # pylint: disable=protected-access
             elif hasattr(self._primitive, "options"):
                 if hasattr(self._primitive.options, "optimization_level"):
-                    self._primitive_level = self._primitive.options["optimization_level"]
+                    self.pass_manager_options["optimization_level"] = self._primitive.options[
+                        "optimization_level"
+                    ]
+            if overwrite:
+                print(
+                    "Optimization level in pass manager options was updated to ",
+                    self.pass_manager_options.get("optimization_level"),
+                )
 
-            # Check if circuit has been transpiled
+            # Check if circuit exist and has to be transpiled
             # In case of switching to ISA in later workflow
-            if not self._transpiled and hasattr(self, "circuit"):
-                if self.pass_manager is None:
-                    # We have switched to ISA and had no PassManager before.
-                    # This will initialize the standard internal transpilation.
-                    self.pass_manager = None
-                elif self._internal_pm:
-                    # We have used internal PassManager before but re-transpilation was requested (probs via change_primitive in WF)
-                    self.pass_manager = None
-                self.construct_circuit(self.num_orbs, self.num_elec)
+            if hasattr(self, "circuit"):
+                self.update_pass_manager(self.pass_manager_options)
 
-    @property
-    def pass_manager(self) -> None | PassManager:
-        """Get PassManager.
-
-        Returns:
-            PassManager
-        """
-        return self._pass_manager
-
-    @pass_manager.setter
-    def pass_manager(self, pass_manager: None | PassManager) -> None:
-        """Set PassManager.
+    def update_pass_manager(self, pass_manager_options: dict[str, Any] | None = None) -> None:
+        """Pass new pass manager options and set pass manager.
 
         Args:
-            pass_manager: PassManager object from Qiskit.
+            pass_manager_options: Dictionary with pass manager options to update.
         """
-        self._internal_pm = False
-        if pass_manager is not None and not self.ISA:
-            raise ValueError("You need to enable ISA if you want to use a custom PassManager.")
-        if pass_manager is None and self.ISA:
-            self._internal_pm = True
-            self._pass_manager: None | PassManager = generate_preset_pass_manager(
-                self._primitive_level, backend=self._primitive_backend
-            )
-            print(
-                f"You selected ISA but did not pass a PassManager. Standard internal transpilation will use backend {self._primitive_backend} with optimization level {self._primitive_level}"
-            )
-        else:
-            self._pass_manager = pass_manager
+        if pass_manager_options is not None:
+            # Update pass_manager_options
+            self.pass_manager_options.update(pass_manager_options)
 
-            # Check if circuit has been set
-            # In case of switching to new PassManager in later workflow
-            if hasattr(self, "circuit"):
-                self.construct_circuit(self.num_orbs, self.num_elec)
+        # Create pass manager based on pass manager options
+        allowed_pm_options = (
+            "optimization_level",
+            "backend",
+            "initial_layout",
+            "layout_method",
+            "routing_method",
+            "translation_method",
+            "seed_transpiler",
+            "optimization_method",
+        )
+        wrong_items = [
+            item for item in list(self.pass_manager_options.keys()) if item not in allowed_pm_options
+        ]
+        if len(wrong_items) > 0:
+            raise ValueError(
+                "The specified pass manager options do not exist. You have specified",
+                wrong_items,
+                " which is not in allowed options",
+                allowed_pm_options,
+            )
+        self._pass_manager = generate_preset_pass_manager(
+            optimization_level=self.pass_manager_options.get("optimization_level"),
+            backend=self.pass_manager_options.get("backend"),
+            initial_layout=self.pass_manager_options.get("initial_layout"),
+            layout_method=self.pass_manager_options.get("layout_method"),
+            routing_method=self.pass_manager_options.get("routing_method"),
+            translation_method=self.pass_manager_options.get("translation_method"),
+            seed_transpiler=self.pass_manager_options.get("seed_transpiler"),
+            optimization_method=self.pass_manager_options.get("optimization_method"),
+        )
+
+        # Check if circuit has been set and PassManager options were updated
+        # In case of switching to new PassManager in later workflow
+        if pass_manager_options is not None and hasattr(self, "circuit"):
+            print("Change in PassManager. Reconstructing circuit.")
+            self.construct_circuit(self.num_orbs, self.num_elec)
 
     def redo_M_mitigation(self, shots: int | None = None) -> None:
         """Redo M_mitigation.
@@ -332,7 +369,7 @@ class QuantumInterface:
         Args:
             shots: Overwrites QI internal shot number if int is defined.
         """
-        self._make_Minv(shots=shots)
+        self._Minv = self._make_Minv(shots=shots)
 
     @property
     def parameters(self) -> list[float]:
@@ -358,10 +395,9 @@ class QuantumInterface:
                 "The length of the parameter list does not fit the chosen circuit for the Ansatz ",
                 self.ansatz,
             )
-        if hasattr(self, "cliques"):
-            # The distributions should only reset if the parameters are actually changed.
-            if not np.array_equal(self._parameters, parameters):
-                self.cliques = Clique()
+        # The distributions should only reset if the parameters are actually changed.
+        if not np.array_equal(self._parameters, parameters):
+            self.saver = {}
         self._parameters = parameters.copy()
 
     @property
@@ -385,11 +421,12 @@ class QuantumInterface:
         """
         # Check if ISA is selected. If yes, pre-transpile circuit for later use.
         if self.ISA:
+            self._ansatz_circuit_raw = ansatz_circuit  # needed for csfs functionality
             self.ansatz_circuit: QuantumCircuit = self._transpile_circuit(ansatz_circuit)
             self._transpiled = True
             # Add state preparation circuit (e.g. HF)
             self._circuit: QuantumCircuit = self.ansatz_circuit.compose(
-                self.state_circuit, qubits=self._circuit_indices, front=True
+                self.state_circuit, qubits=self._initial_ansatz_indices, front=True
             )
         else:
             self.ansatz_circuit = ansatz_circuit
@@ -405,26 +442,54 @@ class QuantumInterface:
         Returns:
             Transpiled Circuit.
         """
-        if self.pass_manager is None:
-            raise ValueError("Missing PassManager for transpilation.")
-        if self.pass_manager is None and not self.ISA:  # for init
-            raise ValueError(
-                "You have not defined a PassManager but switched on ISA and try to transpile a circuit."
-            )
+        if self._pass_manager is None:
+            self.update_pass_manager()
+            assert self._pass_manager is not None
 
-        circuit_return = self.pass_manager.run(circuit)
-        # Get layout indices
+        circuit_return = self._pass_manager.run(circuit)
+        # Get layout indices. Ordered q0, q1, ... qN
+        # Routing can introduce swaps. this is a problem and can change initial vs final layout.
         if circuit_return.layout is None:
-            self._measurement_indices = np.arange(circuit_return.num_qubits)
-            self._circuit_indices = np.arange(circuit_return.num_qubits)
+            self._final_ansatz_indices: np.ndarray = np.arange(circuit_return.num_qubits)
+            self._initial_ansatz_indices: np.ndarray = np.arange(circuit_return.num_qubits)
+
+            # No layout - no problem. We still need these defined
+            self._finalfixedlayout_pm = self._pass_manager
+            self._initialfixedlayout_pm = self._pass_manager
+
         else:
-            self._measurement_indices = circuit_return.layout.final_index_layout()
-            self._circuit_indices = circuit_return.layout.initial_index_layout(filter_ancillas=True)
+            self._final_ansatz_indices = circuit_return.layout.final_index_layout()  # with swaps from routing
+            self._initial_ansatz_indices = circuit_return.layout.initial_index_layout(
+                filter_ancillas=True
+            )  # no swaps from routing
+
+            # Create a pass manager that maps on the Ansatz Circuit qubits in the final layout (with swaps)
+            self._finalfixedlayout_pm = generate_preset_pass_manager(
+                optimization_level=self.pass_manager_options.get("optimization_level"),
+                backend=self.pass_manager_options.get("backend"),
+                initial_layout=self._final_ansatz_indices,
+                layout_method=self.pass_manager_options.get("layout_method"),
+                routing_method=self.pass_manager_options.get("routing_method"),
+                translation_method=self.pass_manager_options.get("translation_method"),
+                seed_transpiler=self.pass_manager_options.get("seed_transpiler"),
+                optimization_method=self.pass_manager_options.get("optimization_method"),
+            )
+            # Create a pass manager that maps on the Ansatz Circuit qubits in the initial layout (no swaps)
+            self._initialfixedlayout_pm = generate_preset_pass_manager(
+                optimization_level=self.pass_manager_options.get("optimization_level"),
+                backend=self.pass_manager_options.get("backend"),
+                initial_layout=self._initial_ansatz_indices,
+                layout_method=self.pass_manager_options.get("layout_method"),
+                routing_method=self.pass_manager_options.get("routing_method"),
+                translation_method=self.pass_manager_options.get("translation_method"),
+                seed_transpiler=self.pass_manager_options.get("seed_transpiler"),
+                optimization_method=self.pass_manager_options.get("optimization_method"),
+            )
 
         # Transpile X and Y measurement gates: only translation to basis gates and optimization.
         self._transp_xy = [
-            self.pass_manager.optimization.run(self.pass_manager.translation.run(to_CBS_measurement("X"))),
-            self.pass_manager.optimization.run(self.pass_manager.translation.run(to_CBS_measurement("Y"))),
+            self._pass_manager.optimization.run(self._pass_manager.translation.run(to_CBS_measurement("X"))),
+            self._pass_manager.optimization.run(self._pass_manager.translation.run(to_CBS_measurement("Y"))),
         ]
 
         return circuit_return
@@ -450,8 +515,7 @@ class QuantumInterface:
         """
         # IMPORTANT: Shot number in primitive initialization gets always overwritten by QI!
         self._circuit_multipl = 1
-        if hasattr(self, "cliques"):
-            self._reset_cliques()
+        self._reset_cliques()
         if hasattr(self, "_Minv") and self._Minv is not None:
             self._reset_M()
         # Get shot number form primitive if none defined
@@ -517,7 +581,7 @@ class QuantumInterface:
 
     def _reset_cliques(self, verbose: bool = True) -> None:
         """Reset cliques to empty."""
-        self.cliques = Clique()
+        self.saver = {}
         if verbose:
             print("Pauli saving has been reset.")
 
@@ -530,6 +594,8 @@ class QuantumInterface:
     def op_to_qbit(self, op: FermionicOperator) -> SparsePauliOp:
         """Fermionic operator to qbit rep.
 
+        The Pauli string representation is in qiskit's format of qN,qN-1,...,q0.
+
         Args:
             op: Operator as SlowQuant's FermionicOperator object
 
@@ -540,6 +606,33 @@ class QuantumInterface:
         if not isinstance(mapped_op, SparsePauliOp):
             raise TypeError(f"The qubit form of the operator is not SparsePauliOp got, {type(mapped_op)}")
         return mapped_op
+
+    def _check_layout_conflict(self, circuit_in: QuantumCircuit) -> int:
+        """Check if a circuit has same layout as ansatz circuit/M.
+
+        Args:
+            circuit_in: Quantum Circuit.
+
+        Returns:
+            0 = no layout - no order conflict.
+            1 = no layout, but order conflict.
+            2 = layout conflict.
+        """
+        if not self.ISA:
+            if circuit_in.layout is None:
+                return 0
+            raise ValueError("ISA is switched off but circuit with layout was found.")
+        if circuit_in.layout is None:
+            circuit_in_layout = np.arange(self.num_qubits)
+        else:
+            circuit_in_layout = circuit_in.layout.final_index_layout()
+        if not np.array_equal(np.sort(circuit_in_layout), np.sort(self._final_ansatz_indices)):
+            raise ValueError("Qubit in circuit is not in initial layout.")
+        if np.array_equal(circuit_in_layout, self._final_ansatz_indices):
+            return 0
+        if np.array_equal(sorted(circuit_in_layout), sorted(self._final_ansatz_indices)):
+            return 1
+        return 2
 
     def quantum_expectation_value(
         self, op: FermionicOperator, custom_parameters: list[float] | None = None
@@ -582,6 +675,9 @@ class QuantumInterface:
         op: FermionicOperator,
         ket_csf: tuple[list[float], list[str]],
         custom_parameters: list[float] | None = None,
+        ISA_csfs_option: int = 0,
+        M_per_superpos: bool = False,
+        reverse_csfs_order: bool = False,
     ) -> float:
         r"""Calculate expectation value using different bra and ket of a Hermitian operator.
 
@@ -613,10 +709,20 @@ class QuantumInterface:
             op: Hermitian fermionic operator.
             ket_csf: Ket CSF.
             custom_parameters: Non-default run parameters.
+            ISA_csfs_option: Option on how to treat the composing of superposition state and Ansatz:
+                0: Find default based on error mitigation. Default without EM: 1.
+                1: Allow flexible (changing) layout.
+                2: Fixed layout but allow change in order (swaps).
+                3: Fixed layout, fixed order, without optimizing circuit after composing.
+                4: Fixed layout, fixed order, with optimizing circuit after composing.
+            M_per_superpos: A new M_Ansatz0 matrix for each superposition state.
+            reverse_csfs_order: If true, the pair-entangled superposition states' order is reversed.
+                This might be relevant as the order can influence the circuit depths.
 
         Returns:
             Expectation value of operator.
         """
+        save_paulis = self._save_paulis
         if not isinstance(self.mapper, JordanWignerMapper):
             raise TypeError(
                 f"Expectation values for custom CSFs only implemented for JordanWignerMapper. Got; {type(self.mapper)}"
@@ -625,65 +731,190 @@ class QuantumInterface:
             raise ValueError(
                 "quantum_expectation_value_csfs got unsupported Qiskit primitive, {type(self._primitive)}"
             )
+        if M_per_superpos and isinstance(self._primitive, BaseEstimator):
+            raise ValueError("Base estimator does not support M_Ansatz0")
+        if M_per_superpos and (self.do_M_ansatz0 + self.do_M_mitigation) != 2:
+            raise ValueError(
+                "You requested M_per_superpos but M error mitigation / M_Ansatz0 was not selected in QI settings."
+            )
+        # Option handling
+        if ISA_csfs_option == 0:
+            ISA_csfs_option = 1  # could also be 2
+            if self.do_M_mitigation and self.ansatz_circuit.layout is not None and not M_per_superpos:
+                ISA_csfs_option = 2
+                if self.do_M_ansatz0:
+                    ISA_csfs_option = 4  # could also be 3
+        print("CSFs expectation value with circuit composing option: ", ISA_csfs_option)
+
         if custom_parameters is None:
             run_parameters = self.parameters
         else:
             run_parameters = custom_parameters
+            save_paulis = False
 
+        # Check if ISA beforehand.
+        if self.ISA:
+            connection_order = self._initial_ansatz_indices
+        else:
+            connection_order = np.arange(self.num_qubits)
         val = 0.0
-        # Loop over dets in bra CSF
-        for bra_coeff, bra_det in zip(bra_csf[0], bra_csf[1]):
-            sign_bra = get_reordering_sign(bra_det)
-            # Loop over dets in ket CSF
-            for ket_coeff, ket_det in zip(ket_csf[0], ket_csf[1]):
-                sign_ket = get_reordering_sign(ket_det)
-                N = bra_coeff * ket_coeff * sign_bra * sign_ket  # pre-factor
-                # I == J (diagonals)
-                if bra_det == ket_det:
-                    circuit = get_determinant_reference(bra_det, self.num_orbs, self.mapper)
-                    # Negate HF in ansatz
-                    circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
-                    # Append ansatz
-                    circuit = circuit.compose(self.circuit)
-                    if isinstance(self._primitive, BaseEstimator):
-                        val += N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
-                    if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+        # print("bras: ", bra_csf[1])  # debug
+        # print("kets: ", ket_csf[1])  # debug
+
+        # Create list of all combinations with their weight consisting of coefficient and reordering sign
+        all_combinations = [
+            (
+                tuple(sorted((bra_csf[1][i], ket_csf[1][j]), reverse=reverse_csfs_order)),
+                bra_csf[0][i]
+                * ket_csf[0][j]
+                * get_reordering_sign(bra_csf[1][i])
+                * get_reordering_sign(ket_csf[1][j]),
+            )
+            for i, j in itertools.product(range(len(bra_csf[1])), range(len(ket_csf[1])))
+        ]
+        # Only unique combinations
+        unique_combinations: dict = defaultdict(float)
+        for combo, weight in all_combinations:
+            unique_combinations[combo] += weight
+
+        # Calculate all unique combinations
+        for (bra_det, ket_det), N in unique_combinations.items():
+            # print("Expectation value of dets: ", bra_det, ket_det)  # debug
+            # I == J (diagonals)
+            if bra_det == ket_det:
+                # Get det circuit. Only X-Gates -> no transpilation.
+                circuit = get_determinant_reference(bra_det, self.num_orbs, self.mapper)
+                # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
+                circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
+                # val_old = val  # debug
+                if isinstance(self._primitive, BaseEstimator):
+                    val += N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
+                elif isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                    if save_paulis:
+                        val += N * self._sampler_quantum_expectation_value(
+                            op, run_circuit=circuit, det=bra_det
+                        )
+                    else:
                         val += N * self._sampler_quantum_expectation_value_nosave(
                             op,
                             run_parameters,
                             circuit,
                             do_cliques=self._do_cliques,
                         )
-                # I != J (off-diagonals)
+                # print("I == J, val = ", val - val_old)  # debug
+            # I != J (off-diagonals)
+            else:
+                # First term of off-diagonal element involving I and J
+                # I and J superposition state of determinants
+                state = get_determinant_superposition_reference(bra_det, ket_det, self.num_orbs, self.mapper)
+                # Superposition state contains non-native gates for ISA -> transpilation needed.
+                if self.ISA:
+                    # print("Doing a superpos simulation")  # debug
+                    match ISA_csfs_option:
+                        case 1:  # Option 1: flexible layout
+                            # Use untranspiled ansatz and compose with superposition state
+                            circuit = self._ansatz_circuit_raw.compose(state, front=True)
+                            # Transpile freely
+                            circuit = self._pass_manager.run(circuit)  # type: ignore
+                        case 2:  # Option 2: fixed layout - flexible order (needed with M)
+                            # Use untranspiled ansatz and compose with superposition state
+                            circuit = self._ansatz_circuit_raw.compose(state, front=True)
+                            # Transpile the composed circuit together using the correct layout
+                            # This will however still introduce routing swaps (flexible order)
+                            circuit = self._initialfixedlayout_pm.run(circuit)
+                        case (
+                            3
+                        ):  # Option 3: fixed layout - fixed order without optimization (needed with M_Ansatz0)
+                            circuit = layout_conserving_compose(
+                                self.ansatz_circuit,
+                                state,
+                                self._initialfixedlayout_pm,
+                                coupling_map=self.pass_manager_options.get("backend").coupling_map,  # type: ignore
+                                optimization=False,
+                            )
+                        case (
+                            4
+                        ):  # Option 4: fixed layout - fixed order with optimization (needed with M_Ansatz0)
+                            circuit = layout_conserving_compose(
+                                self.ansatz_circuit,
+                                state,
+                                self._initialfixedlayout_pm,
+                                coupling_map=self.pass_manager_options.get("backend").coupling_map,  # type: ignore
+                                optimization=True,
+                            )
+                        case _:
+                            raise ValueError("Wrong ISA_csfs_option specified. Needs to be 1,2,3,4.")
                 else:
-                    circuit = get_determinant_superposition_reference(
-                        bra_det, ket_det, self.num_orbs, self.mapper
-                    )
-                    # Negate HF in ansatz
-                    circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
-                    # Append ansatz
-                    circuit = circuit.compose(self.circuit)
-                    # circuit = self._transpile_circuit(circuit)
+                    circuit = self.ansatz_circuit.compose(state, front=True)
+                # val_old = val  # debug
+                # Check if M per superposition circuit is requested
+                if M_per_superpos:
+                    state_corr = state.copy()
+                    # Get state circuit without non-local gates
+                    for idx, instruction in reversed(list(enumerate(state_corr.data))):
+                        if instruction.is_controlled_gate():
+                            del state_corr.data[idx]
+                    if self.ISA:
+                        # Translate and optimize
+                        state_corr = self._pass_manager.optimization.run(self._pass_manager.translation.run(state_corr))  # type: ignore
+                    # Negate
+                    if circuit.layout is not None:
+                        circuit_M = circuit.compose(
+                            state_corr,
+                            front=True,
+                            qubits=circuit.layout.initial_index_layout(filter_ancillas=True),
+                        )
+                    else:
+                        circuit_M = circuit.compose(state_corr, front=True)
+
+                    if save_paulis:
+                        val += N * self._sampler_quantum_expectation_value(
+                            op,
+                            run_circuit=circuit,
+                            det=bra_det + ket_det,
+                            circuit_M=circuit_M,
+                        )
+                    else:
+                        val += N * self._sampler_quantum_expectation_value_nosave(
+                            op,
+                            run_parameters,
+                            circuit,
+                            do_cliques=self._do_cliques,
+                            circuit_M=circuit_M,
+                        )
+                else:
                     if isinstance(self._primitive, BaseEstimator):
                         val += N * self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
-                    if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
-                        val += N * self._sampler_quantum_expectation_value_nosave(
-                            op,
-                            run_parameters,
-                            circuit,
-                            do_cliques=self._do_cliques,
-                        )
-                    circuit = get_determinant_reference(bra_det, self.num_orbs, self.mapper)
-                    # Negate HF in ansatz
-                    circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
-                    # Append ansatz
-                    circuit = circuit.compose(self.circuit)
-                    # circuit = self._transpile_circuit(circuit)
-                    if isinstance(self._primitive, BaseEstimator):
+                    elif isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                        if save_paulis:
+                            val += N * self._sampler_quantum_expectation_value(
+                                op, run_circuit=circuit, det=bra_det + ket_det
+                            )
+                        else:
+                            val += N * self._sampler_quantum_expectation_value_nosave(
+                                op,
+                                run_parameters,
+                                circuit,
+                                do_cliques=self._do_cliques,
+                            )
+                # print("I != J, superpos, val = ", val - val_old)  # debug
+
+                # Second term of off-diagonal element involving only I
+                # Get det circuit. Only X-Gates -> no transpilation.
+                circuit = get_determinant_reference(bra_det, self.num_orbs, self.mapper)
+                # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
+                circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
+                # val_old = val  # debug
+                if isinstance(self._primitive, BaseEstimator):
+                    val -= 0.5 * N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
+                elif isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                    if save_paulis:
                         val -= (
-                            0.5 * N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
+                            0.5
+                            * N
+                            * self._sampler_quantum_expectation_value(op, run_circuit=circuit, det=bra_det)
                         )
-                    if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                    else:
                         val -= (
                             0.5
                             * N
@@ -694,17 +925,24 @@ class QuantumInterface:
                                 do_cliques=self._do_cliques,
                             )
                         )
-                    circuit = get_determinant_reference(ket_det, self.num_orbs, self.mapper)
-                    # Negate HF in ansatz
-                    circuit = circuit.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
-                    # Append ansatz
-                    circuit = circuit.compose(self.circuit)
-                    # circuit = self._transpile_circuit(circuit)
-                    if isinstance(self._primitive, BaseEstimator):
+                # print("I != J, I, val = ", -(val - val_old))  # debug
+
+                # Third term of off-diagonal element involving only J
+                # Get det circuit. Only X-Gates -> no transpilation.
+                circuit = get_determinant_reference(ket_det, self.num_orbs, self.mapper)
+                # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
+                circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
+                # val_old = val  # debug
+                if isinstance(self._primitive, BaseEstimator):
+                    val -= 0.5 * N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
+                elif isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                    if save_paulis:
                         val -= (
-                            0.5 * N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
+                            0.5
+                            * N
+                            * self._sampler_quantum_expectation_value(op, run_circuit=circuit, det=ket_det)
                         )
-                    if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                    else:
                         val -= (
                             0.5
                             * N
@@ -715,6 +953,7 @@ class QuantumInterface:
                                 do_cliques=self._do_cliques,
                             )
                         )
+                # print("I != J, J, val = ", -(val - val_old))  # debug
         return val
 
     def _estimator_quantum_expectation_value(
@@ -728,13 +967,14 @@ class QuantumInterface:
         Args:
             op: SlowQuant fermionic operator.
             run_parameters: Circuit parameters.
+            run_circuit: Quantum circuit.
 
         Returns:
             Expectation value of operator.
         """
         observables = self.op_to_qbit(op)
         if self.ISA:
-            observables = observables.apply_layout(self.circuit.layout)
+            observables = observables.apply_layout(run_circuit.layout)
         job = self._primitive.run(
             circuits=run_circuit, parameter_values=run_parameters, observables=observables, shots=self.shots
         )
@@ -751,7 +991,13 @@ class QuantumInterface:
 
         return values.real
 
-    def _sampler_quantum_expectation_value(self, op: FermionicOperator | SparsePauliOp) -> float:
+    def _sampler_quantum_expectation_value(
+        self,
+        op: FermionicOperator | SparsePauliOp,
+        run_circuit: QuantumCircuit | None = None,
+        det: str | None = None,
+        circuit_M: None | QuantumCircuit = None,
+    ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
 
         Calculated Pauli expectation values will be saved in memory.
@@ -765,10 +1011,22 @@ class QuantumInterface:
 
         Args:
             op: SlowQuant fermionic operator.
+            run_circuit: custom circuit to be run. If not specified, HF+Ansatz circuit is used.
+            det: Classify state (determinant) of circuit for Pauli saving.
+                Specified in chemistry form, i.e. left-to-right, alternating alpha and beta.
+            circuit_M: custom circuit for M_Ansatz0 (correlation matrix is not stored). If not specified, M0 of Ansatz is used.
 
         Returns:
             Expectation value of operator.
         """
+        # Get HF determinant string
+        if det is None:
+            det = "1" * (self.num_elec[0] + self.num_elec[1]) + "0" * (
+                self.num_spin_orbs - (self.num_elec[0] + self.num_elec[1])
+            )
+        det_int = int(det, 2)
+        if run_circuit is None:
+            run_circuit = self.circuit
         values = 0.0
         # Map Fermionic to Qubit
         if isinstance(op, FermionicOperator):
@@ -780,33 +1038,63 @@ class QuantumInterface:
                 f"Got unknown operator type {type(op)}, expected FermionicOperator or SparsePauliOp"
             )
 
-        if not hasattr(self, "cliques"):
-            self.cliques = Clique()
+        if det_int not in self.saver:
+            print("Make new Clique saver for determinant ", det)
+            self.saver[det_int] = Clique()
 
         paulis_str = [str(x) for x in observables.paulis]
-        new_heads = self.cliques.add_paulis(paulis_str)
-
-        # Check if error mitigation is requested and if read-out matrix already exists.
-        if self.do_M_mitigation and self._Minv is None:
-            self._make_Minv(shots=self._M_shots)
+        new_heads = self.saver[det_int].add_paulis(paulis_str)
 
         if len(new_heads) != 0:
+            # Check if error mitigation is requested and if read-out matrix already exists.
+            if self.do_M_mitigation:
+                if circuit_M is None:
+                    if self._Minv is None:
+                        self._Minv = self._make_Minv(shots=self._M_shots)
+                else:
+                    Minv = self._make_Minv(shots=self._M_shots, custom_ansatz=circuit_M)
+
             # Simulate each clique head with one combined device call
             # and return a list of distributions
-            distr = self._one_call_sampler_distributions(new_heads, self.parameters, self.circuit)
+            distr = self._one_call_sampler_distributions(new_heads, self.parameters, run_circuit)
+
             if self.do_M_mitigation:  # apply error mitigation if requested
-                for i, dist in enumerate(distr):
-                    distr[i] = correct_distribution(dist, self._Minv)
+                if circuit_M is None:
+                    # Check if layout conflict in M and current circuit
+                    match self._check_layout_conflict(run_circuit):
+                        case 0:  # no layout - no order conflict
+                            for i, dist in enumerate(distr):
+                                distr[i] = correct_distribution(dist, self._Minv)
+                        case 1:  # no layout, but order conflict
+                            if self.do_M_ansatz0:
+                                raise ValueError("Detected order conflict. Not possile to do M Ansatz0")
+                            print("Detected order conflict. Applying M re-ordering.")
+                            for i, dist in enumerate(distr):
+                                distr[i] = correct_distribution_with_layout_v2(  # maybe v1 is better.
+                                    dist,
+                                    self._Minv,
+                                    self._final_ansatz_indices,
+                                    run_circuit.layout.final_index_layout(),
+                                )
+                        case 2:  # layout conflict
+                            raise ValueError("Detected layout conflict. Cannot do M mitigation.")
+                else:
+                    # custom M -> no layout check needed / possible
+                    for i, dist in enumerate(distr):
+                        distr[i] = correct_distribution(dist, Minv)
+
             if self.do_postselection:
                 for i, (dist, head) in enumerate(zip(distr, new_heads)):
                     if "X" not in head and "Y" not in head:
                         distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
-            self.cliques.update_distr(new_heads, distr)
+            self.saver[det_int].update_distr(new_heads, distr)
 
         # Loop over all Pauli strings in observable and build final result with coefficients
         for pauli, coeff in zip(paulis_str, observables.coeffs):
             result = 0.0
-            for key, value in self.cliques.get_distr(pauli).items():  # build result from quasi-distribution
+            for key, value in (
+                self.saver[det_int].get_distr(pauli).items()
+            ):  # build result from quasi-distribution
                 result += value * get_bitstring_sign(pauli, key)
             values += result * coeff
 
@@ -822,6 +1110,7 @@ class QuantumInterface:
         run_parameters: list[float],
         run_circuit: QuantumCircuit,
         do_cliques: bool = True,
+        circuit_M: None | QuantumCircuit = None,
     ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
 
@@ -838,6 +1127,9 @@ class QuantumInterface:
         Args:
             op: SlowQuant fermionic operator.
             run_parameters: Circuit parameters.
+            run_circuit: Quantum Circuit.
+            do_cliques: If True, use cliques (QWC).
+            circuit_M: Custom circuit for M_Ansatz0.
 
         Returns:
             Expectation value of operator.
@@ -854,8 +1146,12 @@ class QuantumInterface:
             )
 
         # Check if error mitigation is requested and if read-out matrix already exists.
-        if self.do_M_mitigation and self._Minv is None:
-            self._make_Minv(shots=self._M_shots)
+        if self.do_M_mitigation:
+            if circuit_M is None:
+                if self._Minv is None:
+                    self._Minv = self._make_Minv(shots=self._M_shots)
+            else:
+                Minv = self._make_Minv(shots=self._M_shots, custom_ansatz=circuit_M)
 
         paulis_str = [str(x) for x in observables.paulis]
         if do_cliques:
@@ -868,8 +1164,29 @@ class QuantumInterface:
             # and return a list of distributions
             distr = self._one_call_sampler_distributions(new_heads, run_parameters, run_circuit)
             if self.do_M_mitigation:  # apply error mitigation if requested
-                for i, dist in enumerate(distr):
-                    distr[i] = correct_distribution(dist, self._Minv)
+                if circuit_M is None:
+                    # Check if layout conflict in M and current circuit
+                    match self._check_layout_conflict(run_circuit):
+                        case 0:  # no layout - no order conflict
+                            for i, dist in enumerate(distr):
+                                distr[i] = correct_distribution(dist, self._Minv)
+                        case 1:  # no layout, but order conflict
+                            if self.do_M_ansatz0:
+                                raise ValueError("Detected order conflict. Not possible to do M Ansatz0.")
+                            print("Detected order conflict. Applying M re-ordering.")
+                            for i, dist in enumerate(distr):
+                                distr[i] = correct_distribution_with_layout_v2(  # maybe v1 is better.
+                                    dist,
+                                    self._Minv,
+                                    self._final_ansatz_indices,
+                                    run_circuit.layout.final_index_layout(),
+                                )
+                        case 2:  # layout conflict
+                            raise ValueError("Detected layout conflict. Cannot do M mitigation.")
+                else:
+                    # custom M -> no layout check needed / possible
+                    for i, dist in enumerate(distr):
+                        distr[i] = correct_distribution(dist, Minv)
             if self.do_postselection:
                 for i, (dist, head) in enumerate(zip(distr, new_heads)):
                     if "X" not in head and "Y" not in head:
@@ -886,8 +1203,29 @@ class QuantumInterface:
             # Simulate each Pauli string with one combined device call
             distr = self._one_call_sampler_distributions(paulis_str, run_parameters, run_circuit)
             if self.do_M_mitigation:  # apply error mitigation if requested
-                for i, dist in enumerate(distr):
-                    distr[i] = correct_distribution(dist, self._Minv)
+                if circuit_M is None:
+                    # Check if layout conflict in M and current circuit
+                    match self._check_layout_conflict(run_circuit):
+                        case 0:  # no layout - no order conflict
+                            for i, dist in enumerate(distr):
+                                distr[i] = correct_distribution(dist, self._Minv)
+                        case 1:  # no layout, but order conflict
+                            if self.do_M_ansatz0:
+                                raise ValueError("Detected order conflict. Not possile to do M Ansatz0")
+                            print("Detected order conflict. Applying M re-ordering.")
+                            for i, dist in enumerate(distr):
+                                distr[i] = correct_distribution_with_layout_v2(  # maybe v1 is better.
+                                    dist,
+                                    self._Minv,
+                                    self._final_ansatz_indices,
+                                    run_circuit.layout.final_index_layout(),
+                                )
+                        case 2:  # layout conflict
+                            raise ValueError("Detected layout conflict. Cannot do M mitigation.")
+                else:
+                    # custom M -> no layout check needed / possible
+                    for i, dist in enumerate(distr):
+                        distr[i] = correct_distribution(dist, Minv)
             if self.do_postselection:
                 for i, (dist, pauli) in enumerate(zip(distr, paulis_str)):
                     if "X" not in pauli and "Y" not in pauli:
@@ -924,6 +1262,11 @@ class QuantumInterface:
         Returns:
             Variance of expectation value.
         """
+        det_int = int(
+            "1" * (self.num_elec[0] + self.num_elec[1])
+            + "0" * (self.num_spin_orbs - (self.num_elec[0] + self.num_elec[1])),
+            2,
+        )
         if isinstance(self._primitive, BaseEstimator):
             raise ValueError("This function does not work with Estimator.")
         if custom_parameters is None:
@@ -942,15 +1285,15 @@ class QuantumInterface:
             )
 
         if do_cliques:
-            if not hasattr(self, "cliques"):
-                self.cliques = Clique()
+            if det_int not in self.saver:
+                self.saver[det_int] = Clique()
 
-            new_heads = self.cliques.add_paulis([str(x) for x in observables.paulis])
+            new_heads = self.saver[det_int].add_paulis([str(x) for x in observables.paulis])
 
             if len(new_heads) != 0:
                 # Check if error mitigation is requested and if read-out matrix already exists.
                 if self.do_M_mitigation and self._Minv is None:
-                    self._make_Minv()
+                    self._Minv = self._make_Minv()
 
                 # Simulate each clique head with one combined device call
                 # and return a list of distributions
@@ -962,7 +1305,7 @@ class QuantumInterface:
                     for i, (dist, head) in enumerate(zip(distr, new_heads)):
                         if "X" not in head and "Y" not in head:
                             distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
-                self.cliques.update_distr(new_heads, distr)
+                self.saver[det_int].update_distr(new_heads, distr)
         else:
             print(
                 "WARNING: REM and Post-Selection not implemented for quantum variance without the use of cliques."
@@ -976,7 +1319,7 @@ class QuantumInterface:
                 coeff = 1
             # Get distribution from cliques
             if do_cliques:
-                dist = self.cliques.get_distr(pauli)
+                dist = self.saver[det_int].get_distr(pauli)
                 # Calculate p1: Probability of measuring one
                 p1 = 0.0
                 for key, value in dist.items():
@@ -1033,7 +1376,7 @@ class QuantumInterface:
         num_circuits = len(circuits_in)
 
         # Check V1 vs. V2
-        if isinstance(self._primitive, BaseSamplerV2):
+        if isinstance(self._primitive, BaseSamplerV2):  # means ISA=True by default
             # make parameter list 2d for one circuit.
             if num_circuits == 1:
                 run_parameters = [run_parameters]  # type: ignore
@@ -1044,10 +1387,14 @@ class QuantumInterface:
                 pauli_circuit = to_CBS_measurement(pauli, self._transp_xy)
                 for nr_circuit, circuit in enumerate(circuits_in):
                     # Add measurement in correct layout
-                    ansatz_w_obs = circuit.compose(pauli_circuit, qubits=self._measurement_indices)
+                    if circuit.layout is not None:
+                        measurement_indices = circuit.layout.final_index_layout()
+                    else:
+                        measurement_indices = np.arange(self.num_qubits)
+                    ansatz_w_obs = circuit.compose(pauli_circuit, qubits=measurement_indices)
                     # Create classic register and measure relevant qubits
                     ansatz_w_obs.add_register(ClassicalRegister(self.num_qubits, name="meas"))
-                    ansatz_w_obs.measure(self._measurement_indices, np.arange(self.num_qubits))
+                    ansatz_w_obs.measure(measurement_indices, np.arange(self.num_qubits))
                     pubs.append((ansatz_w_obs, run_parameters[nr_circuit]))
             pubs = pubs * self._circuit_multipl
 
@@ -1070,9 +1417,14 @@ class QuantumInterface:
                 for nr_pauli, pauli in enumerate(paulis):
                     pauli_circuit = to_CBS_measurement(pauli, self._transp_xy)
                     for nr_circuit, circuit in enumerate(circuits_in):
-                        ansatz_w_obs = circuit.compose(pauli_circuit, qubits=self._measurement_indices)
+                        # Add measurement in correct layout
+                        if circuit.layout is not None:
+                            measurement_indices = circuit.layout.final_index_layout()
+                        else:
+                            measurement_indices = np.arange(self.num_qubits)
+                        ansatz_w_obs = circuit.compose(pauli_circuit, qubits=measurement_indices)
                         ansatz_w_obs.add_register(ClassicalRegister(self.num_qubits))
-                        ansatz_w_obs.measure(self._measurement_indices, np.arange(self.num_qubits))
+                        ansatz_w_obs.measure(measurement_indices, np.arange(self.num_qubits))
                         circuits[(nr_circuit + (nr_pauli * num_circuits))] = ansatz_w_obs
                 circuits = circuits * self._circuit_multipl
 
@@ -1090,7 +1442,7 @@ class QuantumInterface:
         self.total_device_calls += 1
         self.total_paulis_evaluated += num_paulis * num_circuits
 
-        # Get quasi-distribution in binary probabilities
+        # Get quasi-distribution in binary probabilities ordered qN, qN-1, ..., q0
         if isinstance(self._primitive, BaseSamplerV2):
             result = job.result()
             distr = [{}] * len(result)  # type: list[dict]
@@ -1187,38 +1539,20 @@ class QuantumInterface:
                 p1 += value
         return p1
 
-    def _make_Minv(self, shots: None | int = None) -> None:
+    def _make_Minv(self, shots: None | int = None, custom_ansatz: None | QuantumCircuit = None) -> np.ndarray:
         r"""Make inverse of read-out correlation matrix with one device call.
 
         The read-out correlation matrix is of the form (for two qubits):
 
         .. math::
             M = \begin{pmatrix}
-                P(00|00) & P(00|10) & P(00|01) & P(00|11)\\
-                P(10|00) & P(10|10) & P(10|01) & P(10|11)\\
-                P(01|00) & P(01|10) & P(01|01) & P(01|11)\\
-                P(11|00) & P(11|10) & P(11|01) & P(11|11)
+                P(00|00) & P(00|01) & P(00|10) & P(00|11)\\
+                P(01|00) & P(01|01) & P(01|10) & P(01|11)\\
+                P(10|00) & P(10|01) & P(10|10) & P(10|11)\\
+                P(11|00) & P(11|01) & P(11|10) & P(11|11)
                 \end{pmatrix}
 
         With :math:`P(AB|CD)` meaning the probability of reading :math:`AB` given the circuit is prepared to give :math:`CD`.
-
-        The construction also supports the independent qubit approximation, which for two qubits means that:
-
-        .. math::
-            P(\tilde{q}_1 \tilde{q}_0|q_1 q_0) = P(\tilde{q}_1|q_1)P(\tilde{q}_0|q_0)
-
-        Under this approximation only :math:`\left<00\right|` and :math:`\left<11\right|` need to be measured,
-        in order the gain enough information to construct :math:`M`.
-
-        The read-out correlation take the following form (for two qubits):
-
-        .. math::
-            M = \begin{pmatrix}
-                P_{q1}(0|0)P_{q0}(0|0) & P_{q1}(0|1)P_{q0}(0|0) & P_{q1}(0|0)P_{q0}(0|1) & P_{q1}(0|1)P_{q0}(0|1)\\
-                P_{q1}(1|0)P_{q0}(0|0) & P_{q1}(1|1)P_{q0}(0|0) & P_{q1}(1|0)P_{q0}(0|1) & P_{q1}(1|1)P_{q0}(0|1)\\
-                P_{q1}(0|0)P_{q0}(1|0) & P_{q1}(0|1)P_{q0}(1|0) & P_{q1}(0|0)P_{q0}(1|1) & P_{q1}(0|1)P_{q0}(1|1)\\
-                P_{q1}(1|0)P_{q0}(1|0) & P_{q1}(1|1)P_{q0}(1|0) & P_{q1}(1|0)P_{q0}(1|1) & P_{q1}(1|1)P_{q0}(1|1)
-                \end{pmatrix}
 
         The construct also support the building of the read-out correlation matrix when the ansatz is included:
 
@@ -1231,24 +1565,30 @@ class QuantumInterface:
 
         Args:
             shots: Number of shots if they are meant to differ from QI internal shot number.
-
+            custom_ansatz: Specify custom Ansatz to be used.
         """
-        print("Measuring error mitigation read-out matrix.")
-        self._save_layout = True
         if self.num_qubits > 8:
             raise ValueError("Current implementation does not scale above 8 qubits?")
-        if self.do_M_ansatz0:
-            ansatz = self.ansatz_circuit
+        if custom_ansatz is None:
+            print("Measuring error mitigation read-out matrix.")
+            if self.do_M_ansatz0:
+                ansatz = self.ansatz_circuit
+            else:
+                ansatz = QuantumCircuit(self.num_qubits)  # empty circuit
+                if self.ISA:  # needs correct layout
+                    ansatz = self._finalfixedlayout_pm.run(ansatz)
         else:
-            ansatz = QuantumCircuit(self.num_qubits)  # empty circuit
+            print("Measuring error mitigation read-out matrix with custom Ansatz.")
+            ansatz = custom_ansatz
         M = np.zeros((2**self.num_qubits, 2**self.num_qubits))
         ansatz_list = [None] * 2**self.num_qubits
-        if self.ISA:
+        if ansatz.layout is not None:
             for nr, comb in enumerate(itertools.product([0, 1], repeat=self.num_qubits)):
                 ansatzX = ansatz.copy()
-                for i, bit in enumerate(comb[::-1]):  # because of Qiskit ordering
+                # comb is in qN,qN-1,...,q0
+                for i, bit in enumerate(comb[::-1]):  # get q0 first
                     if bit == 1:
-                        ansatzX.x(self._measurement_indices[i])
+                        ansatzX.x(ansatz.layout.final_index_layout()[i])
                 # Make list of custom ansatz
                 ansatz_list[nr] = ansatzX
             # Simulate all elements with one device call
@@ -1261,7 +1601,7 @@ class QuantumInterface:
         else:
             for nr, comb in enumerate(itertools.product([0, 1], repeat=self.num_qubits)):
                 ansatzX = ansatz.copy()
-                for i, bit in enumerate(comb[::-1]):  # because of Qiskit ordering
+                for i, bit in enumerate(comb[::-1]):
                     if bit == 1:
                         ansatzX.x(i)
                 # Make list of custom ansatz
@@ -1274,10 +1614,11 @@ class QuantumInterface:
                 overwrite_shots=shots,
             )
         # Construct M
-        for idx2, Px in enumerate(Px_list):
-            for idx1, prob in Px.items():
+        for idx2, Px in enumerate(Px_list):  # prepared circuits
+            for idx1, prob in Px.items():  # measured outcomes
                 M[idx1, idx2] = prob
-        self._Minv = np.linalg.inv(M)
+        # self._M = M would be needed to do v1 M correction.
+        return np.linalg.inv(M)
 
     def get_info(self) -> None:
         """Get infos about settings."""
@@ -1285,16 +1626,15 @@ class QuantumInterface:
             data = f"Your settings are:\n {'Ansatz:':<20} {'custom circuit'}\n {'Number of shots:':<20} {self.shots}\n"
         else:
             data = f"Your settings are:\n {'Ansatz:':<20} {self.ansatz}\n {'Number of shots:':<20} {self.shots}\n"
-        data += f" {'ISA':<20} {self.ISA}\n {'Transpiled circuit':<20} {self._transpiled}\n {'Primitive:':<20} {self._primitive.__class__.__name__}\n"
+        data += f" {'ISA':<20} {self.ISA}\n {'Primitive:':<20} {self._primitive.__class__.__name__}\n"
         data += f" {'Post-processing:':<20} {self.do_postselection}"
-        if self.do_M_mitigation:
-            data += (
-                f"\n {'M mitigation:':<20} {self.do_M_mitigation}\n {'M Ansatz0:':<20} {self.do_M_ansatz0}"
-            )
+        data += f"\n {'M mitigation:':<20} {self.do_M_mitigation}\n {'M Ansatz0:':<20} {self.do_M_ansatz0}"
         if self.ISA:
-            data += f"\n {'Circuit layout:':<20} {self._measurement_indices}"
-            if self._internal_pm:
-                data += f"\n {'Transpiled backend:':<20} {self._primitive_backend}\n {'Transpiled opt. level:':<20} {self._primitive_level}"
+            data += f"\n {'Final layout:':<20} {self._final_ansatz_indices}"
+            data += f"\n {'Non-local gates:':<20} {self.ansatz_circuit.num_nonlocal_gates()}"
+            data += f"\n{'Transpiler settings:'}"
+            for key, value in self.pass_manager_options.items():
+                data += f"\n {key:<20} {value}"
             if isinstance(self._primitive, BaseSamplerV2) and hasattr(self._primitive.options, "twirling"):
                 data += f"\n {'Pauli twirling:':<20} {self._primitive.options.twirling.enable_gates}\n {'Dynamic decoupling:':<20} {self._primitive.options.dynamical_decoupling.enable}"
         print(data)
