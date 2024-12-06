@@ -319,25 +319,18 @@ class QuantumInterface:
             if hasattr(self, "circuit"):
                 self.update_pass_manager(self.pass_manager_options)
 
-    def update_pass_manager(self, pass_manager_options: dict[str, Any]) -> None:
+    def update_pass_manager(self, pass_manager_options: dict[str, Any] | None = None) -> None:
         """Pass new pass manager options and set pass manager.
 
         Args:
             pass_manager_options: Dictionary with pass manager options to update.
 
         """
-        # Update pass_manager_options
-        self.pass_manager_options.update(pass_manager_options)
-        self.set_pass_manager()
+        if pass_manager_options is not None:
+            # Update pass_manager_options
+            self.pass_manager_options.update(pass_manager_options)
 
-        # Check if circuit has been set
-        # In case of switching to new PassManager in later workflow
-        if hasattr(self, "circuit"):
-            print("Change in PassManager. Reconstructing circuit.")
-            self.construct_circuit(self.num_orbs, self.num_elec)
-
-    def set_pass_manager(self) -> None:
-        """Create pass manager based on pass manager options."""
+        # Create pass manager based on pass manager options
         allowed_pm_options = (
             "optimization_level",
             "backend",
@@ -358,7 +351,6 @@ class QuantumInterface:
                 " which is not in allowed options",
                 allowed_pm_options,
             )
-
         self._pass_manager = generate_preset_pass_manager(
             optimization_level=self.pass_manager_options.get("optimization_level"),
             backend=self.pass_manager_options.get("backend"),
@@ -369,6 +361,12 @@ class QuantumInterface:
             seed_transpiler=self.pass_manager_options.get("seed_transpiler"),
             optimization_method=self.pass_manager_options.get("optimization_method"),
         )
+
+        # Check if circuit has been set and PassManager options were updated
+        # In case of switching to new PassManager in later workflow
+        if pass_manager_options is not None and hasattr(self, "circuit"):
+            print("Change in PassManager. Reconstructing circuit.")
+            self.construct_circuit(self.num_orbs, self.num_elec)
 
     def redo_M_mitigation(self, shots: int | None = None) -> None:
         """Redo M_mitigation.
@@ -450,7 +448,7 @@ class QuantumInterface:
             Transpiled Circuit.
         """
         if self._pass_manager is None:
-            self.set_pass_manager()
+            self.update_pass_manager()
             assert self._pass_manager is not None
 
         circuit_return = self._pass_manager.run(circuit)
