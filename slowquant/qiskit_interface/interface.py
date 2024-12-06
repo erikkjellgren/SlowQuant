@@ -64,10 +64,9 @@ class QuantumInterface:
             primitive: Qiskit Estimator or Sampler object.
             ansatz: Name of ansatz to be used.
             mapper: Qiskit mapper object, e.g. JW or Parity.
-            ansatz_options: Ansatz options.
-            mapper: Qiskit mapper object.
             ISA: Use ISA for submitting to IBM quantum. Locally transpiling is performed.
             pass_manager_options: Dictionary to define custom pass manager.
+            ansatz_options: Ansatz options.
             shots: Number of shots. None means ideal simulator.
             max_shots_per_run: Maximum number of shots allowed in a single run. Set to 100000 per IBM machines.
             do_M_mitigation: Do error mitigation via read-out correlation matrix.
@@ -138,13 +137,7 @@ class QuantumInterface:
         )  # Contains information about the parameterization needed for gradient evaluations.
 
         # State prep circuit
-        if isinstance(self.ansatz, QuantumCircuit):
-            if self.do_M_ansatz0:
-                raise ValueError("M0 does currently not work with custom ansatz")
-            self.state_circuit: QuantumCircuit = QuantumCircuit(
-                self.ansatz.num_qubits
-            )  # empty state as custom circuit is passed
-        elif self.ansatz == "tUPS" and "do_pp" in self.ansatz_options.keys() and self.ansatz_options["do_pp"]:
+        if self.ansatz == "tUPS" and "do_pp" in self.ansatz_options.keys() and self.ansatz_options["do_pp"]:
             # HF in pp-tUPS ordering
             if not isinstance(self.mapper, JordanWignerMapper):
                 raise ValueError(f"pp-tUPS only implemented for JW mapper, got: {type(self.mapper)}")
@@ -162,7 +155,9 @@ class QuantumInterface:
 
         # Ansatz Circuit
         if isinstance(self.ansatz, QuantumCircuit):
-            print("QI was initialized with a custom QuantumCircuit object.")
+            print(
+                "QI was initialized with a custom QuantumCircuit object. This is assumed to be the Ansatz (without state preparation circuit)"
+            )
             self.circuit = self.ansatz
         elif self.ansatz == "fpUCCD":
             self.ansatz_options["pD"] = True
@@ -275,20 +270,21 @@ class QuantumInterface:
                         self._primitive._backend,  # pylint: disable=protected-access
                         "detected in primitive and added to pass manager options.",
                     )
+                    self.pass_manager_options["backend"] = (
+                        self._primitive._backend  # pylint: disable=protected-access
+                    )
                 else:
                     if (
                         self.pass_manager_options.get("backend")
                         != self._primitive._backend  # pylint: disable=protected-access
                     ):
                         print(
-                            "Backend",
+                            "WARNING: Backend ",
                             self._primitive._backend,  # pylint: disable=protected-access
-                            "detected in primitive and overwrites previous pass manager option item",
+                            "detected in primitive.\nPass manager uses ",
                             self.pass_manager_options.get("backend"),
+                            ".\nEnsure compatibility manually.\n",
                         )
-                self.pass_manager_options["backend"] = (
-                    self._primitive._backend  # pylint: disable=protected-access
-                )
 
             # Get optimization level from backend. Only for v1 primitives. Needed for default pass manager
             overwrite = False
