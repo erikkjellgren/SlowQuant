@@ -386,39 +386,39 @@ def construct_ucc_state(
             T += theta * G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
         else:
             raise ValueError(f"Got unknown excitation type, {exc_type}")
-    mv = functools.partial(
-        _propagate_state,
-        operators=[T],
-        idx2det=idx2det,
-        det2idx=det2idx,
-        num_inactive_orbs=num_inactive_orbs,
-        num_active_orbs=num_active_orbs,
-        num_virtual_orbs=num_virtual_orbs,
-        num_active_elec_alpha=num_active_elec_alpha,
-        num_active_elec_beta=num_active_elec_beta,
-        thetas=thetas,
-        wf_struct=ucc_struct,
-        do_folding=False,
-    )
-    rmv = functools.partial(
-        _propagate_state,
-        operators=[-1.0 * T],
-        idx2det=idx2det,
-        det2idx=det2idx,
-        num_inactive_orbs=num_inactive_orbs,
-        num_active_orbs=num_active_orbs,
-        num_virtual_orbs=num_virtual_orbs,
-        num_active_elec_alpha=num_active_elec_alpha,
-        num_active_elec_beta=num_active_elec_beta,
-        thetas=thetas,
-        wf_struct=ucc_struct,
-        do_folding=False,
-    )
+    # mv = functools.partial(
+    #    _propagate_state,
+    #    operators=[T],
+    #    idx2det=idx2det,
+    #    det2idx=det2idx,
+    #    num_inactive_orbs=num_inactive_orbs,
+    #    num_active_orbs=num_active_orbs,
+    #    num_virtual_orbs=num_virtual_orbs,
+    #    num_active_elec_alpha=num_active_elec_alpha,
+    #    num_active_elec_beta=num_active_elec_beta,
+    #    thetas=thetas,
+    #    wf_struct=ucc_struct,
+    #    do_folding=False,
+    # )
+    # rmv = functools.partial(
+    #    _propagate_state,
+    #    operators=[-1.0 * T],
+    #    idx2det=idx2det,
+    #    det2idx=det2idx,
+    #    num_inactive_orbs=num_inactive_orbs,
+    #    num_active_orbs=num_active_orbs,
+    #    num_virtual_orbs=num_virtual_orbs,
+    #    num_active_elec_alpha=num_active_elec_alpha,
+    #    num_active_elec_beta=num_active_elec_beta,
+    #    thetas=thetas,
+    #    wf_struct=ucc_struct,
+    #    do_folding=False,
+    # )
 
-    #linopT = ss.linalg.LinearOperator((len(state), len(state)), matvec=mv, rmatvec=rmv)
-    #if dagger:
+    # linopT = ss.linalg.LinearOperator((len(state), len(state)), matvec=mv, rmatvec=rmv)
+    # if dagger:
     #    return ss.linalg.expm_multiply(-linopT, state, traceA=0.0)
-    #return ss.linalg.expm_multiply(linopT, state, traceA=0.0)
+    # return ss.linalg.expm_multiply(linopT, state, traceA=0.0)
     # Evil matrix construction
     Tmat = build_operator_matrix(T, idx2det, det2idx, num_active_orbs)
     if dagger:

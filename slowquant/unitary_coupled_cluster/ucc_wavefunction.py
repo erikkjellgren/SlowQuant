@@ -1130,7 +1130,9 @@ class WaveFunctionUCC:
             eps = np.finfo(np.float64).eps ** (
                 1 / 2
             )  # half-precision of double-precision floating-point numbers
-            Hket = propagate_state([Hamiltonian], self.ci_coeffs,
+            Hket = propagate_state(
+                [Hamiltonian],
+                self.ci_coeffs,
                 self.idx2det,
                 self.det2idx,
                 self.num_inactive_orbs,
