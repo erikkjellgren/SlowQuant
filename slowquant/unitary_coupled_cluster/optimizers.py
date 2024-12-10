@@ -243,7 +243,7 @@ class RotoSolve:
 def get_energy_evals(
     f: Callable[[list[float]], float | list[float]], x: list[float], idx: int, R: int
 ) -> list[float] | list[list[float]]:
-    """Evaluate the function in all points needed for the reconstrucing in Rotosolve.
+    """Evaluate the function in all points needed for the reconstruction in Rotosolve.
 
     Args:
         f: Function to evaluate.
