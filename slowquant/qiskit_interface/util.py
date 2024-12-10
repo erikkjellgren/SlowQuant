@@ -237,6 +237,7 @@ class Clique:
         Returns:
             Sample state distribution.
         """
+        # Loop over all saved clique heads to find fit
         for clique_head in self.cliques:
             do_fit, head_fit = fit_in_clique(pauli, clique_head.head)
             if do_fit:
@@ -246,8 +247,33 @@ class Clique:
                     )
                 if clique_head.distr is None:
                     raise ValueError(f"Head, {clique_head.head}, has a distr that is None")
+                # Now apply EM
                 return clique_head.distr
         raise ValueError(f"Could not find matching clique for Pauli, {pauli}")
+
+    def get_value(
+        self,
+        paulis_str: list[str],
+        coeffs: list[float],
+        postselection: bool = False,
+        M: np.ndarray | None = None,
+    ) -> float:
+        """Get value."""
+
+        # Loop over all Pauli strings in observable and build final result with coefficients
+        for pauli, coeff in zip(paulis_str, coeffs):
+            result = 0.0
+            for key, value in self.get_distr(
+                pauli
+            ).items():  # Pass EM  # build result from quasi-distribution
+                result += value * get_bitstring_sign(pauli, key)
+            values += result * coeff
+
+        if isinstance(values, complex):
+            if abs(values.imag) > 10**-2:
+                print("Warning: Complex number detected with Im = ", values.imag)
+
+        return values.real
 
 
 def fit_in_clique(pauli: str, head: str) -> tuple[bool, str]:
@@ -335,7 +361,7 @@ def correct_distribution_with_layout_v2(
     for swap in swaps[::-1]:
         C_new = C_new[swap_indices(num_qubits, swap)]
     # Convert columnvector of probabilities to bitstring distribution
-    for bitint, prob in enumerate(C_new): 
+    for bitint, prob in enumerate(C_new):
         dist[bitint] = prob
     return dist
 
@@ -376,7 +402,7 @@ def correct_distribution_with_layout(
     # Apply M error mitigation matrix
     C_new = M_inv @ C
     # Convert columnvector of probabilities to bitstring distribution
-    for bitint, prob in enumerate(C_new): 
+    for bitint, prob in enumerate(C_new):
         dist[bitint] = prob
     return dist
 

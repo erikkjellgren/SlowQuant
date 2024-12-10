@@ -1057,6 +1057,8 @@ class QuantumInterface:
             # Simulate each clique head with one combined device call
             # and return a list of distributions
             distr = self._one_call_sampler_distributions(new_heads, self.parameters, run_circuit)
+            # Save raw distribution for given determinant
+            self.saver[det_int].update_distr(new_heads, distr)
 
             if self.do_M_mitigation:  # apply error mitigation if requested
                 if circuit_M is None:
@@ -1087,7 +1089,6 @@ class QuantumInterface:
                 for i, (dist, head) in enumerate(zip(distr, new_heads)):
                     if "X" not in head and "Y" not in head:
                         distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
-            self.saver[det_int].update_distr(new_heads, distr)
 
         # Loop over all Pauli strings in observable and build final result with coefficients
         for pauli, coeff in zip(paulis_str, observables.coeffs):
@@ -1360,6 +1361,7 @@ class QuantumInterface:
             Array of quasi-distributions in order of all circuits results for a given Pauli String first.
             E.g.: [PauliString[0] for Circuit[0], PauliString[0] for Circuit[1], ...]
         """
+        print("Measuring the following Pauli strings: ", paulis)
         if self._circuit_multipl > 1:
             shots: int | None = self.max_shots_per_run
         else:
