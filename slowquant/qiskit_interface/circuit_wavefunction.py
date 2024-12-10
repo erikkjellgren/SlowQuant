@@ -1045,7 +1045,7 @@ class WaveFunctionCircuit:
             self._move_cep()
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
-        # Build operator
+            # Build operator
             H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             return self.QI.quantum_expectation_value(H)
