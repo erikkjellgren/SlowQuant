@@ -1,4 +1,3 @@
-# pylint: disable=too-many-lines
 import functools
 from collections.abc import Generator, Sequence
 

@@ -186,7 +186,7 @@ def get_orbital_gradient(
     rdms: ReducedDenstiyMatrix,
     h_int: np.ndarray,
     g_int: np.ndarray,
-    kappa_idx: list[list[int]],
+    kappa_idx: list[tuple[int, int]],
     num_inactive_orbs: int,
     num_active_orbs: int,
 ) -> np.ndarray:
@@ -227,7 +227,7 @@ def get_orbital_gradient_response(
     rdms: ReducedDenstiyMatrix,
     h_int: np.ndarray,
     g_int: np.ndarray,
-    kappa_idx: list[list[int]],
+    kappa_idx: list[tuple[int, int]],
     num_inactive_orbs: int,
     num_active_orbs: int,
 ) -> np.ndarray:
@@ -278,7 +278,9 @@ def get_orbital_gradient_response(
     return 2 ** (-1 / 2) * gradient
 
 
-def get_orbital_response_metric_sigma(rdms: ReducedDenstiyMatrix, kappa_idx: list[list[int]]) -> np.ndarray:
+def get_orbital_response_metric_sigma(
+    rdms: ReducedDenstiyMatrix, kappa_idx: list[tuple[int, int]]
+) -> np.ndarray:
     r"""Calculate the Sigma matrix orbital-orbital block.
 
     .. math::
@@ -352,7 +354,7 @@ def get_orbital_response_vector_norm(
 def get_orbital_response_property_gradient(
     rdms: ReducedDenstiyMatrix,
     x_mo: np.ndarray,
-    kappa_idx: list[list[int]],
+    kappa_idx: list[tuple[int, int]],
     num_inactive_orbs: int,
     num_active_orbs: int,
     response_vectors: np.ndarray,
@@ -397,8 +399,8 @@ def get_orbital_response_hessian_block(
     rdms: ReducedDenstiyMatrix,
     h: np.ndarray,
     g: np.ndarray,
-    kappa_idx1: list[list[int]],
-    kappa_idx2: list[list[int]],
+    kappa_idx1: list[tuple[int, int]],
+    kappa_idx2: list[tuple[int, int]],
     num_inactive_orbs: int,
     num_active_orbs: int,
 ) -> np.ndarray:

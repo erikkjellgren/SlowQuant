@@ -3,7 +3,7 @@ from collections.abc import Sequence
 import numpy as np
 import scipy
 
-from slowquant.qiskit_interface.wavefunction import WaveFunction
+from slowquant.qiskit_interface.circuit_wavefunction import WaveFunctionCircuit
 from slowquant.unitary_coupled_cluster.operators import (
     G1_sa,
     G2_1_sa,
@@ -18,7 +18,7 @@ class quantumLRBaseClass:
 
     def __init__(
         self,
-        wf: WaveFunction,
+        wf: WaveFunctionCircuit,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
