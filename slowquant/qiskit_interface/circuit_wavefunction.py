@@ -1114,8 +1114,8 @@ def _get_energy_evals_for_grad(
 ) -> list[float]:
     """Get energy evaluations needed for the gradient calculation.
 
-    The gradient formula is defined for x=0,
-    so x_shift is used to shift ensure we can get the energy in the point we actually want.
+    The gradient formula is defined for x=0.
+    The x_shift variable is used to shift the energy function, such that current parameter value is in zero.
 
     Args:
         operator: Operator which the derivative is with respect to.

@@ -205,10 +205,16 @@ class RotoSolve:
         res = Result()
         for _ in range(self.max_iterations):
             for i, par_name in enumerate(self._param_names):
+                # Get the energy for specific values of theta_i, defined by the _R parameter.
                 e_vals = get_energy_evals(f, x, i, self._R[par_name])
+                # Do an analytic construction of the energy as a function of theta_i.
                 f_reconstructed = partial(reconstructed_f, energy_vals=e_vals, R=self._R[par_name])
+                # Evaluate the energy in many points.
                 values = f_reconstructed(np.linspace(-np.pi, np.pi, int(1e4)))
+                # Find the theta_i that gives the lowest energy.
                 theta = np.linspace(-np.pi, np.pi, int(1e4))[np.argmin(values)]
+                # Run an optimization on the theta_i that gives to the lowest energy in the previous step.
+                # This is to get more digits precision in value of theta_i.
                 res = scipy.optimize.minimize(f_reconstructed, x0=[theta], method="BFGS", tol=1e-12)
                 x[i] = res.x[0]
                 while x[i] < np.pi:
