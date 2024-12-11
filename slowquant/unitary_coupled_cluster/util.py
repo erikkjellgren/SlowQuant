@@ -76,6 +76,37 @@ def iterate_t2_sa(
                     yield a, i, b, j, fac, 2
 
 
+def iterate_t2_sa_t(
+    active_occ_idx: Sequence[int],
+    active_unocc_idx: Sequence[int],
+) -> Generator[tuple[int, int, int, int, float, int], None, None]:
+    """Iterate over triplet T2 spin-adapted operators.
+
+    Args:
+        active_occ_idx: Indices of strongly occupied orbitals.
+        active_unocc_idx: Indices of weakly occupied orbitals.
+
+    Returns:
+        Spin-adapted triplet T2 operator iteration.
+    """
+    for idx_i, i in enumerate(active_occ_idx):
+        for j in active_occ_idx[idx_i:]:
+            for idx_a, a in enumerate(active_unocc_idx):
+                for b in active_unocc_idx[idx_a:]:
+                    fac = 1 / (2 * 2 ** (1 / 2))
+                    if i == j and a == b:
+                        continue
+                    elif a == b:
+                        yield a, i, b, j, fac, 2
+                    elif i == j:
+                        yield a, i, b, j, fac, 3
+                    else:
+                        yield a, i, b, j, fac, 1
+                        fac = 1 / 2
+                        yield a, i, b, j, fac, 2
+                        yield a, i, b, j, fac, 3
+
+
 def iterate_t1_sa_generalized(
     num_orbs: int,
 ) -> Generator[tuple[int, int, float], None, None]:

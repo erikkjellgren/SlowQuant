@@ -1,5 +1,10 @@
+from collections.abc import Sequence
+
 import numpy as np
 
+from slowquant.molecularintegrals.integralfunctions import (
+    one_electron_integral_transform,
+)
 from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass_triplet import (
     LinearResponseBaseClass,
 )
@@ -7,13 +12,15 @@ from slowquant.unitary_coupled_cluster.operator_matrix import (
     expectation_value,
     propagate_state,
 )
-from slowquant.unitary_coupled_cluster.density_matrix_triplet import (
+from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_orbital_gradient_response,
     get_triplet_orbital_response_hessian_block,
     get_orbital_response_metric_sigma,
+    get_orbital_response_static_property_gradient,
 )
-from slowquant.unitary_coupled_cluster.ucc_wavefunction_triplet import WaveFunctionUCC
+from slowquant.unitary_coupled_cluster.operators import Tpq
+from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
 
@@ -111,33 +118,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
         )
-        """for j, qJ in enumerate(self.q_ops):
-            for i, qI in enumerate(self.q_ops[j:], j):
-                # Make A
-                # <0| qId H qJ |0>
-                val = expectation_value(
-                    self.wf.ci_coeffs,
-                    [qI.dagger * self.H_2i_2a * qJ],
-                    self.wf.ci_coeffs,
-                    *self.index_info,
-                )
-                # -<0| qId qJ H |0>
-                val -= expectation_value(
-                    self.wf.ci_coeffs,
-                    [qI.dagger * qJ * self.H_2i_2a],
-                    self.wf.ci_coeffs,
-                    *self.index_info,
-                )
-                self.A[i,j] = self.A[j,i] = val
-                # Make B
-                # -<0| qId qJd H |0>
-                val = - expectation_value(
-                    self.wf.ci_coeffs,
-                    [qI.dagger * qJ.dagger * self.H_2i_2a],
-                    self.wf.ci_coeffs,
-                    *self.index_info,
-                )
-                self.B[i,j] = self.B [j,i] = val"""
         self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
             rdms, self.wf.kappa_no_activeactive_idx
         )
@@ -265,3 +245,74 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     *self.index_info,
                 )
                 self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = val
+
+    def get_property_gradient(self, property_integrals: Sequence[np.ndarray]) -> np.ndarray:
+        """Calculate property gradient.
+
+        Args:
+            property_integrals: Integrals in AO basis.
+
+        Returns:
+            Property gradient.
+        """
+        rdms = ReducedDenstiyMatrix(
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
+            self.wf.rdm1,
+        )
+        num_mo = len(property_integrals)
+        size_mo = self.wf.num_inactive_orbs + self.wf.num_active_orbs + self.wf.num_virtual_orbs
+        mo = np.zeros((num_mo, size_mo, size_mo))
+        for i, ao in enumerate(property_integrals):
+            mo[i,:,:] += one_electron_integral_transform(self.wf.c_trans, ao)
+
+        idx_shift = len(self.q_ops)
+        V = np.zeros((len(self.q_ops + self.G_ops), num_mo))
+
+        V[: idx_shift, :] = get_orbital_response_static_property_gradient(
+            rdms, 
+            mo, 
+            self.wf.kappa_no_activeactive_idx,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+        )
+
+        for idx, G in enumerate(self.G_ops):
+            G_ket = propagate_state([G], self.wf.ci_coeffs, *self.index_info)
+            Gd_ket = propagate_state([G.dagger], self.wf.ci_coeffs, *self.index_info)
+            # Inactive part
+            for i in range(self.wf.num_inactive_orbs):
+                E_ket = propagate_state([Tpq(i, i)], self.wf.ci_coeffs, *self.index_info)
+                # < 0 | G E | 0 >
+                val = expectation_value(
+                    Gd_ket,
+                    [],
+                    E_ket,
+                    *self.index_info)
+                # - < 0 | E G | 0 >
+                val -= expectation_value(
+                    E_ket,
+                    [],
+                    G_ket,
+                    *self.index_info)
+                V[idx + idx_shift, :] += mo[:,i, i] * val
+            # Active part
+            for p in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):
+                for q in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):
+                    E_ket = propagate_state([Tpq(p, q)], self.wf.ci_coeffs, *self.index_info)
+                    Ed_ket = propagate_state([Tpq(q, p)], self.wf.ci_coeffs, *self.index_info)
+                    # < 0 | G E | 0 >
+                    val = expectation_value(
+                        Gd_ket,
+                        [],
+                        E_ket,
+                        *self.index_info)
+                    # - < 0 | E G | 0 >
+                    val -= expectation_value(
+                        Ed_ket,
+                        [],
+                        G_ket,
+                        *self.index_info)
+                    V[idx + idx_shift, :] += mo[:,p, q] * val
+        return np.concatenate((V, -1 * V))

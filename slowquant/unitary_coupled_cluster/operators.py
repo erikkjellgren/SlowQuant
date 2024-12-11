@@ -42,6 +42,28 @@ def Epq(p: int, q: int) -> FermionicOperator:
     return E
 
 
+def Tpq(p: int, q: int) -> FermionicOperator:
+    r"""Construct the triplet one-electron excitation operator.
+
+    .. math::
+        \hat{T}_{pq} = \hat{a}^\dagger_{p,\alpha}\hat{a}_{q,\alpha} - \hat{a}^\dagger_{p,\beta}\hat{a}_{q,\beta}
+
+    Args:
+        p: Spatial orbital index.
+        q: Spatial orbital index.
+
+    Returns:
+        Triplet one-electron excitation operator.
+    """
+    T = FermionicOperator(a_op(p, "alpha", dagger=True), 1) * FermionicOperator(
+        a_op(q, "alpha", dagger=False), 1
+    )
+    T -= FermionicOperator(a_op(p, "beta", dagger=True), 1) * FermionicOperator(
+        a_op(q, "beta", dagger=False), 1
+    )
+    return T
+
+
 def epqrs(p: int, q: int, r: int, s: int) -> FermionicOperator:
     r"""Construct the singlet two-electron excitation operator.
 
@@ -340,6 +362,82 @@ def G2_2_sa(i: int, j: int, a: int, b: int) -> FermionicOperator:
         Second singlet two-elecetron spin-adapted excitation operator.
     """
     return 1 / (2 * 3 ** (1 / 2)) * (Epq(a, i) * Epq(b, j) - Epq(a, j) * Epq(b, i))
+
+
+def G1_sa_t(i: int, a: int) -> FermionicOperator:
+    r"""Construct triplet one-electron spin-adapted excitation operator.
+
+    .. math::
+        ^T\hat{G}^{[1]}_{ia} = \frac{1}{\sqrt{2}}\hat{T}_{ai}
+
+    Args:
+        i: Spatial orbital index.
+        a: Spatial orbital index.
+
+    Returns:
+        Triplet one-elecetron spin-adapted excitation operator.
+    """
+    return 2 ** (-1 / 2) * Tpq(a, i)
+
+
+def G2_1_sa_t(i: int, j: int, a: int, b: int) -> FermionicOperator:
+    r"""Construct first triplet two-electron spin-adapted excitation operator.
+
+    .. math::
+        ^T\hat{G}^{[1]}_{aibj} = \frac{1}{2\sqrt{2}}\left(\hat{E}_{aj}\hat{T}_{bi} + \hat{E}_{bi}\hat{T}_{aj}\right)
+
+    Args:
+        i: Spatial orbital index.
+        j: Spatial orbital index.
+        a: Spatial orbital index.
+        b: Spatial orbital index.
+
+    Returns:
+        First triplet two-elecetron spin-adapted excitation operator. 
+    """
+    return 1 / (2 * 2 ** (1 / 2)) * (Epq(a, j) * Tpq(b, i) + Epq(b, i) * Tpq(a, j))
+
+
+def G2_2_sa_t(i: int, j: int, a: int, b: int) -> FermionicOperator:
+    r"""Construct second triplet two-electron spin-adapted excitation operator.
+
+    .. math::
+        ^T\hat{G}^{[2]}_{aibj} = \frac{1}{2\sqrt{\left(1+\delta_{ab}\right)}}\left(\hat{E}_{bj}\hat{T}_{ai} + \hat{E}_{aj}\hat{T}_{bi}\right)
+
+    Args:
+        i: Spatial orbital index.
+        j: Spatial orbital index.
+        a: Spatial orbital index.
+        b: Spatial orbital index.
+
+    Returns:
+        Second triplet two-elecetron spin-adapted excitation operator. 
+    """
+    fac = 1
+    if a == b:
+        fac *= 2
+    return 1 / (2 * fac ** (1 / 2)) * (Epq(b, j) * Tpq(a, i) + Epq(a, j) * Tpq(b, i))
+
+
+def G2_3_sa_t(i: int, j: int, a: int, b: int) -> FermionicOperator:
+    r"""Construct third triplet two-electron spin-adapted excitation operator.
+
+    .. math::
+        ^T\hat{G}^{[3]}_{aibj} = \frac{1}{2\sqrt{\left(1+\delta_{ij}\right)}}\left(\hat{E}_{bj}\hat{T}_{ai} + \hat{E}_{bi}\hat{T}_{aj}\right)
+
+    Args:
+        i: Spatial orbital index.
+        j: Spatial orbital index.
+        a: Spatial orbital index.
+        b: Spatial orbital index.
+
+    Returns:
+        Third triplet two-elecetron spin-adapted excitation operator. 
+    """
+    fac = 1
+    if i == j:
+        fac *= 2
+    return 1 / (2 * 2 ** (1 / 2)) * (Epq(b, j) * Tpq(a, i) + Epq(b, i) * Tpq(a, j))
 
 
 def hamiltonian_full_space(h_mo: np.ndarray, g_mo: np.ndarray, num_orbs: int) -> FermionicOperator:

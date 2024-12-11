@@ -11,6 +11,7 @@ class ReducedDenstiyMatrix:
         num_virtual_orbs: int,
         rdm1: np.ndarray,
         rdm2: np.ndarray | None = None,
+        t_rdm2: np.ndarray | None = None,
     ) -> None:
         """Initialize reduced density matrix class.
 
@@ -36,6 +37,7 @@ class ReducedDenstiyMatrix:
         self.idx_shift = num_inactive_orbs
         self.rdm1 = rdm1
         self.rdm2 = rdm2
+        self.t_rdm2 = t_rdm2
 
     def RDM1(self, p: int, q: int) -> float:
         r"""Get full space one-electron reduced density matrix element.
@@ -143,6 +145,68 @@ class ReducedDenstiyMatrix:
             val = 0
             if p == q and r == s:
                 val += 4
+            if q == r and p == s:
+                val -= 2
+            return val
+        return 0
+    
+
+    def t_RDM2(self, p: int, q: int, r: int, s: int) -> float:  # pylint: disable=R0911
+        r"""Get full space triplet two-electron reduced density matrix element.
+
+        .. math::
+            \Gamma^{T [2]}_{pqrs} = \left\{\begin{array}{ll}
+                                  - 2\delta_{jk}\delta_{il} & pqrs = ijkl\\
+                                  - \delta_{ij}\Gamma^{[1]}_{vw} & pqrs = ivwj\\
+                                  \left<0\left|\hat{e}_{vwxy}\right|0\right> & pqrs = vwxy\\
+                                  0 & \text{otherwise} \\
+                                  \end{array} \right.
+
+        and the symmetry `\Gamma^{T [2]}_{pqrs}=\Gamma^{T [2]}_{rspq}=\Gamma^{T [2]}_{qpsr}=\Gamma^{T [2]}_{srqp}`:math:.
+
+        Args:
+            p: Spatial orbital index.
+            q: Spatial orbital index.
+            r: Spatial orbital index.
+            s: Spatial orbital index.
+
+        Returns:
+            Triplet two-electron reduced density matrix element.
+        """
+        if self.t_rdm2 is None:
+            raise ValueError("triplet RDM2 is not given.")
+        if p in self.active_idx and q in self.active_idx and r in self.active_idx and s in self.active_idx:
+            return self.t_rdm2[
+                p - self.idx_shift,
+                q - self.idx_shift,
+                r - self.idx_shift,
+                s - self.idx_shift,
+            ]
+        if (
+            p in self.inactive_idx
+            and q in self.active_idx
+            and r in self.active_idx
+            and s in self.inactive_idx
+        ):
+            if p == s:
+                return -self.rdm1[q - self.idx_shift, r - self.idx_shift]
+            return 0
+        if (
+            p in self.active_idx
+            and q in self.inactive_idx
+            and r in self.inactive_idx
+            and s in self.active_idx
+        ):
+            if q == r:
+                return -self.rdm1[p - self.idx_shift, s - self.idx_shift]
+            return 0
+        if (
+            p in self.inactive_idx
+            and q in self.inactive_idx
+            and r in self.inactive_idx
+            and s in self.inactive_idx
+        ):
+            val = 0
             if q == r and p == s:
                 val -= 2
             return val
@@ -456,3 +520,98 @@ def get_orbital_response_hessian_block(
                         if t == n:
                             A2e[idx1, idx2] -= g[p, q, r, m] * rdms.RDM2(p, q, r, u)
     return 1 / 2 * A1e + 1 / 4 * A2e
+
+
+def get_triplet_orbital_response_hessian_block(
+    rdms: ReducedDenstiyMatrix,
+    h: np.ndarray,
+    g: np.ndarray,
+    kappa_idx1: list[list[int]],
+    kappa_idx2: list[list[int]],
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+) -> np.ndarray:
+    r"""Calculate Hessian-like orbital-orbital block for triplet response.
+
+    .. math::
+        H^{\hat{q}^T,\hat{q}^T}_{tu,mn} = \left<0\left|\left[\hat{q}^T_{tu},\left[\hat{H},\hat{q}^T_{mn}\right]\right]\right|0\right>
+
+    Args:
+       rdms: Reduced density matrix class.
+       kappa_idx1: Orbital parameter indicies in spatial basis.
+       kappa_idx1: Orbital parameter indicies in spatial basis.
+       num_inactive_orbs: Number of inactive orbitals in spatial basis.
+       num_active_orbs: Number of active orbitals in spatial basis.
+
+    Returns:
+        Hessian-like triplet orbital-orbital block.
+    """
+    A1e = np.zeros((len(kappa_idx1), len(kappa_idx1)))
+    A2e = np.zeros((len(kappa_idx1), len(kappa_idx1)))
+    for idx1, (t, u) in enumerate(kappa_idx1):
+        for idx2, (m, n) in enumerate(kappa_idx2):
+            # 1e contribution
+            A1e[idx1, idx2] += h[n, t] * rdms.RDM1(m, u)
+            A1e[idx1, idx2] += h[u, m] * rdms.RDM1(t, n)
+            for p in range(num_inactive_orbs + num_active_orbs):
+                if m == u:
+                    A1e[idx1, idx2] -= h[n, p] * rdms.RDM1(t, p)
+                if t == n:
+                    A1e[idx1, idx2] -= h[p, m] * rdms.RDM1(p, u)
+            # 2e contribution
+            for p in range(num_inactive_orbs + num_active_orbs):
+                for q in range(num_inactive_orbs + num_active_orbs):
+                    A2e[idx1, idx2] += g[n, t, p, q] * rdms.RDM2(m, u, p, q)
+                    A2e[idx1, idx2] -= g[n, p, u, q] * rdms.t_RDM2(m, p, t, q)
+                    A2e[idx1, idx2] += g[n, p, q, t] * rdms.t_RDM2(m, p, q, u)
+                    A2e[idx1, idx2] += g[u, m, p, q] * rdms.RDM2(t, n, p, q)
+                    A2e[idx1, idx2] += g[p, m, u, q] * rdms.t_RDM2(p, n, t, q)
+                    A2e[idx1, idx2] -= g[p, m, q, t] * rdms.t_RDM2(p, n, q, u)
+                    A2e[idx1, idx2] -= g[u, p, n, q] * rdms.t_RDM2(t, p, m, q)
+                    A2e[idx1, idx2] += g[p, t, n, q] * rdms.t_RDM2(p, u, m, q)
+                    A2e[idx1, idx2] += g[p, q, n, t] * rdms.RDM2(p, q, m, u)
+                    A2e[idx1, idx2] += g[u, p, q, m] * rdms.t_RDM2(t, p, q, n)
+                    A2e[idx1, idx2] -= g[p, t, q, m] * rdms.t_RDM2(p, u, q, n)
+                    A2e[idx1, idx2] += g[p, q, u, m] * rdms.RDM2(p, q, t, n)
+            for p in range(num_inactive_orbs + num_active_orbs):
+                for q in range(num_inactive_orbs + num_active_orbs):
+                    for r in range(num_inactive_orbs + num_active_orbs):
+                        if m == u:
+                            A2e[idx1, idx2] -= g[n, p, q, r] * rdms.RDM2(t, p, q, r)
+                        if t == n:
+                            A2e[idx1, idx2] -= g[p, m, q, r] * rdms.RDM2(p, u, q, r)
+                        if m == u:
+                            A2e[idx1, idx2] -= g[p, q, n, r] * rdms.RDM2(p, q, t, r)
+                        if t == n:
+                            A2e[idx1, idx2] -= g[p, q, r, m] * rdms.RDM2(p, q, r, u)
+    return 1 / 2 * A1e + 1 / 4 * A2e
+
+
+def get_orbital_response_static_property_gradient(
+    rdms: ReducedDenstiyMatrix,
+    mo: np.ndarray,
+    kappa_idx: list[list[int]],
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+) -> float:
+    r"""Calculate the orbital part of static property gradient.
+
+    .. math::
+        P^{\hat{q}} = \frac{1}{\sqrt{2}}\sum_{p}\left(-x_{np}\Gamma^{[1]}_{mp} + x_{pm}\Gamma^{[1]}_{pn}\right)
+
+    Args:
+       rdms: Reduced density matrix class.
+       mo: Property integral in MO basis.
+       kappa_idx: Orbital parameter indicies in spatial basis.
+       num_inactive_orbs: Number of inactive orbitals in spatial basis.
+       num_active_orbs: Number of active orbitals in spatial basis.
+
+    Returns:
+        Orbital part of static property gradient.
+    """
+    prop_grad = np.zeros((len(kappa_idx), len(mo)))
+    for idx, (m, n) in enumerate(kappa_idx):
+        for p in range(num_inactive_orbs + num_active_orbs):
+            prop_grad[idx, :] -= mo[:,n, p] * rdms.RDM1(m, p)
+            prop_grad[idx, :] += mo[:,p, m] * rdms.RDM1(p, n)
+    return 2 ** (-1 / 2) * prop_grad

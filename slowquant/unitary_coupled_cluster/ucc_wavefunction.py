@@ -25,7 +25,7 @@ from slowquant.unitary_coupled_cluster.operator_matrix import (
     expectation_value_mat,
     get_indexing,
 )
-from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
+from slowquant.unitary_coupled_cluster.operators import Epq, Tpq, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.util import UccStructure
 
 
@@ -83,6 +83,7 @@ class WaveFunctionUCC:
         self.num_virtual_spin_orbs = 0
         self._rdm1 = None
         self._rdm2 = None
+        self._t_rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
         self._h_mo = None
@@ -316,6 +317,7 @@ class WaveFunctionUCC:
             raise ValueError(f"Expected {len(self._thetas)} theta1 values got {len(theta)}")
         self._rdm1 = None
         self._rdm2 = None
+        self._t_rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
         self._ci_coeffs = None
@@ -399,7 +401,7 @@ class WaveFunctionUCC:
 
     @property
     def rdm2(self) -> np.ndarray:
-        """Calculate two-electron reduced density matrix in the actice space.
+        """Calculate two-electron reduced density matrix in the active space.
 
         Returns:
             Two-electron reduced density matrix.
@@ -450,6 +452,62 @@ class WaveFunctionUCC:
                             self._rdm2[q_idx, p_idx, s_idx, r_idx] = val  # type: ignore
                             self._rdm2[s_idx, r_idx, q_idx, p_idx] = val  # type: ignore
         return self._rdm2
+    
+
+    @property
+    def t_rdm2(self) -> np.ndarray:
+        """Calculate triplet two-electron reduced density matrix in the active space.
+
+        Returns:
+            Triplet two-electron reduced density matrix.
+        """
+        if self._t_rdm2 is None:
+            self._t_rdm2 = np.zeros(
+                (
+                    self.num_active_orbs,
+                    self.num_active_orbs,
+                    self.num_active_orbs,
+                    self.num_active_orbs,
+                )
+            )
+            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                p_idx = p - self.num_inactive_orbs
+                for q in range(self.num_inactive_orbs, p + 1):
+                    q_idx = q - self.num_inactive_orbs
+                    for r in range(self.num_inactive_orbs, p + 1):
+                        r_idx = r - self.num_inactive_orbs
+                        if p == q:
+                            s_lim = r + 1
+                        elif p == r:
+                            s_lim = q + 1
+                        elif q < r:
+                            s_lim = p
+                        else:
+                            s_lim = p + 1
+                        for s in range(self.num_inactive_orbs, s_lim):
+                            s_idx = s - self.num_inactive_orbs
+                            val = expectation_value(
+                                self.ci_coeffs,
+                                [Tpq(p, q), Tpq(r, s)],
+                                self.ci_coeffs,
+                                self.idx2det,
+                                self.det2idx,
+                                self.num_inactive_orbs,
+                                self.num_active_orbs,
+                                self.num_virtual_orbs,
+                                self.num_active_elec_alpha,
+                                self.num_active_elec_beta,
+                                self.thetas,
+                                self.ucc_layout,
+                            )
+                            if q == r:
+                                val -= self.rdm1[p_idx, s_idx]
+                            self._t_rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
+                            self._t_rdm2[r_idx, s_idx, p_idx, q_idx] = val  # type: ignore
+                            self._t_rdm2[q_idx, p_idx, s_idx, r_idx] = val  # type: ignore
+                            self._t_rdm2[s_idx, r_idx, q_idx, p_idx] = val  # type: ignore
+        return self._t_rdm2
+
 
     @property
     def rdm3(self) -> np.ndarray:

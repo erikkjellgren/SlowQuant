@@ -2,7 +2,7 @@ import numpy as np
 import scipy
 
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
-from slowquant.unitary_coupled_cluster.operators_triplet import (
+from slowquant.unitary_coupled_cluster.operators import (
     G3,
     G4,
     G5,
@@ -14,11 +14,10 @@ from slowquant.unitary_coupled_cluster.operators_triplet import (
     G2_3_sa_t,
     hamiltonian_0i_0a,
     hamiltonian_1i_1a,
-    hamiltonian_2i_2a,
 )
-from slowquant.unitary_coupled_cluster.ucc_wavefunction_triplet import WaveFunctionUCC
+from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
-from slowquant.unitary_coupled_cluster.util_triplet import (
+from slowquant.unitary_coupled_cluster.util import (
     UccStructure,
     UpsStructure,
     iterate_t1_sa,
@@ -27,10 +26,6 @@ from slowquant.unitary_coupled_cluster.util_triplet import (
     iterate_t4,
     iterate_t5,
     iterate_t6,
-)
-
-from slowquant.unitary_coupled_cluster.operator_matrix import (
-    expectation_value,
 )
 
 class LinearResponseBaseClass:
@@ -120,13 +115,6 @@ class LinearResponseBaseClass:
         self.B = np.zeros((num_parameters, num_parameters))
         self.Sigma = np.zeros((num_parameters, num_parameters))
         self.Delta = np.zeros((num_parameters, num_parameters))
-        self.H_2i_2a = hamiltonian_2i_2a(
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-        )
         self.H_1i_1a = hamiltonian_1i_1a(
             self.wf.h_mo,
             self.wf.g_mo,
@@ -217,52 +205,4 @@ class LinearResponseBaseClass:
             )
 
         return norms
-    
-    def get_property_gradient(self, property_integrals):
-        """Calculate property gradient.
 
-        Args:
-            property_integrals: Integrals (x,y,z) in AO basis.
-
-        Returns:
-            Property gradient.
-        """
-        mo_coeffs = self.wf.c_trans
-        #out_shape = property_integrals[:-2]
-        #property_integrals = property_integrals.reshape(-1, len(mo_coeffs), len(mo_coeffs))
-        mo_integrals = np.einsum('uj,xuv,vi->xij', mo_coeffs, property_integrals, mo_coeffs)
-
-        ops = self.q_ops + self.G_ops
-        pg = []
-
-        for G in (ops):
-            u = np.zeros(len(mo_integrals), dtype=np.complex128)
-            for i in range(len(mo_integrals[0])):
-                for j in range(len(mo_integrals[0])):
-                    P = Tpq(i, j)
-                    ExpectationValue = expectation_value(
-                        self.wf.ci_coeffs,
-                        [G*P - P*G],
-                        self.wf.ci_coeffs,
-                        *self.index_info)
-
-                    u[:] += mo_integrals[:,i,j]*ExpectationValue
-            pg.extend(u)
-        
-        for op in (ops):
-            G = op.dagger
-            u = np.zeros(len(mo_integrals), dtype=np.complex128)
-            for i in range(len(mo_integrals[0])):
-                for j in range(len(mo_integrals[0])):
-                    P = Tpq(i, j)
-                    ExpectationValue = expectation_value(
-                        self.wf.ci_coeffs,
-                        [G*P - P*G],
-                        self.wf.ci_coeffs,
-                        *self.index_info)
-
-                    u[:] += mo_integrals[:,i,j]*ExpectationValue
-            pg.extend(u)
-
-        #return np.reshape(pg, (len(mo_integrals),-1),  order='F').reshape(*out_shape, -1)
-        return np.reshape(pg, (len(mo_integrals),-1),  order='F')
