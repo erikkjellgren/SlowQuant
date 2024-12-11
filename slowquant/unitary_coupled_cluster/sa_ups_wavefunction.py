@@ -18,12 +18,13 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_gradient,
 )
 from slowquant.unitary_coupled_cluster.operator_matrix import (
-    construct_ups_state,
+    construct_ups_state_SA,
     expectation_value,
-    get_grad_action,
+    expectation_value_SA,
+    get_grad_action_SA,
     get_indexing,
-    propagate_state,
-    propagate_unitary,
+    propagate_state_SA,
+    propagate_unitary_SA,
 )
 from slowquant.unitary_coupled_cluster.operators import (
     Epq,
@@ -279,23 +280,18 @@ class WaveFunctionSAUPS:
             State vector.
         """
         if self._ci_coeffs is None:
-            tmp = []
-            for coeffs in self.csf_coeffs:
-                tmp.append(
-                    construct_ups_state(
-                        coeffs,
-                        self.idx2det,
-                        self.det2idx,
-                        self.num_inactive_orbs,
-                        self.num_active_orbs,
-                        self.num_virtual_orbs,
-                        self.num_active_elec_alpha,
-                        self.num_active_elec_beta,
-                        self.thetas,
-                        self.ups_layout,
-                    )
-                )
-            self._ci_coeffs = np.array(tmp)
+            self._ci_coeffs = construct_ups_state_SA(
+                self.csf_coeffs,
+                self.idx2det,
+                self.det2idx,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.num_virtual_orbs,
+                self.num_active_elec_alpha,
+                self.num_active_elec_beta,
+                self.thetas,
+                self.ups_layout,
+            )
         return self._ci_coeffs  # type: ignore[return-value]
 
     @property
@@ -391,24 +387,21 @@ class WaveFunctionSAUPS:
                         p_idx,
                         q_idx,
                     )
-                    # Loop over each state in SA
-                    for coeffs in self.ci_coeffs:
-                        val += expectation_value(
-                            coeffs,
-                            [Epq_op],
-                            coeffs,
-                            self.idx2det,
-                            self.det2idx,
-                            self.num_inactive_orbs,
-                            self.num_active_orbs,
-                            self.num_virtual_orbs,
-                            self.num_active_elec_alpha,
-                            self.num_active_elec_beta,
-                            self.thetas,
-                            self.ups_layout,
-                            do_folding=False,
-                        )
-                    val = val / len(self.ci_coeffs)
+                    val = expectation_value_SA(
+                        self.ci_coeffs,
+                        [Epq_op],
+                        self.ci_coeffs,
+                        self.idx2det,
+                        self.det2idx,
+                        self.num_inactive_orbs,
+                        self.num_active_orbs,
+                        self.num_virtual_orbs,
+                        self.num_active_elec_alpha,
+                        self.num_active_elec_beta,
+                        self.thetas,
+                        self.ups_layout,
+                        do_folding=False,
+                    )
                     self._rdm1[p_idx, q_idx] = val  # type: ignore
                     self._rdm1[q_idx, p_idx] = val  # type: ignore
         return self._rdm1
@@ -453,25 +446,21 @@ class WaveFunctionSAUPS:
                                 r_idx,
                                 s_idx,
                             )
-                            val = 0.0
-                            # Loop over each state in SA
-                            for coeffs in self.ci_coeffs:
-                                val += expectation_value(
-                                    coeffs,
-                                    [Epq_op, Ers_op],
-                                    coeffs,
-                                    self.idx2det,
-                                    self.det2idx,
-                                    self.num_inactive_orbs,
-                                    self.num_active_orbs,
-                                    self.num_virtual_orbs,
-                                    self.num_active_elec_alpha,
-                                    self.num_active_elec_beta,
-                                    self.thetas,
-                                    self.ups_layout,
-                                    do_folding=False,
-                                )
-                            val = val / len(self.ci_coeffs)
+                            val = expectation_value_SA(
+                                self.ci_coeffs,
+                                [Epq_op, Ers_op],
+                                self.ci_coeffs,
+                                self.idx2det,
+                                self.det2idx,
+                                self.num_inactive_orbs,
+                                self.num_active_orbs,
+                                self.num_virtual_orbs,
+                                self.num_active_elec_alpha,
+                                self.num_active_elec_beta,
+                                self.thetas,
+                                self.ups_layout,
+                                do_folding=False,
+                            )
                             if q == r:
                                 val -= self.rdm1[p_idx, s_idx]
                             self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
@@ -502,30 +491,27 @@ class WaveFunctionSAUPS:
             State-averaged electronic energy.
         """
         if self._sa_energy is None:
-            self._sa_energy = 0.0
             Hamiltonian = hamiltonian_0i_0a(
                 self.h_mo,
                 self.g_mo,
                 self.num_inactive_orbs,
                 self.num_active_orbs,
             ).get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-            for coeffs in self.ci_coeffs:
-                self._sa_energy += expectation_value(
-                    coeffs,
-                    [Hamiltonian],
-                    coeffs,
-                    self.idx2det,
-                    self.det2idx,
-                    self.num_inactive_orbs,
-                    self.num_active_orbs,
-                    self.num_virtual_orbs,
-                    self.num_active_elec_alpha,
-                    self.num_active_elec_beta,
-                    self.thetas,
-                    self.ups_layout,
-                    do_folding=False,
-                )
-            self._sa_energy = self._sa_energy / len(self.ci_coeffs)
+            self._sa_energy = expectation_value_SA(
+                self.ci_coeffs,
+                [Hamiltonian],
+                self.ci_coeffs,
+                self.idx2det,
+                self.det2idx,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.num_virtual_orbs,
+                self.num_active_elec_alpha,
+                self.num_active_elec_beta,
+                self.thetas,
+                self.ups_layout,
+                do_folding=False,
+            )
         return self._sa_energy
 
     def run_wf_optimization_2step(
@@ -877,29 +863,43 @@ class WaveFunctionSAUPS:
         Hamiltonian = hamiltonian_0i_0a(
             self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
         ).get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-        energies = []
-        # Energy for each state in SA
-        for coeffs in self.ci_coeffs:
-            energies.append(
-                expectation_value(
-                    coeffs,
-                    [Hamiltonian],
-                    coeffs,
-                    self.idx2det,
-                    self.det2idx,
-                    self.num_inactive_orbs,
-                    self.num_active_orbs,
-                    self.num_virtual_orbs,
-                    self.num_active_elec_alpha,
-                    self.num_active_elec_beta,
-                    self.thetas,
-                    self.ups_layout,
-                    do_folding=False,
-                )
-            )
         if return_all_states:
+            energies = []
+            # Energy for each state in SA
+            for coeffs in self.ci_coeffs:
+                energies.append(
+                    expectation_value(
+                        coeffs,
+                        [Hamiltonian],
+                        coeffs,
+                        self.idx2det,
+                        self.det2idx,
+                        self.num_inactive_orbs,
+                        self.num_active_orbs,
+                        self.num_virtual_orbs,
+                        self.num_active_elec_alpha,
+                        self.num_active_elec_beta,
+                        self.thetas,
+                        self.ups_layout,
+                        do_folding=False,
+                    )
+                )
             return energies
-        return float(np.mean(energies))
+        return expectation_value_SA(
+            self.ci_coeffs,
+            [Hamiltonian],
+            self.ci_coeffs,
+            self.idx2det,
+            self.det2idx,
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+            self.num_virtual_orbs,
+            self.num_active_elec_alpha,
+            self.num_active_elec_beta,
+            self.thetas,
+            self.ups_layout,
+            do_folding=False,
+        )
 
     def _calc_gradient_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
@@ -945,83 +945,79 @@ class WaveFunctionSAUPS:
                 self.num_active_orbs,
             ).get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             # Reference bra state (no differentiations)
-            bra_vec = np.copy(self.ci_coeffs)
-            for i, coeffs in enumerate(bra_vec):
-                bra_vec[i] = propagate_state(
-                    [Hamiltonian],
-                    coeffs,
-                    self.idx2det,
-                    self.det2idx,
-                    self.num_inactive_orbs,
-                    self.num_active_orbs,
-                    self.num_virtual_orbs,
-                    self.num_active_elec_alpha,
-                    self.num_active_elec_beta,
-                    self.thetas,
-                    self.ups_layout,
-                    do_folding=False,
-                )
-                bra_vec[i] = construct_ups_state(
-                    bra_vec[i],
-                    self.idx2det,
-                    self.det2idx,
-                    self.num_inactive_orbs,
-                    self.num_active_orbs,
-                    self.num_virtual_orbs,
-                    self.num_active_elec_alpha,
-                    self.num_active_elec_beta,
-                    self.thetas,
-                    self.ups_layout,
-                    dagger=True,
-                )
+            bra_vec = propagate_state_SA(
+                [Hamiltonian],
+                self.ci_coeffs,
+                self.idx2det,
+                self.det2idx,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.num_virtual_orbs,
+                self.num_active_elec_alpha,
+                self.num_active_elec_beta,
+                self.thetas,
+                self.ups_layout,
+                do_folding=False,
+            )
+            bra_vec = construct_ups_state_SA(
+                bra_vec,
+                self.idx2det,
+                self.det2idx,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.num_virtual_orbs,
+                self.num_active_elec_alpha,
+                self.num_active_elec_beta,
+                self.thetas,
+                self.ups_layout,
+                dagger=True,
+            )
             # CSF reference state on ket
             ket_vec = np.copy(self.csf_coeffs)
             ket_vec_tmp = np.copy(self.csf_coeffs)
             # Calculate analytical derivatice w.r.t. each theta using gradient_action function
             for i in range(len(self.thetas)):
                 # Loop over each state in SA
-                for j in range(len(bra_vec)):
-                    ket_vec_tmp[j] = get_grad_action(
-                        ket_vec[j],
-                        i,
-                        self.idx2det,
-                        self.det2idx,
-                        self.num_inactive_orbs,
-                        self.num_active_orbs,
-                        self.num_virtual_orbs,
-                        self.num_active_elec_alpha,
-                        self.num_active_elec_beta,
-                        self.ups_layout,
-                    )
+                ket_vec_tmp = get_grad_action_SA(
+                    ket_vec,
+                    i,
+                    self.idx2det,
+                    self.det2idx,
+                    self.num_inactive_orbs,
+                    self.num_active_orbs,
+                    self.num_virtual_orbs,
+                    self.num_active_elec_alpha,
+                    self.num_active_elec_beta,
+                    self.ups_layout,
+                )
                 for bra, ket in zip(bra_vec, ket_vec_tmp):
                     gradient[i + num_kappa] += 2 * np.matmul(bra, ket) / len(bra_vec)
                 # Product rule implications on reference bra and CSF ket
                 # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
-                for j in range(len(bra_vec)):  # pylint: disable=consider-using-enumerate
-                    bra_vec[j] = propagate_unitary(
-                        bra_vec[j],
-                        i,
-                        self.idx2det,
-                        self.det2idx,
-                        self.num_inactive_orbs,
-                        self.num_active_orbs,
-                        self.num_virtual_orbs,
-                        self.num_active_elec_alpha,
-                        self.num_active_elec_beta,
-                        self.thetas,
-                        self.ups_layout,
-                    )
-                    ket_vec[j] = propagate_unitary(
-                        ket_vec[j],
-                        i,
-                        self.idx2det,
-                        self.det2idx,
-                        self.num_inactive_orbs,
-                        self.num_active_orbs,
-                        self.num_virtual_orbs,
-                        self.num_active_elec_alpha,
-                        self.num_active_elec_beta,
-                        self.thetas,
-                        self.ups_layout,
-                    )
+                bra_vec = propagate_unitary_SA(
+                    bra_vec,
+                    i,
+                    self.idx2det,
+                    self.det2idx,
+                    self.num_inactive_orbs,
+                    self.num_active_orbs,
+                    self.num_virtual_orbs,
+                    self.num_active_elec_alpha,
+                    self.num_active_elec_beta,
+                    self.thetas,
+                    self.ups_layout,
+                )
+                ket_vec = propagate_unitary_SA(
+                    ket_vec,
+                    i,
+                    self.idx2det,
+                    self.det2idx,
+                    self.num_inactive_orbs,
+                    self.num_active_orbs,
+                    self.num_virtual_orbs,
+                    self.num_active_elec_alpha,
+                    self.num_active_elec_beta,
+                    self.thetas,
+                    self.ups_layout,
+                )
         return gradient
