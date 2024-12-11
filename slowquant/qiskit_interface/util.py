@@ -1,6 +1,8 @@
+import networkx as nx
 import numpy as np
 from qiskit import QuantumCircuit
 from qiskit.quantum_info import Pauli
+from qiskit.transpiler import CouplingMap, PassManager
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 
@@ -28,7 +30,7 @@ def to_CBS_measurement(op: str, transpiled: None | list[QuantumCircuit] = None) 
     if transpiled is None:
         num_qubits = len(op)
         qc = QuantumCircuit(num_qubits)
-        for i, pauli in enumerate(op[::-1]):
+        for i, pauli in enumerate(op[::-1]):  # turn order to q0,q1,...,qN
             if pauli == "X":
                 qc.append(Pauli("X"), [i])
                 qc.h(i)
@@ -90,6 +92,60 @@ def get_bitstring_sign(op: str, binary: int) -> int:
     if count % 2 == 1:
         return -1
     return 1
+
+
+def swap_indices(num_qubits: int, swap: tuple[int, int]) -> list[int]:
+    """Find new bit ordering based on a bit swap.
+
+    Args:
+        num_qubits: Number of qubits.
+        swap: Swap to be performed.
+
+    Returns:
+        List of new ordering in qubit basis based on swap.
+    """
+    number = 2**num_qubits
+    pos1, pos2 = swap
+
+    # original list in decimals
+    decimal_list = np.arange(number)
+
+    # Generate the binary representation matrix
+    binary_matrix = ((decimal_list[:, None] & (1 << np.arange(num_qubits)[::-1])) > 0).astype(int)
+
+    # Swap the bits at pos1 and pos2 for each row (each binary number)
+    swapped_binary_matrix = binary_matrix.copy()
+    swapped_binary_matrix[:, [pos1, pos2]] = swapped_binary_matrix[:, [pos2, pos1]]
+
+    # Convert the new swapped binary matrix back to decimal
+    powers_of_two = 2 ** np.arange(num_qubits)[::-1]  # [2^(num_bits-1), ..., 2^0]
+    swapped_decimal_list = swapped_binary_matrix.dot(powers_of_two)
+
+    return np.argsort(swapped_decimal_list)
+
+
+def find_swaps(new: list[int], ref: list[int]) -> list[tuple[int, int]]:
+    """Find swaps to turn new into ref.
+
+    Args:
+        new: List to be changed.
+        ref: Reference list.
+
+    Returns:
+        Swaps to turn list into ref.
+    """
+    swaps = []
+    list_in = new.copy()
+
+    for i in range(len(list_in)):
+        if list_in[i] != ref[i]:
+            # Find where the element from ref[i] is in list_in and swap it
+            swap_idx = list_in.index(ref[i], i)
+            swaps.append((i, swap_idx))
+            # Perform the swap in list_in
+            list_in[i], list_in[swap_idx] = list_in[swap_idx], list_in[i]
+
+    return swaps
 
 
 class CliqueHead:
@@ -228,7 +284,7 @@ def correct_distribution(dist: dict[int, float], M: np.ndarray) -> dict[int, flo
 
     Args:
         dist: Quasi-distribution.
-        M: Correlation martix.
+        M: Correlation matrix (inverse).
 
     Returns:
         Quasi-distribution corrected by correlation matrix.
@@ -243,6 +299,251 @@ def correct_distribution(dist: dict[int, float], M: np.ndarray) -> dict[int, flo
     for bitint, prob in dist.items():
         dist[bitint] = C_new[bitint]
     return dist
+
+
+def correct_distribution_with_layout_v2(
+    dist: dict[int, float], M: np.ndarray, ref_layout: list[int], new_layout: list[int]
+) -> dict[int, float]:
+    """Corrects a quasi-distribution of bitstrings based on a correlation matrix in statevector notation.
+
+    Uses layout correction via distribution mapping.
+
+    Args:
+        dist: Quasi-distribution.
+        M: Correlation matrix (inverse).
+        ref_layout: Reference layout of M measurement.
+        new_layout: Layout of current to be corrected circuit measurement.
+
+    Returns:
+        Quasi-distribution corrected by correlation matrix with corrected layout.
+    """
+    # Find swaps that map new layout to reference layout
+    # Layout indices need to be inverted due to qiskit saving layout indices q0->qN and distribtions qN->q0.
+    swaps = find_swaps(new_layout[::-1], ref_layout[::-1])
+    num_qubits = len(ref_layout)
+
+    C = np.zeros(np.shape(M)[0])
+    # Convert bitstring distribution to columnvector of probabilities
+    for bitint, prob in dist.items():
+        C[bitint] = prob
+    # Forward correction of layout
+    for swap in swaps:
+        C = C[swap_indices(num_qubits, swap)]
+    # Apply M error mitigation matrix
+    C_new = M @ C
+    # Backward correction of layout
+    for swap in swaps[::-1]:
+        C_new = C_new[swap_indices(num_qubits, swap)]
+    # Convert columnvector of probabilities to bitstring distribution
+    for bitint, prob in enumerate(C_new): 
+        dist[bitint] = prob
+    return dist
+
+
+def correct_distribution_with_layout(
+    dist: dict[int, float], M_in: np.ndarray, ref_layout: list[int], new_layout: list[int]
+) -> dict[int, float]:
+    """Corrects a quasi-distribution of bitstrings based on a correlation matrix in statevector notation.
+
+    Uses layout correction via M mapping.
+
+    Args:
+        dist: Quasi-distribution.
+        M: Correlation matrix (not inverse).
+        ref_layout: Reference layout of M measurement.
+        new_layout: Layout of current to be corrected circuit measurement.
+
+    Returns:
+        Quasi-distribution corrected by correlation matrix with corrected layout.
+    """
+    # Find swaps that map new layout to reference layout
+    # Layout indices need to be inverted due to qiskit saving layout indices q0->qN and distribtions qN->q0.
+    swaps = find_swaps(new_layout[::-1], ref_layout[::-1])
+    num_qubits = len(ref_layout)
+
+    # Create new M
+    M = M_in.copy()
+    for swap in swaps:
+        idx = np.array(swap_indices(num_qubits, swap))
+        print(idx)
+        M = M[idx, :][:, idx]
+    M_inv = np.linalg.inv(M)
+
+    C = np.zeros(np.shape(M)[0])
+    # Convert bitstring distribution to columnvector of probabilities
+    for bitint, prob in dist.items():
+        C[bitint] = prob
+    # Apply M error mitigation matrix
+    C_new = M_inv @ C
+    # Convert columnvector of probabilities to bitstring distribution
+    for bitint, prob in enumerate(C_new): 
+        dist[bitint] = prob
+    return dist
+
+
+def find_best_path(coupling_map: CouplingMap, start: int, target: int) -> list[int]:
+    """Find the best path between two qubits using the coupling map.
+
+    Args:
+        coupling_map: The coupling map defining valid connections.
+        start: Starting qubit.
+        target: Target qubit.
+
+    Returns:
+        List of qubits representing the path from start to target.
+    """
+    # Convert the coupling map to a NetworkX graph
+    graph = nx.Graph()
+    graph.add_edges_from(coupling_map.get_edges())
+
+    # Find the shortest path between start and target
+    try:
+        path = nx.shortest_path(graph, source=start, target=target)
+    except nx.NetworkXNoPath as e:
+        raise ValueError(f"No valid path between qubit {start} and qubit {target}") from e
+
+    return path
+
+
+def add_permutation_gate(circuit: QuantumCircuit, permutation: list[int], coupling_map: CouplingMap) -> None:
+    """Add a permutation gate to a circuit, adhering to a given coupling map.
+
+    Args:
+        circuit: The quantum circuit to modify.
+        permutation: A list defining the new positions of qubits.
+                            E.g., [2, 0, 1] means qubit 0 goes to 2, 1 goes to 0, and 2 goes to 1.
+        coupling_map: The coupling map that defines valid qubit connections.
+    """
+    # Get the number of qubits
+    num_qubits = len(permutation)
+
+    # Validate input
+    if num_qubits != circuit.num_qubits:
+        raise ValueError("Permutation size must match the number of qubits in the circuit.")
+
+    # Current positions of qubits
+    current_positions = list(range(num_qubits))
+
+    # Self-consistent approach to finding all swaps
+    while current_positions != permutation:
+        # Generate SWAP gates to achieve the permutation
+        # Loop over all positions in array (num_qubits)
+        for target_position in range(num_qubits):
+            # Find the current qubit that needs to be swapped to the target position
+            correct_qubit = permutation[target_position]  # qubit meant to be in target_position
+            current_qubit_position = current_positions.index(correct_qubit)  # position of correct_qubit
+
+            if current_qubit_position != target_position:
+                # Find the full path from the current position to the target position
+                path = find_best_path(coupling_map, current_qubit_position, target_position)
+
+                # Apply SWAP gates along the path
+                for i in range(len(path) - 1):
+                    circuit.swap(path[i], path[i + 1])
+
+                    # Update current positions after each SWAP
+                    current_positions[path[i]], current_positions[path[i + 1]] = (
+                        current_positions[path[i + 1]],
+                        current_positions[path[i]],
+                    )
+
+
+def layout_conserving_compose(
+    ansatz: QuantumCircuit,
+    state: QuantumCircuit,
+    pm: PassManager,
+    coupling_map: CouplingMap,
+    optimization: bool = False,
+    M_circuit: bool = False,
+) -> QuantumCircuit | tuple[QuantumCircuit, QuantumCircuit]:
+    """Composing an un-transpiled state circuit to the front of a transpiled Ansatz circuit.
+
+    Args:
+        ansatz: Transpiled Ansatz circuit.
+        state: Un-transpiled state circuit.
+        pm: PassManager that produces Ansatz's initial layout indices.
+        optimization: Boolean for optimizing composed circuit.
+            Note that optimization can lead to changes in Ansatz's gates and CX count.
+            This can be problematic together with M_Ansatz0.
+
+    Returns:
+        Composed QuantumCircuit.
+    """
+    print("\nLayout-conserving circuit composing requested.")
+    print("Superposition state contains ", state.num_nonlocal_gates(), "non-local gates")
+    if ansatz.layout is not None:  # or just use ISA_option 1
+        state_tmp = pm.run(state)
+        nlg_state = state_tmp.num_nonlocal_gates()
+        print("Transpiled superposition state contains ", nlg_state, "non-local gates")
+
+        if (
+            state_tmp.layout.initial_index_layout(filter_ancillas=True)
+            != state_tmp.layout.final_index_layout()
+        ):
+            # Qiskit wants to change the layout? Not with me. Change it back!
+
+            if coupling_map is None:
+                raise ValueError("No coupling map defined for layout conserving circuit composing.")
+
+            print("Starting self-consistent permutation circuit search...")
+            add_permutation_gate(state_tmp, state_tmp.layout.routing_permutation(), coupling_map)
+            state_tmp = pm.translation.run(state_tmp)
+            print(
+                "Layout correction added ",
+                state_tmp.num_nonlocal_gates() - nlg_state,
+                " non-local gates (without swap optimization)",
+            )
+            state_tmp = pm.optimization.run(state_tmp)
+            print(
+                "Layout correction added ",
+                state_tmp.num_nonlocal_gates() - nlg_state,
+                " non-local gates (with swap optimization)",
+            )
+
+        composed = ansatz.compose(state_tmp, front=True)
+
+        if optimization:
+            nlg_composed = composed.num_nonlocal_gates()
+            composed = pm.optimization.run(composed)
+            composed._layout = ansatz.layout  # pylint: disable=protected-access
+            print(
+                "Composed circuit optimization eliminated ",
+                nlg_composed - composed.num_nonlocal_gates(),
+                "non-local gates",
+            )
+    else:
+        state_tmp = pm.run(state)
+        nlg_state = state_tmp.num_nonlocal_gates()
+        print("Transpiled superposition state contains ", nlg_state, "non-local gates")
+        composed = ansatz.compose(state_tmp, front=True)
+        if optimization:
+            nlg_composed = composed.num_nonlocal_gates()
+            composed = pm.optimization.run(composed)
+            print(
+                "Optimization eliminated ",
+                nlg_composed - composed.num_nonlocal_gates(),
+                "non-local gates",
+            )
+
+    if M_circuit:  # deprecated?
+        state_corr = state.copy()
+        # Get state circuit without non-local gates
+        for idx, instruction in reversed(list(enumerate(state_corr.data))):
+            if instruction.is_controlled_gate():
+                del state_corr.data[idx]
+        # Translate and optimize
+        state_corr = pm.optimization.run(pm.translation.run(state_corr))
+        # Negate
+        if ansatz.layout is not None:
+            composed_M = composed.compose(
+                state_corr, front=True, qubits=composed.layout.initial_index_layout(filter_ancillas=True)
+            )
+        else:
+            composed_M = composed.compose(state_corr, front=True)
+
+        return (composed, composed_M)
+
+    return composed
 
 
 def postselection(
@@ -378,6 +679,39 @@ def get_determinant_superposition_reference(
         if occ1 == "0" and occ2 == "1":
             hadamard_idx = idx
             qc.h(idx)
+            break
+    else:  # No break
+        raise ValueError("Failed to find idx for Hadamard gate")
+    for i, (occ1, occ2) in enumerate(zip(det1, det2)):
+        idx = f2q(i, num_orbs)
+        if occ1 == occ2 or idx == hadamard_idx:
+            continue
+        if occ1 == "1" or occ2 == "1":
+            qc.cx(hadamard_idx, idx)
+    return qc
+
+
+def get_determinant_superposition_reference_MAnsatz0(
+    det1: str, det2: str, num_orbs: int, mapper: JordanWignerMapper
+) -> QuantumCircuit:
+    """Get superposition state for MAnsatz_0.
+
+    Args:
+        det1: determinant string 1.
+        det2: determinant string 2.
+        num_orbs: Number of spin orbitals.
+        mapper: Fermionic to qubit mapper.
+
+    Returns:
+        Quantum circuit.
+    """
+    if not isinstance(mapper, JordanWignerMapper):
+        raise TypeError("Only implemented for JordanWignerMapper. Got: {type(mapper)}")
+    qc = QuantumCircuit(2 * num_orbs)
+    for i, (occ1, occ2) in enumerate(zip(det1, det2)):
+        idx = f2q(i, num_orbs)
+        if occ1 == "0" and occ2 == "1":
+            hadamard_idx = idx
             break
     else:  # No break
         raise ValueError("Failed to find idx for Hadamard gate")
