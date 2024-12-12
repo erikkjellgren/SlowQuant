@@ -493,9 +493,7 @@ def expectation_value_SA(
         wf_struct,
         do_folding=do_folding,
     )
-    val = 0.0
-    for bra_, ket_ in zip(bra, op_ket):
-        val += bra_ @ ket_
+    val = np.einsum("ij,ij->", bra, op_ket)
     if not isinstance(val, float):
         raise ValueError(f"Calculated expectation value is not a float, got type {type(val)}")
     return val / len(bra)
