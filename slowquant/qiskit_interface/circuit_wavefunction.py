@@ -1045,8 +1045,7 @@ class WaveFunctionCircuit:
             self._move_cep()
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
-        # Build operator
-        if theta_optimization:
+            # Build operator
             H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             return self.QI.quantum_expectation_value(H)
@@ -1115,8 +1114,8 @@ def _get_energy_evals_for_grad(
 ) -> list[float]:
     """Get energy evaluations needed for the gradient calculation.
 
-    The gradient formula is defined for x=0,
-    so x_shift is used to shift ensure we can get the energy in the point we actually want.
+    The gradient formula is defined for x=0.
+    The x_shift variable is used to shift the energy function, such that current parameter value is in zero.
 
     Args:
         operator: Operator which the derivative is with respect to.
