@@ -261,8 +261,10 @@ class LinearResponseUCC(LinearResponseBaseClass):
             self.wf.num_virtual_orbs,
             self.wf.rdm1,
         )
-        num_mo = len(property_integrals)
+        in_shape = property_integrals.shape[:-2]
         size_mo = self.wf.num_inactive_orbs + self.wf.num_active_orbs + self.wf.num_virtual_orbs
+        property_integrals = property_integrals.reshape(-1, size_mo, size_mo)
+        num_mo = len(property_integrals)
         mo = np.zeros((num_mo, size_mo, size_mo))
         for i, ao in enumerate(property_integrals):
             mo[i,:,:] += one_electron_integral_transform(self.wf.c_trans, ao)
@@ -315,4 +317,4 @@ class LinearResponseUCC(LinearResponseBaseClass):
                         G_ket,
                         *self.index_info)
                     V[idx + idx_shift, :] += mo[:,p, q] * val
-        return np.concatenate((V, -1 * V))
+        return np.concatenate((V, -1 * V)).reshape(-1, *in_shape)

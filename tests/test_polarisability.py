@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.linalg import solve
 
 import slowquant.SlowQuant as sq
 import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
@@ -46,7 +47,7 @@ def test_H2_sto3g_naive():
     )
 
     property_gradient = LR.get_property_gradient(dipole_integrals)
-    resp = (np.matmul(np.linalg.inv(LR.hessian), property_gradient))
+    resp = (solve(LR.hessian, property_gradient))
     alpha = np.einsum('xi,xi->i', resp, property_gradient)
 
     thresh = 10**-4
@@ -98,7 +99,7 @@ def test_LiH_sto3g_naive():
     )
 
     property_gradient = LR.get_property_gradient(dipole_integrals)
-    resp = (np.matmul(np.linalg.inv(LR.hessian), property_gradient))
+    resp = (solve(LR.hessian, property_gradient))
     alpha = np.einsum('xi,xi->i', resp, property_gradient)
 
     thresh = 10**-2
@@ -158,7 +159,7 @@ def test_H10_sto3g_naive():
     )
 
     property_gradient = LR.get_property_gradient(dipole_integrals)
-    resp = (np.matmul(np.linalg.inv(LR.hessian), property_gradient))
+    resp = (solve(LR.hessian, property_gradient))
     alpha = np.einsum('xi,xi->i', resp, property_gradient)
 
     thresh = 10**-3
