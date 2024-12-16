@@ -23,6 +23,7 @@ from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
 from slowquant.qiskit_interface.custom_ansatz import SDSfUCC, fUCC, tUPS
+from slowquant.qiskit_interface.mitigation import Mitigation
 from slowquant.qiskit_interface.util import (  # correct_distribution_with_layout,
     Clique,
     correct_distribution,
@@ -54,8 +55,7 @@ class QuantumInterface:
         ansatz_options: dict[str, Any] | None = None,
         shots: None | int = None,
         max_shots_per_run: int = 100000,
-        do_M_mitigation: bool = False,
-        do_M_ansatz0: bool = False,
+        M: str = "None",
         do_postselection: bool = True,
     ) -> None:
         """Interface to Qiskit to use IBM quantum hardware or simulator.
@@ -69,8 +69,9 @@ class QuantumInterface:
             ansatz_options: Ansatz options.
             shots: Number of shots. None means ideal simulator.
             max_shots_per_run: Maximum number of shots allowed in a single run. Set to 100000 per IBM machines.
-            do_M_mitigation: Do error mitigation via read-out correlation matrix.
-            do_M_ansatz0: Use the ansatz with theta=0 when constructing the read-out correlation matrix.
+            M: Specifiy error mitigation via read-out correlation matrix.
+                Choose from: None, M, or M0
+                M0 uses the ansatz with theta=0 when constructing the read-out correlation matrix.
             do_postselection: Use postselection to preserve number of particles in the computational basis.
         """
         if ansatz_options is None:
@@ -108,14 +109,15 @@ class QuantumInterface:
         self.ISA = ISA
         self.shots = shots
         self.mapper = mapper
-        self.do_M_mitigation = do_M_mitigation
-        self.do_M_ansatz0 = do_M_ansatz0
-        self._Minv = None
+
+        # Initiate Mitigation object
+        # In future maybe pass the object directly? This would allow for several options
+        self.Mitigation = Mitigation(do_postselection, M)
+
         self.total_shots_used = 0
         self.total_device_calls = 0
         self.total_paulis_evaluated = 0
         self.ansatz_options = ansatz_options
-        self.do_postselection = do_postselection
         self._pass_manager: PassManager = None
         self.saver: dict[int, Clique] = {}
         self._save_paulis = True  # hard switch to stop using Pauli saving (debugging tool).
@@ -369,7 +371,7 @@ class QuantumInterface:
         Args:
             shots: Overwrites QI internal shot number if int is defined.
         """
-        self._Minv = self._make_Minv(shots=shots)
+        self.Mitigation._Minv = self._make_Minv(shots=shots)
 
     @property
     def parameters(self) -> list[float]:
@@ -587,7 +589,7 @@ class QuantumInterface:
 
     def _reset_M(self, verbose: bool = True) -> None:
         """Reset M to None."""
-        self._Minv = None
+        self.Mitigation._Minv = None  # todo: think about saver one day
         if verbose:
             print("M matrix for error mitigation has been reset.")
 
@@ -733,14 +735,14 @@ class QuantumInterface:
             )
         if M_per_superpos and isinstance(self._primitive, BaseEstimator):
             raise ValueError("Base estimator does not support M_Ansatz0")
-        if M_per_superpos and (self.do_M_ansatz0 + self.do_M_mitigation) != 2:
+        if M_per_superpos and self.Mitigation.is_none:
             raise ValueError(
                 "You requested M_per_superpos but M error mitigation / M_Ansatz0 was not selected in QI settings."
             )
         # Option handling
         if ISA_csfs_option == 0:
             ISA_csfs_option = 1  # could also be 2
-            if self.do_M_mitigation and self.ansatz_circuit.layout is not None and not M_per_superpos:
+            if self.Mitigation.M != "None" and self.ansatz_circuit.layout is not None and not M_per_superpos:
                 ISA_csfs_option = 2
                 if self.do_M_ansatz0:
                     ISA_csfs_option = 4  # could also be 3
@@ -1047,11 +1049,12 @@ class QuantumInterface:
 
         if len(new_heads) != 0:
             # Check if error mitigation is requested and if read-out matrix already exists.
-            if self.do_M_mitigation:
+            if self.Mitigation.M != "None":
                 if circuit_M is None:
-                    if self._Minv is None:
-                        self._Minv = self._make_Minv(shots=self._M_shots)
+                    if self.Mitigation._Minv is None:
+                        self.Mitigation._Minv = self._make_Minv(shots=self._M_shots)
                 else:
+                    # custom Minv -> how to integrate into Mitigation object?
                     Minv = self._make_Minv(shots=self._M_shots, custom_ansatz=circuit_M)
 
             # Simulate each clique head with one combined device call
@@ -1059,6 +1062,10 @@ class QuantumInterface:
             distr = self._one_call_sampler_distributions(new_heads, self.parameters, run_circuit)
             # Save raw distribution for given determinant
             self.saver[det_int].update_distr(new_heads, distr)
+
+            # Get value and use Mitigation class
+
+            # How to deal with the layout conflict option?
 
             if self.do_M_mitigation:  # apply error mitigation if requested
                 if circuit_M is None:
@@ -1094,7 +1101,7 @@ class QuantumInterface:
         for pauli, coeff in zip(paulis_str, observables.coeffs):
             result = 0.0
             for key, value in (
-                self.saver[det_int].get_distr(pauli).items()
+                self.saver[det_int].get_distr(pauli).distr.items()
             ):  # build result from quasi-distribution
                 result += value * get_bitstring_sign(pauli, key)
             values += result * coeff
@@ -1197,7 +1204,9 @@ class QuantumInterface:
             # Loop over all Pauli strings in observable and build final result with coefficients
             for pauli, coeff in zip(paulis_str, observables.coeffs):
                 result = 0.0
-                for key, value in cliques.get_distr(pauli).items():  # build result from quasi-distribution
+                for key, value in cliques.get_distr(
+                    pauli
+                ).distr.items():  # build result from quasi-distribution
                     result += value * get_bitstring_sign(pauli, key)
                 values += result * coeff
         else:
@@ -1320,7 +1329,7 @@ class QuantumInterface:
                 coeff = 1
             # Get distribution from cliques
             if do_cliques:
-                dist = self.saver[det_int].get_distr(pauli)
+                dist = self.saver[det_int].get_distr(pauli).distr
                 # Calculate p1: Probability of measuring one
                 p1 = 0.0
                 for key, value in dist.items():
@@ -1640,3 +1649,68 @@ class QuantumInterface:
             if isinstance(self._primitive, BaseSamplerV2) and hasattr(self._primitive.options, "twirling"):
                 data += f"\n {'Pauli twirling:':<20} {self._primitive.options.twirling.enable_gates}\n {'Dynamic decoupling:':<20} {self._primitive.options.dynamical_decoupling.enable}"
         print(data)
+
+
+def _quantum_value(
+    paulis: list[str],
+    coeffs: list[float],
+    data: Clique | list[dict[int, float]],
+    mitigation: Mitigation,
+) -> float:
+    """Calculate expectation value."""
+    # This is coded to avoid too many if statements within loops.
+    # Options are:
+    #   No Clique, no mitigation
+    #   No Clique, mitigation
+    #   Clique, no mitigation
+    #   Clique, mitigation
+
+    # custom M problem!
+    # Redundancy problem!
+
+    values = 0.0
+    if not isinstance(data, Clique):
+        if mitigation.is_none:
+            # No error mitigation, no Clique object
+            # Loop over all Pauli strings in observable and build result with coefficients
+            for pauli, coeff, dist in zip(paulis, coeffs, data):
+                result = 0.0
+                for key, value in dist.items():  # build result from quasi-distribution
+                    result += value * get_bitstring_sign(pauli, key)
+                values += result * coeff
+        else:
+            # Apply error mitigation, no Clique object
+            # Loop over all Pauli strings in observable and build result with coefficients
+            for pauli, coeff, dist in zip(paulis, coeffs, mitigation.apply_mitigation_to_dist(data, pauli)):
+                result = 0.0
+                for key, value in dist.items():  # build result from quasi-distribution
+                    result += value * get_bitstring_sign(pauli, key)
+                values += result * coeff
+    else:
+        if mitigation.is_none:
+            # No error mitigation, use Clique object
+            # Loop over all Pauli strings in observable and build result with coefficients
+            for pauli, coeff in zip(paulis, coeffs):
+                result = 0.0
+                # build result from quasi-distribution
+                for key, value in data.get_distr(pauli).distr.items():
+                    result += value * get_bitstring_sign(pauli, key)
+                values += result * coeff
+        else:
+            # Apply error mitigation, use Clique object
+            # Loop over all Pauli strings in observable and build result with coefficients
+            for pauli, coeff in zip(paulis, coeffs):
+                result = 0.0
+                # build result from quasi-distribution
+                # To-Do: This is super high redundant! But not for postprocessing?
+                # Should we apply this not to the head?
+                # Could it be applied to pauli instead of head?
+                for key, value in mitigation.apply_mitigation_to_clique(data.get_distr(pauli)).items():
+                    result += value * get_bitstring_sign(pauli, key)
+                values += result * coeff
+
+    if isinstance(values, complex):
+        if abs(values.imag) > 10**-2:
+            print("Warning: Complex number detected with Im = ", values.imag)
+
+    return values.real
