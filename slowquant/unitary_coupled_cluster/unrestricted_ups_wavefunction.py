@@ -27,6 +27,12 @@ from slowquant.unitary_coupled_cluster.operator_matrix import (
     get_indexing,
     propagate_unitary,
 )
+from slowquant.unitary_coupled_cluster.operators import (
+    anni
+)
+from slowquant.unitary_coupled_cluster.fermionic_operator import (
+    FermionicOperator
+)
 from slowquant.unitary_coupled_cluster.unrestricted_operators import (
     unrestricted_hamiltonian_0i_0a,
 )
@@ -39,7 +45,7 @@ class UnrestrictedWaveFunctionUPS:
         num_spin_orbs: int,
         num_elec: int,
         cas: tuple[tuple[int, int], int],
-        c_orthonormal: np.ndarray,
+        c_orthonormal: np.ndarray, #tuple[np.ndarray, np.ndarray] ?,
         h_ao: np.ndarray,
         g_ao: np.ndarray,
         ansatz: str,
@@ -52,8 +58,8 @@ class UnrestrictedWaveFunctionUPS:
             num_spin_orbs: Number of spin orbitals.
             num_elec: Number of electrons.
             cas: CAS(num_active_elec, num_active_orbs),
-                 orbitals are counted in spatial basis.
-            c_orthonormal: Initial orbital coefficients.
+                 orbitals are counted in spatial basis. (det her skal rettes til unrestricted)
+            c_orthonormal: Initial orbital coefficients. (der skal være to set, alpha og beta)
             h_ao: One-electron integrals in AO for Hamiltonian.
             g_ao: Two-electron integrals in AO.
             ansatz: Name of ansatz.
@@ -492,23 +498,148 @@ class UnrestrictedWaveFunctionUPS:
         """
         return (self.gaaaa_mo, self.gbbbb_mo, self.gaabb_mo)
 
-    @property
-    def rdm1(self) -> np.ndarray:
+    def _calculate_rdm1(self, spin) -> np.ndarray:
         """Calcuate one-electron reduced density matrix.
 
         Returns:
             One-electron reduced density matrix.
         """
-        raise NotImplementedError
+       # if self._calculate_rdm1 is None:
+        self.calculate_rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs))
+        for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+            p_idx = p - self.num_inactive_orbs
+            for q in range(self.num_inactive_orbs, p + 1):
+                q_idx = q - self.num_inactive_orbs
+                val = expectation_value(
+                    self.ci_coeffs, 
+                    [anni(p, spin, True) * anni(q, spin, False)],
+                    self.ci_coeffs, 
+                    self.idx2det,
+                    self.det2idx,
+                    self.num_inactive_orbs,
+                    self.num_active_orbs,
+                    self.num_virtual_orbs,
+                    self.num_active_elec_alpha,
+                    self.num_active_elec_beta,
+                    self.thetas,
+                    self.ups_layout,
+                )
+                self.calculate_rdm1[p_idx, q_idx] = val
+                self.calculate_rdm1[q_idx, p_idx] = val
+        return self.calculate_rdm1
 
     @property
-    def rdm2(self) -> np.ndarray:
+    def rdm1_C(self) -> np.ndarray:
+        if self._rdm1aa is None:
+            self._rdm1aa = self._calculate_rdm1("alpha")
+        if self._rdm1bb is None:
+            self._rdm1bb = self._calculate_rdm1("beta")
+        return self._rdm1aa + self._rdm1bb
+    # pink book 2.7.6
+
+    @property
+    def rdm1_S(self) -> np.ndarray:
+        if self._rdm1aa is None:
+            self._rdm1aa = self._calculate_rdm1("alpha")    
+        if self._rdm1bb is None:
+            self._rdm1bb = self._calculate_rdm1("beta")
+        return self._rdm1aa - self._rdm1bb
+    #pink book 2.7.26. in the book there is a half in front? Dpq=1/2*(Dpa,qa - Dpb,qb)
+
+    @property
+    def rdm1aa(self) -> np.ndarray:
+        if self._rdm1aa is None:
+            self._rdm1aa = self._calculate_rdm1("alpha")
+        return self._rdm1aa
+
+    @property
+    def rdm1bb(self) -> np.ndarray:
+        if self._rdm1bb is None:
+            self._rdm1bb = self._calculate_rdm1("beta")
+        return self._rdm1bb
+
+    def _calculate_rdm2(self, spin1, spin2) -> np.ndarray:
         """Calcuate two-electron reduced density matrix.
 
         Returns:
             Two-electron reduced density matrix.
         """
-        raise NotImplementedError
+        
+        self.calculate_rdm2 = np.zeros(
+            (
+                self.num_active_orbs,
+                self.num_active_orbs,
+                self.num_active_orbs,
+                self.num_active_orbs
+            )
+        )
+        for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+            p_idx = p - self.num_inactive_orbs
+            for q in range(self.num_inactive_orbs, p + 1):
+                q_idx = q - self.num_inactive_orbs
+                for r in range(self.num_inactive_orbs, p + 1):
+                    r_idx = r - self.num_inactive_orbs
+                    if p == q:
+                        s_lim = r + 1
+                    elif p == r:
+                        s_lim = q + 1
+                    elif q < r:
+                        s_lim = p
+                    else:
+                        s_lim = p + 1
+                    for s in range(self.num_inactive_orbs, s_lim):
+                        s_idx = s- self.num_inactive_orbs
+                        val = expectation_value(
+                            self.ci_coeffs,
+                            [(anni(p, spin1, True) * anni(q, spin1, False)),(anni(r, spin2, True) * anni(s, spin2, False))],
+                            self.ci_coeffs,
+                            self.idx2det,
+                            self.det2idx,
+                            self.num_inactive_orbs,
+                            self.num_active_orbs,
+                            self.num_virtual_orbs,
+                            self.num_active_elec_alpha,
+                            self.num_active_elec_beta,
+                            self.thetas,
+                            self.ups_layout,
+                        )
+                        if q == r:
+                            val -= self.rdm1_C[p_idx, s_idx]
+                            # Should it be _C or _S, I have put _C here because I cant find the two-electron version of _S in the pink book, is there one?
+                        self.calculate_rdm2[p_idx, q_idx, r_idx, s_idx] = val # type: ignore
+                        self.calculate_rdm2[r_idx, s_idx, p_idx, q_idx] = val # type: ignore
+                        self.calculate_rdm2[q_idx, p_idx, s_idx, r_idx] = val # type: ignore
+                        self.calculate_rdm2[s_idx, r_idx, q_idx, p_idx] = val # type: ignore
+        return self.calculate_rdm2
+
+    @property
+    def rdm2_C(self) -> np.ndarray:
+        if self._rdm2aaaa is None:
+            self._rdm2aaaa = self._calculate_rdm2("alpha", "alpha")
+        if self._rdm2bbbb is None: 
+            self._rdm2bbbb = self._calculate_rdm2("beta", "beta")
+        if self._rdm2aabb is None:
+            self._rdm2aabb = self._calculate_rdm2("alpha", "beta")
+        return self._rdm2aaaa + self._rdm2bbbb + self._rdm2aabb
+#should there be 2 self._rdm2aabb?, and is the aabb version equal to bbaa?
+    
+    @property
+    def rdm2aaaa(self) -> np.ndarray:
+        if self._rdm2aaaa is None:
+            self._rdm2aaaa = self._calculate_rdm2("alpha", "alpha")
+        return self._rdm2aaaa      
+
+    @property
+    def rdm2bbbb(self) -> np.ndarray:
+        if self._rdm2bbbb is None: 
+            self._rdm2bbbb = self._calculate_rdm2("beta", "beta")       
+        return self._rdm2bbbb
+
+    @property
+    def rdm2aabb(self) -> np.ndarray:
+        if self._rdm2aabb is None:
+            self._rdm2aabb = self._calculate_rdm2("alpha", "beta")
+        return self._rdm2aabb       
 
     def run_ups(
         self,
