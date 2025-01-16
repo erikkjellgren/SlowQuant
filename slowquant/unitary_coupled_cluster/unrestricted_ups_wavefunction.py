@@ -106,6 +106,7 @@ class UnrestrictedWaveFunctionUPS:
         self._rdm2aaaa = None
         self._rdm2bbbb = None
         self._rdm2aabb = None
+        self._rdm2bbaa = None
         self._haa_mo = None
         self._hbb_mo = None
         self._gaaaa_mo = None
@@ -559,10 +560,10 @@ class UnrestrictedWaveFunctionUPS:
         return self._rdm1bb
 
     def _calculate_rdm2(self, spin1, spin2) -> np.ndarray:
-        """Calcuate two-electron reduced density matrix.
+        """Calcuate two-electron unrestricted reduced density matrix.
 
         Returns:
-            Two-electron reduced density matrix.
+            Two-electron unrestricted reduced density matrix.
         """
         
         self.calculate_rdm2 = np.zeros(
@@ -575,23 +576,15 @@ class UnrestrictedWaveFunctionUPS:
         )
         for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
             p_idx = p - self.num_inactive_orbs
-            for q in range(self.num_inactive_orbs, p + 1):
+            for q in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                 q_idx = q - self.num_inactive_orbs
-                for r in range(self.num_inactive_orbs, p + 1):
+                for r in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                     r_idx = r - self.num_inactive_orbs
-                    if p == q:
-                        s_lim = r + 1
-                    elif p == r:
-                        s_lim = q + 1
-                    elif q < r:
-                        s_lim = p
-                    else:
-                        s_lim = p + 1
-                    for s in range(self.num_inactive_orbs, s_lim):
+                    for s in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                         s_idx = s- self.num_inactive_orbs
                         val = expectation_value(
                             self.ci_coeffs,
-                            [(anni(p, spin1, True) * anni(q, spin1, False)),(anni(r, spin2, True) * anni(s, spin2, False))],
+                            [anni(p, spin1, True) * anni(r, spin2, True) * anni(s, spin2, False) * anni(q, spin1, False)],
                             self.ci_coeffs,
                             self.idx2det,
                             self.det2idx,
@@ -603,13 +596,10 @@ class UnrestrictedWaveFunctionUPS:
                             self.thetas,
                             self.ups_layout,
                         )
-                        if q == r:
-                            val -= self.rdm1_C[p_idx, s_idx]
-                            # Should it be _C or _S, I have put _C here because I cant find the two-electron version of _S in the pink book, is there one?
                         self.calculate_rdm2[p_idx, q_idx, r_idx, s_idx] = val # type: ignore
-                        self.calculate_rdm2[r_idx, s_idx, p_idx, q_idx] = val # type: ignore
-                        self.calculate_rdm2[q_idx, p_idx, s_idx, r_idx] = val # type: ignore
-                        self.calculate_rdm2[s_idx, r_idx, q_idx, p_idx] = val # type: ignore
+                        #self.calculate_rdm2[r_idx, s_idx, p_idx, q_idx] = val # type: ignore
+                        #self.calculate_rdm2[q_idx, p_idx, s_idx, r_idx] = val # type: ignore
+                        #self.calculate_rdm2[s_idx, r_idx, q_idx, p_idx] = val # type: ignore
         return self.calculate_rdm2
 
     @property
@@ -620,9 +610,9 @@ class UnrestrictedWaveFunctionUPS:
             self._rdm2bbbb = self._calculate_rdm2("beta", "beta")
         if self._rdm2aabb is None:
             self._rdm2aabb = self._calculate_rdm2("alpha", "beta")
-        return self._rdm2aaaa + self._rdm2bbbb + self._rdm2aabb
-#should there be 2 self._rdm2aabb?, and is the aabb version equal to bbaa?
-    
+        return self._rdm2aaaa + self._rdm2bbbb + 2*self._rdm2aabb
+    # 2*rdm2aabb = rdm2aabb*rdm2bbaa.T
+
     @property
     def rdm2aaaa(self) -> np.ndarray:
         if self._rdm2aaaa is None:
@@ -639,7 +629,14 @@ class UnrestrictedWaveFunctionUPS:
     def rdm2aabb(self) -> np.ndarray:
         if self._rdm2aabb is None:
             self._rdm2aabb = self._calculate_rdm2("alpha", "beta")
-        return self._rdm2aabb       
+        return self._rdm2aabb   
+
+    @property
+    def rdm2bbaa(self) -> np.ndarray:
+        if self._rdm2bbaa is None:
+            self._rdm2bbaa = self._calculate_rdm2("beta", "alpha")
+        return self._rdm2bbaa
+
 
     def run_ups(
         self,
