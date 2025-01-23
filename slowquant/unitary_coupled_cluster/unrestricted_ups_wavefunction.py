@@ -19,6 +19,10 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_orbital_gradient,
 )
+from slowquant.unitary_coupled_cluster.unrestricted_density_matrix import (
+    UnrestrictedReducedDensityMatrix,
+    get_electronic_energy_unrestricted,
+)
 from slowquant.unitary_coupled_cluster.operator_matrix import (
     build_operator_matrix,
     construct_ups_state,
@@ -35,6 +39,7 @@ from slowquant.unitary_coupled_cluster.fermionic_operator import (
 )
 from slowquant.unitary_coupled_cluster.unrestricted_operators import (
     unrestricted_hamiltonian_0i_0a,
+    unrestricted_hamiltonian_0i_0a_1elec
 )
 from slowquant.unitary_coupled_cluster.util import UpsStructure
 
@@ -112,6 +117,7 @@ class UnrestrictedWaveFunctionUPS:
         self._gaaaa_mo = None
         self._gbbbb_mo = None
         self._gaabb_mo = None
+        self._gbbaa_mo = None
         self.ansatz_options = ansatz_options
         active_space = []
         orbital_counter = 0
@@ -491,6 +497,17 @@ class UnrestrictedWaveFunctionUPS:
         return self._gaabb_mo
 
     @property
+    def gbbaa_mo(self) -> np.ndarray:
+        """Get two-electron Hamiltonian integrals in MO basis.
+
+        Returns:
+            Two-electron Hamiltonian integrals in MO basis.
+        """
+        if self._gbbaa_mo is None:
+            self._gbbaa_mo = two_electron_integral_transform_split(self.c_b_trans, self.c_a_trans, self.g_ao)
+        return self._gbbaa_mo
+
+    @property
     def g_mo(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Get two-electron Hamiltonian integrals in MO basis.
 
@@ -740,6 +757,20 @@ class UnrestrictedWaveFunctionUPS:
                 self._kappa_b_redundant_old[i] = 0
         self.thetas = res["x"][param_idx : num_theta + param_idx].tolist()
 
+    @property
+    def energy_elec_RDM(self) -> float:
+        rdms = UnrestrictedReducedDensityMatrix(
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+            self.num_virtual_orbs,
+            rdm1aa = self.rdm1aa,
+            rdm1bb = self.rdm1bb,
+            rdm2aaaa = self.rdm2aaaa,
+            rdm2bbbb = self.rdm2bbbb,
+            rdm2aabb = self.rdm2aabb,
+            rdm2bbaa = self.rdm2bbaa,
+        )
+        return get_electronic_energy_unrestricted(rdms, self.haa_mo, self.hbb_mo, self.gaaaa_mo, self.gbbbb_mo, self.gaabb_mo, self.gbbaa_mo, self.num_inactive_orbs, self.num_active_orbs)
 
 def energy_ups(
     parameters: Sequence[float],
@@ -814,7 +845,7 @@ def energy_ups(
     return expectation_value(
         wf.ci_coeffs,
         [
-            unrestricted_hamiltonian_0i_0a(
+            unrestricted_hamiltonian_0i_0a_1elec( #OBS skifter mellem 0i_0a og 01_0a_1elec her
                 wf.haa_mo,
                 wf.hbb_mo,
                 wf.gaaaa_mo,

@@ -311,3 +311,37 @@ def unrestricted_hamiltonian_0i_0a(
                             * anni(q, "alpha", False)
                         )
     return hamiltonian_operator
+
+def unrestricted_hamiltonian_0i_0a_1elec(
+    haa_mo: np.ndarray,
+    hbb_mo: np.ndarray,
+    gaaaa_mo: np.ndarray,
+    gbbbb_mo: np.ndarray,
+    gaabb_mo: np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+) -> FermionicOperator:
+    """Get energy Hamiltonian operator.
+
+    Args:
+        h_mo: One-electron Hamiltonian integrals in MO.
+        g_mo: Two-electron Hamiltonian integrals in MO.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+
+    Returns:
+        Energy Hamilonian fermionic operator.
+    """
+    hamiltonian_operator = FermionicOperator({}, {})
+    # Inactive one-electron
+    for i in range(num_inactive_orbs):
+        if abs(haa_mo[i, i]) > 10**-14 or abs(hbb_mo[i, i]) > 10**-14:
+            hamiltonian_operator += haa_mo[i, i] * anni(i, "alpha", True) * anni(i, "alpha", False)
+            hamiltonian_operator += hbb_mo[i, i] * anni(i, "beta", True) * anni(i, "beta", False)
+    # Active one-electron
+    for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+        for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+            if abs(haa_mo[p, q]) > 10**-14 or abs(hbb_mo[p, q]) > 10**-14:
+                hamiltonian_operator += haa_mo[p, q] * anni(p, "alpha", True) * anni(q, "alpha", False)
+                hamiltonian_operator += hbb_mo[p, q] * anni(p, "beta", True) * anni(q, "beta", False)
+    return hamiltonian_operator

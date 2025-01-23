@@ -626,7 +626,6 @@ def energy_ups(
         wf.ups_layout,
     )
 
-
 def gradient_ups(
     parameters: Sequence[float],
     orbital_optimized: bool,

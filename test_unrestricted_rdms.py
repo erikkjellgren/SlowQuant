@@ -68,5 +68,7 @@ WF.run_ups(False)
         
 #print("aa", WF.rdm1aa, "bb", WF.rdm1bb,"aaaa", WF.rdm2aaaa, "bbbb", WF.rdm2bbbb, "aabb", WF.rdm2aabb)
 
-print(WF.rdm2aabb)
-print(WF.rdm2bbaa.transpose(2,3,0,1)) # rdm2aabb[i,j,k,l] = rdm2bbaa[k,l,i,j]
+print("RDM" , WF.energy_elec_RDM, "elec", WF.energy_elec, "pyscf", mf.energy_elec()[0])
+
+#print(WF.rdm2aabb)
+#print(WF.rdm2bbaa.transpose(2,3,0,1)) # rdm2aabb[i,j,k,l] = rdm2bbaa[k,l,i,j]
