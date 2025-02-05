@@ -845,7 +845,7 @@ def energy_ups(
     return expectation_value(
         wf.ci_coeffs,
         [
-            unrestricted_hamiltonian_0i_0a_1elec( #OBS skifter mellem 0i_0a og 01_0a_1elec her
+            unrestricted_hamiltonian_0i_0a( #OBS skifter mellem 0i_0a og 01_0a_1elec her
                 wf.haa_mo,
                 wf.hbb_mo,
                 wf.gaaaa_mo,

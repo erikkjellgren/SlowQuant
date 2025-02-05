@@ -69,10 +69,10 @@ class UnrestrictedReducedDensityMatrix:
             One-electron unrestricted reduced density matrix element.
          """
         if p in self.actitve_idx and q in self.actitve_idx:
-            return self.rdm1bb[p - self.idx_shift, q - self.idx_shift]
+            return self.rdm1aa[p - self.idx_shift, q - self.idx_shift]
         if p in self.inactive_idx and q in self.inactive_idx:
             if p == q:
-                return 2
+                return 1
             return 0
         return 0 
 
@@ -92,14 +92,21 @@ class UnrestrictedReducedDensityMatrix:
             return self.rdm1bb[p - self.idx_shift, q - self.idx_shift]
         if p in self.inactive_idx and q in self.inactive_idx:
             if p == q:
-                return 2
+                return 1
             return 0
         return 0        
 
     def RDM2aaaa(self, p: int, q: int, r: int, s: int) -> float:
         """Get two-elelctron unrestricted reduced density matrix element.
         
-        Think about what the non-zero elements are
+        .. math::
+        \Gamma^{[2]}_{p_{\sigma}q_{\sigma}r_{\tau}s_{\tau}} = \left\{\begin{array}{ll}
+                                  \delta_{ij}\delta_{\sigma \sigma}\delta_{kl}\delta_{\tau \tau} - \delta_{il}\delta_{\sigma \tau}\delta_{kj}\delta_{\tau \sigma} & pqrs = ijkl\\
+                                  \delta_{ij}\delta_{\tau\tau} \Gamma^{[1]}_{v_{\sigma}w_{\sigma}} & pqrs = vwij\\
+                                   - \delta_{ij}\delta_{\sigma\tau}\Gamma^{[1]}_{v_{\tau}w_{\sigma}} & pqrs = ivwj\\
+                                  \left<0\left|a^{\dagger}_{v_{\sigma}}a^{\dagger}_{x_{\tau}}a_{y_{\tau}}a_{w_{\sigma}}\right|0\right> & pqrs = vwxy\\
+                                  0 & \text{otherwise} \\
+                                  \end{array} .. math:.          
         
         Args:
             p: Spatial orbital index
@@ -129,10 +136,10 @@ class UnrestrictedReducedDensityMatrix:
             p in self.inactive_idx
             and q in self.actitve_idx
             and r in self.actitve_idx
-            and s in self.actitve_idx
+            and s in self.inactive_idx
         ):
             if p == s:
-                return -self.rdm1aa[q - self.idx_shift, r - self.idx_shift]
+                return -self.rdm1aa[r - self.idx_shift, q - self.idx_shift]
             return 0
         if (
             p in self.actitve_idx
@@ -141,7 +148,7 @@ class UnrestrictedReducedDensityMatrix:
             and s in self.actitve_idx
         ):
             if q == r:
-                return - self.rdm1aa[p - self.idx_shift, s - self.idx_shift]
+                return -self.rdm1aa[p - self.idx_shift, s - self.idx_shift]
             return 0
         if (
             p in self.actitve_idx
@@ -150,7 +157,7 @@ class UnrestrictedReducedDensityMatrix:
             and s in self.inactive_idx
         ):
             if r == s:
-                return 2 * self.rdm1aa[p - self.idx_shift, q - self.idx_shift]
+                return self.rdm1aa[p - self.idx_shift, q - self.idx_shift]
             return 0
         if (
             p in self.inactive_idx
@@ -159,7 +166,7 @@ class UnrestrictedReducedDensityMatrix:
             and s in self.actitve_idx
         ):
             if p == q:
-                return 2* self.rdm1aa[r - self.idx_shift, s - self.idx_shift]
+                return self.rdm1aa[r - self.idx_shift, s - self.idx_shift]
             return 0
         if (
             p in self.inactive_idx
@@ -169,16 +176,23 @@ class UnrestrictedReducedDensityMatrix:
         ):
             val = 0
             if p == q and r == s:
-                val += 4
-            if q == r and p == s:
-                val -= 2
+                val += 1
+            if p == s and q == r:
+                val -= 1
             return val
         return 0
 
     def RDM2bbbb(self, p: int, q: int, r: int, s: int) -> float:
         """Get two-elelctron unrestricted reduced density matrix element.
         
-        Think about what the non-zero elements are
+        .. math::
+        \Gamma^{[2]}_{p_{\sigma}q_{\sigma}r_{\tau}s_{\tau}} = \left\{\begin{array}{ll}
+                                  \delta_{ij}\delta_{\sigma \sigma}\delta_{kl}\delta_{\tau \tau} - \delta_{il}\delta_{\sigma \tau}\delta_{kj}\delta_{\tau \sigma} & pqrs = ijkl\\
+                                  \delta_{ij}\delta_{\tau\tau} \Gamma^{[1]}_{v_{\sigma}w_{\sigma}} & pqrs = vwij\\
+                                   - \delta_{ij}\delta_{\sigma\tau}\Gamma^{[1]}_{v_{\tau}w_{\sigma}} & pqrs = ivwj\\
+                                  \left<0\left|a^{\dagger}_{v_{\sigma}}a^{\dagger}_{x_{\tau}}a_{y_{\tau}}a_{w_{\sigma}}\right|0\right> & pqrs = vwxy\\
+                                  0 & \text{otherwise} \\
+                                  \end{array} .. math:. 
         
         Args:
             p: Spatial orbital index
@@ -207,10 +221,10 @@ class UnrestrictedReducedDensityMatrix:
             p in self.inactive_idx
             and q in self.actitve_idx
             and r in self.actitve_idx
-            and s in self.actitve_idx
+            and s in self.inactive_idx
         ):
             if p == s:
-                return -self.rdm1bb[q - self.idx_shift, r - self.idx_shift]
+                return -self.rdm1bb[r - self.idx_shift, q - self.idx_shift]
             return 0
         if (
             p in self.actitve_idx
@@ -219,7 +233,7 @@ class UnrestrictedReducedDensityMatrix:
             and s in self.actitve_idx
         ):
             if q == r:
-                return - self.rdm1aa[p - self.idx_shift, s - self.idx_shift]
+                return -self.rdm1bb[p - self.idx_shift, s - self.idx_shift]
             return 0
         if (
             p in self.actitve_idx
@@ -228,7 +242,7 @@ class UnrestrictedReducedDensityMatrix:
             and s in self.inactive_idx
         ):
             if r == s:
-                return 2 * self.rdm1aa[p - self.idx_shift, q - self.idx_shift]
+                return self.rdm1bb[p - self.idx_shift, q - self.idx_shift]
             return 0
         if (
             p in self.inactive_idx
@@ -237,7 +251,7 @@ class UnrestrictedReducedDensityMatrix:
             and s in self.actitve_idx
         ):
             if p == q:
-                return 2* self.rdm1aa[r - self.idx_shift, s - self.idx_shift]
+                return self.rdm1bb[r - self.idx_shift, s - self.idx_shift]
             return 0
         if (
             p in self.inactive_idx
@@ -247,16 +261,23 @@ class UnrestrictedReducedDensityMatrix:
         ):
             val = 0
             if p == q and r == s:
-                val += 4
-            if q == r and p == s:
-                val -= 2
+                val += 1
+            if p == s and q == r:
+                val -= 1
             return val
         return 0
 
     def RDM2aabb(self, p: int, q: int, r: int, s: int) -> float:
         """Get two-elelctron unrestricted reduced density matrix element.
         
-        Think about what the non-zero elements are
+        .. math::
+        \Gamma^{[2]}_{p_{\sigma}q_{\sigma}r_{\tau}s_{\tau}} = \left\{\begin{array}{ll}
+                                  \delta_{ij}\delta_{\sigma \sigma}\delta_{kl}\delta_{\tau \tau} - \delta_{il}\delta_{\sigma \tau}\delta_{kj}\delta_{\tau \sigma} & pqrs = ijkl\\
+                                  \delta_{ij}\delta_{\tau\tau} \Gamma^{[1]}_{v_{\sigma}w_{\sigma}} & pqrs = vwij\\
+                                   - \delta_{ij}\delta_{\sigma\tau}\Gamma^{[1]}_{v_{\tau}w_{\sigma}} & pqrs = ivwj\\
+                                  \left<0\left|a^{\dagger}_{v_{\sigma}}a^{\dagger}_{x_{\tau}}a_{y_{\tau}}a_{w_{\sigma}}\right|0\right> & pqrs = vwxy\\
+                                  0 & \text{otherwise} \\
+                                  \end{array} .. math:. 
         
         Args:
             p: Spatial orbital index
@@ -288,7 +309,6 @@ class UnrestrictedReducedDensityMatrix:
             and s in self.inactive_idx
         ):
             return 0
-            # overlap will always have different spin parts, because p\sigma cannor be equal to s\tau
         if (
             p in self.actitve_idx
             and q in self.inactive_idx
@@ -303,7 +323,7 @@ class UnrestrictedReducedDensityMatrix:
             and s in self.inactive_idx
         ):
             if r == s:
-                return 2 * self.rdm1aa[p - self.idx_shift, q - self.idx_shift]
+                return self.rdm1aa[p - self.idx_shift, q - self.idx_shift]
             return 0
         if (
             p in self.inactive_idx
@@ -312,7 +332,7 @@ class UnrestrictedReducedDensityMatrix:
             and s in self.actitve_idx
         ):
             if p == q:
-                return 2 * self.rdm1bb[r - self.idx_shift, s - self.idx_shift]
+                return self.rdm1bb[r - self.idx_shift, s - self.idx_shift]
             return 0
         if (
             p in self.inactive_idx
@@ -321,13 +341,21 @@ class UnrestrictedReducedDensityMatrix:
             and s in self.inactive_idx
         ):
             if p == q and r == s:
-                return 4
+                return 1
+            return 0
         return 0
 
     def RDM2bbaa(self, p: int, q: int, r: int, s: int) -> float:
         """Get two-elelctron unrestricted reduced density matrix element.
         
-        Think about what the non-zero elements are
+        .. math::
+        \Gamma^{[2]}_{p_{\sigma}q_{\sigma}r_{\tau}s_{\tau}} = \left\{\begin{array}{ll}
+                                  \delta_{ij}\delta_{\sigma \sigma}\delta_{kl}\delta_{\tau \tau} - \delta_{il}\delta_{\sigma \tau}\delta_{kj}\delta_{\tau \sigma} & pqrs = ijkl\\
+                                  \delta_{ij}\delta_{\tau\tau} \Gamma^{[1]}_{v_{\sigma}w_{\sigma}} & pqrs = vwij\\
+                                   - \delta_{ij}\delta_{\sigma\tau}\Gamma^{[1]}_{v_{\tau}w_{\sigma}} & pqrs = ivwj\\
+                                  \left<0\left|a^{\dagger}_{v_{\sigma}}a^{\dagger}_{x_{\tau}}a_{y_{\tau}}a_{w_{\sigma}}\right|0\right> & pqrs = vwxy\\
+                                  0 & \text{otherwise} \\
+                                  \end{array} .. math:. 
         
         Args:
             p: Spatial orbital index
@@ -373,7 +401,7 @@ class UnrestrictedReducedDensityMatrix:
             and s in self.inactive_idx
         ):
             if r == s:
-                return 2 * self.rdm1bb[p - self.idx_shift, q - self.idx_shift]
+                return self.rdm1bb[p - self.idx_shift, q - self.idx_shift]
             return 0
         if (
             p in self.inactive_idx
@@ -382,7 +410,7 @@ class UnrestrictedReducedDensityMatrix:
             and s in self.actitve_idx
         ):
             if p == q:
-                return 2 * self.rdm1aa[r - self.idx_shift, s - self.idx_shift]
+                return self.rdm1aa[r - self.idx_shift, s - self.idx_shift]
             return 0
         if (
             p in self.inactive_idx
@@ -391,7 +419,8 @@ class UnrestrictedReducedDensityMatrix:
             and s in self.inactive_idx
         ):
             if p == q and r == s:
-                return 4
+                return 1
+            return 0
         return 0
 
 def get_electronic_energy_unrestricted(
@@ -425,6 +454,6 @@ def get_electronic_energy_unrestricted(
         for q in range(num_inactive_orbs + num_active_orbs):
             for r in range(num_inactive_orbs + num_active_orbs):
                 for s in range(num_inactive_orbs + num_active_orbs):
-                    energy += 0*(1 / 2 * (g_int_aaaa[p, q, r, s] * rdms.RDM2aaaa(p, q, r, s) + g_int_bbbb[p, q, r, s] * rdms.RDM2bbbb(p, q, r, s) + g_int_aabb[p, q, r, s] * rdms.RDM2aabb(p, q, r, s) + g_int_bbaa[p, q, r, s] * rdms.RDM2bbaa(p, q, r, s)))
+                    energy += 1 / 2 * (g_int_aaaa[p, q, r, s] * rdms.RDM2aaaa(p, q, r, s) + g_int_bbbb[p, q, r, s] * rdms.RDM2bbbb(p, q, r, s) + g_int_aabb[p, q, r, s] * rdms.RDM2aabb(p, q, r, s) + g_int_bbaa[p, q, r, s] * rdms.RDM2bbaa(p, q, r, s))
 
     return energy
