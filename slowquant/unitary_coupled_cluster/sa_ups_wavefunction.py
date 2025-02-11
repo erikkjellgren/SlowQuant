@@ -260,7 +260,7 @@ class WaveFunctionSAUPS:
 
     @kappa.setter
     def kappa(self, k: list[float]) -> None:
-        """Set orbital rotation parameters.
+        """Set orbital rotation parameters, and move current expansion point.
 
         Args:
             k: orbital rotation parameters.
@@ -270,6 +270,10 @@ class WaveFunctionSAUPS:
         self._sa_energy = None
         self._state_energies = None
         self._kappa = k.copy()
+        # Move current expansion point.
+        self._c_mo = self.c_mo
+        self._kappa_old = self.kappa
+        self._state_ci_coeffs = None
 
     @property
     def ci_coeffs(self) -> list[np.ndarray]:
@@ -330,6 +334,9 @@ class WaveFunctionSAUPS:
         # Construct anti-hermitian kappa matrix
         kappa_mat = np.zeros_like(self._c_mo)
         if len(self.kappa) != 0:
+            # The MO transformation is calculated as a difference between current kappa and kappa old.
+            # This is to make the moving of the expansion point to work with SciPy optimization algorithms.
+            # Resetting kappa to zero would mess with any algorithm that has any memory f.x. BFGS.
             if np.max(np.abs(np.array(self.kappa) - np.array(self._kappa_old))) > 0.0:
                 for kappa_val, kappa_old, (p, q) in zip(self.kappa, self._kappa_old, self.kappa_idx):
                     kappa_mat[p, q] = kappa_val - kappa_old
@@ -358,16 +365,6 @@ class WaveFunctionSAUPS:
         if self._g_mo is None:
             self._g_mo = two_electron_integral_transform(self.c_mo, self._g_ao)
         return self._g_mo
-
-    def _move_cep(self) -> None:
-        """Move current expansion point."""
-        self._h_mo = None
-        self._g_mo = None
-        self._sa_energy = None
-        self._state_energies = None
-        self._state_ci_coeffs = None
-        self._c_mo = self.c_mo
-        self._kappa_old = self.kappa
 
     @property
     def rdm1(self) -> np.ndarray:
@@ -833,7 +830,6 @@ class WaveFunctionSAUPS:
         if kappa_optimization:
             num_kappa = len(self.kappa_idx)
             self.kappa = parameters[:num_kappa]
-            self._move_cep()
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
         Hamiltonian = build_operator_matrix(
@@ -853,8 +849,6 @@ class WaveFunctionSAUPS:
             energies.append(expectation_value_mat(coeffs, Hamiltonian, coeffs))
         if return_all_states:
             return energies
-        if kappa_optimization:
-            print(float(np.mean(energies)), self.kappa)
         return float(np.mean(energies))
 
     def _calc_gradient_optimization(
@@ -879,7 +873,6 @@ class WaveFunctionSAUPS:
         if kappa_optimization:
             num_kappa = len(self.kappa_idx)
             self.kappa = parameters[:num_kappa]
-            self._move_cep()
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:

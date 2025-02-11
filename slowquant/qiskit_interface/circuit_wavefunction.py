@@ -186,7 +186,7 @@ class WaveFunctionCircuit:
 
     @kappa.setter
     def kappa(self, k: list[float]) -> None:
-        """Set orbital rotation parameters.
+        """Set orbital rotation parameters, and move current expansion point.
 
         Args:
             k: orbital rotation parameters.
@@ -195,6 +195,9 @@ class WaveFunctionCircuit:
         self._g_mo = None
         self._energy_elec = None
         self._kappa = k.copy()
+        # Move current expansion point.
+        self._c_mo = self.c_mo
+        self._kappa_old = self.kappa
 
     @property
     def c_mo(self) -> np.ndarray:
@@ -205,6 +208,9 @@ class WaveFunctionCircuit:
         """
         kappa_mat = np.zeros_like(self._c_mo)
         if len(self.kappa) != 0:
+            # The MO transformation is calculated as a difference between current kappa and kappa old.
+            # This is to make the moving of the expansion point to work with SciPy optimization algorithms.
+            # Resetting kappa to zero would mess with any algorithm that has any memory f.x. BFGS.
             if np.max(np.abs(np.array(self.kappa) - np.array(self._kappa_old))) > 0.0:
                 for kappa_val, kappa_old, (p, q) in zip(self.kappa, self._kappa_old, self.kappa_idx):
                     kappa_mat[p, q] = kappa_val - kappa_old
@@ -255,15 +261,6 @@ class WaveFunctionCircuit:
         self._rdm4 = None
         self._energy_elec = None
         self.QI.parameters = parameters
-
-    def _move_cep(self) -> None:
-        """Move current expansion point."""
-        self._h_mo = None
-        self._g_mo = None
-        self._energy_elec = None
-        c = self.c_mo
-        self._c_mo = c
-        self._kappa_old = self.kappa
 
     def change_primitive(
         self, primitive: BaseEstimator | BaseSamplerV1 | BaseSamplerV2, verbose: bool = True
@@ -1042,13 +1039,15 @@ class WaveFunctionCircuit:
         if kappa_optimization:
             num_kappa = len(self.kappa_idx)
             self.kappa = parameters[:num_kappa]
-            self._move_cep()
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
             # Build operator
             H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             return self.QI.quantum_expectation_value(H)
+        # RDM is more expensive than evaluation of the Hamiltonian.
+        # Thus only contruct these if orbital-optimization is turned on,
+        # since the RDMs will be reused in the oo gradient calculation.
         rdms = ReducedDenstiyMatrix(
             self.num_inactive_orbs,
             self.num_active_orbs,
@@ -1077,7 +1076,6 @@ class WaveFunctionCircuit:
         if kappa_optimization:
             num_kappa = len(self.kappa_idx)
             self.kappa = parameters[:num_kappa]
-            self._move_cep()
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:

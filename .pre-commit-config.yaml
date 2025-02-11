@@ -1,7 +1,7 @@
 ---
 repos:
   - repo: https://github.com/ambv/black
-    rev: 24.10.0
+    rev: 25.1.0
     hooks:
       - id: black
         args: ["--target-version", "py312"]
@@ -24,18 +24,18 @@ repos:
       - id: trailing-whitespace
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.13.0
+    rev: v1.15.0
     hooks:
       - id: mypy
 
   - repo: https://github.com/PyCQA/isort
-    rev: 5.13.2
+    rev: 6.0.0
     hooks:
       - id: isort
         args: ["--profile", "black"]
 
   - repo: https://github.com/PyCQA/pylint
-    rev: v3.3.1
+    rev: v3.3.4
     hooks:
       - id: pylint
         args: ["--rcfile=.pylintrc"]
