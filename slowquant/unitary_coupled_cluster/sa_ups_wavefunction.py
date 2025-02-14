@@ -703,7 +703,6 @@ class WaveFunctionSAUPS:
         #. 10.1103/PhysRevLett.122.230401, Eq. 2
         """
         state_H = np.zeros((self.num_states, self.num_states))
-        # Hamiltonian matrix
         Hamiltonian = hamiltonian_0i_0a(
             self.h_mo,
             self.g_mo,

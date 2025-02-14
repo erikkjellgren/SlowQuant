@@ -1118,7 +1118,6 @@ class WaveFunctionUCC:
                 rdms, self.h_mo, self.g_mo, self.kappa_idx, self.num_inactive_orbs, self.num_active_orbs
             )
         if theta_optimization:
-            # Hamiltonian matrix
             Hamiltonian = hamiltonian_0i_0a(
                 self.h_mo,
                 self.g_mo,
