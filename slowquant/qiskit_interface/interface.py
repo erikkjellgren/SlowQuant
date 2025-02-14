@@ -1,4 +1,3 @@
-# pylint: disable=too-many-lines
 import copy
 import itertools
 import math
@@ -38,7 +37,7 @@ class QuantumInterface:
     This class handles the interface with qiskit and the communication with quantum hardware.
     """
 
-    def __init__(  # pylint: disable=dangerous-default-value
+    def __init__(
         self,
         primitive: BaseEstimator | BaseSamplerV1 | BaseSamplerV2,
         ansatz: str | QuantumCircuit,

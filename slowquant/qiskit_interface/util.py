@@ -23,7 +23,7 @@ def to_CBS_measurement(op: str, transpiled: None | list[QuantumCircuit] = None) 
         transpiled: List of transpiled X and Y gate.
 
     Returns:
-        Pauli measuremnt quantum circuit.
+        Pauli measurement quantum circuit.
     """
     if transpiled is None:
         num_qubits = len(op)

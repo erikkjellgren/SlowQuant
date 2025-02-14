@@ -265,9 +265,9 @@ class LinearResponseUCC(LinearResponseBaseClass):
             self.wf.rdm1,
             rdm2=self.wf.rdm2,
         )
-        mux = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[0])
-        muy = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[1])
-        muz = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[2])
+        mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
+        muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
+        muz = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[2])
         mux_op = one_elec_op_0i_0a(
             mux,
             self.wf.num_inactive_orbs,
