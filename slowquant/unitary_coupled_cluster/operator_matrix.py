@@ -353,11 +353,21 @@ def propagate_state_SA(
 
 @nb.jit(nopython=True)
 def check_all_zero_states(states: np.ndarray) -> bool:
+    """Check if all elements are zero.
+
+    This part of the code is factored out to be its own function,
+    to get the speed increase from Numba.
+
+    Args:
+        states: Vector to check if all are zero.
+
+    Returns:
+        False if not all zero, otherwise true.
+    """
     for state_coeff in states:
         if abs(state_coeff) > 10**-14:
             return False
-    else:  # no-break
-        return True
+    return True
 
 
 def _propagate_state(
