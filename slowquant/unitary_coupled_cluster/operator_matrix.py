@@ -159,7 +159,6 @@ def propagate_state(
         parity_check[2 * num_active_orbs - i] = num
 
     for op in operators[::-1]:
-        tmp_state[:] = 0.0
         # Ansatz unitary in operators
         if isinstance(op, str):
             if op not in ("U", "Ud"):
@@ -199,6 +198,7 @@ def propagate_state(
                 raise TypeError(f"Got unknown wave function structure type, {type(wf_struct)}")
         # FermionicOperator in operators
         else:
+            tmp_state[:] = 0.0
             # Fold operator to only get active contributions
             if do_folding:
                 op_folded = op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs)
@@ -289,7 +289,6 @@ def propagate_state_SA(
         parity_check[2 * num_active_orbs - i] = num
 
     for op in operators[::-1]:
-        tmp_state[:, :] = 0.0
         # Ansatz unitary in operators
         if isinstance(op, str):
             if op not in ("U", "Ud"):
@@ -315,6 +314,7 @@ def propagate_state_SA(
                 raise TypeError(f"Got unknown wave function structure type, {type(wf_struct)}")
         # FermionicOperator in operators
         else:
+            tmp_state[:, :] = 0.0
             # Fold operator to only get active contributions
             if do_folding:
                 op_folded = op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs)

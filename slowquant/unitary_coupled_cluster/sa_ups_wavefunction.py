@@ -493,7 +493,7 @@ class WaveFunctionSAUPS:
                 self.g_mo,
                 self.num_inactive_orbs,
                 self.num_active_orbs,
-            ).get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+            )
             self._sa_energy = expectation_value_SA(
                 self.ci_coeffs,
                 [Hamiltonian],
@@ -507,7 +507,6 @@ class WaveFunctionSAUPS:
                 self.num_active_elec_beta,
                 self.thetas,
                 self.ups_layout,
-                do_folding=False,
             )
         return self._sa_energy
 
@@ -937,7 +936,7 @@ class WaveFunctionSAUPS:
                 self.g_mo,
                 self.num_inactive_orbs,
                 self.num_active_orbs,
-            ).get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+            )
             # Reference bra state (no differentiations)
             bra_vec = propagate_state_SA(
                 [Hamiltonian],
@@ -951,7 +950,6 @@ class WaveFunctionSAUPS:
                 self.num_active_elec_beta,
                 self.thetas,
                 self.ups_layout,
-                do_folding=False,
             )
             bra_vec = construct_ups_state_SA(
                 bra_vec,
