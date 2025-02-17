@@ -54,7 +54,9 @@ class WaveFunctionCircuit:
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
         if isinstance(quantum_interface.ansatz, QuantumCircuit):
-            print("WARNING: A QI with a custom Ansatz was passed. VQE will only work with COBYLA optimizer.")
+            print(
+                "WARNING: A QI with a custom Ansatz was passed. VQE will only work with COBYLA and COBYQA optimizer."
+            )
         self._c_mo = mo_coeffs
         self._h_ao = h_ao
         self._g_ao = g_ao
@@ -863,8 +865,8 @@ class WaveFunctionCircuit:
             maxiter: Maximum number of iterations.
             is_silent_subiterations: Silence subiterations.
         """
-        if isinstance(self.QI.ansatz, QuantumCircuit) and not optimizer_name.lower() == "cobyla":
-            raise ValueError("Custom Ansatz in QI only works with COBYLA as optimizer")
+        if isinstance(self.QI.ansatz, QuantumCircuit) and not optimizer_name.lower() in ("cobyla", "cobyqa"):
+            raise ValueError("Custom Ansatz in QI only works with COBYLA and COBYQA as optimizer")
         print("### Parameters information:")
         if orbital_optimization:
             print(f"### Number kappa: {len(self.kappa)}")
@@ -963,8 +965,8 @@ class WaveFunctionCircuit:
             tol: Convergence tolerance.
             maxiter: Maximum number of iterations.
         """
-        if isinstance(self.QI.ansatz, QuantumCircuit) and not optimizer_name.lower() == "cobyla":
-            raise ValueError("Custom Ansatz in QI only works with COBYLA as optimizer")
+        if isinstance(self.QI.ansatz, QuantumCircuit) and not optimizer_name.lower() in ("cobyla", "cobyqa"):
+            raise ValueError("Custom Ansatz in QI only works with COBYLA and COBYQA as optimizer")
         print("### Parameters information:")
         if orbital_optimization:
             print(f"### Number kappa: {len(self.kappa)}")
