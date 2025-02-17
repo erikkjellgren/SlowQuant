@@ -780,6 +780,10 @@ class WaveFunctionUPS:
             maxiter: Maximum number of iterations.
             is_silent_subiterations: Silence subiterations.
         """
+        print("### Parameters information:")
+        if orbital_optimization:
+            print(f"### Number kappa: {len(self.kappa)}")
+        print(f"### Number theta: {self.ups_layout.n_params}")
         e_old = 1e12
         print("Full optimization")
         print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
@@ -874,13 +878,17 @@ class WaveFunctionUPS:
             tol: Convergence tolerance.
             maxiter: Maximum number of iterations.
         """
+        print("### Parameters information:")
+        if orbital_optimization:
+            print(f"### Number kappa: {len(self.kappa)}")
+        print(f"### Number theta: {self.ups_layout.n_params}")
         if optimizer_name.lower() == "rotosolve":
             if orbital_optimization and len(self.kappa) != 0:
                 raise ValueError(
                     "Cannot use RotoSolve together with orbital optimization in the one-step solver."
                 )
 
-        print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+        print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
         if orbital_optimization:
             if len(self.thetas) > 0:
                 energy = partial(
