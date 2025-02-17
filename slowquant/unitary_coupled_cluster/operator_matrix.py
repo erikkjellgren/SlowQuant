@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 
+import numba as nb
 import numpy as np
 import scipy.sparse as ss
 from sympy.utilities.iterables import multiset_permutations
@@ -322,9 +323,8 @@ def propagate_state_SA(
                 op_folded = op
             # loop over all determinants
             for i in range(num_dets):
-                if np.max(np.abs(new_state[:, i])) < 10**-14:
+                if check_all_zero_states(new_state[:, i]):
                     continue
-                # loop over all strings of annihilation operators in FermionicOperator sum
                 for fermi_label in op_folded.factors:
                     det = idx2det[i]
                     phase_changes = 0
@@ -349,6 +349,15 @@ def propagate_state_SA(
                             tmp_state[:, det2idx[det]] += val * new_state[:, i]  # Update value
             new_state = np.copy(tmp_state)
     return new_state
+
+
+@nb.jit(nopython=True)
+def check_all_zero_states(states: np.ndarray) -> bool:
+    for state_coeff in states:
+        if abs(state_coeff) > 10**-14:
+            return False
+    else:  # no-break
+        return True
 
 
 def _propagate_state(
