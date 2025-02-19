@@ -850,7 +850,7 @@ class WaveFunctionUPS:
                 e_new = res.fun
                 if orbital_optimization and len(self.kappa) == 0:
                     print(
-                        "WARNING: No orbital optimization performed, because there is no non-redundant orbital parameters"
+                        "WARNING: No orbital optimization performed, because there is no non-redundant orbital parameters."
                     )
                 break
 

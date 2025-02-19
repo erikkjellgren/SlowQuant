@@ -8,6 +8,7 @@ from functools import partial
 import numpy as np
 import scipy
 import scipy.optimize
+import scipy.sparse as ss
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
@@ -19,9 +20,11 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_gradient,
 )
 from slowquant.unitary_coupled_cluster.operator_matrix import (
+    build_operator_matrix,
     construct_ucc_state,
     expectation_value,
     get_indexing,
+    get_ucc_T,
     propagate_state,
 )
 from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
@@ -1123,11 +1126,13 @@ class WaveFunctionUCC:
                 self.g_mo,
                 self.num_inactive_orbs,
                 self.num_active_orbs,
-            ).get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+            )
             # Numerical finite difference gradient
             eps = np.finfo(np.float64).eps ** (
                 1 / 2
             )  # half-precision of double-precision floating-point numbers
+            if eps < 10e-13:
+                raise ValueError(f"Cannot perform finite-difference step-size is too small, {eps}")
             Hket = propagate_state(
                 [Hamiltonian],
                 self.ci_coeffs,
@@ -1140,18 +1145,22 @@ class WaveFunctionUCC:
                 self.num_active_elec_beta,
                 self.thetas,
                 self.ucc_layout,
-                do_folding=False,
             )
             E = self.ci_coeffs @ Hket
-            theta_params = self.thetas
+            theta_params = np.zeros_like(self.thetas)
+            Tmat = build_operator_matrix(
+                get_ucc_T(self.thetas, self.ucc_layout), self.idx2det, self.det2idx, self.num_active_orbs
+            )
             for i in range(len(theta_params)):  # pylint: disable=consider-using-enumerate
                 sign_step = (theta_params[i] >= 0).astype(float) * 2 - 1  # type: ignore [attr-defined]
                 step_size = eps * sign_step * max(1, abs(theta_params[i]))
                 theta_params[i] += step_size
-                self.thetas = theta_params
-                E_plus = self.ci_coeffs @ Hket
+                Tmat_plus = build_operator_matrix(
+                    get_ucc_T(theta_params, self.ucc_layout), self.idx2det, self.det2idx, self.num_active_orbs
+                )
+                bra = ss.linalg.expm_multiply(Tmat + Tmat_plus, self.csf_coeffs, traceA=0.0)
+                E_plus = bra @ Hket
                 theta_params[i] -= step_size
-                self.thetas = theta_params
                 gradient[i + num_kappa] = 2 * (E_plus - E) / step_size
         return gradient
 
