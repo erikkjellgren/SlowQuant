@@ -559,35 +559,7 @@ def construct_ucc_state(
         New state vector with unitaries applied.
     """
     # Build up T matrix based on excitations in ucc_struct and given thetas
-    T = FermionicOperator({}, {})
-    for exc_type, exc_indices, theta in zip(
-        ucc_struct.excitation_operator_type, ucc_struct.excitation_indicies, thetas
-    ):
-        if abs(theta) < 10**-14:
-            continue
-        if exc_type == "sa_single":
-            (i, a) = exc_indices
-            T += theta * G1_sa(i, a, True)
-        elif exc_type == "sa_double_1":
-            (i, j, a, b) = exc_indices
-            T += theta * G2_1_sa(i, j, a, b, True)
-        elif exc_type == "sa_double_2":
-            (i, j, a, b) = exc_indices
-            T += theta * G2_2_sa(i, j, a, b, True)
-        elif exc_type == "triple":
-            (i, j, k, a, b, c) = exc_indices
-            T += theta * G3(i, j, k, a, b, c, True)
-        elif exc_type == "quadruple":
-            (i, j, k, l, a, b, c, d) = exc_indices
-            T += theta * G4(i, j, k, l, a, b, c, d, True)
-        elif exc_type == "quintuple":
-            (i, j, k, l, m, a, b, c, d, e) = exc_indices
-            T += theta * G5(i, j, k, l, m, a, b, c, d, e, True)
-        elif exc_type == "sextuple":
-            (i, j, k, l, m, n, a, b, c, d, e, f) = exc_indices
-            T += theta * G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
-        else:
-            raise ValueError(f"Got unknown excitation type, {exc_type}")
+    T = get_ucc_T(thetas, ucc_struct)
     # mv = functools.partial(
     #    _propagate_state,
     #    operators=[T],
@@ -626,6 +598,53 @@ def construct_ucc_state(
     if dagger:
         return ss.linalg.expm_multiply(-Tmat, state, traceA=0.0)
     return ss.linalg.expm_multiply(Tmat, state, traceA=0.0)
+
+
+def get_ucc_T(
+    thetas: Sequence[float],
+    ucc_struct: UccStructure,
+) -> FermionicOperator:
+    """Construct UCC operator.
+
+    Args:
+        thetas: Active-space parameters.
+               Ordered as (S, D, T, ...).
+        ucc_struct: UCCStructure object.
+
+    Returns:
+        UCC operator.
+    """
+    # Build up T matrix based on excitations in ucc_struct and given thetas
+    T = FermionicOperator({}, {})
+    for exc_type, exc_indices, theta in zip(
+        ucc_struct.excitation_operator_type, ucc_struct.excitation_indicies, thetas
+    ):
+        if abs(theta) < 10**-14:
+            continue
+        if exc_type == "sa_single":
+            (i, a) = exc_indices
+            T += theta * G1_sa(i, a, True)
+        elif exc_type == "sa_double_1":
+            (i, j, a, b) = exc_indices
+            T += theta * G2_1_sa(i, j, a, b, True)
+        elif exc_type == "sa_double_2":
+            (i, j, a, b) = exc_indices
+            T += theta * G2_2_sa(i, j, a, b, True)
+        elif exc_type == "triple":
+            (i, j, k, a, b, c) = exc_indices
+            T += theta * G3(i, j, k, a, b, c, True)
+        elif exc_type == "quadruple":
+            (i, j, k, l, a, b, c, d) = exc_indices
+            T += theta * G4(i, j, k, l, a, b, c, d, True)
+        elif exc_type == "quintuple":
+            (i, j, k, l, m, a, b, c, d, e) = exc_indices
+            T += theta * G5(i, j, k, l, m, a, b, c, d, e, True)
+        elif exc_type == "sextuple":
+            (i, j, k, l, m, n, a, b, c, d, e, f) = exc_indices
+            T += theta * G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
+        else:
+            raise ValueError(f"Got unknown excitation type, {exc_type}")
+    return T
 
 
 def construct_ups_state(
