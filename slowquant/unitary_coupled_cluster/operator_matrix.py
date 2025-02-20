@@ -119,6 +119,7 @@ def propagate_state(
     thetas: Sequence[float],
     wf_struct: UpsStructure | UccStructure,
     do_folding: bool = True,
+    screening_factor: float = 1.0,
 ) -> np.ndarray:
     r"""Propagate state by applying operator.
 
@@ -204,10 +205,13 @@ def propagate_state(
                 op_folded = op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs)
             else:
                 op_folded = op
+            labels = list(op_folded.factors.keys())
+            factors = np.array(list(op_folded.factors.values()))
             # loop over all determinants
             for i in get_determinants(new_state):
                 # loop over all strings of annihilation operators in FermionicOperator sum
-                for fermi_label in op_folded.factors:
+                for label_idx in get_fermi_labels(factors, screening_factor * new_state[i]):
+                    fermi_label = labels[label_idx]
                     det = idx2det[i]
                     phase_changes = 0
                     # evaluate how string of annihilation operator change det
@@ -231,6 +235,13 @@ def propagate_state(
                         )  # Update value
             new_state = np.copy(tmp_state)
     return new_state
+
+
+@nb.jit(nopython=True)
+def get_fermi_labels(factors, screening_factor):
+    for i, factor in enumerate(factors):
+        if abs(factor * screening_factor) > 10**-14:
+            yield i
 
 
 @nb.jit(nopython=True)
@@ -714,6 +725,7 @@ def construct_ups_state(
                     thetas,
                     ups_struct,
                     do_folding=False,
+                    screening_factor=np.sin(A * theta),
                 )
                 + (1 - np.cos(A * theta))
                 * propagate_state(
@@ -729,6 +741,7 @@ def construct_ups_state(
                     thetas,
                     ups_struct,
                     do_folding=False,
+                    screening_factor=(1 - np.cos(A * theta)),
                 )
             )
             tmp = (
@@ -747,6 +760,7 @@ def construct_ups_state(
                     thetas,
                     ups_struct,
                     do_folding=False,
+                    screening_factor=np.sin(A * theta),
                 )
                 + (1 - np.cos(A * theta))
                 * propagate_state(
@@ -762,6 +776,7 @@ def construct_ups_state(
                     thetas,
                     ups_struct,
                     do_folding=False,
+                    screening_factor=(1 - np.cos(A * theta)),
                 )
             )
         elif exc_type in ("single", "double"):
@@ -791,6 +806,7 @@ def construct_ups_state(
                     thetas,
                     ups_struct,
                     do_folding=False,
+                    screening_factor=np.sin(theta),
                 )
                 + (1 - np.cos(theta))
                 * propagate_state(
@@ -806,6 +822,7 @@ def construct_ups_state(
                     thetas,
                     ups_struct,
                     do_folding=False,
+                    screening_factor=(1 - np.cos(theta)),
                 )
             )
         else:
