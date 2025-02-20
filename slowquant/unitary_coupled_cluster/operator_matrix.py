@@ -149,9 +149,8 @@ def propagate_state(
     """
     if len(operators) == 0:
         return np.copy(state)
-    num_dets = len(idx2det)
     new_state = np.copy(state)
-    tmp_state = np.zeros(num_dets)
+    tmp_state = np.zeros_like(state)
     # Create bitstrings for parity check. Key=orbital index. Value=det as int
     parity_check = {0: 0}
     num = 0
@@ -206,9 +205,7 @@ def propagate_state(
             else:
                 op_folded = op
             # loop over all determinants
-            for i in range(num_dets):
-                if abs(new_state[i]) < 10**-14:
-                    continue
+            for i in get_determinants(new_state):
                 # loop over all strings of annihilation operators in FermionicOperator sum
                 for fermi_label in op_folded.factors:
                     det = idx2det[i]
@@ -229,11 +226,28 @@ def propagate_state(
                             det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
                             phase_changes += (det & parity_check[orb_idx]).bit_count()
                     else:  # nobreak
-                        val = op_folded.factors[fermi_label] * (-1) ** phase_changes
-                        if abs(val) > 10**-14:
-                            tmp_state[det2idx[det]] += val * new_state[i]  # Update value
+                        tmp_state[det2idx[det]] += (
+                            op_folded.factors[fermi_label] * (-1) ** phase_changes * new_state[i]
+                        )  # Update value
             new_state = np.copy(tmp_state)
     return new_state
+
+
+@nb.jit(nopython=True)
+def get_determinants(state):
+    """Generate relevant determinant index.
+
+    This part is factored out for performance - jit.
+
+    Args:
+        state: Statevector
+
+    Returns:
+        Index where statevector is non-zero.
+    """
+    for i, val in enumerate(state):
+        if abs(val) > 10**-14:
+            yield i
 
 
 def propagate_state_SA(
@@ -279,7 +293,6 @@ def propagate_state_SA(
     """
     if len(operators) == 0:
         return np.copy(state)
-    num_dets = len(idx2det)
     new_state = np.copy(state)
     tmp_state = np.zeros_like(state)
     # Create bitstrings for parity check. Key=orbital index. Value=det as int
@@ -322,9 +335,7 @@ def propagate_state_SA(
             else:
                 op_folded = op
             # loop over all determinants
-            for i in range(num_dets):
-                if check_all_zero_states(new_state[:, i]):
-                    continue
+            for i in get_determinants_SA(new_state):
                 for fermi_label in op_folded.factors:
                     det = idx2det[i]
                     phase_changes = 0
@@ -345,29 +356,31 @@ def propagate_state_SA(
                             phase_changes += (det & parity_check[orb_idx]).bit_count()
                     else:  # nobreak
                         val = op_folded.factors[fermi_label] * (-1) ** phase_changes
-                        if abs(val) > 10**-14:
-                            tmp_state[:, det2idx[det]] += val * new_state[:, i]  # Update value
+                        tmp_state[:, det2idx[det]] += val * new_state[:, i]  # Update value
             new_state = np.copy(tmp_state)
     return new_state
 
 
 @nb.jit(nopython=True)
-def check_all_zero_states(states: np.ndarray) -> bool:
-    """Check if all elements are zero.
+def get_determinants_SA(state):
+    """Generate relevant determinant index for SA wave function.
 
-    This part of the code is factored out to be its own function,
-    to get the speed increase from Numba.
+    This part is factored out for performance - jit.
 
     Args:
-        states: Vector to check if all are zero.
+        state: Statevector
 
     Returns:
-        False if not all zero, otherwise true.
+        Index where statevector is non-zero.
     """
-    for state_coeff in states:
-        if abs(state_coeff) > 10**-14:
-            return False
-    return True
+    for i, vals in enumerate(state.T):
+        is_non_zero = False
+        for val in vals:
+            if abs(val) > 10**-14:
+                is_non_zero = True
+                break
+        if is_non_zero:
+            yield i
 
 
 def _propagate_state(
