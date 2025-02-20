@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import copy
 import re
+from dataclasses import dataclass
 
 
+@dataclass(repr=False, eq=False, match_args=False)
 class a_op:
+    __slots__ = ("spinless_idx", "idx", "dagger", "spin")
+
     def __init__(self, spinless_idx: int, spin: str, dagger: bool) -> None:
         """Initialize fermionic annihilation operator.
 
@@ -159,6 +163,8 @@ def do_extended_normal_ordering(
 
 
 class FermionicOperator:
+    __slots__ = ("operators", "factors")
+
     def __init__(
         self, annihilation_operator: dict[str, list[a_op]] | a_op, factor: dict[str, float] | float
     ) -> None:
@@ -189,7 +195,6 @@ class FermionicOperator:
             raise ValueError(
                 f"Could not assign operator of {type(annihilation_operator)} with factor of {type(factor)}"
             )
-        self._operators_ab = None
 
     def __add__(self, fermistring: FermionicOperator) -> FermionicOperator:
         """Addition of two fermionic operators.
