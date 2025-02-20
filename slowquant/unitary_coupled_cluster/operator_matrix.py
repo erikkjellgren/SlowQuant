@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
 
 import numba as nb
 import numpy as np
@@ -234,7 +234,7 @@ def propagate_state(
 
 
 @nb.jit(nopython=True)
-def get_determinants(state):
+def get_determinants(state: np.ndarray) -> Generator[int, None, None]:
     """Generate relevant determinant index.
 
     This part is factored out for performance - jit.
@@ -362,7 +362,7 @@ def propagate_state_SA(
 
 
 @nb.jit(nopython=True)
-def get_determinants_SA(state):
+def get_determinants_SA(state: np.ndarray) -> Generator[int, None, None]:
     """Generate relevant determinant index for SA wave function.
 
     This part is factored out for performance - jit.
