@@ -37,6 +37,9 @@ def tUPS(
         * do_pp [bool]: Do perfect pairing. (default: False)
         * do_qnp [bool]: Do QNP tiling. (default: False)
         * skip_last_singles [bool]: Skip last layer of singles operators. (default: False)
+        * reverse_layering [bool]: Reverse the brickwall layering. (default: False)
+        * assume_hf_reference [bool]: Assume Hartree-Fock determinant reference. (default: False)
+                                      This is used to remove parameters that does not do anything.
 
     Args:
         num_orbs: Number of spatial orbitals.

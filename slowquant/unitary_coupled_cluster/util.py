@@ -544,10 +544,14 @@ class UpsStructure:
             * n_layers [int]: Number of layers.
             * do_qnp [bool]: Do QNP tiling. (default: False)
             * skip_last_singles [bool]: Skip last layer of singles operators. (default: False)
+            * reverse_layering [bool]: Reverse the brickwall layering. (default: False)
+            * assume_hf_reference [bool]: Assume Hartree-Fock determinant reference. (default: False)
+                                          This is used to remove parameters that does not do anything.
 
         Args:
             num_active_orbs: Number of spatial active orbitals.
             ansatz_options: Ansatz options.
+            num_elec: Number of active electrons.
 
         Returns:
             tUPS ansatz.
