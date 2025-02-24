@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
 
 import numba as nb
 import numpy as np
@@ -212,19 +212,14 @@ def propagate_state(
                     phase_changes = 0
                     # evaluate how string of annihilation operator change det
                     # take care of phases using parity_check
-                    for fermi_op in op_folded.operators[fermi_label][::-1]:
+                    for fermi_op in reversed(op_folded.operators[fermi_label]):
                         orb_idx = fermi_op.idx
                         nth_bit = (det >> 2 * num_active_orbs - 1 - orb_idx) & 1
-                        if nth_bit == 0 and fermi_op.dagger:
+                        if (nth_bit == 0 and fermi_op.dagger) or (nth_bit == 1 and not fermi_op.dagger):
                             det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
                             phase_changes += (det & parity_check[orb_idx]).bit_count()
-                        elif nth_bit == 1 and fermi_op.dagger:
+                        else:
                             break
-                        elif nth_bit == 0 and not fermi_op.dagger:
-                            break
-                        elif nth_bit == 1 and not fermi_op.dagger:
-                            det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
-                            phase_changes += (det & parity_check[orb_idx]).bit_count()
                     else:  # nobreak
                         tmp_state[det2idx[det]] += (
                             op_folded.factors[fermi_label] * (-1) ** phase_changes * new_state[i]
@@ -234,7 +229,7 @@ def propagate_state(
 
 
 @nb.jit(nopython=True)
-def get_determinants(state):
+def get_determinants(state: np.ndarray) -> Generator[int, None, None]:
     """Generate relevant determinant index.
 
     This part is factored out for performance - jit.
@@ -425,19 +420,14 @@ def propagate_state_SA(
                     phase_changes = 0
                     # evaluate how string of annihilation operator change det
                     # take care of phases using parity_check
-                    for fermi_op in op_folded.operators[fermi_label][::-1]:
+                    for fermi_op in reversed(op_folded.operators[fermi_label]):
                         orb_idx = fermi_op.idx
                         nth_bit = (det >> 2 * num_active_orbs - 1 - orb_idx) & 1
-                        if nth_bit == 0 and fermi_op.dagger:
+                        if (nth_bit == 0 and fermi_op.dagger) or (nth_bit == 1 and not fermi_op.dagger):
                             det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
                             phase_changes += (det & parity_check[orb_idx]).bit_count()
-                        elif nth_bit == 1 and fermi_op.dagger:
+                        else:
                             break
-                        elif nth_bit == 0 and not fermi_op.dagger:
-                            break
-                        elif nth_bit == 1 and not fermi_op.dagger:
-                            det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
-                            phase_changes += (det & parity_check[orb_idx]).bit_count()
                     else:  # nobreak
                         val = op_folded.factors[fermi_label] * (-1) ** phase_changes
                         tmp_state[:, det2idx[det]] += val * new_state[:, i]  # Update value
@@ -446,7 +436,7 @@ def propagate_state_SA(
 
 
 @nb.jit(nopython=True)
-def get_determinants_SA(state):
+def get_determinants_SA(state: np.ndarray) -> Generator[int, None, None]:
     """Generate relevant determinant index for SA wave function.
 
     This part is factored out for performance - jit.
