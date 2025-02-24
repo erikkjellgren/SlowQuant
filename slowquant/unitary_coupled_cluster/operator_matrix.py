@@ -250,6 +250,90 @@ def get_determinants(state):
             yield i
 
 
+def propagate_excitation_operator(
+    operators: list[FermionicOperator | str],
+    state: np.ndarray,
+    idx2det: Sequence[int],
+    det2idx: dict[int, int],
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+    num_active_elec_alpha: int,
+    num_active_elec_beta: int,
+    thetas: Sequence[float],
+    wf_struct: UpsStructure | UccStructure,
+    do_folding: bool = True,
+) -> np.ndarray:
+    r"""Propagate state by applying operator.
+
+    The operator will be folded to only work on the active orbitals.
+    The resulting state should not be acted on with another folded operator.
+    This would violate the "do not multiply folded operators" rule.
+    It is the first step to a faster matrix multiplication for expectation values.
+
+    .. math::
+        \left|\tilde{0}\right> = \hat{O}\left|0\right>
+
+    Args:
+        operators: List of operators.
+        state: State.
+        idx2det: Index to determinant.
+        det2idx: Determinant to index.
+        num_inactive_orbs: Number of inactive spatial orbitals.
+        num_active_orbs: Number of active spatial orbitals.
+        num_virtual_orbs: Number of active spatial orbitals.
+        num_active_elec_alpha: Number of active alpha electrons.
+        num_active_elec_beta: Number of active beta electrons.
+        thetas: Active-space parameters.
+               Ordered as (S, D, T, ...).
+        wf_struct: wave function structure object
+
+    Returns:
+        New state.
+    """
+    if len(operators) == 0:
+        return np.copy(state)
+    new_state = np.copy(state)
+    tmp_state = np.zeros_like(state)
+    # Create bitstrings for parity check. Key=orbital index. Value=det as int
+    parity_check = {0: 0}
+    num = 0
+    for i in range(2 * num_active_orbs - 1, -1, -1):
+        num += 2**i
+        parity_check[2 * num_active_orbs - i] = num
+
+    for op in operators[::-1]:
+        if not isinstance(op, FermionicOperator):
+            raise ValueError(f"Does only work for fermionic operators.")
+        fermi_label = list(op.factors.keys())[0]
+        # loop over all determinants
+        for i in get_determinants(new_state):
+            # loop over all strings of annihilation operators in FermionicOperator sum
+            det = idx2det[i]
+            phase_changes = 0
+            # evaluate how string of annihilation operator change det
+            # take care of phases using parity_check
+            for fermi_op in op.operators[fermi_label][::-1]:
+                orb_idx = fermi_op.idx
+                nth_bit = (det >> 2 * num_active_orbs - 1 - orb_idx) & 1
+                if nth_bit == 0 and fermi_op.dagger:
+                    det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
+                    phase_changes += (det & parity_check[orb_idx]).bit_count()
+                elif nth_bit == 1 and fermi_op.dagger:
+                    break
+                elif nth_bit == 0 and not fermi_op.dagger:
+                    break
+                elif nth_bit == 1 and not fermi_op.dagger:
+                    det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
+                    phase_changes += (det & parity_check[orb_idx]).bit_count()
+            else:  # nobreak
+                tmp_state[det2idx[det]] += (
+                    op.factors[fermi_label] * (-1) ** phase_changes * new_state[i]
+                )  # Update value
+        new_state = np.copy(tmp_state)
+    return tmp_state
+
+
 def propagate_state_SA(
     operators: list[FermionicOperator | str],
     state: np.ndarray,
