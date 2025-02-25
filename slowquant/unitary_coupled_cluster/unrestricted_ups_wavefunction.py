@@ -22,6 +22,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
 from slowquant.unitary_coupled_cluster.unrestricted_density_matrix import (
     UnrestrictedReducedDensityMatrix,
     get_electronic_energy_unrestricted,
+    get_orbital_gradient_unrestricted,
 )
 from slowquant.unitary_coupled_cluster.operator_matrix import (
     build_operator_matrix,
@@ -771,6 +772,21 @@ class UnrestrictedWaveFunctionUPS:
             rdm2bbaa = self.rdm2bbaa,
         )
         return get_electronic_energy_unrestricted(rdms, self.haa_mo, self.hbb_mo, self.gaaaa_mo, self.gbbbb_mo, self.gaabb_mo, self.gbbaa_mo, self.num_inactive_orbs, self.num_active_orbs)
+    
+    @property
+    def orbital_gradient_RDM(self) -> np.ndarray:
+        rdms = UnrestrictedReducedDensityMatrix(
+            self.num_inactive_orbs, 
+            self.num_active_orbs, 
+            self.num_virtual_orbs,
+            rdm1aa = self.rdm1aa, 
+            rdm1bb = self.rdm1bb,
+            rdm2aaaa = self.rdm2aaaa,
+            rdm2bbbb = self.rdm2bbbb,
+            rdm2aabb = self.rdm2aabb,
+            rdm2bbaa = self.rdm2bbaa,
+        )
+        return get_orbital_gradient_unrestricted(rdms, self.haa_mo, self.hbb_mo, self.gaaaa_mo, self.gbbbb_mo, self.gaabb_mo, self.gbbaa_mo, self.kappa_idx, self.num_inactive_orbs, self.num_active_orbs)
 
 def energy_ups(
     parameters: Sequence[float],
@@ -909,16 +925,19 @@ def orbital_rotation_gradient(
     Return:
         Electronic gradient with respect to orbital rotations.
     """
-    rdms = ReducedDenstiyMatrix(
+    rdms = UnrestrictedReducedDensityMatrix(
         wf.num_inactive_orbs,
         wf.num_active_orbs,
-        wf.num_active_orbs,
-        rdm1=wf.rdm1,
-        rdm2=wf.rdm2,
+        wf.num_virtual_orbs,
+        rdm1aa=wf.rdm1aa,
+        rdm1bb=wf.rdm1bb,
+        rdm2aaaa=wf.rdm2aaaa,
+        rdm2bbbb=wf.rdm2bbbb,
+        rdm2aabb=wf.rdm2aabb,
+        rdm2bbaa=wf.rdm2bbaa,
     )
-    gradient = get_orbital_gradient(
-        rdms, wf.h_mo, wf.g_mo, wf.kappa_idx, wf.num_inactive_orbs, wf.num_active_orbs
-    )
+    gradient = get_orbital_gradient_unrestricted(
+        rdms, wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.kappa_idx, wf.num_inactive_orbs, wf.num_active_orbs)
     return gradient
 
 
