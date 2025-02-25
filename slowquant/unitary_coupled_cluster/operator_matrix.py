@@ -85,24 +85,17 @@ def build_operator_matrix(
             det = idx2det[i]
             phase_changes = 0
             # evaluate how string of annihilation operator change det
-            # take care of phases using parity_check
             for fermi_op in op.operators[fermi_label][::-1]:
                 orb_idx = fermi_op.idx
                 nth_bit = (det >> 2 * num_active_orbs - 1 - orb_idx) & 1
-                if nth_bit == 0 and fermi_op.dagger:
+                if (nth_bit == 0 and fermi_op.dagger) or (nth_bit == 1 and not fermi_op.dagger):
                     det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
+                    # take care of phases using parity_check
                     phase_changes += (det & parity_check[orb_idx]).bit_count()
-                elif nth_bit == 1 and fermi_op.dagger:
+                else:
                     break
-                elif nth_bit == 0 and not fermi_op.dagger:
-                    break
-                elif nth_bit == 1 and not fermi_op.dagger:
-                    det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
-                    phase_changes += (det & parity_check[orb_idx]).bit_count()
             else:  # nobreak
-                val = op.factors[fermi_label] * (-1) ** phase_changes
-                if abs(val) > 10**-14:
-                    op_mat[det2idx[det], i] += val
+                op_mat[det2idx[det], i] += op.factors[fermi_label] * (-1) ** phase_changes
     return op_mat
 
 
@@ -142,7 +135,8 @@ def propagate_state(
         num_active_elec_beta: Number of active beta electrons.
         thetas: Active-space parameters.
                Ordered as (S, D, T, ...).
-        wf_struct: wave function structure object
+        wf_struct: wave function structure object.
+        do_folding: Do folding of operator (default: True).
 
     Returns:
         New state.
@@ -211,12 +205,12 @@ def propagate_state(
                     det = idx2det[i]
                     phase_changes = 0
                     # evaluate how string of annihilation operator change det
-                    # take care of phases using parity_check
                     for fermi_op in reversed(op_folded.operators[fermi_label]):
                         orb_idx = fermi_op.idx
                         nth_bit = (det >> 2 * num_active_orbs - 1 - orb_idx) & 1
                         if (nth_bit == 0 and fermi_op.dagger) or (nth_bit == 1 and not fermi_op.dagger):
                             det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
+                            # take care of phases using parity_check
                             phase_changes += (det & parity_check[orb_idx]).bit_count()
                         else:
                             break
@@ -281,7 +275,8 @@ def propagate_state_SA(
         num_active_elec_beta: Number of active beta electrons.
         thetas: Active-space parameters.
                Ordered as (S, D, T, ...).
-        wf_struct: wave function structure object
+        wf_struct: wave function structure object.
+        do_folding: Do folding of operator (default: True).
 
     Returns:
         New state.
@@ -335,12 +330,12 @@ def propagate_state_SA(
                     det = idx2det[i]
                     phase_changes = 0
                     # evaluate how string of annihilation operator change det
-                    # take care of phases using parity_check
                     for fermi_op in reversed(op_folded.operators[fermi_label]):
                         orb_idx = fermi_op.idx
                         nth_bit = (det >> 2 * num_active_orbs - 1 - orb_idx) & 1
                         if (nth_bit == 0 and fermi_op.dagger) or (nth_bit == 1 and not fermi_op.dagger):
                             det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
+                            # take care of phases using parity_check
                             phase_changes += (det & parity_check[orb_idx]).bit_count()
                         else:
                             break
