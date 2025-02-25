@@ -23,7 +23,7 @@ from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
 def get_indexing(
     num_active_orbs: int, num_active_elec_alpha: int, num_active_elec_beta: int
 ) -> tuple[np.ndarray, dict[int, int]]:
-    """Get relation between index and determiant.
+    """Get relation between index and determinant.
 
     Args:
         num_active_orbs: Number of active spatial orbitals.
@@ -31,7 +31,7 @@ def get_indexing(
         num_active_elec_beta: Number of active beta electrons.
 
     Returns:
-        List to map index to determiant and dictionary to map determiant to index.
+        List to map index to determinant and dictionary to map determinant to index.
     """
     idx = 0
     idx2det = []
@@ -55,7 +55,7 @@ def get_indexing(
 
 def build_operator_matrix(
     op: FermionicOperator,
-    idx2det: Sequence[int] | np.ndarray,
+    idx2det: np.ndarray,
     det2idx: dict[int, int],
     num_active_orbs: int,
 ) -> np.ndarray:
@@ -71,6 +71,7 @@ def build_operator_matrix(
         Matrix representation of operator.
     """
     num_dets = len(idx2det)  # number of spin and particle conserving determinants
+    ones = np.ones(num_dets)  # Used with the determinant generator to ensure no determinants are screened.
     op_mat = np.zeros((num_dets, num_dets))  # basis
     # Create bitstrings for parity check. Key=orbital index. Value=det as int
     parity_check = {0: 0}
@@ -78,24 +79,27 @@ def build_operator_matrix(
     for i in range(2 * num_active_orbs - 1, -1, -1):
         num += 2**i
         parity_check[2 * num_active_orbs - i] = num
-    # loop over all determinants
-    for i in range(num_dets):
-        # loop over all strings of annihilation operators in FermionicOperator sum
-        for fermi_label in op.factors:
-            det = idx2det[i]
+    # loop over all strings of annihilation operators in FermionicOperator sum
+    for fermi_label in op.factors:
+        anni_idx = []
+        create_idx = []
+        for fermi_op in op.operators[fermi_label]:
+            if fermi_op.dagger:
+                create_idx.append(fermi_op.idx)
+            else:
+                anni_idx.append(fermi_op.idx)
+        anni_idx = np.array(anni_idx, dtype=int)
+        create_idx = np.array(create_idx, dtype=int)
+        # loop over all determinants
+        for i, det in get_determinants(idx2det, ones, anni_idx, create_idx, num_active_orbs):
             phase_changes = 0
             # evaluate how string of annihilation operator change det
-            for fermi_op in op.operators[fermi_label][::-1]:
+            for fermi_op in reversed(op.operators[fermi_label]):
                 orb_idx = fermi_op.idx
-                nth_bit = (det >> 2 * num_active_orbs - 1 - orb_idx) & 1
-                if (nth_bit == 0 and fermi_op.dagger) or (nth_bit == 1 and not fermi_op.dagger):
-                    det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
-                    # take care of phases using parity_check
-                    phase_changes += (det & parity_check[orb_idx]).bit_count()
-                else:
-                    break
-            else:  # nobreak
-                op_mat[det2idx[det], i] += op.factors[fermi_label] * (-1) ** phase_changes
+                det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
+                # take care of phases using parity_check
+                phase_changes += (det & parity_check[orb_idx]).bit_count()
+            op_mat[det2idx[det], i] += op.factors[fermi_label] * (-1) ** phase_changes
     return op_mat
 
 
@@ -118,7 +122,6 @@ def propagate_state(
     The operator will be folded to only work on the active orbitals.
     The resulting state should not be acted on with another folded operator.
     This would violate the "do not multiply folded operators" rule.
-    It is the first step to a faster matrix multiplication for expectation values.
 
     .. math::
         \left|\tilde{0}\right> = \hat{O}\left|0\right>
@@ -200,17 +203,17 @@ def propagate_state(
                 op_folded = op
             # loop over all strings of annihilation operators in FermionicOperator sum
             for fermi_label in op_folded.factors:
-                # loop over all determinants
-                occ = []
-                unocc = []
+                anni_idx = []
+                create_idx = []
                 for fermi_op in op_folded.operators[fermi_label]:
                     if fermi_op.dagger:
-                        unocc.append(fermi_op.idx)
+                        create_idx.append(fermi_op.idx)
                     else:
-                        occ.append(fermi_op.idx)
-                occ = np.array(occ, dtype=int)
-                unocc = np.array(unocc, dtype=int)
-                for i, det in get_determinants(idx2det, new_state, occ, unocc, num_active_orbs):
+                        anni_idx.append(fermi_op.idx)
+                anni_idx = np.array(anni_idx, dtype=int)
+                create_idx = np.array(create_idx, dtype=int)
+                # loop over all determinants
+                for i, det in get_determinants(idx2det, new_state, anni_idx, create_idx, num_active_orbs):
                     phase_changes = 0
                     # evaluate how string of annihilation operator change det
                     for fermi_op in reversed(op_folded.operators[fermi_label]):
@@ -227,31 +230,46 @@ def propagate_state(
 
 @nb.jit(nopython=True)
 def get_determinants(
-    det: np.ndarray, state: np.ndarray, occ_idxs, unocc_idxs, num_active_orbs
+    det: np.ndarray,
+    state: np.ndarray,
+    anni_idxs: np.ndarray,
+    create_idxs: np.ndarray,
+    num_active_orbs: int,
 ) -> Generator[tuple[int, int], None, None]:
-    """Generate relevant determinant index.
+    """Generate relevant determinants.
 
     This part is factored out for performance - jit.
 
+    This generator yields determinants that does need reach kill-state.
+    It is assumed that operators are normal-ordered for the checking of kill-state to work.
+
     Args:
-        state: Statevector
+        det: List of all determinants.
+        state: State-vector.
+        anni_idxs: Annihilation operator indicies.
+        create_idxs: Creation operator indicies.
+        num_active_orbs: Number of active spatial orbitals.
 
     Returns:
-        Index where statevector is non-zero.
+        Index of determinant and determinant.
     """
     for i, val in enumerate(state):
         if abs(val) < 10**-14:
             continue
-        for occ_idx in occ_idxs:
-            if (det[i] >> 2 * num_active_orbs - 1 - occ_idx) & 1 == 1:
+        for anni_idx in anni_idxs:
+            if (det[i] >> 2 * num_active_orbs - 1 - anni_idx) & 1 == 1:
                 continue
+            # If an annihilation operator works on zero, then we reach kill-state.
             break
         else:  # no-break
-            for unocc_idx in unocc_idxs:
-                if unocc_idx in occ_idxs:
+            for create_idx in create_idxs:
+                if create_idx in anni_idxs:
+                    # A creation operator can always act on index that an annihilation operator,
+                    # has previously worked on.
                     continue
-                if (det[i] >> 2 * num_active_orbs - 1 - unocc_idx) & 1 == 0:
+                if (det[i] >> 2 * num_active_orbs - 1 - create_idx) & 1 == 0:
                     continue
+                # If creation operator works on one, then we reach kill-state.
                 break
             else:  # no-break
                 yield i, det[i]
@@ -260,7 +278,7 @@ def get_determinants(
 def propagate_state_SA(
     operators: list[FermionicOperator | str],
     state: np.ndarray,
-    idx2det: Sequence[int],
+    idx2det: np.ndarray,
     det2idx: dict[int, int],
     num_inactive_orbs: int,
     num_active_orbs: int,
@@ -276,7 +294,6 @@ def propagate_state_SA(
     The operator will be folded to only work on the active orbitals.
     The resulting state should not be acted on with another folded operator.
     This would violate the "do not multiply folded operators" rule.
-    It is the first step to a faster matrix multiplication for expectation values.
 
     .. math::
         \left|\tilde{0}\right> = \hat{O}\left|0\right>
@@ -342,39 +359,56 @@ def propagate_state_SA(
                 op_folded = op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs)
             else:
                 op_folded = op
-            # loop over all determinants
-            for i in get_determinants_SA(new_state):
-                for fermi_label in op_folded.factors:
-                    det = idx2det[i]
+            # loop over all strings of annihilation operators in FermionicOperator sum
+            for fermi_label in op_folded.factors:
+                anni_idx = []
+                create_idx = []
+                for fermi_op in op_folded.operators[fermi_label]:
+                    if fermi_op.dagger:
+                        create_idx.append(fermi_op.idx)
+                    else:
+                        anni_idx.append(fermi_op.idx)
+                anni_idx = np.array(anni_idx, dtype=int)
+                create_idx = np.array(create_idx, dtype=int)
+                # loop over all determinants
+                for i, det in get_determinants_SA(idx2det, new_state, anni_idx, create_idx, num_active_orbs):
                     phase_changes = 0
                     # evaluate how string of annihilation operator change det
                     for fermi_op in reversed(op_folded.operators[fermi_label]):
                         orb_idx = fermi_op.idx
-                        nth_bit = (det >> 2 * num_active_orbs - 1 - orb_idx) & 1
-                        if (nth_bit == 0 and fermi_op.dagger) or (nth_bit == 1 and not fermi_op.dagger):
-                            det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
-                            # take care of phases using parity_check
-                            phase_changes += (det & parity_check[orb_idx]).bit_count()
-                        else:
-                            break
-                    else:  # nobreak
-                        val = op_folded.factors[fermi_label] * (-1) ** phase_changes
-                        tmp_state[:, det2idx[det]] += val * new_state[:, i]  # Update value
+                        det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
+                        # take care of phases using parity_check
+                        phase_changes += (det & parity_check[orb_idx]).bit_count()
+                    val = op_folded.factors[fermi_label] * (-1) ** phase_changes
+                    tmp_state[:, det2idx[det]] += val * new_state[:, i]  # Update value
             new_state = np.copy(tmp_state)
     return new_state
 
 
 @nb.jit(nopython=True)
-def get_determinants_SA(state: np.ndarray) -> Generator[int, None, None]:
-    """Generate relevant determinant index for SA wave function.
+def get_determinants_SA(
+    det: np.ndarray,
+    state: np.ndarray,
+    anni_idxs: np.ndarray,
+    create_idxs: np.ndarray,
+    num_active_orbs: int,
+) -> Generator[tuple[int, int], None, None]:
+    """Generate relevant determinants.
 
     This part is factored out for performance - jit.
 
+    This generator yields determinants that does need reach kill-state.
+    It is assumed that operators are normal-ordered for the checking of kill-state to work.
+
     Args:
-        state: Statevector
+        det: List of all determinants.
+        state: State-vector.
+        anni_idxs: Annihilation operator indicies.
+        create_idxs: Creation operator indicies.
+        num_active_orbs: Number of active spatial orbitals.
 
     Returns:
-        Index where statevector is non-zero.
+        Index of determinant and determinant.
     """
     for i, vals in enumerate(state.T):
         is_non_zero = False
@@ -382,8 +416,25 @@ def get_determinants_SA(state: np.ndarray) -> Generator[int, None, None]:
             if abs(val) > 10**-14:
                 is_non_zero = True
                 break
-        if is_non_zero:
-            yield i
+        if not is_non_zero:
+            continue
+        for anni_idx in anni_idxs:
+            if (det[i] >> 2 * num_active_orbs - 1 - anni_idx) & 1 == 1:
+                continue
+            # If an annihilation operator works on zero, then we reach kill-state.
+            break
+        else:  # no-break
+            for create_idx in create_idxs:
+                if create_idx in anni_idxs:
+                    # A creation operator can always act on index that an annihilation operator,
+                    # has previously worked on.
+                    continue
+                if (det[i] >> 2 * num_active_orbs - 1 - create_idx) & 1 == 0:
+                    continue
+                # If creation operator works on one, then we reach kill-state.
+                break
+            else:  # no-break
+                yield i, det[i]
 
 
 def _propagate_state(
@@ -425,7 +476,7 @@ def expectation_value(
     bra: np.ndarray,
     operators: list[FermionicOperator | str],
     ket: np.ndarray,
-    idx2det: Sequence[int],
+    idx2det: np.ndarray,
     det2idx: dict[int, int],
     num_inactive_orbs: int,
     num_active_orbs: int,
@@ -481,7 +532,7 @@ def expectation_value_SA(
     bra: np.ndarray,
     operators: list[FermionicOperator | str],
     ket: np.ndarray,
-    idx2det: Sequence[int],
+    idx2det: np.ndarray,
     det2idx: dict[int, int],
     num_inactive_orbs: int,
     num_active_orbs: int,
@@ -818,7 +869,7 @@ def construct_ups_state(
 
 def construct_ups_state_SA(
     state: np.ndarray,
-    idx2det: Sequence[int],
+    idx2det: np.ndarray,
     det2idx: dict[int, int],
     num_inactive_orbs: int,
     num_active_orbs: int,
@@ -985,7 +1036,7 @@ def construct_ups_state_SA(
 def propagate_unitary(
     state: np.ndarray,
     idx: int,
-    idx2det: Sequence[int],
+    idx2det: np.ndarray,
     det2idx: dict[int, int],
     num_inactive_orbs: int,
     num_active_orbs: int,
@@ -1295,7 +1346,7 @@ def propagate_unitary_SA(
 def get_grad_action(
     state: np.ndarray,
     idx: int,
-    idx2det: Sequence[int],
+    idx2det: np.ndarray,
     det2idx: dict[int, int],
     num_inactive_orbs,
     num_active_orbs: int,
@@ -1390,7 +1441,7 @@ def get_grad_action(
 def get_grad_action_SA(
     state: np.ndarray,
     idx: int,
-    idx2det: Sequence[int],
+    idx2det: np.ndarray,
     det2idx: dict[int, int],
     num_inactive_orbs,
     num_active_orbs: int,
