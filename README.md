@@ -41,7 +41,7 @@ Just use [PySCF](https://github.com/pyscf/pyscf) instead.
 
 ## Cited in
 
-- Ziems, K. M., Kjellgren, E. R., Sauer, S., Kongsted, J., & Coriani, S. (2024). Understanding and mitigating noise in molecular quantum linear response for spectroscopic properties on quantum computers. arXiv preprint arXiv:2408.09308.
+- Ziems, K. M., Kjellgren, E. R., Sauer, S. P., Kongsted, J., & Coriani, S. (2025). Understanding and mitigating noise in molecular quantum linear response for spectroscopic properties on quantum computers. Chemical Science.
 - Kjellgren, E. R., Reinholdt, P., Ziems, K. M., Sauer, S., Coriani, S., & Kongsted, J. (2024). Divergences in classical and quantum linear response and equation of motion formulations. The Journal of Chemical Physics, 161(12).
 - von Buchwald, T. J., Ziems, K. M., Kjellgren, E. R., Sauer, S. P., Kongsted, J., & Coriani, S. (2024). Reduced density matrix formulation of quantum linear response. Journal of Chemical Theory and Computation, 20(16), 7093-7101.
 - Chan, M., Verstraelen, T., Tehrani, A., Richer, M., Yang, X. D., Kim, T. D., ... & Ayers, P. W. (2024). The tale of HORTON: Lessons learned in a decade of scientific software development. The Journal of Chemical Physics, 160(16).

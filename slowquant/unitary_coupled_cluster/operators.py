@@ -111,7 +111,7 @@ def double_commutator(A: FermionicOperator, B: FermionicOperator, C: FermionicOp
     return A * B * C - A * C * B - B * C * A + C * B * A
 
 
-def G1(i: int, a: int) -> FermionicOperator:
+def G1(i: int, a: int, return_anti_hermitian: bool = False) -> FermionicOperator:
     r"""Construct one-electron excitation operator.
 
     .. math::
@@ -124,10 +124,13 @@ def G1(i: int, a: int) -> FermionicOperator:
     Returns:
         One-elecetron excitation operator.
     """
-    return FermionicOperator(a_op_spin(a, dagger=True), 1) * FermionicOperator(a_op_spin(i, dagger=False), 1)
+    op = FermionicOperator(a_op_spin(a, dagger=True), 1) * FermionicOperator(a_op_spin(i, dagger=False), 1)
+    if return_anti_hermitian:
+        return op - op.dagger
+    return op
 
 
-def G2(i: int, j: int, a: int, b: int) -> FermionicOperator:
+def G2(i: int, j: int, a: int, b: int, return_anti_hermitian: bool = False) -> FermionicOperator:
     r"""Construct two-electron excitation operator.
 
     .. math::
@@ -142,15 +145,20 @@ def G2(i: int, j: int, a: int, b: int) -> FermionicOperator:
     Returns:
         Two-elecetron excitation operator.
     """
-    return (
+    op = (
         FermionicOperator(a_op_spin(a, dagger=True), 1)
         * FermionicOperator(a_op_spin(b, dagger=True), 1)
         * FermionicOperator(a_op_spin(j, dagger=False), 1)
         * FermionicOperator(a_op_spin(i, dagger=False), 1)
     )
+    if return_anti_hermitian:
+        return op - op.dagger
+    return op
 
 
-def G3(i: int, j: int, k: int, a: int, b: int, c: int) -> FermionicOperator:
+def G3(
+    i: int, j: int, k: int, a: int, b: int, c: int, return_anti_hermitian: bool = False
+) -> FermionicOperator:
     r"""Construct three-electron excitation operator.
 
     .. math::
@@ -167,7 +175,7 @@ def G3(i: int, j: int, k: int, a: int, b: int, c: int) -> FermionicOperator:
     Returns:
         Three-elecetron excitation operator.
     """
-    return (
+    op = (
         FermionicOperator(a_op_spin(a, dagger=True), 1)
         * FermionicOperator(a_op_spin(b, dagger=True), 1)
         * FermionicOperator(a_op_spin(c, dagger=True), 1)
@@ -175,9 +183,14 @@ def G3(i: int, j: int, k: int, a: int, b: int, c: int) -> FermionicOperator:
         * FermionicOperator(a_op_spin(j, dagger=False), 1)
         * FermionicOperator(a_op_spin(i, dagger=False), 1)
     )
+    if return_anti_hermitian:
+        return op - op.dagger
+    return op
 
 
-def G4(i: int, j: int, k: int, l: int, a: int, b: int, c: int, d: int) -> FermionicOperator:
+def G4(
+    i: int, j: int, k: int, l: int, a: int, b: int, c: int, d: int, return_anti_hermitian: bool = False
+) -> FermionicOperator:
     r"""Construct four-electron excitation operator.
 
     .. math::
@@ -196,7 +209,7 @@ def G4(i: int, j: int, k: int, l: int, a: int, b: int, c: int, d: int) -> Fermio
     Returns:
         Four-elecetron excitation operator.
     """
-    return (
+    op = (
         FermionicOperator(a_op_spin(a, dagger=True), 1)
         * FermionicOperator(a_op_spin(b, dagger=True), 1)
         * FermionicOperator(a_op_spin(c, dagger=True), 1)
@@ -206,9 +219,24 @@ def G4(i: int, j: int, k: int, l: int, a: int, b: int, c: int, d: int) -> Fermio
         * FermionicOperator(a_op_spin(j, dagger=False), 1)
         * FermionicOperator(a_op_spin(i, dagger=False), 1)
     )
+    if return_anti_hermitian:
+        return op - op.dagger
+    return op
 
 
-def G5(i: int, j: int, k: int, l: int, m: int, a: int, b: int, c: int, d: int, e: int) -> FermionicOperator:
+def G5(
+    i: int,
+    j: int,
+    k: int,
+    l: int,
+    m: int,
+    a: int,
+    b: int,
+    c: int,
+    d: int,
+    e: int,
+    return_anti_hermitian: bool = False,
+) -> FermionicOperator:
     r"""Construct five-electron excitation operator.
 
     .. math::
@@ -229,7 +257,7 @@ def G5(i: int, j: int, k: int, l: int, m: int, a: int, b: int, c: int, d: int, e
     Returns:
         Five-elecetron excitation operator.
     """
-    return (
+    op = (
         FermionicOperator(a_op_spin(a, dagger=True), 1)
         * FermionicOperator(a_op_spin(b, dagger=True), 1)
         * FermionicOperator(a_op_spin(c, dagger=True), 1)
@@ -241,10 +269,25 @@ def G5(i: int, j: int, k: int, l: int, m: int, a: int, b: int, c: int, d: int, e
         * FermionicOperator(a_op_spin(j, dagger=False), 1)
         * FermionicOperator(a_op_spin(i, dagger=False), 1)
     )
+    if return_anti_hermitian:
+        return op - op.dagger
+    return op
 
 
 def G6(
-    i: int, j: int, k: int, l: int, m: int, n: int, a: int, b: int, c: int, d: int, e: int, f: int
+    i: int,
+    j: int,
+    k: int,
+    l: int,
+    m: int,
+    n: int,
+    a: int,
+    b: int,
+    c: int,
+    d: int,
+    e: int,
+    f: int,
+    return_anti_hermitian: bool = False,
 ) -> FermionicOperator:
     r"""Construct six-electron excitation operator.
 
@@ -269,7 +312,7 @@ def G6(
     Returns:
         Six-elecetron excitation operator.
     """
-    return (
+    op = (
         FermionicOperator(a_op_spin(a, dagger=True), 1)
         * FermionicOperator(a_op_spin(b, dagger=True), 1)
         * FermionicOperator(a_op_spin(c, dagger=True), 1)
@@ -283,9 +326,12 @@ def G6(
         * FermionicOperator(a_op_spin(j, dagger=False), 1)
         * FermionicOperator(a_op_spin(i, dagger=False), 1)
     )
+    if return_anti_hermitian:
+        return op - op.dagger
+    return op
 
 
-def G1_sa(i: int, a: int) -> FermionicOperator:
+def G1_sa(i: int, a: int, return_anti_hermitian: bool = False) -> FermionicOperator:
     r"""Construct singlet one-electron spin-adapted excitation operator.
 
     .. math::
@@ -298,10 +344,13 @@ def G1_sa(i: int, a: int) -> FermionicOperator:
     Returns:
         Singlet one-elecetron spin-adapted excitation operator.
     """
-    return 2 ** (-1 / 2) * Epq(a, i)
+    op = 2 ** (-1 / 2) * Epq(a, i)
+    if return_anti_hermitian:
+        return op - op.dagger
+    return op
 
 
-def G2_1_sa(i: int, j: int, a: int, b: int) -> FermionicOperator:
+def G2_1_sa(i: int, j: int, a: int, b: int, return_anti_hermitian: bool = False) -> FermionicOperator:
     r"""Construct first singlet two-electron spin-adapted excitation operator.
 
     .. math::
@@ -321,10 +370,13 @@ def G2_1_sa(i: int, j: int, a: int, b: int) -> FermionicOperator:
         fac *= 2
     if i == j:
         fac *= 2
-    return 1 / 2 * (fac) ** (-1 / 2) * (Epq(a, i) * Epq(b, j) + Epq(a, j) * Epq(b, i))
+    op = 1 / 2 * (fac) ** (-1 / 2) * (Epq(a, i) * Epq(b, j) + Epq(a, j) * Epq(b, i))
+    if return_anti_hermitian:
+        return op - op.dagger
+    return op
 
 
-def G2_2_sa(i: int, j: int, a: int, b: int) -> FermionicOperator:
+def G2_2_sa(i: int, j: int, a: int, b: int, return_anti_hermitian: bool = False) -> FermionicOperator:
     r"""Construct second singlet two-electron spin-adapted excitation operator.
 
     .. math::
@@ -339,7 +391,10 @@ def G2_2_sa(i: int, j: int, a: int, b: int) -> FermionicOperator:
     Returns:
         Second singlet two-elecetron spin-adapted excitation operator.
     """
-    return 1 / (2 * 3 ** (1 / 2)) * (Epq(a, i) * Epq(b, j) - Epq(a, j) * Epq(b, i))
+    op = 1 / (2 * 3 ** (1 / 2)) * (Epq(a, i) * Epq(b, j) - Epq(a, j) * Epq(b, i))
+    if return_anti_hermitian:
+        return op - op.dagger
+    return op
 
 
 def hamiltonian_full_space(h_mo: np.ndarray, g_mo: np.ndarray, num_orbs: int) -> FermionicOperator:
