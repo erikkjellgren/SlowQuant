@@ -541,11 +541,21 @@ class WaveFunctionSAUPS:
             if not is_silent_subiterations:
                 print("--------Ansatz optimization")
                 print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
-            energy_theta = partial(
-                self._calc_energy_optimization,
-                theta_optimization=True,
-                kappa_optimization=False,
-            )
+            if optimizer_name.lower() in ("rotosolve",):
+                # For RotoSolve type solvers the energy per state is needed in the optimzation,
+                # instead of only the state-averaged energy.
+                energy_theta = partial(
+                    self._calc_energy_optimization,
+                    theta_optimization=True,
+                    kappa_optimization=False,
+                    return_all_states=True,
+                )
+            else:
+                energy_theta = partial(
+                    self._calc_energy_optimization,
+                    theta_optimization=True,
+                    kappa_optimization=False,
+                )
             gradient_theta = partial(
                 self._calc_gradient_optimization,
                 theta_optimization=True,
@@ -559,6 +569,8 @@ class WaveFunctionSAUPS:
                 tol=tol,
                 is_silent=is_silent_subiterations,
             )
+            self._old_opt_parameters = np.zeros_like(self.thetas)
+            self._E_opt_old = 0.0
             res = optimizer.minimize(
                 self.thetas,
                 extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
@@ -588,6 +600,8 @@ class WaveFunctionSAUPS:
                     tol=tol,
                     is_silent=is_silent_subiterations,
                 )
+                self._old_opt_parameters = np.zeros(len(self.kappa_idx))
+                self._E_opt_old = 0.0
                 res = optimizer.minimize([0.0] * len(self.kappa_idx))
                 for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
                     self._kappa[i] = 0.0
@@ -689,6 +703,8 @@ class WaveFunctionSAUPS:
                 return_all_states=True,
             )
         optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
+        self._old_opt_parameters = np.zeros_like(parameters)
+        self._E_opt_old = 0.0
         res = optimizer.minimize(
             parameters,
             extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
@@ -856,6 +872,12 @@ class WaveFunctionSAUPS:
         Returns:
             State-averaged electronic energy.
         """
+        # Avoid recalculating energy in callback
+        if (
+            np.max(np.abs(np.array(self._old_opt_parameters) - np.array(parameters))) < 10**-14
+            and not return_all_states
+        ):
+            return self._E_opt_old
         num_kappa = 0
         if kappa_optimization:
             num_kappa = len(self.kappa_idx)
@@ -887,7 +909,7 @@ class WaveFunctionSAUPS:
                     )
                 )
             return energies
-        return expectation_value_SA(
+        E = expectation_value_SA(
             self.ci_coeffs,
             [Hamiltonian],
             self.ci_coeffs,
@@ -902,6 +924,9 @@ class WaveFunctionSAUPS:
             self.ups_layout,
             do_folding=False,
         )
+        self._E_opt_old = E
+        self._old_opt_parameters = np.copy(parameters)
+        return E
 
     def _calc_gradient_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool

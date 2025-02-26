@@ -59,9 +59,9 @@ class Optimizers:
             fun: Function.
             silent: Silence progress print.
         """
-        time_str = f"{time.time() - self._start:7.2f}"
         if not silent:
             e_str = f"{fun(list(x)):3.16f}"
+            time_str = f"{time.time() - self._start:7.2f}"
             print(
                 f"--------{str(self._iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}"
             )

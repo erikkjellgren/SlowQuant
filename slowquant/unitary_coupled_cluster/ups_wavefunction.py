@@ -812,6 +812,8 @@ class WaveFunctionUPS:
                 tol=tol,
                 is_silent=is_silent_subiterations,
             )
+            self._old_opt_parameters = np.zeros_like(self.thetas)
+            self._E_opt_old = 0.0
             res = optimizer.minimize(
                 self.thetas,
                 extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
@@ -841,6 +843,8 @@ class WaveFunctionUPS:
                     tol=tol,
                     is_silent=is_silent_subiterations,
                 )
+                self._old_opt_parameters = np.zeros(len(self.kappa_idx))
+                self._E_opt_old = 0.0
                 res = optimizer.minimize([0.0] * len(self.kappa_idx))
                 for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
                     self._kappa[i] = 0.0
@@ -931,6 +935,8 @@ class WaveFunctionUPS:
         else:
             parameters = self.thetas
         optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
+        self._old_opt_parameters = np.zeros_like(parameters)
+        self._E_opt_old = 0.0
         res = optimizer.minimize(
             parameters,
             extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
@@ -957,14 +963,31 @@ class WaveFunctionUPS:
         Returns:
             Electronic energy.
         """
+        # Avoid recalculating energy in callback
+        if np.max(np.abs(np.array(self._old_opt_parameters) - np.array(parameters))) < 10**-14:
+            return self._E_opt_old
         num_kappa = 0
         if kappa_optimization:
             num_kappa = len(self.kappa_idx)
             self.kappa = parameters[:num_kappa]
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
-        if theta_optimization:
-            return expectation_value(
+        if kappa_optimization:
+            # RDM is more expensive than evaluation of the Hamiltonian.
+            # Thus only contruct these if orbital-optimization is turned on,
+            # since the RDMs will be reused in the oo gradient calculation.
+            rdms = ReducedDenstiyMatrix(
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.num_virtual_orbs,
+                rdm1=self.rdm1,
+                rdm2=self.rdm2,
+            )
+            E = get_electronic_energy(
+                rdms, self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
+            )
+        else:
+            E = expectation_value(
                 self.ci_coeffs,
                 [hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)],
                 self.ci_coeffs,
@@ -978,17 +1001,9 @@ class WaveFunctionUPS:
                 self.thetas,
                 self.ups_layout,
             )
-        # RDM is more expensive than evaluation of the Hamiltonian.
-        # Thus only contruct these if orbital-optimization is turned on,
-        # since the RDMs will be reused in the oo gradient calculation.
-        rdms = ReducedDenstiyMatrix(
-            self.num_inactive_orbs,
-            self.num_active_orbs,
-            self.num_virtual_orbs,
-            rdm1=self.rdm1,
-            rdm2=self.rdm2,
-        )
-        return get_electronic_energy(rdms, self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+        self._E_opt_old = E
+        self._old_opt_parameters = np.copy(parameters)
+        return E
 
     def _calc_gradient_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
