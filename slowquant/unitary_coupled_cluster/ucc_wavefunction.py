@@ -867,7 +867,7 @@ class WaveFunctionUCC:
                 tol=tol,
                 is_silent=is_silent_subiterations,
             )
-            self._old_opt_parameters = np.zeros_like(self.thetas)
+            self._old_opt_parameters = np.zeros_like(self.thetas) + 10**20
             self._E_opt_old = 0.0
             res = optimizer.minimize(self.thetas)
             self.thetas = res.x.tolist()
@@ -895,7 +895,7 @@ class WaveFunctionUCC:
                     tol=tol,
                     is_silent=is_silent_subiterations,
                 )
-                self._old_opt_parameters = np.zeros(len(self.kappa_idx))
+                self._old_opt_parameters = np.zeros(len(self.kappa_idx)) + 10**20
                 self._E_opt_old = 0.0
                 res = optimizer.minimize([0.0] * len(self.kappa_idx))
                 for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
@@ -1014,7 +1014,7 @@ class WaveFunctionUCC:
         else:
             parameters = self.thetas
         optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
-        self._old_opt_parameters = np.zeros_like(parameters)
+        self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0
         res = optimizer.minimize(
             parameters,

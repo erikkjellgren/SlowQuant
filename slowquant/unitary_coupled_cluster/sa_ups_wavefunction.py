@@ -569,7 +569,7 @@ class WaveFunctionSAUPS:
                 tol=tol,
                 is_silent=is_silent_subiterations,
             )
-            self._old_opt_parameters = np.zeros_like(self.thetas)
+            self._old_opt_parameters = np.zeros_like(self.thetas) + 10**20
             self._E_opt_old = 0.0
             res = optimizer.minimize(
                 self.thetas,
@@ -600,7 +600,7 @@ class WaveFunctionSAUPS:
                     tol=tol,
                     is_silent=is_silent_subiterations,
                 )
-                self._old_opt_parameters = np.zeros(len(self.kappa_idx))
+                self._old_opt_parameters = np.zeros(len(self.kappa_idx)) + 10**20
                 self._E_opt_old = 0.0
                 res = optimizer.minimize([0.0] * len(self.kappa_idx))
                 for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
@@ -703,7 +703,7 @@ class WaveFunctionSAUPS:
                 return_all_states=True,
             )
         optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
-        self._old_opt_parameters = np.zeros_like(parameters)
+        self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0
         res = optimizer.minimize(
             parameters,
@@ -858,7 +858,7 @@ class WaveFunctionSAUPS:
         theta_optimization: bool,
         kappa_optimization: bool,
         return_all_states: bool = False,
-    ) -> float | list[float]:
+    ) -> float | np.ndarray:
         r"""Calculate electronic energy of SA-UPS wave function.
 
         .. math::
@@ -873,10 +873,7 @@ class WaveFunctionSAUPS:
             State-averaged electronic energy.
         """
         # Avoid recalculating energy in callback
-        if (
-            np.max(np.abs(np.array(self._old_opt_parameters) - np.array(parameters))) < 10**-14
-            and not return_all_states
-        ):
+        if np.max(np.abs(np.array(self._old_opt_parameters) - np.array(parameters))) < 10**-14:
             return self._E_opt_old
         num_kappa = 0
         if kappa_optimization:
@@ -908,7 +905,9 @@ class WaveFunctionSAUPS:
                         do_folding=False,
                     )
                 )
-            return energies
+            self._E_opt_old = np.copy(np.array(energies))
+            self._old_opt_parameters = np.copy(parameters)
+            return np.array(energies)
         E = expectation_value_SA(
             self.ci_coeffs,
             [Hamiltonian],

@@ -25,7 +25,7 @@ class Optimizers:
 
     def __init__(
         self,
-        fun: Callable[[list[float]], float | list[float]],
+        fun: Callable[[list[float]], float | np.ndarray],
         method: str,
         grad: Callable[[list[float]], np.ndarray] | None = None,
         maxiter: int = 1000,
@@ -50,7 +50,7 @@ class Optimizers:
         self.is_silent = is_silent
 
     def _print_progress(
-        self, x: Sequence[float], fun: Callable[[list[float]], float | list[float]], silent: bool = False
+        self, x: Sequence[float], fun: Callable[[list[float]], float | np.ndarray], silent: bool = False
     ) -> None:
         """Print progress during optimization.
 
@@ -60,7 +60,11 @@ class Optimizers:
             silent: Silence progress print.
         """
         if not silent:
-            e_str = f"{fun(list(x)):3.16f}"
+            e = fun(list(x))
+            if isinstance(e, np.ndarray):
+                e_str = f"{np.mean(e):3.16f}"
+            else:
+                e_str = f"{e:3.16f}"
             time_str = f"{time.time() - self._start:7.2f}"
             print(
                 f"--------{str(self._iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}"
@@ -188,7 +192,7 @@ class RotoSolve:
         self._R = R
         self._param_names = param_names
 
-    def minimize(self, f: Callable[[list[float]], float | list[float]], x0: Sequence[float]) -> Result:
+    def minimize(self, f: Callable[[list[float]], float | np.ndarray], x0: Sequence[float]) -> Result:
         """Run minimization.
 
         Args:
@@ -222,7 +226,7 @@ class RotoSolve:
                 while x[i] > np.pi:
                     x[i] -= 2 * np.pi
             f_tmp = f(x)
-            if isinstance(f_tmp, list):
+            if isinstance(f_tmp, np.ndarray):
                 # State-averaged case
                 f_new = float(np.mean(f_tmp))
             else:
@@ -247,8 +251,8 @@ class RotoSolve:
 
 
 def get_energy_evals(
-    f: Callable[[list[float]], float | list[float]], x: list[float], idx: int, R: int
-) -> list[float] | list[list[float]]:
+    f: Callable[[list[float]], float | np.ndarray], x: list[float], idx: int, R: int
+) -> list[float] | list[np.ndarray]:
     """Evaluate the function in all points needed for the reconstruction in Rotosolve.
 
     Args:
@@ -270,7 +274,7 @@ def get_energy_evals(
 
 
 @nb.jit(nopython=True)
-def reconstructed_f(x_vals: np.ndarray, energy_vals: list[float] | list[list[float]], R: int) -> np.ndarray:
+def reconstructed_f(x_vals: np.ndarray, energy_vals: list[float] | list[np.ndarray], R: int) -> np.ndarray:
     r"""Reconstructed the function in terms of sin-functions.
 
     .. math::
@@ -293,19 +297,7 @@ def reconstructed_f(x_vals: np.ndarray, energy_vals: list[float] | list[list[flo
         Function value in list of points.
     """
     e = np.zeros(len(x_vals))
-    if isinstance(energy_vals[0], list):
-        # State-averaged case
-        for energy_val in energy_vals:
-            for i, mu in enumerate(list(range(-R, R + 1))):
-                x_mu = 2 * mu / (2 * R + 1) * np.pi
-                for j, x in enumerate(x_vals):
-                    e[j] += (
-                        energy_val[i]  # type: ignore
-                        * np.sinc((2 * R + 1) / 2 * (x - x_mu) / np.pi)
-                        / (np.sinc(1 / 2 * (x - x_mu) / np.pi))
-                    )
-        e = e / len(energy_vals)
-    elif isinstance(energy_vals[0], float):
+    if isinstance(energy_vals[0], float):
         # Single state case
         for i, mu in enumerate(list(range(-R, R + 1))):
             x_mu = 2 * mu / (2 * R + 1) * np.pi
@@ -315,4 +307,16 @@ def reconstructed_f(x_vals: np.ndarray, energy_vals: list[float] | list[list[flo
                     * np.sinc((2 * R + 1) / 2 * (x - x_mu) / np.pi)
                     / (np.sinc(1 / 2 * (x - x_mu) / np.pi))
                 )
+    else:
+        # State-averaged case
+        for k in range(len(energy_vals[0])):
+            for i, mu in enumerate(list(range(-R, R + 1))):
+                x_mu = 2 * mu / (2 * R + 1) * np.pi
+                for j, x in enumerate(x_vals):
+                    e[j] += (
+                        energy_vals[i][k]  # type: ignore
+                        * np.sinc((2 * R + 1) / 2 * (x - x_mu) / np.pi)
+                        / (np.sinc(1 / 2 * (x - x_mu) / np.pi))
+                    )
+        e = e / len(energy_vals)
     return e
