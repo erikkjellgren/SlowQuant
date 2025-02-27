@@ -454,6 +454,23 @@ def _propagate_state(
     _propagate_state has another order of the arguments,
     which is needed when using functools.partial.
     """
+    if len(np.shape(state)) == 2:
+        # Needed because SciPy can send in vectors with the shape,
+        # (n, 1) and the JIT accerelated code expect the shape (n,).
+        return propagate_state(
+            operators,
+            state[:, 0],
+            idx2det,
+            det2idx,
+            num_inactive_orbs,
+            num_active_orbs,
+            num_virtual_orbs,
+            num_active_elec_alpha,
+            num_active_elec_beta,
+            thetas,
+            wf_struct,
+            do_folding=do_folding,
+        )
     return propagate_state(
         operators,
         state,
