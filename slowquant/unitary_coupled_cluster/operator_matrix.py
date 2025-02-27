@@ -74,7 +74,7 @@ def build_operator_matrix(
     ones = np.ones(num_dets)  # Used with the determinant generator to ensure no determinants are screened.
     op_mat = np.zeros((num_dets, num_dets))  # basis
     # Create bitstrings for parity check. Key=orbital index. Value=det as int
-    parity_check = {0: 0}
+    parity_check = np.zeros(2 * num_active_orbs + 1, dtype=int)
     num = 0
     for i in range(2 * num_active_orbs - 1, -1, -1):
         num += 2**i
@@ -149,12 +149,11 @@ def propagate_state(
     new_state = np.copy(state)
     tmp_state = np.zeros_like(state)
     # Create bitstrings for parity check. Key=orbital index. Value=det as int
-    parity_check = {0: 0}
+    parity_check = np.zeros(2 * num_active_orbs + 1, dtype=int)
     num = 0
     for i in range(2 * num_active_orbs - 1, -1, -1):
         num += 2**i
         parity_check[2 * num_active_orbs - i] = num
-
     for op in operators[::-1]:
         # Ansatz unitary in operators
         if isinstance(op, str):
@@ -321,12 +320,11 @@ def propagate_state_SA(
     new_state = np.copy(state)
     tmp_state = np.zeros_like(state)
     # Create bitstrings for parity check. Key=orbital index. Value=det as int
-    parity_check = {0: 0}
+    parity_check = np.zeros(2 * num_active_orbs + 1, dtype=int)
     num = 0
     for i in range(2 * num_active_orbs - 1, -1, -1):
         num += 2**i
         parity_check[2 * num_active_orbs - i] = num
-
     for op in operators[::-1]:
         # Ansatz unitary in operators
         if isinstance(op, str):
@@ -502,7 +500,7 @@ def expectation_value(
         num_active_elec_beta: Number of active beta electrons.
         thetas: Active-space parameters.
                Ordered as (S, D, T, ...).
-        wf_struct: wave function structure object
+        wf_struct: Wave function structure object.
 
     Returns:
         Expectation value.
@@ -558,7 +556,7 @@ def expectation_value_SA(
         num_active_elec_beta: Number of active beta electrons.
         thetas: Active-space parameters.
                Ordered as (S, D, T, ...).
-        wf_struct: wave function structure object
+        wf_struct: Wave function structure object.
 
     Returns:
         Expectation value.
