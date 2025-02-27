@@ -15,10 +15,6 @@ from slowquant.molecularintegrals.integralfunctions import (
     two_electron_integral_transform,
     two_electron_integral_transform_split,
 )
-from slowquant.unitary_coupled_cluster.density_matrix import (
-    ReducedDenstiyMatrix,
-    get_orbital_gradient,
-)
 from slowquant.unitary_coupled_cluster.unrestricted_density_matrix import (
     UnrestrictedReducedDensityMatrix,
     get_electronic_energy_unrestricted,
@@ -35,12 +31,8 @@ from slowquant.unitary_coupled_cluster.operator_matrix import (
 from slowquant.unitary_coupled_cluster.operators import (
     anni
 )
-from slowquant.unitary_coupled_cluster.fermionic_operator import (
-    FermionicOperator
-)
 from slowquant.unitary_coupled_cluster.unrestricted_operators import (
     unrestricted_hamiltonian_0i_0a,
-    unrestricted_hamiltonian_0i_0a_1elec
 )
 from slowquant.unitary_coupled_cluster.util import UpsStructure
 
@@ -861,12 +853,13 @@ def energy_ups(
     return expectation_value(
         wf.ci_coeffs,
         [
-            unrestricted_hamiltonian_0i_0a( #OBS skifter mellem 0i_0a og 01_0a_1elec her
+            unrestricted_hamiltonian_0i_0a(
                 wf.haa_mo,
                 wf.hbb_mo,
                 wf.gaaaa_mo,
                 wf.gbbbb_mo,
                 wf.gaabb_mo,
+                wf.gbbaa_mo,
                 wf.num_inactive_orbs,
                 wf.num_active_orbs,
             )
@@ -959,6 +952,7 @@ def active_space_parameter_gradient(
             wf.gaaaa_mo,
             wf.gbbbb_mo,
             wf.gaabb_mo,
+            wf.gbbaa_mo,
             wf.num_inactive_orbs,
             wf.num_active_orbs,
         ).get_folded_operator(wf.num_inactive_orbs, wf.num_active_orbs, wf.num_virtual_orbs),
