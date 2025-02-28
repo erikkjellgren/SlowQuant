@@ -40,7 +40,8 @@ from slowquant.unitary_coupled_cluster.fermionic_operator import (
 )
 from slowquant.unitary_coupled_cluster.unrestricted_operators import (
     unrestricted_hamiltonian_0i_0a,
-    unrestricted_hamiltonian_0i_0a_1elec
+    unrestricted_hamiltonian_0i_0a_1elec,
+    unrestricted_hamiltonian_full_space,
 )
 from slowquant.unitary_coupled_cluster.util import UpsStructure
 
@@ -655,6 +656,41 @@ class UnrestrictedWaveFunctionUPS:
             self._rdm2bbaa = self._calculate_rdm2("beta", "alpha")
         return self._rdm2bbaa
 
+    @property
+    def manual_gradient(self) -> np.ndarray:
+        gradient = np.zeros(18)
+        for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+            for q in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                left = expectation_value(
+                        self.ci_coeffs,
+                        (anni(p, "alpha", True) * anni(q, "alpha", False)) * unrestricted_hamiltonian_full_space + (anni(p, "beta", True) * anni(q, "beta", False)) * unrestricted_hamiltonian_full_space,
+                        self.ci_coeffs,
+                        self.idx2det,
+                        self.det2idx,
+                        self.num_inactive_orbs,
+                        self.num_active_orbs,
+                        self.num_virtual_orbs,
+                        self.num_active_elec_alpha,
+                        self.num_active_elec_beta,
+                        self.thetas,
+                        self.ups_layout
+                        )
+                right = expectation_value(
+                        self.ci_coeffs,
+                        unrestricted_hamiltonian_full_space * anni(p, "alpha", True)*anni(q, "alpha", False) + unrestricted_hamiltonian_full_space * anni(p, "beta", True)*anni(q, "beta", False),
+                        self.ci_coeffs,
+                        self.idx2det,
+                        self.det2idx,
+                        self.num_inactive_orbs,
+                        self.num_active_orbs,
+                        self.num_virtual_orbs,
+                        self.num_active_elec_alpha,
+                        self.num_active_elec_beta,
+                        self.thetas,
+                        self.ups_layout
+                        )
+                gradient = left-right
+        return gradient
 
     def run_ups(
         self,
@@ -902,7 +938,7 @@ def gradient_ups(
     """
     number_kappas = 0
     if orbital_optimized:
-        number_kappas = len(wf.kappa_idx)
+        number_kappas = len(wf.kappa_a) + len(wf.kappa_b)
     gradient = np.zeros_like(parameters)
     if orbital_optimized:
         gradient[:number_kappas] = orbital_rotation_gradient(

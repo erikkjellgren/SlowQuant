@@ -14,14 +14,14 @@ from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import Unre
 
 
 
-mol = pyscf.M(atom="O 0 0 0; H 0.0  0.0  0.9697", basis="6-31G", unit="angstrom", spin=1)
+mol = pyscf.M(atom="O 0 0 0; H 0.0  0.0  0.9697", basis="sto-3g", unit="angstrom", spin=1)
 mol.build()
 mf = scf.UHF(mol)
 mf.kernel()
 
 
 
-mc = mcscf.UCASCI(mf, 3, (2,1))
+mc = mcscf.UCASCI(mf, 1, (1,0))
 res = mc.kernel(mf.mo_coeff)
 
 
@@ -44,7 +44,7 @@ SQobj.set_molecule(
         H  0.0  0.0  0.9697;""",
     distance_unit="angstrom",
 )
-SQobj.set_basis_set("6-31G")
+SQobj.set_basis_set("sto-3g")
 # HF
 SQobj.init_hartree_fock()
 SQobj.hartree_fock.use_diis = False
@@ -56,14 +56,16 @@ g_eri = SQobj.integral.electron_repulsion_tensor
 WF = UnrestrictedWaveFunctionUPS(
     SQobj.molecule.number_bf * 2,
     SQobj.molecule.number_electrons,
-    ((2,1), 3),
+    ((1,0), 1),
     mf.mo_coeff,
     h_core,
     g_eri,
     "fUCC",
-    {"n_layers": 2}
+    {"n_layers": 2},
+    include_active_kappa=True
 )
-WF.run_ups(orbital_optimization=True)
+#print(WF.manual_gradient)
+WF.run_ups(orbital_optimization=True, maxiter=1000)
 #print("hej2", WF.energy_elec + SQobj.molecule.nuclear_repulsion, WF.energy_elec  + SQobj.molecule.nuclear_repulsion - res[0])
         
 #print("aa", WF.rdm1aa, "bb", WF.rdm1bb,"aaaa", WF.rdm2aaaa, "bbbb", WF.rdm2bbbb, "aabb", WF.rdm2aabb)

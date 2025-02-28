@@ -471,14 +471,15 @@ def get_orbital_gradient_unrestricted(
     num_active_orbs: int,
 ) -> np.ndarray:
     """ Figure out your math first!"""
-    gradient = np.zeros(len(kappa_idx))
+    gradient = np.zeros(2*len(kappa_idx))
+    print(h_int_aa, h_int_bb, g_int_aaaa, g_int_bbbb, g_int_aabb, g_int_bbaa)
     for idx, (m, n) in enumerate(kappa_idx):
         #1e contribution
         for p in range(num_inactive_orbs + num_active_orbs):
-            gradient[idx] += h_int_aa[n, p] * rdms.RDM1aa(m, p)
-            gradient[idx] -= h_int_aa[p, m] * rdms.RDM1aa(p, n)
-            gradient[idx] += h_int_bb[n, p] * rdms.RDM1bb(m, p)
-            gradient[idx] -= h_int_bb[p, m] * rdms.RDM1bb(p, n)
+            gradient[idx] += 2 * h_int_aa[n, p] * rdms.RDM1aa(m, p)
+            gradient[idx] -= 2 * h_int_aa[p, m] * rdms.RDM1aa(p, n)
+            gradient[idx+len(kappa_idx)] += 2 * h_int_bb[n, p] * rdms.RDM1bb(m, p)
+            gradient[idx+len(kappa_idx)] -= 2 * h_int_bb[p, m] * rdms.RDM1bb(p, n)
         #2e contribution
         for p in range(num_inactive_orbs + num_active_orbs):
             for q in range(num_inactive_orbs + num_active_orbs):
@@ -487,16 +488,11 @@ def get_orbital_gradient_unrestricted(
                     gradient[idx] -= g_int_aaaa[p, q, n, r] * rdms.RDM2aaaa(m, p, r, q)
                     gradient[idx] -= g_int_aaaa[p, m, q, r] * rdms.RDM2aaaa(p, q, r, n)
                     gradient[idx] += g_int_aaaa[p, q, r, m] * rdms.RDM2aaaa(p, r, q, n)
-                    gradient[idx] += g_int_bbbb[n, p, q, r] * rdms.RDM2bbbb(m, q, r, p)
-                    gradient[idx] -= g_int_bbbb[p, q, n, r] * rdms.RDM2bbbb(m, p, r, q)
-                    gradient[idx] -= g_int_bbbb[p, m, q, r] * rdms.RDM2bbbb(p, q, r, n)
-                    gradient[idx] += g_int_bbbb[p, q, r, m] * rdms.RDM2bbbb(p, r, q, n)
-                    gradient[idx] += g_int_aabb[n, p, q, r] * rdms.RDM2aabb(m, q, r, p)
-                    gradient[idx] -= g_int_aabb[p, q, n, r] * rdms.RDM2aabb(m, p, r, q)
+                    gradient[idx+len(kappa_idx)] += g_int_bbbb[n, p, q, r] * rdms.RDM2bbbb(m, q, r, p)
+                    gradient[idx+len(kappa_idx)] -= g_int_bbbb[p, q, n, r] * rdms.RDM2bbbb(m, p, r, q)
+                    gradient[idx+len(kappa_idx)] -= g_int_bbbb[p, m, q, r] * rdms.RDM2bbbb(p, q, r, n)
+                    gradient[idx+len(kappa_idx)] += g_int_bbbb[p, q, r, m] * rdms.RDM2bbbb(p, r, q, n)
                     gradient[idx] -= g_int_aabb[p, m, q, r] * rdms.RDM2aabb(p, q, r, n)
-                    gradient[idx] += g_int_aabb[p, q, r, m] * rdms.RDM2aabb(p, r, q, n)
-                    gradient[idx] += g_int_bbaa[n, p, q, r] * rdms.RDM2bbaa(m, q, r, p)
-                    gradient[idx] -= g_int_bbaa[p, q, n, r] * rdms.RDM2bbaa(m, p, r, q)
-                    gradient[idx] -= g_int_bbaa[p, m, q, r] * rdms.RDM2bbaa(p, q, r, n)
-                    gradient[idx] += g_int_bbaa[p, q, r, m] * rdms.RDM2bbaa(p, r, q, n)
+                    gradient[idx+len(kappa_idx)] -= g_int_bbaa[p, m, q, r] * rdms.RDM2bbaa(p, q, r, n)
+    print(gradient)
     return gradient
