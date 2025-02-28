@@ -816,10 +816,19 @@ class WaveFunctionUPS:
             )
             self._old_opt_parameters = np.zeros_like(self.thetas) + 10**20
             self._E_opt_old = 0.0
-            res = optimizer.minimize(
-                self.thetas,
-                extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
-            )
+            if optimizer_name.lower() == "rotosolve":
+                res = optimizer.minimize(
+                    self.thetas,
+                    extra_options={
+                        "R": self.ups_layout.grad_param_R,
+                        "param_names": self.ups_layout.param_names,
+                        "f_rotosolve_optimized": self._calc_energy_rotosolve_optimization,
+                    },
+                )
+            else:
+                res = optimizer.minimize(
+                    self.thetas,
+                )
             self.thetas = res.x.tolist()
 
             if orbital_optimization and len(self.kappa) != 0:
