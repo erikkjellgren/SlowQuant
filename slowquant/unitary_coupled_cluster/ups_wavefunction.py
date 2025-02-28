@@ -24,7 +24,9 @@ from slowquant.unitary_coupled_cluster.operator_matrix import (
     get_grad_action,
     get_indexing,
     propagate_state,
+    propagate_state_SA,
     propagate_unitary,
+    propagate_unitary_SA,
 )
 from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
@@ -937,10 +939,19 @@ class WaveFunctionUPS:
         optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
         self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0
-        res = optimizer.minimize(
-            parameters,
-            extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
-        )
+        if optimizer_name.lower() == "rotosolve":
+            res = optimizer.minimize(
+                parameters,
+                extra_options={
+                    "R": self.ups_layout.grad_param_R,
+                    "param_names": self.ups_layout.param_names,
+                    "f_rotosolve_optimized": self._calc_energy_rotosolve_optimization,
+                },
+            )
+        else:
+            res = optimizer.minimize(
+                parameters,
+            )
         if orbital_optimization:
             self.thetas = res.x[len(self.kappa) :].tolist()
             for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
@@ -1004,6 +1015,89 @@ class WaveFunctionUPS:
         self._E_opt_old = E
         self._old_opt_parameters = np.copy(parameters)
         return E
+
+    def _calc_energy_rotosolve_optimization(
+        self,
+        parameters: list[float],
+        theta_diffs: list[float],
+        theta_idx: int,
+    ) -> list[float]:
+        """Calculate electronic energy.
+
+        Args:
+            parameters: Ansatz and orbital rotation parameters.
+
+        Returns:
+            Electronic energy.
+        """
+        self.thetas = parameters[:]
+        state_vec = np.copy(self.csf_coeffs)
+        for i in range(0, theta_idx):
+            state_vec = propagate_unitary(
+                state_vec,
+                i,
+                self.idx2det,
+                self.det2idx,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.num_virtual_orbs,
+                self.num_active_elec_alpha,
+                self.num_active_elec_beta,
+                self.thetas,
+                self.ups_layout,
+            )
+        state_vecs = []
+        theta_tmp = np.copy(self.thetas)
+        for theta_diff in theta_diffs:
+            theta_tmp[theta_idx] = theta_diff
+            state_vecs.append(
+                propagate_unitary(
+                    state_vec,
+                    theta_idx,
+                    self.idx2det,
+                    self.det2idx,
+                    self.num_inactive_orbs,
+                    self.num_active_orbs,
+                    self.num_virtual_orbs,
+                    self.num_active_elec_alpha,
+                    self.num_active_elec_beta,
+                    theta_tmp,
+                    self.ups_layout,
+                )
+            )
+        state_vecs = np.array(state_vecs)
+        for i in range(theta_idx + 1, len(self.thetas)):
+            state_vecs = propagate_unitary_SA(
+                state_vecs,
+                i,
+                self.idx2det,
+                self.det2idx,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.num_virtual_orbs,
+                self.num_active_elec_alpha,
+                self.num_active_elec_beta,
+                self.thetas,
+                self.ups_layout,
+            )
+        Hamiltonian = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+        bra_vec = propagate_state_SA(
+            [Hamiltonian],
+            state_vecs,
+            self.idx2det,
+            self.det2idx,
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+            self.num_virtual_orbs,
+            self.num_active_elec_alpha,
+            self.num_active_elec_beta,
+            self.thetas,
+            self.ups_layout,
+        )
+        energies = []
+        for bra, ket in zip(bra_vec, state_vecs):
+            energies.append(bra @ ket)
+        return energies
 
     def _calc_gradient_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
