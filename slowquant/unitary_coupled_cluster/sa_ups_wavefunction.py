@@ -541,21 +541,11 @@ class WaveFunctionSAUPS:
             if not is_silent_subiterations:
                 print("--------Ansatz optimization")
                 print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
-            if optimizer_name.lower() in ("rotosolve",):
-                # For RotoSolve type solvers the energy per state is needed in the optimzation,
-                # instead of only the state-averaged energy.
-                energy_theta = partial(
-                    self._calc_energy_optimization,
-                    theta_optimization=True,
-                    kappa_optimization=False,
-                    return_all_states=True,
-                )
-            else:
-                energy_theta = partial(
-                    self._calc_energy_optimization,
-                    theta_optimization=True,
-                    kappa_optimization=False,
-                )
+            energy_theta = partial(
+                self._calc_energy_optimization,
+                theta_optimization=True,
+                kappa_optimization=False,
+            )
             gradient_theta = partial(
                 self._calc_gradient_optimization,
                 theta_optimization=True,
@@ -693,15 +683,6 @@ class WaveFunctionSAUPS:
                 parameters = self.kappa
         else:
             parameters = self.thetas
-        if optimizer_name.lower() in ("rotosolve",):
-            # For RotoSolve type solvers the energy per state is needed in the optimzation,
-            # instead of only the state-averaged energy.
-            energy = partial(
-                self._calc_energy_optimization,
-                theta_optimization=True,
-                kappa_optimization=False,
-                return_all_states=True,
-            )
         optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
         self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0
@@ -857,8 +838,7 @@ class WaveFunctionSAUPS:
         parameters: list[float],
         theta_optimization: bool,
         kappa_optimization: bool,
-        return_all_states: bool = False,
-    ) -> float | np.ndarray:
+    ) -> float:
         r"""Calculate electronic energy of SA-UPS wave function.
 
         .. math::
@@ -884,30 +864,6 @@ class WaveFunctionSAUPS:
         Hamiltonian = hamiltonian_0i_0a(
             self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
         ).get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-        if return_all_states:
-            energies = []
-            # Energy for each state in SA
-            for coeffs in self.ci_coeffs:
-                energies.append(
-                    expectation_value(
-                        coeffs,
-                        [Hamiltonian],
-                        coeffs,
-                        self.idx2det,
-                        self.det2idx,
-                        self.num_inactive_orbs,
-                        self.num_active_orbs,
-                        self.num_virtual_orbs,
-                        self.num_active_elec_alpha,
-                        self.num_active_elec_beta,
-                        self.thetas,
-                        self.ups_layout,
-                        do_folding=False,
-                    )
-                )
-            self._E_opt_old = np.copy(np.array(energies))
-            self._old_opt_parameters = np.copy(parameters)
-            return np.array(energies)
         E = expectation_value_SA(
             self.ci_coeffs,
             [Hamiltonian],
