@@ -8,6 +8,7 @@ from functools import partial
 import numpy as np
 import scipy
 import scipy.optimize
+import scipy.sparse as ss
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
@@ -22,8 +23,9 @@ from slowquant.unitary_coupled_cluster.operator_matrix import (
     build_operator_matrix,
     construct_ucc_state,
     expectation_value,
-    expectation_value_mat,
     get_indexing,
+    get_ucc_T,
+    propagate_state,
 )
 from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
@@ -279,10 +281,14 @@ class WaveFunctionUCC:
         if self._ci_coeffs is None:
             self._ci_coeffs = construct_ucc_state(
                 self.csf_coeffs,
+                self.idx2det,
+                self.det2idx,
+                self.num_inactive_orbs,
                 self.num_active_orbs,
+                self.num_virtual_orbs,
                 self.num_active_elec_alpha,
                 self.num_active_elec_beta,
-                self._thetas,
+                self.thetas,
                 self.ucc_layout,
             )
         return self._ci_coeffs
@@ -861,6 +867,8 @@ class WaveFunctionUCC:
                 tol=tol,
                 is_silent=is_silent_subiterations,
             )
+            self._old_opt_parameters = np.zeros_like(self.thetas) + 10**20
+            self._E_opt_old = 0.0
             res = optimizer.minimize(self.thetas)
             self.thetas = res.x.tolist()
 
@@ -887,6 +895,8 @@ class WaveFunctionUCC:
                     tol=tol,
                     is_silent=is_silent_subiterations,
                 )
+                self._old_opt_parameters = np.zeros(len(self.kappa_idx)) + 10**20
+                self._E_opt_old = 0.0
                 res = optimizer.minimize([0.0] * len(self.kappa_idx))
                 for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
                     self.kappa[i] = 0.0
@@ -1004,6 +1014,8 @@ class WaveFunctionUCC:
         else:
             parameters = self.thetas
         optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
+        self._old_opt_parameters = np.zeros_like(parameters) + 10**20
+        self._E_opt_old = 0.0
         res = optimizer.minimize(
             parameters,
         )
@@ -1036,14 +1048,31 @@ class WaveFunctionUCC:
         Returns:
             Electronic energy.
         """
+        # Avoid recalculating energy in callback
+        if np.max(np.abs(np.array(self._old_opt_parameters) - np.array(parameters))) < 10**-14:
+            return self._E_opt_old
         num_kappa = 0
         if kappa_optimization:
             num_kappa = len(self.kappa_idx)
             self.kappa = parameters[:num_kappa]
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
-        if theta_optimization:
-            return expectation_value(
+        if kappa_optimization:
+            # RDM is more expensive than evaluation of the Hamiltonian.
+            # Thus only contruct these if orbital-optimization is turned on,
+            # since the RDMs will be reused in the oo gradient calculation.
+            rdms = ReducedDenstiyMatrix(
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.num_virtual_orbs,
+                rdm1=self.rdm1,
+                rdm2=self.rdm2,
+            )
+            E = get_electronic_energy(
+                rdms, self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
+            )
+        else:
+            E = expectation_value(
                 self.ci_coeffs,
                 [
                     hamiltonian_0i_0a(
@@ -1064,22 +1093,21 @@ class WaveFunctionUCC:
                 self.thetas,
                 self.ucc_layout,
             )
-        # RDM is more expensive than evaluation of the Hamiltonian.
-        # Thus only contruct these if orbital-optimization is turned on,
-        # since the RDMs will be reused in the oo gradient calculation.
-        rdms = ReducedDenstiyMatrix(
-            self.num_inactive_orbs,
-            self.num_active_orbs,
-            self.num_virtual_orbs,
-            rdm1=self.rdm1,
-            rdm2=self.rdm2,
-        )
-        return get_electronic_energy(rdms, self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+        self._E_opt_old = E
+        self._old_opt_parameters = np.copy(parameters)
+        return E
 
     def _calc_gradient_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
     ) -> np.ndarray:
-        """Calculate electronic gradient.
+        r"""Calculate electronic gradient.
+
+        The gradient with respect to the thetas is calculated with finite-difference after applying the product rule.
+
+        .. math::
+            \frac{\partial E}{\partial \theta} = 2\left<\frac{\partial \Psi}{\partial \theta}\left|\hat{H}\right|\Psi\right>
+
+        The bra :math:`\left<\frac{\partial \Psi}{\partial \theta}\right|` is constructed using finite-difference.
 
         Args:
             parameters: Ansatz and orbital rotation parameters.
@@ -1108,33 +1136,47 @@ class WaveFunctionUCC:
                 rdms, self.h_mo, self.g_mo, self.kappa_idx, self.num_inactive_orbs, self.num_active_orbs
             )
         if theta_optimization:
-            # Hamiltonian matrix
-            Hamiltonian = build_operator_matrix(
-                hamiltonian_0i_0a(
-                    self.h_mo,
-                    self.g_mo,
-                    self.num_inactive_orbs,
-                    self.num_active_orbs,
-                ).get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs),
-                self.idx2det,
-                self.det2idx,
+            Hamiltonian = hamiltonian_0i_0a(
+                self.h_mo,
+                self.g_mo,
+                self.num_inactive_orbs,
                 self.num_active_orbs,
             )
             # Numerical finite difference gradient
             eps = np.finfo(np.float64).eps ** (
                 1 / 2
             )  # half-precision of double-precision floating-point numbers
-            E = expectation_value_mat(self.ci_coeffs, Hamiltonian, self.ci_coeffs)
-            theta_params = self.thetas
+            if eps < 10e-13:
+                raise ValueError(f"Cannot perform finite-difference step-size is too small, {eps}")
+            Hket = propagate_state(
+                [Hamiltonian],
+                self.ci_coeffs,
+                self.idx2det,
+                self.det2idx,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.num_virtual_orbs,
+                self.num_active_elec_alpha,
+                self.num_active_elec_beta,
+                self.thetas,
+                self.ucc_layout,
+            )
+            E = self.ci_coeffs @ Hket
+            theta_params = np.zeros_like(self.thetas)
+            Tmat = build_operator_matrix(
+                get_ucc_T(self.thetas, self.ucc_layout), self.idx2det, self.det2idx, self.num_active_orbs
+            )
             for i in range(len(theta_params)):  # pylint: disable=consider-using-enumerate
                 sign_step = (theta_params[i] >= 0).astype(float) * 2 - 1  # type: ignore [attr-defined]
                 step_size = eps * sign_step * max(1, abs(theta_params[i]))
                 theta_params[i] += step_size
-                self.thetas = theta_params
-                E_plus = expectation_value_mat(self.ci_coeffs, Hamiltonian, self.ci_coeffs)
+                Tmat_plus = build_operator_matrix(
+                    get_ucc_T(theta_params, self.ucc_layout), self.idx2det, self.det2idx, self.num_active_orbs
+                )
+                bra = ss.linalg.expm_multiply(Tmat + Tmat_plus, self.csf_coeffs, traceA=0.0)
+                E_plus = bra @ Hket
                 theta_params[i] -= step_size
-                self.thetas = theta_params
-                gradient[i + num_kappa] = (E_plus - E) / step_size
+                gradient[i + num_kappa] = 2 * (E_plus - E) / step_size
         return gradient
 
 
