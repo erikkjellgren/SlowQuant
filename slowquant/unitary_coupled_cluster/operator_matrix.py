@@ -245,8 +245,8 @@ def get_determinants(
     Args:
         det: List of all determinants.
         state: State-vector.
-        anni_idxs: Annihilation operator indicies.
-        create_idxs: Creation operator indicies.
+        anni_idxs: Annihilation operator indices.
+        create_idxs: Creation operator indices.
         num_active_orbs: Number of active spatial orbitals.
 
     Returns:
@@ -401,8 +401,8 @@ def get_determinants_SA(
     Args:
         det: List of all determinants.
         state: State-vector.
-        anni_idxs: Annihilation operator indicies.
-        create_idxs: Creation operator indicies.
+        anni_idxs: Annihilation operator indices.
+        create_idxs: Creation operator indices.
         num_active_orbs: Number of active spatial orbitals.
 
     Returns:
@@ -456,7 +456,7 @@ def _propagate_state(
     """
     if len(np.shape(state)) == 2:
         # Needed because SciPy can send in vectors with the shape,
-        # (n, 1) and the JIT accerelated code expect the shape (n,).
+        # (n, 1) and the JIT accelerated code expect the shape (n,).
         return propagate_state(
             operators,
             state[:, 0],
@@ -686,7 +686,7 @@ def get_ucc_T(
     # Build up T matrix based on excitations in ucc_struct and given thetas
     T = FermionicOperator({}, {})
     for exc_type, exc_indices, theta in zip(
-        ucc_struct.excitation_operator_type, ucc_struct.excitation_indicies, thetas
+        ucc_struct.excitation_operator_type, ucc_struct.excitation_indices, thetas
     ):
         if abs(theta) < 10**-14:
             continue
@@ -740,7 +740,7 @@ def construct_ups_state(
         state: Reference state vector.
         num_active_orbs: Number of active spatial orbitals.
         num_active_elec_alpha: Number of active alpha electrons.
-        num_active_elec_betaa: Number of active beta electrons.
+        num_active_elec_beta: Number of active beta electrons.
         thetas: Ansatz parameters values.
         ups_struct: Unitary product state structure.
         dagger: If true, do dagger unitaries.
@@ -754,7 +754,7 @@ def construct_ups_state(
         order = -1
     # Loop over all excitation in UPSStructure
     for exc_type, exc_indices, theta in zip(
-        ups_struct.excitation_operator_type[::order], ups_struct.excitation_indicies[::order], thetas[::order]
+        ups_struct.excitation_operator_type[::order], ups_struct.excitation_indices[::order], thetas[::order]
     ):
         if abs(theta) < 10**-14:
             continue
@@ -906,7 +906,7 @@ def construct_ups_state_SA(
         state: Reference state vector.
         num_active_orbs: Number of active spatial orbitals.
         num_active_elec_alpha: Number of active alpha electrons.
-        num_active_elec_betaa: Number of active beta electrons.
+        num_active_elec_beta: Number of active beta electrons.
         thetas: Ansatz parameters values.
         ups_struct: Unitary product state structure.
         dagger: If true, do dagger unitaries.
@@ -920,7 +920,7 @@ def construct_ups_state_SA(
         order = -1
     # Loop over all excitation in UPSStructure
     for exc_type, exc_indices, theta in zip(
-        ups_struct.excitation_operator_type[::order], ups_struct.excitation_indicies[::order], thetas[::order]
+        ups_struct.excitation_operator_type[::order], ups_struct.excitation_indices[::order], thetas[::order]
     ):
         if abs(theta) < 10**-14:
             continue
@@ -1077,7 +1077,7 @@ def propagate_unitary(
     """
     # Select unitary operation based on idx
     exc_type = ups_struct.excitation_operator_type[idx]
-    exc_indices = ups_struct.excitation_indicies[idx]
+    exc_indices = ups_struct.excitation_indices[idx]
     theta = thetas[idx]
     if abs(theta) < 10**-14:
         return np.copy(state)
@@ -1232,7 +1232,7 @@ def propagate_unitary_SA(
     """
     # Select unitary operation based on idx
     exc_type = ups_struct.excitation_operator_type[idx]
-    exc_indices = ups_struct.excitation_indicies[idx]
+    exc_indices = ups_struct.excitation_indices[idx]
     theta = thetas[idx]
     if abs(theta) < 10**-14:
         return np.copy(state)
@@ -1401,7 +1401,7 @@ def get_grad_action(
     """
     # Select unitary operation based on idx
     exc_type = ups_struct.excitation_operator_type[idx]
-    exc_indices = ups_struct.excitation_indicies[idx]
+    exc_indices = ups_struct.excitation_indices[idx]
     if exc_type in ("sa_single",):
         # Create T matrix
         A = 1  # 2**(-1/2)
@@ -1496,7 +1496,7 @@ def get_grad_action_SA(
     """
     # Select unitary operation based on idx
     exc_type = ups_struct.excitation_operator_type[idx]
-    exc_indices = ups_struct.excitation_indicies[idx]
+    exc_indices = ups_struct.excitation_indices[idx]
     if exc_type in ("sa_single",):
         # Create T matrix
         A = 1  # 2**(-1/2)

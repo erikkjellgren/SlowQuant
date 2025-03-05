@@ -948,7 +948,7 @@ def construct_ucc_state_extended(
     # Build up T matrix based on excitations in ucc_struct and given thetas
     T = np.zeros((len(state), len(state)))
     for exc_type, exc_indices, theta in zip(
-        ucc_struct.excitation_operator_type, ucc_struct.excitation_indicies, thetas
+        ucc_struct.excitation_operator_type, ucc_struct.excitation_indices, thetas
     ):
         if abs(theta) < 10**-14:
             continue
@@ -1136,7 +1136,7 @@ def construct_ups_state_extended(
         order = -1
     # Loop over all excitation in UPSStructure
     for exc_type, exc_indices, theta in zip(
-        ups_struct.excitation_operator_type[::order], ups_struct.excitation_indicies[::order], thetas[::order]
+        ups_struct.excitation_operator_type[::order], ups_struct.excitation_indices[::order], thetas[::order]
     ):
         if abs(theta) < 10**-14:
             continue

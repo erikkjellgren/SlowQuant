@@ -46,7 +46,7 @@ def operator_string_to_key(operator_string: list[a_op]) -> str:
     """Make key string to index a fermionic operator in a dict structure.
 
     Args:
-        operator_string: Fermionic opreators.
+        operator_string: Fermionic operators.
 
     Returns:
         Dictionary key.
@@ -64,7 +64,7 @@ def operator_to_qiskit_key(operator_string: list[a_op], remapping: dict[int, int
     """Make key string to index a fermionic operator in a dict structure.
 
     Args:
-        operator_string: Fermionic opreators.
+        operator_string: Fermionic operators.
         remapping: Map that takes indices from alpha,beta,alpha,beta
                    to alpha,alpha,beta,beta ordering.
 
@@ -378,7 +378,7 @@ class FermionicOperator:
         Warning, multiplication of folded operators, might give wrong operators.
         (I have not quite figured out a good programming structure that will not allow multiplication after folding)
 
-        Note, that the indicies of the folded operator is remapped, such that idx=0 is the first index in the active space.
+        Note, that the indices of the folded operator is remapped, such that idx=0 is the first index in the active space.
 
         Args:
             num_inactive_orbs: Number of spatial inactive orbitals.
