@@ -139,15 +139,13 @@ class LinearResponseUCC(LinearResponseBaseClass):
                         *self.index_info,
                     )
                     # <CSF| Gd Ud qd H |0>
-                    tmp = expectation_value(
+                    val += expectation_value(
                         G_ket,
                         [],
                         UdqdH_ket,
                         *self.index_info,
                     )
-                    self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = val + tmp
-                    # Make B
-                    self.B_tracked[j, i + idx_shift] = self.B_tracked[i + idx_shift, j] = -tmp
+                    self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = val
                 else:
                     # Make A
                     # <CSF| Gd Ud H q |0>
@@ -158,15 +156,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                         *self.index_info,
                     )
                     self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = val
-                    # Make B
-                    # - <CSF| Gd Ud qd H |0>
-                    val = -expectation_value(
-                        G_ket,
-                        [],
-                        UdqdH_ket,
-                        *self.index_info,
-                    )
-                    self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = val
         for j, GJ in enumerate(self.G_ops):
             UdHUGJ_ket = propagate_state(
                 ["Ud", self.H_0i_0a, "U", GJ],
