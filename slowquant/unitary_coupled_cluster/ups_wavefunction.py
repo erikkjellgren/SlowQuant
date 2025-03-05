@@ -120,7 +120,7 @@ class WaveFunctionUPS:
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
         self.num_active_orbs = self.num_active_spin_orbs // 2
         self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
-        # Contruct spatial idx
+        # Construct spatial idx
         self.inactive_idx: list[int] = []
         self.virtual_idx: list[int] = []
         self.active_idx: list[int] = []
@@ -433,7 +433,7 @@ class WaveFunctionUPS:
 
     @property
     def rdm3(self) -> np.ndarray:
-        """Calculate three-electron reduced density matrix in the actice space.
+        """Calculate three-electron reduced density matrix in the active space.
 
         Currently not utilizing the full symmetry.
 
@@ -850,7 +850,7 @@ class WaveFunctionUPS:
                     self._kappa[i] = 0.0
                     self._kappa_old[i] = 0.0
             else:
-                # If theres is no orbital optimization, then the algorithm is already converged.
+                # If there is no orbital optimization, then the algorithm is already converged.
                 e_new = res.fun
                 if orbital_optimization and len(self.kappa) == 0:
                     print(
@@ -974,7 +974,7 @@ class WaveFunctionUPS:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:
             # RDM is more expensive than evaluation of the Hamiltonian.
-            # Thus only contruct these if orbital-optimization is turned on,
+            # Thus only construct these if orbital-optimization is turned on,
             # since the RDMs will be reused in the oo gradient calculation.
             rdms = ReducedDenstiyMatrix(
                 self.num_inactive_orbs,
@@ -1073,7 +1073,7 @@ class WaveFunctionUPS:
             # CSF reference state on ket
             ket_vec = np.copy(self.csf_coeffs)
             ket_vec_tmp = np.copy(self.csf_coeffs)
-            # Calculate analytical derivatice w.r.t. each theta using gradient_action function
+            # Calculate analytical derivative w.r.t. each theta using gradient_action function
             for i in range(len(self.thetas)):
                 # Derivative action w.r.t. i-th theta on CSF ket
                 ket_vec_tmp = get_grad_action(

@@ -394,7 +394,7 @@ class WaveFunctionUCC:
 
     @property
     def rdm2(self) -> np.ndarray:
-        """Calculate two-electron reduced density matrix in the actice space.
+        """Calculate two-electron reduced density matrix in the active space.
 
         Returns:
             Two-electron reduced density matrix.
@@ -448,7 +448,7 @@ class WaveFunctionUCC:
 
     @property
     def rdm3(self) -> np.ndarray:
-        """Calculate three-electron reduced density matrix in the actice space.
+        """Calculate three-electron reduced density matrix in the active space.
 
         Currently not utilizing the full symmetry.
 
@@ -1059,7 +1059,7 @@ class WaveFunctionUCC:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:
             # RDM is more expensive than evaluation of the Hamiltonian.
-            # Thus only contruct these if orbital-optimization is turned on,
+            # Thus only construct these if orbital-optimization is turned on,
             # since the RDMs will be reused in the oo gradient calculation.
             rdms = ReducedDenstiyMatrix(
                 self.num_inactive_orbs,

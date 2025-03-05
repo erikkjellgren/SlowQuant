@@ -118,7 +118,7 @@ class WaveFunctionCircuit:
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
         self.num_active_orbs = self.num_active_spin_orbs // 2
         self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
-        # Contruct spatial idx
+        # Construct spatial idx
         self.inactive_idx: list[int] = []
         self.virtual_idx: list[int] = []
         self.active_idx: list[int] = []
@@ -723,7 +723,7 @@ class WaveFunctionCircuit:
         return self._rdm4
 
     def precalc_rdm_paulis(self, rdm_order: int) -> None:
-        """Pre-calculate all Paulis used to contruct RDMs up to a certain order.
+        """Pre-calculate all Paulis used to construct RDMs up to a certain order.
 
         This utilizes the saving feature in QuantumInterface when using the Sampler primitive.
         If saving is turned up in QuantumInterface this function will do nothing but waste device time.
@@ -1056,7 +1056,7 @@ class WaveFunctionCircuit:
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             return self.QI.quantum_expectation_value(H)
         # RDM is more expensive than evaluation of the Hamiltonian.
-        # Thus only contruct these if orbital-optimization is turned on,
+        # Thus only construct these if orbital-optimization is turned on,
         # since the RDMs will be reused in the oo gradient calculation.
         rdms = ReducedDenstiyMatrix(
             self.num_inactive_orbs,
