@@ -317,10 +317,14 @@ def get_energy_evals_optimized(
 
 
 def get_energy_evals2d_optimized(
-        f: Callable[[list[float], list[float], list[float], int, int], list[float]], x: list[float], idx1: int, idx2: int, R1: int, R2: int,
+    f: Callable[[list[float], list[float], list[float], int, int], list[float]],
+    x: list[float],
+    idx1: int,
+    idx2: int,
+    R1: int,
+    R2: int,
 ) -> list[float]:
-    """
-    """
+    """ """
     if idx1 <= idx2:
         raise ValueError(f"The first index must be larger than the second index, got idx1,idx2={idx1},{idx2}")
     theta1_diffs = []
@@ -369,8 +373,7 @@ def reconstructed_f(x_vals: np.ndarray, energy_vals: list[float], R: int) -> np.
 
 
 class RotoSolve2D:
-    r"""
-    """
+    r""" """
 
     def __init__(
         self,
@@ -422,8 +425,11 @@ class RotoSolve2D:
         for _ in range(self.max_iterations):
 
             # Generate all possible pairs (i, j, R(i), R(j)) where i < j.
-            par_pairs = [(i, j, self._param_names[i], self._param_names[j]) for i in range(0, num_of_params)
-                     for j in range(i + 1, num_of_params)]
+            par_pairs = [
+                (i, j, self._param_names[i], self._param_names[j])
+                for i in range(0, num_of_params)
+                for j in range(i + 1, num_of_params)
+            ]
             np.random.shuffle(par_pairs)
 
             for i, j, par_name1, par_name2 in par_pairs:
@@ -434,21 +440,39 @@ class RotoSolve2D:
                     par_name1, par_name2 = par_name2, par_name1
                 # Get the energy for specific values of theta_i and theta_j, defined by the _R parameter.
                 if f_rotosolve2d_optimized is not None:
-                    e_vals = get_energy_evals2d_optimized(f_rotosolve2d_optimized, x, i, j, self._R[par_name1], self._R[par_name2])
+                    e_vals = get_energy_evals2d_optimized(
+                        f_rotosolve2d_optimized, x, i, j, self._R[par_name1], self._R[par_name2]
+                    )
                 else:
                     e_vals = get_energy_evals_2d(f, x, i, j, self._R[par_name1], self._R[par_name2])
                 # Do an analytic construction of the energy as a function of theta_i and theta_j.
                 coeffs = get_coefficients_2d(e_vals, self._R[par_name1], self._R[par_name2])
-                f_reconstructed = partial(reconstructed_f_2d, coeffs=coeffs, R1=self._R[par_name1], R2=self._R[par_name2])
-                g_reconstructed = partial(reconstructed_grad_2d, coeffs=coeffs, R1=self._R[par_name1], R2=self._R[par_name2])
+                f_reconstructed = partial(
+                    reconstructed_f_2d, coeffs=coeffs, R1=self._R[par_name1], R2=self._R[par_name2]
+                )
+                g_reconstructed = partial(
+                    reconstructed_grad_2d, coeffs=coeffs, R1=self._R[par_name1], R2=self._R[par_name2]
+                )
+                # hess_reconstructed = partial(reconstructed_hess_2d, coeffs=coeffs, R1=self._R[par_name1], R2=self._R[par_name2])
+                hessp_reconstructed = partial(
+                    reconstructed_hessp_2d, coeffs=coeffs, R1=self._R[par_name1], R2=self._R[par_name2]
+                )
 
                 e_best = 10**20
                 theta1_best = 0.0
                 theta2_best = 0.0
                 # Nyquist-Shannon sampling theorem, https://arxiv.org/pdf/2409.05939
-                for theta_i in np.linspace(-np.pi, np.pi, 2*self._R[par_name1]+1):
-                    for theta_j in np.linspace(-np.pi, np.pi, 2*self._R[par_name2]+1):
-                        res: Any = scipy.optimize.minimize(f_reconstructed, x0=np.array([theta_i, theta_j]), jac=g_reconstructed, method="BFGS", tol=1e-12)
+                for theta_i in np.linspace(-np.pi, np.pi, 2 * self._R[par_name1] + 1):
+                    for theta_j in np.linspace(-np.pi, np.pi, 2 * self._R[par_name2] + 1):
+                        # res: Any = scipy.optimize.minimize(f_reconstructed, x0=np.array([theta_i, theta_j]), jac=g_reconstructed, hess=hess_reconstructed, method="trust-exact", tol=1e-12)
+                        res: Any = scipy.optimize.minimize(
+                            f_reconstructed,
+                            x0=np.array([theta_i, theta_j]),
+                            jac=g_reconstructed,
+                            hessp=hessp_reconstructed,
+                            method="trust-ncg",
+                            tol=1e-12,
+                        )
                         if res.fun < e_best:
                             e_best = res.fun
                             theta1_best = res.x[0]
@@ -484,9 +508,10 @@ class RotoSolve2D:
         return res
 
 
-def get_energy_evals_2d(f: Callable[[list[float]], float], x: list[float], idx1: int, idx2: int, R1: int, R2: int) -> list[float]:
-    """
-    """
+def get_energy_evals_2d(
+    f: Callable[[list[float]], float], x: list[float], idx1: int, idx2: int, R1: int, R2: int
+) -> list[float]:
+    """ """
     e_vals = []
     x = x.copy()
 
@@ -502,8 +527,7 @@ def get_energy_evals_2d(f: Callable[[list[float]], float], x: list[float], idx1:
 
 
 def get_coefficients_2d(energy_vals: list[float], R1: int, R2: int) -> np.ndarray:
-    r"""
-    """
+    r""" """
     # Number of unique positive differences.
     upd1 = 2 * R1 + 1
     upd2 = 2 * R2 + 1
@@ -537,14 +561,12 @@ def get_coefficients_2d(energy_vals: list[float], R1: int, R2: int) -> np.ndarra
 
 @nb.jit(nopython=True)
 def reconstructed_f_2d(xy_vals: np.ndarray, coeffs: np.ndarray, R1: int, R2: int) -> float:
-    r"""
-    """
+    r""" """
     # Number of unique positive differences.
     upd1 = 2 * R1 + 1
     upd2 = 2 * R2 + 1
     # Evaluation of function in external values.
-    x = xy_vals[0]
-    y = xy_vals[1]
+    x, y = xy_vals
     v1 = np.zeros(upd1)
     v2 = np.zeros(upd2)
     v1[0] = 1
@@ -557,40 +579,138 @@ def reconstructed_f_2d(xy_vals: np.ndarray, coeffs: np.ndarray, R1: int, R2: int
         v2[i] = np.cos(i * y)
         v2[R2 + i] = np.sin(i * y)
 
-    v_kron = np.kron(v1, v2)
-    return np.dot(coeffs, v_kron)
+    E = 0.0
+    idx = 0
+    for i in range(upd1):
+        for j in range(upd2):
+            E += coeffs[idx] * v1[i] * v2[j]
+            idx += 1
+    return E
 
 
 @nb.jit(nopython=True)
-def reconstructed_grad_2d(xy_vals: np.ndarray, coeffs: np.ndarray, R1: int, R2: int) -> tuple[float, float]:
-    r"""
-    """
+def reconstructed_grad_2d(xy_vals: np.ndarray, coeffs: np.ndarray, R1: int, R2: int) -> np.ndarray:
+    r""" """
     # Number of unique positive differences.
     upd1 = 2 * R1 + 1
     upd2 = 2 * R2 + 1
     # Evaluation of function in external values.
-    x = xy_vals[0]
-    y = xy_vals[1]
+    x, y = xy_vals
     v1 = np.zeros(upd1)
     v2 = np.zeros(upd2)
     v1_grad = np.zeros(upd1)
     v2_grad = np.zeros(upd2)
     v1[0] = 1
-    v1_grad[0] = 0
     for i in range(1, R1 + 1):
         v1[i] = np.cos(i * x)
         v1[R1 + i] = np.sin(i * x)
-        v1_grad[i] = -i*np.sin(i * x)
-        v1_grad[R1 + i] = i*np.cos(i * x)
+        v1_grad[i] = -i * np.sin(i * x)
+        v1_grad[R1 + i] = i * np.cos(i * x)
 
     v2[0] = 1
-    v2_grad[0] = 0
     for i in range(1, R2 + 1):
         v2[i] = np.cos(i * y)
         v2[R2 + i] = np.sin(i * y)
-        v2_grad[i] = -i*np.sin(i * y)
-        v2_grad[R2 + i] = i*np.cos(i * y)
+        v2_grad[i] = -i * np.sin(i * y)
+        v2_grad[R2 + i] = i * np.cos(i * y)
 
-    v1_kron = np.kron(v1_grad, v2)
-    v2_kron = np.kron(v1, v2_grad)
-    return np.dot(coeffs, v1_kron), np.dot(coeffs, v2_kron)
+    grad1 = 0.0
+    grad2 = 0.0
+    idx = 0
+    for i in range(upd1):
+        for j in range(upd2):
+            grad1 += coeffs[idx] * v1_grad[i] * v2[j]
+            grad2 += coeffs[idx] * v1[i] * v2_grad[j]
+            idx += 1
+    return np.array([grad1, grad2])
+
+
+@nb.jit(nopython=True)
+def reconstructed_hess_2d(xy_vals: np.ndarray, coeffs: np.ndarray, R1: int, R2: int) -> np.ndarray:
+    r""" """
+    # Number of unique positive differences.
+    upd1 = 2 * R1 + 1
+    upd2 = 2 * R2 + 1
+    # Evaluation of function in external values.
+    x, y = xy_vals
+    v1 = np.zeros(upd1)
+    v2 = np.zeros(upd2)
+    v1_grad = np.zeros(upd1)
+    v2_grad = np.zeros(upd2)
+    v1_grad2 = np.zeros(upd1)
+    v2_grad2 = np.zeros(upd2)
+    v1[0] = 1
+    for i in range(1, R1 + 1):
+        v1[i] = np.cos(i * x)
+        v1[R1 + i] = np.sin(i * x)
+        v1_grad[i] = -i * np.sin(i * x)
+        v1_grad[R1 + i] = i * np.cos(i * x)
+        v1_grad2[i] = -(i**2) * np.cos(i * x)
+        v1_grad2[R1 + i] = -(i**2) * np.sin(i * x)
+
+    v2[0] = 1
+    for i in range(1, R2 + 1):
+        v2[i] = np.cos(i * y)
+        v2[R2 + i] = np.sin(i * y)
+        v2_grad[i] = -i * np.sin(i * y)
+        v2_grad[R2 + i] = i * np.cos(i * y)
+        v2_grad2[i] = -(i**2) * np.cos(i * y)
+        v2_grad2[R1 + i] = -(i**2) * np.sin(i * y)
+
+    hess = np.zeros((2, 2))
+    idx = 0
+    for i in range(upd1):
+        for j in range(upd2):
+            hess[0, 0] += coeffs[idx] * v1_grad2[i] * v2[j]
+            hess[0, 1] += coeffs[idx] * v1_grad[i] * v2_grad[j]
+            hess[1, 1] += coeffs[idx] * v1[i] * v2_grad2[j]
+            idx += 1
+    hess[1, 0] = hess[0, 1]
+    return hess
+
+
+@nb.jit(nopython=True)
+def reconstructed_hessp_2d(
+    xy_vals: np.ndarray, vec: np.ndarray, coeffs: np.ndarray, R1: int, R2: int
+) -> np.ndarray:
+    r""" """
+    # Number of unique positive differences.
+    upd1 = 2 * R1 + 1
+    upd2 = 2 * R2 + 1
+    # Evaluation of function in external values.
+    x, y = xy_vals
+    vec1, vec2 = vec
+    v1 = np.zeros(upd1)
+    v2 = np.zeros(upd2)
+    v1_grad = np.zeros(upd1)
+    v2_grad = np.zeros(upd2)
+    v1_grad2 = np.zeros(upd1)
+    v2_grad2 = np.zeros(upd2)
+    v1[0] = 1
+    for i in range(1, R1 + 1):
+        v1[i] = np.cos(i * x)
+        v1[R1 + i] = np.sin(i * x)
+        v1_grad[i] = -i * np.sin(i * x)
+        v1_grad[R1 + i] = i * np.cos(i * x)
+        v1_grad2[i] = -(i**2) * np.cos(i * x)
+        v1_grad2[R1 + i] = -(i**2) * np.sin(i * x)
+
+    v2[0] = 1
+    for i in range(1, R2 + 1):
+        v2[i] = np.cos(i * y)
+        v2[R2 + i] = np.sin(i * y)
+        v2_grad[i] = -i * np.sin(i * y)
+        v2_grad[R2 + i] = i * np.cos(i * y)
+        v2_grad2[i] = -(i**2) * np.cos(i * y)
+        v2_grad2[R1 + i] = -(i**2) * np.sin(i * y)
+
+    hessp1 = 0.0
+    hessp2 = 0.0
+    idx = 0
+    for i in range(upd1):
+        for j in range(upd2):
+            v1v2grad = v1_grad[i] * v2_grad[j]
+            hessp1 += coeffs[idx] * (v1_grad2[i] * v2[j] * vec1 + v1v2grad * vec2)
+            hessp2 += coeffs[idx] * (v1v2grad * vec1 + v1[i] * v2_grad2[j] * vec2)
+            idx += 1
+    return np.array([hessp1, hessp2])
