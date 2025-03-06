@@ -538,7 +538,7 @@ class UpsStructure:
         self.grad_param_R: dict[str, int] = {}
         self.param_names: list[str] = []
 
-    def create_tups(self, num_active_orbs: int, ansatz_options: dict[str, Any]) -> None:
+    def create_tups(self, num_active_orbs: int, ansatz_options: dict[str, Any], num_elec: int) -> None:
         """Create tUPS ansatz.
 
         #. 10.1103/PhysRevResearch.6.023300 (tUPS)
@@ -548,16 +548,20 @@ class UpsStructure:
             * n_layers [int]: Number of layers.
             * do_qnp [bool]: Do QNP tiling. (default: False)
             * skip_last_singles [bool]: Skip last layer of singles operators. (default: False)
+            * reverse_layering [bool]: Reverse the brickwall layering. (default: False)
+            * assume_hf_reference [bool]: Assume Hartree-Fock determinant reference. (default: False)
+                                          This is used to remove parameters that does not do anything.
 
         Args:
             num_active_orbs: Number of spatial active orbitals.
             ansatz_options: Ansatz options.
+            num_elec: Number of active electrons.
 
         Returns:
             tUPS ansatz.
         """
         # Options
-        valid_options = ("n_layers", "do_qnp", "skip_last_singles")
+        valid_options = ("n_layers", "do_qnp", "skip_last_singles", "reverse_layering", "assume_hf_reference")
         for option in ansatz_options:
             if option not in valid_options:
                 raise ValueError(f"Got unknown option for tUPS, {option}. Valid options are: {valid_options}")
@@ -572,9 +576,42 @@ class UpsStructure:
             skip_last_singles = ansatz_options["skip_last_singles"]
         else:
             skip_last_singles = False
+        if "reverse_layering" in ansatz_options.keys():
+            do_reverse_layering = ansatz_options["reverse_layering"]
+        else:
+            do_reverse_layering = False
+        if "assume_hf_reference" in ansatz_options.keys():
+            assume_hf_reference = ansatz_options["assume_hf_reference"]
+            if assume_hf_reference:
+                if num_elec % 2 != 0:
+                    raise ValueError(
+                        f"Cannot assume HF reference for uneven number of electrons, got {num_elec} electrons"
+                    )
+                if num_elec % 4 == 0:
+                    print("Doing reversed layering")
+                    do_reverse_layering = True
+                correlating_orbitals = np.zeros(2 * num_active_orbs)
+                correlating_orbitals[:num_elec] = 1
+        else:
+            assume_hf_reference = False
+        if do_reverse_layering:
+            start_first = 1
+            start_second = 0
+        else:
+            start_first = 0
+            start_second = 1
         # Layer loop
         for n in range(n_layers):
-            for p in range(0, num_active_orbs - 1, 2):  # first column of brick-wall
+            for p in range(start_first, num_active_orbs - 1, 2):  # first column of brick-wall
+                if assume_hf_reference:
+                    if (
+                        np.sum(correlating_orbitals[2 * p : 2 * p + 4]) == 0
+                        or np.sum(correlating_orbitals[2 * p : 2 * p + 4]) == 4
+                    ):
+                        # All of the orbitals are either unccupied or occupied.
+                        # Hence no particle conserving parameterization will change anything
+                        continue
+                    correlating_orbitals[2 * p : 2 * p + 4] = -100
                 if not do_qnp:
                     # First single
                     self.excitation_operator_type.append("sa_single")
@@ -599,7 +636,16 @@ class UpsStructure:
                 self.grad_param_R[f"p{self.n_params:09d}"] = 4
                 self.param_names.append(f"p{self.n_params:09d}")
                 self.n_params += 1
-            for p in range(1, num_active_orbs - 1, 2):  # second column of brick-wall
+            for p in range(start_second, num_active_orbs - 1, 2):  # second column of brick-wall
+                if assume_hf_reference:
+                    if (
+                        np.sum(correlating_orbitals[2 * p : 2 * p + 4]) == 0
+                        or np.sum(correlating_orbitals[2 * p : 2 * p + 4]) == 4
+                    ):
+                        # All of the orbitals are either unccupied or occupied.
+                        # Hence no particle conserving parameterization will change anything
+                        continue
+                    correlating_orbitals[2 * p : 2 * p + 4] = -100
                 if not do_qnp:
                     # First single
                     self.excitation_operator_type.append("sa_single")

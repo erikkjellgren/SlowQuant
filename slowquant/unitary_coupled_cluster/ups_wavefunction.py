@@ -211,10 +211,10 @@ class WaveFunctionUPS:
         # Construct UPS Structure
         self.ups_layout = UpsStructure()
         if ansatz.lower() == "tups":
-            self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
+            self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options, self.num_active_elec)
         elif ansatz.lower() == "qnp":
             self.ansatz_options["do_qnp"] = True
-            self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
+            self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options, self.num_active_elec)
         elif ansatz.lower() == "fuccsd":
             self.ansatz_options["S"] = True
             self.ansatz_options["D"] = True
