@@ -135,7 +135,7 @@ class Optimizers:
                 res = optimizer.minimize(self.fun, x0)
         elif self.method in ("rotosolve_2d",):
             if not isinstance(extra_options, dict):
-                raise TypeError("extra_options is not set, but is required for RotoSolve")
+                raise TypeError("extra_options is not set, but is required for RotoSolve2D")
             if "R" not in extra_options:
                 raise ValueError(f"Expected option 'R' in extra_options, got {extra_options.keys()}")
             if "param_names" not in extra_options:
@@ -424,14 +424,27 @@ class RotoSolve2D:
         fails = 0
         res = Result()
 
-        num_of_params = len(self._param_names)
+        param_option = "shuffled_sweep"
 
+        num_of_params = len(self._param_names)
         for _ in range(self.max_iterations):
 
-            # Generate all possible pairs (i, j, R(i), R(j)) where i < j.
-            par_pairs = [(i, j, self._param_names[i], self._param_names[j]) for i in range(0, num_of_params)
-                     for j in range(i + 1, num_of_params)]
-            np.random.shuffle(par_pairs)
+
+            if param_option == "random_pairs":
+                i, j = np.random.choice(num_of_params, size=2, replace=False)
+                par_pairs = [(i, j, self._param_names[i], self._param_names[j])]
+            elif param_option == "ordered_sweep":
+                # Generate all possible pairs (i, j, R(i), R(j)) where i < j.
+                par_pairs = [(i, j, self._param_names[i], self._param_names[j]) for i in range(0, num_of_params)
+                        for j in range(i + 1, num_of_params)]
+            # Is there an elegant way to do this without needing to check in each iteration?
+            elif param_option == "shuffled_sweep":
+                par_pairs = [(i, j, self._param_names[i], self._param_names[j]) for i in range(0, num_of_params)
+                        for j in range(i + 1, num_of_params)]
+                np.random.shuffle(par_pairs)
+            else:
+                raise ValueError(f"Unknown param_option: {param_option}")
+
 
             for i, j, par_name1, par_name2 in par_pairs:
                 # Get the energy for specific values of theta_i and theta_j, defined by the _R parameter.
