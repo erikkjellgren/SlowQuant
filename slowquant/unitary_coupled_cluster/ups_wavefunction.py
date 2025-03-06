@@ -957,6 +957,15 @@ class WaveFunctionUPS:
                     "f_rotosolve_optimized": self._calc_energy_rotosolve_optimization,
                 },
             )
+        elif optimizer_name.lower() == "rotosolve_2d":
+            res = optimizer.minimize(
+                parameters,
+                extra_options={
+                    "R": self.ups_layout.grad_param_R,
+                    "param_names": self.ups_layout.param_names,
+                    "f_rotosolve_optimized": self._calc_energy_rotosolve_optimization,
+                },
+            )
         else:
             res = optimizer.minimize(
                 parameters,
