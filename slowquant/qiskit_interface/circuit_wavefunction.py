@@ -165,7 +165,7 @@ class WaveFunctionCircuit:
                 self._kappa.append(0.0)
                 self._kappa_old.append(0.0)
                 self.kappa_idx.append((p, q))
-        # HF like orbital rotation indecies
+        # HF like orbital rotation indices
         self.kappa_hf_like_idx = []
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
@@ -318,7 +318,7 @@ class WaveFunctionCircuit:
 
     @property
     def rdm1(self) -> np.ndarray:
-        r"""Calcuate one-electron reduced density matrix.
+        r"""Calculate one-electron reduced density matrix.
 
         The trace condition is enforced:
 
@@ -350,7 +350,7 @@ class WaveFunctionCircuit:
 
     @property
     def rdm2(self) -> np.ndarray:
-        r"""Calcuate two-electron reduced density matrix.
+        r"""Calculate two-electron reduced density matrix.
 
         The trace condition is enforced:
 
@@ -409,7 +409,7 @@ class WaveFunctionCircuit:
 
     @property
     def rdm3(self) -> np.ndarray:
-        r"""Calcuate three-electron reduced density matrix.
+        r"""Calculate three-electron reduced density matrix.
 
         The trace condition is enforced:
 
@@ -482,7 +482,7 @@ class WaveFunctionCircuit:
 
     @property
     def rdm4(self) -> np.ndarray:
-        r"""Calcuate four-electron reduced density matrix.
+        r"""Calculate four-electron reduced density matrix.
 
         The trace condition is enforced:
 
@@ -740,7 +740,7 @@ class WaveFunctionCircuit:
         if rdm_order > 4:
             raise ValueError(f"Precalculation only supported up to order 4 got {rdm_order}")
         if rdm_order < 1:
-            raise ValueError(f"Precalculation need atleast an order of 1 got {rdm_order}")
+            raise ValueError(f"Precalculation need at least an order of 1 got {rdm_order}")
         cumulated_paulis = None
         if rdm_order >= 1:
             self._rdm1 = None
@@ -933,7 +933,7 @@ class WaveFunctionCircuit:
                     self._kappa[i] = 0.0
                     self._kappa_old[i] = 0.0
             else:
-                # If theres is no orbital optimization, then the algorithm is already converged.
+                # If there is no orbital optimization, then the algorithm is already converged.
                 e_new = res.fun
                 if orbital_optimization and len(self.kappa) == 0:
                     print(
@@ -1127,7 +1127,7 @@ def _get_energy_evals_for_grad(
 
     Args:
         operator: Operator which the derivative is with respect to.
-        parameters: Paramters.
+        parameters: Parameters.
         idx: Parameter idx.
         R: Parameter to control we get the needed points.
 

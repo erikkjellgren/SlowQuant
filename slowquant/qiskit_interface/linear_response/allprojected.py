@@ -127,7 +127,7 @@ class quantumLR(quantumLRBaseClass):
         self,
         do_gradients: bool = True,
     ) -> None:
-        """Run simulation of all projected LR matrix elements without re-using recouring matrix elements.
+        """Run simulation of all projected LR matrix elements without re-using recurring matrix elements.
 
         Args:
             do_gradients: Calculate gradients w.r.t. orbital rotations and active space excitations.

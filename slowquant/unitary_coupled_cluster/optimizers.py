@@ -39,8 +39,8 @@ class Optimizers:
             method: Optimization method.
             grad: Gradient of function.
             maxiter: Maximum iterations.
-            tol: Convergence tolerence.
-            is_silent: Supress progress output.
+            tol: Convergence tolerance.
+            is_silent: Suppress progress output.
         """
         self.fun = fun
         self.grad = grad
@@ -80,7 +80,7 @@ class Optimizers:
             * param_names Sequence[str]: Names of parameters needed for Rotosolve.
 
         Args:
-            x0: Starting value of changable parameters.
+            x0: Starting value of changeable parameters.
             extra_options: Extra options for optimizers.
         """
         self._start = time.time()
@@ -144,7 +144,7 @@ class Optimizers:
 class RotoSolve:
     r"""Rotosolve optimizer.
 
-    Implemenation of Rotosolver assuming three eigenvalues for generators.
+    Implementation of Rotosolver assuming three eigenvalues for generators.
     This works for fermionic generators of the type:
 
     .. math::
@@ -155,14 +155,14 @@ class RotoSolve:
     .. math::
         \hat{G}_{pqrs} = \hat{a}^\dagger_p \hat{a}^\dagger_q \hat{a}_r \hat{a}_s - \hat{a}^\dagger_s \hat{a}^\dagger_r \hat{a}_p \hat{a}_q
 
-    Rotosolve works by exactly reconstrucing the energy function in a single parameter:
+    Rotosolve works by exactly reconstructing the energy function in a single parameter:
 
     .. math::
         E(x) = \frac{\sin\left(\frac{2R+1}{2}x\right)}{2R+1}\sum_{\mu=-R}^{R}E(x_\mu)\frac{(-1)^\mu}{\sin\left(\frac{x - x_\mu}{2}\right)}
 
     With :math:`R` being the number of different positive differences between eigenvalues, and :math:`x_\mu=\frac{2\mu}{2R+1}\pi`.
 
-    After the function :math:`E(x)` have been reconstruced the global minima of the function can be found classically.
+    After the function :math:`E(x)` have been reconstructed the global minima of the function can be found classically.
 
     #. 10.22331/q-2021-01-28-391, Algorithm 1
     #. 10.22331/q-2022-03-30-677, Eq. (57)
@@ -182,7 +182,7 @@ class RotoSolve:
             R: R parameter used for the function reconstruction.
             param_names: Names of parameters, used to index R.
             maxiter: Maximum number of iterations (sweeps).
-            tol: Convergence tolerence.
+            tol: Convergence tolerance.
             callback: Callback function, takes only x (parameters) as an argument.
         """
         self._callback = callback
@@ -196,8 +196,8 @@ class RotoSolve:
         """Run minimization.
 
         Args:
-            f: Function to be minimzed, can only take one argument.
-            x: Changable parameters of f.
+            f: Function to be minimized, can only take one argument.
+            x: Changeable parameters of f.
 
         Returns:
             Minimization results.

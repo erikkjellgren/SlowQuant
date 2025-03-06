@@ -531,7 +531,7 @@ class UpsStructure:
     __slots__ = ("excitation_indices", "excitation_operator_type", "n_params", "grad_param_R", "param_names")
 
     def __init__(self) -> None:
-        """Intialize the unitary product state ansatz structure."""
+        """Initialize the unitary product state ansatz structure."""
         self.excitation_indices: list[tuple[int, ...]] = []
         self.excitation_operator_type: list[str] = []
         self.n_params: int = 0

@@ -192,7 +192,7 @@ class quantumLR(quantumLRBaseClass):
         do_rdm: bool = True,
         do_gradients: bool = True,
     ) -> None:
-        """Run simulation of projected LR matrix elements without re-using recourring matrix elements.
+        """Run simulation of projected LR matrix elements without re-using recurring matrix elements.
 
         Args:
             do_rdm: Use RDMs for QQ part.

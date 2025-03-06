@@ -226,7 +226,7 @@ class LinearResponseBaseClass:
         Args:
             dipole_integrals: Dipole integrals (x,y,z) in AO basis.
 
-        Rerturns:
+        Returns:
             Oscillator Strength.
         """
         transition_dipoles = self.get_transition_dipole(dipole_integrals)

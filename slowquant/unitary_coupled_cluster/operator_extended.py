@@ -28,7 +28,7 @@ def get_indexing_extended(
     num_active_elec_beta: int,
     order: int,
 ) -> tuple[list[int], dict[int, int]]:
-    r"""Get indexing between index and determiant, extended to include complete active-space on-top of a full space singles or full space singles and doubles.
+    r"""Get indexing between index and determinant, extended to include complete active-space on-top of a full space singles or full space singles and doubles.
 
     Needed for full-space operators (e.g. orbital rotations between spaces) that act on the reference before the unitary ansatz is applied (e.g. $Uq\left|CSF\right>$) .
     This leads to a change in particle number in the active space and precludes the standard indexing formalism that is based on operator folding into the active space.
@@ -193,7 +193,7 @@ def generate_singles(
         if i != num_inactive_orbs:  # excite out
             inactive[i] = 0
         # loop over excitations into virtual orbs
-        # add loop index for not changing virtal orb
+        # add loop index for not changing virtual orb
         for j in range(num_virtual_orbs + 1):
             if j != num_virtual_orbs:  # excite in
                 virtual[j] = 1
@@ -232,7 +232,7 @@ def generate_doubles(
             if i2 != num_inactive_orbs:
                 inactive[i2] = 0
             # loop over excitations into virtual orbs
-            # add loop index for not changing virtal orb
+            # add loop index for not changing virtual orb
             for j in range(num_virtual_orbs + 1):
                 if j != num_virtual_orbs:
                     virtual[j] = 1
@@ -330,7 +330,7 @@ def propagate_state_extended(
     Args:
         operators: List of operators.
         state: State.
-        idx2det: Index to determiant mapping.
+        idx2det: Index to determinant mapping.
         det2idx: Determinant to index mapping.
         num_inactive_orbs: Number of inactive spatial orbitals.
         num_active_orbs: Number of active spatial orbitals.

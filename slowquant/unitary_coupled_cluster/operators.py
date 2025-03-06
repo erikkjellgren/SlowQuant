@@ -122,7 +122,7 @@ def G1(i: int, a: int, return_anti_hermitian: bool = False) -> FermionicOperator
         a: Spin orbital index.
 
     Returns:
-        One-elecetron excitation operator.
+        One-electron excitation operator.
     """
     op = FermionicOperator(a_op_spin(a, dagger=True), 1) * FermionicOperator(a_op_spin(i, dagger=False), 1)
     if return_anti_hermitian:
@@ -143,7 +143,7 @@ def G2(i: int, j: int, a: int, b: int, return_anti_hermitian: bool = False) -> F
         b: Spin orbital index.
 
     Returns:
-        Two-elecetron excitation operator.
+        Two-electron excitation operator.
     """
     op = (
         FermionicOperator(a_op_spin(a, dagger=True), 1)
@@ -173,7 +173,7 @@ def G3(
         c: Spin orbital index.
 
     Returns:
-        Three-elecetron excitation operator.
+        Three-electron excitation operator.
     """
     op = (
         FermionicOperator(a_op_spin(a, dagger=True), 1)
@@ -207,7 +207,7 @@ def G4(
         d: Spin orbital index.
 
     Returns:
-        Four-elecetron excitation operator.
+        Four-electron excitation operator.
     """
     op = (
         FermionicOperator(a_op_spin(a, dagger=True), 1)
@@ -255,7 +255,7 @@ def G5(
         e: Spin orbital index.
 
     Returns:
-        Five-elecetron excitation operator.
+        Five-electron excitation operator.
     """
     op = (
         FermionicOperator(a_op_spin(a, dagger=True), 1)
@@ -310,7 +310,7 @@ def G6(
         f: Spin orbital index.
 
     Returns:
-        Six-elecetron excitation operator.
+        Six-electron excitation operator.
     """
     op = (
         FermionicOperator(a_op_spin(a, dagger=True), 1)
@@ -342,7 +342,7 @@ def G1_sa(i: int, a: int, return_anti_hermitian: bool = False) -> FermionicOpera
         a: Spatial orbital index.
 
     Returns:
-        Singlet one-elecetron spin-adapted excitation operator.
+        Singlet one-electron spin-adapted excitation operator.
     """
     op = 2 ** (-1 / 2) * Epq(a, i)
     if return_anti_hermitian:
@@ -363,7 +363,7 @@ def G2_1_sa(i: int, j: int, a: int, b: int, return_anti_hermitian: bool = False)
         b: Spatial orbital index.
 
     Returns:
-        First singlet two-elecetron spin-adapted excitation operator.
+        First singlet two-electron spin-adapted excitation operator.
     """
     fac = 1
     if a == b:
@@ -389,7 +389,7 @@ def G2_2_sa(i: int, j: int, a: int, b: int, return_anti_hermitian: bool = False)
         b: Spatial orbital index.
 
     Returns:
-        Second singlet two-elecetron spin-adapted excitation operator.
+        Second singlet two-electron spin-adapted excitation operator.
     """
     op = 1 / (2 * 3 ** (1 / 2)) * (Epq(a, i) * Epq(b, j) - Epq(a, j) * Epq(b, i))
     if return_anti_hermitian:
@@ -442,7 +442,7 @@ def hamiltonian_0i_0a(
         num_active_orbs: Number of active orbitals in spatial basis.
 
     Returns:
-        Energy Hamilonian fermionic operator.
+        Energy Hamiltonian fermionic operator.
     """
     hamiltonian_operator = FermionicOperator({}, {})
     # Inactive one-electron
@@ -500,7 +500,7 @@ def hamiltonian_1i_1a(
         num_virtual_orbs: Number of virtual orbitals in spatial basis.
 
     Returns:
-        Modified Hamilonian fermionic operator.
+        Modified Hamiltonian fermionic operator.
     """
     num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
     hamiltonian_operator = FermionicOperator({}, {})
@@ -569,7 +569,7 @@ def hamiltonian_2i_2a(
         num_virtual_orbs: Number of virtual orbitals in spatial basis.
 
     Returns:
-        Modified Hamilonian fermionic operator.
+        Modified Hamiltonian fermionic operator.
     """
     num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
     hamiltonian_operator = FermionicOperator({}, {})

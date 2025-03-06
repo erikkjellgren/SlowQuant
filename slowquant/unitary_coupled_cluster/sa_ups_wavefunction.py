@@ -193,7 +193,7 @@ class WaveFunctionSAUPS:
                 self._kappa_old.append(0.0)
                 self.kappa_idx.append((p, q))
                 self.kappa_idx_dagger.append((q, p))
-        # HF like orbital rotation indecies
+        # HF like orbital rotation indices
         self.kappa_hf_like_idx = []
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
@@ -234,7 +234,7 @@ class WaveFunctionSAUPS:
                 else:
                     if abs(coeff_i @ coeff_j) > 10**-10:
                         raise ValueError(
-                            f"state {i} and {j} are not otrhogonal got overlap of {coeff_i @ coeff_j}"
+                            f"state {i} and {j} are not orthogonal got overlap of {coeff_i @ coeff_j}"
                         )
         # Construct UPS Structure
         self.ups_layout = UpsStructure()
@@ -542,7 +542,7 @@ class WaveFunctionSAUPS:
                 print("--------Ansatz optimization")
                 print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
             if optimizer_name.lower() in ("rotosolve",):
-                # For RotoSolve type solvers the energy per state is needed in the optimzation,
+                # For RotoSolve type solvers the energy per state is needed in the optimization,
                 # instead of only the state-averaged energy.
                 energy_theta = partial(
                     self._calc_energy_optimization,
@@ -607,7 +607,7 @@ class WaveFunctionSAUPS:
                     self._kappa[i] = 0.0
                     self._kappa_old[i] = 0.0
             else:
-                # If theres is no orbital optimization, then the algorithm is already converged.
+                # If there is no orbital optimization, then the algorithm is already converged.
                 e_new = res.fun
                 if orbital_optimization and len(self.kappa) == 0:
                     print(
@@ -694,7 +694,7 @@ class WaveFunctionSAUPS:
         else:
             parameters = self.thetas
         if optimizer_name.lower() in ("rotosolve",):
-            # For RotoSolve type solvers the energy per state is needed in the optimzation,
+            # For RotoSolve type solvers the energy per state is needed in the optimization,
             # instead of only the state-averaged energy.
             energy = partial(
                 self._calc_energy_optimization,
