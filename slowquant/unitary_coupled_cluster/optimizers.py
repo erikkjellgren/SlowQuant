@@ -149,9 +149,9 @@ class Optimizers:
                 tol=self.tol,
                 callback=print_progress,
             )
-            if "f_rotosolve_optimized" in extra_options:
+            if "f_rotosolve2d_optimized" in extra_options:
                 res = optimizer.minimize(
-                    self.fun, x0, f_rotosolve_optimized=extra_options["f_rotosolve_optimized"]
+                    self.fun, x0, f_rotosolve2d_optimized=extra_options["f_rotosolve2d_optimized"]
                 )
             else:
                 res = optimizer.minimize(self.fun, x0)
@@ -316,6 +316,22 @@ def get_energy_evals_optimized(
     return f(x, theta_diffs, idx)
 
 
+def get_energy_evals2d_optimized(
+        f: Callable[[list[float], list[float], list[float], int, int], list[float]], x: list[float], idx1: int, idx2: int, R1: int, R2: int,
+) -> list[float]:
+    """
+    """
+    if idx1 <= idx2:
+        raise ValueError(f"The first index must be larger than the second index, got idx1,idx2={idx1},{idx2}")
+    theta1_diffs = []
+    theta2_diffs = []
+    for mu1 in range(-R1, R1 + 1):
+        theta1_diffs.append(2 * mu1 / (2 * R1 + 1) * np.pi)
+    for mu2 in range(-R2, R2 + 1):
+        theta2_diffs.append(2 * mu2 / (2 * R2 + 1) * np.pi)
+    return f(x, theta1_diffs, theta2_diffs, idx1, idx2)
+
+
 @nb.jit(nopython=True)
 def reconstructed_f(x_vals: np.ndarray, energy_vals: list[float], R: int) -> np.ndarray:
     r"""Reconstructed the function in terms of sin-functions.
@@ -353,30 +369,7 @@ def reconstructed_f(x_vals: np.ndarray, energy_vals: list[float], R: int) -> np.
 
 
 class RotoSolve2D:
-    r"""Rotosolve optimizer.
-
-    Implemenation of Rotosolver assuming three eigenvalues for generators.
-    This works for fermionic generators of the type:
-
-    .. math::
-        \hat{G}_{pq} = \hat{a}^\dagger_p \hat{a}_q - \hat{a}_q^\dagger \hat{a}_p
-
-    and,
-
-    .. math::
-        \hat{G}_{pqrs} = \hat{a}^\dagger_p \hat{a}^\dagger_q \hat{a}_r \hat{a}_s - \hat{a}^\dagger_s \hat{a}^\dagger_r \hat{a}_p \hat{a}_q
-
-    Rotosolve works by exactly reconstrucing the energy function in a single parameter:
-
-    .. math::
-        E(x) = \frac{\sin\left(\frac{2R+1}{2}x\right)}{2R+1}\sum_{\mu=-R}^{R}E(x_\mu)\frac{(-1)^\mu}{\sin\left(\frac{x - x_\mu}{2}\right)}
-
-    With :math:`R` being the number of different positive differences between eigenvalues, and :math:`x_\mu=\frac{2\mu}{2R+1}\pi`.
-
-    After the function :math:`E(x)` have been reconstruced the global minima of the function can be found classically.
-
-    #. 10.22331/q-2021-01-28-391, Algorithm 1
-    #. 10.22331/q-2022-03-30-677, Eq. (57)
+    r"""
     """
 
     def __init__(
@@ -407,7 +400,7 @@ class RotoSolve2D:
         self,
         f: Callable[[list[float]], float],
         x0: Sequence[float],
-        f_rotosolve_optimized: None | Callable[[list[float], list[float], int], list[float]] = None,
+        f_rotosolve2d_optimized: None | Callable[[list[float], list[float], int], list[float]] = None,
     ) -> Result:
         """Run minimization.
 
@@ -447,27 +440,34 @@ class RotoSolve2D:
 
 
             for i, j, par_name1, par_name2 in par_pairs:
+                # For the optimized classical energy calculation of rotosolve 2D,
+                # It is assumed that the first parameters index is the largest.
+                if i < j:
+                    i, j = j, i
+                    par_name1, par_name2 = par_name2, par_name1
                 # Get the energy for specific values of theta_i and theta_j, defined by the _R parameter.
-                if f_rotosolve_optimized is not None:
-                    e_vals = get_energy_evals_2d(f, x, i, j, self._R[par_name1], self._R[par_name2])
+                if f_rotosolve2d_optimized is not None:
+                    e_vals = get_energy_evals2d_optimized(f_rotosolve2d_optimized, x, i, j, self._R[par_name1], self._R[par_name2])
                 else:
                     e_vals = get_energy_evals_2d(f, x, i, j, self._R[par_name1], self._R[par_name2])
                 # Do an analytic construction of the energy as a function of theta_i and theta_j.
-                f_reconstructed = partial(reconstructed_f_2d, energy_vals=e_vals, R1=self._R[par_name1], R2=self._R[par_name2])
+                coeffs = get_coefficients_2d(e_vals, self._R[par_name1], self._R[par_name2])
+                f_reconstructed = partial(reconstructed_f_2d, coeffs=coeffs, R1=self._R[par_name1], R2=self._R[par_name2])
+                g_reconstructed = partial(reconstructed_grad_2d, coeffs=coeffs, R1=self._R[par_name1], R2=self._R[par_name2])
 
-                # Evaluate the energy in many points.
-                n_points = int(1e4)
-                xy = np.random.uniform(-np.pi, np.pi, (n_points, 2))
-                values = f_reconstructed(xy)
-                # Find the theta_i and theta_j that combined give the lowest energy.
-                min_idx = np.argmin(values)
-                theta_i, theta_j = xy[min_idx]
-                # Run an optimization on the theta_i, theta_j that gives to the lowest energy in the previous step.
-                # This is to get more digits precision in value of theta_i.
-                res = scipy.optimize.minimize(f_reconstructed, x0=np.array([theta_i, theta_j]), method="BFGS", tol=1e-12)
-
-                x[i] = res.x[0]
-                x[j] = res.x[1]
+                e_best = 10**20
+                theta1_best = 0.0
+                theta2_best = 0.0
+                # Nyquist-Shannon sampling theorem, https://arxiv.org/pdf/2409.05939
+                for theta_i in np.linspace(-np.pi, np.pi, 2*self._R[par_name1]+1):
+                    for theta_j in np.linspace(-np.pi, np.pi, 2*self._R[par_name2]+1):
+                        res: Any = scipy.optimize.minimize(f_reconstructed, x0=np.array([theta_i, theta_j]), jac=g_reconstructed, method="BFGS", tol=1e-12)
+                        if res.fun < e_best:
+                            e_best = res.fun
+                            theta1_best = res.x[0]
+                            theta2_best = res.x[1]
+                x[i] = theta1_best
+                x[j] = theta2_best
                 while x[i] < np.pi:
                     x[i] += 2 * np.pi
                 while x[i] > np.pi:
@@ -498,16 +498,7 @@ class RotoSolve2D:
 
 
 def get_energy_evals_2d(f: Callable[[list[float]], float], x: list[float], idx1: int, idx2: int, R1: int, R2: int) -> list[float]:
-    """Evaluate the function in all points needed for the reconstruction in Rotosolve.
-
-    Args:
-        f: Function to evaluate.
-        x: Parameters of f.
-        idx: Index of parameter to be changed.
-        R: Parameter to control how many points are needed.
-
-    Returns:
-        All needed function evaluations.
+    """
     """
     e_vals = []
     x = x.copy()
@@ -523,34 +514,9 @@ def get_energy_evals_2d(f: Callable[[list[float]], float], x: list[float], idx1:
     return e_vals  # type: ignore
 
 
-def reconstructed_f_2d(xy_vals: np.ndarray, energy_vals: list[float], R1: int, R2: int) -> np.ndarray:
-    r"""Reconstructed the function in terms of sin-functions.
-
-    .. math::
-        E(x) = \frac{\sin\left(\frac{2R+1}{2}x\right)}{2R+1}\sum_{\mu=-R}^{R}E(x_\mu)\frac{(-1)^\mu}{\sin\left(\frac{x - x_\mu}{2}\right)}
-
-    For better numerical stability the implemented form is instead:
-
-    .. math::
-        E(x) = \sum_{\mu=-R}^{R}E(x_\mu)\frac{\mathrm{sinc}\left(\frac{2R+1}{2}(x-x_\mu)\right)}{\mathrm{sinc}\left(\frac{1}{2}(x-x_\mu)\right)}
-
-    #. 10.22331/q-2022-03-30-677, Eq. (57)
-    #. https://pennylane.ai/qml/demos/tutorial_general_parshift/, 2024-03-14
-
-    Args:
-        x_vals: List of points to evaluate the function in.
-        energy_vals: Pre-calculated points of original function.
-        R: Parameter to control how many points are needed.
-
-    Returns:
-        Function value in list of points.
+def get_coefficients_2d(energy_vals: list[float], R1: int, R2: int) -> np.ndarray:
+    r"""
     """
-    # Make the format work for the SciPy optimizer.
-    if np.ndim(xy_vals) == 1:
-        xy_vals = [xy_vals]
-
-    e = np.zeros(len(xy_vals))
-
     # Number of unique positive differences.
     upd1 = 2 * R1 + 1
     upd2 = 2 * R2 + 1
@@ -578,27 +544,66 @@ def reconstructed_f_2d(xy_vals: np.ndarray, energy_vals: list[float], R1: int, R
                 v2[R2 + j] = np.sin(j * angle2_list[l])
             v_krons[row_num] = np.kron(v1, v2).T
             row_num += 1
-
     A = np.vstack(v_krons)
+    return np.linalg.lstsq(A, energy_vals)[0]
 
-    coeffs = np.linalg.lstsq(A, energy_vals)[0]
 
+@nb.jit(nopython=True)
+def reconstructed_f_2d(xy_vals: np.ndarray, coeffs: np.ndarray, R1: int, R2: int) -> float:
+    r"""
+    """
+    # Number of unique positive differences.
+    upd1 = 2 * R1 + 1
+    upd2 = 2 * R2 + 1
     # Evaluation of function in external values.
-    for j, xy in enumerate(xy_vals):
-        x = xy[0]
-        y = xy[1]
-        v1 = np.zeros((upd1, 1))
-        v2 = np.zeros((upd2, 1))
-        v1[0] = 1
-        for i in range(1, R1 + 1):
-            v1[i] = np.cos(i * x)
-            v1[R1 + i] = np.sin(i * x)
+    x = xy_vals[0]
+    y = xy_vals[1]
+    v1 = np.zeros(upd1)
+    v2 = np.zeros(upd2)
+    v1[0] = 1
+    for i in range(1, R1 + 1):
+        v1[i] = np.cos(i * x)
+        v1[R1 + i] = np.sin(i * x)
 
-        v2[0] = 1
-        for i in range(1, R2 + 1):
-            v2[i] = np.cos(i * y)
-            v2[R2 + i] = np.sin(i * y)
+    v2[0] = 1
+    for i in range(1, R2 + 1):
+        v2[i] = np.cos(i * y)
+        v2[R2 + i] = np.sin(i * y)
 
-        v_kron = np.kron(v1, v2)
-        e[j] += np.dot(coeffs, v_kron)[0]
-    return e
+    v_kron = np.kron(v1, v2)
+    return np.dot(coeffs, v_kron)
+
+
+@nb.jit(nopython=True)
+def reconstructed_grad_2d(xy_vals: np.ndarray, coeffs: np.ndarray, R1: int, R2: int) -> tuple[float, float]:
+    r"""
+    """
+    # Number of unique positive differences.
+    upd1 = 2 * R1 + 1
+    upd2 = 2 * R2 + 1
+    # Evaluation of function in external values.
+    x = xy_vals[0]
+    y = xy_vals[1]
+    v1 = np.zeros(upd1)
+    v2 = np.zeros(upd2)
+    v1_grad = np.zeros(upd1)
+    v2_grad = np.zeros(upd2)
+    v1[0] = 1
+    v1_grad[0] = 0
+    for i in range(1, R1 + 1):
+        v1[i] = np.cos(i * x)
+        v1[R1 + i] = np.sin(i * x)
+        v1_grad[i] = -i*np.sin(i * x)
+        v1_grad[R1 + i] = i*np.cos(i * x)
+
+    v2[0] = 1
+    v2_grad[0] = 0
+    for i in range(1, R2 + 1):
+        v2[i] = np.cos(i * y)
+        v2[R2 + i] = np.sin(i * y)
+        v2_grad[i] = -i*np.sin(i * y)
+        v2_grad[R2 + i] = i*np.cos(i * y)
+
+    v1_kron = np.kron(v1_grad, v2)
+    v2_kron = np.kron(v1, v2_grad)
+    return np.dot(coeffs, v1_kron), np.dot(coeffs, v2_kron)
