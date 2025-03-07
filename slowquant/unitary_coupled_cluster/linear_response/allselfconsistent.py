@@ -122,14 +122,14 @@ class LinearResponseUCC(LinearResponseBaseClass):
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
                 raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
-        H_ket = propagate_state([H_2i_2a], self.ci_coeffs, *self.index_info_extended)
+        H_ket = propagate_state([H_2i_2a], self.ci_coeffs, *self.index_info_extended, unsafe=True)
         for j, qJ in enumerate(self.q_ops):
-            UdHUqJ_ket = propagate_state(["Ud", H_2i_2a, "U", qJ], self.csf_coeffs, *self.index_info_extended)
-            UdH_ket = propagate_state(["Ud"], H_ket, *self.index_info_extended)
-            qJUdH_ket = propagate_state([qJ], UdH_ket, *self.index_info_extended)
-            qJdUdH_ket = propagate_state([qJ.dagger], UdH_ket, *self.index_info_extended)
+            UdHUqJ_ket = propagate_state(["Ud", H_2i_2a, "U", qJ], self.csf_coeffs, *self.index_info_extended, unsafe=True)
+            UdH_ket = propagate_state(["Ud"], H_ket, *self.index_info_extended, unsafe=True)
+            qJUdH_ket = propagate_state([qJ], UdH_ket, *self.index_info_extended, unsafe=True)
+            qJdUdH_ket = propagate_state([qJ.dagger], UdH_ket, *self.index_info_extended, unsafe=True)
             for i, qI in enumerate(self.q_ops[j:], j):
-                qI_ket = propagate_state([qI], self.csf_coeffs, *self.index_info_extended)
+                qI_ket = propagate_state([qI], self.csf_coeffs, *self.index_info_extended, unsafe=True)
                 # Make A
                 # <CSF| qId Ud H U qJ |CSF>
                 val = expectation_value(
@@ -160,10 +160,10 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     self.Sigma[i, j] = self.Sigma[j, i] = 1
         for j, qJ in enumerate(self.q_ops):
             UdHUq_ket = propagate_state(
-                ["Ud", self.H_1i_1a, "U", qJ], self.csf_coeffs, *self.index_info_extended
+                ["Ud", self.H_1i_1a, "U", qJ], self.csf_coeffs, *self.index_info_extended, unsafe=True
             )
             qdUdH_ket = propagate_state(
-                [qJ.dagger, "Ud", self.H_1i_1a], self.ci_coeffs, *self.index_info_extended
+                [qJ.dagger, "Ud", self.H_1i_1a], self.ci_coeffs, *self.index_info_extended, unsafe=True
             )
             for i, GI in enumerate(self.G_ops):
                 G_ket = propagate_state([GI], self.csf_coeffs, *self.index_info_extended)
@@ -272,36 +272,42 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     [mux_op_q, "U", q],
                     self.csf_coeffs,
                     *self.index_info_extended,
+                    unsafe=True,
                 )
                 q_part_x += self.Y_q_normed[i, state_number] * expectation_value(
                     self.csf_coeffs,
                     [q.dagger, "Ud", mux_op_q],
                     self.ci_coeffs,
                     *self.index_info_extended,
+                    unsafe=True,
                 )
                 q_part_y -= self.Z_q_normed[i, state_number] * expectation_value(
                     self.ci_coeffs,
                     [muy_op_q, "U", q],
                     self.csf_coeffs,
                     *self.index_info_extended,
+                    unsafe=True,
                 )
                 q_part_y += self.Y_q_normed[i, state_number] * expectation_value(
                     self.csf_coeffs,
                     [q.dagger, "Ud", muy_op_q],
                     self.ci_coeffs,
                     *self.index_info_extended,
+                    unsafe=True,
                 )
                 q_part_z -= self.Z_q_normed[i, state_number] * expectation_value(
                     self.ci_coeffs,
                     [muz_op_q, "U", q],
                     self.csf_coeffs,
                     *self.index_info_extended,
+                    unsafe=True,
                 )
                 q_part_z += self.Y_q_normed[i, state_number] * expectation_value(
                     self.csf_coeffs,
                     [q.dagger, "Ud", muz_op_q],
                     self.ci_coeffs,
                     *self.index_info_extended,
+                    unsafe=True,
                 )
             g_part_x = 0.0
             g_part_y = 0.0

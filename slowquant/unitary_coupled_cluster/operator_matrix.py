@@ -591,7 +591,7 @@ def construct_ucc_state(
         New state vector with unitaries applied.
     """
     # Build up T matrix based on excitations in ucc_struct and given thetas
-    T = get_ucc_T(thetas, ucc_struct)
+    T = get_ucc_T(thetas, ucc_struct, ci_info.space_extension_offset)
     # mv = functools.partial(
     #    _propagate_state,
     #    operators=[T],
@@ -623,6 +623,7 @@ def construct_ucc_state(
 def get_ucc_T(
     thetas: Sequence[float],
     ucc_struct: UccStructure,
+    offset: int = 0,
 ) -> FermionicOperator:
     """Construct UCC operator.
 
@@ -630,6 +631,7 @@ def get_ucc_T(
         thetas: Active-space parameters.
                Ordered as (S, D, T, ...).
         ucc_struct: UCCStructure object.
+        offset: Offset needed for extended spaces.
 
     Returns:
         UCC operator.
@@ -642,25 +644,25 @@ def get_ucc_T(
         if abs(theta) < 10**-14:
             continue
         if exc_type == "sa_single":
-            (i, a) = exc_indices
+            (i, a) = np.array(exc_indices) + offset
             T += theta * G1_sa(i, a, True)
         elif exc_type == "sa_double_1":
-            (i, j, a, b) = exc_indices
+            (i, j, a, b) = np.array(exc_indices) + offset
             T += theta * G2_1_sa(i, j, a, b, True)
         elif exc_type == "sa_double_2":
-            (i, j, a, b) = exc_indices
+            (i, j, a, b) = np.array(exc_indices) + offset
             T += theta * G2_2_sa(i, j, a, b, True)
         elif exc_type == "triple":
-            (i, j, k, a, b, c) = exc_indices
+            (i, j, k, a, b, c) = np.array(exc_indices) + offset
             T += theta * G3(i, j, k, a, b, c, True)
         elif exc_type == "quadruple":
-            (i, j, k, l, a, b, c, d) = exc_indices
+            (i, j, k, l, a, b, c, d) = np.array(exc_indices) + offset
             T += theta * G4(i, j, k, l, a, b, c, d, True)
         elif exc_type == "quintuple":
-            (i, j, k, l, m, a, b, c, d, e) = exc_indices
+            (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + offset
             T += theta * G5(i, j, k, l, m, a, b, c, d, e, True)
         elif exc_type == "sextuple":
-            (i, j, k, l, m, n, a, b, c, d, e, f) = exc_indices
+            (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + offset
             T += theta * G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
         else:
             raise ValueError(f"Got unknown excitation type, {exc_type}")
@@ -706,8 +708,7 @@ def construct_ups_state(
             theta = -theta
         if exc_type in ("sa_single",):
             A = 1  # 2**(-1/2)
-            i = exc_indices[0] + offset
-            a = exc_indices[1] + offset
+            (i, a) = np.array(exc_indices) + offset
             # Create T matrices
             Ta = G1(i * 2, a * 2, True)
             Tb = G1(i * 2 + 1, a * 2 + 1, True)
@@ -757,16 +758,10 @@ def construct_ups_state(
         elif exc_type in ("single", "double"):
             # Create T matrix
             if exc_type == "single":
-                (i, a) = exc_indices
-                i = exc_indices[0] + offset
-                a = exc_indices[1] + offset
+                (i, a) = np.array(exc_indices) + offset
                 T = G1(i, a, True)
             elif exc_type == "double":
-                (i, j, a, b) = exc_indices
-                i = exc_indices[0] + offset
-                j = exc_indices[1] + offset
-                a = exc_indices[2] + offset
-                b = exc_indices[3] + offset
+                (i, j, a, b) = np.array(exc_indices) + offset
                 T = G2(i, j, a, b, True)
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")

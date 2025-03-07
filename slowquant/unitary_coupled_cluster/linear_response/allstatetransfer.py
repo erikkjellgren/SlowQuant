@@ -102,17 +102,16 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
         grad = np.zeros(2 * len(self.G_ops))
         UdH_ket = propagate_state(
-            ["Ud", self.H_0i_0a], self.ci_coeffs, *self.index_info_extended, do_folding=False
+            ["Ud", self.H_0i_0a], self.ci_coeffs, *self.index_info_extended,
         )
         for i, op in enumerate(self.G_ops):
-            G_ket = propagate_state([op], self.csf_coeffs, *self.index_info_extended, do_folding=False)
+            G_ket = propagate_state([op], self.csf_coeffs, *self.index_info_extended)
             # - <0| H U G |CSF>
             grad[i] = -expectation_value(
                 UdH_ket,
                 [],
                 G_ket,
                 *self.index_info_extended,
-                do_folding=False,
             )
             # <CSF| Gd Ud H |0>
             grad[i + len(self.G_ops)] = expectation_value(
@@ -120,7 +119,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 [],
                 UdH_ket,
                 *self.index_info_extended,
-                do_folding=False,
             )
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
@@ -131,7 +129,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 ["Ud", H_2i_2a, "U", qJ],
                 self.csf_coeffs,
                 *self.index_info_extended,
-                do_folding=False,
                 unsafe=True,
             )
             for i, qI in enumerate(self.q_ops[j:], j):
@@ -142,7 +139,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     [qI.dagger],
                     UdHUqJ,
                     *self.index_info_extended,
-                    do_folding=False,
                 )
                 if i == j:
                     val -= self.wf.energy_elec
@@ -158,7 +154,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     [GI.dagger],
                     UdHUqJ,
                     *self.index_info_extended,
-                    do_folding=False,
                 )
                 self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = val
         for j, GJ in enumerate(self.G_ops):
@@ -166,7 +161,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 ["Ud", self.H_0i_0a, "U", GJ],
                 self.csf_coeffs,
                 *self.index_info_extended,
-                do_folding=False,
             )
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
@@ -176,7 +170,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     [GI.dagger],
                     UdHUGJ,
                     *self.index_info_extended,
-                    do_folding=False,
                 )
                 if i == j:
                     val -= self.wf.energy_elec
@@ -235,7 +228,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     [mux_op_q, "U", q],
                     self.csf_coeffs,
                     *self.index_info_extended,
-                    do_folding=False,
                     unsafe=True,
                 )
                 q_part_x += self.Y_q_normed[i, state_number] * expectation_value(
@@ -243,7 +235,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     [q.dagger, "Ud", mux_op_q],
                     self.ci_coeffs,
                     *self.index_info_extended,
-                    do_folding=False,
                     unsafe=True,
                 )
                 q_part_y -= self.Z_q_normed[i, state_number] * expectation_value(
@@ -251,7 +242,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     [muy_op_q, "U", q],
                     self.csf_coeffs,
                     *self.index_info_extended,
-                    do_folding=False,
                     unsafe=True,
                 )
                 q_part_y += self.Y_q_normed[i, state_number] * expectation_value(
@@ -259,7 +249,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     [q.dagger, "Ud", muy_op_q],
                     self.ci_coeffs,
                     *self.index_info_extended,
-                    do_folding=False,
                     unsafe=True,
                 )
                 q_part_z -= self.Z_q_normed[i, state_number] * expectation_value(
@@ -267,7 +256,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     [muz_op_q, "U", q],
                     self.csf_coeffs,
                     *self.index_info_extended,
-                    do_folding=False,
                     unsafe=True,
                 )
                 q_part_z += self.Y_q_normed[i, state_number] * expectation_value(
@@ -275,7 +263,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     [q.dagger, "Ud", muz_op_q],
                     self.ci_coeffs,
                     *self.index_info_extended,
-                    do_folding=False,
                     unsafe=True,
                 )
             g_part_x = 0.0
@@ -287,42 +274,36 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     [mux_op_G, "U", G],
                     self.csf_coeffs,
                     *self.index_info_extended,
-                    do_folding=False,
                 )
                 g_part_x += self.Y_G_normed[i, state_number] * expectation_value(
                     self.csf_coeffs,
                     [G.dagger, "Ud", mux_op_G],
                     self.ci_coeffs,
                     *self.index_info_extended,
-                    do_folding=False,
                 )
                 g_part_y -= self.Z_G_normed[i, state_number] * expectation_value(
                     self.ci_coeffs,
                     [muy_op_G, "U", G],
                     self.csf_coeffs,
                     *self.index_info_extended,
-                    do_folding=False,
                 )
                 g_part_y += self.Y_G_normed[i, state_number] * expectation_value(
                     self.csf_coeffs,
                     [G.dagger, "Ud", muy_op_G],
                     self.ci_coeffs,
                     *self.index_info_extended,
-                    do_folding=False,
                 )
                 g_part_z -= self.Z_G_normed[i, state_number] * expectation_value(
                     self.ci_coeffs,
                     [muz_op_G, "U", G],
                     self.csf_coeffs,
                     *self.index_info_extended,
-                    do_folding=False,
                 )
                 g_part_z += self.Y_G_normed[i, state_number] * expectation_value(
                     self.csf_coeffs,
                     [G.dagger, "Ud", muz_op_G],
                     self.ci_coeffs,
                     *self.index_info_extended,
-                    do_folding=False,
                 )
             transition_dipoles[state_number, 0] = q_part_x + g_part_x
             transition_dipoles[state_number, 1] = q_part_y + g_part_y
