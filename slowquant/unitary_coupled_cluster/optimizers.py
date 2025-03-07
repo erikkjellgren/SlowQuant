@@ -420,6 +420,7 @@ class RotoSolve2D:
         param_option = "shuffled_sweep"
 
         num_of_params = len(self._param_names)
+        iters = 0
         for _ in range(self.max_iterations):
 
 
@@ -435,6 +436,15 @@ class RotoSolve2D:
                 par_pairs = [(i, j, self._param_names[i], self._param_names[j]) for i in range(0, num_of_params)
                         for j in range(i + 1, num_of_params)]
                 np.random.shuffle(par_pairs)
+            elif param_option == "simple_sweep":
+                if num_of_params % 2 == 0:
+                    idx_list = np.random.shuffle([i for i in range(num_of_params)])
+                    par_pairs = [(idx_list[i], idx_list[i+1], self._param_names[i], self._param_names[i+1]) for i in range(num_of_params//2)]
+                else:
+                    idx_list = [i for i in range(num_of_params)] 
+                    np.random.shuffle([i for i in range(num_of_params)])
+                    idx_list.append(idx_list[0])
+                    par_pairs = [(idx_list[i], idx_list[i+1], self._param_names[i], self._param_names[i+1]) for i in range(num_of_params//2)]
             else:
                 raise ValueError(f"Unknown param_option: {param_option}")
 
@@ -479,7 +489,8 @@ class RotoSolve2D:
                     x[j] -= 2 * np.pi
             f_tmp = f(x)
             f_new = float(np.mean(f_tmp))
-            if abs(f_best - f_new) < self.threshold:
+            iters += 1
+            if abs(f_best - f_new) < self.threshold and iters > 1000:
                 f_best = f_new
                 x_best = x.copy()
                 break
