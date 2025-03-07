@@ -1,4 +1,5 @@
 from collections.abc import Generator, Sequence
+from dataclasses import dataclass
 
 import numba as nb
 import numpy as np
@@ -20,9 +21,55 @@ from slowquant.unitary_coupled_cluster.operators import (
 from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
 
 
+@dataclass(repr=False, eq=False, match_args=False)
+class CI_Info:
+    __slots__ = (
+        "num_inactive_orbs",
+        "num_active_orbs",
+        "num_virtual_orbs",
+        "num_active_elec_alpha",
+        "num_active_elec_beta",
+        "idx2det",
+        "det2idx",
+        "space_extension_offset",
+    )
+
+    def __init__(
+        self,
+        num_inactive_orbs: int,
+        num_active_orbs: int,
+        num_virtual_orbs: int,
+        num_active_elec_alpha: int,
+        num_active_elec_beta: int,
+        idx2det: np.ndarray,
+        det2idx: dict[int, int],
+    ) -> None:
+        """
+        idx2det: Index to determinant mapping.
+        det2idx: Determinant to index mapping.
+        num_inactive_orbs: Number of inactive spatial orbitals.
+        num_active_orbs: Number of active spatial orbitals.
+        num_virtual_orbs: Number of virtual orbitals.
+        num_active_elec_alpha: Number of active alpha electrons.
+        num_active_elec_beta: Number of active beta electrons.
+        """
+        self.num_inactive_orbs = num_inactive_orbs
+        self.num_active_orbs = num_active_orbs
+        self.num_virtual_orbs = num_virtual_orbs
+        self.num_active_elec_alpha = num_active_elec_alpha
+        self.num_active_elec_beta = num_active_elec_beta
+        self.idx2det = idx2det
+        self.det2idx = det2idx
+        self.space_extension_offset = 0
+
+
 def get_indexing(
-    num_active_orbs: int, num_active_elec_alpha: int, num_active_elec_beta: int
-) -> tuple[np.ndarray, dict[int, int]]:
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+    num_active_elec_alpha: int,
+    num_active_elec_beta: int,
+) -> CI_Info:
     """Get relation between index and determinant.
 
     Args:
@@ -50,26 +97,30 @@ def get_indexing(
             idx2det.append(det)  # relate index to determinant
             det2idx[det] = idx  # relate determinant to index
             idx += 1
-    return np.array(idx2det, dtype=int), det2idx
+    return CI_Info(
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+        num_active_elec_alpha,
+        num_active_elec_beta,
+        np.array(idx2det, dtype=int),
+        det2idx,
+    )
 
 
-def build_operator_matrix(
-    op: FermionicOperator,
-    idx2det: np.ndarray,
-    det2idx: dict[int, int],
-    num_active_orbs: int,
-) -> np.ndarray:
+def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info) -> np.ndarray:
     """Build matrix representation of operator.
 
     Args:
         op: Fermionic number and spin conserving operator.
-        idx2det: Index to determinant.
-        det2idx: Determinant to index.
-        num_active_orbs: Number of active spatial orbitals.
+        ci_info: Information about the CI space.
 
     Returns:
         Matrix representation of operator.
     """
+    idx2det = ci_info.idx2det
+    det2idx = ci_info.det2idx
+    num_active_orbs = ci_info.num_active_orbs
     num_dets = len(idx2det)  # number of spin and particle conserving determinants
     ones = np.ones(num_dets)  # Used with the determinant generator to ensure no determinants are screened.
     op_mat = np.zeros((num_dets, num_dets))  # basis
@@ -106,16 +157,11 @@ def build_operator_matrix(
 def propagate_state(
     operators: list[FermionicOperator | str],
     state: np.ndarray,
-    idx2det: np.ndarray,
-    det2idx: dict[int, int],
-    num_inactive_orbs: int,
-    num_active_orbs: int,
-    num_virtual_orbs: int,
-    num_active_elec_alpha: int,
-    num_active_elec_beta: int,
+    ci_info: CI_Info,
     thetas: Sequence[float],
     wf_struct: UpsStructure | UccStructure,
     do_folding: bool = True,
+    unsafe: bool = False,
 ) -> np.ndarray:
     r"""Propagate state by applying operator.
 
@@ -129,13 +175,7 @@ def propagate_state(
     Args:
         operators: List of operators.
         state: State.
-        idx2det: Index to determinant.
-        det2idx: Determinant to index.
-        num_inactive_orbs: Number of inactive spatial orbitals.
-        num_active_orbs: Number of active spatial orbitals.
-        num_virtual_orbs: Number of active spatial orbitals.
-        num_active_elec_alpha: Number of active alpha electrons.
-        num_active_elec_beta: Number of active beta electrons.
+        ci_info: Information about the CI space.
         thetas: Active-space parameters.
                Ordered as (S, D, T, ...).
         wf_struct: wave function structure object.
@@ -144,6 +184,11 @@ def propagate_state(
     Returns:
         New state.
     """
+    idx2det = ci_info.idx2det
+    det2idx = ci_info.det2idx
+    num_inactive_orbs = ci_info.num_inactive_orbs
+    num_active_orbs = ci_info.num_active_orbs
+    num_virtual_orbs = ci_info.num_virtual_orbs
     if len(operators) == 0:
         return np.copy(state)
     new_state = np.copy(state)
@@ -165,13 +210,7 @@ def propagate_state(
             if isinstance(wf_struct, UpsStructure):
                 new_state = construct_ups_state(
                     new_state,
-                    idx2det,
-                    det2idx,
-                    num_inactive_orbs,
-                    num_active_orbs,
-                    num_virtual_orbs,
-                    num_active_elec_alpha,
-                    num_active_elec_beta,
+                    ci_info,
                     thetas,
                     wf_struct,
                     dagger=dagger,
@@ -179,13 +218,7 @@ def propagate_state(
             elif isinstance(wf_struct, UccStructure):
                 new_state = construct_ucc_state(
                     new_state,
-                    idx2det,
-                    det2idx,
-                    num_inactive_orbs,
-                    num_active_orbs,
-                    num_virtual_orbs,
-                    num_active_elec_alpha,
-                    num_active_elec_beta,
+                    ci_info,
                     thetas,
                     wf_struct,
                     dagger=dagger,
@@ -220,6 +253,9 @@ def propagate_state(
                         det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
                         # take care of phases using parity_check
                         phase_changes += (det & parity_check[orb_idx]).bit_count()
+                    if unsafe:
+                        if det not in det2idx:
+                            continue
                     tmp_state[det2idx[det]] += (
                         op_folded.factors[fermi_label] * (-1) ** phase_changes * new_state[i]
                     )  # Update value
@@ -277,13 +313,7 @@ def get_determinants(
 def propagate_state_SA(
     operators: list[FermionicOperator | str],
     state: np.ndarray,
-    idx2det: np.ndarray,
-    det2idx: dict[int, int],
-    num_inactive_orbs: int,
-    num_active_orbs: int,
-    num_virtual_orbs: int,
-    num_active_elec_alpha: int,
-    num_active_elec_beta: int,
+    ci_info: CI_Info,
     thetas: Sequence[float],
     wf_struct: UpsStructure,
     do_folding: bool = True,
@@ -300,13 +330,7 @@ def propagate_state_SA(
     Args:
         operators: List of operators.
         state: State.
-        idx2det: Index to determinant.
-        det2idx: Determinant to index.
-        num_inactive_orbs: Number of inactive spatial orbitals.
-        num_active_orbs: Number of active spatial orbitals.
-        num_virtual_orbs: Number of active spatial orbitals.
-        num_active_elec_alpha: Number of active alpha electrons.
-        num_active_elec_beta: Number of active beta electrons.
+        ci_info: Information about the CI space.
         thetas: Active-space parameters.
                Ordered as (S, D, T, ...).
         wf_struct: wave function structure object.
@@ -315,6 +339,11 @@ def propagate_state_SA(
     Returns:
         New state.
     """
+    idx2det = ci_info.idx2det
+    det2idx = ci_info.det2idx
+    num_inactive_orbs = ci_info.num_inactive_orbs
+    num_active_orbs = ci_info.num_active_orbs
+    num_virtual_orbs = ci_info.num_virtual_orbs
     if len(operators) == 0:
         return np.copy(state)
     new_state = np.copy(state)
@@ -336,13 +365,7 @@ def propagate_state_SA(
             if isinstance(wf_struct, UpsStructure):
                 new_state = construct_ups_state_SA(
                     new_state,
-                    idx2det,
-                    det2idx,
-                    num_inactive_orbs,
-                    num_active_orbs,
-                    num_virtual_orbs,
-                    num_active_elec_alpha,
-                    num_active_elec_beta,
+                    ci_info,
                     thetas,
                     wf_struct,
                     dagger=dagger,
@@ -438,13 +461,7 @@ def get_determinants_SA(
 def _propagate_state(
     state: np.ndarray,
     operators: list[FermionicOperator | str],
-    idx2det: np.ndarray,
-    det2idx: dict[int, int],
-    num_inactive_orbs: int,
-    num_active_orbs: int,
-    num_virtual_orbs: int,
-    num_active_elec_alpha: int,
-    num_active_elec_beta: int,
+    ci_info: CI_Info,
     thetas: Sequence[float],
     wf_struct: UpsStructure | UccStructure,
     do_folding: bool = True,
@@ -460,13 +477,7 @@ def _propagate_state(
         return propagate_state(
             operators,
             state[:, 0],
-            idx2det,
-            det2idx,
-            num_inactive_orbs,
-            num_active_orbs,
-            num_virtual_orbs,
-            num_active_elec_alpha,
-            num_active_elec_beta,
+            ci_info,
             thetas,
             wf_struct,
             do_folding=do_folding,
@@ -474,13 +485,7 @@ def _propagate_state(
     return propagate_state(
         operators,
         state,
-        idx2det,
-        det2idx,
-        num_inactive_orbs,
-        num_active_orbs,
-        num_virtual_orbs,
-        num_active_elec_alpha,
-        num_active_elec_beta,
+        ci_info,
         thetas,
         wf_struct,
         do_folding=do_folding,
@@ -491,16 +496,11 @@ def expectation_value(
     bra: np.ndarray,
     operators: list[FermionicOperator | str],
     ket: np.ndarray,
-    idx2det: np.ndarray,
-    det2idx: dict[int, int],
-    num_inactive_orbs: int,
-    num_active_orbs: int,
-    num_virtual_orbs: int,
-    num_active_elec_alpha: int,
-    num_active_elec_beta: int,
+    ci_info: CI_Info,
     thetas: Sequence[float],
     wf_struct: UpsStructure | UccStructure,
     do_folding: bool = True,
+    unsafe: bool = False,
 ) -> float:
     """Calculate expectation value of operator.
 
@@ -508,13 +508,7 @@ def expectation_value(
         bra: Bra state.
         op: Operator.
         ket: Ket state.
-        idx2det: Index to determinant mapping.
-        det2idx: Determinant to index mapping.
-        num_inactive_orbs: Number of inactive spatial orbitals.
-        num_active_orbs: Number of active spatial orbitals.
-        num_virtual_orbs: Number of virtual orbitals.
-        num_active_elec_alpha: Number of active alpha electrons.
-        num_active_elec_beta: Number of active beta electrons.
+        ci_info: Information about the CI space.
         thetas: Active-space parameters.
                Ordered as (S, D, T, ...).
         wf_struct: Wave function structure object.
@@ -526,16 +520,11 @@ def expectation_value(
     op_ket = propagate_state(
         operators,
         ket,
-        idx2det,
-        det2idx,
-        num_inactive_orbs,
-        num_active_orbs,
-        num_virtual_orbs,
-        num_active_elec_alpha,
-        num_active_elec_beta,
+        ci_info,
         thetas,
         wf_struct,
         do_folding=do_folding,
+        unsafe=unsafe,
     )
     val = bra @ op_ket
     if not isinstance(val, float):
@@ -547,13 +536,7 @@ def expectation_value_SA(
     bra: np.ndarray,
     operators: list[FermionicOperator | str],
     ket: np.ndarray,
-    idx2det: np.ndarray,
-    det2idx: dict[int, int],
-    num_inactive_orbs: int,
-    num_active_orbs: int,
-    num_virtual_orbs: int,
-    num_active_elec_alpha: int,
-    num_active_elec_beta: int,
+    ci_info: CI_Info,
     thetas: Sequence[float],
     wf_struct: UpsStructure,
     do_folding: bool = True,
@@ -564,13 +547,7 @@ def expectation_value_SA(
         bra: Bra state.
         op: Operator.
         ket: Ket state.
-        idx2det: Index to determinant mapping.
-        det2idx: Determinant to index mapping.
-        num_inactive_orbs: Number of inactive spatial orbitals.
-        num_active_orbs: Number of active spatial orbitals.
-        num_virtual_orbs: Number of virtual orbitals.
-        num_active_elec_alpha: Number of active alpha electrons.
-        num_active_elec_beta: Number of active beta electrons.
+        ci_info: Information about the CI space.
         thetas: Active-space parameters.
                Ordered as (S, D, T, ...).
         wf_struct: Wave function structure object.
@@ -582,13 +559,7 @@ def expectation_value_SA(
     op_ket = propagate_state_SA(
         operators,
         ket,
-        idx2det,
-        det2idx,
-        num_inactive_orbs,
-        num_active_orbs,
-        num_virtual_orbs,
-        num_active_elec_alpha,
-        num_active_elec_beta,
+        ci_info,
         thetas,
         wf_struct,
         do_folding=do_folding,
@@ -601,13 +572,7 @@ def expectation_value_SA(
 
 def construct_ucc_state(
     state: np.ndarray,
-    idx2det: np.ndarray,
-    det2idx: dict[int, int],
-    num_inactive_orbs: int,  # pylint: disable=unused-argument
-    num_active_orbs: int,
-    num_virtual_orbs: int,  # pylint: disable=unused-argument
-    num_active_elec_alpha: int,  # pylint: disable=unused-argument
-    num_active_elec_beta: int,  # pylint: disable=unused-argument
+    ci_info: CI_Info,
     thetas: Sequence[float],
     ucc_struct: UccStructure,
     dagger: bool = False,
@@ -616,9 +581,7 @@ def construct_ucc_state(
 
     Args:
         state: Reference state vector.
-        num_active_orbs: Number of active spatial orbitals.
-        num_elec_alpha: Number of active alpha electrons.
-        num_elec_beta: Number of active beta electrons.
+        ci_info: Information about the CI space.
         thetas: Active-space parameters.
                Ordered as (S, D, T, ...).
         ucc_struct: UCCStructure object.
@@ -632,13 +595,7 @@ def construct_ucc_state(
     # mv = functools.partial(
     #    _propagate_state,
     #    operators=[T],
-    #    idx2det=idx2det,
-    #    det2idx=det2idx,
-    #    num_inactive_orbs=num_inactive_orbs,
-    #    num_active_orbs=num_active_orbs,
-    #    num_virtual_orbs=num_virtual_orbs,
-    #    num_active_elec_alpha=num_active_elec_alpha,
-    #    num_active_elec_beta=num_active_elec_beta,
+    #    ci_info=ci_info,
     #    thetas=thetas,
     #    wf_struct=ucc_struct,
     #    do_folding=False,
@@ -646,13 +603,7 @@ def construct_ucc_state(
     # rmv = functools.partial(
     #    _propagate_state,
     #    operators=[-1.0 * T],
-    #    idx2det=idx2det,
-    #    det2idx=det2idx,
-    #    num_inactive_orbs=num_inactive_orbs,
-    #    num_active_orbs=num_active_orbs,
-    #    num_virtual_orbs=num_virtual_orbs,
-    #    num_active_elec_alpha=num_active_elec_alpha,
-    #    num_active_elec_beta=num_active_elec_beta,
+    #    ci_info=ci_info,
     #    thetas=thetas,
     #    wf_struct=ucc_struct,
     #    do_folding=False,
@@ -663,7 +614,7 @@ def construct_ucc_state(
     #    return ss.linalg.expm_multiply(-linopT, state, traceA=0.0)
     # return ss.linalg.expm_multiply(linopT, state, traceA=0.0)
     # Evil matrix construction
-    Tmat = build_operator_matrix(T, idx2det, det2idx, num_active_orbs)
+    Tmat = build_operator_matrix(T, ci_info)
     if dagger:
         return ss.linalg.expm_multiply(-Tmat, state, traceA=0.0)
     return ss.linalg.expm_multiply(Tmat, state, traceA=0.0)
@@ -718,13 +669,7 @@ def get_ucc_T(
 
 def construct_ups_state(
     state: np.ndarray,
-    idx2det: np.ndarray,
-    det2idx: dict[int, int],
-    num_inactive_orbs: int,
-    num_active_orbs: int,
-    num_virtual_orbs: int,
-    num_active_elec_alpha: int,
-    num_active_elec_beta: int,
+    ci_info: CI_Info,
     thetas: Sequence[float],
     ups_struct: UpsStructure,
     dagger: bool = False,
@@ -738,9 +683,7 @@ def construct_ups_state(
 
     Args:
         state: Reference state vector.
-        num_active_orbs: Number of active spatial orbitals.
-        num_active_elec_alpha: Number of active alpha electrons.
-        num_active_elec_beta: Number of active beta electrons.
+        ci_info: Information about the CI space.
         thetas: Ansatz parameters values.
         ups_struct: Unitary product state structure.
         dagger: If true, do dagger unitaries.
@@ -750,6 +693,7 @@ def construct_ups_state(
     """
     tmp = state.copy()
     order = 1
+    offset = ci_info.space_extension_offset
     if dagger:
         order = -1
     # Loop over all excitation in UPSStructure
@@ -762,7 +706,8 @@ def construct_ups_state(
             theta = -theta
         if exc_type in ("sa_single",):
             A = 1  # 2**(-1/2)
-            (i, a) = exc_indices
+            i = exc_indices[0] + offset
+            a = exc_indices[1] + offset
             # Create T matrices
             Ta = G1(i * 2, a * 2, True)
             Tb = G1(i * 2 + 1, a * 2 + 1, True)
@@ -773,13 +718,7 @@ def construct_ups_state(
                 * propagate_state(
                     [Ta],
                     tmp,
-                    idx2det,
-                    det2idx,
-                    num_inactive_orbs,
-                    num_active_orbs,
-                    num_virtual_orbs,
-                    num_active_elec_alpha,
-                    num_active_elec_beta,
+                    ci_info,
                     thetas,
                     ups_struct,
                     do_folding=False,
@@ -788,13 +727,7 @@ def construct_ups_state(
                 * propagate_state(
                     [Ta, Ta],
                     tmp,
-                    idx2det,
-                    det2idx,
-                    num_inactive_orbs,
-                    num_active_orbs,
-                    num_virtual_orbs,
-                    num_active_elec_alpha,
-                    num_active_elec_beta,
+                    ci_info,
                     thetas,
                     ups_struct,
                     do_folding=False,
@@ -806,13 +739,7 @@ def construct_ups_state(
                 * propagate_state(
                     [Tb],
                     tmp,
-                    idx2det,
-                    det2idx,
-                    num_inactive_orbs,
-                    num_active_orbs,
-                    num_virtual_orbs,
-                    num_active_elec_alpha,
-                    num_active_elec_beta,
+                    ci_info,
                     thetas,
                     ups_struct,
                     do_folding=False,
@@ -821,13 +748,7 @@ def construct_ups_state(
                 * propagate_state(
                     [Tb, Tb],
                     tmp,
-                    idx2det,
-                    det2idx,
-                    num_inactive_orbs,
-                    num_active_orbs,
-                    num_virtual_orbs,
-                    num_active_elec_alpha,
-                    num_active_elec_beta,
+                    ci_info,
                     thetas,
                     ups_struct,
                     do_folding=False,
@@ -837,9 +758,15 @@ def construct_ups_state(
             # Create T matrix
             if exc_type == "single":
                 (i, a) = exc_indices
+                i = exc_indices[0] + offset
+                a = exc_indices[1] + offset
                 T = G1(i, a, True)
             elif exc_type == "double":
                 (i, j, a, b) = exc_indices
+                i = exc_indices[0] + offset
+                j = exc_indices[1] + offset
+                a = exc_indices[2] + offset
+                b = exc_indices[3] + offset
                 T = G2(i, j, a, b, True)
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
@@ -850,13 +777,7 @@ def construct_ups_state(
                 * propagate_state(
                     [T],
                     tmp,
-                    idx2det,
-                    det2idx,
-                    num_inactive_orbs,
-                    num_active_orbs,
-                    num_virtual_orbs,
-                    num_active_elec_alpha,
-                    num_active_elec_beta,
+                    ci_info,
                     thetas,
                     ups_struct,
                     do_folding=False,
@@ -865,13 +786,7 @@ def construct_ups_state(
                 * propagate_state(
                     [T, T],
                     tmp,
-                    idx2det,
-                    det2idx,
-                    num_inactive_orbs,
-                    num_active_orbs,
-                    num_virtual_orbs,
-                    num_active_elec_alpha,
-                    num_active_elec_beta,
+                    ci_info,
                     thetas,
                     ups_struct,
                     do_folding=False,
@@ -884,13 +799,7 @@ def construct_ups_state(
 
 def construct_ups_state_SA(
     state: np.ndarray,
-    idx2det: np.ndarray,
-    det2idx: dict[int, int],
-    num_inactive_orbs: int,
-    num_active_orbs: int,
-    num_virtual_orbs: int,
-    num_active_elec_alpha: int,
-    num_active_elec_beta: int,
+    ci_info: CI_Info,
     thetas: Sequence[float],
     ups_struct: UpsStructure,
     dagger: bool = False,
@@ -904,9 +813,7 @@ def construct_ups_state_SA(
 
     Args:
         state: Reference state vector.
-        num_active_orbs: Number of active spatial orbitals.
-        num_active_elec_alpha: Number of active alpha electrons.
-        num_active_elec_beta: Number of active beta electrons.
+        ci_info: Information about the CI space.
         thetas: Ansatz parameters values.
         ups_struct: Unitary product state structure.
         dagger: If true, do dagger unitaries.
@@ -939,13 +846,7 @@ def construct_ups_state_SA(
                 * propagate_state_SA(
                     [Ta],
                     tmp,
-                    idx2det,
-                    det2idx,
-                    num_inactive_orbs,
-                    num_active_orbs,
-                    num_virtual_orbs,
-                    num_active_elec_alpha,
-                    num_active_elec_beta,
+                    ci_info,
                     thetas,
                     ups_struct,
                     do_folding=False,
@@ -954,13 +855,7 @@ def construct_ups_state_SA(
                 * propagate_state_SA(
                     [Ta, Ta],
                     tmp,
-                    idx2det,
-                    det2idx,
-                    num_inactive_orbs,
-                    num_active_orbs,
-                    num_virtual_orbs,
-                    num_active_elec_alpha,
-                    num_active_elec_beta,
+                    ci_info,
                     thetas,
                     ups_struct,
                     do_folding=False,
@@ -972,13 +867,7 @@ def construct_ups_state_SA(
                 * propagate_state_SA(
                     [Tb],
                     tmp,
-                    idx2det,
-                    det2idx,
-                    num_inactive_orbs,
-                    num_active_orbs,
-                    num_virtual_orbs,
-                    num_active_elec_alpha,
-                    num_active_elec_beta,
+                    ci_info,
                     thetas,
                     ups_struct,
                     do_folding=False,
@@ -987,13 +876,7 @@ def construct_ups_state_SA(
                 * propagate_state_SA(
                     [Tb, Tb],
                     tmp,
-                    idx2det,
-                    det2idx,
-                    num_inactive_orbs,
-                    num_active_orbs,
-                    num_virtual_orbs,
-                    num_active_elec_alpha,
-                    num_active_elec_beta,
+                    ci_info,
                     thetas,
                     ups_struct,
                     do_folding=False,
@@ -1016,13 +899,7 @@ def construct_ups_state_SA(
                 * propagate_state_SA(
                     [T],
                     tmp,
-                    idx2det,
-                    det2idx,
-                    num_inactive_orbs,
-                    num_active_orbs,
-                    num_virtual_orbs,
-                    num_active_elec_alpha,
-                    num_active_elec_beta,
+                    ci_info,
                     thetas,
                     ups_struct,
                     do_folding=False,
@@ -1031,13 +908,7 @@ def construct_ups_state_SA(
                 * propagate_state_SA(
                     [T, T],
                     tmp,
-                    idx2det,
-                    det2idx,
-                    num_inactive_orbs,
-                    num_active_orbs,
-                    num_virtual_orbs,
-                    num_active_elec_alpha,
-                    num_active_elec_beta,
+                    ci_info,
                     thetas,
                     ups_struct,
                     do_folding=False,
@@ -1051,13 +922,7 @@ def construct_ups_state_SA(
 def propagate_unitary(
     state: np.ndarray,
     idx: int,
-    idx2det: np.ndarray,
-    det2idx: dict[int, int],
-    num_inactive_orbs: int,
-    num_active_orbs: int,
-    num_virtual_orbs: int,
-    num_active_elec_alpha: int,
-    num_active_elec_beta: int,
+    ci_info: CI_Info,
     thetas: Sequence[float],
     ups_struct: UpsStructure,
 ) -> np.ndarray:
@@ -1066,9 +931,7 @@ def propagate_unitary(
     Args:
         state: State vector.
         idx: Index of operator in the ups_struct.
-        num_active_orbs: Number of active spatial orbitals.
-        num_active_elec_alpha: Number of active alpha electrons.
-        num_active_elec_beta: Number of active beta electrons.
+        ci_info: Information about the CI space.
         thetas: Values for ansatz parameters.
         ups_struct: UPS structure object.
 
@@ -1094,13 +957,7 @@ def propagate_unitary(
             * propagate_state(
                 [Ta],
                 state,
-                idx2det,
-                det2idx,
-                num_inactive_orbs,
-                num_active_orbs,
-                num_virtual_orbs,
-                num_active_elec_alpha,
-                num_active_elec_beta,
+                ci_info,
                 thetas,
                 ups_struct,
                 do_folding=False,
@@ -1109,13 +966,7 @@ def propagate_unitary(
             * propagate_state(
                 [Ta, Ta],
                 state,
-                idx2det,
-                det2idx,
-                num_inactive_orbs,
-                num_active_orbs,
-                num_virtual_orbs,
-                num_active_elec_alpha,
-                num_active_elec_beta,
+                ci_info,
                 thetas,
                 ups_struct,
                 do_folding=False,
@@ -1127,13 +978,7 @@ def propagate_unitary(
             * propagate_state(
                 [Tb],
                 tmp,
-                idx2det,
-                det2idx,
-                num_inactive_orbs,
-                num_active_orbs,
-                num_virtual_orbs,
-                num_active_elec_alpha,
-                num_active_elec_beta,
+                ci_info,
                 thetas,
                 ups_struct,
                 do_folding=False,
@@ -1142,13 +987,7 @@ def propagate_unitary(
             * propagate_state(
                 [Tb, Tb],
                 tmp,
-                idx2det,
-                det2idx,
-                num_inactive_orbs,
-                num_active_orbs,
-                num_virtual_orbs,
-                num_active_elec_alpha,
-                num_active_elec_beta,
+                ci_info,
                 thetas,
                 ups_struct,
                 do_folding=False,
@@ -1171,13 +1010,7 @@ def propagate_unitary(
             * propagate_state(
                 [T],
                 state,
-                idx2det,
-                det2idx,
-                num_inactive_orbs,
-                num_active_orbs,
-                num_virtual_orbs,
-                num_active_elec_alpha,
-                num_active_elec_beta,
+                ci_info,
                 thetas,
                 ups_struct,
                 do_folding=False,
@@ -1186,13 +1019,7 @@ def propagate_unitary(
             * propagate_state(
                 [T, T],
                 state,
-                idx2det,
-                det2idx,
-                num_inactive_orbs,
-                num_active_orbs,
-                num_virtual_orbs,
-                num_active_elec_alpha,
-                num_active_elec_beta,
+                ci_info,
                 thetas,
                 ups_struct,
                 do_folding=False,
@@ -1206,13 +1033,7 @@ def propagate_unitary(
 def propagate_unitary_SA(
     state: np.ndarray,
     idx: int,
-    idx2det: np.ndarray,
-    det2idx: dict[int, int],
-    num_inactive_orbs: int,
-    num_active_orbs: int,
-    num_virtual_orbs: int,
-    num_active_elec_alpha: int,
-    num_active_elec_beta: int,
+    ci_info: CI_Info,
     thetas: Sequence[float],
     ups_struct: UpsStructure,
 ) -> np.ndarray:
@@ -1221,9 +1042,7 @@ def propagate_unitary_SA(
     Args:
         state: State vector.
         idx: Index of operator in the ups_struct.
-        num_active_orbs: Number of active spatial orbitals.
-        num_active_elec_alpha: Number of active alpha electrons.
-        num_active_elec_beta: Number of active beta electrons.
+        ci_info: Information about the CI space.
         thetas: Values for ansatz parameters.
         ups_struct: UPS structure object.
 
@@ -1249,13 +1068,7 @@ def propagate_unitary_SA(
             * propagate_state_SA(
                 [Ta],
                 state,
-                idx2det,
-                det2idx,
-                num_inactive_orbs,
-                num_active_orbs,
-                num_virtual_orbs,
-                num_active_elec_alpha,
-                num_active_elec_beta,
+                ci_info,
                 thetas,
                 ups_struct,
                 do_folding=False,
@@ -1264,13 +1077,7 @@ def propagate_unitary_SA(
             * propagate_state_SA(
                 [Ta, Ta],
                 state,
-                idx2det,
-                det2idx,
-                num_inactive_orbs,
-                num_active_orbs,
-                num_virtual_orbs,
-                num_active_elec_alpha,
-                num_active_elec_beta,
+                ci_info,
                 thetas,
                 ups_struct,
                 do_folding=False,
@@ -1282,13 +1089,7 @@ def propagate_unitary_SA(
             * propagate_state_SA(
                 [Tb],
                 tmp,
-                idx2det,
-                det2idx,
-                num_inactive_orbs,
-                num_active_orbs,
-                num_virtual_orbs,
-                num_active_elec_alpha,
-                num_active_elec_beta,
+                ci_info,
                 thetas,
                 ups_struct,
                 do_folding=False,
@@ -1297,13 +1098,7 @@ def propagate_unitary_SA(
             * propagate_state_SA(
                 [Tb, Tb],
                 tmp,
-                idx2det,
-                det2idx,
-                num_inactive_orbs,
-                num_active_orbs,
-                num_virtual_orbs,
-                num_active_elec_alpha,
-                num_active_elec_beta,
+                ci_info,
                 thetas,
                 ups_struct,
                 do_folding=False,
@@ -1326,13 +1121,7 @@ def propagate_unitary_SA(
             * propagate_state_SA(
                 [T],
                 state,
-                idx2det,
-                det2idx,
-                num_inactive_orbs,
-                num_active_orbs,
-                num_virtual_orbs,
-                num_active_elec_alpha,
-                num_active_elec_beta,
+                ci_info,
                 thetas,
                 ups_struct,
                 do_folding=False,
@@ -1341,13 +1130,7 @@ def propagate_unitary_SA(
             * propagate_state_SA(
                 [T, T],
                 state,
-                idx2det,
-                det2idx,
-                num_inactive_orbs,
-                num_active_orbs,
-                num_virtual_orbs,
-                num_active_elec_alpha,
-                num_active_elec_beta,
+                ci_info,
                 thetas,
                 ups_struct,
                 do_folding=False,
@@ -1361,13 +1144,7 @@ def propagate_unitary_SA(
 def get_grad_action(
     state: np.ndarray,
     idx: int,
-    idx2det: np.ndarray,
-    det2idx: dict[int, int],
-    num_inactive_orbs,
-    num_active_orbs: int,
-    num_virtual_orbs,
-    num_active_elec_alpha: int,
-    num_active_elec_beta: int,
+    ci_info: CI_Info,
     ups_struct: UpsStructure,
 ) -> np.ndarray:
     r"""Get effect of differentiation with respect to "idx" operator in the UPS expansion.
@@ -1391,9 +1168,7 @@ def get_grad_action(
     Args:
         state: State vector.
         idx: Index of operator in the ups_struct.
-        num_active_orbs: Number of active spatial orbitals.
-        num_active_elec_alpha: Number of active alpha electrons.
-        num_active_elec_beta: Number of active beta electrons.
+        ci_info: Information about the CI space.
         ups_struct: UPS structure object.
 
     Returns:
@@ -1412,13 +1187,7 @@ def get_grad_action(
         tmp = propagate_state(
             [A * (Ta + Tb)],
             state,
-            idx2det,
-            det2idx,
-            num_inactive_orbs,
-            num_active_orbs,
-            num_virtual_orbs,
-            num_active_elec_alpha,
-            num_active_elec_beta,
+            ci_info,
             (0.0,),
             ups_struct,
             do_folding=False,
@@ -1437,13 +1206,7 @@ def get_grad_action(
         tmp = propagate_state(
             [T],
             state,
-            idx2det,
-            det2idx,
-            num_inactive_orbs,
-            num_active_orbs,
-            num_virtual_orbs,
-            num_active_elec_alpha,
-            num_active_elec_beta,
+            ci_info,
             (0.0,),
             ups_struct,
             do_folding=False,
@@ -1456,13 +1219,7 @@ def get_grad_action(
 def get_grad_action_SA(
     state: np.ndarray,
     idx: int,
-    idx2det: np.ndarray,
-    det2idx: dict[int, int],
-    num_inactive_orbs,
-    num_active_orbs: int,
-    num_virtual_orbs,
-    num_active_elec_alpha: int,
-    num_active_elec_beta: int,
+    ci_info: CI_Info,
     ups_struct: UpsStructure,
 ) -> np.ndarray:
     r"""Get effect of differentiation with respect to "idx" operator in the UPS expansion.
@@ -1486,9 +1243,7 @@ def get_grad_action_SA(
     Args:
         state: State vector.
         idx: Index of operator in the ups_struct.
-        num_active_orbs: Number of active spatial orbitals.
-        num_active_elec_alpha: Number of active alpha electrons.
-        num_active_elec_beta: Number of active beta electrons.
+        ci_info: Information about the CI space.
         ups_struct: UPS structure object.
 
     Returns:
@@ -1507,13 +1262,7 @@ def get_grad_action_SA(
         tmp = propagate_state_SA(
             [A * (Ta + Tb)],
             state,
-            idx2det,
-            det2idx,
-            num_inactive_orbs,
-            num_active_orbs,
-            num_virtual_orbs,
-            num_active_elec_alpha,
-            num_active_elec_beta,
+            ci_info,
             (0.0,),
             ups_struct,
             do_folding=False,
@@ -1532,13 +1281,7 @@ def get_grad_action_SA(
         tmp = propagate_state_SA(
             [T],
             state,
-            idx2det,
-            det2idx,
-            num_inactive_orbs,
-            num_active_orbs,
-            num_virtual_orbs,
-            num_active_elec_alpha,
-            num_active_elec_beta,
+            ci_info,
             (0.0,),
             ups_struct,
             do_folding=False,

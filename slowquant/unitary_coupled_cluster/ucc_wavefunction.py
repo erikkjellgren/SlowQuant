@@ -197,13 +197,17 @@ class WaveFunctionUCC:
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     self.kappa_hf_like_idx.append((p, q))
         # Construct determinant basis
-        self.idx2det, self.det2idx = get_indexing(
-            self.num_active_orbs, self.num_active_elec_alpha, self.num_active_elec_beta
+        self.ci_info = get_indexing(
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+            self.num_virtual_orbs,
+            self.num_active_elec_alpha,
+            self.num_active_elec_beta,
         )
-        self.num_det = len(self.idx2det)
+        self.num_det = len(self.ci_info.idx2det)
         self.csf_coeffs = np.zeros(self.num_det)
         hf_det = int("1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec), 2)
-        self.csf_coeffs[self.det2idx[hf_det]] = 1
+        self.csf_coeffs[self.ci_info.det2idx[hf_det]] = 1
         self._ci_coeffs = np.copy(self.csf_coeffs)
         # Construct UCC Structure
         self._excitations = excitations  # Needed for saving the wave function
@@ -281,13 +285,7 @@ class WaveFunctionUCC:
         if self._ci_coeffs is None:
             self._ci_coeffs = construct_ucc_state(
                 self.csf_coeffs,
-                self.idx2det,
-                self.det2idx,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.num_virtual_orbs,
-                self.num_active_elec_alpha,
-                self.num_active_elec_beta,
+                self.ci_info,
                 self.thetas,
                 self.ucc_layout,
             )
@@ -378,13 +376,7 @@ class WaveFunctionUCC:
                         self.ci_coeffs,
                         [Epq(p, q)],
                         self.ci_coeffs,
-                        self.idx2det,
-                        self.det2idx,
-                        self.num_inactive_orbs,
-                        self.num_active_orbs,
-                        self.num_virtual_orbs,
-                        self.num_active_elec_alpha,
-                        self.num_active_elec_beta,
+                        self.ci_info,
                         self.thetas,
                         self.ucc_layout,
                     )
@@ -428,13 +420,7 @@ class WaveFunctionUCC:
                                 self.ci_coeffs,
                                 [Epq(p, q), Epq(r, s)],
                                 self.ci_coeffs,
-                                self.idx2det,
-                                self.det2idx,
-                                self.num_inactive_orbs,
-                                self.num_active_orbs,
-                                self.num_virtual_orbs,
-                                self.num_active_elec_alpha,
-                                self.num_active_elec_beta,
+                                self.ci_info,
                                 self.thetas,
                                 self.ucc_layout,
                             )
@@ -482,13 +468,7 @@ class WaveFunctionUCC:
                                         self.ci_coeffs,
                                         [Epq(p, q), Epq(r, s), Epq(t, u)],
                                         self.ci_coeffs,
-                                        self.idx2det,
-                                        self.det2idx,
-                                        self.num_inactive_orbs,
-                                        self.num_active_orbs,
-                                        self.num_virtual_orbs,
-                                        self.num_active_elec_alpha,
-                                        self.num_active_elec_beta,
+                                        self.ci_info,
                                         self.thetas,
                                         self.ucc_layout,
                                     )
@@ -556,13 +536,7 @@ class WaveFunctionUCC:
                                                 self.ci_coeffs,
                                                 [Epq(p, q), Epq(r, s), Epq(t, u), Epq(m, n)],
                                                 self.ci_coeffs,
-                                                self.idx2det,
-                                                self.det2idx,
-                                                self.num_inactive_orbs,
-                                                self.num_active_orbs,
-                                                self.num_virtual_orbs,
-                                                self.num_active_elec_alpha,
-                                                self.num_active_elec_beta,
+                                                self.ci_info,
                                                 self.thetas,
                                                 self.ucc_layout,
                                             )
@@ -773,13 +747,7 @@ class WaveFunctionUCC:
                     )
                 ],
                 self.ci_coeffs,
-                self.idx2det,
-                self.det2idx,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.num_virtual_orbs,
-                self.num_active_elec_alpha,
-                self.num_active_elec_beta,
+                self.ci_info,
                 self.thetas,
                 self.ucc_layout,
             )
@@ -1083,13 +1051,7 @@ class WaveFunctionUCC:
                     )
                 ],
                 self.ci_coeffs,
-                self.idx2det,
-                self.det2idx,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.num_virtual_orbs,
-                self.num_active_elec_alpha,
-                self.num_active_elec_beta,
+                self.ci_info,
                 self.thetas,
                 self.ucc_layout,
             )
@@ -1151,27 +1113,23 @@ class WaveFunctionUCC:
             Hket = propagate_state(
                 [Hamiltonian],
                 self.ci_coeffs,
-                self.idx2det,
-                self.det2idx,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.num_virtual_orbs,
-                self.num_active_elec_alpha,
-                self.num_active_elec_beta,
+                self.ci_info,
                 self.thetas,
                 self.ucc_layout,
             )
             E = self.ci_coeffs @ Hket
             theta_params = np.zeros_like(self.thetas)
             Tmat = build_operator_matrix(
-                get_ucc_T(self.thetas, self.ucc_layout), self.idx2det, self.det2idx, self.num_active_orbs
+                get_ucc_T(self.thetas, self.ucc_layout),
+                self.ci_info,
             )
             for i in range(len(theta_params)):  # pylint: disable=consider-using-enumerate
                 sign_step = (theta_params[i] >= 0).astype(float) * 2 - 1  # type: ignore [attr-defined]
                 step_size = eps * sign_step * max(1, abs(theta_params[i]))
                 theta_params[i] += step_size
                 Tmat_plus = build_operator_matrix(
-                    get_ucc_T(theta_params, self.ucc_layout), self.idx2det, self.det2idx, self.num_active_orbs
+                    get_ucc_T(theta_params, self.ucc_layout),
+                    self.ci_info,
                 )
                 bra = ss.linalg.expm_multiply(Tmat + Tmat_plus, self.csf_coeffs, traceA=0.0)
                 E_plus = bra @ Hket

@@ -4,6 +4,7 @@ import numpy as np
 import scipy
 
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
+from slowquant.unitary_coupled_cluster.operator_matrix import CI_Info
 from slowquant.unitary_coupled_cluster.operators import (
     G3,
     G4,
@@ -31,10 +32,7 @@ from slowquant.unitary_coupled_cluster.util import (
 
 
 class LinearResponseBaseClass:
-    index_info: (
-        tuple[list[int], dict[int, int], int, int, int, int, int, list[float], UpsStructure]
-        | tuple[list[int], dict[int, int], int, int, int, int, int, list[float], UccStructure]
-    )
+    index_info: tuple[CI_Info, list[float], UpsStructure] | tuple[CI_Info, list[float], UccStructure]
 
     def __init__(
         self,
@@ -50,25 +48,13 @@ class LinearResponseBaseClass:
         self.wf = wave_function
         if isinstance(self.wf, WaveFunctionUCC):
             self.index_info = (
-                self.wf.idx2det,
-                self.wf.det2idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.num_virtual_orbs,
-                self.wf.num_active_elec_alpha,
-                self.wf.num_active_elec_beta,
+                self.wf.ci_info,
                 self.wf.thetas,
                 self.wf.ucc_layout,
             )
         elif isinstance(self.wf, WaveFunctionUPS):
             self.index_info = (
-                self.wf.idx2det,
-                self.wf.det2idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.num_virtual_orbs,
-                self.wf.num_active_elec_alpha,
-                self.wf.num_active_elec_beta,
+                self.wf.ci_info,
                 self.wf.thetas,
                 self.wf.ups_layout,
             )
