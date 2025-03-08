@@ -653,16 +653,16 @@ def get_ucc_T(
             (i, j, a, b) = np.array(exc_indices) + offset
             T += theta * G2_2_sa(i, j, a, b, True)
         elif exc_type == "triple":
-            (i, j, k, a, b, c) = np.array(exc_indices) + offset
+            (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
             T += theta * G3(i, j, k, a, b, c, True)
         elif exc_type == "quadruple":
-            (i, j, k, l, a, b, c, d) = np.array(exc_indices) + offset
+            (i, j, k, l, a, b, c, d) = np.array(exc_indices) + 2 * offset
             T += theta * G4(i, j, k, l, a, b, c, d, True)
         elif exc_type == "quintuple":
-            (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + offset
+            (i, j, k, l, m, a, b, c, d, e) = np.array(exc_indices) + 2 * offset
             T += theta * G5(i, j, k, l, m, a, b, c, d, e, True)
         elif exc_type == "sextuple":
-            (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + offset
+            (i, j, k, l, m, n, a, b, c, d, e, f) = np.array(exc_indices) + 2 * offset
             T += theta * G6(i, j, k, l, m, n, a, b, c, d, e, f, True)
         else:
             raise ValueError(f"Got unknown excitation type, {exc_type}")
@@ -758,10 +758,10 @@ def construct_ups_state(
         elif exc_type in ("single", "double"):
             # Create T matrix
             if exc_type == "single":
-                (i, a) = np.array(exc_indices) + offset
+                (i, a) = np.array(exc_indices) + 2 * offset
                 T = G1(i, a, True)
             elif exc_type == "double":
-                (i, j, a, b) = np.array(exc_indices) + offset
+                (i, j, a, b) = np.array(exc_indices) + 2 * offset
                 T = G2(i, j, a, b, True)
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
@@ -818,6 +818,7 @@ def construct_ups_state_SA(
     """
     tmp = state.copy()
     order = 1
+    offset = ci_info.space_extension_offset
     if dagger:
         order = -1
     # Loop over all excitation in UPSStructure
@@ -830,7 +831,7 @@ def construct_ups_state_SA(
             theta = -theta
         if exc_type in ("sa_single",):
             A = 1  # 2**(-1/2)
-            (i, a) = exc_indices
+            (i, a) = np.array(exc_indices) + offset
             # Create T matrices
             Ta = G1(i * 2, a * 2, True)
             Tb = G1(i * 2 + 1, a * 2 + 1, True)
@@ -880,10 +881,10 @@ def construct_ups_state_SA(
         elif exc_type in ("single", "double"):
             # Create T matrix
             if exc_type == "single":
-                (i, a) = exc_indices
+                (i, a) = np.array(exc_indices) + 2 * offset
                 T = G1(i, a, True)
             elif exc_type == "double":
-                (i, j, a, b) = exc_indices
+                (i, j, a, b) = np.array(exc_indices) + 2 * offset
                 T = G2(i, j, a, b, True)
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
@@ -937,11 +938,12 @@ def propagate_unitary(
     exc_type = ups_struct.excitation_operator_type[idx]
     exc_indices = ups_struct.excitation_indices[idx]
     theta = thetas[idx]
+    offset = ci_info.space_extension_offset
     if abs(theta) < 10**-14:
         return np.copy(state)
     if exc_type in ("sa_single",):
         A = 1  # 2**(-1/2)
-        (i, a) = exc_indices
+        (i, a) = np.array(exc_indices) + offset
         # Create T matrix
         Ta = G1(i * 2, a * 2, True)
         Tb = G1(i * 2 + 1, a * 2 + 1, True)
@@ -991,10 +993,10 @@ def propagate_unitary(
     elif exc_type in ("single", "double"):
         # Create T matrix
         if exc_type == "single":
-            (i, a) = exc_indices
+            (i, a) = np.array(exc_indices) + 2 * offset
             T = G1(i, a, True)
         elif exc_type == "double":
-            (i, j, a, b) = exc_indices
+            (i, j, a, b) = np.array(exc_indices) + 2 * offset
             T = G2(i, j, a, b, True)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
@@ -1048,11 +1050,12 @@ def propagate_unitary_SA(
     exc_type = ups_struct.excitation_operator_type[idx]
     exc_indices = ups_struct.excitation_indices[idx]
     theta = thetas[idx]
+    offset = ci_info.space_extension_offset
     if abs(theta) < 10**-14:
         return np.copy(state)
     if exc_type in ("sa_single",):
         A = 1  # 2**(-1/2)
-        (i, a) = exc_indices
+        (i, a) = np.array(exc_indices) + offset
         # Create T matrix
         Ta = G1(i * 2, a * 2, True)
         Tb = G1(i * 2 + 1, a * 2 + 1, True)
@@ -1102,10 +1105,10 @@ def propagate_unitary_SA(
     elif exc_type in ("single", "double"):
         # Create T matrix
         if exc_type == "single":
-            (i, a) = exc_indices
+            (i, a) = np.array(exc_indices) + 2 * offset
             T = G1(i, a, True)
         elif exc_type == "double":
-            (i, j, a, b) = exc_indices
+            (i, j, a, b) = np.array(exc_indices) + 2 * offset
             T = G2(i, j, a, b, True)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
@@ -1172,10 +1175,11 @@ def get_grad_action(
     # Select unitary operation based on idx
     exc_type = ups_struct.excitation_operator_type[idx]
     exc_indices = ups_struct.excitation_indices[idx]
+    offset = ci_info.space_extension_offset
     if exc_type in ("sa_single",):
         # Create T matrix
         A = 1  # 2**(-1/2)
-        (i, a) = exc_indices
+        (i, a) = np.array(exc_indices) + offset
         Ta = G1(i * 2, a * 2, True)
         Tb = G1(i * 2 + 1, a * 2 + 1, True)
         # Apply missing T factor of derivative
@@ -1190,10 +1194,10 @@ def get_grad_action(
     elif exc_type in ("single", "double"):
         # Create T matrix
         if exc_type == "single":
-            (i, a) = exc_indices
+            (i, a) = np.array(exc_indices) + 2 * offset
             T = G1(i, a, True)
         elif exc_type == "double":
-            (i, j, a, b) = exc_indices
+            (i, j, a, b) = np.array(exc_indices) + 2 * offset
             T = G2(i, j, a, b, True)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
@@ -1247,10 +1251,11 @@ def get_grad_action_SA(
     # Select unitary operation based on idx
     exc_type = ups_struct.excitation_operator_type[idx]
     exc_indices = ups_struct.excitation_indices[idx]
+    offset = ci_info.space_extension_offset
     if exc_type in ("sa_single",):
         # Create T matrix
         A = 1  # 2**(-1/2)
-        (i, a) = exc_indices
+        (i, a) = np.array(exc_indices) + offset
         Ta = G1(i * 2, a * 2, True)
         Tb = G1(i * 2 + 1, a * 2 + 1, True)
         # Apply missing T factor of derivative
@@ -1265,10 +1270,10 @@ def get_grad_action_SA(
     elif exc_type in ("single", "double"):
         # Create T matrix
         if exc_type == "single":
-            (i, a) = exc_indices
+            (i, a) = np.array(exc_indices) + 2 * offset
             T = G1(i, a, True)
         elif exc_type == "double":
-            (i, j, a, b) = exc_indices
+            (i, j, a, b) = np.array(exc_indices) + 2 * offset
             T = G2(i, j, a, b, True)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")

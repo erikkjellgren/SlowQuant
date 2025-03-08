@@ -102,7 +102,9 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
         grad = np.zeros(2 * len(self.G_ops))
         UdH_ket = propagate_state(
-            ["Ud", self.H_0i_0a], self.ci_coeffs, *self.index_info_extended,
+            ["Ud", self.H_0i_0a],
+            self.ci_coeffs,
+            *self.index_info_extended,
         )
         for i, op in enumerate(self.G_ops):
             G_ket = propagate_state([op], self.csf_coeffs, *self.index_info_extended)
