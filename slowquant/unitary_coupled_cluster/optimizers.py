@@ -142,9 +142,14 @@ class Optimizers:
                 raise ValueError(
                     f"Expected option 'param_names' in extra_options, got {extra_options.keys()}"
                 )
+            if "optimization_options" not in extra_options:
+                raise ValueError(
+                    f"Expected option 'optimization_options' in extra_options, got {extra_options.keys()}"
+                )
             optimizer = RotoSolve2D(
                 extra_options["R"],
                 extra_options["param_names"],
+                extra_options["optimization_options"],
                 maxiter=self.maxiter,
                 tol=self.tol,
                 callback=print_progress,
@@ -379,6 +384,7 @@ class RotoSolve2D:
         self,
         R: dict[str, int],
         param_names: Sequence[str],
+        optimization_options: Sequence[str, Any],
         maxiter: int = 30,
         tol: float = 1e-6,
         callback: Callable[[list[float]], None] | None = None,
@@ -399,6 +405,12 @@ class RotoSolve2D:
         self._R = R
         self._param_names = param_names
 
+        if "param_option" not in optimization_options:
+            raise ValueError(
+                f"Expected option 'param_option' in optimization_options, got {optimization_options.keys()}"
+            )
+        self._param_option = optimization_options['param_option']
+
     def minimize(
         self,
         f: Callable[[list[float]], float],
@@ -414,13 +426,14 @@ class RotoSolve2D:
         Returns:
             Minimization results.
         """
+
         f_best = float(10**20)
         x = list(x0).copy()
         x_best = x.copy()
         fails = 0
         res = Result()
 
-        param_option = "shuffled_sweep"
+        param_option = self._param_option
 
         num_of_params = len(self._param_names)
         iters = 0

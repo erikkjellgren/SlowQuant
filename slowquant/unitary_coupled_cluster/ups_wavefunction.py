@@ -884,6 +884,7 @@ class WaveFunctionUPS:
         orbital_optimization: bool = False,
         tol: float = 1e-10,
         maxiter: int = 1000,
+        optimization_options: dict[str, Any] | None = None,
     ) -> None:
         """Run one step optimization of wave function.
 
@@ -964,6 +965,7 @@ class WaveFunctionUPS:
                     "R": self.ups_layout.grad_param_R,
                     "param_names": self.ups_layout.param_names,
                     "f_rotosolve2d_optimized": self._calc_energy_rotosolve2d_optimization,
+                    "optimization_options": optimization_options,
                 },
             )
         else:

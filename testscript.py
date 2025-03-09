@@ -4,20 +4,20 @@ import pyscf
 import matplotlib.pyplot as plt
 
 # Define molecule and basis
-# geometry = """
-#     O 0.000     0.000    0.119;
-#     H 0.000     0.757   -0.477;
-#     H 0.000    -0.757   -0.477;
-# """
-# basis = "6-31G"
-# cas = (8, 6) #(8e, 6o)
-
 geometry = """
-    H 0.000     0.000    0.000;
-    H 0.000    -0.7414    0.000;
+    O 0.000     0.000    0.119;
+    H 0.000     0.757   -0.477;
+    H 0.000    -0.757   -0.477;
 """
 basis = "6-31G"
-cas = (2, 4)
+cas = (8, 6) #(8e, 6o)
+
+# geometry = """
+#     H 0.000     0.000    0.000;
+#     H 0.000    -0.7414    0.000;
+# """
+# basis = "sto-3g"
+# cas = (4, 10)
 
 # Initialize SlowQuant and PySCF
 SQobj = sq.SlowQuant()
@@ -39,7 +39,7 @@ num_elec = SQobj.molecule.number_electrons
 num_spin_orbs = SQobj.molecule.number_bf * 2
 num_orbs = SQobj.molecule.number_bf
 
-layer_depths = list(range(1, 2))
+layer_depths = list(range(3, 4))
 energies_tups_hf = []
 energies_oo_tups_hf = []
 energies_tups_hf_roto = []
@@ -61,10 +61,10 @@ for L in layer_depths:
     print("Rotosolve2D")
     print("Layer depth: {}".format(L))
     # tUPS with HF orbitals
-    WF_hf = WaveFunctionUPS(num_elec=num_elec, cas=cas, mo_coeffs=c_orthonormal_hf, h_ao=h_core, g_ao=g_eri, ansatz="qnp", ansatz_options={"n_layers": L, "do_qnp": False, "skip_last_singles": False, "assume_hf_reference": True}, include_active_kappa=True)
+    WF_hf = WaveFunctionUPS(num_elec=num_elec, cas=cas, mo_coeffs=c_orthonormal_hf, h_ao=h_core, g_ao=g_eri, ansatz="tups", ansatz_options={"n_layers": L, "do_qnp": False, "skip_last_singles": False, "assume_hf_reference": True}, include_active_kappa=True)
 
     energies_tups_hf.append(WF_hf.energy_elec)
-    WF_hf.run_wf_optimization_1step("rotosolve_2d", False)
+    WF_hf.run_wf_optimization_1step("rotosolve_2d", optimization_options={"param_option": "shuffled_sweep"})
     roto_energy = WF_hf.energy_elec
     print("Roto 2D Energy:", roto_energy)
 
