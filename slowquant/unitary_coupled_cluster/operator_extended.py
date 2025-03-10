@@ -29,7 +29,7 @@ def get_indexing_extended(
         order: Excitation order the space will be extended with.
 
     Returns:
-        List to map index to determiant and dictionary to map determiant to index.
+        CI_Info object.
     """
     if order > 2:
         raise ValueError("Excitation order needs to be <= 2")

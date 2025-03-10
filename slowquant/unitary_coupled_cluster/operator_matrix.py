@@ -32,6 +32,8 @@ class CI_Info:
         "idx2det",
         "det2idx",
         "space_extension_offset",
+        "det2alphabeta",
+        "alphabeta2det",
     )
 
     def __init__(
@@ -44,14 +46,16 @@ class CI_Info:
         idx2det: np.ndarray,
         det2idx: dict[int, int],
     ) -> None:
-        """
-        idx2det: Index to determinant mapping.
-        det2idx: Determinant to index mapping.
-        num_inactive_orbs: Number of inactive spatial orbitals.
-        num_active_orbs: Number of active spatial orbitals.
-        num_virtual_orbs: Number of virtual orbitals.
-        num_active_elec_alpha: Number of active alpha electrons.
-        num_active_elec_beta: Number of active beta electrons.
+        """Initialize configuration expansion information object.
+
+        Args:
+            num_inactive_orbs: Number of inactive spatial orbitals.
+            num_active_orbs: Number of active spatial orbitals.
+            num_virtual_orbs: Number of virtual orbitals.
+            num_active_elec_alpha: Number of active alpha electrons.
+            num_active_elec_beta: Number of active beta electrons.
+            idx2det: Index to determinant mapping.
+            det2idx: Determinant to index mapping.
         """
         self.num_inactive_orbs = num_inactive_orbs
         self.num_active_orbs = num_active_orbs
@@ -78,7 +82,7 @@ def get_indexing(
         num_active_elec_beta: Number of active beta electrons.
 
     Returns:
-        List to map index to determinant and dictionary to map determinant to index.
+        CI_Info object.
     """
     idx = 0
     idx2det = []
