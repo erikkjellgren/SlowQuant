@@ -33,6 +33,7 @@ from slowquant.unitary_coupled_cluster.operators import (
 )
 from slowquant.unitary_coupled_cluster.unrestricted_operators import (
     unrestricted_hamiltonian_0i_0a,
+    unrestricted_hamiltonian_full_space,
 )
 from slowquant.unitary_coupled_cluster.util import UpsStructure
 
@@ -340,6 +341,7 @@ class UnrestrictedWaveFunctionUPS:
         self._gaaaa_mo = None
         self._gbbbb_mo = None
         self._gaabb_mo = None
+        self._gbbaa_mo = None
         self._c_a_orthonormal = c[0]
         self._c_b_orthonormal = c[1]
 
@@ -366,6 +368,7 @@ class UnrestrictedWaveFunctionUPS:
         self._rdm2aaaa = None
         self._rdm2bbbb = None
         self._rdm2aabb = None
+        self._rdm2bbaa = None
         self._thetas = theta_vals.copy()
         self.ci_coeffs = construct_ups_state(
             self.csf_coeffs,
@@ -647,40 +650,137 @@ class UnrestrictedWaveFunctionUPS:
             self._rdm2bbaa = self._calculate_rdm2("beta", "alpha")
         return self._rdm2bbaa
 
-    @property
-    def manual_gradient(self) -> np.ndarray:
-        gradient = np.zeros(18)
-        for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-            for q in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                left = expectation_value(
-                        self.ci_coeffs,
-                        (anni(p, "alpha", True) * anni(q, "alpha", False)) * unrestricted_hamiltonian_full_space + (anni(p, "beta", True) * anni(q, "beta", False)) * unrestricted_hamiltonian_full_space,
-                        self.ci_coeffs,
-                        self.idx2det,
-                        self.det2idx,
-                        self.num_inactive_orbs,
-                        self.num_active_orbs,
-                        self.num_virtual_orbs,
-                        self.num_active_elec_alpha,
-                        self.num_active_elec_beta,
-                        self.thetas,
-                        self.ups_layout
+
+    def manual_gradient(
+            wf: UnrestrictedWaveFunctionUPS,
+    ) -> np.ndarray:
+        # lav en variable der samler alle parametre i expectation value
+        gradient = np.zeros(2*len(wf.kappa_idx))
+        for idx, (m, n) in enumerate(wf.kappa_idx):
+            for p in range(wf.num_inactive_orbs + wf.num_active_orbs):
+                alpha = expectation_value(
+                        wf.ci_coeffs,
+                        [anni(m, "alpha", True) * anni(n, "alpha", False) * unrestricted_hamiltonian_full_space(
+                            wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs)],
+                        wf.ci_coeffs,
+                        wf.idx2det,
+                        wf.det2idx,
+                        wf.num_inactive_orbs,
+                        wf.num_active_orbs,
+                        wf.num_virtual_orbs,
+                        wf.num_active_elec_alpha,
+                        wf.num_active_elec_beta,
+                        wf.thetas,
+                        wf.ups_layout
                         )
-                right = expectation_value(
-                        self.ci_coeffs,
-                        unrestricted_hamiltonian_full_space * anni(p, "alpha", True)*anni(q, "alpha", False) + unrestricted_hamiltonian_full_space * anni(p, "beta", True)*anni(q, "beta", False),
-                        self.ci_coeffs,
-                        self.idx2det,
-                        self.det2idx,
-                        self.num_inactive_orbs,
-                        self.num_active_orbs,
-                        self.num_virtual_orbs,
-                        self.num_active_elec_alpha,
-                        self.num_active_elec_beta,
-                        self.thetas,
-                        self.ups_layout
+                alpha -= expectation_value(
+                        wf.ci_coeffs,
+                        [anni(n, "alpha", True) * anni(m, "alpha", False) * unrestricted_hamiltonian_full_space(
+                            wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs)],
+                        wf.ci_coeffs,
+                        wf.idx2det,
+                        wf.det2idx,
+                        wf.num_inactive_orbs,
+                        wf.num_active_orbs,
+                        wf.num_virtual_orbs,
+                        wf.num_active_elec_alpha,
+                        wf.num_active_elec_beta,
+                        wf.thetas,
+                        wf.ups_layout
                         )
-                gradient = left-right
+                
+                alpha -= expectation_value(
+                        wf.ci_coeffs,
+                        [unrestricted_hamiltonian_full_space(
+                            wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs) * (anni(m, "alpha", True) * anni(n, "alpha", False))],
+                        wf.ci_coeffs,
+                        wf.idx2det,
+                        wf.det2idx,
+                        wf.num_inactive_orbs,
+                        wf.num_active_orbs,
+                        wf.num_virtual_orbs,
+                        wf.num_active_elec_alpha,
+                        wf.num_active_elec_beta,
+                        wf.thetas,
+                        wf.ups_layout
+                        )
+                alpha += expectation_value(
+                        wf.ci_coeffs,
+                        [unrestricted_hamiltonian_full_space(
+                            wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs) * (anni(n, "alpha", True) * anni(m, "alpha", False))],
+                        wf.ci_coeffs,
+                        wf.idx2det,
+                        wf.det2idx,
+                        wf.num_inactive_orbs,
+                        wf.num_active_orbs,
+                        wf.num_virtual_orbs,
+                        wf.num_active_elec_alpha,
+                        wf.num_active_elec_beta,
+                        wf.thetas,
+                        wf.ups_layout
+                        )    
+                beta = expectation_value(
+                        wf.ci_coeffs,
+                        [anni(m, "beta", True)*anni(n, "beta", False) * unrestricted_hamiltonian_full_space(
+                            wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs)],
+                        wf.ci_coeffs,
+                        wf.idx2det,
+                        wf.det2idx,
+                        wf.num_inactive_orbs,
+                        wf.num_active_orbs,
+                        wf.num_virtual_orbs,
+                        wf.num_active_elec_alpha,
+                        wf.num_active_elec_beta,
+                        wf.thetas,
+                        wf.ups_layout
+                        )
+                beta -= expectation_value(
+                        wf.ci_coeffs,
+                        [anni(n, "beta", True)*anni(m, "beta", False) * unrestricted_hamiltonian_full_space(
+                            wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs)],
+                        wf.ci_coeffs,
+                        wf.idx2det,
+                        wf.det2idx,
+                        wf.num_inactive_orbs,
+                        wf.num_active_orbs,
+                        wf.num_virtual_orbs,
+                        wf.num_active_elec_alpha,
+                        wf.num_active_elec_beta,
+                        wf.thetas,
+                        wf.ups_layout
+                        )
+                beta -= expectation_value(
+                        wf.ci_coeffs,
+                        [unrestricted_hamiltonian_full_space(
+                            wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs) * (anni(m, "beta", True)*anni(n, "beta", False))],
+                        wf.ci_coeffs,
+                        wf.idx2det,
+                        wf.det2idx,
+                        wf.num_inactive_orbs,
+                        wf.num_active_orbs,
+                        wf.num_virtual_orbs,
+                        wf.num_active_elec_alpha,
+                        wf.num_active_elec_beta,
+                        wf.thetas,
+                        wf.ups_layout
+                        )
+                beta -= expectation_value(
+                        wf.ci_coeffs,
+                        [unrestricted_hamiltonian_full_space(
+                            wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs) * (anni(n, "beta", True)*anni(m, "beta", False))],
+                        wf.ci_coeffs,
+                        wf.idx2det,
+                        wf.det2idx,
+                        wf.num_inactive_orbs,
+                        wf.num_active_orbs,
+                        wf.num_virtual_orbs,
+                        wf.num_active_elec_alpha,
+                        wf.num_active_elec_beta,
+                        wf.thetas,
+                        wf.ups_layout
+                        )
+                gradient[idx] = alpha
+                gradient[idx+len(wf.kappa_idx)] = beta
         return gradient
 
     def run_ups(
@@ -859,8 +959,8 @@ def energy_ups(
         ):
             kappa_a_mat[p, q] = kappa_a_val
             kappa_a_mat[q, p] = -kappa_a_val
-            kappa_a_mat[p, q] = kappa_b_val
-            kappa_a_mat[q, p] = -kappa_b_val
+            kappa_b_mat[p, q] = kappa_b_val
+            kappa_b_mat[q, p] = -kappa_b_val
     if len(wf.kappa_a_redundant) + len(wf.kappa_b_redundant) != 0:
         if np.max(np.abs(wf.kappa_a_redundant)) > 0.0 or np.max(np.abs(wf.kappa_b_redundant)) > 0.0:
             for kappa_a_val, kappa_b_val, (p, q) in zip(
@@ -964,8 +1064,9 @@ def orbital_rotation_gradient(
         rdm2aabb=wf.rdm2aabb,
         rdm2bbaa=wf.rdm2bbaa,
     )
-    gradient = get_orbital_gradient_unrestricted(
-        rdms, wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.kappa_idx, wf.num_inactive_orbs, wf.num_active_orbs)
+    #gradient = get_orbital_gradient_unrestricted(
+     #   rdms, wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.kappa_idx, wf.num_inactive_orbs, wf.num_active_orbs)
+    gradient = wf.manual_gradient()
     return gradient
 
 
