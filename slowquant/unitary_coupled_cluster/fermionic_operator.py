@@ -109,6 +109,8 @@ def do_extended_normal_ordering(
             changed = False
             is_zero = False
             while True:
+                if len(next_operator) == 0:
+                    break
                 a = next_operator[current_idx]
                 b = next_operator[current_idx + 1]
                 i = current_idx
