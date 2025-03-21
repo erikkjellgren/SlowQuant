@@ -120,6 +120,7 @@ def G1(i: int, a: int, return_anti_hermitian: bool = False) -> FermionicOperator
     Args:
         i: Spin orbital index.
         a: Spin orbital index.
+        return_anti_hermitian: Return anti-hermitian version of operator, i.e. op - op^\dagger
 
     Returns:
         One-electron excitation operator.
@@ -141,6 +142,7 @@ def G2(i: int, j: int, a: int, b: int, return_anti_hermitian: bool = False) -> F
         j: Spin orbital index.
         a: Spin orbital index.
         b: Spin orbital index.
+        return_anti_hermitian: Return anti-hermitian version of operator, i.e. op - op^\dagger.
 
     Returns:
         Two-electron excitation operator.
@@ -171,6 +173,7 @@ def G3(
         a: Spin orbital index.
         b: Spin orbital index.
         c: Spin orbital index.
+        return_anti_hermitian: Return anti-hermitian version of operator, i.e. op - op^\dagger.
 
     Returns:
         Three-electron excitation operator.
@@ -205,6 +208,7 @@ def G4(
         b: Spin orbital index.
         c: Spin orbital index.
         d: Spin orbital index.
+        return_anti_hermitian: Return anti-hermitian version of operator, i.e. op - op^\dagger.
 
     Returns:
         Four-electron excitation operator.
@@ -253,6 +257,7 @@ def G5(
         c: Spin orbital index.
         d: Spin orbital index.
         e: Spin orbital index.
+        return_anti_hermitian: Return anti-hermitian version of operator, i.e. op - op^\dagger.
 
     Returns:
         Five-electron excitation operator.
@@ -308,6 +313,7 @@ def G6(
         d: Spin orbital index.
         e: Spin orbital index.
         f: Spin orbital index.
+        return_anti_hermitian: Return anti-hermitian version of operator, i.e. op - op^\dagger.
 
     Returns:
         Six-electron excitation operator.
@@ -340,6 +346,7 @@ def G1_sa(i: int, a: int, return_anti_hermitian: bool = False) -> FermionicOpera
     Args:
         i: Spatial orbital index.
         a: Spatial orbital index.
+        return_anti_hermitian: Return anti-hermitian version of operator, i.e. op - op^\dagger.
 
     Returns:
         Singlet one-electron spin-adapted excitation operator.
@@ -361,6 +368,7 @@ def G2_1_sa(i: int, j: int, a: int, b: int, return_anti_hermitian: bool = False)
         j: Spatial orbital index.
         a: Spatial orbital index.
         b: Spatial orbital index.
+        return_anti_hermitian: Return anti-hermitian version of operator, i.e. op - op^\dagger.
 
     Returns:
         First singlet two-electron spin-adapted excitation operator.
@@ -387,6 +395,7 @@ def G2_2_sa(i: int, j: int, a: int, b: int, return_anti_hermitian: bool = False)
         j: Spatial orbital index.
         a: Spatial orbital index.
         b: Spatial orbital index.
+        return_anti_hermitian: Return anti-hermitian version of operator, i.e. op - op^\dagger.
 
     Returns:
         Second singlet two-electron spin-adapted excitation operator.
