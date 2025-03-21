@@ -5,15 +5,15 @@ import numpy as np
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
+from slowquant.unitary_coupled_cluster.ci_spaces import (
+    CI_Info,
+    get_indexing_extended,
+)
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
     LinearResponseBaseClass,
 )
-from slowquant.unitary_coupled_cluster.operator_extended import (
-    get_indexing_extended,
-)
 from slowquant.unitary_coupled_cluster.operator_matrix import (
-    CI_Info,
     expectation_value,
     propagate_state,
 )

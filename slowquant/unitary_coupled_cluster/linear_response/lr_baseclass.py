@@ -3,8 +3,8 @@ from collections.abc import Sequence
 import numpy as np
 import scipy
 
+from slowquant.unitary_coupled_cluster.ci_spaces import CI_Info
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
-from slowquant.unitary_coupled_cluster.operator_matrix import CI_Info
 from slowquant.unitary_coupled_cluster.operators import (
     G3,
     G4,

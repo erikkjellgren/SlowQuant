@@ -318,16 +318,10 @@ class FermionicOperator:
             new_string_key = operator_string_to_key(new_op)
             operators[new_string_key] = new_op
             factors[new_string_key] = self.factors[key_string]
-        # Build new strings and factors via normal ordering of product of two strings
-        operators_ordered: dict[str, list[a_op]] = {}
-        factors_ordered: dict[str, float] = {}
-        new_ops, new_facs = do_extended_normal_ordering(FermionicOperator(operators, factors))
-        for str_key in new_ops:  # pylint: disable=C0206
-            if str_key not in operators_ordered.keys():  # pylint: disable=C0201
-                operators_ordered[str_key] = new_ops[str_key]
-                factors_ordered[str_key] = new_facs[str_key]
-            else:
-                factors_ordered[str_key] += new_facs[str_key]
+        # Do normal ordering of comlex conjugated operator.
+        operators_ordered, factors_ordered = do_extended_normal_ordering(
+            FermionicOperator(operators, factors)
+        )
         return FermionicOperator(operators_ordered, factors_ordered)
 
     @property

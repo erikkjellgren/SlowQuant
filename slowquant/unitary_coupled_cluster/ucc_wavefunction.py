@@ -14,6 +14,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
     two_electron_integral_transform,
 )
+from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_electronic_energy,
@@ -23,7 +24,6 @@ from slowquant.unitary_coupled_cluster.operator_matrix import (
     build_operator_matrix,
     construct_ucc_state,
     expectation_value,
-    get_indexing,
     get_ucc_T,
     propagate_state,
 )

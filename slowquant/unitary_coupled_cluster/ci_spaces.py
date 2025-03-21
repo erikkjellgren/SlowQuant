@@ -1,9 +1,97 @@
 from collections.abc import Generator
+from dataclasses import dataclass
 
 import numpy as np
 from sympy.utilities.iterables import multiset_permutations
 
-from slowquant.unitary_coupled_cluster.operator_matrix import CI_Info
+
+@dataclass(repr=False, eq=False, match_args=False)
+class CI_Info:
+    __slots__ = (
+        "num_inactive_orbs",
+        "num_active_orbs",
+        "num_virtual_orbs",
+        "num_active_elec_alpha",
+        "num_active_elec_beta",
+        "idx2det",
+        "det2idx",
+        "space_extension_offset",
+    )
+
+    def __init__(
+        self,
+        num_inactive_orbs: int,
+        num_active_orbs: int,
+        num_virtual_orbs: int,
+        num_active_elec_alpha: int,
+        num_active_elec_beta: int,
+        idx2det: np.ndarray,
+        det2idx: dict[int, int],
+    ) -> None:
+        """Initialize configuration expansion information object.
+
+        Args:
+            num_inactive_orbs: Number of inactive spatial orbitals.
+            num_active_orbs: Number of active spatial orbitals.
+            num_virtual_orbs: Number of virtual orbitals.
+            num_active_elec_alpha: Number of active alpha electrons.
+            num_active_elec_beta: Number of active beta electrons.
+            idx2det: Index to determinant mapping.
+            det2idx: Determinant to index mapping.
+        """
+        self.num_inactive_orbs = num_inactive_orbs
+        self.num_active_orbs = num_active_orbs
+        self.num_virtual_orbs = num_virtual_orbs
+        self.num_active_elec_alpha = num_active_elec_alpha
+        self.num_active_elec_beta = num_active_elec_beta
+        self.idx2det = idx2det
+        self.det2idx = det2idx
+        self.space_extension_offset = 0
+
+
+def get_indexing(
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+    num_active_elec_alpha: int,
+    num_active_elec_beta: int,
+) -> CI_Info:
+    """Get relation between index and determinant.
+
+    Args:
+        num_active_orbs: Number of active spatial orbitals.
+        num_active_elec_alpha: Number of active alpha electrons.
+        num_active_elec_beta: Number of active beta electrons.
+
+    Returns:
+        CI_Info object.
+    """
+    idx = 0
+    idx2det = []
+    det2idx = {}
+    # Loop over all possible particle and spin conserving determinant combinations
+    for alpha_string in multiset_permutations(
+        [1] * num_active_elec_alpha + [0] * (num_active_orbs - num_active_elec_alpha)
+    ):
+        for beta_string in multiset_permutations(
+            [1] * num_active_elec_beta + [0] * (num_active_orbs - num_active_elec_beta)
+        ):
+            det_str = ""
+            for a, b in zip(alpha_string, beta_string):
+                det_str += str(a) + str(b)
+            det = int(det_str, 2)  # save determinant as int
+            idx2det.append(det)  # relate index to determinant
+            det2idx[det] = idx  # relate determinant to index
+            idx += 1
+    return CI_Info(
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+        num_active_elec_alpha,
+        num_active_elec_beta,
+        np.array(idx2det, dtype=int),
+        det2idx,
+    )
 
 
 def get_indexing_extended(
