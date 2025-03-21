@@ -248,7 +248,7 @@ def propagate_state(
                         anni_idx.append(fermi_op.idx)
                 anni_idx = np.array(anni_idx, dtype=int)
                 create_idx = np.array(create_idx, dtype=int)
-                # loop over all determinants
+                # loop over all determinants in new_state
                 for i, det in get_determinants(idx2det, new_state, anni_idx, create_idx, num_active_orbs):
                     phase_changes = 0
                     # evaluate how string of annihilation operator change det
