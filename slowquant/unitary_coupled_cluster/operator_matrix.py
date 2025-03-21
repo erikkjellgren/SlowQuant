@@ -167,7 +167,7 @@ def propagate_state(
     do_folding: bool = True,
     unsafe: bool = False,
 ) -> np.ndarray:
-    r"""Propagate state by applying operator.
+    r"""Propagate state by applying operators.
 
     The operators will be folded to only work on the active orbitals.
     The resulting state should not be acted on with another folded operator.
