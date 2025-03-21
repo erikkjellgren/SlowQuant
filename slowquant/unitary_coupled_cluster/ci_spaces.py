@@ -1,11 +1,9 @@
 from collections.abc import Generator
-from dataclasses import dataclass
 
 import numpy as np
 from sympy.utilities.iterables import multiset_permutations
 
 
-@dataclass(repr=False, eq=False, match_args=False)
 class CI_Info:
     __slots__ = (
         "num_inactive_orbs",

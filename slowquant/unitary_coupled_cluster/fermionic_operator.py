@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import copy
 import re
-from dataclasses import dataclass
 
 
-@dataclass(repr=False, eq=False, match_args=False)
 class a_op:
     __slots__ = ("spinless_idx", "idx", "dagger", "spin")
 
