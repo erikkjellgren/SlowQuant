@@ -7,7 +7,7 @@ Unitary Coupled Cluster Util
 .. automodule:: slowquant.unitary_coupled_cluster.fermionic_operator
     :members:
 
-.. automodule:: slowquant.unitary_coupled_cluster.docs/autodoc/unitary_coupled_cluster_util.rst
+.. automodule:: slowquant.unitary_coupled_cluster.operator_state_algebra
     :members:
 
 .. automodule:: slowquant.unitary_coupled_cluster.operators
