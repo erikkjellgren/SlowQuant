@@ -34,7 +34,7 @@ def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info) -> np.ndarray
     det2idx = ci_info.det2idx
     num_active_orbs = ci_info.num_active_orbs
     num_dets = len(idx2det)  # number of spin and particle conserving determinants
-    ones = np.ones(num_dets)  # Used with the determinant generator to ensure no determinants are screened.
+    ones = np.ones(num_dets)  # Used with the determinant generator below as state argument. This ensures that no screening of determinants based on state vector weight is performed.
     op_mat = np.zeros((num_dets, num_dets))  # basis
     # Create bitstrings for parity check. Idx=orbital index. Value=det as int.
     parity_check = np.zeros(2 * num_active_orbs + 1, dtype=int)
