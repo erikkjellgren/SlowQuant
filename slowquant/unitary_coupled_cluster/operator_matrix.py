@@ -44,6 +44,7 @@ def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info) -> np.ndarray
         parity_check[2 * num_active_orbs - i] = num
     # loop over all strings of annihilation operators in FermionicOperator sum
     for fermi_label in op.factors:  # get strings as key of op.factors
+        # Separate each annihilation operator string in creation and annihilation indices
         anni_idx = []
         create_idx = []
         for fermi_op in op.operators[fermi_label]:
