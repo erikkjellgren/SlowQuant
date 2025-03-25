@@ -78,7 +78,9 @@ run_tups = partial(run_conf, ansatz="tups", depth=2)
 # Different configurations to be run.
 confs = [
     ("slsqp", None, "SLSQP"),
-    #("rotosolve", None, "Rotosolve1D"),
+    ("bfgs", None, "BFGS"),
+    ("l-bfgs-b", None, "L-BFGS-N"),
+    ("rotosolve", None, "Rotosolve1D"),
     #("rotosolve_2d", "random_pairs", "2D_random_pairs"),
     #("rotosolve_2d", "ordered_sweep", "2D_ordered_sweep"),
     #("rotosolve_2d", "shuffled_sweep", "2D_shuffled_sweep"),
@@ -143,8 +145,7 @@ for i, (evals, energies) in enumerate(zip(evals_list, energies_list)):
     plt.plot(evals, energies, marker='o', markersize=3, linestyle='-', color=colors[i], label=confs[i][2])
 
 
-# # Convert to a DataFrame
-# max_len = max(len(e) for e in evals)  # Find the longest array
+# max_len = max(len(e) for e in evals)
 # data = {
 #     f"Evals_{i}": np.pad(e, (0, max_len - len(e)), constant_values=np.nan) for i, e in enumerate(evals)
 # }

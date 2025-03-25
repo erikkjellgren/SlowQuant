@@ -154,7 +154,6 @@ class Optimizers:
                 )
             else:
                 res = optimizer.minimize(self.fun, x0)
-            result.rnd_seed = res.rnd_seed
             result.eval_hist = res.eval_hist
             result.energy_hist = res.energy_hist
         elif self.method in ("rotosolve_2d",):
