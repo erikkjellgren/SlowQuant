@@ -764,7 +764,7 @@ class UnrestrictedWaveFunctionUPS:
                         wf.thetas,
                         wf.ups_layout
                         )
-                beta -= expectation_value(
+                beta += expectation_value(
                         wf.ci_coeffs,
                         [unrestricted_hamiltonian_full_space(
                             wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs) * (anni(n, "beta", True)*anni(m, "beta", False))],
