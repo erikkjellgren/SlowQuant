@@ -92,6 +92,9 @@ class WaveFunctionUPS:
         self._g_mo = None
         self._energy_elec: float | None = None
         self.ansatz_options = ansatz_options
+        self.rnd_seed = 0
+        self.energy_hist = []
+        self.eval_hist = []
         # Construct spin orbital spaces and indices
         active_space = []
         orbital_counter = 0
@@ -885,6 +888,7 @@ class WaveFunctionUPS:
         tol: float = 1e-10,
         maxiter: int = 1000,
         optimization_options: dict[str, Any] | None = None,
+        max_func_evals: int = 10000,
     ) -> None:
         """Run one step optimization of wave function.
 
@@ -946,7 +950,7 @@ class WaveFunctionUPS:
                 parameters = self.kappa
         else:
             parameters = self.thetas
-        optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
+        optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol, max_func_evals=max_func_evals)
         self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0
         if optimizer_name.lower() == "rotosolve":
@@ -980,6 +984,9 @@ class WaveFunctionUPS:
         else:
             self.thetas = res.x.tolist()
         self._energy_elec = res.fun
+        self.rnd_seed = res.rnd_seed
+        self.eval_hist = res.eval_hist
+        self.energy_hist = res.energy_hist
 
     def _calc_energy_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool

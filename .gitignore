@@ -4,3 +4,6 @@
 __pycache__/
 local_documentation/
 test_h2_save.npz
+plots
+.venv
+testscript*.py

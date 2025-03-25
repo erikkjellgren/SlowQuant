@@ -15,6 +15,9 @@ class Result:
         """Initialize result class."""
         self.x: np.ndarray
         self.fun: float
+        self.rnd_seed: int | None
+        self.eval_hist: np.ndarray
+        self.energy_hist: np.ndarray
 
 
 class Optimizers:
@@ -31,6 +34,7 @@ class Optimizers:
         maxiter: int = 1000,
         tol: float = 10e-8,
         is_silent: bool = False,
+        max_func_evals: int = 10000,
     ) -> None:
         """Initialize optimizer class.
 
@@ -48,6 +52,7 @@ class Optimizers:
         self.maxiter = maxiter
         self.tol = tol
         self.is_silent = is_silent
+        self.max_func_evals = max_func_evals
 
     def _print_progress(
         self, x: Sequence[float], fun: Callable[[list[float]], float], silent: bool = False
@@ -82,10 +87,24 @@ class Optimizers:
         self._start = time.time()
         self._iteration = 0
         print_progress = partial(self._print_progress, fun=self.fun, silent=self.is_silent)
+        result = Result()
+        result.eval_hist = []
+        result.energy_hist = []
+        result.rnd_seed = None
+        
         if self.method in ("bfgs", "l-bfgs-b", "slsqp"):
+
+            # Extend objective function in order to caputere energy evaluation history of the optimizaiton.
+            def ext_fun(x):
+                energy_value = self.fun(x)
+                result.energy_hist.append(energy_value)
+
+                return energy_value
+
+                
             if self.grad is not None:
                 res = scipy.optimize.minimize(
-                    self.fun,
+                    ext_fun,
                     x0,
                     jac=self.grad,
                     method=self.method,
@@ -95,13 +114,14 @@ class Optimizers:
                 )
             else:
                 res = scipy.optimize.minimize(
-                    self.fun,
+                    ext_fun,
                     x0,
                     method=self.method,
                     tol=self.tol,
                     callback=print_progress,
                     options={"maxiter": self.maxiter},
                 )
+            result.eval_hist = [i for i in range(1, res.nfev + 1)]
         elif self.method in ("cobyla", "cobyqa"):
             res = scipy.optimize.minimize(
                 self.fun,
@@ -125,6 +145,7 @@ class Optimizers:
                 extra_options["param_names"],
                 maxiter=self.maxiter,
                 tol=self.tol,
+                max_func_evals=self.max_func_evals,
                 callback=print_progress,
             )
             if "f_rotosolve_optimized" in extra_options:
@@ -133,6 +154,9 @@ class Optimizers:
                 )
             else:
                 res = optimizer.minimize(self.fun, x0)
+            result.rnd_seed = res.rnd_seed
+            result.eval_hist = res.eval_hist
+            result.energy_hist = res.energy_hist
         elif self.method in ("rotosolve_2d",):
             if not isinstance(extra_options, dict):
                 raise TypeError("extra_options is not set, but is required for RotoSolve2D")
@@ -152,6 +176,7 @@ class Optimizers:
                 extra_options["optimization_options"],
                 maxiter=self.maxiter,
                 tol=self.tol,
+                max_func_evals=self.max_func_evals,
                 callback=print_progress,
             )
             if "f_rotosolve2d_optimized" in extra_options:
@@ -160,9 +185,11 @@ class Optimizers:
                 )
             else:
                 res = optimizer.minimize(self.fun, x0)
+            result.rnd_seed = res.rnd_seed
+            result.eval_hist = res.eval_hist
+            result.energy_hist = res.energy_hist
         else:
             raise ValueError(f"Got an unkonwn optimizer {self.method}")
-        result = Result()
         result.x = res.x
         result.fun = res.fun
         return result
@@ -202,6 +229,7 @@ class RotoSolve:
         maxiter: int = 30,
         tol: float = 1e-6,
         callback: Callable[[list[float]], None] | None = None,
+        max_func_evals: int = 10000,
     ) -> None:
         """Initialize Rotosolver.
 
@@ -215,9 +243,13 @@ class RotoSolve:
         self._callback = callback
         self.max_iterations = maxiter
         self.threshold = tol
+        self.max_func_evals = max_func_evals
         self.max_fail = 3
         self._R = R
         self._param_names = param_names
+        self.num_func_evals = 0
+        self.eval_hist = []
+        self.energy_hist = []
 
     def minimize(
         self,
@@ -246,6 +278,7 @@ class RotoSolve:
                     e_vals = get_energy_evals_optimized(f_rotosolve_optimized, x, i, self._R[par_name])
                 else:
                     e_vals = get_energy_evals(f, x, i, self._R[par_name])
+                self.num_func_evals += 2 * self._R[par_name]
                 # Do an analytic construction of the energy as a function of theta_i.
                 f_reconstructed = partial(reconstructed_f, energy_vals=e_vals, R=self._R[par_name])
                 # Evaluate the energy in many points.
@@ -262,19 +295,27 @@ class RotoSolve:
                     x[i] -= 2 * np.pi
             f_tmp = f(x)
             f_new = float(np.mean(f_tmp))
+            self.eval_hist.append(self.num_func_evals)
+            print("Total number of energy evaluations:", self.num_func_evals)
             if abs(f_best - f_new) < self.threshold:
                 f_best = f_new
                 x_best = x.copy()
+                self.energy_hist.append(f_best)
                 break
             if (f_new - f_best) > 0.0:
                 fails += 1
             else:
                 f_best = f_new
                 x_best = x.copy()
+            self.energy_hist.append(f_best)
+            if self.num_func_evals > self.max_func_evals:
+                break
             if fails == self.max_fail:
                 break
             if self._callback is not None:
                 self._callback(x)
+        res.eval_hist = self.eval_hist
+        res.energy_hist = self.energy_hist
         res.x = np.array(x_best)
         res.fun = f_best
         return res
@@ -388,6 +429,7 @@ class RotoSolve2D:
         maxiter: int = 30,
         tol: float = 1e-6,
         callback: Callable[[list[float]], None] | None = None,
+        max_func_evals: int = 10000,
     ) -> None:
         """Initialize Rotosolver.
 
@@ -399,11 +441,17 @@ class RotoSolve2D:
             callback: Callback function, takes only x (parameters) as an argument.
         """
         self._callback = callback
-        self.max_iterations = maxiter
+        self.max_iterations = 5000 #maxiter
         self.threshold = tol
+        self.max_func_evals = max_func_evals
         self.max_fail = 3
         self._R = R
         self._param_names = param_names
+        self.rnd_seed = None
+        self.num_func_evals = 0
+        self.eval_hist = []
+        self.energy_hist = []
+
 
         if "param_option" not in optimization_options:
             raise ValueError(
@@ -432,19 +480,31 @@ class RotoSolve2D:
         x_best = x.copy()
         fails = 0
         res = Result()
+        seed = np.random.SeedSequence().generate_state(1)[0]
+        self.rnd_seed = seed
+        rng = np.random.default_rng(seed)
+
+        print("Using random seed: ", seed)
 
         param_option = self._param_option
 
         num_of_params = len(self._param_names)
+        one_elec_operators = [
+            (i, self._param_names[i]) for i in range(0, num_of_params)
+            if self._R[self._param_names[i]] <= 2]
+        two_elec_operators = [
+            (i, self._param_names[i]) for i in range(0, num_of_params)
+            if self._R[self._param_names[i]] > 2]
         iters = 0
         for _ in range(self.max_iterations):
 
 
             if param_option == "random_pairs":
-                i, j = np.random.choice(num_of_params, size=2, replace=False)
+                i, j = rng.choice(num_of_params, size=2, replace=False)
                 par_pairs = [
                     (i, j, self._param_names[i], self._param_names[j])
                 ]
+                self.max_fail = 50
             elif param_option == "ordered_sweep":
                 # Generate all possible pairs (i, j, R(i), R(j)) where i < j.
                 par_pairs = [
@@ -460,10 +520,11 @@ class RotoSolve2D:
                     for i in range(0, num_of_params)
                     for j in range(i + 1, num_of_params)
                 ]
-                np.random.shuffle(par_pairs)
+                rng.shuffle(par_pairs)
             elif param_option == "simple_sweep":
                 if num_of_params % 2 == 0:
-                    idx_list = np.random.shuffle([i for i in range(num_of_params)])
+                    idx_list = [i for i in range(num_of_params)] 
+                    rng.shuffle(idx_list)
                     par_pairs = [
                         (idx_list[i], idx_list[i+1], 
                          self._param_names[i], self._param_names[i+1]) 
@@ -471,13 +532,44 @@ class RotoSolve2D:
                     ]
                 else:
                     idx_list = [i for i in range(num_of_params)] 
-                    np.random.shuffle([i for i in range(num_of_params)])
+                    rng.shuffle([i for i in range(num_of_params)])
                     idx_list.append(idx_list[0])
                     par_pairs = [
                         (idx_list[i], idx_list[i+1], 
                          self._param_names[i], self._param_names[i+1]) 
                          for i in range(num_of_params//2)
                     ]
+            elif param_option == "priority_pairs":
+                self.max_fail = 50
+                if iters % 2 == 0:
+                    i, j = rng.choice(len(two_elec_operators), size=2, replace=False)
+                    par_pairs = [
+                        (two_elec_operators[i][0], two_elec_operators[j][0], two_elec_operators[i][1], two_elec_operators[j][1])
+                    ]
+                elif iters % 4 == 1:
+                    i = rng.choice(len(two_elec_operators), size=1, replace=False)[0]
+                    j = rng.choice(len(one_elec_operators), size=1, replace=False)[0]
+                    par_pairs = [
+                        (two_elec_operators[i][0], one_elec_operators[j][0], two_elec_operators[i][1], one_elec_operators[j][1])
+                    ]
+                else:
+                    i, j = rng.choice(len(one_elec_operators), size=2, replace=False)
+                    par_pairs = [
+                        (one_elec_operators[i][0], one_elec_operators[j][0], one_elec_operators[i][1], one_elec_operators[j][1])
+                    ]
+            elif param_option == "priority_sweep":
+                par_pairs1 = [(two_elec_operators[i][0], two_elec_operators[j][0], two_elec_operators[i][1], two_elec_operators[j][1])
+                    for i in range(0, len(two_elec_operators))
+                    for j in range(i + 1, len(two_elec_operators))]
+                
+                par_pairs2 = [(one_elec_operators[i][0], one_elec_operators[j][0], one_elec_operators[i][1], one_elec_operators[j][1])
+                    for i in range(0, len(one_elec_operators))
+                    for j in range(i + 1, len(one_elec_operators))]
+                
+                if iters % 3 == 0:
+                    par_pairs = par_pairs1 + par_pairs2
+                else:
+                    par_pairs = par_pairs1
             else:
                 raise ValueError(f"Unknown param_option: {param_option}")
 
@@ -495,6 +587,8 @@ class RotoSolve2D:
                     )
                 else:
                     e_vals = get_energy_evals_2d(f, x, i, j, self._R[par_name1], self._R[par_name2])
+                self.num_func_evals += (2 * self._R[par_name1] + 1) * (2 * self._R[par_name2] + 1) - 1
+                self.eval_hist.append(self.num_func_evals)
                 # Do an analytic construction of the energy as a function of theta_i and theta_j.
                 coeffs = get_coefficients_2d(e_vals, self._R[par_name1], self._R[par_name2])
                 f_reconstructed = partial(
@@ -538,26 +632,35 @@ class RotoSolve2D:
                     x[j] += 2 * np.pi
                 while x[j] > np.pi:
                     x[j] -= 2 * np.pi
+                self.energy_hist.append(f(x))
             f_tmp = f(x)
             f_new = float(np.mean(f_tmp))
             iters += 1
-            if abs(f_best - f_new) < self.threshold and iters > 1000:
+            #self.eval_hist.append(self.num_func_evals)
+            print("Total number of energy evaluations:", self.num_func_evals)
+            if abs(f_best - f_new) < self.threshold and (iters > self.max_iterations or not param_option in ["random_pairs", "priority_pairs"]):
                 f_best = f_new
                 x_best = x.copy()
+                #self.energy_hist.append(f_best)
                 break
             if (f_new - f_best) > 0.0:
                 fails += 1
             else:
                 f_best = f_new
                 x_best = x.copy()
-            if fails == self.max_fail:
+            #self.energy_hist.append(f_best)
+            if self.num_func_evals > self.max_func_evals:
+                break
+            if fails == self.max_fail :
                 break
             if self._callback is not None:
                 self._callback(x)
+        res.rnd_seed = self.rnd_seed
+        res.eval_hist = self.eval_hist
+        res.energy_hist = self.energy_hist
         res.x = np.array(x_best)
         res.fun = f_best
         return res
-
 
 def get_energy_evals_2d(
     f: Callable[[list[float]], float], x: list[float], idx1: int, idx2: int, R1: int, R2: int
