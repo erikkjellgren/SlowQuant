@@ -655,13 +655,14 @@ class UnrestrictedWaveFunctionUPS:
             wf: UnrestrictedWaveFunctionUPS,
     ) -> np.ndarray:
         # lav en variable der samler alle parametre i expectation value
+        h=unrestricted_hamiltonian_full_space(
+                            wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs)
         gradient = np.zeros(2*len(wf.kappa_idx))
         for idx, (m, n) in enumerate(wf.kappa_idx):
             for p in range(wf.num_inactive_orbs + wf.num_active_orbs):
                 alpha = expectation_value(
                         wf.ci_coeffs,
-                        [anni(m, "alpha", True) * anni(n, "alpha", False) * unrestricted_hamiltonian_full_space(
-                            wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs)],
+                        [anni(m, "alpha", True) * anni(n, "alpha", False) * h],
                         wf.ci_coeffs,
                         wf.idx2det,
                         wf.det2idx,
@@ -675,8 +676,7 @@ class UnrestrictedWaveFunctionUPS:
                         )
                 alpha -= expectation_value(
                         wf.ci_coeffs,
-                        [anni(n, "alpha", True) * anni(m, "alpha", False) * unrestricted_hamiltonian_full_space(
-                            wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs)],
+                        [anni(n, "alpha", True) * anni(m, "alpha", False) * h],
                         wf.ci_coeffs,
                         wf.idx2det,
                         wf.det2idx,
@@ -691,8 +691,7 @@ class UnrestrictedWaveFunctionUPS:
                 
                 alpha -= expectation_value(
                         wf.ci_coeffs,
-                        [unrestricted_hamiltonian_full_space(
-                            wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs) * (anni(m, "alpha", True) * anni(n, "alpha", False))],
+                        [h* (anni(m, "alpha", True) * anni(n, "alpha", False))],
                         wf.ci_coeffs,
                         wf.idx2det,
                         wf.det2idx,
@@ -706,8 +705,7 @@ class UnrestrictedWaveFunctionUPS:
                         )
                 alpha += expectation_value(
                         wf.ci_coeffs,
-                        [unrestricted_hamiltonian_full_space(
-                            wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs) * (anni(n, "alpha", True) * anni(m, "alpha", False))],
+                        [h * (anni(n, "alpha", True) * anni(m, "alpha", False))],
                         wf.ci_coeffs,
                         wf.idx2det,
                         wf.det2idx,
@@ -721,8 +719,7 @@ class UnrestrictedWaveFunctionUPS:
                         )    
                 beta = expectation_value(
                         wf.ci_coeffs,
-                        [anni(m, "beta", True)*anni(n, "beta", False) * unrestricted_hamiltonian_full_space(
-                            wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs)],
+                        [anni(m, "beta", True)*anni(n, "beta", False) * h],
                         wf.ci_coeffs,
                         wf.idx2det,
                         wf.det2idx,
@@ -736,8 +733,7 @@ class UnrestrictedWaveFunctionUPS:
                         )
                 beta -= expectation_value(
                         wf.ci_coeffs,
-                        [anni(n, "beta", True)*anni(m, "beta", False) * unrestricted_hamiltonian_full_space(
-                            wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs)],
+                        [anni(n, "beta", True)*anni(m, "beta", False) * h],
                         wf.ci_coeffs,
                         wf.idx2det,
                         wf.det2idx,
@@ -751,8 +747,7 @@ class UnrestrictedWaveFunctionUPS:
                         )
                 beta -= expectation_value(
                         wf.ci_coeffs,
-                        [unrestricted_hamiltonian_full_space(
-                            wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs) * (anni(m, "beta", True)*anni(n, "beta", False))],
+                        [h * (anni(m, "beta", True)*anni(n, "beta", False))],
                         wf.ci_coeffs,
                         wf.idx2det,
                         wf.det2idx,
@@ -766,8 +761,7 @@ class UnrestrictedWaveFunctionUPS:
                         )
                 beta += expectation_value(
                         wf.ci_coeffs,
-                        [unrestricted_hamiltonian_full_space(
-                            wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs) * (anni(n, "beta", True)*anni(m, "beta", False))],
+                        [h * (anni(n, "beta", True)*anni(m, "beta", False))],
                         wf.ci_coeffs,
                         wf.idx2det,
                         wf.det2idx,

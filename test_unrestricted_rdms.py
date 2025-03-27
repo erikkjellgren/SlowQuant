@@ -21,7 +21,7 @@ mf.kernel()
 
 
 
-mc = mcscf.UCASCI(mf, 1, (0,1))
+mc = mcscf.UCASCI(mf, 1, (1,0))
 res = mc.kernel(mf.mo_coeff)
 
 
@@ -56,7 +56,7 @@ g_eri = SQobj.integral.electron_repulsion_tensor
 WF = UnrestrictedWaveFunctionUPS(
     SQobj.molecule.number_bf * 2,
     SQobj.molecule.number_electrons,
-    ((0,1), 1),
+    ((1,0), 1),
     mf.mo_coeff,
     h_core,
     g_eri,
@@ -64,8 +64,10 @@ WF = UnrestrictedWaveFunctionUPS(
     {"n_layers": 2},
     include_active_kappa=True
 )
-#print(WF.manual_gradient())
+print(WF.manual_gradient())
 print(WF.orbital_gradient_RDM)
+with np.printoptions(precision=3, suppress=True):
+    print(WF.orbital_gradient_RDM - WF.manual_gradient())
 #WF.run_ups(orbital_optimization=True)
 #print(WF.manual_gradient())
 #print(WF.orbital_gradient_RDM)

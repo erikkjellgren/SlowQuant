@@ -31,8 +31,8 @@ def unrestricted_hamiltonian_full_space(
         for q in range(num_orbs):
             if abs(haa_mo[p, q]) < 10**-14 and abs(hbb_mo[p, q]) < 10**-14:
                 continue
-            H_operator += haa_mo[p, q]*0 * anni(p, "alpha", True) * anni(q, "alpha", False)
-            H_operator += hbb_mo[p, q]*0 * anni(p, "beta", True) * anni(q, "beta", False)
+            H_operator += haa_mo[p, q] * anni(p, "alpha", True) * anni(q, "alpha", False)
+            H_operator += hbb_mo[p, q] * anni(p, "beta", True) * anni(q, "beta", False)
     for p in range(num_orbs):
         for q in range(num_orbs):
             for r in range(num_orbs):
