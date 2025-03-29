@@ -41,6 +41,7 @@ Just use [PySCF](https://github.com/pyscf/pyscf) instead.
 
 ## Cited in
 
+- Jensen, P. W., Hedemark, G. S., Ziems, K. M., Kjellgren, E. R., Reinholdt, P., Knecht, S., ... & Sauer, S. (2025). Hyperfine Coupling Constants on Quantum Computers: Performance, Errors, and Future Prospects. arXiv preprint arXiv:2503.09214.
 - Ziems, K. M., Kjellgren, E. R., Sauer, S. P., Kongsted, J., & Coriani, S. (2025). Understanding and mitigating noise in molecular quantum linear response for spectroscopic properties on quantum computers. Chemical Science.
 - Kjellgren, E. R., Reinholdt, P., Ziems, K. M., Sauer, S., Coriani, S., & Kongsted, J. (2024). Divergences in classical and quantum linear response and equation of motion formulations. The Journal of Chemical Physics, 161(12).
 - von Buchwald, T. J., Ziems, K. M., Kjellgren, E. R., Sauer, S. P., Kongsted, J., & Coriani, S. (2024). Reduced density matrix formulation of quantum linear response. Journal of Chemical Theory and Computation, 20(16), 7093-7101.
