@@ -763,7 +763,7 @@ def construct_ups_state(
                 + np.sin(A * theta) * np.matmul(Tb, tmp)
                 + (1 - np.cos(A * theta)) * np.matmul(Tb, np.matmul(Tb, tmp))
             )
-        elif exc_type in ("tups_double", "single", "double"):
+        elif exc_type in ("tups_double", "single", "double", "triple", "quadruple", "quintuple", "sextuple"):
             if exc_type == "tups_double":
                 (p,) = exc_indices
                 T = T2_1_sa_matrix(
@@ -776,6 +776,40 @@ def construct_ups_state(
                 (i, j, a, b) = exc_indices
                 T = T2_matrix(
                     i, j, a, b, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+                ).todense()
+            elif exc_type == "triple":
+                (i, j, k, a, b, c) = exc_indices
+                T = T3_matrix(
+                    i, j, k, a, b, c, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+                ).todense()
+            elif exc_type == "quadruple":
+                (i, j, k, l, a, b, c, d) = exc_indices
+                T = T4_matrix(
+                    i, j, k, l, a, b, c, d, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+                ).todense()
+            elif exc_type == "quintuple":
+                (i, j, k, l, m, a, b, c, d, e) = exc_indices
+                T = T5_matrix(
+                    i, j, k, l, m, a, b, c, d, e, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+                ).todense()
+            elif exc_type == "sextuple":
+                (i, j, k, l, m, n, a, b, c, d, e, f) = exc_indices
+                T = T6_matrix(
+                    i,
+                    j,
+                    k,
+                    l,
+                    m,
+                    n,
+                    a,
+                    b,
+                    c,
+                    d,
+                    e,
+                    f,
+                    num_active_orbs,
+                    num_active_elec_alpha,
+                    num_active_elec_beta,
                 ).todense()
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
@@ -848,7 +882,7 @@ def propagate_unitary(
             + np.sin(A * theta) * np.matmul(Tb, tmp)
             + (1 - np.cos(A * theta)) * np.matmul(Tb, np.matmul(Tb, tmp))
         )
-    elif exc_type in ("tups_double", "single", "double"):
+    elif exc_type in ("tups_double", "single", "double", "triple", "quadruple", "quintuple", "sextuple"):
         if exc_type == "tups_double":
             (p,) = exc_indices
             T = T2_1_sa_matrix(
@@ -860,6 +894,40 @@ def propagate_unitary(
         elif exc_type == "double":
             (i, j, a, b) = exc_indices
             T = T2_matrix(i, j, a, b, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
+        elif exc_type == "triple":
+            (i, j, k, a, b, c) = exc_indices
+            T = T3_matrix(
+                i, j, k, a, b, c, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+            ).todense()
+        elif exc_type == "quadruple":
+            (i, j, k, l, a, b, c, d) = exc_indices
+            T = T4_matrix(
+                i, j, k, l, a, b, c, d, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+            ).todense()
+        elif exc_type == "quintuple":
+            (i, j, k, l, m, a, b, c, d, e) = exc_indices
+            T = T5_matrix(
+                i, j, k, l, m, a, b, c, d, e, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+            ).todense()
+        elif exc_type == "sextuple":
+            (i, j, k, l, m, n, a, b, c, d, e, f) = exc_indices
+            T = T6_matrix(
+                i,
+                j,
+                k,
+                l,
+                m,
+                n,
+                a,
+                b,
+                c,
+                d,
+                e,
+                f,
+                num_active_orbs,
+                num_active_elec_alpha,
+                num_active_elec_beta,
+            ).todense()
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         tmp = (
@@ -933,7 +1001,7 @@ def get_grad_action(
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         tmp = np.matmul(A * (Ta + Tb), state)
-    elif exc_type in ("tups_double", "single", "double"):
+    elif exc_type in ("tups_double", "single", "double", "triple", "quadruple", "quintuple", "sextuple"):
         if exc_type == "tups_double":
             (p,) = exc_indices
             T = T2_1_sa_matrix(
@@ -945,6 +1013,40 @@ def get_grad_action(
         elif exc_type == "double":
             (i, j, a, b) = exc_indices
             T = T2_matrix(i, j, a, b, num_active_orbs, num_active_elec_alpha, num_active_elec_beta).todense()
+        elif exc_type == "triple":
+            (i, j, k, a, b, c) = exc_indices
+            T = T3_matrix(
+                i, j, k, a, b, c, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+            ).todense()
+        elif exc_type == "quadruple":
+            (i, j, k, l, a, b, c, d) = exc_indices
+            T = T4_matrix(
+                i, j, k, l, a, b, c, d, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+            ).todense()
+        elif exc_type == "quintuple":
+            (i, j, k, l, m, a, b, c, d, e) = exc_indices
+            T = T5_matrix(
+                i, j, k, l, m, a, b, c, d, e, num_active_orbs, num_active_elec_alpha, num_active_elec_beta
+            ).todense()
+        elif exc_type == "sextuple":
+            (i, j, k, l, m, n, a, b, c, d, e, f) = exc_indices
+            T = T6_matrix(
+                i,
+                j,
+                k,
+                l,
+                m,
+                n,
+                a,
+                b,
+                c,
+                d,
+                e,
+                f,
+                num_active_orbs,
+                num_active_elec_alpha,
+                num_active_elec_beta,
+            ).todense()
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         tmp = np.matmul(T, state)
