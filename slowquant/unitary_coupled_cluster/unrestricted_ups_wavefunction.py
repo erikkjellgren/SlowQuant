@@ -28,8 +28,11 @@ from slowquant.unitary_coupled_cluster.operator_matrix import (
     get_indexing,
     propagate_unitary,
 )
-from slowquant.unitary_coupled_cluster.operators import (
-    anni
+from slowquant.unitary_coupled_cluster.operators import anni
+from slowquant.unitary_coupled_cluster.unrestricted_density_matrix import (
+    UnrestrictedReducedDensityMatrix,
+    get_electronic_energy_unrestricted,
+    get_orbital_gradient_unrestricted,
 )
 from slowquant.unitary_coupled_cluster.unrestricted_operators import (
     unrestricted_hamiltonian_0i_0a,
@@ -44,7 +47,7 @@ class UnrestrictedWaveFunctionUPS:
         num_spin_orbs: int,
         num_elec: int,
         cas: tuple[tuple[int, int], int],
-        c_orthonormal: np.ndarray, #tuple[np.ndarray, np.ndarray] ?,
+        c_orthonormal: np.ndarray,  # tuple[np.ndarray, np.ndarray] ?,
         h_ao: np.ndarray,
         g_ao: np.ndarray,
         ansatz: str,
@@ -278,25 +281,51 @@ class UnrestrictedWaveFunctionUPS:
         self.csf_coeffs[self.det2idx[hf_det]] = 1
         self.ci_coeffs = np.copy(self.csf_coeffs)
         self.ups_layout = UpsStructure()
-        if ansatz.lower() == "tups":
-            self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
-        elif ansatz.lower() == "qnp":
-            self.ansatz_options["do_qnp"] = True
-            self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
-        elif ansatz.lower() == "fucc":
+        if ansatz.lower() == "fuccsd":
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
+            self.ansatz_options["S"] = True
+            self.ansatz_options["D"] = True
             self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
-        elif ansatz.lower() == "ksafupccgsd":
-            self.ups_layout.create_kSAfUpCCGSD(self.num_active_orbs, self.ansatz_options)
-        elif ansatz.lower() == "duccsd":
+        if ansatz.lower() == "fuccsdt":
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
-            self.ups_layout.create_dUCCSD(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
-        elif ansatz.lower() == "ksadupccgsd":
-            self.ups_layout.create_kSAdUpCCGSD(self.num_active_orbs, self.ansatz_options)
+            self.ansatz_options["S"] = True
+            self.ansatz_options["D"] = True
+            self.ansatz_options["T"] = True
+            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
+        if ansatz.lower() == "fuccsdtq":
+            if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
+            self.ansatz_options["S"] = True
+            self.ansatz_options["D"] = True
+            self.ansatz_options["T"] = True
+            self.ansatz_options["Q"] = True
+            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
+        if ansatz.lower() == "fuccsdtq5":
+            if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
+            self.ansatz_options["S"] = True
+            self.ansatz_options["D"] = True
+            self.ansatz_options["T"] = True
+            self.ansatz_options["Q"] = True
+            self.ansatz_options["5"] = True
+            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
+        if ansatz.lower() == "fuccsdtq56":
+            if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
+            self.ansatz_options["S"] = True
+            self.ansatz_options["D"] = True
+            self.ansatz_options["T"] = True
+            self.ansatz_options["Q"] = True
+            self.ansatz_options["5"] = True
+            self.ansatz_options["6"] = True
+            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
@@ -518,16 +547,16 @@ class UnrestrictedWaveFunctionUPS:
         Returns:
             One-electron reduced density matrix.
         """
-       # if self._calculate_rdm1 is None:
+        # if self._calculate_rdm1 is None:
         self.calculate_rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs))
         for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
             p_idx = p - self.num_inactive_orbs
             for q in range(self.num_inactive_orbs, p + 1):
                 q_idx = q - self.num_inactive_orbs
                 val = expectation_value(
-                    self.ci_coeffs, 
+                    self.ci_coeffs,
                     [anni(p, spin, True) * anni(q, spin, False)],
-                    self.ci_coeffs, 
+                    self.ci_coeffs,
                     self.idx2det,
                     self.det2idx,
                     self.num_inactive_orbs,
@@ -549,16 +578,18 @@ class UnrestrictedWaveFunctionUPS:
         if self._rdm1bb is None:
             self._rdm1bb = self._calculate_rdm1("beta")
         return self._rdm1aa + self._rdm1bb
+
     # pink book 2.7.6
 
     @property
     def rdm1_S(self) -> np.ndarray:
         if self._rdm1aa is None:
-            self._rdm1aa = self._calculate_rdm1("alpha")    
+            self._rdm1aa = self._calculate_rdm1("alpha")
         if self._rdm1bb is None:
             self._rdm1bb = self._calculate_rdm1("beta")
         return self._rdm1aa - self._rdm1bb
-    #pink book 2.7.26. in the book there is a half in front? Dpq=1/2*(Dpa,qa - Dpb,qb)
+
+    # pink book 2.7.26. in the book there is a half in front? Dpq=1/2*(Dpa,qa - Dpb,qb)
 
     @property
     def rdm1aa(self) -> np.ndarray:
@@ -578,14 +609,9 @@ class UnrestrictedWaveFunctionUPS:
         Returns:
             Two-electron unrestricted reduced density matrix.
         """
-        
+
         self.calculate_rdm2 = np.zeros(
-            (
-                self.num_active_orbs,
-                self.num_active_orbs,
-                self.num_active_orbs,
-                self.num_active_orbs
-            )
+            (self.num_active_orbs, self.num_active_orbs, self.num_active_orbs, self.num_active_orbs)
         )
         for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
             p_idx = p - self.num_inactive_orbs
@@ -594,10 +620,15 @@ class UnrestrictedWaveFunctionUPS:
                 for r in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                     r_idx = r - self.num_inactive_orbs
                     for s in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                        s_idx = s- self.num_inactive_orbs
+                        s_idx = s - self.num_inactive_orbs
                         val = expectation_value(
                             self.ci_coeffs,
-                            [anni(p, spin1, True) * anni(r, spin2, True) * anni(s, spin2, False) * anni(q, spin1, False)],
+                            [
+                                anni(p, spin1, True)
+                                * anni(r, spin2, True)
+                                * anni(s, spin2, False)
+                                * anni(q, spin1, False)
+                            ],
                             self.ci_coeffs,
                             self.idx2det,
                             self.det2idx,
@@ -609,40 +640,41 @@ class UnrestrictedWaveFunctionUPS:
                             self.thetas,
                             self.ups_layout,
                         )
-                        self.calculate_rdm2[p_idx, q_idx, r_idx, s_idx] = val # type: ignore
-                        #self.calculate_rdm2[r_idx, s_idx, p_idx, q_idx] = val # type: ignore
-                        #self.calculate_rdm2[q_idx, p_idx, s_idx, r_idx] = val # type: ignore
-                        #self.calculate_rdm2[s_idx, r_idx, q_idx, p_idx] = val # type: ignore
+                        self.calculate_rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
+                        # self.calculate_rdm2[r_idx, s_idx, p_idx, q_idx] = val # type: ignore
+                        # self.calculate_rdm2[q_idx, p_idx, s_idx, r_idx] = val # type: ignore
+                        # self.calculate_rdm2[s_idx, r_idx, q_idx, p_idx] = val # type: ignore
         return self.calculate_rdm2
 
     @property
     def rdm2_C(self) -> np.ndarray:
         if self._rdm2aaaa is None:
             self._rdm2aaaa = self._calculate_rdm2("alpha", "alpha")
-        if self._rdm2bbbb is None: 
+        if self._rdm2bbbb is None:
             self._rdm2bbbb = self._calculate_rdm2("beta", "beta")
         if self._rdm2aabb is None:
             self._rdm2aabb = self._calculate_rdm2("alpha", "beta")
-        return self._rdm2aaaa + self._rdm2bbbb + 2*self._rdm2aabb
+        return self._rdm2aaaa + self._rdm2bbbb + 2 * self._rdm2aabb
+
     # 2*rdm2aabb = rdm2aabb*rdm2bbaa.T
 
     @property
     def rdm2aaaa(self) -> np.ndarray:
         if self._rdm2aaaa is None:
             self._rdm2aaaa = self._calculate_rdm2("alpha", "alpha")
-        return self._rdm2aaaa      
+        return self._rdm2aaaa
 
     @property
     def rdm2bbbb(self) -> np.ndarray:
-        if self._rdm2bbbb is None: 
-            self._rdm2bbbb = self._calculate_rdm2("beta", "beta")       
+        if self._rdm2bbbb is None:
+            self._rdm2bbbb = self._calculate_rdm2("beta", "beta")
         return self._rdm2bbbb
 
     @property
     def rdm2aabb(self) -> np.ndarray:
         if self._rdm2aabb is None:
             self._rdm2aabb = self._calculate_rdm2("alpha", "beta")
-        return self._rdm2aabb   
+        return self._rdm2aabb
 
     @property
     def rdm2bbaa(self) -> np.ndarray:
@@ -652,129 +684,130 @@ class UnrestrictedWaveFunctionUPS:
 
 
     def manual_gradient(
-            wf: UnrestrictedWaveFunctionUPS,
+        wf: UnrestrictedWaveFunctionUPS,
     ) -> np.ndarray:
         # lav en variable der samler alle parametre i expectation value
-        h=unrestricted_hamiltonian_full_space(
-                            wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs)
-        gradient = np.zeros(2*len(wf.kappa_idx))
+        h = unrestricted_hamiltonian_full_space(
+            wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs
+        )
+        gradient = np.zeros(2 * len(wf.kappa_idx))
         for idx, (m, n) in enumerate(wf.kappa_idx):
             for p in range(wf.num_inactive_orbs + wf.num_active_orbs):
                 alpha = expectation_value(
-                        wf.ci_coeffs,
-                        [anni(m, "alpha", True) * anni(n, "alpha", False) * h],
-                        wf.ci_coeffs,
-                        wf.idx2det,
-                        wf.det2idx,
-                        wf.num_inactive_orbs,
-                        wf.num_active_orbs,
-                        wf.num_virtual_orbs,
-                        wf.num_active_elec_alpha,
-                        wf.num_active_elec_beta,
-                        wf.thetas,
-                        wf.ups_layout
-                        )
+                    wf.ci_coeffs,
+                    [anni(m, "alpha", True) * anni(n, "alpha", False) * h],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
                 alpha -= expectation_value(
-                        wf.ci_coeffs,
-                        [anni(n, "alpha", True) * anni(m, "alpha", False) * h],
-                        wf.ci_coeffs,
-                        wf.idx2det,
-                        wf.det2idx,
-                        wf.num_inactive_orbs,
-                        wf.num_active_orbs,
-                        wf.num_virtual_orbs,
-                        wf.num_active_elec_alpha,
-                        wf.num_active_elec_beta,
-                        wf.thetas,
-                        wf.ups_layout
-                        )
-                
+                    wf.ci_coeffs,
+                    [anni(n, "alpha", True) * anni(m, "alpha", False) * h],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+
                 alpha -= expectation_value(
-                        wf.ci_coeffs,
-                        [h* (anni(m, "alpha", True) * anni(n, "alpha", False))],
-                        wf.ci_coeffs,
-                        wf.idx2det,
-                        wf.det2idx,
-                        wf.num_inactive_orbs,
-                        wf.num_active_orbs,
-                        wf.num_virtual_orbs,
-                        wf.num_active_elec_alpha,
-                        wf.num_active_elec_beta,
-                        wf.thetas,
-                        wf.ups_layout
-                        )
+                    wf.ci_coeffs,
+                    [h * (anni(m, "alpha", True) * anni(n, "alpha", False))],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
                 alpha += expectation_value(
-                        wf.ci_coeffs,
-                        [h * (anni(n, "alpha", True) * anni(m, "alpha", False))],
-                        wf.ci_coeffs,
-                        wf.idx2det,
-                        wf.det2idx,
-                        wf.num_inactive_orbs,
-                        wf.num_active_orbs,
-                        wf.num_virtual_orbs,
-                        wf.num_active_elec_alpha,
-                        wf.num_active_elec_beta,
-                        wf.thetas,
-                        wf.ups_layout
-                        )    
+                    wf.ci_coeffs,
+                    [h * (anni(n, "alpha", True) * anni(m, "alpha", False))],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
                 beta = expectation_value(
-                        wf.ci_coeffs,
-                        [anni(m, "beta", True)*anni(n, "beta", False) * h],
-                        wf.ci_coeffs,
-                        wf.idx2det,
-                        wf.det2idx,
-                        wf.num_inactive_orbs,
-                        wf.num_active_orbs,
-                        wf.num_virtual_orbs,
-                        wf.num_active_elec_alpha,
-                        wf.num_active_elec_beta,
-                        wf.thetas,
-                        wf.ups_layout
-                        )
+                    wf.ci_coeffs,
+                    [anni(m, "beta", True) * anni(n, "beta", False) * h],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
                 beta -= expectation_value(
-                        wf.ci_coeffs,
-                        [anni(n, "beta", True)*anni(m, "beta", False) * h],
-                        wf.ci_coeffs,
-                        wf.idx2det,
-                        wf.det2idx,
-                        wf.num_inactive_orbs,
-                        wf.num_active_orbs,
-                        wf.num_virtual_orbs,
-                        wf.num_active_elec_alpha,
-                        wf.num_active_elec_beta,
-                        wf.thetas,
-                        wf.ups_layout
-                        )
+                    wf.ci_coeffs,
+                    [anni(n, "beta", True) * anni(m, "beta", False) * h],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
                 beta -= expectation_value(
-                        wf.ci_coeffs,
-                        [h * (anni(m, "beta", True)*anni(n, "beta", False))],
-                        wf.ci_coeffs,
-                        wf.idx2det,
-                        wf.det2idx,
-                        wf.num_inactive_orbs,
-                        wf.num_active_orbs,
-                        wf.num_virtual_orbs,
-                        wf.num_active_elec_alpha,
-                        wf.num_active_elec_beta,
-                        wf.thetas,
-                        wf.ups_layout
-                        )
+                    wf.ci_coeffs,
+                    [h * (anni(m, "beta", True) * anni(n, "beta", False))],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
                 beta += expectation_value(
-                        wf.ci_coeffs,
-                        [h * (anni(n, "beta", True)*anni(m, "beta", False))],
-                        wf.ci_coeffs,
-                        wf.idx2det,
-                        wf.det2idx,
-                        wf.num_inactive_orbs,
-                        wf.num_active_orbs,
-                        wf.num_virtual_orbs,
-                        wf.num_active_elec_alpha,
-                        wf.num_active_elec_beta,
-                        wf.thetas,
-                        wf.ups_layout
-                        )
+                    wf.ci_coeffs,
+                    [h * (anni(n, "beta", True) * anni(m, "beta", False))],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
                 gradient[idx] = alpha
-                gradient[idx+len(wf.kappa_idx)] = beta
+                gradient[idx + len(wf.kappa_idx)] = beta
         return gradient
 
     def run_ups(
@@ -885,29 +918,51 @@ class UnrestrictedWaveFunctionUPS:
             self.num_inactive_orbs,
             self.num_active_orbs,
             self.num_virtual_orbs,
-            rdm1aa = self.rdm1aa,
-            rdm1bb = self.rdm1bb,
-            rdm2aaaa = self.rdm2aaaa,
-            rdm2bbbb = self.rdm2bbbb,
-            rdm2aabb = self.rdm2aabb,
-            rdm2bbaa = self.rdm2bbaa,
+            rdm1aa=self.rdm1aa,
+            rdm1bb=self.rdm1bb,
+            rdm2aaaa=self.rdm2aaaa,
+            rdm2bbbb=self.rdm2bbbb,
+            rdm2aabb=self.rdm2aabb,
+            rdm2bbaa=self.rdm2bbaa,
         )
-        return get_electronic_energy_unrestricted(rdms, self.haa_mo, self.hbb_mo, self.gaaaa_mo, self.gbbbb_mo, self.gaabb_mo, self.gbbaa_mo, self.num_inactive_orbs, self.num_active_orbs)
-    
+        return get_electronic_energy_unrestricted(
+            rdms,
+            self.haa_mo,
+            self.hbb_mo,
+            self.gaaaa_mo,
+            self.gbbbb_mo,
+            self.gaabb_mo,
+            self.gbbaa_mo,
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+        )
+
     @property
     def orbital_gradient_RDM(self) -> np.ndarray:
         rdms = UnrestrictedReducedDensityMatrix(
-            self.num_inactive_orbs, 
-            self.num_active_orbs, 
+            self.num_inactive_orbs,
+            self.num_active_orbs,
             self.num_virtual_orbs,
-            rdm1aa = self.rdm1aa, 
-            rdm1bb = self.rdm1bb,
-            rdm2aaaa = self.rdm2aaaa,
-            rdm2bbbb = self.rdm2bbbb,
-            rdm2aabb = self.rdm2aabb,
-            rdm2bbaa = self.rdm2bbaa,
+            rdm1aa=self.rdm1aa,
+            rdm1bb=self.rdm1bb,
+            rdm2aaaa=self.rdm2aaaa,
+            rdm2bbbb=self.rdm2bbbb,
+            rdm2aabb=self.rdm2aabb,
+            rdm2bbaa=self.rdm2bbaa,
         )
-        return get_orbital_gradient_unrestricted(rdms, self.haa_mo, self.hbb_mo, self.gaaaa_mo, self.gbbbb_mo, self.gaabb_mo, self.gbbaa_mo, self.kappa_idx, self.num_inactive_orbs, self.num_active_orbs)
+        return get_orbital_gradient_unrestricted(
+            rdms,
+            self.haa_mo,
+            self.hbb_mo,
+            self.gaaaa_mo,
+            self.gbbbb_mo,
+            self.gaabb_mo,
+            self.gbbaa_mo,
+            self.kappa_idx,
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+        )
+
 
 def energy_ups(
     parameters: Sequence[float],
@@ -1060,8 +1115,6 @@ def orbital_rotation_gradient(
     )
     gradient = get_orbital_gradient_unrestricted(
         rdms, wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.kappa_idx, wf.num_inactive_orbs, wf.num_active_orbs)
-    return gradient
-
 
 def active_space_parameter_gradient(
     wf: UnrestrictedWaveFunctionUPS,

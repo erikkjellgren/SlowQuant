@@ -638,12 +638,36 @@ class UpsStructure:
         Returns:
             Factorized UCCSD ansatz.
         """
-        valid_options = ("n_layers",)
+        valid_options = ("n_layers", "S", "D", "T", "Q", "5", "6")
         for option in ansatz_options:
             if option not in valid_options:
                 raise ValueError(f"Got unknown option for fUCC, {option}. Valid options are: {valid_options}")
         if "n_layers" not in ansatz_options.keys():
             raise ValueError("fUCC require the option 'n_layers'")
+        do_S = False
+        do_D = False
+        do_T = False
+        do_Q = False
+        do_5 = False
+        do_6 = False
+        if "S" in ansatz_options.keys():
+            if ansatz_options["S"]:
+                do_S = True
+        if "D" in ansatz_options.keys():
+            if ansatz_options["D"]:
+                do_D = True
+        if "T" in ansatz_options.keys():
+            if ansatz_options["T"]:
+                do_T = True
+        if "Q" in ansatz_options.keys():
+            if ansatz_options["Q"]:
+                do_Q = True
+        if "5" in ansatz_options.keys():
+            if ansatz_options["5"]:
+                do_5 = True
+        if "6" in ansatz_options.keys():
+            if ansatz_options["6"]:
+                do_6 = True
         n_layers = ansatz_options["n_layers"]
         num_spin_orbs = 2 * num_orbs
         occ = []
@@ -656,14 +680,36 @@ class UpsStructure:
             unocc.append(idx)
             idx += 1
         for _ in range(n_layers):
-            for a, i in iterate_t1(occ, unocc):
-                self.excitation_operator_type.append("single")
-                self.excitation_indicies.append((i, a))
-                self.n_params += 1
-            for a, i, b, j in iterate_t2(occ, unocc):
-                self.excitation_operator_type.append("double")
-                self.excitation_indicies.append((i, j, a, b))
-                self.n_params += 1
+            if do_S:
+                for a, i in iterate_t1(occ, unocc):
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indicies.append((i, a))
+                    self.n_params += 1
+            if do_D:
+                for a, i, b, j in iterate_t2(occ, unocc):
+                    self.excitation_operator_type.append("double")
+                    self.excitation_indicies.append((i, j, a, b))
+                    self.n_params += 1
+            if do_T:
+                for a, i, b, j, c, k in iterate_t3(occ, unocc):
+                    self.excitation_indicies.append((i, j, k, a, b, c))
+                    self.excitation_operator_type.append("triple")
+                    self.n_params += 1
+            if do_Q:
+                for a, i, b, j, c, k, d, l in iterate_t4(occ, unocc):
+                    self.excitation_indicies.append((i, j, k, l, a, b, c, d))
+                    self.excitation_operator_type.append("quadruple")
+                    self.n_params += 1
+            if do_5:
+                for a, i, b, j, c, k, d, l, e, m in iterate_t5(occ, unocc):
+                    self.excitation_indicies.append((i, j, k, l, m, a, b, c, d, e))
+                    self.excitation_operator_type.append("quintuple")
+                    self.n_params += 1
+            if do_6:
+                for a, i, b, j, c, k, d, l, e, m, f, n in iterate_t6(occ, unocc):
+                    self.excitation_indicies.append((i, j, k, l, m, n, a, b, c, d, e, f))
+                    self.excitation_operator_type.append("sextuple")
+                    self.n_params += 1
 
     def create_kSAfUpCCGSD(self, num_orbs: int, ansatz_options: dict[str, Any]) -> None:
         """Create modified k-UpCCGSD ansatz.
