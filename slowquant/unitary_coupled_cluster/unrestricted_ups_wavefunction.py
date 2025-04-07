@@ -1058,9 +1058,8 @@ def orbital_rotation_gradient(
         rdm2aabb=wf.rdm2aabb,
         rdm2bbaa=wf.rdm2bbaa,
     )
-    #gradient = get_orbital_gradient_unrestricted(
-     #   rdms, wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.kappa_idx, wf.num_inactive_orbs, wf.num_active_orbs)
-    gradient = wf.manual_gradient()
+    gradient = get_orbital_gradient_unrestricted(
+        rdms, wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.kappa_idx, wf.num_inactive_orbs, wf.num_active_orbs)
     return gradient
 
 
