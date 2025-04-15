@@ -161,10 +161,10 @@ class LinearResponseUCC(LinearResponseBaseClass):
         )
         for j, qJ in enumerate(self.q_ops):
             UdHq_ket = propagate_state_extended(
-                ["Ud", self.H_1i_1a * qJ], self.ci_coeffs, *self.index_info_extended
+                ["Ud", self.H_1i_1a, qJ], self.ci_coeffs, *self.index_info_extended
             )
             UdqdH_ket = propagate_state_extended(
-                ["Ud", qJ.dagger * self.H_1i_1a], self.ci_coeffs, *self.index_info_extended
+                ["Ud", qJ.dagger, self.H_1i_1a], self.ci_coeffs, *self.index_info_extended
             )
             for i, GI in enumerate(self.G_ops):
                 G_ket = propagate_state_extended(
@@ -264,7 +264,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     * expectation_value_extended(
                         UdH00_ket,
                         [GI.dagger, GJ],
-                        self.ci_coeffs,
+                        self.csf_coeffs,
                         *self.index_info_extended,
                     )
                 )

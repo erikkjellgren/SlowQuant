@@ -205,7 +205,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     )
                     * expectation_value(
                         GI_ket,
-                        [self.H_1i_1a],
+                        [self.H_0i_0a],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )

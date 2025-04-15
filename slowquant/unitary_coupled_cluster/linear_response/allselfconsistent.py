@@ -190,8 +190,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     )
                 )
                 # - 1/2<CSF| qJd qId Ud H |0>
-                val = (
-                    -1
+                val -= (
+                    1
                     / 2
                     * expectation_value_extended(
                         self.csf_coeffs,
