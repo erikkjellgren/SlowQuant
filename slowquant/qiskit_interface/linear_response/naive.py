@@ -190,9 +190,9 @@ class quantumLR(quantumLRBaseClass):
                 # Make A
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = (
                     self.wf.QI.quantum_expectation_value(
-                        double_commutator(GI.dagger, self.H_0i_0a, GJ, symmetrized=True).get_folded_operator(
-                            *self.orbs
-                        )
+                        double_commutator(
+                            GI.dagger, self.H_0i_0a, GJ, do_symmetrized=True
+                        ).get_folded_operator(*self.orbs)
                     )
                 )
                 # Make B
