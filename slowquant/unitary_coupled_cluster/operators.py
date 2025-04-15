@@ -104,7 +104,6 @@ def double_commutator(
 
     or for the symmetrized version,
 
-
     .. math::
         \left[\hat{A},\hat{B},\hat{C}\right] =
         \hat{A}\hat{H}\hat{B} + \hat{B}\hat{H}\hat{A} - \frac{1}{2}\left(\hat{A}\hat{B}\hat{H} + \hat{H}\hat{B}\hat{A} + \hat{B}\hat{A}\hat{H} + \hat{H}\hat{A}\hat{B}\right)
