@@ -159,7 +159,9 @@ class quantumLR(quantumLRBaseClass):
                     )
                     # Make B
                     self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = (
-                        -self.wf.QI.quantum_expectation_value(
+                        -1
+                        / 2
+                        * self.wf.QI.quantum_expectation_value(
                             (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
                         )
                     )
@@ -175,11 +177,13 @@ class quantumLR(quantumLRBaseClass):
                     (GI.dagger * GJ).get_folded_operator(*self.orbs)
                 )
                 val -= GG_exp * self.wf.energy_elec
-                val -= self._G_exp[i] * self._HG_exp[j]
                 val += self._G_exp[i] * self._G_exp[j] * self.wf.energy_elec
+                val -= 1 / 2 * self._G_exp[i] * self._HG_exp[j]
+                val -= 1 / 2 * self._G_exp[j] * self._HG_exp[i]
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
                 # Make B
-                val = self._HG_exp[i] * self._G_exp[j]
+                val = 1 / 2 * self._HG_exp[i] * self._G_exp[j]
+                val += 1 / 2 * self._HG_exp[i] * self._G_exp[j]
                 val -= self._G_exp[i] * self._G_exp[j] * self.wf.energy_elec
                 self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
                 # Make Sigma

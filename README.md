@@ -51,13 +51,14 @@ Just use [PySCF](https://github.com/pyscf/pyscf) instead.
 
 ## Feature Graveyard
 
-| Feature               | Last living commit                       |
-|-----------------------|------------------------------------------|
-| KS-DFT                | 1b9c5669ab72dfceee0a69c8dca1c67dd4b31bfd |
-| MP2                   | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
-| RPA                   | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
-| Geometry Optimization | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
-| CIS                   | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
-| CCSD                  | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
-| CCSD(T)               | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
+| Feature                                        | Last living commit                       |
+|------------------------------------------------|------------------------------------------|
+| Approxmiate Hermitification in linear response | 3f5df6818c4dbbb2b54606d0a1a4e00badfb766d |
+| KS-DFT                                         | 1b9c5669ab72dfceee0a69c8dca1c67dd4b31bfd |
+| MP2                                            | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
+| RPA                                            | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
+| Geometry Optimization                          | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
+| CIS                                            | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
+| CCSD                                           | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
+| CCSD(T)                                        | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
 | BOMD                  | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |

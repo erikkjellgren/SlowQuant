@@ -94,7 +94,9 @@ def commutator(A: FermionicOperator, B: FermionicOperator) -> FermionicOperator:
     return A * B - B * A
 
 
-def double_commutator(A: FermionicOperator, B: FermionicOperator, C: FermionicOperator) -> FermionicOperator:
+def double_commutator(
+    A: FermionicOperator, B: FermionicOperator, C: FermionicOperator, symmetrized: bool = False
+) -> FermionicOperator:
     r"""Construct operator double commutator.
 
     .. math::
@@ -104,10 +106,13 @@ def double_commutator(A: FermionicOperator, B: FermionicOperator, C: FermionicOp
         A: Fermionic operator.
         B: Fermionic operator.
         C: Fermionic operator.
+        symmetrized: Do symmetrized double commutator (default: False).
 
     Returns:
         Operator from double commutator.
     """
+    if symmetrized:
+        return A * B * C + C * B * A - 1 / 2 * (A * C * B + B * C * A + C * A * B + B * A * C)
     return A * B * C - A * C * B - B * C * A + C * B * A
 
 
