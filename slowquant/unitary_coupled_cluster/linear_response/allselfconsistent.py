@@ -178,27 +178,12 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 )
                 self.A[i, j] = self.A[j, i] = val
                 # Make B
-                # - 1/2<CSF| qId qJd Ud H |0>
-                val = (
-                    -1
-                    / 2
-                    * expectation_value_extended(
-                        qI_ket,
-                        [],
-                        qJdUdH_ket,
-                        *self.index_info_extended,
-                    )
-                )
-                # - 1/2<CSF| qJd qId Ud H |0>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value_extended(
-                        self.csf_coeffs,
-                        [qJ.dagger, qI.dagger],
-                        UdH_ket,
-                        *self.index_info_extended,
-                    )
+                # -<CSF| qId qJd Ud H |0>
+                val = -expectation_value_extended(
+                    qI_ket,
+                    [],
+                    qJdUdH_ket,
+                    *self.index_info_extended,
                 )
                 self.B[i, j] = self.B[j, i] = val
                 # Make Sigma
