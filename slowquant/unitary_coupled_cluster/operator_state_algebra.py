@@ -421,7 +421,7 @@ def expectation_value(
     do_folding: bool = True,
     unsafe: bool = False,
 ) -> float:
-    """Calculate expectation value of operator.
+    """Calculate expectation value of operator using propagate state.
 
     Args:
         bra: Bra state.
