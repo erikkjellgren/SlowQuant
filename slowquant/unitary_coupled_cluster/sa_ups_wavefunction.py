@@ -836,6 +836,7 @@ class WaveFunctionSAUPS:
             parameters: Ansatz and orbital rotation parameters.
             theta_optimization: If used in theta optimization.
             kappa_optimization: If used in kappa optimization.
+            return_all_states: Return the energy for all states instead of only the averaged energy.
 
         Returns:
             State-averaged electronic energy.

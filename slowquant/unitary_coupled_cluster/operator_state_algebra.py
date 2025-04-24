@@ -76,7 +76,7 @@ def propagate_state(
     thetas: Sequence[float],
     wf_struct: UpsStructure | UccStructure,
     do_folding: bool = True,
-    unsafe: bool = False,
+    do_unsafe: bool = False,
 ) -> np.ndarray:
     r"""Propagate state by applying operators.
 
@@ -95,7 +95,7 @@ def propagate_state(
                Ordered as (S, D, T, ...).
         wf_struct: wave function structure object.
         do_folding: Do folding of operator (default: True).
-        unsafe: Ignore elements that are outside the space defined in ci_info. (default: False)
+        do_unsafe: Ignore elements that are outside the space defined in ci_info. (default: False)
                 If not ignored, getting elements outside the space will stop the calculation.
 
     Returns:
@@ -171,7 +171,13 @@ def propagate_state(
                         det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
                         # take care of phases using parity_check
                         phase_changes += (det & parity_check[orb_idx]).bit_count()
-                    if unsafe:
+                    if do_unsafe:
+                        # For some algorithms it is guaranteed that the application of operators will always
+                        # keep the new determinants within a pre-defined space (in det2idx and idx2det).
+                        # For these algorithms it is a sign of bug if a keyerror when calling det2idx is found.
+                        # These algorithms thus does also not need to check for the exsistence of the new determinant
+                        # in det2idx.
+                        # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
                         if det not in det2idx:
                             continue
                     tmp_state[det2idx[det]] += (
@@ -419,7 +425,7 @@ def expectation_value(
     thetas: Sequence[float],
     wf_struct: UpsStructure | UccStructure,
     do_folding: bool = True,
-    unsafe: bool = False,
+    do_unsafe: bool = False,
 ) -> float:
     """Calculate expectation value of operator using propagate state.
 
@@ -431,6 +437,8 @@ def expectation_value(
         thetas: Active-space parameters.
                Ordered as (S, D, T, ...).
         wf_struct: Wave function structure object.
+        do_unsafe: Ignore elements that are outside the space defined in ci_info. (default: False)
+                If not ignored, getting elements outside the space will stop the calculation.
 
     Returns:
         Expectation value.
@@ -443,7 +451,7 @@ def expectation_value(
         thetas,
         wf_struct,
         do_folding=do_folding,
-        unsafe=unsafe,
+        do_unsafe=do_unsafe,
     )
     val = bra @ op_ket
     if not isinstance(val, float):
@@ -571,6 +579,12 @@ def get_ucc_T(
         elif exc_type == "sa_double_2":
             (i, j, a, b) = np.array(exc_indices) + offset
             T += theta * G2_2_sa(i, j, a, b, True)
+        elif exc_type == "single":
+            (i, a) = np.array(exc_indices) + 2 * offset
+            T += theta * G1(i, a, True)
+        elif exc_type == "double":
+            (i, j, a, b) = np.array(exc_indices) + 2 * offset
+            T += theta * G2(i, j, a, b, True)
         elif exc_type == "triple":
             (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
             T += theta * G3(i, j, k, a, b, c, True)
