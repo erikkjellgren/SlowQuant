@@ -269,6 +269,9 @@ class quantumLR(quantumLRBaseClass):
                     + self.wf.QI.op_to_qbit(
                         (self.H_1i_1a * qJ * GI.dagger).get_folded_operator(*self.orbs)
                     ).paulis.to_labels()
+                    + self.wf.QI.op_to_qbit(
+                        (self.H_1i_1a * GI.dagger * qJ).get_folded_operator(*self.orbs)
+                    ).paulis.to_labels()
                 )
                 A[i + idx_shift][j] = A[j][i + idx_shift] = val
                 # Make B
@@ -279,6 +282,9 @@ class quantumLR(quantumLRBaseClass):
                     + self.wf.QI.op_to_qbit(
                         (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
                     ).paulis.to_labels()
+                    + self.wf.QI.op_to_qbit(
+                        (qJ.dagger * GI.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                    ).paulis.to_labels()
                 )
                 B[i + idx_shift][j] = B[j][i + idx_shift] = val
 
@@ -287,7 +293,9 @@ class quantumLR(quantumLRBaseClass):
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
                 A[i + idx_shift][j + idx_shift] = A[j + idx_shift][i + idx_shift] = self.wf.QI.op_to_qbit(
-                    double_commutator(GI.dagger, self.H_1i_1a, GJ).get_folded_operator(*self.orbs)
+                    double_commutator(GI.dagger, self.H_1i_1a, GJ, do_symmetrized=True).get_folded_operator(
+                        *self.orbs
+                    )
                 ).paulis.to_labels()
                 # Make B
                 B[i + idx_shift][j + idx_shift] = B[j + idx_shift][i + idx_shift] = self.wf.QI.op_to_qbit(
@@ -396,8 +404,15 @@ class quantumLR(quantumLRBaseClass):
                     self.wf.QI.quantum_variance(
                         (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
                     )
-                    + self.wf.QI.quantum_variance(
+                    + 1
+                    / 2
+                    * self.wf.QI.quantum_variance(
                         (self.H_1i_1a * qJ * GI.dagger).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
+                    + 1
+                    / 2
+                    * self.wf.QI.quantum_variance(
+                        (self.H_1i_1a * GI.dagger * qJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
                     )
                 )
                 A[i + idx_shift, j] = A[j, i + idx_shift] = val
@@ -407,8 +422,16 @@ class quantumLR(quantumLRBaseClass):
                         (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs),
                         no_coeffs=no_coeffs,
                     )
-                    + self.wf.QI.quantum_variance(
+                    + 1
+                    / 2
+                    * self.wf.QI.quantum_variance(
                         (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs),
+                        no_coeffs=no_coeffs,
+                    )
+                    + 1
+                    / 2
+                    * self.wf.QI.quantum_variance(
+                        (qJ.dagger * GI.dagger * self.H_1i_1a).get_folded_operator(*self.orbs),
                         no_coeffs=no_coeffs,
                     )
                 )
@@ -420,7 +443,9 @@ class quantumLR(quantumLRBaseClass):
                 # Make A
                 A[i + idx_shift, j + idx_shift] = A[j + idx_shift, i + idx_shift] = np.sqrt(
                     self.wf.QI.quantum_variance(
-                        double_commutator(GI.dagger, self.H_0i_0a, GJ).get_folded_operator(*self.orbs),
+                        double_commutator(
+                            GI.dagger, self.H_0i_0a, GJ, do_symmetrized=True
+                        ).get_folded_operator(*self.orbs),
                         no_coeffs=no_coeffs,
                     )
                 )
