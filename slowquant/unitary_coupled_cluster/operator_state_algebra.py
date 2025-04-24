@@ -460,7 +460,7 @@ def expectation_value_SA(
     wf_struct: UpsStructure,
     do_folding: bool = True,
 ) -> float:
-    """Calculate expectation value of operator.
+    """Calculate expectation value of operator with a SA wave function using propagate state.
 
     Args:
         bra: Bra state.
