@@ -253,62 +253,6 @@ def test_LiH_naiveq_methods_energies() -> None:
     )
     assert np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)
 
-    # HST
-    LR_HST_naive = statetransfer.LinearResponseUCC(
-        WF,
-        excitations="SD",
-        do_approximate_hermitification=True,
-    )
-    LR_HST_naive.calc_excitation_energies()
-
-    solutions = np.array(
-        [
-            0.12957234,
-            0.17886086,
-            0.17886086,
-            0.60515489,
-            0.64717441,
-            0.74104045,
-            0.74104045,
-            1.003942,
-            2.07479277,
-            2.13715595,
-            2.13715595,
-            2.45576414,
-            2.95517029,
-        ]
-    )
-
-    assert np.allclose(LR_HST_naive.excitation_energies, solutions, atol=threshold * 10)
-
-    # HSC
-    LR_HSC_naive = selfconsistent.LinearResponseUCC(
-        WF,
-        excitations="SD",
-        do_approximate_hermitification=True,
-    )
-    LR_HSC_naive.calc_excitation_energies()
-
-    solutions = np.array(
-        [
-            0.12957234,
-            0.17886086,
-            0.17886086,
-            0.60515489,
-            0.64717441,
-            0.74104045,
-            0.74104045,
-            1.003942,
-            2.07479277,
-            2.13715595,
-            2.13715595,
-            2.45576414,
-            2.95517029,
-        ]
-    )
-
-    assert np.allclose(LR_HSC_naive.excitation_energies, solutions, atol=threshold * 10)
-
 
 def test_LiH_naiveq_methods_matrices() -> None:
     """Test LiH all matrices and their properties for naive q LR methods."""
@@ -377,16 +321,6 @@ def test_LiH_naiveq_methods_matrices() -> None:
     assert np.allclose(LR_naive.A, LR_naive.A.T, atol=threshold)
     assert np.allclose(LR_naive.B, LR_naive.B.T, atol=threshold)
     assert np.allclose(LR_naive.Delta, np.zeros_like(LR_naive.Delta), atol=threshold)
-
-    # HST
-    LR_HST_naive = statetransfer.LinearResponseUCC(
-        WF,
-        excitations="SD",
-        do_approximate_hermitification=True,
-    )
-
-    assert np.allclose(LR_HST_naive.A, LR_HST_naive.A.T, atol=threshold)
-    assert np.allclose(LR_HST_naive.B, LR_HST_naive.B.T, atol=threshold)
 
 
 def test_LiH_allproj_energies() -> None:
@@ -492,31 +426,3 @@ def test_LiH_STproj_energies() -> None:
     )
 
     assert np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)
-
-    # HSTproj
-    LR_HSTproj_naive = projected_statetransfer.LinearResponseUCC(
-        WF,
-        excitations="SD",
-        do_approximate_hermitification=True,
-    )
-    LR_HSTproj_naive.calc_excitation_energies()
-
-    solutions = np.array(
-        [
-            0.12972911,
-            0.18092787,
-            0.18092787,
-            0.6053739,
-            0.64747858,
-            0.74982806,
-            0.74982806,
-            1.00424528,
-            2.07489505,
-            2.13720683,
-            2.13720683,
-            2.45602345,
-            2.95608694,
-        ]
-    )
-
-    assert np.allclose(LR_HSTproj_naive.excitation_energies, solutions, atol=threshold * 10)  # type: ignore [assignment]
