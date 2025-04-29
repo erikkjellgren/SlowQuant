@@ -30,14 +30,12 @@ class LinearResponseUCC(LinearResponseBaseClass):
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
-        do_approximate_hermitification: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
-            do_approximate_hermitification: approximated method with BqG = 0 and AqG made Hermitian
         """
         super().__init__(wave_function, excitations)
 
@@ -48,10 +46,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
             self.wf.num_active_orbs,
             self.wf.num_virtual_orbs,
         )
-
-        num_parameters = len(self.G_ops) + len(self.q_ops)
-        if do_approximate_hermitification:
-            self.B_tracked = np.zeros((num_parameters, num_parameters))
 
         rdms = ReducedDenstiyMatrix(
             self.wf.num_inactive_orbs,
@@ -126,36 +120,17 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 )
         for j, qJ in enumerate(self.q_ops):
             UdHq_ket = propagate_state(["Ud", self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info)
-            UdqdH_ket = propagate_state(["Ud", qJ.dagger * self.H_1i_1a], self.wf.ci_coeffs, *self.index_info)
             for i, GI in enumerate(self.G_ops):
                 G_ket = propagate_state([GI], self.wf.csf_coeffs, *self.index_info)
-                if do_approximate_hermitification:
-                    # Make A
-                    # <CSF| Gd Ud H q |0>
-                    val = expectation_value(
-                        G_ket,
-                        [],
-                        UdHq_ket,
-                        *self.index_info,
-                    )
-                    # <CSF| Gd Ud qd H |0>
-                    val += expectation_value(
-                        G_ket,
-                        [],
-                        UdqdH_ket,
-                        *self.index_info,
-                    )
-                    self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = val
-                else:
-                    # Make A
-                    # <CSF| Gd Ud H q |0>
-                    val = expectation_value(
-                        G_ket,
-                        [],
-                        UdHq_ket,
-                        *self.index_info,
-                    )
-                    self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = val
+                # Make A
+                # <CSF| Gd Ud H q |0>
+                val = expectation_value(
+                    G_ket,
+                    [],
+                    UdHq_ket,
+                    *self.index_info,
+                )
+                self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = val
         for j, GJ in enumerate(self.G_ops):
             UdHUGJ_ket = propagate_state(
                 ["Ud", self.H_0i_0a, "U", GJ],

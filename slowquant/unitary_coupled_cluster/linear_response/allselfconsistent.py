@@ -122,16 +122,16 @@ class LinearResponseUCC(LinearResponseBaseClass):
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
                 raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
-        H_ket = propagate_state([H_2i_2a], self.ci_coeffs, *self.index_info_extended, unsafe=True)  # type: ignore
+        H_ket = propagate_state([H_2i_2a], self.ci_coeffs, *self.index_info_extended, do_unsafe=True)  # type: ignore
+        UdH_ket = propagate_state(["Ud"], H_ket, *self.index_info_extended, do_unsafe=True)  # type: ignore
         for j, qJ in enumerate(self.q_ops):
             UdHUqJ_ket = propagate_state(
-                ["Ud", H_2i_2a, "U", qJ], self.csf_coeffs, *self.index_info_extended, unsafe=True  # type: ignore
+                ["Ud", H_2i_2a, "U", qJ], self.csf_coeffs, *self.index_info_extended, do_unsafe=True  # type: ignore
             )
-            UdH_ket = propagate_state(["Ud"], H_ket, *self.index_info_extended, unsafe=True)  # type: ignore
-            qJUdH_ket = propagate_state([qJ], UdH_ket, *self.index_info_extended, unsafe=True)  # type: ignore
-            qJdUdH_ket = propagate_state([qJ.dagger], UdH_ket, *self.index_info_extended, unsafe=True)  # type: ignore
+            qJUdH_ket = propagate_state([qJ], UdH_ket, *self.index_info_extended, do_unsafe=True)  # type: ignore
+            qJdUdH_ket = propagate_state([qJ.dagger], UdH_ket, *self.index_info_extended, do_unsafe=True)  # type: ignore
             for i, qI in enumerate(self.q_ops[j:], j):
-                qI_ket = propagate_state([qI], self.csf_coeffs, *self.index_info_extended, unsafe=True)  # type: ignore
+                qI_ket = propagate_state([qI], self.csf_coeffs, *self.index_info_extended, do_unsafe=True)  # type: ignore
                 # Make A
                 # <CSF| qId Ud H U qJ |CSF>
                 val = expectation_value(
@@ -140,16 +140,31 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     UdHUqJ_ket,
                     *self.index_info_extended,
                 )
-                # - <CSF| qId qJ Ud H |0>
-                val -= expectation_value(
-                    qI_ket,
-                    [],
-                    qJUdH_ket,
-                    *self.index_info_extended,
+                # - 1/2<CSF| qId qJ Ud H |0>
+                val -= (
+                    1
+                    / 2
+                    * expectation_value(
+                        qI_ket,
+                        [],
+                        qJUdH_ket,
+                        *self.index_info_extended,
+                    )
+                )
+                # - 1/2<0| H U qId qJ |CSF>
+                val -= (
+                    1
+                    / 2
+                    * expectation_value(
+                        UdH_ket,
+                        [qI.dagger, qJ],
+                        self.csf_coeffs,
+                        *self.index_info_extended,
+                    )
                 )
                 self.A[i, j] = self.A[j, i] = val
                 # Make B
-                # - <CSF| qId qJd Ud H |0>
+                # -<CSF| qId qJd Ud H |0>
                 val = -expectation_value(
                     qI_ket,
                     [],
@@ -162,10 +177,10 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     self.Sigma[i, j] = self.Sigma[j, i] = 1
         for j, qJ in enumerate(self.q_ops):
             UdHUq_ket = propagate_state(
-                ["Ud", self.H_1i_1a, "U", qJ], self.csf_coeffs, *self.index_info_extended, unsafe=True  # type: ignore
+                ["Ud", self.H_1i_1a, "U", qJ], self.csf_coeffs, *self.index_info_extended, do_unsafe=True  # type: ignore
             )
             qdUdH_ket = propagate_state(
-                [qJ.dagger, "Ud", self.H_1i_1a], self.ci_coeffs, *self.index_info_extended, unsafe=True  # type: ignore
+                [qJ.dagger, "Ud", self.H_1i_1a], self.ci_coeffs, *self.index_info_extended, do_unsafe=True  # type: ignore
             )
             for i, GI in enumerate(self.G_ops):
                 G_ket = propagate_state([GI], self.csf_coeffs, *self.index_info_extended)
@@ -179,12 +194,27 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 )
                 self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
                 # Make B
-                # - <CSF| Gd qd Ud H |0>
-                val = -expectation_value(
-                    G_ket,
-                    [],
-                    qdUdH_ket,
-                    *self.index_info_extended,
+                # - 1/2*<CSF| Gd qd Ud H |0>
+                val = (
+                    -1
+                    / 2
+                    * expectation_value(
+                        G_ket,
+                        [],
+                        qdUdH_ket,
+                        *self.index_info_extended,
+                    )
+                )
+                # - 1/2<CSF| qd Gd Ud H |0>
+                val -= (
+                    1
+                    / 2
+                    * expectation_value(
+                        self.csf_coeffs,
+                        [qJ.dagger, GI.dagger],
+                        UdH_ket,
+                        *self.index_info_extended,
+                    )
                 )
                 self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
         for j, GJ in enumerate(self.G_ops):
@@ -203,12 +233,27 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     UdHUGJ_ket,
                     *self.index_info_extended,
                 )
-                # - <CSF| GId GJ Ud H |0>
-                val -= expectation_value(
-                    GI_ket,
-                    [],
-                    GJUdH_ket,
-                    *self.index_info_extended,
+                # - 1/2<CSF| GId GJ Ud H |0>
+                val -= (
+                    1
+                    / 2
+                    * expectation_value(
+                        GI_ket,
+                        [],
+                        GJUdH_ket,
+                        *self.index_info_extended,
+                    )
+                )
+                # - 1/2<0| H U GId GJ |CSF>
+                val -= (
+                    1
+                    / 2
+                    * expectation_value(
+                        UdH00_ket,
+                        [GI.dagger, GJ],
+                        self.csf_coeffs,
+                        *self.index_info_extended,
+                    )
                 )
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
                 # Make B
@@ -274,42 +319,42 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     [mux_op_q, "U", q],
                     self.csf_coeffs,
                     *self.index_info_extended,
-                    unsafe=True,  # type: ignore
+                    do_unsafe=True,  # type: ignore
                 )
                 q_part_x += self.Y_q_normed[i, state_number] * expectation_value(
                     self.csf_coeffs,
                     [q.dagger, "Ud", mux_op_q],
                     self.ci_coeffs,
                     *self.index_info_extended,
-                    unsafe=True,  # type: ignore
+                    do_unsafe=True,  # type: ignore
                 )
                 q_part_y -= self.Z_q_normed[i, state_number] * expectation_value(
                     self.ci_coeffs,
                     [muy_op_q, "U", q],
                     self.csf_coeffs,
                     *self.index_info_extended,
-                    unsafe=True,  # type: ignore
+                    do_unsafe=True,  # type: ignore
                 )
                 q_part_y += self.Y_q_normed[i, state_number] * expectation_value(
                     self.csf_coeffs,
                     [q.dagger, "Ud", muy_op_q],
                     self.ci_coeffs,
                     *self.index_info_extended,
-                    unsafe=True,  # type: ignore
+                    do_unsafe=True,  # type: ignore
                 )
                 q_part_z -= self.Z_q_normed[i, state_number] * expectation_value(
                     self.ci_coeffs,
                     [muz_op_q, "U", q],
                     self.csf_coeffs,
                     *self.index_info_extended,
-                    unsafe=True,  # type: ignore
+                    do_unsafe=True,  # type: ignore
                 )
                 q_part_z += self.Y_q_normed[i, state_number] * expectation_value(
                     self.csf_coeffs,
                     [q.dagger, "Ud", muz_op_q],
                     self.ci_coeffs,
                     *self.index_info_extended,
-                    unsafe=True,  # type: ignore
+                    do_unsafe=True,  # type: ignore
                 )
             g_part_x = 0.0
             g_part_y = 0.0
