@@ -403,6 +403,7 @@ def expectation_value(
         thetas: Active-space parameters.
                Ordered as (S, D, T, ...).
         wf_struct: Wave function structure object.
+        do_folding: Do folding of operator (default: True).
         do_unsafe: Ignore elements that are outside the space defined in ci_info. (default: False)
                 If not ignored, getting elements outside the space will stop the calculation.
 
