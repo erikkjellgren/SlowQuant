@@ -383,40 +383,6 @@ def get_determinants_SA(
                 yield i, det[i]
 
 
-def _propagate_state(
-    state: np.ndarray,
-    operators: list[FermionicOperator | str],
-    ci_info: CI_Info,
-    thetas: Sequence[float],
-    wf_struct: UpsStructure | UccStructure,
-    do_folding: bool = True,
-) -> np.ndarray:
-    """Call propagate_state.
-
-    _propagate_state has another order of the arguments,
-    which is needed when using functools.partial.
-    """
-    if len(np.shape(state)) == 2:
-        # Needed because SciPy can send in vectors with the shape,
-        # (n, 1) and the JIT accelerated code expect the shape (n,).
-        return propagate_state(
-            operators,
-            state[:, 0],
-            ci_info,
-            thetas,
-            wf_struct,
-            do_folding=do_folding,
-        )
-    return propagate_state(
-        operators,
-        state,
-        ci_info,
-        thetas,
-        wf_struct,
-        do_folding=do_folding,
-    )
-
-
 def expectation_value(
     bra: np.ndarray,
     operators: list[FermionicOperator | str],
@@ -519,27 +485,6 @@ def construct_ucc_state(
     """
     # Build up T matrix based on excitations in ucc_struct and given thetas
     T = get_ucc_T(thetas, ucc_struct, ci_info.space_extension_offset)
-    # mv = functools.partial(
-    #    _propagate_state,
-    #    operators=[T],
-    #    ci_info=ci_info,
-    #    thetas=thetas,
-    #    wf_struct=ucc_struct,
-    #    do_folding=False,
-    # )
-    # rmv = functools.partial(
-    #    _propagate_state,
-    #    operators=[-1.0 * T],
-    #    ci_info=ci_info,
-    #    thetas=thetas,
-    #    wf_struct=ucc_struct,
-    #    do_folding=False,
-    # )
-
-    # linopT = ss.linalg.LinearOperator((len(state), len(state)), matvec=mv, rmatvec=rmv)
-    # if dagger:
-    #    return ss.linalg.expm_multiply(-linopT, state, traceA=0.0)
-    # return ss.linalg.expm_multiply(linopT, state, traceA=0.0)
     # Evil matrix construction
     Tmat = build_operator_matrix(T, ci_info)
     if dagger:
