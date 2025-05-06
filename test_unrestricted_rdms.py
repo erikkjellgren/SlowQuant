@@ -60,19 +60,19 @@ WF = UnrestrictedWaveFunctionUPS(
     mf.mo_coeff,
     h_core,
     g_eri,
-    "fUCC",
-    {"n_layers": 2},
-    include_active_kappa=True
+    "fuccsd",
+    {"n_layers": 1},
+    include_active_kappa=True,
 )
-print(WF.manual_gradient())
-print(WF.orbital_gradient_RDM)
-with np.printoptions(precision=3, suppress=True):
-    print(WF.orbital_gradient_RDM - WF.manual_gradient())
+#print(WF.manual_gradient())
+#print(WF.orbital_gradient_RDM)
+#with np.printoptions(precision=3, suppress=True):
+#    print(WF.orbital_gradient_RDM - WF.manual_gradient())
 #WF.run_ups(orbital_optimization=True)
 #print(WF.manual_gradient())
 #print(WF.orbital_gradient_RDM)
 #print("hej2", WF.energy_elec + SQobj.molecule.nuclear_repulsion, WF.energy_elec  + SQobj.molecule.nuclear_repulsion - res[0])
-        
+print(WF.orbital_response_hessian_unrestricted)        
 #print("aa", WF.rdm1aa, "bb", WF.rdm1bb,"aaaa", WF.rdm2aaaa, "bbbb", WF.rdm2bbbb, "aabb", WF.rdm2aabb)
 
 #print("RDM" , WF.energy_elec_RDM, "elec", WF.energy_elec, "pyscf", mf.energy_elec()[0])

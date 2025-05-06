@@ -454,7 +454,7 @@ def get_electronic_energy_unrestricted(
         for q in range(num_inactive_orbs + num_active_orbs):
             for r in range(num_inactive_orbs + num_active_orbs):
                 for s in range(num_inactive_orbs + num_active_orbs):
-                    energy += 1 / 2 * (g_int_aaaa[p, q, r, s] * rdms.RDM2aaaa(p, q, r, s) + g_int_bbbb[p, q, r, s] * rdms.RDM2bbbb(p, q, r, s) + g_int_aabb[p, q, r, s] * rdms.RDM2aabb(p, q, r, s) + g_int_bbaa[p, q, r, s] * rdms.RDM2bbaa(p, q, r, s))
+                    energy += 1 / 2 * (g_int_aaaa[p, q, r, s] * rdms.RDM2aaaa(p, r, s, q) + g_int_bbbb[p, q, r, s] * rdms.RDM2bbbb(p, r, s, q) + g_int_aabb[p, q, r, s] * rdms.RDM2aabb(p, r, s, q) + g_int_bbaa[p, q, r, s] * rdms.RDM2bbaa(p, r, s, q))
 
     return energy
 
@@ -527,3 +527,144 @@ def get_orbital_gradient_unrestricted(
                     gradient[idx + len(kappa_idx)] -= 0.5 * g_int_bbaa[p, m, q, r] * rdms.RDM2bbaa(p, q, r, n)
                     gradient[idx + len(kappa_idx)] += 0.5 * g_int_bbaa[p, n, q, r] * rdms.RDM2bbaa(p, q, r, m)
     return gradient
+
+
+# tror ikke det er gradienten jeg laver, men hessian block
+def get_orbital_response_hessian_block_unrestricted(
+        rdms: UnrestrictedReducedDensityMatrix,
+        h_int_aa: np.ndarray,
+        h_int_bb: np.ndarray,
+        g_int_aaaa: np.ndarray,
+        g_int_bbbb: np.ndarray,
+        g_int_aabb: np.ndarray,
+        g_int_bbaa: np.ndarray,
+        kappa_idx1: list[list[int]],
+        kappa_idx2: list[list[int]],
+        num_inactive_orbs: int,
+        num_active_orbs: int,
+) -> np.ndarray:
+    r"""Calculate Hessian-like orbital-orbital block in an unrestricted scheme.
+
+    .. math::
+        H^{\hat{q},\hat{q}}_{tu,mn} = \left<0\left|\left[\hat{q}_{tu},\left[\hat{H},\hat{q}_{mn}\right]\right]\right|0\right>
+
+    Args:
+       rdms: Reduced density matrix class.
+       kappa_idx1: Orbital parameter indicies in spatial basis.
+       kappa_idx2: Orbital parameter indicies in spatial basis.
+       num_inactive_orbs: Number of inactive orbitals in spatial basis.
+       num_active_orbs: Number of active orbitals in spatial basis.
+
+    Returns:
+        Hessian-like orbital-orbital block.
+    """
+
+    A1e = np.zeros((len(kappa_idx1)), len(kappa_idx2))
+    A2e = np.zeros((len(kappa_idx1)), len(kappa_idx2))
+    shift1 = len(kappa_idx1)
+    shift2 = len(kappa_idx2)
+    for idx1, (t, u) in enumerate(kappa_idx1):
+        for idx2, (m, n) in enumerate(kappa_idx2):
+            A1e[idx1, idx2] += h_int_aa[u, m] * rdms.RDM1aa(t, n)
+            A1e[idx1, idx2] += h_int_aa[n, t] * rdms.RDM1aa(m, u)
+            A1e[idx1 + shift1, idx2 + shift2] += h_int_bb[u, m] * rdms.RDM1bb(t, n)
+            A1e[idx1 + shift1, idx2 + shift2] += h_int_bb[n, t] * rdms.RDM1bb(m, u)
+            for p in range(num_inactive_orbs + num_active_orbs):
+                if m == u: 
+                    A1e[idx1, idx2] -= h_int_aa[n, p] * rdms.RDM1aa(t, p)
+                    A1e[idx1 + shift1, idx2 + shift2] -= h_int_bb[n, p] * rdms.RDM1bb(t, p)
+                if t == n:
+                    A1e[idx1, idx2] -= h_int_aa[p, m] * rdms.RDM1aa(p, u)
+                    A1e[idx1 + shift1, idx2 + shift2] -= h_int_bb[p, m] * rdms.RDM1bb(p, u)
+            for p in range(num_inactive_orbs + num_active_orbs):
+                for q in range(num_inactive_orbs + num_active_orbs):
+                    #mu, nu, sigma, tau = alpha
+                    A2e[idx1, idx2] += g_int_aaaa[u, m, p, q] * rdms.RDM2aaaa(t, p, q, n)
+                    A2e[idx1, idx2] -= g_int_aaaa[p, m, u, q] * rdms.RDM2aaaa(t, p, q, n) 
+                    A2e[idx1, idx2] -= g_int_aaaa[u, p, q, m] * rdms.RDM2aaaa(t, q, p, n)
+                    A2e[idx1, idx2] += g_int_aaaa[p, q, u, m] * rdms.RDM2aaaa(t, p, q, n)
+                    A2e[idx1, idx2] += g_int_aaaa[n, p, u, q] * rdms.RDM2aaaa(t, m, q, n)
+                    A2e[idx1, idx2] -= g_int_aaaa[u, p, n, q] * rdms.RDM2aaaa(t, m, q, p)
+                    A2e[idx1, idx2] += g_int_aaaa[p, m, q, t] * rdms.RDM2aaaa(p, q, n, u)
+                    A2e[idx1, idx2] -= g_int_aaaa[p, t, q, m] * rdms.RDM2aaaa(p, q, n, u)
+                    A2e[idx1, idx2] += g_int_aaaa[n, t, p, q] * rdms.RDM2aaaa(m, p, q, u)
+                    A2e[idx1, idx2] -= g_int_aaaa[n, p, q, t] * rdms.RDM2aaaa(m, q, p, u)
+                    A2e[idx1, idx2] -= g_int_aaaa[p, t, n, q] * rdms.RDM2aaaa(m, p, q, u)
+                    A2e[idx1, idx2] += g_int_aaaa[p, q, n, t] * rdms.RDM2aaaa(m, p, q, u)
+
+                    #mu, nu, sigma, tau = beta
+                    A2e[idx1 + shift1, idx2 + shift2] += g_int_bbbb[u, m, p, q] * rdms.RDM2bbbb(t, p, q, n)
+                    A2e[idx1 + shift1, idx2 + shift2] -= g_int_bbbb[p, m, u, q] * rdms.RDM2bbbb(t, p, q, n)
+                    A2e[idx1 + shift1, idx2 + shift2] -= g_int_bbbb[u, p, q, m] * rdms.RDM2bbbb(t, q, p, n)
+                    A2e[idx1 + shift1, idx2 + shift2] += g_int_bbbb[p, q, u, m] * rdms.RDM2bbbb(t, p, q, n)
+                    A2e[idx1 + shift1, idx2 + shift2] += g_int_bbbb[n, p, u, q] * rdms.RDM2bbbb(t, m, q, n)
+                    A2e[idx1 + shift1, idx2 + shift2] -= g_int_bbbb[u, p, n, q] * rdms.RDM2bbbb(t, m, q, p)
+                    A2e[idx1 + shift1, idx2 + shift2] += g_int_bbbb[p, m, q, t] * rdms.RDM2bbbb(p, q, n, u)
+                    A2e[idx1 + shift1, idx2 + shift2] -= g_int_bbbb[p, t, q, m] * rdms.RDM2bbbb(p, q, n, u)
+                    A2e[idx1 + shift1, idx2 + shift2] += g_int_bbbb[n, t, p, q] * rdms.RDM2bbbb(m, p, q, u)
+                    A2e[idx1 + shift1, idx2 + shift2] -= g_int_bbbb[n, p, q, t] * rdms.RDM2bbbb(m, q, p, u)
+                    A2e[idx1 + shift1, idx2 + shift2] -= g_int_bbbb[p, t, n, q] * rdms.RDM2bbbb(m, p, q, u)
+                    A2e[idx1 + shift1, idx2 + shift2] += g_int_bbbb[p, q, n, t] * rdms.RDM2bbbb(m, p, q, u)
+                    
+                    #nu, mu, tau = alpha, sigma = beta
+                    A2e[idx1, idx2] += g_int_bbaa[p, q, u, m] * rdms.RDM2aabb(t, p, q, n)
+                    A2e[idx1, idx2] += g_int_bbaa[p, q, n, t] * rdms.RDM2aabb(m, p, q, u)
+
+                    #nu, mu, sigma = alpha, tau = beta
+                    A2e[idx1, idx2] += g_int_aabb[u, m, p, q] * rdms.RDM2aabb(t, p, q, n)
+                    A2e[idx1, idx2] += g_int_aabb[n, t, p, q] * rdms.RDM2aabb(m, p, q, u)
+
+                    #nu, mu, tau = beta, sigma = alpha
+                    A2e[idx1 + shift1, idx2 + shift2] += g_int_aabb[p, q, u, m] * rdms.RDM2bbaa(t, p, q, n)
+                    A2e[idx1 + shift1, idx2 + shift2] += g_int_aabb[p, q, n, t] * rdms.RDM2bbaa(m, p, q, u)
+
+                    #nu, mu, sigma = beta, tau = alpha
+                    A2e[idx1 + shift1, idx2 + shift2] += g_int_bbaa[u, m, p, q] * rdms.RDM2bbaa(t, p, q, n)
+                    A2e[idx1 + shift1, idx2 + shift2] += g_int_bbaa[n, t, p, q] * rdms.RDM2bbaa(m, p, q, u)
+                    
+                    #mu, sigma = beta, nu, tau = alpha
+                    A2e[idx1 + shift1, idx2] += g_int_bbaa[u, p, q, m] * rdms.RDM2bbaa(t, q, n, p) #ombyttet indices 3
+                    A2e[idx1 + shift1, idx2] -= g_int_bbaa[u, p, n, q] * rdms.RDM2bbaa(t, m, q, p)
+                    A2e[idx1 + shift1, idx2] -= g_int_bbaa[p, t, q, m] * rdms.RDM2bbaa(p, q, n, u)
+                    A2e[idx1 + shift1, idx2] += g_int_bbaa[p, t, n, q] * rdms.RDM2bbaa(p, m, q, u) #ombyttet indices 15
+
+                    #mu, tau = beta, nu, sigma = alpha
+                    A2e[idx1 + shift1, idx2] += g_int_aabb[p, m, u, q] * rdms.RDM2aabb(p, t, q, n) #ombyttet indices 2
+                    A2e[idx1 + shift1, idx2] -= g_int_aabb[n, p, u, q] * rdms.RDM2aabb(m, t, q, n) #ombyttet indices 6
+                    A2e[idx1 + shift1, idx2] -= g_int_aabb[p, m, q, t] * rdms.RDM2aabb(p, q, u, n) #ombyttet indices 10
+                    A2e[idx1 + shift1, idx2] += g_int_aabb[n, p, q, t] * rdms.RDM2aabb(m, q, u, p) #ombyttet indices 14
+
+                    #mu, sigma = alpha, nu, tau = beta
+                    A2e[idx1, idx2 + shift2] += g_int_aabb[u, p, q, m] * rdms.RDM2aabb(t, q, n, p) #ombyttet indices 3
+                    A2e[idx1, idx2 + shift2] -= g_int_aabb[u, p, n, q] * rdms.RDM2aabb(t, m, q, p)
+                    A2e[idx1, idx2 + shift2] -= g_int_aabb[p, t, q, m] * rdms.RDM2aabb(p, q, n, u)
+                    A2e[idx1, idx2 + shift2] += g_int_aabb[p, t, n, q] * rdms.RDM2aabb(p, m, q, u) #ombyttet indices 15
+
+                    #mu, tau = alpha, nu, sigma = beta
+                    A2e[idx1, idx2 + shift2] += g_int_bbaa[p, m, u, q] * rdms.RDM2bbaa(p, t, q, n) #ombyttet indices 2
+                    A2e[idx1, idx2 + shift2] -= g_int_bbaa[n, p, u, q] * rdms.RDM2bbaa(m, t, q, n) #ombyttet indices 6
+                    A2e[idx1, idx2 + shift2] -= g_int_bbaa[p, m, q, t] * rdms.RDM2bbaa(p, q, u, n) #ombyttet indices 10
+                    A2e[idx1, idx2 + shift2] += g_int_bbaa[n, p, q, t] * rdms.RDM2bbaa(m, q, u, p) #ombyttet indeices 14
+
+            for p in range(num_inactive_orbs + num_active_orbs):
+                    for q in range(num_inactive_orbs + num_active_orbs):
+                        for r in range(num_inactive_orbs + num_active_orbs):
+                            if m == u:
+                                A2e[idx1, idx2] -= g_int_aaaa[n, p, q, r] * rdms.RDM2aaaa(t, q, r, p)
+                                A2e[idx1, idx2] += g_int_aaaa[p, q, n, r] * rdms.RDM2aaaa(t, p, r, q)
+                                A2e[idx1 + shift1, idx2 + shift2] -= g_int_bbbb[n, p, q, r] * rdms.RDM2bbbb(t, q, r, p)
+                                A2e[idx1 + shift1, idx2 + shift2] += g_int_bbbb[p, q, n, r] * rdms.RDM2bbbb(t, p, r, q)
+                                A2e[idx1, idx2] -= g_int_bbaa[p, q, n, r] * rdms.RDM2aabb(t, p, q, r) # ombytte indices (skal flyttes) 7
+                                A2e[idx1, idx2] -= g_int_aabb[n, p, q, r] * rdms.RDM2aabb(t, q, r, p) # skal flyttes 5
+                                A2e[idx1 + shift1, idx2 + shift2] -= g_int_aabb[p, q, n, r] * rdms.RDM2bbaa(t, p, q, r) # ombytte indices (skal flyttes) 7
+                                A2e[idx1 + shift1, idx2 + shift2] -= g_int_bbaa[n, p, q, r] * rdms.RDM2bbaa(t, q, r, p) # skal flyttes 5
+                            if t == n:
+                                A2e[idx1, idx2] -= g_int_aaaa[p, m, q, r] * rdms.RDM2aaaa(p, q, r, u)
+                                A2e[idx1, idx2] += g_int_aaaa[p, q, r, m] * rdms.RDM2aaaa(p, r, q, u)
+                                A2e[idx1 + shift1, idx2 + shift2] -= g_int_bbbb[p, m, q, r] * rdms.RDM2bbbb(p, q, r, u)
+                                A2e[idx1 + shift1, idx2 + shift2] += g_int_bbbb[p, q, r, m] * rdms.RDM2bbbb(p, r, q, u)
+                                A2e[idx1, idx2] -= g_int_bbaa[p, q, r, m] * rdms.RDM2aabb(r, p, q, u) # ombytte indices (skal flyttes) 11 
+                                A2e[idx1, idx2] -= g_int_aabb[p, m, q, r] * rdms.RDM2aabb(p, q, r, u) # skal flyttes 9 
+                                A2e[idx1 + shift1, idx2 + shift2] -= g_int_aabb[p, q, r, m] * rdms.RDM2bbaa(r, p, q, u) # ombytte indices (skal flyttes) 11             
+                                A2e[idx1 + shift1, idx2 + shift2] -= g_int_bbaa[p, m, q, r] * rdms.RDM2bbaa(p, q, r, u) # skal flyttes 9   
+    return A1e + A2e

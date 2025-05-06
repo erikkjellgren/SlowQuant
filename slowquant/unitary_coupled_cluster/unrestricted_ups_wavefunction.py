@@ -19,6 +19,7 @@ from slowquant.unitary_coupled_cluster.unrestricted_density_matrix import (
     UnrestrictedReducedDensityMatrix,
     get_electronic_energy_unrestricted,
     get_orbital_gradient_unrestricted,
+    get_orbital_response_hessian_block_unrestricted,
 )
 from slowquant.unitary_coupled_cluster.operator_matrix import (
     build_operator_matrix,
@@ -808,8 +809,8 @@ class UnrestrictedWaveFunctionUPS:
                 )
                 gradient[idx] = alpha
                 gradient[idx + len(wf.kappa_idx)] = beta
-        return gradient
-
+        return gradient        
+    
     def run_ups(
         self,
         orbital_optimization: bool = False,
@@ -1184,3 +1185,4 @@ def active_space_parameter_gradient(
             wf.ups_layout,
         )
     return gradient_theta
+
