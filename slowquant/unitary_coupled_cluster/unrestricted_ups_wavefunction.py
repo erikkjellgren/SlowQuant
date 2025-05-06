@@ -288,7 +288,7 @@ class UnrestrictedWaveFunctionUPS:
             self.ansatz_options["S"] = True
             self.ansatz_options["D"] = True
             self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
-        if ansatz.lower() == "fuccsdt":
+        elif ansatz.lower() == "fuccsdt":
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
@@ -296,7 +296,7 @@ class UnrestrictedWaveFunctionUPS:
             self.ansatz_options["D"] = True
             self.ansatz_options["T"] = True
             self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
-        if ansatz.lower() == "fuccsdtq":
+        elif ansatz.lower() == "fuccsdtq":
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
@@ -305,7 +305,7 @@ class UnrestrictedWaveFunctionUPS:
             self.ansatz_options["T"] = True
             self.ansatz_options["Q"] = True
             self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
-        if ansatz.lower() == "fuccsdtq5":
+        elif ansatz.lower() == "fuccsdtq5":
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
@@ -315,7 +315,7 @@ class UnrestrictedWaveFunctionUPS:
             self.ansatz_options["Q"] = True
             self.ansatz_options["5"] = True
             self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
-        if ansatz.lower() == "fuccsdtq56":
+        elif ansatz.lower() == "fuccsdtq56":
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
