@@ -54,7 +54,9 @@ class WaveFunctionCircuit:
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
         if isinstance(quantum_interface.ansatz, QuantumCircuit):
-            print("WARNING: A QI with a custom Ansatz was passed. VQE will only work with COBYLA optimizer.")
+            print(
+                "WARNING: A QI with a custom Ansatz was passed. VQE will only work with COBYLA and COBYQA optimizer."
+            )
         self._c_mo = mo_coeffs
         self._h_ao = h_ao
         self._g_ao = g_ao
@@ -116,7 +118,7 @@ class WaveFunctionCircuit:
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
         self.num_active_orbs = self.num_active_spin_orbs // 2
         self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
-        # Contruct spatial idx
+        # Construct spatial idx
         self.inactive_idx: list[int] = []
         self.virtual_idx: list[int] = []
         self.active_idx: list[int] = []
@@ -163,7 +165,7 @@ class WaveFunctionCircuit:
                 self._kappa.append(0.0)
                 self._kappa_old.append(0.0)
                 self.kappa_idx.append((p, q))
-        # HF like orbital rotation indecies
+        # HF like orbital rotation indices
         self.kappa_hf_like_idx = []
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
@@ -316,7 +318,7 @@ class WaveFunctionCircuit:
 
     @property
     def rdm1(self) -> np.ndarray:
-        r"""Calcuate one-electron reduced density matrix.
+        r"""Calculate one-electron reduced density matrix.
 
         The trace condition is enforced:
 
@@ -348,7 +350,7 @@ class WaveFunctionCircuit:
 
     @property
     def rdm2(self) -> np.ndarray:
-        r"""Calcuate two-electron reduced density matrix.
+        r"""Calculate two-electron reduced density matrix.
 
         The trace condition is enforced:
 
@@ -407,7 +409,7 @@ class WaveFunctionCircuit:
 
     @property
     def rdm3(self) -> np.ndarray:
-        r"""Calcuate three-electron reduced density matrix.
+        r"""Calculate three-electron reduced density matrix.
 
         The trace condition is enforced:
 
@@ -480,7 +482,7 @@ class WaveFunctionCircuit:
 
     @property
     def rdm4(self) -> np.ndarray:
-        r"""Calcuate four-electron reduced density matrix.
+        r"""Calculate four-electron reduced density matrix.
 
         The trace condition is enforced:
 
@@ -721,7 +723,7 @@ class WaveFunctionCircuit:
         return self._rdm4
 
     def precalc_rdm_paulis(self, rdm_order: int) -> None:
-        """Pre-calculate all Paulis used to contruct RDMs up to a certain order.
+        """Pre-calculate all Paulis used to construct RDMs up to a certain order.
 
         This utilizes the saving feature in QuantumInterface when using the Sampler primitive.
         If saving is turned up in QuantumInterface this function will do nothing but waste device time.
@@ -738,7 +740,7 @@ class WaveFunctionCircuit:
         if rdm_order > 4:
             raise ValueError(f"Precalculation only supported up to order 4 got {rdm_order}")
         if rdm_order < 1:
-            raise ValueError(f"Precalculation need atleast an order of 1 got {rdm_order}")
+            raise ValueError(f"Precalculation need at least an order of 1 got {rdm_order}")
         cumulated_paulis = None
         if rdm_order >= 1:
             self._rdm1 = None
@@ -863,8 +865,12 @@ class WaveFunctionCircuit:
             maxiter: Maximum number of iterations.
             is_silent_subiterations: Silence subiterations.
         """
-        if isinstance(self.QI.ansatz, QuantumCircuit) and not optimizer_name.lower() == "cobyla":
-            raise ValueError("Custom Ansatz in QI only works with COBYLA as optimizer")
+        if isinstance(self.QI.ansatz, QuantumCircuit) and not optimizer_name.lower() in ("cobyla", "cobyqa"):
+            raise ValueError("Custom Ansatz in QI only works with COBYLA and COBYQA as optimizer.")
+        print("### Parameters information:")
+        if orbital_optimization:
+            print(f"### Number kappa: {len(self.kappa)}")
+        print(f"### Number theta: {len(self.thetas)}")
         e_old = 1e12
         print("Full optimization")
         print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
@@ -927,7 +933,7 @@ class WaveFunctionCircuit:
                     self._kappa[i] = 0.0
                     self._kappa_old[i] = 0.0
             else:
-                # If theres is no orbital optimization, then the algorithm is already converged.
+                # If there is no orbital optimization, then the algorithm is already converged.
                 e_new = res.fun
                 if orbital_optimization and len(self.kappa) == 0:
                     print(
@@ -959,15 +965,19 @@ class WaveFunctionCircuit:
             tol: Convergence tolerance.
             maxiter: Maximum number of iterations.
         """
-        if isinstance(self.QI.ansatz, QuantumCircuit) and not optimizer_name.lower() == "cobyla":
-            raise ValueError("Custom Ansatz in QI only works with COBYLA as optimizer")
+        if isinstance(self.QI.ansatz, QuantumCircuit) and not optimizer_name.lower() in ("cobyla", "cobyqa"):
+            raise ValueError("Custom Ansatz in QI only works with COBYLA and COBYQA as optimizer.")
+        print("### Parameters information:")
+        if orbital_optimization:
+            print(f"### Number kappa: {len(self.kappa)}")
+        print(f"### Number theta: {len(self.thetas)}")
         if optimizer_name.lower() == "rotosolve":
             if orbital_optimization and len(self.kappa) != 0:
                 raise ValueError(
                     "Cannot use RotoSolve together with orbital optimization in the one-step solver."
                 )
 
-        print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+        print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
         if orbital_optimization:
             if len(self.thetas) > 0:
                 energy = partial(
@@ -1046,7 +1056,7 @@ class WaveFunctionCircuit:
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             return self.QI.quantum_expectation_value(H)
         # RDM is more expensive than evaluation of the Hamiltonian.
-        # Thus only contruct these if orbital-optimization is turned on,
+        # Thus only construct these if orbital-optimization is turned on,
         # since the RDMs will be reused in the oo gradient calculation.
         rdms = ReducedDenstiyMatrix(
             self.num_inactive_orbs,
@@ -1117,7 +1127,7 @@ def _get_energy_evals_for_grad(
 
     Args:
         operator: Operator which the derivative is with respect to.
-        parameters: Paramters.
+        parameters: Parameters.
         idx: Parameter idx.
         R: Parameter to control we get the needed points.
 
