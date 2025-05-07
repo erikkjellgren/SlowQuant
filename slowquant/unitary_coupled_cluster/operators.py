@@ -116,20 +116,31 @@ def commutator(A: FermionicOperator, B: FermionicOperator) -> FermionicOperator:
     return A * B - B * A
 
 
-def double_commutator(A: FermionicOperator, B: FermionicOperator, C: FermionicOperator) -> FermionicOperator:
+def double_commutator(
+    A: FermionicOperator, B: FermionicOperator, C: FermionicOperator, do_symmetrized: bool = False
+) -> FermionicOperator:
     r"""Construct operator double commutator.
 
     .. math::
         \left[\hat{A},\left[\hat{B},\hat{C}\right]\right] = \hat{A}\hat{B}\hat{C} - \hat{A}\hat{C}\hat{B} - \hat{B}\hat{C}\hat{A} + \hat{C}\hat{B}\hat{A}
 
+    or for the symmetrized version,
+
+    .. math::
+        \left[\hat{A},\hat{B},\hat{C}\right] =
+        \hat{A}\hat{H}\hat{B} + \hat{B}\hat{H}\hat{A} - \frac{1}{2}\left(\hat{A}\hat{B}\hat{H} + \hat{H}\hat{B}\hat{A} + \hat{B}\hat{A}\hat{H} + \hat{H}\hat{A}\hat{B}\right)
+
     Args:
         A: Fermionic operator.
         B: Fermionic operator.
         C: Fermionic operator.
+        do_symmetrized: Do symmetrized double commutator (default: False).
 
     Returns:
         Operator from double commutator.
     """
+    if do_symmetrized:
+        return A * B * C + C * B * A - 1 / 2 * (A * C * B + B * C * A + C * A * B + B * A * C)
     return A * B * C - A * C * B - B * C * A + C * B * A
 
 
