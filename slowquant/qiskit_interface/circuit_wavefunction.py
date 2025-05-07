@@ -24,7 +24,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_gradient,
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
-from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
+from slowquant.unitary_coupled_cluster.operators import Epq, Tpq, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 
 
@@ -75,6 +75,7 @@ class WaveFunctionCircuit:
         self.num_virtual_spin_orbs = 0
         self._rdm1 = None
         self._rdm2 = None
+        self._t_rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
         self._h_mo = None
@@ -257,6 +258,7 @@ class WaveFunctionCircuit:
         """
         self._rdm1 = None
         self._rdm2 = None
+        self._t_rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
         self._energy_elec = None
@@ -289,6 +291,7 @@ class WaveFunctionCircuit:
                 print("Reset RDMs, energies, and QI metrics.")
         self._rdm1 = None
         self._rdm2 = None
+        self._t_rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
         self._energy_elec = None
@@ -404,6 +407,55 @@ class WaveFunctionCircuit:
                             self._rdm2[i, i, j, j] * self.num_active_elec * (self.num_active_elec - 1) / trace  # type: ignore [index]
                         )
         return self._rdm2
+    
+    @property
+    def t_rdm2(self) -> np.ndarray:
+        r"""Calcuate two-electron reduced density matrix.
+
+        The trace condition is enforced:
+
+        .. math::
+            \sum_{ij}\Gamma^{[2]}_{iijj} = N_e(N_e-1)
+
+        Returns:
+            Two-electron reduced density matrix.
+        """
+        if self._t_rdm2 is None:
+            self._t_rdm2 = np.zeros(
+                (
+                    self.num_active_orbs,
+                    self.num_active_orbs,
+                    self.num_active_orbs,
+                    self.num_active_orbs,
+                )
+            )
+            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                p_idx = p - self.num_inactive_orbs
+                for q in range(self.num_inactive_orbs, p + 1):
+                    q_idx = q - self.num_inactive_orbs
+                    for r in range(self.num_inactive_orbs, p + 1):
+                        r_idx = r - self.num_inactive_orbs
+                        if p == q:
+                            s_lim = r + 1
+                        elif p == r:
+                            s_lim = q + 1
+                        elif q < r:
+                            s_lim = p
+                        else:
+                            s_lim = p + 1
+                        for s in range(self.num_inactive_orbs, s_lim):
+                            s_idx = s - self.num_inactive_orbs
+                            pdm2_op = (Tpq(p, q) * Tpq(r, s)).get_folded_operator(
+                                self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+                            )
+                            val = self.QI.quantum_expectation_value(pdm2_op)
+                            if q == r:
+                                val -= self.rdm1[p_idx, s_idx]
+                            self._t_rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore [index]
+                            self._t_rdm2[r_idx, s_idx, p_idx, q_idx] = val  # type: ignore [index]
+                            self._t_rdm2[q_idx, p_idx, s_idx, r_idx] = val  # type: ignore [index]
+                            self._t_rdm2[s_idx, r_idx, q_idx, p_idx] = val  # type: ignore [index]
+        return self._t_rdm2
 
     @property
     def rdm3(self) -> np.ndarray:
