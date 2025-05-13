@@ -54,6 +54,7 @@ Just use [PySCF](https://github.com/pyscf/pyscf) instead.
 
 | Feature                                        | Last living commit                       |
 |------------------------------------------------|------------------------------------------|
+| No submatrix saving in proj and all-proj LR    | 3f5df6818c4dbbb2b54606d0a1a4e00badfb766d |
 | Approxmiate Hermitification in linear response | 3f5df6818c4dbbb2b54606d0a1a4e00badfb766d |
 | Approxmiate linear response formalism          | 3f5df6818c4dbbb2b54606d0a1a4e00badfb766d |
 | KS-DFT                                         | 1b9c5669ab72dfceee0a69c8dca1c67dd4b31bfd |

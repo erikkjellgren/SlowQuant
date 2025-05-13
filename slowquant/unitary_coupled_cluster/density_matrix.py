@@ -4,6 +4,8 @@ import numpy as np
 class ReducedDenstiyMatrix:
     """Reduced density matrix class."""
 
+    __slots__ = ("inactive_idx", "virtual_idx", "active_idx", "idx_shift", "rdm1", "rdm2")
+
     def __init__(
         self,
         num_inactive_orbs: int,
@@ -199,7 +201,7 @@ def get_orbital_gradient(
        rdms: Reduced density matrix class.
        h_int: One-electron integrals in MO in Hamiltonian.
        g_int: Two-electron integrals in MO in Hamiltonian.
-       kappa_idx: Orbital parameter indicies in spatial basis.
+       kappa_idx: Orbital parameter indices in spatial basis.
        num_inactive_orbs: Number of inactive orbitals in spatial basis.
        num_active_orbs: Number of active orbitals in spatial basis.
 
@@ -240,7 +242,7 @@ def get_orbital_gradient_response(
        rdms: Reduced density matrix class.
        h_int: One-electron integrals in MO in Hamiltonian.
        g_int: Two-electron integrals in MO in Hamiltonian.
-       kappa_idx: Orbital parameter indicies in spatial basis.
+       kappa_idx: Orbital parameter indices in spatial basis.
        num_inactive_orbs: Number of inactive orbitals in spatial basis.
        num_active_orbs: Number of active orbitals in spatial basis.
 
@@ -288,7 +290,7 @@ def get_orbital_response_metric_sigma(
 
     Args:
        rdms: Reduced density matrix class.
-       kappa_idx: Orbital parameter indicies in spatial basis.
+       kappa_idx: Orbital parameter indices in spatial basis.
 
     Returns:
         Sigma matrix orbital-orbital block.
@@ -317,7 +319,7 @@ def get_orbital_response_vector_norm(
 
     Args:
        rdms: Reduced density matrix class.
-       kappa_idx: Orbital parameter indicies in spatial basis.
+       kappa_idx: Orbital parameter indices in spatial basis.
        response_vectors: Response vectors.
        state_number: State number counting from zero.
        number_excitations: Total number of excitations.
@@ -369,7 +371,7 @@ def get_orbital_response_property_gradient(
     Args:
        rdms: Reduced density matrix class.
        x_mo: Property integral in MO basis.
-       kappa_idx: Orbital parameter indicies in spatial basis.
+       kappa_idx: Orbital parameter indices in spatial basis.
        num_inactive_orbs: Number of inactive orbitals in spatial basis.
        num_active_orbs: Number of active orbitals in spatial basis.
        response_vectors: Response vectors.
@@ -411,8 +413,8 @@ def get_orbital_response_hessian_block(
 
     Args:
        rdms: Reduced density matrix class.
-       kappa_idx1: Orbital parameter indicies in spatial basis.
-       kappa_idx1: Orbital parameter indicies in spatial basis.
+       kappa_idx1: Orbital parameter indices in spatial basis.
+       kappa_idx1: Orbital parameter indices in spatial basis.
        num_inactive_orbs: Number of inactive orbitals in spatial basis.
        num_active_orbs: Number of active orbitals in spatial basis.
 
