@@ -611,11 +611,8 @@ def get_orbital_response_static_property_gradient(
         Orbital part of static property gradient.
     """
     prop_grad = np.zeros((len(kappa_idx), len(mo)))
-    prop_grad_dagger = np.zeros_like(prop_grad)
     for idx, (n, m) in enumerate(kappa_idx):
         for p in range(num_inactive_orbs + num_active_orbs):
             prop_grad[idx, :] += mo[:,n, p] * rdms.RDM1(m, p)
             prop_grad[idx, :] -= mo[:,p, m] * rdms.RDM1(p, n)
-            prop_grad_dagger[idx, :] -= mo[:, p, n] * rdms.RDM1(m, p)
-            prop_grad_dagger[idx, :] += mo[:, m, p] * rdms.RDM1(p, n)
-    return 2 ** (-1 / 2) * prop_grad, 2 ** (-1 / 2) * prop_grad_dagger
+    return 2 ** (-1 / 2) * prop_grad

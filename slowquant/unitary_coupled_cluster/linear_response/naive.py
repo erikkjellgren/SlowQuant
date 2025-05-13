@@ -136,7 +136,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     Hq_ket,
                     *self.index_info,
                 )
-                # - 1/2<0| H q Gd |0>
+                # - 1/2*<0| H q Gd |0>
                 val -= (
                     1
                     / 2
@@ -147,7 +147,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                         *self.index_info,
                     )
                 )
-                # - 1/2<0| H Gd q |0>
+                # - 1/2*<0| H Gd q |0>
                 val -= (
                     1
                     / 2
@@ -215,7 +215,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     GId_ket,
                     *self.index_info,
                 )
-                # - 1/2<0| GId GJ H |0>
+                # - 1/2*<0| GId GJ H |0>
                 val -= (
                     1
                     / 2
@@ -463,13 +463,10 @@ class LinearResponseUCC(LinearResponseBaseClass):
             mo[i,:,:] += one_electron_integral_transform(self.wf.c_mo, ao)
 
         idx_shift_q = len(self.q_ops)
-        idx_shift_qG = len(self.q_ops + self.G_ops)
-        #V = np.zeros((2 * idx_shift_qG, num_mo))
-        V = np.zeros((idx_shift_qG, num_mo))
+        V = np.zeros((len(self.q_ops + self.G_ops), num_mo))
 
         # Orbital rotation part
-        #V[: idx_shift_q, :], V[idx_shift_qG : idx_shift_qG + idx_shift_q, :] = (
-        V[: idx_shift_q, :], _ = (
+        V[: idx_shift_q, :] = (
             get_orbital_response_static_property_gradient(
             rdms, 
             mo, 
@@ -498,7 +495,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     *self.index_info
                     )
                 V[idx + idx_shift_q, :] += mo[:,i, i] * val
-                #V[idx + idx_shift_q + idx_shift_qG, :] -= mo[:,i,i] * val
             # Active part
             for p in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):
                 for q in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):
@@ -519,8 +515,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                         *self.index_info
                         )
                     V[idx + idx_shift_q, :] += mo[:, p, q] * val
-                    #V[idx + idx_shift_q + idx_shift_qG, :] -= mo[:, q, p] * val
         if np.allclose(mo, mo.transpose(0, -1, -2)):
             return np.vstack((V, -1 * V)).reshape(-1, *in_shape)
         return np.vstack((V, V)).reshape(-1, *in_shape)
-        #return V.reshape(-1, *in_shape)

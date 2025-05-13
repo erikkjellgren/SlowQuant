@@ -135,7 +135,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     Hq_ket,
                     *self.index_info,
                 )
-                # - 1/2<0| H q Gd |0>
+                # - 1/2*<0| H q Gd |0>
                 val -= (
                     1
                     / 2
@@ -146,7 +146,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                         *self.index_info,
                     )
                 )
-                # - 1/2<0| H Gd q |0>
+                # - 1/2*<0| H Gd q |0>
                 val -= (
                     1
                     / 2
@@ -214,7 +214,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     GId_ket,
                     *self.index_info,
                 )
-                # - 1/2<0| GId GJ H |0>
+                # - 1/2*<0| GId GJ H |0>
                 val -= (
                     1
                     / 2
@@ -330,11 +330,10 @@ class LinearResponseUCC(LinearResponseBaseClass):
             mo[i,:,:] += one_electron_integral_transform(self.wf.c_mo, ao)
 
         idx_shift_q = len(self.q_ops)
-        idx_shift_qG = len(self.q_ops + self.G_ops)
-        V = np.zeros((2 * idx_shift_qG, num_mo))
+        V = np.zeros((len(self.q_ops + self.G_ops), num_mo))
 
         # Orbital rotation part
-        V[: idx_shift_q, :], V[idx_shift_qG : idx_shift_qG + idx_shift_q, :] = (
+        V[: idx_shift_q, :] = (
             get_orbital_response_static_property_gradient(
             rdms, 
             mo, 
@@ -343,41 +342,46 @@ class LinearResponseUCC(LinearResponseBaseClass):
             self.wf.num_active_orbs,
         ))
         for idx, G in enumerate(self.G_ops):
+            G_ket = propagate_state([G], self.wf.ci_coeffs, *self.index_info)
+            Gd_ket = propagate_state([G.dagger], self.wf.ci_coeffs, *self.index_info)
             # Inactive part
             for i in range(self.wf.num_inactive_orbs):
-                # < 0 | G E | 0 >
+                T_ket = propagate_state([Tpq(i, i)], self.wf.ci_coeffs, *self.index_info)
+                # < 0 | G T | 0 >
                 val = expectation_value(
-                    self.wf.ci_coeffs,
-                    [G * Tpq(i,i)],
-                    self.wf.ci_coeffs,
+                    Gd_ket,
+                    [],
+                    T_ket,
                     *self.index_info
-                )
-                # - < 0 | E G | 0 >
-                val -= expectation_value(
-                    self.wf.ci_coeffs,
-                    [Tpq(i,i) * G],
-                    self.wf.ci_coeffs,
-                    *self.index_info
-                )
-                V[idx + idx_shift_q, :] += mo[:,i,i] * val
-                V[idx + idx_shift_q + idx_shift_qG, :] -= mo[:,i,i] * val
-            # Active part
-            for m in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):
-                for n in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):
-                    # < 0 | G E | 0 >
-                    val = expectation_value(
-                        self.wf.ci_coeffs,
-                        [G * Tpq(m,n)],
-                        self.wf.ci_coeffs,
-                        *self.index_info
                     )
+                # - < 0 | T G | 0 >
+                val -= expectation_value(
+                    T_ket,
+                    [],
+                    G_ket,
+                    *self.index_info
+                    )
+                V[idx + idx_shift_q, :] += mo[:,i, i] * val
+            # Active part
+            for p in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):
+                for q in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):
+                    T_ket = propagate_state([Tpq(p, q)], self.wf.ci_coeffs, *self.index_info)
+                    Td_ket = propagate_state([Tpq(q, p)], self.wf.ci_coeffs, *self.index_info)
+                    # < 0 | G T | 0 >
+                    val = expectation_value(
+                        Gd_ket,
+                        [],
+                        T_ket,
+                        *self.index_info
+                        )
                     # - < 0 | E G | 0 >
                     val -= expectation_value(
-                        self.wf.ci_coeffs,
-                        [Tpq(m,n) * G],
-                        self.wf.ci_coeffs,
+                        Td_ket,
+                        [],
+                        G_ket,
                         *self.index_info
-                    )
-                    V[idx + idx_shift_q, :] += mo[:,m, n] * val
-                    V[idx + idx_shift_q + idx_shift_qG, :] -= mo[:,n, m] * val
-        return V.reshape(-1, *in_shape)
+                        )
+                    V[idx + idx_shift_q, :] += mo[:, p, q] * val
+        if np.allclose(mo, mo.transpose(0, -1, -2)):
+            return np.vstack((V, -1 * V)).reshape(-1, *in_shape)
+        return np.vstack((V, V)).reshape(-1, *in_shape)
