@@ -1,4 +1,4 @@
-#import numpy as np
+# import numpy as np
 
 import slowquant.SlowQuant as sq
 import slowquant.unitary_coupled_cluster.linear_response.naive_triplet as naive_t  # pylint: disable=consider-using-from-import
@@ -24,7 +24,6 @@ def test_H2_sto3g_naive_triplet():
     g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -32,7 +31,7 @@ def test_H2_sto3g_naive_triplet():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
     LR = naive_t.LinearResponseUCC(WF, excitations="SD")
@@ -56,7 +55,7 @@ def test_H4plus2_sto3g_naive_triplet():
             H  0.74  0.0  0.0;
             H  0.74  0.0  1.0;""",
         distance_unit="angstrom",
-        molecular_charge=2
+        molecular_charge=2,
     )
     SQobj.set_basis_set("STO-3G")
     # HF
@@ -66,7 +65,6 @@ def test_H4plus2_sto3g_naive_triplet():
     g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 4),
         SQobj.hartree_fock.mo_coeff,
@@ -74,7 +72,7 @@ def test_H4plus2_sto3g_naive_triplet():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
     LR = naive_t.LinearResponseUCC(WF, excitations="SD")
@@ -110,7 +108,6 @@ def test_LiH_sto3g_naive_triplet():
     g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -118,7 +115,7 @@ def test_LiH_sto3g_naive_triplet():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
     LR = naive_t.LinearResponseUCC(WF, excitations="SD")
@@ -168,7 +165,6 @@ def test_h10_sto3g_naive_triplet():
     g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -176,7 +172,7 @@ def test_h10_sto3g_naive_triplet():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
     LR = naive_t.LinearResponseUCC(WF, excitations="SD")

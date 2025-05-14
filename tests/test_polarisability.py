@@ -25,7 +25,6 @@ def test_H2_sto3g_naive():
     g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -33,12 +32,12 @@ def test_H2_sto3g_naive():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
     LR = naive.LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
-    
+
     # Calculate dipole integrals
     dipole_integrals = (
         SQobj.integral.get_multipole_matrix([1, 0, 0]),
@@ -47,8 +46,8 @@ def test_H2_sto3g_naive():
     )
 
     property_gradient = LR.get_property_gradient(dipole_integrals)
-    resp = (solve(LR.hessian, property_gradient))
-    alpha = np.einsum('xi,xi->i', resp, property_gradient)
+    resp = solve(LR.hessian, property_gradient)
+    alpha = np.einsum("xi,xi->i", resp, property_gradient)
 
     thresh = 10**-4
 
@@ -77,7 +76,6 @@ def test_LiH_sto3g_naive():
     g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -85,12 +83,12 @@ def test_LiH_sto3g_naive():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
     LR = naive.LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
-    
+
     # Calculate dipole integrals
     dipole_integrals = (
         SQobj.integral.get_multipole_matrix([1, 0, 0]),
@@ -99,8 +97,8 @@ def test_LiH_sto3g_naive():
     )
 
     property_gradient = LR.get_property_gradient(dipole_integrals)
-    resp = (solve(LR.hessian, property_gradient))
-    alpha = np.einsum('xi,xi->i', resp, property_gradient)
+    resp = solve(LR.hessian, property_gradient)
+    alpha = np.einsum("xi,xi->i", resp, property_gradient)
 
     thresh = 10**-2
 
@@ -137,7 +135,6 @@ def test_H10_sto3g_naive():
     g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -145,12 +142,12 @@ def test_H10_sto3g_naive():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
     LR = naive.LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
-    
+
     # Calculate dipole integrals
     dipole_integrals = (
         SQobj.integral.get_multipole_matrix([1, 0, 0]),
@@ -159,8 +156,8 @@ def test_H10_sto3g_naive():
     )
 
     property_gradient = LR.get_property_gradient(dipole_integrals)
-    resp = (solve(LR.hessian, property_gradient))
-    alpha = np.einsum('xi,xi->i', resp, property_gradient)
+    resp = solve(LR.hessian, property_gradient)
+    alpha = np.einsum("xi,xi->i", resp, property_gradient)
 
     thresh = 10**-3
 

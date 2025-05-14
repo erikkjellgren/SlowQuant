@@ -5,6 +5,8 @@ import re
 
 
 class a_op:
+    __slots__ = ("spinless_idx", "idx", "dagger", "spin")
+
     def __init__(self, spinless_idx: int, spin: str, dagger: bool) -> None:
         """Initialize fermionic annihilation operator.
 
@@ -42,7 +44,7 @@ def operator_string_to_key(operator_string: list[a_op]) -> str:
     """Make key string to index a fermionic operator in a dict structure.
 
     Args:
-        operator_string: Fermionic opreators.
+        operator_string: Fermionic operators.
 
     Returns:
         Dictionary key.
@@ -60,7 +62,7 @@ def operator_to_qiskit_key(operator_string: list[a_op], remapping: dict[int, int
     """Make key string to index a fermionic operator in a dict structure.
 
     Args:
-        operator_string: Fermionic opreators.
+        operator_string: Fermionic operators.
         remapping: Map that takes indices from alpha,beta,alpha,beta
                    to alpha,alpha,beta,beta ordering.
 
@@ -105,6 +107,8 @@ def do_extended_normal_ordering(
             changed = False
             is_zero = False
             while True:
+                if len(next_operator) == 0:
+                    break
                 a = next_operator[current_idx]
                 b = next_operator[current_idx + 1]
                 i = current_idx
@@ -159,6 +163,8 @@ def do_extended_normal_ordering(
 
 
 class FermionicOperator:
+    __slots__ = ("operators", "factors")
+
     def __init__(
         self, annihilation_operator: dict[str, list[a_op]] | a_op, factor: dict[str, float] | float
     ) -> None:
@@ -189,7 +195,6 @@ class FermionicOperator:
             raise ValueError(
                 f"Could not assign operator of {type(annihilation_operator)} with factor of {type(factor)}"
             )
-        self._operators_ab = None
 
     def __add__(self, fermistring: FermionicOperator) -> FermionicOperator:
         """Addition of two fermionic operators.
@@ -311,7 +316,11 @@ class FermionicOperator:
             new_string_key = operator_string_to_key(new_op)
             operators[new_string_key] = new_op
             factors[new_string_key] = self.factors[key_string]
-        return FermionicOperator(operators, factors)
+        # Do normal ordering of comlex conjugated operator.
+        operators_ordered, factors_ordered = do_extended_normal_ordering(
+            FermionicOperator(operators, factors)
+        )
+        return FermionicOperator(operators_ordered, factors_ordered)
 
     @property
     def operator_count(self) -> dict[int, int]:
@@ -373,7 +382,7 @@ class FermionicOperator:
         Warning, multiplication of folded operators, might give wrong operators.
         (I have not quite figured out a good programming structure that will not allow multiplication after folding)
 
-        Note, that the indicies of the folded operator is remapped, such that idx=0 is the first index in the active space.
+        Note, that the indices of the folded operator is remapped, such that idx=0 is the first index in the active space.
 
         Args:
             num_inactive_orbs: Number of spatial inactive orbitals.

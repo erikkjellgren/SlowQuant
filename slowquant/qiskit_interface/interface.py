@@ -492,7 +492,7 @@ class QuantumInterface:
         """Get max number of shots per run.
 
         Returns:
-            Max number of shots pers run.
+            Max number of shots per run.
         """
         return self._max_shots_per_run
 
@@ -605,7 +605,7 @@ class QuantumInterface:
 
         Calculated Pauli expectation values will be saved in memory.
 
-        The expectation value over a fermionic operator is calcuated as:
+        The expectation value over a fermionic operator is calculated as:
 
         .. math::
             E = \sum_i^N c_i\left<0\left|P_i\right|0\right>
@@ -670,10 +670,10 @@ class QuantumInterface:
     ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
 
-        Calling this function will not use any pre-calculated Pauli expectaion values.
+        Calling this function will not use any pre-calculated Pauli expectation values.
         Nor will it save any of the calculated Pauli expectation values.
 
-        The expectation value over a fermionic operator is calcuated as:
+        The expectation value over a fermionic operator is calculated as:
 
         .. math::
             E = \sum_i^N c_i\left<0\left|P_i\right|0\right>
@@ -845,7 +845,7 @@ class QuantumInterface:
     ) -> list[dict[int, float]]:
         r"""Get results from a sampler distribution for several Pauli strings measured on several circuits.
 
-        The expectation value of a Pauli string is calcuated as:
+        The expectation value of a Pauli string is calculated as:
 
         .. math::
             E = \sum_i^N p_i\left<b_i\left|P\right|b_i\right>
@@ -965,7 +965,7 @@ class QuantumInterface:
     ) -> dict[int, float]:
         r"""Get results from a sampler distribution for one given Pauli string.
 
-        The expectation value of a Pauli string is calcuated as:
+        The expectation value of a Pauli string is calculated as:
 
         .. math::
             E = \sum_i^N p_i\left<b_i\left|P\right|b_i\right>

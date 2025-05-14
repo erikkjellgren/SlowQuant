@@ -375,7 +375,7 @@ def _double_excitation_trotter(
     """Get double excitation as a trotterized fermionic operator.
 
     The Pauli string from the mapped fermionic operator are sorted
-    lexicographically to make the circuit shorter from gate cancelation.
+    lexicographically to make the circuit shorter from gate cancellation.
 
     Args:
         i: Strongly occupied spin orbital index.

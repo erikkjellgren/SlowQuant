@@ -13,17 +13,17 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
     two_electron_integral_transform,
 )
+from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_electronic_energy,
     get_orbital_gradient,
 )
-from slowquant.unitary_coupled_cluster.operator_matrix import (
-    build_operator_matrix,
+from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     construct_ups_state,
     expectation_value,
     get_grad_action,
-    get_indexing,
+    propagate_state,
     propagate_unitary,
 )
 from slowquant.unitary_coupled_cluster.operators import Epq, Tpq, hamiltonian_0i_0a
@@ -121,7 +121,7 @@ class WaveFunctionUPS:
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
         self.num_active_orbs = self.num_active_spin_orbs // 2
         self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
-        # Contruct spatial idx
+        # Construct spatial idx
         self.inactive_idx: list[int] = []
         self.virtual_idx: list[int] = []
         self.active_idx: list[int] = []
@@ -188,7 +188,7 @@ class WaveFunctionUPS:
                 self._kappa.append(0.0)
                 self._kappa_old.append(0.0)
                 self.kappa_idx.append((p, q))
-        # HF like orbital rotation indecies
+        # HF like orbital rotation indices
         self.kappa_hf_like_idx = []
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
@@ -199,13 +199,17 @@ class WaveFunctionUPS:
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     self.kappa_hf_like_idx.append((p, q))
         # Construct determinant basis
-        self.idx2det, self.det2idx = get_indexing(
-            self.num_active_orbs, self.num_active_elec_alpha, self.num_active_elec_beta
+        self.ci_info = get_indexing(
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+            self.num_virtual_orbs,
+            self.num_active_elec_alpha,
+            self.num_active_elec_beta,
         )
-        self.num_det = len(self.idx2det)
+        self.num_det = len(self.ci_info.idx2det)
         self.csf_coeffs = np.zeros(self.num_det)
         hf_det = int("1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec), 2)
-        self.csf_coeffs[self.det2idx[hf_det]] = 1
+        self.csf_coeffs[self.ci_info.det2idx[hf_det]] = 1
         self.ci_coeffs = np.copy(self.csf_coeffs)
         # Construct UPS Structure
         self.ups_layout = UpsStructure()
@@ -295,9 +299,7 @@ class WaveFunctionUPS:
         self._thetas = theta_vals.copy()
         self.ci_coeffs = construct_ups_state(
             self.csf_coeffs,
-            self.num_active_orbs,
-            self.num_active_elec_alpha,
-            self.num_active_elec_beta,
+            self.ci_info,
             self.thetas,
             self.ups_layout,
         )
@@ -361,13 +363,7 @@ class WaveFunctionUPS:
                         self.ci_coeffs,
                         [Epq(p, q)],
                         self.ci_coeffs,
-                        self.idx2det,
-                        self.det2idx,
-                        self.num_inactive_orbs,
-                        self.num_active_orbs,
-                        self.num_virtual_orbs,
-                        self.num_active_elec_alpha,
-                        self.num_active_elec_beta,
+                        self.ci_info,
                         self.thetas,
                         self.ups_layout,
                     )
@@ -411,13 +407,7 @@ class WaveFunctionUPS:
                                 self.ci_coeffs,
                                 [Epq(p, q) * Epq(r, s)],
                                 self.ci_coeffs,
-                                self.idx2det,
-                                self.det2idx,
-                                self.num_inactive_orbs,
-                                self.num_active_orbs,
-                                self.num_virtual_orbs,
-                                self.num_active_elec_alpha,
-                                self.num_active_elec_beta,
+                                self.ci_info,
                                 self.thetas,
                                 self.ups_layout,
                             )
@@ -465,15 +455,9 @@ class WaveFunctionUPS:
                                 self.ci_coeffs,
                                 [Tpq(p, q), Tpq(r, s)],
                                 self.ci_coeffs,
-                                self.idx2det,
-                                self.det2idx,
-                                self.num_inactive_orbs,
-                                self.num_active_orbs,
-                                self.num_virtual_orbs,
-                                self.num_active_elec_alpha,
-                                self.num_active_elec_beta,
+                                self.ci_info,
                                 self.thetas,
-                                self.ucc_layout,
+                                self.ups_layout,
                             )
                             if q == r:
                                 val -= self.rdm1[p_idx, s_idx]
@@ -485,7 +469,7 @@ class WaveFunctionUPS:
 
     @property
     def rdm3(self) -> np.ndarray:
-        """Calculate three-electron reduced density matrix in the actice space.
+        """Calculate three-electron reduced density matrix in the active space.
 
         Currently not utilizing the full symmetry.
 
@@ -519,13 +503,7 @@ class WaveFunctionUPS:
                                         self.ci_coeffs,
                                         [Epq(p, q), Epq(r, s), Epq(t, u)],
                                         self.ci_coeffs,
-                                        self.idx2det,
-                                        self.det2idx,
-                                        self.num_inactive_orbs,
-                                        self.num_active_orbs,
-                                        self.num_virtual_orbs,
-                                        self.num_active_elec_alpha,
-                                        self.num_active_elec_beta,
+                                        self.ci_info,
                                         self.thetas,
                                         self.ups_layout,
                                     )
@@ -593,13 +571,7 @@ class WaveFunctionUPS:
                                                 self.ci_coeffs,
                                                 [Epq(p, q), Epq(r, s), Epq(t, u), Epq(m, n)],
                                                 self.ci_coeffs,
-                                                self.idx2det,
-                                                self.det2idx,
-                                                self.num_inactive_orbs,
-                                                self.num_active_orbs,
-                                                self.num_virtual_orbs,
-                                                self.num_active_elec_alpha,
-                                                self.num_active_elec_beta,
+                                                self.ci_info,
                                                 self.thetas,
                                                 self.ups_layout,
                                             )
@@ -803,13 +775,7 @@ class WaveFunctionUPS:
                 self.ci_coeffs,
                 [hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)],
                 self.ci_coeffs,
-                self.idx2det,
-                self.det2idx,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.num_virtual_orbs,
-                self.num_active_elec_alpha,
-                self.num_active_elec_beta,
+                self.ci_info,
                 self.thetas,
                 self.ups_layout,
             )
@@ -832,6 +798,10 @@ class WaveFunctionUPS:
             maxiter: Maximum number of iterations.
             is_silent_subiterations: Silence subiterations.
         """
+        print("### Parameters information:")
+        if orbital_optimization:
+            print(f"### Number kappa: {len(self.kappa)}")
+        print(f"### Number theta: {self.ups_layout.n_params}")
         e_old = 1e12
         print("Full optimization")
         print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
@@ -860,6 +830,8 @@ class WaveFunctionUPS:
                 tol=tol,
                 is_silent=is_silent_subiterations,
             )
+            self._old_opt_parameters = np.zeros_like(self.thetas) + 10**20
+            self._E_opt_old = 0.0
             res = optimizer.minimize(
                 self.thetas,
                 extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
@@ -889,16 +861,18 @@ class WaveFunctionUPS:
                     tol=tol,
                     is_silent=is_silent_subiterations,
                 )
+                self._old_opt_parameters = np.zeros(len(self.kappa_idx)) + 10**20
+                self._E_opt_old = 0.0
                 res = optimizer.minimize([0.0] * len(self.kappa_idx))
                 for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
                     self._kappa[i] = 0.0
                     self._kappa_old[i] = 0.0
             else:
-                # If theres is no orbital optimization, then the algorithm is already converged.
+                # If there is no orbital optimization, then the algorithm is already converged.
                 e_new = res.fun
                 if orbital_optimization and len(self.kappa) == 0:
                     print(
-                        "WARNING: No orbital optimization performed, because there is no non-redundant orbital parameters"
+                        "WARNING: No orbital optimization performed, because there is no non-redundant orbital parameters."
                     )
                 break
 
@@ -926,13 +900,17 @@ class WaveFunctionUPS:
             tol: Convergence tolerance.
             maxiter: Maximum number of iterations.
         """
+        print("### Parameters information:")
+        if orbital_optimization:
+            print(f"### Number kappa: {len(self.kappa)}")
+        print(f"### Number theta: {self.ups_layout.n_params}")
         if optimizer_name.lower() == "rotosolve":
             if orbital_optimization and len(self.kappa) != 0:
                 raise ValueError(
                     "Cannot use RotoSolve together with orbital optimization in the one-step solver."
                 )
 
-        print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+        print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
         if orbital_optimization:
             if len(self.thetas) > 0:
                 energy = partial(
@@ -975,6 +953,8 @@ class WaveFunctionUPS:
         else:
             parameters = self.thetas
         optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
+        self._old_opt_parameters = np.zeros_like(parameters) + 10**20
+        self._E_opt_old = 0.0
         res = optimizer.minimize(
             parameters,
             extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
@@ -1001,38 +981,41 @@ class WaveFunctionUPS:
         Returns:
             Electronic energy.
         """
+        # Avoid recalculating energy in callback
+        if np.max(np.abs(np.array(self._old_opt_parameters) - np.array(parameters))) < 10**-14:
+            return self._E_opt_old
         num_kappa = 0
         if kappa_optimization:
             num_kappa = len(self.kappa_idx)
             self.kappa = parameters[:num_kappa]
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
-        if theta_optimization:
-            return expectation_value(
-                self.ci_coeffs,
-                [hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)],
-                self.ci_coeffs,
-                self.idx2det,
-                self.det2idx,
+        if kappa_optimization:
+            # RDM is more expensive than evaluation of the Hamiltonian.
+            # Thus only construct these if orbital-optimization is turned on,
+            # since the RDMs will be reused in the oo gradient calculation.
+            rdms = ReducedDenstiyMatrix(
                 self.num_inactive_orbs,
                 self.num_active_orbs,
                 self.num_virtual_orbs,
-                self.num_active_elec_alpha,
-                self.num_active_elec_beta,
+                rdm1=self.rdm1,
+                rdm2=self.rdm2,
+            )
+            E = get_electronic_energy(
+                rdms, self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
+            )
+        else:
+            E = expectation_value(
+                self.ci_coeffs,
+                [hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)],
+                self.ci_coeffs,
+                self.ci_info,
                 self.thetas,
                 self.ups_layout,
             )
-        # RDM is more expensive than evaluation of the Hamiltonian.
-        # Thus only contruct these if orbital-optimization is turned on,
-        # since the RDMs will be reused in the oo gradient calculation.
-        rdms = ReducedDenstiyMatrix(
-            self.num_inactive_orbs,
-            self.num_active_orbs,
-            self.num_virtual_orbs,
-            rdm1=self.rdm1,
-            rdm2=self.rdm2,
-        )
-        return get_electronic_energy(rdms, self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+        self._E_opt_old = E
+        self._old_opt_parameters = np.copy(parameters)
+        return E
 
     def _calc_gradient_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
@@ -1066,23 +1049,23 @@ class WaveFunctionUPS:
                 rdms, self.h_mo, self.g_mo, self.kappa_idx, self.num_inactive_orbs, self.num_active_orbs
             )
         if theta_optimization:
-            Hamiltonian = build_operator_matrix(
-                hamiltonian_0i_0a(
-                    self.h_mo,
-                    self.g_mo,
-                    self.num_inactive_orbs,
-                    self.num_active_orbs,
-                ).get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs),
-                self.idx2det,
-                self.det2idx,
+            Hamiltonian = hamiltonian_0i_0a(
+                self.h_mo,
+                self.g_mo,
+                self.num_inactive_orbs,
                 self.num_active_orbs,
             )
             # Reference bra state (no differentiations)
+            bra_vec = propagate_state(
+                [Hamiltonian],
+                self.ci_coeffs,
+                self.ci_info,
+                self.thetas,
+                self.ups_layout,
+            )
             bra_vec = construct_ups_state(
-                np.matmul(Hamiltonian, self.ci_coeffs),
-                self.num_active_orbs,
-                self.num_active_elec_alpha,
-                self.num_active_elec_beta,
+                bra_vec,
+                self.ci_info,
                 self.thetas,
                 self.ups_layout,
                 dagger=True,
@@ -1090,15 +1073,13 @@ class WaveFunctionUPS:
             # CSF reference state on ket
             ket_vec = np.copy(self.csf_coeffs)
             ket_vec_tmp = np.copy(self.csf_coeffs)
-            # Calculate analytical derivatice w.r.t. each theta using gradient_action function
+            # Calculate analytical derivative w.r.t. each theta using gradient_action function
             for i in range(len(self.thetas)):
                 # Derivative action w.r.t. i-th theta on CSF ket
                 ket_vec_tmp = get_grad_action(
                     ket_vec,
                     i,
-                    self.num_active_orbs,
-                    self.num_active_elec_alpha,
-                    self.num_active_elec_beta,
+                    self.ci_info,
                     self.ups_layout,
                 )
                 gradient[i + num_kappa] += 2 * np.matmul(bra_vec, ket_vec_tmp)
@@ -1107,18 +1088,14 @@ class WaveFunctionUPS:
                 bra_vec = propagate_unitary(
                     bra_vec,
                     i,
-                    self.num_active_orbs,
-                    self.num_active_elec_alpha,
-                    self.num_active_elec_beta,
+                    self.ci_info,
                     self.thetas,
                     self.ups_layout,
                 )
                 ket_vec = propagate_unitary(
                     ket_vec,
                     i,
-                    self.num_active_orbs,
-                    self.num_active_elec_alpha,
-                    self.num_active_elec_beta,
+                    self.ci_info,
                     self.thetas,
                     self.ups_layout,
                 )

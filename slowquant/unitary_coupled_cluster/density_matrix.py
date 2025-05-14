@@ -4,6 +4,8 @@ import numpy as np
 class ReducedDenstiyMatrix:
     """Reduced density matrix class."""
 
+    __slots__ = ("inactive_idx", "virtual_idx", "active_idx", "idx_shift", "rdm1", "rdm2", "t_rdm2")
+
     def __init__(
         self,
         num_inactive_orbs: int,
@@ -21,6 +23,7 @@ class ReducedDenstiyMatrix:
             num_virtual_orbs: Number of virtual orbitals in spatial basis.
             rdm1: One-electron reduced density matrix in the active space.
             rdm2: Two-electron reduced density matrix in the active space.
+            t_rdm2: Triplet two-electron reduced density matrix in the active space.
         """
         self.inactive_idx = []
         self.active_idx = []
@@ -149,7 +152,6 @@ class ReducedDenstiyMatrix:
                 val -= 2
             return val
         return 0
-    
 
     def t_RDM2(self, p: int, q: int, r: int, s: int) -> float:  # pylint: disable=R0911
         r"""Get full space triplet two-electron reduced density matrix element.
@@ -262,7 +264,7 @@ def get_orbital_gradient(
        rdms: Reduced density matrix class.
        h_int: One-electron integrals in MO in Hamiltonian.
        g_int: Two-electron integrals in MO in Hamiltonian.
-       kappa_idx: Orbital parameter indicies in spatial basis.
+       kappa_idx: Orbital parameter indices in spatial basis.
        num_inactive_orbs: Number of inactive orbitals in spatial basis.
        num_active_orbs: Number of active orbitals in spatial basis.
 
@@ -303,7 +305,7 @@ def get_orbital_gradient_response(
        rdms: Reduced density matrix class.
        h_int: One-electron integrals in MO in Hamiltonian.
        g_int: Two-electron integrals in MO in Hamiltonian.
-       kappa_idx: Orbital parameter indicies in spatial basis.
+       kappa_idx: Orbital parameter indices in spatial basis.
        num_inactive_orbs: Number of inactive orbitals in spatial basis.
        num_active_orbs: Number of active orbitals in spatial basis.
 
@@ -351,7 +353,7 @@ def get_orbital_response_metric_sigma(
 
     Args:
        rdms: Reduced density matrix class.
-       kappa_idx: Orbital parameter indicies in spatial basis.
+       kappa_idx: Orbital parameter indices in spatial basis.
 
     Returns:
         Sigma matrix orbital-orbital block.
@@ -380,7 +382,7 @@ def get_orbital_response_vector_norm(
 
     Args:
        rdms: Reduced density matrix class.
-       kappa_idx: Orbital parameter indicies in spatial basis.
+       kappa_idx: Orbital parameter indices in spatial basis.
        response_vectors: Response vectors.
        state_number: State number counting from zero.
        number_excitations: Total number of excitations.
@@ -432,7 +434,7 @@ def get_orbital_response_property_gradient(
     Args:
        rdms: Reduced density matrix class.
        x_mo: Property integral in MO basis.
-       kappa_idx: Orbital parameter indicies in spatial basis.
+       kappa_idx: Orbital parameter indices in spatial basis.
        num_inactive_orbs: Number of inactive orbitals in spatial basis.
        num_active_orbs: Number of active orbitals in spatial basis.
        response_vectors: Response vectors.
@@ -474,8 +476,8 @@ def get_orbital_response_hessian_block(
 
     Args:
        rdms: Reduced density matrix class.
-       kappa_idx1: Orbital parameter indicies in spatial basis.
-       kappa_idx1: Orbital parameter indicies in spatial basis.
+       kappa_idx1: Orbital parameter indices in spatial basis.
+       kappa_idx1: Orbital parameter indices in spatial basis.
        num_inactive_orbs: Number of inactive orbitals in spatial basis.
        num_active_orbs: Number of active orbitals in spatial basis.
 
@@ -527,8 +529,8 @@ def get_triplet_orbital_response_hessian_block(
     rdms: ReducedDenstiyMatrix,
     h: np.ndarray,
     g: np.ndarray,
-    kappa_idx1: list[list[int]],
-    kappa_idx2: list[list[int]],
+    kappa_idx1: list[tuple[int, int]],
+    kappa_idx2: list[tuple[int, int]],
     num_inactive_orbs: int,
     num_active_orbs: int,
 ) -> np.ndarray:
@@ -591,7 +593,7 @@ def get_triplet_orbital_response_hessian_block(
 def get_orbital_response_static_property_gradient(
     rdms: ReducedDenstiyMatrix,
     mo: np.ndarray,
-    kappa_idx: list[list[int]],
+    kappa_idx: list[tuple[int, int]],
     num_inactive_orbs: int,
     num_active_orbs: int,
 ) -> float:
@@ -613,6 +615,6 @@ def get_orbital_response_static_property_gradient(
     prop_grad = np.zeros((len(kappa_idx), len(mo)))
     for idx, (n, m) in enumerate(kappa_idx):
         for p in range(num_inactive_orbs + num_active_orbs):
-            prop_grad[idx, :] += mo[:,n, p] * rdms.RDM1(m, p)
-            prop_grad[idx, :] -= mo[:,p, m] * rdms.RDM1(p, n)
+            prop_grad[idx, :] += mo[:, n, p] * rdms.RDM1(m, p)
+            prop_grad[idx, :] -= mo[:, p, m] * rdms.RDM1(p, n)
     return 2 ** (-1 / 2) * prop_grad

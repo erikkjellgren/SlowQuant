@@ -3,7 +3,6 @@ from slowquant.hartreefock.hartreefockclass import _HartreeFock
 from slowquant.logger import _Logger
 from slowquant.molecularintegrals.integralclass import _Integral
 from slowquant.molecule.moleculeclass import _Molecule
-from slowquant.properties.propertiesclass import _Properties
 
 
 class SlowQuant:
@@ -12,7 +11,6 @@ class SlowQuant:
         self.molecule: _Molecule
         self.integral: _Integral
         self.hartree_fock: _HartreeFock
-        self.properties: _Properties
         self.logger = _Logger()
 
     def set_molecule(
@@ -50,7 +48,3 @@ class SlowQuant:
     def init_hartree_fock(self) -> None:
         """Initialize Hartree-Fock module."""
         self.hartree_fock = _HartreeFock(self.molecule, self.integral)
-
-    def init_properties(self) -> None:
-        """Initialize Hartree-Fock module."""
-        self.properties = _Properties(self.molecule, self.integral)
