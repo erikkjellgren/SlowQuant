@@ -964,6 +964,275 @@ class UnrestrictedWaveFunctionUPS:
             self.num_active_orbs,
         )
 
+    @property
+    def orbital_response_hessian_unrestricted(self) -> np.ndarray:
+        rdms = UnrestrictedReducedDensityMatrix(
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+            self.num_virtual_orbs,
+            rdm1aa=self.rdm1aa,
+            rdm1bb=self.rdm1bb,
+            rdm2aaaa=self.rdm2aaaa,
+            rdm2bbbb=self.rdm2bbbb,
+            rdm2aabb=self.rdm2aabb,
+            rdm2bbaa=self.rdm2bbaa,
+        )
+        return get_orbital_response_hessian_block_unrestricted(
+            rdms,
+            self.haa_mo,
+            self.hbb_mo,
+            self.gaaaa_mo,
+            self.gbbbb_mo,
+            self.gaabb_mo,
+            self.gbbaa_mo,
+            self.kappa_idx,
+            self.kappa_idx,
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+        )
+
+    def manual_hessian_block_unrestricted(
+        wf: UnrestrictedWaveFunctionUPS,
+    ) -> np.ndarray:
+        h = unrestricted_hamiltonian_full_space(
+            wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs
+        )
+        A_block = np.zeros((2*len(wf.kappa_idx), 2*len(wf.kappa_idx)))
+        for idx1, (t, u) in enumerate(wf.kappa_idx):
+            for idx2, (m, n) in enumerate(wf.kappa_idx):
+                E_tu_a = (1/np.sqrt(2))*(anni(t, "alpha", True)*anni(u, "alpha", False))
+                E_mn_a = (1/np.sqrt(2))*(anni(m, "alpha", True)*anni(n, "alpha", False))
+                E_tu_b = (1/np.sqrt(2))*(anni(t, "beta", True)*anni(u, "beta", False))
+                E_mn_b = (1/np.sqrt(2))*(anni(m, "beta", True)*anni(n, "beta", False))
+                aa = expectation_value(
+                    wf.ci_coeffs,
+                    [E_tu_a * h * E_mn_a],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                aa -= expectation_value(
+                    wf.ci_coeffs,
+                    [E_tu_a * E_mn_a * h],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                aa -= expectation_value(
+                    wf.ci_coeffs,
+                    [h * E_mn_a * E_tu_a],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                aa += expectation_value(
+                    wf.ci_coeffs,
+                    [E_mn_a * h * E_tu_a],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                ba = expectation_value(
+                    wf.ci_coeffs,
+                    [E_tu_b * h * E_mn_a],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                ba -= expectation_value(
+                    wf.ci_coeffs,
+                    [E_tu_b * E_mn_a * h],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                ba -= expectation_value(
+                    wf.ci_coeffs,
+                    [h * E_mn_a * E_tu_b],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                ba += expectation_value(
+                    wf.ci_coeffs,
+                    [E_mn_a * h * E_tu_b],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                ab = expectation_value(
+                    wf.ci_coeffs,
+                    [E_tu_a * h * E_mn_b],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                ab -= expectation_value(
+                    wf.ci_coeffs,
+                    [E_tu_a * E_mn_b * h],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                ab -= expectation_value(
+                    wf.ci_coeffs,
+                    [h * E_mn_b * E_tu_a],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                ab += expectation_value(
+                    wf.ci_coeffs,
+                    [E_mn_b * h * E_tu_a],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                bb = expectation_value(
+                    wf.ci_coeffs,
+                    [E_tu_b * h * E_mn_b],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                bb -= expectation_value(
+                    wf.ci_coeffs,
+                    [E_tu_b * E_mn_b * h],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                bb -= expectation_value(
+                    wf.ci_coeffs,
+                    [h * E_mn_b * E_tu_b],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                bb += expectation_value(
+                    wf.ci_coeffs,
+                    [E_mn_b * h * E_tu_b],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                A_block[idx1, idx2] = aa
+                A_block[idx1, idx2 + len(wf.kappa_idx)] = ab
+                A_block[idx1 + len(wf.kappa_idx), idx2] = ba
+                A_block[idx1 + len(wf.kappa_idx), idx2 + len(wf.kappa_idx)] = bb
+        return A_block
 
 def energy_ups(
     parameters: Sequence[float],

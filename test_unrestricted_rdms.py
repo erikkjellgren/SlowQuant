@@ -21,7 +21,7 @@ mf.kernel()
 
 
 
-mc = mcscf.UCASCI(mf, 1, (1,0))
+mc = mcscf.UCASCI(mf, 1, (0,1))
 res = mc.kernel(mf.mo_coeff)
 
 
@@ -56,7 +56,7 @@ g_eri = SQobj.integral.electron_repulsion_tensor
 WF = UnrestrictedWaveFunctionUPS(
     SQobj.molecule.number_bf * 2,
     SQobj.molecule.number_electrons,
-    ((1,0), 1),
+    ((0,1), 1),
     mf.mo_coeff,
     h_core,
     g_eri,
@@ -72,7 +72,10 @@ WF = UnrestrictedWaveFunctionUPS(
 #print(WF.manual_gradient())
 #print(WF.orbital_gradient_RDM)
 #print("hej2", WF.energy_elec + SQobj.molecule.nuclear_repulsion, WF.energy_elec  + SQobj.molecule.nuclear_repulsion - res[0])
-print(WF.orbital_response_hessian_unrestricted)        
+#print(WF.orbital_response_hessian_unrestricted) 
+#print(WF.manual_hessian_block_unrestricted())  
+with np.printoptions(precision=4, suppress=True):
+    print(WF.orbital_response_hessian_unrestricted - WF.manual_hessian_block_unrestricted())     
 #print("aa", WF.rdm1aa, "bb", WF.rdm1bb,"aaaa", WF.rdm2aaaa, "bbbb", WF.rdm2bbbb, "aabb", WF.rdm2aabb)
 
 #print("RDM" , WF.energy_elec_RDM, "elec", WF.energy_elec, "pyscf", mf.energy_elec()[0])
