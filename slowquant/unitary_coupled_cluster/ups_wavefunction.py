@@ -1007,13 +1007,7 @@ class WaveFunctionUPS:
             state_vec = propagate_unitary(
                 state_vec,
                 i,
-                self.idx2det,
-                self.det2idx,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.num_virtual_orbs,
-                self.num_active_elec_alpha,
-                self.num_active_elec_beta,
+                self.ci_info,
                 self.thetas,
                 self.ups_layout,
             )
@@ -1025,13 +1019,7 @@ class WaveFunctionUPS:
                 propagate_unitary(
                     state_vec,
                     theta_idx,
-                    self.idx2det,
-                    self.det2idx,
-                    self.num_inactive_orbs,
-                    self.num_active_orbs,
-                    self.num_virtual_orbs,
-                    self.num_active_elec_alpha,
-                    self.num_active_elec_beta,
+                    self.ci_info,
                     theta_tmp,
                     self.ups_layout,
                 )
@@ -1041,13 +1029,7 @@ class WaveFunctionUPS:
             state_vecs = propagate_unitary_SA(
                 state_vecs,
                 i,
-                self.idx2det,
-                self.det2idx,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.num_virtual_orbs,
-                self.num_active_elec_alpha,
-                self.num_active_elec_beta,
+                self.ci_info,
                 self.thetas,
                 self.ups_layout,
             )
@@ -1055,13 +1037,7 @@ class WaveFunctionUPS:
         bra_vec = propagate_state_SA(
             [Hamiltonian],
             state_vecs,
-            self.idx2det,
-            self.det2idx,
-            self.num_inactive_orbs,
-            self.num_active_orbs,
-            self.num_virtual_orbs,
-            self.num_active_elec_alpha,
-            self.num_active_elec_beta,
+            self.ci_info,
             self.thetas,
             self.ups_layout,
         )

@@ -896,7 +896,7 @@ class WaveFunctionSAUPS:
                 state_vec,
                 theta_idx,
                 self.ci_info,
-                self.thetas,
+                theta_tmp,
                 self.ups_layout,
             )
             for state in state_tmp:
