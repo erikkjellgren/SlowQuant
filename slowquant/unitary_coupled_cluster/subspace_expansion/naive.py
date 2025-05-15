@@ -1,8 +1,9 @@
 import numpy as np
 import scipy
 
+from slowquant.unitary_coupled_cluster.ci_spaces import CI_Info
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
-from slowquant.unitary_coupled_cluster.operator_matrix import (
+from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     expectation_value,
     propagate_state,
 )
@@ -31,36 +32,28 @@ from slowquant.unitary_coupled_cluster.util import (
 
 
 class SubspaceExpansion:
-    index_info: (
-        tuple[list[int], dict[int, int], int, int, int, int, int, list[float], UpsStructure]
-        | tuple[list[int], dict[int, int], int, int, int, int, int, list[float], UccStructure]
-    )
+    index_info: tuple[CI_Info, list[float], UpsStructure] | tuple[CI_Info, list[float], UccStructure]
 
     def __init__(
         self, wave_function: WaveFunctionUCC | WaveFunctionUPS, excitations: str, do_TDA: bool = False
     ) -> None:
+        """Initialize subspace expansion by calculating the needed matrices.
+
+        Args:
+            wave_function: Wave function object.
+            excitations: Which excitation orders to include in response.
+            do_TDA: Apply Tamm-Dancoff approximation (default: False).
+        """
         self.wf = wave_function
         if isinstance(self.wf, WaveFunctionUCC):
             self.index_info = (
-                self.wf.idx2det,
-                self.wf.det2idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.num_virtual_orbs,
-                self.wf.num_active_elec_alpha,
-                self.wf.num_active_elec_beta,
+                self.wf.ci_info,
                 self.wf.thetas,
                 self.wf.ucc_layout,
             )
         elif isinstance(self.wf, WaveFunctionUPS):
             self.index_info = (
-                self.wf.idx2det,
-                self.wf.det2idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.num_virtual_orbs,
-                self.wf.num_active_elec_alpha,
-                self.wf.num_active_elec_beta,
+                self.wf.ci_info,
                 self.wf.thetas,
                 self.wf.ups_layout,
             )
@@ -141,7 +134,7 @@ class SubspaceExpansion:
                 )
         self.H = H
         self.S = S
-        eigval, eigvec = scipy.linalg.eig(H, S)
+        eigval, _ = scipy.linalg.eig(H, S)
         sorting = np.argsort(eigval)
         eigval = eigval[sorting]
         self.E0 = np.real(eigval[0])
