@@ -3,7 +3,7 @@ from collections.abc import Sequence
 import numpy as np
 import scipy
 
-from slowquant.qiskit_interface.wavefunction import WaveFunction
+from slowquant.qiskit_interface.circuit_wavefunction import WaveFunctionCircuit
 from slowquant.unitary_coupled_cluster.operators import (
     G1_sa,
     G2_1_sa,
@@ -18,7 +18,7 @@ class quantumLRBaseClass:
 
     def __init__(
         self,
-        wf: WaveFunction,
+        wf: WaveFunctionCircuit,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
@@ -318,7 +318,7 @@ class quantumLRBaseClass:
         return self.excitation_energies
 
     def get_normed_excitation_vectors(self) -> None:
-        """Get normed excitation vectors via excitated state norm."""
+        """Get normed excitation vectors via excited state norm."""
         self.normed_excitation_vectors = np.zeros_like(self.excitation_vectors)
         self._Z_q = self.excitation_vectors[: self.num_q, :]
         self._Z_G = self.excitation_vectors[self.num_q : self.num_q + self.num_G, :]
@@ -364,7 +364,7 @@ class quantumLRBaseClass:
         return norms
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
-        """Calculate transtition dipole moment.
+        """Calculate transition dipole moment.
 
         Args:
             dipole_integrals: Dipole integrals (x,y,z) in AO basis.
@@ -383,7 +383,7 @@ class quantumLRBaseClass:
         Args:
             dipole_integrals: Dipole integrals (x,y,z) in AO basis.
 
-        Rerturns:
+        Returns:
             Oscillator Strength.
         """
         transition_dipoles = self.get_transition_dipole(dipole_integrals)

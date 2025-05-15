@@ -14,4 +14,6 @@ disable=abstract-method,
         too-many-instance-attributes,
         too-many-locals,
         too-many-nested-blocks,
+        too-many-lines,
+        too-many-positional-arguments,
         too-many-statements

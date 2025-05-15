@@ -13,7 +13,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
 from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
     LinearResponseBaseClass,
 )
-from slowquant.unitary_coupled_cluster.operator_matrix import (
+from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     expectation_value,
     propagate_state,
 )
@@ -159,28 +159,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     HGJ_ket,
                     *self.index_info,
                 )
-                # - <0| GId GJ |0> * E
-                val -= (
-                    expectation_value(
-                        GI_ket,
-                        [],
-                        GJ_ket,
-                        *self.index_info,
-                    )
-                    * self.wf.energy_elec
-                )
-                # - <0| GId |0> * <0| H GJ |0>
-                val -= expectation_value(
-                    GI_ket,
-                    [],
-                    self.wf.ci_coeffs,
-                    *self.index_info,
-                ) * expectation_value(
-                    self.wf.ci_coeffs,
-                    [],
-                    HGJ_ket,
-                    *self.index_info,
-                )
                 # <0 | GId |0> * <0| GJ |0> * E
                 val += (
                     expectation_value(
@@ -197,19 +175,85 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     )
                     * self.wf.energy_elec
                 )
+                # - <0| GId GJ |0> * E
+                val -= (
+                    expectation_value(
+                        GI_ket,
+                        [],
+                        GJ_ket,
+                        *self.index_info,
+                    )
+                    * self.wf.energy_elec
+                )
+                # - 1/2*<0| GId |0> * <0| H GJ |0>
+                val -= (
+                    1
+                    / 2
+                    * expectation_value(
+                        GI_ket,
+                        [],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                    * expectation_value(
+                        self.wf.ci_coeffs,
+                        [],
+                        HGJ_ket,
+                        *self.index_info,
+                    )
+                )
+                # - 1/2*<0| GJ |0> * <0| GId H |0>
+                val -= (
+                    1
+                    / 2
+                    * expectation_value(
+                        self.wf.ci_coeffs,
+                        [],
+                        GJ_ket,
+                        *self.index_info,
+                    )
+                    * expectation_value(
+                        GI_ket,
+                        [self.H_1i_1a],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                )
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
                 # Make B
-                # <0| GId H |0> * <0| GJd |0>
-                val = expectation_value(
-                    self.wf.ci_coeffs,
-                    [GI.dagger, self.H_0i_0a],
-                    self.wf.ci_coeffs,
-                    *self.index_info,
-                ) * expectation_value(
-                    self.wf.ci_coeffs,
-                    [GJ.dagger],
-                    self.wf.ci_coeffs,
-                    *self.index_info,
+                # 1/2<0| GId H |0> * <0| GJd |0>
+                val = (
+                    1
+                    / 2
+                    * expectation_value(
+                        self.wf.ci_coeffs,
+                        [GI.dagger, self.H_0i_0a],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                    * expectation_value(
+                        self.wf.ci_coeffs,
+                        [GJ.dagger],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                )
+                # 1/2<0| GJd H |0> * <0| GId |0>
+                val += (
+                    1
+                    / 2
+                    * expectation_value(
+                        self.wf.ci_coeffs,
+                        [GJ.dagger, self.H_0i_0a],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                    * expectation_value(
+                        self.wf.ci_coeffs,
+                        [GI.dagger],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
                 )
                 # - <0| GId |0> * <0| GJd |0> * E
                 val -= (
@@ -269,9 +313,9 @@ class LinearResponseUCC(LinearResponseBaseClass):
             self.wf.rdm1,
             rdm2=self.wf.rdm2,
         )
-        mux = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[0])
-        muy = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[1])
-        muz = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[2])
+        mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
+        muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
+        muz = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[2])
         mux_op = one_elec_op_0i_0a(
             mux,
             self.wf.num_inactive_orbs,

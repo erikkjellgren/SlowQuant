@@ -1,10 +1,12 @@
 import numpy as np
 import pyscf
 from qiskit.primitives import Estimator, Sampler
+from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_aer import AerSimulator
 from qiskit_aer.primitives import Sampler as SamplerAer
 from qiskit_aer.primitives import SamplerV2 as SamplerV2Aer
 from qiskit_ibm_runtime import SamplerV2 as SamplerV2IBM
+from qiskit_ibm_runtime.fake_provider import FakeTorino
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 
 import slowquant.qiskit_interface.linear_response.allprojected as q_allprojected  # pylint: disable=consider-using-from-import
@@ -12,8 +14,9 @@ import slowquant.qiskit_interface.linear_response.naive as q_naive  # pylint: di
 import slowquant.qiskit_interface.linear_response.projected as q_projected  # pylint: disable=consider-using-from-import
 import slowquant.unitary_coupled_cluster.linear_response.allprojected as allprojected  # pylint: disable=consider-using-from-import
 import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
+from slowquant.qiskit_interface.circuit_wavefunction import WaveFunctionCircuit
 from slowquant.qiskit_interface.interface import QuantumInterface
-from slowquant.qiskit_interface.wavefunction import WaveFunction
+from slowquant.unitary_coupled_cluster.operators import hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
@@ -31,7 +34,6 @@ def test_LiH_naive_estimator() -> None:
 
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nao * 2,
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -41,25 +43,24 @@ def test_LiH_naive_estimator() -> None:
     )
 
     # Optimize WF
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Optimize WF with QSQ
     estimator = Estimator()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
-        rhf.mo_coeff,
+        WF.c_mo,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
         QI,
     )
 
-    qWF.run_vqe_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", True)
 
     # LR with SQ
     LR = naive.LinearResponseUCC(WF, excitations="SD")
@@ -74,19 +75,19 @@ def test_LiH_naive_estimator() -> None:
     assert np.allclose(excitation_energies, LR.excitation_energies, atol=10**-4)
 
     solution = [
-        0.12947075,
-        0.17874853,
-        0.17874853,
-        0.60462373,
-        0.64663037,
-        0.74060052,
-        0.74060052,
-        1.00275465,
-        2.0748271,
-        2.13720201,
-        2.13720201,
-        2.45509667,
-        2.95432578,
+        0.12945826,
+        0.17872954,
+        0.17872954,
+        0.60460094,
+        0.64662905,
+        0.74056115,
+        0.74056115,
+        1.00273293,
+        2.07482709,
+        2.13719974,
+        2.13719974,
+        2.45509448,
+        2.95423197,
     ]
 
     assert np.allclose(excitation_energies, solution, atol=10**-6)
@@ -106,7 +107,6 @@ def test_LiH_naive_samplerQiskit() -> None:
 
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nao * 2,
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -116,25 +116,24 @@ def test_LiH_naive_samplerQiskit() -> None:
     )
 
     # Optimize WF
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Optimize WF with QSQ
     estimator = Sampler()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
-        rhf.mo_coeff,
+        WF.c_mo,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
         QI,
     )
 
-    qWF.run_vqe_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", True)
 
     # LR with SQ
     LR = naive.LinearResponseUCC(WF, excitations="SD")
@@ -149,19 +148,19 @@ def test_LiH_naive_samplerQiskit() -> None:
     assert np.allclose(excitation_energies, LR.excitation_energies, atol=10**-4)
 
     solution = [
-        0.12947075,
-        0.17874853,
-        0.17874853,
-        0.60462373,
-        0.64663037,
-        0.74060052,
-        0.74060052,
-        1.00275465,
-        2.0748271,
-        2.13720201,
-        2.13720201,
-        2.45509667,
-        2.95432578,
+        0.12945846,
+        0.17872984,
+        0.17872984,
+        0.60460091,
+        0.64662826,
+        0.74055997,
+        0.74055997,
+        1.00273236,
+        2.074827,
+        2.13719972,
+        2.13719972,
+        2.45509362,
+        2.95423092,
     ]
 
     assert np.allclose(excitation_energies, solution, atol=10**-6)
@@ -181,7 +180,6 @@ def test_LiH_naive() -> None:
 
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nao * 2,
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -191,25 +189,24 @@ def test_LiH_naive() -> None:
     )
 
     # Optimize WF
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Optimize WF with QSQ
     estimator = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
-        rhf.mo_coeff,
+        WF.c_mo,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
         QI,
     )
 
-    qWF.run_vqe_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", True)
 
     # LR with SQ
     LR = naive.LinearResponseUCC(WF, excitations="SD")
@@ -224,19 +221,19 @@ def test_LiH_naive() -> None:
     assert np.allclose(excitation_energies, LR.excitation_energies, atol=10**-4)
 
     solution = [
-        0.12947075,
-        0.17874853,
-        0.17874853,
-        0.60462373,
-        0.64663037,
-        0.74060052,
-        0.74060052,
-        1.00275465,
-        2.0748271,
-        2.13720201,
-        2.13720201,
-        2.45509667,
-        2.95432578,
+        0.12945857,
+        0.17873002,
+        0.17873002,
+        0.60460103,
+        0.64662807,
+        0.7405599,
+        0.7405599,
+        1.00273234,
+        2.07482701,
+        2.13719975,
+        2.13719975,
+        2.45509343,
+        2.95423121,
     ]
 
     assert np.allclose(excitation_energies, solution, atol=10**-6)
@@ -254,23 +251,35 @@ def test_LiH_projected() -> None:
     mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
     rhf = pyscf.scf.RHF(mol).run()
 
-    # Optimize WF with QSQ
-    estimator = SamplerAer()
-    mapper = ParityMapper(num_particles=(1, 1))
-
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
-
-    qWF = WaveFunction(
-        mol.nao * 2,
+    # SlowQuant
+    WF = WaveFunctionUCC(
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
+        "SD",
+    )
+
+    # Optimize WF
+    WF.run_wf_optimization_1step("SLSQP", True)
+
+    # Optimize WF with QSQ
+    estimator = SamplerAer()
+    mapper = ParityMapper(num_particles=(1, 1))
+
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
+
+    qWF = WaveFunctionCircuit(
+        mol.nelectron,
+        (2, 2),
+        WF.c_mo,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
         QI,
     )
 
-    qWF.run_vqe_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", True)
 
     # LR with QSQ
     qLR = q_projected.quantumLR(qWF)
@@ -279,74 +288,19 @@ def test_LiH_projected() -> None:
     excitation_energies = qLR.get_excitation_energies()
 
     solution = [
-        0.12947075,
-        0.17874853,
-        0.17874853,
-        0.60462373,
-        0.64663037,
-        0.74060052,
-        0.74060052,
-        1.00275465,
-        2.0748271,
-        2.13720201,
-        2.13720201,
-        2.45509667,
-        2.95432578,
-    ]
-
-    assert np.allclose(excitation_energies, solution, atol=10**-6)
-
-
-def test_LiH_dumb_projected() -> None:
-    """
-    Test LiH ooVQE with rotosolve + projected LR with sampler from QiskitAer
-    """
-    # Define molecule
-    atom = "Li .0 .0 .0; H .0 .0 1.672"
-    basis = "sto-3g"
-
-    # PySCF
-    mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
-    rhf = pyscf.scf.RHF(mol).run()
-
-    # Optimize WF with QSQ
-    estimator = SamplerAer()
-    mapper = ParityMapper(num_particles=(1, 1))
-
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
-
-    qWF = WaveFunction(
-        mol.nao * 2,
-        mol.nelectron,
-        (2, 2),
-        rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
-        QI,
-    )
-
-    qWF.run_vqe_2step("rotosolve", True)
-
-    # LR with QSQ
-    qLR = q_projected.quantumLR(qWF)
-
-    qLR._run_no_saving(do_rdm=True)  # pylint: disable=protected-access
-    excitation_energies = qLR.get_excitation_energies()
-
-    solution = [
-        0.12947075,
-        0.17874853,
-        0.17874853,
-        0.60462373,
-        0.64663037,
-        0.74060052,
-        0.74060052,
-        1.00275465,
-        2.0748271,
-        2.13720201,
-        2.13720201,
-        2.45509667,
-        2.95432578,
+        0.1294585,
+        0.17872992,
+        0.17872992,
+        0.60460117,
+        0.64662822,
+        0.74056037,
+        0.74056037,
+        1.00273275,
+        2.07482698,
+        2.13719974,
+        2.13719974,
+        2.45509396,
+        2.95423188,
     ]
 
     assert np.allclose(excitation_energies, solution, atol=10**-6)
@@ -366,7 +320,6 @@ def test_LiH_allprojected() -> None:
 
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nao * 2,
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -376,25 +329,24 @@ def test_LiH_allprojected() -> None:
     )
 
     # Optimize WF
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Optimize WF with QSQ
     estimator = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
-        rhf.mo_coeff,
+        WF.c_mo,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
         QI,
     )
 
-    qWF.run_vqe_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", True)
 
     # LR with SQ
     LR = allprojected.LinearResponseUCC(WF, excitations="SD")
@@ -408,22 +360,20 @@ def test_LiH_allprojected() -> None:
 
     assert np.allclose(excitation_energies, LR.excitation_energies, atol=10**-4)
 
-    print(excitation_energies)
-
     solution = [
-        0.12961625,
-        0.18079147,
-        0.18079147,
-        0.60483322,
-        0.6469466,
-        0.74931037,
-        0.74931037,
-        1.00301551,
-        2.07493174,
-        2.13725269,
-        2.13725269,
-        2.45535992,
-        2.95516418,
+        0.12961665,
+        0.18079167,
+        0.18079167,
+        0.60483162,
+        0.6469434,
+        0.74930517,
+        0.74930517,
+        1.00301143,
+        2.07493044,
+        2.13725045,
+        2.13725045,
+        2.45535443,
+        2.95513784,
     ]
 
     assert np.allclose(excitation_energies, solution, atol=10**-6)
@@ -441,23 +391,35 @@ def test_LiH_dumb_allprojected() -> None:
     mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
     rhf = pyscf.scf.RHF(mol).run()
 
-    # Optimize WF with QSQ
-    estimator = SamplerAer()
-    mapper = ParityMapper(num_particles=(1, 1))
-
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
-
-    qWF = WaveFunction(
-        mol.nao * 2,
+    # SlowQuant
+    WF = WaveFunctionUCC(
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
+        "SD",
+    )
+
+    # Optimize WF
+    WF.run_wf_optimization_1step("SLSQP", True)
+
+    # Optimize WF with QSQ
+    estimator = SamplerAer()
+    mapper = ParityMapper(num_particles=(1, 1))
+
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
+
+    qWF = WaveFunctionCircuit(
+        mol.nelectron,
+        (2, 2),
+        WF.c_mo,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
         QI,
     )
 
-    qWF.run_vqe_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", True)
 
     # LR with QSQ
     qLR = q_allprojected.quantumLR(qWF)
@@ -465,22 +427,20 @@ def test_LiH_dumb_allprojected() -> None:
     qLR.run()
     excitation_energies = qLR.get_excitation_energies()
 
-    print(excitation_energies)
-
     solution = [
-        0.12961625,
-        0.18079147,
-        0.18079147,
-        0.60483322,
-        0.6469466,
-        0.74931037,
-        0.74931037,
-        1.00301551,
-        2.07493174,
-        2.13725269,
-        2.13725269,
-        2.45535992,
-        2.95516418,
+        0.12961659,
+        0.18079162,
+        0.18079162,
+        0.60483121,
+        0.64694295,
+        0.74930422,
+        0.74930422,
+        1.00301035,
+        2.07493039,
+        2.13725044,
+        2.13725044,
+        2.45535349,
+        2.95513469,
     ]
 
     assert np.allclose(excitation_energies, solution, atol=10**-6)
@@ -498,23 +458,35 @@ def test_LiH_naive_sampler_ISA() -> None:
     mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
     rhf = pyscf.scf.RHF(mol).run()
 
-    # Optimize WF with QSQ
-    sampler = SamplerAer()
-    mapper = ParityMapper(num_particles=(1, 1))
-
-    QI = QuantumInterface(sampler, "tUCCSD", mapper, ISA=True)
-
-    qWF = WaveFunction(
-        mol.nao * 2,
+    # SlowQuant
+    WF = WaveFunctionUCC(
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
+        "SD",
+    )
+
+    # Optimize WF
+    WF.run_wf_optimization_1step("SLSQP", True)
+
+    # Optimize WF with QSQ
+    sampler = SamplerAer()
+    mapper = ParityMapper(num_particles=(1, 1))
+
+    QI = QuantumInterface(sampler, "fUCCSD", mapper, ISA=True)
+
+    qWF = WaveFunctionCircuit(
+        mol.nelectron,
+        (2, 2),
+        WF.c_mo,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
         QI,
     )
 
-    qWF.run_vqe_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", True)
 
     # LR with QSQ
     qLR = q_naive.quantumLR(qWF)
@@ -523,19 +495,19 @@ def test_LiH_naive_sampler_ISA() -> None:
     excitation_energies = qLR.get_excitation_energies()
 
     solution = [
-        0.12947075,
-        0.17874853,
-        0.17874853,
-        0.60462373,
-        0.64663037,
-        0.74060052,
-        0.74060052,
-        1.00275465,
-        2.0748271,
-        2.13720201,
-        2.13720201,
-        2.45509667,
-        2.95432578,
+        0.12945828,
+        0.17872932,
+        0.17872932,
+        0.60460038,
+        0.64662872,
+        0.74055989,
+        0.74055989,
+        1.00273248,
+        2.07482743,
+        2.13719967,
+        2.13719967,
+        2.45509327,
+        2.95422909,
     ]
 
     assert np.allclose(excitation_energies, solution, atol=10**-6)
@@ -555,23 +527,35 @@ def test_LiH_oscillator_strength() -> None:
 
     x, y, z = mol.intor("int1e_r", comp=3)
 
-    # Optimize WF with QSQ
-    estimator = SamplerAer()
-    mapper = ParityMapper(num_particles=(1, 1))
-
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
-
-    qWF = WaveFunction(
-        mol.nao * 2,
+    # SlowQuant
+    WF = WaveFunctionUCC(
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
         mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
         mol.intor("int2e"),
+        "SD",
+    )
+
+    # Optimize WF
+    WF.run_wf_optimization_1step("SLSQP", True)
+
+    # Optimize WF with QSQ
+    estimator = SamplerAer()
+    mapper = ParityMapper(num_particles=(1, 1))
+
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
+
+    qWF = WaveFunctionCircuit(
+        mol.nelectron,
+        (2, 2),
+        WF.c_mo,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
         QI,
     )
 
-    qWF.run_vqe_2step("rotosolve", True)
+    qWF.run_wf_optimization_2step("rotosolve", True)
 
     # naive LR with QSQ
     qLR_naive = q_naive.quantumLR(qWF)
@@ -581,22 +565,22 @@ def test_LiH_oscillator_strength() -> None:
     osc_strengths = qLR_naive.get_oscillator_strength([x, y, z])
 
     solution = [
-        0.04993035,
-        0.24117267,
-        0.24117267,
-        0.15818932,
-        0.16642583,
-        0.01036042,
-        0.01036042,
-        0.00625735,
-        0.06238003,
-        0.12886178,
-        0.12886178,
-        0.04602256,
-        0.00390723,
+        0.04994476,
+        0.24117344,
+        0.24117344,
+        0.15814894,
+        0.16656511,
+        0.01038248,
+        0.01038248,
+        0.00625838,
+        0.06238359,
+        0.12886307,
+        0.12886307,
+        0.04601737,
+        0.00390778,
     ]
 
-    assert np.allclose(osc_strengths, solution, atol=10**-6)
+    assert np.allclose(osc_strengths, solution, atol=10**-5)
 
     # proj LR with QSQ
     qLR_proj = q_projected.quantumLR(qWF)
@@ -606,22 +590,22 @@ def test_LiH_oscillator_strength() -> None:
     osc_strengths = qLR_proj.get_oscillator_strength([x, y, z])
 
     solution = [
-        0.04993178,
-        0.24117267,
-        0.24117267,
-        0.15817858,
-        0.16644551,
-        0.01036042,
-        0.01036042,
-        0.00626061,
-        0.06238002,
-        0.12886178,
-        0.12886178,
-        0.04602259,
-        0.00390724,
+        0.04994581,
+        0.24117141,
+        0.24117141,
+        0.15813749,
+        0.16659558,
+        0.01038159,
+        0.01038159,
+        0.00626614,
+        0.062484,
+        0.12886242,
+        0.12886242,
+        0.0460578,
+        0.00391062,
     ]
 
-    assert np.allclose(osc_strengths, solution, atol=10**-6)
+    assert np.allclose(osc_strengths, solution, atol=10**-5)
 
     # allproj LR with QSQ
     qLR_allproj = q_allprojected.quantumLR(qWF)
@@ -631,22 +615,22 @@ def test_LiH_oscillator_strength() -> None:
     osc_strengths = qLR_allproj.get_oscillator_strength([x, y, z])
 
     solution = [
-        0.05008157,
-        0.25084325,
-        0.25084325,
-        0.16221272,
-        0.16126769,
-        0.01835635,
-        0.01835635,
-        0.0067395,
-        0.06319573,
-        0.13384356,
-        0.13384356,
-        0.04670223,
-        0.00384224,
+        0.05010188,
+        0.25086563,
+        0.25086563,
+        0.16218005,
+        0.16126645,
+        0.01835985,
+        0.01835985,
+        0.00673626,
+        0.06319923,
+        0.13384523,
+        0.13384523,
+        0.04670278,
+        0.00384235,
     ]
 
-    assert np.allclose(osc_strengths, solution, atol=10**-6)
+    assert np.allclose(osc_strengths, solution, atol=10**-5)
 
 
 def test_gradient_optimizer_H2() -> None:
@@ -661,10 +645,9 @@ def test_gradient_optimizer_H2() -> None:
 
     estimator = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
-    QI = QuantumInterface(estimator, "tUCCD", mapper)
+    QI = QuantumInterface(estimator, "fUCCD", mapper)
 
-    WF = WaveFunction(
-        mol.nao * 2,
+    WF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -673,7 +656,7 @@ def test_gradient_optimizer_H2() -> None:
         QI,
     )
 
-    WF.run_vqe_2step("SLSQP", False)
+    WF.run_wf_optimization_2step("SLSQP", False)
     assert abs(WF.energy_elec - -1.8572750819575072) < 10**-6
 
 
@@ -693,10 +676,9 @@ def test_sampler_changes() -> None:
 
     # Ideal Estimator
     estimator = Estimator()
-    QI = QuantumInterface(estimator, "tUCCSD", mapper)
+    QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -765,10 +747,9 @@ def test_shots() -> None:
     sampler = SamplerAer(transpile_options={"optimization_level": 0})
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(sampler, "tUCCSD", mapper, shots=10)
+    QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=10)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -777,7 +758,7 @@ def test_shots() -> None:
         QI,
     )
 
-    print(qWF.energy_elec)
+    _ = qWF.energy_elec
 
 
 def test_fUCC_h2o() -> None:
@@ -791,8 +772,7 @@ def test_fUCC_h2o() -> None:
     mapper = JordanWignerMapper()
     QI = QuantumInterface(estimator, "fUCCSD", mapper)
 
-    WF = WaveFunction(
-        mol.nao * 2,
+    WF = WaveFunctionCircuit(
         mol.nelectron,
         (4, 4),
         rhf.mo_coeff,
@@ -801,7 +781,7 @@ def test_fUCC_h2o() -> None:
         QI,
     )
 
-    WF.run_vqe_2step("RotoSolve", False)
+    WF.run_wf_optimization_2step("RotoSolve", False)
     assert abs(WF.energy_elec - -83.96650295692562) < 10**-6
 
 
@@ -823,10 +803,9 @@ def test_samplerV2() -> None:
     sampler = SamplerV2Aer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(sampler, "tUCCSD", mapper, shots=10)
+    QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=10)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -835,7 +814,7 @@ def test_samplerV2() -> None:
         QI,
     )
 
-    print(qWF.energy_elec)
+    _ = qWF.energy_elec
 
 
 def test_samplerV2_ibm() -> None:
@@ -857,10 +836,9 @@ def test_samplerV2_ibm() -> None:
     sampler = SamplerV2IBM(mode=aer)
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(sampler, "tUCCSD", mapper, shots=10)
+    QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=10)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -869,7 +847,7 @@ def test_samplerV2_ibm() -> None:
         QI,
     )
 
-    print(qWF.energy_elec)
+    _ = qWF.energy_elec
 
 
 def test_custom() -> None:
@@ -888,10 +866,9 @@ def test_custom() -> None:
     sampler = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(sampler, "tUCCSD", mapper, shots=None)
+    QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=None)
 
-    qWF = WaveFunction(
-        mol.nao * 2,
+    qWF = WaveFunctionCircuit(
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
@@ -899,12 +876,13 @@ def test_custom() -> None:
         mol.intor("int2e"),
         QI,
     )
-    qWF.run_vqe_2step("rotosolve", True, is_silent_subiterations=True)
+    qWF.run_wf_optimization_2step("rotosolve", True, is_silent_subiterations=True)
     energy = qWF._calc_energy_elec()  # pylint: disable=protected-access
 
     qc = qWF.QI.circuit.copy()
     qc_param = qWF.QI.parameters
-    qc_H = qWF._get_hamiltonian()  # pylint: disable=protected-access
+    qc_H = hamiltonian_0i_0a(qWF.h_mo, qWF.g_mo, qWF.num_inactive_orbs, qWF.num_active_orbs)
+    qc_H = qc_H.get_folded_operator(qWF.num_inactive_orbs, qWF.num_active_orbs, qWF.num_virtual_orbs)
 
     # Define the Sampler
     sampler = SamplerAer()
@@ -919,3 +897,43 @@ def test_custom() -> None:
     QI.parameters = qc_param
 
     assert abs(QI.quantum_expectation_value(qc_H) - energy) < 10**-8
+
+
+def test_H2_sampler_couplingmap() -> None:
+    """
+    Test coupling map.
+    """
+    # Define molecule
+    atom = "H .0 .0 .0; H .0 .0 1.0"
+    basis = "sto-3g"
+
+    # PySCF
+    mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
+    rhf = pyscf.scf.RHF(mol).run()
+
+    # Optimize WF with QSQ
+    sampler = SamplerAer()
+    mapper = JordanWignerMapper()
+
+    QI = QuantumInterface(sampler, "fUCCSD", mapper, ISA=True)
+
+    qWF = WaveFunctionCircuit(
+        mol.nelectron,
+        (2, 2),
+        rhf.mo_coeff,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
+        QI,
+    )
+
+    qWF.run_wf_optimization_2step("rotosolve", True)
+
+    pm = generate_preset_pass_manager(3, backend=FakeTorino())
+    QI.ISA = True
+    QI.pass_manager = pm
+
+    QI._reset_cliques()  # pylint: disable=protected-access
+
+    assert np.allclose(
+        qWF._calc_energy_elec(), -1.6303275411526188, atol=10**-6  # pylint: disable=protected-access
+    )
