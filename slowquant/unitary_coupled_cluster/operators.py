@@ -94,20 +94,31 @@ def commutator(A: FermionicOperator, B: FermionicOperator) -> FermionicOperator:
     return A * B - B * A
 
 
-def double_commutator(A: FermionicOperator, B: FermionicOperator, C: FermionicOperator) -> FermionicOperator:
+def double_commutator(
+    A: FermionicOperator, B: FermionicOperator, C: FermionicOperator, do_symmetrized: bool = False
+) -> FermionicOperator:
     r"""Construct operator double commutator.
 
     .. math::
         \left[\hat{A},\left[\hat{B},\hat{C}\right]\right] = \hat{A}\hat{B}\hat{C} - \hat{A}\hat{C}\hat{B} - \hat{B}\hat{C}\hat{A} + \hat{C}\hat{B}\hat{A}
 
+    or for the symmetrized version,
+
+    .. math::
+        \left[\hat{A},\hat{B},\hat{C}\right] =
+        \hat{A}\hat{H}\hat{B} + \hat{B}\hat{H}\hat{A} - \frac{1}{2}\left(\hat{A}\hat{B}\hat{H} + \hat{H}\hat{B}\hat{A} + \hat{B}\hat{A}\hat{H} + \hat{H}\hat{A}\hat{B}\right)
+
     Args:
         A: Fermionic operator.
         B: Fermionic operator.
         C: Fermionic operator.
+        do_symmetrized: Do symmetrized double commutator (default: False).
 
     Returns:
         Operator from double commutator.
     """
+    if do_symmetrized:
+        return A * B * C + C * B * A - 1 / 2 * (A * C * B + B * C * A + C * A * B + B * A * C)
     return A * B * C - A * C * B - B * C * A + C * B * A
 
 
@@ -120,9 +131,10 @@ def G1(i: int, a: int, return_anti_hermitian: bool = False) -> FermionicOperator
     Args:
         i: Spin orbital index.
         a: Spin orbital index.
+        return_anti_hermitian: Return anti-hermitian version of operator, i.e. op - op^\dagger
 
     Returns:
-        One-elecetron excitation operator.
+        One-electron excitation operator.
     """
     op = FermionicOperator(a_op_spin(a, dagger=True), 1) * FermionicOperator(a_op_spin(i, dagger=False), 1)
     if return_anti_hermitian:
@@ -141,9 +153,10 @@ def G2(i: int, j: int, a: int, b: int, return_anti_hermitian: bool = False) -> F
         j: Spin orbital index.
         a: Spin orbital index.
         b: Spin orbital index.
+        return_anti_hermitian: Return anti-hermitian version of operator, i.e. op - op^\dagger.
 
     Returns:
-        Two-elecetron excitation operator.
+        Two-electron excitation operator.
     """
     op = (
         FermionicOperator(a_op_spin(a, dagger=True), 1)
@@ -171,9 +184,10 @@ def G3(
         a: Spin orbital index.
         b: Spin orbital index.
         c: Spin orbital index.
+        return_anti_hermitian: Return anti-hermitian version of operator, i.e. op - op^\dagger.
 
     Returns:
-        Three-elecetron excitation operator.
+        Three-electron excitation operator.
     """
     op = (
         FermionicOperator(a_op_spin(a, dagger=True), 1)
@@ -205,9 +219,10 @@ def G4(
         b: Spin orbital index.
         c: Spin orbital index.
         d: Spin orbital index.
+        return_anti_hermitian: Return anti-hermitian version of operator, i.e. op - op^\dagger.
 
     Returns:
-        Four-elecetron excitation operator.
+        Four-electron excitation operator.
     """
     op = (
         FermionicOperator(a_op_spin(a, dagger=True), 1)
@@ -253,9 +268,10 @@ def G5(
         c: Spin orbital index.
         d: Spin orbital index.
         e: Spin orbital index.
+        return_anti_hermitian: Return anti-hermitian version of operator, i.e. op - op^\dagger.
 
     Returns:
-        Five-elecetron excitation operator.
+        Five-electron excitation operator.
     """
     op = (
         FermionicOperator(a_op_spin(a, dagger=True), 1)
@@ -308,9 +324,10 @@ def G6(
         d: Spin orbital index.
         e: Spin orbital index.
         f: Spin orbital index.
+        return_anti_hermitian: Return anti-hermitian version of operator, i.e. op - op^\dagger.
 
     Returns:
-        Six-elecetron excitation operator.
+        Six-electron excitation operator.
     """
     op = (
         FermionicOperator(a_op_spin(a, dagger=True), 1)
@@ -340,9 +357,10 @@ def G1_sa(i: int, a: int, return_anti_hermitian: bool = False) -> FermionicOpera
     Args:
         i: Spatial orbital index.
         a: Spatial orbital index.
+        return_anti_hermitian: Return anti-hermitian version of operator, i.e. op - op^\dagger.
 
     Returns:
-        Singlet one-elecetron spin-adapted excitation operator.
+        Singlet one-electron spin-adapted excitation operator.
     """
     op = 2 ** (-1 / 2) * Epq(a, i)
     if return_anti_hermitian:
@@ -361,9 +379,10 @@ def G2_1_sa(i: int, j: int, a: int, b: int, return_anti_hermitian: bool = False)
         j: Spatial orbital index.
         a: Spatial orbital index.
         b: Spatial orbital index.
+        return_anti_hermitian: Return anti-hermitian version of operator, i.e. op - op^\dagger.
 
     Returns:
-        First singlet two-elecetron spin-adapted excitation operator.
+        First singlet two-electron spin-adapted excitation operator.
     """
     fac = 1
     if a == b:
@@ -387,9 +406,10 @@ def G2_2_sa(i: int, j: int, a: int, b: int, return_anti_hermitian: bool = False)
         j: Spatial orbital index.
         a: Spatial orbital index.
         b: Spatial orbital index.
+        return_anti_hermitian: Return anti-hermitian version of operator, i.e. op - op^\dagger.
 
     Returns:
-        Second singlet two-elecetron spin-adapted excitation operator.
+        Second singlet two-electron spin-adapted excitation operator.
     """
     op = 1 / (2 * 3 ** (1 / 2)) * (Epq(a, i) * Epq(b, j) - Epq(a, j) * Epq(b, i))
     if return_anti_hermitian:
@@ -442,7 +462,7 @@ def hamiltonian_0i_0a(
         num_active_orbs: Number of active orbitals in spatial basis.
 
     Returns:
-        Energy Hamilonian fermionic operator.
+        Energy Hamiltonian fermionic operator.
     """
     hamiltonian_operator = FermionicOperator({}, {})
     # Inactive one-electron
@@ -500,7 +520,7 @@ def hamiltonian_1i_1a(
         num_virtual_orbs: Number of virtual orbitals in spatial basis.
 
     Returns:
-        Modified Hamilonian fermionic operator.
+        Modified Hamiltonian fermionic operator.
     """
     num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
     hamiltonian_operator = FermionicOperator({}, {})
@@ -569,7 +589,7 @@ def hamiltonian_2i_2a(
         num_virtual_orbs: Number of virtual orbitals in spatial basis.
 
     Returns:
-        Modified Hamilonian fermionic operator.
+        Modified Hamiltonian fermionic operator.
     """
     num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
     hamiltonian_operator = FermionicOperator({}, {})

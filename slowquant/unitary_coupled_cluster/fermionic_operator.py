@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import copy
 import re
-from dataclasses import dataclass
 
 
-@dataclass(repr=False, eq=False, match_args=False)
 class a_op:
     __slots__ = ("spinless_idx", "idx", "dagger", "spin")
 
@@ -46,7 +44,7 @@ def operator_string_to_key(operator_string: list[a_op]) -> str:
     """Make key string to index a fermionic operator in a dict structure.
 
     Args:
-        operator_string: Fermionic opreators.
+        operator_string: Fermionic operators.
 
     Returns:
         Dictionary key.
@@ -64,7 +62,7 @@ def operator_to_qiskit_key(operator_string: list[a_op], remapping: dict[int, int
     """Make key string to index a fermionic operator in a dict structure.
 
     Args:
-        operator_string: Fermionic opreators.
+        operator_string: Fermionic operators.
         remapping: Map that takes indices from alpha,beta,alpha,beta
                    to alpha,alpha,beta,beta ordering.
 
@@ -109,6 +107,8 @@ def do_extended_normal_ordering(
             changed = False
             is_zero = False
             while True:
+                if len(next_operator) == 0:
+                    break
                 a = next_operator[current_idx]
                 b = next_operator[current_idx + 1]
                 i = current_idx
@@ -316,7 +316,11 @@ class FermionicOperator:
             new_string_key = operator_string_to_key(new_op)
             operators[new_string_key] = new_op
             factors[new_string_key] = self.factors[key_string]
-        return FermionicOperator(operators, factors)
+        # Do normal ordering of comlex conjugated operator.
+        operators_ordered, factors_ordered = do_extended_normal_ordering(
+            FermionicOperator(operators, factors)
+        )
+        return FermionicOperator(operators_ordered, factors_ordered)
 
     @property
     def operator_count(self) -> dict[int, int]:
@@ -378,7 +382,7 @@ class FermionicOperator:
         Warning, multiplication of folded operators, might give wrong operators.
         (I have not quite figured out a good programming structure that will not allow multiplication after folding)
 
-        Note, that the indicies of the folded operator is remapped, such that idx=0 is the first index in the active space.
+        Note, that the indices of the folded operator is remapped, such that idx=0 is the first index in the active space.
 
         Args:
             num_inactive_orbs: Number of spatial inactive orbitals.

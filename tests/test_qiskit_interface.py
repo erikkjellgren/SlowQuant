@@ -306,73 +306,6 @@ def test_LiH_projected() -> None:
     assert np.allclose(excitation_energies, solution, atol=10**-6)
 
 
-def test_LiH_dumb_projected() -> None:
-    """
-    Test LiH ooVQE with rotosolve + projected LR with sampler from QiskitAer
-    """
-    # Define molecule
-    atom = "Li .0 .0 .0; H .0 .0 1.672"
-    basis = "sto-3g"
-
-    # PySCF
-    mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
-    rhf = pyscf.scf.RHF(mol).run()
-
-    # SlowQuant
-    WF = WaveFunctionUCC(
-        mol.nelectron,
-        (2, 2),
-        rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
-        "SD",
-    )
-
-    # Optimize WF
-    WF.run_wf_optimization_1step("SLSQP", True)
-
-    # Optimize WF with QSQ
-    estimator = SamplerAer()
-    mapper = ParityMapper(num_particles=(1, 1))
-
-    QI = QuantumInterface(estimator, "fUCCSD", mapper)
-
-    qWF = WaveFunctionCircuit(
-        mol.nelectron,
-        (2, 2),
-        WF.c_mo,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
-        QI,
-    )
-
-    qWF.run_wf_optimization_2step("rotosolve", True)
-
-    # LR with QSQ
-    qLR = q_projected.quantumLR(qWF)
-
-    qLR._run_no_saving(do_rdm=True)  # pylint: disable=protected-access
-    excitation_energies = qLR.get_excitation_energies()
-
-    solution = [
-        0.1294586,
-        0.17873008,
-        0.17873008,
-        0.60460128,
-        0.64662825,
-        0.74056057,
-        0.74056057,
-        1.0027328,
-        2.07482697,
-        2.13719977,
-        2.13719977,
-        2.45509398,
-        2.95423213,
-    ]
-
-    assert np.allclose(excitation_energies, solution, atol=10**-6)
-
-
 def test_LiH_allprojected() -> None:
     """
     Test LiH ooVQE with rotosolve + allprojected LR with sampler from QiskitAer
@@ -657,19 +590,19 @@ def test_LiH_oscillator_strength() -> None:
     osc_strengths = qLR_proj.get_oscillator_strength([x, y, z])
 
     solution = [
-        0.04994469,
-        0.24117344,
-        0.24117344,
-        0.15814901,
-        0.16656476,
-        0.01038248,
-        0.01038248,
-        0.00625818,
-        0.06238363,
-        0.12886307,
-        0.12886307,
-        0.04601738,
-        0.00390777,
+        0.04994581,
+        0.24117141,
+        0.24117141,
+        0.15813749,
+        0.16659558,
+        0.01038159,
+        0.01038159,
+        0.00626614,
+        0.062484,
+        0.12886242,
+        0.12886242,
+        0.0460578,
+        0.00391062,
     ]
 
     assert np.allclose(osc_strengths, solution, atol=10**-5)

@@ -35,13 +35,13 @@ repos:
         args: ["--profile", "black"]
 
   - repo: https://github.com/PyCQA/pylint
-    rev: v3.3.4
+    rev: v3.3.6
     hooks:
       - id: pylint
         args: ["--rcfile=.pylintrc"]
 
   - repo: https://github.com/PyCQA/flake8
-    rev: 7.1.1
+    rev: 7.2.0
     hooks:
       - id: flake8
         additional_dependencies: [pep8-naming]

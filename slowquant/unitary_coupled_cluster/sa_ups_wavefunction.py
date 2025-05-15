@@ -13,16 +13,16 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
     two_electron_integral_transform,
 )
+from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
 from slowquant.unitary_coupled_cluster.density_matrix import (
     ReducedDenstiyMatrix,
     get_orbital_gradient,
 )
-from slowquant.unitary_coupled_cluster.operator_matrix import (
+from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     construct_ups_state_SA,
     expectation_value,
     expectation_value_SA,
     get_grad_action_SA,
-    get_indexing,
     propagate_state_SA,
     propagate_unitary_SA,
 )
@@ -129,7 +129,7 @@ class WaveFunctionSAUPS:
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
         self.num_active_orbs = self.num_active_spin_orbs // 2
         self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
-        # Contruct spatial idx
+        # Construct spatial idx
         self.inactive_idx: list[int] = []
         self.virtual_idx: list[int] = []
         self.active_idx: list[int] = []
@@ -193,7 +193,7 @@ class WaveFunctionSAUPS:
                 self._kappa_old.append(0.0)
                 self.kappa_idx.append((p, q))
                 self.kappa_idx_dagger.append((q, p))
-        # HF like orbital rotation indecies
+        # HF like orbital rotation indices
         self.kappa_hf_like_idx = []
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
@@ -204,10 +204,14 @@ class WaveFunctionSAUPS:
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     self.kappa_hf_like_idx.append((p, q))
         # Construct determinant basis
-        self.idx2det, self.det2idx = get_indexing(
-            self.num_active_orbs, self.num_active_elec_alpha, self.num_active_elec_beta
+        self.ci_info = get_indexing(
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+            self.num_virtual_orbs,
+            self.num_active_elec_alpha,
+            self.num_active_elec_beta,
         )
-        self.num_det = len(self.idx2det)
+        self.num_det = len(self.ci_info.idx2det)
         # SA details
         self.num_states = len(states[0])
         self.csf_coeffs = np.zeros((self.num_states, self.num_det))  # state vector for each state in SA
@@ -223,7 +227,7 @@ class WaveFunctionSAUPS:
                     raise ValueError(
                         f"Length of determinant, {len(on_vec)}, does not match number of active spin orbitals, {self.num_active_spin_orbs}. For determinant, {on_vec}"
                     )
-                idx = self.det2idx[int(on_vec, 2)]
+                idx = self.ci_info.det2idx[int(on_vec, 2)]
                 self.csf_coeffs[i, idx] = coeff
         self._ci_coeffs = np.copy(self.csf_coeffs)
         for i, coeff_i in enumerate(self.ci_coeffs):
@@ -234,7 +238,7 @@ class WaveFunctionSAUPS:
                 else:
                     if abs(coeff_i @ coeff_j) > 10**-10:
                         raise ValueError(
-                            f"state {i} and {j} are not otrhogonal got overlap of {coeff_i @ coeff_j}"
+                            f"state {i} and {j} are not orthogonal got overlap of {coeff_i @ coeff_j}"
                         )
         # Construct UPS Structure
         self.ups_layout = UpsStructure()
@@ -286,13 +290,7 @@ class WaveFunctionSAUPS:
         if self._ci_coeffs is None:
             self._ci_coeffs = construct_ups_state_SA(
                 self.csf_coeffs,
-                self.idx2det,
-                self.det2idx,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.num_virtual_orbs,
-                self.num_active_elec_alpha,
-                self.num_active_elec_beta,
+                self.ci_info,
                 self.thetas,
                 self.ups_layout,
             )
@@ -388,13 +386,7 @@ class WaveFunctionSAUPS:
                         self.ci_coeffs,
                         [Epq_op],
                         self.ci_coeffs,
-                        self.idx2det,
-                        self.det2idx,
-                        self.num_inactive_orbs,
-                        self.num_active_orbs,
-                        self.num_virtual_orbs,
-                        self.num_active_elec_alpha,
-                        self.num_active_elec_beta,
+                        self.ci_info,
                         self.thetas,
                         self.ups_layout,
                         do_folding=False,
@@ -447,13 +439,7 @@ class WaveFunctionSAUPS:
                                 self.ci_coeffs,
                                 [Epq_op, Ers_op],
                                 self.ci_coeffs,
-                                self.idx2det,
-                                self.det2idx,
-                                self.num_inactive_orbs,
-                                self.num_active_orbs,
-                                self.num_virtual_orbs,
-                                self.num_active_elec_alpha,
-                                self.num_active_elec_beta,
+                                self.ci_info,
                                 self.thetas,
                                 self.ups_layout,
                                 do_folding=False,
@@ -498,13 +484,7 @@ class WaveFunctionSAUPS:
                 self.ci_coeffs,
                 [Hamiltonian],
                 self.ci_coeffs,
-                self.idx2det,
-                self.det2idx,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.num_virtual_orbs,
-                self.num_active_elec_alpha,
-                self.num_active_elec_beta,
+                self.ci_info,
                 self.thetas,
                 self.ups_layout,
             )
@@ -606,7 +586,7 @@ class WaveFunctionSAUPS:
                     self._kappa[i] = 0.0
                     self._kappa_old[i] = 0.0
             else:
-                # If theres is no orbital optimization, then the algorithm is already converged.
+                # If there is no orbital optimization, then the algorithm is already converged.
                 e_new = res.fun
                 if orbital_optimization and len(self.kappa) == 0:
                     print(
@@ -740,13 +720,7 @@ class WaveFunctionSAUPS:
                     coeff_i,
                     [Hamiltonian],
                     coeff_j,
-                    self.idx2det,
-                    self.det2idx,
-                    self.num_inactive_orbs,
-                    self.num_active_orbs,
-                    self.num_virtual_orbs,
-                    self.num_active_elec_alpha,
-                    self.num_active_elec_beta,
+                    self.ci_info,
                     self.thetas,
                     self.ups_layout,
                     do_folding=False,
@@ -813,13 +787,7 @@ class WaveFunctionSAUPS:
                     coeff_i,
                     [op],
                     coeff_j,
-                    self.idx2det,
-                    self.det2idx,
-                    self.num_inactive_orbs,
-                    self.num_active_orbs,
-                    self.num_virtual_orbs,
-                    self.num_active_elec_alpha,
-                    self.num_active_elec_beta,
+                    self.ci_info,
                     self.thetas,
                     self.ups_layout,
                     do_folding=False,
@@ -866,6 +834,7 @@ class WaveFunctionSAUPS:
             parameters: Ansatz and orbital rotation parameters.
             theta_optimization: If used in theta optimization.
             kappa_optimization: If used in kappa optimization.
+            return_all_states: Return the energy for all states instead of only the averaged energy.
 
         Returns:
             State-averaged electronic energy.
@@ -886,13 +855,7 @@ class WaveFunctionSAUPS:
             self.ci_coeffs,
             [Hamiltonian],
             self.ci_coeffs,
-            self.idx2det,
-            self.det2idx,
-            self.num_inactive_orbs,
-            self.num_active_orbs,
-            self.num_virtual_orbs,
-            self.num_active_elec_alpha,
-            self.num_active_elec_beta,
+            self.ci_info,
             self.thetas,
             self.ups_layout,
             do_folding=False,
@@ -921,13 +884,7 @@ class WaveFunctionSAUPS:
             state_vec = propagate_unitary_SA(
                 state_vec,
                 i,
-                self.idx2det,
-                self.det2idx,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.num_virtual_orbs,
-                self.num_active_elec_alpha,
-                self.num_active_elec_beta,
+                self.ci_info,
                 self.thetas,
                 self.ups_layout,
             )
@@ -938,14 +895,8 @@ class WaveFunctionSAUPS:
             state_tmp = propagate_unitary_SA(
                 state_vec,
                 theta_idx,
-                self.idx2det,
-                self.det2idx,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.num_virtual_orbs,
-                self.num_active_elec_alpha,
-                self.num_active_elec_beta,
-                theta_tmp,
+                self.ci_info,
+                self.thetas,
                 self.ups_layout,
             )
             for state in state_tmp:
@@ -955,13 +906,7 @@ class WaveFunctionSAUPS:
             state_vecs = propagate_unitary_SA(
                 state_vecs,
                 i,
-                self.idx2det,
-                self.det2idx,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.num_virtual_orbs,
-                self.num_active_elec_alpha,
-                self.num_active_elec_beta,
+                self.ci_info,
                 self.thetas,
                 self.ups_layout,
             )
@@ -969,13 +914,7 @@ class WaveFunctionSAUPS:
         bra_vec = propagate_state_SA(
             [Hamiltonian],
             state_vecs,
-            self.idx2det,
-            self.det2idx,
-            self.num_inactive_orbs,
-            self.num_active_orbs,
-            self.num_virtual_orbs,
-            self.num_active_elec_alpha,
-            self.num_active_elec_beta,
+            self.ci_info,
             self.thetas,
             self.ups_layout,
         )
@@ -1033,25 +972,13 @@ class WaveFunctionSAUPS:
             bra_vec = propagate_state_SA(
                 [Hamiltonian],
                 self.ci_coeffs,
-                self.idx2det,
-                self.det2idx,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.num_virtual_orbs,
-                self.num_active_elec_alpha,
-                self.num_active_elec_beta,
+                self.ci_info,
                 self.thetas,
                 self.ups_layout,
             )
             bra_vec = construct_ups_state_SA(
                 bra_vec,
-                self.idx2det,
-                self.det2idx,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.num_virtual_orbs,
-                self.num_active_elec_alpha,
-                self.num_active_elec_beta,
+                self.ci_info,
                 self.thetas,
                 self.ups_layout,
                 dagger=True,
@@ -1059,19 +986,13 @@ class WaveFunctionSAUPS:
             # CSF reference state on ket
             ket_vec = np.copy(self.csf_coeffs)
             ket_vec_tmp = np.copy(self.csf_coeffs)
-            # Calculate analytical derivatice w.r.t. each theta using gradient_action function
+            # Calculate analytical derivative w.r.t. each theta using gradient_action function
             for i in range(len(self.thetas)):
                 # Loop over each state in SA
                 ket_vec_tmp = get_grad_action_SA(
                     ket_vec,
                     i,
-                    self.idx2det,
-                    self.det2idx,
-                    self.num_inactive_orbs,
-                    self.num_active_orbs,
-                    self.num_virtual_orbs,
-                    self.num_active_elec_alpha,
-                    self.num_active_elec_beta,
+                    self.ci_info,
                     self.ups_layout,
                 )
                 for bra, ket in zip(bra_vec, ket_vec_tmp):
@@ -1081,26 +1002,14 @@ class WaveFunctionSAUPS:
                 bra_vec = propagate_unitary_SA(
                     bra_vec,
                     i,
-                    self.idx2det,
-                    self.det2idx,
-                    self.num_inactive_orbs,
-                    self.num_active_orbs,
-                    self.num_virtual_orbs,
-                    self.num_active_elec_alpha,
-                    self.num_active_elec_beta,
+                    self.ci_info,
                     self.thetas,
                     self.ups_layout,
                 )
                 ket_vec = propagate_unitary_SA(
                     ket_vec,
                     i,
-                    self.idx2det,
-                    self.det2idx,
-                    self.num_inactive_orbs,
-                    self.num_active_orbs,
-                    self.num_virtual_orbs,
-                    self.num_active_elec_alpha,
-                    self.num_active_elec_beta,
+                    self.ci_info,
                     self.thetas,
                     self.ups_layout,
                 )

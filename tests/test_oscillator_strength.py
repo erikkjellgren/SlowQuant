@@ -277,7 +277,7 @@ def test_LiH_sto3g_proj():
     assert abs(osc_strengths[5] - 0.010379091370812886) < thresh
     assert abs(osc_strengths[6] - 0.010379091373763447) < thresh
     assert abs(osc_strengths[7] - 0.006256710161922168) < thresh
-    assert abs(osc_strengths[8] - 0.0623868647774392) < thresh
+    assert abs(osc_strengths[8] - 0.062488043049451776) < thresh
     assert abs(osc_strengths[9] - 0.12886225822034553) < thresh
     assert abs(osc_strengths[10] - 0.12886225822019629) < thresh
     assert abs(osc_strengths[11] - 0.046007031170702296) < thresh
@@ -415,7 +415,7 @@ def test_LiH_sto3g_st():
     assert abs(osc_strengths[5] - 0.010379091370809963) < thresh
     assert abs(osc_strengths[6] - 0.010379091373763017) < thresh
     assert abs(osc_strengths[7] - 0.0062567030068973305) < thresh
-    assert abs(osc_strengths[8] - 0.06238684901394572) < thresh
+    assert abs(osc_strengths[8] - 0.06248802645793188) < thresh
     assert abs(osc_strengths[9] - 0.12886225822029365) < thresh
     assert abs(osc_strengths[10] - 0.12886225822018843) < thresh
     assert abs(osc_strengths[11] - 0.04600702378157588) < thresh

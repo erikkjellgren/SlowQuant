@@ -439,11 +439,11 @@ def iterate_pair_t2_generalized(
 
 
 class UccStructure:
-    __slots__ = ("excitation_indicies", "excitation_operator_type", "n_params")
+    __slots__ = ("excitation_indices", "excitation_operator_type", "n_params")
 
     def __init__(self) -> None:
         """Intialize the unitary coupled cluster ansatz structure."""
-        self.excitation_indicies: list[tuple[int, ...]] = []
+        self.excitation_indices: list[tuple[int, ...]] = []
         self.excitation_operator_type: list[str] = []
         self.n_params = 0
 
@@ -455,7 +455,7 @@ class UccStructure:
             active_unocc_idx: Active weakly occupied spatial orbital indices.
         """
         for a, i, _ in iterate_t1_sa(active_occ_idx, active_unocc_idx):
-            self.excitation_indicies.append((i, a))
+            self.excitation_indices.append((i, a))
             self.excitation_operator_type.append("sa_single")
             self.n_params += 1
 
@@ -467,7 +467,7 @@ class UccStructure:
             active_unocc_idx: Active weakly occupied spatial orbital indices.
         """
         for a, i, b, j, _, op_type in iterate_t2_sa(active_occ_idx, active_unocc_idx):
-            self.excitation_indicies.append((i, j, a, b))
+            self.excitation_indices.append((i, j, a, b))
             if op_type == 1:
                 self.excitation_operator_type.append("sa_double_1")
             elif op_type == 2:
@@ -482,7 +482,7 @@ class UccStructure:
             active_unocc_spin_idx: Active weakly occupied spin orbital indices.
         """
         for a, i, b, j, c, k in iterate_t3(active_occ_spin_idx, active_unocc_spin_idx):
-            self.excitation_indicies.append((i, j, k, a, b, c))
+            self.excitation_indices.append((i, j, k, a, b, c))
             self.excitation_operator_type.append("triple")
             self.n_params += 1
 
@@ -496,7 +496,7 @@ class UccStructure:
             active_unocc_spin_idx: Active weakly occupied spin orbital indices.
         """
         for a, i, b, j, c, k, d, l in iterate_t4(active_occ_spin_idx, active_unocc_spin_idx):
-            self.excitation_indicies.append((i, j, k, l, a, b, c, d))
+            self.excitation_indices.append((i, j, k, l, a, b, c, d))
             self.excitation_operator_type.append("quadruple")
             self.n_params += 1
 
@@ -510,7 +510,7 @@ class UccStructure:
             active_unocc_spin_idx: Active weakly occupied spin orbital indices.
         """
         for a, i, b, j, c, k, d, l, e, m in iterate_t5(active_occ_spin_idx, active_unocc_spin_idx):
-            self.excitation_indicies.append((i, j, k, l, m, a, b, c, d, e))
+            self.excitation_indices.append((i, j, k, l, m, a, b, c, d, e))
             self.excitation_operator_type.append("quintuple")
             self.n_params += 1
 
@@ -522,17 +522,17 @@ class UccStructure:
             active_unocc_spin_idx: Active weakly occupied spin orbital indices.
         """
         for a, i, b, j, c, k, d, l, e, m, f, n in iterate_t6(active_occ_spin_idx, active_unocc_spin_idx):
-            self.excitation_indicies.append((i, j, k, l, m, n, a, b, c, d, e, f))
+            self.excitation_indices.append((i, j, k, l, m, n, a, b, c, d, e, f))
             self.excitation_operator_type.append("sextuple")
             self.n_params += 1
 
 
 class UpsStructure:
-    __slots__ = ("excitation_indicies", "excitation_operator_type", "n_params", "grad_param_R", "param_names")
+    __slots__ = ("excitation_indices", "excitation_operator_type", "n_params", "grad_param_R", "param_names")
 
     def __init__(self) -> None:
-        """Intialize the unitary product state ansatz structure."""
-        self.excitation_indicies: list[tuple[int, ...]] = []
+        """Initialize the unitary product state ansatz structure."""
+        self.excitation_indices: list[tuple[int, ...]] = []
         self.excitation_operator_type: list[str] = []
         self.n_params: int = 0
         self.grad_param_R: dict[str, int] = {}
@@ -578,13 +578,13 @@ class UpsStructure:
                 if not do_qnp:
                     # First single
                     self.excitation_operator_type.append("sa_single")
-                    self.excitation_indicies.append((p, p + 1))
+                    self.excitation_indices.append((p, p + 1))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
                 # Double
                 self.excitation_operator_type.append("double")
-                self.excitation_indicies.append((2 * p, 2 * p + 1, 2 * p + 2, 2 * p + 3))
+                self.excitation_indices.append((2 * p, 2 * p + 1, 2 * p + 2, 2 * p + 3))
                 self.grad_param_R[f"p{self.n_params:09d}"] = 2
                 self.param_names.append(f"p{self.n_params:09d}")
                 self.n_params += 1
@@ -595,7 +595,7 @@ class UpsStructure:
                     # the last single excitation is earlier than expected.
                     continue
                 self.excitation_operator_type.append("sa_single")
-                self.excitation_indicies.append((p, p + 1))
+                self.excitation_indices.append((p, p + 1))
                 self.grad_param_R[f"p{self.n_params:09d}"] = 4
                 self.param_names.append(f"p{self.n_params:09d}")
                 self.n_params += 1
@@ -603,13 +603,13 @@ class UpsStructure:
                 if not do_qnp:
                     # First single
                     self.excitation_operator_type.append("sa_single")
-                    self.excitation_indicies.append((p, p + 1))
+                    self.excitation_indices.append((p, p + 1))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
                 # Double
                 self.excitation_operator_type.append("double")
-                self.excitation_indicies.append((2 * p, 2 * p + 1, 2 * p + 2, 2 * p + 3))
+                self.excitation_indices.append((2 * p, 2 * p + 1, 2 * p + 2, 2 * p + 3))
                 self.grad_param_R[f"p{self.n_params:09d}"] = 2
                 self.param_names.append(f"p{self.n_params:09d}")
                 self.n_params += 1
@@ -617,7 +617,7 @@ class UpsStructure:
                 if n + 1 == n_layers and skip_last_singles:
                     continue
                 self.excitation_operator_type.append("sa_single")
-                self.excitation_indicies.append((p, p + 1))
+                self.excitation_indices.append((p, p + 1))
                 self.grad_param_R[f"p{self.n_params:09d}"] = 4
                 self.param_names.append(f"p{self.n_params:09d}")
                 self.n_params += 1
@@ -693,42 +693,42 @@ class UpsStructure:
             if do_S:
                 for a, i in iterate_t1(occ, unocc):
                     self.excitation_operator_type.append("single")
-                    self.excitation_indicies.append((i, a))
+                    self.excitation_indices.append((i, a))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_SAS:
                 for a, i, _ in iterate_t1_sa(occ, unocc):
                     self.excitation_operator_type.append("sa_single")
-                    self.excitation_indicies.append((i, a))
+                    self.excitation_indices.append((i, a))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_SAGS:
                 for a, i, _ in iterate_t1_sa_generalized(num_orbs):
                     self.excitation_operator_type.append("sa_single")
-                    self.excitation_indicies.append((i, a))
+                    self.excitation_indices.append((i, a))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_D:
                 for a, i, b, j in iterate_t2(occ, unocc):
                     self.excitation_operator_type.append("double")
-                    self.excitation_indicies.append((i, j, a, b))
+                    self.excitation_indices.append((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_pD:
                 for a, i, b, j in iterate_pair_t2(occ, unocc):
                     self.excitation_operator_type.append("double")
-                    self.excitation_indicies.append((i, j, a, b))
+                    self.excitation_indices.append((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_GpD:
                 for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
                     self.excitation_operator_type.append("double")
-                    self.excitation_indicies.append((i, j, a, b))
+                    self.excitation_indices.append((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
@@ -800,22 +800,22 @@ class UpsStructure:
             if do_D:
                 for a, i, b, j in iterate_t2(occ, unocc):
                     if i % 2 == a % 2:
-                        self.excitation_indicies.append((i, a))
+                        self.excitation_indices.append((i, a))
                     else:
-                        self.excitation_indicies.append((i, b))
+                        self.excitation_indices.append((i, b))
                     self.excitation_operator_type.append("single")
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
                     self.excitation_operator_type.append("double")
-                    self.excitation_indicies.append((i, j, a, b))
+                    self.excitation_indices.append((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
                     if i % 2 == a % 2:
-                        self.excitation_indicies.append((j, b))
+                        self.excitation_indices.append((j, b))
                     else:
-                        self.excitation_indicies.append((j, a))
+                        self.excitation_indices.append((j, a))
                     self.excitation_operator_type.append("single")
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
@@ -823,34 +823,34 @@ class UpsStructure:
             if do_pD:
                 for a, i, b, j in iterate_pair_t2(occ, unocc):
                     self.excitation_operator_type.append("sa_single")
-                    self.excitation_indicies.append((i // 2, a // 2))
+                    self.excitation_indices.append((i // 2, a // 2))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
                     self.excitation_operator_type.append("double")
-                    self.excitation_indicies.append((i, j, a, b))
+                    self.excitation_indices.append((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
                     self.excitation_operator_type.append("sa_single")
-                    self.excitation_indicies.append((i // 2, a // 2))
+                    self.excitation_indices.append((i // 2, a // 2))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_GpD:
                 for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
                     self.excitation_operator_type.append("sa_single")
-                    self.excitation_indicies.append((i // 2, a // 2))
+                    self.excitation_indices.append((i // 2, a // 2))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
                     self.excitation_operator_type.append("double")
-                    self.excitation_indicies.append((i, j, a, b))
+                    self.excitation_indices.append((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
                     self.excitation_operator_type.append("sa_single")
-                    self.excitation_indicies.append((i // 2, a // 2))
+                    self.excitation_indices.append((i // 2, a // 2))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
