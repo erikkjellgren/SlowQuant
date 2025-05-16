@@ -259,18 +259,17 @@ class FermionicOperator:
                 new_ops, new_facs = do_extended_normal_ordering(
                     FermionicOperator(
                         {
-                            string_key1
-                            + string_key2: self.operators[string_key2]
+                            string_key1 + string_key2: self.operators[string_key2]
                             + fermistring.operators[string_key1]
                         },
                         {
-                            string_key1
-                            + string_key2: self.factors[string_key2] * fermistring.factors[string_key1]
+                            string_key1 + string_key2: self.factors[string_key2]
+                            * fermistring.factors[string_key1]
                         },
                     )
                 )
-                for str_key in new_ops:  # pylint: disable=C0206
-                    if str_key not in operators.keys():  # pylint: disable=C0201
+                for str_key in new_ops:
+                    if str_key not in operators.keys():
                         operators[str_key] = new_ops[str_key]
                         factors[str_key] = new_facs[str_key]
                     else:

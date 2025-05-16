@@ -82,7 +82,6 @@ class WaveFunctionCircuit:
         self._h_mo = None
         self._g_mo = None
         self._energy_elec: float | None = None
-        self.do_trace_corrected = True
         active_space = []
         orbital_counter = 0
         for i in range(num_elec - cas[0], num_elec):
@@ -283,7 +282,7 @@ class WaveFunctionCircuit:
             raise ValueError("EstimatorV2 is not currently supported.")
         if isinstance(primitive, BaseSamplerV2) and verbose:
             print("WARNING: Using SamplerV2 is an experimental feature.")
-        self.QI._primitive = primitive  # pylint: disable=protected-access
+        self.QI._primitive = primitive
         if verbose:
             if self.QI.do_M_ansatz0:
                 print("Reset RDMs, energies, QI metrics, and correlation matrix.")
@@ -310,11 +309,11 @@ class WaveFunctionCircuit:
     def _reconstruct_circuit(self) -> None:
         """Construct circuit again."""
         # force ISA = False
-        self.QI._ISA = False  # pylint: disable=protected-access
+        self.QI._ISA = False
         self.QI.construct_circuit(
             self.num_active_orbs, (self.num_active_elec // 2, self.num_active_elec // 2)
         )
-        self.QI._transpiled = False  # pylint: disable=protected-access
+        self.QI._transpiled = False
 
     @property
     def rdm1(self) -> np.ndarray:
@@ -340,12 +339,6 @@ class WaveFunctionCircuit:
                     val = self.QI.quantum_expectation_value(rdm1_op)
                     self._rdm1[p_idx, q_idx] = val  # type: ignore [index]
                     self._rdm1[q_idx, p_idx] = val  # type: ignore [index]
-            if self.do_trace_corrected:
-                trace = 0.0
-                for i in range(self.num_active_orbs):
-                    trace += self._rdm1[i, i]  # type: ignore [index]
-                for i in range(self.num_active_orbs):
-                    self._rdm1[i, i] = self._rdm1[i, i] * self.num_active_elec / trace  # type: ignore [index]
         return self._rdm1
 
     @property
@@ -395,16 +388,6 @@ class WaveFunctionCircuit:
                             self._rdm2[r_idx, s_idx, p_idx, q_idx] = val  # type: ignore [index]
                             self._rdm2[q_idx, p_idx, s_idx, r_idx] = val  # type: ignore [index]
                             self._rdm2[s_idx, r_idx, q_idx, p_idx] = val  # type: ignore [index]
-            if self.do_trace_corrected:
-                trace = 0.0
-                for i in range(self.num_active_orbs):
-                    for j in range(self.num_active_orbs):
-                        trace += self._rdm2[i, i, j, j]  # type: ignore [index]
-                for i in range(self.num_active_orbs):
-                    for j in range(self.num_active_orbs):
-                        self._rdm2[i, i, j, j] = (  # type: ignore [index]
-                            self._rdm2[i, i, j, j] * self.num_active_elec * (self.num_active_elec - 1) / trace  # type: ignore [index]
-                        )
         return self._rdm2
 
     @property
@@ -466,18 +449,6 @@ class WaveFunctionCircuit:
                                     self._rdm3[s_idx, r_idx, u_idx, t_idx, q_idx, p_idx] = val  # type: ignore
                                     self._rdm3[u_idx, t_idx, q_idx, p_idx, s_idx, r_idx] = val  # type: ignore
                                     self._rdm3[u_idx, t_idx, s_idx, r_idx, q_idx, p_idx] = val  # type: ignore
-            if self.do_trace_corrected:
-                trace = 0.0
-                for i in range(self.num_active_orbs):
-                    for j in range(self.num_active_orbs):
-                        for k in range(self.num_active_orbs):
-                            trace += self._rdm3[i, i, j, j, k, k]  # type: ignore [index]
-                for i in range(self.num_active_orbs):
-                    for j in range(self.num_active_orbs):
-                        for k in range(self.num_active_orbs):
-                            self._rdm3[i, i, j, j, k, k] = (  # type: ignore [index]
-                                self._rdm3[i, i, j, j, k, k] * self.num_active_elec * (self.num_active_elec - 1) * (self.num_active_elec - 2) / trace  # type: ignore [index]
-                            )
         return self._rdm3
 
     @property
@@ -701,25 +672,6 @@ class WaveFunctionCircuit:
                                             self._rdm4[  # type: ignore
                                                 n_idx, m_idx, u_idx, t_idx, s_idx, r_idx, q_idx, p_idx
                                             ] = val
-            if self.do_trace_corrected:
-                trace = 0.0
-                for i in range(self.num_active_orbs):
-                    for j in range(self.num_active_orbs):
-                        for k in range(self.num_active_orbs):
-                            for l in range(self.num_active_orbs):
-                                trace += self._rdm4[i, i, j, j, k, k, l, l]  # type: ignore [index]
-                for i in range(self.num_active_orbs):
-                    for j in range(self.num_active_orbs):
-                        for k in range(self.num_active_orbs):
-                            for l in range(self.num_active_orbs):
-                                self._rdm4[i, i, j, j, k, k, l, l] = (  # type: ignore [index]
-                                    self._rdm4[i, i, j, j, k, k, l, l]  # type: ignore [index]
-                                    * self.num_active_elec
-                                    * (self.num_active_elec - 1)
-                                    * (self.num_active_elec - 2)
-                                    * (self.num_active_elec - 3)
-                                    / trace
-                                )
         return self._rdm4
 
     def precalc_rdm_paulis(self, rdm_order: int) -> None:
@@ -732,10 +684,11 @@ class WaveFunctionCircuit:
             rdm_order: Max order RDM.
         """
         if not isinstance(
-            self.QI._primitive, (BaseSamplerV1, BaseSamplerV2)  # pylint: disable=protected-access
+            self.QI._primitive,
+            (BaseSamplerV1, BaseSamplerV2),
         ):
             raise TypeError(
-                f"This feature is only supported for Sampler got {type(self.QI._primitive)} from QuantumInterface"  # pylint: disable=protected-access
+                f"This feature is only supported for Sampler got {type(self.QI._primitive)} from QuantumInterface"
             )
         if rdm_order > 4:
             raise ValueError(f"Precalculation only supported up to order 4 got {rdm_order}")
@@ -808,7 +761,7 @@ class WaveFunctionCircuit:
         # Calling expectation value to put all Paulis in cliques
         # and compute distributions for the cliques.
         # The coefficients are set to one, so the Paulis cannot cancel out.
-        _ = self.QI._sampler_quantum_expectation_value(  # pylint: disable=protected-access
+        _ = self.QI._sampler_quantum_expectation_value(
             SparsePauliOp(cumulated_paulis, np.ones(len(cumulated_paulis)))  # type: ignore[arg-type]
         )
 
@@ -929,7 +882,7 @@ class WaveFunctionCircuit:
                     is_silent=is_silent_subiterations,
                 )
                 res = optimizer.minimize([0.0] * len(self.kappa_idx))
-                for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
+                for i in range(len(self.kappa)):
                     self._kappa[i] = 0.0
                     self._kappa_old[i] = 0.0
             else:
@@ -1025,7 +978,7 @@ class WaveFunctionCircuit:
         )
         if orbital_optimization:
             self.thetas = res.x[len(self.kappa) :].tolist()
-            for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
+            for i in range(len(self.kappa)):
                 self._kappa[i] = 0.0
                 self._kappa_old[i] = 0.0
         else:
@@ -1102,7 +1055,7 @@ class WaveFunctionCircuit:
         if theta_optimization:
             H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-            for i in range(len(parameters[num_kappa:])):  # pylint: disable=consider-using-enumerate
+            for i in range(len(parameters[num_kappa:])):
                 R = self.QI.grad_param_R[self.QI.param_names[i]]
                 e_vals_grad = _get_energy_evals_for_grad(H, self.QI, parameters, i, R)
                 grad = 0.0

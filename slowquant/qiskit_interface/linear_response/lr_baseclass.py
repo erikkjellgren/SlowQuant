@@ -15,7 +15,6 @@ from slowquant.unitary_coupled_cluster.util import iterate_t1_sa, iterate_t2_sa
 
 
 class quantumLRBaseClass:
-
     def __init__(
         self,
         wf: WaveFunctionCircuit,
@@ -180,8 +179,7 @@ class quantumLRBaseClass:
                             + f"{A_row[nr]:3.6f}".center(10)
                             + " | "
                             + f"{B_row[nr]:3.6f}".center(10)
-                            + " | "
-                            f"{Sigma_row[nr]:3.6f}".center(10)
+                            + f" | {Sigma_row[nr]:3.6f}".center(10)
                         )
                     else:
                         print(
@@ -191,8 +189,7 @@ class quantumLRBaseClass:
                             + f"{A_row[nr]:3.6f}".center(10)
                             + " | "
                             + f"{B_row[nr]:3.6f}".center(10)
-                            + " | "
-                            f"{Sigma_row[nr]:3.6f}".center(10)
+                            + f" | {Sigma_row[nr]:3.6f}".center(10)
                         )
 
         if cv:
@@ -268,8 +265,7 @@ class quantumLRBaseClass:
                                 + f"{A_row[nr]:3.6f}".center(10)
                                 + " | "
                                 + f"{B_row[nr]:3.6f}".center(10)
-                                + " | "
-                                f"{Sigma_row[nr]:3.6f}".center(10)
+                                + f" | {Sigma_row[nr]:3.6f}".center(10)
                             )
                         else:
                             print(
@@ -279,8 +275,7 @@ class quantumLRBaseClass:
                                 + f"{A_row[nr]:3.6f}".center(10)
                                 + " | "
                                 + f"{B_row[nr]:3.6f}".center(10)
-                                + " | "
-                                f"{Sigma_row[nr]:3.6f}".center(10)
+                                + f" | {Sigma_row[nr]:3.6f}".center(10)
                             )
 
     def get_excitation_energies(self) -> np.ndarray:
@@ -441,7 +436,6 @@ class quantumLRBaseClass:
         print(f"{'Value'.center(12)} | {'Position'.center(12)} | {'Operator'.center(12)}\n")
 
         for state, vec in enumerate(self.excitation_vectors.T):
-
             sorted_indices = np.argsort(np.abs(vec))[::-1]
             sorted_vec = np.abs(vec[sorted_indices]) ** 2
 

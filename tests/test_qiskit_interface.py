@@ -915,5 +915,7 @@ def test_H2_sampler_couplingmap() -> None:
     QI._reset_cliques()  # pylint: disable=protected-access
 
     assert np.allclose(
-        qWF._calc_energy_elec(), -1.6303275411526188, atol=10**-6  # pylint: disable=protected-access
+        qWF._calc_energy_elec(),
+        -1.6303275411526188,
+        atol=10**-6,  # pylint: disable=protected-access
     )

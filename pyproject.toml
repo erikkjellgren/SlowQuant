@@ -1,10 +1,10 @@
 [tool.ruff]
-line-length = 160
+line-length = 110
 indent-width = 4
 target-version = "py313"
 
 # Enable rules to cover flake8, isort, pylint, pydocstyle, etc.
-select = [
+lint.select = [
   "E",    # pycodestyle errors (flake8)
   "F",    # pyflakes (flake8)
   "W",    # pycodestyle warnings
@@ -16,7 +16,7 @@ select = [
 ]
 
 # Optionally ignore some rules you find too strict
-ignore = [
+lint.ignore = [
   "D100",     # undocumented-public-module
   "D101",     # undocumented-public-class
   "D104",     # undocumented-public-package

@@ -123,9 +123,9 @@ class QuantumInterface:
         self.num_orbs = num_orbs
         self.num_spin_orbs = 2 * num_orbs
         self.num_elec = num_elec
-        self.grad_param_R: dict[str, int] = (
-            {}
-        )  # Contains information about the parameterization needed for gradient evaluations.
+        self.grad_param_R: dict[
+            str, int
+        ] = {}  # Contains information about the parameterization needed for gradient evaluations.
 
         # State prep circuit
         if isinstance(self.ansatz, QuantumCircuit):
@@ -223,7 +223,7 @@ class QuantumInterface:
             )
         self.param_names = [str(x) for x in self.circuit.parameters]
         for name in self.param_names:
-            if name not in self.grad_param_R.keys():  # pylint: disable=consider-iterating-dictionary
+            if name not in self.grad_param_R.keys():
                 raise ValueError(
                     f"Got parameter name, {name}, that is not in grad_param_R, {self.grad_param_R}"
                 )
@@ -257,20 +257,17 @@ class QuantumInterface:
         if self._ISA:
             # Get backend from primitive.
             if hasattr(self._primitive, "_backend"):
-                self._primitive_backend = self._primitive._backend  # pylint: disable=protected-access
+                self._primitive_backend = self._primitive._backend
             else:
                 self._primitive_backend = None
 
             # Get optimization level from backend. Only for v1 primitives.
             self._primitive_level = 3
             if hasattr(self._primitive, "_transpile_options") and hasattr(
-                self._primitive._transpile_options, "optimization_level"  # pylint: disable=protected-access
+                self._primitive._transpile_options,
+                "optimization_level",
             ):
-                self._primitive_level = (
-                    self._primitive._transpile_options[  # pylint: disable=protected-access
-                        "optimization_level"
-                    ]
-                )
+                self._primitive_level = self._primitive._transpile_options["optimization_level"]
             elif hasattr(self._primitive, "options"):
                 if hasattr(self._primitive.options, "optimization_level"):
                     self._primitive_level = self._primitive.options["optimization_level"]

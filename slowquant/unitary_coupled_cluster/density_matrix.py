@@ -68,7 +68,7 @@ class ReducedDenstiyMatrix:
             return 0
         return 0
 
-    def RDM2(self, p: int, q: int, r: int, s: int) -> float:  # pylint: disable=R0911
+    def RDM2(self, p: int, q: int, r: int, s: int) -> float:
         r"""Get full space two-electron reduced density matrix element.
 
         .. math::

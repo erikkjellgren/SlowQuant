@@ -46,7 +46,7 @@ class quantumLR(quantumLRBaseClass):
 
         if self.num_q != 0:
             if do_rdm:
-                if isinstance(self.wf.QI._primitive, BaseSampler):  # pylint: disable=protected-access
+                if isinstance(self.wf.QI._primitive, BaseSampler):
                     self.wf.precalc_rdm_paulis(2)
                 # RDMs
                 rdms = ReducedDenstiyMatrix(
