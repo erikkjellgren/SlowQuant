@@ -2,14 +2,16 @@
 import numpy as np
 
 import slowquant.SlowQuant as sq
-import slowquant.unitary_coupled_cluster.linear_response.allprojected as allprojected  # pylint: disable=consider-using-from-import
-import slowquant.unitary_coupled_cluster.linear_response.allselfconsistent as allselfconsistent  # pylint: disable=consider-using-from-import
-import slowquant.unitary_coupled_cluster.linear_response.allstatetransfer as allstatetransfer  # pylint: disable=consider-using-from-import
-import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
-import slowquant.unitary_coupled_cluster.linear_response.projected as projected  # pylint: disable=consider-using-from-import
-import slowquant.unitary_coupled_cluster.linear_response.projected_statetransfer as projected_statetransfer  # pylint: disable=consider-using-from-import
-import slowquant.unitary_coupled_cluster.linear_response.selfconsistent as selfconsistent  # pylint: disable=consider-using-from-import
-import slowquant.unitary_coupled_cluster.linear_response.statetransfer as statetransfer  # pylint: disable=consider-using-from-import
+from slowquant.unitary_coupled_cluster.linear_response import (
+    allprojected,
+    allselfconsistent,
+    allstatetransfer,
+    naive,
+    projected,
+    projected_statetransfer,
+    selfconsistent,
+    statetransfer,
+)
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
@@ -55,7 +57,6 @@ def test_h2_sto3g_uccsd_lr() -> None:
 
 def test_LiH_atmethods_energies() -> None:
     """Test LiH at LR methods."""
-
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """Li   0.0           0.0  0.0;
@@ -128,7 +129,6 @@ def test_LiH_atmethods_energies() -> None:
 
 def test_LiH_naiveq_methods_energies() -> None:
     """Test LiH energies for naive q LR methods."""
-
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """Li   0.0           0.0  0.0;
@@ -256,7 +256,6 @@ def test_LiH_naiveq_methods_energies() -> None:
 
 def test_LiH_naiveq_methods_matrices() -> None:
     """Test LiH all matrices and their properties for naive q LR methods."""
-
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """Li   0.0           0.0  0.0;
@@ -325,7 +324,6 @@ def test_LiH_naiveq_methods_matrices() -> None:
 
 def test_LiH_allproj_energies() -> None:
     """Test LiH for all-proj LR method."""
-
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """Li   0.0           0.0  0.0;
@@ -377,7 +375,6 @@ def test_LiH_allproj_energies() -> None:
 
 def test_LiH_STproj_energies() -> None:
     """Test LiH for ST-proj LR method."""
-
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """Li   0.0           0.0  0.0;

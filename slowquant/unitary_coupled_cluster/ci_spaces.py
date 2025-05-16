@@ -6,13 +6,13 @@ from sympy.utilities.iterables import multiset_permutations
 
 class CI_Info:
     __slots__ = (
-        "num_inactive_orbs",
-        "num_active_orbs",
-        "num_virtual_orbs",
+        "det2idx",
+        "idx2det",
         "num_active_elec_alpha",
         "num_active_elec_beta",
-        "idx2det",
-        "det2idx",
+        "num_active_orbs",
+        "num_inactive_orbs",
+        "num_virtual_orbs",
         "space_extension_offset",
     )
 
@@ -57,7 +57,9 @@ def get_indexing(
     """Get relation between index and determinant.
 
     Args:
+        num_inactive_orbs: Number of inactive spatial orbitals.
         num_active_orbs: Number of active spatial orbitals.
+        num_virtual_orbs: Number of virtual spatial orbitals.
         num_active_elec_alpha: Number of active alpha electrons.
         num_active_elec_beta: Number of active beta electrons.
 

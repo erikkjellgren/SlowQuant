@@ -146,10 +146,16 @@ class LinearResponseUCC(LinearResponseBaseClass):
         )
         for j, qJ in enumerate(self.q_ops):
             UdHq_ket = propagate_state(
-                ["Ud", self.H_1i_1a, qJ], self.ci_coeffs, *self.index_info_extended, do_unsafe=True  # type: ignore
+                ["Ud", self.H_1i_1a, qJ],
+                self.ci_coeffs,
+                *self.index_info_extended,
+                do_unsafe=True,  # type: ignore
             )
             UdqdH_ket = propagate_state(
-                ["Ud", qJ.dagger, self.H_1i_1a], self.ci_coeffs, *self.index_info_extended, do_unsafe=True  # type: ignore
+                ["Ud", qJ.dagger, self.H_1i_1a],
+                self.ci_coeffs,
+                *self.index_info_extended,
+                do_unsafe=True,  # type: ignore
             )
             for i, GI in enumerate(self.G_ops):
                 G_ket = propagate_state(

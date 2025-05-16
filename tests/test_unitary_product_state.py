@@ -2,15 +2,15 @@
 import numpy as np
 
 import slowquant.SlowQuant as sq
-import slowquant.unitary_coupled_cluster.linear_response.allstatetransfer as allstLR
-import slowquant.unitary_coupled_cluster.linear_response.naive as naiveLR
+import slowquant.unitary_coupled_cluster.linear_response.allstatetransfer as allstlr
+import slowquant.unitary_coupled_cluster.linear_response.naive as naivelr
 from slowquant.unitary_coupled_cluster.sa_ups_wavefunction import WaveFunctionSAUPS
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
 
 def test_ups_naivelr() -> None:
-    """Test LiH UCCSD(2,2) LR"""
+    """Test LiH UCCSD(2,2) LR."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """Li 0.0           0.0  0.0;
@@ -38,7 +38,7 @@ def test_ups_naivelr() -> None:
         SQobj.integral.get_multipole_matrix([0, 0, 1]),
     )
     WF.run_wf_optimization_1step("SLSQP", True)
-    LR = naiveLR.LinearResponseUCC(WF, excitations="SD")
+    LR = naivelr.LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.129476) < 10**-4
     assert abs(LR.excitation_energies[1] - 0.178749) < 10**-4
@@ -70,9 +70,7 @@ def test_ups_naivelr() -> None:
 
 
 def test_LiH_sto3g_allST():
-    """
-    Test LiH STO-3G all-statetransfer LR oscialltor strength
-    """
+    """Test LiH STO-3G all-statetransfer LR oscialltor strength."""
     # Slowquant Object with parameters and setup
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -106,7 +104,7 @@ def test_LiH_sto3g_allST():
     )
     WF2.run_wf_optimization_1step("SLSQP", False)
     # Linear Response
-    LR = allstLR.LinearResponseUCC(
+    LR = allstlr.LinearResponseUCC(
         WF2,
         excitations="SD",
     )
@@ -180,8 +178,9 @@ def test_ups_water_44() -> None:
 
 
 def test_saups_h2_3states() -> None:
-    """This should give exactly the same as FCI since all states,
-    are includes in the subspace expansion.
+    """This should give exactly the same as FCI.
+
+    Since all states, are includes in the subspace expansion.
     """
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(

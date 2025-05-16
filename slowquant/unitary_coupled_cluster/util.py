@@ -77,8 +77,8 @@ def iterate_t1(
     """Iterate over T1 spin-conserving operators.
 
     Args:
-        active_occ_idx: Spin indices of strongly occupied orbitals.
-        active_unocc_idx: Spin indices of weakly occupied orbitals.
+        active_occ_spin_idx: Spin indices of strongly occupied orbitals.
+        active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
 
     Returns:
         T1 operator iteration.
@@ -107,8 +107,8 @@ def iterate_t2(
     """Iterate over T2 spin-conserving operators.
 
     Args:
-        active_occ_idx: Spin indices of strongly occupied orbitals.
-        active_unocc_idx: Spin indices of weakly occupied orbitals.
+        active_occ_spin_idx: Spin indices of strongly occupied orbitals.
+        active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
 
     Returns:
         T2 operator iteration.
@@ -147,8 +147,8 @@ def iterate_t3(
     """Iterate over T3 spin-conserving operators.
 
     Args:
-        active_occ_idx: Spin indices of strongly occupied orbitals.
-        active_unocc_idx: Spin indices of weakly occupied orbitals.
+        active_occ_spin_idx: Spin indices of strongly occupied orbitals.
+        active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
 
     Returns:
         T3 operator iteration.
@@ -197,8 +197,8 @@ def iterate_t4(
     """Iterate over T4 spin-conserving operators.
 
     Args:
-        active_occ_idx: Spin indices of strongly occupied orbitals.
-        active_unocc_idx: Spin indices of weakly occupied orbitals.
+        active_occ_spin_idx: Spin indices of strongly occupied orbitals.
+        active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
 
     Returns:
         T4 operator iteration.
@@ -257,8 +257,8 @@ def iterate_t5(
     """Iterate over T5 spin-conserving operators.
 
     Args:
-        active_occ_idx: Spin indices of strongly occupied orbitals.
-        active_unocc_idx: Spin indices of weakly occupied orbitals.
+        active_occ_spin_idx: Spin indices of strongly occupied orbitals.
+        active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
 
     Returns:
         T5 operator iteration.
@@ -327,8 +327,8 @@ def iterate_t6(
     """Iterate over T6 spin-conserving operators.
 
     Args:
-        active_occ_idx: Spin indices of strongly occupied orbitals.
-        active_unocc_idx: Spin indices of weakly occupied orbitals.
+        active_occ_spin_idx: Spin indices of strongly occupied orbitals.
+        active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
 
     Returns:
         T6 operator iteration.
@@ -528,7 +528,7 @@ class UccStructure:
 
 
 class UpsStructure:
-    __slots__ = ("excitation_indices", "excitation_operator_type", "n_params", "grad_param_R", "param_names")
+    __slots__ = ("excitation_indices", "excitation_operator_type", "grad_param_R", "n_params", "param_names")
 
     def __init__(self) -> None:
         """Initialize the unitary product state ansatz structure."""

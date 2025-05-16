@@ -9,21 +9,21 @@ from qiskit_ibm_runtime import SamplerV2 as SamplerV2IBM
 from qiskit_ibm_runtime.fake_provider import FakeTorino
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 
-import slowquant.qiskit_interface.linear_response.allprojected as q_allprojected  # pylint: disable=consider-using-from-import
-import slowquant.qiskit_interface.linear_response.naive as q_naive  # pylint: disable=consider-using-from-import
-import slowquant.qiskit_interface.linear_response.projected as q_projected  # pylint: disable=consider-using-from-import
-import slowquant.unitary_coupled_cluster.linear_response.allprojected as allprojected  # pylint: disable=consider-using-from-import
-import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
+import slowquant.qiskit_interface.linear_response.allprojected as q_allprojected
+import slowquant.qiskit_interface.linear_response.naive as q_naive
+import slowquant.qiskit_interface.linear_response.projected as q_projected
 from slowquant.qiskit_interface.circuit_wavefunction import WaveFunctionCircuit
 from slowquant.qiskit_interface.interface import QuantumInterface
+from slowquant.unitary_coupled_cluster.linear_response import (
+    allprojected,
+    naive,
+)
 from slowquant.unitary_coupled_cluster.operators import hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
 def test_LiH_naive_estimator() -> None:
-    """
-    Test LiH ooVQE with rotosolve + naive LR with estimator from Qiskit
-    """
+    """Test LiH ooVQE with rotosolve + naive LR with estimator from Qiskit."""
     # Define molecule
     atom = "Li .0 .0 .0; H .0 .0 1.672"
     basis = "sto-3g"
@@ -94,9 +94,7 @@ def test_LiH_naive_estimator() -> None:
 
 
 def test_LiH_naive_samplerQiskit() -> None:
-    """
-    Test LiH ooVQE with rotosolve + naive LR with sampler from Qiskit
-    """
+    """Test LiH ooVQE with rotosolve + naive LR with sampler from Qiskit."""
     # Define molecule
     atom = "Li .0 .0 .0; H .0 .0 1.672"
     basis = "sto-3g"
@@ -167,9 +165,7 @@ def test_LiH_naive_samplerQiskit() -> None:
 
 
 def test_LiH_naive() -> None:
-    """
-    Test LiH ooVQE with rotosolve + naive LR with sampler from QiskitAer
-    """
+    """Test LiH ooVQE with rotosolve + naive LR with sampler from QiskitAer."""
     # Define molecule
     atom = "Li .0 .0 .0; H .0 .0 1.672"
     basis = "sto-3g"
@@ -240,9 +236,7 @@ def test_LiH_naive() -> None:
 
 
 def test_LiH_projected() -> None:
-    """
-    Test LiH ooVQE with rotosolve + projected LR sampler from QiskitAer
-    """
+    """Test LiH ooVQE with rotosolve + projected LR sampler from QiskitAer."""
     # Define molecule
     atom = "Li .0 .0 .0; H .0 .0 1.672"
     basis = "sto-3g"
@@ -307,9 +301,7 @@ def test_LiH_projected() -> None:
 
 
 def test_LiH_allprojected() -> None:
-    """
-    Test LiH ooVQE with rotosolve + allprojected LR with sampler from QiskitAer
-    """
+    """Test LiH ooVQE with rotosolve + allprojected LR with sampler from QiskitAer."""
     # Define molecule
     atom = "Li .0 .0 .0; H .0 .0 1.672"
     basis = "sto-3g"
@@ -380,9 +372,7 @@ def test_LiH_allprojected() -> None:
 
 
 def test_LiH_dumb_allprojected() -> None:
-    """
-    Test LiH ooVQE with rotosolve + dumb allprojected LR with sampler from QiskitAer
-    """
+    """Test LiH ooVQE with rotosolve + dumb allprojected LR with sampler from QiskitAer."""
     # Define molecule
     atom = "Li .0 .0 .0; H .0 .0 1.672"
     basis = "sto-3g"
@@ -447,9 +437,7 @@ def test_LiH_dumb_allprojected() -> None:
 
 
 def test_LiH_naive_sampler_ISA() -> None:
-    """
-    Test LiH ooVQE with rotosolve + naive LR with sampler from QiskitAer
-    """
+    """Test LiH ooVQE with rotosolve + naive LR with sampler from QiskitAer."""
     # Define molecule
     atom = "Li .0 .0 .0; H .0 .0 1.672"
     basis = "sto-3g"
@@ -514,9 +502,7 @@ def test_LiH_naive_sampler_ISA() -> None:
 
 
 def test_LiH_oscillator_strength() -> None:
-    """
-    Test oscillator strength for various LR parametrizations
-    """
+    """Test oscillator strength for various LR parametrizations."""
     # Define molecule
     atom = "Li .0 .0 .0; H .0 .0 1.672"
     basis = "sto-3g"
@@ -661,9 +647,7 @@ def test_gradient_optimizer_H2() -> None:
 
 
 def test_sampler_changes() -> None:
-    """
-    Test primitive changes
-    """
+    """Test primitive changes."""
     # Define molecule
     atom = "Li .0 .0 .0; H .0 .0 1.672"
     basis = "sto-3g"
@@ -710,14 +694,14 @@ def test_sampler_changes() -> None:
 
     assert QI.max_shots_per_run == 100000
     assert QI.shots == 200000
-    assert QI._circuit_multipl == 2  # pylint: disable=protected-access
+    assert QI._circuit_multipl == 2
 
     # Change limit
     QI.max_shots_per_run = 50000
 
     assert QI.max_shots_per_run == 50000
     assert QI.shots == 200000
-    assert QI._circuit_multipl == 4  # pylint: disable=protected-access
+    assert QI._circuit_multipl == 4
 
     QI.shots = None
 
@@ -725,13 +709,13 @@ def test_sampler_changes() -> None:
     qWF.change_primitive(sampler)
 
     assert QI.shots == 10000
-    assert QI._transpiled is True  # pylint: disable=protected-access
+    assert QI._transpiled is True
     assert QI.ISA is True
 
 
 def test_shots() -> None:
-    """
-    Test if shots work.
+    """Test if shots work.
+
     This just runs a simulation with some shots checking that nothing is broken with qiskit aer.
     No values are compared.
     """
@@ -786,8 +770,8 @@ def test_fUCC_h2o() -> None:
 
 
 def test_samplerV2() -> None:
-    """
-    Test SamplerV2
+    """Test SamplerV2.
+
     This just runs a simulation with some shots, checking that nothing is broken.
     No values are compared.
     """
@@ -818,8 +802,8 @@ def test_samplerV2() -> None:
 
 
 def test_samplerV2_ibm() -> None:
-    """
-    Test SamplerV2 IBM
+    """Test SamplerV2 IBM.
+
     This just runs a simulation with some shots, checking that nothing is broken.
     No values are compared.
     """
@@ -851,9 +835,7 @@ def test_samplerV2_ibm() -> None:
 
 
 def test_custom() -> None:
-    """
-    Test custom Ansatz.
-    """
+    """Test custom Ansatz."""
     # Define molecule
     atom = "H .0 .0 .0; H .0 .0 1.0"
     basis = "sto-3g"
@@ -877,7 +859,7 @@ def test_custom() -> None:
         QI,
     )
     qWF.run_wf_optimization_2step("rotosolve", True, is_silent_subiterations=True)
-    energy = qWF._calc_energy_elec()  # pylint: disable=protected-access
+    energy = qWF._calc_energy_elec()
 
     qc = qWF.QI.circuit.copy()
     qc_param = qWF.QI.parameters
@@ -900,9 +882,7 @@ def test_custom() -> None:
 
 
 def test_H2_sampler_couplingmap() -> None:
-    """
-    Test coupling map.
-    """
+    """Test coupling map."""
     # Define molecule
     atom = "H .0 .0 .0; H .0 .0 1.0"
     basis = "sto-3g"
@@ -932,8 +912,10 @@ def test_H2_sampler_couplingmap() -> None:
     QI.ISA = True
     QI.pass_manager = pm
 
-    QI._reset_cliques()  # pylint: disable=protected-access
+    QI._reset_cliques()
 
     assert np.allclose(
-        qWF._calc_energy_elec(), -1.6303275411526188, atol=10**-6  # pylint: disable=protected-access
+        qWF._calc_energy_elec(),
+        -1.6303275411526188,
+        atol=10**-6,
     )
