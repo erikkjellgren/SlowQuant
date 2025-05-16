@@ -2,17 +2,16 @@ import numpy as np
 
 import slowquant.SlowQuant as sq
 from slowquant.unitary_coupled_cluster.linear_response import (
-    allstatetransfer,  # pylint: disable=consider-using-from-import
-    naive,  # pylint: disable=consider-using-from-import
-    projected,  # pylint: disable=consider-using-from-import
-    statetransfer,  # pylint: disable=consider-using-from-import
+    allstatetransfer,
+    naive,
+    projected,
+    statetransfer,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
 def test_H2_631g_naive():
-    """Test of oscialltor strength for naive LR with working equations
-    """
+    """Test of oscialltor strength for naive LR with working equations."""
     # Slowquant Object with parameters and setup
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -75,8 +74,7 @@ def test_H2_631g_naive():
 
 
 def test_LiH_sto3g_naive():
-    """Test LiH Sto-3G naive LR oscialltor strength
-    """
+    """Test LiH Sto-3G naive LR oscialltor strength."""
     # Slowquant Object with parameters and setup
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -153,8 +151,7 @@ def test_LiH_sto3g_naive():
 
 
 def test_H2_631g_projLR():
-    """Test of oscialltor strength for projected LR with working equations
-    """
+    """Test of oscialltor strength for projected LR with working equations."""
     # Slowquant Object with parameters and setup
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -212,8 +209,7 @@ def test_H2_631g_projLR():
 
 
 def test_LiH_sto3g_proj():
-    """Test LiH Sto-3G projected LR oscialltor strength
-    """
+    """Test LiH Sto-3G projected LR oscialltor strength."""
     # Slowquant Object with parameters and setup
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -283,8 +279,7 @@ def test_LiH_sto3g_proj():
 
 
 def test_H2_631g_STLR():
-    """Test of oscialltor strength for projected LR with working equations
-    """
+    """Test of oscialltor strength for projected LR with working equations."""
     # Slowquant Object with parameters and setup
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -344,8 +339,7 @@ def test_H2_631g_STLR():
 
 
 def test_LiH_sto3g_st():
-    """Test LiH Sto-3G projected LR oscialltor strength
-    """
+    """Test LiH Sto-3G projected LR oscialltor strength."""
     # Slowquant Object with parameters and setup
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -419,8 +413,7 @@ def test_LiH_sto3g_st():
 
 
 def test_H2_631g_allST():
-    """Test of oscialltor strength for projected LR with working equations
-    """
+    """Test of oscialltor strength for projected LR with working equations."""
     # Slowquant Object with parameters and setup
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -476,8 +469,7 @@ def test_H2_631g_allST():
 
 
 def test_LiH_sto3g_allST():
-    """Test LiH STO-3G all-statetransfer LR oscialltor strength
-    """
+    """Test LiH STO-3G all-statetransfer LR oscialltor strength."""
     # Slowquant Object with parameters and setup
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(

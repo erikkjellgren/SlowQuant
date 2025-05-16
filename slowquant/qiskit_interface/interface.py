@@ -683,6 +683,7 @@ class QuantumInterface:
         Args:
             op: SlowQuant fermionic operator.
             run_parameters: Circuit parameters.
+            do_cliques: Sort Pauli strings into QWC cliques (default: True).
 
         Returns:
             Expectation value of operator.
@@ -854,7 +855,7 @@ class QuantumInterface:
 
         Args:
             paulis: (List of) Pauli strings to measure.
-            run_paramters: List of parameters of each circuit.
+            run_parameters: List of parameters of each circuit.
             circuits_in: List of circuits
             overwrite_shots: Overwrite QI shot number.
 
@@ -974,7 +975,7 @@ class QuantumInterface:
 
         Args:
             pauli: Pauli string to measure.
-            run_paramters: Parameters of circuit.
+            run_parameters: Parameters of circuit.
             custom_circ: Specific circuit to run.
 
         Returns:

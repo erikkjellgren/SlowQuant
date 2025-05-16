@@ -8,7 +8,7 @@ def read_basis(atom_name: str, basis_set: str) -> tuple[np.ndarray, np.ndarray, 
 
     Args:
         atom_name: Name of atom.
-        basisset: Name of basisset
+        basis_set: Name of basisset
 
     Returns:
         Basisset information, exponents, contraction coefficients and angular moments.

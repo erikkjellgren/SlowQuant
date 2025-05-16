@@ -57,7 +57,9 @@ def get_indexing(
     """Get relation between index and determinant.
 
     Args:
+        num_inactive_orbs: Number of inactive spatial orbitals.
         num_active_orbs: Number of active spatial orbitals.
+        num_virtual_orbs: Number of virtual spatial orbitals.
         num_active_elec_alpha: Number of active alpha electrons.
         num_active_elec_beta: Number of active beta electrons.
 

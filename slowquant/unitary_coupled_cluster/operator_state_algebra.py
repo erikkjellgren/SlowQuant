@@ -397,7 +397,7 @@ def expectation_value(
 
     Args:
         bra: Bra state.
-        op: Operator.
+        operators: Operator.
         ket: Ket state.
         ci_info: Information about the CI space.
         thetas: Active-space parameters.
@@ -439,12 +439,13 @@ def expectation_value_SA(
 
     Args:
         bra: Bra state.
-        op: Operator.
+        operators: Operator.
         ket: Ket state.
         ci_info: Information about the CI space.
         thetas: Active-space parameters.
                Ordered as (S, D, T, ...).
         wf_struct: Wave function structure object.
+        do_folding: Do folding of operator (default: True).
 
     Returns:
         Expectation value.

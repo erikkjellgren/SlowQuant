@@ -1127,6 +1127,7 @@ def _get_energy_evals_for_grad(
 
     Args:
         operator: Operator which the derivative is with respect to.
+        quantum_interface: Quantum interface class object.
         parameters: Parameters.
         idx: Parameter idx.
         R: Parameter to control we get the needed points.
