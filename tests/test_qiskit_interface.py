@@ -9,14 +9,14 @@ from qiskit_ibm_runtime import SamplerV2 as SamplerV2IBM
 from qiskit_ibm_runtime.fake_provider import FakeTorino
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 
-import slowquant.qiskit_interface.linear_response.allprojected as q_allprojected  # pylint: disable=consider-using-from-import
-import slowquant.qiskit_interface.linear_response.naive as q_naive  # pylint: disable=consider-using-from-import
-import slowquant.qiskit_interface.linear_response.projected as q_projected  # pylint: disable=consider-using-from-import
+import slowquant.qiskit_interface.linear_response.allprojected as q_allprojected
+import slowquant.qiskit_interface.linear_response.naive as q_naive
+import slowquant.qiskit_interface.linear_response.projected as q_projected
 from slowquant.qiskit_interface.circuit_wavefunction import WaveFunctionCircuit
 from slowquant.qiskit_interface.interface import QuantumInterface
 from slowquant.unitary_coupled_cluster.linear_response import (
-    allprojected,  # pylint: disable=consider-using-from-import
-    naive,  # pylint: disable=consider-using-from-import
+    allprojected,
+    naive,
 )
 from slowquant.unitary_coupled_cluster.operators import hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
@@ -694,14 +694,14 @@ def test_sampler_changes() -> None:
 
     assert QI.max_shots_per_run == 100000
     assert QI.shots == 200000
-    assert QI._circuit_multipl == 2  # pylint: disable=protected-access
+    assert QI._circuit_multipl == 2
 
     # Change limit
     QI.max_shots_per_run = 50000
 
     assert QI.max_shots_per_run == 50000
     assert QI.shots == 200000
-    assert QI._circuit_multipl == 4  # pylint: disable=protected-access
+    assert QI._circuit_multipl == 4
 
     QI.shots = None
 
@@ -709,7 +709,7 @@ def test_sampler_changes() -> None:
     qWF.change_primitive(sampler)
 
     assert QI.shots == 10000
-    assert QI._transpiled is True  # pylint: disable=protected-access
+    assert QI._transpiled is True
     assert QI.ISA is True
 
 
@@ -859,7 +859,7 @@ def test_custom() -> None:
         QI,
     )
     qWF.run_wf_optimization_2step("rotosolve", True, is_silent_subiterations=True)
-    energy = qWF._calc_energy_elec()  # pylint: disable=protected-access
+    energy = qWF._calc_energy_elec()
 
     qc = qWF.QI.circuit.copy()
     qc_param = qWF.QI.parameters
@@ -912,10 +912,10 @@ def test_H2_sampler_couplingmap() -> None:
     QI.ISA = True
     QI.pass_manager = pm
 
-    QI._reset_cliques()  # pylint: disable=protected-access
+    QI._reset_cliques()
 
     assert np.allclose(
         qWF._calc_energy_elec(),
         -1.6303275411526188,
-        atol=10**-6,  # pylint: disable=protected-access
+        atol=10**-6,
     )

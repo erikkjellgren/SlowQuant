@@ -3,14 +3,14 @@ import numpy as np
 
 import slowquant.SlowQuant as sq
 from slowquant.unitary_coupled_cluster.linear_response import (
-    allprojected,  # pylint: disable=consider-using-from-import
-    allselfconsistent,  # pylint: disable=consider-using-from-import
-    allstatetransfer,  # pylint: disable=consider-using-from-import
-    naive,  # pylint: disable=consider-using-from-import
-    projected,  # pylint: disable=consider-using-from-import
-    projected_statetransfer,  # pylint: disable=consider-using-from-import
-    selfconsistent,  # pylint: disable=consider-using-from-import
-    statetransfer,  # pylint: disable=consider-using-from-import
+    allprojected,
+    allselfconsistent,
+    allstatetransfer,
+    naive,
+    projected,
+    projected_statetransfer,
+    selfconsistent,
+    statetransfer,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
