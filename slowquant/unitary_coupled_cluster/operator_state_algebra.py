@@ -194,7 +194,7 @@ def get_determinants(
     anni_idxs: np.ndarray,
     create_idxs: np.ndarray,
     num_active_orbs: int,
-) -> Generator[tuple[int, int], None, None]:
+) -> Generator[tuple[int, int]]:
     """Generate relevant determinants.
 
     This part is factored out for performance - jit.
@@ -338,7 +338,7 @@ def get_determinants_SA(
     anni_idxs: np.ndarray,
     create_idxs: np.ndarray,
     num_active_orbs: int,
-) -> Generator[tuple[int, int], None, None]:
+) -> Generator[tuple[int, int]]:
     """Generate relevant determinants.
 
     This part is factored out for performance - jit.

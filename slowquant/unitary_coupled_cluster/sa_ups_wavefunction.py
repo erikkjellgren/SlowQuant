@@ -235,11 +235,10 @@ class WaveFunctionSAUPS:
                 if i == j:
                     if abs(1 - coeff_i @ coeff_j) > 10**-10:
                         raise ValueError(f"state {i} is not normalized got overlap of {coeff_i @ coeff_j}")
-                else:
-                    if abs(coeff_i @ coeff_j) > 10**-10:
-                        raise ValueError(
-                            f"state {i} and {j} are not orthogonal got overlap of {coeff_i @ coeff_j}"
-                        )
+                elif abs(coeff_i @ coeff_j) > 10**-10:
+                    raise ValueError(
+                        f"state {i} and {j} are not orthogonal got overlap of {coeff_i @ coeff_j}"
+                    )
         # Construct UPS Structure
         self.ups_layout = UpsStructure()
         if ansatz.lower() == "tups":

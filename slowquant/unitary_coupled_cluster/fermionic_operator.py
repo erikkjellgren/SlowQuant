@@ -5,7 +5,7 @@ import re
 
 
 class a_op:
-    __slots__ = ("spinless_idx", "idx", "dagger", "spin")
+    __slots__ = ("dagger", "idx", "spin", "spinless_idx")
 
     def __init__(self, spinless_idx: int, spin: str, dagger: bool) -> None:
         """Initialize fermionic annihilation operator.
@@ -137,13 +137,12 @@ def do_extended_normal_ordering(
                         changed = True
                 elif a.dagger and not b.dagger:
                     pass
-                else:
-                    if a.idx == b.idx:
-                        is_zero = True
-                    elif a.idx < b.idx:
-                        next_operator[i], next_operator[j] = next_operator[j], next_operator[i]
-                        factor *= -1
-                        changed = True
+                elif a.idx == b.idx:
+                    is_zero = True
+                elif a.idx < b.idx:
+                    next_operator[i], next_operator[j] = next_operator[j], next_operator[i]
+                    factor *= -1
+                    changed = True
                 current_idx += 1
                 if current_idx + 1 == len(next_operator) or is_zero:
                     break
@@ -163,7 +162,7 @@ def do_extended_normal_ordering(
 
 
 class FermionicOperator:
-    __slots__ = ("operators", "factors")
+    __slots__ = ("factors", "operators")
 
     def __init__(
         self, annihilation_operator: dict[str, list[a_op]] | a_op, factor: dict[str, float] | float
@@ -426,13 +425,12 @@ class FermionicOperator:
                         )
                     elif anni.idx in virtual_idx:
                         virtual_dagger.append(anni.idx)
-                else:
-                    if anni.idx in inactive_idx:
-                        inactive.append(anni.idx)
-                    elif anni.idx in active_idx:
-                        active.append(a_op(anni.spinless_idx - num_inactive_orbs, anni.spin, anni.dagger))
-                    elif anni.idx in virtual_idx:
-                        virtual.append(anni.idx)
+                elif anni.idx in inactive_idx:
+                    inactive.append(anni.idx)
+                elif anni.idx in active_idx:
+                    active.append(a_op(anni.spinless_idx - num_inactive_orbs, anni.spin, anni.dagger))
+                elif anni.idx in virtual_idx:
+                    virtual.append(anni.idx)
             # Any virtual indices will make the operator evaluate to zero.
             if len(virtual) != 0 or len(virtual_dagger) != 0:
                 continue

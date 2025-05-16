@@ -33,7 +33,7 @@ class _Molecule:
             )
 
         if ".xyz" in molecule_file:
-            with open(molecule_file, "r", encoding="UTF-8") as file:
+            with open(molecule_file, encoding="UTF-8") as file:
                 self.atoms = []
                 for i, line in enumerate(file):
                     if i < 2:
@@ -298,4 +298,4 @@ class Shell:
                 exponents_, contraction_coefficients_ * self.normalization[bf_i, :], angular_moment
             )
         self.angular_moments = angular_moments_
-        self.bf_idx = np.array((range(bf_idx_, bf_idx_ + len(angular_moments_))))
+        self.bf_idx = np.array(range(bf_idx_, bf_idx_ + len(angular_moments_)))

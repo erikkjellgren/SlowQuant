@@ -4,7 +4,7 @@ import numpy as np
 class ReducedDenstiyMatrix:
     """Reduced density matrix class."""
 
-    __slots__ = ("inactive_idx", "virtual_idx", "active_idx", "idx_shift", "rdm1", "rdm2")
+    __slots__ = ("active_idx", "idx_shift", "inactive_idx", "rdm1", "rdm2", "virtual_idx")
 
     def __init__(
         self,

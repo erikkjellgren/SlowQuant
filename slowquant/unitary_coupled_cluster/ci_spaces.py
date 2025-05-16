@@ -6,13 +6,13 @@ from sympy.utilities.iterables import multiset_permutations
 
 class CI_Info:
     __slots__ = (
-        "num_inactive_orbs",
-        "num_active_orbs",
-        "num_virtual_orbs",
+        "det2idx",
+        "idx2det",
         "num_active_elec_alpha",
         "num_active_elec_beta",
-        "idx2det",
-        "det2idx",
+        "num_active_orbs",
+        "num_inactive_orbs",
+        "num_virtual_orbs",
         "space_extension_offset",
     )
 
@@ -253,7 +253,7 @@ def get_indexing_extended(
 
 def generate_singles(
     num_inactive_orbs: int, num_virtual_orbs: int
-) -> Generator[tuple[list[int], list[int]], None, None]:
+) -> Generator[tuple[list[int], list[int]]]:
     """Generate single excited determinant in the inactive and virtual space.
 
     These are generated via single excitation between all three spaces and thus are only particle conserving in the full space.
@@ -288,7 +288,7 @@ def generate_singles(
 
 def generate_doubles(
     num_inactive_orbs: int, num_virtual_orbs: int
-) -> Generator[tuple[list[int], list[int]], None, None]:
+) -> Generator[tuple[list[int], list[int]]]:
     """Generate double excited determinant in the inactive and virtual space.
 
     These are generated via double excitation between all three spaces and thus are only particle conserving in the full space.

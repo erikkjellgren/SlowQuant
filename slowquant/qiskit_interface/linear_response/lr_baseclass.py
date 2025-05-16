@@ -174,7 +174,7 @@ class quantumLRBaseClass:
                 for nr, i in enumerate(range(self.num_params)):
                     if nr < self.num_q:
                         print(
-                            f"q{str(nr):<{3}}:"
+                            f"q{nr!s:<{3}}:"
                             + f"{(A_row[nr] + B_row[nr]) / 2:3.6f}".center(10)
                             + " | "
                             + f"{A_row[nr]:3.6f}".center(10)
@@ -185,7 +185,7 @@ class quantumLRBaseClass:
                         )
                     else:
                         print(
-                            f"G{str(nr - self.num_q):<{3}}:"
+                            f"G{nr - self.num_q!s:<{3}}:"
                             + f"{(A_row[nr] + B_row[nr]) / 2:3.6f}".center(10)
                             + " | "
                             + f"{A_row[nr]:3.6f}".center(10)
@@ -262,7 +262,7 @@ class quantumLRBaseClass:
                     for nr, i in enumerate(range(self.num_params)):
                         if nr < self.num_q:
                             print(
-                                f"q{str(nr):<{3}}:"
+                                f"q{nr!s:<{3}}:"
                                 + f"{(A_row[nr] + B_row[nr]) / 2:3.6f}".center(10)
                                 + " | "
                                 + f"{A_row[nr]:3.6f}".center(10)
@@ -273,7 +273,7 @@ class quantumLRBaseClass:
                             )
                         else:
                             print(
-                                f"G{str(nr - self.num_q):<{3}}:"
+                                f"G{nr - self.num_q!s:<{3}}:"
                                 + f"{(A_row[nr] + B_row[nr]) / 2:3.6f}".center(10)
                                 + " | "
                                 + f"{A_row[nr]:3.6f}".center(10)
@@ -460,11 +460,10 @@ class quantumLRBaseClass:
                         operator_index = "q" + str(sorted_indices[i])
                     else:
                         operator_index = "G" + str(sorted_indices[i] - self.num_q)
+                elif sorted_indices[i] - self.num_params < self.num_q:
+                    operator_index = "q" + str(sorted_indices[i] - self.num_params) + "^d"
                 else:
-                    if sorted_indices[i] - self.num_params < self.num_q:
-                        operator_index = "q" + str(sorted_indices[i] - self.num_params) + "^d"
-                    else:
-                        operator_index = "G" + str(sorted_indices[i] - self.num_params - self.num_q) + "^d"
+                    operator_index = "G" + str(sorted_indices[i] - self.num_params - self.num_q) + "^d"
 
                 print(
                     f"{element.center(12)} | {str(sorted_indices[i]).center(12)} | {operator_index.center(12)}"

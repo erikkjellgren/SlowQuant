@@ -865,7 +865,7 @@ class WaveFunctionCircuit:
             maxiter: Maximum number of iterations.
             is_silent_subiterations: Silence subiterations.
         """
-        if isinstance(self.QI.ansatz, QuantumCircuit) and not optimizer_name.lower() in ("cobyla", "cobyqa"):
+        if isinstance(self.QI.ansatz, QuantumCircuit) and optimizer_name.lower() not in ("cobyla", "cobyqa"):
             raise ValueError("Custom Ansatz in QI only works with COBYLA and COBYQA as optimizer.")
         print("### Parameters information:")
         if orbital_optimization:
@@ -965,7 +965,7 @@ class WaveFunctionCircuit:
             tol: Convergence tolerance.
             maxiter: Maximum number of iterations.
         """
-        if isinstance(self.QI.ansatz, QuantumCircuit) and not optimizer_name.lower() in ("cobyla", "cobyqa"):
+        if isinstance(self.QI.ansatz, QuantumCircuit) and optimizer_name.lower() not in ("cobyla", "cobyqa"):
             raise ValueError("Custom Ansatz in QI only works with COBYLA and COBYQA as optimizer.")
         print("### Parameters information:")
         if orbital_optimization:
