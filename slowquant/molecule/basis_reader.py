@@ -17,7 +17,7 @@ def read_basis(atom_name: str, basis_set: str) -> tuple[np.ndarray, np.ndarray, 
     basis_set = basis_set.replace("*", "_st_")
     if len(atom_name) == 1:
         atom_name = f"{atom_name} "
-    with open(f"{this_file_location}/basisset/{basis_set.lower()}.basis", encoding="UTF-8") as basisfile:
+    with open(f"{this_file_location}/basisset/{basis_set.lower()}.basis", "r", encoding="UTF-8") as basisfile:
         for line in basisfile:
             if line[0:2] == atom_name.lower():
                 # Found the correct atom.

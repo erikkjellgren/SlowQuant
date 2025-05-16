@@ -43,10 +43,10 @@ def run_unrestricted_hartree_fock(
         C_HOMO = C0_alpha[number_electrons_alpha - 1]
         C_LUMO = C0_alpha[number_electrons_alpha]
         C0_alpha[number_electrons_alpha - 1] = (
-            1 / (1 + lumo_homo_mix_coeff**2) ** 0.5 * (C_HOMO + lumo_homo_mix_coeff * C_LUMO)
+            1 / ((1 + lumo_homo_mix_coeff**2)) ** 0.5 * (C_HOMO + lumo_homo_mix_coeff * C_LUMO)
         )
         C0_alpha[number_electrons_alpha] = (
-            1 / (1 + lumo_homo_mix_coeff**2) ** 0.5 * (-lumo_homo_mix_coeff * C_HOMO + C_LUMO)
+            1 / ((1 + lumo_homo_mix_coeff**2)) ** 0.5 * (-lumo_homo_mix_coeff * C_HOMO + C_LUMO)
         )
     # Only using occupied MOs
     C0_alpha = C0_alpha[0 : int(number_electrons_alpha)]

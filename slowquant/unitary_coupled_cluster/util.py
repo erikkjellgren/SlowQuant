@@ -7,7 +7,7 @@ import numpy as np
 def iterate_t1_sa(
     active_occ_idx: Sequence[int],
     active_unocc_idx: Sequence[int],
-) -> Generator[tuple[int, int, float]]:
+) -> Generator[tuple[int, int, float], None, None]:
     """Iterate over T1 spin-adapted operators.
 
     Args:
@@ -26,7 +26,7 @@ def iterate_t1_sa(
 def iterate_t2_sa(
     active_occ_idx: Sequence[int],
     active_unocc_idx: Sequence[int],
-) -> Generator[tuple[int, int, int, int, float, int]]:
+) -> Generator[tuple[int, int, int, int, float, int], None, None]:
     """Iterate over T2 spin-adapted operators.
 
     Args:
@@ -55,7 +55,7 @@ def iterate_t2_sa(
 
 def iterate_t1_sa_generalized(
     num_orbs: int,
-) -> Generator[tuple[int, int, float]]:
+) -> Generator[tuple[int, int, float], None, None]:
     """Iterate over T1 spin-adapted operators.
 
     Args:
@@ -73,7 +73,7 @@ def iterate_t1_sa_generalized(
 def iterate_t1(
     active_occ_spin_idx: Sequence[int],
     active_unocc_spin_idx: Sequence[int],
-) -> Generator[tuple[int, int]]:
+) -> Generator[tuple[int, int], None, None]:
     """Iterate over T1 spin-conserving operators.
 
     Args:
@@ -103,7 +103,7 @@ def iterate_t1(
 def iterate_t2(
     active_occ_spin_idx: Sequence[int],
     active_unocc_spin_idx: Sequence[int],
-) -> Generator[tuple[int, int, int, int]]:
+) -> Generator[tuple[int, int, int, int], None, None]:
     """Iterate over T2 spin-conserving operators.
 
     Args:
@@ -143,7 +143,7 @@ def iterate_t2(
 def iterate_t3(
     active_occ_spin_idx: Sequence[int],
     active_unocc_spin_idx: Sequence[int],
-) -> Generator[tuple[int, int, int, int, int, int]]:
+) -> Generator[tuple[int, int, int, int, int, int], None, None]:
     """Iterate over T3 spin-conserving operators.
 
     Args:
@@ -193,7 +193,7 @@ def iterate_t3(
 def iterate_t4(
     active_occ_spin_idx: Sequence[int],
     active_unocc_spin_idx: Sequence[int],
-) -> Generator[tuple[int, int, int, int, int, int, int, int]]:
+) -> Generator[tuple[int, int, int, int, int, int, int, int], None, None]:
     """Iterate over T4 spin-conserving operators.
 
     Args:
@@ -253,7 +253,7 @@ def iterate_t4(
 def iterate_t5(
     active_occ_spin_idx: Sequence[int],
     active_unocc_spin_idx: Sequence[int],
-) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int]]:
+) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int], None, None]:
     """Iterate over T5 spin-conserving operators.
 
     Args:
@@ -323,7 +323,7 @@ def iterate_t5(
 def iterate_t6(
     active_occ_spin_idx: Sequence[int],
     active_unocc_spin_idx: Sequence[int],
-) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int, int, int]]:
+) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int, int, int], None, None]:
     """Iterate over T6 spin-conserving operators.
 
     Args:
@@ -407,7 +407,7 @@ def iterate_t6(
 def iterate_pair_t2(
     active_occ_idx: Sequence[int],
     active_unocc_idx: Sequence[int],
-) -> Generator[tuple[int, int, int, int]]:
+) -> Generator[tuple[int, int, int, int], None, None]:
     """Iterate over pair T2 operators.
 
     Args:
@@ -424,7 +424,7 @@ def iterate_pair_t2(
 
 def iterate_pair_t2_generalized(
     num_orbs: int,
-) -> Generator[tuple[int, int, int, int]]:
+) -> Generator[tuple[int, int, int, int], None, None]:
     """Iterate over generalized pair T2 operators.
 
     Args:
