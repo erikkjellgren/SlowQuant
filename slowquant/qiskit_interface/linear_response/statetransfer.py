@@ -119,7 +119,7 @@ class quantumLR(quantumLRBaseClass):
                 )
                 # Y * <CSF| Gd Ud mux U | CSF>
                 g_part_x = self._Y_G_normed[i, state_number] * self.wf.QI.quantum_expectation_value_csfs(
-                    self.states["G{i}"], mux_active, self.states["HF"]
+                    self.states[f"G{i}"], mux_active, self.states["HF"]
                 )
                 # -Z * <CSF| Ud muy U G | CSF>
                 g_part_y -= self._Z_G_normed[i, state_number] * self.wf.QI.quantum_expectation_value_csfs(
@@ -127,7 +127,7 @@ class quantumLR(quantumLRBaseClass):
                 )
                 # Y * <CSF| Gd Ud muy U | CSF>
                 g_part_y = self._Y_G_normed[i, state_number] * self.wf.QI.quantum_expectation_value_csfs(
-                    self.states["G{i}"], muy_active, self.states["HF"]
+                    self.states[f"G{i}"], muy_active, self.states["HF"]
                 )
                 # -Z * <CSF| Ud muz U G | CSF>
                 g_part_z -= self._Z_G_normed[i, state_number] * self.wf.QI.quantum_expectation_value_csfs(
@@ -135,7 +135,7 @@ class quantumLR(quantumLRBaseClass):
                 )
                 # Y * <CSF| Gd Ud muz U | CSF>
                 g_part_z = self._Y_G_normed[i, state_number] * self.wf.QI.quantum_expectation_value_csfs(
-                    self.states["G{i}"], muz_active, self.states["HF"]
+                    self.states[f"G{i}"], muz_active, self.states["HF"]
                 )
             transition_dipoles[state_number, 0] = g_part_x
             transition_dipoles[state_number, 1] = g_part_y
