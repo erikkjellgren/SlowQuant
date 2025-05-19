@@ -198,7 +198,7 @@ def fUCC(
     Args:
         num_orbs: Number of spatial orbitals.
         num_elec: Number of alpha and beta electrons.
-        mapper: Fermioinc to qubit mapper.
+        mapper: Fermionic to qubit mapper.
         ansatz_options: Ansatz options.
 
     Returns:
