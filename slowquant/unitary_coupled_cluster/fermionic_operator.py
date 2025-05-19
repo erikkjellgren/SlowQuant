@@ -517,11 +517,11 @@ def get_determinant_expansion_from_operator_on_HF(
                 phase_changes += (det & parity_check[orb_idx]).bit_count()
         else:  # nobreak
             val = operator.factors[fermi_label] * (-1) ** phase_changes
-            det_str = format(det, f"0{2*num_active_orbs}b")
+            det_str = format(det, f"0{2 * num_active_orbs}b")
             if det_str in dets:
                 idx = dets.index(det_str)
                 coeffs[idx] += val
             else:
-                dets.append(format(det, f"0{2*num_active_orbs}b"))
+                dets.append(format(det, f"0{2 * num_active_orbs}b"))
                 coeffs.append(val)
     return coeffs, dets

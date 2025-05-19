@@ -137,7 +137,7 @@ def find_swaps(new: list[int], ref: list[int]) -> list[tuple[int, int]]:
     swaps = []
     list_in = new.copy()
 
-    for i in range(len(list_in)):
+    for i in range(len(list_in)):  # pylint: disable=consider-using-enumerate
         if list_in[i] != ref[i]:
             # Find where the element from ref[i] is in list_in and swap it
             swap_idx = list_in.index(ref[i], i)
@@ -335,7 +335,7 @@ def correct_distribution_with_layout_v2(
     for swap in swaps[::-1]:
         C_new = C_new[swap_indices(num_qubits, swap)]
     # Convert columnvector of probabilities to bitstring distribution
-    for bitint, prob in enumerate(C_new): 
+    for bitint, prob in enumerate(C_new):
         dist[bitint] = prob
     return dist
 
@@ -376,7 +376,7 @@ def correct_distribution_with_layout(
     # Apply M error mitigation matrix
     C_new = M_inv @ C
     # Convert columnvector of probabilities to bitstring distribution
-    for bitint, prob in enumerate(C_new): 
+    for bitint, prob in enumerate(C_new):
         dist[bitint] = prob
     return dist
 
@@ -666,7 +666,17 @@ def f2q(i: int, num_orbs: int) -> int:
 def get_determinant_superposition_reference(
     det1: str, det2: str, num_orbs: int, mapper: JordanWignerMapper
 ) -> QuantumCircuit:
-    """Erik could have described the function."""
+    """Get quantum circuit for superposition of two determinants.
+
+    Args:
+        det1: First determinant.
+        det2: Second determinant.
+        num_orbs: Number of spatial orbitals.
+        mapper: Fermionic to qubit mapper.
+
+    Returns:
+        Quantum circuit for superposition of two determinant.
+    """
     if not isinstance(mapper, JordanWignerMapper):
         raise TypeError("Only implemented for JordanWignerMapper. Got: {type(mapper)}")
     qc = QuantumCircuit(2 * num_orbs)
@@ -724,8 +734,17 @@ def get_determinant_superposition_reference_MAnsatz0(
     return qc
 
 
-def get_determinant_reference(det, num_orbs, mapper) -> QuantumCircuit:
-    """Erik could have described the function."""
+def get_determinant_reference(det: str, num_orbs: int, mapper: FermionicMapper) -> QuantumCircuit:
+    """Get quantum circuit for a determinant.
+
+    Args:
+        det: Determinant.
+        num_orbs: Number of spatial orbitals.
+        mapper: Fermionic to qubit mapper.
+
+    Returns:
+        Quantum circuit for determinant.
+    """
     if not isinstance(mapper, JordanWignerMapper):
         raise TypeError("Only implemented for JordanWignerMapper. Got: {type(mapper)}")
     qc = QuantumCircuit(2 * num_orbs)
@@ -736,8 +755,17 @@ def get_determinant_reference(det, num_orbs, mapper) -> QuantumCircuit:
     return qc
 
 
-def get_reordering_sign(det) -> int:
-    """Erik could have described the function."""
+def get_reordering_sign(det: str) -> int:
+    """Get sign from reordering determinant.
+
+    The reordering is done from spin-paired to spin-blocked.
+
+    Args:
+        det: Determinant.
+
+    Returns:
+        Phase factor from the reordering.
+    """
     sign = 1
     alphas = 0
     for i, occ in enumerate(det[::-1]):
