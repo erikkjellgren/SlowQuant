@@ -203,7 +203,7 @@ class WaveFunctionSA:
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     self.kappa_hf_like_idx.append([p, q])
         self._energy_elec: float | None = None
-        self.num_states = len(states)
+        self.num_states = len(states[0])
         self.states = states
         # Setup Qiskit stuff
         self.QI = quantum_interface
