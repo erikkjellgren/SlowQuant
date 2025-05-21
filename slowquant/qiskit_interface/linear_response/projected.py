@@ -43,7 +43,7 @@ class quantumLR(quantumLRBaseClass):
 
         if self.num_q != 0:
             if do_rdm:
-                if isinstance(self.wf.QI._primitive, BaseSampler):  # pylint: disable=protected-access
+                if isinstance(self.wf.QI._primitive, BaseSampler):
                     self.wf.precalc_rdm_paulis(2)
                 # RDMs
                 rdms = ReducedDenstiyMatrix(
@@ -63,16 +63,15 @@ class quantumLR(quantumLRBaseClass):
                         self.wf.num_inactive_orbs,
                         self.wf.num_active_orbs,
                     )
-            else:
-                if do_gradients:
-                    grad = np.zeros(2 * self.num_q)
-                    for i, op in enumerate(self.q_ops):
-                        grad[i] = self.wf.QI.quantum_expectation_value(
-                            (self.H_1i_1a * op).get_folded_operator(*self.orbs)
-                        )
-                        grad[i + self.num_q] = self.wf.QI.quantum_expectation_value(
-                            (op.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
-                        )
+            elif do_gradients:
+                grad = np.zeros(2 * self.num_q)
+                for i, op in enumerate(self.q_ops):
+                    grad[i] = self.wf.QI.quantum_expectation_value(
+                        (self.H_1i_1a * op).get_folded_operator(*self.orbs)
+                    )
+                    grad[i + self.num_q] = self.wf.QI.quantum_expectation_value(
+                        (op.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                    )
         if do_gradients:
             if self.num_q != 0:
                 print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))

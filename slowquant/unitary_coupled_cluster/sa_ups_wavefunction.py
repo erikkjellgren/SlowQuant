@@ -235,11 +235,10 @@ class WaveFunctionSAUPS:
                 if i == j:
                     if abs(1 - coeff_i @ coeff_j) > 10**-10:
                         raise ValueError(f"state {i} is not normalized got overlap of {coeff_i @ coeff_j}")
-                else:
-                    if abs(coeff_i @ coeff_j) > 10**-10:
-                        raise ValueError(
-                            f"state {i} and {j} are not orthogonal got overlap of {coeff_i @ coeff_j}"
-                        )
+                elif abs(coeff_i @ coeff_j) > 10**-10:
+                    raise ValueError(
+                        f"state {i} and {j} are not orthogonal got overlap of {coeff_i @ coeff_j}"
+                    )
         # Construct UPS Structure
         self.ups_layout = UpsStructure()
         if ansatz.lower() == "tups":
@@ -583,7 +582,7 @@ class WaveFunctionSAUPS:
                 self._old_opt_parameters = np.zeros(len(self.kappa_idx)) + 10**20
                 self._E_opt_old = 0.0
                 res = optimizer.minimize([0.0] * len(self.kappa_idx))
-                for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
+                for i in range(len(self.kappa)):
                     self._kappa[i] = 0.0
                     self._kappa_old[i] = 0.0
             else:
@@ -596,9 +595,9 @@ class WaveFunctionSAUPS:
                 break
 
             e_new = res.fun
-            time_str = f"{time.time() - full_start:7.2f}"  # type: ignore
+            time_str = f"{time.time() - full_start:7.2f}"
             e_str = f"{e_new:3.12f}"
-            print(f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+            print(f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")
             if abs(e_new - e_old) < tol:
                 break
             e_old = e_new
@@ -691,7 +690,7 @@ class WaveFunctionSAUPS:
         )
         if orbital_optimization:
             self.thetas = res.x[len(self.kappa) :].tolist()
-            for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
+            for i in range(len(self.kappa)):
                 self._kappa[i] = 0.0
                 self._kappa_old[i] = 0.0
         else:
