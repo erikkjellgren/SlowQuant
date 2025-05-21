@@ -173,7 +173,7 @@ class quantumLRBaseClass:
                 for nr, i in enumerate(range(self.num_params)):
                     if nr < self.num_q:
                         print(
-                            f"q{nr!s:<{3}}:"
+                            f"q{str(nr):<{3}}:"
                             + f"{(A_row[nr] + B_row[nr]) / 2:3.6f}".center(10)
                             + " | "
                             + f"{A_row[nr]:3.6f}".center(10)
@@ -259,7 +259,7 @@ class quantumLRBaseClass:
                     for nr, i in enumerate(range(self.num_params)):
                         if nr < self.num_q:
                             print(
-                                f"q{nr!s:<{3}}:"
+                                f"q{str(nr):<{3}}:"
                                 + f"{(A_row[nr] + B_row[nr]) / 2:3.6f}".center(10)
                                 + " | "
                                 + f"{A_row[nr]:3.6f}".center(10)

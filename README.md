@@ -55,6 +55,7 @@ Just use [PySCF](https://github.com/pyscf/pyscf) instead.
 
 | Feature                                        | Last living commit                       |
 |------------------------------------------------|------------------------------------------|
+| RDM trace correction quantum wave function     | e26074fc8aae8dc0f6528308022ad265c5ca18bc |
 | No submatrix saving in proj and all-proj LR    | 3f5df6818c4dbbb2b54606d0a1a4e00badfb766d |
 | Approxmiate Hermitification in linear response | 3f5df6818c4dbbb2b54606d0a1a4e00badfb766d |
 | Approxmiate linear response formalism          | 3f5df6818c4dbbb2b54606d0a1a4e00badfb766d |

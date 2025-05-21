@@ -35,6 +35,7 @@ lint.ignore = [
   "PLR0915",  # too-many-statements
   "PLR2004",  # magic-value-comparison
   "PLW2901",  # redefined-loop-name
+  "RUF010",   # explicit-f-string-type-conversion
 ]
 
 # Exclude these paths from checks (customize as needed)
