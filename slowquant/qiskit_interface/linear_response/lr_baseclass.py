@@ -183,7 +183,7 @@ class quantumLRBaseClass:
                         )
                     else:
                         print(
-                            f"G{nr - self.num_q!s:<{3}}:"
+                            f"G{str(nr - self.num_q):<{3}}:"
                             + f"{(A_row[nr] + B_row[nr]) / 2:3.6f}".center(10)
                             + " | "
                             + f"{A_row[nr]:3.6f}".center(10)
@@ -269,7 +269,7 @@ class quantumLRBaseClass:
                             )
                         else:
                             print(
-                                f"G{nr - self.num_q!s:<{3}}:"
+                                f"G{str(nr - self.num_q):<{3}}:"
                                 + f"{(A_row[nr] + B_row[nr]) / 2:3.6f}".center(10)
                                 + " | "
                                 + f"{A_row[nr]:3.6f}".center(10)
