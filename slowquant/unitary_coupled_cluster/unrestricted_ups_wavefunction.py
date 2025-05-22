@@ -20,6 +20,7 @@ from slowquant.unitary_coupled_cluster.unrestricted_density_matrix import (
     get_electronic_energy_unrestricted,
     get_orbital_gradient_unrestricted,
     get_orbital_response_hessian_block_unrestricted,
+    get_orbital_response_metric_sigma_unrestricted,
 )
 from slowquant.unitary_coupled_cluster.operator_matrix import (
     build_operator_matrix,
@@ -963,7 +964,7 @@ class UnrestrictedWaveFunctionUPS:
             self.num_inactive_orbs,
             self.num_active_orbs,
         )
-
+    #print the unrestricted orbital response hessian block for test
     @property
     def orbital_response_hessian_unrestricted(self) -> np.ndarray:
         rdms = UnrestrictedReducedDensityMatrix(
@@ -990,6 +991,94 @@ class UnrestrictedWaveFunctionUPS:
             self.num_inactive_orbs,
             self.num_active_orbs,
         )
+
+    @property
+    def orbital_response_metric_sigma_unrestricted(self) -> np.ndarray:
+        rdms = UnrestrictedReducedDensityMatrix(
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+            self.num_virtual_orbs,
+            rdm1aa=self.rdm1aa,
+            rdm1bb=self.rdm1bb,
+            rdm2aaaa=self.rdm2aaaa,
+            rdm2bbbb=self.rdm2bbbb,
+            rdm2aabb=self.rdm2aabb,
+            rdm2bbaa=self.rdm2bbaa,
+        )
+        return get_orbital_response_metric_sigma_unrestricted(
+            rdms,
+            self.kappa_idx,
+        )
+    
+    def manual_metric_sigma_unrestricted(
+            wf: UnrestrictedWaveFunctionUPS,
+    ) -> np.ndarray:
+        sigma = np.zeros((2*len(wf.kappa_idx), 2*len(wf.kappa_idx)))
+        for idx1, (m, n) in enumerate(wf.kappa_idx):
+            for idx2, (p, q) in enumerate(wf.kappa_idx):
+                q_qp_a = (1/np.sqrt(2))*(anni(q, "alpha", True)*anni(p, "alpha", False))
+                q_mn_a = (1/np.sqrt(2))*(anni(m, "alpha", True)*anni(n, "alpha", False))
+                q_qp_b = (1/np.sqrt(2))*(anni(q, "beta", True)*anni(p, "beta", False))
+                q_mn_b = (1/np.sqrt(2))*(anni(m, "beta", True)*anni(n, "beta", False))
+                aa = expectation_value(
+                    wf.ci_coeffs,
+                    [q_qp_a * q_mn_a],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                aa -= expectation_value(
+                    wf.ci_coeffs,
+                    [q_mn_a * q_qp_a],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                bb = expectation_value(
+                    wf.ci_coeffs,
+                    [q_qp_b * q_mn_b],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                bb -= expectation_value(
+                    wf.ci_coeffs,
+                    [q_mn_b * q_qp_b],
+                    wf.ci_coeffs,
+                    wf.idx2det,
+                    wf.det2idx,
+                    wf.num_inactive_orbs,
+                    wf.num_active_orbs,
+                    wf.num_virtual_orbs,
+                    wf.num_active_elec_alpha,
+                    wf.num_active_elec_beta,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                sigma[idx1, idx2] = aa
+                sigma[idx1 + len(wf.kappa_idx), idx2 + len(wf.kappa_idx)] = bb
+        return sigma
 
     def manual_hessian_block_unrestricted(
         wf: UnrestrictedWaveFunctionUPS,

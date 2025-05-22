@@ -528,8 +528,64 @@ def get_orbital_gradient_unrestricted(
                     gradient[idx + len(kappa_idx)] += 0.5 * g_int_bbaa[p, n, q, r] * rdms.RDM2bbaa(p, q, r, m)
     return gradient
 
+def get_orbital_response_metric_sigma_unrestricted(
+        rdms: UnrestrictedReducedDensityMatrix, 
+        kappa_idx: list[list[int]],
+) -> np.ndarray:
+    r"""Calculate the Sigma matrix orbital-orbital block.
 
-# tror ikke det er gradienten jeg laver, men hessian block
+    .. math::
+        \Sigma_{pq,pq}^{\hat{q},\hat{q}} = \left<0\left|\left[\hat{q}_{pq}^\dagger,\hat{q}_{pq}\right]\right|0\right>
+
+    Args:
+       rdms: Reduced density matrix class.
+       kappa_idx: Orbital parameter indicies in spatial basis.
+
+    Returns:
+        Sigma matrix orbital-orbital block.
+    """
+    sigma = np.zeros((2*len(kappa_idx), 2*len(kappa_idx)))
+    for idx1, (p, q) in enumerate(kappa_idx):
+        for idx2, (m, n) in enumerate(kappa_idx):
+            if m == p:
+                sigma[idx1, idx2] += rdms.RDM1aa(q, n)
+                sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] += rdms.RDM1bb(q, n)
+            if q == n:
+                sigma[idx1, idx2] -= rdms.RDM1aa(m, p)
+                sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] -= rdms.RDM1bb(m, p)
+    return 1/2 * sigma
+
+"""
+def get_orbital_response_property_gradient_unrestricted(
+        rdms: UnrestrictedReducedDensityMatrix,
+        mo: np.ndarray,
+        kappa_idx: list[tuple[int, int]],
+        num_inactive_orbs: int,
+        num_active_orbs: int,
+) -> float:
+    Calculate the orbital part of static property gradient.
+
+    .. math::
+        P^{\hat{q}} = \frac{1}{\sqrt{2}}\sum_{p}\left(-x_{np}\Gamma^{[1]}_{mp} + x_{pm}\Gamma^{[1]}_{pn}\right)
+
+    Args:
+       rdms: Reduced density matrix class.
+       mo: Property integral in MO basis.
+       kappa_idx: Orbital parameter indicies in spatial basis.
+       num_inactive_orbs: Number of inactive orbitals in spatial basis.
+       num_active_orbs: Number of active orbitals in spatial basis.
+
+    Returns:
+        Orbital part of static property gradient.
+    
+    prop_grad = np.zeros((2*len(kappa_idx), 2*len(mo)))
+    for idx, (n, m) in enumerate(kappa_idx):
+        for p in range(num_inactive_orbs, num_active_orbs):
+            prop_grad[idx, :] +=
+
+    return prop_grad
+"""
+
 def get_orbital_response_hessian_block_unrestricted(
         rdms: UnrestrictedReducedDensityMatrix,
         h_int_aa: np.ndarray,
