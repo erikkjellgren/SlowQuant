@@ -97,6 +97,8 @@ class WaveFunctionSAUPS:
         self._rdm2 = None
         self._h_mo = None
         self._g_mo = None
+        self._state_energies = None
+        self._sa_energy = None
         self.ansatz_options = ansatz_options
         # Construct spin orbital spaces and indices
         active_space = []
