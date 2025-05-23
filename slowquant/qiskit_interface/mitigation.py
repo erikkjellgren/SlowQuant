@@ -11,34 +11,54 @@ class Mitigation:
 
         Args:
             postselection: Boolean to do postselection.
-            M: Confusion matrix for read-out (and gate) error.
+            M: Option for readout confusion matrix:
+                None, M, or M0
         """
         M_options = ["None", "M", "M0"]
         if M not in M_options:
             raise ValueError("Specified M option does not exist. Choose from ", M_options)
         self.postselection = postselection
         self.M = M
+        
         self._Minv = None  # what about custom M?
 
-    # Stuff to take care of changing mitigation!
+    # Stuff to take care of changing mitigation! -> Maybe it should not. Create new object!
     # Custom M problem?
 
+    def set_details(self, mapper: FermionicMapper, num_elec: int, num_qubits: int) -> None:
+        """Details"""
+        # Maybe rather make quantum_value a function of QI? 
+        # See discussion in comments there. 
+        # Maybe better pass this info in apply_mitigation functions? 
+        self.mapper = mapper
+        self.num_elec = num_elec
+        self.num_qubits = num_qubits
+
     def is_none(self) -> bool:
+        """Check if any Mitigation is requested."""
         if not self.postselection and self.M == "None":
             return True
         return False
 
     def apply_mitigation_to_clique(self, clique_head: CliqueHead) -> list[dict[int, float]]:
-        """Apply EM"""
+        """Apply EM to one CLique head."""
         return self.apply_mitigation_to_dist(clique_head.distr, clique_head.head)
         # saver?
 
     def apply_mitigation_to_dist(self, dist: list[dict[int, float]], pauli: str) -> list[dict[int, float]]:
-        """Apply EM"""
+        """Apply EM to one distribution."""
         dist_corr = dist.copy()
+
         # Do M
+        # Missing custom dist.
+        # Missing correction with layout.
+        if self.M != "None":
+            dist_corr = correct_distribution(dist_corr, self._Minv)
 
         # Do postselection
+        if self.postselection:
+            if "X" not in pauli and "Y" not in pauli:
+                dist_corr = postselection(dist_corr, self.mapper, self.num_elec, self.num_qubits)
 
         return dist_corr
 
@@ -61,7 +81,7 @@ def correct_distribution(dist: dict[int, float], M: np.ndarray) -> dict[int, flo
     # Apply M error mitigation matrix
     C_new = M @ C
     # Convert columnvector of probabilities to bitstring distribution
-    for bitint, prob in dist.items():
+    for bitint, prob in dist.items(): # Erik's fix missing? 
         dist[bitint] = C_new[bitint]
     return dist
 

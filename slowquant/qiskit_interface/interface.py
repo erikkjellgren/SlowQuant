@@ -236,6 +236,9 @@ class QuantumInterface:
                 raise ValueError(
                     f"Got parameter name, {name}, that is not in grad_param_R, {self.grad_param_R}"
                 )
+            
+        # Set Mitigation object details
+        self.Mitigation.set_details(self.mapper, self.num_elec, self.num_qubits)
 
         if not hasattr(self, "_parameters"):
             # Set parameter to HarteeFock
@@ -371,6 +374,8 @@ class QuantumInterface:
         Args:
             shots: Overwrites QI internal shot number if int is defined.
         """
+        if self._M_shots is not None and shots is None:
+            shots = self._M_shots
         self.Mitigation._Minv = self._make_Minv(shots=shots)
 
     @property
@@ -583,6 +588,7 @@ class QuantumInterface:
 
     def _reset_cliques(self, verbose: bool = True) -> None:
         """Reset cliques to empty."""
+        # ToDo: What about Mitigation object?
         self.saver = {}
         if verbose:
             print("Pauli saving has been reset.")
@@ -1044,6 +1050,7 @@ class QuantumInterface:
             print("Make new Clique saver for determinant ", det)
             self.saver[det_int] = Clique()
 
+        # Get pauli strings and new Clique heads
         paulis_str = [str(x) for x in observables.paulis]
         new_heads = self.saver[det_int].add_paulis(paulis_str)
 
@@ -1054,7 +1061,7 @@ class QuantumInterface:
                     if self.Mitigation._Minv is None:
                         self.Mitigation._Minv = self._make_Minv(shots=self._M_shots)
                 else:
-                    # custom Minv -> how to integrate into Mitigation object?
+                    # custom Minv -> how to integrate into Mitigation object? -> custom function?
                     Minv = self._make_Minv(shots=self._M_shots, custom_ansatz=circuit_M)
 
             # Simulate each clique head with one combined device call
@@ -1066,6 +1073,8 @@ class QuantumInterface:
             # Get value and use Mitigation class
 
             # How to deal with the layout conflict option?
+
+            quantum_value(
 
             if self.do_M_mitigation:  # apply error mitigation if requested
                 if circuit_M is None:
@@ -1651,13 +1660,16 @@ class QuantumInterface:
         print(data)
 
 
-def _quantum_value(
+def quantum_value(
     paulis: list[str],
     coeffs: list[float],
     data: Clique | list[dict[int, float]],
     mitigation: Mitigation,
-) -> float:
+    ) -> float:
     """Calculate expectation value."""
+    # Should this maybe better be a function of QI?
+    # Then no need for Mitigation.set_details() function 
+
     # This is coded to avoid too many if statements within loops.
     # Options are:
     #   No Clique, no mitigation
@@ -1667,6 +1679,7 @@ def _quantum_value(
 
     # custom M problem!
     # Redundancy problem!
+    # layout check problem!
 
     values = 0.0
     if not isinstance(data, Clique):
@@ -1681,9 +1694,9 @@ def _quantum_value(
         else:
             # Apply error mitigation, no Clique object
             # Loop over all Pauli strings in observable and build result with coefficients
-            for pauli, coeff, dist in zip(paulis, coeffs, mitigation.apply_mitigation_to_dist(data, pauli)):
+            for pauli, coeff, dist in zip(paulis, coeffs, data): 
                 result = 0.0
-                for key, value in dist.items():  # build result from quasi-distribution
+                for key, value in mitigation.apply_mitigation_to_dist(dist,pauli).items():  # build result from quasi-distribution
                     result += value * get_bitstring_sign(pauli, key)
                 values += result * coeff
     else:
