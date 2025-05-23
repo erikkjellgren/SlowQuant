@@ -8,7 +8,7 @@ from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 def to_CBS_measurement(op: str, transpiled: None | list[QuantumCircuit] = None) -> QuantumCircuit:
     r"""Convert a Pauli string to Pauli measurement circuit.
 
-    This is achived by the following transformation:
+    This is achieved by the following transformation:
 
     .. math::
         \begin{align}
@@ -23,7 +23,7 @@ def to_CBS_measurement(op: str, transpiled: None | list[QuantumCircuit] = None) 
         transpiled: List of transpiled X and Y gate.
 
     Returns:
-        Pauli measuremnt quantum circuit.
+        Pauli measurement quantum circuit.
     """
     if transpiled is None:
         num_qubits = len(op)
@@ -67,7 +67,7 @@ def get_bitstring_sign(op: str, binary: int) -> int:
         \left<1\left|HSYS^{\dagger}H\right|1\right> &= -1
         \end{align}
 
-    The total expectation value is then evaulated as:
+    The total expectation value is then evaluated as:
 
     .. math::
         E = \prod_i^N\left<b_i\left|P_{i,T}\right|b_i\right>
@@ -228,7 +228,7 @@ def correct_distribution(dist: dict[int, float], M: np.ndarray) -> dict[int, flo
 
     Args:
         dist: Quasi-distribution.
-        M: Correlation martix.
+        M: Correlation matrix.
 
     Returns:
         Quasi-distribution corrected by correlation matrix.
@@ -271,7 +271,7 @@ def postselection(
         \left|01\right> \rightarrow 0\left|01\right>p
 
     Where :math:`p` is zero for even number of electrons and one for odd number of electrons.
-    This counting is done independtly for the :math:`\alpha` part and :math:`\beta` part.
+    This counting is done independently for the :math:`\alpha` part and :math:`\beta` part.
 
     Args:
         dist: Measured quasi-distribution.
@@ -302,28 +302,29 @@ def postselection(
             bitstr_b = bitstr[:num_a]
             current_parity = "0"
             change_counter = 0
-            for bit in bitstr_a:
-                if bit != current_parity:
-                    current_parity = bit
-                    change_counter += 1
-            if current_parity == "1" and num_elec[0] % 2 == 0:
-                change_counter += 1
-            elif current_parity == "0" and num_elec[0] % 2 == 1:
-                change_counter += 1
-            if change_counter != num_elec[0]:
-                break
-            current_parity = "0"
-            change_counter = 0
             for bit in bitstr_b:
                 if bit != current_parity:
                     current_parity = bit
                     change_counter += 1
             if current_parity == "1" and num_elec[1] % 2 == 0:
                 change_counter += 1
+                current_parity = "0"
             elif current_parity == "0" and num_elec[1] % 2 == 1:
                 change_counter += 1
+                current_parity = "1"
+            if change_counter != num_elec[0]:
+                continue
+            change_counter = 0
+            for bit in bitstr_a:
+                if bit != current_parity:
+                    current_parity = bit
+                    change_counter += 1
+            if current_parity == "1" and (num_elec[0] + num_elec[1]) % 2 == 0:
+                change_counter += 1
+            elif current_parity == "0" and (num_elec[0] + num_elec[1]) % 2 == 1:
+                change_counter += 1
             if change_counter != num_elec[1]:
-                break
+                continue
             new_dist[int(bitstr, 2)] = val
             prob_sum += val
     else:

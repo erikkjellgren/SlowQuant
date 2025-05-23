@@ -1,4 +1,3 @@
-# pylint: disable=too-many-lines
 import copy
 import itertools
 import math
@@ -16,17 +15,12 @@ from qiskit.primitives import (
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler import PassManager
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
-from qiskit_nature.second_q.circuit.library import PUCCD, UCC, UCCSD, HartreeFock
+from qiskit_nature.second_q.circuit.library import HartreeFock
+from qiskit_nature.second_q.mappers import JordanWignerMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
-from slowquant.qiskit_interface.custom_ansatz import (
-    dUCCSD,
-    fUCC,
-    kSAdUpCCGSD,
-    kSAfUpCCGSD,
-    tUPS,
-)
+from slowquant.qiskit_interface.custom_ansatz import SDSfUCC, fUCC, tUPS
 from slowquant.qiskit_interface.util import (
     Clique,
     correct_distribution,
@@ -43,7 +37,7 @@ class QuantumInterface:
     This class handles the interface with qiskit and the communication with quantum hardware.
     """
 
-    def __init__(  # pylint: disable=dangerous-default-value
+    def __init__(
         self,
         primitive: BaseEstimator | BaseSamplerV1 | BaseSamplerV2,
         ansatz: str | QuantumCircuit,
@@ -76,15 +70,17 @@ class QuantumInterface:
         if ansatz_options is None:
             ansatz_options = {}
         allowed_ansatz = (
-            "tUCCSD",
-            "tPUCCD",
-            "tUCCD",
+            "fpUCCD",
+            "fUCCD",
             "tUPS",
             "fUCCSD",
             "QNP",
             "kSAfUpCCGSD",
-            "dUCCSD",
-            "kSAdUpCCGSD",
+            "SDSfUCCSD",
+            "kSASDSfUpCCGSD",
+            "fUCC",
+            "SDSfUCC",
+            "HF",
         )
         if not isinstance(ansatz, QuantumCircuit) and ansatz not in allowed_ansatz:
             raise ValueError(
@@ -127,82 +123,94 @@ class QuantumInterface:
         self.num_orbs = num_orbs
         self.num_spin_orbs = 2 * num_orbs
         self.num_elec = num_elec
-        self.grad_param_R: dict[str, int] = (
-            {}
-        )  # Contains information about the parameterization needed for gradient evaluations.
+        self.grad_param_R: dict[
+            str, int
+        ] = {}  # Contains information about the parameterization needed for gradient evaluations.
 
+        # State prep circuit
+        if isinstance(self.ansatz, QuantumCircuit):
+            self.state_circuit: QuantumCircuit = QuantumCircuit(
+                self.ansatz.num_qubits
+            )  # empty state as custom circuit is passed
+        elif self.ansatz == "tUPS" and "do_pp" in self.ansatz_options.keys() and self.ansatz_options["do_pp"]:
+            # HF in pp-tUPS ordering
+            if not isinstance(self.mapper, JordanWignerMapper):
+                raise ValueError(f"pp-tUPS only implemented for JW mapper, got: {type(self.mapper)}")
+            if np.sum(num_elec) != num_orbs:
+                raise ValueError(
+                    f"pp-tUPS only implemented for number of electrons and number of orbitals being the same, got: ({np.sum(num_elec)}, {num_orbs}), (elec, orbs)"
+                )
+            self.state_circuit = QuantumCircuit(2 * num_orbs)
+            for p in range(0, 2 * num_orbs):
+                if p % 2 == 0:
+                    self.state_circuit.x(p)
+        else:
+            self.state_circuit = HartreeFock(num_orbs, num_elec, self.mapper)
+        self.num_qubits = self.state_circuit.num_qubits
+
+        # Ansatz Circuit
         if isinstance(self.ansatz, QuantumCircuit):
             print("QI was initialized with a custom QuantumCircuit object.")
             self.circuit = self.ansatz
-        elif self.ansatz == "tUCCSD":
-            if len(self.ansatz_options) != 0:
-                raise ValueError(f"No options available for tUCCSD got {self.ansatz_options}")
-            self.circuit = UCCSD(
-                num_orbs,
-                self.num_elec,
-                self.mapper,
-                initial_state=HartreeFock(
-                    num_orbs,
-                    self.num_elec,
-                    self.mapper,
-                ),
-            )
-        elif self.ansatz == "tPUCCD":
-            if len(self.ansatz_options) != 0:
-                raise ValueError(f"No options available for tPUCCD got {self.ansatz_options}")
-            self.circuit = PUCCD(
-                num_orbs,
-                self.num_elec,
-                self.mapper,
-                initial_state=HartreeFock(
-                    num_orbs,
-                    self.num_elec,
-                    self.mapper,
-                ),
-            )
-        elif self.ansatz == "tUCCD":
-            if len(self.ansatz_options) != 0:
-                raise ValueError(f"No options available for tUCCD got {self.ansatz_options}")
-            self.circuit = UCC(
-                num_orbs,
-                self.num_elec,
-                "d",
-                self.mapper,
-                initial_state=HartreeFock(
-                    num_orbs,
-                    self.num_elec,
-                    self.mapper,
-                ),
-            )
+        elif self.ansatz == "fpUCCD":
+            self.ansatz_options["pD"] = True
+            if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
+            self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
+        elif self.ansatz == "fUCCD":
+            self.ansatz_options["D"] = True
+            if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
+            self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
         elif self.ansatz == "HF":
             if len(self.ansatz_options) != 0:
                 raise ValueError(f"No options available for HF got {self.ansatz_options}")
-            self.circuit = HartreeFock(num_orbs, self.num_elec, self.mapper)
+            self.circuit = QuantumCircuit(self.num_qubits)  # empty ansatz circuit
         elif self.ansatz == "tUPS":
             self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
         elif self.ansatz == "QNP":
             self.ansatz_options["do_qnp"] = True
             self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
         elif self.ansatz == "fUCCSD":
+            self.ansatz_options["S"] = True
+            self.ansatz_options["D"] = True
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
             self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
         elif self.ansatz == "kSAfUpCCGSD":
-            self.circuit, self.grad_param_R = kSAfUpCCGSD(
-                num_orbs, self.num_elec, self.mapper, self.ansatz_options
-            )
-        elif self.ansatz == "dUCCSD":
+            self.ansatz_options["SAGS"] = True
+            self.ansatz_options["GpD"] = True
+            self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
+        elif self.ansatz == "SDSfUCCSD":
+            self.ansatz_options["D"] = True
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = dUCCSD(
+            self.circuit, self.grad_param_R = SDSfUCC(
                 num_orbs, self.num_elec, self.mapper, self.ansatz_options
             )
-        elif self.ansatz == "kSAdUpCCGSD":
-            self.circuit, self.grad_param_R = kSAdUpCCGSD(
+        elif self.ansatz == "kSASDSfUpCCGSD":
+            self.ansatz_options["GpD"] = True
+            self.circuit, self.grad_param_R = SDSfUCC(
                 num_orbs, self.num_elec, self.mapper, self.ansatz_options
             )
+        elif self.ansatz == "fUCC":
+            if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
+            self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
+        elif self.ansatz == "SDSfUCC":
+            if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
+            self.circuit, self.grad_param_R = SDSfUCC(
+                num_orbs, self.num_elec, self.mapper, self.ansatz_options
+            )
+        else:
+            raise ValueError(f"Unknown ansatz: {self.ansatz}")
 
         # Check that R parameter for gradient is consistent with the paramter names.
         if len(self.grad_param_R) == 0:
@@ -215,7 +223,7 @@ class QuantumInterface:
             )
         self.param_names = [str(x) for x in self.circuit.parameters]
         for name in self.param_names:
-            if name not in self.grad_param_R.keys():  # pylint: disable=consider-iterating-dictionary
+            if name not in self.grad_param_R.keys():
                 raise ValueError(
                     f"Got parameter name, {name}, that is not in grad_param_R, {self.grad_param_R}"
                 )
@@ -249,20 +257,17 @@ class QuantumInterface:
         if self._ISA:
             # Get backend from primitive.
             if hasattr(self._primitive, "_backend"):
-                self._primitive_backend = self._primitive._backend  # pylint: disable=protected-access
+                self._primitive_backend = self._primitive._backend
             else:
                 self._primitive_backend = None
 
             # Get optimization level from backend. Only for v1 primitives.
             self._primitive_level = 3
             if hasattr(self._primitive, "_transpile_options") and hasattr(
-                self._primitive._transpile_options, "optimization_level"  # pylint: disable=protected-access
+                self._primitive._transpile_options,
+                "optimization_level",
             ):
-                self._primitive_level = (
-                    self._primitive._transpile_options[  # pylint: disable=protected-access
-                        "optimization_level"
-                    ]
-                )
+                self._primitive_level = self._primitive._transpile_options["optimization_level"]
             elif hasattr(self._primitive, "options"):
                 if hasattr(self._primitive.options, "optimization_level"):
                     self._primitive_level = self._primitive.options["optimization_level"]
@@ -277,7 +282,7 @@ class QuantumInterface:
                 elif self._internal_pm:
                     # We have used internal PassManager before but re-transpilation was requested (probs via change_primitive in WF)
                     self.pass_manager = None
-                self.circuit = self.circuit
+                self.construct_circuit(self.num_orbs, self.num_elec)
 
     @property
     def pass_manager(self) -> None | PassManager:
@@ -312,7 +317,7 @@ class QuantumInterface:
             # Check if circuit has been set
             # In case of switching to new PassManager in later workflow
             if hasattr(self, "circuit"):
-                self.circuit = self.circuit
+                self.construct_circuit(self.num_orbs, self.num_elec)
 
     def redo_M_mitigation(self, shots: int | None = None) -> None:
         """Redo M_mitigation.
@@ -357,28 +362,32 @@ class QuantumInterface:
         """Get circuit.
 
         Returns:
-            circuit
+            circuit (State + Ansatz circuit)
         """
         return self._circuit
 
     @circuit.setter
     def circuit(
         self,
-        circuit: QuantumCircuit,
+        ansatz_circuit: QuantumCircuit,
     ) -> None:
         """Set circuit.
 
         Args:
-            circuit: circuit
+            ansatz_circuit: Ansatz circuit
         """
-        # Set the number of qubits before transpilation to (probably) device with larger number of qubits.
-        self.num_qubits = circuit.num_qubits
         # Check if ISA is selected. If yes, pre-transpile circuit for later use.
         if self.ISA:
-            self._circuit = self._transpile_circuit(circuit)
+            self.ansatz_circuit: QuantumCircuit = self._transpile_circuit(ansatz_circuit)
             self._transpiled = True
+            # Add state preparation circuit (e.g. HF)
+            self._circuit: QuantumCircuit = self.ansatz_circuit.compose(
+                self.state_circuit, qubits=self._circuit_indices, front=True
+            )
         else:
-            self._circuit = circuit
+            self.ansatz_circuit = ansatz_circuit
+            # Add state preparation circuit (e.g. HF)
+            self._circuit = self.ansatz_circuit.compose(self.state_circuit, front=True)
 
     def _transpile_circuit(self, circuit: QuantumCircuit) -> QuantumCircuit:
         """Transpile circuit with default or set PassManager.
@@ -399,9 +408,11 @@ class QuantumInterface:
         circuit_return = self.pass_manager.run(circuit)
         # Get layout indices
         if circuit_return.layout is None:
-            self._layout_indices = np.arange(circuit_return.num_qubits)
+            self._measurement_indices = np.arange(circuit_return.num_qubits)
+            self._circuit_indices = np.arange(circuit_return.num_qubits)
         else:
-            self._layout_indices = circuit_return.layout.final_index_layout()
+            self._measurement_indices = circuit_return.layout.final_index_layout()
+            self._circuit_indices = circuit_return.layout.initial_index_layout(filter_ancillas=True)
 
         # Transpile X and Y measurement gates: only translation to basis gates and optimization.
         self._transp_xy = [
@@ -478,7 +489,7 @@ class QuantumInterface:
         """Get max number of shots per run.
 
         Returns:
-            Max number of shots pers run.
+            Max number of shots per run.
         """
         return self._max_shots_per_run
 
@@ -591,7 +602,7 @@ class QuantumInterface:
 
         Calculated Pauli expectation values will be saved in memory.
 
-        The expectation value over a fermionic operator is calcuated as:
+        The expectation value over a fermionic operator is calculated as:
 
         .. math::
             E = \sum_i^N c_i\left<0\left|P_i\right|0\right>
@@ -656,10 +667,10 @@ class QuantumInterface:
     ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
 
-        Calling this function will not use any pre-calculated Pauli expectaion values.
+        Calling this function will not use any pre-calculated Pauli expectation values.
         Nor will it save any of the calculated Pauli expectation values.
 
-        The expectation value over a fermionic operator is calcuated as:
+        The expectation value over a fermionic operator is calculated as:
 
         .. math::
             E = \sum_i^N c_i\left<0\left|P_i\right|0\right>
@@ -669,6 +680,7 @@ class QuantumInterface:
         Args:
             op: SlowQuant fermionic operator.
             run_parameters: Circuit parameters.
+            do_cliques: Sort Pauli strings into QWC cliques (default: True).
 
         Returns:
             Expectation value of operator.
@@ -831,7 +843,7 @@ class QuantumInterface:
     ) -> list[dict[int, float]]:
         r"""Get results from a sampler distribution for several Pauli strings measured on several circuits.
 
-        The expectation value of a Pauli string is calcuated as:
+        The expectation value of a Pauli string is calculated as:
 
         .. math::
             E = \sum_i^N p_i\left<b_i\left|P\right|b_i\right>
@@ -840,7 +852,7 @@ class QuantumInterface:
 
         Args:
             paulis: (List of) Pauli strings to measure.
-            run_paramters: List of parameters of each circuit.
+            run_parameters: List of parameters of each circuit.
             circuits_in: List of circuits
             overwrite_shots: Overwrite QI shot number.
 
@@ -875,10 +887,10 @@ class QuantumInterface:
                 pauli_circuit = to_CBS_measurement(pauli, self._transp_xy)
                 for nr_circuit, circuit in enumerate(circuits_in):
                     # Add measurement in correct layout
-                    ansatz_w_obs = circuit.compose(pauli_circuit, qubits=self._layout_indices)
+                    ansatz_w_obs = circuit.compose(pauli_circuit, qubits=self._measurement_indices)
                     # Create classic register and measure relevant qubits
                     ansatz_w_obs.add_register(ClassicalRegister(self.num_qubits, name="meas"))
-                    ansatz_w_obs.measure(self._layout_indices, np.arange(self.num_qubits))
+                    ansatz_w_obs.measure(self._measurement_indices, np.arange(self.num_qubits))
                     pubs.append((ansatz_w_obs, run_parameters[nr_circuit]))
             pubs = pubs * self._circuit_multipl
 
@@ -901,9 +913,9 @@ class QuantumInterface:
                 for nr_pauli, pauli in enumerate(paulis):
                     pauli_circuit = to_CBS_measurement(pauli, self._transp_xy)
                     for nr_circuit, circuit in enumerate(circuits_in):
-                        ansatz_w_obs = circuit.compose(pauli_circuit, qubits=self._layout_indices)
+                        ansatz_w_obs = circuit.compose(pauli_circuit, qubits=self._measurement_indices)
                         ansatz_w_obs.add_register(ClassicalRegister(self.num_qubits))
-                        ansatz_w_obs.measure(self._layout_indices, np.arange(self.num_qubits))
+                        ansatz_w_obs.measure(self._measurement_indices, np.arange(self.num_qubits))
                         circuits[(nr_circuit + (nr_pauli * num_circuits))] = ansatz_w_obs
                 circuits = circuits * self._circuit_multipl
 
@@ -951,7 +963,7 @@ class QuantumInterface:
     ) -> dict[int, float]:
         r"""Get results from a sampler distribution for one given Pauli string.
 
-        The expectation value of a Pauli string is calcuated as:
+        The expectation value of a Pauli string is calculated as:
 
         .. math::
             E = \sum_i^N p_i\left<b_i\left|P\right|b_i\right>
@@ -960,7 +972,7 @@ class QuantumInterface:
 
         Args:
             pauli: Pauli string to measure.
-            run_paramters: Parameters of circuit.
+            run_parameters: Parameters of circuit.
             custom_circ: Specific circuit to run.
 
         Returns:
@@ -1069,18 +1081,11 @@ class QuantumInterface:
         if self.num_qubits > 8:
             raise ValueError("Current implementation does not scale above 8 qubits?")
         if self.do_M_ansatz0:
-            ansatz = self.circuit
-            if self.ISA:
-                # Negate the Hartree-Fock State.
-                # Only X Gates. Should need no transpilation.
-                self.hf = HartreeFock(self.num_orbs, self.num_elec, self.mapper)
-                ansatz = ansatz.compose(
-                    HartreeFock(self.num_orbs, self.num_elec, self.mapper), qubits=self._layout_indices
-                )
-            else:
-                ansatz = ansatz.compose(HartreeFock(self.num_orbs, self.num_elec, self.mapper))
+            ansatz = self.ansatz_circuit
         else:
-            ansatz = QuantumCircuit(self.circuit.num_qubits)  # empty circuit
+            ansatz = QuantumCircuit(self.num_qubits)  # empty circuit
+            if self.ISA:  # needs correct layout
+                ansatz = self.pass_manager.run(ansatz)  # type: ignore
         M = np.zeros((2**self.num_qubits, 2**self.num_qubits))
         ansatz_list = [None] * 2**self.num_qubits
         if self.ISA:
@@ -1088,7 +1093,7 @@ class QuantumInterface:
                 ansatzX = ansatz.copy()
                 for i, bit in enumerate(comb[::-1]):  # because of Qiskit ordering
                     if bit == 1:
-                        ansatzX.x(self._layout_indices[i])
+                        ansatzX.x(self._measurement_indices[i])
                 # Make list of custom ansatz
                 ansatz_list[nr] = ansatzX
             # Simulate all elements with one device call
@@ -1132,9 +1137,15 @@ class QuantumInterface:
                 f"\n {'M mitigation:':<20} {self.do_M_mitigation}\n {'M Ansatz0:':<20} {self.do_M_ansatz0}"
             )
         if self.ISA:
-            data += f"\n {'Circuit layout:':<20} {self._layout_indices}"
+            data += f"\n {'Circuit layout:':<20} {self._measurement_indices}"
+            data += f"\n {'Non-local gates:':<20} {self.ansatz_circuit.num_nonlocal_gates()}"
             if self._internal_pm:
-                data += f"\n {'Transpiled backend:':<20} {self._primitive_backend}\n {'Transpiled opt. level:':<20} {self._primitive_level}"
+                data += f"\n {'Transpilation strategy:':<20} {'Default / internal'}"
+                data += f"\n {'Backend:':<20} {self._primitive_backend}\n {'Transpiled opt. level:':<20} {self._primitive_level}"
+            else:
+                data += f"\n {'Transpilation strategy:':<20} {'External PassManager'}"
+                if hasattr(self, "_primitive_backend"):
+                    data += f"\n {'Primitive backend:':<20} {self._primitive_backend}\n"
             if isinstance(self._primitive, BaseSamplerV2) and hasattr(self._primitive.options, "twirling"):
                 data += f"\n {'Pauli twirling:':<20} {self._primitive.options.twirling.enable_gates}\n {'Dynamic decoupling:':<20} {self._primitive.options.dynamical_decoupling.enable}"
         print(data)
