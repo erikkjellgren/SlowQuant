@@ -15,13 +15,6 @@ from slowquant.molecularintegrals.integralfunctions import (
     two_electron_integral_transform,
     two_electron_integral_transform_split,
 )
-from slowquant.unitary_coupled_cluster.unrestricted_density_matrix import (
-    UnrestrictedReducedDensityMatrix,
-    get_electronic_energy_unrestricted,
-    get_orbital_gradient_unrestricted,
-    get_orbital_response_hessian_block_unrestricted,
-    get_orbital_response_metric_sigma_unrestricted,
-)
 from slowquant.unitary_coupled_cluster.operator_matrix import (
     build_operator_matrix,
     construct_ups_state,
@@ -35,6 +28,8 @@ from slowquant.unitary_coupled_cluster.unrestricted_density_matrix import (
     UnrestrictedReducedDensityMatrix,
     get_electronic_energy_unrestricted,
     get_orbital_gradient_unrestricted,
+    get_orbital_response_hessian_block_unrestricted,
+    get_orbital_response_metric_sigma_unrestricted,
 )
 from slowquant.unitary_coupled_cluster.unrestricted_operators import (
     unrestricted_hamiltonian_0i_0a,
@@ -684,7 +679,6 @@ class UnrestrictedWaveFunctionUPS:
             self._rdm2bbaa = self._calculate_rdm2("beta", "alpha")
         return self._rdm2bbaa
 
-
     def manual_gradient(
         wf: UnrestrictedWaveFunctionUPS,
     ) -> np.ndarray:
@@ -810,8 +804,8 @@ class UnrestrictedWaveFunctionUPS:
                 )
                 gradient[idx] = alpha
                 gradient[idx + len(wf.kappa_idx)] = beta
-        return gradient        
-    
+        return gradient
+
     def run_ups(
         self,
         orbital_optimization: bool = False,
@@ -964,7 +958,8 @@ class UnrestrictedWaveFunctionUPS:
             self.num_inactive_orbs,
             self.num_active_orbs,
         )
-    #print the unrestricted orbital response hessian block for test
+
+    # print the unrestricted orbital response hessian block for test
     @property
     def orbital_response_hessian_unrestricted(self) -> np.ndarray:
         rdms = UnrestrictedReducedDensityMatrix(
@@ -1009,17 +1004,17 @@ class UnrestrictedWaveFunctionUPS:
             rdms,
             self.kappa_idx,
         )
-    
+
     def manual_metric_sigma_unrestricted(
-            wf: UnrestrictedWaveFunctionUPS,
+        wf: UnrestrictedWaveFunctionUPS,
     ) -> np.ndarray:
-        sigma = np.zeros((2*len(wf.kappa_idx), 2*len(wf.kappa_idx)))
+        sigma = np.zeros((2 * len(wf.kappa_idx), 2 * len(wf.kappa_idx)))
         for idx1, (m, n) in enumerate(wf.kappa_idx):
             for idx2, (p, q) in enumerate(wf.kappa_idx):
-                q_qp_a = (1/np.sqrt(2))*(anni(q, "alpha", True)*anni(p, "alpha", False))
-                q_mn_a = (1/np.sqrt(2))*(anni(m, "alpha", True)*anni(n, "alpha", False))
-                q_qp_b = (1/np.sqrt(2))*(anni(q, "beta", True)*anni(p, "beta", False))
-                q_mn_b = (1/np.sqrt(2))*(anni(m, "beta", True)*anni(n, "beta", False))
+                q_qp_a = (1 / np.sqrt(2)) * (anni(q, "alpha", True) * anni(p, "alpha", False))
+                q_mn_a = (1 / np.sqrt(2)) * (anni(m, "alpha", True) * anni(n, "alpha", False))
+                q_qp_b = (1 / np.sqrt(2)) * (anni(q, "beta", True) * anni(p, "beta", False))
+                q_mn_b = (1 / np.sqrt(2)) * (anni(m, "beta", True) * anni(n, "beta", False))
                 aa = expectation_value(
                     wf.ci_coeffs,
                     [q_qp_a * q_mn_a],
@@ -1086,13 +1081,13 @@ class UnrestrictedWaveFunctionUPS:
         h = unrestricted_hamiltonian_full_space(
             wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs
         )
-        A_block = np.zeros((2*len(wf.kappa_idx), 2*len(wf.kappa_idx)))
+        A_block = np.zeros((2 * len(wf.kappa_idx), 2 * len(wf.kappa_idx)))
         for idx1, (t, u) in enumerate(wf.kappa_idx):
             for idx2, (m, n) in enumerate(wf.kappa_idx):
-                E_tu_a = (1/np.sqrt(2))*(anni(t, "alpha", True)*anni(u, "alpha", False))
-                E_mn_a = (1/np.sqrt(2))*(anni(m, "alpha", True)*anni(n, "alpha", False))
-                E_tu_b = (1/np.sqrt(2))*(anni(t, "beta", True)*anni(u, "beta", False))
-                E_mn_b = (1/np.sqrt(2))*(anni(m, "beta", True)*anni(n, "beta", False))
+                E_tu_a = (1 / np.sqrt(2)) * (anni(t, "alpha", True) * anni(u, "alpha", False))
+                E_mn_a = (1 / np.sqrt(2)) * (anni(m, "alpha", True) * anni(n, "alpha", False))
+                E_tu_b = (1 / np.sqrt(2)) * (anni(t, "beta", True) * anni(u, "beta", False))
+                E_mn_b = (1 / np.sqrt(2)) * (anni(m, "beta", True) * anni(n, "beta", False))
                 aa = expectation_value(
                     wf.ci_coeffs,
                     [E_tu_a * h * E_mn_a],
@@ -1323,6 +1318,7 @@ class UnrestrictedWaveFunctionUPS:
                 A_block[idx1 + len(wf.kappa_idx), idx2 + len(wf.kappa_idx)] = bb
         return A_block
 
+
 def energy_ups(
     parameters: Sequence[float],
     orbital_optimized: bool,
@@ -1472,8 +1468,19 @@ def orbital_rotation_gradient(
         rdm2aabb=wf.rdm2aabb,
         rdm2bbaa=wf.rdm2bbaa,
     )
-    gradient = get_orbital_gradient_unrestricted(
-        rdms, wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.kappa_idx, wf.num_inactive_orbs, wf.num_active_orbs)
+    return get_orbital_gradient_unrestricted(
+        rdms,
+        wf.haa_mo,
+        wf.hbb_mo,
+        wf.gaaaa_mo,
+        wf.gbbbb_mo,
+        wf.gaabb_mo,
+        wf.gbbaa_mo,
+        wf.kappa_idx,
+        wf.num_inactive_orbs,
+        wf.num_active_orbs,
+    )
+
 
 def active_space_parameter_gradient(
     wf: UnrestrictedWaveFunctionUPS,
@@ -1543,4 +1550,3 @@ def active_space_parameter_gradient(
             wf.ups_layout,
         )
     return gradient_theta
-
