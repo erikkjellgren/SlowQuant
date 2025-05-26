@@ -202,7 +202,7 @@ class RotoSolve:
 
         Args:
             f: Function to be minimized, can only take one argument.
-            x: Changeable parameters of f.
+            x0: Initial guess of changeable parameters of f.
 
         Returns:
             Minimization results.

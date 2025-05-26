@@ -22,7 +22,6 @@ from slowquant.unitary_coupled_cluster.operators import (
 
 
 class quantumLR(quantumLRBaseClass):
-
     def run(
         self,
         do_gradients: bool = True,
