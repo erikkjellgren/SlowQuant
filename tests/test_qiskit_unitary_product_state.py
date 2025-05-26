@@ -249,6 +249,7 @@ def test_ksasdsfupccgsd() -> None:
 
 def test_lih_fucc_allparameters() -> None:
     """Tests that a change in all parameters in fucc works.
+
     This example was used to test a bug in post-selection.
     """
     atom = "Li .0 .0 .0; H .0 .0 1.672"

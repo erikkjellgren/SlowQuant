@@ -4,7 +4,7 @@ import numpy as np
 class ReducedDenstiyMatrix:
     """Reduced density matrix class."""
 
-    __slots__ = ("inactive_idx", "virtual_idx", "active_idx", "idx_shift", "rdm1", "rdm2")
+    __slots__ = ("active_idx", "idx_shift", "inactive_idx", "rdm1", "rdm2", "virtual_idx")
 
     def __init__(
         self,
@@ -68,7 +68,7 @@ class ReducedDenstiyMatrix:
             return 0
         return 0
 
-    def RDM2(self, p: int, q: int, r: int, s: int) -> float:  # pylint: disable=R0911
+    def RDM2(self, p: int, q: int, r: int, s: int) -> float:
         r"""Get full space two-electron reduced density matrix element.
 
         .. math::
@@ -164,6 +164,7 @@ def get_electronic_energy(
         E = \sum_{pq}h_{pq}\Gamma^{[1]}_{pq} + \frac{1}{2}\sum_{pqrs}g_{pqrs}\Gamma^{[2]}_{pqrs}
 
     Args:
+        rdms: Reduced density matrix class.
         h_int: One-electron integrals in MO.
         g_int: Two-electron integrals in MO.
         num_inactive_orbs: Number of inactive orbitals.
@@ -198,12 +199,12 @@ def get_orbital_gradient(
         g_{pq}^{\hat{\kappa}} = \left<0\left|\left[\hat{\kappa}_{pq},\hat{H}\right]\right|0\right>
 
     Args:
-       rdms: Reduced density matrix class.
-       h_int: One-electron integrals in MO in Hamiltonian.
-       g_int: Two-electron integrals in MO in Hamiltonian.
-       kappa_idx: Orbital parameter indices in spatial basis.
-       num_inactive_orbs: Number of inactive orbitals in spatial basis.
-       num_active_orbs: Number of active orbitals in spatial basis.
+        rdms: Reduced density matrix class.
+        h_int: One-electron integrals in MO in Hamiltonian.
+        g_int: Two-electron integrals in MO in Hamiltonian.
+        kappa_idx: Orbital parameter indices in spatial basis.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
 
     Returns:
         Orbital gradient.
@@ -413,8 +414,10 @@ def get_orbital_response_hessian_block(
 
     Args:
        rdms: Reduced density matrix class.
+       h: Hamiltonian one-electron integrals in MO basis.
+       g: Hamiltonian two-electron integrals in MO basis.
        kappa_idx1: Orbital parameter indices in spatial basis.
-       kappa_idx1: Orbital parameter indices in spatial basis.
+       kappa_idx2: Orbital parameter indices in spatial basis.
        num_inactive_orbs: Number of inactive orbitals in spatial basis.
        num_active_orbs: Number of active orbitals in spatial basis.
 

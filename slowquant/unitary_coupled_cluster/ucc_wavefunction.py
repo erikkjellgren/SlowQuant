@@ -866,7 +866,7 @@ class WaveFunctionUCC:
                 self._old_opt_parameters = np.zeros(len(self.kappa_idx)) + 10**20
                 self._E_opt_old = 0.0
                 res = optimizer.minimize([0.0] * len(self.kappa_idx))
-                for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
+                for i in range(len(self.kappa)):
                     self.kappa[i] = 0.0
                     self._kappa_old[i] = 0.0
             else:
@@ -879,9 +879,9 @@ class WaveFunctionUCC:
                 break
 
             e_new = res.fun
-            time_str = f"{time.time() - full_start:7.2f}"  # type: ignore
+            time_str = f"{time.time() - full_start:7.2f}"
             e_str = f"{e_new:3.12f}"
-            print(f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+            print(f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")
             if abs(e_new - e_old) < tol:
                 break
             e_old = e_new
@@ -989,7 +989,7 @@ class WaveFunctionUCC:
         )
         if orbital_optimization:
             self.thetas = res.x[len(self.kappa) :].tolist()
-            for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
+            for i in range(len(self.kappa)):
                 self._kappa[i] = 0.0
                 self._kappa_old[i] = 0.0
         else:
@@ -1123,7 +1123,7 @@ class WaveFunctionUCC:
                 get_ucc_T(self.thetas, self.ucc_layout),
                 self.ci_info,
             )
-            for i in range(len(theta_params)):  # pylint: disable=consider-using-enumerate
+            for i in range(len(theta_params)):
                 sign_step = (theta_params[i] >= 0).astype(float) * 2 - 1  # type: ignore [attr-defined]
                 step_size = eps * sign_step * max(1, abs(theta_params[i]))
                 theta_params[i] += step_size
@@ -1160,7 +1160,7 @@ def load_wavefunction(filename: str) -> WaveFunctionUCC:
     wf.thetas = dat["thetas"]
     if abs(wf.energy_elec - float(dat["energy_elec"])) > 10**-6:
         raise ValueError(
-            f'Calculate energy is different from saved energy: {wf.energy_elec} and {float(dat["energy_elec"])}.'
+            f"Calculate energy is different from saved energy: {wf.energy_elec} and {float(dat['energy_elec'])}."
         )
     print(f"Electronic energy of loaded wave function is {wf.energy_elec}")
     return wf
