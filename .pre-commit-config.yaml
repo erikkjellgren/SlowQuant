@@ -1,13 +1,5 @@
 ---
 repos:
-  - repo: https://github.com/ambv/black
-    rev: 25.1.0
-    hooks:
-      - id: black
-        args: ["--target-version", "py312"]
-        additional_dependencies:
-          - toml
-
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
@@ -28,28 +20,11 @@ repos:
     hooks:
       - id: mypy
 
-  - repo: https://github.com/PyCQA/isort
-    rev: 6.0.1
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.10
     hooks:
-      - id: isort
-        args: ["--profile", "black"]
-
-  - repo: https://github.com/PyCQA/pylint
-    rev: v3.3.6
-    hooks:
-      - id: pylint
-        args: ["--rcfile=.pylintrc"]
-
-  - repo: https://github.com/PyCQA/flake8
-    rev: 7.2.0
-    hooks:
-      - id: flake8
-        additional_dependencies: [pep8-naming]
-        args: [--config=.flake8]
-
-  - repo: https://github.com/pycqa/pydocstyle
-    rev: 6.3.0
-    hooks:
-      - id: pydocstyle
-        args:
-          - --ignore=D100,D101,D104,D203,D213,D403,D406,D407,D413
+      # Run the linter.
+      - id: ruff-check
+        args: [ --fix ]
+      # Run the formatter.
+      - id: ruff-format
