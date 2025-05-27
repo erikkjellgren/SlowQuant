@@ -737,7 +737,6 @@ class WaveFunctionSA:
             for j, (coeffs_j, csf_j) in enumerate(zip(self.states[0], self.states[1])):
                 if j > i:
                     continue
-                print("HAM IJ", i, j)
                 state_H[i, j] = state_H[j, i] = self.QI.quantum_expectation_value_csfs(
                     (coeffs_i, csf_i), H, (coeffs_j, csf_j)
                 )
