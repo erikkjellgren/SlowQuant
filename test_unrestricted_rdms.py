@@ -21,7 +21,7 @@ mf.kernel()
 
 
 
-mc = mcscf.UCASCI(mf, 1, (0,1))
+mc = mcscf.UCASCI(mf, 2, (2,2))
 res = mc.kernel(mf.mo_coeff)
 
 
@@ -54,9 +54,8 @@ g_eri = SQobj.integral.electron_repulsion_tensor
 #print("hej", SQobj.hartree_fock.E_uhf + SQobj.molecule.nuclear_repulsion, SQobj.hartree_fock.E_uhf - mf.energy_elec()[0])
     
 WF = UnrestrictedWaveFunctionUPS(
-    SQobj.molecule.number_bf * 2,
     SQobj.molecule.number_electrons,
-    ((0,1), 1),
+    ((2,2), 2),
     mf.mo_coeff,
     h_core,
     g_eri,
@@ -66,14 +65,14 @@ WF = UnrestrictedWaveFunctionUPS(
 )
 #print(WF.manual_gradient())
 #print(WF.orbital_gradient_RDM)
-#with np.printoptions(precision=3, suppress=True):
-#    print(WF.orbital_gradient_RDM - WF.manual_gradient())
+with np.printoptions(precision=3, suppress=True):
+    print(WF.orbital_gradient_RDM - WF.manual_gradient())
 #WF.run_ups(orbital_optimization=True)
 
 #print(WF.orbital_response_hessian_unrestricted) 
 #print(WF.manual_hessian_block_unrestricted())  
-#with np.printoptions(precision=4, suppress=True):
-#    print(WF.orbital_response_hessian_unrestricted - WF.manual_hessian_block_unrestricted())     
+with np.printoptions(precision=4, suppress=True):
+    print(WF.orbital_response_hessian_unrestricted - WF.manual_hessian_block_unrestricted())     
 
 #print(WF.orbital_response_metric_sigma_unrestricted)
 #print(WF.manual_metric_sigma_unrestricted())
