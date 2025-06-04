@@ -359,3 +359,28 @@ def unrestricted_hamiltonian_0i_0a(
                             * anni(q, "beta", False)
                         )
     return hamiltonian_operator
+
+
+def unrestricted_one_elec_op_full_space(intsaa_mo: np.ndarray, intsbb_mo: np.ndarray, num_orbs: int) -> FermionicOperator:
+    r"""Construct full-space one-electron operator.
+
+    .. math::
+        \hat{O} = \sum_{pq}h_{pq}\hat{E}_{pq}
+
+    Args:
+        intsaa_mo: One-electron integrals alpha-alpha for operator in MO basis.
+        intsbb_mo: One-electron integrals beta-beta for operator in MO basis.
+        num_orbs: Number of spatial orbitals.
+
+    Returns:
+        One-electron operator in full-space.
+    """
+    one_elec_op = FermionicOperator({}, {})
+    for p in range(num_orbs):
+        for q in range(num_orbs):
+            if abs(intsaa_mo[p, q]) < 10**-14 and abs(intsbb_mo[p, q]) < 10**-14:
+                continue
+            one_elec_op += intsaa_mo[p, q] * anni(p, "alpha", True) * anni(q, "alpha", False)
+            one_elec_op += intsbb_mo[p, q] * anni(p, "beta", True) * anni(q, "beta", False)
+    return one_elec_op
+

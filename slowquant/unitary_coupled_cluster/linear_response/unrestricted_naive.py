@@ -20,7 +20,10 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     expectation_value,
     propagate_state,
 )
-#from slowquant.unitary_coupled_cluster.unrestricted_operators import unrestricted_one_elec_op_0i_0a
+from slowquant.unitary_coupled_cluster.unrestricted_operators import (
+        #unrestricted_one_elec_op_0i_0a,
+        unrestricted_one_elec_op_full_space,
+)
 from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 
 
@@ -344,25 +347,27 @@ class LinearResponseUPS(LinearResponseBaseClass):
             self.wf.rdm2aabb,
             self.wf.rdm2bbaa,
         )
-        raise NotImplementedError
-    #one_elec_op_01_0a mangler i unrestricted
-        mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
-        muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
-        muz = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[2])
-        mux_op = one_elec_op_0i_0a(
-            mux,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
+        mux_aa = one_electron_integral_transform(self.wf.c_a_mo, dipole_integrals[0])
+        mux_bb = one_electron_integral_transform(self.wf.c_b_mo, dipole_integrals[0])
+        muy_aa = one_electron_integral_transform(self.wf.c_a_mo, dipole_integrals[1])
+        muy_bb = one_electron_integral_transform(self.wf.c_b_mo, dipole_integrals[1])
+        muz_aa = one_electron_integral_transform(self.wf.c_a_mo, dipole_integrals[2])
+        muz_bb = one_electron_integral_transform(self.wf.c_b_mo, dipole_integrals[2])
+        # should be optimized to unirestricted_one_elec_op_0i_0a
+        mux_op = unrestricted_one_elec_op_full_space(
+            mux_aa,
+            mux_bb,
+            self.wf.num_orbs,
         )
-        muy_op = one_elec_op_0i_0a(
-            muy,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
+        muy_op = unrestricted_one_elec_op_full_space(
+            muy_aa,
+            muy_bb,
+            self.wf.num_orbs,
         )
-        muz_op = one_elec_op_0i_0a(
-            muz,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
+        muz_op = unrestricted_one_elec_op_full_space(
+            muz_aa,
+            muz_bb,
+            self.wf.num_orbs,
         )
         mux_ket = propagate_state([mux_op], self.wf.ci_coeffs, *self.index_info)
         muxd_ket = propagate_state([mux_op.dagger], self.wf.ci_coeffs, *self.index_info)

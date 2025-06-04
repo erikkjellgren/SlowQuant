@@ -92,7 +92,7 @@ class LinearResponseBaseClass:
         self.B = np.zeros((num_parameters, num_parameters))
         self.Sigma = np.zeros((num_parameters, num_parameters))
         self.Delta = np.zeros((num_parameters, num_parameters))
-        #kan optimeres til at være hamiltonian_1i_1a
+        # should be optimized to unrestriccted_hamiltonian_1i_1a
         self.H_1i_1a = unrestricted_hamiltonian_full_space(
             self.wf.haa_mo,
             self.wf.hbb_mo,
