@@ -459,7 +459,7 @@ def get_electronic_energy_unrestricted(
     return energy
 
 def get_orbital_gradient_unrestricted(
-        rdms: UnrestrictedReducedDensityMatrix,
+    rdms: UnrestrictedReducedDensityMatrix,
     h_int_aa: np.ndarray,
     h_int_bb: np.ndarray,
     g_int_aaaa: np.ndarray,
@@ -527,6 +527,134 @@ def get_orbital_gradient_unrestricted(
                     gradient[idx + len(kappa_idx)] -= 0.5 * g_int_bbaa[p, m, q, r] * rdms.RDM2bbaa(p, q, r, n)
                     gradient[idx + len(kappa_idx)] += 0.5 * g_int_bbaa[p, n, q, r] * rdms.RDM2bbaa(p, q, r, m)
     return gradient
+
+def get_orbital_gradient_response_unrestricted(
+    rdms: UnrestrictedReducedDensityMatrix,
+    h_int_aa: np.ndarray,
+    h_int_bb: np.ndarray,
+    g_int_aaaa: np.ndarray,
+    g_int_bbbb: np.ndarray,
+    g_int_aabb: np.ndarray,
+    g_int_bbaa: np.ndarray,
+    kappa_idx: list[list[int]],
+    num_inactive_orbs: int,
+    num_active_orbs: int,    
+) -> np.ndarray:
+    
+    gradient = np.zeros(4*len(kappa_idx))
+    shift = len(kappa_idx)
+    b = 2*len(kappa_idx)
+    bshift = 3*len(kappa_idx)
+    for idx, (m, n) in enumerate(kappa_idx):
+        #1e contribution
+        for p in range(num_inactive_orbs + num_active_orbs):
+            gradient[idx] +=  h_int_aa[n, p] * rdms.RDM1aa(m, p)
+            gradient[idx] -=  h_int_aa[m, p] * rdms.RDM1aa(n, p)
+            gradient[idx] -=  h_int_aa[p, m] * rdms.RDM1aa(p, n)
+            gradient[idx] +=  h_int_aa[p, n] * rdms.RDM1aa(p, m)
+            gradient[idx+b] +=  h_int_bb[n, p] * rdms.RDM1bb(m, p)
+            gradient[idx+b] -=  h_int_bb[m, p] * rdms.RDM1bb(n, p)
+            gradient[idx+b] -=  h_int_bb[p, m] * rdms.RDM1bb(p, n)
+            gradient[idx+b] +=  h_int_bb[p, n] * rdms.RDM1bb(p, m)
+        #2e contribution
+        for p in range(num_inactive_orbs + num_active_orbs):
+            for q in range(num_inactive_orbs + num_active_orbs):
+                for r in range(num_inactive_orbs + num_active_orbs):
+                    #aaaa
+                    gradient[idx] += 0.5 * g_int_aaaa[n, p, q, r] * rdms.RDM2aaaa(m, q, r, p)
+                    gradient[idx] -= 0.5 * g_int_aaaa[p, q, n, r] * rdms.RDM2aaaa(m, p, r, q)
+                    gradient[idx] -= 0.5 * g_int_aaaa[m, p, q, r] * rdms.RDM2aaaa(n, q, r, p)
+                    gradient[idx] += 0.5 * g_int_aaaa[p, q, m, r] * rdms.RDM2aaaa(n, p, r, q)
+                    gradient[idx] -= 0.5 * g_int_aaaa[p, m, q, r] * rdms.RDM2aaaa(p, q, r, n)
+                    gradient[idx] += 0.5 * g_int_aaaa[p, q, r, m] * rdms.RDM2aaaa(p, r, q, n)
+                    gradient[idx] += 0.5 * g_int_aaaa[p, n, q, r] * rdms.RDM2aaaa(p, q, r, m)
+                    gradient[idx] -= 0.5 * g_int_aaaa[p, q, r, n] * rdms.RDM2aaaa(p, r, q, m)
+                    #bbbb
+                    gradient[idx+b] += 0.5 * g_int_bbbb[n, p, q, r] * rdms.RDM2bbbb(m, q, r, p)
+                    gradient[idx+b] -= 0.5 * g_int_bbbb[p, q, n, r] * rdms.RDM2bbbb(m, p, r, q)
+                    gradient[idx+b] -= 0.5 * g_int_bbbb[m, p, q, r] * rdms.RDM2bbbb(n, q, r, p)
+                    gradient[idx+b] += 0.5 * g_int_bbbb[p, q, m, r] * rdms.RDM2bbbb(n, p, r, q)
+                    gradient[idx+b] -= 0.5 * g_int_bbbb[p, m, q, r] * rdms.RDM2bbbb(p, q, r, n)
+                    gradient[idx+b] += 0.5 * g_int_bbbb[p, q, r, m] * rdms.RDM2bbbb(p, r, q, n)
+                    gradient[idx+b] += 0.5 * g_int_bbbb[p, n, q, r] * rdms.RDM2bbbb(p, q, r, m)
+                    gradient[idx+b] -= 0.5 * g_int_bbbb[p, q, r, n] * rdms.RDM2bbbb(p, r, q, m)
+                    #aabb
+                    #kappa a with aabb
+                    gradient[idx] += 0.5 * g_int_aabb[n, p, q, r] * rdms.RDM2aabb(m, q, r, p) 
+                    gradient[idx] -= 0.5 * g_int_aabb[m, p, q, r] * rdms.RDM2aabb(n, q, r, p) 
+                    gradient[idx] -= 0.5 * g_int_aabb[p, m, q, r] * rdms.RDM2aabb(p, q, r, n) 
+                    gradient[idx] += 0.5 * g_int_aabb[p, n, q, r] * rdms.RDM2aabb(p, q, r, m) 
+                    # kappa a with bbaa
+                    gradient[idx] += 0.5 * g_int_bbaa[p, q, n, r] * rdms.RDM2bbaa(p, m, r, q) 
+                    gradient[idx] -= 0.5 * g_int_bbaa[p, q, m, r] * rdms.RDM2bbaa(p, n, r, q) 
+                    gradient[idx] -= 0.5 * g_int_bbaa[p, q, r, m] * rdms.RDM2bbaa(p, r, n, q) 
+                    gradient[idx] += 0.5 * g_int_bbaa[p, q, r, n] * rdms.RDM2bbaa(p, r, m, q)
+                    #kappa b with aabb
+                    gradient[idx + b] += 0.5 * g_int_aabb[p, q, n, r] * rdms.RDM2aabb(p, m, r, q)
+                    gradient[idx + b] -= 0.5 * g_int_aabb[p, q, m, r] * rdms.RDM2aabb(p, n, r, q)
+                    gradient[idx + b] -= 0.5 * g_int_aabb[p, q, r, m] * rdms.RDM2aabb(p, r, n, q)
+                    gradient[idx + b] += 0.5 * g_int_aabb[p, q, r, n] * rdms.RDM2aabb(p, r, m, q)
+                    # kappa b with bbaa
+                    gradient[idx + b] += 0.5 * g_int_bbaa[n, p, q, r] * rdms.RDM2bbaa(m, q, r, p)
+                    gradient[idx + b] -= 0.5 * g_int_bbaa[m, p, q, r] * rdms.RDM2bbaa(n, q, r, p)
+                    gradient[idx + b] -= 0.5 * g_int_bbaa[p, m, q, r] * rdms.RDM2bbaa(p, q, r, n)
+                    gradient[idx + b] += 0.5 * g_int_bbaa[p, n, q, r] * rdms.RDM2bbaa(p, q, r, m)
+
+    for idx, (n, m) in enumerate(kappa_idx):
+        #1e contribution
+        for p in range(num_inactive_orbs + num_active_orbs):
+            gradient[idx + shift] +=  h_int_aa[n, p] * rdms.RDM1aa(m, p)
+            gradient[idx + shift] -=  h_int_aa[m, p] * rdms.RDM1aa(n, p)
+            gradient[idx + shift] -=  h_int_aa[p, m] * rdms.RDM1aa(p, n)
+            gradient[idx + shift] +=  h_int_aa[p, n] * rdms.RDM1aa(p, m)
+            gradient[idx + bshift] +=  h_int_bb[n, p] * rdms.RDM1bb(m, p)
+            gradient[idx + bshift] -=  h_int_bb[m, p] * rdms.RDM1bb(n, p)
+            gradient[idx + bshift] -=  h_int_bb[p, m] * rdms.RDM1bb(p, n)
+            gradient[idx + bshift] +=  h_int_bb[p, n] * rdms.RDM1bb(p, m)
+        #2e contribution
+        for p in range(num_inactive_orbs + num_active_orbs):
+            for q in range(num_inactive_orbs + num_active_orbs):
+                for r in range(num_inactive_orbs + num_active_orbs):
+                    #aaaa
+                    gradient[idx + shift] += 0.5 * g_int_aaaa[n, p, q, r] * rdms.RDM2aaaa(m, q, r, p)
+                    gradient[idx + shift] -= 0.5 * g_int_aaaa[p, q, n, r] * rdms.RDM2aaaa(m, p, r, q)
+                    gradient[idx + shift] -= 0.5 * g_int_aaaa[m, p, q, r] * rdms.RDM2aaaa(n, q, r, p)
+                    gradient[idx + shift] += 0.5 * g_int_aaaa[p, q, m, r] * rdms.RDM2aaaa(n, p, r, q)
+                    gradient[idx + shift] -= 0.5 * g_int_aaaa[p, m, q, r] * rdms.RDM2aaaa(p, q, r, n)
+                    gradient[idx + shift] += 0.5 * g_int_aaaa[p, q, r, m] * rdms.RDM2aaaa(p, r, q, n)
+                    gradient[idx + shift] += 0.5 * g_int_aaaa[p, n, q, r] * rdms.RDM2aaaa(p, q, r, m)
+                    gradient[idx + shift] -= 0.5 * g_int_aaaa[p, q, r, n] * rdms.RDM2aaaa(p, r, q, m)
+                    #bbbb
+                    gradient[idx + bshift] += 0.5 * g_int_bbbb[n, p, q, r] * rdms.RDM2bbbb(m, q, r, p)
+                    gradient[idx + bshift] -= 0.5 * g_int_bbbb[p, q, n, r] * rdms.RDM2bbbb(m, p, r, q)
+                    gradient[idx + bshift] -= 0.5 * g_int_bbbb[m, p, q, r] * rdms.RDM2bbbb(n, q, r, p)
+                    gradient[idx + bshift] += 0.5 * g_int_bbbb[p, q, m, r] * rdms.RDM2bbbb(n, p, r, q)
+                    gradient[idx + bshift] -= 0.5 * g_int_bbbb[p, m, q, r] * rdms.RDM2bbbb(p, q, r, n)
+                    gradient[idx + bshift] += 0.5 * g_int_bbbb[p, q, r, m] * rdms.RDM2bbbb(p, r, q, n)
+                    gradient[idx + bshift] += 0.5 * g_int_bbbb[p, n, q, r] * rdms.RDM2bbbb(p, q, r, m)
+                    gradient[idx + bshift] -= 0.5 * g_int_bbbb[p, q, r, n] * rdms.RDM2bbbb(p, r, q, m)
+                    #aabb
+                    #kappa a with aabb
+                    gradient[idx + shift] += 0.5 * g_int_aabb[n, p, q, r] * rdms.RDM2aabb(m, q, r, p) 
+                    gradient[idx + shift] -= 0.5 * g_int_aabb[m, p, q, r] * rdms.RDM2aabb(n, q, r, p) 
+                    gradient[idx + shift] -= 0.5 * g_int_aabb[p, m, q, r] * rdms.RDM2aabb(p, q, r, n) 
+                    gradient[idx + shift] += 0.5 * g_int_aabb[p, n, q, r] * rdms.RDM2aabb(p, q, r, m) 
+                    # kappa a with bbaa
+                    gradient[idx + shift] += 0.5 * g_int_bbaa[p, q, n, r] * rdms.RDM2bbaa(p, m, r, q) 
+                    gradient[idx + shift] -= 0.5 * g_int_bbaa[p, q, m, r] * rdms.RDM2bbaa(p, n, r, q) 
+                    gradient[idx + shift] -= 0.5 * g_int_bbaa[p, q, r, m] * rdms.RDM2bbaa(p, r, n, q) 
+                    gradient[idx + shift] += 0.5 * g_int_bbaa[p, q, r, n] * rdms.RDM2bbaa(p, r, m, q)
+                    #kappa b with aabb
+                    gradient[idx + bshift] += 0.5 * g_int_aabb[p, q, n, r] * rdms.RDM2aabb(p, m, r, q)
+                    gradient[idx + bshift] -= 0.5 * g_int_aabb[p, q, m, r] * rdms.RDM2aabb(p, n, r, q)
+                    gradient[idx + bshift] -= 0.5 * g_int_aabb[p, q, r, m] * rdms.RDM2aabb(p, r, n, q)
+                    gradient[idx + bshift] += 0.5 * g_int_aabb[p, q, r, n] * rdms.RDM2aabb(p, r, m, q)
+                    # kappa b with bbaa
+                    gradient[idx + bshift] += 0.5 * g_int_bbaa[n, p, q, r] * rdms.RDM2bbaa(m, q, r, p)
+                    gradient[idx + bshift] -= 0.5 * g_int_bbaa[m, p, q, r] * rdms.RDM2bbaa(n, q, r, p)
+                    gradient[idx + bshift] -= 0.5 * g_int_bbaa[p, m, q, r] * rdms.RDM2bbaa(p, q, r, n)
+                    gradient[idx + bshift] += 0.5 * g_int_bbaa[p, n, q, r] * rdms.RDM2bbaa(p, q, r, m)
+    return 2 ** (1/2) * gradient
 
 def get_orbital_response_metric_sigma_unrestricted(
         rdms: UnrestrictedReducedDensityMatrix, 
