@@ -840,7 +840,7 @@ class WaveFunctionUPS:
         optimizer_name: str,
         orbital_optimization: bool = False,
         tol: float = 1e-10,
-        maxiter: int = 1000,
+        maxiter: int = 2,       # the origianl is 1000 
     ) -> None:
         """Run one step optimization of wave function.
 
@@ -902,6 +902,8 @@ class WaveFunctionUPS:
                 parameters = self.kappa
         else:
             parameters = self.thetas
+            
+        print("Things happening there")
         optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
         self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0

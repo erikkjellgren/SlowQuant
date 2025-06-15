@@ -83,6 +83,7 @@ class Optimizers:
             x0: Starting value of changeable parameters.
             extra_options: Extra options for optimizers.
         """
+        print(self.method)
         self._start = time.time()
         self._iteration = 0
         print_progress = partial(self._print_progress, fun=self.fun, silent=self.is_silent)
@@ -209,6 +210,7 @@ class RotoSolve:
         res = Result()
         for _ in range(self.max_iterations):
             for i, par_name in enumerate(self._param_names):
+                print("Hi")
                 # Get the energy for specific values of theta_i, defined by the _R parameter.
                 e_vals = get_energy_evals(f, x, i, self._R[par_name])
                 # Do an analytic construction of the energy as a function of theta_i.

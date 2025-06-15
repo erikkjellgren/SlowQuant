@@ -212,6 +212,7 @@ def get_determinants(
     Returns:
         Index of determinant and determinant.
     """
+    print(state)
     for i, val in enumerate(state):
         if abs(val) < 10**-14:
             continue
@@ -411,6 +412,9 @@ def expectation_value(
         Expectation value.
     """
     # build state vector of operator on ket
+    print(len(operators) , end = " ")
+    print(len(operators[0].operators))
+    print(build_operator_matrix(operators[0], ci_info))
     op_ket = propagate_state(
         operators,
         ket,
@@ -421,6 +425,9 @@ def expectation_value(
         do_unsafe=do_unsafe,
     )
     val = bra @ op_ket
+    print(op_ket)
+    print(bra)
+    print(val)
     if not isinstance(val, float):
         raise ValueError(f"Calculated expectation value is not a float, got type {type(val)}")
     return val
@@ -1053,6 +1060,7 @@ def get_grad_action(
         State with derivative of the idx'th unitary applied.
     """
     # Select unitary operation based on idx
+    print("Calculation for derivative")
     exc_type = ups_struct.excitation_operator_type[idx]
     exc_indices = ups_struct.excitation_indices[idx]
     offset = ci_info.space_extension_offset

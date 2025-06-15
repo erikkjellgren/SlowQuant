@@ -500,6 +500,7 @@ def hamiltonian_0i_0a(
                 for s in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
                     if abs(g_mo[p, q, r, s]) > 10**-14:
                         hamiltonian_operator += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s)
+                        
     return hamiltonian_operator
 
 
