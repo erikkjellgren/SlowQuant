@@ -10,7 +10,7 @@ from slowquant.unitary_coupled_cluster.unrestricted_density_matrix import (
     get_orbital_gradient_response_unrestricted,
     get_orbital_response_hessian_block_unrestricted,
     get_orbital_response_metric_sigma_unrestricted,
-    #get_orbital_response_property_gradient_unrestricted,
+    get_orbital_response_property_gradient_unrestricted,
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.linear_response.unrestricted_lr_baseclass import (
@@ -21,8 +21,10 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     propagate_state,
 )
 from slowquant.unitary_coupled_cluster.unrestricted_operators import (
-        #unrestricted_one_elec_op_0i_0a,
-        unrestricted_one_elec_op_full_space,
+    unrestricted_one_elec_op_full_space,
+)
+from slowquant.unitary_coupled_cluster.operators import (
+    anni
 )
 from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 
@@ -466,3 +468,81 @@ class LinearResponseUPS(LinearResponseBaseClass):
             transition_dipoles[state_number, 1] = q_part_y + transition_dipole_y
             transition_dipoles[state_number, 2] = q_part_z + transition_dipole_z
         return transition_dipoles
+    
+
+    def get_property_gradient_unrestricted(self, property_integrals: np.ndarray) -> np.ndarray:
+        """Calculate unrestricted property gradient.
+
+        Args:
+            property_integrals: Integrals in AO basis.
+
+        Returns:
+            Property gradient.
+        """
+        rdms = UnrestrictedReducedDensityMatrix(
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
+            self.wf.rdm1aa,
+            self.wf.rdm1bb,
+        )
+        in_shape = property_integrals.shape[:-2]
+        size_mo = self.wf.num_inactive_orbs + self.wf.num_active_orbs + self.wf.num_inactive_orbs
+        property_integrals = property_integrals.reshape(-1, size_mo, size_mo)
+        num_mo =len(property_integrals)
+        mo_a = np.zeros((num_mo, size_mo, size_mo))
+        mo_b = np.zeros((num_mo, size_mo, size_mo))
+        for i, ao in enumerate(property_integrals):
+            mo_a[i, :, :] += one_electron_integral_transform(self.wf.c_a_mo, ao)
+            mo_b[i, :, :] += one_electron_integral_transform(self.wf.c_b_mo, ao)
+        
+        idx_shift_q = len(self.q_ops)
+        V = np.zeros((len(self.q_ops + self.G_ops), num_mo))
+
+        #orbital rotation part
+        V[:idx_shift_q, :] = get_orbital_response_property_gradient_unrestricted(
+            rdms,
+            mo_a,
+            mo_b,
+            self.wf.kappa_no_activeactive_idx,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+        )
+
+        for idx, G in enumerate(self.G_ops):
+            G_ket = propagate_state([G], self.wf.ci_coeffs, *self.index_info)
+            Gd_ket = propagate_state([G.dagger], self.wf.ci_coeffs, *self.index_info)
+            # Inactive part
+            for i in range(self.wf.num_inactive_orbs):
+                E_ket_a = propagate_state([anni(i, "alpha", True) * anni(i, "alpha", False)], self.wf.ci_coeffs, *self.index_info)
+                E_ket_b = propagate_state([anni(i, "beta", True) * anni(i, "beta", False)], self.wf.ci_coeffs, *self.index_info)
+                # < 0 | GE | 0 >
+                val_a = expectation_value(Gd_ket, [], E_ket_a, *self.index_info)
+                val_b = expectation_value(Gd_ket, [], E_ket_b, *self.index_info)
+                # -< 0 | EG | 0 > 
+                val_a -= expectation_value(E_ket_a, [], Gd_ket, *self.index_info) #Den skal ikek være dagger da indices er ii (aka det bliver det samme!)
+                val_b -= expectation_value(E_ket_b, [], Gd_ket, *self.index_info)
+                V[idx + idx_shift_q, :] += mo_a[:, i, i] * val_a
+                V[idx + idx_shift_q, :] += mo_b[:, i, i] * val_b
+
+            #active part
+            for p in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):
+                for q in range(
+                    self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs                    
+                ):
+                    E_ket_a = propagate_state([anni(p, "alpha", True) * anni(q, "alpha", False)], self.wf.ci_coeffs, *self.index_info)
+                    E_ket_b = propagate_state([anni(p, "beta", True) * anni(q, "beta", False)], self.wf.ci_coeffs, *self.index_info)
+                    Ed_ket_a = propagate_state([anni(q, "alpha", True) * anni(p, "alpha", False)], self.wf.ci_coeffs, *self.index_info)
+                    Ed_ket_b = propagate_state([anni(q, "beta", True) * anni(p, "beta", False)], self.wf.ci_coeffs, *self.index_info)
+                    # < 0 | GE | 0 >
+                    val_a = expectation_value(Gd_ket, [], E_ket_a, *self.index_info)
+                    val_b = expectation_value(Gd_ket, [], E_ket_b, *self.index_info)
+                    # -< 0 | EG | 0 > 
+                    val_a -= expectation_value(Ed_ket_a, [], G_ket, *self.index_info)
+                    val_b -= expectation_value(Ed_ket_b, [], G_ket, *self.index_info)
+                    V[idx + idx_shift_q, :] += mo_a[:, p, q] * val_a
+                    V[idx + idx_shift_q, :] += mo_b[:, p, q] * val_b
+            #check if complex
+            if np.allclose(mo_a, mo_a.transpose(0, -1, -2)) and np.allclose(mo_b, mo_b.transpose(0, -1, -2)):
+                return np.vstack((V, -1 * V)).reshape(-1, *in_shape)
+            return np.vstack((V, V)).reshape(-1, *in_shape)
