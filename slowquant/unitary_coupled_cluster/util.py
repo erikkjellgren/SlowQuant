@@ -46,11 +46,18 @@ def iterate_t2_sa(
                     if i == j:
                         fac *= 2.0
                     fac = 1 / 2 * (fac) ** (-1 / 2)
-                    yield a, i, b, j, fac, 1
+                    if i == j and a == b:
+                        yield a, i, b, j, fac, 1
+                    elif i == j:
+                        yield a, i, b, j, fac, 2
+                    elif a == b:
+                        yield a, i, b, j, fac, 3
+                    else:
+                        yield a, i, b, j, fac, 4
                     if i == j or a == b:
                         continue
                     fac = 1 / (2 * 3 ** (1 / 2))
-                    yield a, i, b, j, fac, 2
+                    yield a, i, b, j, fac, 5
 
 
 def iterate_t1_sa_generalized(
@@ -472,6 +479,12 @@ class UccStructure:
                 self.excitation_operator_type.append("sa_double_1")
             elif op_type == 2:
                 self.excitation_operator_type.append("sa_double_2")
+            elif op_type == 3:
+                self.excitation_operator_type.append("sa_double_3")
+            elif op_type == 4:
+                self.excitation_operator_type.append("sa_double_4")
+            elif op_type == 5:
+                self.excitation_operator_type.append("sa_double_5")
             self.n_params += 1
 
     def add_triples(self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int]) -> None:

@@ -14,8 +14,7 @@ from slowquant.unitary_coupled_cluster.operators import (
     G5,
     G6,
     G1_sa,
-    G2_1_sa,
-    G2_2_sa,
+    G2_sa,
 )
 from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
 
@@ -522,10 +521,19 @@ def get_ucc_T(
             T += theta * G1_sa(i, a, True)
         elif exc_type == "sa_double_1":
             (i, j, a, b) = np.array(exc_indices) + offset
-            T += theta * G2_1_sa(i, j, a, b, True)
+            T += theta * G2_sa(i, j, a, b, 1, True)
         elif exc_type == "sa_double_2":
             (i, j, a, b) = np.array(exc_indices) + offset
-            T += theta * G2_2_sa(i, j, a, b, True)
+            T += theta * G2_sa(i, j, a, b, 2, True)
+        elif exc_type == "sa_double_3":
+            (i, j, a, b) = np.array(exc_indices) + offset
+            T += theta * G2_sa(i, j, a, b, 3, True)
+        elif exc_type == "sa_double_4":
+            (i, j, a, b) = np.array(exc_indices) + offset
+            T += theta * G2_sa(i, j, a, b, 4, True)
+        elif exc_type == "sa_double_5":
+            (i, j, a, b) = np.array(exc_indices) + offset
+            T += theta * G2_sa(i, j, a, b, 5, True)
         elif exc_type == "single":
             (i, a) = np.array(exc_indices) + 2 * offset
             T += theta * G1(i, a, True)
@@ -870,7 +878,7 @@ def propagate_unitary(
                 do_folding=False,
             )
         )
-    elif exc_type in ("single", "double"):
+    elif exc_type in ("single", "double", "sa_double_1"):
         # Create T matrix
         if exc_type == "single":
             (i, a) = np.array(exc_indices) + 2 * offset
@@ -878,6 +886,9 @@ def propagate_unitary(
         elif exc_type == "double":
             (i, j, a, b) = np.array(exc_indices) + 2 * offset
             T = G2(i, j, a, b, True)
+        elif exc_type == "sa_double_1":
+            (i, j, a, b) = np.array(exc_indices) + offset
+            T = G2_sa(i, j, a, b, 1, True)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Analytical application on state vector
@@ -901,6 +912,151 @@ def propagate_unitary(
                 ups_struct,
                 do_folding=False,
             )
+        )
+    elif exc_type in ("sa_double_2", "sa_double_3"):
+        if exc_type == "sa_double_2":
+            (i, j, a, b) = np.array(exc_indices) + offset
+            T = G2_sa(i, j, a, b, 2, True)
+        elif exc_type == "sa_double_3":
+            (i, j, a, b) = np.array(exc_indices) + offset
+            T = G2_sa(i, j, a, b, 3, True)
+        else:
+            raise ValueError(f"Got unknown excitation type: {exc_type}")
+        S = (1, 2**(1/2)/2)
+        k1 = (-1, 2*2**(1/2))
+        k3 = (-2, 2*2**(1/2))
+        k2 = (1, -4)
+        k4 = (2, -4) 
+        tmp = (state
+              + (k1[0]*np.sin(S[0]*theta) + k1[1] * np.sin(S[1] * theta))
+            * propagate_state(
+                [T],
+                state,
+                ci_info,
+                thetas,
+                ups_struct,
+                do_folding=False,
+            )
+              + (k3[0]*np.sin(S[0]*theta) + k3[1] * np.sin(S[1] * theta))
+            * propagate_state(
+                [T,T,T],
+                state,
+                ci_info,
+                thetas,
+                ups_struct,
+                do_folding=False,
+            )
+              + (k2[0]*(np.cos(S[0]*theta)-1) + k2[1] * (np.cos(S[1] * theta)-1))
+            * propagate_state(
+                [T,T],
+                state,
+                ci_info,
+                thetas,
+                ups_struct,
+                do_folding=False,
+            )
+              + (k4[0]*(np.cos(S[0]*theta)-1) + k4[1] * (np.cos(S[1] * theta)-1))
+            * propagate_state(
+                [T,T,T,T],
+                state,
+                ci_info,
+                thetas,
+                ups_struct,
+                do_folding=False,
+            )
+               )
+    elif exc_type in ("sa_double_4",):
+        (i, j, a, b) = np.array(exc_indices) + offset
+        T = G2_sa(i, j, a, b, 4, True)
+        S = (1, 2**(1/2), 2**(1/2)/2, 1/2)
+        k1 = (2/3, -2**(1/2)/42, - 8*2**(1/2)/3, 128/21)
+        k3 = (13/3, -2**(1/2)/6, -44*2**(1/2)/3, 64/3)
+        k5 = (22/3, -2**(1/2)/3, -52*2**(1/2)/3, 64/3)
+        k7 = (8/3, -4*2**(1/2)/21, -16*2**(1/2)/3, 128/21)
+        k2 = (-2/3, 1/42, 16/3, -256/21)
+        k4 = (-13/3, 1/6, 88/3, -128/3)
+        k6 = (-22/3, 1/3, 104/3, -128/3)
+        k8 = (-8/3, 4/21, 32/3, -256/21)
+        tmp = (state
+              + (k1[0]*np.sin(S[0]*theta) + k1[1]*np.sin(S[1]*theta) + k1[2]*np.sin(S[2]*theta) + k1[3]*np.sin(S[3]*theta))
+            * propagate_state(
+                [T],
+                state,
+                ci_info,
+                thetas,
+                ups_struct,
+                do_folding=False,
+            )
+              + (k3[0]*np.sin(S[0]*theta) + k3[1]*np.sin(S[1]*theta) + k3[2]*np.sin(S[2]*theta) + k3[3]*np.sin(S[3]*theta))
+            * propagate_state(
+                [T,T,T],
+                state,
+                ci_info,
+                thetas,
+                ups_struct,
+                do_folding=False,
+            )
+              + (k5[0]*np.sin(S[0]*theta) + k5[1]*np.sin(S[1]*theta) + k5[2]*np.sin(S[2]*theta) + k5[3]*np.sin(S[3]*theta))
+            * propagate_state(
+                [T,T,T,T,T],
+                state,
+                ci_info,
+                thetas,
+                ups_struct,
+                do_folding=False,
+            )
+              + (k7[0]*np.sin(S[0]*theta) + k7[1]*np.sin(S[1]*theta) + k7[2]*np.sin(S[2]*theta) + k7[3]*np.sin(S[3]*theta))
+            * propagate_state(
+                [T,T,T,T,T,T,T],
+                state,
+                ci_info,
+                thetas,
+                ups_struct,
+                do_folding=False,
+            )
+              + (k2[0]*(np.cos(S[0]*theta)-1) + k2[1] * (np.cos(S[1] * theta)-1) + k2[2] * (np.cos(S[2] * theta)-1) + k2[3] * (np.cos(S[3] * theta)-1))
+            * propagate_state(
+                [T,T],
+                state,
+                ci_info,
+                thetas,
+                ups_struct,
+                do_folding=False,
+            )
+              + (k4[0]*(np.cos(S[0]*theta)-1) + k4[1] * (np.cos(S[1] * theta)-1) + k4[2] * (np.cos(S[2] * theta)-1) + k4[3] * (np.cos(S[3] * theta)-1))
+            * propagate_state(
+                [T,T,T,T],
+                state,
+                ci_info,
+                thetas,
+                ups_struct,
+                do_folding=False,
+            )
+              + (k6[0]*(np.cos(S[0]*theta)-1) + k6[1] * (np.cos(S[1] * theta)-1) + k6[2] * (np.cos(S[2] * theta)-1) + k6[3] * (np.cos(S[3] * theta)-1))
+            * propagate_state(
+                [T,T,T,T,T,T],
+                state,
+                ci_info,
+                thetas,
+                ups_struct,
+                do_folding=False,
+            )
+              + (k8[0]*(np.cos(S[0]*theta)-1) + k8[1] * (np.cos(S[1] * theta)-1) + k8[2] * (np.cos(S[2] * theta)-1) + k8[3] * (np.cos(S[3] * theta)-1))
+            * propagate_state(
+                [T,T,T,T,T,T,T,T],
+                state,
+                ci_info,
+                thetas,
+                ups_struct,
+                do_folding=False,
+            )
+        )
+    elif exc_type in ("sa_double_5",):
+        (i, j, a, b) = np.array(exc_indices) + offset
+        T = G2_sa(i, j, a, b, 5, True)
+        S = ()
+        k1 = ()
+        tmp = (state
         )
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")

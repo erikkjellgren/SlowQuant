@@ -783,7 +783,7 @@ class WaveFunctionUCC:
         for exc_type in self.ucc_layout.excitation_operator_type:
             if exc_type == "sa_single":
                 num_theta1 += 1
-            elif exc_type in ("sa_double_1", "sa_double_2"):
+            elif exc_type in ("sa_double_1", "sa_double_2", "sa_double_3", "sa_double_4", "sa_double_5"):
                 num_theta2 += 1
             elif exc_type == "triple":
                 num_theta3 += 1
@@ -915,7 +915,7 @@ class WaveFunctionUCC:
         for exc_type in self.ucc_layout.excitation_operator_type:
             if exc_type == "sa_single":
                 num_theta1 += 1
-            elif exc_type in ("sa_double_1", "sa_double_2"):
+            elif exc_type in ("sa_double_1", "sa_double_2", "sa_double_3", "sa_double_4", "sa_double_5"):
                 num_theta2 += 1
             elif exc_type == "triple":
                 num_theta3 += 1
