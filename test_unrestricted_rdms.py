@@ -14,13 +14,14 @@ from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import Unre
 
 
 
-mol = pyscf.M(atom="O 0 0 0; H 0.0  0.0  0.9697", basis="sto-3g", unit="angstrom", spin=1)
+mol = pyscf.M(atom="H 0 0 0; H 0.0  0.0  0.74", basis="6-31g", unit="angstrom", spin=0)
+#mol = pyscf.M(atom="O 0 0 0; H 0.0  0.0  0.9697", basis="sto-3g", unit="angstrom", spin=1)
 mol.build()
 mf = scf.UHF(mol)
 mf.kernel()
 print(mol.intor('int1e_r'))
 
-mc = mcscf.UCASCI(mf, 2, (2,2))
+mc = mcscf.UCASCI(mf, 2, (1,1))
 res = mc.kernel(mf.mo_coeff)
 print(mf.mo_coeff)
 
@@ -39,12 +40,17 @@ Test for unrestricted rdms
 """
 # Slowquant Object with parameters and setup
 SQobj = sq.SlowQuant()
+#SQobj.set_molecule(
+#    """O  0.0   0.0  0.0;
+#        H  0.0  0.0  0.9697;""",
+#    distance_unit="angstrom",
+#)
 SQobj.set_molecule(
-    """O  0.0   0.0  0.0;
-        H  0.0  0.0  0.9697;""",
+    """H  0.0   0.0  0.0;
+        H  0.0  0.0  0.74;""",
     distance_unit="angstrom",
 )
-SQobj.set_basis_set("sto-3g")
+SQobj.set_basis_set("6-31g")
 # HF
 SQobj.init_hartree_fock()
 SQobj.hartree_fock.use_diis = False
@@ -55,7 +61,7 @@ g_eri = SQobj.integral.electron_repulsion_tensor
     
 WF = UnrestrictedWaveFunctionUPS(
     SQobj.molecule.number_electrons,
-    ((2,2), 2),
+    ((1,1), 2),
     mf.mo_coeff,
     h_core,
     g_eri,
@@ -63,21 +69,22 @@ WF = UnrestrictedWaveFunctionUPS(
     {"n_layers": 1},
     include_active_kappa=True,
 )
+
 #print(WF.manual_gradient())
 #print(WF.orbital_gradient_RDM)
 #with np.printoptions(precision=3, suppress=True):
 #    print(WF.orbital_gradient_RDM - WF.manual_gradient())
-#WF.run_ups(orbital_optimization=True)
+WF.run_wf_optimization_1step("slsqp", True)
 
 #print(WF.orbital_response_hessian_unrestricted) 
 #print(WF.manual_hessian_block_unrestricted())  
-#with np.printoptions(precision=4, suppress=True):
-#    print(WF.orbital_response_hessian_unrestricted - WF.manual_hessian_block_unrestricted())     
+with np.printoptions(precision=4, suppress=True):
+    print(WF.orbital_response_hessian_unrestricted - WF.manual_hessian_block_unrestricted())     
 
 #print(WF.orbital_response_metric_sigma_unrestricted)
 #print(WF.manual_metric_sigma_unrestricted())
-#with np.printoptions(precision=3, suppress=True):
-#    print(WF.orbital_response_metric_sigma_unrestricted - WF.manual_metric_sigma_unrestricted())
+with np.printoptions(precision=4, suppress=True):
+    print(WF.orbital_response_metric_sigma_unrestricted - WF.manual_metric_sigma_unrestricted())
 
 
 #print("hej2", WF.energy_elec + SQobj.molecule.nuclear_repulsion, WF.energy_elec  + SQobj.molecule.nuclear_repulsion - res[0])

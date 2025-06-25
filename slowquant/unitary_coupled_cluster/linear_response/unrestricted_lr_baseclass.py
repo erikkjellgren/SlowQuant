@@ -16,6 +16,7 @@ from slowquant.unitary_coupled_cluster.operators import (
 from slowquant.unitary_coupled_cluster.unrestricted_operators import (
     unrestricted_hamiltonian_full_space,
     unrestricted_hamiltonian_0i_0a,
+    unrestricted_one_elec_op_full_space
 )
 from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.util import (
@@ -92,7 +93,6 @@ class LinearResponseBaseClass:
         self.B = np.zeros((num_parameters, num_parameters))
         self.Sigma = np.zeros((num_parameters, num_parameters))
         self.Delta = np.zeros((num_parameters, num_parameters))
-        # should be optimized to unrestriccted_hamiltonian_1i_1a
         self.H_1i_1a = unrestricted_hamiltonian_full_space(
             self.wf.haa_mo,
             self.wf.hbb_mo,
@@ -125,7 +125,6 @@ class LinearResponseBaseClass:
             hess_eigval,
             _,
         ) = np.linalg.eig(E2)
-        print(hess_eigval)
         print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
         if np.abs(np.min(hess_eigval)) < 10**-8:
             print("WARNING: Small eigenvalue in Hessian")
