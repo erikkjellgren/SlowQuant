@@ -658,7 +658,7 @@ class UpsStructure:
             Factorized UCC ansatz.
         """
         # Options
-        valid_options = ("n_layers", "S", "D", "SAGS", "pD", "GpD", "SAS")
+        valid_options = ("n_layers", "S", "D", "SAGS", "pD", "GpD", "SAS", "SAD")
         for option in ansatz_options:
             if option not in valid_options:
                 raise ValueError(f"Got unknown option for fUCC, {option}. Valid options are: {valid_options}")
@@ -670,6 +670,7 @@ class UpsStructure:
         do_D = False
         do_pD = False
         do_GpD = False
+        do_SAD = False
         if "S" in ansatz_options.keys():
             if ansatz_options["S"]:
                 do_S = True
@@ -688,7 +689,10 @@ class UpsStructure:
         if "GpD" in ansatz_options.keys():
             if ansatz_options["GpD"]:
                 do_GpD = True
-        if True not in (do_S, do_SAS, do_SAGS, do_D, do_pD, do_GpD):
+        if "SAD" in ansatz_options.keys():
+            if ansatz_options["SAD"]:
+                do_SAD = True
+        if True not in (do_S, do_SAS, do_SAGS, do_D, do_pD, do_GpD, do_SAD):
             raise ValueError("fUCC requires some excitations got none.")
         n_layers = ansatz_options["n_layers"]
         num_spin_orbs = 2 * num_orbs
@@ -743,6 +747,14 @@ class UpsStructure:
                     self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+            if do_SAD:
+                for a, i, b, j, _, op_case in iterate_t2_sa(occ, unocc):
+                    self.excitation_operator_type.append(f"sa_double_{op_case}")
+                    self.excitation_indices.append((i, j, a, b))
+                    # Rotosolve not implemented for SA doubles
+                    # self.grad_param_R[f"p{self.n_params:09d}"] = None
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
 
