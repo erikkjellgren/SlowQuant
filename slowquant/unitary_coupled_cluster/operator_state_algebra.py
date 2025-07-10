@@ -819,6 +819,12 @@ def construct_ups_state(
                 ups_struct,
                 do_folding=False,
             )
+            out += (
+                k6[0] * (np.cos(S[0] * theta) - 1)
+                + k6[1] * (np.cos(S[1] * theta) - 1)
+                + k6[2] * (np.cos(S[2] * theta) - 1)
+                + k6[3] * (np.cos(S[3] * theta) - 1)
+            ) * tmp
             tmp = propagate_state(
                 [T],
                 tmp,
@@ -827,12 +833,6 @@ def construct_ups_state(
                 ups_struct,
                 do_folding=False,
             )
-            out += (
-                k6[0] * (np.cos(S[0] * theta) - 1)
-                + k6[1] * (np.cos(S[1] * theta) - 1)
-                + k6[2] * (np.cos(S[2] * theta) - 1)
-                + k6[3] * (np.cos(S[3] * theta) - 1)
-            ) * tmp
             out += (
                 k7[0] * np.sin(S[0] * theta)
                 + k7[1] * np.sin(S[1] * theta)
