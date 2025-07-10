@@ -921,71 +921,26 @@ def construct_ups_state(
                 do_folding=False,
             )
             out += (
-                k3[0] * np.sin(S[0] * theta)
-                + k3[1] * np.sin(S[1] * theta)
-                + k3[2] * np.sin(S[2] * theta)
-                + k3[3] * np.sin(S[3] * theta)
-                + k3[4] * np.sin(S[4] * theta)
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                thetas,
-                ups_struct,
-                do_folding=False,
-            )
-            out += (
-                k5[0] * np.sin(S[0] * theta)
-                + k5[1] * np.sin(S[1] * theta)
-                + k5[2] * np.sin(S[2] * theta)
-                + k5[3] * np.sin(S[3] * theta)
-                + k5[4] * np.sin(S[4] * theta)
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                thetas,
-                ups_struct,
-                do_folding=False,
-            )
-            out += (
-                k7[0] * np.sin(S[0] * theta)
-                + k7[1] * np.sin(S[1] * theta)
-                + k7[2] * np.sin(S[2] * theta)
-                + k7[3] * np.sin(S[3] * theta)
-                + k7[4] * np.sin(S[4] * theta)
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                thetas,
-                ups_struct,
-                do_folding=False,
-            )
-            out += (
-                k9[0] * np.sin(S[0] * theta)
-                + k9[1] * np.sin(S[1] * theta)
-                + k9[2] * np.sin(S[2] * theta)
-                + k9[3] * np.sin(S[3] * theta)
-                + k9[4] * np.sin(S[4] * theta)
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                thetas,
-                ups_struct,
-                do_folding=False,
-            )
-            out += (
                 k2[0] * (np.cos(S[0] * theta) - 1)
                 + k2[1] * (np.cos(S[1] * theta) - 1)
                 + k2[2] * (np.cos(S[2] * theta) - 1)
                 + k2[3] * (np.cos(S[3] * theta) - 1)
                 + k2[4] * (np.cos(S[4] * theta) - 1)
+            ) * tmp
+            tmp = propagate_state(
+                [T],
+                tmp,
+                ci_info,
+                thetas,
+                ups_struct,
+                do_folding=False,
+            )
+            out += (
+                k3[0] * np.sin(S[0] * theta)
+                + k3[1] * np.sin(S[1] * theta)
+                + k3[2] * np.sin(S[2] * theta)
+                + k3[3] * np.sin(S[3] * theta)
+                + k3[4] * np.sin(S[4] * theta)
             ) * tmp
             tmp = propagate_state(
                 [T],
@@ -1011,6 +966,21 @@ def construct_ups_state(
                 do_folding=False,
             )
             out += (
+                k5[0] * np.sin(S[0] * theta)
+                + k5[1] * np.sin(S[1] * theta)
+                + k5[2] * np.sin(S[2] * theta)
+                + k5[3] * np.sin(S[3] * theta)
+                + k5[4] * np.sin(S[4] * theta)
+            ) * tmp
+            tmp = propagate_state(
+                [T],
+                tmp,
+                ci_info,
+                thetas,
+                ups_struct,
+                do_folding=False,
+            )
+            out += (
                 k6[0] * (np.cos(S[0] * theta) - 1)
                 + k6[1] * (np.cos(S[1] * theta) - 1)
                 + k6[2] * (np.cos(S[2] * theta) - 1)
@@ -1026,11 +996,41 @@ def construct_ups_state(
                 do_folding=False,
             )
             out += (
+                k7[0] * np.sin(S[0] * theta)
+                + k7[1] * np.sin(S[1] * theta)
+                + k7[2] * np.sin(S[2] * theta)
+                + k7[3] * np.sin(S[3] * theta)
+                + k7[4] * np.sin(S[4] * theta)
+            ) * tmp
+            tmp = propagate_state(
+                [T],
+                tmp,
+                ci_info,
+                thetas,
+                ups_struct,
+                do_folding=False,
+            )
+            out += (
                 k8[0] * (np.cos(S[0] * theta) - 1)
                 + k8[1] * (np.cos(S[1] * theta) - 1)
                 + k8[2] * (np.cos(S[2] * theta) - 1)
                 + k8[3] * (np.cos(S[3] * theta) - 1)
                 + k8[4] * (np.cos(S[4] * theta) - 1)
+            ) * tmp
+            tmp = propagate_state(
+                [T],
+                tmp,
+                ci_info,
+                thetas,
+                ups_struct,
+                do_folding=False,
+            )
+            out += (
+                k9[0] * np.sin(S[0] * theta)
+                + k9[1] * np.sin(S[1] * theta)
+                + k9[2] * np.sin(S[2] * theta)
+                + k9[3] * np.sin(S[3] * theta)
+                + k9[4] * np.sin(S[4] * theta)
             ) * tmp
             tmp = propagate_state(
                 [T],
@@ -1372,52 +1372,24 @@ def propagate_unitary(
             do_folding=False,
         )
         out += (
-            k3[0] * np.sin(S[0] * theta)
-            + k3[1] * np.sin(S[1] * theta)
-            + k3[2] * np.sin(S[2] * theta)
-            + k3[3] * np.sin(S[3] * theta)
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            thetas,
-            ups_struct,
-            do_folding=False,
-        )
-        out += (
-            k5[0] * np.sin(S[0] * theta)
-            + k5[1] * np.sin(S[1] * theta)
-            + k5[2] * np.sin(S[2] * theta)
-            + k5[3] * np.sin(S[3] * theta)
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            thetas,
-            ups_struct,
-            do_folding=False,
-        )
-        out += (
-            k7[0] * np.sin(S[0] * theta)
-            + k7[1] * np.sin(S[1] * theta)
-            + k7[2] * np.sin(S[2] * theta)
-            + k7[3] * np.sin(S[3] * theta)
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            thetas,
-            ups_struct,
-            do_folding=False,
-        )
-        out += (
             k2[0] * (np.cos(S[0] * theta) - 1)
             + k2[1] * (np.cos(S[1] * theta) - 1)
             + k2[2] * (np.cos(S[2] * theta) - 1)
             + k2[3] * (np.cos(S[3] * theta) - 1)
+        ) * tmp
+        tmp = propagate_state(
+            [T],
+            tmp,
+            ci_info,
+            thetas,
+            ups_struct,
+            do_folding=False,
+        )
+        out += (
+            k3[0] * np.sin(S[0] * theta)
+            + k3[1] * np.sin(S[1] * theta)
+            + k3[2] * np.sin(S[2] * theta)
+            + k3[3] * np.sin(S[3] * theta)
         ) * tmp
         tmp = propagate_state(
             [T],
@@ -1442,10 +1414,38 @@ def propagate_unitary(
             do_folding=False,
         )
         out += (
+            k5[0] * np.sin(S[0] * theta)
+            + k5[1] * np.sin(S[1] * theta)
+            + k5[2] * np.sin(S[2] * theta)
+            + k5[3] * np.sin(S[3] * theta)
+        ) * tmp
+        tmp = propagate_state(
+            [T],
+            tmp,
+            ci_info,
+            thetas,
+            ups_struct,
+            do_folding=False,
+        )
+        out += (
             k6[0] * (np.cos(S[0] * theta) - 1)
             + k6[1] * (np.cos(S[1] * theta) - 1)
             + k6[2] * (np.cos(S[2] * theta) - 1)
             + k6[3] * (np.cos(S[3] * theta) - 1)
+        ) * tmp
+        tmp = propagate_state(
+            [T],
+            tmp,
+            ci_info,
+            thetas,
+            ups_struct,
+            do_folding=False,
+        )
+        out += (
+            k7[0] * np.sin(S[0] * theta)
+            + k7[1] * np.sin(S[1] * theta)
+            + k7[2] * np.sin(S[2] * theta)
+            + k7[3] * np.sin(S[3] * theta)
         ) * tmp
         tmp = propagate_state(
             [T],
@@ -1530,71 +1530,26 @@ def propagate_unitary(
             do_folding=False,
         )
         out += (
-            k3[0] * np.sin(S[0] * theta)
-            + k3[1] * np.sin(S[1] * theta)
-            + k3[2] * np.sin(S[2] * theta)
-            + k3[3] * np.sin(S[3] * theta)
-            + k3[4] * np.sin(S[4] * theta)
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            thetas,
-            ups_struct,
-            do_folding=False,
-        )
-        out += (
-            k5[0] * np.sin(S[0] * theta)
-            + k5[1] * np.sin(S[1] * theta)
-            + k5[2] * np.sin(S[2] * theta)
-            + k5[3] * np.sin(S[3] * theta)
-            + k5[4] * np.sin(S[4] * theta)
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            thetas,
-            ups_struct,
-            do_folding=False,
-        )
-        out += (
-            k7[0] * np.sin(S[0] * theta)
-            + k7[1] * np.sin(S[1] * theta)
-            + k7[2] * np.sin(S[2] * theta)
-            + k7[3] * np.sin(S[3] * theta)
-            + k7[4] * np.sin(S[4] * theta)
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            thetas,
-            ups_struct,
-            do_folding=False,
-        )
-        out += (
-            k9[0] * np.sin(S[0] * theta)
-            + k9[1] * np.sin(S[1] * theta)
-            + k9[2] * np.sin(S[2] * theta)
-            + k9[3] * np.sin(S[3] * theta)
-            + k9[4] * np.sin(S[4] * theta)
-        ) * tmp
-        tmp = propagate_state(
-            [T],
-            tmp,
-            ci_info,
-            thetas,
-            ups_struct,
-            do_folding=False,
-        )
-        out += (
             k2[0] * (np.cos(S[0] * theta) - 1)
             + k2[1] * (np.cos(S[1] * theta) - 1)
             + k2[2] * (np.cos(S[2] * theta) - 1)
             + k2[3] * (np.cos(S[3] * theta) - 1)
             + k2[4] * (np.cos(S[4] * theta) - 1)
+        ) * tmp
+        tmp = propagate_state(
+            [T],
+            tmp,
+            ci_info,
+            thetas,
+            ups_struct,
+            do_folding=False,
+        )
+        out += (
+            k3[0] * np.sin(S[0] * theta)
+            + k3[1] * np.sin(S[1] * theta)
+            + k3[2] * np.sin(S[2] * theta)
+            + k3[3] * np.sin(S[3] * theta)
+            + k3[4] * np.sin(S[4] * theta)
         ) * tmp
         tmp = propagate_state(
             [T],
@@ -1620,6 +1575,21 @@ def propagate_unitary(
             do_folding=False,
         )
         out += (
+            k5[0] * np.sin(S[0] * theta)
+            + k5[1] * np.sin(S[1] * theta)
+            + k5[2] * np.sin(S[2] * theta)
+            + k5[3] * np.sin(S[3] * theta)
+            + k5[4] * np.sin(S[4] * theta)
+        ) * tmp
+        tmp = propagate_state(
+            [T],
+            tmp,
+            ci_info,
+            thetas,
+            ups_struct,
+            do_folding=False,
+        )
+        out += (
             k6[0] * (np.cos(S[0] * theta) - 1)
             + k6[1] * (np.cos(S[1] * theta) - 1)
             + k6[2] * (np.cos(S[2] * theta) - 1)
@@ -1635,11 +1605,41 @@ def propagate_unitary(
             do_folding=False,
         )
         out += (
+            k7[0] * np.sin(S[0] * theta)
+            + k7[1] * np.sin(S[1] * theta)
+            + k7[2] * np.sin(S[2] * theta)
+            + k7[3] * np.sin(S[3] * theta)
+            + k7[4] * np.sin(S[4] * theta)
+        ) * tmp
+        tmp = propagate_state(
+            [T],
+            tmp,
+            ci_info,
+            thetas,
+            ups_struct,
+            do_folding=False,
+        )
+        out += (
             k8[0] * (np.cos(S[0] * theta) - 1)
             + k8[1] * (np.cos(S[1] * theta) - 1)
             + k8[2] * (np.cos(S[2] * theta) - 1)
             + k8[3] * (np.cos(S[3] * theta) - 1)
             + k8[4] * (np.cos(S[4] * theta) - 1)
+        ) * tmp
+        tmp = propagate_state(
+            [T],
+            tmp,
+            ci_info,
+            thetas,
+            ups_struct,
+            do_folding=False,
+        )
+        out += (
+            k9[0] * np.sin(S[0] * theta)
+            + k9[1] * np.sin(S[1] * theta)
+            + k9[2] * np.sin(S[2] * theta)
+            + k9[3] * np.sin(S[3] * theta)
+            + k9[4] * np.sin(S[4] * theta)
         ) * tmp
         tmp = propagate_state(
             [T],
