@@ -764,52 +764,24 @@ def construct_ups_state(
                 do_folding=False,
             )
             out += (
-                k3[0] * np.sin(S[0] * theta)
-                + k3[1] * np.sin(S[1] * theta)
-                + k3[2] * np.sin(S[2] * theta)
-                + k3[3] * np.sin(S[3] * theta)
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                thetas,
-                ups_struct,
-                do_folding=False,
-            )
-            out += (
-                k5[0] * np.sin(S[0] * theta)
-                + k5[1] * np.sin(S[1] * theta)
-                + k5[2] * np.sin(S[2] * theta)
-                + k5[3] * np.sin(S[3] * theta)
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                thetas,
-                ups_struct,
-                do_folding=False,
-            )
-            out += (
-                k7[0] * np.sin(S[0] * theta)
-                + k7[1] * np.sin(S[1] * theta)
-                + k7[2] * np.sin(S[2] * theta)
-                + k7[3] * np.sin(S[3] * theta)
-            ) * tmp
-            tmp = propagate_state(
-                [T],
-                tmp,
-                ci_info,
-                thetas,
-                ups_struct,
-                do_folding=False,
-            )
-            out += (
                 k2[0] * (np.cos(S[0] * theta) - 1)
                 + k2[1] * (np.cos(S[1] * theta) - 1)
                 + k2[2] * (np.cos(S[2] * theta) - 1)
                 + k2[3] * (np.cos(S[3] * theta) - 1)
+            ) * tmp
+            tmp = propagate_state(
+                [T],
+                tmp,
+                ci_info,
+                thetas,
+                ups_struct,
+                do_folding=False,
+            )
+            out += (
+                k3[0] * np.sin(S[0] * theta)
+                + k3[1] * np.sin(S[1] * theta)
+                + k3[2] * np.sin(S[2] * theta)
+                + k3[3] * np.sin(S[3] * theta)
             ) * tmp
             tmp = propagate_state(
                 [T],
@@ -834,10 +806,38 @@ def construct_ups_state(
                 do_folding=False,
             )
             out += (
+                k5[0] * np.sin(S[0] * theta)
+                + k5[1] * np.sin(S[1] * theta)
+                + k5[2] * np.sin(S[2] * theta)
+                + k5[3] * np.sin(S[3] * theta)
+            ) * tmp
+            tmp = propagate_state(
+                [T],
+                tmp,
+                ci_info,
+                thetas,
+                ups_struct,
+                do_folding=False,
+            )
+            tmp = propagate_state(
+                [T],
+                tmp,
+                ci_info,
+                thetas,
+                ups_struct,
+                do_folding=False,
+            )
+            out += (
                 k6[0] * (np.cos(S[0] * theta) - 1)
                 + k6[1] * (np.cos(S[1] * theta) - 1)
                 + k6[2] * (np.cos(S[2] * theta) - 1)
                 + k6[3] * (np.cos(S[3] * theta) - 1)
+            ) * tmp
+            out += (
+                k7[0] * np.sin(S[0] * theta)
+                + k7[1] * np.sin(S[1] * theta)
+                + k7[2] * np.sin(S[2] * theta)
+                + k7[3] * np.sin(S[3] * theta)
             ) * tmp
             tmp = propagate_state(
                 [T],
@@ -1049,9 +1049,7 @@ def construct_ups_state(
             ) * tmp
         else:
             raise ValueError(f"Got unknown excitation type, {exc_type}")
-    # A unitary transformation should be norm conserving.
-    # Hence, nummerical noise can be mitigated by renorming.
-    return out * (out@out) / (state@state)
+    return out
 
 
 def construct_ups_state_SA(
