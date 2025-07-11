@@ -1,5 +1,7 @@
 import networkx as nx
 import numpy as np
+import pickle  
+import copy
 from qiskit import QuantumCircuit
 from qiskit.quantum_info import Pauli
 from qiskit.transpiler import CouplingMap, PassManager
@@ -148,6 +150,62 @@ def find_swaps(new: list[int], ref: list[int]) -> list[tuple[int, int]]:
     return swaps
 
 
+class MitigationFlags:
+    """Class to handle mitigation flags."""
+    FLAG_ORDER = [
+        'do_M_mitigation',
+        'do_M_ansatz0',
+        'do_postselection',
+        # Add more flags here in future if needed
+    ]
+
+    def __init__(self, **kwargs):
+        """Initialize mitigation flags.
+        Args:
+            **kwargs: Flags to be set. If a flag is not provided, it defaults to False.
+        """
+        unknown_flags = set(kwargs) - set(self.FLAG_ORDER)
+        print(unknown_flags)
+        if unknown_flags:
+            raise ValueError(f"Unknown flag(s): {', '.join(unknown_flags)}")
+
+        for flag in self.FLAG_ORDER:
+            setattr(self, flag, kwargs.get(flag, False))
+
+    def to_int(self) -> int:
+        """Convert mitigation flags to an integer representation."""
+        result = 0
+        for i, flag in enumerate(self.FLAG_ORDER):
+            if getattr(self, flag):
+                result |= 1 << i
+        return result
+
+    def to_bin(self) -> int:
+        """Convert mitigation flags to a binary representation."""
+        return bin(self.to_int())
+    
+    def status_report(self) -> str:
+        lines = []
+        for flag in self.FLAG_ORDER:
+            value = getattr(self, flag)
+            status = "ON" if value else "OFF"
+            lines.append(f"{flag}: {status}")
+        return "\n".join(lines)
+
+    def __repr__(self):
+        flags = {f: getattr(self, f) for f in self.FLAG_ORDER}
+        return f"<MitigationFlags int={self.to_int()} bin={self.to_bin()} flags={flags}>"
+
+class CliqueSaver:
+    """Class to handle saving of cliques.
+
+    This class is used to save a clique heads distributions based on the used mitigation scheme.
+    """
+
+    def __init__(self) -> None:
+        """Initialize CliqueSaver."""
+        self.cliques: dict[int, Clique] = {}
+
 class CliqueHead:
     def __init__(self, head: str, distr: dict[int, float] | None) -> None:
         """Initialize clique head dataclass.
@@ -249,6 +307,73 @@ class Clique:
                 return clique_head.distr
         raise ValueError(f"Could not find matching clique for Pauli, {pauli}")
 
+class Savers:
+    """"Collection of savers for different classifiers."""
+    def __init__(self):
+        self.data: dict[int, dict[int, Clique]] = {0:{}} # initialize raw results saver
+
+    def add_saver(self, classifier: int):
+        if classifier not in self.data.keys():
+            self.data[classifier] = {}
+
+    def get_saver(self, classifier: int) -> dict[int, 'Clique']:
+        return self.data.get(classifier, {})
+    
+    def det_in_saver(self, det_int:int, mitigation_int: int = 0) -> bool:
+        """Check if a determinant is in the saver.
+        Args:
+            det_int: Determinant integer.
+            mitigation_int: Mitigation integer.
+        Returns:    
+            True if determinant is in the saver, False otherwise.
+        """
+        return det_int in self.data[mitigation_int]
+    
+    def update_saver(self, det_int: int, mitigation_flags: MitigationFlags) -> None:
+        """Update the saver with new det entries if needed.
+        Args:
+            det_int: Determinant integer.
+            mitigation_flags: Mitigation flags object.
+        """
+        # Check for raw results
+        if not self.det_in_saver(det_int):
+            print("Make new Clique saver in raw results for determinant ", det_int)
+            self.saver[0][det_int] = Clique()
+        # Check for mitigated results
+        if mitigation_flags.to_int() !=0 and not self.det_in_saver(det_int,mitigation_flags.to_int()):
+            print("Make new Clique saver in mitigated results\n" + mitigation_flags.status_report() +  "\nfor determinant ", det_int)
+            self.add_saver(mitigation_flags.to_int())
+            self.saver[mitigation_flags.to_int()][det_int] = Clique()
+
+    def add_paulis(self, det_int:int, paulis: list[str], mitigation_flags: MitigationFlags) -> list[str]:
+        """Add list of Pauli strings to cliques for specific det and mitigation result. 
+
+        Args:
+            det_int: Determinant integer.
+            paulis: Paulis to be added to cliques.
+            mitigation_flags: Mitigation flags object.
+
+        Returns:
+            List of clique heads to be calculated.
+        """
+        # Update saver with new det entries if needed.
+        self.update_saver(det_int, mitigation_flags)
+
+        # Add paulis to the saver
+        paulis_out = self.data[0][det_int].add_paulis(paulis)
+        return paulis_out
+    
+    def reset(self):
+        """Reset all saved data."""
+        self.data = {0:{}} # initialize raw results saver
+
+    def save(self, path: str):
+        with open(path, 'wb') as f:
+            pickle.dump(self.data, f)
+
+    def load(self, path: str):
+        with open(path, 'rb') as f:
+            self.data = pickle.load(f)
 
 def fit_in_clique(pauli: str, head: str) -> tuple[bool, str]:
     """Check if a Pauli fits in a given clique.

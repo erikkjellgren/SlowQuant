@@ -319,7 +319,7 @@ class WaveFunctionSA:
             print("WARNING: Using SamplerV2 is an experimental feature.")
         self.QI._primitive = primitive  # pylint: disable=protected-access
         if verbose:
-            if self.QI.do_M_ansatz0:
+            if self.QI.mitigation_flags.do_M_ansatz0:
                 print("Reset RDMs, energies, QI metrics, and correlation matrix.")
             else:
                 print("Reset RDMs, energies, and QI metrics.")
