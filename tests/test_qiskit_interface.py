@@ -1197,17 +1197,15 @@ def test_state_average_Mplus() -> None:
 
     QI.shots = None
     QI.ISA = True
-    QI.do_postselection = False
+    QI.update_mitigation_flags(do_postselection = False)
     QI.update_pass_manager({"backend": FakeTorino(), "seed_transpiler": 1234})
 
-    QI.do_M_mitigation = False
-    QI.do_M_ansatz0 = False
+    QI.update_mitigation_flags(do_M_mitigation = False, do_M_ansatz0 = False)
 
     QI._reset_cliques()
     assert abs(QWF._calc_energy_elec() + 9.60851106217584) < 10**-6  # type: ignore  # CSFs option 1
 
-    QI.do_M_mitigation = True
-    QI.do_M_ansatz0 = True
+    QI.update_mitigation_flags(do_M_mitigation = True, do_M_ansatz0 = True)
     QI.redo_M_mitigation()
 
     QI._reset_cliques()
@@ -1218,6 +1216,6 @@ def test_state_average_Mplus() -> None:
         abs(QWF._calc_energy_elec(M_per_superpos=True) + 9.635276750167002) < 10**-6  # type: ignore
     )  # CSFs option 1
 
-    QI.do_postselection = True
+    QI.update_mitigation_flags(do_postselection = True)
     QI._reset_cliques()
     assert abs(QWF._calc_energy_elec() + 9.636464216617595) < 10**-6  # type: ignore  # CSFs option 4

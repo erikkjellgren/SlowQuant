@@ -164,14 +164,23 @@ class MitigationFlags:
         Args:
             **kwargs: Flags to be set. If a flag is not provided, it defaults to False.
         """
-        unknown_flags = set(kwargs) - set(self.FLAG_ORDER)
-        print(unknown_flags)
-        if unknown_flags:
-            raise ValueError(f"Unknown flag(s): {', '.join(unknown_flags)}")
+        self._validate_flags(kwargs)
 
         for flag in self.FLAG_ORDER:
             setattr(self, flag, kwargs.get(flag, False))
+    
+    def _validate_flags(self, flag_dict):
+        """Validate the provided flags against the defined FLAG_ORDER."""
+        unknown_flags = set(flag_dict) - set(self.FLAG_ORDER)
+        if unknown_flags:
+            raise ValueError(f"Unknown flag(s): {', '.join(unknown_flags)}")
 
+    def update_flags(self, **kwargs):
+        """Update mitigation flags with provided keyword arguments."""
+        self._validate_flags(kwargs)
+        for flag, value in kwargs.items():
+            setattr(self, flag, value)
+    
     def to_int(self) -> int:
         """Convert mitigation flags to an integer representation."""
         result = 0

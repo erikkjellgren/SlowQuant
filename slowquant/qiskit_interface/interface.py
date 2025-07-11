@@ -243,6 +243,14 @@ class QuantumInterface:
             # Set parameter to HarteeFock
             self._parameters = [0.0] * self.circuit.num_parameters
 
+    def update_mitigation_flags(self, **kwargs) -> None:
+        """Update mitigation flags.
+
+        Args:
+            **kwargs: Keyword arguments to update mitigation flags.
+        """
+        self.mitigation_flags.update_flags(**kwargs)
+
     @property
     def ISA(self) -> bool:
         """Get ISA setting.
