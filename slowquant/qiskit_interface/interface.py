@@ -25,7 +25,6 @@ from qiskit_nature.second_q.operators import FermionicOp
 from slowquant.qiskit_interface.custom_ansatz import SDSfUCC, fUCC, tUPS
 from slowquant.qiskit_interface.util import (  # correct_distribution_with_layout,
     Clique,
-    Savers,
     MitigationFlags,
     correct_distribution,
     correct_distribution_with_layout_v2,
@@ -745,14 +744,21 @@ class QuantumInterface:
             )
         if M_per_superpos and isinstance(self._primitive, BaseEstimator):
             raise ValueError("Base estimator does not support M_Ansatz0")
-        if M_per_superpos and (self.mitigation_flags.do_M_ansatz0 + self.mitigation_flags.do_M_mitigation) != 2:
+        if (
+            M_per_superpos
+            and (self.mitigation_flags.do_M_ansatz0 + self.mitigation_flags.do_M_mitigation) != 2
+        ):
             raise ValueError(
                 "You requested M_per_superpos but M error mitigation / M_Ansatz0 was not selected in QI settings."
             )
         # Option handling
         if ISA_csfs_option == 0:
             ISA_csfs_option = 1  # could also be 2
-            if self.mitigation_flags.do_M_mitigation and self.ansatz_circuit.layout is not None and not M_per_superpos:
+            if (
+                self.mitigation_flags.do_M_mitigation
+                and self.ansatz_circuit.layout is not None
+                and not M_per_superpos
+            ):
                 ISA_csfs_option = 2
                 if self.mitigation_flags.do_M_ansatz0:
                     ISA_csfs_option = 4  # could also be 3
@@ -1069,11 +1075,8 @@ class QuantumInterface:
             # Simulate each clique head with one combined device call
             # and return a list of distributions
             distr = self._one_call_sampler_distributions(new_heads, self.parameters, run_circuit)
-
-            # save in raw saver
-
-            #if self.mitigator not None:
-                # do stuff
+            # save raw results
+            self.saver[det_int].update_distr(new_heads, distr)
 
             if self.mitigation_flags.do_M_mitigation:  # apply error mitigation if requested
                 if circuit_M is None:
@@ -1104,13 +1107,16 @@ class QuantumInterface:
                 for i, (dist, head) in enumerate(zip(distr, new_heads)):
                     if "X" not in head and "Y" not in head:
                         distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
-            self.saver[det_int].update_distr(new_heads, distr)
+
+            if self.mitigation_flags.to_int() != 0:
+                # save mitigated results
+                self.saver[det_int].update_distr(new_heads, distr, self.mitigation_flags.to_int())
 
         # Loop over all Pauli strings in observable and build final result with coefficients
         for pauli, coeff in zip(paulis_str, observables.coeffs):
             result = 0.0
             for key, value in (
-                self.saver[det_int].get_distr(pauli).items()
+                self.saver[det_int].get_distr(pauli, self.mitigation_flags.to_int()).items()
             ):  # build result from quasi-distribution
                 result += value * get_bitstring_sign(pauli, key)
             values += result * coeff
