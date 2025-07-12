@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 import networkx as nx
 import numpy as np
 from qiskit import QuantumCircuit
@@ -253,7 +254,14 @@ class CliqueSaver:
         self.data = {0: {}}  # reset to empty raw results saver
 
     def empty(self, mitigation_int: int = 0) -> bool:
-        """Check if saver is empty."""
+        """Check if saver is empty.
+
+        Args:
+            mitigation_int: Mitigation integer, default is 0.
+
+        Returns:
+            True if empty, False otherwise.
+        """
         if mitigation_int not in self.data:
             return True  # it is empty if it does not exist.
         if self.data[mitigation_int]:
@@ -264,12 +272,24 @@ class CliqueSaver:
                 raise ValueError("Empty data not consistent accross mitigation saver.")
         return True  # empty
 
-    def add_distr(self, distr: dict[int, float], mitigation_int: int = 0):
-        """Add distribution to saver."""
+    def add_distr(self, distr: dict[int, float], mitigation_int: int = 0) -> None:
+        """Add distribution to saver.
+
+        Args:
+            distr: Distribution to be added.
+            mitigation_int: Mitigation integer, default is 0.
+        """
         self.data[mitigation_int] = distr
 
     def get_distr(self, mitigation_int: int = 0) -> dict[int, float]:
-        """Return distribution."""
+        """Return distribution.
+
+        Args:
+            mitigation_int: Mitigation integer, default is 0.
+
+        Returns:
+            Distribution for the given mitigation integer.
+        """
         return self.data[mitigation_int]
 
 
