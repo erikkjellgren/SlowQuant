@@ -1064,53 +1064,58 @@ class QuantumInterface:
         new_heads = self.saver[det_int].add_paulis(paulis_str)
 
         if len(new_heads) != 0:
-            # Check if error mitigation is requested and if read-out matrix already exists.
-            if self.mitigation_flags.do_M_mitigation:
-                if circuit_M is None:
-                    if self._Minv is None:
-                        self._Minv = self._make_Minv(shots=self._M_shots)
-                else:
-                    Minv = self._make_Minv(shots=self._M_shots, custom_ansatz=circuit_M)
-
             # Simulate each clique head with one combined device call
             # and return a list of distributions
             distr = self._one_call_sampler_distributions(new_heads, self.parameters, run_circuit)
             # save raw results
             self.saver[det_int].update_distr(new_heads, distr)
 
-            if self.mitigation_flags.do_M_mitigation:  # apply error mitigation if requested
-                if circuit_M is None:
-                    # Check if layout conflict in M and current circuit
-                    match self._check_layout_conflict(run_circuit):
-                        case 0:  # no layout - no order conflict
-                            for i, dist in enumerate(distr):
-                                distr[i] = correct_distribution(dist, self._Minv)
-                        case 1:  # no layout, but order conflict
-                            if self.mitigation_flags.do_M_ansatz0:
-                                raise ValueError("Detected order conflict. Not possile to do M Ansatz0")
-                            print("Detected order conflict. Applying M re-ordering.")
-                            for i, dist in enumerate(distr):
-                                distr[i] = correct_distribution_with_layout_v2(  # maybe v1 is better.
-                                    dist,
-                                    self._Minv,
-                                    self._final_ansatz_indices,
-                                    run_circuit.layout.final_index_layout(),
-                                )
-                        case 2:  # layout conflict
-                            raise ValueError("Detected layout conflict. Cannot do M mitigation.")
-                else:
-                    # custom M -> no layout check needed / possible
-                    for i, dist in enumerate(distr):
-                        distr[i] = correct_distribution(dist, Minv)
+        if self.mitigation_flags.to_int() != 0:
+            # figure out if mitigated result already exist.
+            # if yes, do nothing and go to value calculation.
+            # if not, generate new mitigated data based on raw data.
+            # one could maybe also think of doing mitigation and its saving when new_heads is not empty.
+            head_mit, distr_raw = self.saver[det_int].get_empty_heads_distr(self.mitigation_flags.to_int())
 
-            if self.mitigation_flags.do_postselection:
-                for i, (dist, head) in enumerate(zip(distr, new_heads)):
-                    if "X" not in head and "Y" not in head:
-                        distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
+            if len(head_mit) != 0:
+                if self.mitigation_flags.do_M_mitigation:  # apply error mitigation if requested
+                    if circuit_M is None:
+                        # Check if read-out matrix already exists.
+                        if self._Minv is None:
+                            # do stantard M
+                            self._Minv = self._make_Minv(shots=self._M_shots)
+                        # Check if layout conflict in M and current circuit
+                        match self._check_layout_conflict(run_circuit):
+                            case 0:  # no layout - no order conflict
+                                for i, dist in enumerate(distr_raw):
+                                    distr_raw[i] = correct_distribution(dist, self._Minv)
+                            case 1:  # no layout, but order conflict
+                                if self.mitigation_flags.do_M_ansatz0:
+                                    raise ValueError("Detected order conflict. Not possile to do M Ansatz0")
+                                print("Detected order conflict. Applying M re-ordering.")
+                                for i, dist in enumerate(distr_raw):
+                                    distr_raw[i] = correct_distribution_with_layout_v2(  # maybe v1 is better.
+                                        dist,
+                                        self._Minv,
+                                        self._final_ansatz_indices,
+                                        run_circuit.layout.final_index_layout(),
+                                    )
+                            case 2:  # layout conflict
+                                raise ValueError("Detected layout conflict. Cannot do M mitigation.")
+                    else:
+                        # get custom M
+                        Minv = self._make_Minv(shots=self._M_shots, custom_ansatz=circuit_M)
+                        # custom M -> no layout check needed / possible
+                        for i, dist in enumerate(distr_raw):
+                            distr_raw[i] = correct_distribution(dist, Minv)
 
-            if self.mitigation_flags.to_int() != 0:
+                if self.mitigation_flags.do_postselection:
+                    for i, (dist, head) in enumerate(zip(distr_raw, head_mit)):
+                        if "X" not in head and "Y" not in head:
+                            distr_raw[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
+
                 # save mitigated results
-                self.saver[det_int].update_distr(new_heads, distr, self.mitigation_flags.to_int())
+                self.saver[det_int].update_distr(head_mit, distr_raw, self.mitigation_flags.to_int())
 
         # Loop over all Pauli strings in observable and build final result with coefficients
         for pauli, coeff in zip(paulis_str, observables.coeffs):

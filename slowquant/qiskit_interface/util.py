@@ -301,6 +301,7 @@ class CliqueHead:
             head: Clique head.
             distr: Sample state distribution.
         """
+        # Could that not be a dictionary?
         self.head = head
         self.distr = CliqueSaver()
 
@@ -400,6 +401,64 @@ class Clique:
                     )
                 return clique_head.distr.get_distr(mitigation_int)
         raise ValueError(f"Could not find matching clique for Pauli, {pauli}")
+
+    def get_empty_heads(self, mitigation_int) -> list[str]:
+        """Return all heads that do not have any data for a specific mitigation int.
+
+        Args:
+            mitigation_int: Mitigation integer, default is 0.
+
+        Returns:
+            List of heads that have no data for the given mitigation integer.
+        """
+        empties = []
+        for clique_head in self.cliques:
+            if clique_head.distr.empty(mitigation_int):
+                empties.append(clique_head.head)
+        return empties
+
+    def get_distr_heads(self, heads: list[str], mitigation_int: int = 0) -> list[dict[int, float]]:
+        """Return the distribution data for a list of heads and for a given mitigation int (default 0).
+
+        This function looks only for the specific heads given, not trying to find pauli strings in commuting heads.
+        The latter would be the function get_distr.
+
+        Args:
+            heads: List of clique heads.
+            mitigation_int: Mitigation integer, default is 0.
+
+        Returns:
+            List of distributions for the given heads and mitigation integer.
+        """
+        distr = []
+        # This needs looping many times over all cliques.
+        # To avoid this one would need to re-write the whole clique structure into dictionaries.
+        # But this might make the other clique operations slower.
+        for head in heads:
+            for clique_heads in self.cliques:
+                if clique_heads.head == head:
+                    distr.append(clique_heads.distr.data[mitigation_int])
+                    break
+
+        return distr
+
+    def get_empty_heads_distr(self, mitigation_int) -> tuple[list[str], list[dict[int, float]]]:
+        """Return all heads that have empty data for a given mitigation_int plus return the corresponding raw data.
+
+        Args:
+            mitigation_int: Mitigation integer, default is 0.
+
+        Returns:
+            Tuple of lists: List of heads that have no data for the given mitigation integer,
+            and list of corresponding raw data distributions.
+        """
+        heads = []
+        distr = []
+        for clique_head in self.cliques:
+            if clique_head.distr.empty(mitigation_int):
+                heads.append(clique_head.head)
+                distr.append(clique_head.distr.data[0])  # raw data
+        return heads, distr
 
 
 # class Savers:
