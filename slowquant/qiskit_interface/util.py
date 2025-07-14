@@ -200,11 +200,6 @@ class MitigationFlags:
         for flag in flag_dict.items():
             if not isinstance(flag[1], bool):
                 raise TypeError(f"{flag[0]} must be a boolean")
-        if self.do_M_ansatz0 is True:
-            self.do_M_mitigation = True
-        if self.do_M_ansatz0_plus is True:
-            self.do_M_mitigation = True
-            self.do_M_ansatz0 = True
 
     def update_flags(self, **kwargs) -> None:
         """Update mitigation flags with provided keyword arguments.
@@ -215,6 +210,11 @@ class MitigationFlags:
         self._validate_flags(kwargs)
         for flag, value in kwargs.items():
             setattr(self, flag, value)
+        if self.do_M_ansatz0 is True:
+            self.do_M_mitigation = True
+        if self.do_M_ansatz0_plus is True:
+            self.do_M_mitigation = True
+            self.do_M_ansatz0 = True
         print("You selected the following mitigation flags:\n" + self.status_report())
 
     def to_int(self) -> int:
@@ -474,7 +474,7 @@ class Clique:
         for clique_head in self.cliques:
             if clique_head.distr.empty(mitigation_int):
                 heads.append(clique_head.head)
-                distr.append(clique_head.distr.data[0])  # raw data
+                distr.append(clique_head.distr.data[0].copy())  # raw data
         return heads, distr
 
     def print_cliques(self) -> None:
