@@ -176,6 +176,7 @@ class MitigationFlags:
         self.do_M_ansatz0 = do_M_ansatz0
         self.do_M_ansatz0_plus = do_M_ansatz0_plus
         self.do_postselection = do_postselection
+        print("You selected the following mitigation flags:\n" + self.status_report())
 
     def flag_order(self) -> list[str]:
         """Return the order of flags for validation and conversion.
@@ -185,19 +186,25 @@ class MitigationFlags:
         """
         return ["do_M_mitigation", "do_M_ansatz0", "do_M_ansatz0_plus", "do_postselection"]
 
-    def _validate_flags(self, flag_dict):
+    def _validate_flags(self, flag_dict) -> None:
         """Validate the provided flags against the defined flag_order.
 
         Args:
             flag_dict: Dictionary of flags to validate.
         """
-        print(flag_dict)
         unknown_flags = set(flag_dict) - set(self.flag_order())
         if unknown_flags:
-            raise ValueError(f"Unknown flag(s): {', '.join(unknown_flags)}")
+            raise ValueError(
+                f"Unknown flag(s): {', '.join(unknown_flags)}\nAccepted flags: {self.flag_order()}"
+            )
         for flag in flag_dict.items():
             if not isinstance(flag[1], bool):
                 raise TypeError(f"{flag[0]} must be a boolean")
+        if self.do_M_ansatz0 is True:
+            self.do_M_mitigation = True
+        if self.do_M_ansatz0_plus is True:
+            self.do_M_mitigation = True
+            self.do_M_ansatz0 = True
 
     def update_flags(self, **kwargs) -> None:
         """Update mitigation flags with provided keyword arguments.
@@ -208,6 +215,7 @@ class MitigationFlags:
         self._validate_flags(kwargs)
         for flag, value in kwargs.items():
             setattr(self, flag, value)
+        print("You selected the following mitigation flags:\n" + self.status_report())
 
     def to_int(self) -> int:
         """Convert mitigation flags to an integer representation.
@@ -469,80 +477,11 @@ class Clique:
                 distr.append(clique_head.distr.data[0])  # raw data
         return heads, distr
 
-
-# class Savers:
-#     """ "Collection of savers for different classifiers."""
-
-#     def __init__(self):
-#         self.data: dict[int, dict[int, Clique]] = {0: {}}  # initialize raw results saver
-
-#     def add_saver(self, classifier: int):
-#         if classifier not in self.data.keys():
-#             self.data[classifier] = {}
-
-#     def get_saver(self, classifier: int) -> dict[int, "Clique"]:
-#         return self.data.get(classifier, {})
-
-#     def det_in_saver(self, det_int: int, mitigation_int: int = 0) -> bool:
-#         """Check if a determinant is in the saver.
-#         Args:
-#             det_int: Determinant integer.
-#             mitigation_int: Mitigation integer.
-#         Returns:
-#             True if determinant is in the saver, False otherwise.
-#         """
-#         return det_int in self.data[mitigation_int]
-
-#     def update_saver(self, det_int: int, mitigation_flags: MitigationFlags) -> None:
-#         """Update the saver with new det entries if needed.
-#         Args:
-#             det_int: Determinant integer.
-#             mitigation_flags: Mitigation flags object.
-#         """
-#         # Check for raw results
-#         if not self.det_in_saver(det_int):
-#             print("Make new Clique saver in raw results for determinant ", det_int)
-#             self.saver[0][det_int] = Clique()
-#         # Check for mitigated results
-#         if mitigation_flags.to_int() != 0 and not self.det_in_saver(det_int, mitigation_flags.to_int()):
-#             print(
-#                 "Make new Clique saver in mitigated results\n"
-#                 + mitigation_flags.status_report()
-#                 + "\nfor determinant ",
-#                 det_int,
-#             )
-#             self.add_saver(mitigation_flags.to_int())
-#             self.saver[mitigation_flags.to_int()][det_int] = Clique()
-
-#     def add_paulis(self, det_int: int, paulis: list[str], mitigation_flags: MitigationFlags) -> list[str]:
-#         """Add list of Pauli strings to cliques for specific det and mitigation result.
-
-#         Args:
-#             det_int: Determinant integer.
-#             paulis: Paulis to be added to cliques.
-#             mitigation_flags: Mitigation flags object.
-
-#         Returns:
-#             List of clique heads to be calculated.
-#         """
-#         # Update saver with new det entries if needed.
-#         self.update_saver(det_int, mitigation_flags)
-
-#         # Add paulis to the saver
-#         paulis_out = self.data[0][det_int].add_paulis(paulis)
-#         return paulis_out
-
-#     def reset(self):
-#         """Reset all saved data."""
-#         self.data = {0: {}}  # initialize raw results saver
-
-#     def save(self, path: str):
-#         with open(path, "wb") as f:
-#             pickle.dump(self.data, f)
-
-#     def load(self, path: str):
-#         with open(path, "rb") as f:
-#             self.data = pickle.load(f)
+    def print_cliques(self) -> None:
+        """Print all cliques and their distributions."""
+        print("Clique heads and their distributions:")
+        for clique_head in self.cliques:
+            print(f"Head: {clique_head.head}, Distribution: {clique_head.distr.data}")
 
 
 def fit_in_clique(pauli: str, head: str) -> tuple[bool, str]:

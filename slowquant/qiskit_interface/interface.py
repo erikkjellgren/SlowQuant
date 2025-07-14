@@ -2,6 +2,7 @@
 import copy
 import itertools
 import math
+import pickle
 from collections import defaultdict
 from typing import Any
 
@@ -1385,6 +1386,7 @@ class QuantumInterface:
             Array of quasi-distributions in order of all circuits results for a given Pauli String first.
             E.g.: [PauliString[0] for Circuit[0], PauliString[0] for Circuit[1], ...]
         """
+        print("running...")
         if self._circuit_multipl > 1:
             shots: int | None = self.max_shots_per_run
         else:
@@ -1645,15 +1647,32 @@ class QuantumInterface:
         # self._M = M would be needed to do v1 M correction.
         return np.linalg.inv(M)
 
+    def save_paulis_to_file(self, filename: str) -> None:
+        """Save all Pauli strings and their distributions to a file.
+
+        Args:
+            filename: Name of the file to save the data to.
+        """
+        with open(filename, "wb") as file:
+            pickle.dump(self.saver, file)
+
+    def load_paulis_from_file(self, filename: str) -> None:
+        """Load Pauli strings and their distributions from a file.
+
+        Args:
+            filename: Name of the file to load the data from.
+        """
+        with open(filename, "rb") as file:
+            self.saver = pickle.load(file)
+        print(f"Loaded Pauli strings from {filename}.")
+
     def get_info(self) -> None:
         """Get infos about settings."""
         if isinstance(self.ansatz, QuantumCircuit):
             data = f"Your settings are:\n {'Ansatz:':<20} {'custom circuit'}\n {'Number of shots:':<20} {self.shots}\n"
         else:
             data = f"Your settings are:\n {'Ansatz:':<20} {self.ansatz}\n {'Number of shots:':<20} {self.shots}\n"
-        data += f" {'ISA':<20} {self.ISA}\n {'Primitive:':<20} {self._primitive.__class__.__name__}\n"
-        data += f" {'Post-processing:':<20} {self.mitigation_flags.do_postselection}"
-        data += f"\n {'M mitigation:':<20} {self.mitigation_flags.do_M_mitigation}\n {'M Ansatz0:':<20} {self.mitigation_flags.do_M_ansatz0}"
+        data += f" {'ISA':<20} {self.ISA}\n {'Primitive:':<20} {self._primitive.__class__.__name__}"
         if self.ISA:
             data += f"\n {'Final layout:':<20} {self._final_ansatz_indices}"
             data += f"\n {'Non-local gates:':<20} {self.ansatz_circuit.num_nonlocal_gates()}"
@@ -1662,4 +1681,4 @@ class QuantumInterface:
                 data += f"\n {key:<20} {value}"
             if isinstance(self._primitive, BaseSamplerV2) and hasattr(self._primitive.options, "twirling"):
                 data += f"\n {'Pauli twirling:':<20} {self._primitive.options.twirling.enable_gates}\n {'Dynamic decoupling:':<20} {self._primitive.options.dynamical_decoupling.enable}"
-        print(data)
+        print(data + "\nMitigation flags:\n" + str(self.mitigation_flags.status_report()))
