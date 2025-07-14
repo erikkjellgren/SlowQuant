@@ -1213,10 +1213,9 @@ def test_state_average_Mplus() -> None:
     assert abs(QWF._calc_energy_elec() + 9.633426170009107) < 10**-6  # type: ignore  # CSFs option 4
 
     QI._reset_cliques()
-    assert (
-        abs(QWF._calc_energy_elec(M_per_superpos=True) + 9.635276750167002) < 10**-6  # type: ignore
-    )  # CSFs option 1
+    QI.update_mitigation_flags(do_M_ansatz0_plus=True)
+    assert abs(QWF._calc_energy_elec() + 9.635276750167002) < 10**-6  # type: ignore  # CSFs option 1
 
-    QI.update_mitigation_flags(do_postselection=True)
+    QI.update_mitigation_flags(do_postselection=True, do_M_ansatz0_plus=False)
     QI._reset_cliques()
     assert abs(QWF._calc_energy_elec() + 9.636464216617595) < 10**-6  # type: ignore  # CSFs option 4

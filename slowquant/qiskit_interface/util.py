@@ -153,19 +153,28 @@ class MitigationFlags:
     """Class to handle mitigation flags."""
 
     def __init__(
-        self, do_M_mitigation: bool = False, do_M_ansatz0: bool = False, do_postselection: bool = False
+        self,
+        do_M_mitigation: bool = False,
+        do_M_ansatz0: bool = False,
+        do_M_ansatz0_plus: bool = False,
+        do_postselection: bool = False,
     ):
         """Initialize mitigation flags.
 
         Args:
             do_M_mitigation: Whether to perform error mitigation.
             do_M_ansatz0: Whether to perform M0 mitigation.
+            do_M_ansatz0_plus: Whether to perform M0 mitigation for each initial superposition state.
             do_postselection: Whether to perform post-selection.
         """
         if do_M_ansatz0 is True:
             do_M_mitigation = True
+        if do_M_ansatz0_plus is True:
+            do_M_mitigation = True
+            do_M_ansatz0 = True
         self.do_M_mitigation = do_M_mitigation
         self.do_M_ansatz0 = do_M_ansatz0
+        self.do_M_ansatz0_plus = do_M_ansatz0_plus
         self.do_postselection = do_postselection
 
     def flag_order(self) -> list[str]:
@@ -174,7 +183,7 @@ class MitigationFlags:
         Returns:
             List of flag names in the order they should be processed.
         """
-        return ["do_M_mitigation", "do_M_ansatz0", "do_postselection"]
+        return ["do_M_mitigation", "do_M_ansatz0", "do_M_ansatz0_plus", "do_postselection"]
 
     def _validate_flags(self, flag_dict):
         """Validate the provided flags against the defined flag_order.

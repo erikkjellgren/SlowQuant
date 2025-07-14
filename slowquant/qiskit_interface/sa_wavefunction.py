@@ -826,14 +826,11 @@ class WaveFunctionSA:
             osc_strs[idx] = 2 / 3 * excitation_energy * (td_x**2 + td_y**2 + td_z**2)
         return osc_strs
 
-    def _calc_energy_elec(
-        self, ISA_csfs_option: int = 0, M_per_superpos: bool = False, rep: int = 1
-    ) -> list[float] | float:
+    def _calc_energy_elec(self, ISA_csfs_option: int = 0, rep: int = 1) -> list[float] | float:
         """Run electronic energy simulation.
 
         Args:
             ISA_csfs_option: Option for how to deal with superposition state circuits.
-            M_per_superpos: Switch on M0 per superposition state.
             rep: Repeat energy calculation for statistics.
 
         Returns:
@@ -849,7 +846,6 @@ class WaveFunctionSA:
                     H,
                     (coeffs, csf),
                     ISA_csfs_option=ISA_csfs_option,
-                    M_per_superpos=M_per_superpos,
                 )
 
             return energy / self.num_states
@@ -862,7 +858,6 @@ class WaveFunctionSA:
                     H,
                     (coeffs, csf),
                     ISA_csfs_option=ISA_csfs_option,
-                    M_per_superpos=M_per_superpos,
                 )
             energy = energy / self.num_states
             energies.append(energy)

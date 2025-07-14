@@ -57,6 +57,7 @@ class QuantumInterface:
         max_shots_per_run: int = 100000,
         do_M_mitigation: bool = False,
         do_M_ansatz0: bool = False,
+        do_M_ansatz0_plus: bool = False,
         do_postselection: bool = False,
     ) -> None:
         """Interface to Qiskit to use IBM quantum hardware or simulator.
@@ -72,6 +73,7 @@ class QuantumInterface:
             max_shots_per_run: Maximum number of shots allowed in a single run. Set to 100000 per IBM machines.
             do_M_mitigation: Do error mitigation via read-out correlation matrix.
             do_M_ansatz0: Use the ansatz with theta=0 when constructing the read-out correlation matrix.
+            do_M_ansatz0_plus: Creates M0 for each initia superposition state. Only used for SA-VQE.
             do_postselection: Use postselection to preserve number of particles in the computational basis.
         """
         if ansatz_options is None:
@@ -112,6 +114,7 @@ class QuantumInterface:
         self.mitigation_flags: MitigationFlags = MitigationFlags(
             do_M_mitigation=do_M_mitigation,
             do_M_ansatz0=do_M_ansatz0,
+            do_M_ansatz0_plus=do_M_ansatz0_plus,
             do_postselection=do_postselection,
         )
         self._Minv = None
@@ -687,7 +690,6 @@ class QuantumInterface:
         ket_csf: tuple[list[float], list[str]],
         custom_parameters: list[float] | None = None,
         ISA_csfs_option: int = 0,
-        M_per_superpos: bool = False,
         reverse_csfs_order: bool = False,
     ) -> float:
         r"""Calculate expectation value using different bra and ket of a Hermitian operator.
@@ -726,7 +728,6 @@ class QuantumInterface:
                 2: Fixed layout but allow change in order (swaps).
                 3: Fixed layout, fixed order, without optimizing circuit after composing.
                 4: Fixed layout, fixed order, with optimizing circuit after composing.
-            M_per_superpos: A new M_Ansatz0 matrix for each superposition state.
             reverse_csfs_order: If true, the pair-entangled superposition states' order is reversed.
                 This might be relevant as the order can influence the circuit depths.
 
@@ -742,22 +743,16 @@ class QuantumInterface:
             raise ValueError(
                 "quantum_expectation_value_csfs got unsupported Qiskit primitive, {type(self._primitive)}"
             )
-        if M_per_superpos and isinstance(self._primitive, BaseEstimator):
+        if self.mitigation_flags.do_M_ansatz0_plus and isinstance(self._primitive, BaseEstimator):
             raise ValueError("Base estimator does not support M_Ansatz0")
-        if (
-            M_per_superpos
-            and (self.mitigation_flags.do_M_ansatz0 + self.mitigation_flags.do_M_mitigation) != 2
-        ):
-            raise ValueError(
-                "You requested M_per_superpos but M error mitigation / M_Ansatz0 was not selected in QI settings."
-            )
+
         # Option handling
         if ISA_csfs_option == 0:
             ISA_csfs_option = 1  # could also be 2
             if (
                 self.mitigation_flags.do_M_mitigation
                 and self.ansatz_circuit.layout is not None
-                and not M_per_superpos
+                and not self.mitigation_flags.do_M_ansatz0_plus
             ):
                 ISA_csfs_option = 2
                 if self.mitigation_flags.do_M_ansatz0:
@@ -866,7 +861,7 @@ class QuantumInterface:
                     circuit = self.ansatz_circuit.compose(state, front=True)
                 # val_old = val  # debug
                 # Check if M per superposition circuit is requested
-                if M_per_superpos:
+                if self.mitigation_flags.do_M_ansatz0_plus:
                     state_corr = state.copy()
                     # Get state circuit without non-local gates
                     for idx, instruction in reversed(list(enumerate(state_corr.data))):
