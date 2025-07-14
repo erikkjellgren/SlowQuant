@@ -1075,6 +1075,7 @@ class QuantumInterface:
             # if yes, do nothing and go to value calculation.
             # if not, generate new mitigated data based on raw data.
             # one could maybe also think of doing mitigation and its saving when new_heads is not empty.
+            # that might make it faster!
             head_mit, distr_raw = self.saver[det_int].get_empty_heads_distr(self.mitigation_flags.to_int())
 
             if len(head_mit) != 0:
@@ -1104,6 +1105,7 @@ class QuantumInterface:
                                 raise ValueError("Detected layout conflict. Cannot do M mitigation.")
                     else:
                         # get custom M
+                        # that might be wrong to do ? think about it!
                         Minv = self._make_Minv(shots=self._M_shots, custom_ansatz=circuit_M)
                         # custom M -> no layout check needed / possible
                         for i, dist in enumerate(distr_raw):
