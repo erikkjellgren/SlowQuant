@@ -1087,41 +1087,10 @@ class QuantumInterface:
 
             if len(head_mit) != 0:
                 if self.mitigation_flags.do_M_mitigation:  # apply error mitigation if requested
-                    if circuit_M is None:
-                        # Check if read-out matrix already exists.
-                        if self._Minv is None:
-                            # do stantard M
-                            self._Minv = self._make_Minv(shots=self._M_shots)
-                        # Check if layout conflict in M and current circuit
-                        match self._check_layout_conflict(run_circuit):
-                            case 0:  # no layout - no order conflict
-                                for i, dist in enumerate(distr_raw):
-                                    distr_raw[i] = correct_distribution(dist, self._Minv)
-                            case 1:  # no layout, but order conflict
-                                if self.mitigation_flags.do_M_ansatz0:
-                                    raise ValueError("Detected order conflict. Not possile to do M Ansatz0")
-                                print("Detected order conflict. Applying M re-ordering.")
-                                for i, dist in enumerate(distr_raw):
-                                    distr_raw[i] = correct_distribution_with_layout_v2(  # maybe v1 is better.
-                                        dist,
-                                        self._Minv,
-                                        self._final_ansatz_indices,
-                                        run_circuit.layout.final_index_layout(),
-                                    )
-                            case 2:  # layout conflict
-                                raise ValueError("Detected layout conflict. Cannot do M mitigation.")
-                    else:
-                        # get custom M
-                        # that might be wrong to do ? think about it!
-                        Minv = self._make_Minv(shots=self._M_shots, custom_ansatz=circuit_M)
-                        # custom M -> no layout check needed / possible
-                        for i, dist in enumerate(distr_raw):
-                            distr_raw[i] = correct_distribution(dist, Minv)
+                    self._apply_M_mitigation(distr_raw, run_circuit, circuit_M)
 
-                if self.mitigation_flags.do_postselection:
-                    for i, (dist, head) in enumerate(zip(distr_raw, head_mit)):
-                        if "X" not in head and "Y" not in head:
-                            distr_raw[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
+                if self.mitigation_flags.do_postselection:  # apply post-selection if requested
+                    self._apply_postselection(distr_raw, head_mit)
 
                 # save mitigated results
                 self.saver[det_int].update_distr(head_mit, distr_raw, self.mitigation_flags.to_int())
@@ -1182,14 +1151,6 @@ class QuantumInterface:
                 f"Got unknown operator type {type(op)}, expected FermionicOperator or SparsePauliOp"
             )
 
-        # Check if error mitigation is requested and if read-out matrix already exists.
-        if self.mitigation_flags.do_M_mitigation:
-            if circuit_M is None:
-                if self._Minv is None:
-                    self._Minv = self._make_Minv(shots=self._M_shots)
-            else:
-                Minv = self._make_Minv(shots=self._M_shots, custom_ansatz=circuit_M)
-
         paulis_str = [str(x) for x in observables.paulis]
         if do_cliques:
             # Obtain cliques for operator's Pauli strings
@@ -1201,33 +1162,11 @@ class QuantumInterface:
             # and return a list of distributions
             distr = self._one_call_sampler_distributions(new_heads, run_parameters, run_circuit)
             if self.mitigation_flags.do_M_mitigation:  # apply error mitigation if requested
-                if circuit_M is None:
-                    # Check if layout conflict in M and current circuit
-                    match self._check_layout_conflict(run_circuit):
-                        case 0:  # no layout - no order conflict
-                            for i, dist in enumerate(distr):
-                                distr[i] = correct_distribution(dist, self._Minv)
-                        case 1:  # no layout, but order conflict
-                            if self.mitigation_flags.do_M_ansatz0:
-                                raise ValueError("Detected order conflict. Not possible to do M Ansatz0.")
-                            print("Detected order conflict. Applying M re-ordering.")
-                            for i, dist in enumerate(distr):
-                                distr[i] = correct_distribution_with_layout_v2(  # maybe v1 is better.
-                                    dist,
-                                    self._Minv,
-                                    self._final_ansatz_indices,
-                                    run_circuit.layout.final_index_layout(),
-                                )
-                        case 2:  # layout conflict
-                            raise ValueError("Detected layout conflict. Cannot do M mitigation.")
-                else:
-                    # custom M -> no layout check needed / possible
-                    for i, dist in enumerate(distr):
-                        distr[i] = correct_distribution(dist, Minv)
-            if self.mitigation_flags.do_postselection:
-                for i, (dist, head) in enumerate(zip(distr, new_heads)):
-                    if "X" not in head and "Y" not in head:
-                        distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
+                self._apply_M_mitigation(distr, run_circuit, circuit_M)
+
+            if self.mitigation_flags.do_postselection:  # apply post-selection if requested
+                self._apply_postselection(distr, new_heads)
+
             cliques.update_distr(new_heads, distr)
 
             # Loop over all Pauli strings in observable and build final result with coefficients
@@ -1240,33 +1179,10 @@ class QuantumInterface:
             # Simulate each Pauli string with one combined device call
             distr = self._one_call_sampler_distributions(paulis_str, run_parameters, run_circuit)
             if self.mitigation_flags.do_M_mitigation:  # apply error mitigation if requested
-                if circuit_M is None:
-                    # Check if layout conflict in M and current circuit
-                    match self._check_layout_conflict(run_circuit):
-                        case 0:  # no layout - no order conflict
-                            for i, dist in enumerate(distr):
-                                distr[i] = correct_distribution(dist, self._Minv)
-                        case 1:  # no layout, but order conflict
-                            if self.mitigation_flags.do_M_ansatz0:
-                                raise ValueError("Detected order conflict. Not possile to do M Ansatz0")
-                            print("Detected order conflict. Applying M re-ordering.")
-                            for i, dist in enumerate(distr):
-                                distr[i] = correct_distribution_with_layout_v2(  # maybe v1 is better.
-                                    dist,
-                                    self._Minv,
-                                    self._final_ansatz_indices,
-                                    run_circuit.layout.final_index_layout(),
-                                )
-                        case 2:  # layout conflict
-                            raise ValueError("Detected layout conflict. Cannot do M mitigation.")
-                else:
-                    # custom M -> no layout check needed / possible
-                    for i, dist in enumerate(distr):
-                        distr[i] = correct_distribution(dist, Minv)
-            if self.mitigation_flags.do_postselection:
-                for i, (dist, pauli) in enumerate(zip(distr, paulis_str)):
-                    if "X" not in pauli and "Y" not in pauli:
-                        distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
+                self._apply_M_mitigation(distr, run_circuit, circuit_M)
+
+            if self.mitigation_flags.do_postselection:  # apply post-selection if requested
+                self._apply_postselection(distr, paulis_str)
 
             # Loop over all Pauli strings in observable and build final result with coefficients
             for pauli, coeff, dist in zip(paulis_str, observables.coeffs, distr):
@@ -1370,6 +1286,60 @@ class QuantumInterface:
                 var_p = 4 * np.abs(coeff.real) ** 2 * np.abs(p1 - p1**2) / (self.shots)
             result += var_p
         return result
+
+    def _apply_M_mitigation(
+        self,
+        distr: list[dict[int, float]],
+        run_circuit: QuantumCircuit,
+        circuit_M: QuantumCircuit | None = None,
+    ) -> None:
+        """Apply M mitigation to the distributions.
+
+        Args:
+            distr: List of distributions to be mitigated.
+            run_circuit: The circuit used for running the distributions.
+            circuit_M: Optional custom circuit for M_Ansatz0 mitigation.
+        """
+        if circuit_M is None:
+            # Check if read-out matrix already exists.
+            if self._Minv is None:
+                # do stantard M
+                self._Minv = self._make_Minv(shots=self._M_shots)
+            # Check if layout conflict in M and current circuit
+            match self._check_layout_conflict(run_circuit):
+                case 0:  # no layout - no order conflict
+                    for i, dist in enumerate(distr):
+                        distr[i] = correct_distribution(dist, self._Minv)
+                case 1:  # no layout, but order conflict
+                    if self.mitigation_flags.do_M_ansatz0:
+                        raise ValueError("Detected order conflict. Not possile to do M Ansatz0")
+                    print("Detected order conflict. Applying M re-ordering.")
+                    for i, dist in enumerate(distr):
+                        distr[i] = correct_distribution_with_layout_v2(  # maybe v1 is better.
+                            dist,
+                            self._Minv,
+                            self._final_ansatz_indices,
+                            run_circuit.layout.final_index_layout(),
+                        )
+                case 2:  # layout conflict
+                    raise ValueError("Detected layout conflict. Cannot do M mitigation.")
+        else:
+            # get custom M
+            Minv = self._make_Minv(shots=self._M_shots, custom_ansatz=circuit_M)
+            # custom M -> no layout check needed / possible
+            for i, dist in enumerate(distr):
+                distr[i] = correct_distribution(dist, Minv)
+
+    def _apply_postselection(self, distr: list[dict[int, float]], heads: list[str]) -> None:
+        """Apply post-selection to the distributions.
+
+        Args:
+            distr: List of distributions to be post-selected.
+            heads: List of Pauli strings (heads).
+        """
+        for i, (dist, head) in enumerate(zip(distr, heads)):
+            if "X" not in head and "Y" not in head:
+                distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
 
     def _one_call_sampler_distributions(
         self,
