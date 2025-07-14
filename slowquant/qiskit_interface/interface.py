@@ -57,7 +57,7 @@ class QuantumInterface:
         max_shots_per_run: int = 100000,
         do_M_mitigation: bool = False,
         do_M_ansatz0: bool = False,
-        do_postselection: bool = True,
+        do_postselection: bool = False,
     ) -> None:
         """Interface to Qiskit to use IBM quantum hardware or simulator.
 

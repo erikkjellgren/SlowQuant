@@ -1094,6 +1094,7 @@ def test_state_average_M() -> None:
         ISA=True,
         do_M_mitigation=True,
         do_M_ansatz0=True,
+        do_postselection=True,
         pass_manager_options={"backend": FakeTorino(), "seed_transpiler": 1234},
     )
 
@@ -1189,7 +1190,7 @@ def test_state_average_Mplus() -> None:
     )
     QWF.ansatz_parameters = WF.thetas
 
-    assert abs(WF._sa_energy - QWF._calc_energy_elec()) < 10**-6
+    assert abs(WF._sa_energy - QWF._calc_energy_elec()) < 10**-6  # type: ignore
 
     noise_model = NoiseModel.from_backend(FakeTorino())
     sampler = SamplerAer(backend_options={"noise_model": noise_model})
@@ -1197,15 +1198,15 @@ def test_state_average_Mplus() -> None:
 
     QI.shots = None
     QI.ISA = True
-    QI.update_mitigation_flags(do_postselection = False)
+    QI.update_mitigation_flags(do_postselection=False)
     QI.update_pass_manager({"backend": FakeTorino(), "seed_transpiler": 1234})
 
-    QI.update_mitigation_flags(do_M_mitigation = False, do_M_ansatz0 = False)
+    QI.update_mitigation_flags(do_M_mitigation=False, do_M_ansatz0=False)
 
     QI._reset_cliques()
     assert abs(QWF._calc_energy_elec() + 9.60851106217584) < 10**-6  # type: ignore  # CSFs option 1
 
-    QI.update_mitigation_flags(do_M_mitigation = True, do_M_ansatz0 = True)
+    QI.update_mitigation_flags(do_M_mitigation=True, do_M_ansatz0=True)
     QI.redo_M_mitigation()
 
     QI._reset_cliques()
@@ -1216,6 +1217,6 @@ def test_state_average_Mplus() -> None:
         abs(QWF._calc_energy_elec(M_per_superpos=True) + 9.635276750167002) < 10**-6  # type: ignore
     )  # CSFs option 1
 
-    QI.update_mitigation_flags(do_postselection = True)
+    QI.update_mitigation_flags(do_postselection=True)
     QI._reset_cliques()
     assert abs(QWF._calc_energy_elec() + 9.636464216617595) < 10**-6  # type: ignore  # CSFs option 4
