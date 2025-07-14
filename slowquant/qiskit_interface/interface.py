@@ -902,7 +902,7 @@ class QuantumInterface:
                     elif isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
                         if save_paulis:
                             val += N * self._sampler_quantum_expectation_value(
-                                op, run_circuit=circuit, det=bra_det + ket_det
+                                op, run_circuit=circuit, det=bra_det + ket_det, csfs_option=ISA_csfs_option
                             )
                         else:
                             val += N * self._sampler_quantum_expectation_value_nosave(
@@ -1011,6 +1011,7 @@ class QuantumInterface:
         run_circuit: QuantumCircuit | None = None,
         det: str | None = None,
         circuit_M: None | QuantumCircuit = None,
+        csfs_option: int = 1,
     ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
 
@@ -1054,7 +1055,17 @@ class QuantumInterface:
 
         if det_int not in self.saver:
             print("Make new Clique saver for determinant ", det)
-            self.saver[det_int] = Clique()
+            self.saver[det_int] = Clique(csfs_option)
+        else:
+            # If a different csfs option has been used in SA-VQE that means the circuit has been altered.
+            # Thus, we cannot use raw results from an unaltered circuit run with a different csfs_option.
+            if self.saver[det_int].csfs_option != csfs_option:
+                print(
+                    "Warning: Clique saver for determinant ",
+                    det,
+                    " has different csfs_option than requested. Rerunning raw data.",
+                )
+                self.saver[det_int] = Clique(csfs_option)
 
         paulis_str = [str(x) for x in observables.paulis]
         new_heads = self.saver[det_int].add_paulis(paulis_str)
@@ -1386,7 +1397,6 @@ class QuantumInterface:
             Array of quasi-distributions in order of all circuits results for a given Pauli String first.
             E.g.: [PauliString[0] for Circuit[0], PauliString[0] for Circuit[1], ...]
         """
-        print("running...")
         if self._circuit_multipl > 1:
             shots: int | None = self.max_shots_per_run
         else:

@@ -217,6 +217,12 @@ class MitigationFlags:
             self.do_M_ansatz0 = True
         print("You selected the following mitigation flags:\n" + self.status_report())
 
+    def all_to_false(self) -> None:
+        """Set all mitigation flags to False."""
+        for flag in self.flag_order():
+            setattr(self, flag, False)
+        print("All mitigation flags set to False.")
+
     def to_int(self) -> int:
         """Convert mitigation flags to an integer representation.
 
@@ -329,9 +335,10 @@ class Clique:
     #. 10.1109/TQE.2020.3035814, Sec. IV. A, IV. B, and VIII.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, csfs_option: int = 1) -> None:
         """Initialize clique class."""
         self.cliques: list[CliqueHead] = []
+        self.csfs_option = csfs_option
 
     def add_paulis(self, paulis: list[str]) -> list[str]:
         """Add list of Pauli strings to cliques and return clique heads to be simulated.
@@ -482,6 +489,14 @@ class Clique:
         print("Clique heads and their distributions:")
         for clique_head in self.cliques:
             print(f"Head: {clique_head.head}, Distribution: {clique_head.distr.data}")
+
+    def print_clique_heads(self) -> None:
+        """Print all clique heads."""
+        print("Clique heads:")
+        heads = []
+        for clique_head in self.cliques:
+            heads.append(clique_head.head)
+        print(heads)
 
 
 def fit_in_clique(pauli: str, head: str) -> tuple[bool, str]:
