@@ -7,7 +7,6 @@ from typing import Any
 
 import numpy as np
 import scipy
-import scipy.optimize
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
@@ -29,7 +28,11 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
 from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import UpsStructure
-
+from slowquant.unitary_coupled_cluster.operators import (
+    G1,
+    G2,
+)
+from slowquant.unitary_coupled_cluster.util import iterate_t1, iterate_t2
 
 class WaveFunctionUPS:
     def __init__(
@@ -247,9 +250,14 @@ class WaveFunctionUPS:
                 # default option
                 self.ansatz_options["n_layers"] = 1
             self.ups_layout.create_SDSfUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
+        elif ansatz.lower() == "adapt":
+            None
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
-        self._thetas = np.zeros(self.ups_layout.n_params).tolist()
+        if self.ups_layout.n_params == 0 :
+            self._thetas = []
+        else: 
+            self._thetas = np.zeros(self.ups_layout.n_params).tolist()
 
     @property
     def kappa(self) -> list[float]:
@@ -919,6 +927,104 @@ class WaveFunctionUPS:
         else:
             self.thetas = res.x.tolist()
         self._energy_elec = res.fun
+
+    
+    def do_adapt(self, maxiter=1000, epoch=10e-6):    
+        excitation_pool: list[tuple[int, ...]] = []
+        excitation_pool_type: list[str] = []
+        for a, i in iterate_t1(self.active_occ_spin_idx, self.active_unocc_spin_idx):
+        #for a, i in iterate_t1_sa(self.active_occ_spin_idx, self.active_unocc_spin_idx):
+            excitation_pool.append((int(a),int(i)))            
+            excitation_pool_type.append("single")
+        for a, i, b, j in iterate_t2(self.active_occ_spin_idx, self.active_unocc_spin_idx):
+            print(a, i , b, j)
+            excitation_pool.append((i, j, a, b))
+            excitation_pool_type.append("double")
+        print(self.ups_layout.excitation_indices)
+        print(self.ups_layout.excitation_operator_type)
+        
+        
+        grad = None
+        nloop = 0
+        for i in range(maxiter):
+            Hamiltonian = hamiltonian_0i_0a(
+                self.h_mo,
+                self.g_mo,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+            )
+            
+            grad = []
+            
+            for i in range(len(excitation_pool_type)):
+                T = None
+                if excitation_pool_type[i] == "single":
+                    (i, a) = np.array(excitation_pool[i]) 
+                    T = G1(i, a, True)
+                elif excitation_pool_type[i] == "double":
+                    (i, j, a, b) = np.array(excitation_pool[i]) 
+                    T = G2(i, j, a, b, True)
+                gr = expectation_value(self.ci_coeffs,[T, Hamiltonian],  self.ci_coeffs,
+                                    self.ci_info, self.thetas,self.ups_layout)
+                gr -= expectation_value(self.ci_coeffs,[ Hamiltonian, T],  self.ci_coeffs,
+                                    self.ci_info, self.thetas,self.ups_layout)
+                grad.append(gr)
+                
+            print()
+            print("Printing Grad and Excitation Pool")
+            print("#################################")
+            print(
+                    f"------GP{str("").center(72)}"
+                )
+            print(
+                    f"------GP{str("-----------------------------------------------------------------------------------").center(72)}"
+                )
+            print(
+                    f"------GP{str("Grad").center(27)} | {str("Excitation Pool indices").center(18)} | {str("Excitation Pool type").center(27)}"
+                )
+            for i in range(len(grad)):
+                
+                print(
+                    f"------GP{str(grad[i]).center(27)} | {str(excitation_pool[i]).center(18)} | {excitation_pool_type[i].center(27)}"
+                )
+
+            print()
+            print(np.argmax(np.abs(grad)))
+            max_arg = np.argmax(np.abs(grad))
+            if(np.max(np.abs(grad)) < epoch):
+                nloop = i
+                break
+            self.ups_layout.excitation_indices.append(np.array(excitation_pool[max_arg])-self.num_inactive_spin_orbs)
+            self.ups_layout.excitation_operator_type.append(excitation_pool_type[max_arg])
+            #del excitation_pool[max_arg]
+            #del excitation_pool_type[max_arg]
+            self.ups_layout.n_params += 1
+            excitation_pool = excitation_pool
+            excitation_pool_type = excitation_pool_type
+            
+            self._thetas.append(0.0)
+            print()
+            print("Printing UPS layout")
+            print("#############")
+            #print(self.ups_layout.excitation_indices)
+            #print()
+            self.run_wf_optimization_1step("bfgs", False)
+            print()
+            print("Printing the Optimised Theta")
+            print("############################")
+            
+            print(
+                    f"--------{str("Thetas").center(27)} | {str("UPS Layout indices").center(18)} | {str("Excitation indices").center(18)} | {str("UPS Layout type").center(27)}"
+                )
+            for i in range(len(self._thetas)):
+                
+                print(
+                    f"--------{str(self._thetas[i]).center(27)} | {str(self.ups_layout.excitation_indices[i]).center(18)} |{str(self.ups_layout.excitation_indices[i] + self.num_inactive_spin_orbs ).center(18)} | {self.ups_layout.excitation_operator_type[i].center(27)}"
+                )
+        print("------GP  Number of Loop", end = " ")
+        print(nloop)
+        
+        
 
     def _calc_energy_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
