@@ -1380,3 +1380,66 @@ def test_no_saving() -> None:
 
     QI.update_mitigation_flags(do_postselection=False, do_M_ansatz0=True)
     assert abs(QWF._calc_energy_elec() + 9.63342617000911) < 10**-6  # type: ignore
+
+
+def test_variance() -> None:
+    """Test variance calculation."""
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """Li  0.0           0.0  0.0;
+        H  0.735           0.0  0.0;
+        """,
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("sto-3g")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
+
+    # Conventional UPS wave function
+    WF = WaveFunctionUPS(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 2),
+        SQobj.hartree_fock.mo_coeff,
+        h_core,
+        g_eri,
+        "tUPS",
+        ansatz_options={"n_layers": 1, "skip_last_singles": True},
+        include_active_kappa=True,
+    )
+    WF.run_ups(True)
+
+    noise_model = NoiseModel.from_backend(FakeTorino())  # That might change
+    sampler = SamplerAer(backend_options={"noise_model": noise_model})
+    mapper = JordanWignerMapper()
+    QI = QuantumInterface(
+        sampler,
+        "tUPS",
+        mapper,
+        ansatz_options={"n_layers": 1, "skip_last_singles": True},
+        ISA=True,
+        do_M_mitigation=False,
+        do_M_ansatz0=False,
+        do_postselection=False,
+        pass_manager_options={"backend": FakeTorino(), "seed_transpiler": 1234},
+    )
+
+    qWF = WaveFunction(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 2),
+        WF.c_trans,
+        h_core,
+        g_eri,
+        QI,
+    )
+    qWF.ansatz_parameters = WF.thetas
+
+    qWF._calc_energy_elec()
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.040592737332136634) < 10**-6  # type: ignore
+
+    QI.update_mitigation_flags(do_postselection=True)
+    qWF._calc_energy_elec()
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.024708172056620556) < 10**-6  # type: ignore

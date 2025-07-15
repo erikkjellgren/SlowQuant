@@ -1206,9 +1206,12 @@ class QuantumInterface:
     ) -> float:
         """Calculate variance (std**2) of expectation value of circuit and observables.
 
+        This works either by accessing the saver distributions or by claculating each expectation value from scratch.
+        If they are calculated from scratch, no error mitigation can be applied.
+
         Args:
             op: SlowQuant fermionic operator.
-            do_cliques: boolean if cliques are used.
+            do_cliques: boolean if cliques are used. They are accessed via the saver.
             no_coeffs: boolean if coefficients of each Pauli string are used or all st to 1.
             custom_parameters: optional custom circuit parameters.
 
@@ -1237,33 +1240,6 @@ class QuantumInterface:
                 f"Got unknown operator type {type(op)}, expected FermionicOperator or SparsePauliOp"
             )
 
-        if do_cliques:
-            if det_int not in self.saver:
-                self.saver[det_int] = Clique()
-
-            new_heads = self.saver[det_int].add_paulis([str(x) for x in observables.paulis])
-
-            if len(new_heads) != 0:
-                # Check if error mitigation is requested and if read-out matrix already exists.
-                if self.mitigation_flags.do_M_mitigation and self._Minv is None:
-                    self._Minv = self._make_Minv()
-
-                # Simulate each clique head with one combined device call
-                # and return a list of distributions
-                distr = self._one_call_sampler_distributions(new_heads, run_parameters, self.circuit)
-                if self.mitigation_flags.do_M_mitigation:  # apply error mitigation if requested
-                    for i, dist in enumerate(distr):
-                        distr[i] = correct_distribution(dist, self._Minv)
-                if self.mitigation_flags.do_postselection:
-                    for i, (dist, head) in enumerate(zip(distr, new_heads)):
-                        if "X" not in head and "Y" not in head:
-                            distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
-                self.saver[det_int].update_distr(new_heads, distr)
-        else:
-            print(
-                "WARNING: REM and Post-Selection not implemented for quantum variance without the use of cliques."
-            )
-
         # Loop over all Pauli strings in observable and build final result with coefficients
         result = 0.0
         paulis_str = [str(x) for x in observables.paulis]
@@ -1272,7 +1248,7 @@ class QuantumInterface:
                 coeff = 1
             # Get distribution from cliques
             if do_cliques:
-                dist = self.saver[det_int].get_distr(pauli)
+                dist = self.saver[det_int].get_distr(pauli, self.mitigation_flags.to_int())
                 # Calculate p1: Probability of measuring one
                 p1 = 0.0
                 for key, value in dist.items():
