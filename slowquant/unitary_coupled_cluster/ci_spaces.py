@@ -2,7 +2,7 @@ from collections.abc import Generator
 
 import numpy as np
 from sympy.utilities.iterables import multiset_permutations
-
+import numba as nb
 
 class CI_Info:
     __slots__ = (
@@ -43,7 +43,11 @@ class CI_Info:
         self.num_active_elec_alpha = num_active_elec_alpha
         self.num_active_elec_beta = num_active_elec_beta
         self.idx2det = idx2det
-        self.det2idx = det2idx
+        nb_dict = nb.typed.Dict.empty(key_type=nb.int64, value_type=nb.int64)
+        # Populate it
+        for k, v in det2idx.items():
+            nb_dict[k] = v
+        self.det2idx = nb_dict
         self.space_extension_offset = 0
 
 

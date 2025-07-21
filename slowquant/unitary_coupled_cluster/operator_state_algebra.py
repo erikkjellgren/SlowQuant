@@ -111,7 +111,7 @@ def propagate_state(
     new_state = np.copy(state)
     tmp_state = np.zeros_like(state)
     # Create bitstrings for parity check. Contains occupied determinant up to orbital index.
-    parity_check = np.zeros(2 * num_active_orbs + 1, dtype=int)
+    parity_check = np.zeros(2 * num_active_orbs + 1, dtype=np.int64)
     num = 0
     for i in range(2 * num_active_orbs - 1, -1, -1):
         num += 2**i
@@ -160,78 +160,59 @@ def propagate_state(
                         create_idx.append(fermi_op[0])
                     else:
                         anni_idx.append(fermi_op[0])
-                anni_idx = np.array(anni_idx, dtype=int)
-                create_idx = np.array(create_idx, dtype=int)
-                # loop over all determinants in new_state
-                for i, det in get_determinants(idx2det, new_state, anni_idx, create_idx, num_active_orbs):
-                    phase_changes = 0
-                    # evaluate how string of annihilation operator change det
-                    for fermi_op in reversed(op_folded.operators[fermi_label]):
-                        orb_idx = fermi_op[0]
-                        det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
-                        # take care of phases using parity_check
-                        phase_changes += (det & parity_check[orb_idx]).bit_count()
-                    if do_unsafe:
-                        # For some algorithms it is guaranteed that the application of operators will always
-                        # keep the new determinants within a pre-defined space (in det2idx and idx2det).
-                        # For these algorithms it is a sign of bug if a keyerror when calling det2idx is found.
-                        # These algorithms thus does also not need to check for the exsistence of the new determinant
-                        # in det2idx.
-                        # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
-                        if det not in det2idx:
-                            continue
-                    tmp_state[det2idx[det]] += (
-                        op_folded.factors[fermi_label] * (-1) ** phase_changes * new_state[i]
-                    )  # Update value
+                anni_idx = np.array(anni_idx, dtype=np.int64)
+                create_idx = np.array(create_idx, dtype=np.int64)
+                tmp_state = apply_operator(new_state, anni_idx, create_idx, num_active_orbs, parity_check, idx2det, det2idx, do_unsafe, tmp_state, op_folded.factors[fermi_label])
             new_state = np.copy(tmp_state)
     return new_state
 
+@nb.jit(nopython=True)
+def apply_operator(new_state, anni_idxs, create_idxs, num_active_orbs, parity_check, idx2det, det2idx, do_unsafe, tmp_state, factor):
+    # loop over all determinants in new_state
+    for i, det in enumerate(idx2det):
+        if abs(new_state[i]) < 10**-14:
+            continue
+        phase_changes = 0
+        is_killstate = False
+        # evaluate how string of annihilation operator change det
+        for orb_idx in anni_idxs[::-1]:
+            if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 0:
+                is_killstate = True
+                break
+            det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
+            # take care of phases using parity_check
+            phase_changes += bitcount(det & parity_check[orb_idx])
+        if is_killstate:
+            continue
+        for orb_idx in create_idxs[::-1]:
+            if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 1:
+                is_killstate = True
+                break
+            det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
+            # take care of phases using parity_check
+            phase_changes += bitcount(det & parity_check[orb_idx])
+        if is_killstate:
+            continue
+        if do_unsafe:
+            # For some algorithms it is guaranteed that the application of operators will always
+            # keep the new determinants within a pre-defined space (in det2idx and idx2det).
+            # For these algorithms it is a sign of bug if a keyerror when calling det2idx is found.
+            # These algorithms thus does also not need to check for the exsistence of the new determinant
+            # in det2idx.
+            # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
+            if det not in det2idx:
+                continue
+        tmp_state[det2idx[det]] += factor * (-1) ** phase_changes * new_state[i]
+    return tmp_state
+
 
 @nb.jit(nopython=True)
-def get_determinants(
-    det: np.ndarray,
-    state: np.ndarray,
-    anni_idxs: np.ndarray,
-    create_idxs: np.ndarray,
-    num_active_orbs: int,
-) -> Generator[tuple[int, int], None, None]:
-    """Generate relevant determinants.
-
-    This part is factored out for performance - jit.
-
-    This generator yields determinants that does need reach kill-state.
-    It is assumed that operators are normal-ordered for the checking of kill-state to work.
-
-    Args:
-        det: List of all determinants.
-        state: State-vector.
-        anni_idxs: Annihilation operator indices.
-        create_idxs: Creation operator indices.
-        num_active_orbs: Number of active spatial orbitals.
-
-    Returns:
-        Index of determinant and determinant.
-    """
-    for i, val in enumerate(state):
-        if abs(val) < 10**-14:
-            continue
-        for anni_idx in anni_idxs:
-            if (det[i] >> 2 * num_active_orbs - 1 - anni_idx) & 1 == 1:
-                continue
-            # If an annihilation operator works on zero, then we reach kill-state.
-            break
-        else:  # no-break
-            for create_idx in create_idxs:
-                if create_idx in anni_idxs:
-                    # A creation operator can always act on index that an annihilation operator,
-                    # has previously worked on.
-                    continue
-                if (det[i] >> 2 * num_active_orbs - 1 - create_idx) & 1 == 0:
-                    continue
-                # If creation operator works on one, then we reach kill-state.
-                break
-            else:  # no-break
-                yield i, det[i]
+def bitcount(x):
+    b = 0
+    while x > 0:
+        x &= nb.uint64(x - 1)  # x &= x - nb.uint64(1)  works too
+        b += 1
+    return b
 
 
 def propagate_state_SA(

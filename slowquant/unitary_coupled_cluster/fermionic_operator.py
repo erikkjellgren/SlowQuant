@@ -4,10 +4,7 @@ import copy
 import re
 
 
-class a_op:
-    __slots__ = ("dagger", "idx", "spin", "spinless_idx")
-
-    def __init__(self, spinless_idx: int, spin: str, dagger: bool) -> None:
+def a_op(spinless_idx: int, spin: str, dagger: bool) -> tuple[int, bool]:
         """Initialize fermionic annihilation operator.
 
         Args:
@@ -17,15 +14,13 @@ class a_op:
         """
         if spin not in ("alpha", "beta"):
             raise ValueError(f'spin must be "alpha" or "beta" got {spin}')
-        self.spinless_idx = spinless_idx
-        self.idx = 2 * self.spinless_idx
-        self.dagger = dagger
-        self.spin = spin
-        if self.spin == "beta":
-            self.idx += 1
+        idx = 2 * spinless_idx
+        if spin == "beta":
+            idx += 1
+        return (idx, dagger)
 
 
-def a_op_spin(spin_idx: int, dagger: bool) -> a_op:
+def a_op_spin(spin_idx: int, dagger: bool) -> tuple[int, bool]:
     """Get fermionic annihilation operator.
 
     Args:
@@ -35,9 +30,7 @@ def a_op_spin(spin_idx: int, dagger: bool) -> a_op:
     Returns:
         Annihilation operator.
     """
-    if spin_idx % 2 == 0:
-        return a_op(spin_idx // 2, "alpha", dagger)
-    return a_op(spin_idx // 2, "beta", dagger)
+    return (spin_idx, dagger)
 
 
 def operator_string_to_key(operator_string: list[tuple[int, bool]]) -> str:
@@ -135,7 +128,7 @@ def do_extended_normal_ordering(
                         next_operator[i], next_operator[j] = next_operator[j], next_operator[i]
                         factor *= -1
                         changed = True
-                elif a.dagger and not b.dagger:
+                elif a[1] and not b[1]:
                     pass
                 elif a[0] == b[0]:
                     is_zero = True
