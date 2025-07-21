@@ -156,10 +156,10 @@ def propagate_state(
                 anni_idx = []
                 create_idx = []
                 for fermi_op in op_folded.operators[fermi_label]:
-                    if fermi_op.dagger:
-                        create_idx.append(fermi_op.idx)
+                    if fermi_op[1]:
+                        create_idx.append(fermi_op[0])
                     else:
-                        anni_idx.append(fermi_op.idx)
+                        anni_idx.append(fermi_op[0])
                 anni_idx = np.array(anni_idx, dtype=int)
                 create_idx = np.array(create_idx, dtype=int)
                 # loop over all determinants in new_state
@@ -167,7 +167,7 @@ def propagate_state(
                     phase_changes = 0
                     # evaluate how string of annihilation operator change det
                     for fermi_op in reversed(op_folded.operators[fermi_label]):
-                        orb_idx = fermi_op.idx
+                        orb_idx = fermi_op[0]
                         det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
                         # take care of phases using parity_check
                         phase_changes += (det & parity_check[orb_idx]).bit_count()

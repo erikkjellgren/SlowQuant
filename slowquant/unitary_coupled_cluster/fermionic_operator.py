@@ -40,7 +40,7 @@ def a_op_spin(spin_idx: int, dagger: bool) -> a_op:
     return a_op(spin_idx // 2, "beta", dagger)
 
 
-def operator_string_to_key(operator_string: list[a_op]) -> str:
+def operator_string_to_key(operator_string: list[tuple[int, bool]]) -> str:
     """Make key string to index a fermionic operator in a dict structure.
 
     Args:
@@ -51,14 +51,14 @@ def operator_string_to_key(operator_string: list[a_op]) -> str:
     """
     string_key = ""
     for a in operator_string:
-        if a.dagger:
-            string_key += f"c{a.idx}"
+        if a[1]:
+            string_key += f"c{a[0]}"
         else:
-            string_key += f"a{a.idx}"
+            string_key += f"a{a[0]}"
     return string_key
 
 
-def operator_to_qiskit_key(operator_string: list[a_op], remapping: dict[int, int]) -> str:
+def operator_to_qiskit_key(operator_string: list[tuple[int, bool]], remapping: dict[int, int]) -> str:
     """Make key string to index a fermionic operator in a dict structure.
 
     Args:
@@ -71,16 +71,16 @@ def operator_to_qiskit_key(operator_string: list[a_op], remapping: dict[int, int
     """
     string_key = ""
     for a in operator_string:
-        if a.dagger:
-            string_key += f" +_{remapping[a.idx]}"
+        if a[1]:
+            string_key += f" +_{remapping[a[0]]}"
         else:
-            string_key += f" -_{remapping[a.idx]}"
+            string_key += f" -_{remapping[a[0]]}"
     return string_key[1:]
 
 
 def do_extended_normal_ordering(
     fermistring: FermionicOperator,
-) -> tuple[dict[str, list[a_op]], dict[str, float]]:
+) -> tuple[dict[str, list[tuple[int, bool]]], dict[str, float]]:
     """Reorder fermionic operator string.
 
     The string will be ordered such that all creation operators are first,
@@ -113,15 +113,15 @@ def do_extended_normal_ordering(
                 b = next_operator[current_idx + 1]
                 i = current_idx
                 j = current_idx + 1
-                if a.dagger and b.dagger:
-                    if a.idx == b.idx:
+                if a[1] and b[1]:
+                    if a[0] == b[0]:
                         is_zero = True
-                    elif a.idx < b.idx:
+                    elif a[0] < b[0]:
                         next_operator[i], next_operator[j] = next_operator[j], next_operator[i]
                         factor *= -1
                         changed = True
-                elif not a.dagger and b.dagger:
-                    if a.idx == b.idx:
+                elif not a[1] and b[1]:
+                    if a[0] == b[0]:
                         new_op = copy.copy(next_operator)
                         new_op.pop(j)
                         new_op.pop(i)
@@ -137,9 +137,9 @@ def do_extended_normal_ordering(
                         changed = True
                 elif a.dagger and not b.dagger:
                     pass
-                elif a.idx == b.idx:
+                elif a[0] == b[0]:
                     is_zero = True
-                elif a.idx < b.idx:
+                elif a[0] < b[0]:
                     next_operator[i], next_operator[j] = next_operator[j], next_operator[i]
                     factor *= -1
                     changed = True
@@ -165,7 +165,7 @@ class FermionicOperator:
     __slots__ = ("factors", "operators")
 
     def __init__(
-        self, annihilation_operator: dict[str, list[a_op]] | a_op, factor: dict[str, float] | float
+        self, annihilation_operator: dict[str, list[tuple[int, bool]]] | tuple[int, bool], factor: dict[str, float] | float
     ) -> None:
         """Initialize fermionic operator class.
 
@@ -250,7 +250,7 @@ class FermionicOperator:
         Returns:
             New fermionic operator.
         """
-        operators: dict[str, list[a_op]] = {}
+        operators: dict[str, list[tuple[int, bool]]] = {}
         factors: dict[str, float] = {}
         # Iterate over all strings in both FermionicOperators
         for string_key1 in fermistring.operators.keys():
@@ -307,10 +307,10 @@ class FermionicOperator:
         for key_string in self.operators.keys():
             new_op = []
             for op in reversed(self.operators[key_string]):
-                if op.dagger:
-                    new_op.append(a_op(op.spinless_idx, op.spin, False))
+                if op[1]:
+                    new_op.append((op[0], False))
                 else:
-                    new_op.append(a_op(op.spinless_idx, op.spin, True))
+                    new_op.append((op[0], True))
             new_string_key = operator_string_to_key(new_op)
             operators[new_string_key] = new_op
             factors[new_string_key] = self.factors[key_string]
@@ -415,21 +415,19 @@ class FermionicOperator:
             fac = 1
             # Loop over individual annihilation operator and sort into spaces
             for anni in self.operators[key_string]:
-                if anni.dagger:
-                    if anni.idx in inactive_idx:
-                        inactive_dagger.append(anni.idx)
-                    elif anni.idx in active_idx:
-                        active_dagger.append(
-                            a_op(anni.spinless_idx - num_inactive_orbs, anni.spin, anni.dagger)
-                        )
-                    elif anni.idx in virtual_idx:
-                        virtual_dagger.append(anni.idx)
-                elif anni.idx in inactive_idx:
-                    inactive.append(anni.idx)
-                elif anni.idx in active_idx:
-                    active.append(a_op(anni.spinless_idx - num_inactive_orbs, anni.spin, anni.dagger))
-                elif anni.idx in virtual_idx:
-                    virtual.append(anni.idx)
+                if anni[1]:
+                    if anni[0] in inactive_idx:
+                        inactive_dagger.append(anni[0])
+                    elif anni[0] in active_idx:
+                        active_dagger.append((anni[0] - 2*num_inactive_orbs, anni[1]))
+                    elif anni[0] in virtual_idx:
+                        virtual_dagger.append(anni[0])
+                elif anni[0] in inactive_idx:
+                    inactive.append(anni[0])
+                elif anni[0] in active_idx:
+                    active.append((anni[0] - 2*num_inactive_orbs, anni[1]))
+                elif anni[0] in virtual_idx:
+                    virtual.append(anni[0])
             # Any virtual indices will make the operator evaluate to zero.
             if len(virtual) != 0 or len(virtual_dagger) != 0:
                 continue
