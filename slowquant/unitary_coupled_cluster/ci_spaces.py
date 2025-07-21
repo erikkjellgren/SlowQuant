@@ -1,8 +1,9 @@
 from collections.abc import Generator
 
+import numba as nb
 import numpy as np
 from sympy.utilities.iterables import multiset_permutations
-import numba as nb
+
 
 class CI_Info:
     __slots__ = (

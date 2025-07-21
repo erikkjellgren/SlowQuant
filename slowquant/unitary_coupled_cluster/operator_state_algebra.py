@@ -162,12 +162,35 @@ def propagate_state(
                         anni_idx.append(fermi_op[0])
                 anni_idx = np.array(anni_idx, dtype=np.int64)
                 create_idx = np.array(create_idx, dtype=np.int64)
-                tmp_state = apply_operator(new_state, anni_idx, create_idx, num_active_orbs, parity_check, idx2det, det2idx, do_unsafe, tmp_state, op_folded.factors[fermi_label])
+                tmp_state = apply_operator(
+                    new_state,
+                    anni_idx,
+                    create_idx,
+                    num_active_orbs,
+                    parity_check,
+                    idx2det,
+                    det2idx,
+                    do_unsafe,
+                    tmp_state,
+                    op_folded.factors[fermi_label],
+                )
             new_state = np.copy(tmp_state)
     return new_state
 
+
 @nb.jit(nopython=True)
-def apply_operator(new_state, anni_idxs, create_idxs, num_active_orbs, parity_check, idx2det, det2idx, do_unsafe, tmp_state, factor):
+def apply_operator(
+    new_state,
+    anni_idxs,
+    create_idxs,
+    num_active_orbs,
+    parity_check,
+    idx2det,
+    det2idx,
+    do_unsafe,
+    tmp_state,
+    factor,
+):
     # loop over all determinants in new_state
     for i, det in enumerate(idx2det):
         if abs(new_state[i]) < 10**-14:

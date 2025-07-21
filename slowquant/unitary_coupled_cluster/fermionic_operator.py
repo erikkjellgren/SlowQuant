@@ -5,19 +5,19 @@ import re
 
 
 def a_op(spinless_idx: int, spin: str, dagger: bool) -> tuple[int, bool]:
-        """Initialize fermionic annihilation operator.
+    """Initialize fermionic annihilation operator.
 
-        Args:
-            spinless_idx: Spatial orbital index.
-            spin: Alpha or beta spin.
-            dagger: If creation operator.
-        """
-        if spin not in ("alpha", "beta"):
-            raise ValueError(f'spin must be "alpha" or "beta" got {spin}')
-        idx = 2 * spinless_idx
-        if spin == "beta":
-            idx += 1
-        return (idx, dagger)
+    Args:
+        spinless_idx: Spatial orbital index.
+        spin: Alpha or beta spin.
+        dagger: If creation operator.
+    """
+    if spin not in ("alpha", "beta"):
+        raise ValueError(f'spin must be "alpha" or "beta" got {spin}')
+    idx = 2 * spinless_idx
+    if spin == "beta":
+        idx += 1
+    return (idx, dagger)
 
 
 def a_op_spin(spin_idx: int, dagger: bool) -> tuple[int, bool]:
@@ -158,7 +158,9 @@ class FermionicOperator:
     __slots__ = ("factors", "operators")
 
     def __init__(
-        self, annihilation_operator: dict[str, list[tuple[int, bool]]] | tuple[int, bool], factor: dict[str, float] | float
+        self,
+        annihilation_operator: dict[str, list[tuple[int, bool]]] | tuple[int, bool],
+        factor: dict[str, float] | float,
     ) -> None:
         """Initialize fermionic operator class.
 
@@ -412,13 +414,13 @@ class FermionicOperator:
                     if anni[0] in inactive_idx:
                         inactive_dagger.append(anni[0])
                     elif anni[0] in active_idx:
-                        active_dagger.append((anni[0] - 2*num_inactive_orbs, anni[1]))
+                        active_dagger.append((anni[0] - 2 * num_inactive_orbs, anni[1]))
                     elif anni[0] in virtual_idx:
                         virtual_dagger.append(anni[0])
                 elif anni[0] in inactive_idx:
                     inactive.append(anni[0])
                 elif anni[0] in active_idx:
-                    active.append((anni[0] - 2*num_inactive_orbs, anni[1]))
+                    active.append((anni[0] - 2 * num_inactive_orbs, anni[1]))
                 elif anni[0] in virtual_idx:
                     virtual.append(anni[0])
             # Any virtual indices will make the operator evaluate to zero.
