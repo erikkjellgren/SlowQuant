@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-import re
 
 
 def a_op(spinless_idx: int, spin: str, dagger: bool) -> tuple[int, bool]:
@@ -212,6 +211,26 @@ class FermionicOperator:
                 operators[string_key] = fermistring.operators[string_key]
                 factors[string_key] = fermistring.factors[string_key]
         return FermionicOperator(operators, factors)
+
+    def __iadd__(self, fermistring: FermionicOperator) -> FermionicOperator:
+        """Inplace addition of two fermionic operators.
+
+        Args:
+            fermistring: Fermionic operator.
+
+        Returns:
+            Updated fermionic operator.
+        """
+        for string_key in fermistring.operators.keys():
+            if string_key in self.operators.keys():
+                self.factors[string_key] += fermistring.factors[string_key]
+                if abs(self.factors[string_key]) < 10**-14:
+                    del self.factors[string_key]
+                    del self.operators[string_key]
+            else:
+                self.operators[string_key] = fermistring.operators[string_key]
+                self.factors[string_key] = fermistring.factors[string_key]
+        return self
 
     def __sub__(self, fermistring: FermionicOperator) -> FermionicOperator:
         """Subtraction of two fermionic operators.
@@ -448,19 +467,3 @@ class FermionicOperator:
                 factors[new_key] = fac * self.factors[key_string]
                 operators[new_key] = active_op
         return FermionicOperator(operators, factors)
-
-    def get_info(self) -> tuple[list[list[int]], list[list[int]], list[float]]:
-        """Return operator excitation in ordered strings with coefficient."""
-        excitations = list(self.factors.keys())
-        coefficients = list(self.factors.values())
-        creation = []
-        annihilation = []
-        for op_string in excitations:
-            numbers = re.findall(r"\d+", op_string)
-            numbers = [int(num) for num in numbers]
-            midpoint = len(numbers) // 2
-            c = numbers[:midpoint]
-            a = numbers[midpoint:]
-            creation.append(c)
-            annihilation.append(a)
-        return annihilation, creation, coefficients
