@@ -255,7 +255,28 @@ class FermionicOperator:
                 factors[string_key] = -fermistring.factors[string_key]
         return FermionicOperator(operators, factors)
 
-    def __mul__(self, fermistring: FermionicOperator) -> FermionicOperator:
+    def __isub__(self, fermistring: FermionicOperator) -> FermionicOperator:
+        """Inplace subtraction of two fermionic operators.
+
+        Args:
+            fermistring: Fermionic operator.
+
+        Returns:
+            Update fermionic operator.
+        """
+        # Combine annihilation string entries of two FermionicOperators with relevant sign flip.
+        for string_key in fermistring.operators.keys():
+            if string_key in self.operators.keys():
+                self.factors[string_key] -= fermistring.factors[string_key]
+                if abs(self.factors[string_key]) < 10**-14:
+                    del self.factors[string_key]
+                    del self.operators[string_key]
+            else:
+                self.operators[string_key] = fermistring.operators[string_key]
+                self.factors[string_key] = -fermistring.factors[string_key]
+        return self
+
+    def __mul__(self, fermistring: FermionicOperator | float | int) -> FermionicOperator:
         """Multiplication of two fermionic operators.
 
         Args:
@@ -264,34 +285,90 @@ class FermionicOperator:
         Returns:
             New fermionic operator.
         """
-        operators: dict[str, list[tuple[int, bool]]] = {}
-        factors: dict[str, float] = {}
-        # Iterate over all strings in both FermionicOperators
-        for string_key1 in fermistring.operators.keys():
-            for string_key2 in self.operators.keys():
-                # Build new strings and factors via normal ordering of product of two strings
-                new_ops, new_facs = do_extended_normal_ordering(
-                    FermionicOperator(
-                        {
-                            string_key1 + string_key2: self.operators[string_key2]
-                            + fermistring.operators[string_key1]
-                        },
-                        {
-                            string_key1 + string_key2: self.factors[string_key2]
-                            * fermistring.factors[string_key1]
-                        },
+        if type(fermistring) in (float, int):
+            operators = copy.copy(self.operators)
+            factors = copy.copy(self.factors)
+            for string_key in self.factors.keys():
+                # The name fermistring is misleading here.
+                factors[string_key] *= fermistring
+        elif type(fermistring) is FermionicOperator:
+            operators: dict[str, list[tuple[int, bool]]] = {}
+            factors: dict[str, float] = {}
+            # Iterate over all strings in both FermionicOperators
+            for string_key1 in fermistring.operators.keys():
+                for string_key2 in self.operators.keys():
+                    # Build new strings and factors via normal ordering of product of two strings
+                    new_ops, new_facs = do_extended_normal_ordering(
+                        FermionicOperator(
+                            {
+                                string_key1 + string_key2: self.operators[string_key2]
+                                + fermistring.operators[string_key1]
+                            },
+                            {
+                                string_key1 + string_key2: self.factors[string_key2]
+                                * fermistring.factors[string_key1]
+                            },
+                        )
                     )
-                )
-                for str_key in new_ops:
-                    if str_key not in operators.keys():
-                        operators[str_key] = new_ops[str_key]
-                        factors[str_key] = new_facs[str_key]
-                    else:
-                        factors[str_key] += new_facs[str_key]
-                        if abs(factors[str_key]) < 10**-14:
-                            del factors[str_key]
-                            del operators[str_key]
+                    for str_key in new_ops:
+                        if str_key not in operators.keys():
+                            operators[str_key] = new_ops[str_key]
+                            factors[str_key] = new_facs[str_key]
+                        else:
+                            factors[str_key] += new_facs[str_key]
+                            if abs(factors[str_key]) < 10**-14:
+                                del factors[str_key]
+                                del operators[str_key]
+        else:
+            raise TypeError(f"Got unknown type of fermistring: {type(fermistring)}")
         return FermionicOperator(operators, factors)
+
+    def __imul__(self, fermistring: FermionicOperator | float | int) -> FermionicOperator:
+        """Inplace multiplication of two fermionic operators.
+
+        Args:
+            fermistring: Fermionic operator.
+
+        Returns:
+            Updated fermionic operator.
+        """
+        if type(fermistring) in (float, int):
+            for string_key in self.factors.keys():
+                # The name fermistring is misleading here.
+                self.factors[string_key] *= fermistring
+        elif type(fermistring) is FermionicOperator:
+            operators: dict[str, list[tuple[int, bool]]] = {}
+            factors: dict[str, float] = {}
+            # Iterate over all strings in both FermionicOperators
+            for string_key1 in fermistring.operators.keys():
+                for string_key2 in self.operators.keys():
+                    # Build new strings and factors via normal ordering of product of two strings
+                    new_ops, new_facs = do_extended_normal_ordering(
+                        FermionicOperator(
+                            {
+                                string_key1 + string_key2: self.operators[string_key2]
+                                + fermistring.operators[string_key1]
+                            },
+                            {
+                                string_key1 + string_key2: self.factors[string_key2]
+                                * fermistring.factors[string_key1]
+                            },
+                        )
+                    )
+                    for str_key in new_ops:
+                        if str_key not in operators.keys():
+                            operators[str_key] = new_ops[str_key]
+                            factors[str_key] = new_facs[str_key]
+                        else:
+                            factors[str_key] += new_facs[str_key]
+                            if abs(factors[str_key]) < 10**-14:
+                                del factors[str_key]
+                                del operators[str_key]
+            self.factors = factors
+            self.operators = operators
+        else:
+            raise TypeError(f"Got unknown type of fermistring: {type(fermistring)}")
+        return self
 
     def __rmul__(self, number: float) -> FermionicOperator:
         """Multiplication of number with fermionic operator.
@@ -307,6 +384,18 @@ class FermionicOperator:
         for key_string in self.operators:
             operators[key_string] = self.operators[key_string]
             factors[key_string] = self.factors[key_string] * number
+        return FermionicOperator(operators, factors)
+
+    def __neg__(self):
+        """Negate the factors in a fermionic operator.
+
+        Retunrs:
+            New fermionic operator.
+        """
+        operators = copy.copy(self.operators)
+        factors = copy.copy(self.factors)
+        for string_key in self.factors.keys():
+            factors[string_key] = -factors[string_key]
         return FermionicOperator(operators, factors)
 
     @property

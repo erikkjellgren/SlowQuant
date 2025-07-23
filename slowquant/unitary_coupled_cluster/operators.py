@@ -57,9 +57,11 @@ def epqrs(p: int, q: int, r: int, s: int) -> FermionicOperator:
     Returns:
         Singlet two-electron excitation operator.
     """
+    op = Epq(p, q)
+    op *= Epq(r, s)
     if q == r:
-        return Epq(p, q) * Epq(r, s) - Epq(p, s)
-    return Epq(p, q) * Epq(r, s)
+        op -= Epq(p, s)
+    return op
 
 
 def Eminuspq(p: int, q: int) -> FermionicOperator:
@@ -75,7 +77,9 @@ def Eminuspq(p: int, q: int) -> FermionicOperator:
     Returns:
         Singlet one-electron excitation operator.
     """
-    return Epq(p, q) - Epq(q, p)
+    op = Epq(p, q)
+    op -= Epq(q, p)
+    return op
 
 
 def commutator(A: FermionicOperator, B: FermionicOperator) -> FermionicOperator:
@@ -138,7 +142,7 @@ def G1(i: int, a: int, return_anti_hermitian: bool = False) -> FermionicOperator
     """
     op = FermionicOperator(a_op_spin(a, dagger=True), 1) * FermionicOperator(a_op_spin(i, dagger=False), 1)
     if return_anti_hermitian:
-        return op - op.dagger
+        op -= op.dagger
     return op
 
 
@@ -198,7 +202,7 @@ def G3(
         * FermionicOperator(a_op_spin(i, dagger=False), 1)
     )
     if return_anti_hermitian:
-        return op - op.dagger
+        op -= op.dagger
     return op
 
 
@@ -235,7 +239,7 @@ def G4(
         * FermionicOperator(a_op_spin(i, dagger=False), 1)
     )
     if return_anti_hermitian:
-        return op - op.dagger
+        op -= op.dagger
     return op
 
 
@@ -286,7 +290,7 @@ def G5(
         * FermionicOperator(a_op_spin(i, dagger=False), 1)
     )
     if return_anti_hermitian:
-        return op - op.dagger
+        op -= op.dagger
     return op
 
 
@@ -344,7 +348,7 @@ def G6(
         * FermionicOperator(a_op_spin(i, dagger=False), 1)
     )
     if return_anti_hermitian:
-        return op - op.dagger
+        op -= op.dagger
     return op
 
 
@@ -364,7 +368,7 @@ def G1_sa(i: int, a: int, return_anti_hermitian: bool = False) -> FermionicOpera
     """
     op = 2 ** (-1 / 2) * Epq(a, i)
     if return_anti_hermitian:
-        return op - op.dagger
+        op -= op.dagger
     return op
 
 
@@ -391,7 +395,7 @@ def G2_1_sa(i: int, j: int, a: int, b: int, return_anti_hermitian: bool = False)
         fac *= 2
     op = 1 / 2 * (fac) ** (-1 / 2) * (Epq(a, i) * Epq(b, j) + Epq(a, j) * Epq(b, i))
     if return_anti_hermitian:
-        return op - op.dagger
+        op -= op.dagger
     return op
 
 
@@ -413,7 +417,7 @@ def G2_2_sa(i: int, j: int, a: int, b: int, return_anti_hermitian: bool = False)
     """
     op = 1 / (2 * 3 ** (1 / 2)) * (Epq(a, i) * Epq(b, j) - Epq(a, j) * Epq(b, i))
     if return_anti_hermitian:
-        return op - op.dagger
+        op -= op.dagger
     return op
 
 
