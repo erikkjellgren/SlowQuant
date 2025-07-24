@@ -191,6 +191,8 @@ def apply_operator(
     tmp_state,
     factor,
 ):
+    anni_idxs = anni_idxs[::-1]
+    create_idxs = create_idxs[::-1]
     # loop over all determinants in new_state
     for i, det in enumerate(idx2det):
         if abs(new_state[i]) < 10**-14:
@@ -198,7 +200,7 @@ def apply_operator(
         phase_changes = 0
         is_killstate = False
         # evaluate how string of annihilation operator change det
-        for orb_idx in anni_idxs[::-1]:
+        for orb_idx in anni_idxs:
             if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 0:
                 is_killstate = True
                 break
@@ -207,7 +209,7 @@ def apply_operator(
             phase_changes += bitcount(det & parity_check[orb_idx])
         if is_killstate:
             continue
-        for orb_idx in create_idxs[::-1]:
+        for orb_idx in create_idxs:
             if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 1:
                 is_killstate = True
                 break
@@ -233,7 +235,7 @@ def apply_operator(
 def bitcount(x):
     b = 0
     while x > 0:
-        x &= nb.uint64(x - 1)  # x &= x - nb.uint64(1)  works too
+        x &= x - 1
         b += 1
     return b
 

@@ -32,7 +32,7 @@ def a_op_spin(spin_idx: int, dagger: bool) -> tuple[int, bool]:
     return (spin_idx, dagger)
 
 
-def operator_string_to_key(operator_string: list[tuple[int, bool]]) -> str:
+def operator_string_to_key(operator_string: list[tuple[int, bool]]) -> tuple[tuple[int, bool], ...]:
     """Make key string to index a fermionic operator in a dict structure.
 
     Args:
@@ -41,13 +41,7 @@ def operator_string_to_key(operator_string: list[tuple[int, bool]]) -> str:
     Returns:
         Dictionary key.
     """
-    string_key = ""
-    for a in operator_string:
-        if a[1]:
-            string_key += f"c{a[0]}"
-        else:
-            string_key += f"a{a[0]}"
-    return string_key
+    return tuple(operator_string)
 
 
 def operator_to_qiskit_key(operator_string: list[tuple[int, bool]], remapping: dict[int, int]) -> str:
@@ -438,6 +432,24 @@ class FermionicOperator:
             else:
                 op_count[op_lenght] += 1
         return op_count
+
+    @property
+    def operator_readable(self) -> dict[str, float]:
+        """Get the operator in human readable format.
+
+        Returns:
+            Operator in humanreable format.
+        """
+        operator = {}
+        for string, fac in self.factors.items():
+            string_key = ""
+            for a in self.operators[string]:
+                if a[1]:
+                    string_key += f"c{a[0]}"
+                else:
+                    string_key += f"a{a[0]}"
+            operator[string_key] = fac
+        return operator
 
     def get_qiskit_form(self, num_orbs: int) -> dict[str, float]:
         """Get fermionic operator on qiskit form.
