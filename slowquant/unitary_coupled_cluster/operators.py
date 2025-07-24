@@ -33,12 +33,11 @@ def Epq(p: int, q: int) -> FermionicOperator:
     Returns:
         Singlet one-electron excitation operator.
     """
-    E = FermionicOperator(a_op(p, "alpha", dagger=True), 1) * FermionicOperator(
-        a_op(q, "alpha", dagger=False), 1
-    )
-    E += FermionicOperator(a_op(p, "beta", dagger=True), 1) * FermionicOperator(
-        a_op(q, "beta", dagger=False), 1
-    )
+    E = FermionicOperator(a_op(p, "alpha", dagger=True), 1)
+    E *= FermionicOperator(a_op(q, "alpha", dagger=False), 1)
+    tmp = FermionicOperator(a_op(p, "beta", dagger=True), 1)
+    tmp *= FermionicOperator(a_op(q, "beta", dagger=False), 1)
+    E += tmp
     return E
 
 
@@ -140,7 +139,8 @@ def G1(i: int, a: int, return_anti_hermitian: bool = False) -> FermionicOperator
     Returns:
         One-electron excitation operator.
     """
-    op = FermionicOperator(a_op_spin(a, dagger=True), 1) * FermionicOperator(a_op_spin(i, dagger=False), 1)
+    op = FermionicOperator(a_op_spin(a, dagger=True), 1)
+    op *= FermionicOperator(a_op_spin(i, dagger=False), 1)
     if return_anti_hermitian:
         op -= op.dagger
     return op
@@ -162,14 +162,12 @@ def G2(i: int, j: int, a: int, b: int, return_anti_hermitian: bool = False) -> F
     Returns:
         Two-electron excitation operator.
     """
-    op = (
-        FermionicOperator(a_op_spin(a, dagger=True), 1)
-        * FermionicOperator(a_op_spin(b, dagger=True), 1)
-        * FermionicOperator(a_op_spin(j, dagger=False), 1)
-        * FermionicOperator(a_op_spin(i, dagger=False), 1)
-    )
+    op = FermionicOperator(a_op_spin(a, dagger=True), 1)
+    op *= FermionicOperator(a_op_spin(b, dagger=True), 1)
+    op *= FermionicOperator(a_op_spin(j, dagger=False), 1)
+    op *= FermionicOperator(a_op_spin(i, dagger=False), 1)
     if return_anti_hermitian:
-        return op - op.dagger
+        op -= op.dagger
     return op
 
 
@@ -193,14 +191,12 @@ def G3(
     Returns:
         Three-electron excitation operator.
     """
-    op = (
-        FermionicOperator(a_op_spin(a, dagger=True), 1)
-        * FermionicOperator(a_op_spin(b, dagger=True), 1)
-        * FermionicOperator(a_op_spin(c, dagger=True), 1)
-        * FermionicOperator(a_op_spin(k, dagger=False), 1)
-        * FermionicOperator(a_op_spin(j, dagger=False), 1)
-        * FermionicOperator(a_op_spin(i, dagger=False), 1)
-    )
+    op = FermionicOperator(a_op_spin(a, dagger=True), 1)
+    op *= FermionicOperator(a_op_spin(b, dagger=True), 1)
+    op *= FermionicOperator(a_op_spin(c, dagger=True), 1)
+    op *= FermionicOperator(a_op_spin(k, dagger=False), 1)
+    op *= FermionicOperator(a_op_spin(j, dagger=False), 1)
+    op *= FermionicOperator(a_op_spin(i, dagger=False), 1)
     if return_anti_hermitian:
         op -= op.dagger
     return op
@@ -228,16 +224,14 @@ def G4(
     Returns:
         Four-electron excitation operator.
     """
-    op = (
-        FermionicOperator(a_op_spin(a, dagger=True), 1)
-        * FermionicOperator(a_op_spin(b, dagger=True), 1)
-        * FermionicOperator(a_op_spin(c, dagger=True), 1)
-        * FermionicOperator(a_op_spin(d, dagger=True), 1)
-        * FermionicOperator(a_op_spin(l, dagger=False), 1)
-        * FermionicOperator(a_op_spin(k, dagger=False), 1)
-        * FermionicOperator(a_op_spin(j, dagger=False), 1)
-        * FermionicOperator(a_op_spin(i, dagger=False), 1)
-    )
+    op = FermionicOperator(a_op_spin(a, dagger=True), 1)
+    op *= FermionicOperator(a_op_spin(b, dagger=True), 1)
+    op *= FermionicOperator(a_op_spin(c, dagger=True), 1)
+    op *= FermionicOperator(a_op_spin(d, dagger=True), 1)
+    op *= FermionicOperator(a_op_spin(l, dagger=False), 1)
+    op *= FermionicOperator(a_op_spin(k, dagger=False), 1)
+    op *= FermionicOperator(a_op_spin(j, dagger=False), 1)
+    op *= FermionicOperator(a_op_spin(i, dagger=False), 1)
     if return_anti_hermitian:
         op -= op.dagger
     return op
@@ -277,18 +271,16 @@ def G5(
     Returns:
         Five-electron excitation operator.
     """
-    op = (
-        FermionicOperator(a_op_spin(a, dagger=True), 1)
-        * FermionicOperator(a_op_spin(b, dagger=True), 1)
-        * FermionicOperator(a_op_spin(c, dagger=True), 1)
-        * FermionicOperator(a_op_spin(d, dagger=True), 1)
-        * FermionicOperator(a_op_spin(e, dagger=True), 1)
-        * FermionicOperator(a_op_spin(m, dagger=False), 1)
-        * FermionicOperator(a_op_spin(l, dagger=False), 1)
-        * FermionicOperator(a_op_spin(k, dagger=False), 1)
-        * FermionicOperator(a_op_spin(j, dagger=False), 1)
-        * FermionicOperator(a_op_spin(i, dagger=False), 1)
-    )
+    op = FermionicOperator(a_op_spin(a, dagger=True), 1)
+    op *= FermionicOperator(a_op_spin(b, dagger=True), 1)
+    op *= FermionicOperator(a_op_spin(c, dagger=True), 1)
+    op *= FermionicOperator(a_op_spin(d, dagger=True), 1)
+    op *= FermionicOperator(a_op_spin(e, dagger=True), 1)
+    op *= FermionicOperator(a_op_spin(m, dagger=False), 1)
+    op *= FermionicOperator(a_op_spin(l, dagger=False), 1)
+    op *= FermionicOperator(a_op_spin(k, dagger=False), 1)
+    op *= FermionicOperator(a_op_spin(j, dagger=False), 1)
+    op *= FermionicOperator(a_op_spin(i, dagger=False), 1)
     if return_anti_hermitian:
         op -= op.dagger
     return op
@@ -333,20 +325,18 @@ def G6(
     Returns:
         Six-electron excitation operator.
     """
-    op = (
-        FermionicOperator(a_op_spin(a, dagger=True), 1)
-        * FermionicOperator(a_op_spin(b, dagger=True), 1)
-        * FermionicOperator(a_op_spin(c, dagger=True), 1)
-        * FermionicOperator(a_op_spin(d, dagger=True), 1)
-        * FermionicOperator(a_op_spin(e, dagger=True), 1)
-        * FermionicOperator(a_op_spin(f, dagger=True), 1)
-        * FermionicOperator(a_op_spin(n, dagger=False), 1)
-        * FermionicOperator(a_op_spin(m, dagger=False), 1)
-        * FermionicOperator(a_op_spin(l, dagger=False), 1)
-        * FermionicOperator(a_op_spin(k, dagger=False), 1)
-        * FermionicOperator(a_op_spin(j, dagger=False), 1)
-        * FermionicOperator(a_op_spin(i, dagger=False), 1)
-    )
+    op = FermionicOperator(a_op_spin(a, dagger=True), 1)
+    op *= FermionicOperator(a_op_spin(b, dagger=True), 1)
+    op *= FermionicOperator(a_op_spin(c, dagger=True), 1)
+    op *= FermionicOperator(a_op_spin(d, dagger=True), 1)
+    op *= FermionicOperator(a_op_spin(e, dagger=True), 1)
+    op *= FermionicOperator(a_op_spin(f, dagger=True), 1)
+    op *= FermionicOperator(a_op_spin(n, dagger=False), 1)
+    op *= FermionicOperator(a_op_spin(m, dagger=False), 1)
+    op *= FermionicOperator(a_op_spin(l, dagger=False), 1)
+    op *= FermionicOperator(a_op_spin(k, dagger=False), 1)
+    op *= FermionicOperator(a_op_spin(j, dagger=False), 1)
+    op *= FermionicOperator(a_op_spin(i, dagger=False), 1)
     if return_anti_hermitian:
         op -= op.dagger
     return op
