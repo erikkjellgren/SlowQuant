@@ -32,18 +32,6 @@ def a_op_spin(spin_idx: int, dagger: bool) -> tuple[int, bool]:
     return (spin_idx, dagger)
 
 
-def operator_string_to_key(operator_string: list[tuple[int, bool]]) -> tuple[tuple[int, bool], ...]:
-    """Make key string to index a fermionic operator in a dict structure.
-
-    Args:
-        operator_string: Fermionic operators.
-
-    Returns:
-        Dictionary key.
-    """
-    return tuple(operator_string)
-
-
 def operator_to_qiskit_key(operator_string: list[tuple[int, bool]], remapping: dict[int, int]) -> str:
     """Make key string to index a fermionic operator in a dict structure.
 
@@ -134,7 +122,7 @@ def do_extended_normal_ordering(
                     break
             if not changed or is_zero:
                 if not is_zero:
-                    key_string = operator_string_to_key(next_operator)
+                    key_string = tuple(next_operator)
                     if key_string not in new_operators:
                         new_operators[key_string] = next_operator
                         new_factors[key_string] = factor
@@ -170,7 +158,7 @@ class FermionicOperator:
         if not isinstance(annihilation_operator, dict) and isinstance(factor, float):
             raise ValueError(f"factor cannot be dict when annihilation_operator is {type(a_op)}")
         if not isinstance(annihilation_operator, dict) and not isinstance(factor, dict):
-            string_key = operator_string_to_key([annihilation_operator])
+            string_key = tuple([annihilation_operator])
             self.operators = {}
             self.operators[string_key] = [annihilation_operator]
             self.factors = {}
@@ -408,7 +396,7 @@ class FermionicOperator:
                     new_op.append((op[0], False))
                 else:
                     new_op.append((op[0], True))
-            new_string_key = operator_string_to_key(new_op)
+            new_string_key = tuple(new_op)
             operators[new_string_key] = new_op
             factors[new_string_key] = self.factors[key_string]
         # Do normal ordering of comlex conjugated operator.
@@ -561,7 +549,7 @@ class FermionicOperator:
                 if i % 2 == 0:
                     ket_flip_fac *= -1
             fac *= ket_flip_fac
-            new_key = operator_string_to_key(active_op)
+            new_key = tuple(active_op)
             if new_key in factors:
                 factors[new_key] += fac * self.factors[key_string]
             else:
