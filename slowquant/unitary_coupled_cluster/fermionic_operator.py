@@ -54,7 +54,9 @@ def operator_to_qiskit_key(operator_string: list[tuple[int, bool]], remapping: d
 
 def do_extended_normal_ordering(
     fermistring: FermionicOperator,
-) -> tuple[dict[str, list[tuple[int, bool]]], dict[str, float]]:
+) -> tuple[
+    dict[tuple[tuple[int, bool], ...], list[tuple[int, bool]]], dict[tuple[tuple[int, bool], ...], float]
+]:
     """Reorder fermionic operator string.
 
     The string will be ordered such that all creation operators are first,
@@ -140,8 +142,8 @@ class FermionicOperator:
 
     def __init__(
         self,
-        annihilation_operator: dict[str, list[tuple[int, bool]]] | tuple[int, bool],
-        factor: dict[str, float] | float,
+        annihilation_operator: dict[tuple[tuple[int, bool], ...], list[tuple[int, bool]]] | tuple[int, bool],
+        factor: dict[tuple[tuple[int, bool], ...], float] | float,
     ) -> None:
         """Initialize fermionic operator class.
 
@@ -272,10 +274,10 @@ class FermionicOperator:
             factors = copy.copy(self.factors)
             for string_key in self.factors.keys():
                 # The name fermistring is misleading here.
-                factors[string_key] *= fermistring
+                factors[string_key] *= fermistring  # type: ignore
         elif type(fermistring) is FermionicOperator:
-            operators: dict[str, list[tuple[int, bool]]] = {}
-            factors: dict[str, float] = {}
+            operators = {}  # type: ignore
+            factors = {}  # type: ignore
             # Iterate over all strings in both FermionicOperators
             for string_key1 in fermistring.operators.keys():
                 for string_key2 in self.operators.keys():
@@ -317,10 +319,10 @@ class FermionicOperator:
         if type(fermistring) in (float, int):
             for string_key in self.factors.keys():
                 # The name fermistring is misleading here.
-                self.factors[string_key] *= fermistring
+                self.factors[string_key] *= fermistring  # type: ignore
         elif type(fermistring) is FermionicOperator:
-            operators: dict[str, list[tuple[int, bool]]] = {}
-            factors: dict[str, float] = {}
+            operators: dict[tuple[tuple[int, bool], ...], list[tuple[int, bool]]] = {}
+            factors: dict[tuple[tuple[int, bool], ...], float] = {}
             # Iterate over all strings in both FermionicOperators
             for string_key1 in fermistring.operators.keys():
                 for string_key2 in self.operators.keys():
@@ -493,8 +495,8 @@ class FermionicOperator:
         Returns:
            Folded fermionic operator.
         """
-        operators = {}
-        factors: dict[str, float] = {}
+        operators: dict[tuple[tuple[int, bool], ...], list[tuple[int, bool]]] = {}
+        factors: dict[tuple[tuple[int, bool], ...], float] = {}
         inactive_idx = []
         active_idx = []
         virtual_idx = []
@@ -554,5 +556,5 @@ class FermionicOperator:
                 factors[new_key] += fac * self.factors[key_string]
             else:
                 factors[new_key] = fac * self.factors[key_string]
-                operators[new_key] = active_op
+                operators[new_key] = active_op  # type: ignore
         return FermionicOperator(operators, factors)

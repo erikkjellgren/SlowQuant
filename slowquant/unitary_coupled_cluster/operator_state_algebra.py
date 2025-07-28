@@ -1,4 +1,4 @@
-from collections.abc import Generator, Sequence
+from collections.abc import Sequence
 
 import numba as nb
 import numpy as np
@@ -20,12 +20,255 @@ from slowquant.unitary_coupled_cluster.operators import (
 from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
 
 
-def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info) -> np.ndarray:
+@nb.jit(nopython=True)
+def bitcount(x: int) -> int:
+    """Count number of ones in binary representation of an integer.
+
+    Implementaion of Brian Kernighan algorithm,
+    https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetKernighan
+
+    Args:
+        x: Integer.
+
+    Returns:
+        Number of ones in the binary.
+    """
+    b = 0
+    while x > 0:
+        x &= x - 1
+        b += 1
+    return b
+
+
+@nb.jit(nopython=True)
+def apply_operator(
+    state: np.ndarray,
+    anni_idxs: np.ndarray,
+    create_idxs: np.ndarray,
+    num_active_orbs: int,
+    parity_check: np.ndarray,
+    idx2det: np.ndarray,
+    det2idx: dict[int, int],
+    do_unsafe: bool,
+    tmp_state: np.ndarray,
+    factor: float,
+) -> np.ndarray:
+    """Apply operator to state.
+
+    This part is outside of propagate_state for performance reasons,
+    i.e., Numba JIT.
+
+    Args:
+        state: Original state.
+        anni_idxs: Indicies for annihilation operators.
+        create_idxs: Indicies for creation operators.
+        num_active_orbs: Number of active spatial orbitals.
+        parity_check: Array used to check the parity when an operator is applied.
+        idx2det: Maps index to determinant.
+        det2idx: Maps determinant to index.
+        do_unsafe: Do unsafe.
+        tmp_state: New state.
+        factor: Factor in front of operator.
+
+    Returns:
+        New state.
+    """
+    anni_idxs = anni_idxs[::-1]
+    create_idxs = create_idxs[::-1]
+    # loop over all determinants in new_state
+    for i, det in enumerate(idx2det):
+        if abs(state[i]) < 10**-14:
+            continue
+        phase_changes = 0
+        is_killstate = False
+        # evaluate how string of annihilation operator change det
+        for orb_idx in anni_idxs:
+            if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 0:
+                is_killstate = True
+                break
+            det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
+            # take care of phases using parity_check
+            phase_changes += bitcount(det & parity_check[orb_idx])
+        if is_killstate:
+            continue
+        for orb_idx in create_idxs:
+            if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 1:
+                is_killstate = True
+                break
+            det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
+            # take care of phases using parity_check
+            phase_changes += bitcount(det & parity_check[orb_idx])
+        if is_killstate:
+            continue
+        if do_unsafe:
+            # For some algorithms it is guaranteed that the application of operators will always
+            # keep the new determinants within a pre-defined space (in det2idx and idx2det).
+            # For these algorithms it is a sign of bug if a keyerror when calling det2idx is found.
+            # These algorithms thus does also not need to check for the exsistence of the new determinant
+            # in det2idx.
+            # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
+            if det not in det2idx:
+                continue
+        tmp_state[det2idx[det]] += factor * (-1) ** phase_changes * state[i]
+    return tmp_state
+
+
+@nb.jit(nopython=True)
+def apply_operator_matrix(
+    op_mat: np.ndarray,
+    anni_idxs: np.ndarray,
+    create_idxs: np.ndarray,
+    num_active_orbs: int,
+    parity_check: np.ndarray,
+    idx2det: np.ndarray,
+    det2idx: dict[int, int],
+    do_unsafe: bool,
+    factor: float,
+) -> np.ndarray:
+    """Apply operator to state.
+
+    This part is outside of propagate_state for performance reasons,
+    i.e., Numba JIT.
+
+    Args:
+        op_mat: Matrix representation of operator.
+        anni_idxs: Indicies for annihilation operators.
+        create_idxs: Indicies for creation operators.
+        num_active_orbs: Number of active spatial orbitals.
+        parity_check: Array used to check the parity when an operator is applied.
+        idx2det: Maps index to determinant.
+        det2idx: Maps determinant to index.
+        do_unsafe: Do unsafe.
+        factor: Factor in front of operator.
+
+    Returns:
+        New state.
+    """
+    anni_idxs = anni_idxs[::-1]
+    create_idxs = create_idxs[::-1]
+    # loop over all determinants in new_state
+    for i, det in enumerate(idx2det):
+        phase_changes = 0
+        is_killstate = False
+        # evaluate how string of annihilation operator change det
+        for orb_idx in anni_idxs:
+            if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 0:
+                is_killstate = True
+                break
+            det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
+            # take care of phases using parity_check
+            phase_changes += bitcount(det & parity_check[orb_idx])
+        if is_killstate:
+            continue
+        for orb_idx in create_idxs:
+            if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 1:
+                is_killstate = True
+                break
+            det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
+            # take care of phases using parity_check
+            phase_changes += bitcount(det & parity_check[orb_idx])
+        if is_killstate:
+            continue
+        if do_unsafe:
+            # For some algorithms it is guaranteed that the application of operators will always
+            # keep the new determinants within a pre-defined space (in det2idx and idx2det).
+            # For these algorithms it is a sign of bug if a keyerror when calling det2idx is found.
+            # These algorithms thus does also not need to check for the exsistence of the new determinant
+            # in det2idx.
+            # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
+            if det not in det2idx:
+                continue
+        op_mat[det2idx[det], i] += factor * (-1) ** phase_changes
+    return op_mat
+
+
+@nb.jit(nopython=True)
+def apply_operator_SA(
+    state: np.ndarray,
+    anni_idxs: np.ndarray,
+    create_idxs: np.ndarray,
+    num_active_orbs: int,
+    parity_check: np.ndarray,
+    idx2det: np.ndarray,
+    det2idx: dict[int, int],
+    do_unsafe: bool,
+    tmp_state: np.ndarray,
+    factor: float,
+) -> np.ndarray:
+    """Apply operator to state.
+
+    This part is outside of propagate_state for performance reasons,
+    i.e., Numba JIT.
+
+    Args:
+        state: Original state.
+        anni_idxs: Indicies for annihilation operators.
+        create_idxs: Indicies for creation operators.
+        num_active_orbs: Number of active spatial orbitals.
+        parity_check: Array used to check the parity when an operator is applied.
+        idx2det: Maps index to determinant.
+        det2idx: Maps determinant to index.
+        do_unsafe: Do unsafe.
+        tmp_state: New state.
+        factor: Factor in front of operator.
+
+    Returns:
+        New state.
+    """
+    anni_idxs = anni_idxs[::-1]
+    create_idxs = create_idxs[::-1]
+    # loop over all determinants in new_state
+    for i, det in enumerate(idx2det):
+        is_non_zero = False
+        for val in state[:, i]:
+            if abs(val) > 10**-14:
+                is_non_zero = True
+                break
+        if not is_non_zero:
+            continue
+        phase_changes = 0
+        is_killstate = False
+        # evaluate how string of annihilation operator change det
+        for orb_idx in anni_idxs:
+            if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 0:
+                is_killstate = True
+                break
+            det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
+            # take care of phases using parity_check
+            phase_changes += bitcount(det & parity_check[orb_idx])
+        if is_killstate:
+            continue
+        for orb_idx in create_idxs:
+            if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 1:
+                is_killstate = True
+                break
+            det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
+            # take care of phases using parity_check
+            phase_changes += bitcount(det & parity_check[orb_idx])
+        if is_killstate:
+            continue
+        if do_unsafe:
+            # For some algorithms it is guaranteed that the application of operators will always
+            # keep the new determinants within a pre-defined space (in det2idx and idx2det).
+            # For these algorithms it is a sign of bug if a keyerror when calling det2idx is found.
+            # These algorithms thus does also not need to check for the exsistence of the new determinant
+            # in det2idx.
+            # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
+            if det not in det2idx:
+                continue
+        val = factor * (-1) ** phase_changes
+        tmp_state[:, det2idx[det]] += val * state[:, i]  # Update value
+    return tmp_state
+
+
+def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bool = False) -> np.ndarray:
     """Build matrix representation of operator.
 
     Args:
         op: Fermionic number and spin conserving operator.
         ci_info: Information about the CI space.
+        do_unsafe: Ignore elements that are outside the space defined in ci_info. (default: False)
+                If not ignored, getting elements outside the space will stop the calculation.
 
     Returns:
         Matrix representation of operator.
@@ -34,9 +277,6 @@ def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info) -> np.ndarray
     det2idx = ci_info.det2idx
     num_active_orbs = ci_info.num_active_orbs
     num_dets = len(idx2det)  # number of spin and particle conserving determinants
-    ones = np.ones(
-        num_dets
-    )  # Used with the determinant generator below as state argument. This ensures that no screening of determinants based on state vector weight is performed.
     op_mat = np.zeros((num_dets, num_dets))  # basis
     # Create bitstrings for parity check. Contains occupied determinant up to orbital index.
     parity_check = np.zeros(2 * num_active_orbs + 1, dtype=int)
@@ -45,27 +285,28 @@ def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info) -> np.ndarray
         num += 2**i
         parity_check[2 * num_active_orbs - i] = num
     # loop over all strings of annihilation operators in FermionicOperator sum
-    for fermi_label in op.factors:  # get strings as key of op.factors
+    for fermi_label in op.factors:
         # Separate each annihilation operator string in creation and annihilation indices
         anni_idx = []
         create_idx = []
         for fermi_op in op.operators[fermi_label]:
-            if fermi_op.dagger:
-                create_idx.append(fermi_op.idx)
+            if fermi_op[1]:
+                create_idx.append(fermi_op[0])
             else:
-                anni_idx.append(fermi_op.idx)
-        anni_idx = np.array(anni_idx, dtype=int)
-        create_idx = np.array(create_idx, dtype=int)
-        # loop over all determinants
-        for i, det in get_determinants(idx2det, ones, anni_idx, create_idx, num_active_orbs):
-            phase_changes = 0
-            # evaluate how string of annihilation operator change det
-            for fermi_op in reversed(op.operators[fermi_label]):
-                orb_idx = fermi_op.idx
-                det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
-                # take care of phases using parity_check
-                phase_changes += (det & parity_check[orb_idx]).bit_count()
-            op_mat[det2idx[det], i] += op.factors[fermi_label] * (-1) ** phase_changes
+                anni_idx.append(fermi_op[0])
+        anni_idx = np.array(anni_idx, dtype=np.int64)
+        create_idx = np.array(create_idx, dtype=np.int64)
+        op_mat = apply_operator_matrix(
+            op_mat,
+            anni_idx,
+            create_idx,
+            num_active_orbs,
+            parity_check,
+            idx2det,
+            det2idx,
+            do_unsafe,
+            op.factors[fermi_label],
+        )
     return op_mat
 
 
@@ -178,68 +419,6 @@ def propagate_state(
     return new_state
 
 
-@nb.jit(nopython=True)
-def apply_operator(
-    new_state,
-    anni_idxs,
-    create_idxs,
-    num_active_orbs,
-    parity_check,
-    idx2det,
-    det2idx,
-    do_unsafe,
-    tmp_state,
-    factor,
-):
-    anni_idxs = anni_idxs[::-1]
-    create_idxs = create_idxs[::-1]
-    # loop over all determinants in new_state
-    for i, det in enumerate(idx2det):
-        if abs(new_state[i]) < 10**-14:
-            continue
-        phase_changes = 0
-        is_killstate = False
-        # evaluate how string of annihilation operator change det
-        for orb_idx in anni_idxs:
-            if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 0:
-                is_killstate = True
-                break
-            det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
-            # take care of phases using parity_check
-            phase_changes += bitcount(det & parity_check[orb_idx])
-        if is_killstate:
-            continue
-        for orb_idx in create_idxs:
-            if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 1:
-                is_killstate = True
-                break
-            det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
-            # take care of phases using parity_check
-            phase_changes += bitcount(det & parity_check[orb_idx])
-        if is_killstate:
-            continue
-        if do_unsafe:
-            # For some algorithms it is guaranteed that the application of operators will always
-            # keep the new determinants within a pre-defined space (in det2idx and idx2det).
-            # For these algorithms it is a sign of bug if a keyerror when calling det2idx is found.
-            # These algorithms thus does also not need to check for the exsistence of the new determinant
-            # in det2idx.
-            # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
-            if det not in det2idx:
-                continue
-        tmp_state[det2idx[det]] += factor * (-1) ** phase_changes * new_state[i]
-    return tmp_state
-
-
-@nb.jit(nopython=True)
-def bitcount(x):
-    b = 0
-    while x > 0:
-        x &= x - 1
-        b += 1
-    return b
-
-
 def propagate_state_SA(
     operators: list[FermionicOperator | str],
     state: np.ndarray,
@@ -247,6 +426,7 @@ def propagate_state_SA(
     thetas: Sequence[float],
     wf_struct: UpsStructure,
     do_folding: bool = True,
+    do_unsafe: bool = False,
 ) -> np.ndarray:
     r"""Propagate state by applying operator.
 
@@ -265,6 +445,8 @@ def propagate_state_SA(
                Ordered as (S, D, T, ...).
         wf_struct: wave function structure object.
         do_folding: Do folding of operator (default: True).
+        do_unsafe: Ignore elements that are outside the space defined in ci_info. (default: False)
+                If not ignored, getting elements outside the space will stop the calculation.
 
     Returns:
         New state.
@@ -304,7 +486,7 @@ def propagate_state_SA(
                 raise TypeError(f"Got unknown wave function structure type, {type(wf_struct)}")
         # FermionicOperator in operators
         else:
-            tmp_state[:, :] = 0.0
+            tmp_state[:] = 0.0
             # Fold operator to only get active contributions
             if do_folding:
                 op_folded = op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs)
@@ -316,77 +498,26 @@ def propagate_state_SA(
                 anni_idx = []
                 create_idx = []
                 for fermi_op in op_folded.operators[fermi_label]:
-                    if fermi_op.dagger:
-                        create_idx.append(fermi_op.idx)
+                    if fermi_op[1]:
+                        create_idx.append(fermi_op[0])
                     else:
-                        anni_idx.append(fermi_op.idx)
-                anni_idx = np.array(anni_idx, dtype=int)
-                create_idx = np.array(create_idx, dtype=int)
-                # loop over all determinants
-                for i, det in get_determinants_SA(idx2det, new_state, anni_idx, create_idx, num_active_orbs):
-                    phase_changes = 0
-                    # evaluate how string of annihilation operator change det
-                    for fermi_op in reversed(op_folded.operators[fermi_label]):
-                        orb_idx = fermi_op.idx
-                        det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
-                        # take care of phases using parity_check
-                        phase_changes += (det & parity_check[orb_idx]).bit_count()
-                    val = op_folded.factors[fermi_label] * (-1) ** phase_changes
-                    tmp_state[:, det2idx[det]] += val * new_state[:, i]  # Update value
+                        anni_idx.append(fermi_op[0])
+                anni_idx = np.array(anni_idx, dtype=np.int64)
+                create_idx = np.array(create_idx, dtype=np.int64)
+                tmp_state = apply_operator_SA(
+                    new_state,
+                    anni_idx,
+                    create_idx,
+                    num_active_orbs,
+                    parity_check,
+                    idx2det,
+                    det2idx,
+                    do_unsafe,
+                    tmp_state,
+                    op_folded.factors[fermi_label],
+                )
             new_state = np.copy(tmp_state)
     return new_state
-
-
-@nb.jit(nopython=True)
-def get_determinants_SA(
-    det: np.ndarray,
-    state: np.ndarray,
-    anni_idxs: np.ndarray,
-    create_idxs: np.ndarray,
-    num_active_orbs: int,
-) -> Generator[tuple[int, int], None, None]:
-    """Generate relevant determinants.
-
-    This part is factored out for performance - jit.
-
-    This generator yields determinants that does need reach kill-state.
-    It is assumed that operators are normal-ordered for the checking of kill-state to work.
-
-    Args:
-        det: List of all determinants.
-        state: State-vector.
-        anni_idxs: Annihilation operator indices.
-        create_idxs: Creation operator indices.
-        num_active_orbs: Number of active spatial orbitals.
-
-    Returns:
-        Index of determinant and determinant.
-    """
-    for i, vals in enumerate(state.T):
-        is_non_zero = False
-        for val in vals:
-            if abs(val) > 10**-14:
-                is_non_zero = True
-                break
-        if not is_non_zero:
-            continue
-        for anni_idx in anni_idxs:
-            if (det[i] >> 2 * num_active_orbs - 1 - anni_idx) & 1 == 1:
-                continue
-            # If an annihilation operator works on zero, then we reach kill-state.
-            break
-        else:  # no-break
-            for create_idx in create_idxs:
-                if create_idx in anni_idxs:
-                    # A creation operator can always act on index that an annihilation operator,
-                    # has previously worked on.
-                    continue
-                if (det[i] >> 2 * num_active_orbs - 1 - create_idx) & 1 == 0:
-                    continue
-                # If creation operator works on one, then we reach kill-state.
-                break
-            else:  # no-break
-                yield i, det[i]
 
 
 def expectation_value(
