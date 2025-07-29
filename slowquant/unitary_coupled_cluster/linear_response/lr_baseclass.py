@@ -122,7 +122,7 @@ class LinearResponseBaseClass:
         (
             hess_eigval,
             _,
-        ) = np.linalg.eigh(E2)
+        ) = np.linalg.eig(E2)
         print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
         if np.abs(np.min(hess_eigval)) < 10**-8:
             print("WARNING: Small eigenvalue in Hessian")
@@ -139,7 +139,7 @@ class LinearResponseBaseClass:
         self.hessian = E2
         self.metric = S
 
-        eigval, eigvec = scipy.linalg.eigh(self.hessian, self.metric)
+        eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)
         sorting = np.argsort(eigval)
         self.excitation_energies = np.real(eigval[sorting][size:])
         self.response_vectors = np.real(eigvec[:, sorting][:, size:])

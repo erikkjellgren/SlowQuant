@@ -291,14 +291,14 @@ class quantumLRBaseClass:
         (
             hess_eigval,
             _,
-        ) = scipy.linalg.eigh(self.hessian)
+        ) = scipy.linalg.eig(self.hessian)
         print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
         if np.min(hess_eigval) < 0:
             print("WARNING: Negative eigenvalue in Hessian.")
         print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.metric)))}")
 
         # Solve eigenvalue equation
-        eigval, eigvec = scipy.linalg.eigh(self.hessian, self.metric)
+        eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)
         sorting = np.argsort(eigval)
         self.excitation_energies = np.real(eigval[sorting][size:])
         self.excitation_vectors = np.real(eigvec[:, sorting][:, size:])

@@ -332,7 +332,7 @@ def test_SA_sa_doubles() -> None:
         h_core,
         g_eri,
         ([[1]], [["111100000000"]]),
-        ansatz="fUCC",
+        ansatz="SAfUCCSD",
         ansatz_options={"n_layers": 1, "SAS": True, "SAD": True},
     )
     WF.run_wf_optimization_1step("SLSQP")
