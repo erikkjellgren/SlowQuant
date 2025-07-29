@@ -84,7 +84,7 @@ class LinearResponseBaseClass:
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
         for i, a in self.wf.kappa_no_activeactive_idx:
             op = G1(2*a, 2*i)
-            self.q_ops.append(op)
+            self.q_ops.append(op) 
             op = G1(2*a + 1, 2*i + 1)
             self.q_ops.append(op)
 

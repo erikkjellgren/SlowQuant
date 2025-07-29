@@ -507,10 +507,10 @@ def get_orbital_gradient_unrestricted(
                     gradient[idx+len(kappa_idx)] -= 0.5 * g_int_bbbb[p, q, r, n] * rdms.RDM2bbbb(p, r, q, m)
                     #aabb
                     #kappa a with aabb
-                    gradient[idx] += 0.5 * g_int_aabb[n, p, q, r] * rdms.RDM2aabb(m, q, r, p) # [0, 0.08, 0, -0.01, 0, -0.06, 0.13, 0, 0]
-                    gradient[idx] -= 0.5 * g_int_aabb[m, p, q, r] * rdms.RDM2aabb(n, q, r, p) # [0, 0, 0, 0, 0, 0, 0, 0, 0]
-                    gradient[idx] -= 0.5 * g_int_aabb[p, m, q, r] * rdms.RDM2aabb(p, q, r, n) # [0, 0, 0, 0, 0, 0, -0.13, 0, 0]
-                    gradient[idx] += 0.5 * g_int_aabb[p, n, q, r] * rdms.RDM2aabb(p, q, r, m) # [0, 0.08, 0, -0.01, 0, -0.06, 0.13, 0, 0]
+                    gradient[idx] += 0.5 * g_int_aabb[n, p, q, r] * rdms.RDM2aabb(m, q, r, p) 
+                    gradient[idx] -= 0.5 * g_int_aabb[m, p, q, r] * rdms.RDM2aabb(n, q, r, p) 
+                    gradient[idx] -= 0.5 * g_int_aabb[p, m, q, r] * rdms.RDM2aabb(p, q, r, n) 
+                    gradient[idx] += 0.5 * g_int_aabb[p, n, q, r] * rdms.RDM2aabb(p, q, r, m) 
                     # kappa a with bbaa
                     gradient[idx] += 0.5 * g_int_bbaa[p, q, n, r] * rdms.RDM2bbaa(p, m, r, q) 
                     gradient[idx] -= 0.5 * g_int_bbaa[p, q, m, r] * rdms.RDM2bbaa(p, n, r, q) 
@@ -675,12 +675,20 @@ def get_orbital_response_metric_sigma_unrestricted(
     sigma = np.zeros((2*len(kappa_idx), 2*len(kappa_idx)))
     for idx1, (p, q) in enumerate(kappa_idx):
         for idx2, (m, n) in enumerate(kappa_idx):
+            # Below [q, q]
             if m == p:
-                sigma[idx1, idx2] += rdms.RDM1aa(q, n)
-                sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] += rdms.RDM1bb(q, n)
+                sigma[idx1, idx2] += rdms.RDM1aa(p, n)
+                sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] += rdms.RDM1bb(p, n)
             if q == n:
-                sigma[idx1, idx2] -= rdms.RDM1aa(m, p)
-                sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] -= rdms.RDM1bb(m, p)
+                sigma[idx1, idx2] -= rdms.RDM1aa(m, q)
+                sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] -= rdms.RDM1bb(m, q)
+            # Below [q^dagger, q]
+            # if m == p:
+            #     sigma[idx1, idx2] += rdms.RDM1aa(q, n)
+            #     sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] += rdms.RDM1bb(q, n)
+            # if q == n:
+            #     sigma[idx1, idx2] -= rdms.RDM1aa(m, p)
+            #     sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] -= rdms.RDM1bb(m, p)
     return 1/2 * sigma
 
 def get_orbital_response_property_gradient_unrestricted(
