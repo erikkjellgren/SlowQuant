@@ -125,8 +125,6 @@ class LinearResponseBaseClass:
             hess_eigval,
             _,
         ) = np.linalg.eig(E2)
-        for i in range(len(self.Sigma)):
-            print(i, self.Sigma[i,i])
         print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
         if np.abs(np.min(hess_eigval)) < 10**-8:
             print("WARNING: Small eigenvalue in Hessian")
