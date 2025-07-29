@@ -368,25 +368,42 @@ def G1_sa(i: int, a: int, return_anti_hermitian: bool = False) -> FermionicOpera
     return op
 
 
-def G2_sa(i: int, j: int, a: int, b: int, case: int, return_anti_hermitian: bool = False) -> FermionicOperator:
+def G2_sa(
+    i: int, j: int, a: int, b: int, case: int, return_anti_hermitian: bool = False
+) -> FermionicOperator:
     r"""Construct singlet two-electron spin-adapted excitation operator.
 
-    Case 1 to 4 are based in on the equation,
+    The first four cases are based on the equation,
 
     .. math::
-        \hat{G}^{[1]}_{aibj} = \frac{1}{2\sqrt{\left(1+\delta_{ab}\right)\left(1+\delta_{ij}\right)}}\left(\hat{E}_{ai}\hat{E}_{bj} + \hat{E}_{aj}\hat{E}_{bi}\right)
+        {}^\text{SA}\hat{T}_{aibj} = \frac{1}{2\sqrt{\left(1+\delta_{ab}\right)\left(1+\delta_{ij}\right)}}\left(\hat{E}_{ai}\hat{E}_{bj} + \hat{E}_{aj}\hat{E}_{bi}\right)
+
+    Case 1 is given by,
+
+    .. math::
+        {}^\text{SA}\hat{T}_{aiai} = \frac{1}{2}\hat{E}_{ai}\hat{E}_{ai}
+
+    Case 2 is given by,
+
+    .. math::
+        {}^\text{SA}\hat{T}_{aibi} = \frac{1}{\sqrt{2}}\hat{E}_{ai}\hat{E}_{bi}
+
+    Case 3 is gien by,
+
+    .. math::
+        {}^\text{SA}\hat{T}_{aiaj} = \frac{1}{\sqrt{2}}\hat{E}_{ai}\hat{E}_{aj}
+
+    Case 4 is given by,
+
+    .. math::
+        {}^\text{SA}\hat{T}_{aibj} = \frac{1}{2}\left(\hat{E}_{ai}\hat{E}_{bj} + \hat{E}_{aj}\hat{E}_{bi}\right)
 
     Case 5 is given by,
 
     .. math::
-        \hat{G}^{[2]}_{aibj} = \frac{1}{2\sqrt{3}}\left(\hat{E}_{ai}\hat{E}_{bj} - \hat{E}_{aj}\hat{E}_{bi}\right)
+        {}^\text{SA}\hat{T}^{'}_{aibj} = \frac{1}{2\sqrt{3}}\left(\hat{E}_{ai}\hat{E}_{bj} - \hat{E}_{aj}\hat{E}_{bi}\right)
 
-    INSERT PROPER CASE DESCRIPTION!
-    Case 1 - iiaa
-    case 2 - iiab
-    case 3 - ijaa
-    case 4 - ijab
-    case 5 - ijab
+    #. 10.1063/1.472430, Eq. (15) and Eq. (16)
 
     Args:
         i: Spatial orbital index.
@@ -394,12 +411,12 @@ def G2_sa(i: int, j: int, a: int, b: int, case: int, return_anti_hermitian: bool
         a: Spatial orbital index.
         b: Spatial orbital index.
         case: Case identifier for the operator.
-        return_anti_hermitian: Return anti-hermitian version of operator, i.e. op - op^\dagger.
+        return_anti_hermitian: Return anti-Hermitian version of operator, i.e. op - op^\dagger.
 
     Returns:
-        First singlet two-electron spin-adapted excitation operator.
+        Singlet two-electron spin-adapted excitation operator.
     """
-    if case in (1,2,3,4):
+    if case in (1, 2, 3, 4):
         fac = 1
         if a == b:
             fac *= 2

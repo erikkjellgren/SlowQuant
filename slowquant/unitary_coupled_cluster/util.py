@@ -703,13 +703,13 @@ class UpsStructure:
         idx = 0
         for _ in range(np.sum(num_elec)):
             occ_spin.append(idx)
-            if idx%2 == 0:
-                occ.append(idx//2)
+            if idx % 2 == 0:
+                occ.append(idx // 2)
             idx += 1
         for _ in range(num_spin_orbs - np.sum(num_elec)):
             unocc_spin.append(idx)
-            if idx%2 == 0:
-                unocc.append(idx//2)
+            if idx % 2 == 0:
+                unocc.append(idx // 2)
             idx += 1
         # Layer loop
         for _ in range(n_layers):

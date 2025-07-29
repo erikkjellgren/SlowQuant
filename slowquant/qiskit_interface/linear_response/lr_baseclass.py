@@ -6,8 +6,7 @@ import scipy
 from slowquant.qiskit_interface.circuit_wavefunction import WaveFunctionCircuit
 from slowquant.unitary_coupled_cluster.operators import (
     G1_sa,
-    G2_1_sa,
-    G2_2_sa,
+    G2_sa,
     hamiltonian_0i_0a,
     hamiltonian_1i_1a,
 )
@@ -36,14 +35,8 @@ class quantumLRBaseClass:
         for a, i, _ in iterate_t1_sa(wf.active_occ_idx, wf.active_unocc_idx):
             self.G_ops.append(G1_sa(i, a))
         # G2
-        for a, i, b, j, _, type_idx in iterate_t2_sa(wf.active_occ_idx, wf.active_unocc_idx):
-            if type_idx == 1:
-                # G2_1
-                self.G_ops.append(G2_1_sa(i, j, a, b))
-            elif type_idx == 2:
-                # G2_2
-                self.G_ops.append(G2_2_sa(i, j, a, b))
-
+        for a, i, b, j, _, op_type in iterate_t2_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
+            self.G_ops.append(G2_sa(i, j, a, b, op_type))
         # q
         self.q_ops = []
         for p, q in wf.kappa_no_activeactive_idx:
@@ -298,14 +291,14 @@ class quantumLRBaseClass:
         (
             hess_eigval,
             _,
-        ) = scipy.linalg.eig(self.hessian)
+        ) = scipy.linalg.eigh(self.hessian)
         print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
         if np.min(hess_eigval) < 0:
             print("WARNING: Negative eigenvalue in Hessian.")
         print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.metric)))}")
 
         # Solve eigenvalue equation
-        eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)
+        eigval, eigvec = scipy.linalg.eigh(self.hessian, self.metric)
         sorting = np.argsort(eigval)
         self.excitation_energies = np.real(eigval[sorting][size:])
         self.excitation_vectors = np.real(eigvec[:, sorting][:, size:])
