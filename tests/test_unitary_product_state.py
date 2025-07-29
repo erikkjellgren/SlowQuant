@@ -336,4 +336,4 @@ def test_SA_sa_doubles() -> None:
         ansatz_options={"n_layers": 1, "SAS": True, "SAD": True},
     )
     WF.run_wf_optimization_1step("SLSQP")
-    assert abs(WF.energy_elec - -8.874521029611891) < 10**-8
+    assert abs(WF.energy_states[0] - -8.874521029611891) < 10**-8
