@@ -79,24 +79,18 @@ class UnrestrictedWaveFunctionUPS:
         self.active_spin_idx = []
         self.active_occ_spin_idx = []
         self.active_unocc_spin_idx = []
-        self.active_spin_idx_shifted = []
-        self.active_occ_spin_idx_shifted = []
-        self.active_unocc_spin_idx_shifted = []
-        self.active_idx_shifted = []
-        self.active_occ_idx_shifted = []
-        self.active_unocc_idx_shifted = []
         self.num_elec = num_elec
         self.num_elec_alpha = (num_elec - np.sum(cas[0])) // 2 + cas[0][0]
         self.num_elec_beta = (num_elec - np.sum(cas[0])) // 2 + cas[0][1]
         self.num_spin_orbs = 2 * len(h_ao)
         self.num_orbs = len(h_ao)
         self._include_active_kappa = include_active_kappa
-        self.num_active_elec = np.sum(cas[0])
         self.num_active_elec_alpha = cas[0][0]
         self.num_active_elec_beta = cas[0][1]
-        self.num_active_spin_orbs = 0
-        self.num_inactive_spin_orbs = 0
-        self.num_virtual_spin_orbs = 0
+        self.num_active_elec = self.num_active_elec_alpha + self.num_active_elec_beta
+        self.num_active_spin_orbs = 2*cas[1]
+        self.num_inactive_spin_orbs = self.num_elec - self.num_active_elec
+        self.num_virtual_spin_orbs = 2*len(h_ao) - self.num_inactive_spin_orbs - self.num_active_spin_orbs
         self._rdm1aa = None
         self._rdm1bb = None
         self._rdm2aaaa = None
@@ -110,39 +104,19 @@ class UnrestrictedWaveFunctionUPS:
         self._gaabb_mo = None
         self._gbbaa_mo = None
         self.ansatz_options = ansatz_options
-        active_space = []
-        orbital_counter = 0
-        for i in range(
-            2
-            * min(
-                self.num_elec_alpha - self.num_active_elec_alpha,
-                self.num_elec_beta - self.num_active_elec_beta,
-            ),
-            2 * max(self.num_elec_alpha, self.num_elec_beta),
-        ):
-            active_space.append(i)
-            orbital_counter += 1
-        for i in range(
-            2 * max(self.num_elec_alpha, self.num_elec_beta),
-            2 * max(self.num_elec_alpha, self.num_elec_beta) + 2 * cas[1] - orbital_counter,
-        ):
-            active_space.append(i)
-        for i in range(2 * max(self.num_elec_alpha, self.num_elec_beta)):
-            if i in active_space:
-                self.active_spin_idx.append(i)
-                self.active_occ_spin_idx.append(i)
-                self.num_active_spin_orbs += 1
-            else:
-                self.inactive_spin_idx.append(i)
-                self.num_inactive_spin_orbs += 1
-        for i in range(2 * max(self.num_elec_alpha, self.num_elec_beta), self.num_spin_orbs):
-            if i in active_space:
-                self.active_spin_idx.append(i)
+        self.inactive_spin_idx = [x for x  in range(self.num_inactive_spin_orbs)]
+        self.active_spin_idx = [x + self.num_inactive_spin_orbs for x  in range(self.num_active_spin_orbs)]
+        self.virtual_spin_idx = [x + self.num_inactive_spin_orbs + self.num_virtual_spin_orbs for x  in range(self.num_virtual_spin_orbs)]
+        self.active_occ_spin_idx = []
+        for i in range(self.num_active_elec_alpha):
+            self.active_occ_spin_idx.append(2*i + self.num_inactive_spin_orbs)
+        for i in range(self.num_active_elec_beta):
+            self.active_occ_spin_idx.append(2*i+1 + self.num_inactive_spin_orbs)
+        self.active_occ_spin_idx.sort()
+        self.active_unocc_spin_idx = []
+        for i in range(self.num_inactive_spin_orbs, self.num_inactive_spin_orbs+ self.num_active_spin_orbs):
+            if i not in self.active_occ_spin_idx:
                 self.active_unocc_spin_idx.append(i)
-                self.num_active_spin_orbs += 1
-            else:
-                self.virtual_spin_idx.append(i)
-                self.num_virtual_spin_orbs += 1
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
         self.num_active_orbs = self.num_active_spin_orbs // 2
         self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
@@ -167,23 +141,6 @@ class UnrestrictedWaveFunctionUPS:
         for idx in self.active_unocc_spin_idx:
             if idx // 2 not in self.active_unocc_idx:
                 self.active_unocc_idx.append(idx // 2)
-        # Make shifted indecies
-        if len(self.active_spin_idx) != 0:
-            active_shift = np.min(self.active_spin_idx)
-            for active_idx in self.active_spin_idx:
-                self.active_spin_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_occ_spin_idx:
-                self.active_occ_spin_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_unocc_spin_idx:
-                self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
-        if len(self.active_idx) != 0:
-            active_shift = np.min(self.active_idx)
-            for active_idx in self.active_idx:
-                self.active_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_occ_idx:
-                self.active_occ_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_unocc_idx:
-                self.active_unocc_idx_shifted.append(active_idx - active_shift)
         # Find non-redundant kappas
         self._kappa_a = []
         self._kappa_b = []
@@ -245,16 +202,6 @@ class UnrestrictedWaveFunctionUPS:
                 self._kappa_a_old.append(0.0)
                 self._kappa_b_old.append(0.0)
                 self.kappa_idx.append([p, q])
-        # HF like orbital rotation indecies
-        self.kappa_hf_like_idx = []
-        for p in range(0, self.num_orbs):
-            for q in range(p + 1, self.num_orbs):
-                if p in self.inactive_idx and q in self.virtual_idx:
-                    self.kappa_hf_like_idx.append([p, q])
-                elif p in self.inactive_idx and q in self.active_unocc_idx:
-                    self.kappa_hf_like_idx.append([p, q])
-                elif p in self.active_occ_idx and q in self.virtual_idx:
-                    self.kappa_hf_like_idx.append([p, q])
         # Construct determinant basis
         self.ci_info = get_indexing(
             self.num_inactive_orbs,
