@@ -104,7 +104,7 @@ def OH_cation():
     geometry = """O  0.0   0.0  0.0;
         H  0.0  0.0  1.0289;"""
     basis="STO-3g"
-    active_space = ((2,2),4)
+    active_space = ((1,3),4)
     charge = 1
     #the pyscf spin parameter is the value of 2S (tne number of unpaired electrons, or the difference between the number of alpha and beta electrons)
     spin=2
@@ -140,9 +140,19 @@ def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74;"""
     basis = '6-31g'
-    active_space = ((1,1),2)
+    active_space = ((1,1),4)
     charge = 0
     spin=0
+
+    get_unrestricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
+
+def h2_ion(): 
+    geometry = """H  0.0   0.0  0.0;
+        H  0.0  0.0  0.74;"""
+    basis = '6-31g'
+    active_space = ((1,2),4)
+    charge = -1
+    spin=1
 
     get_unrestricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
 
@@ -156,9 +166,10 @@ def h2_res():
 
     get_restricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
 
-#test_exc_energy()
-#oh_radical()
+#OH_cation()
+oh_radical()
 #excita_h2o()
-h2()
-h2_res()
+#h2()
+#h2_res()
 #NO_radical()
+#h2_ion()
