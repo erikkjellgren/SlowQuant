@@ -1076,13 +1076,13 @@ class QuantumInterface:
             # save raw results
             self.saver[det_int].update_distr(new_heads, distr)
 
-        if self.mitigation_flags.to_int() != 0:
+        if self.mitigation_flags.is_enabled():
             # figure out if mitigated result already exist.
             # if yes, do nothing and go to value calculation.
             # if not, generate new mitigated data based on raw data.
             # one could maybe also think of doing mitigation and its saving when new_heads is not empty.
             # that might make it faster!
-            head_mit, distr_raw = self.saver[det_int].get_empty_heads_distr(self.mitigation_flags.to_int())
+            head_mit, distr_raw = self.saver[det_int].get_empty_heads_distr(self.mitigation_flags)
 
             if len(head_mit) != 0:
                 if self.mitigation_flags.do_M_mitigation:  # apply error mitigation if requested
@@ -1092,13 +1092,13 @@ class QuantumInterface:
                     self._apply_postselection(distr_raw, head_mit)
 
                 # save mitigated results
-                self.saver[det_int].update_distr(head_mit, distr_raw, self.mitigation_flags.to_int())
+                self.saver[det_int].update_distr(head_mit, distr_raw, self.mitigation_flags)
 
         # Loop over all Pauli strings in observable and build final result with coefficients
         for pauli, coeff in zip(paulis_str, observables.coeffs):
             result = 0.0
             for key, value in (
-                self.saver[det_int].get_distr(pauli, self.mitigation_flags.to_int()).items()
+                self.saver[det_int].get_distr(pauli, self.mitigation_flags).items()
             ):  # build result from quasi-distribution
                 result += value * get_bitstring_sign(pauli, key)
             values += result * coeff
@@ -1247,7 +1247,7 @@ class QuantumInterface:
                 coeff = 1
             # Get distribution from cliques
             if do_cliques:
-                dist = self.saver[det_int].get_distr(pauli, self.mitigation_flags.to_int())
+                dist = self.saver[det_int].get_distr(pauli, self.mitigation_flags)
                 # Calculate p1: Probability of measuring one
                 p1 = 0.0
                 for key, value in dist.items():

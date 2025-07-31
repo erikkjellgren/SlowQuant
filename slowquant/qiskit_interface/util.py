@@ -176,9 +176,10 @@ class MitigationFlags:
         self.do_M_ansatz0 = do_M_ansatz0
         self.do_M_ansatz0_plus = do_M_ansatz0_plus
         self.do_postselection = do_postselection
-        print("You selected the following mitigation flags:\n" + self.status_report())
         # Tuple of flag names in the order they should be processed.
         self._flag_order = ("do_M_mitigation", "do_M_ansatz0", "do_M_ansatz0_plus", "do_postselection")
+
+        print("You selected the following mitigation flags:\n" + self.status_report())
 
     def _validate_flags(self, flag_dict) -> None:
         """Validate the provided flags against the defined flag_order.
@@ -242,9 +243,19 @@ class MitigationFlags:
             lines.append(f"{flag}: {status}")
         return "\n".join(lines)
 
+    def is_enabled(self) -> bool:
+        """Check if any mitigation is enabled.
+
+        Returns:
+            True if any mitigation flag is set to True, False otherwise.
+        """
+        if self.to_int() == 0:
+            return False
+        return True
+
     def __repr__(self):
         """Representation of the MitigationFlags object."""
-        flags = {f: getattr(self, f) for f in self.flag_order()}
+        flags = {f: getattr(self, f) for f in self._flag_order}
         return f"<MitigationFlags int={self.to_int()} bin={bin(self.to_int())} flags={flags}>"
 
 
@@ -262,15 +273,16 @@ class CliqueSaver:
         """Reset CliqueSaver."""
         self.data = {0: {}}  # reset to empty raw results saver
 
-    def is_empty(self, mitigation_int: int = 0) -> bool:
+    def is_empty(self, mitigation_flags: MitigationFlags | None = None) -> bool:
         """Check if saver is empty.
 
         Args:
-            mitigation_int: Mitigation integer, default is 0.
+            mitigation_flags: Mitigation flags object, default is None.
 
         Returns:
             True if empty, False otherwise.
         """
+        mitigation_int = mitigation_flags.to_int() if mitigation_flags is not None else 0
         if mitigation_int not in self.data:
             return True  # it is empty if it does not exist.
         if self.data[mitigation_int]:
@@ -281,24 +293,26 @@ class CliqueSaver:
                 raise ValueError("Empty data not consistent accross mitigation saver.")
         return True  # empty
 
-    def add_distr(self, distr: dict[int, float], mitigation_int: int = 0) -> None:
+    def add_distr(self, distr: dict[int, float], mitigation_flags: MitigationFlags | None = None) -> None:
         """Add distribution to saver.
 
         Args:
             distr: Distribution to be added.
-            mitigation_int: Mitigation integer, default is 0.
+            mitigation_flags: Mitigation flags object, default is None.
         """
+        mitigation_int = mitigation_flags.to_int() if mitigation_flags is not None else 0
         self.data[mitigation_int] = distr
 
-    def get_distr(self, mitigation_int: int = 0) -> dict[int, float]:
+    def get_distr(self, mitigation_flags: MitigationFlags | None = None) -> dict[int, float]:
         """Return distribution.
 
         Args:
-            mitigation_int: Mitigation integer, default is 0.
+            mitigation_flags: Mitigation flags object, default is None.
 
         Returns:
             Distribution for the given mitigation integer.
         """
+        mitigation_int = mitigation_flags.to_int() if mitigation_flags is not None else 0
         return self.data[mitigation_int]
 
 
@@ -364,32 +378,35 @@ class Clique:
         return new_heads
 
     def update_distr(
-        self, new_heads: list[str], new_distr: list[dict[int, float]], mitigation_int: int = 0
+        self,
+        new_heads: list[str],
+        new_distr: list[dict[int, float]],
+        mitigation_flags: MitigationFlags | None = None,
     ) -> None:
         """Update sample state distributions of clique heads.
 
         Args:
             new_heads: List of clique heads.
             new_distr: List of sample state distributions.
-            mitigation_int: Mitigation integer, default is 0.
+            mitigation_flags: Mitigation flags object, default is None.
         """
         for head, distr in zip(new_heads, new_distr):
             for clique_head in self.cliques:
                 if head == clique_head.head:
-                    if not clique_head.distr.is_empty(mitigation_int):
+                    if not clique_head.distr.is_empty(mitigation_flags):
                         raise ValueError(
-                            f"Trying to update head distr that is not None. Head; {clique_head.head}; mitigation int; {mitigation_int}"
+                            f"Trying to update head distr that is not None. Head; {clique_head.head}; mitigation; {mitigation_flags}"
                         )
-                    clique_head.distr.add_distr(distr, mitigation_int)
+                    clique_head.distr.add_distr(distr, mitigation_flags)
 
         # Check that all heads have a distr
         for clique_head in self.cliques:
-            if clique_head.distr.is_empty(mitigation_int):
+            if clique_head.distr.is_empty(mitigation_flags):
                 raise ValueError(
-                    f"Head, {clique_head.head}, has not been allocated for mitigation int; {mitigation_int}"
+                    f"Head, {clique_head.head}, has not been allocated for mitigation; {mitigation_flags}"
                 )
 
-    def get_distr(self, pauli: str, mitigation_int: int = 0) -> dict[int, float]:
+    def get_distr(self, pauli: str, mitigation_flags: MitigationFlags | None = None) -> dict[int, float]:
         """Get sample state distribution for a Pauli string.
 
         Args:
@@ -405,11 +422,11 @@ class Clique:
                     raise ValueError(
                         f"Found matching clique, but head will be mutated. Head; {clique_head.head}, Pauli; {pauli}"
                     )
-                if clique_head.distr.is_empty(mitigation_int):
+                if clique_head.distr.is_empty(mitigation_flags):
                     raise ValueError(
-                        f"Head, {clique_head.head}, has no distribution for mitigation int; {mitigation_int}"
+                        f"Head, {clique_head.head}, has no distribution for mitigation; {mitigation_flags}"
                     )
-                return clique_head.distr.get_distr(mitigation_int)
+                return clique_head.distr.get_distr(mitigation_flags)
         raise ValueError(f"Could not find matching clique for Pauli, {pauli}")
 
     def get_empty_heads(self, mitigation_int) -> list[str]:
@@ -452,11 +469,13 @@ class Clique:
 
         return distr
 
-    def get_empty_heads_distr(self, mitigation_int) -> tuple[list[str], list[dict[int, float]]]:
+    def get_empty_heads_distr(
+        self, mitigation_flags: MitigationFlags
+    ) -> tuple[list[str], list[dict[int, float]]]:
         """Return all heads that have empty data for a given mitigation_int plus return the corresponding raw data.
 
         Args:
-            mitigation_int: Mitigation integer, default is 0.
+            mitigation_flags: Mitigation flags object.
 
         Returns:
             Tuple of lists: List of heads that have no data for the given mitigation integer,
@@ -465,7 +484,7 @@ class Clique:
         heads = []
         distr = []
         for clique_head in self.cliques:
-            if clique_head.distr.is_empty(mitigation_int):
+            if clique_head.distr.is_empty(mitigation_flags):
                 heads.append(clique_head.head)
                 distr.append(clique_head.distr.data[0].copy())  # raw data
         return heads, distr
