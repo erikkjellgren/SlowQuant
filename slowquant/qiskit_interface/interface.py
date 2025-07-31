@@ -24,7 +24,7 @@ from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
 from slowquant.qiskit_interface.custom_ansatz import SDSfUCC, fUCC, tUPS
-from slowquant.qiskit_interface.util import (  # correct_distribution_with_layout,
+from slowquant.qiskit_interface.util import (
     Clique,
     MitigationFlags,
     correct_distribution,
@@ -74,7 +74,7 @@ class QuantumInterface:
             max_shots_per_run: Maximum number of shots allowed in a single run. Set to 100000 per IBM machines.
             do_M_mitigation: Do error mitigation via read-out correlation matrix.
             do_M_ansatz0: Use the ansatz with theta=0 when constructing the read-out correlation matrix.
-            do_M_ansatz0_plus: Creates M0 for each initia superposition state. Only used for SA-VQE.
+            do_M_ansatz0_plus: Creates M0 for each initial superposition state. Only used for SA-VQE.
             do_postselection: Use postselection to preserve number of particles in the computational basis.
         """
         if ansatz_options is None:
@@ -860,7 +860,6 @@ class QuantumInterface:
                             raise ValueError("Wrong ISA_csfs_option specified. Needs to be 1,2,3,4.")
                 else:
                     circuit = self.ansatz_circuit.compose(state, front=True)
-                # val_old = val  # debug
                 # Check if M per superposition circuit is requested
                 if self.mitigation_flags.do_M_ansatz0_plus:
                     state_corr = state.copy()
@@ -1637,4 +1636,4 @@ class QuantumInterface:
                 data += f"\n {key:<20} {value}"
             if isinstance(self._primitive, BaseSamplerV2) and hasattr(self._primitive.options, "twirling"):
                 data += f"\n {'Pauli twirling:':<20} {self._primitive.options.twirling.enable_gates}\n {'Dynamic decoupling:':<20} {self._primitive.options.dynamical_decoupling.enable}"
-        print(data + "\nMitigation flags:\n" + str(self.mitigation_flags.status_report()))
+        print(f"{data}\nMitigation flags:\n{self.mitigation_flags.status_report()}")

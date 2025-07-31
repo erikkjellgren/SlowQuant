@@ -177,14 +177,8 @@ class MitigationFlags:
         self.do_M_ansatz0_plus = do_M_ansatz0_plus
         self.do_postselection = do_postselection
         print("You selected the following mitigation flags:\n" + self.status_report())
-
-    def flag_order(self) -> list[str]:
-        """Return the order of flags for validation and conversion.
-
-        Returns:
-            List of flag names in the order they should be processed.
-        """
-        return ["do_M_mitigation", "do_M_ansatz0", "do_M_ansatz0_plus", "do_postselection"]
+        # Tuple of flag names in the order they should be processed.
+        self._flag_order = ("do_M_mitigation", "do_M_ansatz0", "do_M_ansatz0_plus", "do_postselection")
 
     def _validate_flags(self, flag_dict) -> None:
         """Validate the provided flags against the defined flag_order.
@@ -192,10 +186,10 @@ class MitigationFlags:
         Args:
             flag_dict: Dictionary of flags to validate.
         """
-        unknown_flags = set(flag_dict) - set(self.flag_order())
+        unknown_flags = set(flag_dict) - set(self._flag_order)
         if unknown_flags:
             raise ValueError(
-                f"Unknown flag(s): {', '.join(unknown_flags)}\nAccepted flags: {self.flag_order()}"
+                f"Unknown flag(s): {', '.join(unknown_flags)}\nAccepted flags: {self._flag_order}"
             )
         for flag in flag_dict.items():
             if not isinstance(flag[1], bool):
@@ -219,7 +213,7 @@ class MitigationFlags:
 
     def all_to_false(self) -> None:
         """Set all mitigation flags to False."""
-        for flag in self.flag_order():
+        for flag in self._flag_order:
             setattr(self, flag, False)
         print("All mitigation flags set to False.")
 
@@ -230,18 +224,10 @@ class MitigationFlags:
             Integer representation of the mitigation flags, where each bit corresponds to a flag.
         """
         result = 0
-        for i, flag in enumerate(self.flag_order()):
+        for i, flag in enumerate(self._flag_order):
             if getattr(self, flag):
                 result |= 1 << i
         return result
-
-    def to_bin(self) -> str:
-        """Convert mitigation flags to a binary representation.
-
-        Returns:
-            Binary string representation of the mitigation flags.
-        """
-        return bin(self.to_int())
 
     def status_report(self) -> str:
         """Generate a status report of the mitigation flags.
@@ -250,7 +236,7 @@ class MitigationFlags:
             A string report indicating the status of each mitigation flag.
         """
         lines = []
-        for flag in self.flag_order():
+        for flag in self._flag_order:
             value = getattr(self, flag)
             status = "ON" if value else "OFF"
             lines.append(f"{flag}: {status}")
@@ -259,7 +245,7 @@ class MitigationFlags:
     def __repr__(self):
         """Representation of the MitigationFlags object."""
         flags = {f: getattr(self, f) for f in self.flag_order()}
-        return f"<MitigationFlags int={self.to_int()} bin={self.to_bin()} flags={flags}>"
+        return f"<MitigationFlags int={self.to_int()} bin={bin(self.to_int())} flags={flags}>"
 
 
 class CliqueSaver:
@@ -276,7 +262,7 @@ class CliqueSaver:
         """Reset CliqueSaver."""
         self.data = {0: {}}  # reset to empty raw results saver
 
-    def empty(self, mitigation_int: int = 0) -> bool:
+    def is_empty(self, mitigation_int: int = 0) -> bool:
         """Check if saver is empty.
 
         Args:
@@ -373,7 +359,7 @@ class Clique:
         # Find new Paulis that need to be measured
         new_heads = []
         for clique_head in self.cliques:
-            if clique_head.distr.empty():
+            if clique_head.distr.is_empty():
                 new_heads.append(clique_head.head)
         return new_heads
 
@@ -390,7 +376,7 @@ class Clique:
         for head, distr in zip(new_heads, new_distr):
             for clique_head in self.cliques:
                 if head == clique_head.head:
-                    if not clique_head.distr.empty(mitigation_int):
+                    if not clique_head.distr.is_empty(mitigation_int):
                         raise ValueError(
                             f"Trying to update head distr that is not None. Head; {clique_head.head}; mitigation int; {mitigation_int}"
                         )
@@ -398,7 +384,7 @@ class Clique:
 
         # Check that all heads have a distr
         for clique_head in self.cliques:
-            if clique_head.distr.empty(mitigation_int):
+            if clique_head.distr.is_empty(mitigation_int):
                 raise ValueError(
                     f"Head, {clique_head.head}, has not been allocated for mitigation int; {mitigation_int}"
                 )
@@ -419,7 +405,7 @@ class Clique:
                     raise ValueError(
                         f"Found matching clique, but head will be mutated. Head; {clique_head.head}, Pauli; {pauli}"
                     )
-                if clique_head.distr.empty(mitigation_int):
+                if clique_head.distr.is_empty(mitigation_int):
                     raise ValueError(
                         f"Head, {clique_head.head}, has no distribution for mitigation int; {mitigation_int}"
                     )
@@ -437,7 +423,7 @@ class Clique:
         """
         empties = []
         for clique_head in self.cliques:
-            if clique_head.distr.empty(mitigation_int):
+            if clique_head.distr.is_empty(mitigation_int):
                 empties.append(clique_head.head)
         return empties
 
@@ -479,7 +465,7 @@ class Clique:
         heads = []
         distr = []
         for clique_head in self.cliques:
-            if clique_head.distr.empty(mitigation_int):
+            if clique_head.distr.is_empty(mitigation_int):
                 heads.append(clique_head.head)
                 distr.append(clique_head.distr.data[0].copy())  # raw data
         return heads, distr
