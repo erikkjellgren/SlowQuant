@@ -324,7 +324,6 @@ class CliqueHead:
             head: Clique head.
             distr: Sample state distribution.
         """
-        # Could that not be a dictionary?
         self.head = head
         self.distr = CliqueSaver()
 
