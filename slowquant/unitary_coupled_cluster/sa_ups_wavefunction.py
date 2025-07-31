@@ -23,19 +23,20 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     expectation_value,
     expectation_value_SA,
     get_grad_action_SA,
+    propagate_state,
     propagate_state_SA,
     propagate_unitary_SA,
-    propagate_state
 )
 from slowquant.unitary_coupled_cluster.operators import (
     Epq,
+    G1_sa,
+    G2_1_sa,
+    G2_2_sa,
     hamiltonian_0i_0a,
     one_elec_op_0i_0a,
 )
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
-from slowquant.unitary_coupled_cluster.util import UpsStructure
-from slowquant.unitary_coupled_cluster.operators import G1_sa, G2_1_sa, G2_2_sa
-from slowquant.unitary_coupled_cluster.util import iterate_t1_sa, iterate_t2_sa
+from slowquant.unitary_coupled_cluster.util import UpsStructure, iterate_t1_sa, iterate_t2_sa
 
 
 class WaveFunctionSAUPS:
@@ -218,11 +219,13 @@ class WaveFunctionSAUPS:
         self.num_det = len(self.ci_info.idx2det)
         # SA details
         if state_picks.lower() in ("cis_diag", "cisd_diag"):
-            if 'num_states' not in state_options.keys():
+            if "num_states" not in state_options.keys():
                 raise ValueError("Requires 'num_states' in state_options.")
             self.num_states = state_options["num_states"]
             hf_state = np.zeros(self.num_det)
-            hf_det = int("1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec), 2)
+            hf_det = int(
+                "1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec), 2
+            )
             hf_state[self.ci_info.det2idx[hf_det]] = 1
             H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
             energies = []
@@ -246,9 +249,9 @@ class WaveFunctionSAUPS:
             if state_picks.lower() == "cisd_diag":
                 for a, i, b, j, _, op_type in iterate_t2_sa(self.active_occ_idx, self.active_unocc_idx):
                     if op_type == 1:
-                        op = G2_1_sa(i,j,a,b)
+                        op = G2_1_sa(i, j, a, b)
                     else:
-                        op = G2_2_sa(i,j,a,b)
+                        op = G2_2_sa(i, j, a, b)
                     state = propagate_state([op], hf_state, self.ci_info, None, None)
                     energy = expectation_value(state, [H], state, self.ci_info, None, None)
                     energies.append(energy)
@@ -261,35 +264,39 @@ class WaveFunctionSAUPS:
             energies = np.array(energies)[sortidx]
             csfs_info = np.array(csfs_info, dtype=object)[sortidx]
             # Checking for degenerate states that should be included.
-            energy_max = energies[self.num_states-1]
+            energy_max = energies[self.num_states - 1]
             n_states = 0
             for energy in energies:
                 if energy - energy_max > 10**-6:
                     break
                 n_states += 1
             if self.num_states != n_states:
-                print(f"Changing the number of states from {self.num_states} to {n_states} due to degeneracy.")
+                print(
+                    f"Changing the number of states from {self.num_states} to {n_states} due to degeneracy."
+                )
                 self.num_states = n_states
             self.csf_coeffs = np.zeros((self.num_states, self.num_det))  # state vector for each state in SA
             print("Adding the states:")
             for i in range(self.num_states):
                 state_str = ""
                 for coeff, idx in csfs_info[i]:
-                    self.csf_coeffs[i,idx] = coeff
+                    self.csf_coeffs[i, idx] = coeff
                     if coeff > 0:
                         state_str += f" +{coeff:.2f}|{bin(self.ci_info.idx2det[idx])[2:].zfill(self.num_active_spin_orbs)}>"
                     else:
                         state_str += f" {coeff:.2f}|{bin(self.ci_info.idx2det[idx])[2:].zfill(self.num_active_spin_orbs)}>"
                 print(f"{energies[i]:.5f}", state_str)
-            print("Initial SA energy:", np.mean(energies[:self.num_states]))
+            print("Initial SA energy:", np.mean(energies[: self.num_states]))
         elif state_picks.lower() == "manual":
             if "states" in state_options.keys():
-                states = state_options['states']
+                states = state_options["states"]
                 self.num_states = len(states)
-                self.csf_coeffs = np.zeros((self.num_states, self.num_det))  # state vector for each state in SA
+                self.csf_coeffs = np.zeros(
+                    (self.num_states, self.num_det)
+                )  # state vector for each state in SA
                 for i, state in enumerate(states):
                     # Loop over all determinants of a given state
-                    for (coeff, on_vec) in state:
+                    for coeff, on_vec in state:
                         if len(on_vec) != self.num_active_spin_orbs:
                             raise ValueError(
                                 f"Length of determinant, {len(on_vec)}, does not match number of active spin orbitals, {self.num_active_spin_orbs}. For determinant, {on_vec}"
@@ -302,7 +309,7 @@ class WaveFunctionSAUPS:
                     energy = expectation_value(state, [H], state, self.ci_info, None, None)
                     print(f"state {i} energy:", energy)
                     sa_energy += energy
-                print("Initial SA energy:", sa_energy/self.num_states)
+                print("Initial SA energy:", sa_energy / self.num_states)
             else:
                 raise KeyError("state_options requires key 'states'")
         else:

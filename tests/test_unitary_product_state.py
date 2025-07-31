@@ -201,12 +201,13 @@ def test_saups_h2_3states() -> None:
         h_core,
         g_eri,
         "manual",
-        {"states": [
-            [(1, "1100")],
-            [(2 ** (-1 / 2), "1001"), (-2 ** (-1 / 2), "0110")],
-            [(1, "0011")],
+        {
+            "states": [
+                [(1, "1100")],
+                [(2 ** (-1 / 2), "1001"), (-(2 ** (-1 / 2)), "0110")],
+                [(1, "0011")],
             ]
-         },
+        },
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
         include_active_kappa=True,
@@ -250,12 +251,13 @@ def test_saups_h3_3states() -> None:
         h_core,
         g_eri,
         "manual",
-        {"states": [
-            [(1, "110000")],
-            [(2 ** (-1 / 2), "100100"), (-2 ** (-1 / 2), "011000")],
-            [(2 ** (-1 / 2), "100001"), (-2 ** (-1 / 2), "010010")],
+        {
+            "states": [
+                [(1, "110000")],
+                [(2 ** (-1 / 2), "100100"), (-(2 ** (-1 / 2)), "011000")],
+                [(2 ** (-1 / 2), "100001"), (-(2 ** (-1 / 2)), "010010")],
             ]
-         },
+        },
         "tUPS",
         ansatz_options={"n_layers": 2, "skip_last_singles": True},
         include_active_kappa=True,
@@ -283,7 +285,7 @@ def test_saups_lih_statepicker() -> None:
         """Li 0 0 0;
         H 1.6 0 0""",
         distance_unit="angstrom",
-    )  
+    )
     SQobj.set_basis_set("STO-3G")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
@@ -296,7 +298,7 @@ def test_saups_lih_statepicker() -> None:
         h_core,
         g_eri,
         state_picks="cisd_diag",
-        state_options={'num_states': 3},
+        state_options={"num_states": 3},
         ansatz="tUPS",
         ansatz_options={"n_layers": 1},
     )
