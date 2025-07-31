@@ -29,7 +29,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
 from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import UpsStructure
-
+from slowquant.unitary_coupled_cluster.sa_ups_wavefunction import WaveFunctionSAUPS
 
 class WaveFunctionUPS:
     def __init__(
@@ -321,6 +321,13 @@ class WaveFunctionUPS:
                     kappa_mat[q, p] = -(kappa_val - kappa_old)
         # Apply orbital rotation unitary to MO coefficients
         return np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
+
+    @c_mo.setter
+    def c_mo(self, c: np.ndarray) -> None:
+        self._h_mo = None
+        self._g_mo = None
+        self._energy_elec = None
+        self._c_mo = c.copy()
 
     @property
     def h_mo(self) -> np.ndarray:
@@ -917,6 +924,27 @@ class WaveFunctionUPS:
         else:
             self.thetas = res.x.tolist()
         self._energy_elec = res.fun
+
+    def run_constrained_state_averaged_optimization(self,
+        optimizer_name: str,
+        orbital_optimization: bool = False,
+        tol: float = 1e-10,
+        maxiter: int = 1000,
+    ) -> None:
+        sawf = WaveFunctionSAUPS(
+                self.num_elec,
+                (self.num_active_elec, self.num_active_orbs),
+                self.c_mo,
+                self._h_ao,
+                self._g_ao,
+                (),
+                "None",
+                include_active_kappa=True
+        )
+        sawf.ups_layout = self.ups_layout
+        thetas, c_mo = sawf._run_constrained_state_averaged_optimization(optimizer_name,orbital_optimization,tol,maxiter)
+        self.thetas = thetas
+        self.c_mo = c_mo
 
     def _calc_energy_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool

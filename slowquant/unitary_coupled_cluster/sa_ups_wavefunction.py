@@ -253,6 +253,8 @@ class WaveFunctionSAUPS:
         elif ansatz.lower() == "ksasdsfupccgsd":
             self.ansatz_options["GpD"] = True
             self.ups_layout.create_SDSfUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
+        elif ansatz.lower() == "None":
+            None
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
@@ -698,11 +700,19 @@ class WaveFunctionSAUPS:
         # Subspace diagonalization
         self._do_state_ci()
         self._sa_energy = res.fun
+    
+    def _run_constrained_state_averaged_optimization(self,
+        optimizer_name: str,
+        orbital_optimization: bool = False,
+        tol: float = 1e-10,
+        maxiter: int = 1000,
+    ) -> tuple[list[float], np.ndarray]:
+        return self.thetas, self.c_mo
 
     def _do_state_ci(self) -> None:
         r"""Do subspace diagonalisation.
 
-        #. 10.1103/PhysRevLett.122.230401, Eq. 2
+        #. 10.1103/PhysRevLett.122.230401, Eq. (2)
         """
         state_H = np.zeros((self.num_states, self.num_states))
         Hamiltonian = hamiltonian_0i_0a(
