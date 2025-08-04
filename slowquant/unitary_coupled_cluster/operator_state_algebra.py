@@ -53,7 +53,7 @@ def apply_operator(
     tmp_state: np.ndarray,
     factor: float,
 ) -> np.ndarray:
-    """Apply operator to state.
+    """Apply operator to state for a single state wave function.
 
     This part is outside of propagate_state for performance reasons,
     i.e., Numba JIT.
@@ -84,6 +84,7 @@ def apply_operator(
         # evaluate how string of annihilation operator change det
         for orb_idx in anni_idxs:
             if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 0:
+                # If an annihilation operator works on zero, then we reach kill-state.
                 is_killstate = True
                 break
             det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
@@ -93,6 +94,7 @@ def apply_operator(
             continue
         for orb_idx in create_idxs:
             if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 1:
+                # If creation operator works on one, then we reach kill-state.
                 is_killstate = True
                 break
             det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
@@ -114,7 +116,7 @@ def apply_operator(
 
 
 @nb.jit(nopython=True)
-def apply_operator_matrix(
+def add_operator_matrix(
     op_mat: np.ndarray,
     anni_idxs: np.ndarray,
     create_idxs: np.ndarray,
@@ -125,7 +127,7 @@ def apply_operator_matrix(
     do_unsafe: bool,
     factor: float,
 ) -> np.ndarray:
-    """Apply operator to state.
+    """Add matrix representation of annihilation string.
 
     This part is outside of propagate_state for performance reasons,
     i.e., Numba JIT.
@@ -142,7 +144,7 @@ def apply_operator_matrix(
         factor: Factor in front of operator.
 
     Returns:
-        New state.
+        Operator matrix.
     """
     anni_idxs = anni_idxs[::-1]
     create_idxs = create_idxs[::-1]
@@ -153,6 +155,7 @@ def apply_operator_matrix(
         # evaluate how string of annihilation operator change det
         for orb_idx in anni_idxs:
             if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 0:
+                # If an annihilation operator works on zero, then we reach kill-state.
                 is_killstate = True
                 break
             det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
@@ -162,6 +165,7 @@ def apply_operator_matrix(
             continue
         for orb_idx in create_idxs:
             if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 1:
+                # If creation operator works on one, then we reach kill-state.
                 is_killstate = True
                 break
             det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
@@ -195,7 +199,7 @@ def apply_operator_SA(
     tmp_state: np.ndarray,
     factor: float,
 ) -> np.ndarray:
-    """Apply operator to state.
+    """Apply operator to state for a state-averaged wave function.
 
     This part is outside of propagate_state for performance reasons,
     i.e., Numba JIT.
@@ -231,6 +235,7 @@ def apply_operator_SA(
         # evaluate how string of annihilation operator change det
         for orb_idx in anni_idxs:
             if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 0:
+                # If an annihilation operator works on zero, then we reach kill-state.
                 is_killstate = True
                 break
             det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
@@ -240,6 +245,7 @@ def apply_operator_SA(
             continue
         for orb_idx in create_idxs:
             if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 1:
+                # If creation operator works on one, then we reach kill-state.
                 is_killstate = True
                 break
             det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
@@ -296,7 +302,7 @@ def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bo
                 anni_idx.append(fermi_op[0])
         anni_idx = np.array(anni_idx, dtype=np.int64)
         create_idx = np.array(create_idx, dtype=np.int64)
-        op_mat = apply_operator_matrix(
+        op_mat = add_operator_matrix(
             op_mat,
             anni_idx,
             create_idx,

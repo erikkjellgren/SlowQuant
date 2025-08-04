@@ -119,6 +119,7 @@ class FermionicOperator:
 
         Args:
             annihilation_operator: Annihilation operator.
+                                   Got the format dict[((spin_idx, dagger), ...): factor].
         """
         if isinstance(annihilation_operator, dict):
             self.operators = annihilation_operator
@@ -337,7 +338,7 @@ class FermionicOperator:
         return op_count
 
     @property
-    def operator_readable(self) -> dict[str, float]:
+    def operators_readable(self) -> dict[str, float]:
         """Get the operator in human readable format.
 
         Returns:
@@ -472,7 +473,7 @@ class FermionicOperator:
 
     def get_info(self) -> tuple[list[list[int]], list[list[int]], list[float]]:
         """Return operator excitation in ordered strings with coefficient."""
-        operator = self.operator_readable
+        operator = self.operators_readable
         excitations = list(operator.keys())
         coefficients = list(operator.values())
         creation = []
