@@ -11,9 +11,10 @@ def a_op(spinless_idx: int, spin: str, dagger: bool) -> tuple[int, bool]:
         spinless_idx: Spatial orbital index.
         spin: Alpha or beta spin.
         dagger: If creation operator.
+
     Returns:
         Tuple of spin index and dagger boolean.
-        """
+    """
     if spin not in ("alpha", "beta"):
         raise ValueError(f'spin must be "alpha" or "beta" got {spin}')
     idx = 2 * spinless_idx
@@ -30,7 +31,7 @@ def a_op_spin(spin_idx: int, dagger: bool) -> tuple[int, bool]:
         dagger: If creation operator.
 
     Returns:
-        Annihilation operator.
+        Tuple of spin index and dagger boolean.
     """
     return (spin_idx, dagger)
 
