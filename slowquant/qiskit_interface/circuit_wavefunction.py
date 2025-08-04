@@ -19,7 +19,6 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.qiskit_interface.interface import QuantumInterface
 from slowquant.unitary_coupled_cluster.density_matrix import (
-    ReducedDenstiyMatrix,
     get_electronic_energy,
     get_orbital_gradient,
 )
@@ -1011,14 +1010,9 @@ class WaveFunctionCircuit:
         # RDM is more expensive than evaluation of the Hamiltonian.
         # Thus only construct these if orbital-optimization is turned on,
         # since the RDMs will be reused in the oo gradient calculation.
-        rdms = ReducedDenstiyMatrix(
-            self.num_inactive_orbs,
-            self.num_active_orbs,
-            self.num_virtual_orbs,
-            rdm1=self.rdm1,
-            rdm2=self.rdm2,
+        return get_electronic_energy(
+            self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.rdm1, self.rdm2
         )
-        return get_electronic_energy(rdms, self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
 
     def _calc_gradient_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
@@ -1042,15 +1036,14 @@ class WaveFunctionCircuit:
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:
-            rdms = ReducedDenstiyMatrix(
+            gradient[:num_kappa] = get_orbital_gradient(
+                self.h_mo,
+                self.g_mo,
+                self.kappa_idx,
                 self.num_inactive_orbs,
                 self.num_active_orbs,
-                self.num_virtual_orbs,
-                rdm1=self.rdm1,
-                rdm2=self.rdm2,
-            )
-            gradient[:num_kappa] = get_orbital_gradient(
-                rdms, self.h_mo, self.g_mo, self.kappa_idx, self.num_inactive_orbs, self.num_active_orbs
+                self.rdm1,
+                self.rdm2,
             )
         if theta_optimization:
             H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
