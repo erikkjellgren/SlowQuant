@@ -73,7 +73,7 @@ class LinearResponseUPS(LinearResponseBaseClass):
             print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
                 raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
-
+        
         grad = np.zeros(2 * len(self.G_ops))
         H00_ket = propagate_state([self.H_0i_0a], self.wf.ci_coeffs, *self.index_info)
         for i, op in enumerate(self.G_ops):
@@ -112,114 +112,114 @@ class LinearResponseUPS(LinearResponseBaseClass):
             if np.max(np.abs(grad)) > 10**-3:
                 raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
             
-            #RDM version
-        self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block_unrestricted(
-            rdms,
-            self.wf.haa_mo,
-            self.wf.hbb_mo,
-            self.wf.gaaaa_mo,
-            self.wf.gbbbb_mo,
-            self.wf.gaabb_mo,
-            self.wf.gbbaa_mo,
-            self.wf.kappa_no_activeactive_idx_dagger,
-            self.wf.kappa_no_activeactive_idx,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block_unrestricted(
-            rdms,
-            self.wf.haa_mo,
-            self.wf.hbb_mo,
-            self.wf.gaaaa_mo,
-            self.wf.gbbbb_mo,
-            self.wf.gaabb_mo,
-            self.wf.gbbaa_mo,
-            self.wf.kappa_no_activeactive_idx_dagger,
-            self.wf.kappa_no_activeactive_idx_dagger,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma_unrestricted(
-            rdms, self.wf.kappa_no_activeactive_idx
-        )
+        #     #RDM version
+        # self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block_unrestricted(
+        #     rdms,
+        #     self.wf.haa_mo,
+        #     self.wf.hbb_mo,
+        #     self.wf.gaaaa_mo,
+        #     self.wf.gbbbb_mo,
+        #     self.wf.gaabb_mo,
+        #     self.wf.gbbaa_mo,
+        #     self.wf.kappa_no_activeactive_idx_dagger,
+        #     self.wf.kappa_no_activeactive_idx,
+        #     self.wf.num_inactive_orbs,
+        #     self.wf.num_active_orbs,
+        # )
+        # self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block_unrestricted(
+        #     rdms,
+        #     self.wf.haa_mo,
+        #     self.wf.hbb_mo,
+        #     self.wf.gaaaa_mo,
+        #     self.wf.gbbbb_mo,
+        #     self.wf.gaabb_mo,
+        #     self.wf.gbbaa_mo,
+        #     self.wf.kappa_no_activeactive_idx_dagger,
+        #     self.wf.kappa_no_activeactive_idx_dagger,
+        #     self.wf.num_inactive_orbs,
+        #     self.wf.num_active_orbs,
+        # )
+        # self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma_unrestricted(
+        #     rdms, self.wf.kappa_no_activeactive_idx
+        # )
         
         #manual version
-        # for j, qJ in enumerate(self.q_ops):
-        #     for i, qI in enumerate(self.q_ops):
-        #         #Make A
-        #         # <0| qd H q |0>
-        #         val = (expectation_value(
-        #             self.wf.ci_coeffs,
-        #             [qJ.dagger * self.H_1i_1a * qI],
-        #             self.wf.ci_coeffs,
-        #             *self.index_info,
-        #         ))
-        #         # -<0| qd q H |0>
-        #         val -= (expectation_value(
-        #             self.wf.ci_coeffs,
-        #             [qJ.dagger * qI * self.H_1i_1a],
-        #             self.wf.ci_coeffs,
-        #             *self.index_info,
-        #         ))
-        #         # -<0| H q qd |0>
-        #         val -= (expectation_value(
-        #             self.wf.ci_coeffs,
-        #             [self.H_1i_1a * qI * qJ.dagger],
-        #             self.wf.ci_coeffs,
-        #             *self.index_info,
-        #         ))
-        #         # <0| q H qd |0>
-        #         val += (expectation_value(
-        #             self.wf.ci_coeffs,
-        #             [qI * self.H_1i_1a * qJ.dagger],
-        #             self.wf.ci_coeffs,
-        #             *self.index_info,
-        #         ))
-        #         self.A[i, j] = val
-        #         #make B
-        #         # <0| qd H qd |0>
-        #         val = (expectation_value(
-        #             self.wf.ci_coeffs,
-        #             [qJ.dagger * self.H_1i_1a * qI.dagger],
-        #             self.wf.ci_coeffs,
-        #             *self.index_info,
-        #         ))
-        #         # -<0| qd qd H |0>
-        #         val -= (expectation_value(
-        #             self.wf.ci_coeffs,
-        #             [qJ.dagger * qI.dagger * self.H_1i_1a],
-        #             self.wf.ci_coeffs,
-        #             *self.index_info,
-        #         ))
-        #         # -<0| H qd qd |0>
-        #         val -= (expectation_value(
-        #             self.wf.ci_coeffs,
-        #             [self.H_1i_1a * qI.dagger * qJ.dagger],
-        #             self.wf.ci_coeffs,
-        #             *self.index_info,
-        #         ))
-        #         # <0| qd H qd |0>
-        #         val += (expectation_value(
-        #             self.wf.ci_coeffs,
-        #             [qI.dagger * self.H_1i_1a * qJ.dagger],
-        #             self.wf.ci_coeffs,
-        #             *self.index_info,
-        #         ))
-        #         self.B[i, j] = val
-        #         #make sigma
-        #         val = (expectation_value(
-        #             self.wf.ci_coeffs,
-        #             [qJ.dagger * qI],
-        #             self.wf.ci_coeffs,
-        #             *self.index_info,
-        #         ))
-        #         val -= (expectation_value(
-        #             self.wf.ci_coeffs,
-        #             [qI * qJ.dagger],
-        #             self.wf.ci_coeffs,
-        #             *self.index_info,
-        #         ))
-        #         self.Sigma[i, j] = val
+        for j, qJ in enumerate(self.q_ops):
+            for i, qI in enumerate(self.q_ops):
+                #Make A
+                # <0| qd H q |0>
+                val = (expectation_value(
+                    self.wf.ci_coeffs,
+                    [qJ.dagger * self.H_1i_1a * qI],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
+                ))
+                # -<0| qd q H |0>
+                val -= (expectation_value(
+                    self.wf.ci_coeffs,
+                    [qJ.dagger * qI * self.H_1i_1a],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
+                ))
+                # -<0| H q qd |0>
+                val -= (expectation_value(
+                    self.wf.ci_coeffs,
+                    [self.H_1i_1a * qI * qJ.dagger],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
+                ))
+                # <0| q H qd |0>
+                val += (expectation_value(
+                    self.wf.ci_coeffs,
+                    [qI * self.H_1i_1a * qJ.dagger],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
+                ))
+                self.A[i, j] = val
+                #make B
+                # <0| qd H qd |0>
+                val = (expectation_value(
+                    self.wf.ci_coeffs,
+                    [qJ.dagger * self.H_1i_1a * qI.dagger],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
+                ))
+                # -<0| qd qd H |0>
+                val -= (expectation_value(
+                    self.wf.ci_coeffs,
+                    [qJ.dagger * qI.dagger * self.H_1i_1a],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
+                ))
+                # -<0| H qd qd |0>
+                val -= (expectation_value(
+                    self.wf.ci_coeffs,
+                    [self.H_1i_1a * qI.dagger * qJ.dagger],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
+                ))
+                # <0| qd H qd |0>
+                val += (expectation_value(
+                    self.wf.ci_coeffs,
+                    [qI.dagger * self.H_1i_1a * qJ.dagger],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
+                ))
+                self.B[i, j] = val
+                #make sigma
+                val = (expectation_value(
+                    self.wf.ci_coeffs,
+                    [qJ.dagger * qI],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
+                ))
+                val -= (expectation_value(
+                    self.wf.ci_coeffs,
+                    [qI * qJ.dagger],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
+                ))
+                self.Sigma[i, j] = val
 
         for j, qJ in enumerate(self.q_ops):
             Hq_ket = propagate_state([self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info)

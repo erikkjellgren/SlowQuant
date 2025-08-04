@@ -32,18 +32,18 @@ def get_unrestricted_excitation_energy(geometry, basis, active_space, charge=0, 
         mf.mo_coeff,
         h_core,
         g_eri,
-        "fuccsd",
-        {"n_layers":1},
+        "fuccsdtq",
+        {"n_layers":2},
         include_active_kappa=True,
     )
     
     #WF.run_wf_optimization_1step("slsqp", False)
-    WF.run_wf_optimization_1step("slsqp", True)
+    WF.run_wf_optimization_1step("bfgs", True)
     
 
     print("Energy elec", WF.energy_elec_RDM)
 
-    ULR = unaive.LinearResponseUPS(WF, excitations="SD")
+    ULR = unaive.LinearResponseUPS(WF, excitations="SDTQ")
     ULR.calc_excitation_energies()
     print(ULR.excitation_energies)
 
@@ -91,11 +91,20 @@ def oh_radical():
     geometry = """O  0.0   0.0  0.0;
         H  0.0  0.0  0.9697;"""
     basis = 'STO-3G'
-    active_space = ((2,1),3)
+    active_space = ((3,2),4)
     charge = 0
     spin=1
 
     get_unrestricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
+    
+def oh_radical_res():
+    geometry = """O  0.0   0.0  0.0;
+        H  0.0  0.0  0.9697;"""
+    basis = 'STO-3G'
+    active_space = (5,4)
+    charge = 0
+    spin=1
+    get_restricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
 
 def OH_cation():
     """
@@ -104,7 +113,7 @@ def OH_cation():
     geometry = """O  0.0   0.0  0.0;
         H  0.0  0.0  1.0289;"""
     basis="STO-3g"
-    active_space = ((1,3),4)
+    active_space = ((5,3),6)
     charge = 1
     #the pyscf spin parameter is the value of 2S (tne number of unpaired electrons, or the difference between the number of alpha and beta electrons)
     spin=2
@@ -167,9 +176,10 @@ def h2_res():
     get_restricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
 
 #OH_cation()
-oh_radical()
+#oh_radical_res()
+#oh_radical()
 #excita_h2o()
 #h2()
 #h2_res()
-#NO_radical()
+NO_radical()
 #h2_ion()
