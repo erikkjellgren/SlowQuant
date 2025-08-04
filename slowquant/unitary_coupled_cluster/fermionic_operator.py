@@ -113,13 +113,12 @@ class FermionicOperator:
     ) -> None:
         """Initialize fermionic operator class.
 
-        Fermionic operators are defined via an annihilation_operator dictionary where each entry is one addend of the operator.
-        Each entry is a strings of annihilation operator specified via its string (key) and list of a_op (item).
-        The dictionary factor contains the factor for each of the addend of the fermionic operator.
+        Fermionic operators are defined via an annihilation_operator dictionary where each entry is one of the annihilation operators.
+        Each entry is a tuples (key) of an integer (spin orbital index) and a bool (dagger/not dagger)
+        which defines the keys and a float (value) that is the factor in front of the annihilation string.
 
         Args:
             annihilation_operator: Annihilation operator.
-                                   Got the format dict[((spin_idx, dagger), ...): factor].
         """
         if isinstance(annihilation_operator, dict):
             self.operators = annihilation_operator
