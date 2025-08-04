@@ -2,6 +2,7 @@
 import copy
 import itertools
 import math
+import pickle
 from collections import defaultdict
 from typing import Any
 
@@ -23,8 +24,9 @@ from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
 from slowquant.qiskit_interface.custom_ansatz import SDSfUCC, fUCC, tUPS
-from slowquant.qiskit_interface.util import (  # correct_distribution_with_layout,
+from slowquant.qiskit_interface.util import (
     Clique,
+    MitigationFlags,
     correct_distribution,
     correct_distribution_with_layout_v2,
     get_bitstring_sign,
@@ -56,7 +58,8 @@ class QuantumInterface:
         max_shots_per_run: int = 100000,
         do_M_mitigation: bool = False,
         do_M_ansatz0: bool = False,
-        do_postselection: bool = True,
+        do_M_ansatz0_plus: bool = False,
+        do_postselection: bool = False,
     ) -> None:
         """Interface to Qiskit to use IBM quantum hardware or simulator.
 
@@ -71,6 +74,7 @@ class QuantumInterface:
             max_shots_per_run: Maximum number of shots allowed in a single run. Set to 100000 per IBM machines.
             do_M_mitigation: Do error mitigation via read-out correlation matrix.
             do_M_ansatz0: Use the ansatz with theta=0 when constructing the read-out correlation matrix.
+            do_M_ansatz0_plus: Creates M0 for each initial superposition state. Only used for SA-VQE.
             do_postselection: Use postselection to preserve number of particles in the computational basis.
         """
         if ansatz_options is None:
@@ -108,14 +112,17 @@ class QuantumInterface:
         self.ISA = ISA
         self.shots = shots
         self.mapper = mapper
-        self.do_M_mitigation = do_M_mitigation
-        self.do_M_ansatz0 = do_M_ansatz0
+        self.mitigation_flags: MitigationFlags = MitigationFlags(
+            do_M_mitigation=do_M_mitigation,
+            do_M_ansatz0=do_M_ansatz0,
+            do_M_ansatz0_plus=do_M_ansatz0_plus,
+            do_postselection=do_postselection,
+        )
         self._Minv = None
         self.total_shots_used = 0
         self.total_device_calls = 0
         self.total_paulis_evaluated = 0
         self.ansatz_options = ansatz_options
-        self.do_postselection = do_postselection
         self._pass_manager: PassManager = None
         self.saver: dict[int, Clique] = {}
         self._save_paulis = True  # hard switch to stop using Pauli saving (debugging tool).
@@ -238,6 +245,14 @@ class QuantumInterface:
         if not hasattr(self, "_parameters"):
             # Set parameter to HarteeFock
             self._parameters = [0.0] * self.circuit.num_parameters
+
+    def update_mitigation_flags(self, **kwargs) -> None:
+        """Update mitigation flags.
+
+        Args:
+            **kwargs: Keyword arguments to update mitigation flags.
+        """
+        self.mitigation_flags.update_flags(**kwargs)
 
     @property
     def ISA(self) -> bool:
@@ -676,7 +691,6 @@ class QuantumInterface:
         ket_csf: tuple[list[float], list[str]],
         custom_parameters: list[float] | None = None,
         ISA_csfs_option: int = 0,
-        M_per_superpos: bool = False,
         reverse_csfs_order: bool = False,
     ) -> float:
         r"""Calculate expectation value using different bra and ket of a Hermitian operator.
@@ -715,7 +729,6 @@ class QuantumInterface:
                 2: Fixed layout but allow change in order (swaps).
                 3: Fixed layout, fixed order, without optimizing circuit after composing.
                 4: Fixed layout, fixed order, with optimizing circuit after composing.
-            M_per_superpos: A new M_Ansatz0 matrix for each superposition state.
             reverse_csfs_order: If true, the pair-entangled superposition states' order is reversed.
                 This might be relevant as the order can influence the circuit depths.
 
@@ -731,18 +744,19 @@ class QuantumInterface:
             raise ValueError(
                 "quantum_expectation_value_csfs got unsupported Qiskit primitive, {type(self._primitive)}"
             )
-        if M_per_superpos and isinstance(self._primitive, BaseEstimator):
+        if self.mitigation_flags.do_M_ansatz0_plus and isinstance(self._primitive, BaseEstimator):
             raise ValueError("Base estimator does not support M_Ansatz0")
-        if M_per_superpos and (self.do_M_ansatz0 + self.do_M_mitigation) != 2:
-            raise ValueError(
-                "You requested M_per_superpos but M error mitigation / M_Ansatz0 was not selected in QI settings."
-            )
+
         # Option handling
         if ISA_csfs_option == 0:
             ISA_csfs_option = 1  # could also be 2
-            if self.do_M_mitigation and self.ansatz_circuit.layout is not None and not M_per_superpos:
+            if (
+                self.mitigation_flags.do_M_mitigation
+                and self.ansatz_circuit.layout is not None
+                and not self.mitigation_flags.do_M_ansatz0_plus
+            ):
                 ISA_csfs_option = 2
-                if self.do_M_ansatz0:
+                if self.mitigation_flags.do_M_ansatz0:
                     ISA_csfs_option = 4  # could also be 3
         print("CSFs expectation value with circuit composing option: ", ISA_csfs_option)
 
@@ -846,9 +860,8 @@ class QuantumInterface:
                             raise ValueError("Wrong ISA_csfs_option specified. Needs to be 1,2,3,4.")
                 else:
                     circuit = self.ansatz_circuit.compose(state, front=True)
-                # val_old = val  # debug
                 # Check if M per superposition circuit is requested
-                if M_per_superpos:
+                if self.mitigation_flags.do_M_ansatz0_plus:
                     state_corr = state.copy()
                     # Get state circuit without non-local gates
                     for idx, instruction in reversed(list(enumerate(state_corr.data))):
@@ -888,7 +901,7 @@ class QuantumInterface:
                     elif isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
                         if save_paulis:
                             val += N * self._sampler_quantum_expectation_value(
-                                op, run_circuit=circuit, det=bra_det + ket_det
+                                op, run_circuit=circuit, det=bra_det + ket_det, csfs_option=ISA_csfs_option
                             )
                         else:
                             val += N * self._sampler_quantum_expectation_value_nosave(
@@ -997,6 +1010,7 @@ class QuantumInterface:
         run_circuit: QuantumCircuit | None = None,
         det: str | None = None,
         circuit_M: None | QuantumCircuit = None,
+        csfs_option: int = 1,
     ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
 
@@ -1040,60 +1054,51 @@ class QuantumInterface:
 
         if det_int not in self.saver:
             print("Make new Clique saver for determinant ", det)
-            self.saver[det_int] = Clique()
+            self.saver[det_int] = Clique(csfs_option)
+        else:
+            # If a different csfs option has been used in SA-VQE that means the circuit has been altered.
+            # Thus, we cannot use raw results from an unaltered circuit run with a different csfs_option.
+            if self.saver[det_int].csfs_option != csfs_option:
+                print(
+                    "Warning: Clique saver for determinant ",
+                    det,
+                    " has different csfs_option than requested. Rerunning raw data.",
+                )
+                self.saver[det_int] = Clique(csfs_option)
 
         paulis_str = [str(x) for x in observables.paulis]
         new_heads = self.saver[det_int].add_paulis(paulis_str)
 
         if len(new_heads) != 0:
-            # Check if error mitigation is requested and if read-out matrix already exists.
-            if self.do_M_mitigation:
-                if circuit_M is None:
-                    if self._Minv is None:
-                        self._Minv = self._make_Minv(shots=self._M_shots)
-                else:
-                    Minv = self._make_Minv(shots=self._M_shots, custom_ansatz=circuit_M)
-
             # Simulate each clique head with one combined device call
             # and return a list of distributions
             distr = self._one_call_sampler_distributions(new_heads, self.parameters, run_circuit)
-
-            if self.do_M_mitigation:  # apply error mitigation if requested
-                if circuit_M is None:
-                    # Check if layout conflict in M and current circuit
-                    match self._check_layout_conflict(run_circuit):
-                        case 0:  # no layout - no order conflict
-                            for i, dist in enumerate(distr):
-                                distr[i] = correct_distribution(dist, self._Minv)
-                        case 1:  # no layout, but order conflict
-                            if self.do_M_ansatz0:
-                                raise ValueError("Detected order conflict. Not possile to do M Ansatz0")
-                            print("Detected order conflict. Applying M re-ordering.")
-                            for i, dist in enumerate(distr):
-                                distr[i] = correct_distribution_with_layout_v2(  # maybe v1 is better.
-                                    dist,
-                                    self._Minv,
-                                    self._final_ansatz_indices,
-                                    run_circuit.layout.final_index_layout(),
-                                )
-                        case 2:  # layout conflict
-                            raise ValueError("Detected layout conflict. Cannot do M mitigation.")
-                else:
-                    # custom M -> no layout check needed / possible
-                    for i, dist in enumerate(distr):
-                        distr[i] = correct_distribution(dist, Minv)
-
-            if self.do_postselection:
-                for i, (dist, head) in enumerate(zip(distr, new_heads)):
-                    if "X" not in head and "Y" not in head:
-                        distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
+            # save raw results
             self.saver[det_int].update_distr(new_heads, distr)
+
+        if self.mitigation_flags.is_enabled():
+            # figure out if mitigated result already exist.
+            # if yes, do nothing and go to value calculation.
+            # if not, generate new mitigated data based on raw data.
+            # one could maybe also think of doing mitigation and its saving when new_heads is not empty.
+            # that might make it faster!
+            head_mit, distr_raw = self.saver[det_int].get_empty_heads_distr(self.mitigation_flags)
+
+            if len(head_mit) != 0:
+                if self.mitigation_flags.do_M_mitigation:  # apply error mitigation if requested
+                    self._apply_M_mitigation(distr_raw, run_circuit, circuit_M)
+
+                if self.mitigation_flags.do_postselection:  # apply post-selection if requested
+                    self._apply_postselection(distr_raw, head_mit)
+
+                # save mitigated results
+                self.saver[det_int].update_distr(head_mit, distr_raw, self.mitigation_flags)
 
         # Loop over all Pauli strings in observable and build final result with coefficients
         for pauli, coeff in zip(paulis_str, observables.coeffs):
             result = 0.0
             for key, value in (
-                self.saver[det_int].get_distr(pauli).items()
+                self.saver[det_int].get_distr(pauli, self.mitigation_flags).items()
             ):  # build result from quasi-distribution
                 result += value * get_bitstring_sign(pauli, key)
             values += result * coeff
@@ -1145,14 +1150,6 @@ class QuantumInterface:
                 f"Got unknown operator type {type(op)}, expected FermionicOperator or SparsePauliOp"
             )
 
-        # Check if error mitigation is requested and if read-out matrix already exists.
-        if self.do_M_mitigation:
-            if circuit_M is None:
-                if self._Minv is None:
-                    self._Minv = self._make_Minv(shots=self._M_shots)
-            else:
-                Minv = self._make_Minv(shots=self._M_shots, custom_ansatz=circuit_M)
-
         paulis_str = [str(x) for x in observables.paulis]
         if do_cliques:
             # Obtain cliques for operator's Pauli strings
@@ -1163,34 +1160,12 @@ class QuantumInterface:
             # Simulate each clique head with one combined device call
             # and return a list of distributions
             distr = self._one_call_sampler_distributions(new_heads, run_parameters, run_circuit)
-            if self.do_M_mitigation:  # apply error mitigation if requested
-                if circuit_M is None:
-                    # Check if layout conflict in M and current circuit
-                    match self._check_layout_conflict(run_circuit):
-                        case 0:  # no layout - no order conflict
-                            for i, dist in enumerate(distr):
-                                distr[i] = correct_distribution(dist, self._Minv)
-                        case 1:  # no layout, but order conflict
-                            if self.do_M_ansatz0:
-                                raise ValueError("Detected order conflict. Not possible to do M Ansatz0.")
-                            print("Detected order conflict. Applying M re-ordering.")
-                            for i, dist in enumerate(distr):
-                                distr[i] = correct_distribution_with_layout_v2(  # maybe v1 is better.
-                                    dist,
-                                    self._Minv,
-                                    self._final_ansatz_indices,
-                                    run_circuit.layout.final_index_layout(),
-                                )
-                        case 2:  # layout conflict
-                            raise ValueError("Detected layout conflict. Cannot do M mitigation.")
-                else:
-                    # custom M -> no layout check needed / possible
-                    for i, dist in enumerate(distr):
-                        distr[i] = correct_distribution(dist, Minv)
-            if self.do_postselection:
-                for i, (dist, head) in enumerate(zip(distr, new_heads)):
-                    if "X" not in head and "Y" not in head:
-                        distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
+            if self.mitigation_flags.do_M_mitigation:  # apply error mitigation if requested
+                self._apply_M_mitigation(distr, run_circuit, circuit_M)
+
+            if self.mitigation_flags.do_postselection:  # apply post-selection if requested
+                self._apply_postselection(distr, new_heads)
+
             cliques.update_distr(new_heads, distr)
 
             # Loop over all Pauli strings in observable and build final result with coefficients
@@ -1202,34 +1177,11 @@ class QuantumInterface:
         else:
             # Simulate each Pauli string with one combined device call
             distr = self._one_call_sampler_distributions(paulis_str, run_parameters, run_circuit)
-            if self.do_M_mitigation:  # apply error mitigation if requested
-                if circuit_M is None:
-                    # Check if layout conflict in M and current circuit
-                    match self._check_layout_conflict(run_circuit):
-                        case 0:  # no layout - no order conflict
-                            for i, dist in enumerate(distr):
-                                distr[i] = correct_distribution(dist, self._Minv)
-                        case 1:  # no layout, but order conflict
-                            if self.do_M_ansatz0:
-                                raise ValueError("Detected order conflict. Not possile to do M Ansatz0")
-                            print("Detected order conflict. Applying M re-ordering.")
-                            for i, dist in enumerate(distr):
-                                distr[i] = correct_distribution_with_layout_v2(  # maybe v1 is better.
-                                    dist,
-                                    self._Minv,
-                                    self._final_ansatz_indices,
-                                    run_circuit.layout.final_index_layout(),
-                                )
-                        case 2:  # layout conflict
-                            raise ValueError("Detected layout conflict. Cannot do M mitigation.")
-                else:
-                    # custom M -> no layout check needed / possible
-                    for i, dist in enumerate(distr):
-                        distr[i] = correct_distribution(dist, Minv)
-            if self.do_postselection:
-                for i, (dist, pauli) in enumerate(zip(distr, paulis_str)):
-                    if "X" not in pauli and "Y" not in pauli:
-                        distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
+            if self.mitigation_flags.do_M_mitigation:  # apply error mitigation if requested
+                self._apply_M_mitigation(distr, run_circuit, circuit_M)
+
+            if self.mitigation_flags.do_postselection:  # apply post-selection if requested
+                self._apply_postselection(distr, paulis_str)
 
             # Loop over all Pauli strings in observable and build final result with coefficients
             for pauli, coeff, dist in zip(paulis_str, observables.coeffs, distr):
@@ -1253,9 +1205,12 @@ class QuantumInterface:
     ) -> float:
         """Calculate variance (std**2) of expectation value of circuit and observables.
 
+        This works either by accessing the saver distributions or by claculating each expectation value from scratch.
+        If they are calculated from scratch, no error mitigation can be applied.
+
         Args:
             op: SlowQuant fermionic operator.
-            do_cliques: boolean if cliques are used.
+            do_cliques: boolean if cliques are used. They are accessed via the saver.
             no_coeffs: boolean if coefficients of each Pauli string are used or all st to 1.
             custom_parameters: optional custom circuit parameters.
 
@@ -1284,33 +1239,6 @@ class QuantumInterface:
                 f"Got unknown operator type {type(op)}, expected FermionicOperator or SparsePauliOp"
             )
 
-        if do_cliques:
-            if det_int not in self.saver:
-                self.saver[det_int] = Clique()
-
-            new_heads = self.saver[det_int].add_paulis([str(x) for x in observables.paulis])
-
-            if len(new_heads) != 0:
-                # Check if error mitigation is requested and if read-out matrix already exists.
-                if self.do_M_mitigation and self._Minv is None:
-                    self._Minv = self._make_Minv()
-
-                # Simulate each clique head with one combined device call
-                # and return a list of distributions
-                distr = self._one_call_sampler_distributions(new_heads, run_parameters, self.circuit)
-                if self.do_M_mitigation:  # apply error mitigation if requested
-                    for i, dist in enumerate(distr):
-                        distr[i] = correct_distribution(dist, self._Minv)
-                if self.do_postselection:
-                    for i, (dist, head) in enumerate(zip(distr, new_heads)):
-                        if "X" not in head and "Y" not in head:
-                            distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
-                self.saver[det_int].update_distr(new_heads, distr)
-        else:
-            print(
-                "WARNING: REM and Post-Selection not implemented for quantum variance without the use of cliques."
-            )
-
         # Loop over all Pauli strings in observable and build final result with coefficients
         result = 0.0
         paulis_str = [str(x) for x in observables.paulis]
@@ -1319,7 +1247,7 @@ class QuantumInterface:
                 coeff = 1
             # Get distribution from cliques
             if do_cliques:
-                dist = self.saver[det_int].get_distr(pauli)
+                dist = self.saver[det_int].get_distr(pauli, self.mitigation_flags)
                 # Calculate p1: Probability of measuring one
                 p1 = 0.0
                 for key, value in dist.items():
@@ -1333,6 +1261,60 @@ class QuantumInterface:
                 var_p = 4 * np.abs(coeff.real) ** 2 * np.abs(p1 - p1**2) / (self.shots)
             result += var_p
         return result
+
+    def _apply_M_mitigation(
+        self,
+        distr: list[dict[int, float]],
+        run_circuit: QuantumCircuit,
+        circuit_M: QuantumCircuit | None = None,
+    ) -> None:
+        """Apply M mitigation to the distributions.
+
+        Args:
+            distr: List of distributions to be mitigated.
+            run_circuit: The circuit used for running the distributions.
+            circuit_M: Optional custom circuit for M_Ansatz0 mitigation.
+        """
+        if circuit_M is None:
+            # Check if read-out matrix already exists.
+            if self._Minv is None:
+                # do stantard M
+                self._Minv = self._make_Minv(shots=self._M_shots)
+            # Check if layout conflict in M and current circuit
+            match self._check_layout_conflict(run_circuit):
+                case 0:  # no layout - no order conflict
+                    for i, dist in enumerate(distr):
+                        distr[i] = correct_distribution(dist, self._Minv)
+                case 1:  # no layout, but order conflict
+                    if self.mitigation_flags.do_M_ansatz0:
+                        raise ValueError("Detected order conflict. Not possile to do M Ansatz0")
+                    print("Detected order conflict. Applying M re-ordering.")
+                    for i, dist in enumerate(distr):
+                        distr[i] = correct_distribution_with_layout_v2(  # maybe v1 is better.
+                            dist,
+                            self._Minv,
+                            self._final_ansatz_indices,
+                            run_circuit.layout.final_index_layout(),
+                        )
+                case 2:  # layout conflict
+                    raise ValueError("Detected layout conflict. Cannot do M mitigation.")
+        else:
+            # get custom M
+            Minv = self._make_Minv(shots=self._M_shots, custom_ansatz=circuit_M)
+            # custom M -> no layout check needed / possible
+            for i, dist in enumerate(distr):
+                distr[i] = correct_distribution(dist, Minv)
+
+    def _apply_postselection(self, distr: list[dict[int, float]], heads: list[str]) -> None:
+        """Apply post-selection to the distributions.
+
+        Args:
+            distr: List of distributions to be post-selected.
+            heads: List of Pauli strings (heads).
+        """
+        for i, (dist, head) in enumerate(zip(distr, heads)):
+            if "X" not in head and "Y" not in head:
+                distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
 
     def _one_call_sampler_distributions(
         self,
@@ -1571,7 +1553,7 @@ class QuantumInterface:
             raise ValueError("Current implementation does not scale above 8 qubits?")
         if custom_ansatz is None:
             print("Measuring error mitigation read-out matrix.")
-            if self.do_M_ansatz0:
+            if self.mitigation_flags.do_M_ansatz0:
                 ansatz = self.ansatz_circuit
             else:
                 ansatz = QuantumCircuit(self.num_qubits)  # empty circuit
@@ -1620,15 +1602,32 @@ class QuantumInterface:
         # self._M = M would be needed to do v1 M correction.
         return np.linalg.inv(M)
 
+    def save_paulis_to_file(self, filename: str) -> None:
+        """Save all Pauli strings and their distributions to a file.
+
+        Args:
+            filename: Name of the file to save the data to.
+        """
+        with open(filename, "wb") as file:
+            pickle.dump(self.saver, file)
+
+    def load_paulis_from_file(self, filename: str) -> None:
+        """Load Pauli strings and their distributions from a file.
+
+        Args:
+            filename: Name of the file to load the data from.
+        """
+        with open(filename, "rb") as file:
+            self.saver = pickle.load(file)
+        print(f"Loaded Pauli strings from {filename}.")
+
     def get_info(self) -> None:
         """Get infos about settings."""
         if isinstance(self.ansatz, QuantumCircuit):
             data = f"Your settings are:\n {'Ansatz:':<20} {'custom circuit'}\n {'Number of shots:':<20} {self.shots}\n"
         else:
             data = f"Your settings are:\n {'Ansatz:':<20} {self.ansatz}\n {'Number of shots:':<20} {self.shots}\n"
-        data += f" {'ISA':<20} {self.ISA}\n {'Primitive:':<20} {self._primitive.__class__.__name__}\n"
-        data += f" {'Post-processing:':<20} {self.do_postselection}"
-        data += f"\n {'M mitigation:':<20} {self.do_M_mitigation}\n {'M Ansatz0:':<20} {self.do_M_ansatz0}"
+        data += f" {'ISA':<20} {self.ISA}\n {'Primitive:':<20} {self._primitive.__class__.__name__}"
         if self.ISA:
             data += f"\n {'Final layout:':<20} {self._final_ansatz_indices}"
             data += f"\n {'Non-local gates:':<20} {self.ansatz_circuit.num_nonlocal_gates()}"
@@ -1637,4 +1636,4 @@ class QuantumInterface:
                 data += f"\n {key:<20} {value}"
             if isinstance(self._primitive, BaseSamplerV2) and hasattr(self._primitive.options, "twirling"):
                 data += f"\n {'Pauli twirling:':<20} {self._primitive.options.twirling.enable_gates}\n {'Dynamic decoupling:':<20} {self._primitive.options.dynamical_decoupling.enable}"
-        print(data)
+        print(f"{data}\nMitigation flags:\n{self.mitigation_flags.status_report()}")

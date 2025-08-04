@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 import networkx as nx
 import numpy as np
 from qiskit import QuantumCircuit
@@ -148,8 +149,175 @@ def find_swaps(new: list[int], ref: list[int]) -> list[tuple[int, int]]:
     return swaps
 
 
+class MitigationFlags:
+    """Class to handle mitigation flags."""
+
+    def __init__(
+        self,
+        do_M_mitigation: bool = False,
+        do_M_ansatz0: bool = False,
+        do_M_ansatz0_plus: bool = False,
+        do_postselection: bool = False,
+    ):
+        """Initialize mitigation flags.
+
+        Args:
+            do_M_mitigation: Whether to perform error mitigation.
+            do_M_ansatz0: Whether to perform M0 mitigation.
+            do_M_ansatz0_plus: Whether to perform M0 mitigation for each initial superposition state.
+            do_postselection: Whether to perform post-selection.
+        """
+        if do_M_ansatz0 is True:
+            do_M_mitigation = True
+        if do_M_ansatz0_plus is True:
+            do_M_mitigation = True
+            do_M_ansatz0 = True
+        self.do_M_mitigation = do_M_mitigation
+        self.do_M_ansatz0 = do_M_ansatz0
+        self.do_M_ansatz0_plus = do_M_ansatz0_plus
+        self.do_postselection = do_postselection
+        # Tuple of flag names in the order they should be processed.
+        self._flag_order = ("do_M_mitigation", "do_M_ansatz0", "do_M_ansatz0_plus", "do_postselection")
+
+        print("You selected the following mitigation flags:\n" + self.status_report())
+
+    def _validate_flags(self, flag_dict) -> None:
+        """Validate the provided flags against the defined flag_order.
+
+        Args:
+            flag_dict: Dictionary of flags to validate.
+        """
+        unknown_flags = set(flag_dict) - set(self._flag_order)
+        if unknown_flags:
+            raise ValueError(
+                f"Unknown flag(s): {', '.join(unknown_flags)}\nAccepted flags: {self._flag_order}"
+            )
+        for flag in flag_dict.items():
+            if not isinstance(flag[1], bool):
+                raise TypeError(f"{flag[0]} must be a boolean")
+
+    def update_flags(self, **kwargs) -> None:
+        """Update mitigation flags with provided keyword arguments.
+
+        Args:
+            **kwargs: Flags to be updated. If a flag is not provided, it remains unchanged.
+        """
+        self._validate_flags(kwargs)
+        for flag, value in kwargs.items():
+            setattr(self, flag, value)
+        if self.do_M_ansatz0 is True:
+            self.do_M_mitigation = True
+        if self.do_M_ansatz0_plus is True:
+            self.do_M_mitigation = True
+            self.do_M_ansatz0 = True
+        print("You selected the following mitigation flags:\n" + self.status_report())
+
+    def all_to_false(self) -> None:
+        """Set all mitigation flags to False."""
+        for flag in self._flag_order:
+            setattr(self, flag, False)
+        print("All mitigation flags set to False.")
+
+    def to_int(self) -> int:
+        """Convert mitigation flags to an integer representation.
+
+        Returns:
+            Integer representation of the mitigation flags, where each bit corresponds to a flag.
+        """
+        result = 0
+        for i, flag in enumerate(self._flag_order):
+            if getattr(self, flag):
+                result |= 1 << i
+        return result
+
+    def status_report(self) -> str:
+        """Generate a status report of the mitigation flags.
+
+        Returns:
+            A string report indicating the status of each mitigation flag.
+        """
+        lines = []
+        for flag in self._flag_order:
+            value = getattr(self, flag)
+            status = "ON" if value else "OFF"
+            lines.append(f"{flag}: {status}")
+        return "\n".join(lines)
+
+    def is_enabled(self) -> bool:
+        """Check if any mitigation is enabled.
+
+        Returns:
+            True if any mitigation flag is set to True, False otherwise.
+        """
+        if self.to_int() == 0:
+            return False
+        return True
+
+    def __repr__(self):
+        """Representation of the MitigationFlags object."""
+        flags = {f: getattr(self, f) for f in self._flag_order}
+        return f"<MitigationFlags int={self.to_int()} bin={bin(self.to_int())} flags={flags}>"
+
+
+class CliqueSaver:
+    """Class to handle saving of cliques.
+
+    This class is used to save a clique heads distributions based on the used mitigation scheme.
+    """
+
+    def __init__(self) -> None:
+        """Initialize CliqueSaver."""
+        self.data: dict[int, dict[int, float]] = {0: {}}  # initialize raw results saver
+
+    def reset(self) -> None:
+        """Reset CliqueSaver."""
+        self.data = {0: {}}  # reset to empty raw results saver
+
+    def is_empty(self, mitigation_flags: MitigationFlags | None = None) -> bool:
+        """Check if saver is empty.
+
+        Args:
+            mitigation_flags: Mitigation flags object, default is None.
+
+        Returns:
+            True if empty, False otherwise.
+        """
+        mitigation_int = mitigation_flags.to_int() if mitigation_flags is not None else 0
+        if mitigation_int not in self.data:
+            return True  # it is empty if it does not exist.
+        if self.data[mitigation_int]:
+            return False  # not empty
+        # check if all are empty
+        if mitigation_int == 0 and len(self.data) > 1:
+            if not all(len(inner) == 0 for inner in self.data.values()):
+                raise ValueError("Empty data not consistent accross mitigation saver.")
+        return True  # empty
+
+    def add_distr(self, distr: dict[int, float], mitigation_flags: MitigationFlags | None = None) -> None:
+        """Add distribution to saver.
+
+        Args:
+            distr: Distribution to be added.
+            mitigation_flags: Mitigation flags object, default is None.
+        """
+        mitigation_int = mitigation_flags.to_int() if mitigation_flags is not None else 0
+        self.data[mitigation_int] = distr
+
+    def get_distr(self, mitigation_flags: MitigationFlags | None = None) -> dict[int, float]:
+        """Return distribution.
+
+        Args:
+            mitigation_flags: Mitigation flags object, default is None.
+
+        Returns:
+            Distribution for the given mitigation integer.
+        """
+        mitigation_int = mitigation_flags.to_int() if mitigation_flags is not None else 0
+        return self.data[mitigation_int]
+
+
 class CliqueHead:
-    def __init__(self, head: str, distr: dict[int, float] | None) -> None:
+    def __init__(self, head: str) -> None:
         """Initialize clique head dataclass.
 
         Args:
@@ -157,7 +325,7 @@ class CliqueHead:
             distr: Sample state distribution.
         """
         self.head = head
-        self.distr = distr
+        self.distr = CliqueSaver()
 
 
 class Clique:
@@ -166,9 +334,10 @@ class Clique:
     #. 10.1109/TQE.2020.3035814, Sec. IV. A, IV. B, and VIII.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, csfs_option: int = 1) -> None:
         """Initialize clique class."""
         self.cliques: list[CliqueHead] = []
+        self.csfs_option = csfs_option
 
     def add_paulis(self, paulis: list[str]) -> list[str]:
         """Add list of Pauli strings to cliques and return clique heads to be simulated.
@@ -182,7 +351,7 @@ class Clique:
         # The special case of computational basis
         # should always be the first clique.
         if len(self.cliques) == 0:
-            self.cliques.append(CliqueHead("Z" * len(paulis[0]), None))
+            self.cliques.append(CliqueHead("Z" * len(paulis[0])))
 
         # Loop over Pauli strings (passed via observable) in reverse sorted order
         for pauli in sorted(paulis, reverse=True):
@@ -192,43 +361,51 @@ class Clique:
                 do_fit, head_fit = fit_in_clique(pauli, clique_head.head)
                 if do_fit:
                     if head_fit != clique_head.head:
-                        # Update Clique head by setting distr to None (= to be simulated)
-                        clique_head.distr = None
+                        # Update Clique head by resetting distr (= to be simulated)
+                        clique_head.distr.reset()
                     clique_head.head = head_fit
                     break
             else:  # no break
                 # Pauli String does not fit any simulated Clique head and has to be simulated
-                self.cliques.append(CliqueHead(pauli, None))
+                self.cliques.append(CliqueHead(pauli))
 
         # Find new Paulis that need to be measured
         new_heads = []
         for clique_head in self.cliques:
-            if clique_head.distr is None:
+            if clique_head.distr.is_empty():
                 new_heads.append(clique_head.head)
         return new_heads
 
-    def update_distr(self, new_heads: list[str], new_distr: list[dict[int, float]]) -> None:
+    def update_distr(
+        self,
+        new_heads: list[str],
+        new_distr: list[dict[int, float]],
+        mitigation_flags: MitigationFlags | None = None,
+    ) -> None:
         """Update sample state distributions of clique heads.
 
         Args:
             new_heads: List of clique heads.
             new_distr: List of sample state distributions.
+            mitigation_flags: Mitigation flags object, default is None.
         """
         for head, distr in zip(new_heads, new_distr):
             for clique_head in self.cliques:
                 if head == clique_head.head:
-                    if clique_head.distr is not None:
+                    if not clique_head.distr.is_empty(mitigation_flags):
                         raise ValueError(
-                            f"Trying to update head distr that is not None. Head; {clique_head.head}"
+                            f"Trying to update head distr that is not None. Head; {clique_head.head}; mitigation; {mitigation_flags}"
                         )
-                    clique_head.distr = distr
+                    clique_head.distr.add_distr(distr, mitigation_flags)
 
         # Check that all heads have a distr
         for clique_head in self.cliques:
-            if clique_head.distr is None:
-                raise ValueError(f"Head, {clique_head.head}, has a distr that is None")
+            if clique_head.distr.is_empty(mitigation_flags):
+                raise ValueError(
+                    f"Head, {clique_head.head}, has not been allocated for mitigation; {mitigation_flags}"
+                )
 
-    def get_distr(self, pauli: str) -> dict[int, float]:
+    def get_distr(self, pauli: str, mitigation_flags: MitigationFlags | None = None) -> dict[int, float]:
         """Get sample state distribution for a Pauli string.
 
         Args:
@@ -244,10 +421,86 @@ class Clique:
                     raise ValueError(
                         f"Found matching clique, but head will be mutated. Head; {clique_head.head}, Pauli; {pauli}"
                     )
-                if clique_head.distr is None:
-                    raise ValueError(f"Head, {clique_head.head}, has a distr that is None")
-                return clique_head.distr
+                if clique_head.distr.is_empty(mitigation_flags):
+                    raise ValueError(
+                        f"Head, {clique_head.head}, has no distribution for mitigation; {mitigation_flags}"
+                    )
+                return clique_head.distr.get_distr(mitigation_flags)
         raise ValueError(f"Could not find matching clique for Pauli, {pauli}")
+
+    def get_empty_heads(self, mitigation_int) -> list[str]:
+        """Return all heads that do not have any data for a specific mitigation int.
+
+        Args:
+            mitigation_int: Mitigation integer, default is 0.
+
+        Returns:
+            List of heads that have no data for the given mitigation integer.
+        """
+        empties = []
+        for clique_head in self.cliques:
+            if clique_head.distr.is_empty(mitigation_int):
+                empties.append(clique_head.head)
+        return empties
+
+    def get_distr_heads(self, heads: list[str], mitigation_int: int = 0) -> list[dict[int, float]]:
+        """Return the distribution data for a list of heads and for a given mitigation int (default 0).
+
+        This function looks only for the specific heads given, not trying to find pauli strings in commuting heads.
+        The latter would be the function get_distr.
+
+        Args:
+            heads: List of clique heads.
+            mitigation_int: Mitigation integer, default is 0.
+
+        Returns:
+            List of distributions for the given heads and mitigation integer.
+        """
+        distr = []
+        # This needs looping many times over all cliques.
+        # To avoid this one would need to re-write the whole clique structure into dictionaries.
+        # But this might make the other clique operations slower.
+        for head in heads:
+            for clique_heads in self.cliques:
+                if clique_heads.head == head:
+                    distr.append(clique_heads.distr.data[mitigation_int])
+                    break
+
+        return distr
+
+    def get_empty_heads_distr(
+        self, mitigation_flags: MitigationFlags
+    ) -> tuple[list[str], list[dict[int, float]]]:
+        """Return all heads that have empty data for a given mitigation_int plus return the corresponding raw data.
+
+        Args:
+            mitigation_flags: Mitigation flags object.
+
+        Returns:
+            Tuple of lists: List of heads that have no data for the given mitigation integer,
+            and list of corresponding raw data distributions.
+        """
+        heads = []
+        distr = []
+        for clique_head in self.cliques:
+            if clique_head.distr.is_empty(mitigation_flags):
+                heads.append(clique_head.head)
+                distr.append(clique_head.distr.data[0].copy())  # raw data
+        return heads, distr
+
+    def print_cliques(self) -> None:
+        """Print all cliques and their distributions."""
+        print("Clique heads and their distributions:")
+        for clique_head in self.cliques:
+            print(f"Head: {clique_head.head}, Distribution: {clique_head.distr.data}")
+
+    def print_clique_heads(self) -> None:
+        """Print all clique heads."""
+        print("Clique heads:")
+        heads = []
+        for clique_head in self.cliques:
+            heads.append(clique_head.head)
+        print(heads)
 
 
 def fit_in_clique(pauli: str, head: str) -> tuple[bool, str]:

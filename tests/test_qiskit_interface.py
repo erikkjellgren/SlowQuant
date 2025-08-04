@@ -23,6 +23,7 @@ from slowquant.qiskit_interface.sa_wavefunction import WaveFunctionSA
 from slowquant.qiskit_interface.wavefunction import WaveFunction
 from slowquant.unitary_coupled_cluster.sa_ups_wavefunction import WaveFunctionSAUPS
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
+from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
 
 def test_LiH_naive_estimator() -> None:
@@ -966,6 +967,81 @@ def test_H2_sampler_layout() -> None:
     assert np.allclose(qWF._calc_energy_elec(), -1.6303275411526188, atol=10**-6)
 
 
+def test_mitigation() -> None:
+    """Test mitigations."""
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """Li  0.0           0.0  0.0;
+        H  0.735           0.0  0.0;
+        """,
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("sto-3g")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
+
+    # Conventional UPS wave function
+    WF = WaveFunctionUPS(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 2),
+        SQobj.hartree_fock.mo_coeff,
+        h_core,
+        g_eri,
+        "tUPS",
+        ansatz_options={"n_layers": 1, "skip_last_singles": True},
+        include_active_kappa=True,
+    )
+    WF.run_ups(True)
+
+    noise_model = NoiseModel.from_backend(FakeTorino())  # That might change
+    sampler = SamplerAer(backend_options={"noise_model": noise_model})
+    mapper = JordanWignerMapper()
+    QI = QuantumInterface(
+        sampler,
+        "tUPS",
+        mapper,
+        ansatz_options={"n_layers": 1, "skip_last_singles": True},
+        ISA=True,
+        do_M_mitigation=False,
+        do_M_ansatz0=False,
+        do_postselection=False,
+        pass_manager_options={"backend": FakeTorino(), "seed_transpiler": 1234},
+    )
+
+    qWF = WaveFunction(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 2),
+        WF.c_trans,
+        h_core,
+        g_eri,
+        QI,
+    )
+    qWF.ansatz_parameters = WF.thetas
+
+    assert abs(qWF._calc_energy_elec() + 9.649846545745412) < 10**-6  # type: ignore
+    assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0]
+
+    QI.update_mitigation_flags(do_postselection=True)
+    assert abs(qWF._calc_energy_elec() + 9.698203783853641) < 10**-6  # type: ignore
+    assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8]
+
+    QI.update_mitigation_flags(do_postselection=False, do_M_ansatz0=True)
+    assert abs(qWF._calc_energy_elec() + 9.709098117653463) < 10**-6  # type: ignore
+    assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3]
+
+    QI.update_mitigation_flags(do_postselection=True)
+    assert abs(qWF._calc_energy_elec() + 9.711635788561269) < 10**-6  # type: ignore
+    assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3, 11]
+
+    QI.update_mitigation_flags(do_M_ansatz0_plus=True)
+    assert abs(qWF._calc_energy_elec() + 9.711635788561269) < 10**-6  # type: ignore
+    assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3, 11, 15]
+
+
 def test_state_average_layout() -> None:
     """
     Test RDM1 calculation with SA in the presence of complicated layout.
@@ -1094,6 +1170,7 @@ def test_state_average_M() -> None:
         ISA=True,
         do_M_mitigation=True,
         do_M_ansatz0=True,
+        do_postselection=True,
         pass_manager_options={"backend": FakeTorino(), "seed_transpiler": 1234},
     )
 
@@ -1189,7 +1266,7 @@ def test_state_average_Mplus() -> None:
     )
     QWF.ansatz_parameters = WF.thetas
 
-    assert abs(WF._sa_energy - QWF._calc_energy_elec()) < 10**-6
+    assert abs(WF._sa_energy - QWF._calc_energy_elec()) < 10**-6  # type: ignore
 
     noise_model = NoiseModel.from_backend(FakeTorino())
     sampler = SamplerAer(backend_options={"noise_model": noise_model})
@@ -1197,27 +1274,172 @@ def test_state_average_Mplus() -> None:
 
     QI.shots = None
     QI.ISA = True
-    QI.do_postselection = False
     QI.update_pass_manager({"backend": FakeTorino(), "seed_transpiler": 1234})
 
-    QI.do_M_mitigation = False
-    QI.do_M_ansatz0 = False
-
+    # No EM
     QI._reset_cliques()
     assert abs(QWF._calc_energy_elec() + 9.60851106217584) < 10**-6  # type: ignore  # CSFs option 1
 
-    QI.do_M_mitigation = True
-    QI.do_M_ansatz0 = True
-    QI.redo_M_mitigation()
+    # EM with M_Ansatz0
+    QI.update_mitigation_flags(do_M_mitigation=True, do_M_ansatz0=True)
+    # QI.redo_M_mitigation()
 
-    QI._reset_cliques()
+    # QI._reset_cliques()
     assert abs(QWF._calc_energy_elec() + 9.633426170009107) < 10**-6  # type: ignore  # CSFs option 4
 
-    QI._reset_cliques()
-    assert (
-        abs(QWF._calc_energy_elec(M_per_superpos=True) + 9.635276750167002) < 10**-6  # type: ignore
-    )  # CSFs option 1
+    # EM with M_Ansatz0+
+    # QI._reset_cliques()
+    QI.update_mitigation_flags(do_M_ansatz0_plus=True)
+    assert abs(QWF._calc_energy_elec() + 9.635276750167002) < 10**-6  # type: ignore  # CSFs option 1
 
-    QI.do_postselection = True
-    QI._reset_cliques()
+    # EM with M_Ansatz0 and postselection
+    QI.update_mitigation_flags(do_postselection=True, do_M_ansatz0_plus=False)
+    # QI._reset_cliques()
     assert abs(QWF._calc_energy_elec() + 9.636464216617595) < 10**-6  # type: ignore  # CSFs option 4
+
+
+def test_no_saving() -> None:
+    """
+    Test Energy calculation with SA for the no saving options
+    """
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """Li  0.0           0.0  0.0;
+        H  0.735           0.0  0.0;
+        """,
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("sto-3g")
+    SQobj.init_hartree_fock()
+
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    c_mo = SQobj.hartree_fock.mo_coeff
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
+
+    WF = WaveFunctionSAUPS(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 2),
+        c_mo,
+        h_core,
+        g_eri,
+        (
+            [
+                [1],
+                [2 ** (-1 / 2), -(2 ** (-1 / 2))],
+            ],
+            [
+                ["1100"],
+                ["1001", "0110"],
+            ],
+        ),
+        "tUPS",
+        ansatz_options={"n_layers": 1},
+    )
+    WF.run_saups(False)
+
+    sampler = SamplerAer()
+    mapper = JordanWignerMapper()
+    QI = QuantumInterface(sampler, "tUPS", mapper, ansatz_options={"n_layers": 1})
+
+    QWF = WaveFunctionSA(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 2),
+        c_mo,
+        h_core,
+        g_eri,
+        (
+            [
+                [1],
+                [2 ** (-1 / 2), -(2 ** (-1 / 2))],
+            ],
+            [
+                ["1100"],
+                ["1001", "0110"],
+            ],
+        ),
+        QI,
+    )
+    QWF.ansatz_parameters = WF.thetas
+
+    QI._save_paulis = False
+    assert abs(WF._sa_energy - QWF._calc_energy_elec()) < 10**-6  # type: ignore
+
+    QI._do_cliques = False
+    assert abs(WF._sa_energy - QWF._calc_energy_elec()) < 10**-6  # type: ignore
+
+    noise_model = NoiseModel.from_backend(FakeTorino())
+    sampler = SamplerAer(backend_options={"noise_model": noise_model})
+    QWF.change_primitive(sampler)
+
+    QI.shots = None
+    QI.ISA = True
+    QI.update_pass_manager({"backend": FakeTorino(), "seed_transpiler": 1234})
+
+    QI.update_mitigation_flags(do_postselection=False, do_M_ansatz0=True)
+    assert abs(QWF._calc_energy_elec() + 9.63342617000911) < 10**-6  # type: ignore
+
+
+def test_variance() -> None:
+    """Test variance calculation."""
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """Li  0.0           0.0  0.0;
+        H  0.735           0.0  0.0;
+        """,
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("sto-3g")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
+
+    # Conventional UPS wave function
+    WF = WaveFunctionUPS(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 2),
+        SQobj.hartree_fock.mo_coeff,
+        h_core,
+        g_eri,
+        "tUPS",
+        ansatz_options={"n_layers": 1, "skip_last_singles": True},
+        include_active_kappa=True,
+    )
+    WF.run_ups(True)
+
+    noise_model = NoiseModel.from_backend(FakeTorino())  # That might change
+    sampler = SamplerAer(backend_options={"noise_model": noise_model})
+    mapper = JordanWignerMapper()
+    QI = QuantumInterface(
+        sampler,
+        "tUPS",
+        mapper,
+        ansatz_options={"n_layers": 1, "skip_last_singles": True},
+        ISA=True,
+        do_M_mitigation=False,
+        do_M_ansatz0=False,
+        do_postselection=False,
+        pass_manager_options={"backend": FakeTorino(), "seed_transpiler": 1234},
+    )
+
+    qWF = WaveFunction(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 2),
+        WF.c_trans,
+        h_core,
+        g_eri,
+        QI,
+    )
+    qWF.ansatz_parameters = WF.thetas
+
+    qWF._calc_energy_elec()
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.040592737332136634) < 10**-6  # type: ignore
+
+    QI.update_mitigation_flags(do_postselection=True)
+    qWF._calc_energy_elec()
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.024708172056620556) < 10**-6  # type: ignore
