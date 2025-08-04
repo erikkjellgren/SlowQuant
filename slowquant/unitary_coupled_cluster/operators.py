@@ -2,22 +2,39 @@ import numpy as np
 
 from slowquant.unitary_coupled_cluster.fermionic_operator import (
     FermionicOperator,
-    a_op,
-    a_op_spin,
 )
 
 
-def anni_spin(p: int, dagger: bool) -> FermionicOperator:
+def a_op(spinless_idx: int, spin: str, dagger: bool) -> FermionicOperator:
     """Construct annihilation/creation operator.
 
     Args:
-        p: Spin orbital index.
+        spinless_idx: Spatial orbital index.
+        spin: Alpha or beta spin.
         dagger: If creation operator.
 
     Returns:
         Annihilation/creation operator.
     """
-    return FermionicOperator(a_op_spin(p, dagger=dagger), 1)
+    if spin not in ("alpha", "beta"):
+        raise ValueError(f'spin must be "alpha" or "beta" got {spin}')
+    idx = 2 * spinless_idx
+    if spin == "beta":
+        idx += 1
+    return FermionicOperator({((idx, dagger),): 1})
+
+
+def a_op_spin(spin_idx: int, dagger: bool) -> FermionicOperator:
+    """Construct annihilation/creation operator.
+
+    Args:
+        spin_idx: Spin orbital index.
+        dagger: If creation operator.
+
+    Returns:
+        Annihilation/creation operator.
+    """
+    return FermionicOperator({((spin_idx, dagger),): 1})
 
 
 def Epq(p: int, q: int) -> FermionicOperator:
@@ -33,10 +50,10 @@ def Epq(p: int, q: int) -> FermionicOperator:
     Returns:
         Singlet one-electron excitation operator.
     """
-    E = FermionicOperator(a_op(p, "alpha", dagger=True), 1)
-    E *= FermionicOperator(a_op(q, "alpha", dagger=False), 1)
-    tmp = FermionicOperator(a_op(p, "beta", dagger=True), 1)
-    tmp *= FermionicOperator(a_op(q, "beta", dagger=False), 1)
+    E = a_op(p, "alpha", dagger=True)
+    E *= a_op(q, "alpha", dagger=False)
+    tmp = a_op(p, "beta", dagger=True)
+    tmp *= a_op(q, "beta", dagger=False)
     E += tmp
     return E
 
@@ -139,8 +156,8 @@ def G1(i: int, a: int, return_anti_hermitian: bool = False) -> FermionicOperator
     Returns:
         One-electron excitation operator.
     """
-    op = FermionicOperator(a_op_spin(a, dagger=True), 1)
-    op *= FermionicOperator(a_op_spin(i, dagger=False), 1)
+    op = a_op_spin(a, dagger=True)
+    op *= a_op_spin(i, dagger=False)
     if return_anti_hermitian:
         op -= op.dagger
     return op
@@ -162,10 +179,10 @@ def G2(i: int, j: int, a: int, b: int, return_anti_hermitian: bool = False) -> F
     Returns:
         Two-electron excitation operator.
     """
-    op = FermionicOperator(a_op_spin(a, dagger=True), 1)
-    op *= FermionicOperator(a_op_spin(b, dagger=True), 1)
-    op *= FermionicOperator(a_op_spin(j, dagger=False), 1)
-    op *= FermionicOperator(a_op_spin(i, dagger=False), 1)
+    op = a_op_spin(a, dagger=True)
+    op *= a_op_spin(b, dagger=True)
+    op *= a_op_spin(j, dagger=False)
+    op *= a_op_spin(i, dagger=False)
     if return_anti_hermitian:
         op -= op.dagger
     return op
@@ -191,12 +208,12 @@ def G3(
     Returns:
         Three-electron excitation operator.
     """
-    op = FermionicOperator(a_op_spin(a, dagger=True), 1)
-    op *= FermionicOperator(a_op_spin(b, dagger=True), 1)
-    op *= FermionicOperator(a_op_spin(c, dagger=True), 1)
-    op *= FermionicOperator(a_op_spin(k, dagger=False), 1)
-    op *= FermionicOperator(a_op_spin(j, dagger=False), 1)
-    op *= FermionicOperator(a_op_spin(i, dagger=False), 1)
+    op = a_op_spin(a, dagger=True)
+    op *= a_op_spin(b, dagger=True)
+    op *= a_op_spin(c, dagger=True)
+    op *= a_op_spin(k, dagger=False)
+    op *= a_op_spin(j, dagger=False)
+    op *= a_op_spin(i, dagger=False)
     if return_anti_hermitian:
         op -= op.dagger
     return op
@@ -224,14 +241,14 @@ def G4(
     Returns:
         Four-electron excitation operator.
     """
-    op = FermionicOperator(a_op_spin(a, dagger=True), 1)
-    op *= FermionicOperator(a_op_spin(b, dagger=True), 1)
-    op *= FermionicOperator(a_op_spin(c, dagger=True), 1)
-    op *= FermionicOperator(a_op_spin(d, dagger=True), 1)
-    op *= FermionicOperator(a_op_spin(l, dagger=False), 1)
-    op *= FermionicOperator(a_op_spin(k, dagger=False), 1)
-    op *= FermionicOperator(a_op_spin(j, dagger=False), 1)
-    op *= FermionicOperator(a_op_spin(i, dagger=False), 1)
+    op = a_op_spin(a, dagger=True)
+    op *= a_op_spin(b, dagger=True)
+    op *= a_op_spin(c, dagger=True)
+    op *= a_op_spin(d, dagger=True)
+    op *= a_op_spin(l, dagger=False)
+    op *= a_op_spin(k, dagger=False)
+    op *= a_op_spin(j, dagger=False)
+    op *= a_op_spin(i, dagger=False)
     if return_anti_hermitian:
         op -= op.dagger
     return op
@@ -271,16 +288,16 @@ def G5(
     Returns:
         Five-electron excitation operator.
     """
-    op = FermionicOperator(a_op_spin(a, dagger=True), 1)
-    op *= FermionicOperator(a_op_spin(b, dagger=True), 1)
-    op *= FermionicOperator(a_op_spin(c, dagger=True), 1)
-    op *= FermionicOperator(a_op_spin(d, dagger=True), 1)
-    op *= FermionicOperator(a_op_spin(e, dagger=True), 1)
-    op *= FermionicOperator(a_op_spin(m, dagger=False), 1)
-    op *= FermionicOperator(a_op_spin(l, dagger=False), 1)
-    op *= FermionicOperator(a_op_spin(k, dagger=False), 1)
-    op *= FermionicOperator(a_op_spin(j, dagger=False), 1)
-    op *= FermionicOperator(a_op_spin(i, dagger=False), 1)
+    op = a_op_spin(a, dagger=True)
+    op *= a_op_spin(b, dagger=True)
+    op *= a_op_spin(c, dagger=True)
+    op *= a_op_spin(d, dagger=True)
+    op *= a_op_spin(e, dagger=True)
+    op *= a_op_spin(m, dagger=False)
+    op *= a_op_spin(l, dagger=False)
+    op *= a_op_spin(k, dagger=False)
+    op *= a_op_spin(j, dagger=False)
+    op *= a_op_spin(i, dagger=False)
     if return_anti_hermitian:
         op -= op.dagger
     return op
@@ -325,18 +342,18 @@ def G6(
     Returns:
         Six-electron excitation operator.
     """
-    op = FermionicOperator(a_op_spin(a, dagger=True), 1)
-    op *= FermionicOperator(a_op_spin(b, dagger=True), 1)
-    op *= FermionicOperator(a_op_spin(c, dagger=True), 1)
-    op *= FermionicOperator(a_op_spin(d, dagger=True), 1)
-    op *= FermionicOperator(a_op_spin(e, dagger=True), 1)
-    op *= FermionicOperator(a_op_spin(f, dagger=True), 1)
-    op *= FermionicOperator(a_op_spin(n, dagger=False), 1)
-    op *= FermionicOperator(a_op_spin(m, dagger=False), 1)
-    op *= FermionicOperator(a_op_spin(l, dagger=False), 1)
-    op *= FermionicOperator(a_op_spin(k, dagger=False), 1)
-    op *= FermionicOperator(a_op_spin(j, dagger=False), 1)
-    op *= FermionicOperator(a_op_spin(i, dagger=False), 1)
+    op = a_op_spin(a, dagger=True)
+    op *= a_op_spin(b, dagger=True)
+    op *= a_op_spin(c, dagger=True)
+    op *= a_op_spin(d, dagger=True)
+    op *= a_op_spin(e, dagger=True)
+    op *= a_op_spin(f, dagger=True)
+    op *= a_op_spin(n, dagger=False)
+    op *= a_op_spin(m, dagger=False)
+    op *= a_op_spin(l, dagger=False)
+    op *= a_op_spin(k, dagger=False)
+    op *= a_op_spin(j, dagger=False)
+    op *= a_op_spin(i, dagger=False)
     if return_anti_hermitian:
         op -= op.dagger
     return op
@@ -425,7 +442,7 @@ def hamiltonian_full_space(h_mo: np.ndarray, g_mo: np.ndarray, num_orbs: int) ->
     Returns:
         Hamiltonian operator in full-space.
     """
-    H_operator = FermionicOperator({}, {})
+    H_operator = FermionicOperator({})
     for p in range(num_orbs):
         for q in range(num_orbs):
             if abs(h_mo[p, q]) < 10**-14:
@@ -458,7 +475,7 @@ def hamiltonian_0i_0a(
     Returns:
         Energy Hamiltonian fermionic operator.
     """
-    hamiltonian_operator = FermionicOperator({}, {})
+    hamiltonian_operator = FermionicOperator({})
     # Inactive one-electron
     for i in range(num_inactive_orbs):
         if abs(h_mo[i, i]) > 10**-14:
@@ -517,7 +534,7 @@ def hamiltonian_1i_1a(
         Modified Hamiltonian fermionic operator.
     """
     num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
-    hamiltonian_operator = FermionicOperator({}, {})
+    hamiltonian_operator = FermionicOperator({})
     virtual_start = num_inactive_orbs + num_active_orbs
     for p in range(num_orbs):
         for q in range(num_orbs):
@@ -586,7 +603,7 @@ def hamiltonian_2i_2a(
         Modified Hamiltonian fermionic operator.
     """
     num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
-    hamiltonian_operator = FermionicOperator({}, {})
+    hamiltonian_operator = FermionicOperator({})
     virtual_start = num_inactive_orbs + num_active_orbs
     for p in range(num_orbs):
         for q in range(num_orbs):
@@ -644,7 +661,7 @@ def one_elec_op_full_space(ints_mo: np.ndarray, num_orbs: int) -> FermionicOpera
     Returns:
         One-electron operator in full-space.
     """
-    one_elec_op = FermionicOperator({}, {})
+    one_elec_op = FermionicOperator({})
     for p in range(num_orbs):
         for q in range(num_orbs):
             if abs(ints_mo[p, q]) > 10**-14:
@@ -663,7 +680,7 @@ def one_elec_op_0i_0a(ints_mo: np.ndarray, num_inactive_orbs: int, num_active_or
     Returns:
         One-electron operator for active-space.
     """
-    one_elec_op = FermionicOperator({}, {})
+    one_elec_op = FermionicOperator({})
     # Inactive one-electron
     for i in range(num_inactive_orbs):
         if abs(ints_mo[i, i]) > 10**-14:
@@ -691,7 +708,7 @@ def one_elec_op_1i_1a(
         Modified one-electron operator.
     """
     num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
-    one_elec_op = FermionicOperator({}, {})
+    one_elec_op = FermionicOperator({})
     virtual_start = num_inactive_orbs + num_active_orbs
     for p in range(num_orbs):
         for q in range(num_orbs):

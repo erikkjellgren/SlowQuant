@@ -346,7 +346,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
         transition_dipole_z = 0.0
         transition_dipoles = np.zeros((number_excitations, 3))
         for state_number in range(number_excitations):
-            transfer_op = FermionicOperator({}, {})
+            transfer_op = FermionicOperator({})
             for i, G in enumerate(self.G_ops):
                 transfer_op += (
                     self.Z_G_normed[i, state_number] * G.dagger + self.Y_G_normed[i, state_number] * G

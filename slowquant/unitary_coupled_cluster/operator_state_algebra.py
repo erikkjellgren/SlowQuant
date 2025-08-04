@@ -285,11 +285,11 @@ def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bo
         num += 2**i
         parity_check[2 * num_active_orbs - i] = num
     # loop over all strings of annihilation operators in FermionicOperator sum
-    for fermi_label in op.factors:
+    for fermi_label in op.operators.keys():
         # Separate each annihilation operator string in creation and annihilation indices
         anni_idx = []
         create_idx = []
-        for fermi_op in op.operators[fermi_label]:
+        for fermi_op in fermi_label:
             if fermi_op[1]:
                 create_idx.append(fermi_op[0])
             else:
@@ -305,7 +305,7 @@ def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bo
             idx2det,
             det2idx,
             do_unsafe,
-            op.factors[fermi_label],
+            op.operators[fermi_label],
         )
     return op_mat
 
@@ -392,11 +392,11 @@ def propagate_state(
             else:
                 op_folded = op
             # loop over all strings of annihilation operators in FermionicOperator sum
-            for fermi_label in op_folded.factors:
+            for fermi_label in op_folded.operators.keys():
                 # Separate each annihilation operator string in creation and annihilation indices
                 anni_idx = []
                 create_idx = []
-                for fermi_op in op_folded.operators[fermi_label]:
+                for fermi_op in fermi_label:
                     if fermi_op[1]:
                         create_idx.append(fermi_op[0])
                     else:
@@ -413,7 +413,7 @@ def propagate_state(
                     det2idx,
                     do_unsafe,
                     tmp_state,
-                    op_folded.factors[fermi_label],
+                    op_folded.operators[fermi_label],
                 )
             new_state = np.copy(tmp_state)
     return new_state
@@ -493,11 +493,11 @@ def propagate_state_SA(
             else:
                 op_folded = op
             # loop over all strings of annihilation operators in FermionicOperator sum
-            for fermi_label in op_folded.factors:
+            for fermi_label in op_folded.operators.keys():
                 # Separate each annihilation operator string in creation and annihilation indices
                 anni_idx = []
                 create_idx = []
-                for fermi_op in op_folded.operators[fermi_label]:
+                for fermi_op in fermi_label:
                     if fermi_op[1]:
                         create_idx.append(fermi_op[0])
                     else:
@@ -514,7 +514,7 @@ def propagate_state_SA(
                     det2idx,
                     do_unsafe,
                     tmp_state,
-                    op_folded.factors[fermi_label],
+                    op_folded.operators[fermi_label],
                 )
             new_state = np.copy(tmp_state)
     return new_state
@@ -648,7 +648,7 @@ def get_ucc_T(
         UCC operator.
     """
     # Build up T matrix based on excitations in ucc_struct and given thetas
-    T = FermionicOperator({}, {})
+    T = FermionicOperator({})
     for exc_type, exc_indices, theta in zip(
         ucc_struct.excitation_operator_type, ucc_struct.excitation_indices, thetas
     ):

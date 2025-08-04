@@ -489,7 +489,7 @@ class quantumLR(quantumLRBaseClass):
         transition_dipole_z = 0.0
         transition_dipoles = np.zeros((number_excitations, 3))
         for state_number in range(number_excitations):
-            transfer_op = FermionicOperator({}, {})
+            transfer_op = FermionicOperator({})
             for i, G in enumerate(self.G_ops):
                 transfer_op += (
                     self._Z_G_normed[i, state_number] * G.dagger + self._Y_G_normed[i, state_number] * G
