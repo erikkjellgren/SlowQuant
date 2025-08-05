@@ -12,7 +12,6 @@ from slowquant.qiskit_interface.linear_response.lr_baseclass import (
 )
 from slowquant.qiskit_interface.util import Clique
 from slowquant.unitary_coupled_cluster.density_matrix import (
-    ReducedDenstiyMatrix,
     get_orbital_response_property_gradient,
 )
 from slowquant.unitary_coupled_cluster.operators import (
@@ -403,13 +402,6 @@ class quantumLR(quantumLRBaseClass):
         if len(dipole_integrals) != 3:
             raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
         number_excitations = len(self.excitation_energies)
-        rdms = ReducedDenstiyMatrix(
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-            self.wf.rdm1,
-            rdm2=self.wf.rdm2,
-        )
 
         mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
         muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
@@ -420,36 +412,40 @@ class quantumLR(quantumLRBaseClass):
 
         transition_dipoles = np.zeros((number_excitations, 3))
         for state_number in range(number_excitations):
-            q_part_x = get_orbital_response_property_gradient(
-                rdms,
-                mux,
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.normed_excitation_vectors,
-                state_number,
-                number_excitations,
-            )
-            q_part_y = get_orbital_response_property_gradient(
-                rdms,
-                muy,
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.normed_excitation_vectors,
-                state_number,
-                number_excitations,
-            )
-            q_part_z = get_orbital_response_property_gradient(
-                rdms,
-                muz,
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.normed_excitation_vectors,
-                state_number,
-                number_excitations,
-            )
+            q_part_x = 0.0
+            q_part_y = 0.0
+            q_part_z = 0.0
+            if self.num_q != 0:
+                q_part_x = get_orbital_response_property_gradient(
+                    mux,
+                    self.wf.kappa_no_activeactive_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.normed_excitation_vectors,
+                    state_number,
+                    number_excitations,
+                )
+                q_part_y = get_orbital_response_property_gradient(
+                    muy,
+                    self.wf.kappa_no_activeactive_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.normed_excitation_vectors,
+                    state_number,
+                    number_excitations,
+                )
+                q_part_z = get_orbital_response_property_gradient(
+                    muz,
+                    self.wf.kappa_no_activeactive_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.normed_excitation_vectors,
+                    state_number,
+                    number_excitations,
+                )
             g_part_x = 0.0
             g_part_y = 0.0
             g_part_z = 0.0
