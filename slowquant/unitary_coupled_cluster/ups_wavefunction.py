@@ -926,6 +926,8 @@ class WaveFunctionUPS:
         self._energy_elec = res.fun
 
     def run_constrained_state_averaged_optimization(self,
+        state_picks: str,
+        state_options: dict[str, Any],
         optimizer_name: str,
         orbital_optimization: bool = False,
         tol: float = 1e-10,
@@ -937,7 +939,8 @@ class WaveFunctionUPS:
                 self.c_mo,
                 self._h_ao,
                 self._g_ao,
-                (),
+                state_picks,
+                state_options,
                 "None",
                 include_active_kappa=True
         )
