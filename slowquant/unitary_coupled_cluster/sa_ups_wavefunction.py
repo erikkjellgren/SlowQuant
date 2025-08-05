@@ -23,16 +23,20 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     expectation_value,
     expectation_value_SA,
     get_grad_action_SA,
+    propagate_state,
     propagate_state_SA,
     propagate_unitary_SA,
 )
 from slowquant.unitary_coupled_cluster.operators import (
     Epq,
+    G1_sa,
+    G2_1_sa,
+    G2_2_sa,
     hamiltonian_0i_0a,
     one_elec_op_0i_0a,
 )
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
-from slowquant.unitary_coupled_cluster.util import UpsStructure
+from slowquant.unitary_coupled_cluster.util import UpsStructure, iterate_t1_sa, iterate_t2_sa
 
 
 class WaveFunctionSAUPS:
@@ -43,7 +47,8 @@ class WaveFunctionSAUPS:
         mo_coeffs: np.ndarray,
         h_ao: np.ndarray,
         g_ao: np.ndarray,
-        states: tuple[list[list[float]], list[list[str]]],
+        state_picks: str,
+        state_options: dict[str, Any],
         ansatz: str,
         ansatz_options: dict[str, Any] | None = None,
         include_active_kappa: bool = False,
@@ -213,22 +218,102 @@ class WaveFunctionSAUPS:
         )
         self.num_det = len(self.ci_info.idx2det)
         # SA details
-        self.num_states = len(states[0])
-        self.csf_coeffs = np.zeros((self.num_states, self.num_det))  # state vector for each state in SA
-        # Loop over all states in SA procedure
-        for i, (coeffs, on_vecs) in enumerate(zip(states[0], states[1])):
-            if len(coeffs) != len(on_vecs):
-                raise ValueError(
-                    f"Mismatch in number of coefficients, {len(coeffs)}, and number of determinants, {len(on_vecs)}. For {coeffs} and {on_vecs}"
+        if state_picks.lower() in ("cis_diag", "cisd_diag"):
+            if "num_states" not in state_options.keys():
+                raise ValueError("Requires 'num_states' in state_options.")
+            self.num_states = state_options["num_states"]
+            hf_state = np.zeros(self.num_det)
+            hf_det = int(
+                "1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec), 2
+            )
+            hf_state[self.ci_info.det2idx[hf_det]] = 1
+            H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+            energies = []
+            csfs_info = []
+            csf_tmp = []
+            for idx, val in enumerate(hf_state):
+                if abs(val) > 10**-10:
+                    csf_tmp.append([val, idx])
+            csfs_info.append(csf_tmp)
+            energies.append(expectation_value(hf_state, [H], hf_state, self.ci_info, None, None))
+            for a, i, _ in iterate_t1_sa(self.active_occ_idx, self.active_unocc_idx):
+                op = G1_sa(i, a)
+                state = propagate_state([op], hf_state, self.ci_info, None, None)
+                energy = expectation_value(state, [H], state, self.ci_info, None, None)
+                csf_tmp = []
+                for idx, val in enumerate(state):
+                    if abs(val) > 10**-10:
+                        csf_tmp.append([val, idx])
+                csfs_info.append(csf_tmp)
+                energies.append(energy)
+            if state_picks.lower() == "cisd_diag":
+                for a, i, b, j, _, op_type in iterate_t2_sa(self.active_occ_idx, self.active_unocc_idx):
+                    if op_type == 1:
+                        op = G2_1_sa(i, j, a, b)
+                    else:
+                        op = G2_2_sa(i, j, a, b)
+                    state = propagate_state([op], hf_state, self.ci_info, None, None)
+                    energy = expectation_value(state, [H], state, self.ci_info, None, None)
+                    energies.append(energy)
+                    csf_tmp = []
+                    for idx, val in enumerate(state):
+                        if abs(val) > 10**-10:
+                            csf_tmp.append([val, idx])
+                    csfs_info.append(csf_tmp)
+            sortidx = np.argsort(energies)
+            energies = np.array(energies)[sortidx]
+            csfs_info = np.array(csfs_info, dtype=object)[sortidx]
+            # Checking for degenerate states that should be included.
+            energy_max = energies[self.num_states - 1]
+            n_states = 0
+            for energy in energies:
+                if energy - energy_max > 10**-6:
+                    break
+                n_states += 1
+            if self.num_states != n_states:
+                print(
+                    f"Changing the number of states from {self.num_states} to {n_states} due to degeneracy."
                 )
-            # Loop over all determinants of a given state
-            for coeff, on_vec in zip(coeffs, on_vecs):
-                if len(on_vec) != self.num_active_spin_orbs:
-                    raise ValueError(
-                        f"Length of determinant, {len(on_vec)}, does not match number of active spin orbitals, {self.num_active_spin_orbs}. For determinant, {on_vec}"
-                    )
-                idx = self.ci_info.det2idx[int(on_vec, 2)]
-                self.csf_coeffs[i, idx] = coeff
+                self.num_states = n_states
+            self.csf_coeffs = np.zeros((self.num_states, self.num_det))  # state vector for each state in SA
+            print("Adding the states:")
+            for i in range(self.num_states):
+                state_str = ""
+                for coeff, idx in csfs_info[i]:
+                    self.csf_coeffs[i, idx] = coeff
+                    if coeff > 0:
+                        state_str += f" +{coeff:.2f}|{bin(self.ci_info.idx2det[idx])[2:].zfill(self.num_active_spin_orbs)}>"
+                    else:
+                        state_str += f" {coeff:.2f}|{bin(self.ci_info.idx2det[idx])[2:].zfill(self.num_active_spin_orbs)}>"
+                print(f"{energies[i]:.5f}", state_str)
+            print("Initial SA energy:", np.mean(energies[: self.num_states]))
+        elif state_picks.lower() == "manual":
+            if "states" in state_options.keys():
+                states = state_options["states"]
+                self.num_states = len(states)
+                self.csf_coeffs = np.zeros(
+                    (self.num_states, self.num_det)
+                )  # state vector for each state in SA
+                for i, state in enumerate(states):
+                    # Loop over all determinants of a given state
+                    for coeff, on_vec in state:
+                        if len(on_vec) != self.num_active_spin_orbs:
+                            raise ValueError(
+                                f"Length of determinant, {len(on_vec)}, does not match number of active spin orbitals, {self.num_active_spin_orbs}. For determinant, {on_vec}"
+                            )
+                        idx = self.ci_info.det2idx[int(on_vec, 2)]
+                        self.csf_coeffs[i, idx] = coeff
+                sa_energy = 0.0
+                H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+                for i, state in enumerate(self.csf_coeffs):
+                    energy = expectation_value(state, [H], state, self.ci_info, None, None)
+                    print(f"state {i} energy:", energy)
+                    sa_energy += energy
+                print("Initial SA energy:", sa_energy / self.num_states)
+            else:
+                raise KeyError("state_options requires key 'states'")
+        else:
+            raise ValueError(f"Got unknown state_picks, {state_picks}")
         self._ci_coeffs = np.copy(self.csf_coeffs)
         for i, coeff_i in enumerate(self.ci_coeffs):
             for j, coeff_j in enumerate(self.ci_coeffs):
@@ -700,8 +785,9 @@ class WaveFunctionSAUPS:
         # Subspace diagonalization
         self._do_state_ci()
         self._sa_energy = res.fun
-    
-    def _run_constrained_state_averaged_optimization(self,
+
+    def _run_constrained_state_averaged_optimization(
+        self,
         optimizer_name: str,
         orbital_optimization: bool = False,
         tol: float = 1e-10,

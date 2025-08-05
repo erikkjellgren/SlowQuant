@@ -200,18 +200,14 @@ def test_saups_h2_3states() -> None:
         SQobj.hartree_fock.mo_coeff,
         h_core,
         g_eri,
-        (
-            [
-                [1],
-                [2 ** (-1 / 2), -(2 ** (-1 / 2))],
-                [1],
-            ],
-            [
-                ["1100"],
-                ["1001", "0110"],
-                ["0011"],
-            ],
-        ),
+        "manual",
+        {
+            "states": [
+                [(1, "1100")],
+                [(2 ** (-1 / 2), "1001"), (-(2 ** (-1 / 2)), "0110")],
+                [(1, "0011")],
+            ]
+        },
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
         include_active_kappa=True,
@@ -254,18 +250,14 @@ def test_saups_h3_3states() -> None:
         SQobj.hartree_fock.mo_coeff,
         h_core,
         g_eri,
-        (
-            [
-                [1],
-                [2 ** (-1 / 2), -(2 ** (-1 / 2))],
-                [2 ** (-1 / 2), -(2 ** (-1 / 2))],
-            ],
-            [
-                ["110000"],
-                ["100100", "011000"],
-                ["100001", "010010"],
-            ],
-        ),
+        "manual",
+        {
+            "states": [
+                [(1, "110000")],
+                [(2 ** (-1 / 2), "100100"), (-(2 ** (-1 / 2)), "011000")],
+                [(2 ** (-1 / 2), "100001"), (-(2 ** (-1 / 2)), "010010")],
+            ]
+        },
         "tUPS",
         ansatz_options={"n_layers": 2, "skip_last_singles": True},
         include_active_kappa=True,
@@ -284,3 +276,34 @@ def test_saups_h3_3states() -> None:
     osc = WF.get_oscillator_strenghts(dipole_integrals)
     assert abs(osc[0] - 0.7569) < 10**-3
     assert abs(osc[1] - 0.7569) < 10**-3
+
+
+def test_saups_lih_statepicker() -> None:
+    """Test a system where the subspace is not everything."""
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """Li 0 0 0;
+        H 1.6 0 0""",
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("STO-3G")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
+    WF = WaveFunctionSAUPS(
+        SQobj.molecule.number_electrons,
+        (4, 6),
+        SQobj.hartree_fock.mo_coeff,
+        h_core,
+        g_eri,
+        state_picks="cisd_diag",
+        state_options={"num_states": 3},
+        ansatz="tUPS",
+        ansatz_options={"n_layers": 1},
+    )
+    WF.run_wf_optimization_1step("SLSQP")
+    assert abs(WF.energy_states[0] - -8.854327845441917) < 10**-8
+    assert abs(WF.energy_states[1] - -8.699934527099694) < 10**-8
+    assert abs(WF.energy_states[2] - -8.640139228107547) < 10**-8
+    assert abs(WF.energy_states[3] - -8.640139228107547) < 10**-8
