@@ -283,9 +283,7 @@ class WaveFunction:
         self._energy_elec = None
         self.QI.parameters = parameters
 
-    def change_primitive(
-        self, primitive: BaseEstimator | BaseSamplerV1 | BaseSamplerV2, verbose: bool = True
-    ) -> None:
+    def change_primitive(self, primitive: BaseSamplerV1 | BaseSamplerV2, verbose: bool = True) -> None:
         """Change the primitive expectation value calculator.
 
         Args:
@@ -298,10 +296,8 @@ class WaveFunction:
                 Multiple switching back and forth can lead to un-expected outcomes and is an experimental feature.\n"
             )
 
-        if isinstance(primitive, BaseEstimatorV2):
-            raise ValueError("EstimatorV2 is not currently supported.")
-        if isinstance(primitive, BaseSamplerV2) and verbose:
-            print("WARNING: Using SamplerV2 is an experimental feature.")
+        if isinstance(primitive, (BaseEstimator, BaseEstimatorV2)):
+            raise ValueError("Estimator is not supported.")
         self.QI._primitive = primitive  # pylint: disable=protected-access
         if verbose:
             if self.QI.mitigation_flags.do_M_ansatz0:

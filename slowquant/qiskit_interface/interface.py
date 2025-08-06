@@ -48,7 +48,7 @@ class QuantumInterface:
 
     def __init__(  # pylint: disable=dangerous-default-value
         self,
-        primitive: BaseEstimator | BaseSamplerV1 | BaseSamplerV2,
+        primitive: BaseSamplerV1 | BaseSamplerV2,
         ansatz: str | QuantumCircuit,
         mapper: FermionicMapper,
         ISA: bool = False,
@@ -64,7 +64,7 @@ class QuantumInterface:
         """Interface to Qiskit to use IBM quantum hardware or simulator.
 
         Args:
-            primitive: Qiskit Estimator or Sampler object.
+            primitive: Qiskit Sampler object.
             ansatz: Name of ansatz to be used.
             mapper: Qiskit mapper object, e.g. JW or Parity.
             ISA: Use ISA for submitting to IBM quantum. Locally transpiling is performed.
@@ -100,10 +100,8 @@ class QuantumInterface:
             )
         if pass_manager_options is None:
             pass_manager_options = {}
-        if isinstance(primitive, BaseEstimatorV2):
-            raise TypeError("EstimatorV2 is not currently supported.")
-        if isinstance(primitive, BaseSamplerV2):
-            print("WARNING: Using SamplerV2 is an experimental feature.")
+        if isinstance(primitive, (BaseEstimatorV2, BaseEstimator)):
+            raise TypeError("Estimator is not supported.")
         self.ansatz = ansatz
         self._transpiled = False  # Check if circuit has been transpiled
         self.max_shots_per_run = max_shots_per_run
@@ -548,27 +546,20 @@ class QuantumInterface:
         # Check if shot number is allowed
         if self._shots is not None:
             if self._shots > self.max_shots_per_run:
-                if isinstance(self._primitive, BaseEstimator):
-                    self.shots = self.max_shots_per_run
+                print("Number of requested shots exceed the limit of ", self.max_shots_per_run)
+                # Get number of circuits needed to fulfill shot number
+                self._circuit_multipl = math.floor(self._shots / self.max_shots_per_run)
+                print(
+                    "Maximum shots are used and additional",
+                    self._circuit_multipl - 1,
+                    "circuits per Pauli string are appended to circumvent limit.",
+                )
+                if self._shots % self.max_shots_per_run != 0:
+                    self._shots = self._circuit_multipl * self.max_shots_per_run
                     print(
-                        "WARNING: Number of shots specified exceed possibility for Estimator. Number of shots is set to ",
-                        self.max_shots_per_run,
+                        "WARNING: Requested shots must be multiple of max_shots_per_run. Total shots has been adjusted to ",
+                        self._shots,
                     )
-                else:
-                    print("Number of requested shots exceed the limit of ", self.max_shots_per_run)
-                    # Get number of circuits needed to fulfill shot number
-                    self._circuit_multipl = math.floor(self._shots / self.max_shots_per_run)
-                    print(
-                        "Maximum shots are used and additional",
-                        self._circuit_multipl - 1,
-                        "circuits per Pauli string are appended to circumvent limit.",
-                    )
-                    if self._shots % self.max_shots_per_run != 0:
-                        self._shots = self._circuit_multipl * self.max_shots_per_run
-                        print(
-                            "WARNING: Requested shots must be multiple of max_shots_per_run. Total shots has been adjusted to ",
-                            self._shots,
-                        )
 
     @property
     def max_shots_per_run(self) -> int:
@@ -668,9 +659,7 @@ class QuantumInterface:
             run_parameters = custom_parameters
             save_paulis = False
 
-        # Check if estimator or sampler
-        if isinstance(self._primitive, BaseEstimator):
-            return self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
+        # Check if saving is requested
         if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)) and save_paulis:
             return self._sampler_quantum_expectation_value(op)
         if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
@@ -740,12 +729,10 @@ class QuantumInterface:
             raise TypeError(
                 f"Expectation values for custom CSFs only implemented for JordanWignerMapper. Got; {type(self.mapper)}"
             )
-        if not isinstance(self._primitive, (BaseEstimator, BaseSamplerV1, BaseSamplerV2)):
+        if not isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
             raise ValueError(
                 "quantum_expectation_value_csfs got unsupported Qiskit primitive, {type(self._primitive)}"
             )
-        if self.mitigation_flags.do_M_ansatz0_plus and isinstance(self._primitive, BaseEstimator):
-            raise ValueError("Base estimator does not support M_Ansatz0")
 
         # Option handling
         if ISA_csfs_option == 0:
@@ -800,22 +787,15 @@ class QuantumInterface:
                 circuit = get_determinant_reference(bra_det, self.num_orbs, self.mapper)
                 # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
                 circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
-                # val_old = val  # debug
-                if isinstance(self._primitive, BaseEstimator):
-                    val += N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
-                elif isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
-                    if save_paulis:
-                        val += N * self._sampler_quantum_expectation_value(
-                            op, run_circuit=circuit, det=bra_det
-                        )
-                    else:
-                        val += N * self._sampler_quantum_expectation_value_nosave(
-                            op,
-                            run_parameters,
-                            circuit,
-                            do_cliques=self._do_cliques,
-                        )
-                # print("I == J, val = ", val - val_old)  # debug
+                if save_paulis:
+                    val += N * self._sampler_quantum_expectation_value(op, run_circuit=circuit, det=bra_det)
+                else:
+                    val += N * self._sampler_quantum_expectation_value_nosave(
+                        op,
+                        run_parameters,
+                        circuit,
+                        do_cliques=self._do_cliques,
+                    )
             # I != J (off-diagonals)
             else:
                 # First term of off-diagonal element involving I and J
@@ -896,20 +876,17 @@ class QuantumInterface:
                             circuit_M=circuit_M,
                         )
                 else:
-                    if isinstance(self._primitive, BaseEstimator):
-                        val += N * self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
-                    elif isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
-                        if save_paulis:
-                            val += N * self._sampler_quantum_expectation_value(
-                                op, run_circuit=circuit, det=bra_det + ket_det, csfs_option=ISA_csfs_option
-                            )
-                        else:
-                            val += N * self._sampler_quantum_expectation_value_nosave(
-                                op,
-                                run_parameters,
-                                circuit,
-                                do_cliques=self._do_cliques,
-                            )
+                    if save_paulis:
+                        val += N * self._sampler_quantum_expectation_value(
+                            op, run_circuit=circuit, det=bra_det + ket_det, csfs_option=ISA_csfs_option
+                        )
+                    else:
+                        val += N * self._sampler_quantum_expectation_value_nosave(
+                            op,
+                            run_parameters,
+                            circuit,
+                            do_cliques=self._do_cliques,
+                        )
                 # print("I != J, superpos, val = ", val - val_old)  # debug
 
                 # Second term of off-diagonal element involving only I
@@ -917,27 +894,23 @@ class QuantumInterface:
                 circuit = get_determinant_reference(bra_det, self.num_orbs, self.mapper)
                 # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
                 circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
-                # val_old = val  # debug
-                if isinstance(self._primitive, BaseEstimator):
-                    val -= 0.5 * N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
-                elif isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
-                    if save_paulis:
-                        val -= (
-                            0.5
-                            * N
-                            * self._sampler_quantum_expectation_value(op, run_circuit=circuit, det=bra_det)
+                if save_paulis:
+                    val -= (
+                        0.5
+                        * N
+                        * self._sampler_quantum_expectation_value(op, run_circuit=circuit, det=bra_det)
+                    )
+                else:
+                    val -= (
+                        0.5
+                        * N
+                        * self._sampler_quantum_expectation_value_nosave(
+                            op,
+                            run_parameters,
+                            circuit,
+                            do_cliques=self._do_cliques,
                         )
-                    else:
-                        val -= (
-                            0.5
-                            * N
-                            * self._sampler_quantum_expectation_value_nosave(
-                                op,
-                                run_parameters,
-                                circuit,
-                                do_cliques=self._do_cliques,
-                            )
-                        )
+                    )
                 # print("I != J, I, val = ", -(val - val_old))  # debug
 
                 # Third term of off-diagonal element involving only J
@@ -945,64 +918,25 @@ class QuantumInterface:
                 circuit = get_determinant_reference(ket_det, self.num_orbs, self.mapper)
                 # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
                 circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
-                # val_old = val  # debug
-                if isinstance(self._primitive, BaseEstimator):
-                    val -= 0.5 * N * self._estimator_quantum_expectation_value(op, run_parameters, circuit)
-                elif isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
-                    if save_paulis:
-                        val -= (
-                            0.5
-                            * N
-                            * self._sampler_quantum_expectation_value(op, run_circuit=circuit, det=ket_det)
+                if save_paulis:
+                    val -= (
+                        0.5
+                        * N
+                        * self._sampler_quantum_expectation_value(op, run_circuit=circuit, det=ket_det)
+                    )
+                else:
+                    val -= (
+                        0.5
+                        * N
+                        * self._sampler_quantum_expectation_value_nosave(
+                            op,
+                            run_parameters,
+                            circuit,
+                            do_cliques=self._do_cliques,
                         )
-                    else:
-                        val -= (
-                            0.5
-                            * N
-                            * self._sampler_quantum_expectation_value_nosave(
-                                op,
-                                run_parameters,
-                                circuit,
-                                do_cliques=self._do_cliques,
-                            )
-                        )
+                    )
                 # print("I != J, J, val = ", -(val - val_old))  # debug
         return val
-
-    def _estimator_quantum_expectation_value(
-        self,
-        op: FermionicOperator,
-        run_parameters: list[float],
-        run_circuit: QuantumCircuit,
-    ) -> float:
-        """Calculate expectation value of circuit and observables via Estimator.
-
-        Args:
-            op: SlowQuant fermionic operator.
-            run_parameters: Circuit parameters.
-            run_circuit: Quantum circuit.
-
-        Returns:
-            Expectation value of operator.
-        """
-        observables = self.op_to_qbit(op)
-        if self.ISA:
-            observables = observables.apply_layout(run_circuit.layout)
-        job = self._primitive.run(
-            circuits=run_circuit, parameter_values=run_parameters, observables=observables, shots=self.shots
-        )
-        if self.shots is not None:  # check if ideal simulator
-            self.total_shots_used += self.shots * len(observables)
-        self.total_device_calls += 1
-        self.total_paulis_evaluated += len(observables)
-        result = job.result()
-        values = result.values[0]
-
-        if isinstance(values, complex):
-            if abs(values.imag) > 10**-2:
-                print("Warning: Complex number detected with Im = ", values.imag)
-
-        return values.real
 
     def _sampler_quantum_expectation_value(
         self,
@@ -1222,8 +1156,6 @@ class QuantumInterface:
             + "0" * (self.num_spin_orbs - (self.num_elec[0] + self.num_elec[1])),
             2,
         )
-        if isinstance(self._primitive, BaseEstimator):
-            raise ValueError("This function does not work with Estimator.")
         if custom_parameters is None:
             run_parameters = self.parameters
         else:

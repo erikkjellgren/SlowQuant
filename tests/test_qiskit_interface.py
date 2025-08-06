@@ -3,7 +3,7 @@
 import numpy as np
 import pyscf
 from numpy.testing import assert_allclose
-from qiskit.primitives import Estimator, Sampler
+from qiskit.primitives import Sampler
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel
 from qiskit_aer.primitives import Sampler as SamplerAer
@@ -24,81 +24,6 @@ from slowquant.qiskit_interface.wavefunction import WaveFunction
 from slowquant.unitary_coupled_cluster.sa_ups_wavefunction import WaveFunctionSAUPS
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
-
-
-def test_LiH_naive_estimator() -> None:
-    """
-    Test LiH ooVQE with rotosolve + naive LR with estimator from Qiskit
-    """
-    # Define molecule
-    atom = "Li .0 .0 .0; H .0 .0 1.672"
-    basis = "sto-3g"
-
-    # PySCF
-    mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
-    rhf = pyscf.scf.RHF(mol).run()
-
-    # SlowQuant
-    WF = WaveFunctionUCC(
-        mol.nao * 2,
-        mol.nelectron,
-        (2, 2),
-        rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
-        "SD",
-    )
-
-    # Optimize WF
-    WF.run_ucc(True)
-
-    # Optimize WF with QSQ
-    estimator = Estimator()
-    mapper = ParityMapper(num_particles=(1, 1))
-
-    QI = QuantumInterface(estimator, "fUCCSD", mapper)
-
-    qWF = WaveFunction(
-        mol.nao * 2,
-        mol.nelectron,
-        (2, 2),
-        rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
-        QI,
-    )
-
-    qWF.run_vqe_2step("rotosolve", True)
-
-    # LR with SQ
-    LR = naive.LinearResponseUCC(WF, excitations="SD")
-    LR.calc_excitation_energies()
-
-    # LR with QSQ
-    qLR = q_naive.quantumLR(qWF)
-
-    qLR.run(do_rdm=True)
-    excitation_energies = qLR.get_excitation_energies()
-
-    assert np.allclose(excitation_energies, LR.excitation_energies, atol=10**-4)
-
-    solution = [
-        0.12947075,
-        0.17874853,
-        0.17874853,
-        0.60462373,
-        0.64663037,
-        0.74060052,
-        0.74060052,
-        1.00275465,
-        2.0748271,
-        2.13720201,
-        2.13720201,
-        2.45509667,
-        2.95432578,
-    ]
-
-    assert np.allclose(excitation_energies, solution, atol=10**-6)
 
 
 def test_LiH_naive_samplerQiskit() -> None:
@@ -128,10 +53,10 @@ def test_LiH_naive_samplerQiskit() -> None:
     WF.run_ucc(True)
 
     # Optimize WF with QSQ
-    estimator = Sampler()
+    sampler = Sampler()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "fUCCSD", mapper)
+    QI = QuantumInterface(sampler, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -203,10 +128,10 @@ def test_LiH_naive() -> None:
     WF.run_ucc(True)
 
     # Optimize WF with QSQ
-    estimator = SamplerAer()
+    sampler = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "fUCCSD", mapper)
+    QI = QuantumInterface(sampler, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -264,10 +189,10 @@ def test_LiH_projected() -> None:
     rhf = pyscf.scf.RHF(mol).run()
 
     # Optimize WF with QSQ
-    estimator = SamplerAer()
+    sampler = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "fUCCSD", mapper)
+    QI = QuantumInterface(sampler, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -319,10 +244,10 @@ def test_LiH_dumb_projected() -> None:
     rhf = pyscf.scf.RHF(mol).run()
 
     # Optimize WF with QSQ
-    estimator = SamplerAer()
+    sampler = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "fUCCSD", mapper)
+    QI = QuantumInterface(sampler, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -388,10 +313,10 @@ def test_LiH_allprojected() -> None:
     WF.run_ucc(True)
 
     # Optimize WF with QSQ
-    estimator = SamplerAer()
+    sampler = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "fUCCSD", mapper)
+    QI = QuantumInterface(sampler, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -451,10 +376,10 @@ def test_LiH_dumb_allprojected() -> None:
     rhf = pyscf.scf.RHF(mol).run()
 
     # Optimize WF with QSQ
-    estimator = SamplerAer()
+    sampler = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "fUCCSD", mapper)
+    QI = QuantumInterface(sampler, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -565,10 +490,10 @@ def test_LiH_oscillator_strength() -> None:
     x, y, z = mol.intor("int1e_r", comp=3)
 
     # Optimize WF with QSQ
-    estimator = SamplerAer()
+    sampler = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
-    QI = QuantumInterface(estimator, "fUCCSD", mapper)
+    QI = QuantumInterface(sampler, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -668,9 +593,9 @@ def test_gradient_optimizer_H2() -> None:
     mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
     rhf = pyscf.scf.RHF(mol).run()
 
-    estimator = SamplerAer()
+    sampler = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
-    QI = QuantumInterface(estimator, "fUCCD", mapper)
+    QI = QuantumInterface(sampler, "fUCCD", mapper)
 
     WF = WaveFunction(
         mol.nao * 2,
@@ -700,9 +625,9 @@ def test_sampler_changes() -> None:
 
     mapper = ParityMapper(num_particles=(1, 1))
 
-    # Ideal Estimator
-    estimator = Estimator()
-    QI = QuantumInterface(estimator, "fUCCSD", mapper)
+    # Ideal Sampler
+    sampler = Sampler()
+    QI = QuantumInterface(sampler, "fUCCSD", mapper)
 
     qWF = WaveFunction(
         mol.nao * 2,
@@ -713,13 +638,6 @@ def test_sampler_changes() -> None:
         mol.intor("int2e"),
         QI,
     )
-
-    assert QI.max_shots_per_run == 100000
-    assert QI.shots is None
-
-    # Ideal Sampler
-    sampler = Sampler()
-    qWF.change_primitive(sampler)
 
     assert QI.max_shots_per_run == 100000
     assert QI.shots is None
@@ -796,9 +714,9 @@ def test_fUCC_h2o() -> None:
     mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
     rhf = pyscf.scf.RHF(mol).run()
 
-    estimator = Estimator()
+    sampler = SamplerAer()
     mapper = JordanWignerMapper()
-    QI = QuantumInterface(estimator, "fUCCSD", mapper)
+    QI = QuantumInterface(sampler, "fUCCSD", mapper)
 
     WF = WaveFunction(
         mol.nao * 2,

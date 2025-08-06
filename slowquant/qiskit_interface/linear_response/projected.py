@@ -1,7 +1,6 @@
 from collections.abc import Sequence
 
 import numpy as np
-from qiskit.primitives import BaseSampler
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
@@ -43,8 +42,7 @@ class quantumLR(quantumLRBaseClass):
 
         if self.num_q != 0:
             if do_rdm:
-                if isinstance(self.wf.QI._primitive, BaseSampler):  # pylint: disable=protected-access
-                    self.wf.precalc_rdm_paulis(2)
+                self.wf.precalc_rdm_paulis(2)
                 # RDMs
                 rdms = ReducedDenstiyMatrix(
                     self.wf.num_inactive_orbs,
@@ -204,8 +202,7 @@ class quantumLR(quantumLRBaseClass):
 
         if self.num_q != 0:
             if do_rdm:
-                if isinstance(self.wf.QI._primitive, BaseSampler):  # pylint: disable=protected-access
-                    self.wf.precalc_rdm_paulis(2)
+                self.wf.precalc_rdm_paulis(2)
                 # RDMs
                 rdms = ReducedDenstiyMatrix(
                     self.wf.num_inactive_orbs,
