@@ -53,6 +53,7 @@ Just use [PySCF](https://github.com/pyscf/pyscf) instead.
 
 | Feature               | Last living commit                       |
 |-----------------------|------------------------------------------|
+| Estimator             | 1fe8c4cac7ff5a620b760ee18ff1a8179cf40898 |
 | KS-DFT                | 1b9c5669ab72dfceee0a69c8dca1c67dd4b31bfd |
 | MP2                   | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
 | RPA                   | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
