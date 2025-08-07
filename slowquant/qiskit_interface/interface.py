@@ -10,7 +10,7 @@ import numpy as np
 from qiskit import QuantumCircuit
 from qiskit.circuit import ClassicalRegister
 from qiskit.primitives import (
-    BaseEstimator,
+    BaseEstimatorV1,
     BaseEstimatorV2,
     BaseSamplerV1,
     BaseSamplerV2,
@@ -100,7 +100,7 @@ class QuantumInterface:
             )
         if pass_manager_options is None:
             pass_manager_options = {}
-        if isinstance(primitive, (BaseEstimatorV2, BaseEstimator)):
+        if isinstance(primitive, (BaseEstimatorV2, BaseEstimatorV1)):
             raise TypeError("Estimator is not supported.")
         self.ansatz = ansatz
         self._transpiled = False  # Check if circuit has been transpiled

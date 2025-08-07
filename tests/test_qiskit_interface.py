@@ -3,7 +3,6 @@
 import numpy as np
 import pyscf
 from numpy.testing import assert_allclose
-from qiskit.primitives import Sampler
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel
 from qiskit_aer.primitives import Sampler as SamplerAer
@@ -53,7 +52,7 @@ def test_LiH_naive_samplerQiskit() -> None:
     WF.run_ucc(True)
 
     # Optimize WF with QSQ
-    sampler = Sampler()
+    sampler = SamplerAer()
     mapper = ParityMapper(num_particles=(1, 1))
 
     QI = QuantumInterface(sampler, "fUCCSD", mapper)
@@ -626,7 +625,7 @@ def test_sampler_changes() -> None:
     mapper = ParityMapper(num_particles=(1, 1))
 
     # Ideal Sampler
-    sampler = Sampler()
+    sampler = SamplerAer()
     QI = QuantumInterface(sampler, "fUCCSD", mapper)
 
     qWF = WaveFunction(

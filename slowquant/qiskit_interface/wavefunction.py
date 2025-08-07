@@ -7,7 +7,7 @@ import numpy as np
 import scipy
 from qiskit import QuantumCircuit
 from qiskit.primitives import (
-    BaseEstimator,
+    BaseEstimatorV1,
     BaseEstimatorV2,
     BaseSamplerV1,
     BaseSamplerV2,
@@ -296,7 +296,7 @@ class WaveFunction:
                 Multiple switching back and forth can lead to un-expected outcomes and is an experimental feature.\n"
             )
 
-        if isinstance(primitive, (BaseEstimator, BaseEstimatorV2)):
+        if isinstance(primitive, (BaseEstimatorV1, BaseEstimatorV2)):
             raise ValueError("Estimator is not supported.")
         self.QI._primitive = primitive  # pylint: disable=protected-access
         if verbose:
