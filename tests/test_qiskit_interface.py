@@ -5,7 +5,12 @@ import pyscf
 from numpy.testing import assert_allclose
 from qiskit.primitives import Estimator, Sampler
 from qiskit_aer import AerSimulator
-from qiskit_aer.noise import NoiseModel
+from qiskit_aer.noise import NoiseModel, depolarizing_error
+from qiskit_aer.noise.errors import (
+    ReadoutError,
+    amplitude_damping_error,
+    phase_damping_error,
+)
 from qiskit_aer.primitives import Sampler as SamplerAer
 from qiskit_aer.primitives import SamplerV2 as SamplerV2Aer
 from qiskit_ibm_runtime import SamplerV2 as SamplerV2IBM
@@ -24,6 +29,13 @@ from slowquant.qiskit_interface.wavefunction import WaveFunction
 from slowquant.unitary_coupled_cluster.sa_ups_wavefunction import WaveFunctionSAUPS
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
+
+noise_model = NoiseModel()
+noise_model.add_all_qubit_quantum_error(depolarizing_error(0.005, 1), ["u1", "u2", "u3"])
+noise_model.add_all_qubit_quantum_error(depolarizing_error(0.02, 2), ["cx"])
+noise_model.add_all_qubit_quantum_error(amplitude_damping_error(0.02), ["u1", "u2", "u3"], warnings=False)
+noise_model.add_all_qubit_quantum_error(phase_damping_error(0.03), ["u1", "u2", "u3"], warnings=False)
+noise_model.add_all_qubit_readout_error(ReadoutError([[0.95, 0.05], [0.1, 0.9]]))
 
 
 def test_LiH_naive_estimator() -> None:
@@ -996,7 +1008,6 @@ def test_mitigation() -> None:
     )
     WF.run_ups(True)
 
-    noise_model = NoiseModel.from_backend(FakeTorino())  # That might change
     sampler = SamplerAer(backend_options={"noise_model": noise_model})
     mapper = JordanWignerMapper()
     QI = QuantumInterface(
@@ -1022,23 +1033,23 @@ def test_mitigation() -> None:
     )
     qWF.ansatz_parameters = WF.thetas
 
-    assert abs(qWF._calc_energy_elec() + 9.649846545745412) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() + 9.258549202172054) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0]
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() + 9.698203783853641) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() + 9.531143400515425) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8]
 
     QI.update_mitigation_flags(do_postselection=False, do_M_ansatz0=True)
-    assert abs(qWF._calc_energy_elec() + 9.709098117653463) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() + 9.665136097395242) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3]
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() + 9.711635788561269) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() + 9.711819110417231) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3, 11]
 
     QI.update_mitigation_flags(do_M_ansatz0_plus=True)
-    assert abs(qWF._calc_energy_elec() + 9.711635788561269) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() + 9.711819110417231) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3, 11, 15]
 
 
@@ -1159,7 +1170,6 @@ def test_state_average_M() -> None:
     )
     WF.run_saups(False)
 
-    noise_model = NoiseModel.from_backend(FakeTorino())  # That might change
     sampler = SamplerAer(backend_options={"noise_model": noise_model})
     mapper = JordanWignerMapper()
     QI = QuantumInterface(
@@ -1195,9 +1205,7 @@ def test_state_average_M() -> None:
     )
     QWF.ansatz_parameters = WF.thetas
 
-    # This might fail if the noise model of FakeTorinto changes.
-    # But if it fails check if the Noise mode is the issue. Do NOT ignore this failing!
-    assert abs(QWF._calc_energy_elec() + 1.3755439434495917) < 10**-6  # type: ignore
+    assert abs(QWF._calc_energy_elec() + 1.417013381867924) < 10**-6  # type: ignore
 
 
 def test_state_average_Mplus() -> None:
@@ -1268,7 +1276,6 @@ def test_state_average_Mplus() -> None:
 
     assert abs(WF._sa_energy - QWF._calc_energy_elec()) < 10**-6  # type: ignore
 
-    noise_model = NoiseModel.from_backend(FakeTorino())
     sampler = SamplerAer(backend_options={"noise_model": noise_model})
     QWF.change_primitive(sampler)
 
@@ -1278,24 +1285,20 @@ def test_state_average_Mplus() -> None:
 
     # No EM
     QI._reset_cliques()
-    assert abs(QWF._calc_energy_elec() + 9.60851106217584) < 10**-6  # type: ignore  # CSFs option 1
+    assert abs(QWF._calc_energy_elec() + 9.437068894682653) < 10**-6  # type: ignore  # CSFs option 1
 
     # EM with M_Ansatz0
     QI.update_mitigation_flags(do_M_mitigation=True, do_M_ansatz0=True)
-    # QI.redo_M_mitigation()
 
-    # QI._reset_cliques()
-    assert abs(QWF._calc_energy_elec() + 9.633426170009107) < 10**-6  # type: ignore  # CSFs option 4
+    assert abs(QWF._calc_energy_elec() + 9.594604931255208) < 10**-6  # type: ignore  # CSFs option 4
 
     # EM with M_Ansatz0+
-    # QI._reset_cliques()
     QI.update_mitigation_flags(do_M_ansatz0_plus=True)
-    assert abs(QWF._calc_energy_elec() + 9.635276750167002) < 10**-6  # type: ignore  # CSFs option 1
+    assert abs(QWF._calc_energy_elec() + 9.607824917072104) < 10**-6  # type: ignore  # CSFs option 1
 
     # EM with M_Ansatz0 and postselection
     QI.update_mitigation_flags(do_postselection=True, do_M_ansatz0_plus=False)
-    # QI._reset_cliques()
-    assert abs(QWF._calc_energy_elec() + 9.636464216617595) < 10**-6  # type: ignore  # CSFs option 4
+    assert abs(QWF._calc_energy_elec() + 9.635783384095342) < 10**-6  # type: ignore  # CSFs option 4
 
 
 def test_no_saving() -> None:
@@ -1370,7 +1373,6 @@ def test_no_saving() -> None:
     QI._do_cliques = False
     assert abs(WF._sa_energy - QWF._calc_energy_elec()) < 10**-6  # type: ignore
 
-    noise_model = NoiseModel.from_backend(FakeTorino())
     sampler = SamplerAer(backend_options={"noise_model": noise_model})
     QWF.change_primitive(sampler)
 
@@ -1379,7 +1381,7 @@ def test_no_saving() -> None:
     QI.update_pass_manager({"backend": FakeTorino(), "seed_transpiler": 1234})
 
     QI.update_mitigation_flags(do_postselection=False, do_M_ansatz0=True)
-    assert abs(QWF._calc_energy_elec() + 9.63342617000911) < 10**-6  # type: ignore
+    assert abs(QWF._calc_energy_elec() + 9.594604931255208) < 10**-6  # type: ignore
 
 
 def test_variance() -> None:
@@ -1411,7 +1413,6 @@ def test_variance() -> None:
     )
     WF.run_ups(True)
 
-    noise_model = NoiseModel.from_backend(FakeTorino())  # That might change
     sampler = SamplerAer(backend_options={"noise_model": noise_model})
     mapper = JordanWignerMapper()
     QI = QuantumInterface(
@@ -1438,8 +1439,8 @@ def test_variance() -> None:
     qWF.ansatz_parameters = WF.thetas
 
     qWF._calc_energy_elec()
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.040592737332136634) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.13590797869982368) < 10**-6  # type: ignore
 
     QI.update_mitigation_flags(do_postselection=True)
     qWF._calc_energy_elec()
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.024708172056620556) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.08330602766877596) < 10**-6  # type: ignore
