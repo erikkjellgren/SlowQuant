@@ -47,7 +47,7 @@ class UnrestrictedReducedDensityMatrix:
 # what about rdm1_C, rdm1_S, rdm2_C? What are they used for?
 
     def RDM1aa(self, p: int, q: int) -> float:
-        """Get one-electron unrestricted reduced density matrix element
+        r"""Get one-electron unrestricted reduced density matrix element
         
         The only non-zero elements are:
 
@@ -97,7 +97,7 @@ class UnrestrictedReducedDensityMatrix:
         return 0        
 
     def RDM2aaaa(self, p: int, r: int, s: int, q: int) -> float:
-        """Get two-elelctron unrestricted reduced density matrix element.
+        r"""Get two-elelctron unrestricted reduced density matrix element.
         
         .. math::
         \Gamma^{[2]}_{p_{\sigma}q_{\sigma}r_{\tau}s_{\tau}} = \left\{\begin{array}{ll}
@@ -183,7 +183,7 @@ class UnrestrictedReducedDensityMatrix:
         return 0
 
     def RDM2bbbb(self, p: int, r: int, s: int, q: int) -> float:
-        """Get two-elelctron unrestricted reduced density matrix element.
+        r"""Get two-elelctron unrestricted reduced density matrix element.
         
         .. math::
         \Gamma^{[2]}_{p_{\sigma}q_{\sigma}r_{\tau}s_{\tau}} = \left\{\begin{array}{ll}
@@ -268,7 +268,7 @@ class UnrestrictedReducedDensityMatrix:
         return 0
 
     def RDM2aabb(self, p: int, r: int, s: int, q: int) -> float:
-        """Get two-elelctron unrestricted reduced density matrix element.
+        r"""Get two-elelctron unrestricted reduced density matrix element.
         
         .. math::
         \Gamma^{[2]}_{p_{\sigma}q_{\sigma}r_{\tau}s_{\tau}} = \left\{\begin{array}{ll}
@@ -346,7 +346,7 @@ class UnrestrictedReducedDensityMatrix:
         return 0
 
     def RDM2bbaa(self, p: int, r: int, s: int, q: int) -> float:
-        """Get two-elelctron unrestricted reduced density matrix element.
+        r"""Get two-elelctron unrestricted reduced density matrix element.
         
         .. math::
         \Gamma^{[2]}_{p_{\sigma}q_{\sigma}r_{\tau}s_{\tau}} = \left\{\begin{array}{ll}
@@ -692,8 +692,11 @@ def get_orbital_response_property_gradient_unrestricted(
         kappa_idx: list[tuple[int, int]],
         num_inactive_orbs: int,
         num_active_orbs: int,
+        response_vectors: np.ndarray,
+        state_number: int,
+        number_excitations: int,
 ) -> np.ndarray:
-    r"""Calculate the orbital part of property gradient.
+    r"""Calculate the orbital part of property gradient. For oscillator strengths
 
     .. math::
        Figure out your math!!!
@@ -708,13 +711,25 @@ def get_orbital_response_property_gradient_unrestricted(
     Returns:
         Orbital part of property gradient.
     """
-    prop_grad = np.zeros((2*len(kappa_idx), 2*len(mo)))
-    for idx, (n, m) in enumerate(kappa_idx):
+    prop_grad = 0
+    for idx, (m, n) in enumerate(kappa_idx):
         for p in range(num_inactive_orbs, num_active_orbs):
-            prop_grad[idx, :] += mo_a[:, n, p] * rdms.RDM1aa(m, p)
-            prop_grad[idx, :] -= mo_a[:, p, m] * rdms.RDM1aa(p, n)
-            prop_grad[idx + len(kappa_idx), :] += mo_b[:, n, p] * rdms.RDM1bb(m, p)
-            prop_grad[idx + len(kappa_idx), :] -= mo_b[:, p, m] * rdms.RDM1bb(p, n)
+            prop_grad += ((response_vectors[idx, state_number] - response_vectors[idx + number_excitations, state_number])
+                * mo_a[n, p] 
+                * rdms.RDM1aa(m, p)
+            )
+            prop_grad -= ((response_vectors[idx, state_number] - response_vectors[idx + number_excitations, state_number]) 
+                * mo_a[p, m] 
+                * rdms.RDM1aa(p, n)
+            )
+            prop_grad += ((response_vectors[idx, state_number] - response_vectors[idx + number_excitations, state_number])
+                * mo_b[n, p] 
+                * rdms.RDM1bb(m, p)
+            )
+            prop_grad -= ((response_vectors[idx, state_number] - response_vectors[idx + number_excitations, state_number]) 
+                * mo_b[p, m] 
+                * rdms.RDM1bb(p, n)
+            )
     return 2**(-1/2) *  prop_grad
 
 

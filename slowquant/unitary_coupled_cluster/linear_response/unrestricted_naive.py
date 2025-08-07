@@ -143,6 +143,8 @@ class LinearResponseUPS(LinearResponseBaseClass):
         #     rdms, self.wf.kappa_no_activeactive_idx
         # )
         
+        #end RDM
+
         #manual version
         for j, qJ in enumerate(self.q_ops):
             for i, qI in enumerate(self.q_ops):
@@ -220,6 +222,7 @@ class LinearResponseUPS(LinearResponseBaseClass):
                     *self.index_info,
                 ))
                 self.Sigma[i, j] = val
+        #End manual
 
         for j, qJ in enumerate(self.q_ops):
             Hq_ket = propagate_state([self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info)
@@ -500,6 +503,7 @@ class LinearResponseUPS(LinearResponseBaseClass):
                 state_number,
                 number_excitations,
             )
+            # print(q_part_x)
             transfer_ket = propagate_state([transfer_op], self.wf.ci_coeffs, *self.index_info)
             transferd_ket = propagate_state([transfer_op.dagger], self.wf.ci_coeffs, *self.index_info)
             # <0| mux T |0>

@@ -1,40 +1,53 @@
 import pyscf
 from pyscf import scf, mcscf
+import numpy as np
 
+import slowquant.SlowQuant as sq
 import slowquant.unitary_coupled_cluster.linear_response.unrestricted_naive as unaive
 from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 
-def get_unrestricted_excitation_energy(geometry, basis, active_space, charge=0, spin=0, unit="bohr"):
+def get_ures_exc_energy_osc(geometry, basis, active_space, charge=0, spin=0, unit="bohr"):
     """
     Calculate unrestricted excitation energies
     """
     # PySCF
 
-    mol = pyscf.M(atom=geometry, basis=basis, charge=charge, spin=spin, unit=unit)
-    mol.build()
-    mf = scf.UHF(mol)
-    mf.kernel()
+    # mol = pyscf.M(atom=geometry, basis=basis, charge=charge, spin=spin, unit=unit)
+    # mol.build()
+    # mf = scf.UHF(mol)
+    # mf.kernel()
 
-    mc = mcscf.UCASCI(mf, 4, (2,2))
-    res = mc.kernel(mf.mo_coeff)
+    # mc = mcscf.UCASCI(mf, 4, (2,2))
+    # res = mc.kernel(mf.mo_coeff)
 
-    h_core = mol.intor("int1e_kin") + mol.intor("int1e_nuc")
-    g_eri = mol.intor("int2e")
+    # h_core = mol.intor("int1e_kin") + mol.intor("int1e_nuc")
+    # g_eri = mol.intor("int2e")
+    # Slowquant object
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(geometry, distance_unit = unit)
+    SQobj.set_basis_set(basis)
+    SQobj.molecule.molecular_charge = charge
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_unrestricted_hartree_fock()
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
 
     # SlowQuant
+    #mo_coeff = np.append(SQobj.hartree_fock.mo_coeff_alpha, SQobj.hartree_fock.mo_coeff_beta)
+    print(SQobj.hartree_fock.mo_coeff_alpha)
 
     WF = UnrestrictedWaveFunctionUPS(
-        mol.nelectron,
+        SQobj.molecule.number_electrons,
         active_space,
-        mf.mo_coeff,
+        mo_coeff,
         h_core,
         g_eri,
-        "fuccsd",
-        {"n_layers":1},
+        "fuccsdtq",
+        {"n_layers":2},
         include_active_kappa=True,
     )
 
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("bfgs", True)
 
     print("Energy elec", WF.energy_elec_RDM)
 
@@ -43,25 +56,50 @@ def get_unrestricted_excitation_energy(geometry, basis, active_space, charge=0, 
     ULR.get_oscillator_strength()
     print(ULR.excitation_energies)
 
-def test_exc_energy():
+    # dipole_integrals = (
+        
+    # )
+    # print(dipole_integrals)
+    # # not correct number of indices.... from the dipole integrals
+    # osc_strengths = ULR.get_oscillator_strength(dipole_integrals=dipole_integrals)
+    # print(osc_strengths)
+
+def oh_radical(): 
     geometry = """O  0.0   0.0  0.0;
         H  0.0  0.0  0.9697;"""
     basis = 'STO-3G'
-    active_space = ((2,1),3)
+    active_space = ((3,2),4)
     charge = 0
     spin=1
 
-    get_unrestricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
+    get_ures_exc_energy_osc(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit='angstrom')
 
-def excita_h2o():
-    geometry = """O -0.000000   -0.000000    0.112729
-                H -0.000000    0.794937   -0.450915
-                H -0.000000   -0.794937   -0.450915"""
+def OH_cation():
+    """
+    Test of hfc for OH using unrestricted RDMs
+    """
+    geometry = """O  0.0   0.0  0.0;
+        H  0.0  0.0  1.0289;"""
+    basis="STO-3g"
+    active_space = ((3,1),4)
+    charge = 1
+    #the pyscf spin parameter is the value of 2S (tne number of unpaired electrons, or the difference between the number of alpha and beta electrons)
+    spin=2
+    
+    get_ures_exc_energy_osc(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit='angstrom')
 
+def NO_radical():
+    """
+    Test of hfc for OH using unrestricted RDMs
+    """
+    geometry = """O  0.0   0.0  0.0;
+        N  0.0  0.0  1.1508;"""
     basis = "STO-3G"
-    active_space = ((2,2),4)
+    active_space = ((1,2),3)
+    charge = 0
+    #the pyscf spin parameter is the value of 2S (tne number of unpaired electrons, or the difference between the number of alpha and beta electrons)
+    spin=1
 
-    get_unrestricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, unit="angstrom")
+    get_ures_exc_energy_osc(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit='angstrom')
 
-#test_exc_energy()
-excita_h2o()
+oh_radical()

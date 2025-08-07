@@ -11,8 +11,10 @@ def get_unrestricted_excitation_energy(geometry, basis, active_space, charge=0, 
     """
     Calculate unrestricted excitation energies
     """
+    # Info for output file
+    print(f'geometry: {geometry}, basis: {basis}, active space: {active_space}, charge: {charge}, spin (2S+1): {spin+1}')
+    print('type of calculation: manual')
     # PySCF
-
     mol = pyscf.M(atom=geometry, basis=basis, charge=charge, spin=spin, unit=unit)
     mol.build()
     mf = scf.UHF(mol)
@@ -23,9 +25,9 @@ def get_unrestricted_excitation_energy(geometry, basis, active_space, charge=0, 
 
     h_core = mol.intor("int1e_kin") + mol.intor("int1e_nuc")
     g_eri = mol.intor("int2e")
-
+    
     # SlowQuant
-
+    
     WF = UnrestrictedWaveFunctionUPS(
         mol.nelectron,
         active_space,
@@ -36,7 +38,7 @@ def get_unrestricted_excitation_energy(geometry, basis, active_space, charge=0, 
         {"n_layers":2},
         include_active_kappa=True,
     )
-    
+    print(mf.mo_coeff)
     #WF.run_wf_optimization_1step("slsqp", False)
     WF.run_wf_optimization_1step("bfgs", True)
     
@@ -46,6 +48,16 @@ def get_unrestricted_excitation_energy(geometry, basis, active_space, charge=0, 
     ULR = unaive.LinearResponseUPS(WF, excitations="SDTQ")
     ULR.calc_excitation_energies()
     print(ULR.excitation_energies)
+
+    dipole_integrals = (mol.intor('int1e_r')[0,:],
+                        mol.intor('int1e_r')[1,:],
+                        mol.intor('int1e_r')[2,:]
+                        )
+    #print(dipole_integrals)
+   
+    osc_strengths = ULR.get_oscillator_strength(dipole_integrals=dipole_integrals)
+    print(osc_strengths)
+
 
 def get_restricted_excitation_energy(geometry, basis, active_space, charge=0, spin=0, unit="bohr"):
     """
@@ -113,7 +125,7 @@ def OH_cation():
     geometry = """O  0.0   0.0  0.0;
         H  0.0  0.0  1.0289;"""
     basis="STO-3g"
-    active_space = ((5,3),6)
+    active_space = ((3,1),4)
     charge = 1
     #the pyscf spin parameter is the value of 2S (tne number of unpaired electrons, or the difference between the number of alpha and beta electrons)
     spin=2
@@ -177,9 +189,9 @@ def h2_res():
 
 #OH_cation()
 #oh_radical_res()
-#oh_radical()
+oh_radical()
 #excita_h2o()
 #h2()
 #h2_res()
-NO_radical()
+#NO_radical()
 #h2_ion()
