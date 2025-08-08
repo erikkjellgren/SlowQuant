@@ -1428,9 +1428,9 @@ def test_variance() -> None:
     )
     qWF.ansatz_parameters = WF.thetas
 
-    qWF._calc_energy_elec()
+    assert abs(qWF._calc_energy_elec() + 9.258549202172054) < 10**-6  # type: ignore
     assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.13590797869982368) < 10**-6  # type: ignore
 
     QI.update_mitigation_flags(do_postselection=True)
-    qWF._calc_energy_elec()
+    assert abs(qWF._calc_energy_elec() + 9.531143400515425) < 10**-6  # type: ignore
     assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.08330602766877596) < 10**-6  # type: ignore
