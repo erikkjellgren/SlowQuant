@@ -979,6 +979,79 @@ def test_H2_sampler_layout() -> None:
     assert np.allclose(qWF._calc_energy_elec(), -1.6303275411526188, atol=10**-6)
 
 
+def test_mitigation_nocm() -> None:
+    """Test mitigations without coupling map."""
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """Li  0.0           0.0  0.0;
+        H  0.735           0.0  0.0;
+        """,
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("sto-3g")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
+
+    # Conventional UPS wave function
+    WF = WaveFunctionUPS(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 2),
+        SQobj.hartree_fock.mo_coeff,
+        h_core,
+        g_eri,
+        "tUPS",
+        ansatz_options={"n_layers": 1, "skip_last_singles": True},
+        include_active_kappa=True,
+    )
+    WF.run_ups(True)
+
+    sampler = SamplerAer(backend_options={"noise_model": noise_model})
+    mapper = JordanWignerMapper()
+    QI = QuantumInterface(
+        sampler,
+        "tUPS",
+        mapper,
+        ansatz_options={"n_layers": 1, "skip_last_singles": True},
+        ISA=False,
+        do_M_mitigation=False,
+        do_M_ansatz0=False,
+        do_postselection=False,
+    )
+
+    qWF = WaveFunction(
+        SQobj.molecule.number_bf * 2,
+        SQobj.molecule.number_electrons,
+        (2, 2),
+        WF.c_trans,
+        h_core,
+        g_eri,
+        QI,
+    )
+    qWF.ansatz_parameters = WF.thetas
+
+    assert abs(qWF._calc_energy_elec() + 9.436070579779887) < 10**-6  # type: ignore
+    assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0]
+
+    QI.update_mitigation_flags(do_postselection=True)
+    assert abs(qWF._calc_energy_elec() + 9.61483066006192) < 10**-6  # type: ignore
+    assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8]
+
+    QI.update_mitigation_flags(do_postselection=False, do_M_ansatz0=True)
+    assert abs(qWF._calc_energy_elec() + 9.689892475818768) < 10**-6  # type: ignore
+    assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3]
+
+    QI.update_mitigation_flags(do_postselection=True)
+    assert abs(qWF._calc_energy_elec() + 9.712244139831084) < 10**-6  # type: ignore
+    assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3, 11]
+
+    QI.update_mitigation_flags(do_M_ansatz0_plus=True)
+    assert abs(qWF._calc_energy_elec() + 9.712244139831084) < 10**-6  # type: ignore
+    assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3, 11, 15]
+
+
 def test_mitigation() -> None:
     """Test mitigations."""
     SQobj = sq.SlowQuant()
