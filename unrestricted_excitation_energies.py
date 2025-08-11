@@ -38,7 +38,6 @@ def get_unrestricted_excitation_energy(geometry, basis, active_space, charge=0, 
         {"n_layers":2},
         include_active_kappa=True,
     )
-    print(mf.mo_coeff)
     #WF.run_wf_optimization_1step("slsqp", False)
     WF.run_wf_optimization_1step("bfgs", True)
     
@@ -53,7 +52,6 @@ def get_unrestricted_excitation_energy(geometry, basis, active_space, charge=0, 
                         mol.intor('int1e_r')[1,:],
                         mol.intor('int1e_r')[2,:]
                         )
-    #print(dipole_integrals)
    
     osc_strengths = ULR.get_oscillator_strength(dipole_integrals=dipole_integrals)
     print(osc_strengths)

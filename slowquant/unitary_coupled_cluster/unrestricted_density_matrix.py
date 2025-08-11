@@ -673,15 +673,23 @@ def get_orbital_response_metric_sigma_unrestricted(
         Sigma matrix orbital-orbital block.
     """
     sigma = np.zeros((2*len(kappa_idx), 2*len(kappa_idx)))
-    for idx1, (p, q) in enumerate(kappa_idx):
-        for idx2, (m, n) in enumerate(kappa_idx):
+    for idx1, (n, m) in enumerate(kappa_idx):
+        for idx2, (p, q) in enumerate(kappa_idx):
             # Below [q^dagger, q]
             if m == p:
-                sigma[idx1, idx2] += rdms.RDM1aa(q, n)
-                sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] += rdms.RDM1bb(q, n)
+                sigma[idx1, idx2] += rdms.RDM1aa(n, q)
+                sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] += rdms.RDM1bb(n, q)
             if q == n:
-                sigma[idx1, idx2] -= rdms.RDM1aa(m, p)
-                sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] -= rdms.RDM1bb(m, p)
+                sigma[idx1, idx2] -= rdms.RDM1aa(p, m)
+                sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] -= rdms.RDM1bb(p, m)
+    # for idx1, (n, m) in enumerate(kappa_idx):
+    #     for idx2, (p, q) in enumerate(kappa_idx):
+    #         if p == n:
+    #             sigma[idx1, idx2] += rdms.RDM1aa(m, q)
+    #             sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] -= rdms.RDM1bb(m, q)
+    #         if m == q:
+    #             sigma[idx1, idx2] += rdms.RDM1aa(p, n)
+    #             sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] -= rdms.RDM1bb(p, n)
     return 1/2 * sigma
 
 
@@ -768,7 +776,6 @@ def get_orbital_response_hessian_block_unrestricted(
     shift2 = len(kappa_idx2)
     for idx1, (t, u) in enumerate(kappa_idx1):
         for idx2, (m, n) in enumerate(kappa_idx2):
-            
             A1e[idx1, idx2] += h_int_aa[u, m] * rdms.RDM1aa(t, n)
             A1e[idx1, idx2] += h_int_aa[n, t] * rdms.RDM1aa(m, u)
             A1e[idx1 + shift1, idx2 + shift2] += h_int_bb[u, m] * rdms.RDM1bb(t, n)
