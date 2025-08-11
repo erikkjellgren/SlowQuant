@@ -720,6 +720,8 @@ def construct_ups_state(
         \boldsymbol{U}_N...\boldsymbol{U}_0\left|\nu\right> = \left|\tilde\nu\right>
 
     #. 10.48550/arXiv.2303.10825, Eq. 15
+    #. 10.48550/arXiv.2505.00883, Eq. 45, 47, and, 49 (SA doubles)
+    #. 10.48550/arXiv.2505.02984, Eq. 35, D1, and, D2 (SA doubles)
 
     Args:
         state: Reference state vector.
@@ -1158,6 +1160,8 @@ def construct_ups_state_SA(
         \boldsymbol{U}_N...\boldsymbol{U}_0\left|\nu\right> = \left|\tilde\nu\right>
 
     #. 10.48550/arXiv.2303.10825, Eq. 15
+    #. 10.48550/arXiv.2505.00883, Eq. 45, 47, and, 49 (SA doubles)
+    #. 10.48550/arXiv.2505.02984, Eq. 35, D1, and, D2 (SA doubles)
 
     Args:
         state: Reference state vector.
@@ -1592,6 +1596,9 @@ def propagate_unitary(
 ) -> np.ndarray:
     """Apply unitary from UPS operator number 'idx' to state.
 
+    #. 10.48550/arXiv.2505.00883, Eq. 45, 47, and, 49 (SA doubles)
+    #. 10.48550/arXiv.2505.02984, Eq. 35, D1, and, D2 (SA doubles)
+
     Args:
         state: State vector.
         idx: Index of operator in the ups_struct.
@@ -2021,6 +2028,9 @@ def propagate_unitary_SA(
     ups_struct: UpsStructure,
 ) -> np.ndarray:
     """Apply unitary from UPS operator number 'idx' to state.
+
+    #. 10.48550/arXiv.2505.00883, Eq. 45, 47, and, 49 (SA doubles)
+    #. 10.48550/arXiv.2505.02984, Eq. 35, D1, and, D2 (SA doubles)
 
     Args:
         state: State vector.
