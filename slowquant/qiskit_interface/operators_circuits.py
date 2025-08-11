@@ -7,7 +7,7 @@ from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
 from slowquant.qiskit_interface.util import f2q
-from slowquant.unitary_coupled_cluster.operators import anni_spin
+from slowquant.unitary_coupled_cluster.operators import a_op_spin
 
 
 def single_excitation(
@@ -345,7 +345,7 @@ def _single_excitation_trotter(
         Trotterized fermionic single excitation circuit.
     """
     num_spin_orbs = 2 * num_orbs
-    op = anni_spin(a, True) * anni_spin(i, False)
+    op = a_op_spin(a, True) * a_op_spin(i, False)
     T = op - op.dagger
     op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
     ops = np.array([str(pauli) for pauli in op_mapped.paulis])
@@ -375,7 +375,7 @@ def _double_excitation_trotter(
     """Get double excitation as a trotterized fermionic operator.
 
     The Pauli string from the mapped fermionic operator are sorted
-    lexicographically to make the circuit shorter from gate cancelation.
+    lexicographically to make the circuit shorter from gate cancellation.
 
     Args:
         i: Strongly occupied spin orbital index.
@@ -393,7 +393,7 @@ def _double_excitation_trotter(
     num_spin_orbs = 2 * num_orbs
     ops = []
     factors = []
-    op = anni_spin(a, True) * anni_spin(b, True) * anni_spin(j, False) * anni_spin(i, False)
+    op = a_op_spin(a, True) * a_op_spin(b, True) * a_op_spin(j, False) * a_op_spin(i, False)
     T = op - op.dagger
     op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
     ops = np.array([str(pauli) for pauli in op_mapped.paulis])

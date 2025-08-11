@@ -1,9 +1,58 @@
-[tool.black]
+[tool.ruff]
 line-length = 110
-target-version = ['py38']
-include = '\.pyi?$'
-exclude = '''
-/(
-    \.git
-)/
-'''
+indent-width = 4
+target-version = "py313"
+
+# Enable rules to cover flake8, isort, pylint, pydocstyle, etc.
+lint.select = [
+  "E",    # pycodestyle errors (flake8)
+  "F",    # pyflakes (flake8)
+  "W",    # pycodestyle warnings
+  "I",    # isort (import sorting)
+  "NPY",  # NumPy-specific rules
+  "N",    # pep8-naming
+  "D",    # pydocstyle (docstrings)
+  "PL",   # pylint checks
+  "RUF",  # Ruff-specific improvements
+]
+
+# Optionally ignore some rules you find too strict
+lint.ignore = [
+  "D100",     # undocumented-public-module
+  "D101",     # undocumented-public-class
+  "D104",     # undocumented-public-package
+  "E501",     # line-too-long
+  "E741",     # ambiguous-variable-name
+  "N801",     # invalid-class-name
+  "N802",     # invalid-function-name
+  "N803",     # invalid-argument-name
+  "N806",     # non-lowercase-variable-in-function
+  "N813",     # camelcase-imported-as-lowercase
+  "N999",     # invalid-module-name
+  "PLR0911",  # too-many-return-statements
+  "PLR0912",  # too-many-branches
+  "PLR0913",  # too-many-arguments
+  "PLR0915",  # too-many-statements
+  "PLR2004",  # magic-value-comparison
+  "PLW2901",  # redefined-loop-name
+  "RUF010",   # explicit-f-string-type-conversion
+]
+
+# Exclude these paths from checks (customize as needed)
+exclude = [
+  "__pycache__",
+]
+
+# Allow automatic fixing for all rules
+fix = true
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+# Enable formatting similar to Black
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+docstring-code-format = true
+skip-magic-trailing-comma = false
