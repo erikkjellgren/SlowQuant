@@ -15,7 +15,6 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
 from slowquant.unitary_coupled_cluster.density_matrix import (
-    ReducedDenstiyMatrix,
     get_orbital_gradient,
 )
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
@@ -901,15 +900,14 @@ class WaveFunctionSAUPS:
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:
-            rdms = ReducedDenstiyMatrix(
+            gradient[:num_kappa] = get_orbital_gradient(
+                self.h_mo,
+                self.g_mo,
+                self.kappa_idx,
                 self.num_inactive_orbs,
                 self.num_active_orbs,
-                self.num_virtual_orbs,
-                rdm1=self.rdm1,
-                rdm2=self.rdm2,
-            )
-            gradient[:num_kappa] = get_orbital_gradient(
-                rdms, self.h_mo, self.g_mo, self.kappa_idx, self.num_inactive_orbs, self.num_active_orbs
+                self.rdm1,
+                self.rdm2,
             )
         if theta_optimization:
             Hamiltonian = hamiltonian_0i_0a(
