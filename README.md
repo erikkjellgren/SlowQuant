@@ -41,7 +41,9 @@ Just use [PySCF](https://github.com/pyscf/pyscf) instead.
 
 ## Cited in
 
-- Ziems, K. M., Kjellgren, E. R., Sauer, S., Kongsted, J., & Coriani, S. (2024). Understanding and mitigating noise in molecular quantum linear response for spectroscopic properties on quantum computers. arXiv preprint arXiv:2408.09308.
+- Kjellgren, E. R., Ziems, K. M., Reinholdt, P., Sauer, S., Coriani, S., & Kongsted, J. (2025). Exact closed-form expression for unitary spin-adapted fermionic singlet double excitation operators. arXiv preprint arXiv:2505.00883.
+- Jensen, P. W., Hedemark, G. S., Ziems, K. M., Kjellgren, E. R., Reinholdt, P., Knecht, S., ... & Sauer, S. (2025). Hyperfine Coupling Constants on Quantum Computers: Performance, Errors, and Future Prospects. arXiv preprint arXiv:2503.09214.
+- Ziems, K. M., Kjellgren, E. R., Sauer, S. P., Kongsted, J., & Coriani, S. (2025). Understanding and mitigating noise in molecular quantum linear response for spectroscopic properties on quantum computers. Chemical Science.
 - Kjellgren, E. R., Reinholdt, P., Ziems, K. M., Sauer, S., Coriani, S., & Kongsted, J. (2024). Divergences in classical and quantum linear response and equation of motion formulations. The Journal of Chemical Physics, 161(12).
 - von Buchwald, T. J., Ziems, K. M., Kjellgren, E. R., Sauer, S. P., Kongsted, J., & Coriani, S. (2024). Reduced density matrix formulation of quantum linear response. Journal of Chemical Theory and Computation, 20(16), 7093-7101.
 - Chan, M., Verstraelen, T., Tehrani, A., Richer, M., Yang, X. D., Kim, T. D., ... & Ayers, P. W. (2024). The tale of HORTON: Lessons learned in a decade of scientific software development. The Journal of Chemical Physics, 160(16).
@@ -51,13 +53,17 @@ Just use [PySCF](https://github.com/pyscf/pyscf) instead.
 
 ## Feature Graveyard
 
-| Feature               | Last living commit                       |
-|-----------------------|------------------------------------------|
-| KS-DFT                | 1b9c5669ab72dfceee0a69c8dca1c67dd4b31bfd |
-| MP2                   | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
-| RPA                   | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
-| Geometry Optimization | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
-| CIS                   | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
-| CCSD                  | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
-| CCSD(T)               | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
-| BOMD                  | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
+| Feature                                        | Last living commit                       |
+|------------------------------------------------|------------------------------------------|
+| RDM trace correction quantum wave function     | e26074fc8aae8dc0f6528308022ad265c5ca18bc |
+| No submatrix saving in proj and all-proj LR    | 3f5df6818c4dbbb2b54606d0a1a4e00badfb766d |
+| Approxmiate Hermitification in linear response | 3f5df6818c4dbbb2b54606d0a1a4e00badfb766d |
+| Approxmiate linear response formalism          | 3f5df6818c4dbbb2b54606d0a1a4e00badfb766d |
+| KS-DFT                                         | 1b9c5669ab72dfceee0a69c8dca1c67dd4b31bfd |
+| MP2                                            | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
+| RPA                                            | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
+| Geometry Optimization                          | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
+| CIS                                            | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
+| CCSD                                           | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
+| CCSD(T)                                        | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |
+| BOMD                                           | 46bf811dfcf217ce0c37ddec77d34ef00da769c3 |

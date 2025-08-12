@@ -1,4 +1,3 @@
-# pylint: disable=too-many-lines
 import copy
 import itertools
 import math
@@ -46,7 +45,7 @@ class QuantumInterface:
     This class handles the interface with qiskit and the communication with quantum hardware.
     """
 
-    def __init__(  # pylint: disable=dangerous-default-value
+    def __init__(
         self,
         primitive: BaseEstimator | BaseSamplerV1 | BaseSamplerV2,
         ansatz: str | QuantumCircuit,
@@ -144,7 +143,11 @@ class QuantumInterface:
         ] = {}  # Contains information about the parameterization needed for gradient evaluations.
 
         # State prep circuit
-        if self.ansatz == "tUPS" and "do_pp" in self.ansatz_options.keys() and self.ansatz_options["do_pp"]:
+        if isinstance(self.ansatz, QuantumCircuit):
+            self.state_circuit: QuantumCircuit = QuantumCircuit(
+                self.ansatz.num_qubits
+            )  # empty state as custom circuit is passed
+        elif self.ansatz == "tUPS" and "do_pp" in self.ansatz_options.keys() and self.ansatz_options["do_pp"]:
             # HF in pp-tUPS ordering
             if not isinstance(self.mapper, JordanWignerMapper):
                 raise ValueError(f"pp-tUPS only implemented for JW mapper, got: {type(self.mapper)}")
@@ -237,7 +240,7 @@ class QuantumInterface:
             )
         self.param_names = [str(x) for x in self.circuit.parameters]
         for name in self.param_names:
-            if name not in self.grad_param_R.keys():  # pylint: disable=consider-iterating-dictionary
+            if name not in self.grad_param_R.keys():
                 raise ValueError(
                     f"Got parameter name, {name}, that is not in grad_param_R, {self.grad_param_R}"
                 )
@@ -570,7 +573,7 @@ class QuantumInterface:
         """Get max number of shots per run.
 
         Returns:
-            Max number of shots pers run.
+            Max number of shots per run.
         """
         return self._max_shots_per_run
 
@@ -1010,7 +1013,7 @@ class QuantumInterface:
 
         Calculated Pauli expectation values will be saved in memory.
 
-        The expectation value over a fermionic operator is calcuated as:
+        The expectation value over a fermionic operator is calculated as:
 
         .. math::
             E = \sum_i^N c_i\left<0\left|P_i\right|0\right>
@@ -1112,10 +1115,10 @@ class QuantumInterface:
     ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
 
-        Calling this function will not use any pre-calculated Pauli expectaion values.
+        Calling this function will not use any pre-calculated Pauli expectation values.
         Nor will it save any of the calculated Pauli expectation values.
 
-        The expectation value over a fermionic operator is calcuated as:
+        The expectation value over a fermionic operator is calculated as:
 
         .. math::
             E = \sum_i^N c_i\left<0\left|P_i\right|0\right>
@@ -1318,7 +1321,7 @@ class QuantumInterface:
     ) -> list[dict[int, float]]:
         r"""Get results from a sampler distribution for several Pauli strings measured on several circuits.
 
-        The expectation value of a Pauli string is calcuated as:
+        The expectation value of a Pauli string is calculated as:
 
         .. math::
             E = \sum_i^N p_i\left<b_i\left|P\right|b_i\right>
@@ -1327,7 +1330,7 @@ class QuantumInterface:
 
         Args:
             paulis: (List of) Pauli strings to measure.
-            run_paramters: List of parameters of each circuit.
+            run_parameters: List of parameters of each circuit.
             circuits_in: List of circuits
             overwrite_shots: Overwrite QI shot number.
 
@@ -1447,7 +1450,7 @@ class QuantumInterface:
     ) -> dict[int, float]:
         r"""Get results from a sampler distribution for one given Pauli string.
 
-        The expectation value of a Pauli string is calcuated as:
+        The expectation value of a Pauli string is calculated as:
 
         .. math::
             E = \sum_i^N p_i\left<b_i\left|P\right|b_i\right>
@@ -1456,7 +1459,7 @@ class QuantumInterface:
 
         Args:
             pauli: Pauli string to measure.
-            run_paramters: Parameters of circuit.
+            run_parameters: Parameters of circuit.
             custom_circ: Specific circuit to run.
 
         Returns:
