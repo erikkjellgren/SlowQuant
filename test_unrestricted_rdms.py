@@ -78,13 +78,13 @@ WF.run_wf_optimization_1step("slsqp", True)
 
 #print(WF.orbital_response_hessian_unrestricted) 
 #print(WF.manual_hessian_block_unrestricted())  
-with np.printoptions(precision=4, suppress=True):
-    print(WF.orbital_response_hessian_unrestricted - WF.manual_hessian_block_unrestricted())     
+# with np.printoptions(precision=4, suppress=True):
+#     print(WF.orbital_response_hessian_unrestricted - WF.manual_hessian_block_unrestricted())     
 
 #print(WF.orbital_response_metric_sigma_unrestricted)
 #print(WF.manual_metric_sigma_unrestricted())
-with np.printoptions(precision=4, suppress=True):
-    print(WF.orbital_response_metric_sigma_unrestricted - WF.manual_metric_sigma_unrestricted())
+# with np.printoptions(precision=4, suppress=True):
+#     print(WF.orbital_response_metric_sigma_unrestricted - WF.manual_metric_sigma_unrestricted())
 
 
 #print("hej2", WF.energy_elec + SQobj.molecule.nuclear_repulsion, WF.energy_elec  + SQobj.molecule.nuclear_repulsion - res[0])
@@ -96,3 +96,6 @@ with np.printoptions(precision=4, suppress=True):
 
 #print(WF.rdm2aabb)
 #print(WF.rdm2bbaa.transpose(2,3,0,1)) # rdm2aabb[i,j,k,l] = rdm2bbaa[k,l,i,j]
+
+
+print(WF.orbital_hessian_unrestricted_A)

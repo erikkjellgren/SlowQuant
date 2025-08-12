@@ -46,7 +46,7 @@ def get_unrestricted_excitation_energy(geometry, basis, active_space, charge=0, 
 
     ULR = unaive.LinearResponseUPS(WF, excitations="SDTQ")
     ULR.calc_excitation_energies()
-    print(ULR.excitation_energies)
+    print(f'excitation energies: {ULR.excitation_energies}')
 
     dipole_integrals = (mol.intor('int1e_r')[0,:],
                         mol.intor('int1e_r')[1,:],
@@ -54,7 +54,7 @@ def get_unrestricted_excitation_energy(geometry, basis, active_space, charge=0, 
                         )
    
     osc_strengths = ULR.get_oscillator_strength(dipole_integrals=dipole_integrals)
-    print(osc_strengths)
+    print(f'oscillator strengths: {osc_strengths}')
 
 
 def get_restricted_excitation_energy(geometry, basis, active_space, charge=0, spin=0, unit="bohr"):
@@ -106,15 +106,6 @@ def oh_radical():
     spin=1
 
     get_unrestricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
-    
-def oh_radical_res():
-    geometry = """O  0.0   0.0  0.0;
-        H  0.0  0.0  0.9697;"""
-    basis = 'STO-3G'
-    active_space = (5,4)
-    charge = 0
-    spin=1
-    get_restricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
 
 def OH_cation():
     """
@@ -144,17 +135,6 @@ def NO_radical():
     
     get_unrestricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit='angstrom')
 
-
-def excita_h2o():
-    geometry = """O -0.000000   -0.000000    0.112729
-                H -0.000000    0.794937   -0.450915
-                H -0.000000   -0.794937   -0.450915"""
-
-    basis = "STO-3G"
-    active_space = ((2,2),4)
-
-    get_unrestricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, unit="angstrom")
-
 def h2(): 
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74;"""
@@ -169,8 +149,8 @@ def h2_ion():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74;"""
     basis = '6-31g'
-    active_space = ((1,2),4)
-    charge = -1
+    active_space = ((1,0),2)
+    charge = 1
     spin=1
 
     get_unrestricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
@@ -185,11 +165,19 @@ def h2_res():
 
     get_restricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
 
-#OH_cation()
-#oh_radical_res()
+def lih_plus():
+    geometry = """ Li 0.0 0.0 0.0;
+        H 0.0 0.0 1.5949;"""
+    basis = '6-31g'
+    active_space = ((1,0),2)
+    charge = 1
+    spin = 1
+    get_unrestricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
+
+# OH_cation()
 oh_radical()
-#excita_h2o()
-#h2()
-#h2_res()
-#NO_radical()
-#h2_ion()
+# h2()
+# h2_res()
+# NO_radical()
+# h2_ion()
+#lih_plus()

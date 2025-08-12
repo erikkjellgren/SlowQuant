@@ -1054,7 +1054,7 @@ class UnrestrictedWaveFunctionUPS:
 
     # print the unrestricted orbital response hessian block for test
     @property
-    def orbital_response_hessian_unrestricted(self) -> np.ndarray:
+    def orbital_hessian_unrestricted_A(self) -> np.ndarray:
         rdms = UnrestrictedReducedDensityMatrix(
             self.num_inactive_orbs,
             self.num_active_orbs,
@@ -1074,12 +1074,39 @@ class UnrestrictedWaveFunctionUPS:
             self.gbbbb_mo,
             self.gaabb_mo,
             self.gbbaa_mo,
-            self.kappa_idx,
-            self.kappa_idx,
+            self.kappa_no_activeactive_idx_dagger,
+            self.kappa_no_activeactive_idx,
             self.num_inactive_orbs,
             self.num_active_orbs,
         )
-
+    
+    @property
+    def orbital_hessian_unrestricted_B(self) -> np.ndarray:
+        rdms = UnrestrictedReducedDensityMatrix(
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+            self.num_virtual_orbs,
+            rdm1aa=self.rdm1aa,
+            rdm1bb=self.rdm1bb,
+            rdm2aaaa=self.rdm2aaaa,
+            rdm2bbbb=self.rdm2bbbb,
+            rdm2aabb=self.rdm2aabb,
+            rdm2bbaa=self.rdm2bbaa,
+        )
+        return get_orbital_response_hessian_block_unrestricted(
+            rdms,
+            self.haa_mo,
+            self.hbb_mo,
+            self.gaaaa_mo,
+            self.gbbbb_mo,
+            self.gaabb_mo,
+            self.gbbaa_mo,
+            self.kappa_no_activeactive_idx_dagger,
+            self.kappa_no_activeactive_idx_dagger,
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+        )
+    #Print response orbital metric sigma for test
     @property
     def orbital_response_metric_sigma_unrestricted(self) -> np.ndarray:
         rdms = UnrestrictedReducedDensityMatrix(
@@ -1095,19 +1122,19 @@ class UnrestrictedWaveFunctionUPS:
         )
         return get_orbital_response_metric_sigma_unrestricted(
             rdms,
-            self.kappa_idx,
+            self.kappa_no_activeactive_idx,
         )
 
     def manual_metric_sigma_unrestricted(
         wf: UnrestrictedWaveFunctionUPS,
     ) -> np.ndarray:
-        sigma = np.zeros((2 * len(wf.kappa_idx), 2 * len(wf.kappa_idx)))
-        for idx1, (m, n) in enumerate(wf.kappa_idx):
-            for idx2, (p, q) in enumerate(wf.kappa_idx):
-                q_qp_a = (1 / np.sqrt(2)) * (anni(q, "alpha", True) * anni(p, "alpha", False))
-                q_mn_a = (1 / np.sqrt(2)) * (anni(m, "alpha", True) * anni(n, "alpha", False))
-                q_qp_b = (1 / np.sqrt(2)) * (anni(q, "beta", True) * anni(p, "beta", False))
-                q_mn_b = (1 / np.sqrt(2)) * (anni(m, "beta", True) * anni(n, "beta", False))
+        sigma = np.zeros((2 * len(wf.kappa_no_activeactive_idx), 2 * len(wf.kappa_no_activeactive_idx)))
+        for idx1, (q, p) in enumerate(wf.kappa_no_activeactive_idx):
+            for idx2, (m, n) in enumerate(wf.kappa_no_activeactive_idx):
+                q_qp_a = (anni(p, "alpha", True) * anni(q, "alpha", False))
+                q_mn_a = (anni(m, "alpha", True) * anni(n, "alpha", False))
+                q_qp_b = (anni(p, "beta", True) * anni(q, "beta", False))
+                q_mn_b = (anni(m, "beta", True) * anni(n, "beta", False))
                 aa = expectation_value(
                     wf.ci_coeffs,
                     [q_qp_a * q_mn_a],
@@ -1140,23 +1167,23 @@ class UnrestrictedWaveFunctionUPS:
                     wf.thetas,
                     wf.ups_layout,
                 )
-                sigma[idx1, idx2] = aa
-                sigma[idx1 + len(wf.kappa_idx), idx2 + len(wf.kappa_idx)] = bb
+                sigma[idx1*2, idx2*2] = aa
+                sigma[idx1*2+1, idx2*2 + 1] = bb
         return sigma
 
-    def manual_hessian_block_unrestricted(
+    def manual_hessian_unrestricted_A(
         wf: UnrestrictedWaveFunctionUPS,
     ) -> np.ndarray:
         h = unrestricted_hamiltonian_full_space(
             wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs
         )
-        A_block = np.zeros((2 * len(wf.kappa_idx), 2 * len(wf.kappa_idx)))
-        for idx1, (t, u) in enumerate(wf.kappa_idx):
-            for idx2, (m, n) in enumerate(wf.kappa_idx):
-                E_tu_a = (1 / np.sqrt(2)) * (anni(t, "alpha", True) * anni(u, "alpha", False))
-                E_mn_a = (1 / np.sqrt(2)) * (anni(m, "alpha", True) * anni(n, "alpha", False))
-                E_tu_b = (1 / np.sqrt(2)) * (anni(t, "beta", True) * anni(u, "beta", False))
-                E_mn_b = (1 / np.sqrt(2)) * (anni(m, "beta", True) * anni(n, "beta", False))
+        A_block = np.zeros((2 * len(wf.kappa_no_activeactive_idx), 2 * len(wf.kappa_no_activeactive_idx)))
+        for idx1, (u, t) in enumerate(wf.kappa_no_activeactive_idx):
+            for idx2, (m, n) in enumerate(wf.kappa_no_activeactive_idx):
+                E_tu_a = (anni(t, "alpha", True) * anni(u, "alpha", False))
+                E_mn_a = (anni(m, "alpha", True) * anni(n, "alpha", False))
+                E_tu_b = (anni(t, "beta", True) * anni(u, "beta", False))
+                E_mn_b = (anni(m, "beta", True) * anni(n, "beta", False))
                 aa = expectation_value(
                     wf.ci_coeffs,
                     [E_tu_a * h * E_mn_a],
@@ -1285,16 +1312,162 @@ class UnrestrictedWaveFunctionUPS:
                     wf.thetas,
                     wf.ups_layout,
                 )
-                A_block[idx1, idx2] = aa
-                A_block[idx1, idx2 + len(wf.kappa_idx)] = ab
-                A_block[idx1 + len(wf.kappa_idx), idx2] = ba
-                A_block[idx1 + len(wf.kappa_idx), idx2 + len(wf.kappa_idx)] = bb
+                A_block[idx1*2, idx2*2] = aa
+                A_block[idx1*2, idx2*2+1] = ab
+                A_block[idx1*2+1, idx2*2] = ba
+                A_block[idx1*2+1, idx2*2+1] = bb
         return A_block
+
+    def manual_hessian_unrestricted_B(
+        wf: UnrestrictedWaveFunctionUPS,
+    ) -> np.ndarray:
+        h = unrestricted_hamiltonian_full_space(
+            wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs
+        )
+        B_block = np.zeros((2 * len(wf.kappa_no_activeactive_idx), 2 * len(wf.kappa_no_activeactive_idx)))
+        for idx1, (u, t) in enumerate(wf.kappa_no_activeactive_idx):
+            for idx2, (n, m) in enumerate(wf.kappa_no_activeactive_idx):
+                E_tu_a = (anni(t, "alpha", True) * anni(u, "alpha", False))
+                E_mn_a = (anni(m, "alpha", True) * anni(n, "alpha", False))
+                E_tu_b = (anni(t, "beta", True) * anni(u, "beta", False))
+                E_mn_b = (anni(m, "beta", True) * anni(n, "beta", False))
+                aa = expectation_value(
+                    wf.ci_coeffs,
+                    [E_tu_a * h * E_mn_a],
+                    wf.ci_coeffs,
+                    wf.ci_info,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                aa -= expectation_value(
+                    wf.ci_coeffs,
+                    [E_tu_a * E_mn_a * h],
+                    wf.ci_coeffs,
+                    wf.ci_info,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                aa -= expectation_value(
+                    wf.ci_coeffs,
+                    [h * E_mn_a * E_tu_a],
+                    wf.ci_coeffs,
+                    wf.ci_info,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                aa += expectation_value(
+                    wf.ci_coeffs,
+                    [E_mn_a * h * E_tu_a],
+                    wf.ci_coeffs,
+                    wf.ci_info,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                ba = expectation_value(
+                    wf.ci_coeffs,
+                    [E_tu_b * h * E_mn_a],
+                    wf.ci_coeffs,
+                    wf.ci_info,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                ba -= expectation_value(
+                    wf.ci_coeffs,
+                    [E_tu_b * E_mn_a * h],
+                    wf.ci_coeffs,
+                    wf.ci_info,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                ba -= expectation_value(
+                    wf.ci_coeffs,
+                    [h * E_mn_a * E_tu_b],
+                    wf.ci_coeffs,
+                    wf.ci_info,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                ba += expectation_value(
+                    wf.ci_coeffs,
+                    [E_mn_a * h * E_tu_b],
+                    wf.ci_coeffs,
+                    wf.ci_info,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                ab = expectation_value(
+                    wf.ci_coeffs,
+                    [E_tu_a * h * E_mn_b],
+                    wf.ci_coeffs,
+                    wf.ci_info,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                ab -= expectation_value(
+                    wf.ci_coeffs,
+                    [E_tu_a * E_mn_b * h],
+                    wf.ci_coeffs,
+                    wf.ci_info,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                ab -= expectation_value(
+                    wf.ci_coeffs,
+                    [h * E_mn_b * E_tu_a],
+                    wf.ci_coeffs,
+                    wf.ci_info,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                ab += expectation_value(
+                    wf.ci_coeffs,
+                    [E_mn_b * h * E_tu_a],
+                    wf.ci_coeffs,
+                    wf.ci_info,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                bb = expectation_value(
+                    wf.ci_coeffs,
+                    [E_tu_b * h * E_mn_b],
+                    wf.ci_coeffs,
+                    wf.ci_info,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                bb -= expectation_value(
+                    wf.ci_coeffs,
+                    [E_tu_b * E_mn_b * h],
+                    wf.ci_coeffs,
+                    wf.ci_info,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                bb -= expectation_value(
+                    wf.ci_coeffs,
+                    [h * E_mn_b * E_tu_b],
+                    wf.ci_coeffs,
+                    wf.ci_info,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                bb += expectation_value(
+                    wf.ci_coeffs,
+                    [E_mn_b * h * E_tu_b],
+                    wf.ci_coeffs,
+                    wf.ci_info,
+                    wf.thetas,
+                    wf.ups_layout,
+                )
+                B_block[idx1*2, idx2*2] = aa
+                B_block[idx1*2, idx2*2+1] = ab
+                B_block[idx1*2+1, idx2*2] = ba
+                B_block[idx1*2+1, idx2*2+1] = bb
+        return B_block
 
     def manual_gradient(
         wf: UnrestrictedWaveFunctionUPS,
     ) -> np.ndarray:
-        # lav en variable der samler alle parametre i expectation value
         h = unrestricted_hamiltonian_full_space(
             wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_orbs
         )

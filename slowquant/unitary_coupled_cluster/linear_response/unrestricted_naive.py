@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 
 import numpy as np
+import sys
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
@@ -112,7 +113,7 @@ class LinearResponseUPS(LinearResponseBaseClass):
             if np.max(np.abs(grad)) > 10**-3:
                 raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
             
-        #     #RDM version
+        #Start RDM version
         self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block_unrestricted(
             rdms,
             self.wf.haa_mo,
@@ -126,7 +127,6 @@ class LinearResponseUPS(LinearResponseBaseClass):
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
         )
-        print(f'rdm A: {self.A}')
         self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block_unrestricted(
             rdms,
             self.wf.haa_mo,
@@ -140,14 +140,12 @@ class LinearResponseUPS(LinearResponseBaseClass):
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
         )
-        print(f'rdm B: {self.B}')
         self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma_unrestricted(
             rdms, self.wf.kappa_no_activeactive_idx
         )
-        print(f'rdm Sigma: {self.Sigma}')
-        #end RDM
+        #End RDM
 
-        #manual version
+        #Start manual version
         # for j, qJ in enumerate(self.q_ops):
         #     for i, qI in enumerate(self.q_ops):
         #         #Make A
@@ -180,7 +178,6 @@ class LinearResponseUPS(LinearResponseBaseClass):
         #             *self.index_info,
         #         ))
         #         self.A[i, j] = val
-                
         #         #make B
         #         # <0| qd H qd |0>
         #         val = (expectation_value(
@@ -225,7 +222,7 @@ class LinearResponseUPS(LinearResponseBaseClass):
         #             *self.index_info,
         #         ))
         #         self.Sigma[i, j] = val
-        #End manual
+        #End manual version
 
         for j, qJ in enumerate(self.q_ops):
             Hq_ket = propagate_state([self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info)
