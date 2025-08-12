@@ -1,4 +1,3 @@
-# pylint: disable=too-many-lines
 import networkx as nx
 import numpy as np
 from qiskit import QuantumCircuit
@@ -138,7 +137,7 @@ def find_swaps(new: list[int], ref: list[int]) -> list[tuple[int, int]]:
     swaps = []
     list_in = new.copy()
 
-    for i in range(len(list_in)):  # pylint: disable=consider-using-enumerate
+    for i in range(len(list_in)):
         if list_in[i] != ref[i]:
             # Find where the element from ref[i] is in list_in and swap it
             swap_idx = list_in.index(ref[i], i)
@@ -758,7 +757,7 @@ def layout_conserving_compose(
         if optimization:
             nlg_composed = composed.num_nonlocal_gates()
             composed = pm.optimization.run(composed)
-            composed._layout = ansatz.layout  # pylint: disable=protected-access
+            composed._layout = ansatz.layout
             print(
                 "Composed circuit optimization eliminated ",
                 nlg_composed - composed.num_nonlocal_gates(),

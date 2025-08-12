@@ -285,16 +285,14 @@ class QuantumInterface:
                 if self.pass_manager_options.get("backend") is None:
                     print(
                         "Backend",
-                        self._primitive._backend,  # pylint: disable=protected-access
+                        self._primitive._backend,
                         "detected in primitive and added to pass manager options.",
                     )
-                    self.pass_manager_options["backend"] = self._primitive._backend  # pylint: disable=protected-access
-                elif (
-                    self.pass_manager_options.get("backend") != self._primitive._backend  # pylint: disable=protected-access
-                ):
+                    self.pass_manager_options["backend"] = self._primitive._backend
+                elif self.pass_manager_options.get("backend") != self._primitive._backend:
                     print(
                         "WARNING: Backend ",
-                        self._primitive._backend,  # pylint: disable=protected-access
+                        self._primitive._backend,
                         "detected in primitive.\nPass manager uses ",
                         self.pass_manager_options.get("backend"),
                         ".\nEnsure compatibility manually.\n",
@@ -307,11 +305,11 @@ class QuantumInterface:
             self.pass_manager_options["optimization_level"] = 3
             if hasattr(self._primitive, "_transpile_options") and hasattr(
                 self._primitive._transpile_options,
-                "optimization_level",  # pylint: disable=protected-access
+                "optimization_level",
             ):
-                self.pass_manager_options["optimization_level"] = self._primitive._transpile_options[  # pylint: disable=protected-access
+                self.pass_manager_options["optimization_level"] = self._primitive._transpile_options[
                     "optimization_level"
-                ]  # pylint: disable=protected-access
+                ]
             elif hasattr(self._primitive, "options"):
                 if hasattr(self._primitive.options, "optimization_level"):
                     self.pass_manager_options["optimization_level"] = self._primitive.options[

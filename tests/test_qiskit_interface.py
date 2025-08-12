@@ -1066,7 +1066,7 @@ def test_state_average_layout() -> None:
 
 
 def test_state_average_M() -> None:
-    """Test Energy calculation with SA in the presence of complicated layout and M_Ansatz0"""
+    """Test Energy calculation with SA in the presence of complicated layout and M_Ansatz0."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """H  0.0           0.0  0.0;
@@ -1144,7 +1144,7 @@ def test_state_average_M() -> None:
 
 
 def test_state_average_Mplus() -> None:
-    """Test Energy calculation with SA in the presence of complicated layout and with M_Ansatz0+"""
+    """Test Energy calculation with SA in the presence of complicated layout and with M_Ansatz0+."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """Li  0.0           0.0  0.0;
@@ -1238,7 +1238,7 @@ def test_state_average_Mplus() -> None:
 
 
 def test_no_saving() -> None:
-    """Test Energy calculation with SA for the no saving options"""
+    """Test Energy calculation with SA for the no saving options."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
         """Li  0.0           0.0  0.0;

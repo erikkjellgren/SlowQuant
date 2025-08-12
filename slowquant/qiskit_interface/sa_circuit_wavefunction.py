@@ -853,7 +853,7 @@ class WaveFunctionSACircuit:
         if theta_optimization:
             H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-            for i in range(len(parameters)):  # pylint: disable=consider-using-enumerate
+            for i in range(len(parameters)):
                 R = self.QI.grad_param_R[self.QI.param_names[i]]
                 e_vals_grad = get_energy_evals_for_grad(H, self.QI, parameters, i, R)
                 grad = 0.0
