@@ -67,7 +67,10 @@ class RotoSolve:
         self._param_names = param_names
 
     def minimize(
-        self, f: Callable[[list[float]], float], x: list[float], jac=None  # pylint: disable=unused-argument
+        self,
+        f: Callable[[list[float]], float],
+        x: list[float],
+        jac=None,  # pylint: disable=unused-argument
     ) -> Result:
         """Run minimization.
 

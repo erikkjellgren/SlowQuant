@@ -13,7 +13,6 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.qiskit_interface.interface import QuantumInterface
 from slowquant.unitary_coupled_cluster.density_matrix import (
-    get_electronic_energy,
     get_orbital_gradient,
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
@@ -434,11 +433,27 @@ class WaveFunctionSACircuit:
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             sa_energy = 0.0
             for coeffs, csf in zip(self.states[0], self.states[1]):
-                sa_energy += self.QI.quantum_expectation_value_csfs(
-                    (coeffs, csf), H, (coeffs, csf)
-                )
+                sa_energy += self.QI.quantum_expectation_value_csfs((coeffs, csf), H, (coeffs, csf))
             self._sa_energy = sa_energy / self.num_states
         return self._sa_energy
+
+    def _calc_energy_elec(self) -> float:
+        """Run electronic energy simulation, regardless of self._sa_energy_elec variable.
+
+        Returns:
+            State-averaged electronic energy.
+        """
+        H = hamiltonian_0i_0a(
+            self.h_mo,
+            self.g_mo,
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+        )
+        H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+        sa_energy = 0.0
+        for coeffs, csf in zip(self.states[0], self.states[1]):
+            sa_energy += self.QI.quantum_expectation_value_csfs((coeffs, csf), H, (coeffs, csf))
+        return sa_energy / self.num_states
 
     def run_wf_optimization_2step(
         self,
@@ -505,7 +520,7 @@ class WaveFunctionSACircuit:
             self._E_opt_old = 0.0
             res = optimizer.minimize(
                 self.thetas,
-                extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
+                extra_options={"R": self.QI.grad_param_R, "param_names": self.QI.param_names},
             )
             self.thetas = res.x.tolist()
 
@@ -641,7 +656,7 @@ class WaveFunctionSACircuit:
         self._E_opt_old = 0.0
         res = optimizer.minimize(
             parameters,
-            extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
+            extra_options={"R": self.QI.grad_param_R, "param_names": self.QI.param_names},
         )
         if orbital_optimization:
             self.thetas = res.x[len(self.kappa) :].tolist()
@@ -791,11 +806,9 @@ class WaveFunctionSACircuit:
             self.thetas = parameters[num_kappa:]
         H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
         H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-        energy_states = [] 
+        energy_states = []
         for coeffs, csf in zip(self.states[0], self.states[1]):
-            energy_states.append(self.QI.quantum_expectation_value_csfs(
-                (coeffs, csf), H, (coeffs, csf)
-            ))
+            energy_states.append(self.QI.quantum_expectation_value_csfs((coeffs, csf), H, (coeffs, csf)))
         if return_all_states:
             return np.array(energy_states)
         E = np.mean(energy_states)

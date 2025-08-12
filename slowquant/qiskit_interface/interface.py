@@ -139,9 +139,9 @@ class QuantumInterface:
         self.num_orbs = num_orbs
         self.num_spin_orbs = 2 * num_orbs
         self.num_elec = num_elec
-        self.grad_param_R: dict[str, int] = (
-            {}
-        )  # Contains information about the parameterization needed for gradient evaluations.
+        self.grad_param_R: dict[
+            str, int
+        ] = {}  # Contains information about the parameterization needed for gradient evaluations.
 
         # State prep circuit
         if self.ansatz == "tUPS" and "do_pp" in self.ansatz_options.keys() and self.ansatz_options["do_pp"]:
@@ -285,21 +285,17 @@ class QuantumInterface:
                         self._primitive._backend,  # pylint: disable=protected-access
                         "detected in primitive and added to pass manager options.",
                     )
-                    self.pass_manager_options["backend"] = (
-                        self._primitive._backend  # pylint: disable=protected-access
+                    self.pass_manager_options["backend"] = self._primitive._backend  # pylint: disable=protected-access
+                elif (
+                    self.pass_manager_options.get("backend") != self._primitive._backend  # pylint: disable=protected-access
+                ):
+                    print(
+                        "WARNING: Backend ",
+                        self._primitive._backend,  # pylint: disable=protected-access
+                        "detected in primitive.\nPass manager uses ",
+                        self.pass_manager_options.get("backend"),
+                        ".\nEnsure compatibility manually.\n",
                     )
-                else:
-                    if (
-                        self.pass_manager_options.get("backend")
-                        != self._primitive._backend  # pylint: disable=protected-access
-                    ):
-                        print(
-                            "WARNING: Backend ",
-                            self._primitive._backend,  # pylint: disable=protected-access
-                            "detected in primitive.\nPass manager uses ",
-                            self.pass_manager_options.get("backend"),
-                            ".\nEnsure compatibility manually.\n",
-                        )
 
             # Get optimization level from backend. Only for v1 primitives. Needed for default pass manager
             overwrite = False
@@ -307,13 +303,12 @@ class QuantumInterface:
                 overwrite = True
             self.pass_manager_options["optimization_level"] = 3
             if hasattr(self._primitive, "_transpile_options") and hasattr(
-                self._primitive._transpile_options, "optimization_level"  # pylint: disable=protected-access
+                self._primitive._transpile_options,
+                "optimization_level",  # pylint: disable=protected-access
             ):
-                self.pass_manager_options["optimization_level"] = (
-                    self._primitive._transpile_options[  # pylint: disable=protected-access
-                        "optimization_level"
-                    ]
-                )  # pylint: disable=protected-access
+                self.pass_manager_options["optimization_level"] = self._primitive._transpile_options[  # pylint: disable=protected-access
+                    "optimization_level"
+                ]  # pylint: disable=protected-access
             elif hasattr(self._primitive, "options"):
                 if hasattr(self._primitive.options, "optimization_level"):
                     self.pass_manager_options["optimization_level"] = self._primitive.options[
@@ -836,9 +831,7 @@ class QuantumInterface:
                             # Transpile the composed circuit together using the correct layout
                             # This will however still introduce routing swaps (flexible order)
                             circuit = self._initialfixedlayout_pm.run(circuit)
-                        case (
-                            3
-                        ):  # Option 3: fixed layout - fixed order without optimization (needed with M_Ansatz0)
+                        case 3:  # Option 3: fixed layout - fixed order without optimization (needed with M_Ansatz0)
                             circuit = layout_conserving_compose(
                                 self.ansatz_circuit,
                                 state,
@@ -869,7 +862,9 @@ class QuantumInterface:
                             del state_corr.data[idx]
                     if self.ISA:
                         # Translate and optimize
-                        state_corr = self._pass_manager.optimization.run(self._pass_manager.translation.run(state_corr))  # type: ignore
+                        state_corr = self._pass_manager.optimization.run(
+                            self._pass_manager.translation.run(state_corr)
+                        )  # type: ignore
                     # Negate
                     if circuit.layout is not None:
                         circuit_M = circuit.compose(
@@ -895,21 +890,20 @@ class QuantumInterface:
                             do_cliques=self._do_cliques,
                             circuit_M=circuit_M,
                         )
-                else:
-                    if isinstance(self._primitive, BaseEstimator):
-                        val += N * self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
-                    elif isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
-                        if save_paulis:
-                            val += N * self._sampler_quantum_expectation_value(
-                                op, run_circuit=circuit, det=bra_det + ket_det, csfs_option=ISA_csfs_option
-                            )
-                        else:
-                            val += N * self._sampler_quantum_expectation_value_nosave(
-                                op,
-                                run_parameters,
-                                circuit,
-                                do_cliques=self._do_cliques,
-                            )
+                elif isinstance(self._primitive, BaseEstimator):
+                    val += N * self._estimator_quantum_expectation_value(op, run_parameters, self.circuit)
+                elif isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
+                    if save_paulis:
+                        val += N * self._sampler_quantum_expectation_value(
+                            op, run_circuit=circuit, det=bra_det + ket_det, csfs_option=ISA_csfs_option
+                        )
+                    else:
+                        val += N * self._sampler_quantum_expectation_value_nosave(
+                            op,
+                            run_parameters,
+                            circuit,
+                            do_cliques=self._do_cliques,
+                        )
                 # print("I != J, superpos, val = ", val - val_old)  # debug
 
                 # Second term of off-diagonal element involving only I
@@ -1055,16 +1049,15 @@ class QuantumInterface:
         if det_int not in self.saver:
             print("Make new Clique saver for determinant ", det)
             self.saver[det_int] = Clique(csfs_option)
-        else:
-            # If a different csfs option has been used in SA-VQE that means the circuit has been altered.
-            # Thus, we cannot use raw results from an unaltered circuit run with a different csfs_option.
-            if self.saver[det_int].csfs_option != csfs_option:
-                print(
-                    "Warning: Clique saver for determinant ",
-                    det,
-                    " has different csfs_option than requested. Rerunning raw data.",
-                )
-                self.saver[det_int] = Clique(csfs_option)
+        # If a different csfs option has been used in SA-VQE that means the circuit has been altered.
+        # Thus, we cannot use raw results from an unaltered circuit run with a different csfs_option.
+        elif self.saver[det_int].csfs_option != csfs_option:
+            print(
+                "Warning: Clique saver for determinant ",
+                det,
+                " has different csfs_option than requested. Rerunning raw data.",
+            )
+            self.saver[det_int] = Clique(csfs_option)
 
         paulis_str = [str(x) for x in observables.paulis]
         new_heads = self.saver[det_int].add_paulis(paulis_str)

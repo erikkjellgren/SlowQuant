@@ -13,7 +13,6 @@ from slowquant.qiskit_interface.linear_response.lr_baseclass import (
 )
 from slowquant.qiskit_interface.util import Clique
 from slowquant.unitary_coupled_cluster.density_matrix import (
-    ReducedDenstiyMatrix,
     get_orbital_gradient_response,
     get_orbital_response_hessian_block,
     get_orbital_response_metric_sigma,
@@ -46,36 +45,29 @@ class quantumLR(quantumLRBaseClass):
 
         if self.num_q != 0:
             if do_rdm:
-                if isinstance(self.wf.QI._primitive, BaseSampler):  # pylint: disable=protected-access
+                if isinstance(self.wf.QI._primitive, BaseSampler):
                     self.wf.precalc_rdm_paulis(2)
                 # RDMs
-                rdms = ReducedDenstiyMatrix(
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
-                    self.wf.rdm1,
-                    rdm2=self.wf.rdm2,
-                )
                 if do_gradients:
                     # Check gradients
                     grad = get_orbital_gradient_response(
-                        rdms,
                         self.wf.h_mo,
                         self.wf.g_mo,
                         self.wf.kappa_no_activeactive_idx,
                         self.wf.num_inactive_orbs,
                         self.wf.num_active_orbs,
+                        self.wf.rdm1,
+                        self.wf.rdm2,
                     )
-            else:
-                if do_gradients:
-                    grad = np.zeros(2 * self.num_q)
-                    for i, op in enumerate(self.q_ops):
-                        grad[i] = self.wf.QI.quantum_expectation_value(
-                            (self.H_1i_1a * op).get_folded_operator(*self.orbs)
-                        )
-                        grad[i + self.num_q] = self.wf.QI.quantum_expectation_value(
-                            (op.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
-                        )
+            elif do_gradients:
+                grad = np.zeros(2 * self.num_q)
+                for i, op in enumerate(self.q_ops):
+                    grad[i] = self.wf.QI.quantum_expectation_value(
+                        (self.H_1i_1a * op).get_folded_operator(*self.orbs)
+                    )
+                    grad[i + self.num_q] = self.wf.QI.quantum_expectation_value(
+                        (op.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                    )
         if do_gradients:
             if self.num_q != 0:
                 print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
@@ -99,25 +91,30 @@ class quantumLR(quantumLRBaseClass):
         if self.num_q != 0:
             if do_rdm:
                 self.A[: self.num_q, : self.num_q] = get_orbital_response_hessian_block(
-                    rdms,
                     self.wf.h_mo,
                     self.wf.g_mo,
                     self.wf.kappa_no_activeactive_idx_dagger,
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
                     self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.wf.rdm2,
                 )
                 self.B[: self.num_q, : self.num_q] = get_orbital_response_hessian_block(
-                    rdms,
                     self.wf.h_mo,
                     self.wf.g_mo,
                     self.wf.kappa_no_activeactive_idx_dagger,
                     self.wf.kappa_no_activeactive_idx_dagger,
                     self.wf.num_inactive_orbs,
                     self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.wf.rdm2,
                 )
                 self.Sigma[: self.num_q, : self.num_q] = get_orbital_response_metric_sigma(
-                    rdms, self.wf.kappa_no_activeactive_idx
+                    self.wf.kappa_no_activeactive_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1,
                 )
             else:
                 self.H_2i_2a = hamiltonian_2i_2a(
@@ -150,17 +147,37 @@ class quantumLR(quantumLRBaseClass):
             for j, qJ in enumerate(self.q_ops):
                 for i, GI in enumerate(self.G_ops):
                     # Make A
-                    val = self.wf.QI.quantum_expectation_value(
-                        (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
-                    ) - self.wf.QI.quantum_expectation_value(
-                        (self.H_1i_1a * qJ * GI.dagger).get_folded_operator(*self.orbs)
+                    val = (
+                        self.wf.QI.quantum_expectation_value(
+                            (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs)
+                        )
+                        - 1
+                        / 2
+                        * self.wf.QI.quantum_expectation_value(
+                            (self.H_1i_1a * qJ * GI.dagger).get_folded_operator(*self.orbs)
+                        )
+                        - 1
+                        / 2
+                        * self.wf.QI.quantum_expectation_value(
+                            (self.H_1i_1a * GI.dagger * qJ).get_folded_operator(*self.orbs)
+                        )
                     )
                     self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
                     # Make B
-                    val = self.wf.QI.quantum_expectation_value(
-                        (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs)
-                    ) - self.wf.QI.quantum_expectation_value(
-                        (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                    val = (
+                        self.wf.QI.quantum_expectation_value(
+                            (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs)
+                        )
+                        - 1
+                        / 2
+                        * self.wf.QI.quantum_expectation_value(
+                            (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                        )
+                        - 1
+                        / 2
+                        * self.wf.QI.quantum_expectation_value(
+                            (qJ.dagger * GI.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                        )
                     )
                     self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
 
@@ -170,7 +187,9 @@ class quantumLR(quantumLRBaseClass):
                 # Make A
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = (
                     self.wf.QI.quantum_expectation_value(
-                        double_commutator(GI.dagger, self.H_0i_0a, GJ).get_folded_operator(*self.orbs)
+                        double_commutator(
+                            GI.dagger, self.H_0i_0a, GJ, do_symmetrized=True
+                        ).get_folded_operator(*self.orbs)
                     )
                 )
                 # Make B
@@ -247,6 +266,9 @@ class quantumLR(quantumLRBaseClass):
                     + self.wf.QI.op_to_qbit(
                         (self.H_1i_1a * qJ * GI.dagger).get_folded_operator(*self.orbs)
                     ).paulis.to_labels()
+                    + self.wf.QI.op_to_qbit(
+                        (self.H_1i_1a * GI.dagger * qJ).get_folded_operator(*self.orbs)
+                    ).paulis.to_labels()
                 )
                 A[i + idx_shift][j] = A[j][i + idx_shift] = val
                 # Make B
@@ -257,6 +279,9 @@ class quantumLR(quantumLRBaseClass):
                     + self.wf.QI.op_to_qbit(
                         (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
                     ).paulis.to_labels()
+                    + self.wf.QI.op_to_qbit(
+                        (qJ.dagger * GI.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                    ).paulis.to_labels()
                 )
                 B[i + idx_shift][j] = B[j][i + idx_shift] = val
 
@@ -265,7 +290,9 @@ class quantumLR(quantumLRBaseClass):
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
                 A[i + idx_shift][j + idx_shift] = A[j + idx_shift][i + idx_shift] = self.wf.QI.op_to_qbit(
-                    double_commutator(GI.dagger, self.H_1i_1a, GJ).get_folded_operator(*self.orbs)
+                    double_commutator(GI.dagger, self.H_1i_1a, GJ, do_symmetrized=True).get_folded_operator(
+                        *self.orbs
+                    )
                 ).paulis.to_labels()
                 # Make B
                 B[i + idx_shift][j + idx_shift] = B[j + idx_shift][i + idx_shift] = self.wf.QI.op_to_qbit(
@@ -374,8 +401,15 @@ class quantumLR(quantumLRBaseClass):
                     self.wf.QI.quantum_variance(
                         (GI.dagger * self.H_1i_1a * qJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
                     )
-                    + self.wf.QI.quantum_variance(
+                    + 1
+                    / 2
+                    * self.wf.QI.quantum_variance(
                         (self.H_1i_1a * qJ * GI.dagger).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
+                    )
+                    + 1
+                    / 2
+                    * self.wf.QI.quantum_variance(
+                        (self.H_1i_1a * GI.dagger * qJ).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
                     )
                 )
                 A[i + idx_shift, j] = A[j, i + idx_shift] = val
@@ -385,8 +419,16 @@ class quantumLR(quantumLRBaseClass):
                         (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs),
                         no_coeffs=no_coeffs,
                     )
-                    + self.wf.QI.quantum_variance(
+                    + 1
+                    / 2
+                    * self.wf.QI.quantum_variance(
                         (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs),
+                        no_coeffs=no_coeffs,
+                    )
+                    + 1
+                    / 2
+                    * self.wf.QI.quantum_variance(
+                        (qJ.dagger * GI.dagger * self.H_1i_1a).get_folded_operator(*self.orbs),
                         no_coeffs=no_coeffs,
                     )
                 )
@@ -398,7 +440,9 @@ class quantumLR(quantumLRBaseClass):
                 # Make A
                 A[i + idx_shift, j + idx_shift] = A[j + idx_shift, i + idx_shift] = np.sqrt(
                     self.wf.QI.quantum_variance(
-                        double_commutator(GI.dagger, self.H_0i_0a, GJ).get_folded_operator(*self.orbs),
+                        double_commutator(
+                            GI.dagger, self.H_0i_0a, GJ, do_symmetrized=True
+                        ).get_folded_operator(*self.orbs),
                         no_coeffs=no_coeffs,
                     )
                 )
@@ -433,17 +477,10 @@ class quantumLR(quantumLRBaseClass):
         if len(dipole_integrals) != 3:
             raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
         number_excitations = len(self.excitation_energies)
-        rdms = ReducedDenstiyMatrix(
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-            self.wf.rdm1,
-            rdm2=self.wf.rdm2,
-        )
 
-        mux = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[0])
-        muy = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[1])
-        muz = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[2])
+        mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
+        muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
+        muz = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[2])
         mux_op = one_elec_op_0i_0a(mux, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
         muy_op = one_elec_op_0i_0a(muy, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
         muz_op = one_elec_op_0i_0a(muz, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
@@ -452,42 +489,45 @@ class quantumLR(quantumLRBaseClass):
         transition_dipole_z = 0.0
         transition_dipoles = np.zeros((number_excitations, 3))
         for state_number in range(number_excitations):
-            transfer_op = FermionicOperator({}, {})
+            transfer_op = FermionicOperator({})
             for i, G in enumerate(self.G_ops):
                 transfer_op += (
                     self._Z_G_normed[i, state_number] * G.dagger + self._Y_G_normed[i, state_number] * G
                 )
-
-            q_part_x = get_orbital_response_property_gradient(
-                rdms,
-                mux,
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.normed_excitation_vectors,
-                state_number,
-                number_excitations,
-            )
-            q_part_y = get_orbital_response_property_gradient(
-                rdms,
-                muy,
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.normed_excitation_vectors,
-                state_number,
-                number_excitations,
-            )
-            q_part_z = get_orbital_response_property_gradient(
-                rdms,
-                muz,
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.normed_excitation_vectors,
-                state_number,
-                number_excitations,
-            )
+            q_part_x = 0.0
+            q_part_y = 0.0
+            q_part_z = 0.0
+            if self.num_q != 0:
+                q_part_x = get_orbital_response_property_gradient(
+                    mux,
+                    self.wf.kappa_no_activeactive_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.normed_excitation_vectors,
+                    state_number,
+                    number_excitations,
+                )
+                q_part_y = get_orbital_response_property_gradient(
+                    muy,
+                    self.wf.kappa_no_activeactive_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.normed_excitation_vectors,
+                    state_number,
+                    number_excitations,
+                )
+                q_part_z = get_orbital_response_property_gradient(
+                    muz,
+                    self.wf.kappa_no_activeactive_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.normed_excitation_vectors,
+                    state_number,
+                    number_excitations,
+                )
             if self.num_G != 0:
                 transition_dipole_x = self.wf.QI.quantum_expectation_value(
                     commutator(mux_op, transfer_op).get_folded_operator(*self.orbs)

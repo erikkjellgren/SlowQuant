@@ -5,7 +5,7 @@ from functools import partial
 import numpy as np
 import scipy
 from qiskit import QuantumCircuit
-from qiskit.primitives import BaseEstimator, BaseEstimatorV2, BaseSampler, BaseSamplerV2
+from qiskit.primitives import BaseEstimator, BaseEstimatorV2, BaseSampler, BaseSamplerV1, BaseSamplerV2
 from qiskit.quantum_info import SparsePauliOp
 
 from slowquant.molecularintegrals.integralfunctions import (
@@ -784,7 +784,7 @@ class WaveFunctionCircuit:
         return self._energy_elec
 
     def _calc_energy_elec(self) -> float:
-        """Run electronic energy simulation, regardless of self.energy_elec variable.
+        """Run electronic energy simulation, regardless of self._energy_elec variable.
 
         Returns:
             Electronic energy.
