@@ -949,23 +949,23 @@ def test_mitigation_nocm() -> None:
     )
     qWF.ansatz_parameters = WF.thetas
 
-    assert abs(qWF._calc_energy_elec() + 9.436070579779887) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() + 9.418341779479798) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0]
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() + 9.61483066006192) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() + 9.6024842933555) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8]
 
     QI.update_mitigation_flags(do_postselection=False, do_M_ansatz0=True)
-    assert abs(qWF._calc_energy_elec() + 9.689892475818768) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() + 9.683868077270974) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3]
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() + 9.712244139831084) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() + 9.703076881083204) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3, 11]
 
     QI.update_mitigation_flags(do_M_ansatz0_plus=True)
-    assert abs(qWF._calc_energy_elec() + 9.712244139831084) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() + 9.703076881083204) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3, 11, 15]
 
 
@@ -1023,23 +1023,23 @@ def test_mitigation() -> None:
     )
     qWF.ansatz_parameters = WF.thetas
 
-    assert abs(qWF._calc_energy_elec() + 9.258549202172054) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() + 9.233709939942546) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0]
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() + 9.531143400515425) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() + 9.530439599929217) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8]
 
     QI.update_mitigation_flags(do_postselection=False, do_M_ansatz0=True)
-    assert abs(qWF._calc_energy_elec() + 9.665136097395242) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() + 9.661825573106206) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3]
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() + 9.711819110417231) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() + 9.711973925840587) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3, 11]
 
     QI.update_mitigation_flags(do_M_ansatz0_plus=True)
-    assert abs(qWF._calc_energy_elec() + 9.711819110417231) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() + 9.711973925840587) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3, 11, 15]
 
 
@@ -1195,7 +1195,7 @@ def test_state_average_M() -> None:
     )
     QWF.ansatz_parameters = WF.thetas
 
-    assert abs(QWF._calc_energy_elec() + 1.417013381867924) < 10**-6  # type: ignore
+    assert abs(QWF._calc_energy_elec() + 1.4240939758312483) < 10**-6  # type: ignore
 
 
 def test_state_average_Mplus() -> None:
@@ -1275,20 +1275,20 @@ def test_state_average_Mplus() -> None:
 
     # No EM
     QI._reset_cliques()
-    assert abs(QWF._calc_energy_elec() + 9.437068894682653) < 10**-6  # type: ignore  # CSFs option 1
+    assert abs(QWF._calc_energy_elec() + 9.436258997213987) < 10**-6  # type: ignore  # CSFs option 1
 
     # EM with M_Ansatz0
     QI.update_mitigation_flags(do_M_mitigation=True, do_M_ansatz0=True)
 
-    assert abs(QWF._calc_energy_elec() + 9.594604931255208) < 10**-6  # type: ignore  # CSFs option 4
+    assert abs(QWF._calc_energy_elec() + 9.596224644030176) < 10**-6  # type: ignore  # CSFs option 4
 
     # EM with M_Ansatz0+
     QI.update_mitigation_flags(do_M_ansatz0_plus=True)
-    assert abs(QWF._calc_energy_elec() + 9.607824917072104) < 10**-6  # type: ignore  # CSFs option 1
+    assert abs(QWF._calc_energy_elec() + 9.608563673328995) < 10**-6  # type: ignore  # CSFs option 1
 
     # EM with M_Ansatz0 and postselection
     QI.update_mitigation_flags(do_postselection=True, do_M_ansatz0_plus=False)
-    assert abs(QWF._calc_energy_elec() + 9.635783384095342) < 10**-6  # type: ignore  # CSFs option 4
+    assert abs(QWF._calc_energy_elec() + 9.638637411200133) < 10**-6  # type: ignore  # CSFs option 4
 
 
 def test_no_saving() -> None:
@@ -1371,7 +1371,7 @@ def test_no_saving() -> None:
     QI.update_pass_manager({"backend": FakeTorino(), "seed_transpiler": 1234})
 
     QI.update_mitigation_flags(do_postselection=False, do_M_ansatz0=True)
-    assert abs(QWF._calc_energy_elec() + 9.594604931255208) < 10**-6  # type: ignore
+    assert abs(QWF._calc_energy_elec() + 9.596224644030176) < 10**-6  # type: ignore
 
 
 def test_variance_nocm() -> None:
@@ -1427,12 +1427,12 @@ def test_variance_nocm() -> None:
     )
     qWF.ansatz_parameters = WF.thetas
 
-    assert abs(qWF._calc_energy_elec() + 9.436070579779887) < 10**-6  # type: ignore
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.09898261302574121) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() + 9.418341779479798) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.10216972771269525) < 10**-6  # type: ignore
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() + 9.61483066006192) < 10**-6  # type: ignore
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.0500483723441194) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() + 9.6024842933555) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.05290092431551458) < 10**-6  # type: ignore
 
 
 def test_variance() -> None:
@@ -1489,9 +1489,9 @@ def test_variance() -> None:
     )
     qWF.ansatz_parameters = WF.thetas
 
-    assert abs(qWF._calc_energy_elec() + 9.258549202172054) < 10**-6  # type: ignore
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.13590797869982368) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() + 9.233709939942546) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.1366806110474569) < 10**-6  # type: ignore
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() + 9.531143400515425) < 10**-6  # type: ignore
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.08330602766877596) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() + 9.530439599929217) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.08153932076245432) < 10**-6  # type: ignore
