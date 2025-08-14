@@ -174,8 +174,8 @@ def lih_plus():
     spin = 1
     get_unrestricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
 
-# OH_cation()
-oh_radical()
+OH_cation()
+#oh_radical()
 # h2()
 # h2_res()
 # NO_radical()
