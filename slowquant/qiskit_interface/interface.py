@@ -300,28 +300,9 @@ class QuantumInterface:
                         )
 
             # Get optimization level from backend. Only for v1 primitives. Needed for default pass manager
-            overwrite = False
-            if self.pass_manager_options.get("optimization_level") is not None:
-                overwrite = True
-            self.pass_manager_options["optimization_level"] = 3
-            if hasattr(self._primitive, "_transpile_options") and hasattr(
-                self._primitive._transpile_options, "optimization_level"  # pylint: disable=protected-access
-            ):
-                self.pass_manager_options["optimization_level"] = (
-                    self._primitive._transpile_options[  # pylint: disable=protected-access
-                        "optimization_level"
-                    ]
-                )  # pylint: disable=protected-access
-            elif hasattr(self._primitive, "options"):
-                if hasattr(self._primitive.options, "optimization_level"):
-                    self.pass_manager_options["optimization_level"] = self._primitive.options[
-                        "optimization_level"
-                    ]
-            if overwrite:
-                print(
-                    "Optimization level in pass manager options was updated to ",
-                    self.pass_manager_options.get("optimization_level"),
-                )
+            if self.pass_manager_options.get("optimization_level") is None:
+                print("Optimization level not set in pass manager options. Using default value 3.")
+                self.pass_manager_options["optimization_level"] = 3
 
             # Check if circuit exist and has to be transpiled
             # In case of switching to ISA in later workflow
