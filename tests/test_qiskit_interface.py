@@ -79,7 +79,7 @@ def test_LiH_naive() -> None:
     qWF.run_wf_optimization_2step("rotosolve", True)
 
     # LR with SQ
-    LR = naive.LinearResponseUCC(WF, excitations="SD")
+    LR = naive.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
 
     # LR with QSQ
@@ -216,7 +216,7 @@ def test_LiH_allprojected() -> None:
     qWF.run_wf_optimization_2step("rotosolve", True)
 
     # LR with SQ
-    LR = allprojected.LinearResponseUCC(WF, excitations="SD")
+    LR = allprojected.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
 
     # LR with QSQ
