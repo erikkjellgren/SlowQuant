@@ -1,4 +1,3 @@
-# pylint: disable=too-many-lines
 import copy
 import itertools
 import math
@@ -46,7 +45,7 @@ class QuantumInterface:
     This class handles the interface with qiskit and the communication with quantum hardware.
     """
 
-    def __init__(  # pylint: disable=dangerous-default-value
+    def __init__(
         self,
         primitive: BaseSamplerV1 | BaseSamplerV2,
         ansatz: str | QuantumCircuit,
@@ -137,12 +136,16 @@ class QuantumInterface:
         self.num_orbs = num_orbs
         self.num_spin_orbs = 2 * num_orbs
         self.num_elec = num_elec
-        self.grad_param_R: dict[str, int] = (
-            {}
-        )  # Contains information about the parameterization needed for gradient evaluations.
+        self.grad_param_R: dict[
+            str, int
+        ] = {}  # Contains information about the parameterization needed for gradient evaluations.
 
         # State prep circuit
-        if self.ansatz == "tUPS" and "do_pp" in self.ansatz_options.keys() and self.ansatz_options["do_pp"]:
+        if isinstance(self.ansatz, QuantumCircuit):
+            self.state_circuit: QuantumCircuit = QuantumCircuit(
+                self.ansatz.num_qubits
+            )  # empty state as custom circuit is passed
+        elif self.ansatz == "tUPS" and "do_pp" in self.ansatz_options.keys() and self.ansatz_options["do_pp"]:
             # HF in pp-tUPS ordering
             if not isinstance(self.mapper, JordanWignerMapper):
                 raise ValueError(f"pp-tUPS only implemented for JW mapper, got: {type(self.mapper)}")
@@ -235,7 +238,7 @@ class QuantumInterface:
             )
         self.param_names = [str(x) for x in self.circuit.parameters]
         for name in self.param_names:
-            if name not in self.grad_param_R.keys():  # pylint: disable=consider-iterating-dictionary
+            if name not in self.grad_param_R.keys():
                 raise ValueError(
                     f"Got parameter name, {name}, that is not in grad_param_R, {self.grad_param_R}"
                 )
@@ -280,24 +283,18 @@ class QuantumInterface:
                 if self.pass_manager_options.get("backend") is None:
                     print(
                         "Backend",
-                        self._primitive._backend,  # pylint: disable=protected-access
+                        self._primitive._backend,
                         "detected in primitive and added to pass manager options.",
                     )
-                    self.pass_manager_options["backend"] = (
-                        self._primitive._backend  # pylint: disable=protected-access
+                    self.pass_manager_options["backend"] = self._primitive._backend
+                elif self.pass_manager_options.get("backend") != self._primitive._backend:
+                    print(
+                        "WARNING: Backend ",
+                        self._primitive._backend,
+                        "detected in primitive.\nPass manager uses ",
+                        self.pass_manager_options.get("backend"),
+                        ".\nEnsure compatibility manually.\n",
                     )
-                else:
-                    if (
-                        self.pass_manager_options.get("backend")
-                        != self._primitive._backend  # pylint: disable=protected-access
-                    ):
-                        print(
-                            "WARNING: Backend ",
-                            self._primitive._backend,  # pylint: disable=protected-access
-                            "detected in primitive.\nPass manager uses ",
-                            self.pass_manager_options.get("backend"),
-                            ".\nEnsure compatibility manually.\n",
-                        )
 
             # Get optimization level from backend. Only for v1 primitives. Needed for default pass manager
             if self.pass_manager_options.get("optimization_level") is None:
@@ -547,7 +544,7 @@ class QuantumInterface:
         """Get max number of shots per run.
 
         Returns:
-            Max number of shots pers run.
+            Max number of shots per run.
         """
         return self._max_shots_per_run
 
@@ -797,9 +794,7 @@ class QuantumInterface:
                             # Transpile the composed circuit together using the correct layout
                             # This will however still introduce routing swaps (flexible order)
                             circuit = self._initialfixedlayout_pm.run(circuit)
-                        case (
-                            3
-                        ):  # Option 3: fixed layout - fixed order without optimization (needed with M_Ansatz0)
+                        case 3:  # Option 3: fixed layout - fixed order without optimization (needed with M_Ansatz0)
                             circuit = layout_conserving_compose(
                                 self.ansatz_circuit,
                                 state,
@@ -830,7 +825,9 @@ class QuantumInterface:
                             del state_corr.data[idx]
                     if self.ISA:
                         # Translate and optimize
-                        state_corr = self._pass_manager.optimization.run(self._pass_manager.translation.run(state_corr))  # type: ignore
+                        state_corr = self._pass_manager.optimization.run(
+                            self._pass_manager.translation.run(state_corr)
+                        )  # type: ignore
                     # Negate
                     if circuit.layout is not None:
                         circuit_M = circuit.compose(
@@ -856,18 +853,17 @@ class QuantumInterface:
                             do_cliques=self._do_cliques,
                             circuit_M=circuit_M,
                         )
+                elif save_paulis:
+                    val += N * self._sampler_quantum_expectation_value(
+                        op, run_circuit=circuit, det=bra_det + ket_det, csfs_option=ISA_csfs_option
+                    )
                 else:
-                    if save_paulis:
-                        val += N * self._sampler_quantum_expectation_value(
-                            op, run_circuit=circuit, det=bra_det + ket_det, csfs_option=ISA_csfs_option
-                        )
-                    else:
-                        val += N * self._sampler_quantum_expectation_value_nosave(
-                            op,
-                            run_parameters,
-                            circuit,
-                            do_cliques=self._do_cliques,
-                        )
+                    val += N * self._sampler_quantum_expectation_value_nosave(
+                        op,
+                        run_parameters,
+                        circuit,
+                        do_cliques=self._do_cliques,
+                    )
                 # print("I != J, superpos, val = ", val - val_old)  # debug
 
                 # Second term of off-diagonal element involving only I
@@ -931,7 +927,7 @@ class QuantumInterface:
 
         Calculated Pauli expectation values will be saved in memory.
 
-        The expectation value over a fermionic operator is calcuated as:
+        The expectation value over a fermionic operator is calculated as:
 
         .. math::
             E = \sum_i^N c_i\left<0\left|P_i\right|0\right>
@@ -944,6 +940,7 @@ class QuantumInterface:
             det: Classify state (determinant) of circuit for Pauli saving.
                 Specified in chemistry form, i.e. left-to-right, alternating alpha and beta.
             circuit_M: custom circuit for M_Ansatz0 (correlation matrix is not stored). If not specified, M0 of Ansatz is used.
+            csfs_option: Option for how superposition of initial states was handled. Default is 1.
 
         Returns:
             Expectation value of operator.
@@ -968,18 +965,17 @@ class QuantumInterface:
             )
 
         if det_int not in self.saver:
-            print("Make new Clique saver for determinant ", det)
+            # print("Make new Clique saver for determinant ", det)
             self.saver[det_int] = Clique(csfs_option)
-        else:
-            # If a different csfs option has been used in SA-VQE that means the circuit has been altered.
-            # Thus, we cannot use raw results from an unaltered circuit run with a different csfs_option.
-            if self.saver[det_int].csfs_option != csfs_option:
-                print(
-                    "Warning: Clique saver for determinant ",
-                    det,
-                    " has different csfs_option than requested. Rerunning raw data.",
-                )
-                self.saver[det_int] = Clique(csfs_option)
+        # If a different csfs option has been used in SA-VQE that means the circuit has been altered.
+        # Thus, we cannot use raw results from an unaltered circuit run with a different csfs_option.
+        elif self.saver[det_int].csfs_option != csfs_option:
+            print(
+                "Warning: Clique saver for determinant ",
+                det,
+                " has different csfs_option than requested. Rerunning raw data.",
+            )
+            self.saver[det_int] = Clique(csfs_option)
 
         paulis_str = [str(x) for x in observables.paulis]
         new_heads = self.saver[det_int].add_paulis(paulis_str)
@@ -1034,10 +1030,10 @@ class QuantumInterface:
     ) -> float:
         r"""Calculate expectation value of circuit and observables via Sampler.
 
-        Calling this function will not use any pre-calculated Pauli expectaion values.
+        Calling this function will not use any pre-calculated Pauli expectation values.
         Nor will it save any of the calculated Pauli expectation values.
 
-        The expectation value over a fermionic operator is calcuated as:
+        The expectation value over a fermionic operator is calculated as:
 
         .. math::
             E = \sum_i^N c_i\left<0\left|P_i\right|0\right>
@@ -1238,7 +1234,7 @@ class QuantumInterface:
     ) -> list[dict[int, float]]:
         r"""Get results from a sampler distribution for several Pauli strings measured on several circuits.
 
-        The expectation value of a Pauli string is calcuated as:
+        The expectation value of a Pauli string is calculated as:
 
         .. math::
             E = \sum_i^N p_i\left<b_i\left|P\right|b_i\right>
@@ -1247,7 +1243,7 @@ class QuantumInterface:
 
         Args:
             paulis: (List of) Pauli strings to measure.
-            run_paramters: List of parameters of each circuit.
+            run_parameters: List of parameters of each circuit.
             circuits_in: List of circuits
             overwrite_shots: Overwrite QI shot number.
 
@@ -1367,7 +1363,7 @@ class QuantumInterface:
     ) -> dict[int, float]:
         r"""Get results from a sampler distribution for one given Pauli string.
 
-        The expectation value of a Pauli string is calcuated as:
+        The expectation value of a Pauli string is calculated as:
 
         .. math::
             E = \sum_i^N p_i\left<b_i\left|P\right|b_i\right>
@@ -1376,7 +1372,7 @@ class QuantumInterface:
 
         Args:
             pauli: Pauli string to measure.
-            run_paramters: Parameters of circuit.
+            run_parameters: Parameters of circuit.
             custom_circ: Specific circuit to run.
 
         Returns:

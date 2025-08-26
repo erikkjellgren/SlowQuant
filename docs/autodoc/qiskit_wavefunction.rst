@@ -1,5 +1,5 @@
 Wavefunction
 ============
 
-.. automodule:: slowquant.qiskit_interface.wavefunction
+.. automodule:: slowquant.qiskit_interface.circuit_wavefunction
     :members:

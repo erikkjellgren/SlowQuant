@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# pylint: skip-file
 
 import os
 import sys
@@ -26,7 +25,7 @@ master_doc = "index"
 
 # General information about the project.
 project = "SLOWQUANT"
-copyright = "2017-2024, Erik Kjellgren"  # pylint: disable=W0622
+copyright = "2017-2024, Erik Kjellgren"
 author = "Erik Kjellgren"
 
 # -- Options for HTML output ----------------------------------------------

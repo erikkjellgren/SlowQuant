@@ -124,9 +124,9 @@ class quantumLR(quantumLRBaseClass):
             raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
         number_excitations = len(self.excitation_energies)
 
-        mux = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[0])
-        muy = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[1])
-        muz = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[2])
+        mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
+        muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
+        muz = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[2])
         mux_op = one_elec_op_0i_0a(mux, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
         muy_op = one_elec_op_0i_0a(muy, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
         muz_op = one_elec_op_0i_0a(muz, self.wf.num_inactive_orbs, self.wf.num_active_orbs)

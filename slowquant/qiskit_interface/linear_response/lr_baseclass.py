@@ -3,7 +3,7 @@ from collections.abc import Sequence
 import numpy as np
 import scipy
 
-from slowquant.qiskit_interface.wavefunction import WaveFunction
+from slowquant.qiskit_interface.circuit_wavefunction import WaveFunctionCircuit
 from slowquant.unitary_coupled_cluster.operators import (
     G1_sa,
     G2_1_sa,
@@ -15,10 +15,9 @@ from slowquant.unitary_coupled_cluster.util import iterate_t1_sa, iterate_t2_sa
 
 
 class quantumLRBaseClass:
-
     def __init__(
         self,
-        wf: WaveFunction,
+        wf: WaveFunctionCircuit,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
@@ -180,8 +179,7 @@ class quantumLRBaseClass:
                             + f"{A_row[nr]:3.6f}".center(10)
                             + " | "
                             + f"{B_row[nr]:3.6f}".center(10)
-                            + " | "
-                            f"{Sigma_row[nr]:3.6f}".center(10)
+                            + f" | {Sigma_row[nr]:3.6f}".center(10)
                         )
                     else:
                         print(
@@ -191,8 +189,7 @@ class quantumLRBaseClass:
                             + f"{A_row[nr]:3.6f}".center(10)
                             + " | "
                             + f"{B_row[nr]:3.6f}".center(10)
-                            + " | "
-                            f"{Sigma_row[nr]:3.6f}".center(10)
+                            + f" | {Sigma_row[nr]:3.6f}".center(10)
                         )
 
         if cv:
@@ -268,8 +265,7 @@ class quantumLRBaseClass:
                                 + f"{A_row[nr]:3.6f}".center(10)
                                 + " | "
                                 + f"{B_row[nr]:3.6f}".center(10)
-                                + " | "
-                                f"{Sigma_row[nr]:3.6f}".center(10)
+                                + f" | {Sigma_row[nr]:3.6f}".center(10)
                             )
                         else:
                             print(
@@ -279,8 +275,7 @@ class quantumLRBaseClass:
                                 + f"{A_row[nr]:3.6f}".center(10)
                                 + " | "
                                 + f"{B_row[nr]:3.6f}".center(10)
-                                + " | "
-                                f"{Sigma_row[nr]:3.6f}".center(10)
+                                + f" | {Sigma_row[nr]:3.6f}".center(10)
                             )
 
     def get_excitation_energies(self) -> np.ndarray:
@@ -318,7 +313,7 @@ class quantumLRBaseClass:
         return self.excitation_energies
 
     def get_normed_excitation_vectors(self) -> None:
-        """Get normed excitation vectors via excitated state norm."""
+        """Get normed excitation vectors via excited state norm."""
         self.normed_excitation_vectors = np.zeros_like(self.excitation_vectors)
         self._Z_q = self.excitation_vectors[: self.num_q, :]
         self._Z_G = self.excitation_vectors[self.num_q : self.num_q + self.num_G, :]
@@ -364,7 +359,7 @@ class quantumLRBaseClass:
         return norms
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
-        """Calculate transtition dipole moment.
+        """Calculate transition dipole moment.
 
         Args:
             dipole_integrals: Dipole integrals (x,y,z) in AO basis.
@@ -383,7 +378,7 @@ class quantumLRBaseClass:
         Args:
             dipole_integrals: Dipole integrals (x,y,z) in AO basis.
 
-        Rerturns:
+        Returns:
             Oscillator Strength.
         """
         transition_dipoles = self.get_transition_dipole(dipole_integrals)
@@ -441,7 +436,6 @@ class quantumLRBaseClass:
         print(f"{'Value'.center(12)} | {'Position'.center(12)} | {'Operator'.center(12)}\n")
 
         for state, vec in enumerate(self.excitation_vectors.T):
-
             sorted_indices = np.argsort(np.abs(vec))[::-1]
             sorted_vec = np.abs(vec[sorted_indices]) ** 2
 
@@ -460,11 +454,10 @@ class quantumLRBaseClass:
                         operator_index = "q" + str(sorted_indices[i])
                     else:
                         operator_index = "G" + str(sorted_indices[i] - self.num_q)
+                elif sorted_indices[i] - self.num_params < self.num_q:
+                    operator_index = "q" + str(sorted_indices[i] - self.num_params) + "^d"
                 else:
-                    if sorted_indices[i] - self.num_params < self.num_q:
-                        operator_index = "q" + str(sorted_indices[i] - self.num_params) + "^d"
-                    else:
-                        operator_index = "G" + str(sorted_indices[i] - self.num_params - self.num_q) + "^d"
+                    operator_index = "G" + str(sorted_indices[i] - self.num_params - self.num_q) + "^d"
 
                 print(
                     f"{element.center(12)} | {str(sorted_indices[i]).center(12)} | {operator_index.center(12)}"

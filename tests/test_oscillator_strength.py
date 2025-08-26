@@ -1,17 +1,17 @@
 import numpy as np
 
 import slowquant.SlowQuant as sq
-import slowquant.unitary_coupled_cluster.linear_response.allstatetransfer as allstatetransfer  # pylint: disable=consider-using-from-import
-import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
-import slowquant.unitary_coupled_cluster.linear_response.projected as projected  # pylint: disable=consider-using-from-import
-import slowquant.unitary_coupled_cluster.linear_response.statetransfer as statetransfer  # pylint: disable=consider-using-from-import
+from slowquant.unitary_coupled_cluster.linear_response import (
+    allstatetransfer,
+    naive,
+    projected,
+    statetransfer,
+)
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
 def test_H2_631g_naive():
-    """
-    Test of oscialltor strength for naive LR with working equations
-    """
+    """Test of oscialltor strength for naive LR with working equations."""
     # Slowquant Object with parameters and setup
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -27,7 +27,6 @@ def test_H2_631g_naive():
     g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -35,7 +34,7 @@ def test_H2_631g_naive():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
     LR = naive.LinearResponseUCC(WF, excitations="SD")
@@ -75,9 +74,7 @@ def test_H2_631g_naive():
 
 
 def test_LiH_sto3g_naive():
-    """
-    Test LiH Sto-3G naive LR oscialltor strength
-    """
+    """Test LiH Sto-3G naive LR oscialltor strength."""
     # Slowquant Object with parameters and setup
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -91,9 +88,8 @@ def test_LiH_sto3g_naive():
     SQobj.hartree_fock.run_restricted_hartree_fock()
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
-    # OO-UCCSD
+    # oo-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -101,7 +97,7 @@ def test_LiH_sto3g_naive():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
     LR = naive.LinearResponseUCC(WF, excitations="SD")
@@ -155,9 +151,7 @@ def test_LiH_sto3g_naive():
 
 
 def test_H2_631g_projLR():
-    """
-    Test of oscialltor strength for projected LR with working equations
-    """
+    """Test of oscialltor strength for projected LR with working equations."""
     # Slowquant Object with parameters and setup
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -173,7 +167,6 @@ def test_H2_631g_projLR():
     g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -181,7 +174,7 @@ def test_H2_631g_projLR():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
     LR = projected.LinearResponseUCC(WF, excitations="SD")
@@ -216,9 +209,7 @@ def test_H2_631g_projLR():
 
 
 def test_LiH_sto3g_proj():
-    """
-    Test LiH Sto-3G projected LR oscialltor strength
-    """
+    """Test LiH Sto-3G projected LR oscialltor strength."""
     # Slowquant Object with parameters and setup
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -232,9 +223,8 @@ def test_LiH_sto3g_proj():
     SQobj.hartree_fock.run_restricted_hartree_fock()
     h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
     g_eri = SQobj.integral.electron_repulsion_tensor
-    # OO-UCCSD
+    # oo-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -242,7 +232,7 @@ def test_LiH_sto3g_proj():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     LR = projected.LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
@@ -281,7 +271,7 @@ def test_LiH_sto3g_proj():
     assert abs(osc_strengths[5] - 0.010379091370812886) < thresh
     assert abs(osc_strengths[6] - 0.010379091373763447) < thresh
     assert abs(osc_strengths[7] - 0.006256710161922168) < thresh
-    assert abs(osc_strengths[8] - 0.0623868647774392) < thresh
+    assert abs(osc_strengths[8] - 0.062488043049451776) < thresh
     assert abs(osc_strengths[9] - 0.12886225822034553) < thresh
     assert abs(osc_strengths[10] - 0.12886225822019629) < thresh
     assert abs(osc_strengths[11] - 0.046007031170702296) < thresh
@@ -289,9 +279,7 @@ def test_LiH_sto3g_proj():
 
 
 def test_H2_631g_STLR():
-    """
-    Test of oscialltor strength for projected LR with working equations
-    """
+    """Test of oscialltor strength for projected LR with working equations."""
     # Slowquant Object with parameters and setup
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -307,7 +295,6 @@ def test_H2_631g_STLR():
     g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -315,7 +302,7 @@ def test_H2_631g_STLR():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
     LR = statetransfer.LinearResponseUCC(
@@ -352,9 +339,7 @@ def test_H2_631g_STLR():
 
 
 def test_LiH_sto3g_st():
-    """
-    Test LiH Sto-3G projected LR oscialltor strength
-    """
+    """Test LiH Sto-3G projected LR oscialltor strength."""
     # Slowquant Object with parameters and setup
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -370,7 +355,6 @@ def test_LiH_sto3g_st():
     g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -378,7 +362,7 @@ def test_LiH_sto3g_st():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
     LR = statetransfer.LinearResponseUCC(
@@ -421,7 +405,7 @@ def test_LiH_sto3g_st():
     assert abs(osc_strengths[5] - 0.010379091370809963) < thresh
     assert abs(osc_strengths[6] - 0.010379091373763017) < thresh
     assert abs(osc_strengths[7] - 0.0062567030068973305) < thresh
-    assert abs(osc_strengths[8] - 0.06238684901394572) < thresh
+    assert abs(osc_strengths[8] - 0.06248802645793188) < thresh
     assert abs(osc_strengths[9] - 0.12886225822029365) < thresh
     assert abs(osc_strengths[10] - 0.12886225822018843) < thresh
     assert abs(osc_strengths[11] - 0.04600702378157588) < thresh
@@ -429,9 +413,7 @@ def test_LiH_sto3g_st():
 
 
 def test_H2_631g_allST():
-    """
-    Test of oscialltor strength for projected LR with working equations
-    """
+    """Test of oscialltor strength for projected LR with working equations."""
     # Slowquant Object with parameters and setup
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -447,7 +429,6 @@ def test_H2_631g_allST():
     g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -455,7 +436,7 @@ def test_H2_631g_allST():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
     LR = allstatetransfer.LinearResponseUCC(
@@ -488,9 +469,7 @@ def test_H2_631g_allST():
 
 
 def test_LiH_sto3g_allST():
-    """
-    Test LiH STO-3G all-statetransfer LR oscialltor strength
-    """
+    """Test LiH STO-3G all-statetransfer LR oscialltor strength."""
     # Slowquant Object with parameters and setup
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -506,7 +485,6 @@ def test_LiH_sto3g_allST():
     g_eri = SQobj.integral.electron_repulsion_tensor
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_bf * 2,
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
@@ -514,7 +492,7 @@ def test_LiH_sto3g_allST():
         g_eri,
         "SD",
     )
-    WF.run_ucc(True)
+    WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
     LR = allstatetransfer.LinearResponseUCC(

@@ -6,7 +6,6 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
 from slowquant.unitary_coupled_cluster.density_matrix import (
-    ReducedDenstiyMatrix,
     get_orbital_gradient_response,
     get_orbital_response_hessian_block,
     get_orbital_response_metric_sigma,
@@ -16,7 +15,7 @@ from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperat
 from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
     LinearResponseBaseClass,
 )
-from slowquant.unitary_coupled_cluster.operator_matrix import (
+from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     expectation_value,
     propagate_state,
 )
@@ -39,25 +38,19 @@ class LinearResponseUCC(LinearResponseBaseClass):
         """
         super().__init__(wave_function, excitations)
 
-        rdms = ReducedDenstiyMatrix(
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-            self.wf.rdm1,
-            rdm2=self.wf.rdm2,
-        )
         idx_shift = len(self.q_ops)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
-        grad = get_orbital_gradient_response(
-            rdms,
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.kappa_no_activeactive_idx,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        if len(grad) != 0:
+        if len(self.q_ops) != 0:
+            grad = get_orbital_gradient_response(
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.kappa_no_activeactive_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.rdm1,
+                self.wf.rdm2,
+            )
             print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
                 raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
@@ -99,28 +92,34 @@ class LinearResponseUCC(LinearResponseBaseClass):
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
                 raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
-        # Do orbital-orbital blocks
-        self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
-            rdms,
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.kappa_no_activeactive_idx_dagger,
-            self.wf.kappa_no_activeactive_idx,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
-            rdms,
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.kappa_no_activeactive_idx_dagger,
-            self.wf.kappa_no_activeactive_idx_dagger,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
-            rdms, self.wf.kappa_no_activeactive_idx
-        )
+        if len(self.q_ops) != 0:
+            # Do orbital-orbital blocks
+            self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.kappa_no_activeactive_idx_dagger,
+                self.wf.kappa_no_activeactive_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.rdm1,
+                self.wf.rdm2,
+            )
+            self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.kappa_no_activeactive_idx_dagger,
+                self.wf.kappa_no_activeactive_idx_dagger,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.rdm1,
+                self.wf.rdm2,
+            )
+            self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
+                self.wf.kappa_no_activeactive_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.rdm1,
+            )
         for j, qJ in enumerate(self.q_ops):
             Hq_ket = propagate_state([self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info)
             qdH_ket = propagate_state([qJ.dagger * self.H_1i_1a], self.wf.ci_coeffs, *self.index_info)
@@ -135,12 +134,27 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     Hq_ket,
                     *self.index_info,
                 )
-                # - <0| H q Gd |0>
-                val -= expectation_value(
-                    qdH_ket,
-                    [],
-                    Gd_ket,
-                    *self.index_info,
+                # - 1/2<0| H q Gd |0>
+                val -= (
+                    1
+                    / 2
+                    * expectation_value(
+                        qdH_ket,
+                        [],
+                        Gd_ket,
+                        *self.index_info,
+                    )
+                )
+                # - 1/2<0| H Gd q |0>
+                val -= (
+                    1
+                    / 2
+                    * expectation_value(
+                        self.wf.ci_coeffs,
+                        [self.H_1i_1a * GI.dagger * qJ],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
                 )
                 self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
                 # Make B
@@ -151,12 +165,27 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     Gd_ket,
                     *self.index_info,
                 )
-                # - <0| Gd qd H |0>
-                val -= expectation_value(
-                    G_ket,
-                    [],
-                    qdH_ket,
-                    *self.index_info,
+                # - 1/2*<0| Gd qd H |0>
+                val -= (
+                    1
+                    / 2
+                    * expectation_value(
+                        G_ket,
+                        [],
+                        qdH_ket,
+                        *self.index_info,
+                    )
+                )
+                # - 1/2*<0| qd Gd H |0>
+                val -= (
+                    1
+                    / 2
+                    * expectation_value(
+                        self.wf.ci_coeffs,
+                        [qJ.dagger * GI.dagger * self.H_1i_1a],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
                 )
                 self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
         for j, GJ in enumerate(self.G_ops):
@@ -177,26 +206,56 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     HGJ_ket,
                     *self.index_info,
                 )
-                # - <0| GId GJ H |0>
-                val -= expectation_value(
-                    GI_ket,
-                    [],
-                    GJH_ket,
-                    *self.index_info,
-                )
-                # - <0| H GJ GId |0>
-                val -= expectation_value(
-                    GJdH_ket,
-                    [],
-                    GId_ket,
-                    *self.index_info,
-                )
                 # <0| GJ H GId |0>
                 val += expectation_value(
                     HGJd_ket,
                     [],
                     GId_ket,
                     *self.index_info,
+                )
+                # - 1/2<0| GId GJ H |0>
+                val -= (
+                    1
+                    / 2
+                    * expectation_value(
+                        GI_ket,
+                        [],
+                        GJH_ket,
+                        *self.index_info,
+                    )
+                )
+                # - 1/2*<0| H GJ GId |0>
+                val -= (
+                    1
+                    / 2
+                    * expectation_value(
+                        GJdH_ket,
+                        [],
+                        GId_ket,
+                        *self.index_info,
+                    )
+                )
+                # - 1/2*<0| GJ GId H |0>
+                val -= (
+                    1
+                    / 2
+                    * expectation_value(
+                        GJd_ket,
+                        [GI.dagger],
+                        H00_ket,
+                        *self.index_info,
+                    )
+                )
+                # - 1/2*<0| H GId GJ |0>
+                val -= (
+                    1
+                    / 2
+                    * expectation_value(
+                        H00_ket,
+                        [GI.dagger],
+                        GJ_ket,
+                        *self.index_info,
+                    )
                 )
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
                 # Make B
@@ -258,16 +317,9 @@ class LinearResponseUCC(LinearResponseBaseClass):
         if len(dipole_integrals) != 3:
             raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
         number_excitations = len(self.excitation_energies)
-        rdms = ReducedDenstiyMatrix(
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-            self.wf.rdm1,
-            rdm2=self.wf.rdm2,
-        )
-        mux = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[0])
-        muy = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[1])
-        muz = one_electron_integral_transform(self.wf.c_trans, dipole_integrals[2])
+        mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
+        muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
+        muz = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[2])
         mux_op = one_elec_op_0i_0a(
             mux,
             self.wf.num_inactive_orbs,
@@ -294,41 +346,45 @@ class LinearResponseUCC(LinearResponseBaseClass):
         transition_dipole_z = 0.0
         transition_dipoles = np.zeros((number_excitations, 3))
         for state_number in range(number_excitations):
-            transfer_op = FermionicOperator({}, {})
+            transfer_op = FermionicOperator({})
             for i, G in enumerate(self.G_ops):
                 transfer_op += (
                     self.Z_G_normed[i, state_number] * G.dagger + self.Y_G_normed[i, state_number] * G
                 )
-            q_part_x = get_orbital_response_property_gradient(
-                rdms,
-                mux,
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.normed_response_vectors,
-                state_number,
-                number_excitations,
-            )
-            q_part_y = get_orbital_response_property_gradient(
-                rdms,
-                muy,
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.normed_response_vectors,
-                state_number,
-                number_excitations,
-            )
-            q_part_z = get_orbital_response_property_gradient(
-                rdms,
-                muz,
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.normed_response_vectors,
-                state_number,
-                number_excitations,
-            )
+            q_part_x = 0.0
+            q_part_y = 0.0
+            q_part_z = 0.0
+            if len(self.q_ops) != 0:
+                q_part_x = get_orbital_response_property_gradient(
+                    mux,
+                    self.wf.kappa_no_activeactive_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.normed_response_vectors,
+                    state_number,
+                    number_excitations,
+                )
+                q_part_y = get_orbital_response_property_gradient(
+                    muy,
+                    self.wf.kappa_no_activeactive_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.normed_response_vectors,
+                    state_number,
+                    number_excitations,
+                )
+                q_part_z = get_orbital_response_property_gradient(
+                    muz,
+                    self.wf.kappa_no_activeactive_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.normed_response_vectors,
+                    state_number,
+                    number_excitations,
+                )
             transfer_ket = propagate_state([transfer_op], self.wf.ci_coeffs, *self.index_info)
             transferd_ket = propagate_state([transfer_op.dagger], self.wf.ci_coeffs, *self.index_info)
             # <0| mux T |0>
