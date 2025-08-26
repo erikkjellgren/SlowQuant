@@ -153,8 +153,6 @@ def test_LiH_projected() -> None:
     qLR.run(do_rdm=True)
     excitation_energies = qLR.get_excitation_energies()
 
-    print(excitation_energies)
-
     solution = [
         0.1294585,
         0.17872992,
