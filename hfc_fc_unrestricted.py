@@ -39,6 +39,7 @@ def get_hcf_fc_unrestricted(geometry, basis, active_space, unit='bohr', charge=0
     # WF.run_wf_optimization_1step("bfgs", True)
 
     # FC
+    """ a_{iso}^K = \frac{f_k}{2\pi M} \bigg\{\bigg [[A^K_{\alpha}]_I - [A^K_{\beta}]_I\bigg] + \bigg[[A^K_{\alpha}]_A \Gamma^{[1]}_{\alpha} - [A^K_{\beta}]_A \Gamma^{[1]}_{\beta}\bigg] \bigg\}"""
     for atom in mol._atom:
         print(atom[0])
         amp_basis = mol.eval_gto("GTOval_sph", coords=[atom[1]])[0]
@@ -70,10 +71,7 @@ def get_hcf_fc_unrestricted(geometry, basis, active_space, unit='bohr', charge=0
 
 
 
-def test_OH_hfc():
-    """
-    Test of hfc for OH using unrestricted RDMs
-    """
+def OH_rad_hfc():
     geometry = """O  0.0   0.0  0.0;
         H  0.0  0.0  0.9697;"""
     basis = '6311++gss-j'
@@ -84,5 +82,30 @@ def test_OH_hfc():
     
     get_hcf_fc_unrestricted(geometry=geometry, basis=basis, active_space=active_space, unit='angstrom', charge=charge, spin=spin)
 
-test_OH_hfc()
+def OH_cat_hfc():
+    geometry = """O  0.0   0.0  0.0;
+        H  0.0  0.0  1.0289;"""
+    basis="6311++gss-j"
+    active_space = ((3,1),4)
+    charge = 1
+    #the pyscf spin parameter is the value of 2S (tne number of unpaired electrons, or the difference between the number of alpha and beta electrons)
+    spin=2
+    
+    get_hcf_fc_unrestricted(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit='angstrom')
+
+def NO_rad_hfc():
+    geometry = """O  0.0   0.0  0.0;
+        N  0.0  0.0  1.1508;"""
+    basis = "STO-3G"
+    active_space = ((2,1),3)
+    charge = 0
+    #the pyscf spin parameter is the value of 2S (tne number of unpaired electrons, or the difference between the number of alpha and beta electrons)
+    spin=1
+    
+    get_hcf_fc_unrestricted(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit='angstrom')
+
+
+OH_rad_hfc()
+OH_cat_hfc()
+NO_rad_hfc()
 
