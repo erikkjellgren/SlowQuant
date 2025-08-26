@@ -10,6 +10,7 @@ def get_hcf_fc_unrestricted(geometry, basis, active_space, unit='bohr', charge=0
     """
     Calculate hyperfine coupling constant (fermi-contact term) for a molecule
     """
+    print("active space:", {active_space})
     #PySCF
     mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin)
     mol.build()
@@ -30,29 +31,43 @@ def get_hcf_fc_unrestricted(geometry, basis, active_space, unit='bohr', charge=0
         mf.mo_coeff,
         h_core,
         g_eri,
-        "fuccsd",
-        {"n_layers":1},
+        "fuccsdt",
+        {"n_layers":2},
         include_active_kappa=True,
     )
 
-    #WF.run_wf_optimization_1step("SLSQP", True)
+    # WF.run_wf_optimization_1step("bfgs", True)
 
     # FC
     for atom in mol._atom:
-        print(atom)
+        print(atom[0])
         amp_basis = mol.eval_gto("GTOval_sph", coords=[atom[1]])[0]
-        #old version of h1ao
-        #h1ao = np.array([np.outer(np.conj(amp_basis), amp_basis)]) * nist.G_ELECTRON * 2/3 * np.pi
-        h1ao = np.outer(np.conj(amp_basis), amp_basis) * nist.G_ELECTRON * 2/3 * np.pi
-    #hfc here whould be in atomic units
-        print((WF.num_inactive_orbs), WF.num_virtual_orbs, WF.num_active_orbs)
-        print(WF.rdm1aa - WF.rdm1bb)
-
-        print(h1ao[:, (WF.num_inactive_orbs-1):(len(amp_basis)+WF.num_virtual_orbs-1)][(WF.num_inactive_orbs-1):(len(amp_basis)+WF.num_virtual_orbs-1)])
+        mo_basis_a = amp_basis@WF.c_a_mo
+        mo_basis_b = amp_basis@WF.c_b_mo
+        h1mo_a = np.outer(np.conj(mo_basis_a), mo_basis_a)[:WF.num_inactive_orbs + WF.num_active_orbs, :WF.num_inactive_orbs + WF.num_active_orbs]
+        h1mo_b = np.outer(np.conj(mo_basis_b), mo_basis_b)[:WF.num_inactive_orbs + WF.num_active_orbs, :WF.num_inactive_orbs + WF.num_active_orbs] 
+        rdma = np.eye(WF.num_inactive_orbs + WF.num_active_orbs)
+        rdmb = np.eye(WF.num_inactive_orbs + WF.num_active_orbs)
+        rdma[WF.num_inactive_orbs: , WF.num_inactive_orbs:] = WF.rdm1aa
+        rdmb[WF.num_inactive_orbs: , WF.num_inactive_orbs:] = WF.rdm1bb
+        hfc = np.trace(h1mo_a@rdma  - h1mo_b@rdmb)
+        g_k = 0
+        m = 0
+        if atom[0] == "H":
+            g_k = 5.58569468
+        if atom[0] == "O":
+            g_k = -0.757516
+        if atom[0] == "N":
+            g_k = 0.40376100
+        if np.absolute(WF.num_active_elec_alpha - WF.num_active_elec_beta) == 1:
+            m = 0.5
+        if np.absolute(WF.num_active_elec_alpha - WF.num_active_elec_beta) == 3:
+            m = 1
         
-        hfc = np.matmul(h1ao[:, (WF.num_inactive_orbs-1):(len(amp_basis)+WF.num_virtual_orbs-1)][(WF.num_inactive_orbs-1):(len(amp_basis)+WF.num_virtual_orbs-1)], (WF.rdm1aa - WF.rdm1bb))
-        print(hfc)
-    #print(WF.num_elec)
+        print("HFC without factor:", hfc)
+        print("HFC:", 400.12*g_k/m*hfc, "MHz")
+    
+
 
 
 def test_OH_hfc():
@@ -61,8 +76,8 @@ def test_OH_hfc():
     """
     geometry = """O  0.0   0.0  0.0;
         H  0.0  0.0  0.9697;"""
-    basis = 'STO-3G'
-    active_space = ((1,2),3)
+    basis = '6311++gss-j'
+    active_space = ((2,1),3)
     charge = 0
     #the pyscf spin parameter is the value of 2S (tne number of unpaired electrons, or the difference between the number of alpha and beta electrons)
     spin=1
