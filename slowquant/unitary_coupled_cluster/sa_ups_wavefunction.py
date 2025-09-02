@@ -756,7 +756,7 @@ class WaveFunctionSAUPS:
             "Iteration # | Iteration time [s] | Electronic energy [Hartree] | max|grad| [Hartree] | Operator"
         )
         start = time.time()
-        for iteration in range(1, maxiter + 1):
+        for iteration in range(maxiter):
             Hamiltonian = hamiltonian_0i_0a(
                 self.h_mo,
                 self.g_mo,
