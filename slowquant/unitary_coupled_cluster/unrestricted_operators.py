@@ -87,124 +87,6 @@ def unrestricted_hamiltonian_full_space(
     return H_operator
 
 
-def unrestricted_hamiltonian_1i_1a(
-    haa_mo: np.ndarray,
-    hbb_mo: np.ndarray,
-    gaaaa_mo: np.ndarray,
-    gbbbb_mo: np.ndarray,
-    gaabb_mo: np.ndarray,
-    gbbaa_mo: np.ndarray,
-    num_inactive_orbs: int,
-    num_active_orbs: int,
-    num_virtual_orbs: int,
-) -> FermionicOperator:
-    """Get Hamiltonian operator that works together with an extra inactive and an extra virtual index.
-
-    Args:
-        h_mo: One-electron Hamiltonian integrals in MO.
-        g_mo: Two-electron Hamiltonian integrals in MO.
-        num_inactive_orbs: Number of inactive orbitals in spatial basis.
-        num_active_orbs: Number of active orbitals in spatial basis.
-        num_virtual_orbs: Number of virtual orbitals in spatial basis.
-
-    Returns:
-        Modified Hamiltonian fermionic operator.
-    """
-    num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
-    hamiltonian_operator = FermionicOperator({})
-    virtual_start = num_inactive_orbs + num_active_orbs
-    for p in range(num_orbs):
-        for q in range(num_orbs):
-            if p >= virtual_start and q >= virtual_start:
-                continue
-            if p < num_inactive_orbs and q < num_inactive_orbs and p != q:
-                continue
-            if abs(haa_mo[p, q]) > 10**-14 or abs(hbb_mo[p, q]) > 10**-14:
-                hamiltonian_operator += haa_mo[p, q] * a_op(p, "alpha", True) * a_op(q, "alpha", False)
-                hamiltonian_operator += hbb_mo[p, q] * a_op(p, "beta", True) * a_op(q, "beta", False)
-    for p in range(num_orbs):
-        for q in range(num_orbs):
-            for r in range(num_orbs):
-                for s in range(num_orbs):
-                    num_virt = 0
-                    if p >= virtual_start:
-                        num_virt += 1
-                    if q >= virtual_start:
-                        num_virt += 1
-                    if r >= virtual_start:
-                        num_virt += 1
-                    if s >= virtual_start:
-                        num_virt += 1
-                    if num_virt > 1:
-                        continue
-                    num_act = 0
-                    if p < num_inactive_orbs:
-                        num_act += 1
-                    if q < num_inactive_orbs:
-                        num_act += 1
-                    if r < num_inactive_orbs:
-                        num_act += 1
-                    if s < num_inactive_orbs:
-                        num_act += 1
-                    if p < num_inactive_orbs and q < num_inactive_orbs and p == q:
-                        num_act -= 2
-                    if r < num_inactive_orbs and s < num_inactive_orbs and r == s:
-                        num_act -= 2
-                    if p < num_inactive_orbs and s < num_inactive_orbs and p == s:
-                        num_act -= 2
-                    if q < num_inactive_orbs and r < num_inactive_orbs and q == r:
-                        num_act -= 2
-                    if num_act > 1:
-                        continue
-                    if (
-                        abs(gaaaa_mo[p, q, r, s]) > 10**-14
-                        or abs(gbbbb_mo[p, q, r, s]) > 10**-14
-                        or abs(gaabb_mo[p, q, r, s]) > 10**-14
-                        or abs(gbbaa_mo[p, q, r, s]) > 10**-14
-                    ):
-                        hamiltonian_operator += (
-                            1
-                            / 2
-                            * gaaaa_mo[p, q, r, s]
-                            * a_op(p, "alpha", True)
-                            * a_op(r, "alpha", True)
-                            * a_op(s, "alpha", False)
-                            * a_op(q, "alpha", False)
-                        )
-                        hamiltonian_operator += (
-                            1
-                            / 2
-                            * gbbbb_mo[p, q, r, s]
-                            * a_op(p, "beta", True)
-                            * a_op(r, "beta", True)
-                            * a_op(s, "beta", False)
-                            * a_op(q, "beta", False)
-                        )
-                        hamiltonian_operator += (
-                            1
-                            / 2
-                            * (
-                                gaabb_mo[p, q, r, s]
-                                * a_op(p, "alpha", True)
-                                * a_op(r, "beta", True)
-                                * a_op(s, "beta", False)
-                                * a_op(q, "alpha", False)
-                            )
-                        )
-                        hamiltonian_operator += (
-                            1
-                            / 2
-                            * (
-                                gbbaa_mo[p, q, r, s]
-                                * a_op(p, "beta", True)
-                                * a_op(r, "alpha", True)
-                                * a_op(s, "alpha", False)
-                                * a_op(q, "beta", False)
-                            )
-                        )
-    return hamiltonian_operator
-
-
 def unrestricted_hamiltonian_0i_0a(
     haa_mo: np.ndarray,
     hbb_mo: np.ndarray,
@@ -521,6 +403,238 @@ def unrestricted_hamiltonian_0i_0a(
     return hamiltonian_operator
 
 
+def unrestricted_hamiltonian_1i_1a(
+    haa_mo: np.ndarray,
+    hbb_mo: np.ndarray,
+    gaaaa_mo: np.ndarray,
+    gbbbb_mo: np.ndarray,
+    gaabb_mo: np.ndarray,
+    gbbaa_mo: np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+) -> FermionicOperator:
+    """Get Hamiltonian operator that works together with an extra inactive and an extra virtual index.
+
+    Args:
+        h_mo: One-electron Hamiltonian integrals in MO.
+        g_mo: Two-electron Hamiltonian integrals in MO.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
+
+    Returns:
+        Modified Hamiltonian fermionic operator.
+    """
+    num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
+    hamiltonian_operator = FermionicOperator({})
+    virtual_start = num_inactive_orbs + num_active_orbs
+    for p in range(num_orbs):
+        for q in range(num_orbs):
+            if p >= virtual_start and q >= virtual_start:
+                continue
+            if p < num_inactive_orbs and q < num_inactive_orbs and p != q:
+                continue
+            if abs(haa_mo[p, q]) > 10**-14 or abs(hbb_mo[p, q]) > 10**-14:
+                hamiltonian_operator += haa_mo[p, q] * a_op(p, "alpha", True) * a_op(q, "alpha", False)
+                hamiltonian_operator += hbb_mo[p, q] * a_op(p, "beta", True) * a_op(q, "beta", False)
+    for p in range(num_orbs):
+        for q in range(num_orbs):
+            for r in range(num_orbs):
+                for s in range(num_orbs):
+                    num_virt = 0
+                    if p >= virtual_start:
+                        num_virt += 1
+                    if q >= virtual_start:
+                        num_virt += 1
+                    if r >= virtual_start:
+                        num_virt += 1
+                    if s >= virtual_start:
+                        num_virt += 1
+                    if num_virt > 1:
+                        continue
+                    num_act = 0
+                    if p < num_inactive_orbs:
+                        num_act += 1
+                    if q < num_inactive_orbs:
+                        num_act += 1
+                    if r < num_inactive_orbs:
+                        num_act += 1
+                    if s < num_inactive_orbs:
+                        num_act += 1
+                    if p < num_inactive_orbs and q < num_inactive_orbs and p == q:
+                        num_act -= 2
+                    if r < num_inactive_orbs and s < num_inactive_orbs and r == s:
+                        num_act -= 2
+                    if p < num_inactive_orbs and s < num_inactive_orbs and p == s:
+                        num_act -= 2
+                    if q < num_inactive_orbs and r < num_inactive_orbs and q == r:
+                        num_act -= 2
+                    if num_act > 1:
+                        continue
+                    if (
+                        abs(gaaaa_mo[p, q, r, s]) > 10**-14
+                        or abs(gbbbb_mo[p, q, r, s]) > 10**-14
+                        or abs(gaabb_mo[p, q, r, s]) > 10**-14
+                        or abs(gbbaa_mo[p, q, r, s]) > 10**-14
+                    ):
+                        hamiltonian_operator += (
+                            1
+                            / 2
+                            * gaaaa_mo[p, q, r, s]
+                            * a_op(p, "alpha", True)
+                            * a_op(r, "alpha", True)
+                            * a_op(s, "alpha", False)
+                            * a_op(q, "alpha", False)
+                        )
+                        hamiltonian_operator += (
+                            1
+                            / 2
+                            * gbbbb_mo[p, q, r, s]
+                            * a_op(p, "beta", True)
+                            * a_op(r, "beta", True)
+                            * a_op(s, "beta", False)
+                            * a_op(q, "beta", False)
+                        )
+                        hamiltonian_operator += (
+                            1
+                            / 2
+                            * (
+                                gaabb_mo[p, q, r, s]
+                                * a_op(p, "alpha", True)
+                                * a_op(r, "beta", True)
+                                * a_op(s, "beta", False)
+                                * a_op(q, "alpha", False)
+                            )
+                        )
+                        hamiltonian_operator += (
+                            1
+                            / 2
+                            * (
+                                gbbaa_mo[p, q, r, s]
+                                * a_op(p, "beta", True)
+                                * a_op(r, "alpha", True)
+                                * a_op(s, "alpha", False)
+                                * a_op(q, "beta", False)
+                            )
+                        )
+    return hamiltonian_operator
+
+
+def unrestricted_hamiltonian_2i_2a(
+    haa_mo: np.ndarray,
+    hbb_mo: np.ndarray,
+    gaaaa_mo: np.ndarray,
+    gbbbb_mo: np.ndarray,
+    gaabb_mo: np.ndarray,
+    gbbaa_mo: np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+) -> FermionicOperator:
+    """Get Hamiltonian operator that works together with an extra inactive and an extra virtual index.
+
+    Args:
+        h_mo: One-electron Hamiltonian integrals in MO.
+        g_mo: Two-electron Hamiltonian integrals in MO.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
+
+    Returns:
+        Modified Hamiltonian fermionic operator.
+    """
+    num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
+    hamiltonian_operator = FermionicOperator({})
+    virtual_start = num_inactive_orbs + num_active_orbs
+    for p in range(num_orbs):
+        for q in range(num_orbs):
+            if abs(haa_mo[p, q]) > 10**-14 or abs(hbb_mo[p, q]) > 10**-14:
+                hamiltonian_operator += haa_mo[p, q] * a_op(p, "alpha", True) * a_op(q, "alpha", False)
+                hamiltonian_operator += hbb_mo[p, q] * a_op(p, "beta", True) * a_op(q, "beta", False)
+    for p in range(num_orbs):
+        for q in range(num_orbs):
+            for r in range(num_orbs):
+                for s in range(num_orbs):
+                    num_virt = 0
+                    if p >= virtual_start:
+                        num_virt += 1
+                    if q >= virtual_start:
+                        num_virt += 1
+                    if r >= virtual_start:
+                        num_virt += 1
+                    if s >= virtual_start:
+                        num_virt += 1
+                    if num_virt > 2:
+                        continue
+                    num_act = 0
+                    if p < num_inactive_orbs:
+                        num_act += 1
+                    if q < num_inactive_orbs:
+                        num_act += 1
+                    if r < num_inactive_orbs:
+                        num_act += 1
+                    if s < num_inactive_orbs:
+                        num_act += 1
+                    if p < num_inactive_orbs and q < num_inactive_orbs and p == q:
+                        num_act -= 2
+                    if r < num_inactive_orbs and s < num_inactive_orbs and r == s:
+                        num_act -= 2
+                    if p < num_inactive_orbs and s < num_inactive_orbs and p == s:
+                        num_act -= 2
+                    if q < num_inactive_orbs and r < num_inactive_orbs and q == r:
+                        num_act -= 2
+                    if num_act > 2:
+                        continue
+                    if (
+                        abs(gaaaa_mo[p, q, r, s]) > 10**-14
+                        or abs(gbbbb_mo[p, q, r, s]) > 10**-14
+                        or abs(gaabb_mo[p, q, r, s]) > 10**-14
+                        or abs(gbbaa_mo[p, q, r, s]) > 10**-14
+                    ):
+                        hamiltonian_operator += (
+                            1
+                            / 2
+                            * gaaaa_mo[p, q, r, s]
+                            * a_op(p, "alpha", True)
+                            * a_op(r, "alpha", True)
+                            * a_op(s, "alpha", False)
+                            * a_op(q, "alpha", False)
+                        )
+                        hamiltonian_operator += (
+                            1
+                            / 2
+                            * gbbbb_mo[p, q, r, s]
+                            * a_op(p, "beta", True)
+                            * a_op(r, "beta", True)
+                            * a_op(s, "beta", False)
+                            * a_op(q, "beta", False)
+                        )
+                        hamiltonian_operator += (
+                            1
+                            / 2
+                            * (
+                                gaabb_mo[p, q, r, s]
+                                * a_op(p, "alpha", True)
+                                * a_op(r, "beta", True)
+                                * a_op(s, "beta", False)
+                                * a_op(q, "alpha", False)
+                            )
+                        )
+                        hamiltonian_operator += (
+                            1
+                            / 2
+                            * (
+                                gbbaa_mo[p, q, r, s]
+                                * a_op(p, "beta", True)
+                                * a_op(r, "alpha", True)
+                                * a_op(s, "alpha", False)
+                                * a_op(q, "beta", False)
+                            )
+                        )
+    return hamiltonian_operator
+
+
 def unrestricted_one_elec_op_full_space(
     intsaa_mo: np.ndarray, intsbb_mo: np.ndarray, num_orbs: int
 ) -> FermionicOperator:
@@ -540,6 +654,69 @@ def unrestricted_one_elec_op_full_space(
     one_elec_op = FermionicOperator({})
     for p in range(num_orbs):
         for q in range(num_orbs):
+            if abs(intsaa_mo[p, q]) < 10**-14 and abs(intsbb_mo[p, q]) < 10**-14:
+                continue
+            one_elec_op += intsaa_mo[p, q] * a_op(p, "alpha", True) * a_op(q, "alpha", False)
+            one_elec_op += intsbb_mo[p, q] * a_op(p, "beta", True) * a_op(q, "beta", False)
+    return one_elec_op
+
+
+def one_elec_op_0i_0a(
+    intsaa_mo: np.ndarray, intsbb_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int
+) -> FermionicOperator:
+    """Create one-electron operator that makes no changes in the inactive and virtual orbitals.
+
+    Args:
+        ints_mo: One-electron integrals for operator in MO basis.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+
+    Returns:
+        One-electron operator for active-space.
+    """
+    one_elec_op = FermionicOperator({})
+    # Inactive one-electron
+    for i in range(num_inactive_orbs):
+        if abs(intsaa_mo[i, i]) > 10**-14 or abs(intsbb_mo[i, i]) > 10**-14:
+            one_elec_op += intsaa_mo[i, i] * a_op(i, "alpha", True) * a_op(i, "alpha", False)
+            one_elec_op += intsbb_mo[i, i] * a_op(i, "beta", True) * a_op(i, "beta", False)
+    # Active one-electron
+    for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+        for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+            if abs(intsaa_mo[p, q]) < 10**-14 and abs(intsbb_mo[p, q]) < 10**-14:
+                continue
+            one_elec_op += intsaa_mo[p, q] * a_op(p, "alpha", True) * a_op(q, "alpha", False)
+            one_elec_op += intsbb_mo[p, q] * a_op(p, "beta", True) * a_op(q, "beta", False)
+    return one_elec_op
+
+
+def unrestricted_one_elec_op_1i_1a(
+    intsaa_mo: np.ndarray,
+    intsbb_mo: np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+) -> FermionicOperator:
+    """Create one-electron operator that makes up to one change in the inactive and virtual orbitals.
+
+    Args:
+        ints_mo: One-electron integrals for operator in MO basis.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        num_virtual_orbs: Number of virtual orbitals in spatial basis.
+
+    Returns:
+        Modified one-electron operator.
+    """
+    num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
+    one_elec_op = FermionicOperator({})
+    virtual_start = num_inactive_orbs + num_active_orbs
+    for p in range(num_orbs):
+        for q in range(num_orbs):
+            if p >= virtual_start and q >= virtual_start:
+                continue
+            if p < num_inactive_orbs and q < num_inactive_orbs and p != q:
+                continue
             if abs(intsaa_mo[p, q]) < 10**-14 and abs(intsbb_mo[p, q]) < 10**-14:
                 continue
             one_elec_op += intsaa_mo[p, q] * a_op(p, "alpha", True) * a_op(q, "alpha", False)
