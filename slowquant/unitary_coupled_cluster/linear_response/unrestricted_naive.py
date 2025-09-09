@@ -16,6 +16,8 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
 from slowquant.unitary_coupled_cluster.operators import a_op
 from slowquant.unitary_coupled_cluster.unrestricted_density_matrix import (
     get_orbital_gradient_response_unrestricted,
+    get_orbital_response_hessian_block_unrestricted,
+    get_orbital_response_metric_sigma_unrestricted,
     get_orbital_response_property_gradient_unrestricted,
 )
 from slowquant.unitary_coupled_cluster.unrestricted_operators import (
@@ -102,76 +104,91 @@ class LinearResponseUPS(LinearResponseBaseClass):
                 raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
 
         # Start RDM version
-        # self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block_unrestricted(
-        #     self.wf.haa_mo,
-        #     self.wf.hbb_mo,
-        #     self.wf.gaaaa_mo,
-        #     self.wf.gbbbb_mo,
-        #     self.wf.gaabb_mo,
-        #     self.wf.gbbaa_mo,
-        #     self.wf.kappa_no_activeactive_idx_dagger,
-        #     self.wf.kappa_no_activeactive_idx,
-        #     self.wf.num_inactive_orbs,
-        #     self.wf.num_active_orbs,
-        #    self.wf.rdm1aa,
-        #    self.wf.rdm1bb,
-        #    self.wf.rdm2aaaa,
-        #    self.wf.rdm2bbbb,
-        #    self.wf.rdm2aabb,
-        #    self.wf.rdm2bbaa,
-        # )
-        # self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block_unrestricted(
-        #     self.wf.haa_mo,
-        #     self.wf.hbb_mo,
-        #     self.wf.gaaaa_mo,
-        #     self.wf.gbbbb_mo,
-        #     self.wf.gaabb_mo,
-        #     self.wf.gbbaa_mo,
-        #     self.wf.kappa_no_activeactive_idx_dagger,
-        #     self.wf.kappa_no_activeactive_idx_dagger,
-        #     self.wf.num_inactive_orbs,
-        #     self.wf.num_active_orbs,
-        #    self.wf.rdm1aa,
-        #    self.wf.rdm1bb,
-        #    self.wf.rdm2aaaa,
-        #    self.wf.rdm2bbbb,
-        #    self.wf.rdm2aabb,
-        #    self.wf.rdm2bbaa,
-        # )
-        # self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma_unrestricted(
-        #     self.wf.kappa_no_activeactive_idx, self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.rdm1aa, self.wf.rdm1bb,
-        # )
+        self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block_unrestricted(
+            self.wf.haa_mo,
+            self.wf.hbb_mo,
+            self.wf.gaaaa_mo,
+            self.wf.gbbbb_mo,
+            self.wf.gaabb_mo,
+            self.wf.gbbaa_mo,
+            self.wf.kappa_no_activeactive_idx_dagger,
+            self.wf.kappa_no_activeactive_idx,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.rdm1aa,
+            self.wf.rdm1bb,
+            self.wf.rdm2aaaa,
+            self.wf.rdm2bbbb,
+            self.wf.rdm2aabb,
+            self.wf.rdm2bbaa,
+        )
+        self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block_unrestricted(
+            self.wf.haa_mo,
+            self.wf.hbb_mo,
+            self.wf.gaaaa_mo,
+            self.wf.gbbbb_mo,
+            self.wf.gaabb_mo,
+            self.wf.gbbaa_mo,
+            self.wf.kappa_no_activeactive_idx_dagger,
+            self.wf.kappa_no_activeactive_idx_dagger,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.rdm1aa,
+            self.wf.rdm1bb,
+            self.wf.rdm2aaaa,
+            self.wf.rdm2bbbb,
+            self.wf.rdm2aabb,
+            self.wf.rdm2bbaa,
+        )
+        self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma_unrestricted(
+            self.wf.kappa_no_activeactive_idx,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.rdm1aa,
+            self.wf.rdm1bb,
+        )
         # End RDM
 
         # Start manual version
+        """
+        from slowquant.unitary_coupled_cluster.unrestricted_operators import unrestricted_hamiltonian_full_space
+        H = unrestricted_hamiltonian_full_space(
+            self.wf.haa_mo,
+            self.wf.hbb_mo,
+            self.wf.gaaaa_mo,
+            self.wf.gbbbb_mo,
+            self.wf.gaabb_mo,
+            self.wf.gbbaa_mo,
+            self.wf.num_orbs,
+        )
         for j, qJ in enumerate(self.q_ops):
             for i, qI in enumerate(self.q_ops):
                 # Make A
                 # <0| qd H q |0>
                 val = expectation_value(
                     self.wf.ci_coeffs,
-                    [qJ.dagger * self.H_1i_1a * qI],
+                    [qJ.dagger * H * qI],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
                 # -<0| qd q H |0>
                 val -= expectation_value(
                     self.wf.ci_coeffs,
-                    [qJ.dagger * qI * self.H_1i_1a],
+                    [qJ.dagger * qI * H],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
                 # -<0| H q qd |0>
                 val -= expectation_value(
                     self.wf.ci_coeffs,
-                    [self.H_1i_1a * qI * qJ.dagger],
+                    [H * qI * qJ.dagger],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
                 # <0| q H qd |0>
                 val += expectation_value(
                     self.wf.ci_coeffs,
-                    [qI * self.H_1i_1a * qJ.dagger],
+                    [qI * H * qJ.dagger],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
@@ -180,28 +197,28 @@ class LinearResponseUPS(LinearResponseBaseClass):
                 # <0| qd H qd |0>
                 val = expectation_value(
                     self.wf.ci_coeffs,
-                    [qJ.dagger * self.H_1i_1a * qI.dagger],
+                    [qJ.dagger * H * qI.dagger],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
                 # -<0| qd qd H |0>
                 val -= expectation_value(
                     self.wf.ci_coeffs,
-                    [qJ.dagger * qI.dagger * self.H_1i_1a],
+                    [qJ.dagger * qI.dagger * H],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
                 # -<0| H qd qd |0>
                 val -= expectation_value(
                     self.wf.ci_coeffs,
-                    [self.H_1i_1a * qI.dagger * qJ.dagger],
+                    [H * qI.dagger * qJ.dagger],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
                 # <0| qd H qd |0>
                 val += expectation_value(
                     self.wf.ci_coeffs,
-                    [qI.dagger * self.H_1i_1a * qJ.dagger],
+                    [qI.dagger * H * qJ.dagger],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
@@ -220,6 +237,7 @@ class LinearResponseUPS(LinearResponseBaseClass):
                     *self.index_info,
                 )
                 self.Sigma[i, j] = val
+        """
         # End manual version
 
         for j, qJ in enumerate(self.q_ops):
