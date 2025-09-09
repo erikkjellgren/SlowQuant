@@ -496,7 +496,8 @@ class UnrestrictedWaveFunction:
             rdm_order: Max order RDM.
         """
         if not isinstance(
-            self.QI._primitive, (BaseSamplerV1, BaseSamplerV2)  # pylint: disable=protected-access
+            self.QI._primitive,
+            (BaseSamplerV1, BaseSamplerV2),  # pylint: disable=protected-access
         ):
             raise TypeError(
                 f"This feature is only supported for Sampler got {type(self.QI._primitive)} from QuantumInterface"  # pylint: disable=protected-access
@@ -876,15 +877,15 @@ def calc_energy_oo(kappa: list[float], wf: WaveFunction) -> float:
     """
     kappa_mat = np.zeros_like(wf.c_orthonormal)
     for kappa_val, (p, q) in zip(
-        np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx  # pylint: disable=protected-access
+        np.array(kappa) - np.array(wf._kappa_old),
+        wf.kappa_idx,  # pylint: disable=protected-access
     ):
         kappa_mat[p, q] = kappa_val
         kappa_mat[q, p] = -kappa_val
     if len(wf.kappa_redundant) != 0:
         if np.max(np.abs(wf.kappa_redundant)) > 0.0:
             for kappa_val, (p, q) in zip(
-                np.array(wf.kappa_redundant)
-                - np.array(wf._kappa_redundant_old),  # pylint: disable=protected-access
+                np.array(wf.kappa_redundant) - np.array(wf._kappa_redundant_old),  # pylint: disable=protected-access
                 wf.kappa_redundant_idx,
             ):
                 kappa_mat[p, q] = kappa_val
@@ -921,15 +922,15 @@ def calc_energy_both(parameters, wf) -> float:
     # Do orbital partial
     kappa_mat = np.zeros_like(wf.c_orthonormal)
     for kappa_val, (p, q) in zip(
-        np.array(kappa) - np.array(wf._kappa_old), wf.kappa_idx  # pylint: disable=protected-access
+        np.array(kappa) - np.array(wf._kappa_old),
+        wf.kappa_idx,  # pylint: disable=protected-access
     ):
         kappa_mat[p, q] = kappa_val
         kappa_mat[q, p] = -kappa_val
     if len(wf.kappa_redundant) != 0:
         if np.max(np.abs(wf.kappa_redundant)) > 0.0:
             for kappa_val, (p, q) in zip(
-                np.array(wf.kappa_redundant)
-                - np.array(wf._kappa_redundant_old),  # pylint: disable=protected-access
+                np.array(wf.kappa_redundant) - np.array(wf._kappa_redundant_old),  # pylint: disable=protected-access
                 wf.kappa_redundant_idx,
             ):
                 kappa_mat[p, q] = kappa_val

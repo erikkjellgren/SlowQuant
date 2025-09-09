@@ -21,10 +21,9 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     propagate_state,
     propagate_unitary,
 )
-from slowquant.unitary_coupled_cluster.operators import anni
+from slowquant.unitary_coupled_cluster.operators import a_op
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.unrestricted_density_matrix import (
-    UnrestrictedReducedDensityMatrix,
     get_electronic_energy_unrestricted,
     get_orbital_gradient_unrestricted,
     get_orbital_response_hessian_block_unrestricted,
@@ -88,9 +87,9 @@ class UnrestrictedWaveFunctionUPS:
         self.num_active_elec_alpha = cas[0][0]
         self.num_active_elec_beta = cas[0][1]
         self.num_active_elec = self.num_active_elec_alpha + self.num_active_elec_beta
-        self.num_active_spin_orbs = 2*cas[1]
+        self.num_active_spin_orbs = 2 * cas[1]
         self.num_inactive_spin_orbs = self.num_elec - self.num_active_elec
-        self.num_virtual_spin_orbs = 2*len(h_ao) - self.num_inactive_spin_orbs - self.num_active_spin_orbs
+        self.num_virtual_spin_orbs = 2 * len(h_ao) - self.num_inactive_spin_orbs - self.num_active_spin_orbs
         self._rdm1aa = None
         self._rdm1bb = None
         self._rdm2aaaa = None
@@ -104,17 +103,20 @@ class UnrestrictedWaveFunctionUPS:
         self._gaabb_mo = None
         self._gbbaa_mo = None
         self.ansatz_options = ansatz_options
-        self.inactive_spin_idx = [x for x  in range(self.num_inactive_spin_orbs)]
-        self.active_spin_idx = [x + self.num_inactive_spin_orbs for x  in range(self.num_active_spin_orbs)]
-        self.virtual_spin_idx = [x + self.num_inactive_spin_orbs + self.num_virtual_spin_orbs for x  in range(self.num_virtual_spin_orbs)]
+        self.inactive_spin_idx = [x for x in range(self.num_inactive_spin_orbs)]
+        self.active_spin_idx = [x + self.num_inactive_spin_orbs for x in range(self.num_active_spin_orbs)]
+        self.virtual_spin_idx = [
+            x + self.num_inactive_spin_orbs + self.num_virtual_spin_orbs
+            for x in range(self.num_virtual_spin_orbs)
+        ]
         self.active_occ_spin_idx = []
         for i in range(self.num_active_elec_alpha):
-            self.active_occ_spin_idx.append(2*i + self.num_inactive_spin_orbs)
+            self.active_occ_spin_idx.append(2 * i + self.num_inactive_spin_orbs)
         for i in range(self.num_active_elec_beta):
-            self.active_occ_spin_idx.append(2*i+1 + self.num_inactive_spin_orbs)
+            self.active_occ_spin_idx.append(2 * i + 1 + self.num_inactive_spin_orbs)
         self.active_occ_spin_idx.sort()
         self.active_unocc_spin_idx = []
-        for i in range(self.num_inactive_spin_orbs, self.num_inactive_spin_orbs+ self.num_active_spin_orbs):
+        for i in range(self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs):
             if i not in self.active_occ_spin_idx:
                 self.active_unocc_spin_idx.append(i)
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
@@ -162,14 +164,14 @@ class UnrestrictedWaveFunctionUPS:
                     self._kappa_b_redundant.append(0.0)
                     self._kappa_a_redundant_old.append(0.0)
                     self._kappa_b_redundant_old.append(0.0)
-                    self.kappa_redundant_idx.append([p, q])
+                    self.kappa_redundant_idx.append((p, q))
                     continue
                 if p in self.virtual_idx and q in self.virtual_idx:
                     self._kappa_a_redundant.append(0.0)
                     self._kappa_b_redundant.append(0.0)
                     self._kappa_a_redundant_old.append(0.0)
                     self._kappa_b_redundant_old.append(0.0)
-                    self.kappa_redundant_idx.append([p, q])
+                    self.kappa_redundant_idx.append((p, q))
                     continue
                 if not include_active_kappa:
                     if p in self.active_idx and q in self.active_idx:
@@ -177,7 +179,7 @@ class UnrestrictedWaveFunctionUPS:
                         self._kappa_b_redundant.append(0.0)
                         self._kappa_a_redundant_old.append(0.0)
                         self._kappa_b_redundant_old.append(0.0)
-                        self.kappa_redundant_idx.append([p, q])
+                        self.kappa_redundant_idx.append((p, q))
                         continue
                 if include_active_kappa:
                     if p in self.active_occ_idx and q in self.active_occ_idx:
@@ -185,23 +187,23 @@ class UnrestrictedWaveFunctionUPS:
                         self._kappa_b_redundant.append(0.0)
                         self._kappa_a_redundant_old.append(0.0)
                         self._kappa_b_redundant_old.append(0.0)
-                        self.kappa_redundant_idx.append([p, q])
+                        self.kappa_redundant_idx.append((p, q))
                         continue
                     if p in self.active_unocc_idx and q in self.active_unocc_idx:
                         self._kappa_a_redundant.append(0.0)
                         self._kappa_b_redundant.append(0.0)
                         self._kappa_a_redundant_old.append(0.0)
                         self._kappa_b_redundant_old.append(0.0)
-                        self.kappa_redundant_idx.append([p, q])
+                        self.kappa_redundant_idx.append((p, q))
                         continue
                 if not (p in self.active_idx and q in self.active_idx):
-                    self.kappa_no_activeactive_idx.append([p, q])
-                    self.kappa_no_activeactive_idx_dagger.append([q, p])
+                    self.kappa_no_activeactive_idx.append((p, q))
+                    self.kappa_no_activeactive_idx_dagger.append((q, p))
                 self._kappa_a.append(0.0)
                 self._kappa_b.append(0.0)
                 self._kappa_a_old.append(0.0)
                 self._kappa_b_old.append(0.0)
-                self.kappa_idx.append([p, q])
+                self.kappa_idx.append((p, q))
         # Construct determinant basis
         self.ci_info = get_indexing(
             self.num_inactive_orbs,
@@ -488,7 +490,7 @@ class UnrestrictedWaveFunctionUPS:
                 q_idx = q - self.num_inactive_orbs
                 val = expectation_value(
                     self.ci_coeffs,
-                    [anni(p, spin, True) * anni(q, spin, False)],
+                    [a_op(p, spin, True) * a_op(q, spin, False)],
                     self.ci_coeffs,
                     self.ci_info,
                     self.thetas,
@@ -550,10 +552,10 @@ class UnrestrictedWaveFunctionUPS:
                         val = expectation_value(
                             self.ci_coeffs,
                             [
-                                anni(p, spin1, True)
-                                * anni(r, spin2, True)
-                                * anni(s, spin2, False)
-                                * anni(q, spin1, False)
+                                a_op(p, spin1, True)
+                                * a_op(r, spin2, True)
+                                * a_op(s, spin2, False)
+                                * a_op(q, spin1, False)
                             ],
                             self.ci_coeffs,
                             self.ci_info,
@@ -851,19 +853,7 @@ class UnrestrictedWaveFunctionUPS:
             # RDM is more expensive than evaluation of the Hamiltonian.
             # Thus only construct these if orbital-optimization is turned on,
             # since the RDMs will be reused in the oo gradient calculation.
-            rdms = UnrestrictedReducedDensityMatrix(
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.num_virtual_orbs,
-                rdm1aa=self.rdm1aa,
-                rdm1bb=self.rdm1bb,
-                rdm2aaaa=self.rdm2aaaa,
-                rdm2bbbb=self.rdm2bbbb,
-                rdm2aabb=self.rdm2aabb,
-                rdm2bbaa=self.rdm2bbaa,
-            )
             E = get_electronic_energy_unrestricted(
-                rdms,
                 self.haa_mo,
                 self.hbb_mo,
                 self.gaaaa_mo,
@@ -872,6 +862,12 @@ class UnrestrictedWaveFunctionUPS:
                 self.gbbaa_mo,
                 self.num_inactive_orbs,
                 self.num_active_orbs,
+                self.rdm1aa,
+                self.rdm1bb,
+                self.rdm2aaaa,
+                self.rdm2bbbb,
+                self.rdm2aabb,
+                self.rdm2bbaa,
             )
         else:
             E = expectation_value(
@@ -921,19 +917,7 @@ class UnrestrictedWaveFunctionUPS:
         if theta_optimization:
             self.thetas = parameters[num_kappa_a + num_kappa_b :]
         if kappa_optimization:
-            rdms = UnrestrictedReducedDensityMatrix(
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.num_virtual_orbs,
-                rdm1aa=self.rdm1aa,
-                rdm1bb=self.rdm1bb,
-                rdm2aaaa=self.rdm2aaaa,
-                rdm2bbbb=self.rdm2bbbb,
-                rdm2aabb=self.rdm2aabb,
-                rdm2bbaa=self.rdm2bbaa,
-            )
             gradient[: num_kappa_a + num_kappa_b] = get_orbital_gradient_unrestricted(
-                rdms,
                 self.haa_mo,
                 self.hbb_mo,
                 self.gaaaa_mo,
@@ -943,6 +927,12 @@ class UnrestrictedWaveFunctionUPS:
                 self.kappa_idx,
                 self.num_inactive_orbs,
                 self.num_active_orbs,
+                self.rdm1aa,
+                self.rdm1bb,
+                self.rdm2aaaa,
+                self.rdm2bbbb,
+                self.rdm2aabb,
+                self.rdm2bbaa,
             )
         if theta_optimization:
             Hamiltonian = unrestricted_hamiltonian_0i_0a(
@@ -1003,19 +993,7 @@ class UnrestrictedWaveFunctionUPS:
 
     @property
     def energy_elec_RDM(self) -> float:
-        rdms = UnrestrictedReducedDensityMatrix(
-            self.num_inactive_orbs,
-            self.num_active_orbs,
-            self.num_virtual_orbs,
-            rdm1aa=self.rdm1aa,
-            rdm1bb=self.rdm1bb,
-            rdm2aaaa=self.rdm2aaaa,
-            rdm2bbbb=self.rdm2bbbb,
-            rdm2aabb=self.rdm2aabb,
-            rdm2bbaa=self.rdm2bbaa,
-        )
         return get_electronic_energy_unrestricted(
-            rdms,
             self.haa_mo,
             self.hbb_mo,
             self.gaaaa_mo,
@@ -1024,23 +1002,17 @@ class UnrestrictedWaveFunctionUPS:
             self.gbbaa_mo,
             self.num_inactive_orbs,
             self.num_active_orbs,
+            self.rdm1aa,
+            self.rdm1bb,
+            self.rdm2aaaa,
+            self.rdm2bbbb,
+            self.rdm2aabb,
+            self.rdm2bbaa,
         )
 
     @property
     def orbital_gradient_RDM(self) -> np.ndarray:
-        rdms = UnrestrictedReducedDensityMatrix(
-            self.num_inactive_orbs,
-            self.num_active_orbs,
-            self.num_virtual_orbs,
-            rdm1aa=self.rdm1aa,
-            rdm1bb=self.rdm1bb,
-            rdm2aaaa=self.rdm2aaaa,
-            rdm2bbbb=self.rdm2bbbb,
-            rdm2aabb=self.rdm2aabb,
-            rdm2bbaa=self.rdm2bbaa,
-        )
         return get_orbital_gradient_unrestricted(
-            rdms,
             self.haa_mo,
             self.hbb_mo,
             self.gaaaa_mo,
@@ -1050,24 +1022,18 @@ class UnrestrictedWaveFunctionUPS:
             self.kappa_idx,
             self.num_inactive_orbs,
             self.num_active_orbs,
+            self.rdm1aa,
+            self.rdm1bb,
+            self.rdm2aaaa,
+            self.rdm2bbbb,
+            self.rdm2aabb,
+            self.rdm2bbaa,
         )
 
     # print the unrestricted orbital response hessian block for test
     @property
     def orbital_hessian_unrestricted_A(self) -> np.ndarray:
-        rdms = UnrestrictedReducedDensityMatrix(
-            self.num_inactive_orbs,
-            self.num_active_orbs,
-            self.num_virtual_orbs,
-            rdm1aa=self.rdm1aa,
-            rdm1bb=self.rdm1bb,
-            rdm2aaaa=self.rdm2aaaa,
-            rdm2bbbb=self.rdm2bbbb,
-            rdm2aabb=self.rdm2aabb,
-            rdm2bbaa=self.rdm2bbaa,
-        )
         return get_orbital_response_hessian_block_unrestricted(
-            rdms,
             self.haa_mo,
             self.hbb_mo,
             self.gaaaa_mo,
@@ -1078,23 +1044,17 @@ class UnrestrictedWaveFunctionUPS:
             self.kappa_no_activeactive_idx,
             self.num_inactive_orbs,
             self.num_active_orbs,
+            self.rdm1aa,
+            self.rdm1bb,
+            self.rdm2aaaa,
+            self.rdm2bbbb,
+            self.rdm2aabb,
+            self.rdm2bbaa,
         )
-    
+
     @property
     def orbital_hessian_unrestricted_B(self) -> np.ndarray:
-        rdms = UnrestrictedReducedDensityMatrix(
-            self.num_inactive_orbs,
-            self.num_active_orbs,
-            self.num_virtual_orbs,
-            rdm1aa=self.rdm1aa,
-            rdm1bb=self.rdm1bb,
-            rdm2aaaa=self.rdm2aaaa,
-            rdm2bbbb=self.rdm2bbbb,
-            rdm2aabb=self.rdm2aabb,
-            rdm2bbaa=self.rdm2bbaa,
-        )
         return get_orbital_response_hessian_block_unrestricted(
-            rdms,
             self.haa_mo,
             self.hbb_mo,
             self.gaaaa_mo,
@@ -1105,24 +1065,23 @@ class UnrestrictedWaveFunctionUPS:
             self.kappa_no_activeactive_idx_dagger,
             self.num_inactive_orbs,
             self.num_active_orbs,
+            self.rdm1aa,
+            self.rdm1bb,
+            self.rdm2aaaa,
+            self.rdm2bbbb,
+            self.rdm2aabb,
+            self.rdm2bbaa,
         )
-    #Print response orbital metric sigma for test
+
+    # Print response orbital metric sigma for test
     @property
     def orbital_response_metric_sigma_unrestricted(self) -> np.ndarray:
-        rdms = UnrestrictedReducedDensityMatrix(
+        return get_orbital_response_metric_sigma_unrestricted(
+            self.kappa_no_activeactive_idx,
             self.num_inactive_orbs,
             self.num_active_orbs,
-            self.num_virtual_orbs,
-            rdm1aa=self.rdm1aa,
-            rdm1bb=self.rdm1bb,
-            rdm2aaaa=self.rdm2aaaa,
-            rdm2bbbb=self.rdm2bbbb,
-            rdm2aabb=self.rdm2aabb,
-            rdm2bbaa=self.rdm2bbaa,
-        )
-        return get_orbital_response_metric_sigma_unrestricted(
-            rdms,
-            self.kappa_no_activeactive_idx,
+            self.rdm1aa,
+            self.rdm1bb,
         )
 
     def manual_metric_sigma_unrestricted(
@@ -1131,10 +1090,10 @@ class UnrestrictedWaveFunctionUPS:
         sigma = np.zeros((2 * len(wf.kappa_no_activeactive_idx), 2 * len(wf.kappa_no_activeactive_idx)))
         for idx1, (q, p) in enumerate(wf.kappa_no_activeactive_idx):
             for idx2, (m, n) in enumerate(wf.kappa_no_activeactive_idx):
-                q_qp_a = (anni(p, "alpha", True) * anni(q, "alpha", False))
-                q_mn_a = (anni(m, "alpha", True) * anni(n, "alpha", False))
-                q_qp_b = (anni(p, "beta", True) * anni(q, "beta", False))
-                q_mn_b = (anni(m, "beta", True) * anni(n, "beta", False))
+                q_qp_a = a_op(p, "alpha", True) * a_op(q, "alpha", False)
+                q_mn_a = a_op(m, "alpha", True) * a_op(n, "alpha", False)
+                q_qp_b = a_op(p, "beta", True) * a_op(q, "beta", False)
+                q_mn_b = a_op(m, "beta", True) * a_op(n, "beta", False)
                 aa = expectation_value(
                     wf.ci_coeffs,
                     [q_qp_a * q_mn_a],
@@ -1167,8 +1126,8 @@ class UnrestrictedWaveFunctionUPS:
                     wf.thetas,
                     wf.ups_layout,
                 )
-                sigma[idx1*2, idx2*2] = aa
-                sigma[idx1*2+1, idx2*2 + 1] = bb
+                sigma[idx1 * 2, idx2 * 2] = aa
+                sigma[idx1 * 2 + 1, idx2 * 2 + 1] = bb
         return sigma
 
     def manual_hessian_unrestricted_A(
@@ -1180,10 +1139,10 @@ class UnrestrictedWaveFunctionUPS:
         A_block = np.zeros((2 * len(wf.kappa_no_activeactive_idx), 2 * len(wf.kappa_no_activeactive_idx)))
         for idx1, (u, t) in enumerate(wf.kappa_no_activeactive_idx):
             for idx2, (m, n) in enumerate(wf.kappa_no_activeactive_idx):
-                E_tu_a = (anni(t, "alpha", True) * anni(u, "alpha", False))
-                E_mn_a = (anni(m, "alpha", True) * anni(n, "alpha", False))
-                E_tu_b = (anni(t, "beta", True) * anni(u, "beta", False))
-                E_mn_b = (anni(m, "beta", True) * anni(n, "beta", False))
+                E_tu_a = a_op(t, "alpha", True) * a_op(u, "alpha", False)
+                E_mn_a = a_op(m, "alpha", True) * a_op(n, "alpha", False)
+                E_tu_b = a_op(t, "beta", True) * a_op(u, "beta", False)
+                E_mn_b = a_op(m, "beta", True) * a_op(n, "beta", False)
                 aa = expectation_value(
                     wf.ci_coeffs,
                     [E_tu_a * h * E_mn_a],
@@ -1312,10 +1271,10 @@ class UnrestrictedWaveFunctionUPS:
                     wf.thetas,
                     wf.ups_layout,
                 )
-                A_block[idx1*2, idx2*2] = aa
-                A_block[idx1*2, idx2*2+1] = ab
-                A_block[idx1*2+1, idx2*2] = ba
-                A_block[idx1*2+1, idx2*2+1] = bb
+                A_block[idx1 * 2, idx2 * 2] = aa
+                A_block[idx1 * 2, idx2 * 2 + 1] = ab
+                A_block[idx1 * 2 + 1, idx2 * 2] = ba
+                A_block[idx1 * 2 + 1, idx2 * 2 + 1] = bb
         return A_block
 
     def manual_hessian_unrestricted_B(
@@ -1327,10 +1286,10 @@ class UnrestrictedWaveFunctionUPS:
         B_block = np.zeros((2 * len(wf.kappa_no_activeactive_idx), 2 * len(wf.kappa_no_activeactive_idx)))
         for idx1, (u, t) in enumerate(wf.kappa_no_activeactive_idx):
             for idx2, (n, m) in enumerate(wf.kappa_no_activeactive_idx):
-                E_tu_a = (anni(t, "alpha", True) * anni(u, "alpha", False))
-                E_mn_a = (anni(m, "alpha", True) * anni(n, "alpha", False))
-                E_tu_b = (anni(t, "beta", True) * anni(u, "beta", False))
-                E_mn_b = (anni(m, "beta", True) * anni(n, "beta", False))
+                E_tu_a = a_op(t, "alpha", True) * a_op(u, "alpha", False)
+                E_mn_a = a_op(m, "alpha", True) * a_op(n, "alpha", False)
+                E_tu_b = a_op(t, "beta", True) * a_op(u, "beta", False)
+                E_mn_b = a_op(m, "beta", True) * a_op(n, "beta", False)
                 aa = expectation_value(
                     wf.ci_coeffs,
                     [E_tu_a * h * E_mn_a],
@@ -1459,10 +1418,10 @@ class UnrestrictedWaveFunctionUPS:
                     wf.thetas,
                     wf.ups_layout,
                 )
-                B_block[idx1*2, idx2*2] = aa
-                B_block[idx1*2, idx2*2+1] = ab
-                B_block[idx1*2+1, idx2*2] = ba
-                B_block[idx1*2+1, idx2*2+1] = bb
+                B_block[idx1 * 2, idx2 * 2] = aa
+                B_block[idx1 * 2, idx2 * 2 + 1] = ab
+                B_block[idx1 * 2 + 1, idx2 * 2] = ba
+                B_block[idx1 * 2 + 1, idx2 * 2 + 1] = bb
         return B_block
 
     def manual_gradient(
@@ -1476,7 +1435,7 @@ class UnrestrictedWaveFunctionUPS:
             for p in range(wf.num_inactive_orbs + wf.num_active_orbs):
                 alpha = expectation_value(
                     wf.ci_coeffs,
-                    [anni(m, "alpha", True) * anni(n, "alpha", False) * h],
+                    [a_op(m, "alpha", True) * a_op(n, "alpha", False) * h],
                     wf.ci_coeffs,
                     wf.ci_info,
                     wf.thetas,
@@ -1484,7 +1443,7 @@ class UnrestrictedWaveFunctionUPS:
                 )
                 alpha -= expectation_value(
                     wf.ci_coeffs,
-                    [anni(n, "alpha", True) * anni(m, "alpha", False) * h],
+                    [a_op(n, "alpha", True) * a_op(m, "alpha", False) * h],
                     wf.ci_coeffs,
                     wf.ci_info,
                     wf.thetas,
@@ -1493,7 +1452,7 @@ class UnrestrictedWaveFunctionUPS:
 
                 alpha -= expectation_value(
                     wf.ci_coeffs,
-                    [h * (anni(m, "alpha", True) * anni(n, "alpha", False))],
+                    [h * (a_op(m, "alpha", True) * a_op(n, "alpha", False))],
                     wf.ci_coeffs,
                     wf.ci_info,
                     wf.thetas,
@@ -1501,7 +1460,7 @@ class UnrestrictedWaveFunctionUPS:
                 )
                 alpha += expectation_value(
                     wf.ci_coeffs,
-                    [h * (anni(n, "alpha", True) * anni(m, "alpha", False))],
+                    [h * (a_op(n, "alpha", True) * a_op(m, "alpha", False))],
                     wf.ci_coeffs,
                     wf.ci_info,
                     wf.thetas,
@@ -1509,7 +1468,7 @@ class UnrestrictedWaveFunctionUPS:
                 )
                 beta = expectation_value(
                     wf.ci_coeffs,
-                    [anni(m, "beta", True) * anni(n, "beta", False) * h],
+                    [a_op(m, "beta", True) * a_op(n, "beta", False) * h],
                     wf.ci_coeffs,
                     wf.ci_info,
                     wf.thetas,
@@ -1517,7 +1476,7 @@ class UnrestrictedWaveFunctionUPS:
                 )
                 beta -= expectation_value(
                     wf.ci_coeffs,
-                    [anni(n, "beta", True) * anni(m, "beta", False) * h],
+                    [a_op(n, "beta", True) * a_op(m, "beta", False) * h],
                     wf.ci_coeffs,
                     wf.ci_info,
                     wf.thetas,
@@ -1525,7 +1484,7 @@ class UnrestrictedWaveFunctionUPS:
                 )
                 beta -= expectation_value(
                     wf.ci_coeffs,
-                    [h * (anni(m, "beta", True) * anni(n, "beta", False))],
+                    [h * (a_op(m, "beta", True) * a_op(n, "beta", False))],
                     wf.ci_coeffs,
                     wf.ci_info,
                     wf.thetas,
@@ -1533,7 +1492,7 @@ class UnrestrictedWaveFunctionUPS:
                 )
                 beta += expectation_value(
                     wf.ci_coeffs,
-                    [h * (anni(n, "beta", True) * anni(m, "beta", False))],
+                    [h * (a_op(n, "beta", True) * a_op(m, "beta", False))],
                     wf.ci_coeffs,
                     wf.ci_info,
                     wf.thetas,

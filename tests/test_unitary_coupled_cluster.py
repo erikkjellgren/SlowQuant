@@ -724,7 +724,7 @@ def test_H2_sto3g_uccsd_saveload() -> None:
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("SLSQP")
     WF.save_wavefunction("test_h2_save", force_overwrite=True)
     WF2 = load_wavefunction("test_h2_save")
     LR = naivelr.LinearResponseUCC(WF2, "SD")

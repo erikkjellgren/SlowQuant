@@ -6,17 +6,16 @@ import scipy
 from slowquant.unitary_coupled_cluster.ci_spaces import CI_Info
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.operators import (
+    G1,
+    G2,
     G3,
     G4,
     G5,
     G6,
-    G1,
-    G2,
 )
 from slowquant.unitary_coupled_cluster.unrestricted_operators import (
-    unrestricted_hamiltonian_full_space,
     unrestricted_hamiltonian_0i_0a,
-    unrestricted_one_elec_op_full_space
+    unrestricted_hamiltonian_1i_1a,
 )
 from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.util import (
@@ -83,24 +82,26 @@ class LinearResponseBaseClass:
             ):
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
         for i, a in self.wf.kappa_no_activeactive_idx:
-            op = G1(2*a, 2*i)
-            self.q_ops.append(op) 
-            op = G1(2*a + 1, 2*i + 1)
+            op = G1(2 * a, 2 * i)
             self.q_ops.append(op)
-    
+            op = G1(2 * a + 1, 2 * i + 1)
+            self.q_ops.append(op)
+
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters))
         self.B = np.zeros((num_parameters, num_parameters))
         self.Sigma = np.zeros((num_parameters, num_parameters))
         self.Delta = np.zeros((num_parameters, num_parameters))
-        self.H_1i_1a = unrestricted_hamiltonian_full_space(
+        self.H_1i_1a = unrestricted_hamiltonian_1i_1a(
             self.wf.haa_mo,
             self.wf.hbb_mo,
             self.wf.gaaaa_mo,
             self.wf.gbbbb_mo,
             self.wf.gaabb_mo,
             self.wf.gbbaa_mo,
-            self.wf.num_orbs,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
         self.H_0i_0a = unrestricted_hamiltonian_0i_0a(
             self.wf.haa_mo,
@@ -129,7 +130,7 @@ class LinearResponseBaseClass:
         if np.abs(np.min(hess_eigval)) < 10**-8:
             print("WARNING: Small eigenvalue in Hessian")
         elif np.min(hess_eigval) < 0:
-        #    raise ValueError("Negative eigenvalue in Hessian.")
+            #    raise ValueError("Negative eigenvalue in Hessian.")
             print("WARNING: Negative eigenvalue in Hessian")
 
         S = np.zeros((size * 2, size * 2))

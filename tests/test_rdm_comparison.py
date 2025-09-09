@@ -1,6 +1,5 @@
 import pyscf
-from pyscf import scf, mcscf, mp
-from pyscf import gto, scf, mcscf, fci
+from pyscf import fci, mcscf, scf
 
 mol = pyscf.M(atom="O 0 0 0; H 0.0  0.0  0.9697", basis="6-31G", unit="angstrom", spin=1)
 mol.build()
@@ -8,8 +7,7 @@ mf = scf.UHF(mol)
 mf.kernel()
 
 
-
-mc = mcscf.UCASCI(mf, 3, (2,1))
+mc = mcscf.UCASCI(mf, 3, (2, 1))
 res = mc.kernel(mf.mo_coeff)
 
 
