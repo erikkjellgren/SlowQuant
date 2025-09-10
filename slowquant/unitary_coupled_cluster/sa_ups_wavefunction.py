@@ -726,8 +726,8 @@ class WaveFunctionSAUPS:
         grad_threshold: float = 1e-5,
         orbital_optimization: bool = False,
     ) -> None:
-        excitation_pool: list[tuple[int, ...]] = []
-        excitation_pool_type: list[str] = []
+        excitation_pool = []
+        excitation_pool_type = []
         if operator_pool.lower() == "sa_singles_sa_doubles":
             for a, i, _ in iterate_t1_sa_generalized(self.num_active_orbs):
                 excitation_pool.append((i, a))
@@ -764,42 +764,42 @@ class WaveFunctionSAUPS:
                 self.num_active_orbs,
             )
             H_ket = propagate_state_SA(
-                [Hamiltonian], self.ci_coeffs, self.ci_info, self.thetas, self.ups_layout
+                [Hamiltonian], self.ci_coeffs, self.ci_info,
             )
             grad = []
 
             for idx, exc_type in enumerate(excitation_pool_type):
                 if exc_type == "single":
-                    (i, a) = np.array(excitation_pool[idx]) + self.num_inactive_spin_orbs
+                    (i, a) = np.array(excitation_pool[idx])
                     T = G1(i, a, True)
                 elif exc_type == "double":
-                    (i, j, a, b) = np.array(excitation_pool[idx]) + self.num_inactive_spin_orbs
+                    (i, j, a, b) = np.array(excitation_pool[idx])
                     T = G2(i, j, a, b, True)
                 elif exc_type in ("sa_single",):
-                    (i, a) = np.array(excitation_pool[idx]) + self.num_inactive_orbs
+                    (i, a) = np.array(excitation_pool[idx])
                     T = G1_sa(i, a, True)
                 elif exc_type in ("sa_double_1",):
-                    (i, j, a, b) = np.array(excitation_pool[idx]) + self.num_inactive_orbs
+                    (i, j, a, b) = np.array(excitation_pool[idx])
                     T = G2_sa(i, j, a, b, 1, True)
                 elif exc_type in ("sa_double_2",):
-                    (i, j, a, b) = np.array(excitation_pool[idx]) + self.num_inactive_orbs
+                    (i, j, a, b) = np.array(excitation_pool[idx])
                     T = G2_sa(i, j, a, b, 2, True)
                 elif exc_type in ("sa_double_3",):
-                    (i, j, a, b) = np.array(excitation_pool[idx]) + self.num_inactive_orbs
+                    (i, j, a, b) = np.array(excitation_pool[idx])
                     T = G2_sa(i, j, a, b, 3, True)
                 elif exc_type in ("sa_double_4",):
-                    (i, j, a, b) = np.array(excitation_pool[idx]) + self.num_inactive_orbs
+                    (i, j, a, b) = np.array(excitation_pool[idx])
                     T = G2_sa(i, j, a, b, 4, True)
                 elif exc_type in ("sa_double_5",):
-                    (i, j, a, b) = np.array(excitation_pool[idx]) + self.num_inactive_orbs
+                    (i, j, a, b) = np.array(excitation_pool[idx])
                     T = G2_sa(i, j, a, b, 5, True)
                 else:
                     raise ValueError(f"Got unknown excitation type {exc_type}")
                 gr = expectation_value_SA(
-                    self.ci_coeffs, [T], H_ket, self.ci_info, self.thetas, self.ups_layout
+                    self.ci_coeffs, [T], H_ket, self.ci_info, do_folding=False
                 )
                 gr -= expectation_value_SA(
-                    H_ket, [T], self.ci_coeffs, self.ci_info, self.thetas, self.ups_layout
+                    H_ket, [T], self.ci_coeffs, self.ci_info, do_folding=False
                 )
                 grad.append(gr)
             if np.max(np.abs(grad)) < grad_threshold:
@@ -808,8 +808,6 @@ class WaveFunctionSAUPS:
             self.ups_layout.excitation_indices.append(excitation_pool[max_arg])
             self.ups_layout.excitation_operator_type.append(excitation_pool_type[max_arg])
             self.ups_layout.n_params += 1
-            excitation_pool = excitation_pool
-            excitation_pool_type = excitation_pool_type
 
             self._thetas.append(0.0)
             self.run_wf_optimization_1step("bfgs", orbital_optimization=orbital_optimization, is_silent=True)
