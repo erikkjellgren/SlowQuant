@@ -5,7 +5,12 @@ from functools import partial
 import numpy as np
 import scipy
 from qiskit import QuantumCircuit
-from qiskit.primitives import BaseEstimator, BaseEstimatorV2, BaseSampler, BaseSamplerV1, BaseSamplerV2
+from qiskit.primitives import (
+    BaseEstimatorV1,
+    BaseEstimatorV2,
+    BaseSamplerV1,
+    BaseSamplerV2,
+)
 from qiskit.quantum_info import SparsePauliOp
 
 from slowquant.molecularintegrals.integralfunctions import (
@@ -258,9 +263,7 @@ class WaveFunctionCircuit:
         self._energy_elec = None
         self.QI.parameters = parameters
 
-    def change_primitive(
-        self, primitive: BaseEstimator | BaseSampler | BaseSamplerV2, verbose: bool = True
-    ) -> None:
+    def change_primitive(self, primitive: BaseSamplerV1 | BaseSamplerV2, verbose: bool = True) -> None:
         """Change the primitive expectation value calculator.
 
         Args:
@@ -273,10 +276,10 @@ class WaveFunctionCircuit:
                 Multiple switching back and forth can lead to un-expected outcomes and is an experimental feature.\n"
             )
 
-        if isinstance(primitive, BaseEstimatorV2):
-            raise ValueError("EstimatorV2 is not currently supported.")
-        if isinstance(primitive, BaseSamplerV2) and verbose:
-            print("WARNING: Using SamplerV2 is an experimental feature.")
+        if isinstance(primitive, (BaseEstimatorV1, BaseEstimatorV2)):
+            raise ValueError("Estimator is not supported.")
+        elif not isinstance(primitive, (BaseSamplerV1, BaseSamplerV2)):
+            raise TypeError(f"Unsupported primitive, {type(self._primitive)}")
         self.QI._primitive = primitive
         if verbose:
             if self.QI.mitigation_flags.do_M_ansatz0:
@@ -782,6 +785,17 @@ class WaveFunctionCircuit:
         if self._energy_elec is None:
             self._energy_elec = self._calc_energy_elec()
         return self._energy_elec
+
+    def _get_hamiltonian(self) -> FermionicOperator:
+        """Return electronic Hamiltonian as FermionicOperator.
+
+        Returns:
+            FermionicOperator.
+        """
+        H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+        H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+
+        return H
 
     def _calc_energy_elec(self) -> float:
         """Run electronic energy simulation, regardless of self._energy_elec variable.

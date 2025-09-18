@@ -5,7 +5,7 @@ from functools import partial
 import numpy as np
 import scipy
 from qiskit import QuantumCircuit
-from qiskit.primitives import BaseEstimator, BaseEstimatorV2, BaseSampler, BaseSamplerV2
+from qiskit.primitives import BaseEstimatorV1, BaseEstimatorV2, BaseSamplerV1, BaseSamplerV2
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
@@ -270,9 +270,7 @@ class WaveFunctionSACircuit:
         self._ci_coeffs = None
         self.QI.parameters = parameters
 
-    def change_primitive(
-        self, primitive: BaseEstimator | BaseSampler | BaseSamplerV2, verbose: bool = True
-    ) -> None:
+    def change_primitive(self, primitive: BaseSamplerV1 | BaseSamplerV2, verbose: bool = True) -> None:
         """Change the primitive expectation value calculator.
 
         Args:
@@ -285,10 +283,10 @@ class WaveFunctionSACircuit:
                 Multiple switching back and forth can lead to un-expected outcomes and is an experimental feature.\n"
             )
 
-        if isinstance(primitive, BaseEstimatorV2):
-            raise ValueError("EstimatorV2 is not currently supported.")
-        if isinstance(primitive, BaseSamplerV2) and verbose:
-            print("WARNING: Using SamplerV2 is an experimental feature.")
+        if isinstance(primitive, (BaseEstimatorV1, BaseEstimatorV2)):
+            raise ValueError("Estimator is not supported.")
+        elif not isinstance(primitive, (BaseSamplerV1, BaseSamplerV2)):
+            raise TypeError(f"Unsupported Qiskit primitive, {type(self._primitive)}")
         self.QI._primitive = primitive
         if verbose:
             if self.QI.mitigation_flags.do_M_ansatz0:
@@ -878,6 +876,7 @@ def get_energy_evals_for_grad(
 
     Args:
         operator: Operator which the derivative is with respect to.
+        quantum_interface: Quantum interface object
         parameters: Paramters.
         idx: Parameter idx.
         R: Parameter to control we get the needed points.

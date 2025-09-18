@@ -307,7 +307,8 @@ def test_lih_fucc_mappings() -> None:
         mol.intor("int2e"),
         "fUCCSD",
     )
-    assert abs(WF.energy_elec - -8.808220920154708) < 10**-10
+    WF.run_wf_optimization_1step("SLSQP", False)
+    assert abs(WF.energy_elec - -8.82972563114591) < 10**-10
 
     sampler = Sampler()
     mapper = JordanWignerMapper()
@@ -356,7 +357,8 @@ def test_lih_sdsfucc_mappings() -> None:
         mol.intor("int2e"),
         "SDSfUCCSD",
     )
-    assert abs(WF.energy_elec - -8.808220920154705) < 10**-10
+    WF.run_wf_optimization_1step("SLSQP", False)
+    assert abs(WF.energy_elec - -8.829725631105443) < 10**-10
 
     sampler = Sampler()
     mapper = JordanWignerMapper()
@@ -406,7 +408,8 @@ def test_lih_tups_mappings() -> None:
         "tUPS",
         ansatz_options={"n_layers": 4},
     )
-    assert abs(WF.energy_elec - -8.808220920154707) < 10**-10
+    WF.run_wf_optimization_1step("SLSQP", False)
+    assert abs(WF.energy_elec - -8.825023029148799) < 10**-10
 
     sampler = Sampler()
     mapper = JordanWignerMapper()
