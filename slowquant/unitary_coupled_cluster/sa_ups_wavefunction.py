@@ -764,7 +764,9 @@ class WaveFunctionSAUPS:
                 self.num_active_orbs,
             )
             H_ket = propagate_state_SA(
-                [Hamiltonian], self.ci_coeffs, self.ci_info,
+                [Hamiltonian],
+                self.ci_coeffs,
+                self.ci_info,
             )
             grad = []
 
@@ -795,12 +797,8 @@ class WaveFunctionSAUPS:
                     T = G2_sa(i, j, a, b, 5, True)
                 else:
                     raise ValueError(f"Got unknown excitation type {exc_type}")
-                gr = expectation_value_SA(
-                    self.ci_coeffs, [T], H_ket, self.ci_info, do_folding=False
-                )
-                gr -= expectation_value_SA(
-                    H_ket, [T], self.ci_coeffs, self.ci_info, do_folding=False
-                )
+                gr = expectation_value_SA(self.ci_coeffs, [T], H_ket, self.ci_info, do_folding=False)
+                gr -= expectation_value_SA(H_ket, [T], self.ci_coeffs, self.ci_info, do_folding=False)
                 grad.append(gr)
             if np.max(np.abs(grad)) < grad_threshold:
                 break
