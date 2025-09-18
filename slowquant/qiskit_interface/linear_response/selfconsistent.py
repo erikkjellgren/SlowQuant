@@ -6,7 +6,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
 from slowquant.qiskit_interface.linear_response.lr_baseclass import quantumLRBaseClass
-from slowquant.unitary_coupled_cluster.fermionic_operator import (
+from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     get_determinant_expansion_from_operator_on_HF,
 )
 from slowquant.unitary_coupled_cluster.operators import one_elec_op_0i_0a
