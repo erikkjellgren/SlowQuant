@@ -361,8 +361,6 @@ class WaveFunctionUPS:
                         [Epq(p, q)],
                         self.ci_coeffs,
                         self.ci_info,
-                        self.thetas,
-                        self.ups_layout,
                     )
                     self._rdm1[p_idx, q_idx] = val  # type: ignore
                     self._rdm1[q_idx, p_idx] = val  # type: ignore
@@ -405,8 +403,6 @@ class WaveFunctionUPS:
                                 [Epq(p, q) * Epq(r, s)],
                                 self.ci_coeffs,
                                 self.ci_info,
-                                self.thetas,
-                                self.ups_layout,
                             )
                             if q == r:
                                 val -= self.rdm1[p_idx, s_idx]
@@ -453,8 +449,6 @@ class WaveFunctionUPS:
                                         [Epq(p, q), Epq(r, s), Epq(t, u)],
                                         self.ci_coeffs,
                                         self.ci_info,
-                                        self.thetas,
-                                        self.ups_layout,
                                     )
                                     if t == s:
                                         val -= self.rdm2[p_idx, q_idx, r_idx, u_idx]
@@ -521,8 +515,6 @@ class WaveFunctionUPS:
                                                 [Epq(p, q), Epq(r, s), Epq(t, u), Epq(m, n)],
                                                 self.ci_coeffs,
                                                 self.ci_info,
-                                                self.thetas,
-                                                self.ups_layout,
                                             )
                                             if r == q:
                                                 val -= self.rdm3[p_idx, s_idx, t_idx, u_idx, m_idx, n_idx]
@@ -725,8 +717,6 @@ class WaveFunctionUPS:
                 [hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
-                self.thetas,
-                self.ups_layout,
             )
         return self._energy_elec
 
@@ -952,8 +942,6 @@ class WaveFunctionUPS:
                 [hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
-                self.thetas,
-                self.ups_layout,
             )
         self._E_opt_old = E
         self._old_opt_parameters = np.copy(parameters)
@@ -1001,8 +989,6 @@ class WaveFunctionUPS:
                 [Hamiltonian],
                 self.ci_coeffs,
                 self.ci_info,
-                self.thetas,
-                self.ups_layout,
             )
             bra_vec = construct_ups_state(
                 bra_vec,
