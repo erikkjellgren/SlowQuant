@@ -286,7 +286,7 @@ class WaveFunctionSACircuit:
         if isinstance(primitive, (BaseEstimatorV1, BaseEstimatorV2)):
             raise ValueError("Estimator is not supported.")
         elif not isinstance(primitive, (BaseSamplerV1, BaseSamplerV2)):
-            raise TypeError(f"Unsupported Qiskit primitive, {type(self._primitive)}")
+            raise TypeError(f"Unsupported Qiskit primitive, {type(primitive)}")
         self.QI._primitive = primitive
         if verbose:
             if self.QI.mitigation_flags.do_M_ansatz0:

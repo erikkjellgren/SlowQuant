@@ -409,6 +409,7 @@ class Clique:
 
         Args:
             pauli: Pauli string.
+            mitigation_flags: Mitigation flags object, default is None.
 
         Returns:
             Sample state distribution.
@@ -601,7 +602,7 @@ def correct_distribution_with_layout(
 
     Args:
         dist: Quasi-distribution.
-        M: Correlation matrix (not inverse).
+        M_in: Correlation matrix (not inverse).
         ref_layout: Reference layout of M measurement.
         new_layout: Layout of current to be corrected circuit measurement.
 
@@ -714,9 +715,11 @@ def layout_conserving_compose(
         ansatz: Transpiled Ansatz circuit.
         state: Un-transpiled state circuit.
         pm: PassManager that produces Ansatz's initial layout indices.
+        coupling_map: Coupling map for device layout.
         optimization: Boolean for optimizing composed circuit.
             Note that optimization can lead to changes in Ansatz's gates and CX count.
             This can be problematic together with M_Ansatz0.
+        M_circuit: Depricated?
 
     Returns:
         Composed QuantumCircuit.
