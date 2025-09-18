@@ -493,8 +493,6 @@ class UnrestrictedWaveFunctionUPS:
                     [a_op(p, spin, True) * a_op(q, spin, False)],
                     self.ci_coeffs,
                     self.ci_info,
-                    self.thetas,
-                    self.ups_layout,
                 )
                 self.calculate_rdm1[p_idx, q_idx] = val
                 self.calculate_rdm1[q_idx, p_idx] = val
@@ -559,8 +557,6 @@ class UnrestrictedWaveFunctionUPS:
                             ],
                             self.ci_coeffs,
                             self.ci_info,
-                            self.thetas,
-                            self.ups_layout,
                         )
                         self.calculate_rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
                         # self.calculate_rdm2[r_idx, s_idx, p_idx, q_idx] = val # type: ignore
@@ -628,8 +624,6 @@ class UnrestrictedWaveFunctionUPS:
                 ],
                 self.ci_coeffs,
                 self.ci_info,
-                self.thetas,
-                self.ups_layout,
             )
         return self._energy_elec
 
@@ -886,8 +880,6 @@ class UnrestrictedWaveFunctionUPS:
                 ],
                 self.ci_coeffs,
                 self.ci_info,
-                self.thetas,
-                self.ups_layout,
             )
         self._E_opt_old = E
         self._old_opt_parameters = np.copy(parameters)
@@ -950,8 +942,6 @@ class UnrestrictedWaveFunctionUPS:
                 [Hamiltonian],
                 self.ci_coeffs,
                 self.ci_info,
-                self.thetas,
-                self.ups_layout,
             )
             bra_vec = construct_ups_state(
                 bra_vec,
@@ -1099,32 +1089,24 @@ class UnrestrictedWaveFunctionUPS:
                     [q_qp_a * q_mn_a],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 aa -= expectation_value(
                     wf.ci_coeffs,
                     [q_mn_a * q_qp_a],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 bb = expectation_value(
                     wf.ci_coeffs,
                     [q_qp_b * q_mn_b],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 bb -= expectation_value(
                     wf.ci_coeffs,
                     [q_mn_b * q_qp_b],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 sigma[idx1 * 2, idx2 * 2] = aa
                 sigma[idx1 * 2 + 1, idx2 * 2 + 1] = bb
@@ -1148,128 +1130,96 @@ class UnrestrictedWaveFunctionUPS:
                     [E_tu_a * h * E_mn_a],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 aa -= expectation_value(
                     wf.ci_coeffs,
                     [E_tu_a * E_mn_a * h],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 aa -= expectation_value(
                     wf.ci_coeffs,
                     [h * E_mn_a * E_tu_a],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 aa += expectation_value(
                     wf.ci_coeffs,
                     [E_mn_a * h * E_tu_a],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 ba = expectation_value(
                     wf.ci_coeffs,
                     [E_tu_b * h * E_mn_a],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 ba -= expectation_value(
                     wf.ci_coeffs,
                     [E_tu_b * E_mn_a * h],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 ba -= expectation_value(
                     wf.ci_coeffs,
                     [h * E_mn_a * E_tu_b],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 ba += expectation_value(
                     wf.ci_coeffs,
                     [E_mn_a * h * E_tu_b],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 ab = expectation_value(
                     wf.ci_coeffs,
                     [E_tu_a * h * E_mn_b],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 ab -= expectation_value(
                     wf.ci_coeffs,
                     [E_tu_a * E_mn_b * h],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 ab -= expectation_value(
                     wf.ci_coeffs,
                     [h * E_mn_b * E_tu_a],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 ab += expectation_value(
                     wf.ci_coeffs,
                     [E_mn_b * h * E_tu_a],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 bb = expectation_value(
                     wf.ci_coeffs,
                     [E_tu_b * h * E_mn_b],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 bb -= expectation_value(
                     wf.ci_coeffs,
                     [E_tu_b * E_mn_b * h],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 bb -= expectation_value(
                     wf.ci_coeffs,
                     [h * E_mn_b * E_tu_b],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 bb += expectation_value(
                     wf.ci_coeffs,
                     [E_mn_b * h * E_tu_b],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 A_block[idx1 * 2, idx2 * 2] = aa
                 A_block[idx1 * 2, idx2 * 2 + 1] = ab
@@ -1295,128 +1245,96 @@ class UnrestrictedWaveFunctionUPS:
                     [E_tu_a * h * E_mn_a],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 aa -= expectation_value(
                     wf.ci_coeffs,
                     [E_tu_a * E_mn_a * h],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 aa -= expectation_value(
                     wf.ci_coeffs,
                     [h * E_mn_a * E_tu_a],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 aa += expectation_value(
                     wf.ci_coeffs,
                     [E_mn_a * h * E_tu_a],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 ba = expectation_value(
                     wf.ci_coeffs,
                     [E_tu_b * h * E_mn_a],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 ba -= expectation_value(
                     wf.ci_coeffs,
                     [E_tu_b * E_mn_a * h],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 ba -= expectation_value(
                     wf.ci_coeffs,
                     [h * E_mn_a * E_tu_b],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 ba += expectation_value(
                     wf.ci_coeffs,
                     [E_mn_a * h * E_tu_b],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 ab = expectation_value(
                     wf.ci_coeffs,
                     [E_tu_a * h * E_mn_b],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 ab -= expectation_value(
                     wf.ci_coeffs,
                     [E_tu_a * E_mn_b * h],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 ab -= expectation_value(
                     wf.ci_coeffs,
                     [h * E_mn_b * E_tu_a],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 ab += expectation_value(
                     wf.ci_coeffs,
                     [E_mn_b * h * E_tu_a],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 bb = expectation_value(
                     wf.ci_coeffs,
                     [E_tu_b * h * E_mn_b],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 bb -= expectation_value(
                     wf.ci_coeffs,
                     [E_tu_b * E_mn_b * h],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 bb -= expectation_value(
                     wf.ci_coeffs,
                     [h * E_mn_b * E_tu_b],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 bb += expectation_value(
                     wf.ci_coeffs,
                     [E_mn_b * h * E_tu_b],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 B_block[idx1 * 2, idx2 * 2] = aa
                 B_block[idx1 * 2, idx2 * 2 + 1] = ab
@@ -1438,16 +1356,12 @@ class UnrestrictedWaveFunctionUPS:
                     [a_op(m, "alpha", True) * a_op(n, "alpha", False) * h],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 alpha -= expectation_value(
                     wf.ci_coeffs,
                     [a_op(n, "alpha", True) * a_op(m, "alpha", False) * h],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
 
                 alpha -= expectation_value(
@@ -1455,48 +1369,36 @@ class UnrestrictedWaveFunctionUPS:
                     [h * (a_op(m, "alpha", True) * a_op(n, "alpha", False))],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 alpha += expectation_value(
                     wf.ci_coeffs,
                     [h * (a_op(n, "alpha", True) * a_op(m, "alpha", False))],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 beta = expectation_value(
                     wf.ci_coeffs,
                     [a_op(m, "beta", True) * a_op(n, "beta", False) * h],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 beta -= expectation_value(
                     wf.ci_coeffs,
                     [a_op(n, "beta", True) * a_op(m, "beta", False) * h],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 beta -= expectation_value(
                     wf.ci_coeffs,
                     [h * (a_op(m, "beta", True) * a_op(n, "beta", False))],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 beta += expectation_value(
                     wf.ci_coeffs,
                     [h * (a_op(n, "beta", True) * a_op(m, "beta", False))],
                     wf.ci_coeffs,
                     wf.ci_info,
-                    wf.thetas,
-                    wf.ups_layout,
                 )
                 gradient[idx] = alpha
                 gradient[idx + len(wf.kappa_idx)] = beta
