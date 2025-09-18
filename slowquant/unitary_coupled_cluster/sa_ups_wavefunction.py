@@ -29,8 +29,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
 from slowquant.unitary_coupled_cluster.operators import (
     Epq,
     G1_sa,
-    G2_1_sa,
-    G2_2_sa,
+    G2_sa,
     hamiltonian_0i_0a,
     one_elec_op_0i_0a,
 )
@@ -234,11 +233,11 @@ class WaveFunctionSAUPS:
                 if abs(val) > 10**-10:
                     csf_tmp.append([val, idx])
             csfs_info.append(csf_tmp)
-            energies.append(expectation_value(hf_state, [H], hf_state, self.ci_info, None, None))
+            energies.append(expectation_value(hf_state, [H], hf_state, self.ci_info))
             for a, i, _ in iterate_t1_sa(self.active_occ_idx, self.active_unocc_idx):
                 op = G1_sa(i, a)
-                state = propagate_state([op], hf_state, self.ci_info, None, None)
-                energy = expectation_value(state, [H], state, self.ci_info, None, None)
+                state = propagate_state([op], hf_state, self.ci_info)
+                energy = expectation_value(state, [H], state, self.ci_info)
                 csf_tmp = []
                 for idx, val in enumerate(state):
                     if abs(val) > 10**-10:
@@ -247,12 +246,9 @@ class WaveFunctionSAUPS:
                 energies.append(energy)
             if state_picks.lower() == "cisd_diag":
                 for a, i, b, j, _, op_type in iterate_t2_sa(self.active_occ_idx, self.active_unocc_idx):
-                    if op_type == 1:
-                        op = G2_1_sa(i, j, a, b)
-                    else:
-                        op = G2_2_sa(i, j, a, b)
-                    state = propagate_state([op], hf_state, self.ci_info, None, None)
-                    energy = expectation_value(state, [H], state, self.ci_info, None, None)
+                    op = G2_sa(i, j, a, b, op_type)
+                    state = propagate_state([op], hf_state, self.ci_info)
+                    energy = expectation_value(state, [H], state, self.ci_info)
                     energies.append(energy)
                     csf_tmp = []
                     for idx, val in enumerate(state):
@@ -305,7 +301,7 @@ class WaveFunctionSAUPS:
                 sa_energy = 0.0
                 H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
                 for i, state in enumerate(self.csf_coeffs):
-                    energy = expectation_value(state, [H], state, self.ci_info, None, None)
+                    energy = expectation_value(state, [H], state, self.ci_info)
                     print(f"state {i} energy:", energy)
                     sa_energy += energy
                 print("Initial SA energy:", sa_energy / self.num_states)
@@ -337,6 +333,13 @@ class WaveFunctionSAUPS:
         elif ansatz.lower() == "ksasdsfupccgsd":
             self.ansatz_options["GpD"] = True
             self.ups_layout.create_SDSfUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
+        elif ansatz.lower() == "safuccsd":
+            if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
+            self.ansatz_options["SAS"] = True
+            self.ansatz_options["SAD"] = True
+            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
@@ -470,8 +473,6 @@ class WaveFunctionSAUPS:
                         [Epq_op],
                         self.ci_coeffs,
                         self.ci_info,
-                        self.thetas,
-                        self.ups_layout,
                         do_folding=False,
                     )
                     self._rdm1[p_idx, q_idx] = val  # type: ignore
@@ -523,8 +524,6 @@ class WaveFunctionSAUPS:
                                 [Epq_op, Ers_op],
                                 self.ci_coeffs,
                                 self.ci_info,
-                                self.thetas,
-                                self.ups_layout,
                                 do_folding=False,
                             )
                             if q == r:
@@ -568,8 +567,6 @@ class WaveFunctionSAUPS:
                 [Hamiltonian],
                 self.ci_coeffs,
                 self.ci_info,
-                self.thetas,
-                self.ups_layout,
             )
         return self._sa_energy
 
@@ -805,8 +802,6 @@ class WaveFunctionSAUPS:
                     [Hamiltonian],
                     coeff_j,
                     self.ci_info,
-                    self.thetas,
-                    self.ups_layout,
                     do_folding=False,
                 )
         # Diagonalize
@@ -872,8 +867,6 @@ class WaveFunctionSAUPS:
                     [op],
                     coeff_j,
                     self.ci_info,
-                    self.thetas,
-                    self.ups_layout,
                     do_folding=False,
                 )
         # Transition between SA states (after diagonalization)
@@ -946,8 +939,6 @@ class WaveFunctionSAUPS:
                         [Hamiltonian],
                         coeffs,
                         self.ci_info,
-                        self.thetas,
-                        self.ups_layout,
                         do_folding=False,
                     )
                 )
@@ -959,8 +950,6 @@ class WaveFunctionSAUPS:
             [Hamiltonian],
             self.ci_coeffs,
             self.ci_info,
-            self.thetas,
-            self.ups_layout,
             do_folding=False,
         )
         self._E_opt_old = E
@@ -1013,8 +1002,6 @@ class WaveFunctionSAUPS:
                 [Hamiltonian],
                 self.ci_coeffs,
                 self.ci_info,
-                self.thetas,
-                self.ups_layout,
             )
             bra_vec = construct_ups_state_SA(
                 bra_vec,

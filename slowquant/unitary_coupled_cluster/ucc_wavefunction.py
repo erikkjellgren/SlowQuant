@@ -376,8 +376,6 @@ class WaveFunctionUCC:
                         [Epq(p, q)],
                         self.ci_coeffs,
                         self.ci_info,
-                        self.thetas,
-                        self.ucc_layout,
                     )
                     self._rdm1[p_idx, q_idx] = val  # type: ignore
                     self._rdm1[q_idx, p_idx] = val  # type: ignore
@@ -420,8 +418,6 @@ class WaveFunctionUCC:
                                 [Epq(p, q), Epq(r, s)],
                                 self.ci_coeffs,
                                 self.ci_info,
-                                self.thetas,
-                                self.ucc_layout,
                             )
                             if q == r:
                                 val -= self.rdm1[p_idx, s_idx]
@@ -468,8 +464,6 @@ class WaveFunctionUCC:
                                         [Epq(p, q), Epq(r, s), Epq(t, u)],
                                         self.ci_coeffs,
                                         self.ci_info,
-                                        self.thetas,
-                                        self.ucc_layout,
                                     )
                                     if t == s:
                                         val -= self.rdm2[p_idx, q_idx, r_idx, u_idx]
@@ -536,8 +530,6 @@ class WaveFunctionUCC:
                                                 [Epq(p, q), Epq(r, s), Epq(t, u), Epq(m, n)],
                                                 self.ci_coeffs,
                                                 self.ci_info,
-                                                self.thetas,
-                                                self.ucc_layout,
                                             )
                                             if r == q:
                                                 val -= self.rdm3[p_idx, s_idx, t_idx, u_idx, m_idx, n_idx]
@@ -747,8 +739,6 @@ class WaveFunctionUCC:
                 ],
                 self.ci_coeffs,
                 self.ci_info,
-                self.thetas,
-                self.ucc_layout,
             )
         return self._energy_elec
 
@@ -782,7 +772,7 @@ class WaveFunctionUCC:
         for exc_type in self.ucc_layout.excitation_operator_type:
             if exc_type == "sa_single":
                 num_theta1 += 1
-            elif exc_type in ("sa_double_1", "sa_double_2"):
+            elif exc_type in ("sa_double_1", "sa_double_2", "sa_double_3", "sa_double_4", "sa_double_5"):
                 num_theta2 += 1
             elif exc_type == "triple":
                 num_theta3 += 1
@@ -914,7 +904,7 @@ class WaveFunctionUCC:
         for exc_type in self.ucc_layout.excitation_operator_type:
             if exc_type == "sa_single":
                 num_theta1 += 1
-            elif exc_type in ("sa_double_1", "sa_double_2"):
+            elif exc_type in ("sa_double_1", "sa_double_2", "sa_double_3", "sa_double_4", "sa_double_5"):
                 num_theta2 += 1
             elif exc_type == "triple":
                 num_theta3 += 1
@@ -1049,8 +1039,6 @@ class WaveFunctionUCC:
                 ],
                 self.ci_coeffs,
                 self.ci_info,
-                self.thetas,
-                self.ucc_layout,
             )
         self._E_opt_old = E
         self._old_opt_parameters = np.copy(parameters)
@@ -1110,8 +1098,6 @@ class WaveFunctionUCC:
                 [Hamiltonian],
                 self.ci_coeffs,
                 self.ci_info,
-                self.thetas,
-                self.ucc_layout,
             )
             E = self.ci_coeffs @ Hket
             theta_params = np.zeros_like(self.thetas)
