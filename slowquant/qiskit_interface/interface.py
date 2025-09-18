@@ -99,8 +99,10 @@ class QuantumInterface:
             )
         if pass_manager_options is None:
             pass_manager_options = {}
-        if isinstance(primitive, (BaseEstimatorV2, BaseEstimatorV1)):
-            raise TypeError("Estimator is not supported.")
+        if isinstance(primitive, (BaseEstimatorV1, BaseEstimatorV2)):
+            raise ValueError("Estimator is not supported.")
+        elif not isinstance(primitive, (BaseSamplerV1, BaseSamplerV2)):
+            raise TypeError(f"Unsupported Qiskit primitive, {type(self._primitive)}")
         self.ansatz = ansatz
         self._transpiled = False  # Check if circuit has been transpiled
         self.max_shots_per_run = max_shots_per_run

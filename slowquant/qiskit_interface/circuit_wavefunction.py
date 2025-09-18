@@ -278,7 +278,9 @@ class WaveFunctionCircuit:
 
         if isinstance(primitive, (BaseEstimatorV1, BaseEstimatorV2)):
             raise ValueError("Estimator is not supported.")
-        self.QI._primitive = primitive  # pylint: disable=protected-access
+        elif not isinstance(primitive, (BaseSamplerV1, BaseSamplerV2)):
+            raise TypeError(f"Unsupported primitive, {type(self._primitive)}")
+        self.QI._primitive = primitive
         if verbose:
             if self.QI.mitigation_flags.do_M_ansatz0:
                 print("Reset RDMs, energies, QI metrics, and correlation matrix.")
