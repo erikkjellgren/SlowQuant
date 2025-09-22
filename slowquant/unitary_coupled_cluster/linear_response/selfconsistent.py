@@ -66,6 +66,7 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.thetas,
                 self.wf.ups_layout,
             )
+        else:
             raise ValueError(f"Got incompatible wave function type, {type(self.wf)}")
         num_det = len(ci_info.idx2det)
         self.csf_coeffs = np.zeros(num_det)
