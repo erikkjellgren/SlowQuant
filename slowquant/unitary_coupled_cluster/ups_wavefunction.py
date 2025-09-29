@@ -848,7 +848,8 @@ class WaveFunctionUPS:
         optimizer_name: str,
         orbital_optimization: bool = False,
         tol: float = 1e-10,
-        maxiter: int = 1000,       # the origianl is 1000 
+        maxiter: int = 1000,       # the origianl is 1000
+        opt_last: bool = False,     # choose between full or partial optimization
     ) -> None:
         """Run one step optimization of wave function.
 
@@ -912,7 +913,14 @@ class WaveFunctionUPS:
         else:
             parameters = self.thetas
 
-        optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
+        # Choice between full opt and last parameter opt
+
+        if opt_last == False:
+            optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
+
+        elif opt_last == True:
+            optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol, params=self.thetas)
+
         self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0
         res = optimizer.minimize(
@@ -927,6 +935,8 @@ class WaveFunctionUPS:
         else:
             self.thetas = res.x.tolist()
         self._energy_elec = res.fun
+
+        print('CURRENT THETAS AFTER OPT', self.thetas)
 
     
     def do_adapt(self, maxiter=1000, epoch=1e-6 , orbital_opt: bool = False):    

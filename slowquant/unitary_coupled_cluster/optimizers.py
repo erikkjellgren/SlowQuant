@@ -31,6 +31,7 @@ class Optimizers:
         maxiter: int = 1000,
         tol: float = 10e-8,
         is_silent: bool = False,
+        params: list[float] | None = None, # parameters for constrained optimization
     ) -> None:
         """Initialize optimizer class.
 
@@ -48,6 +49,7 @@ class Optimizers:
         self.maxiter = maxiter
         self.tol = tol
         self.is_silent = is_silent
+        self.params = params
 
     def _print_progress(
         self, x: Sequence[float], fun: Callable[[list[float]], float | np.ndarray], silent: bool = False
@@ -136,6 +138,40 @@ class Optimizers:
 
         else:
             raise ValueError(f"Got an unkonwn optimizer {self.method}")
+        
+        # Try the optimization of only the last added parameter
+        if self.params is not None:
+            print('OPTIMIZING ONLY THE LAST')
+
+            if self.method in ("l-bfgs-b", "slsqp") and len(self.params) > 1:
+
+                bounds = [(theta, theta) for theta in self.params[:-1]] + [(-np.pi, np.pi)]
+
+                if self.grad is not None:
+                    res = scipy.optimize.minimize(
+                        self.fun,
+                        x0,
+                        jac=self.grad,
+                        method=self.method,
+                        tol=self.tol,
+                        callback=print_progress,
+                        options={"maxiter": self.maxiter},
+                        bounds = bounds
+                    )
+                else:
+                    res = scipy.optimize.minimize(
+                        self.fun,
+                        x0,
+                        method=self.method,
+                        tol=self.tol,
+                        callback=print_progress,
+                        options={"maxiter": self.maxiter},
+                        bounds = bounds
+                    )
+        else:
+            print('OPTIMIZING EVERYTHING')
+
+
         result = Result()
         result.x = res.x
         result.fun = res.fun

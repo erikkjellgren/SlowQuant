@@ -403,6 +403,69 @@ def iterate_t6(
                                                         continue
                                                     yield a, i, b, j, c, k, d, l, e, m, f, n
 
+def iterate_t1_generalized(
+    num_spin_orbs: int,
+) -> Generator[tuple[int, int], None, None]:
+    """Iterate over T1 spin-conserving operators.
+
+    Args:
+        num_spin_orbs: Number of spin orbitals.
+
+    Returns:
+        T1 operator iteration.
+    """
+    for i in range(num_spin_orbs):
+        for a in range(i + 1, num_spin_orbs):
+            num_alpha = 0
+            num_beta = 0
+            if a % 2 == 0:
+                num_alpha += 1
+            else:
+                num_beta += 1
+            if i % 2 == 0:
+                num_alpha -= 1
+            else:
+                num_beta -= 1
+            if num_alpha != 0 or num_beta != 0:
+                continue
+            yield a, i
+
+def iterate_t2_generalized(
+    num_spin_orbs: int,
+) -> Generator[tuple[int, int, int, int], None, None]:
+    """Iterate over T2 spin-conserving operators.
+
+    Args:
+        num_spin_orbs: Number of spin orbitals.
+
+    Returns:
+        T2 operator iteration.
+    """
+    for i in range(num_spin_orbs):
+        for j in range(num_spin_orbs):
+            for a in range(max(i, j) + 1, num_spin_orbs):
+                for b in range(max(i, j) + 1, num_spin_orbs):
+                    num_alpha = 0
+                    num_beta = 0
+                    if a % 2 == 0:
+                        num_alpha += 1
+                    else:
+                        num_beta += 1
+                    if b % 2 == 0:
+                        num_alpha += 1
+                    else:
+                        num_beta += 1
+                    if i % 2 == 0:
+                        num_alpha -= 1
+                    else:
+                        num_beta -= 1
+                    if j % 2 == 0:
+                        num_alpha -= 1
+                    else:
+                        num_beta -= 1
+                    if num_alpha != 0 or num_beta != 0:
+                        continue
+                    yield a, i, b, j
 
 def iterate_pair_t2(
     active_occ_idx: Sequence[int],
