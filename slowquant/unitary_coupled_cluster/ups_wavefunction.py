@@ -259,6 +259,8 @@ class WaveFunctionUPS:
         else: 
             self._thetas = np.zeros(self.ups_layout.n_params).tolist()
 
+        self.num_energy_evals = 0   # energy evaluations
+
     @property
     def kappa(self) -> list[float]:
         """Get orbital rotation parameters."""
@@ -1082,6 +1084,10 @@ class WaveFunctionUPS:
             )
         self._E_opt_old = E
         self._old_opt_parameters = np.copy(parameters)
+
+        # Counting energy measurements
+        self.num_energy_evals += 1
+
         return E
 
     def _calc_gradient_optimization(
@@ -1166,4 +1172,8 @@ class WaveFunctionUPS:
                     self.thetas,
                     self.ups_layout,
                 )
+
+        # Counting gradient measurements -> phase shift
+        self.num_energy_evals += 4*self.ups_layout.n_params
+
         return gradient
