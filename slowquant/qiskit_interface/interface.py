@@ -739,8 +739,6 @@ class QuantumInterface:
         else:
             connection_order = np.arange(self.num_qubits)
         val = 0.0
-        # print("bras: ", bra_csf[1])  # debug
-        # print("kets: ", ket_csf[1])  # debug
 
         # Create list of all combinations with their weight consisting of coefficient and reordering sign
         all_combinations = [
@@ -760,7 +758,6 @@ class QuantumInterface:
 
         # Calculate all unique combinations
         for (bra_det, ket_det), N in unique_combinations.items():
-            # print("Expectation value of dets: ", bra_det, ket_det)  # debug
             # I == J (diagonals)
             if bra_det == ket_det:
                 # Get det circuit. Only X-Gates -> no transpilation.
@@ -783,7 +780,6 @@ class QuantumInterface:
                 state = get_determinant_superposition_reference(bra_det, ket_det, self.num_orbs, self.mapper)
                 # Superposition state contains non-native gates for ISA -> transpilation needed.
                 if self.ISA:
-                    # print("Doing a superpos simulation")  # debug
                     match ISA_csfs_option:
                         case 1:  # Option 1: flexible layout
                             # Use untranspiled ansatz and compose with superposition state
@@ -866,7 +862,6 @@ class QuantumInterface:
                         circuit,
                         do_cliques=self._do_cliques,
                     )
-                # print("I != J, superpos, val = ", val - val_old)  # debug
 
                 # Second term of off-diagonal element involving only I
                 # Get det circuit. Only X-Gates -> no transpilation.
@@ -890,7 +885,6 @@ class QuantumInterface:
                             do_cliques=self._do_cliques,
                         )
                     )
-                # print("I != J, I, val = ", -(val - val_old))  # debug
 
                 # Third term of off-diagonal element involving only J
                 # Get det circuit. Only X-Gates -> no transpilation.
@@ -914,7 +908,6 @@ class QuantumInterface:
                             do_cliques=self._do_cliques,
                         )
                     )
-                # print("I != J, J, val = ", -(val - val_old))  # debug
         return val
 
     def _sampler_quantum_expectation_value(
@@ -967,7 +960,6 @@ class QuantumInterface:
             )
 
         if det_int not in self.saver:
-            # print("Make new Clique saver for determinant ", det)
             self.saver[det_int] = Clique(csfs_option)
         # If a different csfs option has been used in SA-VQE that means the circuit has been altered.
         # Thus, we cannot use raw results from an unaltered circuit run with a different csfs_option.
