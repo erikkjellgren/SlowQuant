@@ -23,7 +23,7 @@ from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
 
-class LinearResponseUCC(LinearResponseBaseClass):
+class LinearResponse(LinearResponseBaseClass):
     def __init__(
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,

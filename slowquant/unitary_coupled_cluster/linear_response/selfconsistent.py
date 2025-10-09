@@ -30,7 +30,7 @@ from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
 
 
-class LinearResponseUCC(LinearResponseBaseClass):
+class LinearResponse(LinearResponseBaseClass):
     index_info_extended: tuple[CI_Info, list[float], UpsStructure] | tuple[CI_Info, list[float], UccStructure]
 
     def __init__(
@@ -66,6 +66,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.wf.thetas,
                 self.wf.ups_layout,
             )
+        else:
             raise ValueError(f"Got incompatible wave function type, {type(self.wf)}")
         num_det = len(ci_info.idx2det)
         self.csf_coeffs = np.zeros(num_det)
