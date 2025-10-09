@@ -488,7 +488,7 @@ def test_h2_selfconsistent_lr() -> None:
         QI,
     )
     qWF.thetas = WF.thetas
-    qlr = selfconsistentqc.quantumLR(qWF)
+    qlr = selfconsistentqc.quantumLR(qWF, "SD")
     qlr.run()
     qlr.get_excitation_energies()
     qlr.get_normed_excitation_vectors()
@@ -546,7 +546,7 @@ def test_h2_statetransfer_lr() -> None:
         QI,
     )
     qWF.thetas = WF.thetas
-    qlr = statetransferqc.quantumLR(qWF)
+    qlr = statetransferqc.quantumLR(qWF, "SD")
     qlr.run()
     qlr.get_excitation_energies()
     qlr.get_normed_excitation_vectors()

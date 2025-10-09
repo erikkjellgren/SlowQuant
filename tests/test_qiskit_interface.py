@@ -83,7 +83,7 @@ def test_LiH_naive() -> None:
     LR.calc_excitation_energies()
 
     # LR with QSQ
-    qLR = q_naive.quantumLR(qWF)
+    qLR = q_naive.quantumLR(qWF, "SD")
 
     qLR.run(do_rdm=True)
     excitation_energies = qLR.get_excitation_energies()
@@ -148,7 +148,7 @@ def test_LiH_projected() -> None:
     qWF.run_wf_optimization_2step("rotosolve", True)
 
     # LR with QSQ
-    qLR = q_projected.quantumLR(qWF)
+    qLR = q_projected.quantumLR(qWF, "SD")
 
     qLR.run(do_rdm=True)
     excitation_energies = qLR.get_excitation_energies()
@@ -218,7 +218,7 @@ def test_LiH_allprojected() -> None:
     LR.calc_excitation_energies()
 
     # LR with QSQ
-    qLR = q_allprojected.quantumLR(qWF)
+    qLR = q_allprojected.quantumLR(qWF, "SD")
 
     qLR.run()
     excitation_energies = qLR.get_excitation_energies()
@@ -285,7 +285,7 @@ def test_LiH_naive_sampler_ISA() -> None:
     qWF.run_wf_optimization_2step("rotosolve", True)
 
     # LR with QSQ
-    qLR = q_naive.quantumLR(qWF)
+    qLR = q_naive.quantumLR(qWF, "SD")
 
     qLR.run(do_rdm=True)
     excitation_energies = qLR.get_excitation_energies()
@@ -352,7 +352,7 @@ def test_LiH_oscillator_strength() -> None:
     qWF.run_wf_optimization_2step("rotosolve", True)
 
     # naive LR with QSQ
-    qLR_naive = q_naive.quantumLR(qWF)
+    qLR_naive = q_naive.quantumLR(qWF, "SD")
     qLR_naive.run(do_rdm=True)
     qLR_naive.get_excitation_energies()
     qLR_naive.get_normed_excitation_vectors()
@@ -377,7 +377,7 @@ def test_LiH_oscillator_strength() -> None:
     assert np.allclose(osc_strengths, solution, atol=10**-5)
 
     # proj LR with QSQ
-    qLR_proj = q_projected.quantumLR(qWF)
+    qLR_proj = q_projected.quantumLR(qWF, "SD")
     qLR_proj.run(do_rdm=True)
     qLR_proj.get_excitation_energies()
     qLR_proj.get_normed_excitation_vectors()
@@ -402,7 +402,7 @@ def test_LiH_oscillator_strength() -> None:
     assert np.allclose(osc_strengths, solution, atol=10**-5)
 
     # allproj LR with QSQ
-    qLR_allproj = q_allprojected.quantumLR(qWF)
+    qLR_allproj = q_allprojected.quantumLR(qWF, "SD")
     qLR_allproj.run()
     qLR_allproj.get_excitation_energies()
     qLR_allproj.get_normed_excitation_vectors()
