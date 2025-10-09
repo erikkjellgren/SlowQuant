@@ -10,7 +10,6 @@ from slowquant.unitary_coupled_cluster.operators import (
     G4,
     G5,
     G6,
-    Epq,
     G1_sa,
     G2_sa,
     hamiltonian_0i_0a,
@@ -88,9 +87,8 @@ class LinearResponseBaseClass:
                 self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx
             ):
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
-        for i, a in self.wf.kappa_no_activeactive_idx:
-            op = 2 ** (-1 / 2) * Epq(a, i)
-            self.q_ops.append(op)
+        for p, q in self.wf.kappa_no_activeactive_idx:
+            self.q_ops.append(G1_sa(p, q))
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters))
