@@ -210,7 +210,7 @@ def test_h2_sto3g_uccsd_lr() -> None:
         SQobj.integral.get_multipole_matrix([0, 0, 1]),
     )
     WF.run_wf_optimization_1step("SLSQP", False)
-    LR = selfconsistentlr.LinearResponseUCC(WF, excitations="SD")
+    LR = selfconsistentlr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 1.015738) < 10**-4
     assert abs(LR.excitation_energies[1] - 1.719504) < 10**-4
@@ -272,7 +272,7 @@ def test_h2_631g_hf_lr() -> None:
         "SD",
     )
     WF.run_wf_optimization_1step("SLSQP", True)
-    LR = selfconsistentlr.LinearResponseUCC(WF, excitations="SD")
+    LR = selfconsistentlr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     dipole_integrals = (
         SQobj.integral.get_multipole_matrix([1, 0, 0]),
@@ -310,7 +310,7 @@ def test_h2_631g_oouccsd_lr() -> None:
         "SD",
     )
     WF.run_wf_optimization_1step("SLSQP", True, tol=10**-11)
-    LR = selfconsistentlr.LinearResponseUCC(WF, excitations="SD")
+    LR = selfconsistentlr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     dipole_integrals = (
         SQobj.integral.get_multipole_matrix([1, 0, 0]),
@@ -356,7 +356,7 @@ def test_h4_sto3g_uccsd_lr_naive() -> None:
         "SD",
     )
     WF.run_wf_optimization_1step("SLSQP", False)
-    LR = naivelr.LinearResponseUCC(WF, excitations="SD")
+    LR = naivelr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     dipole_integrals = (
         SQobj.integral.get_multipole_matrix([1, 0, 0]),
@@ -392,7 +392,7 @@ def test_h4_sto3g_uccsd_lr_naive() -> None:
     assert abs(osc_strengths[11] - 0.0) < 10**-3
     assert abs(osc_strengths[12] - 0.000019) < 10**-3
     assert abs(osc_strengths[13] - 0.0) < 10**-3
-    LR = selfconsistentlr.LinearResponseUCC(WF, excitations="SD")
+    LR = selfconsistentlr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.162962) < 10**-5
     assert abs(LR.excitation_energies[1] - 0.385979) < 10**-5
@@ -446,7 +446,7 @@ def test_be_sto3g_uccsd_lr_naive() -> None:
         "SD",
     )
     WF.run_wf_optimization_1step("SLSQP", True)
-    LR = selfconsistentlr.LinearResponseUCC(WF, excitations="SD")
+    LR = selfconsistentlr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     dipole_integrals = (
         SQobj.integral.get_multipole_matrix([1, 0, 0]),
@@ -474,7 +474,7 @@ def test_be_sto3g_uccsd_lr_naive() -> None:
     assert abs(osc_strengths[7] - 0.137059) < 10**-3
     assert abs(osc_strengths[8] - 0.127297) < 10**-3
     assert abs(osc_strengths[9] - 0.0) < 10**-3
-    LR = naivelr.LinearResponseUCC(WF, excitations="SD")
+    LR = naivelr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.000001) < 10**-5
     assert abs(LR.excitation_energies[1] - 0.000001) < 10**-5
@@ -529,7 +529,7 @@ def test_lih_sto3g_uccsd_lr_naive() -> None:
         SQobj.integral.get_multipole_matrix([0, 0, 1]),
     )
     WF.run_wf_optimization_1step("SLSQP", True)
-    LR = selfconsistentlr.LinearResponseUCC(WF, excitations="SD")
+    LR = selfconsistentlr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.129476) < 10**-4
     assert abs(LR.excitation_energies[1] - 0.178749) < 10**-4
@@ -558,7 +558,7 @@ def test_lih_sto3g_uccsd_lr_naive() -> None:
     assert abs(osc_strengths[10] - 0.128862) < 10**-3
     assert abs(osc_strengths[11] - 0.046007) < 10**-3
     assert abs(osc_strengths[12] - 0.003904) < 10**-3
-    LR = naivelr.LinearResponseUCC(WF, excitations="SD")
+    LR = naivelr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.129476) < 10**-4
     assert abs(LR.excitation_energies[1] - 0.178749) < 10**-4
@@ -616,7 +616,7 @@ def test_LiH_sto3g_uccsd_lr() -> None:
         SQobj.integral.get_multipole_matrix([0, 0, 1]),
     )
     WF.run_wf_optimization_1step("SLSQP", True)
-    LR = naivelr.LinearResponseUCC(WF, excitations="SD")
+    LR = naivelr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.129476) < 10**-4
     assert abs(LR.excitation_energies[1] - 0.178749) < 10**-4
@@ -645,7 +645,7 @@ def test_LiH_sto3g_uccsd_lr() -> None:
     assert abs(osc_strengths[10] - 0.128862) < 10**-3
     assert abs(osc_strengths[11] - 0.046007) < 10**-3
     assert abs(osc_strengths[12] - 0.003903) < 10**-3
-    LR = selfconsistentlr.LinearResponseUCC(WF, excitations="SD")
+    LR = selfconsistentlr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.129476) < 10**-4
     assert abs(LR.excitation_energies[1] - 0.178749) < 10**-4
@@ -727,7 +727,7 @@ def test_H2_sto3g_uccsd_saveload() -> None:
     WF.run_wf_optimization_1step("SLSQP")
     WF.save_wavefunction("test_h2_save", force_overwrite=True)
     WF2 = load_wavefunction("test_h2_save")
-    LR = naivelr.LinearResponseUCC(WF2, "SD")
+    LR = naivelr.LinearResponse(WF2, "SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.54127603) < 10**-5
     assert abs(LR.excitation_energies[1] - 0.59557678) < 10**-5

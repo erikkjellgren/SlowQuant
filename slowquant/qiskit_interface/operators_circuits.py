@@ -349,7 +349,7 @@ def _single_excitation_trotter(
     T = op - op.dagger
     op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
     ops = np.array([str(pauli) for pauli in op_mapped.paulis])
-    factors = np.array([(-1.0j * x).real for x in op_mapped.coeffs])
+    factors = np.array([(1.0j * x).real for x in op_mapped.coeffs])
     sort_idx = np.argsort(ops)
     ops = ops[sort_idx]
     factors = factors[sort_idx]
@@ -397,7 +397,7 @@ def _double_excitation_trotter(
     T = op - op.dagger
     op_mapped = mapper.map(FermionicOp(T.get_qiskit_form(num_orbs), num_spin_orbs))
     ops = np.array([str(pauli) for pauli in op_mapped.paulis])
-    factors = np.array([(-1.0j * x).real for x in op_mapped.coeffs])
+    factors = np.array([(1.0j * x).real for x in op_mapped.coeffs])
     sort_idx = np.argsort(ops)
     ops = ops[sort_idx]
     factors = factors[sort_idx]
