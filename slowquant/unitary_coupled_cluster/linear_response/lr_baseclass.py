@@ -12,8 +12,7 @@ from slowquant.unitary_coupled_cluster.operators import (
     G6,
     Epq,
     G1_sa,
-    G2_1_sa,
-    G2_2_sa,
+    G2_sa,
     hamiltonian_0i_0a,
     hamiltonian_1i_1a,
 )
@@ -70,10 +69,7 @@ class LinearResponseBaseClass:
                 self.G_ops.append(G1_sa(i, a))
         if "d" in excitations:
             for a, i, b, j, _, op_type in iterate_t2_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
-                if op_type == 1:
-                    self.G_ops.append(G2_1_sa(i, j, a, b))
-                elif op_type == 2:
-                    self.G_ops.append(G2_2_sa(i, j, a, b))
+                self.G_ops.append(G2_sa(i, j, a, b, op_type))
         if "t" in excitations:
             for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
                 self.G_ops.append(G3(i, j, k, a, b, c))

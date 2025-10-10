@@ -337,6 +337,13 @@ class WaveFunctionSAUPS:
         elif ansatz.lower() == "ksasdsfupccgsd":
             self.ansatz_options["GpD"] = True
             self.ups_layout.create_SDSfUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
+        elif ansatz.lower() == "safuccsd":
+            if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
+            self.ansatz_options["SAS"] = True
+            self.ansatz_options["SAD"] = True
+            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
         elif ansatz.lower() == "None":
             None
         else:
@@ -472,8 +479,6 @@ class WaveFunctionSAUPS:
                         [Epq_op],
                         self.ci_coeffs,
                         self.ci_info,
-                        self.thetas,
-                        self.ups_layout,
                         do_folding=False,
                     )
                     self._rdm1[p_idx, q_idx] = val  # type: ignore
@@ -525,8 +530,6 @@ class WaveFunctionSAUPS:
                                 [Epq_op, Ers_op],
                                 self.ci_coeffs,
                                 self.ci_info,
-                                self.thetas,
-                                self.ups_layout,
                                 do_folding=False,
                             )
                             if q == r:
@@ -570,8 +573,6 @@ class WaveFunctionSAUPS:
                 [Hamiltonian],
                 self.ci_coeffs,
                 self.ci_info,
-                self.thetas,
-                self.ups_layout,
             )
         return self._sa_energy
 
@@ -816,8 +817,6 @@ class WaveFunctionSAUPS:
                     [Hamiltonian],
                     coeff_j,
                     self.ci_info,
-                    self.thetas,
-                    self.ups_layout,
                     do_folding=False,
                 )
         # Diagonalize
@@ -883,8 +882,6 @@ class WaveFunctionSAUPS:
                     [op],
                     coeff_j,
                     self.ci_info,
-                    self.thetas,
-                    self.ups_layout,
                     do_folding=False,
                 )
         # Transition between SA states (after diagonalization)
@@ -957,8 +954,6 @@ class WaveFunctionSAUPS:
                         [Hamiltonian],
                         coeffs,
                         self.ci_info,
-                        self.thetas,
-                        self.ups_layout,
                         do_folding=False,
                     )
                 )
@@ -970,8 +965,6 @@ class WaveFunctionSAUPS:
             [Hamiltonian],
             self.ci_coeffs,
             self.ci_info,
-            self.thetas,
-            self.ups_layout,
             do_folding=False,
         )
         self._E_opt_old = E
@@ -1024,8 +1017,6 @@ class WaveFunctionSAUPS:
                 [Hamiltonian],
                 self.ci_coeffs,
                 self.ci_info,
-                self.thetas,
-                self.ups_layout,
             )
             bra_vec = construct_ups_state_SA(
                 bra_vec,
