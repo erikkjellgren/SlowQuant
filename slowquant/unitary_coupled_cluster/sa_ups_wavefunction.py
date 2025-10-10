@@ -63,6 +63,8 @@ class WaveFunctionSAUPS:
             states: States to include in the state-averaged expansion.
                     Tuple of lists containing weights and determinants.
                     Each state in SA can be constructed of several dets.
+                    Ordering: left-to-right, alpha-beta alternating.
+            state_options: Options for state selection.
             ansatz: Name of ansatz.
             ansatz_options: Ansatz options.
             include_active_kappa: Include active-active orbital rotations.

@@ -1,6 +1,7 @@
 import time
 from collections.abc import Sequence
 from functools import partial
+from typing import Any
 
 import numpy as np
 import scipy
@@ -32,7 +33,8 @@ class WaveFunctionSACircuit:
         mo_coeffs: np.ndarray,
         h_ao: np.ndarray,
         g_ao: np.ndarray,
-        states: tuple[list[list[float]], list[list[str]]],
+        state_picks: str,
+        state_options: dict[str, Any],
         quantum_interface: QuantumInterface,
         include_active_kappa: bool = False,
     ) -> None:
@@ -49,6 +51,7 @@ class WaveFunctionSACircuit:
                     Tuple of lists containing weights and determinants.
                     Each state in SA can be constructed of several dets.
                     Ordering: left-to-right, alpha-beta alternating.
+            state_options: Options for state selection.
             quantum_interface: QuantumInterface.
             include_active_kappa: Include active-active orbital rotations.
         """
