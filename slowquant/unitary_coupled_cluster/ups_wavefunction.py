@@ -89,6 +89,7 @@ class WaveFunctionUPS:
         self._g_mo = None
         self._energy_elec: float | None = None
         self.ansatz_options = ansatz_options
+        self.num_energy_evals = 0
         # Construct spin orbital spaces and indices
         active_space = []
         orbital_counter = 0
@@ -945,6 +946,7 @@ class WaveFunctionUPS:
             )
         self._E_opt_old = E
         self._old_opt_parameters = np.copy(parameters)
+        self.num_energy_evals += 1  # count one measurement
         return E
 
     def _calc_gradient_optimization(
@@ -1026,4 +1028,7 @@ class WaveFunctionUPS:
                     self.thetas,
                     self.ups_layout,
                 )
+            self.num_energy_evals += 2 * np.sum(
+                list(self.ups_layout.grad_param_R.values())
+            )  # Count energy measurements for all gradients
         return gradient
