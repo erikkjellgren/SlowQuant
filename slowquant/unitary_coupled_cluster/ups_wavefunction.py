@@ -93,6 +93,8 @@ class WaveFunctionUPS:
         self._g_mo = None
         self._energy_elec: float | None = None
         self.ansatz_options = ansatz_options
+        self.num_energy_evals = 0   # energy evaluations
+
         # Construct spin orbital spaces and indices
         active_space = []
         orbital_counter = 0
@@ -258,8 +260,6 @@ class WaveFunctionUPS:
             self._thetas = []
         else: 
             self._thetas = np.zeros(self.ups_layout.n_params).tolist()
-
-        self.num_energy_evals = 0   # energy evaluations
 
     @property
     def kappa(self) -> list[float]:
@@ -1174,6 +1174,6 @@ class WaveFunctionUPS:
                 )
 
         # Counting gradient measurements -> phase shift
-        self.num_energy_evals += 4*self.ups_layout.n_params
-
+        self.num_energy_evals += 2 * np.sum(list(self.ups_layout.grad_param_R.values()))  # Count energy measurements for all gradients
+        
         return gradient
