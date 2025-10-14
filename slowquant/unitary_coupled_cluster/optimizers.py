@@ -31,7 +31,7 @@ class Optimizers:
         maxiter: int = 1000,
         tol: float = 10e-8,
         is_silent: bool = False,
-        energy_eval_callback: Callable[[], int] | None = None,  # New argument
+        energy_eval_callback: Callable[[], int] | None = None,
     ) -> None:
         """Initialize optimizer class.
 
@@ -50,7 +50,7 @@ class Optimizers:
         self.maxiter = maxiter
         self.tol = tol
         self.is_silent = is_silent
-        self.energy_eval_callback = energy_eval_callback  # Store the callback
+        self.energy_eval_callback = energy_eval_callback
 
     def _print_progress(
         self, x: Sequence[float], fun: Callable[[list[float]], float | np.ndarray], silent: bool = False
