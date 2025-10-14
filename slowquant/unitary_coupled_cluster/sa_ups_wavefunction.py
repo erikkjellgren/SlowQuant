@@ -550,6 +550,7 @@ class WaveFunctionSAUPS:
                 maxiter=maxiter,
                 tol=tol,
                 is_silent=is_silent_subiterations,
+                energy_eval_callback=lambda: self.num_energy_evals,
             )
             self._old_opt_parameters = np.zeros_like(self.thetas) + 10**20
             self._E_opt_old = 0.0
@@ -583,6 +584,7 @@ class WaveFunctionSAUPS:
                     maxiter=maxiter,
                     tol=tol,
                     is_silent=is_silent_subiterations,
+                    energy_eval_callback=lambda: self.num_energy_evals,
                 )
                 self._old_opt_parameters = np.zeros(len(self.kappa_idx)) + 10**20
                 self._E_opt_old = 0.0
@@ -688,7 +690,14 @@ class WaveFunctionSAUPS:
                 kappa_optimization=False,
                 return_all_states=True,
             )
-        optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
+        optimizer = Optimizers(
+            energy,
+            optimizer_name,
+            grad=gradient,
+            maxiter=maxiter,
+            tol=tol,
+            energy_eval_callback=lambda: self.num_energy_evals,
+        )
         self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0
         res = optimizer.minimize(

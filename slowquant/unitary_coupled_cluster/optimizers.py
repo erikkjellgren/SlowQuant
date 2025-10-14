@@ -31,6 +31,7 @@ class Optimizers:
         maxiter: int = 1000,
         tol: float = 10e-8,
         is_silent: bool = False,
+        energy_eval_callback: Callable[[], int] | None = None,  # New argument
     ) -> None:
         """Initialize optimizer class.
 
@@ -41,6 +42,7 @@ class Optimizers:
             maxiter: Maximum iterations.
             tol: Convergence tolerance.
             is_silent: Suppress progress output.
+            energy_eval_callback: Callback to fetch num_energy_evals.
         """
         self.fun = fun
         self.grad = grad
@@ -48,6 +50,7 @@ class Optimizers:
         self.maxiter = maxiter
         self.tol = tol
         self.is_silent = is_silent
+        self.energy_eval_callback = energy_eval_callback  # Store the callback
 
     def _print_progress(
         self, x: Sequence[float], fun: Callable[[list[float]], float | np.ndarray], silent: bool = False
@@ -66,8 +69,9 @@ class Optimizers:
             else:
                 e_str = f"{e:3.16f}"
             time_str = f"{time.time() - self._start:7.2f}"
+            evals_str = str(self.energy_eval_callback()) if self.energy_eval_callback else "N/A"
             print(
-                f"--------{str(self._iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}"
+                f"--------{str(self._iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {evals_str.center(11)}"
             )
             self._iteration += 1
             self._start = time.time()
