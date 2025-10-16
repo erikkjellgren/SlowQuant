@@ -6,7 +6,7 @@ import numpy as np
 import scipy
 from qiskit import QuantumCircuit
 from qiskit.primitives import (
-    BaseEstimator,
+    BaseEstimatorV1,
     BaseEstimatorV2,
     BaseSamplerV1,
     BaseSamplerV2,
@@ -19,7 +19,6 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.qiskit_interface.interface import QuantumInterface
 from slowquant.unitary_coupled_cluster.density_matrix import (
-    ReducedDenstiyMatrix,
     get_electronic_energy,
     get_orbital_gradient,
 )
@@ -71,7 +70,9 @@ class WaveFunctionCircuit:
         self.num_elec = num_elec
         self.num_spin_orbs = 2 * len(h_ao)
         self.num_orbs = len(h_ao)
-        self.num_active_elec = 0
+        self.num_active_elec = cas[0]
+        self.num_active_elec_alpha = self.num_active_elec // 2
+        self.num_active_elec_beta = self.num_active_elec // 2
         self.num_active_spin_orbs = 0
         self.num_inactive_spin_orbs = 0
         self.num_virtual_spin_orbs = 0
@@ -94,7 +95,6 @@ class WaveFunctionCircuit:
                 self.active_spin_idx.append(i)
                 self.active_occ_spin_idx.append(i)
                 self.num_active_spin_orbs += 1
-                self.num_active_elec += 1
             else:
                 self.inactive_spin_idx.append(i)
                 self.num_inactive_spin_orbs += 1
@@ -177,7 +177,7 @@ class WaveFunctionCircuit:
         # Setup Qiskit stuff
         self.QI = quantum_interface
         self.QI.construct_circuit(
-            self.num_active_orbs, (self.num_active_elec // 2, self.num_active_elec // 2)
+            self.num_active_orbs, (self.num_active_elec_alpha, self.num_active_elec_beta)
         )
 
     @property
@@ -263,9 +263,7 @@ class WaveFunctionCircuit:
         self._energy_elec = None
         self.QI.parameters = parameters
 
-    def change_primitive(
-        self, primitive: BaseEstimator | BaseSamplerV1 | BaseSamplerV2, verbose: bool = True
-    ) -> None:
+    def change_primitive(self, primitive: BaseSamplerV1 | BaseSamplerV2, verbose: bool = True) -> None:
         """Change the primitive expectation value calculator.
 
         Args:
@@ -278,13 +276,13 @@ class WaveFunctionCircuit:
                 Multiple switching back and forth can lead to un-expected outcomes and is an experimental feature.\n"
             )
 
-        if isinstance(primitive, BaseEstimatorV2):
-            raise ValueError("EstimatorV2 is not currently supported.")
-        if isinstance(primitive, BaseSamplerV2) and verbose:
-            print("WARNING: Using SamplerV2 is an experimental feature.")
+        if isinstance(primitive, (BaseEstimatorV1, BaseEstimatorV2)):
+            raise ValueError("Estimator is not supported.")
+        elif not isinstance(primitive, (BaseSamplerV1, BaseSamplerV2)):
+            raise TypeError(f"Unsupported primitive, {type(primitive)}")
         self.QI._primitive = primitive
         if verbose:
-            if self.QI.do_M_ansatz0:
+            if self.QI.mitigation_flags.do_M_ansatz0:
                 print("Reset RDMs, energies, QI metrics, and correlation matrix.")
             else:
                 print("Reset RDMs, energies, and QI metrics.")
@@ -300,6 +298,7 @@ class WaveFunctionCircuit:
         # Reset circuit and initiate re-transpiling
         ISA_old = self.QI.ISA
         self._reconstruct_circuit()  # Reconstruct circuit but keeping parameters
+        self.QI._transpiled = False
         self.QI.ISA = ISA_old  # Redo ISA including transpilation if requested
         self.QI.shots = self.QI.shots  # Redo shots parameter check
 
@@ -308,12 +307,9 @@ class WaveFunctionCircuit:
 
     def _reconstruct_circuit(self) -> None:
         """Construct circuit again."""
-        # force ISA = False
-        self.QI._ISA = False
         self.QI.construct_circuit(
-            self.num_active_orbs, (self.num_active_elec // 2, self.num_active_elec // 2)
+            self.num_active_orbs, (self.num_active_elec_alpha, self.num_active_elec_beta)
         )
-        self.QI._transpiled = False
 
     @property
     def rdm1(self) -> np.ndarray:
@@ -790,8 +786,19 @@ class WaveFunctionCircuit:
             self._energy_elec = self._calc_energy_elec()
         return self._energy_elec
 
+    def _get_hamiltonian(self) -> FermionicOperator:
+        """Return electronic Hamiltonian as FermionicOperator.
+
+        Returns:
+            FermionicOperator.
+        """
+        H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+        H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+
+        return H
+
     def _calc_energy_elec(self) -> float:
-        """Run electronic energy simulation, regardless of self.energy_elec variable.
+        """Run electronic energy simulation, regardless of self._energy_elec variable.
 
         Returns:
             Electronic energy.
@@ -1011,14 +1018,9 @@ class WaveFunctionCircuit:
         # RDM is more expensive than evaluation of the Hamiltonian.
         # Thus only construct these if orbital-optimization is turned on,
         # since the RDMs will be reused in the oo gradient calculation.
-        rdms = ReducedDenstiyMatrix(
-            self.num_inactive_orbs,
-            self.num_active_orbs,
-            self.num_virtual_orbs,
-            rdm1=self.rdm1,
-            rdm2=self.rdm2,
+        return get_electronic_energy(
+            self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.rdm1, self.rdm2
         )
-        return get_electronic_energy(rdms, self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
 
     def _calc_gradient_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
@@ -1042,15 +1044,14 @@ class WaveFunctionCircuit:
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:
-            rdms = ReducedDenstiyMatrix(
+            gradient[:num_kappa] = get_orbital_gradient(
+                self.h_mo,
+                self.g_mo,
+                self.kappa_idx,
                 self.num_inactive_orbs,
                 self.num_active_orbs,
-                self.num_virtual_orbs,
-                rdm1=self.rdm1,
-                rdm2=self.rdm2,
-            )
-            gradient[:num_kappa] = get_orbital_gradient(
-                rdms, self.h_mo, self.g_mo, self.kappa_idx, self.num_inactive_orbs, self.num_active_orbs
+                self.rdm1,
+                self.rdm2,
             )
         if theta_optimization:
             H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)

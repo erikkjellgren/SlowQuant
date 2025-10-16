@@ -14,7 +14,6 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
 from slowquant.unitary_coupled_cluster.density_matrix import (
-    ReducedDenstiyMatrix,
     get_electronic_energy,
     get_orbital_gradient,
 )
@@ -93,8 +92,7 @@ class WaveFunctionUPS:
         self._g_mo = None
         self._energy_elec: float | None = None
         self.ansatz_options = ansatz_options
-        self.num_energy_evals = 0   # energy evaluations
-
+        self.num_energy_evals = 0
         # Construct spin orbital spaces and indices
         active_space = []
         orbital_counter = 0
@@ -372,8 +370,6 @@ class WaveFunctionUPS:
                         [Epq(p, q)],
                         self.ci_coeffs,
                         self.ci_info,
-                        self.thetas,
-                        self.ups_layout,
                     )
                     self._rdm1[p_idx, q_idx] = val  # type: ignore
                     self._rdm1[q_idx, p_idx] = val  # type: ignore
@@ -416,8 +412,6 @@ class WaveFunctionUPS:
                                 [Epq(p, q) * Epq(r, s)],
                                 self.ci_coeffs,
                                 self.ci_info,
-                                self.thetas,
-                                self.ups_layout,
                             )
                             if q == r:
                                 val -= self.rdm1[p_idx, s_idx]
@@ -464,8 +458,6 @@ class WaveFunctionUPS:
                                         [Epq(p, q), Epq(r, s), Epq(t, u)],
                                         self.ci_coeffs,
                                         self.ci_info,
-                                        self.thetas,
-                                        self.ups_layout,
                                     )
                                     if t == s:
                                         val -= self.rdm2[p_idx, q_idx, r_idx, u_idx]
@@ -532,8 +524,6 @@ class WaveFunctionUPS:
                                                 [Epq(p, q), Epq(r, s), Epq(t, u), Epq(m, n)],
                                                 self.ci_coeffs,
                                                 self.ci_info,
-                                                self.thetas,
-                                                self.ups_layout,
                                             )
                                             if r == q:
                                                 val -= self.rdm3[p_idx, s_idx, t_idx, u_idx, m_idx, n_idx]
@@ -736,8 +726,6 @@ class WaveFunctionUPS:
                 [hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
-                self.thetas,
-                self.ups_layout,
             )
         return self._energy_elec
 
@@ -1063,15 +1051,8 @@ class WaveFunctionUPS:
             # RDM is more expensive than evaluation of the Hamiltonian.
             # Thus only construct these if orbital-optimization is turned on,
             # since the RDMs will be reused in the oo gradient calculation.
-            rdms = ReducedDenstiyMatrix(
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.num_virtual_orbs,
-                rdm1=self.rdm1,
-                rdm2=self.rdm2,
-            )
             E = get_electronic_energy(
-                rdms, self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
+                self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.rdm1, self.rdm2
             )
         else:
             E = expectation_value(
@@ -1079,15 +1060,10 @@ class WaveFunctionUPS:
                 [hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
-                self.thetas,
-                self.ups_layout,
             )
         self._E_opt_old = E
         self._old_opt_parameters = np.copy(parameters)
-
-        # Counting energy measurements
-        self.num_energy_evals += 1
-
+        self.num_energy_evals += 1  # count one measurement
         return E
 
     def _calc_gradient_optimization(
@@ -1111,15 +1087,14 @@ class WaveFunctionUPS:
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:
-            rdms = ReducedDenstiyMatrix(
+            gradient[:num_kappa] = get_orbital_gradient(
+                self.h_mo,
+                self.g_mo,
+                self.kappa_idx,
                 self.num_inactive_orbs,
                 self.num_active_orbs,
-                self.num_virtual_orbs,
-                rdm1=self.rdm1,
-                rdm2=self.rdm2,
-            )
-            gradient[:num_kappa] = get_orbital_gradient(
-                rdms, self.h_mo, self.g_mo, self.kappa_idx, self.num_inactive_orbs, self.num_active_orbs
+                self.rdm1,
+                self.rdm2,
             )
         if theta_optimization:
             Hamiltonian = hamiltonian_0i_0a(
@@ -1133,8 +1108,6 @@ class WaveFunctionUPS:
                 [Hamiltonian],
                 self.ci_coeffs,
                 self.ci_info,
-                self.thetas,
-                self.ups_layout,
             )
             bra_vec = construct_ups_state(
                 bra_vec,
@@ -1172,8 +1145,7 @@ class WaveFunctionUPS:
                     self.thetas,
                     self.ups_layout,
                 )
-
-        # Counting gradient measurements -> phase shift
-        self.num_energy_evals += 2 * np.sum(list(self.ups_layout.grad_param_R.values()))  # Count energy measurements for all gradients
-        
+            self.num_energy_evals += 2 * np.sum(
+                list(self.ups_layout.grad_param_R.values())
+            )  # Count energy measurements for all gradients
         return gradient

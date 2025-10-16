@@ -38,7 +38,7 @@ def test_ups_naivelr() -> None:
         SQobj.integral.get_multipole_matrix([0, 0, 1]),
     )
     WF.run_wf_optimization_1step("SLSQP", True)
-    LR = naivelr.LinearResponseUCC(WF, excitations="SD")
+    LR = naivelr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.129476) < 10**-4
     assert abs(LR.excitation_energies[1] - 0.178749) < 10**-4
@@ -104,7 +104,7 @@ def test_LiH_sto3g_allST():
     )
     WF2.run_wf_optimization_1step("SLSQP", False)
     # Linear Response
-    LR = allstlr.LinearResponseUCC(
+    LR = allstlr.LinearResponse(
         WF2,
         excitations="SD",
     )
@@ -284,3 +284,56 @@ def test_saups_h3_3states() -> None:
     osc = WF.get_oscillator_strenghts(dipole_integrals)
     assert abs(osc[0] - 0.7569) < 10**-3
     assert abs(osc[1] - 0.7569) < 10**-3
+
+
+def test_sa_doubles() -> None:
+    """Test spin-adapted double excitations."""
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """Li 0 0 0;
+        H 1.6 0 0""",
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("STO-3G")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
+    WF = WaveFunctionUPS(
+        SQobj.molecule.number_electrons,
+        (4, 6),
+        SQobj.hartree_fock.mo_coeff,
+        h_core,
+        g_eri,
+        ansatz="fUCC",
+        ansatz_options={"n_layers": 1, "SAS": True, "SAD": True},
+    )
+    WF.run_wf_optimization_1step("SLSQP")
+    assert abs(WF.energy_elec - -8.874521029611891) < 10**-8
+
+
+def test_SA_sa_doubles() -> None:
+    """Test spin-adapted double excitations."""
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """Li 0 0 0;
+        H 1.6 0 0""",
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("STO-3G")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
+    WF = WaveFunctionSAUPS(
+        SQobj.molecule.number_electrons,
+        (4, 6),
+        SQobj.hartree_fock.mo_coeff,
+        h_core,
+        g_eri,
+        ([[1]], [["111100000000"]]),
+        ansatz="SAfUCCSD",
+        ansatz_options={"n_layers": 1, "SAS": True, "SAD": True},
+    )
+    WF.run_wf_optimization_1step("SLSQP")
+    assert abs(WF.energy_states[0] - -8.874521029611891) < 10**-8
