@@ -37,10 +37,15 @@ from slowquant.unitary_coupled_cluster.operators import (
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import (
     UpsStructure,
+    iterate_pair_t2,
     iterate_pair_t2_generalized,
+    iterate_t1,
     iterate_t1_generalized,
+    iterate_t1_sa,
     iterate_t1_sa_generalized,
+    iterate_t2,
     iterate_t2_generalized,
+    iterate_t2_sa,
     iterate_t2_sa_generalized,
 )
 
@@ -721,36 +726,83 @@ class WaveFunctionSAUPS:
 
     def do_adapt(
         self,
-        operator_pool: str,
+        operator_pool: list[str],
         maxiter: int = 1000,
         grad_threshold: float = 1e-5,
         orbital_optimization: bool = False,
     ) -> None:
+        """Do ADAPT optimization.
+
+        The valid operator pool is,
+
+        - S, singles.
+        - D, doubles.
+        - pD, pair doubles.
+        - SAS, spin-adapted singles.
+        - SAD, spin-adapted doubles.
+        - GS, generalized singles.
+        - GD, generalized doubles.
+        - GpD, generalized pair doubles.
+        - SAGS, spin-adapted generalized singles.
+        - SAGD, spin-adapted generalized doubles.
+
+        Args:
+            operator_pool: Which operators to include in the ADAPT.
+            maxiter: Maximum iterations.
+            grad_threshold: Convergence threshold based on gradient.
+            orbital_optimization: Do orbital optimization.
+        """
         excitation_pool = []
         excitation_pool_type = []
-        if operator_pool.lower() == "sa_singles_sa_doubles":
-            for a, i, _ in iterate_t1_sa_generalized(self.num_active_orbs):
+        _operator_pool = [x.lower() for x in operator_pool]
+        valid_operators = ("sags", "sagd", "s", "d", "sas", "sad", "gs", "gd", "gpd", "pd")
+        for operator in _operator_pool:
+            if operator not in valid_operators:
+                raise ValueError(f"Got invalid operator for ADAPT, {operator}")
+        if "s" in _operator_pool:
+            for a, i in iterate_t1(self.active_occ_spin_idx_shifted, self.active_unocc_spin_idx_shifted):
                 excitation_pool.append((i, a))
-                excitation_pool_type.append("sa_single")
-            for a, i, b, j, _, op_case in iterate_t2_sa_generalized(self.num_active_orbs):
-                excitation_pool.append((i, j, a, b))
-                excitation_pool_type.append(f"sa_double_{op_case}")
-        elif operator_pool.lower() == "sa_singles_pair_doubles":
-            for a, i, _ in iterate_t1_sa_generalized(self.num_active_orbs):
-                excitation_pool.append((i, a))
-                excitation_pool_type.append("sa_single")
-            for a, i, b, j in iterate_pair_t2_generalized(self.num_active_orbs):
+                excitation_pool_type.append("single")
+        if "d" in _operator_pool:
+            for a, i, b, j in iterate_t2(
+                self.active_occ_spin_idx_shifted, self.active_unocc_spin_idx_shifted
+            ):
                 excitation_pool.append((i, j, a, b))
                 excitation_pool_type.append("double")
-        elif operator_pool.lower() == "singles_doubles":
+        if "gs" in _operator_pool:
             for a, i in iterate_t1_generalized(self.num_active_spin_orbs):
                 excitation_pool.append((i, a))
                 excitation_pool_type.append("single")
+        if "gd" in _operator_pool:
             for a, i, b, j in iterate_t2_generalized(self.num_active_spin_orbs):
                 excitation_pool.append((i, j, a, b))
                 excitation_pool_type.append("double")
-        else:
-            raise ValueError(f"Got unknown operator pool, {operator_pool}")
+        if "pd" in _operator_pool:
+            for a, i, b, j in iterate_pair_t2(self.active_occ_idx_shifted, self.active_unocc_idx_shifted):
+                excitation_pool.append((i, j, a, b))
+                excitation_pool_type.append("double")
+        if "pgd" in _operator_pool:
+            for a, i, b, j in iterate_pair_t2_generalized(self.num_active_orbs):
+                excitation_pool.append((i, j, a, b))
+                excitation_pool_type.append("double")
+        if "sas" in _operator_pool:
+            for a, i, _ in iterate_t1_sa(self.active_occ_idx_shifted, self.active_unocc_idx_shifted):
+                excitation_pool.append((i, a))
+                excitation_pool_type.append("sa_single")
+        if "sad" in _operator_pool:
+            for a, i, b, j, _, op_case in iterate_t2_sa(
+                self.active_occ_idx_shifted, self.active_unocc_idx_shifted
+            ):
+                excitation_pool.append((i, j, a, b))
+                excitation_pool_type.append(f"sa_double_{op_case}")
+        if "sags" in _operator_pool:
+            for a, i, _ in iterate_t1_sa_generalized(self.num_active_orbs):
+                excitation_pool.append((i, a))
+                excitation_pool_type.append("sa_single")
+        if "sagd" in _operator_pool:
+            for a, i, b, j, _, op_case in iterate_t2_sa_generalized(self.num_active_orbs):
+                excitation_pool.append((i, j, a, b))
+                excitation_pool_type.append(f"sa_double_{op_case}")
 
         print(
             "Iteration # | Iteration time [s] | Electronic energy [Hartree] | max|grad| [Hartree] | Operator"
