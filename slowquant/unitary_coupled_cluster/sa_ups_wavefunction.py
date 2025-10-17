@@ -782,7 +782,7 @@ class WaveFunctionSAUPS:
             for a, i, b, j in iterate_pair_t2(self.active_occ_idx_shifted, self.active_unocc_idx_shifted):
                 excitation_pool.append((i, j, a, b))
                 excitation_pool_type.append("double")
-        if "pgd" in _operator_pool:
+        if "gpd" in _operator_pool:
             for a, i, b, j in iterate_pair_t2_generalized(self.num_active_orbs):
                 excitation_pool.append((i, j, a, b))
                 excitation_pool_type.append("double")
