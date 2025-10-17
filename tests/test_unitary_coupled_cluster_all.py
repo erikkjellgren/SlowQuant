@@ -38,7 +38,7 @@ def test_h2_sto3g_uccsd_lr() -> None:
     )
     WF.run_wf_optimization_1step("SLSQP", False)
     # SC
-    LR = allselfconsistent.LinearResponseUCC(
+    LR = allselfconsistent.LinearResponse(
         WF,
         excitations="SD",
     )
@@ -46,7 +46,7 @@ def test_h2_sto3g_uccsd_lr() -> None:
     assert abs(LR.excitation_energies[0] - 1.0157376) < 10**-3
     assert abs(LR.excitation_energies[1] - 1.71950367) < 10**-3
     # ST
-    LR = allstatetransfer.LinearResponseUCC(  # type: ignore [assigment]
+    LR = allstatetransfer.LinearResponse(  # type: ignore [assigment]
         WF,
         excitations="SD",
     )
@@ -81,7 +81,7 @@ def test_LiH_atmethods_energies() -> None:
     threshold = 10 ** (-3)
 
     # atSC
-    LR_atSC = allselfconsistent.LinearResponseUCC(
+    LR_atSC = allselfconsistent.LinearResponse(
         WF,
         excitations="SD",
     )
@@ -104,7 +104,7 @@ def test_LiH_atmethods_energies() -> None:
     assert np.allclose(LR_atSC.excitation_energies, solutions, atol=threshold)
 
     # atST
-    LR_atST = allstatetransfer.LinearResponseUCC(
+    LR_atST = allstatetransfer.LinearResponse(
         WF,
         excitations="SD",
     )
@@ -153,7 +153,7 @@ def test_LiH_naiveq_methods_energies() -> None:
     threshold = 10 ** (-5)
 
     # naive
-    LR_naive = naive.LinearResponseUCC(WF, excitations="SD")
+    LR_naive = naive.LinearResponse(WF, excitations="SD")
     LR_naive.calc_excitation_energies()
 
     solutions = np.array(
@@ -176,7 +176,7 @@ def test_LiH_naiveq_methods_energies() -> None:
     assert np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)
 
     # proj:
-    LR_naive = projected.LinearResponseUCC(  # type: ignore [assigment]
+    LR_naive = projected.LinearResponse(  # type: ignore [assigment]
         WF,
         excitations="SD",
     )
@@ -202,7 +202,7 @@ def test_LiH_naiveq_methods_energies() -> None:
     assert np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)
 
     # SC
-    LR_naive = selfconsistent.LinearResponseUCC(  # type: ignore [assigment]
+    LR_naive = selfconsistent.LinearResponse(  # type: ignore [assigment]
         WF,
         excitations="SD",
     )
@@ -228,7 +228,7 @@ def test_LiH_naiveq_methods_energies() -> None:
     assert np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)
 
     # ST
-    LR_naive = statetransfer.LinearResponseUCC(  # type: ignore [assigment]
+    LR_naive = statetransfer.LinearResponse(  # type: ignore [assigment]
         WF,
         excitations="SD",
     )
@@ -280,7 +280,7 @@ def test_LiH_naiveq_methods_matrices() -> None:
     threshold = 10 ** (-5)
 
     # naive
-    LR_naive = naive.LinearResponseUCC(
+    LR_naive = naive.LinearResponse(
         WF,
         excitations="SD",
     )
@@ -290,7 +290,7 @@ def test_LiH_naiveq_methods_matrices() -> None:
     assert np.allclose(LR_naive.Delta, np.zeros_like(LR_naive.Delta), atol=threshold)
 
     # SC
-    LR_naive = selfconsistent.LinearResponseUCC(  # type: ignore [assigment]
+    LR_naive = selfconsistent.LinearResponse(  # type: ignore [assigment]
         WF,
         excitations="SD",
     )
@@ -301,7 +301,7 @@ def test_LiH_naiveq_methods_matrices() -> None:
 
     # projected:
     threshold = 10 ** (-5)
-    LR_naive = projected.LinearResponseUCC(  # type: ignore [assigment]
+    LR_naive = projected.LinearResponse(  # type: ignore [assigment]
         WF,
         excitations="SD",
     )
@@ -312,7 +312,7 @@ def test_LiH_naiveq_methods_matrices() -> None:
     assert np.allclose(LR_naive.Delta, np.zeros_like(LR_naive.Delta), atol=threshold)
 
     # ST
-    LR_naive = statetransfer.LinearResponseUCC(  # type: ignore [assigment]
+    LR_naive = statetransfer.LinearResponse(  # type: ignore [assigment]
         WF,
         excitations="SD",
     )
@@ -347,7 +347,7 @@ def test_LiH_allproj_energies() -> None:
 
     threshold = 10 ** (-5)
 
-    LR_naive = allprojected.LinearResponseUCC(
+    LR_naive = allprojected.LinearResponse(
         WF,
         excitations="SD",
     )
@@ -398,7 +398,7 @@ def test_LiH_STproj_energies() -> None:
 
     threshold = 10 ** (-5)
 
-    LR_naive = projected_statetransfer.LinearResponseUCC(
+    LR_naive = projected_statetransfer.LinearResponse(
         WF,
         excitations="SD",
     )

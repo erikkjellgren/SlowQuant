@@ -38,7 +38,7 @@ def test_ups_naivelr() -> None:
         SQobj.integral.get_multipole_matrix([0, 0, 1]),
     )
     WF.run_wf_optimization_1step("SLSQP", True)
-    LR = naivelr.LinearResponseUCC(WF, excitations="SD")
+    LR = naivelr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.129476) < 10**-4
     assert abs(LR.excitation_energies[1] - 0.178749) < 10**-4
@@ -104,7 +104,7 @@ def test_LiH_sto3g_allST():
     )
     WF2.run_wf_optimization_1step("SLSQP", False)
     # Linear Response
-    LR = allstlr.LinearResponseUCC(
+    LR = allstlr.LinearResponse(
         WF2,
         excitations="SD",
     )

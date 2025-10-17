@@ -37,9 +37,9 @@ def test_H2_631g_naive():
     WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
-    LR = naive.LinearResponseUCC(WF, excitations="SD")
+    LR = naive.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
-    genericLR = naive.LinearResponseUCC(WF, excitations="SD")
+    genericLR = naive.LinearResponse(WF, excitations="SD")
     genericLR.calc_excitation_energies()
 
     thresh = 10**-4
@@ -100,9 +100,9 @@ def test_LiH_sto3g_naive():
     WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
-    LR = naive.LinearResponseUCC(WF, excitations="SD")
+    LR = naive.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
-    genericLR = naive.LinearResponseUCC(WF, excitations="SD")
+    genericLR = naive.LinearResponse(WF, excitations="SD")
     genericLR.calc_excitation_energies()
 
     thresh = 10**-4
@@ -177,7 +177,7 @@ def test_H2_631g_projLR():
     WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
-    LR = projected.LinearResponseUCC(WF, excitations="SD")
+    LR = projected.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
 
     thresh = 10**-4
@@ -234,7 +234,7 @@ def test_LiH_sto3g_proj():
     )
     WF.run_wf_optimization_1step("SLSQP", True)
 
-    LR = projected.LinearResponseUCC(WF, excitations="SD")
+    LR = projected.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
 
     thresh = 10**-4
@@ -305,7 +305,7 @@ def test_H2_631g_STLR():
     WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
-    LR = statetransfer.LinearResponseUCC(
+    LR = statetransfer.LinearResponse(
         WF,
         excitations="SD",
     )
@@ -365,7 +365,7 @@ def test_LiH_sto3g_st():
     WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
-    LR = statetransfer.LinearResponseUCC(
+    LR = statetransfer.LinearResponse(
         WF,
         excitations="SD",
     )
@@ -439,7 +439,7 @@ def test_H2_631g_allST():
     WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
-    LR = allstatetransfer.LinearResponseUCC(
+    LR = allstatetransfer.LinearResponse(
         WF,
         excitations="SD",
     )
@@ -495,7 +495,7 @@ def test_LiH_sto3g_allST():
     WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
-    LR = allstatetransfer.LinearResponseUCC(
+    LR = allstatetransfer.LinearResponse(
         WF,
         excitations="SD",
     )
