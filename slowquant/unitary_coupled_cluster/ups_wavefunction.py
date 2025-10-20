@@ -864,6 +864,7 @@ class WaveFunctionUPS:
             orbital_optimization: Perform orbital optimization.
             tol: Convergence tolerance.
             maxiter: Maximum number of iterations.
+            is_silent: Toggle optimization print.
         """
         if not is_silent:
             print("### Parameters information:")
@@ -965,7 +966,7 @@ class WaveFunctionUPS:
             grad_threshold: Convergence threshold based on gradient.
             orbital_optimization: Do orbital optimization.
         """
-        excitation_pool = []
+        excitation_pool: list[tuple[int, ...]] = []
         excitation_pool_type = []
         _operator_pool = [x.lower() for x in operator_pool]
         valid_operators = ("sags", "sagd", "s", "d", "sas", "sad", "gs", "gd", "gpd", "pd")
@@ -1078,7 +1079,7 @@ class WaveFunctionUPS:
             e_str = f"{self.energy_elec:3.12f}"
             grad_str = f"{np.abs(grad[max_arg]):3.12f}"
             print(
-                f"{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {grad_str.center(19)} | {excitation_pool_type[max_arg]}{excitation_pool[max_arg]}"
+                f"{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {grad_str.center(19)} | {excitation_pool_type[max_arg]}{tuple([int(x) for x in excitation_pool[max_arg]])}"
             )
             start = time.time()
 
