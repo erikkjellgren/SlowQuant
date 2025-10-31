@@ -33,7 +33,19 @@ from slowquant.unitary_coupled_cluster.unrestricted_operators import (
     unrestricted_hamiltonian_0i_0a,
     unrestricted_hamiltonian_full_space,
 )
-from slowquant.unitary_coupled_cluster.util import UpsStructure
+from slowquant.unitary_coupled_cluster.operators import (
+    G1,
+    G2,
+)
+from slowquant.unitary_coupled_cluster.util import (
+    UpsStructure,
+    iterate_pair_t2,
+    iterate_pair_t2_generalized,
+    iterate_t1,
+    iterate_t1_generalized,
+    iterate_t2,
+    iterate_t2_generalized,
+)
 
 
 class UnrestrictedWaveFunctionUPS:
@@ -78,6 +90,12 @@ class UnrestrictedWaveFunctionUPS:
         self.active_spin_idx = []
         self.active_occ_spin_idx = []
         self.active_unocc_spin_idx = []
+        self.active_spin_idx_shifted = []
+        self.active_occ_spin_idx_shifted = []
+        self.active_unocc_spin_idx_shifted = []
+        self.active_idx_shifted = []
+        self.active_occ_idx_shifted = []
+        self.active_unocc_idx_shifted = []
         self.num_elec = num_elec
         self.num_elec_alpha = (num_elec - np.sum(cas[0])) // 2 + cas[0][0]
         self.num_elec_beta = (num_elec - np.sum(cas[0])) // 2 + cas[0][1]
@@ -143,6 +161,23 @@ class UnrestrictedWaveFunctionUPS:
         for idx in self.active_unocc_spin_idx:
             if idx // 2 not in self.active_unocc_idx:
                 self.active_unocc_idx.append(idx // 2)
+        # Make shifted indices
+        if len(self.active_spin_idx) != 0:
+            active_shift = np.min(self.active_spin_idx)
+            for active_idx in self.active_spin_idx:
+                self.active_spin_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_occ_spin_idx:
+                self.active_occ_spin_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_unocc_spin_idx:
+                self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
+        if len(self.active_idx) != 0:
+            active_shift = np.min(self.active_idx)
+            for active_idx in self.active_idx:
+                self.active_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_occ_idx:
+                self.active_occ_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_unocc_idx:
+                self.active_unocc_idx_shifted.append(active_idx - active_shift)
         # Find non-redundant kappas
         self._kappa_a = []
         self._kappa_b = []
@@ -273,9 +308,14 @@ class UnrestrictedWaveFunctionUPS:
             self.ansatz_options["5"] = True
             self.ansatz_options["6"] = True
             self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
+        elif ansatz.lower() == "adapt":
+            None
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
-        self._thetas = np.zeros(self.ups_layout.n_params).tolist()
+        if self.ups_layout.n_params == 0:
+            self._thetas = []
+        else:
+            self._thetas = np.zeros(self.ups_layout.n_params).tolist()
 
     @property
     def kappa_a(self) -> list[float]:
@@ -739,6 +779,7 @@ class UnrestrictedWaveFunctionUPS:
         orbital_optimization: bool = False,
         tol: float = 1e-10,
         maxiter: int = 1000,
+        is_silent: bool = False,
     ) -> None:
         """Run one step optimization of wave function.
 
@@ -747,18 +788,21 @@ class UnrestrictedWaveFunctionUPS:
             orbital_optimization: Perform orbital optimization.
             tol: Convergence tolerance.
             maxiter: Maximum number of iterations.
+            is_silent: Toggle optimization print.
         """
-        print("### Parameters information:")
-        if orbital_optimization:
-            print(f"### Number kappa: {len(self.kappa_a) + len(self.kappa_b)}")
-        print(f"### Number theta: {self.ups_layout.n_params}")
+        if not is_silent:
+            print("### Parameters information:")
+            if orbital_optimization:
+                print(f"### Number kappa: {len(self.kappa_a) + len(self.kappa_b)}")
+            print(f"### Number theta: {self.ups_layout.n_params}")
         if optimizer_name.lower() == "rotosolve":
             if orbital_optimization and len(self.kappa_a) + len(self.kappa_b) != 0:
                 raise ValueError(
                     "Cannot use RotoSolve together with orbital optimization in the one-step solver."
                 )
 
-        print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+        if not is_silent:
+            print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
         if orbital_optimization:
             if len(self.thetas) > 0:
                 energy = partial(
@@ -800,7 +844,7 @@ class UnrestrictedWaveFunctionUPS:
                 parameters = self.kappa_a + self.kappa_b
         else:
             parameters = self.thetas
-        optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
+        optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol, is_silent=is_silent)
         self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0
         res = optimizer.minimize(
@@ -817,6 +861,114 @@ class UnrestrictedWaveFunctionUPS:
         else:
             self.thetas = res.x.tolist()
         self._energy_elec = res.fun
+
+    def do_adapt(
+        self,
+        operator_pool: list[str],
+        maxiter: int = 1000,
+        grad_threshold: float = 1e-5,
+        orbital_optimization: bool = False,
+    ) -> None:
+        """Do ADAPT optimization.
+
+        The valid operator pool is,
+
+        - S, singles.
+        - D, doubles.
+        - pD, pair doubles.
+        - GS, generalized singles.
+        - GD, generalized doubles.
+        - GpD, generalized pair doubles.
+
+        Args:
+            operator_pool: Which operators to include in the ADAPT.
+            maxiter: Maximum iterations.
+            grad_threshold: Convergence threshold based on gradient.
+            orbital_optimization: Do orbital optimization.
+        """
+        excitation_pool: list[tuple[int, ...]] = []
+        excitation_pool_type = []
+        _operator_pool = [x.lower() for x in operator_pool]
+        valid_operators = ("s", "d", "gs", "gd", "gpd", "pd")
+        for operator in _operator_pool:
+            if operator not in valid_operators:
+                raise ValueError(f"Got invalid operator for ADAPT, {operator}")
+        if "s" in _operator_pool:
+            for a, i in iterate_t1(self.active_occ_spin_idx_shifted, self.active_unocc_spin_idx_shifted):
+                excitation_pool.append((i, a))
+                excitation_pool_type.append("single")
+        if "d" in _operator_pool:
+            for a, i, b, j in iterate_t2(
+                self.active_occ_spin_idx_shifted, self.active_unocc_spin_idx_shifted
+            ):
+                excitation_pool.append((i, j, a, b))
+                excitation_pool_type.append("double")
+        if "gs" in _operator_pool:
+            for a, i in iterate_t1_generalized(self.num_active_spin_orbs):
+                excitation_pool.append((i, a))
+                excitation_pool_type.append("single")
+        if "gd" in _operator_pool:
+            for a, i, b, j in iterate_t2_generalized(self.num_active_spin_orbs):
+                excitation_pool.append((i, j, a, b))
+                excitation_pool_type.append("double")
+        if "pd" in _operator_pool:
+            for a, i, b, j in iterate_pair_t2(self.active_occ_idx_shifted, self.active_unocc_idx_shifted):
+                excitation_pool.append((i, j, a, b))
+                excitation_pool_type.append("double")
+        if "gpd" in _operator_pool:
+            for a, i, b, j in iterate_pair_t2_generalized(self.num_active_orbs):
+                excitation_pool.append((i, j, a, b))
+                excitation_pool_type.append("double")
+
+        print(
+            "Iteration # | Iteration time [s] | Electronic energy [Hartree] | max|grad| [Hartree] | Operator"
+        )
+        start = time.time()
+        for iteration in range(maxiter):
+            Hamiltonian = unrestricted_hamiltonian_0i_0a(
+                        self.haa_mo,
+                        self.hbb_mo,
+                        self.gaaaa_mo,
+                        self.gbbbb_mo,
+                        self.gaabb_mo,
+                        self.gbbaa_mo,
+                        self.num_inactive_orbs,
+                        self.num_active_orbs,
+            )
+            H_ket = propagate_state(
+                [Hamiltonian],
+                self.ci_coeffs,
+                self.ci_info,
+            )
+            grad = []
+
+            for idx, exc_type in enumerate(excitation_pool_type):
+                if exc_type == "single":
+                    (i, a) = np.array(excitation_pool[idx])
+                    T = G1(i, a, True)
+                elif exc_type == "double":
+                    (i, j, a, b) = np.array(excitation_pool[idx])
+                    T = G2(i, j, a, b, True)
+                else:
+                    raise ValueError(f"Got unknown excitation type {exc_type}")
+                gr = expectation_value(self.ci_coeffs, [T], H_ket, self.ci_info, do_folding=False)
+                gr -= expectation_value(H_ket, [T], self.ci_coeffs, self.ci_info, do_folding=False)
+                grad.append(gr)
+            if np.max(np.abs(grad)) < grad_threshold:
+                break
+            max_arg = np.argmax(np.abs(grad))
+            self.ups_layout.excitation_indices.append(excitation_pool[max_arg])
+            self.ups_layout.excitation_operator_type.append(excitation_pool_type[max_arg])
+            self.ups_layout.n_params += 1
+
+            self._thetas.append(0.0)
+            self.run_wf_optimization_1step("bfgs", orbital_optimization=orbital_optimization, is_silent=True)
+            time_str = f"{time.time() - start:7.2f}"
+            e_str = f"{self.energy_elec:3.12f}"
+            grad_str = f"{np.abs(grad[max_arg]):3.12f}"
+            print(
+                f"{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {grad_str.center(19)} | {excitation_pool_type[max_arg]}{tuple([int(x) for x in excitation_pool[max_arg]])}"
+            )
 
     def _calc_energy_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
