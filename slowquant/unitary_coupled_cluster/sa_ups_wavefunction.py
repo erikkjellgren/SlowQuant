@@ -26,12 +26,28 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     propagate_unitary_SA,
 )
 from slowquant.unitary_coupled_cluster.operators import (
+    G1,
+    G2,
     Epq,
+    G1_sa,
+    G2_sa,
     hamiltonian_0i_0a,
     one_elec_op_0i_0a,
 )
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
-from slowquant.unitary_coupled_cluster.util import UpsStructure
+from slowquant.unitary_coupled_cluster.util import (
+    UpsStructure,
+    iterate_pair_t2,
+    iterate_pair_t2_generalized,
+    iterate_t1,
+    iterate_t1_generalized,
+    iterate_t1_sa,
+    iterate_t1_sa_generalized,
+    iterate_t2,
+    iterate_t2_generalized,
+    iterate_t2_sa,
+    iterate_t2_sa_generalized,
+)
 
 
 class WaveFunctionSAUPS:
@@ -98,6 +114,7 @@ class WaveFunctionSAUPS:
         self._sa_energy: float | None = None
         self._state_energies = None
         self.ansatz_options = ansatz_options
+        self.num_energy_evals = 0
         # Construct spin orbital spaces and indices
         active_space = []
         orbital_counter = 0
@@ -259,9 +276,14 @@ class WaveFunctionSAUPS:
             self.ansatz_options["SAS"] = True
             self.ansatz_options["SAD"] = True
             self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
+        elif ansatz.lower() == "adapt":
+            None
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
-        self._thetas = np.zeros(self.ups_layout.n_params).tolist()
+        if self.ups_layout.n_params == 0:
+            self._thetas = []
+        else:
+            self._thetas = np.zeros(self.ups_layout.n_params).tolist()
 
     @property
     def kappa(self) -> list[float]:
@@ -611,6 +633,7 @@ class WaveFunctionSAUPS:
         orbital_optimization: bool = False,
         tol: float = 1e-10,
         maxiter: int = 1000,
+        is_silent: bool = False,
     ) -> None:
         """Run one step optimization of wave function.
 
@@ -619,18 +642,20 @@ class WaveFunctionSAUPS:
             orbital_optimization: Perform orbital optimization.
             tol: Convergence tolerance.
             maxiter: Maximum number of iterations.
+            is_silent: Toggle optimization print.
         """
-        print("### Parameters information:")
-        if orbital_optimization:
-            print(f"### Number kappa: {len(self.kappa)}")
-        print(f"### Number theta: {self.ups_layout.n_params}")
+        if not is_silent:
+            print("### Parameters information:")
+            if orbital_optimization:
+                print(f"### Number kappa: {len(self.kappa)}")
+            print(f"### Number theta: {self.ups_layout.n_params}")
         if optimizer_name.lower() == "rotosolve":
             if orbital_optimization and len(self.kappa) != 0:
                 raise ValueError(
                     "Cannot use RotoSolve together with orbital optimization in the one-step solver."
                 )
-
-        print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+        if not is_silent:
+            print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
         if orbital_optimization:
             if len(self.thetas) > 0:
                 energy = partial(
@@ -681,7 +706,9 @@ class WaveFunctionSAUPS:
                 kappa_optimization=False,
                 return_all_states=True,
             )
-        optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
+        optimizer = Optimizers(
+            energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol, is_silent=is_silent
+        )
         self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0
         res = optimizer.minimize(
@@ -698,6 +725,151 @@ class WaveFunctionSAUPS:
         # Subspace diagonalization
         self._do_state_ci()
         self._sa_energy = res.fun
+
+    def do_adapt(
+        self,
+        operator_pool: list[str],
+        maxiter: int = 1000,
+        grad_threshold: float = 1e-5,
+        orbital_optimization: bool = False,
+    ) -> None:
+        """Do ADAPT optimization.
+
+        The valid operator pool is,
+
+        - S, singles.
+        - D, doubles.
+        - pD, pair doubles.
+        - SAS, spin-adapted singles.
+        - SAD, spin-adapted doubles.
+        - GS, generalized singles.
+        - GD, generalized doubles.
+        - GpD, generalized pair doubles.
+        - SAGS, spin-adapted generalized singles.
+        - SAGD, spin-adapted generalized doubles.
+
+        Args:
+            operator_pool: Which operators to include in the ADAPT.
+            maxiter: Maximum iterations.
+            grad_threshold: Convergence threshold based on gradient.
+            orbital_optimization: Do orbital optimization.
+        """
+        excitation_pool: list[tuple[int, ...]] = []
+        excitation_pool_type = []
+        _operator_pool = [x.lower() for x in operator_pool]
+        valid_operators = ("sags", "sagd", "s", "d", "sas", "sad", "gs", "gd", "gpd", "pd")
+        for operator in _operator_pool:
+            if operator not in valid_operators:
+                raise ValueError(f"Got invalid operator for ADAPT, {operator}")
+        if "s" in _operator_pool:
+            for a, i in iterate_t1(self.active_occ_spin_idx_shifted, self.active_unocc_spin_idx_shifted):
+                excitation_pool.append((i, a))
+                excitation_pool_type.append("single")
+        if "d" in _operator_pool:
+            for a, i, b, j in iterate_t2(
+                self.active_occ_spin_idx_shifted, self.active_unocc_spin_idx_shifted
+            ):
+                excitation_pool.append((i, j, a, b))
+                excitation_pool_type.append("double")
+        if "gs" in _operator_pool:
+            for a, i in iterate_t1_generalized(self.num_active_spin_orbs):
+                excitation_pool.append((i, a))
+                excitation_pool_type.append("single")
+        if "gd" in _operator_pool:
+            for a, i, b, j in iterate_t2_generalized(self.num_active_spin_orbs):
+                excitation_pool.append((i, j, a, b))
+                excitation_pool_type.append("double")
+        if "pd" in _operator_pool:
+            for a, i, b, j in iterate_pair_t2(self.active_occ_idx_shifted, self.active_unocc_idx_shifted):
+                excitation_pool.append((i, j, a, b))
+                excitation_pool_type.append("double")
+        if "gpd" in _operator_pool:
+            for a, i, b, j in iterate_pair_t2_generalized(self.num_active_orbs):
+                excitation_pool.append((i, j, a, b))
+                excitation_pool_type.append("double")
+        if "sas" in _operator_pool:
+            for a, i, _ in iterate_t1_sa(self.active_occ_idx_shifted, self.active_unocc_idx_shifted):
+                excitation_pool.append((i, a))
+                excitation_pool_type.append("sa_single")
+        if "sad" in _operator_pool:
+            for a, i, b, j, _, op_case in iterate_t2_sa(
+                self.active_occ_idx_shifted, self.active_unocc_idx_shifted
+            ):
+                excitation_pool.append((i, j, a, b))
+                excitation_pool_type.append(f"sa_double_{op_case}")
+        if "sags" in _operator_pool:
+            for a, i, _ in iterate_t1_sa_generalized(self.num_active_orbs):
+                excitation_pool.append((i, a))
+                excitation_pool_type.append("sa_single")
+        if "sagd" in _operator_pool:
+            for a, i, b, j, _, op_case in iterate_t2_sa_generalized(self.num_active_orbs):
+                excitation_pool.append((i, j, a, b))
+                excitation_pool_type.append(f"sa_double_{op_case}")
+
+        print(
+            "Iteration # | Iteration time [s] | Electronic energy [Hartree] | max|grad| [Hartree] | Operator"
+        )
+        start = time.time()
+        for iteration in range(maxiter):
+            Hamiltonian = hamiltonian_0i_0a(
+                self.h_mo,
+                self.g_mo,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+            )
+            H_ket = propagate_state_SA(
+                [Hamiltonian],
+                self.ci_coeffs,
+                self.ci_info,
+            )
+            grad = []
+
+            for idx, exc_type in enumerate(excitation_pool_type):
+                if exc_type == "single":
+                    (i, a) = np.array(excitation_pool[idx])
+                    T = G1(i, a, True)
+                elif exc_type == "double":
+                    (i, j, a, b) = np.array(excitation_pool[idx])
+                    T = G2(i, j, a, b, True)
+                elif exc_type in ("sa_single",):
+                    (i, a) = np.array(excitation_pool[idx])
+                    T = G1_sa(i, a, True)
+                elif exc_type in ("sa_double_1",):
+                    (i, j, a, b) = np.array(excitation_pool[idx])
+                    T = G2_sa(i, j, a, b, 1, True)
+                elif exc_type in ("sa_double_2",):
+                    (i, j, a, b) = np.array(excitation_pool[idx])
+                    T = G2_sa(i, j, a, b, 2, True)
+                elif exc_type in ("sa_double_3",):
+                    (i, j, a, b) = np.array(excitation_pool[idx])
+                    T = G2_sa(i, j, a, b, 3, True)
+                elif exc_type in ("sa_double_4",):
+                    (i, j, a, b) = np.array(excitation_pool[idx])
+                    T = G2_sa(i, j, a, b, 4, True)
+                elif exc_type in ("sa_double_5",):
+                    (i, j, a, b) = np.array(excitation_pool[idx])
+                    T = G2_sa(i, j, a, b, 5, True)
+                else:
+                    raise ValueError(f"Got unknown excitation type {exc_type}")
+                gr = expectation_value_SA(self.ci_coeffs, [T], H_ket, self.ci_info, do_folding=False)
+                gr -= expectation_value_SA(H_ket, [T], self.ci_coeffs, self.ci_info, do_folding=False)
+                grad.append(gr)
+            if np.max(np.abs(grad)) < grad_threshold:
+                break
+            max_arg = np.argmax(np.abs(grad))
+            self.ups_layout.excitation_indices.append(excitation_pool[max_arg])
+            self.ups_layout.excitation_operator_type.append(excitation_pool_type[max_arg])
+            self.ups_layout.n_params += 1
+
+            self._thetas.append(0.0)
+            self.run_wf_optimization_1step("bfgs", orbital_optimization=orbital_optimization, is_silent=True)
+            time_str = f"{time.time() - start:7.2f}"
+            e_str = f"{self.sa_energy:3.12f}"
+            grad_str = f"{np.abs(grad[max_arg]):3.12f}"
+            print(
+                f"{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {grad_str.center(19)} | {excitation_pool_type[max_arg]}{tuple([int(x) for x in excitation_pool[max_arg]])}"
+            )
+            start = time.time()
 
     def _do_state_ci(self) -> None:
         r"""Do subspace diagonalisation.
@@ -873,6 +1045,7 @@ class WaveFunctionSAUPS:
         )
         self._E_opt_old = E
         self._old_opt_parameters = np.copy(parameters)
+        self.num_energy_evals += self.num_states  # count one measurement per state
         return E
 
     def _calc_gradient_optimization(
@@ -959,4 +1132,7 @@ class WaveFunctionSAUPS:
                     self.thetas,
                     self.ups_layout,
                 )
+            self.num_energy_evals += (
+                2 * np.sum(list(self.ups_layout.grad_param_R.values())) * self.num_states
+            )  # Count energy measurements for all gradients
         return gradient

@@ -77,6 +77,41 @@ def iterate_t1_sa_generalized(
             yield a, i, fac
 
 
+def iterate_t2_sa_generalized(
+    num_orbs: int,
+) -> Generator[tuple[int, int, int, int, float, int], None, None]:
+    """Iterate over T2 spin-adapted operators.
+
+    Args:
+        num_orbs: Number of active spatial orbitals.
+
+    Returns:
+        Spin-adapted T2 operator iteration.
+    """
+    for i in range(num_orbs):
+        for j in range(num_orbs):
+            for a in range(max(i, j) + 1, num_orbs):
+                for b in range(max(i, j) + 1, num_orbs):
+                    fac = 1.0
+                    if a == b:
+                        fac *= 2.0
+                    if i == j:
+                        fac *= 2.0
+                    fac = 1 / 2 * (fac) ** (-1 / 2)
+                    if i == j and a == b:
+                        yield a, i, b, j, fac, 1
+                    elif i == j:
+                        yield a, i, b, j, fac, 2
+                    elif a == b:
+                        yield a, i, b, j, fac, 3
+                    else:
+                        yield a, i, b, j, fac, 4
+                    if i == j or a == b:
+                        continue
+                    fac = 1 / (2 * 3 ** (1 / 2))
+                    yield a, i, b, j, fac, 5
+
+
 def iterate_t1(
     active_occ_spin_idx: Sequence[int],
     active_unocc_spin_idx: Sequence[int],
@@ -92,6 +127,34 @@ def iterate_t1(
     """
     for a in active_unocc_spin_idx:
         for i in active_occ_spin_idx:
+            num_alpha = 0
+            num_beta = 0
+            if a % 2 == 0:
+                num_alpha += 1
+            else:
+                num_beta += 1
+            if i % 2 == 0:
+                num_alpha -= 1
+            else:
+                num_beta -= 1
+            if num_alpha != 0 or num_beta != 0:
+                continue
+            yield a, i
+
+
+def iterate_t1_generalized(
+    num_spin_orbs: int,
+) -> Generator[tuple[int, int], None, None]:
+    """Iterate over T1 spin-conserving operators.
+
+    Args:
+        num_spin_orbs: Number of spin orbitals.
+
+    Returns:
+        T1 operator iteration.
+    """
+    for i in range(num_spin_orbs):
+        for a in range(i + 1, num_spin_orbs):
             num_alpha = 0
             num_beta = 0
             if a % 2 == 0:
@@ -124,6 +187,44 @@ def iterate_t2(
         for b in active_unocc_spin_idx[idx_a + 1 :]:
             for idx_i, i in enumerate(active_occ_spin_idx):
                 for j in active_occ_spin_idx[idx_i + 1 :]:
+                    num_alpha = 0
+                    num_beta = 0
+                    if a % 2 == 0:
+                        num_alpha += 1
+                    else:
+                        num_beta += 1
+                    if b % 2 == 0:
+                        num_alpha += 1
+                    else:
+                        num_beta += 1
+                    if i % 2 == 0:
+                        num_alpha -= 1
+                    else:
+                        num_beta -= 1
+                    if j % 2 == 0:
+                        num_alpha -= 1
+                    else:
+                        num_beta -= 1
+                    if num_alpha != 0 or num_beta != 0:
+                        continue
+                    yield a, i, b, j
+
+
+def iterate_t2_generalized(
+    num_spin_orbs: int,
+) -> Generator[tuple[int, int, int, int], None, None]:
+    """Iterate over T2 spin-conserving operators.
+
+    Args:
+        num_spin_orbs: Number of spin orbitals.
+
+    Returns:
+        T2 operator iteration.
+    """
+    for i in range(num_spin_orbs):
+        for j in range(num_spin_orbs):
+            for a in range(max(i, j) + 1, num_spin_orbs):
+                for b in range(max(i, j) + 1, num_spin_orbs):
                     num_alpha = 0
                     num_beta = 0
                     if a % 2 == 0:
