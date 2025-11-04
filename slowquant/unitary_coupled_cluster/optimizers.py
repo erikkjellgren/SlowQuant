@@ -185,12 +185,21 @@ class RotoSolve:
             tol: Convergence tolerance.
             callback: Callback function, takes only x (parameters) as an argument.
         """
+        for Rval in R.values():
+            if not isinstance(Rval, (int, float)):
+                raise ValueError(f"Got unsupported type of R value, {Rval}, {type(Rval)}")
+            if np.isnan(Rval):
+                raise ValueError("Got nan R value")
         self._callback = callback
         self.max_iterations = maxiter
         self.threshold = tol
         self.max_fail = 3
         self._R = R
         self._param_names = param_names
+        if len(self._param_names) != len(self._R):
+            raise ValueError(
+                f"Number of parameter names, {len(self._param_names)}, does not match number of R values, {len(self._R)}"
+            )
 
     def minimize(self, f: Callable[[list[float]], float | np.ndarray], x0: Sequence[float]) -> Result:
         """Run minimization.
@@ -202,6 +211,10 @@ class RotoSolve:
         Returns:
             Minimization results.
         """
+        if len(x0) != len(self._param_names):
+            raise ValueError(
+                f"Number of provided parameters, {len(x0)}, does not match number of given R values, {len(self._R)}"
+            )
         f_best = float(10**20)
         x = list(x0).copy()
         x_best = x.copy()

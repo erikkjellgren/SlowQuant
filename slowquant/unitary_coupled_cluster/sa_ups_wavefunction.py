@@ -518,6 +518,7 @@ class WaveFunctionSAUPS:
         tol: float = 1e-10,
         maxiter: int = 1000,
         is_silent_subiterations: bool = False,
+        is_silent: bool = False,
     ) -> None:
         """Run two step optimization of wave function.
 
@@ -527,14 +528,22 @@ class WaveFunctionSAUPS:
             tol: Convergence tolerance.
             maxiter: Maximum number of iterations.
             is_silent_subiterations: Silence subiterations.
+            is_silent: Toggle optimization print.
+                       If False, then is_silent_subiterations is also forced to be False.
         """
-        print("### Parameters information:")
+        if is_silent:
+            is_silent_subiterations = False
+        if not is_silent:
+            print("### Parameters information:")
         if orbital_optimization:
-            print(f"### Number kappa: {len(self.kappa)}")
-        print(f"### Number theta: {self.ups_layout.n_params}")
+            if not is_silent:
+                print(f"### Number kappa: {len(self.kappa)}")
+
+        if not is_silent:
+            print(f"### Number theta: {self.ups_layout.n_params}")
+            print("Full optimization")
+            print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
         e_old = 1e12
-        print("Full optimization")
-        print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
         for full_iter in range(0, int(maxiter)):
             full_start = time.time()
 
@@ -619,7 +628,8 @@ class WaveFunctionSAUPS:
             e_new = res.fun
             time_str = f"{time.time() - full_start:7.2f}"
             e_str = f"{e_new:3.12f}"
-            print(f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")
+            if not is_silent:
+                print(f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")
             if abs(e_new - e_old) < tol:
                 break
             e_old = e_new
@@ -732,6 +742,8 @@ class WaveFunctionSAUPS:
         maxiter: int = 1000,
         grad_threshold: float = 1e-5,
         orbital_optimization: bool = False,
+        optimizer_name: str = "bfgs",
+        optimizer_type: str = "1step",
     ) -> None:
         """Do ADAPT optimization.
 
@@ -753,6 +765,8 @@ class WaveFunctionSAUPS:
             maxiter: Maximum iterations.
             grad_threshold: Convergence threshold based on gradient.
             orbital_optimization: Do orbital optimization.
+            optimizer_name: Name of optimizer to do wave function parameter optimizer.
+            optimizer_type: Can be '1step' or '2step'.
         """
         excitation_pool: list[tuple[int, ...]] = []
         excitation_pool_type = []
@@ -859,10 +873,33 @@ class WaveFunctionSAUPS:
             max_arg = np.argmax(np.abs(grad))
             self.ups_layout.excitation_indices.append(excitation_pool[max_arg])
             self.ups_layout.excitation_operator_type.append(excitation_pool_type[max_arg])
+            self.ups_layout.param_names.append(f"p{self.ups_layout.n_params:09d}")
+            if excitation_pool_type[max_arg] in ("single", "double", "sa_double_1"):
+                self.ups_layout.grad_param_R[f"p{self.ups_layout.n_params:09d}"] = 2
+            elif excitation_pool_type[max_arg] in ("sa_single"):
+                self.ups_layout.grad_param_R[f"p{self.ups_layout.n_params:09d}"] = 4
+            elif excitation_pool_type[max_arg] in (
+                "sa_double_2",
+                "sa_double_3",
+                "sa_double_4",
+                "sa_double_5",
+            ):
+                self.ups_layout.grad_param_R[f"p{self.ups_layout.n_params:09d}"] = np.nan
+            else:
+                raise ValueError(f"Got unknown excitation type, {excitation_pool_type[max_arg]}")
             self.ups_layout.n_params += 1
 
             self._thetas.append(0.0)
-            self.run_wf_optimization_1step("bfgs", orbital_optimization=orbital_optimization, is_silent=True)
+            if optimizer_type == "1step":
+                self.run_wf_optimization_1step(
+                    optimizer_name, orbital_optimization=orbital_optimization, is_silent=True
+                )
+            elif optimizer_type == "2step":
+                self.run_wf_optimization_2step(
+                    optimizer_name, orbital_optimization=orbital_optimization, is_silent=True
+                )
+            else:
+                raise ValueError(f"Got unknown optimizer_type, {optimizer_type}, can be '1step' or '2step'")
             time_str = f"{time.time() - start:7.2f}"
             e_str = f"{self.sa_energy:3.12f}"
             grad_str = f"{np.abs(grad[max_arg]):3.12f}"
