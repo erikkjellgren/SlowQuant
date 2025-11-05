@@ -41,29 +41,33 @@ class LinearResponseUPS(LinearResponseBaseClass):
         super().__init__(wave_function, excitations)
 
         idx_shift = len(self.q_ops)
+        G_shift = int(len(self.G_ops)/2)
+        # print(G_shift)
+        q_shift = int(len(self.q_ops)/2)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
-        grad = get_orbital_gradient_response_unrestricted(
-            self.wf.haa_mo,
-            self.wf.hbb_mo,
-            self.wf.gaaaa_mo,
-            self.wf.gbbbb_mo,
-            self.wf.gaabb_mo,
-            self.wf.gbbaa_mo,
-            self.wf.kappa_no_activeactive_idx,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.rdm1aa,
-            self.wf.rdm1bb,
-            self.wf.rdm2aaaa,
-            self.wf.rdm2bbbb,
-            self.wf.rdm2aabb,
-            self.wf.rdm2bbaa,
-        )
-        if len(grad) != 0:
-            print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-            if np.max(np.abs(grad)) > 10**-3:
-                raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
+        if len(self.q_ops) != 0:
+            grad = get_orbital_gradient_response_unrestricted(
+                self.wf.haa_mo,
+                self.wf.hbb_mo,
+                self.wf.gaaaa_mo,
+                self.wf.gbbbb_mo,
+                self.wf.gaabb_mo,
+                self.wf.gbbaa_mo,
+                self.wf.kappa_no_activeactive_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.rdm1aa,
+                self.wf.rdm1bb,
+                self.wf.rdm2aaaa,
+                self.wf.rdm2bbbb,
+                self.wf.rdm2aabb,
+                self.wf.rdm2bbaa,
+            )
+            if len(grad) != 0:
+                print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+                if np.max(np.abs(grad)) > 10**-3:
+                    raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
 
         grad = np.zeros(2 * len(self.G_ops))
         H00_ket = propagate_state([self.H_0i_0a], self.wf.ci_coeffs, *self.index_info)
@@ -104,49 +108,51 @@ class LinearResponseUPS(LinearResponseBaseClass):
                 raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
 
         # Start RDM version
-        self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block_unrestricted(
-            self.wf.haa_mo,
-            self.wf.hbb_mo,
-            self.wf.gaaaa_mo,
-            self.wf.gbbbb_mo,
-            self.wf.gaabb_mo,
-            self.wf.gbbaa_mo,
-            self.wf.kappa_no_activeactive_idx_dagger,
-            self.wf.kappa_no_activeactive_idx,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.rdm1aa,
-            self.wf.rdm1bb,
-            self.wf.rdm2aaaa,
-            self.wf.rdm2bbbb,
-            self.wf.rdm2aabb,
-            self.wf.rdm2bbaa,
-        )
-        self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block_unrestricted(
-            self.wf.haa_mo,
-            self.wf.hbb_mo,
-            self.wf.gaaaa_mo,
-            self.wf.gbbbb_mo,
-            self.wf.gaabb_mo,
-            self.wf.gbbaa_mo,
-            self.wf.kappa_no_activeactive_idx_dagger,
-            self.wf.kappa_no_activeactive_idx_dagger,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.rdm1aa,
-            self.wf.rdm1bb,
-            self.wf.rdm2aaaa,
-            self.wf.rdm2bbbb,
-            self.wf.rdm2aabb,
-            self.wf.rdm2bbaa,
-        )
-        self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma_unrestricted(
-            self.wf.kappa_no_activeactive_idx,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.rdm1aa,
-            self.wf.rdm1bb,
-        )
+        if len(self.q_ops) != 0:
+            self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block_unrestricted(
+                self.wf.haa_mo,
+                self.wf.hbb_mo,
+                self.wf.gaaaa_mo,
+                self.wf.gbbbb_mo,
+                self.wf.gaabb_mo,
+                self.wf.gbbaa_mo,
+                self.wf.kappa_no_activeactive_idx_dagger,
+                self.wf.kappa_no_activeactive_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.rdm1aa,
+                self.wf.rdm1bb,
+                self.wf.rdm2aaaa,
+                self.wf.rdm2bbbb,
+                self.wf.rdm2aabb,
+                self.wf.rdm2bbaa,
+            )
+            # print(self.A)
+            self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block_unrestricted(
+                self.wf.haa_mo,
+                self.wf.hbb_mo,
+                self.wf.gaaaa_mo,
+                self.wf.gbbbb_mo,
+                self.wf.gaabb_mo,
+                self.wf.gbbaa_mo,
+                self.wf.kappa_no_activeactive_idx_dagger,
+                self.wf.kappa_no_activeactive_idx_dagger,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.rdm1aa,
+                self.wf.rdm1bb,
+                self.wf.rdm2aaaa,
+                self.wf.rdm2bbbb,
+                self.wf.rdm2aabb,
+                self.wf.rdm2bbaa,
+            )
+            self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma_unrestricted(
+                self.wf.kappa_no_activeactive_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.rdm1aa,
+                self.wf.rdm1bb,
+            )
         # End RDM
 
         # Start manual version
@@ -239,75 +245,96 @@ class LinearResponseUPS(LinearResponseBaseClass):
                 self.Sigma[i, j] = val
         """
         # End manual version
+        if len(self.q_ops) != 0:
+            for j, qJ in enumerate(self.q_ops):
+                Hq_ket = propagate_state([self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info)
+                qdH_ket = propagate_state([qJ.dagger * self.H_1i_1a], self.wf.ci_coeffs, *self.index_info)
+                for i, GI in enumerate(self.G_ops):
+                    G_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
+                    Gd_ket = propagate_state([GI.dagger], self.wf.ci_coeffs, *self.index_info)
+                    # Make A
+                    # <0| Gd H q |0>
+                    val = expectation_value(
+                        G_ket,
+                        [],
+                        Hq_ket,
+                        *self.index_info,
+                    )
+                    # - 1/2<0| H q Gd |0>
+                    val -= (
+                        1
+                        / 2
+                        * expectation_value(
+                            qdH_ket,
+                            [],
+                            Gd_ket,
+                            *self.index_info,
+                        )
+                    )
+                    # - 1/2<0| H Gd q |0>
+                    val -= (
+                        1
+                        / 2
+                        * expectation_value(
+                            self.wf.ci_coeffs,
+                            [self.H_1i_1a * GI.dagger * qJ],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                    )
+                    #i er G, j er q (j kaldes først i loopet)
+                    if j % 2 == 0:
+                        if i % 2 == 0:
+                            # print(int(i-i/2), j, int(i-i/2)+idx_shift)
+                            self.A[int(i-(i/2)) + idx_shift, int(j-(j/2))] = self.A[int(j-(j/2)), int(i-(i/2)) + idx_shift] = val # alpha alpha
+                        else:
+                            # print(i, int(i-(i/2+0.5)), int(i-(i/2+0.5)) + idx_shift + G_shift, j, int(j-(j/2+0.5)), int(j-(j/2+0.5)) + q_shift) #find ud af hvordan jeg kan få den til ikke at gå ud af matrice grænsen....
+                            self.A[int(i-(i/2+0.5)) + idx_shift + G_shift, int(j-(j/2+0.5))] = self.A[int(j-(j/2+0.5)) + q_shift, int(i-(i/2+0.5)) + idx_shift] = val # up right alpha beta/beta alpha
+                            self.A[int(i-(i/2+0.5)) + idx_shift, int(j-(j/2+0.5)) + q_shift] = self.A[int(j-(j/2+0.5)), int(i-(i/2+0.5)) + idx_shift + G_shift] = val # bottom left alpha beta/ beta alpha
+                    else:
+                        self.A[int(i-(i/2+0.5)) + idx_shift + G_shift, int(j-(j/2+0.5)) + q_shift] = self.A[int(j-(j/2+0.5)) + q_shift, int(i-(i/2+0.5)) + idx_shift + G_shift] = val # beta beta
+                    # self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
 
-        for j, qJ in enumerate(self.q_ops):
-            Hq_ket = propagate_state([self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info)
-            qdH_ket = propagate_state([qJ.dagger * self.H_1i_1a], self.wf.ci_coeffs, *self.index_info)
-            for i, GI in enumerate(self.G_ops):
-                G_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
-                Gd_ket = propagate_state([GI.dagger], self.wf.ci_coeffs, *self.index_info)
-                # Make A
-                # <0| Gd H q |0>
-                val = expectation_value(
-                    G_ket,
-                    [],
-                    Hq_ket,
-                    *self.index_info,
-                )
-                # - 1/2<0| H q Gd |0>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
-                        qdH_ket,
+                    # Make B
+                    # <0| qd H Gd |0>
+                    val = expectation_value(
+                        Hq_ket,
                         [],
                         Gd_ket,
                         *self.index_info,
                     )
-                )
-                # - 1/2<0| H Gd q |0>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [self.H_1i_1a * GI.dagger * qJ],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
+                    # - 1/2*<0| Gd qd H |0>
+                    val -= (
+                        1
+                        / 2
+                        * expectation_value(
+                            G_ket,
+                            [],
+                            qdH_ket,
+                            *self.index_info,
+                        )
                     )
-                )
-                self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
-                # Make B
-                # <0| qd H Gd |0>
-                val = expectation_value(
-                    Hq_ket,
-                    [],
-                    Gd_ket,
-                    *self.index_info,
-                )
-                # - 1/2*<0| Gd qd H |0>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
-                        G_ket,
-                        [],
-                        qdH_ket,
-                        *self.index_info,
+                    # - 1/2*<0| qd Gd H |0>
+                    val -= (
+                        1
+                        / 2
+                        * expectation_value(
+                            self.wf.ci_coeffs,
+                            [qJ.dagger * GI.dagger * self.H_1i_1a],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
                     )
-                )
-                # - 1/2*<0| qd Gd H |0>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [qJ.dagger * GI.dagger * self.H_1i_1a],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                )
-                self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
+                    #i er G, j er q (j kaldes først i loopet)
+                    if j % 2 == 0:
+                        if i % 2 == 0:
+                            self.B[int(i-(i/2)) + idx_shift, int(j-(j/2))] = self.B[int(j-(j/2)), int(i-(i/2)) + idx_shift] = val # alpha alpha
+                        else:
+                            self.B[int(i-(i/2+0.5)) + idx_shift + G_shift, int(j-(j/2+0.5))] = self.B[int(j-(j/2+0.5)) + q_shift, int(i-(i/2+0.5)) + idx_shift] = val # up right alpha beta/beta alpha
+                            self.B[int(i-(i/2+0.5)) + idx_shift, int(j-(j/2+0.5)) + q_shift] = self.B[int(j-(j/2+0.5)), int(i-(i/2+0.5)) + idx_shift + G_shift] = val # bottom left alpha beta/ beta alpha
+                    else:
+                        self.B[int(i-(i/2+0.5)) + idx_shift + G_shift, int(j-(j/2+0.5)) + q_shift] = self.B[int(j-(j/2+0.5)) + q_shift, int(i-(i/2+0.5)) + idx_shift + G_shift] = val # beta beta
+                    # self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
         for j, GJ in enumerate(self.G_ops):
             GJH_ket = propagate_state([GJ], H00_ket, *self.index_info)
             GJdH_ket = propagate_state([GJ.dagger], H00_ket, *self.index_info)
@@ -377,7 +404,17 @@ class LinearResponseUPS(LinearResponseBaseClass):
                         *self.index_info,
                     )
                 )
-                self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
+                #Forsøg på at inddele i blokke
+                if i % 2 == 0:
+                    if j % 2 == 0:
+                        self.A[int(i-(i/2)) + idx_shift, int(j-(j/2)) + idx_shift] = self.A[int(j-(j/2)) + idx_shift, int(i-(i/2)) + idx_shift] = val
+                    else:
+                        self.A[int(i-(i/2+0.5)) + idx_shift, int(j-(j/2+0.5)) + idx_shift + G_shift] = self.A[int(j-(j/2+0.5)) + idx_shift, int(i-(i/2+0.5)) + idx_shift + G_shift] = val
+                else:
+                    self.A[int(i-(i/2+0.5)) + idx_shift + G_shift, int(j-(j/2+0.5)) + idx_shift + G_shift] = self.A[int(j-(j/2+0.5)) + idx_shift + G_shift, int(i-(i/2+0.5)) + idx_shift + G_shift] = val
+                #gammel måde gem
+                # self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
+                
                 # Make B
                 # <0| GId H GJd |0>
                 val = expectation_value(
@@ -407,7 +444,15 @@ class LinearResponseUPS(LinearResponseBaseClass):
                     GId_ket,
                     *self.index_info,
                 )
-                self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
+                if i % 2 == 0:
+                    if j % 2 == 0:
+                        self.B[int(i-(i/2)) + idx_shift, int(j-(j/2)) + idx_shift] = self.B[int(j-(j/2)) + idx_shift, int(i-(i/2)) + idx_shift] = val
+                    else:
+                        self.B[int(i-(i/2+0.5)) + idx_shift, int(j-(j/2+0.5)) + idx_shift + G_shift] = self.B[int(j-(j/2+0.5)) + idx_shift, int(i-(i/2+0.5)) + idx_shift + G_shift] = val
+                else:
+                    self.B[int(i-(i/2+0.5)) + idx_shift + G_shift, int(j-(j/2+0.5)) + idx_shift + G_shift] = self.B[int(j-(j/2+0.5)) + idx_shift + G_shift, int(i-(i/2+0.5)) + idx_shift + G_shift] = val
+
+                # self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
                 # Make Sigma
                 # <0| GId GJ |0>
                 val = expectation_value(
@@ -423,7 +468,14 @@ class LinearResponseUPS(LinearResponseBaseClass):
                     GId_ket,
                     *self.index_info,
                 )
-                self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = val
+                if i % 2 == 0:
+                    if j % 2 == 0:
+                        self.Sigma[int(i-(i/2)) + idx_shift, int(j-(j/2)) + idx_shift] = self.Sigma[int(j-(j/2)) + idx_shift, int(i-(i/2)) + idx_shift] = val
+                    else:
+                        self.Sigma[int(i-(i/2+0.5)) + idx_shift, int(j-(j/2+0.5)) + idx_shift + G_shift] = self.Sigma[int(j-(j/2+0.5)) + idx_shift, int(i-(i/2+0.5)) + idx_shift + G_shift] = val
+                else:
+                    self.Sigma[int(i-(i/2+0.5)) + idx_shift + G_shift, int(j-(j/2+0.5)) + idx_shift + G_shift] = self.Sigma[int(j-(j/2+0.5)) + idx_shift + G_shift, int(i-(i/2+0.5)) + idx_shift + G_shift] = val
+                # self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = val
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.

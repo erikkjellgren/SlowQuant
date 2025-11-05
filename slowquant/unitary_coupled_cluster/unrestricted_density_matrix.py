@@ -1,6 +1,6 @@
 import numba as nb
 import numpy as np
-
+import io
 
 @nb.jit(nopython=True)
 def RDM1xx(p: int, q: int, num_inactive_orbs: int, num_active_orbs: int, rdm1xx: np.ndarray) -> float:
@@ -521,185 +521,187 @@ def get_orbital_gradient_response_unrestricted(
 
     """
     gradient = np.zeros(4 * len(kappa_idx))
-    shift = len(2 * kappa_idx)
+    shift = len(kappa_idx)
+    shift2 = len(2 * kappa_idx)
+    shift3 = len(3 * kappa_idx)
     for idx, (m, n) in enumerate(kappa_idx):
         # 1e contribution
         for p in range(num_inactive_orbs + num_active_orbs):
-            gradient[idx * 2] += h_int_aa[n, p] * RDM1xx(m, p, num_inactive_orbs, num_active_orbs, rdm1aa)
-            gradient[idx * 2] -= h_int_aa[m, p] * RDM1xx(n, p, num_inactive_orbs, num_active_orbs, rdm1aa)
-            gradient[idx * 2] -= h_int_aa[p, m] * RDM1xx(p, n, num_inactive_orbs, num_active_orbs, rdm1aa)
-            gradient[idx * 2] += h_int_aa[p, n] * RDM1xx(p, m, num_inactive_orbs, num_active_orbs, rdm1aa)
-            gradient[idx * 2 + 1] += h_int_bb[n, p] * RDM1xx(m, p, num_inactive_orbs, num_active_orbs, rdm1bb)
-            gradient[idx * 2 + 1] -= h_int_bb[m, p] * RDM1xx(n, p, num_inactive_orbs, num_active_orbs, rdm1bb)
-            gradient[idx * 2 + 1] -= h_int_bb[p, m] * RDM1xx(p, n, num_inactive_orbs, num_active_orbs, rdm1bb)
-            gradient[idx * 2 + 1] += h_int_bb[p, n] * RDM1xx(p, m, num_inactive_orbs, num_active_orbs, rdm1bb)
+            gradient[idx] += h_int_aa[n, p] * RDM1xx(m, p, num_inactive_orbs, num_active_orbs, rdm1aa)
+            gradient[idx] -= h_int_aa[m, p] * RDM1xx(n, p, num_inactive_orbs, num_active_orbs, rdm1aa)
+            gradient[idx] -= h_int_aa[p, m] * RDM1xx(p, n, num_inactive_orbs, num_active_orbs, rdm1aa)
+            gradient[idx] += h_int_aa[p, n] * RDM1xx(p, m, num_inactive_orbs, num_active_orbs, rdm1aa)
+            gradient[idx + shift] += h_int_bb[n, p] * RDM1xx(m, p, num_inactive_orbs, num_active_orbs, rdm1bb)
+            gradient[idx + shift] -= h_int_bb[m, p] * RDM1xx(n, p, num_inactive_orbs, num_active_orbs, rdm1bb)
+            gradient[idx + shift] -= h_int_bb[p, m] * RDM1xx(p, n, num_inactive_orbs, num_active_orbs, rdm1bb)
+            gradient[idx + shift] += h_int_bb[p, n] * RDM1xx(p, m, num_inactive_orbs, num_active_orbs, rdm1bb)
         # 2e contribution
         for p in range(num_inactive_orbs + num_active_orbs):
             for q in range(num_inactive_orbs + num_active_orbs):
                 for r in range(num_inactive_orbs + num_active_orbs):
                     # aaaa
-                    gradient[idx * 2] += (
+                    gradient[idx] += (
                         0.5
                         * g_int_aaaa[n, p, q, r]
                         * RDM2xxxx(m, q, r, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
-                    gradient[idx * 2] -= (
+                    gradient[idx] -= (
                         0.5
                         * g_int_aaaa[p, q, n, r]
                         * RDM2xxxx(m, p, r, q, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
-                    gradient[idx * 2] -= (
+                    gradient[idx] -= (
                         0.5
                         * g_int_aaaa[m, p, q, r]
                         * RDM2xxxx(n, q, r, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
-                    gradient[idx * 2] += (
+                    gradient[idx] += (
                         0.5
                         * g_int_aaaa[p, q, m, r]
                         * RDM2xxxx(n, p, r, q, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
-                    gradient[idx * 2] -= (
+                    gradient[idx] -= (
                         0.5
                         * g_int_aaaa[p, m, q, r]
                         * RDM2xxxx(p, q, r, n, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
-                    gradient[idx * 2] += (
+                    gradient[idx] += (
                         0.5
                         * g_int_aaaa[p, q, r, m]
                         * RDM2xxxx(p, r, q, n, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
-                    gradient[idx * 2] += (
+                    gradient[idx] += (
                         0.5
                         * g_int_aaaa[p, n, q, r]
                         * RDM2xxxx(p, q, r, m, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
-                    gradient[idx * 2] -= (
+                    gradient[idx] -= (
                         0.5
                         * g_int_aaaa[p, q, r, n]
                         * RDM2xxxx(p, r, q, m, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
                     # bbbb
-                    gradient[idx * 2 + 1] += (
+                    gradient[idx + shift] += (
                         0.5
                         * g_int_bbbb[n, p, q, r]
                         * RDM2xxxx(m, q, r, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb)
                     )
-                    gradient[idx * 2 + 1] -= (
+                    gradient[idx + shift] -= (
                         0.5
                         * g_int_bbbb[p, q, n, r]
                         * RDM2xxxx(m, p, r, q, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb)
                     )
-                    gradient[idx * 2 + 1] -= (
+                    gradient[idx + shift] -= (
                         0.5
                         * g_int_bbbb[m, p, q, r]
                         * RDM2xxxx(n, q, r, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb)
                     )
-                    gradient[idx * 2 + 1] += (
+                    gradient[idx + shift] += (
                         0.5
                         * g_int_bbbb[p, q, m, r]
                         * RDM2xxxx(n, p, r, q, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb)
                     )
-                    gradient[idx * 2 + 1] -= (
+                    gradient[idx + shift] -= (
                         0.5
                         * g_int_bbbb[p, m, q, r]
                         * RDM2xxxx(p, q, r, n, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb)
                     )
-                    gradient[idx * 2 + 1] += (
+                    gradient[idx + shift] += (
                         0.5
                         * g_int_bbbb[p, q, r, m]
                         * RDM2xxxx(p, r, q, n, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb)
                     )
-                    gradient[idx * 2 + 1] += (
+                    gradient[idx + shift] += (
                         0.5
                         * g_int_bbbb[p, n, q, r]
                         * RDM2xxxx(p, q, r, m, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb)
                     )
-                    gradient[idx * 2 + 1] -= (
+                    gradient[idx + shift] -= (
                         0.5
                         * g_int_bbbb[p, q, r, n]
                         * RDM2xxxx(p, r, q, m, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb)
                     )
                     # aabb
                     # kappa a with aabb
-                    gradient[idx * 2] += (
+                    gradient[idx] += (
                         0.5
                         * g_int_aabb[n, p, q, r]
                         * RDM2xxyy(m, q, r, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb)
                     )
-                    gradient[idx * 2] -= (
+                    gradient[idx] -= (
                         0.5
                         * g_int_aabb[m, p, q, r]
                         * RDM2xxyy(n, q, r, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb)
                     )
-                    gradient[idx * 2] -= (
+                    gradient[idx] -= (
                         0.5
                         * g_int_aabb[p, m, q, r]
                         * RDM2xxyy(p, q, r, n, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb)
                     )
-                    gradient[idx * 2] += (
+                    gradient[idx] += (
                         0.5
                         * g_int_aabb[p, n, q, r]
                         * RDM2xxyy(p, q, r, m, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb)
                     )
                     # kappa a with bbaa
-                    gradient[idx * 2] += (
+                    gradient[idx] += (
                         0.5
                         * g_int_bbaa[p, q, n, r]
                         * RDM2xxyy(p, m, r, q, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa)
                     )
-                    gradient[idx * 2] -= (
+                    gradient[idx] -= (
                         0.5
                         * g_int_bbaa[p, q, m, r]
                         * RDM2xxyy(p, n, r, q, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa)
                     )
-                    gradient[idx * 2] -= (
+                    gradient[idx] -= (
                         0.5
                         * g_int_bbaa[p, q, r, m]
                         * RDM2xxyy(p, r, n, q, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa)
                     )
-                    gradient[idx * 2] += (
+                    gradient[idx] += (
                         0.5
                         * g_int_bbaa[p, q, r, n]
                         * RDM2xxyy(p, r, m, q, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa)
                     )
                     # kappa b with aabb
-                    gradient[idx * 2 + 1] += (
+                    gradient[idx + shift] += (
                         0.5
                         * g_int_aabb[p, q, n, r]
                         * RDM2xxyy(p, m, r, q, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb)
                     )
-                    gradient[idx * 2 + 1] -= (
+                    gradient[idx + shift] -= (
                         0.5
                         * g_int_aabb[p, q, m, r]
                         * RDM2xxyy(p, n, r, q, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb)
                     )
-                    gradient[idx * 2 + 1] -= (
+                    gradient[idx + shift] -= (
                         0.5
                         * g_int_aabb[p, q, r, m]
                         * RDM2xxyy(p, r, n, q, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb)
                     )
-                    gradient[idx * 2 + 1] += (
+                    gradient[idx + shift] += (
                         0.5
                         * g_int_aabb[p, q, r, n]
                         * RDM2xxyy(p, r, m, q, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb)
                     )
                     # kappa b with bbaa
-                    gradient[idx * 2 + 1] += (
+                    gradient[idx + shift] += (
                         0.5
                         * g_int_bbaa[n, p, q, r]
                         * RDM2xxyy(m, q, r, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa)
                     )
-                    gradient[idx * 2 + 1] -= (
+                    gradient[idx + shift] -= (
                         0.5
                         * g_int_bbaa[m, p, q, r]
                         * RDM2xxyy(n, q, r, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa)
                     )
-                    gradient[idx * 2 + 1] -= (
+                    gradient[idx + shift] -= (
                         0.5
                         * g_int_bbaa[p, m, q, r]
                         * RDM2xxyy(p, q, r, n, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa)
                     )
-                    gradient[idx * 2 + 1] += (
+                    gradient[idx + shift] += (
                         0.5
                         * g_int_bbaa[p, n, q, r]
                         * RDM2xxyy(p, q, r, m, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa)
@@ -708,28 +710,28 @@ def get_orbital_gradient_response_unrestricted(
     for idx, (n, m) in enumerate(kappa_idx):
         # 1e contribution
         for p in range(num_inactive_orbs + num_active_orbs):
-            gradient[(idx * 2) + shift] += h_int_aa[n, p] * RDM1xx(
+            gradient[idx+ shift2] += h_int_aa[n, p] * RDM1xx(
                 m, p, num_inactive_orbs, num_active_orbs, rdm1aa
             )
-            gradient[(idx * 2) + shift] -= h_int_aa[m, p] * RDM1xx(
+            gradient[idx+ shift2] -= h_int_aa[m, p] * RDM1xx(
                 n, p, num_inactive_orbs, num_active_orbs, rdm1aa
             )
-            gradient[(idx * 2) + shift] -= h_int_aa[p, m] * RDM1xx(
+            gradient[idx+ shift2] -= h_int_aa[p, m] * RDM1xx(
                 p, n, num_inactive_orbs, num_active_orbs, rdm1aa
             )
-            gradient[(idx * 2) + shift] += h_int_aa[p, n] * RDM1xx(
+            gradient[idx+ shift2] += h_int_aa[p, n] * RDM1xx(
                 p, m, num_inactive_orbs, num_active_orbs, rdm1aa
             )
-            gradient[(idx * 2 + 1) + shift] += h_int_bb[n, p] * RDM1xx(
+            gradient[idx + shift3] += h_int_bb[n, p] * RDM1xx(
                 m, p, num_inactive_orbs, num_active_orbs, rdm1bb
             )
-            gradient[(idx * 2 + 1) + shift] -= h_int_bb[m, p] * RDM1xx(
+            gradient[idx + shift3] -= h_int_bb[m, p] * RDM1xx(
                 n, p, num_inactive_orbs, num_active_orbs, rdm1bb
             )
-            gradient[(idx * 2 + 1) + shift] -= h_int_bb[p, m] * RDM1xx(
+            gradient[idx + shift3] -= h_int_bb[p, m] * RDM1xx(
                 p, n, num_inactive_orbs, num_active_orbs, rdm1bb
             )
-            gradient[(idx * 2 + 1) + shift] += h_int_bb[p, n] * RDM1xx(
+            gradient[idx + shift3] += h_int_bb[p, n] * RDM1xx(
                 p, m, num_inactive_orbs, num_active_orbs, rdm1bb
             )
         # 2e contribution
@@ -737,168 +739,168 @@ def get_orbital_gradient_response_unrestricted(
             for q in range(num_inactive_orbs + num_active_orbs):
                 for r in range(num_inactive_orbs + num_active_orbs):
                     # aaaa
-                    gradient[(idx * 2) + shift] += (
+                    gradient[idx+ shift2] += (
                         0.5
                         * g_int_aaaa[n, p, q, r]
                         * RDM2xxxx(m, q, r, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
-                    gradient[(idx * 2) + shift] -= (
+                    gradient[idx+ shift2] -= (
                         0.5
                         * g_int_aaaa[p, q, n, r]
                         * RDM2xxxx(m, p, r, q, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
-                    gradient[(idx * 2) + shift] -= (
+                    gradient[idx+ shift2] -= (
                         0.5
                         * g_int_aaaa[m, p, q, r]
                         * RDM2xxxx(n, q, r, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
-                    gradient[(idx * 2) + shift] += (
+                    gradient[idx+ shift2] += (
                         0.5
                         * g_int_aaaa[p, q, m, r]
                         * RDM2xxxx(n, p, r, q, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
-                    gradient[(idx * 2) + shift] -= (
+                    gradient[idx+ shift2] -= (
                         0.5
                         * g_int_aaaa[p, m, q, r]
                         * RDM2xxxx(p, q, r, n, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
-                    gradient[(idx * 2) + shift] += (
+                    gradient[idx+ shift2] += (
                         0.5
                         * g_int_aaaa[p, q, r, m]
                         * RDM2xxxx(p, r, q, n, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
-                    gradient[(idx * 2) + shift] += (
+                    gradient[idx+ shift2] += (
                         0.5
                         * g_int_aaaa[p, n, q, r]
                         * RDM2xxxx(p, q, r, m, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
-                    gradient[(idx * 2) + shift] -= (
+                    gradient[idx+ shift2] -= (
                         0.5
                         * g_int_aaaa[p, q, r, n]
                         * RDM2xxxx(p, r, q, m, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
                     # bbbb
-                    gradient[(idx * 2 + 1) + shift] += (
+                    gradient[idx + shift3] += (
                         0.5
                         * g_int_bbbb[n, p, q, r]
                         * RDM2xxxx(m, q, r, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb)
                     )
-                    gradient[(idx * 2 + 1) + shift] -= (
+                    gradient[idx + shift3] -= (
                         0.5
                         * g_int_bbbb[p, q, n, r]
                         * RDM2xxxx(m, p, r, q, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb)
                     )
-                    gradient[(idx * 2 + 1) + shift] -= (
+                    gradient[idx + shift3] -= (
                         0.5
                         * g_int_bbbb[m, p, q, r]
                         * RDM2xxxx(n, q, r, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb)
                     )
-                    gradient[(idx * 2 + 1) + shift] += (
+                    gradient[idx + shift3] += (
                         0.5
                         * g_int_bbbb[p, q, m, r]
                         * RDM2xxxx(n, p, r, q, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb)
                     )
-                    gradient[(idx * 2 + 1) + shift] -= (
+                    gradient[idx + shift3] -= (
                         0.5
                         * g_int_bbbb[p, m, q, r]
                         * RDM2xxxx(p, q, r, n, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb)
                     )
-                    gradient[(idx * 2 + 1) + shift] += (
+                    gradient[idx + shift3] += (
                         0.5
                         * g_int_bbbb[p, q, r, m]
                         * RDM2xxxx(p, r, q, n, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb)
                     )
-                    gradient[(idx * 2 + 1) + shift] += (
+                    gradient[idx + shift3] += (
                         0.5
                         * g_int_bbbb[p, n, q, r]
                         * RDM2xxxx(p, q, r, m, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb)
                     )
-                    gradient[(idx * 2 + 1) + shift] -= (
+                    gradient[idx + shift3] -= (
                         0.5
                         * g_int_bbbb[p, q, r, n]
                         * RDM2xxxx(p, r, q, m, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb)
                     )
                     # aabb
                     # kappa a with aabb
-                    gradient[(idx * 2) + shift] += (
+                    gradient[idx + shift2] += (
                         0.5
                         * g_int_aabb[n, p, q, r]
                         * RDM2xxyy(m, q, r, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb)
                     )
-                    gradient[(idx * 2) + shift] -= (
+                    gradient[idx + shift2] -= (
                         0.5
                         * g_int_aabb[m, p, q, r]
                         * RDM2xxyy(n, q, r, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb)
                     )
-                    gradient[(idx * 2) + shift] -= (
+                    gradient[idx + shift2] -= (
                         0.5
                         * g_int_aabb[p, m, q, r]
                         * RDM2xxyy(p, q, r, n, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb)
                     )
-                    gradient[(idx * 2) + shift] += (
+                    gradient[idx + shift2] += (
                         0.5
                         * g_int_aabb[p, n, q, r]
                         * RDM2xxyy(p, q, r, m, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb)
                     )
                     # kappa a with bbaa
-                    gradient[(idx * 2) + shift] += (
+                    gradient[idx + shift2] += (
                         0.5
                         * g_int_bbaa[p, q, n, r]
                         * RDM2xxyy(p, m, r, q, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa)
                     )
-                    gradient[(idx * 2) + shift] -= (
+                    gradient[idx + shift2] -= (
                         0.5
                         * g_int_bbaa[p, q, m, r]
                         * RDM2xxyy(p, n, r, q, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa)
                     )
-                    gradient[(idx * 2) + shift] -= (
+                    gradient[idx + shift2] -= (
                         0.5
                         * g_int_bbaa[p, q, r, m]
                         * RDM2xxyy(p, r, n, q, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa)
                     )
-                    gradient[(idx * 2) + shift] += (
+                    gradient[idx + shift2] += (
                         0.5
                         * g_int_bbaa[p, q, r, n]
                         * RDM2xxyy(p, r, m, q, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa)
                     )
                     # kappa b with aabb
-                    gradient[(idx * 2 + 1) + shift] += (
+                    gradient[idx + shift3] += (
                         0.5
                         * g_int_aabb[p, q, n, r]
                         * RDM2xxyy(p, m, r, q, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb)
                     )
-                    gradient[(idx * 2 + 1) + shift] -= (
+                    gradient[idx + shift3] -= (
                         0.5
                         * g_int_aabb[p, q, m, r]
                         * RDM2xxyy(p, n, r, q, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb)
                     )
-                    gradient[(idx * 2 + 1) + shift] -= (
+                    gradient[idx + shift3] -= (
                         0.5
                         * g_int_aabb[p, q, r, m]
                         * RDM2xxyy(p, r, n, q, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb)
                     )
-                    gradient[(idx * 2 + 1) + shift] += (
+                    gradient[idx + shift3] += (
                         0.5
                         * g_int_aabb[p, q, r, n]
                         * RDM2xxyy(p, r, m, q, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb)
                     )
                     # kappa b with bbaa
-                    gradient[(idx * 2 + 1) + shift] += (
+                    gradient[idx + shift3] += (
                         0.5
                         * g_int_bbaa[n, p, q, r]
                         * RDM2xxyy(m, q, r, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa)
                     )
-                    gradient[(idx * 2 + 1) + shift] -= (
+                    gradient[idx + shift3] -= (
                         0.5
                         * g_int_bbaa[m, p, q, r]
                         * RDM2xxyy(n, q, r, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa)
                     )
-                    gradient[(idx * 2 + 1) + shift] -= (
+                    gradient[idx + shift3] -= (
                         0.5
                         * g_int_bbaa[p, m, q, r]
                         * RDM2xxyy(p, q, r, n, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa)
                     )
-                    gradient[(idx * 2 + 1) + shift] += (
+                    gradient[idx + shift3] += (
                         0.5
                         * g_int_bbaa[p, n, q, r]
                         * RDM2xxyy(p, q, r, m, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa)
@@ -930,11 +932,11 @@ def get_orbital_response_metric_sigma_unrestricted(
     for idx1, (q, p) in enumerate(kappa_idx):
         for idx2, (m, n) in enumerate(kappa_idx):
             if p == n:
-                sigma[idx1 * 2, idx2 * 2] -= RDM1xx(m, q, num_inactive_orbs, num_active_orbs, rdm1aa)
-                sigma[idx1 * 2 + 1, idx2 * 2 + 1] -= RDM1xx(m, q, num_inactive_orbs, num_active_orbs, rdm1bb)
+                sigma[idx1, idx2] -= RDM1xx(m, q, num_inactive_orbs, num_active_orbs, rdm1aa)
+                sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] -= RDM1xx(m, q, num_inactive_orbs, num_active_orbs, rdm1bb)
             if m == q:
-                sigma[idx1 * 2, idx2 * 2] += RDM1xx(p, n, num_inactive_orbs, num_active_orbs, rdm1aa)
-                sigma[idx1 * 2 + 1, idx2 * 2 + 1] += RDM1xx(p, n, num_inactive_orbs, num_active_orbs, rdm1bb)
+                sigma[idx1, idx2] += RDM1xx(p, n, num_inactive_orbs, num_active_orbs, rdm1aa)
+                sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] += RDM1xx(p, n, num_inactive_orbs, num_active_orbs, rdm1bb)
     return sigma
 
 
@@ -1009,7 +1011,7 @@ def get_orbital_response_property_gradient_unrestricted(
     return prop_grad
 
 
-@nb.jit(nopython=True)
+# @nb.jit(nopython=True)
 def get_orbital_response_hessian_block_unrestricted(
     h_int_aa: np.ndarray,
     h_int_bb: np.ndarray,
@@ -1049,255 +1051,274 @@ def get_orbital_response_hessian_block_unrestricted(
     Returns:
         Unrestricted Hessian-like orbital-orbital block.
     """
+    # with io.open("/mnt/c/Users/Pernille/Seafile/phd/code/SlowQuant/slowquant/b.txt", 'w', encoding='utf-8') as file:
+    #     file.write(f"start\n\n")
+    # file.close()
     A1e = np.zeros((2 * len(kappa_idx1), 2 * len(kappa_idx2)))
     A2e = np.zeros((2 * len(kappa_idx1), 2 * len(kappa_idx2)))
     for idx1, (t, u) in enumerate(kappa_idx1):
         for idx2, (m, n) in enumerate(kappa_idx2):
-            A1e[idx1 * 2, idx2 * 2] += h_int_aa[u, m] * RDM1xx(
+            # with io.open("/mnt/c/Users/Pernille/Seafile/phd/code/SlowQuant/slowquant/b.txt", 'a+', encoding='utf-8') as file:
+            #     file.write(f"idx1:{idx1} and idx2:{idx2}\n\n")                
+            # file.close()
+            A1e[idx1, idx2] += h_int_aa[u, m] * RDM1xx(
                 t, n, num_inactive_orbs, num_active_orbs, rdm1aa
             )
-            A1e[idx1 * 2, idx2 * 2] += h_int_aa[n, t] * RDM1xx(
+            A1e[idx1, idx2] += h_int_aa[n, t] * RDM1xx(
                 m, u, num_inactive_orbs, num_active_orbs, rdm1aa
             )
-            A1e[idx1 * 2 + 1, idx2 * 2 + 1] += h_int_bb[u, m] * RDM1xx(
+            A1e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] += h_int_bb[u, m] * RDM1xx(
                 t, n, num_inactive_orbs, num_active_orbs, rdm1bb
             )
-            A1e[idx1 * 2 + 1, idx2 * 2 + 1] += h_int_bb[n, t] * RDM1xx(
+            A1e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] += h_int_bb[n, t] * RDM1xx(
                 m, u, num_inactive_orbs, num_active_orbs, rdm1bb
             )
             for p in range(num_inactive_orbs + num_active_orbs):
                 if m == u:
-                    A1e[idx1 * 2, idx2 * 2] -= h_int_aa[n, p] * RDM1xx(
+                    A1e[idx1, idx2] -= h_int_aa[n, p] * RDM1xx(
                         t, p, num_inactive_orbs, num_active_orbs, rdm1aa
                     )
-                    A1e[idx1 * 2 + 1, idx2 * 2 + 1] -= h_int_bb[n, p] * RDM1xx(
+                    A1e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= h_int_bb[n, p] * RDM1xx(
                         t, p, num_inactive_orbs, num_active_orbs, rdm1bb
                     )
                 if t == n:
-                    A1e[idx1 * 2, idx2 * 2] -= h_int_aa[p, m] * RDM1xx(
+                    A1e[idx1, idx2] -= h_int_aa[p, m] * RDM1xx(
                         p, u, num_inactive_orbs, num_active_orbs, rdm1aa
                     )
-                    A1e[idx1 * 2 + 1, idx2 * 2 + 1] -= h_int_bb[p, m] * RDM1xx(
+                    A1e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= h_int_bb[p, m] * RDM1xx(
                         p, u, num_inactive_orbs, num_active_orbs, rdm1bb
                     )
+            # et forsøg på at lave hessian matrix symmetrisk
+            # print(idx1, idx2)
+            # A1e[idx1, idx2] = A1e[idx2, idx1]
+            # A1e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] = A1e[idx2 + len(kappa_idx1), idx1 + len(kappa_idx1)]
             for p in range(num_inactive_orbs + num_active_orbs):
                 for q in range(num_inactive_orbs + num_active_orbs):
                     # mu, nu, sigma, tau = alpha
-                    A2e[idx1 * 2, idx2 * 2] += g_int_aaaa[n, p, u, q] * RDM2xxxx(
+                    A2e[idx1, idx2] += g_int_aaaa[n, p, u, q] * RDM2xxxx(
                         t, m, q, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa
                     )
-                    A2e[idx1 * 2, idx2 * 2] += g_int_aaaa[n, t, p, q] * RDM2xxxx(
+                    A2e[idx1, idx2] += g_int_aaaa[n, t, p, q] * RDM2xxxx(
                         m, p, q, u, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa
                     )
-                    A2e[idx1 * 2, idx2 * 2] -= g_int_aaaa[n, p, q, t] * RDM2xxxx(
+                    A2e[idx1, idx2] -= g_int_aaaa[n, p, q, t] * RDM2xxxx(
                         m, q, p, u, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa
                     )
-                    A2e[idx1 * 2, idx2 * 2] -= g_int_aaaa[u, p, n, q] * RDM2xxxx(
+                    A2e[idx1, idx2] -= g_int_aaaa[u, p, n, q] * RDM2xxxx(
                         t, m, q, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa
                     )
-                    A2e[idx1 * 2, idx2 * 2] -= g_int_aaaa[p, t, n, q] * RDM2xxxx(
+                    A2e[idx1, idx2] -= g_int_aaaa[p, t, n, q] * RDM2xxxx(
                         m, p, q, u, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa
                     )
-                    A2e[idx1 * 2, idx2 * 2] += g_int_aaaa[p, q, n, t] * RDM2xxxx(
+                    A2e[idx1, idx2] += g_int_aaaa[p, q, n, t] * RDM2xxxx(
                         m, p, q, u, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa
                     )
-                    A2e[idx1 * 2, idx2 * 2] += g_int_aaaa[u, m, p, q] * RDM2xxxx(
+                    A2e[idx1, idx2] += g_int_aaaa[u, m, p, q] * RDM2xxxx(
                         t, p, q, n, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa
                     )
-                    A2e[idx1 * 2, idx2 * 2] -= g_int_aaaa[p, m, u, q] * RDM2xxxx(
+                    A2e[idx1, idx2] -= g_int_aaaa[p, m, u, q] * RDM2xxxx(
                         t, p, q, n, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa
                     )
-                    A2e[idx1 * 2, idx2 * 2] += g_int_aaaa[p, m, q, t] * RDM2xxxx(
+                    A2e[idx1, idx2] += g_int_aaaa[p, m, q, t] * RDM2xxxx(
                         p, q, n, u, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa
                     )
-                    A2e[idx1 * 2, idx2 * 2] -= g_int_aaaa[u, p, q, m] * RDM2xxxx(
+                    A2e[idx1, idx2] -= g_int_aaaa[u, p, q, m] * RDM2xxxx(
                         t, q, p, n, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa
                     )
-                    A2e[idx1 * 2, idx2 * 2] += g_int_aaaa[p, q, u, m] * RDM2xxxx(
+                    A2e[idx1, idx2] += g_int_aaaa[p, q, u, m] * RDM2xxxx(
                         t, p, q, n, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa
                     )
-                    A2e[idx1 * 2, idx2 * 2] -= g_int_aaaa[p, t, q, m] * RDM2xxxx(
+                    A2e[idx1, idx2] -= g_int_aaaa[p, t, q, m] * RDM2xxxx(
                         p, q, n, u, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa
                     )
 
                     # mu, nu, sigma, tau = beta
-                    A2e[idx1 * 2 + 1, idx2 * 2 + 1] += g_int_bbbb[n, p, u, q] * RDM2xxxx(
+                    A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] += g_int_bbbb[n, p, u, q] * RDM2xxxx(
                         t, m, q, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb
                     )
-                    A2e[idx1 * 2 + 1, idx2 * 2 + 1] += g_int_bbbb[n, t, p, q] * RDM2xxxx(
+                    A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] += g_int_bbbb[n, t, p, q] * RDM2xxxx(
                         m, p, q, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb
                     )
-                    A2e[idx1 * 2 + 1, idx2 * 2 + 1] -= g_int_bbbb[n, p, q, t] * RDM2xxxx(
+                    A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_bbbb[n, p, q, t] * RDM2xxxx(
                         m, q, p, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb
                     )
-                    A2e[idx1 * 2 + 1, idx2 * 2 + 1] -= g_int_bbbb[u, p, n, q] * RDM2xxxx(
+                    A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_bbbb[u, p, n, q] * RDM2xxxx(
                         t, m, q, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb
                     )
-                    A2e[idx1 * 2 + 1, idx2 * 2 + 1] -= g_int_bbbb[p, t, n, q] * RDM2xxxx(
+                    A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_bbbb[p, t, n, q] * RDM2xxxx(
                         m, p, q, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb
                     )
-                    A2e[idx1 * 2 + 1, idx2 * 2 + 1] += g_int_bbbb[p, q, n, t] * RDM2xxxx(
+                    A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] += g_int_bbbb[p, q, n, t] * RDM2xxxx(
                         m, p, q, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb
                     )
-                    A2e[idx1 * 2 + 1, idx2 * 2 + 1] += g_int_bbbb[u, m, p, q] * RDM2xxxx(
+                    A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] += g_int_bbbb[u, m, p, q] * RDM2xxxx(
                         t, p, q, n, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb
                     )
-                    A2e[idx1 * 2 + 1, idx2 * 2 + 1] -= g_int_bbbb[p, m, u, q] * RDM2xxxx(
+                    A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_bbbb[p, m, u, q] * RDM2xxxx(
                         t, p, q, n, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb
                     )
-                    A2e[idx1 * 2 + 1, idx2 * 2 + 1] += g_int_bbbb[p, m, q, t] * RDM2xxxx(
+                    A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] += g_int_bbbb[p, m, q, t] * RDM2xxxx(
                         p, q, n, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb
                     )
-                    A2e[idx1 * 2 + 1, idx2 * 2 + 1] -= g_int_bbbb[u, p, q, m] * RDM2xxxx(
+                    A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_bbbb[u, p, q, m] * RDM2xxxx(
                         t, q, p, n, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb
                     )
-                    A2e[idx1 * 2 + 1, idx2 * 2 + 1] += g_int_bbbb[p, q, u, m] * RDM2xxxx(
+                    A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] += g_int_bbbb[p, q, u, m] * RDM2xxxx(
                         t, p, q, n, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb
                     )
-                    A2e[idx1 * 2 + 1, idx2 * 2 + 1] -= g_int_bbbb[p, t, q, m] * RDM2xxxx(
+                    A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_bbbb[p, t, q, m] * RDM2xxxx(
                         p, q, n, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb
                     )
 
                     # nu, mu, tau = alpha, sigma = beta
-                    A2e[idx1 * 2, idx2 * 2] += g_int_bbaa[p, q, u, m] * RDM2xxyy(
+                    A2e[idx1, idx2] += g_int_bbaa[p, q, u, m] * RDM2xxyy(
                         t, p, q, n, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
                     )
-                    A2e[idx1 * 2, idx2 * 2] += g_int_bbaa[p, q, n, t] * RDM2xxyy(
+                    A2e[idx1, idx2] += g_int_bbaa[p, q, n, t] * RDM2xxyy(
                         m, p, q, u, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
                     )
 
                     # nu, mu, sigma = alpha, tau = beta
-                    A2e[idx1 * 2, idx2 * 2] += g_int_aabb[u, m, p, q] * RDM2xxyy(
+                    A2e[idx1, idx2] += g_int_aabb[u, m, p, q] * RDM2xxyy(
                         t, p, q, n, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
                     )
-                    A2e[idx1 * 2, idx2 * 2] += g_int_aabb[n, t, p, q] * RDM2xxyy(
+                    A2e[idx1, idx2] += g_int_aabb[n, t, p, q] * RDM2xxyy(
                         m, p, q, u, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
                     )
 
                     # nu, mu, tau = beta, sigma = alpha
-                    A2e[idx1 * 2 + 1, idx2 * 2 + 1] += g_int_aabb[p, q, u, m] * RDM2xxyy(
+                    A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] += g_int_aabb[p, q, u, m] * RDM2xxyy(
                         t, p, q, n, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
                     )
-                    A2e[idx1 * 2 + 1, idx2 * 2 + 1] += g_int_aabb[p, q, n, t] * RDM2xxyy(
+                    A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] += g_int_aabb[p, q, n, t] * RDM2xxyy(
                         m, p, q, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
                     )
 
                     # nu, mu, sigma = beta, tau = alpha
-                    A2e[idx1 * 2 + 1, idx2 * 2 + 1] += g_int_bbaa[u, m, p, q] * RDM2xxyy(
+                    A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] += g_int_bbaa[u, m, p, q] * RDM2xxyy(
                         t, p, q, n, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
                     )
-                    A2e[idx1 * 2 + 1, idx2 * 2 + 1] += g_int_bbaa[n, t, p, q] * RDM2xxyy(
+                    A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] += g_int_bbaa[n, t, p, q] * RDM2xxyy(
                         m, p, q, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
                     )
 
                     # mu, sigma = beta, nu, tau = alpha
-                    A2e[idx1 * 2 + 1, idx2 * 2] += g_int_bbaa[u, p, q, m] * RDM2xxyy(
+                    A2e[idx1 + len(kappa_idx1), idx2] += g_int_bbaa[u, p, q, m] * RDM2xxyy(
                         t, q, n, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
-                    )  # ombyttet indices 3
-                    A2e[idx1 * 2 + 1, idx2 * 2] -= g_int_bbaa[u, p, n, q] * RDM2xxyy(
+                    )  
+                    A2e[idx1 + len(kappa_idx1), idx2] -= g_int_bbaa[u, p, n, q] * RDM2xxyy(
                         t, m, q, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
                     )
-                    A2e[idx1 * 2 + 1, idx2 * 2] -= g_int_bbaa[p, t, q, m] * RDM2xxyy(
+                    A2e[idx1 + len(kappa_idx1), idx2] -= g_int_bbaa[p, t, q, m] * RDM2xxyy(
                         p, q, n, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
                     )
-                    A2e[idx1 * 2 + 1, idx2 * 2] += g_int_bbaa[p, t, n, q] * RDM2xxyy(
+                    A2e[idx1 + len(kappa_idx1), idx2] += g_int_bbaa[p, t, n, q] * RDM2xxyy(
                         p, m, q, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
-                    )  # ombyttet indices 15
+                    )  
 
                     # mu, tau = beta, nu, sigma = alpha
-                    A2e[idx1 * 2 + 1, idx2 * 2] += g_int_aabb[p, m, u, q] * RDM2xxyy(
+                    A2e[idx1 + len(kappa_idx1), idx2] += g_int_aabb[p, m, u, q] * RDM2xxyy(
                         p, t, q, n, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
-                    )  # ombyttet indices 2
-                    A2e[idx1 * 2 + 1, idx2 * 2] -= g_int_aabb[n, p, u, q] * RDM2xxyy(
+                    )  
+                    A2e[idx1 + len(kappa_idx1), idx2] -= g_int_aabb[n, p, u, q] * RDM2xxyy(
                         m, t, q, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
-                    )  # ombyttet indices 6
-                    A2e[idx1 * 2 + 1, idx2 * 2] -= g_int_aabb[p, m, q, t] * RDM2xxyy(
+                    )  
+                    A2e[idx1 + len(kappa_idx1), idx2] -= g_int_aabb[p, m, q, t] * RDM2xxyy(
                         p, q, u, n, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
-                    )  # ombyttet indices 10
-                    A2e[idx1 * 2 + 1, idx2 * 2] += g_int_aabb[n, p, q, t] * RDM2xxyy(
+                    )  
+                    A2e[idx1 + len(kappa_idx1), idx2] += g_int_aabb[n, p, q, t] * RDM2xxyy(
                         m, q, u, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
-                    )  # ombyttet indices 14
+                    )  
 
                     # mu, sigma = alpha, nu, tau = beta
-                    A2e[idx1 * 2, idx2 * 2 + 1] += g_int_aabb[u, p, q, m] * RDM2xxyy(
+                    A2e[idx1, idx2 + len(kappa_idx1)] += g_int_aabb[u, p, q, m] * RDM2xxyy(
                         t, q, n, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
-                    )  # ombyttet indices 3
-                    A2e[idx1 * 2, idx2 * 2 + 1] -= g_int_aabb[u, p, n, q] * RDM2xxyy(
+                    )  
+                    A2e[idx1, idx2 + len(kappa_idx1)] -= g_int_aabb[u, p, n, q] * RDM2xxyy(
                         t, m, q, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
                     )
-                    A2e[idx1 * 2, idx2 * 2 + 1] -= g_int_aabb[p, t, q, m] * RDM2xxyy(
+                    A2e[idx1, idx2 + len(kappa_idx1)] -= g_int_aabb[p, t, q, m] * RDM2xxyy(
                         p, q, n, u, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
                     )
-                    A2e[idx1 * 2, idx2 * 2 + 1] += g_int_aabb[p, t, n, q] * RDM2xxyy(
+                    A2e[idx1, idx2 + len(kappa_idx1)] += g_int_aabb[p, t, n, q] * RDM2xxyy(
                         p, m, q, u, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
-                    )  # ombyttet indices 15
+                    )  
 
                     # mu, tau = alpha, nu, sigma = beta
-                    A2e[idx1 * 2, idx2 * 2 + 1] += g_int_bbaa[p, m, u, q] * RDM2xxyy(
+                    A2e[idx1, idx2 + len(kappa_idx1)] += g_int_bbaa[p, m, u, q] * RDM2xxyy(
                         p, t, q, n, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
-                    )  # ombyttet indices 2
-                    A2e[idx1 * 2, idx2 * 2 + 1] -= g_int_bbaa[n, p, u, q] * RDM2xxyy(
+                    )  
+                    A2e[idx1, idx2 + len(kappa_idx1)] -= g_int_bbaa[n, p, u, q] * RDM2xxyy(
                         m, t, q, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
-                    )  # ombyttet indices 6
-                    A2e[idx1 * 2, idx2 * 2 + 1] -= g_int_bbaa[p, m, q, t] * RDM2xxyy(
+                    )  
+                    A2e[idx1, idx2 + len(kappa_idx1)] -= g_int_bbaa[p, m, q, t] * RDM2xxyy(
                         p, q, u, n, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
-                    )  # ombyttet indices 10
-                    A2e[idx1 * 2, idx2 * 2 + 1] += g_int_bbaa[n, p, q, t] * RDM2xxyy(
+                    )  
+                    A2e[idx1, idx2 + len(kappa_idx1)] += g_int_bbaa[n, p, q, t] * RDM2xxyy(
                         m, q, u, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
-                    )  # ombyttet indeices 14
+                    )  
 
             for p in range(num_inactive_orbs + num_active_orbs):
                 for q in range(num_inactive_orbs + num_active_orbs):
                     for r in range(num_inactive_orbs + num_active_orbs):
                         if m == u:
-                            A2e[idx1 * 2, idx2 * 2] -= g_int_aaaa[n, p, q, r] * RDM2xxxx(
+                            A2e[idx1, idx2] -= g_int_aaaa[n, p, q, r] * RDM2xxxx(
                                 t, q, r, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa
                             )
-                            A2e[idx1 * 2, idx2 * 2] += g_int_aaaa[p, q, n, r] * RDM2xxxx(
+                            A2e[idx1, idx2] += g_int_aaaa[p, q, n, r] * RDM2xxxx(
                                 t, p, r, q, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa
                             )
-                            A2e[idx1 * 2 + 1, idx2 * 2 + 1] -= g_int_bbbb[n, p, q, r] * RDM2xxxx(
+                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_bbbb[n, p, q, r] * RDM2xxxx(
                                 t, q, r, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb
                             )
-                            A2e[idx1 * 2 + 1, idx2 * 2 + 1] += g_int_bbbb[p, q, n, r] * RDM2xxxx(
+                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] += g_int_bbbb[p, q, n, r] * RDM2xxxx(
                                 t, p, r, q, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb
                             )
-                            A2e[idx1 * 2, idx2 * 2] -= g_int_bbaa[p, q, n, r] * RDM2xxyy(
+                            A2e[idx1, idx2] -= g_int_bbaa[p, q, n, r] * RDM2xxyy(
                                 t, p, q, r, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
-                            )  # ombytte indices
-                            A2e[idx1 * 2, idx2 * 2] -= g_int_aabb[n, p, q, r] * RDM2xxyy(
+                            )  
+                            A2e[idx1, idx2] -= g_int_aabb[n, p, q, r] * RDM2xxyy(
                                 t, q, r, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
                             )
-                            A2e[idx1 * 2 + 1, idx2 * 2 + 1] -= g_int_aabb[p, q, n, r] * RDM2xxyy(
+                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_aabb[p, q, n, r] * RDM2xxyy(
                                 t, p, q, r, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
-                            )  # ombytte indices (skal flyttes) 7
-                            A2e[idx1 * 2 + 1, idx2 * 2 + 1] -= g_int_bbaa[n, p, q, r] * RDM2xxyy(
+                            )  
+                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_bbaa[n, p, q, r] * RDM2xxyy(
                                 t, q, r, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
                             )
                         if t == n:
-                            A2e[idx1 * 2, idx2 * 2] -= g_int_aaaa[p, m, q, r] * RDM2xxxx(
+                            A2e[idx1, idx2] -= g_int_aaaa[p, m, q, r] * RDM2xxxx(
                                 p, q, r, u, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa
                             )
-                            A2e[idx1 * 2, idx2 * 2] += g_int_aaaa[p, q, r, m] * RDM2xxxx(
+                            A2e[idx1, idx2] += g_int_aaaa[p, q, r, m] * RDM2xxxx(
                                 p, r, q, u, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa
                             )
-                            A2e[idx1 * 2 + 1, idx2 * 2 + 1] -= g_int_bbbb[p, m, q, r] * RDM2xxxx(
+                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_bbbb[p, m, q, r] * RDM2xxxx(
                                 p, q, r, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb
                             )
-                            A2e[idx1 * 2 + 1, idx2 * 2 + 1] += g_int_bbbb[p, q, r, m] * RDM2xxxx(
+                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] += g_int_bbbb[p, q, r, m] * RDM2xxxx(
                                 p, r, q, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb
                             )
-                            A2e[idx1 * 2, idx2 * 2] -= g_int_bbaa[p, q, r, m] * RDM2xxyy(
+                            A2e[idx1, idx2] -= g_int_bbaa[p, q, r, m] * RDM2xxyy(
                                 r, p, q, u, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
-                            )  # ombytte indices
-                            A2e[idx1 * 2, idx2 * 2] -= g_int_aabb[p, m, q, r] * RDM2xxyy(
+                            )  
+                            A2e[idx1, idx2] -= g_int_aabb[p, m, q, r] * RDM2xxyy(
                                 p, q, r, u, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
                             )
-                            A2e[idx1 * 2 + 1, idx2 * 2 + 1] -= g_int_aabb[p, q, r, m] * RDM2xxyy(
+                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_aabb[p, q, r, m] * RDM2xxyy(
                                 r, p, q, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
-                            )  # ombytte indices (skal flyttes) 11
-                            A2e[idx1 * 2 + 1, idx2 * 2 + 1] -= g_int_bbaa[p, m, q, r] * RDM2xxyy(
+                            )  
+                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_bbaa[p, m, q, r] * RDM2xxyy(
                                 p, q, r, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
                             )
+            # A2e[idx1, idx2] = A2e[idx2, idx1]
+            # A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] = A2e[idx2 + len(kappa_idx1), idx1 + len(kappa_idx1)]
+            # A2e[idx1, idx2 + len(kappa_idx1)] = A2e[idx2 + len(kappa_idx1), idx1]
+            # A2e[idx1 + len(kappa_idx1), idx2] = A2e[idx2, idx1 + len(kappa_idx1)]
+            # with io.open("/mnt/c/Users/Pernille/Seafile/phd/code/SlowQuant/slowquant/b.txt", 'a+', encoding='utf-8') as file:
+            #     file.write(f"{A1e + 1/2 * A2e}\n\n")                
+            # file.close()                
 
-    return A1e + 1 / 2 * A2e
+    # return 1/2* (A1e + A1e.T + (1 / 2 * A2e) + (1/2*A2e.T))
+    return A1e + (1/2 *A2e)
+
