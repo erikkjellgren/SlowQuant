@@ -736,7 +736,15 @@ class UpsStructure:
                 self.param_names.append(f"p{self.n_params:09d}")
                 self.n_params += 1
 
-    def create_fUCC(self, num_orbs: int, num_elec: int, ansatz_options: dict[str, Any]) -> None:
+    def create_fUCC(
+        self,
+        occ_idx: list[int],
+        unocc_idx: list[int],
+        occ_spin_idx: list[int],
+        unocc_spin_idx: list[int],
+        num_orbs: int,
+        ansatz_options: dict[str, Any],
+    ) -> None:
         """Create factorized UCC ansatz.
 
         #. 10.1021/acs.jctc.8b01004 (k-UpCCGSD)
@@ -744,9 +752,11 @@ class UpsStructure:
         Ansatz Options:
             * n_layers [int]: Number of layers.
             * S [bool]: Add single excitations.
+            * GS [bool]: Add generalized single excitations.
             * SAS [bool]: Add spin-adapted single excitations.
             * SAGS [bool]: Add generalized spin-adapted single excitations.
             * D [bool]: Add double excitations.
+            * GD [bool]: Add generalized double excitations.
             * pD [bool]: Add pair double excitations.
             * GpD [bool]: Add generalized pair double excitations.
 
@@ -759,16 +769,33 @@ class UpsStructure:
             Factorized UCC ansatz.
         """
         # Options
-        valid_options = ("n_layers", "S", "D", "SAGS", "pD", "GpD", "SAS", "T", "Q", "5", "6", "SAD")
+        valid_options = (
+            "n_layers",
+            "S",
+            "D",
+            "SAGS",
+            "pD",
+            "GpD",
+            "SAS",
+            "T",
+            "Q",
+            "5",
+            "6",
+            "SAD",
+            "GS",
+            "GD",
+        )
         for option in ansatz_options:
             if option not in valid_options:
                 raise ValueError(f"Got unknown option for fUCC, {option}. Valid options are: {valid_options}")
         if "n_layers" not in ansatz_options.keys():
             raise ValueError("fUCC require the option 'n_layers'")
         do_S = False
+        do_GS = False
         do_SAS = False
         do_SAGS = False
         do_D = False
+        do_GD = False
         do_pD = False
         do_GpD = False
         do_T = False
@@ -779,6 +806,9 @@ class UpsStructure:
         if "S" in ansatz_options.keys():
             if ansatz_options["S"]:
                 do_S = True
+        if "GS" in ansatz_options.keys():
+            if ansatz_options["GS"]:
+                do_GS = True
         if "SAS" in ansatz_options.keys():
             if ansatz_options["SAS"]:
                 do_SAS = True
@@ -788,6 +818,9 @@ class UpsStructure:
         if "D" in ansatz_options.keys():
             if ansatz_options["D"]:
                 do_D = True
+        if "GD" in ansatz_options.keys():
+            if ansatz_options["GD"]:
+                do_GD = True
         if "pD" in ansatz_options.keys():
             if ansatz_options["pD"]:
                 do_pD = True
@@ -809,36 +842,41 @@ class UpsStructure:
         if "SAD" in ansatz_options.keys():
             if ansatz_options["SAD"]:
                 do_SAD = True
-        if True not in (do_S, do_SAS, do_SAGS, do_D, do_pD, do_GpD, do_T, do_Q, do_5, do_6, do_SAD):
+        if True not in (
+            do_S,
+            do_SAS,
+            do_SAGS,
+            do_D,
+            do_pD,
+            do_GpD,
+            do_T,
+            do_Q,
+            do_5,
+            do_6,
+            do_SAD,
+            do_GS,
+            do_GD,
+        ):
             raise ValueError("fUCC requires some excitations got none.")
         n_layers = ansatz_options["n_layers"]
-        num_spin_orbs = 2 * num_orbs
-        occ_spin = []
-        unocc_spin = []
-        occ = []
-        unocc = []
-        idx = 0
-        for _ in range(np.sum(num_elec)):
-            occ_spin.append(idx)
-            if idx % 2 == 0:
-                occ.append(idx // 2)
-            idx += 1
-        for _ in range(num_spin_orbs - np.sum(num_elec)):
-            unocc_spin.append(idx)
-            if idx % 2 == 0:
-                unocc.append(idx // 2)
-            idx += 1
         # Layer loop
         for _ in range(n_layers):
             if do_S:
-                for a, i in iterate_t1(occ_spin, unocc_spin):
+                for a, i in iterate_t1(occ_spin_idx, unocc_spin_idx):
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((i, a))
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+            if do_GS:
+                for a, i in iterate_t1_generalized(2 * num_orbs):
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((i, a))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_SAS:
-                for a, i, _ in iterate_t1_sa(occ, unocc):
+                for a, i, _ in iterate_t1_sa(occ_idx, unocc_idx):
                     self.excitation_operator_type.append("sa_single")
                     self.excitation_indices.append((i, a))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
@@ -852,54 +890,61 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_D:
-                for a, i, b, j in iterate_t2(occ_spin, unocc_spin):
+                for a, i, b, j in iterate_t2(occ_spin_idx, unocc_spin_idx):
+                    self.excitation_operator_type.append("double")
+                    self.excitation_indices.append((i, j, a, b))
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+            if do_GD:
+                for a, i, b, j in iterate_t2_generalized(2 * num_orbs):
                     self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_pD:
-                for a, i, b, j in iterate_pair_t2(occ, unocc):
+                for a, i, b, j in iterate_pair_t2(occ_idx, unocc_idx):
                     self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_GpD:
-                for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
+                for a, i, b, j in iterate_pair_t2_generalized(2 * num_orbs):
                     self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_T:
-                for a, i, b, j, c, k in iterate_t3(occ_spin, unocc_spin):
+                for a, i, b, j, c, k in iterate_t3(occ_spin_idx, unocc_spin_idx):
                     self.excitation_operator_type.append("triple")
                     self.excitation_indices.append((i, j, k, a, b, c))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_Q:
-                for a, i, b, j, c, k, d, l in iterate_t4(occ_spin, unocc_spin):
+                for a, i, b, j, c, k, d, l in iterate_t4(occ_spin_idx, unocc_spin_idx):
                     self.excitation_operator_type.append("quadruple")
                     self.excitation_indices.append((i, j, k, l, a, b, c, d))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_5:
-                for a, i, b, j, c, k, d, l, e, m in iterate_t5(occ_spin, unocc_spin):
+                for a, i, b, j, c, k, d, l, e, m in iterate_t5(occ_spin_idx, unocc_spin_idx):
                     self.excitation_operator_type.append("quintuple")
                     self.excitation_indices.append((i, j, k, l, m, a, b, c, d, e))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_6:
-                for a, i, b, j, c, k, d, l, e, m, f, n in iterate_t6(occ_spin, unocc_spin):
+                for a, i, b, j, c, k, d, l, e, m, f, n in iterate_t6(occ_spin_idx, unocc_spin_idx):
                     self.excitation_operator_type.append("sextuple")
                     self.excitation_indices.append((i, j, k, l, m, n, a, b, c, d, e, f))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
             if do_SAD:
-                for a, i, b, j, _, op_case in iterate_t2_sa(occ, unocc):
+                for a, i, b, j, _, op_case in iterate_t2_sa(occ_idx, unocc_idx):
                     self.excitation_operator_type.append(f"sa_double_{op_case}")
                     self.excitation_indices.append((i, j, a, b))
                     # Rotosolve not implemented for SA doubles
