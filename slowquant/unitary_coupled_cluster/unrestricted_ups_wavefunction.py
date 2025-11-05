@@ -21,7 +21,11 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     propagate_state,
     propagate_unitary,
 )
-from slowquant.unitary_coupled_cluster.operators import a_op
+from slowquant.unitary_coupled_cluster.operators import (
+    G1,
+    G2,
+    a_op,
+)
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.unrestricted_density_matrix import (
     get_electronic_energy_unrestricted,
@@ -32,10 +36,6 @@ from slowquant.unitary_coupled_cluster.unrestricted_density_matrix import (
 from slowquant.unitary_coupled_cluster.unrestricted_operators import (
     unrestricted_hamiltonian_0i_0a,
     unrestricted_hamiltonian_full_space,
-)
-from slowquant.unitary_coupled_cluster.operators import (
-    G1,
-    G2,
 )
 from slowquant.unitary_coupled_cluster.util import (
     UpsStructure,
@@ -340,6 +340,8 @@ class UnrestrictedWaveFunctionUPS:
         self._gbbaa_mo = None
         self._energy_elec = None
         self._kappa_a = k.copy()
+        if isinstance(self._kappa_a, np.ndarray):
+            self._kappa_a = self._kappa_a.tolist()
         # Move current expansion point.
         self._c_a_mo = self.c_a_mo
         self._kappa_a_old = self.kappa_a
@@ -357,6 +359,8 @@ class UnrestrictedWaveFunctionUPS:
         self._gbbaa_mo = None
         self._energy_elec = None
         self._kappa_b = k.copy()
+        if isinstance(self._kappa_b, np.ndarray):
+            self._kappa_b = self._kappa_b.tolist()
         # Move current expansion point.
         self._c_b_mo = self.c_b_mo
         self._kappa_b_old = self.kappa_b
@@ -385,6 +389,8 @@ class UnrestrictedWaveFunctionUPS:
         self._rdm2bbaa = None
         self._energy_elec = None
         self._thetas = theta_vals.copy()
+        if isinstance(self._thetas, np.ndarray):
+            self._thetas = self._thetas.tolist()
         self.ci_coeffs = construct_ups_state(
             self.csf_coeffs,
             self.ci_info,
@@ -817,7 +823,6 @@ class UnrestrictedWaveFunctionUPS:
                 )
             else:
                 energy = partial(
-                    self._calc_energy_optimization,
                     theta_optimization=False,
                     kappa_optimization=True,
                 )
@@ -844,7 +849,9 @@ class UnrestrictedWaveFunctionUPS:
                 parameters = self.kappa_a + self.kappa_b
         else:
             parameters = self.thetas
-        optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol, is_silent=is_silent)
+        optimizer = Optimizers(
+            energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol, is_silent=is_silent
+        )
         self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0
         res = optimizer.minimize(
@@ -926,14 +933,14 @@ class UnrestrictedWaveFunctionUPS:
         start = time.time()
         for iteration in range(maxiter):
             Hamiltonian = unrestricted_hamiltonian_0i_0a(
-                        self.haa_mo,
-                        self.hbb_mo,
-                        self.gaaaa_mo,
-                        self.gbbbb_mo,
-                        self.gaabb_mo,
-                        self.gbbaa_mo,
-                        self.num_inactive_orbs,
-                        self.num_active_orbs,
+                self.haa_mo,
+                self.hbb_mo,
+                self.gaaaa_mo,
+                self.gbbbb_mo,
+                self.gaabb_mo,
+                self.gbbaa_mo,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
             )
             H_ket = propagate_state(
                 [Hamiltonian],
