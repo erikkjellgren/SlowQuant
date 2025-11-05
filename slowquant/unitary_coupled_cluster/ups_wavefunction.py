@@ -291,6 +291,8 @@ class WaveFunctionUPS:
         self._g_mo = None
         self._energy_elec = None
         self._kappa = k.copy()
+        if isinstance(self._kappa, np.ndarray):
+            self._kappa = self._kappa.tolist()
         # Move current expansion point.
         self._c_mo = self.c_mo
         self._kappa_old = self.kappa
@@ -319,6 +321,8 @@ class WaveFunctionUPS:
         self._rdm4 = None
         self._energy_elec = None
         self._thetas = theta_vals.copy()
+        if isinstance(self._thetas, np.ndarray):
+            self._thetas = self._thetas.tolist()
         self.ci_coeffs = construct_ups_state(
             self.csf_coeffs,
             self.ci_info,

@@ -302,6 +302,8 @@ class WaveFunctionSAUPS:
         self._sa_energy = None
         self._state_energies = None
         self._kappa = k.copy()
+        if isinstance(self._kappa, np.ndarray):
+            self._kappa = self._kappa.tolist()
         # Move current expansion point.
         self._c_mo = self.c_mo
         self._kappa_old = self.kappa
@@ -348,6 +350,8 @@ class WaveFunctionSAUPS:
         self._state_ci_coeffs = None
         self._ci_coeffs = None
         self._thetas = theta_vals.copy()
+        if isinstance(self._thetas, np.ndarray):
+            self._thetas = self._thetas.tolist()
 
     @property
     def c_mo(self) -> np.ndarray:
