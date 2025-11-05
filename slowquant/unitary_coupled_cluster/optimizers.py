@@ -25,12 +25,13 @@ class Optimizers:
 
     def __init__(
         self,
-        fun: Callable[[list[float]], float],
+        fun: Callable[[list[float]], float | np.ndarray],
         method: str,
         grad: Callable[[list[float]], np.ndarray] | None = None,
         maxiter: int = 1000,
         tol: float = 10e-8,
         is_silent: bool = False,
+        energy_eval_callback: Callable[[], int] | None = None,
     ) -> None:
         """Initialize optimizer class.
 
@@ -41,6 +42,7 @@ class Optimizers:
             maxiter: Maximum iterations.
             tol: Convergence tolerance.
             is_silent: Suppress progress output.
+            energy_eval_callback: Callback to fetch num_energy_evals.
         """
         self.fun = fun
         self.grad = grad
@@ -48,9 +50,10 @@ class Optimizers:
         self.maxiter = maxiter
         self.tol = tol
         self.is_silent = is_silent
+        self.energy_eval_callback = energy_eval_callback
 
     def _print_progress(
-        self, x: Sequence[float], fun: Callable[[list[float]], float], silent: bool = False
+        self, x: Sequence[float], fun: Callable[[list[float]], float | np.ndarray], silent: bool = False
     ) -> None:
         """Print progress during optimization.
 
@@ -60,10 +63,15 @@ class Optimizers:
             silent: Silence progress print.
         """
         if not silent:
-            e_str = f"{fun(list(x)):3.16f}"
+            e = fun(list(x))
+            if isinstance(e, np.ndarray):
+                e_str = f"{np.mean(e):3.16f}"
+            else:
+                e_str = f"{e:3.16f}"
             time_str = f"{time.time() - self._start:7.2f}"
+            evals_str = str(self.energy_eval_callback()) if self.energy_eval_callback else "N/A"
             print(
-                f"--------{str(self._iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}"
+                f"--------{str(self._iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {evals_str.center(11)}"
             )
             self._iteration += 1
             self._start = time.time()
@@ -127,12 +135,8 @@ class Optimizers:
                 tol=self.tol,
                 callback=print_progress,
             )
-            if "f_rotosolve_optimized" in extra_options:
-                res = optimizer.minimize(
-                    self.fun, x0, f_rotosolve_optimized=extra_options["f_rotosolve_optimized"]
-                )
-            else:
-                res = optimizer.minimize(self.fun, x0)
+            res = optimizer.minimize(self.fun, x0)
+
         else:
             raise ValueError(f"Got an unkonwn optimizer {self.method}")
         result = Result()
@@ -192,12 +196,7 @@ class RotoSolve:
         self._R = R
         self._param_names = param_names
 
-    def minimize(
-        self,
-        f: Callable[[list[float]], float],
-        x0: Sequence[float],
-        f_rotosolve_optimized: None | Callable[[list[float], list[float], int], list[float]] = None,
-    ) -> Result:
+    def minimize(self, f: Callable[[list[float]], float | np.ndarray], x0: Sequence[float]) -> Result:
         """Run minimization.
 
         Args:
@@ -215,10 +214,7 @@ class RotoSolve:
         for _ in range(self.max_iterations):
             for i, par_name in enumerate(self._param_names):
                 # Get the energy for specific values of theta_i, defined by the _R parameter.
-                if f_rotosolve_optimized is not None:
-                    e_vals = get_energy_evals_optimized(f_rotosolve_optimized, x, i, self._R[par_name])
-                else:
-                    e_vals = get_energy_evals(f, x, i, self._R[par_name])
+                e_vals = get_energy_evals(f, x, i, self._R[par_name])
                 # Do an analytic construction of the energy as a function of theta_i.
                 f_reconstructed = partial(reconstructed_f, energy_vals=e_vals, R=self._R[par_name])
                 # Evaluate the energy in many points.
@@ -234,7 +230,12 @@ class RotoSolve:
                 while x[i] > np.pi:
                     x[i] -= 2 * np.pi
             f_tmp = f(x)
-            f_new = float(np.mean(f_tmp))
+            if isinstance(f_tmp, np.ndarray):
+                # State-averaged case
+                f_new = float(np.mean(f_tmp))
+            else:
+                # Single state case
+                f_new = f_tmp
             if abs(f_best - f_new) < self.threshold:
                 f_best = f_new
                 x_best = x.copy()
@@ -253,7 +254,9 @@ class RotoSolve:
         return res
 
 
-def get_energy_evals(f: Callable[[list[float]], float], x: list[float], idx: int, R: int) -> list[float]:
+def get_energy_evals(
+    f: Callable[[list[float]], float | np.ndarray], x: list[float], idx: int, R: int
+) -> list[float] | list[np.ndarray]:
     """Evaluate the function in all points needed for the reconstruction in Rotosolve.
 
     Args:
@@ -274,28 +277,8 @@ def get_energy_evals(f: Callable[[list[float]], float], x: list[float], idx: int
     return e_vals  # type: ignore
 
 
-def get_energy_evals_optimized(
-    f: Callable[[list[float], list[float], int], list[float]], x: list[float], idx: int, R: int
-) -> list[float]:
-    """Evaluate the function in all points needed for the reconstruction in Rotosolve.
-
-    Args:
-        f: Function to evaluate.
-        x: Parameters of f.
-        idx: Index of parameter to be changed.
-        R: Parameter to control how many points are needed.
-
-    Returns:
-        All needed function evaluations.
-    """
-    theta_diffs = []
-    for mu in range(-R, R + 1):
-        theta_diffs.append(2 * mu / (2 * R + 1) * np.pi)
-    return f(x, theta_diffs, idx)
-
-
 @nb.jit(nopython=True)
-def reconstructed_f(x_vals: np.ndarray, energy_vals: list[float], R: int) -> np.ndarray:
+def reconstructed_f(x_vals: np.ndarray, energy_vals: list[float] | list[np.ndarray], R: int) -> np.ndarray:
     r"""Reconstructed the function in terms of sin-functions.
 
     .. math::
@@ -318,13 +301,26 @@ def reconstructed_f(x_vals: np.ndarray, energy_vals: list[float], R: int) -> np.
         Function value in list of points.
     """
     e = np.zeros(len(x_vals))
-    # Single state case
-    for i, mu in enumerate(list(range(-R, R + 1))):
-        x_mu = 2 * mu / (2 * R + 1) * np.pi
-        for j, x in enumerate(x_vals):
-            e[j] += (
-                energy_vals[i]
-                * np.sinc((2 * R + 1) / 2 * (x - x_mu) / np.pi)
-                / (np.sinc(1 / 2 * (x - x_mu) / np.pi))
-            )
+    if isinstance(energy_vals[0], float):
+        # Single state case
+        for i, mu in enumerate(list(range(-R, R + 1))):
+            x_mu = 2 * mu / (2 * R + 1) * np.pi
+            for j, x in enumerate(x_vals):
+                e[j] += (
+                    energy_vals[i]
+                    * np.sinc((2 * R + 1) / 2 * (x - x_mu) / np.pi)
+                    / (np.sinc(1 / 2 * (x - x_mu) / np.pi))
+                )
+    else:
+        # State-averaged case
+        for k in range(len(energy_vals[0])):
+            for i, mu in enumerate(list(range(-R, R + 1))):
+                x_mu = 2 * mu / (2 * R + 1) * np.pi
+                for j, x in enumerate(x_vals):
+                    e[j] += (
+                        energy_vals[i][k]  # type: ignore
+                        * np.sinc((2 * R + 1) / 2 * (x - x_mu) / np.pi)
+                        / (np.sinc(1 / 2 * (x - x_mu) / np.pi))
+                    )
+        e = e / len(energy_vals)
     return e

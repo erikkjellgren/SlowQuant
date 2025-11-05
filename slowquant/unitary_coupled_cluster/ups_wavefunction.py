@@ -15,7 +15,6 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
 from slowquant.unitary_coupled_cluster.density_matrix import (
-    ReducedDenstiyMatrix,
     get_electronic_energy,
     get_orbital_gradient,
 )
@@ -24,9 +23,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     expectation_value,
     get_grad_action,
     propagate_state,
-    propagate_state_SA,
     propagate_unitary,
-    propagate_unitary_SA,
 )
 from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
@@ -92,6 +89,7 @@ class WaveFunctionUPS:
         self._g_mo = None
         self._energy_elec: float | None = None
         self.ansatz_options = ansatz_options
+        self.num_energy_evals = 0
         # Construct spin orbital spaces and indices
         active_space = []
         orbital_counter = 0
@@ -364,8 +362,6 @@ class WaveFunctionUPS:
                         [Epq(p, q)],
                         self.ci_coeffs,
                         self.ci_info,
-                        self.thetas,
-                        self.ups_layout,
                     )
                     self._rdm1[p_idx, q_idx] = val  # type: ignore
                     self._rdm1[q_idx, p_idx] = val  # type: ignore
@@ -408,8 +404,6 @@ class WaveFunctionUPS:
                                 [Epq(p, q) * Epq(r, s)],
                                 self.ci_coeffs,
                                 self.ci_info,
-                                self.thetas,
-                                self.ups_layout,
                             )
                             if q == r:
                                 val -= self.rdm1[p_idx, s_idx]
@@ -456,8 +450,6 @@ class WaveFunctionUPS:
                                         [Epq(p, q), Epq(r, s), Epq(t, u)],
                                         self.ci_coeffs,
                                         self.ci_info,
-                                        self.thetas,
-                                        self.ups_layout,
                                     )
                                     if t == s:
                                         val -= self.rdm2[p_idx, q_idx, r_idx, u_idx]
@@ -524,8 +516,6 @@ class WaveFunctionUPS:
                                                 [Epq(p, q), Epq(r, s), Epq(t, u), Epq(m, n)],
                                                 self.ci_coeffs,
                                                 self.ci_info,
-                                                self.thetas,
-                                                self.ups_layout,
                                             )
                                             if r == q:
                                                 val -= self.rdm3[p_idx, s_idx, t_idx, u_idx, m_idx, n_idx]
@@ -728,8 +718,6 @@ class WaveFunctionUPS:
                 [hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
-                self.thetas,
-                self.ups_layout,
             )
         return self._energy_elec
 
@@ -756,14 +744,16 @@ class WaveFunctionUPS:
         print(f"### Number theta: {self.ups_layout.n_params}")
         e_old = 1e12
         print("Full optimization")
-        print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+        print("Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #")
         for full_iter in range(0, int(maxiter)):
             full_start = time.time()
 
             # Do ansatz optimization
             if not is_silent_subiterations:
                 print("--------Ansatz optimization")
-                print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+                print(
+                    "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
+                )
             energy_theta = partial(
                 self._calc_energy_optimization,
                 theta_optimization=True,
@@ -781,6 +771,7 @@ class WaveFunctionUPS:
                 maxiter=maxiter,
                 tol=tol,
                 is_silent=is_silent_subiterations,
+                energy_eval_callback=lambda: self.num_energy_evals,
             )
             self._old_opt_parameters = np.zeros_like(self.thetas) + 10**20
             self._E_opt_old = 0.0
@@ -790,7 +781,6 @@ class WaveFunctionUPS:
                     extra_options={
                         "R": self.ups_layout.grad_param_R,
                         "param_names": self.ups_layout.param_names,
-                        "f_rotosolve_optimized": self._calc_energy_rotosolve_optimization,
                     },
                 )
             else:
@@ -802,7 +792,9 @@ class WaveFunctionUPS:
             if orbital_optimization and len(self.kappa) != 0:
                 if not is_silent_subiterations:
                     print("--------Orbital optimization")
-                    print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+                    print(
+                        "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
+                    )
                 energy_oo = partial(
                     self._calc_energy_optimization,
                     theta_optimization=False,
@@ -821,6 +813,7 @@ class WaveFunctionUPS:
                     maxiter=maxiter,
                     tol=tol,
                     is_silent=is_silent_subiterations,
+                    energy_eval_callback=lambda: self.num_energy_evals,
                 )
                 self._old_opt_parameters = np.zeros(len(self.kappa_idx)) + 10**20
                 self._E_opt_old = 0.0
@@ -840,7 +833,9 @@ class WaveFunctionUPS:
             e_new = res.fun
             time_str = f"{time.time() - full_start:7.2f}"
             e_str = f"{e_new:3.12f}"
-            print(f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")
+            print(
+                f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {str(self.num_energy_evals).center(11)}"
+            )
             if abs(e_new - e_old) < tol:
                 break
             e_old = e_new
@@ -871,7 +866,7 @@ class WaveFunctionUPS:
                     "Cannot use RotoSolve together with orbital optimization in the one-step solver."
                 )
 
-        print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+        print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #")
         if orbital_optimization:
             if len(self.thetas) > 0:
                 energy = partial(
@@ -913,7 +908,14 @@ class WaveFunctionUPS:
                 parameters = self.kappa
         else:
             parameters = self.thetas
-        optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
+        optimizer = Optimizers(
+            energy,
+            optimizer_name,
+            grad=gradient,
+            maxiter=maxiter,
+            tol=tol,
+            energy_eval_callback=lambda: self.num_energy_evals,
+        )
         self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0
         if optimizer_name.lower() == "rotosolve":
@@ -922,7 +924,6 @@ class WaveFunctionUPS:
                 extra_options={
                     "R": self.ups_layout.grad_param_R,
                     "param_names": self.ups_layout.param_names,
-                    "f_rotosolve_optimized": self._calc_energy_rotosolve_optimization,
                 },
             )
         else:
@@ -964,15 +965,8 @@ class WaveFunctionUPS:
             # RDM is more expensive than evaluation of the Hamiltonian.
             # Thus only construct these if orbital-optimization is turned on,
             # since the RDMs will be reused in the oo gradient calculation.
-            rdms = ReducedDenstiyMatrix(
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.num_virtual_orbs,
-                rdm1=self.rdm1,
-                rdm2=self.rdm2,
-            )
             E = get_electronic_energy(
-                rdms, self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
+                self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.rdm1, self.rdm2
             )
         else:
             E = expectation_value(
@@ -980,71 +974,11 @@ class WaveFunctionUPS:
                 [hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
-                self.thetas,
-                self.ups_layout,
             )
         self._E_opt_old = E
         self._old_opt_parameters = np.copy(parameters)
+        self.num_energy_evals += 1  # count one measurement
         return E
-
-    def _calc_energy_rotosolve_optimization(
-        self,
-        parameters: list[float],
-        theta_diffs: list[float],
-        theta_idx: int,
-    ) -> list[float]:
-        """Calculate electronic energy.
-
-        Args:
-            parameters: Ansatz and orbital rotation parameters.
-
-        Returns:
-            Electronic energy.
-        """
-        self.thetas = parameters[:]
-        state_vec = np.copy(self.csf_coeffs)
-        for i in range(0, theta_idx):
-            state_vec = propagate_unitary(
-                state_vec,
-                i,
-                self.ci_info,
-                self.thetas,
-                self.ups_layout,
-            )
-        state_vecs = []
-        theta_tmp = np.copy(self.thetas)
-        for theta_diff in theta_diffs:
-            theta_tmp[theta_idx] = theta_diff
-            state_vecs.append(
-                propagate_unitary(
-                    state_vec,
-                    theta_idx,
-                    self.ci_info,
-                    theta_tmp,
-                    self.ups_layout,
-                )
-            )
-        state_vecs = np.array(state_vecs)
-        for i in range(theta_idx + 1, len(self.thetas)):
-            state_vecs = propagate_unitary_SA(
-                state_vecs,
-                i,
-                self.ci_info,
-                self.thetas,
-                self.ups_layout,
-            )
-        Hamiltonian = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
-        bra_vec = propagate_state_SA(
-            [Hamiltonian],
-            state_vecs,
-            self.ci_info,
-            self.thetas,
-            self.ups_layout,
-        )
-        energies = []
-        for bra, ket in zip(bra_vec, state_vecs):
-            energies.append(bra @ ket)
-        return energies
 
     def _calc_gradient_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
@@ -1067,15 +1001,14 @@ class WaveFunctionUPS:
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:
-            rdms = ReducedDenstiyMatrix(
+            gradient[:num_kappa] = get_orbital_gradient(
+                self.h_mo,
+                self.g_mo,
+                self.kappa_idx,
                 self.num_inactive_orbs,
                 self.num_active_orbs,
-                self.num_virtual_orbs,
-                rdm1=self.rdm1,
-                rdm2=self.rdm2,
-            )
-            gradient[:num_kappa] = get_orbital_gradient(
-                rdms, self.h_mo, self.g_mo, self.kappa_idx, self.num_inactive_orbs, self.num_active_orbs
+                self.rdm1,
+                self.rdm2,
             )
         if theta_optimization:
             Hamiltonian = hamiltonian_0i_0a(
@@ -1089,8 +1022,6 @@ class WaveFunctionUPS:
                 [Hamiltonian],
                 self.ci_coeffs,
                 self.ci_info,
-                self.thetas,
-                self.ups_layout,
             )
             bra_vec = construct_ups_state(
                 bra_vec,
@@ -1128,4 +1059,7 @@ class WaveFunctionUPS:
                     self.thetas,
                     self.ups_layout,
                 )
+            self.num_energy_evals += 2 * np.sum(
+                list(self.ups_layout.grad_param_R.values())
+            )  # Count energy measurements for all gradients
         return gradient

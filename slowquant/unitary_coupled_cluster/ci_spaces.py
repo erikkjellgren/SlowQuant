@@ -1,5 +1,7 @@
 from collections.abc import Generator
 
+import numba as nb
+import numba.typed as nbt
 import numpy as np
 from sympy.utilities.iterables import multiset_permutations
 
@@ -43,7 +45,11 @@ class CI_Info:
         self.num_active_elec_alpha = num_active_elec_alpha
         self.num_active_elec_beta = num_active_elec_beta
         self.idx2det = idx2det
-        self.det2idx = det2idx
+        # Unfortunately, Numba needs a little bit of typing help.
+        nb_dict = nbt.Dict.empty(key_type=nb.int64, value_type=nb.int64)
+        for k, v in det2idx.items():
+            nb_dict[k] = v
+        self.det2idx = nb_dict
         self.space_extension_offset = 0
 
 
