@@ -141,7 +141,7 @@ class _HartreeFock:
         Returns:
             FermionicOperator.
         """
-        h_mo = one_electron_integral_transform(self.mo_coeff, self.int_obj.kinetic_energy_matrix + self.int_obj.nuclear_attraction_matrix,x)
+        h_mo = one_electron_integral_transform(self.mo_coeff, self.int_obj.kinetic_energy_matrix + self.int_obj.nuclear_attraction_matrix)
         g_mo = two_electron_integral_transform(self.mo_coeff, self.int_obj.electron_repulsion_tensor)
         num_orbs = self.mol_obj.number_bf
         H = hamiltonian_0i_0a(h_mo, g_mo, 0, num_orbs)
