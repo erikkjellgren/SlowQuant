@@ -786,7 +786,7 @@ class WaveFunctionCircuit:
             self._energy_elec = self._calc_energy_elec()
         return self._energy_elec
 
-    def _get_hamiltonian(self) -> FermionicOperator:
+    def _get_hamiltonian(self, qiskit_form: bool = False) -> FermionicOperator:
         """Return electronic Hamiltonian as FermionicOperator.
 
         Returns:
@@ -795,6 +795,8 @@ class WaveFunctionCircuit:
         H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
         H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
 
+        if qiskit_form:
+            return H.get_qiskit_form(self.num_orbs)
         return H
 
     def _calc_energy_elec(self) -> float:
