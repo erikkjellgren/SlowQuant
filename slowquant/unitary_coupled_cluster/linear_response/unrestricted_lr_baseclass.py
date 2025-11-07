@@ -91,6 +91,7 @@ class LinearResponseBaseClass:
         self.A = np.zeros((num_parameters, num_parameters))
         self.B = np.zeros((num_parameters, num_parameters))
         self.Sigma = np.zeros((num_parameters, num_parameters))
+        print(len(self.Sigma))
         self.Delta = np.zeros((num_parameters, num_parameters))
         self.H_1i_1a = unrestricted_hamiltonian_1i_1a(
             self.wf.haa_mo,
@@ -127,7 +128,6 @@ class LinearResponseBaseClass:
         E2[:size, size:] = self.B
         E2[size:, :size] = self.B
         E2[size:, size:] = self.A
-        ny = np.subtract(E2,E2.T)
         (
             hess_eigval,
             _,
@@ -140,6 +140,9 @@ class LinearResponseBaseClass:
             print("WARNING: Negative eigenvalue in Hessian")
 
         S = np.zeros((size * 2, size * 2))
+        print(len(self.Delta))
+        print(len(self.Sigma))
+        print(len(S[size:, :size]))
         S[:size, :size] = self.Sigma
         S[:size, size:] = self.Delta
         S[size:, :size] = -self.Delta

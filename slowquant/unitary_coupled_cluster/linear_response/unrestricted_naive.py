@@ -40,6 +40,49 @@ class LinearResponseUPS(LinearResponseBaseClass):
         """
         super().__init__(wave_function, excitations)
 
+        #Screen for A_ii = 0
+        finite_excitations_idx = []
+        A = get_orbital_response_hessian_block_unrestricted(
+                self.wf.haa_mo,
+                self.wf.hbb_mo,
+                self.wf.gaaaa_mo,
+                self.wf.gbbbb_mo,
+                self.wf.gaabb_mo,
+                self.wf.gbbaa_mo,
+                self.wf.kappa_no_activeactive_idx_dagger,
+                self.wf.kappa_no_activeactive_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.rdm1aa,
+                self.wf.rdm1bb,
+                self.wf.rdm2aaaa,
+                self.wf.rdm2bbbb,
+                self.wf.rdm2aabb,
+                self.wf.rdm2bbaa,) 
+        # Man behøver ikke regne hele A, men det er bare lige nemt at gøre for qq
+        for i, q in enumerate(self.q_ops):
+            if abs(A[i,i]) > 10**-6: # whatever rimeligt threshold
+                finite_excitations_idx.append(True)
+            else:
+                finite_excitations_idx.append(False)
+        
+        for i, G in enumerate(self.G_ops):
+            GI_ket = propagate_state([G], self.wf.ci_coeffs, *self.index_info)
+            HGI_ket = propagate_state([self.H_0i_0a, G], self.wf.ci_coeffs, *self.index_info)
+            # <0| GId H GJ |0>
+            A = expectation_value(
+                GI_ket,
+                [],
+                HGI_ket,
+                *self.index_info,
+            )
+            if abs(A) > 10**-6: # whatever rimeligt threshold
+                finite_excitations_idx.append(True)
+            else:
+                finite_excitations_idx.append(False)
+        
+        finite_excitations_idx = np.array(finite_excitations_idx)
+
         idx_shift = len(self.q_ops)
         G_shift = int(len(self.G_ops)/2)
         # print(G_shift)
@@ -106,7 +149,6 @@ class LinearResponseUPS(LinearResponseBaseClass):
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
                 raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
-
         # Start RDM version
         if len(self.q_ops) != 0:
             self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block_unrestricted(
@@ -476,6 +518,10 @@ class LinearResponseUPS(LinearResponseBaseClass):
                 else:
                     self.Sigma[int(i-(i/2+0.5)) + idx_shift + G_shift, int(j-(j/2+0.5)) + idx_shift + G_shift] = self.Sigma[int(j-(j/2+0.5)) + idx_shift + G_shift, int(i-(i/2+0.5)) + idx_shift + G_shift] = val
                 # self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = val
+        self.A = self.A[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape((np.sum(finite_excitations_idx), np.sum(finite_excitations_idx)))
+        self.B = self.B[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape((np.sum(finite_excitations_idx), np.sum(finite_excitations_idx)))
+        self.Sigma = self.Sigma[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape((np.sum(finite_excitations_idx), np.sum(finite_excitations_idx)))
+        self.Delta = np.zeros((len(self.Sigma), len(self.Sigma))) # Delta er defineret her fordi den ellers har forkert dimension i unrestricted_lr_baseclass.py
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.
