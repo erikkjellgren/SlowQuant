@@ -99,7 +99,7 @@ class Optimizers:
                     method=self.method,
                     tol=self.tol,
                     callback=print_progress,
-                    options={"maxiter": self.maxiter},
+                    options={"maxiter": self.maxiter, "disp": True},
                 )
             else:
                 res = scipy.optimize.minimize(
@@ -108,7 +108,7 @@ class Optimizers:
                     method=self.method,
                     tol=self.tol,
                     callback=print_progress,
-                    options={"maxiter": self.maxiter},
+                    options={"maxiter": self.maxiter, "disp": True},
                 )
         elif self.method in ("cobyla", "cobyqa"):
             res = scipy.optimize.minimize(
@@ -117,7 +117,7 @@ class Optimizers:
                 method=self.method,
                 tol=self.tol,
                 callback=print_progress,
-                options={"maxiter": self.maxiter},
+                options={"maxiter": self.maxiter, "disp": True},
             )
         elif self.method in ("rotosolve",):
             if not isinstance(extra_options, dict):
@@ -142,6 +142,8 @@ class Optimizers:
         result = Result()
         result.x = res.x
         result.fun = res.fun
+        if not res.success:
+            print(res.message)
         return result
 
 
