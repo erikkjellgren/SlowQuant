@@ -18,13 +18,16 @@ from slowquant.molecularintegrals.integralfunctions import (
     two_electron_integral_transform_split,
 )
 from slowquant.qiskit_interface.interface import QuantumInterface
-from slowquant.unitary_coupled_cluster.density_matrix import (
-    get_electronic_energy,
-    get_orbital_gradient,
-)
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.operators import a_op
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
+from slowquant.unitary_coupled_cluster.unrestricted_density_matrix import (
+    get_electronic_energy_unrestricted,
+    get_orbital_gradient_unrestricted,
+)
+from slowquant.unitary_coupled_cluster.unrestricted_operators import (
+    unrestricted_hamiltonian_0i_0a,
+)
 
 
 class UnrestrictedWaveFunctionCircuit:
@@ -220,7 +223,12 @@ class UnrestrictedWaveFunctionCircuit:
         # Setup Qiskit stuff
         self.QI = quantum_interface
         self.QI.construct_circuit(
-            self.num_active_orbs, (self.num_active_elec_alpha, self.num_active_elec_beta)
+            self.active_occ_idx_shifted,
+            self.active_unocc_idx_shifted,
+            self.active_occ_spin_idx_shifted,
+            self.active_unocc_spin_idx_shifted,
+            self.num_active_orbs,
+            (self.num_active_elec_alpha, self.num_active_elec_beta),
         )
 
     @property
@@ -422,7 +430,6 @@ class UnrestrictedWaveFunctionCircuit:
         """
         return (self.gaaaa_mo, self.gbbbb_mo, self.gaabb_mo)
 
-
     def change_primitive(self, primitive: BaseSamplerV1 | BaseSamplerV2, verbose: bool = True) -> None:
         """Change the primitive expectation value calculator.
 
@@ -538,7 +545,12 @@ class UnrestrictedWaveFunctionCircuit:
                     r_idx = r - self.num_inactive_orbs
                     for s in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                         s_idx = s - self.num_inactive_orbs
-                        rdm2_op = (a_op(p, spin1, True) * a_op(r, spin2, True) * a_op(s, spin2, False) * a_op(q, spin1, False)).get_folded_operator(
+                        rdm2_op = (
+                            a_op(p, spin1, True)
+                            * a_op(r, spin2, True)
+                            * a_op(s, spin2, False)
+                            * a_op(q, spin1, False)
+                        ).get_folded_operator(
                             self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                         )
                         val = self.QI.quantum_expectation_value(rdm2_op)
@@ -628,9 +640,14 @@ class UnrestrictedWaveFunctionCircuit:
                         for s in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
                             for spin1 in ("alpha", "beta"):
                                 for spin2 in ("alpha", "beta"):
-                                    rdm2_op = (a_op(p, spin1, True) * a_op(r, spin2, True) * a_op(s, spin2, False) * a_op(q, spin1, False)).get_folded_operator(
-                                    self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
-                                )
+                                    rdm2_op = (
+                                        a_op(p, spin1, True)
+                                        * a_op(r, spin2, True)
+                                        * a_op(s, spin2, False)
+                                        * a_op(q, spin1, False)
+                                    ).get_folded_operator(
+                                        self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+                                    )
                                     mapped_op = self.QI.op_to_qbit(rdm2_op)
                                     cumulated_paulis = cumulated_paulis.union(mapped_op.paulis)  # type: ignore[union-attr]
         # Calling expectation value to put all Paulis in cliques
@@ -672,15 +689,15 @@ class UnrestrictedWaveFunctionCircuit:
             FermionicOperator.
         """
         H = unrestricted_hamiltonian_0i_0a(
-                        self.haa_mo,
-                        self.hbb_mo,
-                        self.gaaaa_mo,
-                        self.gbbbb_mo,
-                        self.gaabb_mo,
-                        self.gbbaa_mo,
-                        self.num_inactive_orbs,
-                        self.num_active_orbs,
-                    )
+            self.haa_mo,
+            self.hbb_mo,
+            self.gaaaa_mo,
+            self.gbbbb_mo,
+            self.gaabb_mo,
+            self.gbbaa_mo,
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+        )
         H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
 
         return H
@@ -692,15 +709,15 @@ class UnrestrictedWaveFunctionCircuit:
             Electronic energy.
         """
         H = unrestricted_hamiltonian_0i_0a(
-                        self.haa_mo,
-                        self.hbb_mo,
-                        self.gaaaa_mo,
-                        self.gbbbb_mo,
-                        self.gaabb_mo,
-                        self.gbbaa_mo,
-                        self.num_inactive_orbs,
-                        self.num_active_orbs,
-                    )
+            self.haa_mo,
+            self.hbb_mo,
+            self.gaaaa_mo,
+            self.gbbbb_mo,
+            self.gaabb_mo,
+            self.gbbaa_mo,
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+        )
         H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
         energy_elec = self.QI.quantum_expectation_value(H)
         return energy_elec
@@ -919,21 +936,6 @@ class UnrestrictedWaveFunctionCircuit:
             self.thetas = parameters[num_kappa_a + num_kappa_b :]
             # Build operator
             H = unrestricted_hamiltonian_0i_0a(
-                        self.haa_mo,
-                        self.hbb_mo,
-                        self.gaaaa_mo,
-                        self.gbbbb_mo,
-                        self.gaabb_mo,
-                        self.gbbaa_mo,
-                        self.num_inactive_orbs,
-                        self.num_active_orbs,
-                    )
-            H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-            return self.QI.quantum_expectation_value(H)
-        # RDM is more expensive than evaluation of the Hamiltonian.
-        # Thus only construct these if orbital-optimization is turned on,
-        # since the RDMs will be reused in the oo gradient calculation.
-        return get_electronic_energy_unrestricted(
                 self.haa_mo,
                 self.hbb_mo,
                 self.gaaaa_mo,
@@ -942,13 +944,28 @@ class UnrestrictedWaveFunctionCircuit:
                 self.gbbaa_mo,
                 self.num_inactive_orbs,
                 self.num_active_orbs,
-                self.rdm1aa,
-                self.rdm1bb,
-                self.rdm2aaaa,
-                self.rdm2bbbb,
-                self.rdm2aabb,
-                self.rdm2bbaa,
             )
+            H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+            return self.QI.quantum_expectation_value(H)
+        # RDM is more expensive than evaluation of the Hamiltonian.
+        # Thus only construct these if orbital-optimization is turned on,
+        # since the RDMs will be reused in the oo gradient calculation.
+        return get_electronic_energy_unrestricted(
+            self.haa_mo,
+            self.hbb_mo,
+            self.gaaaa_mo,
+            self.gbbbb_mo,
+            self.gaabb_mo,
+            self.gbbaa_mo,
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+            self.rdm1aa,
+            self.rdm1bb,
+            self.rdm2aaaa,
+            self.rdm2bbbb,
+            self.rdm2aabb,
+            self.rdm2bbaa,
+        )
 
     def _calc_gradient_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
@@ -1003,9 +1020,9 @@ class UnrestrictedWaveFunctionCircuit:
                 self.num_active_orbs,
             )
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-            for i in range(len(parameters[num_kappa_a + num_kappa_b:])):
+            for i in range(len(parameters[num_kappa_a + num_kappa_b :])):
                 R = self.QI.grad_param_R[self.QI.param_names[i]]
-                e_vals_grad = _get_energy_evals_for_grad(H, self.QI, parameters, i, R)
+                e_vals_grad = _get_energy_evals_for_grad(H, self.QI, self.thetas, i, R)
                 grad = 0.0
                 for j, mu in enumerate(list(range(1, 2 * R + 1))):
                     x_mu = (2 * mu - 1) / (2 * R) * np.pi

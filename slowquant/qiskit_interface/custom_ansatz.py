@@ -122,8 +122,11 @@ def tUPS(
 
 
 def fUCC(
+    occ_idx: list[int],
+    unocc_idx: list[int],
+    occ_spin_idx: list[int],
+    unocc_spin_idx: list[int],
     num_orbs: int,
-    num_elec: tuple[int, int],
     mapper: FermionicMapper,
     ansatz_options: dict[str, Any],
 ) -> tuple[QuantumCircuit, dict[str, int]]:
@@ -183,28 +186,18 @@ def fUCC(
     if True not in (do_S, do_SAS, do_SAGS, do_D, do_pD, do_GpD):
         raise ValueError("fUCC requires some excitations got none.")
     n_layers = ansatz_options["n_layers"]
-    num_spin_orbs = 2 * num_orbs
-    occ = []
-    unocc = []
-    idx = 0
-    for _ in range(np.sum(num_elec)):
-        occ.append(idx)
-        idx += 1
-    for _ in range(num_spin_orbs - np.sum(num_elec)):
-        unocc.append(idx)
-        idx += 1
     qc = HartreeFock(num_orbs, (0, 0), mapper)  # empty circuit with qubit number based on mapper
     grad_param_R = {}
     idx = 0
     # Layer loop
     for _ in range(n_layers):
         if do_S:
-            for a, i in iterate_t1(occ, unocc):
+            for a, i in iterate_t1(occ_spin_idx, unocc_spin_idx):
                 qc = single_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 2
                 idx += 1
         if do_SAS:
-            for a, i, _ in iterate_t1_sa(occ, unocc):
+            for a, i, _ in iterate_t1_sa(occ_idx, unocc_idx):
                 qc = sa_single_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 4
                 idx += 1
@@ -214,17 +207,17 @@ def fUCC(
                 grad_param_R[f"p{idx:09d}"] = 4
                 idx += 1
         if do_D:
-            for a, i, b, j in iterate_t2(occ, unocc):
+            for a, i, b, j in iterate_t2(occ_spin_idx, unocc_spin_idx):
                 qc = double_excitation(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 2
                 idx += 1
         if do_pD:
-            for a, i, b, j in iterate_pair_t2(occ, unocc):
+            for a, i, b, j in iterate_pair_t2(occ_idx, unocc_idx):
                 qc = double_excitation(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 2
                 idx += 1
         if do_GpD:
-            for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
+            for a, i, b, j in iterate_pair_t2_generalized(2 * num_orbs):
                 qc = double_excitation(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 2
                 idx += 1
