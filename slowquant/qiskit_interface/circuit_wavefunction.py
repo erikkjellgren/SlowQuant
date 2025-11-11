@@ -1035,7 +1035,6 @@ class WaveFunctionCircuit:
         Returns:
             Electronic gradient.
         """
-        num_kappa = 0
         gradient = np.zeros(len(parameters))
         num_kappa = 0
         if kappa_optimization:

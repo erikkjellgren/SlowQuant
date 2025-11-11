@@ -77,7 +77,7 @@ class UnrestrictedWaveFunctionUPS:
             ansatz_options = {}
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
-        if len(cas) != 2:
+        if len(cas[0]) != 2:
             raise ValueError(
                 "Number of electrons in the active space must be specified as a tuple of (alpha, beta)."
             )
@@ -564,7 +564,7 @@ class UnrestrictedWaveFunctionUPS:
             One-electron reduced density matrix.
         """
         # if self._calculate_rdm1 is None:
-        self.calculate_rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs))
+        calculate_rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs))
         for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
             p_idx = p - self.num_inactive_orbs
             for q in range(self.num_inactive_orbs, p + 1):
@@ -575,9 +575,9 @@ class UnrestrictedWaveFunctionUPS:
                     self.ci_coeffs,
                     self.ci_info,
                 )
-                self.calculate_rdm1[p_idx, q_idx] = val
-                self.calculate_rdm1[q_idx, p_idx] = val
-        return self.calculate_rdm1
+                calculate_rdm1[p_idx, q_idx] = val
+                calculate_rdm1[q_idx, p_idx] = val
+        return calculate_rdm1
 
     @property
     def rdm1_C(self) -> np.ndarray:
@@ -617,7 +617,7 @@ class UnrestrictedWaveFunctionUPS:
         Returns:
             Two-electron unrestricted reduced density matrix.
         """
-        self.calculate_rdm2 = np.zeros(
+        calculate_rdm2 = np.zeros(
             (self.num_active_orbs, self.num_active_orbs, self.num_active_orbs, self.num_active_orbs)
         )
         for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
@@ -639,11 +639,11 @@ class UnrestrictedWaveFunctionUPS:
                             self.ci_coeffs,
                             self.ci_info,
                         )
-                        self.calculate_rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
-                        # self.calculate_rdm2[r_idx, s_idx, p_idx, q_idx] = val # type: ignore
-                        # self.calculate_rdm2[q_idx, p_idx, s_idx, r_idx] = val # type: ignore
-                        # self.calculate_rdm2[s_idx, r_idx, q_idx, p_idx] = val # type: ignore
-        return self.calculate_rdm2
+                        calculate_rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
+                        # calculate_rdm2[r_idx, s_idx, p_idx, q_idx] = val # type: ignore
+                        # calculate_rdm2[q_idx, p_idx, s_idx, r_idx] = val # type: ignore
+                        # calculate_rdm2[s_idx, r_idx, q_idx, p_idx] = val # type: ignore
+        return calculate_rdm2
 
     @property
     def rdm2_C(self) -> np.ndarray:
@@ -765,7 +765,7 @@ class UnrestrictedWaveFunctionUPS:
             )
             self.thetas = res.x.tolist()
 
-            if orbital_optimization and len(self.kappa_a) + len(self.kappa_b):
+            if orbital_optimization and len(self.kappa_a) + len(self.kappa_b) != 0:
                 if not is_silent_subiterations:
                     print("--------Orbital optimization")
                     print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
@@ -794,6 +794,7 @@ class UnrestrictedWaveFunctionUPS:
                 for i in range(len(self.kappa_a)):
                     self._kappa_a[i] = 0.0
                     self._kappa_a_old[i] = 0.0
+                for i in range(len(self.kappa_b)):
                     self._kappa_b[i] = 0.0
                     self._kappa_b_old[i] = 0.0
             else:
@@ -858,6 +859,7 @@ class UnrestrictedWaveFunctionUPS:
                 )
             else:
                 energy = partial(
+                    self._calc_energy_optimization,
                     theta_optimization=False,
                     kappa_optimization=True,
                 )
@@ -898,6 +900,7 @@ class UnrestrictedWaveFunctionUPS:
             for i in range(len(self.kappa_a)):
                 self._kappa_a[i] = 0.0
                 self._kappa_a_old[i] = 0.0
+            for i in range(len(self.kappa_b)):
                 self._kappa_b[i] = 0.0
                 self._kappa_b_old[i] = 0.0
         else:
