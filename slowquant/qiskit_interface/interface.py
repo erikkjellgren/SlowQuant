@@ -298,10 +298,18 @@ class QuantumInterface:
                         ".\nEnsure compatibility manually.\n",
                     )
 
-            # Get optimization level from backend. Only for v1 primitives. Needed for default pass manager
+            # Set default optimization level
             if self.pass_manager_options.get("optimization_level") is None:
                 print("Optimization level not set in pass manager options. Using default value 3.")
                 self.pass_manager_options["optimization_level"] = 3
+
+            # Set default transpiler seed
+            if (
+                self.pass_manager_options.get("seed_transpiler") is None
+                and self.pass_manager_options.get("backend") is not None
+            ):
+                print("Seed not set. Using default value 1234.")
+                self.pass_manager_options["seed_transpiler"] = 1234
 
             # Check if circuit exist and has to be transpiled
             # In case of switching to ISA in later workflow
@@ -339,6 +347,11 @@ class QuantumInterface:
                 " which is not in allowed options",
                 allowed_pm_options,
             )
+        # check if circuit has been transpiled previosuly
+        redo_ISA = False
+        if not self.ISA:
+            self.ISA = True
+            redo_ISA = True
         self._pass_manager = generate_preset_pass_manager(
             optimization_level=self.pass_manager_options.get("optimization_level"),
             backend=self.pass_manager_options.get("backend"),
@@ -352,7 +365,7 @@ class QuantumInterface:
 
         # Check if circuit has been set and PassManager options were updated
         # In case of switching to new PassManager in later workflow
-        if pass_manager_options is not None and hasattr(self, "circuit"):
+        if pass_manager_options is not None and hasattr(self, "circuit") and not redo_ISA:
             print("Change in PassManager. Reconstructing circuit.")
             self.construct_circuit(self.num_orbs, self.num_elec)
 
@@ -1532,11 +1545,23 @@ class QuantumInterface:
             data = f"Your settings are:\n {'Ansatz:':<20} {self.ansatz}\n {'Number of shots:':<20} {self.shots}\n"
         data += f" {'ISA':<20} {self.ISA}\n {'Primitive:':<20} {self._primitive.__class__.__name__}"
         if self.ISA:
-            data += f"\n {'Final layout:':<20} {self._final_ansatz_indices}"
-            data += f"\n {'Non-local gates:':<20} {self.ansatz_circuit.num_nonlocal_gates()}"
-            data += f"\n{'Transpiler settings:'}"
-            for key, value in self.pass_manager_options.items():
-                data += f"\n {key:<20} {value}"
-            if isinstance(self._primitive, BaseSamplerV2) and hasattr(self._primitive.options, "twirling"):
-                data += f"\n {'Pauli twirling:':<20} {self._primitive.options.twirling.enable_gates}\n {'Dynamic decoupling:':<20} {self._primitive.options.dynamical_decoupling.enable}"
+            if self._transpiled:
+                data += f"\n {'Final layout:':<20} {self._final_ansatz_indices}"
+                data += f"\n {'Non-local gates:':<20} {self.ansatz_circuit.num_nonlocal_gates()}"
+                data += f"\n{'Transpiler settings:'}"
+                for key, value in self.pass_manager_options.items():
+                    data += f"\n {key:<20} {value}"
+                if isinstance(self._primitive, BaseSamplerV2) and hasattr(
+                    self._primitive.options, "twirling"
+                ):
+                    data += f"\n {'Pauli twirling:':<20} {self._primitive.options.twirling.enable_gates}\n {'Dynamic decoupling:':<20} {self._primitive.options.dynamical_decoupling.enable}"
+            else:
+                data += "\nCircuit not yet transpiled"
+                for key, value in self.pass_manager_options.items():
+                    data += f"\n {key:<20} {value}"
+                if isinstance(self._primitive, BaseSamplerV2) and hasattr(
+                    self._primitive.options, "twirling"
+                ):
+                    data += f"\n {'Pauli twirling:':<20} {self._primitive.options.twirling.enable_gates}\n {'Dynamic decoupling:':<20} {self._primitive.options.dynamical_decoupling.enable}"
+
         print(f"{data}\nMitigation flags:\n{self.mitigation_flags.status_report()}")

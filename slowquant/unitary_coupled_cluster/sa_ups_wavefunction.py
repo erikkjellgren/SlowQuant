@@ -534,14 +534,16 @@ class WaveFunctionSAUPS:
         print(f"### Number theta: {self.ups_layout.n_params}")
         e_old = 1e12
         print("Full optimization")
-        print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+        print("Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #")
         for full_iter in range(0, int(maxiter)):
             full_start = time.time()
 
             # Do ansatz optimization
             if not is_silent_subiterations:
                 print("--------Ansatz optimization")
-                print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+                print(
+                    "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
+                )
             if optimizer_name.lower() in ("rotosolve",):
                 # For RotoSolve type solvers the energy per state is needed in the optimization,
                 # instead of only the state-averaged energy.
@@ -569,6 +571,7 @@ class WaveFunctionSAUPS:
                 maxiter=maxiter,
                 tol=tol,
                 is_silent=is_silent_subiterations,
+                energy_eval_callback=lambda: self.num_energy_evals,
             )
             self._old_opt_parameters = np.zeros_like(self.thetas) + 10**20
             self._E_opt_old = 0.0
@@ -581,7 +584,9 @@ class WaveFunctionSAUPS:
             if orbital_optimization and len(self.kappa) != 0:
                 if not is_silent_subiterations:
                     print("--------Orbital optimization")
-                    print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+                    print(
+                        "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
+                    )
                 energy_oo = partial(
                     self._calc_energy_optimization,
                     theta_optimization=False,
@@ -600,6 +605,7 @@ class WaveFunctionSAUPS:
                     maxiter=maxiter,
                     tol=tol,
                     is_silent=is_silent_subiterations,
+                    energy_eval_callback=lambda: self.num_energy_evals,
                 )
                 self._old_opt_parameters = np.zeros(len(self.kappa_idx)) + 10**20
                 self._E_opt_old = 0.0
@@ -619,7 +625,9 @@ class WaveFunctionSAUPS:
             e_new = res.fun
             time_str = f"{time.time() - full_start:7.2f}"
             e_str = f"{e_new:3.12f}"
-            print(f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")
+            print(
+                f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {str(self.num_energy_evals).center(11)}"
+            )
             if abs(e_new - e_old) < tol:
                 break
             e_old = e_new
@@ -655,7 +663,9 @@ class WaveFunctionSAUPS:
                     "Cannot use RotoSolve together with orbital optimization in the one-step solver."
                 )
         if not is_silent:
-            print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+            print(
+                "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
+            )
         if orbital_optimization:
             if len(self.thetas) > 0:
                 energy = partial(
@@ -707,7 +717,13 @@ class WaveFunctionSAUPS:
                 return_all_states=True,
             )
         optimizer = Optimizers(
-            energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol, is_silent=is_silent
+            energy,
+            optimizer_name,
+            grad=gradient,
+            maxiter=maxiter,
+            tol=tol,
+            is_silent=is_silent,
+            energy_eval_callback=lambda: self.num_energy_evals,
         )
         self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0
