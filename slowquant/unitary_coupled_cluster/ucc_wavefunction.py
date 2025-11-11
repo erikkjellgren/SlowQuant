@@ -270,6 +270,8 @@ class WaveFunctionUCC:
         self._g_mo = None
         self._energy_elec = None
         self._kappa = k.copy()
+        if isinstance(self._kappa, np.ndarray):
+            self._kappa = self._kappa.tolist()
         # Move current expansion point.
         self._c_mo = self.c_mo
         self._kappa_old = self.kappa
@@ -315,6 +317,8 @@ class WaveFunctionUCC:
         self._energy_elec = None
         self._ci_coeffs = None
         self._thetas = theta.copy()
+        if isinstance(self._thetas, np.ndarray):
+            self._thetas = self._thetas.tolist()
 
     @property
     def c_mo(self) -> np.ndarray:
