@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Sequence
 from functools import partial
 from typing import Any
 
@@ -10,31 +9,31 @@ import scipy
 import scipy.optimize
 
 from slowquant.molecularintegrals.integralfunctions import (
-    #one_electron_integral_transform,
-    #two_electron_integral_transform,
+    one_electron_integral_transform,
 )
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
-from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
-    get_electronic_energy,
-    get_orbital_gradient,
-)
+from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space
+
+# from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
+#    get_electronic_energy,
+#    get_orbital_gradient,
+# )
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     construct_ups_state,
     expectation_value,
-    get_grad_action,
-    propagate_state,
-    propagate_unitary,
+    #    get_grad_action,
+    #    propagate_state,
+    #    propagate_unitary,
 )
-from slowquant.unitary_coupled_cluster.generalized_operators import hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import UpsStructure
 
 
-class WaveFunctionUPS:
+class GeneralizedWaveFunctionUPS:
     def __init__(
         self,
         num_elec: int,
-        cas: Sequence[int],
+        cas: tuple[tuple[int, int], int],
         mo_coeffs: np.ndarray,
         h_ao: np.ndarray,
         g_ao: np.ndarray,
@@ -65,58 +64,151 @@ class WaveFunctionUPS:
         self._g_ao = g_ao
         self._rdm1 = None
         self._rdm2 = None
-        self._h_spin_mo = None
-        self._g_spin_mo = None
+        self._h_mo = None
+        self._g_mo = None
         self._energy_elec: float | None = None
         self.ansatz_options = ansatz_options
         self.num_energy_evals = 0
         # Construct spin orbital spaces and indices
-        # Construct spatial idx
-        # Make shifted indices
+        self.inactive_spin_idx = []
+        self.virtual_spin_idx = []
+        self.active_spin_idx = []
+        self.active_occ_spin_idx = []
+        self.active_unocc_spin_idx = []
+        self.active_spin_idx_shifted = []
+        self.active_occ_spin_idx_shifted = []
+        self.active_unocc_spin_idx_shifted = []
+        self.num_elec = num_elec
+        self.num_elec_alpha = (num_elec - np.sum(cas[0])) // 2 + cas[0][0]
+        self.num_elec_beta = (num_elec - np.sum(cas[0])) // 2 + cas[0][1]
+        self.num_spin_orbs = 2 * len(h_ao)
+        self._include_active_kappa = include_active_kappa
+        self.num_active_elec_alpha = cas[0][0]
+        self.num_active_elec_beta = cas[0][1]
+        self.num_active_elec = self.num_active_elec_alpha + self.num_active_elec_beta
+        self.num_active_spin_orbs = 2 * cas[1]
+        self.num_inactive_spin_orbs = self.num_elec - self.num_active_elec
+        self.num_virtual_spin_orbs = 2 * len(h_ao) - self.num_inactive_spin_orbs - self.num_active_spin_orbs
         # Find non-redundant kappas
-        # kappa can be optimized in spatial basis
-        # Loop over all q>p orb combinations and find redundant kappas
-        # HF like orbital rotation indices
+        self._kappa_real = []
+        self._kappa_imag = []
+        self.kappa_spin_idx = []
+        self.kappa_no_activeactive_spin_idx = []
+        self.kappa_no_activeactive_spin_idx_dagger = []
+        self._kappa_real_redundant = []
+        self._kappa_imag_redundant = []
+        self.kappa_redundant_spin_idx = []
+        self._kappa_real_old = []
+        self._kappa_imag_old = []
+        self._kappa_real_redundant_old = []
+        self._kappa_imag_redundant_old = []
+        for p in range(0, self.num_spin_orbs):
+            for q in range(p + 1, self.num_spin_orbs):
+                if p in self.inactive_spin_idx and q in self.inactive_spin_idx:
+                    self._kappa_real_redundant.append(0.0)
+                    self._kappa_imag_redundant.append(0.0)
+                    self._kappa_real_redundant_old.append(0.0)
+                    self._kappa_imag_redundant_old.append(0.0)
+                    self.kappa_redundant_spin_idx.append((p, q))
+                    continue
+                if p in self.virtual_spin_idx and q in self.virtual_spin_idx:
+                    self._kappa_real_redundant.append(0.0)
+                    self._kappa_imag_redundant.append(0.0)
+                    self._kappa_real_redundant_old.append(0.0)
+                    self._kappa_imag_redundant_old.append(0.0)
+                    self.kappa_redundant_spin_idx.append((p, q))
+                    continue
+                if not include_active_kappa:
+                    if p in self.active_spin_idx and q in self.active_spin_idx:
+                        self._kappa_real_redundant.append(0.0)
+                        self._kappa_imag_redundant.append(0.0)
+                        self._kappa_real_redundant_old.append(0.0)
+                        self._kappa_imag_redundant_old.append(0.0)
+                        self.kappa_redundant_spin_idx.append((p, q))
+                        continue
+                if include_active_kappa:
+                    if p in self.active_occ_spin_idx and q in self.active_occ_spin_idx:
+                        self._kappa_real_redundant.append(0.0)
+                        self._kappa_imag_redundant.append(0.0)
+                        self._kappa_real_redundant_old.append(0.0)
+                        self._kappa_imag_redundant_old.append(0.0)
+                        self.kappa_redundant_spin_idx.append((p, q))
+                        continue
+                    if p in self.active_unocc_spin_idx and q in self.active_unocc_spin_idx:
+                        self._kappa_real_redundant.append(0.0)
+                        self._kappa_imag_redundant.append(0.0)
+                        self._kappa_real_redundant_old.append(0.0)
+                        self._kappa_imag_redundant_old.append(0.0)
+                        self.kappa_redundant_spin_idx.append((p, q))
+                        continue
+                if not (p in self.active_spin_idx and q in self.active_spin_idx):
+                    self.kappa_no_activeactive_spin_idx.append((p, q))
+                    self.kappa_no_activeactive_spin_idx_dagger.append((q, p))
+                self._kappa_real.append(0.0)
+                self._kappa_imag.append(0.0)
+                self._kappa_real_old.append(0.0)
+                self._kappa_imag_old.append(0.0)
+                self.kappa_spin_idx.append((p, q))
         # Construct determinant basis
         self.ci_info = get_indexing(
-            self.num_inactive_orbs,
-            self.num_active_orbs,
-            self.num_virtual_orbs,
+            self.num_inactive_spin_orbs // 2,
+            self.num_active_spin_orbs // 2,
+            self.num_virtual_spin_orbs // 2,
             self.num_active_elec_alpha,
             self.num_active_elec_beta,
         )
         self.num_det = len(self.ci_info.idx2det)
         self.csf_coeffs = np.zeros(self.num_det)
-        hf_det = int("1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec), 2)
+        hf_string = ""
+        for i in range(self.num_active_spin_orbs // 2):
+            if i < self.num_active_elec_alpha:
+                hf_string += "1"
+            else:
+                hf_string += "0"
+            if i < self.num_active_elec_beta:
+                hf_string += "1"
+            else:
+                hf_string += "0"
+        hf_det = int(hf_string, 2)
         self.csf_coeffs[self.ci_info.det2idx[hf_det]] = 1
         self.ci_coeffs = np.copy(self.csf_coeffs)
         # Construct UPS Structure
         self.ups_layout = UpsStructure()
         # Do the ansatz setup @ERIK
-        if ansatz.lower() == "fuccsd":
+        if ansatz.lower() == "none":
+            None
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
-        self._thetas = np.zeros(self.ups_layout.n_params).tolist()
+        if self.ups_layout.n_params == 0:
+            self._thetas = []
+        else:
+            self._thetas = np.zeros(self.ups_layout.n_params).tolist()
 
     @property
-    def kappa(self) -> list[float]:
-        """Get orbital rotation parameters."""
-        return self._kappa.copy()
+    def kappa_real(self) -> list[float]:
+        """Get real orbital rotation parameters."""
+        return self._kappa_real.copy()
 
-    @kappa.setter
-    def kappa(self, k: list[float]) -> None:
+    @property
+    def kappa_imag(self) -> list[float]:
+        """Get imaginary orbital rotation parameters."""
+        return self._kappa_imag.copy()
+
+    def set_kappa_cep(self, k_real: list[float], k_imag: list[float]) -> None:
         """Set orbital rotation parameters, and move current expansion point.
 
         Args:
             k: orbital rotation parameters.
         """
-        self._h_spin_mo = None
-        self._g_spin_mo = None
+        self._h_mo = None
+        self._g_mo = None
         self._energy_elec = None
-        self._kappa = k.copy()
+        self._kappa_real = k_real.copy()
+        self._kappa_imag = k_imag.copy()
         # Move current expansion point.
         self._c_mo = self.c_mo
-        self._kappa_old = self.kappa
+        self._kappa_real_old = self.kappa_real
+        self._kappa_imag_old = self.kappa_imag
 
     @property
     def thetas(self) -> list[float]:
@@ -156,46 +248,58 @@ class WaveFunctionUPS:
         """
         # Construct anti-hermitian kappa matrix
         kappa_mat = np.zeros_like(self._c_mo)
-        if len(self.kappa) != 0:
+        if len(self.kappa_real) != 0:
             # The MO transformation is calculated as a difference between current kappa and kappa old.
             # This is to make the moving of the expansion point to work with SciPy optimization algorithms.
             # Resetting kappa to zero would mess with any algorithm that has any memory f.x. BFGS.
-            if np.max(np.abs(np.array(self.kappa) - np.array(self._kappa_old))) > 0.0:
-                for kappa_val, kappa_old, (p, q) in zip(self.kappa, self._kappa_old, self.kappa_idx):
+            if (
+                np.max(np.abs(np.array(self.kappa_real) - np.array(self._kappa_real_old))) > 0.0
+                or np.max(np.abs(np.array(self.kappa_imag) - np.array(self._kappa_imag_old))) > 0.0
+            ):
+                for kappa_val, kappa_old, (p, q) in zip(
+                    self.kappa_real, self._kappa_real_old, self.kappa_spin_idx
+                ):
                     kappa_mat[p, q] = kappa_val - kappa_old
                     kappa_mat[q, p] = -(kappa_val - kappa_old)
+                for kappa_val, kappa_old, (p, q) in zip(
+                    self.kappa_imag, self._kappa_imag_old, self.kappa_spin_idx
+                ):
+                    kappa_mat[p, q] = (kappa_val - kappa_old) * 1.0j
+                    kappa_mat[q, p] = (kappa_val - kappa_old) * 1.0j
         # Apply orbital rotation unitary to MO coefficients
         return np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
 
     @property
-    def h_spin_mo(self) -> np.ndarray:
+    def h_mo(self) -> np.ndarray:
         """Get one-electron Hamiltonian integrals in MO basis.
 
         Returns:
             One-electron Hamiltonian integrals in MO basis.
         """
-        if self._h_spin_mo is None:
-            self._h_spin_mo = #one_electron_integral_transform(self.c_mo, self._h_ao)
-        return self._h_spin_mo
+        if self._h_mo is None:
+            self._h_mo = None  # one_electron_integral_transform(self.c_mo, self._h_ao)
+        return self._h_mo
 
     @property
-    def g_spin_mo(self) -> np.ndarray:
+    def g_mo(self) -> np.ndarray:
         """Get two-electron Hamiltonian integrals in MO basis.
 
         Returns:
             Two-electron Hamiltonian integrals in MO basis.
         """
-        if self._g_spin_mo is None:
-            self._g_spin_mo = #two_electron_integral_transform(self.c_mo, self._g_ao)
-        return self._g_spin_mo
+        if self._g_mo is None:
+            self._g_mo = None  # two_electron_integral_transform(self.c_mo, self._g_ao)
+        return self._g_mo
 
     @property
     def rdm1(self) -> np.ndarray:
         # We need relevant rdm1 for generalized
+        return None
 
     @property
     def rdm2(self) -> np.ndarray:
         # We need relevant rdm2 for generalized
+        return None
 
     def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
         r"""Check orthonormality of orbitals.
@@ -221,7 +325,9 @@ class WaveFunctionUPS:
         if self._energy_elec is None:
             self._energy_elec = expectation_value(
                 self.ci_coeffs,
-                [generalized_hamiltonian_0i_0a(self.h_spin_mo, self.g_spin_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
+                # Skal ændres til generalized_hamiltonian_0i_0a på et tidspunkt.
+                # [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
+                [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
             )
@@ -446,6 +552,7 @@ class WaveFunctionUPS:
         if np.max(np.abs(np.array(self._old_opt_parameters) - np.array(parameters))) < 10**-14:
             return self._E_opt_old
         num_kappa = 0
+        E = 0
         return E
 
     def _calc_gradient_optimization(
