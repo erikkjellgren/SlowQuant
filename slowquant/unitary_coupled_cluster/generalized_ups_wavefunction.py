@@ -180,9 +180,11 @@ class GeneralizedWaveFunctionUPS:
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         if self.ups_layout.n_params == 0:
-            self._thetas = []
+            self._thetas_real = []
+            self._thetas_imag = []
         else:
-            self._thetas = np.zeros(self.ups_layout.n_params).tolist()
+            self._thetas_real = np.zeros(self.ups_layout.n_params).tolist()
+            self._thetas_imag = np.zeros(self.ups_layout.n_params).tolist()
 
     @property
     def kappa_real(self) -> list[float]:
@@ -211,27 +213,49 @@ class GeneralizedWaveFunctionUPS:
         self._kappa_imag_old = self.kappa_imag
 
     @property
-    def thetas(self) -> list[float]:
-        """Get theta values.
+    def thetas_real(self) -> list[float]:
+        """Get real theta values.
 
         Returns:
             theta values.
         """
-        return self._thetas.copy()
+        return self._thetas_real.copy()
 
-    @thetas.setter
-    def thetas(self, theta_vals: list[float]) -> None:
+    @property
+    def thetas_imag(self) -> list[float]:
+        """Get imaginary theta values.
+
+        Returns:
+            theta values.
+        """
+        return self._thetas_imag.copy()
+
+    @property
+    def thetas(self) -> list[complex]:
+        """Get complex theta values.
+
+        Returns:
+            theta values.
+        """
+        return (np.array(self._thetas_real.copy()) + 1.0j * np.array(self._thetas_imag.copy())).tolist()
+
+    def set_thetas(self, theta_real: list[float], theta_imag: list[float]) -> None:
         """Set theta values.
 
         Args:
             theta_vals: theta values.
         """
-        if len(theta_vals) != len(self._thetas):
-            raise ValueError(f"Expected {len(self._thetas)} theta1 values got {len(theta_vals)}")
+        if len(theta_real) != len(self._thetas_real):
+            raise ValueError(f"Expected {len(self._thetas_real)} real theta values got {len(theta_real)}")
+        if len(theta_real) != len(self._thetas_real):
+            raise ValueError(
+                f"Expected {len(self._thetas_imag)} imaginary theta values got {len(theta_imag)}"
+            )
         self._rdm1 = None
         self._rdm2 = None
         self._energy_elec = None
-        self._thetas = theta_vals.copy()
+        self._thetas_real = theta_real.copy()
+        self._thetas_imag = theta_imag.copy()
         self.ci_coeffs = construct_ups_state(
             self.csf_coeffs,
             self.ci_info,
@@ -252,15 +276,13 @@ class GeneralizedWaveFunctionUPS:
             # The MO transformation is calculated as a difference between current kappa and kappa old.
             # This is to make the moving of the expansion point to work with SciPy optimization algorithms.
             # Resetting kappa to zero would mess with any algorithm that has any memory f.x. BFGS.
-            if (
-                np.max(np.abs(np.array(self.kappa_real) - np.array(self._kappa_real_old))) > 0.0
-                or np.max(np.abs(np.array(self.kappa_imag) - np.array(self._kappa_imag_old))) > 0.0
-            ):
+            if np.max(np.abs(np.array(self.kappa_real) - np.array(self._kappa_real_old))) > 0.0:
                 for kappa_val, kappa_old, (p, q) in zip(
                     self.kappa_real, self._kappa_real_old, self.kappa_spin_idx
                 ):
                     kappa_mat[p, q] = kappa_val - kappa_old
                     kappa_mat[q, p] = -(kappa_val - kappa_old)
+            if np.max(np.abs(np.array(self.kappa_imag) - np.array(self._kappa_imag_old))) > 0.0:
                 for kappa_val, kappa_old, (p, q) in zip(
                     self.kappa_imag, self._kappa_imag_old, self.kappa_spin_idx
                 ):
