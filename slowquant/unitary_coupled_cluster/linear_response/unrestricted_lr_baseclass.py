@@ -91,7 +91,6 @@ class LinearResponseBaseClass:
         self.A = np.zeros((num_parameters, num_parameters))
         self.B = np.zeros((num_parameters, num_parameters))
         self.Sigma = np.zeros((num_parameters, num_parameters))
-        print(len(self.Sigma))
         self.Delta = np.zeros((num_parameters, num_parameters))
         self.H_1i_1a = unrestricted_hamiltonian_1i_1a(
             self.wf.haa_mo,

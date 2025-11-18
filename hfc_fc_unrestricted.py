@@ -117,12 +117,12 @@ def NO_rad_hfc():
     active_space = ((1,2),3)
     charge = 0
     #the pyscf spin parameter is the value of 2S (tne number of unpaired electrons, or the difference between the number of alpha and beta electrons)
-    spin=1
+    spin=-1
     
     get_hcf_fc_unrestricted(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit='angstrom')
 
 
-OH_rad_hfc()
+# OH_rad_hfc()
 # OH_cat_hfc()
-# NO_rad_hfc()
+NO_rad_hfc()
 

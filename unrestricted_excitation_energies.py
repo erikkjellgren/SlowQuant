@@ -49,11 +49,10 @@ def get_unrestricted_excitation_energy(geometry, basis, active_space, charge=0, 
     ULR.calc_excitation_energies()
     print(f'excitation energies: {ULR.excitation_energies}')
         
-    dipole_integrals = (mol.intor('int1e_r')[0,:],
-                        mol.intor('int1e_r')[1,:],
-                        mol.intor('int1e_r')[2,:]
-                        )
-    # print(dipole_integrals)
+    # dipole_integrals = (mol.intor('int1e_r')[0,:],
+    #                     mol.intor('int1e_r')[1,:],
+    #                     mol.intor('int1e_r')[2,:]
+    #                     )
     # osc_strengths = ULR.get_oscillator_strength(dipole_integrals=dipole_integrals)
     # print(f'oscillator strengths: {osc_strengths}')
 
