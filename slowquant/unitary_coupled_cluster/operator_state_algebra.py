@@ -1,5 +1,4 @@
 import math
-from collections.abc import Sequence
 
 import numba as nb
 import numpy as np
@@ -51,7 +50,7 @@ def apply_operator(
     det2idx: dict[int, int],
     do_unsafe: bool,
     tmp_state: np.ndarray,
-    factor: float,
+    factor: float | complex,
 ) -> np.ndarray:
     """Apply operator to state for a single state wave function.
 
@@ -125,7 +124,7 @@ def add_operator_matrix(
     idx2det: np.ndarray,
     det2idx: dict[int, int],
     do_unsafe: bool,
-    factor: float,
+    factor: float | complex,
 ) -> np.ndarray:
     """Add matrix representation of annihilation string.
 
@@ -197,7 +196,7 @@ def apply_operator_SA(
     det2idx: dict[int, int],
     do_unsafe: bool,
     tmp_state: np.ndarray,
-    factor: float,
+    factor: float | complex,
 ) -> np.ndarray:
     """Apply operator to state for a state-averaged wave function.
 
@@ -320,7 +319,7 @@ def propagate_state(
     operators: list[FermionicOperator | str],
     state: np.ndarray,
     ci_info: CI_Info,
-    thetas: Sequence[float] | None = None,
+    thetas: list[float | complex] | None = None,
     wf_struct: UpsStructure | UccStructure | None = None,
     do_folding: bool = True,
     do_unsafe: bool = False,
@@ -433,7 +432,7 @@ def propagate_state_SA(
     operators: list[FermionicOperator | str],
     state: np.ndarray,
     ci_info: CI_Info,
-    thetas: Sequence[float] | None = None,
+    thetas: list[float | complex] | None = None,
     wf_struct: UpsStructure | None = None,
     do_folding: bool = True,
     do_unsafe: bool = False,
@@ -537,7 +536,7 @@ def expectation_value(
     operators: list[FermionicOperator | str],
     ket: np.ndarray,
     ci_info: CI_Info,
-    thetas: Sequence[float] | None = None,
+    thetas: list[float | complex] | None = None,
     wf_struct: UpsStructure | UccStructure | None = None,
     do_folding: bool = True,
     do_unsafe: bool = False,
@@ -569,7 +568,7 @@ def expectation_value(
         do_folding=do_folding,
         do_unsafe=do_unsafe,
     )
-    val = bra @ op_ket
+    val = bra.conj() @ op_ket
     if not isinstance(val, float):
         raise ValueError(f"Calculated expectation value is not a float, got type {type(val)}")
     return val
@@ -580,7 +579,7 @@ def expectation_value_SA(
     operators: list[FermionicOperator | str],
     ket: np.ndarray,
     ci_info: CI_Info,
-    thetas: Sequence[float] | None = None,
+    thetas: list[float | complex] | None = None,
     wf_struct: UpsStructure | None = None,
     do_folding: bool = True,
 ) -> float:
@@ -608,7 +607,7 @@ def expectation_value_SA(
         wf_struct,
         do_folding=do_folding,
     )
-    val = np.einsum("ij,ij->", bra, op_ket)
+    val = np.einsum("ij,ij->", bra.conj(), op_ket)
     if not isinstance(val, float):
         raise ValueError(f"Calculated expectation value is not a float, got type {type(val)}")
     return val / len(bra)
@@ -617,7 +616,7 @@ def expectation_value_SA(
 def construct_ucc_state(
     state: np.ndarray,
     ci_info: CI_Info,
-    thetas: Sequence[float],
+    thetas: list[float | complex],
     ucc_struct: UccStructure,
     dagger: bool = False,
 ) -> np.ndarray:
@@ -644,7 +643,7 @@ def construct_ucc_state(
 
 
 def get_ucc_T(
-    thetas: Sequence[float],
+    thetas: list[float | complex],
     ucc_struct: UccStructure,
     offset: int = 0,
 ) -> FermionicOperator:
@@ -710,7 +709,7 @@ def get_ucc_T(
 def construct_ups_state(
     state: np.ndarray,
     ci_info: CI_Info,
-    thetas: Sequence[float],
+    thetas: list[float | complex],
     ups_struct: UpsStructure,
     dagger: bool = False,
 ) -> np.ndarray:
@@ -1150,7 +1149,7 @@ def construct_ups_state(
 def construct_ups_state_SA(
     state: np.ndarray,
     ci_info: CI_Info,
-    thetas: Sequence[float],
+    thetas: list[float | complex],
     ups_struct: UpsStructure,
     dagger: bool = False,
 ) -> np.ndarray:
@@ -1591,7 +1590,7 @@ def propagate_unitary(
     state: np.ndarray,
     idx: int,
     ci_info: CI_Info,
-    thetas: Sequence[float],
+    thetas: list[float | complex],
     ups_struct: UpsStructure,
 ) -> np.ndarray:
     """Apply unitary from UPS operator number 'idx' to state.
@@ -2024,7 +2023,7 @@ def propagate_unitary_SA(
     state: np.ndarray,
     idx: int,
     ci_info: CI_Info,
-    thetas: Sequence[float],
+    thetas: list[float | complex],
     ups_struct: UpsStructure,
 ) -> np.ndarray:
     """Apply unitary from UPS operator number 'idx' to state.
@@ -2648,7 +2647,7 @@ def get_determinant_expansion_from_operator_on_HF(
     num_active_orbs: int,
     num_active_elec_alpha: int,
     num_active_elec_beta: int,
-) -> tuple[list[float], list[str]]:
+) -> tuple[list[float | complex], list[str]]:
     """Get determinant expansion from applying operator to HF state.
 
     Args:

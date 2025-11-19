@@ -26,7 +26,7 @@ def operator_to_qiskit_key(operator_string: tuple[tuple[int, bool], ...], remapp
 
 def do_extended_normal_ordering(
     fermistring: FermionicOperator,
-) -> dict[tuple[tuple[int, bool], ...], float]:
+) -> dict[tuple[tuple[int, bool], ...], float | complex]:
     """Reorder fermionic operator string.
 
     The string will be ordered such that all creation operators are first,
@@ -109,13 +109,13 @@ class FermionicOperator:
 
     def __init__(
         self,
-        annihilation_operator: dict[tuple[tuple[int, bool], ...], float],
+        annihilation_operator: dict[tuple[tuple[int, bool], ...], float | complex],
     ) -> None:
         """Initialize fermionic operator class.
 
         Fermionic operators are defined via an annihilation_operator dictionary where each entry is one of the annihilation operators.
         Each entry is a tuples (key) of an integer (spin orbital index) and a bool (dagger/not dagger)
-        which defines the keys and a float (value) that is the factor in front of the annihilation string.
+        which defines the keys and a complex (value) that is the factor in front of the annihilation string.
 
         Args:
             annihilation_operator: Annihilation operator.
@@ -202,7 +202,7 @@ class FermionicOperator:
                 self.operators[op_key] = -fermistring.operators[op_key]
         return self
 
-    def __mul__(self, fermistring: FermionicOperator | float | int) -> FermionicOperator:
+    def __mul__(self, fermistring: FermionicOperator | float | int | complex) -> FermionicOperator:
         """Multiplication of two fermionic operators.
 
         Args:
@@ -211,7 +211,7 @@ class FermionicOperator:
         Returns:
             New fermionic operator.
         """
-        if type(fermistring) in (float, int):
+        if type(fermistring) in (float, int, complex):
             operators = copy.copy(self.operators)
             for op_key in self.operators.keys():
                 # The name fermistring is misleading here.
@@ -238,7 +238,7 @@ class FermionicOperator:
             raise TypeError(f"Got unknown type of fermistring: {type(fermistring)}")
         return FermionicOperator(operators)
 
-    def __imul__(self, fermistring: FermionicOperator | float | int) -> FermionicOperator:
+    def __imul__(self, fermistring: FermionicOperator | float | int | complex) -> FermionicOperator:
         """Inplace multiplication of two fermionic operators.
 
         Args:
@@ -247,12 +247,12 @@ class FermionicOperator:
         Returns:
             Updated fermionic operator.
         """
-        if type(fermistring) in (float, int):
+        if type(fermistring) in (float, int, complex):
             for op_key in self.operators.keys():
                 # The name fermistring is misleading here.
                 self.operators[op_key] *= fermistring  # type: ignore
         elif type(fermistring) is FermionicOperator:
-            operators: dict[tuple[tuple[int, bool], ...], float] = {}
+            operators: dict[tuple[tuple[int, bool], ...], float | complex] = {}
             # Iterate over all strings in both FermionicOperators
             for op_key1 in fermistring.operators.keys():
                 for op_key2 in self.operators.keys():
@@ -274,7 +274,7 @@ class FermionicOperator:
             raise TypeError(f"Got unknown type of fermistring: {type(fermistring)}")
         return self
 
-    def __rmul__(self, number: float) -> FermionicOperator:
+    def __rmul__(self, number: float | int | complex) -> FermionicOperator:
         """Multiplication of number with fermionic operator.
 
         Args:
@@ -337,7 +337,7 @@ class FermionicOperator:
         return op_count
 
     @property
-    def operators_readable(self) -> dict[str, float]:
+    def operators_readable(self) -> dict[str, float | complex]:
         """Get the operator in human readable format.
 
         Returns:
@@ -354,7 +354,7 @@ class FermionicOperator:
             operator[op_key] = fac
         return operator
 
-    def get_qiskit_form(self, num_orbs: int) -> dict[str, float]:
+    def get_qiskit_form(self, num_orbs: int) -> dict[str, float | complex]:
         """Get fermionic operator on qiskit form.
 
         Args:
@@ -408,7 +408,7 @@ class FermionicOperator:
         Returns:
            Folded fermionic operator.
         """
-        operators: dict[tuple[tuple[int, bool], ...], float] = {}
+        operators: dict[tuple[tuple[int, bool], ...], float | complex] = {}
         inactive_idx = []
         active_idx = []
         virtual_idx = []
@@ -470,7 +470,7 @@ class FermionicOperator:
                 operators[new_key] = fac * self.operators[op_key]
         return FermionicOperator(operators)
 
-    def get_info(self) -> tuple[list[list[int]], list[list[int]], list[float]]:
+    def get_info(self) -> tuple[list[list[int]], list[list[int]], list[float | complex]]:
         """Return operator excitation in ordered strings with coefficient."""
         operator = self.operators_readable
         excitations = list(operator.keys())
