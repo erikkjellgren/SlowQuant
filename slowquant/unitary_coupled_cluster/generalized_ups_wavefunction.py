@@ -11,7 +11,7 @@ import scipy.optimize
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
-from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
+from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_generalized
 from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space
 
 # from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
@@ -150,10 +150,10 @@ class GeneralizedWaveFunctionUPS:
                 self._kappa_imag_old.append(0.0)
                 self.kappa_spin_idx.append((p, q))
         # Construct determinant basis
-        self.ci_info = get_indexing(
-            self.num_inactive_spin_orbs // 2,
-            self.num_active_spin_orbs // 2,
-            self.num_virtual_spin_orbs // 2,
+        self.ci_info = get_indexing_generalized(
+            self.num_inactive_spin_orbs,
+            self.num_active_spin_orbs,
+            self.num_virtual_spin_orbs,
             self.num_active_elec_alpha,
             self.num_active_elec_beta,
         )

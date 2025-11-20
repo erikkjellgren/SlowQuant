@@ -100,6 +100,39 @@ def get_indexing(
     )
 
 
+def get_indexing_generalized(
+    num_inactive_spin_orbs: int,
+    num_active_spin_orbs: int,
+    num_virtual_spin_orbs: int,
+    num_active_elec_alpha: int,
+    num_active_elec_beta: int,
+) -> CI_Info:
+    idx = 0
+    idx2det = []
+    det2idx = {}
+    num_active_elec = num_active_elec_alpha + num_active_elec_beta
+    # Loop over all possible particle conserving determinants
+    for string in multiset_permutations(
+        [1] * num_active_elec + [0] * (num_active_spin_orbs - num_active_elec)
+    ):
+        det_str = ""
+        for occ in string:
+            det_str += str(occ)
+        det = int(det_str, 2)  # save determinant as int
+        idx2det.append(det)  # relate index to determinant
+        det2idx[det] = idx  # relate determinant to index
+        idx += 1
+    return CI_Info(
+        num_inactive_spin_orbs // 2,
+        num_active_spin_orbs // 2,
+        num_virtual_spin_orbs // 2,
+        num_active_elec_alpha,
+        num_active_elec_beta,
+        np.array(idx2det, dtype=int),
+        det2idx,
+    )
+
+
 def get_indexing_extended(
     num_inactive_orbs: int,
     num_active_orbs: int,
