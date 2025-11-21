@@ -81,7 +81,7 @@ class GeneralizedWaveFunctionUPS:
         self.active_unocc_spin_idx_shifted = []
         # Number of electrons:
         self.num_elec = num_elec
-        # DO we need this?
+        # Do we need this?
         self.num_elec_alpha = (num_elec - np.sum(cas[0])) // 2 + cas[0][0]
         self.num_elec_beta = (num_elec - np.sum(cas[0])) // 2 + cas[0][1]
         # Number of spin orbitals:
@@ -384,8 +384,8 @@ class GeneralizedWaveFunctionUPS:
                                 self.ci_info,
                                 do_folding=False,
                             )
-                            if Q == R:
-                                val -= self.rdm1[P_idx, S_idx]
+                            #if Q == R: # No comprehendo
+                            #    val -= self.rdm1[P_idx, S_idx]
                             self._rdm2[P_idx, Q_idx, R_idx, S_idx] =  val  # type: ignore
                             self._rdm2[R_idx, Q_idx, P_idx, S_idx] = -val  # type: ignore
                             self._rdm2[P_idx, S_idx, R_idx, Q_idx] = -val  # type: ignore
