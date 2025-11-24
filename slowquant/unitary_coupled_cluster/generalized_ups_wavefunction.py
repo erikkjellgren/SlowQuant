@@ -9,10 +9,10 @@ import scipy
 import scipy.optimize
 
 from slowquant.molecularintegrals.integralfunctions import (
-    one_electron_integral_transform,
+    Generalized_one_electron_transform,  Generalized_two_electron_transform, one_electron_integral_transform, two_electron_integral_transform
 )
-from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_generalized
-from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space
+from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
+from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, a_op_spin
 
 # from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
 #    get_electronic_energy,
@@ -150,10 +150,10 @@ class GeneralizedWaveFunctionUPS:
                 self._kappa_imag_old.append(0.0)
                 self.kappa_spin_idx.append((p, q))
         # Construct determinant basis
-        self.ci_info = get_indexing_generalized(
-            self.num_inactive_spin_orbs,
-            self.num_active_spin_orbs,
-            self.num_virtual_spin_orbs,
+        self.ci_info = get_indexing(
+            self.num_inactive_spin_orbs // 2,
+            self.num_active_spin_orbs // 2,
+            self.num_virtual_spin_orbs // 2,
             self.num_active_elec_alpha,
             self.num_active_elec_beta,
         )
@@ -180,11 +180,9 @@ class GeneralizedWaveFunctionUPS:
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         if self.ups_layout.n_params == 0:
-            self._thetas_real = []
-            self._thetas_imag = []
+            self._thetas = []
         else:
-            self._thetas_real = np.zeros(self.ups_layout.n_params).tolist()
-            self._thetas_imag = np.zeros(self.ups_layout.n_params).tolist()
+            self._thetas = np.zeros(self.ups_layout.n_params).tolist()
 
     @property
     def kappa_real(self) -> list[float]:
@@ -213,49 +211,27 @@ class GeneralizedWaveFunctionUPS:
         self._kappa_imag_old = self.kappa_imag
 
     @property
-    def thetas_real(self) -> list[float]:
-        """Get real theta values.
+    def thetas(self) -> list[float]:
+        """Get theta values.
 
         Returns:
             theta values.
         """
-        return self._thetas_real.copy()
+        return self._thetas.copy()
 
-    @property
-    def thetas_imag(self) -> list[float]:
-        """Get imaginary theta values.
-
-        Returns:
-            theta values.
-        """
-        return self._thetas_imag.copy()
-
-    @property
-    def thetas(self) -> list[complex]:
-        """Get complex theta values.
-
-        Returns:
-            theta values.
-        """
-        return (np.array(self._thetas_real.copy()) + 1.0j * np.array(self._thetas_imag.copy())).tolist()
-
-    def set_thetas(self, theta_real: list[float], theta_imag: list[float]) -> None:
+    @thetas.setter
+    def thetas(self, theta_vals: list[float]) -> None:
         """Set theta values.
 
         Args:
             theta_vals: theta values.
         """
-        if len(theta_real) != len(self._thetas_real):
-            raise ValueError(f"Expected {len(self._thetas_real)} real theta values got {len(theta_real)}")
-        if len(theta_real) != len(self._thetas_real):
-            raise ValueError(
-                f"Expected {len(self._thetas_imag)} imaginary theta values got {len(theta_imag)}"
-            )
+        if len(theta_vals) != len(self._thetas):
+            raise ValueError(f"Expected {len(self._thetas)} theta1 values got {len(theta_vals)}")
         self._rdm1 = None
         self._rdm2 = None
         self._energy_elec = None
-        self._thetas_real = theta_real.copy()
-        self._thetas_imag = theta_imag.copy()
+        self._thetas = theta_vals.copy()
         self.ci_coeffs = construct_ups_state(
             self.csf_coeffs,
             self.ci_info,
@@ -276,13 +252,15 @@ class GeneralizedWaveFunctionUPS:
             # The MO transformation is calculated as a difference between current kappa and kappa old.
             # This is to make the moving of the expansion point to work with SciPy optimization algorithms.
             # Resetting kappa to zero would mess with any algorithm that has any memory f.x. BFGS.
-            if np.max(np.abs(np.array(self.kappa_real) - np.array(self._kappa_real_old))) > 0.0:
+            if (
+                np.max(np.abs(np.array(self.kappa_real) - np.array(self._kappa_real_old))) > 0.0
+                or np.max(np.abs(np.array(self.kappa_imag) - np.array(self._kappa_imag_old))) > 0.0
+            ):
                 for kappa_val, kappa_old, (p, q) in zip(
                     self.kappa_real, self._kappa_real_old, self.kappa_spin_idx
                 ):
                     kappa_mat[p, q] = kappa_val - kappa_old
                     kappa_mat[q, p] = -(kappa_val - kappa_old)
-            if np.max(np.abs(np.array(self.kappa_imag) - np.array(self._kappa_imag_old))) > 0.0:
                 for kappa_val, kappa_old, (p, q) in zip(
                     self.kappa_imag, self._kappa_imag_old, self.kappa_spin_idx
                 ):
@@ -299,7 +277,7 @@ class GeneralizedWaveFunctionUPS:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._h_mo is None:
-            self._h_mo = None  # one_electron_integral_transform(self.c_mo, self._h_ao)
+            self._h_mo = Generalized_one_electron_transform(self.c_mo,self._h_ao)  # one_electron_integral_transform(self.c_mo, self._h_ao)
         return self._h_mo
 
     @property
@@ -310,19 +288,81 @@ class GeneralizedWaveFunctionUPS:
             Two-electron Hamiltonian integrals in MO basis.
         """
         if self._g_mo is None:
-            self._g_mo = None  # two_electron_integral_transform(self.c_mo, self._g_ao)
+            self._g_mo = Generalized_two_electron_transform(self.c_mo,self._g_ao)  # two_electron_integral_transform(self.c_mo, self._g_ao)
         return self._g_mo
 
     @property
     def rdm1(self) -> np.ndarray:
-        # We need relevant rdm1 for generalized
-        return None
+     
+        """Calculate one-electron reduced density matrix in the active space.
+
+        Returns:
+            One-electron reduced density matrix.
+        """
+        if self._rdm1 is None:
+            self._rdm1 = np.zeros((self.num_active_spin_orbs, self.num_active_spin_orbs))
+            for P in range(self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs):
+                P_idx = P - self.num_inactive_spin_orbs
+                for Q in range(self.num_inactive_spin_orbs, P + 1):
+                    Q_idx = Q - self.num_inactive_spin_orbs
+                    val = expectation_value(
+                        self.ci_coeffs,
+                        [(a_op_spin(P, True)*a_op_spin(Q, False))], 
+                        self.ci_coeffs,
+                        self.ci_info,
+                    )
+                    self._rdm1[P_idx, Q_idx] = val  # type: ignore
+                    self._rdm1[Q_idx, P_idx] = val  # type: ignore
+        return self._rdm1
 
     @property
     def rdm2(self) -> np.ndarray:
-        # We need relevant rdm2 for generalized
-        return None
 
+
+        """Calculate two-electron reduced density matrix in the active space.
+
+        Returns:
+            Two-electron reduced density matrix.
+        """
+        if self._rdm2 is None:
+            self._rdm2 = np.zeros(
+                (   self.num_active_spin_orbs,
+                    self.num_active_spin_orbs,
+                    self.num_active_spin_orbs,
+                    self.num_active_spin_orbs,
+                )
+            )
+            for p in range(self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs):
+                p_idx = p - self.num_inactive_spin_orbs
+                for q in range(self.num_inactive_spin_orbs, p + 1):
+                    q_idx = q - self.num_inactive_spin_orbs
+                    for r in range(self.num_inactive_spin_orbs, p + 1):
+                        r_idx = r - self.num_inactive_spin_orbs
+                        if p == q:
+                            s_lim = r + 1
+                        elif p == r:
+                            s_lim = q + 1
+                        elif q < r:
+                            s_lim = p
+                        else:
+                            s_lim = p + 1
+                        for s in range(self.num_inactive_spin_orbs, s_lim):
+                            s_idx = s - self.num_inactive_spin_orbs
+                            val = expectation_value(
+                                self.ci_coeffs,
+                                [(a_op_spin(p, True)*a_op_spin(r, True)*a_op_spin(s, False)*a_op_spin(q, False))],
+                                self.ci_coeffs,
+                                self.ci_info,
+                            )
+                            if q == r:
+                                val -= self.rdm1[p_idx, s_idx]
+                            self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
+                            self._rdm2[r_idx, s_idx, p_idx, q_idx] = val  # type: ignore
+                            self._rdm2[q_idx, p_idx, s_idx, r_idx] = val  # type: ignore
+                            self._rdm2[s_idx, r_idx, q_idx, p_idx] = val  # type: ignore
+        return self._rdm2
+    
+    
     def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
         r"""Check orthonormality of orbitals.
 
@@ -592,3 +632,4 @@ class GeneralizedWaveFunctionUPS:
         """
         gradient = np.zeros(len(parameters))
         return gradient
+

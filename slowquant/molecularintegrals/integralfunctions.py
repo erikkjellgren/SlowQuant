@@ -194,7 +194,11 @@ def one_electron_integral_transform(C: np.ndarray, int1e: np.ndarray) -> np.ndar
         One-electron integrals in MO.
     """
     return np.einsum("ai,bj,ab->ij", C, C, int1e, optimize=["einsum_path", (0, 2), (0, 1)])
-
+def Generalized_one_electron_transform(C,int_1e_inp):
+    "int_1e_inp = int_1e_kin+int_1e_nuc"
+    cont1=np.einsum("aP,bQ, ab->PQ", C[:int(C.shape[0]/2)].conj(),C[:int(C.shape[0]/2)],(int_1e_inp)) #alpha alpha
+    cont2=np.einsum("aP,bQ, ab->PQ", C[int(C.shape[0]/2):int(C.shape[0]/2)*2].conj(),C[int(C.shape[0]/2):int(C.shape[0]/2)*2],(int_1e_inp)) #beta beta
+    return np.add(cont1,cont2)
 
 def two_electron_integral_transform(C: np.ndarray, int2e: np.ndarray) -> np.ndarray:
     """Transform two-electron integrals from AO to MO.
@@ -209,3 +213,30 @@ def two_electron_integral_transform(C: np.ndarray, int2e: np.ndarray) -> np.ndar
     return np.einsum(
         "ai,bj,ck,dl,abcd->ijkl", C, C, C, C, int2e, optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)]
     )
+
+# def two_electron_integral_transform_aabb(C_a: np.ndarray, C_b: np.narray, int2e: np.ndarray) -> np.ndarray:
+    """Transform two-electron integrals from AO to MO with spin alpha, alpha beta, beta.
+
+    Args:
+        C_a: alpha MO coefficients.
+        C_b: beta MO coefficients
+        int2e: Two-electron integrals in AO.
+
+    Returns:
+        Two-electron integrals in MO alpha, alpha, beta, beta basis.
+    """
+    return np.einsum(
+        "ai,bj,ck,dl,abcd->ijkl", C_a, C_a, C_b, C_b, int2e, optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)]
+    )
+    
+def Generalized_two_electron_transform(C,int_2e_inp):
+    #int(C.shape[0]/2) is number of occupied orbitals to assure that we get the correct alpha and beta terms from the coefficient matrix
+    #alpha alpha alpha alpha
+    cont1=np.einsum("aP,bQ,cR,dS,abcd->PQRS", C[:int(C.shape[0]/2)].conj(),C[:int(C.shape[0]/2)],C[:int(C.shape[0]/2)].conj(),C[:int(C.shape[0]/2)],int_2e_inp)
+    #beta beta beta beta
+    cont2=np.einsum("aP,bQ,cR,dS,abcd->PQRS", C[int(C.shape[0]/2):int(C.shape[0]/2)*2].conj(),C[int(C.shape[0]/2):int(C.shape[0]/2)*2],C[int(C.shape[0]/2):int(C.shape[0]/2)*2].conj(),C[int(C.shape[0]/2):int(C.shape[0]/2)*2],int_2e_inp)
+    #alpha alpha, beta beta
+    cont3=np.einsum("aP,bQ,cR,dS,abcd->PQRS", C[:int(C.shape[0]/2)].conj(),C[:int(C.shape[0]/2)],C[int(C.shape[0]/2):int(C.shape[0]/2)*2].conj(),C[int(C.shape[0]/2):int(C.shape[0]/2)*2],int_2e_inp)
+    #beta beta alpha alpha
+    cont4=np.einsum("aP,bQ,cR,dS,abcd->PQRS", C[int(C.shape[0]/2):int(C.shape[0]/2)*2].conj(),C[int(C.shape[0]/2):int(C.shape[0]/2)*2],C[:int(C.shape[0]/2)].conj(),C[:int(C.shape[0]/2)],int_2e_inp)
+    return cont1+cont2+cont3+cont4
