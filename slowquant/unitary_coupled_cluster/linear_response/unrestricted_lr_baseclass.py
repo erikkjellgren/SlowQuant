@@ -139,9 +139,6 @@ class LinearResponseBaseClass:
             print("WARNING: Negative eigenvalue in Hessian")
 
         S = np.zeros((size * 2, size * 2))
-        print(len(self.Delta))
-        print(len(self.Sigma))
-        print(len(S[size:, :size]))
         S[:size, :size] = self.Sigma
         S[:size, size:] = self.Delta
         S[size:, :size] = -self.Delta

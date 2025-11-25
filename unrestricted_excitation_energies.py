@@ -29,21 +29,33 @@ def get_unrestricted_excitation_energy(geometry, basis, active_space, charge=0, 
     
     # SlowQuant
     
+    # WF = UnrestrictedWaveFunctionUPS(
+    #     mol.nelectron,
+    #     active_space,
+    #     mf.mo_coeff,
+    #     h_core,
+    #     g_eri,
+    #     "fuccsdtq",
+    #     {"n_layers":2},
+    #     include_active_kappa=True,
+    # )
+    # #WF.run_wf_optimization_1step("slsqp", False)
+    # WF.run_wf_optimization_1step("bfgs", True)
+    
     WF = UnrestrictedWaveFunctionUPS(
         mol.nelectron,
         active_space,
         mf.mo_coeff,
         h_core,
         g_eri,
-        "fuccsdtq",
+        "adapt",
         {"n_layers":2},
         include_active_kappa=True,
     )
-    #WF.run_wf_optimization_1step("slsqp", False)
-    WF.run_wf_optimization_1step("bfgs", True)
-    
 
-    print("Energy elec", WF.energy_elec_RDM)
+    WF.do_adapt(["GS", "GD"], orbital_optimization=True)
+
+    print("Electronic energy", WF.energy_elec_RDM)
 
     ULR = unaive.LinearResponseUPS(WF, excitations="SDTQ")
     ULR.calc_excitation_energies()

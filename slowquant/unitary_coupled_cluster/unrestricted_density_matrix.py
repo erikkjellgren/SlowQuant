@@ -1090,8 +1090,8 @@ def get_orbital_response_hessian_block_unrestricted(
                     )
             # et forsøg på at lave hessian matrix symmetrisk
             # print(idx1, idx2)
-            A1e[idx1, idx2] = A1e[idx2, idx1]
-            A1e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] = A1e[idx2 + len(kappa_idx1), idx1 + len(kappa_idx1)]
+            # A1e[idx1, idx2] = A1e[idx2, idx1]
+            # A1e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] = A1e[idx2 + len(kappa_idx1), idx1 + len(kappa_idx1)]
             for p in range(num_inactive_orbs + num_active_orbs):
                 for q in range(num_inactive_orbs + num_active_orbs):
                     # mu, nu, sigma, tau = alpha
@@ -1311,14 +1311,14 @@ def get_orbital_response_hessian_block_unrestricted(
                             A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_bbaa[p, m, q, r] * RDM2xxyy(
                                 p, q, r, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
                             )
-            A2e[idx1, idx2] = A2e[idx2, idx1]
-            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] = A2e[idx2 + len(kappa_idx1), idx1 + len(kappa_idx1)]
-            A2e[idx1, idx2 + len(kappa_idx1)] = A2e[idx2 + len(kappa_idx1), idx1]
-            A2e[idx1 + len(kappa_idx1), idx2] = A2e[idx2, idx1 + len(kappa_idx1)]
+            # A2e[idx1, idx2] = A2e[idx2, idx1]
+            # A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] = A2e[idx2 + len(kappa_idx1), idx1 + len(kappa_idx1)]
+            # A2e[idx1, idx2 + len(kappa_idx1)] = A2e[idx2 + len(kappa_idx1), idx1]
+            # A2e[idx1 + len(kappa_idx1), idx2] = A2e[idx2, idx1 + len(kappa_idx1)]
             # with io.open("/mnt/c/Users/Pernille/Seafile/phd/code/SlowQuant/slowquant/b.txt", 'a+', encoding='utf-8') as file:
             #     file.write(f"{A1e + 1/2 * A2e}\n\n")                
             # file.close()                
 
-    # return 1/2* (A1e + A1e.T + (1 / 2 * A2e) + (1/2*A2e.T))
-    return A1e + (1/2 *A2e)
+    return 1/2* (A1e + A1e.T + ((1 / 2 * A2e) + (1/2*A2e.T)))
+    # return A1e + (1/2 *A2e)
 

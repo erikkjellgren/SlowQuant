@@ -85,7 +85,6 @@ class LinearResponseUPS(LinearResponseBaseClass):
 
         idx_shift = len(self.q_ops)
         G_shift = int(len(self.G_ops)/2)
-        # print(G_shift)
         q_shift = int(len(self.q_ops)/2)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
