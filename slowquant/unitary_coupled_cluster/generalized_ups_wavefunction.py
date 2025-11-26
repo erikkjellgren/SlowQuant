@@ -9,8 +9,8 @@ import scipy
 import scipy.optimize
 
 from slowquant.molecularintegrals.integralfunctions import (
-    Generalized_one_electron_transform,
-    Generalized_two_electron_transform,
+    generalized_one_electron_transform,
+    generalized_two_electron_transform,
     one_electron_integral_transform,
 )
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_generalized
@@ -63,6 +63,18 @@ class GeneralizedWaveFunctionUPS:
             ansatz_options = {}
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
+        if len(cas[0]) != 2:
+            raise ValueError(
+                "Number of electrons in the active space must be specified as a tuple of (alpha, beta)."
+            )
+        if cas[1] > len(h_ao):
+            raise ValueError(
+                f"More spatial active orbitls than total orbitals. Got {cas[1]} active orbitals, and {len(h_ao)} total orbitals."
+            )
+        if np.sum(cas[0]) > num_elec:
+            raise ValueError(
+                f"More active electrons than total electrons. Got {np.sum(cas[0])} active electrons, and {num_elec} total electrons."
+            )
         # Init stuff
         self._c_mo = mo_coeffs
         self._h_ao = h_ao
@@ -304,9 +316,7 @@ class GeneralizedWaveFunctionUPS:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._h_mo is None:
-            self._h_mo = Generalized_one_electron_transform(
-                self.c_mo, self._h_ao
-            )  # one_electron_integral_transform(self.c_mo, self._h_ao)
+            self._h_mo = generalized_one_electron_transform(self.c_mo, self._h_ao)
         return self._h_mo
 
     @property
@@ -317,9 +327,7 @@ class GeneralizedWaveFunctionUPS:
             Two-electron Hamiltonian integrals in MO basis.
         """
         if self._g_mo is None:
-            self._g_mo = Generalized_two_electron_transform(
-                self.c_mo, self._g_ao
-            )  # two_electron_integral_transform(self.c_mo, self._g_ao)
+            self._g_mo = generalized_two_electron_transform(self.c_mo, self._g_ao)
         return self._g_mo
 
     @property
@@ -453,7 +461,7 @@ class GeneralizedWaveFunctionUPS:
         """
         print("### Parameters information:")
         if orbital_optimization:
-            print(f"### Number kappa: {len(self.kappa)}")
+            print(f"### Number kappa: {len(self.kappa_real)}")
         print(f"### Number theta: {self.ups_layout.n_params}")
         e_old = 1e12
         print("Full optimization")
@@ -489,12 +497,12 @@ class GeneralizedWaveFunctionUPS:
             self._old_opt_parameters = np.zeros_like(self.thetas) + 10**20
             self._E_opt_old = 0.0
             res = optimizer.minimize(
-                self.thetas,
+                self.thetas_real + self.thetas_imag,
                 extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
             )
-            self.thetas = res.x.tolist()
+            self.set_thetas(res.x[: len(self.thetas_real)].tolist(), res.x[len(self.thetas_real) :].tolist())
 
-            if orbital_optimization and len(self.kappa) != 0:
+            if orbital_optimization and len(self.kappa_real) != 0:
                 if not is_silent_subiterations:
                     print("--------Orbital optimization")
                     print(
@@ -520,16 +528,18 @@ class GeneralizedWaveFunctionUPS:
                     is_silent=is_silent_subiterations,
                     energy_eval_callback=lambda: self.num_energy_evals,
                 )
-                self._old_opt_parameters = np.zeros(len(self.kappa_idx)) + 10**20
+                self._old_opt_parameters = np.zeros(2 * len(self.kappa_spin_idx)) + 10**20
                 self._E_opt_old = 0.0
-                res = optimizer.minimize([0.0] * len(self.kappa_idx))
-                for i in range(len(self.kappa)):
-                    self._kappa[i] = 0.0
-                    self._kappa_old[i] = 0.0
+                res = optimizer.minimize([0.0] * 2 * len(self.kappa_spin_idx))
+                for i in range(len(self.kappa_real)):
+                    self._kappa_real[i] = 0.0
+                    self._kappa_imag[i] = 0.0
+                    self._kappa_real_old[i] = 0.0
+                    self._kappa_imag_old[i] = 0.0
             else:
                 # If there is no orbital optimization, then the algorithm is already converged.
                 e_new = res.fun
-                if orbital_optimization and len(self.kappa) == 0:
+                if orbital_optimization and len(self.kappa_real) == 0:
                     print(
                         "WARNING: No orbital optimization performed, because there is no non-redundant orbital parameters."
                     )
@@ -563,10 +573,10 @@ class GeneralizedWaveFunctionUPS:
         """
         print("### Parameters information:")
         if orbital_optimization:
-            print(f"### Number kappa: {len(self.kappa)}")
+            print(f"### Number kappa: {len(self.kappa_real)}")
         print(f"### Number theta: {self.ups_layout.n_params}")
         if optimizer_name.lower() == "rotosolve":
-            if orbital_optimization and len(self.kappa) != 0:
+            if orbital_optimization and len(self.kappa_real) != 0:
                 raise ValueError(
                     "Cannot use RotoSolve together with orbital optimization in the one-step solver."
                 )
