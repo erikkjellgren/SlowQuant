@@ -4,9 +4,11 @@ from pyscf import mcscf, scf, gto, x2c
 
 # from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
+from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.linear_response import naive
 from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
-
+from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space
+from slowquant.unitary_coupled_cluster.generalized_density_matrix import get_orbital_gradient_generalized
 
 def unrestricted(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     """Calculate hyperfine coupling constant (fermi-contact term) for a molecule"""
@@ -39,57 +41,6 @@ def unrestricted(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c
     # )
     # # print(WF.energy_elec_RDM)
     # WF.run_wf_optimization_1step("bfgs", True)
-
-
-
-from slowquant.unitary_coupled_cluster.fermionic_operator import (
-    FermionicOperator, 
-)
-
-
-
-def a_op_spin(spin_idx: int, dagger: bool) -> FermionicOperator:
-    """Construct annihilation/creation operator.
-
-    Args:
-        spin_idx: Spin orbital index.
-        dagger: If creation operator.
-
-    Returns:
-        Annihilation/creation operator.
-    """
-    return FermionicOperator({((spin_idx, dagger),): 1})
-
-def generalized_hamiltonian_full_space(h_spin_mo: np.ndarray, g_spin_mo: np.ndarray, num_spin_orbs: int) -> FermionicOperator:
-    r"""Construct full-space generalized electronic Hamiltonian.
-
-    .. math::
-        \hat{H} = ?
-
-    Args:
-        h_spin_mo: Core one-electron integrals in spin MO basis.
-        g_spin_mo: Two-electron integrals in spin MO basis.
-        num_spin_orbs: Number of spin orbitals.
-
-    Returns:
-        Generalized Hamiltonian operator in full-space.
-    """
-    H_operator = FermionicOperator({})
-    # Build operator
-    for p in range(num_spin_orbs):
-        for q in range(num_spin_orbs):
-            if abs(h_spin_mo[p, q]) < 10**-14:
-                continue
-            H_operator += h_spin_mo[p, q] * (a_op_spin(p, True)*a_op_spin(q, False))
-    for p in range(num_spin_orbs):
-        for q in range(num_spin_orbs):
-            for r in range(num_spin_orbs):
-                for s in range(num_spin_orbs):
-                    if abs(g_spin_mo[p, q, r, s]) < 10**-14:
-                        continue
-                    H_operator += 1 / 2 * g_spin_mo[p, q, r, s] * (a_op_spin(p, True)*a_op_spin(r, True)*a_op_spin(s, False)*a_op_spin(q, False))
-    return H_operator
-
 
 def restricted(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     """.........."""
@@ -142,72 +93,6 @@ def restricted(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=1
     LR.calc_excitation_energies()
     print(LR.excitation_energies)
 
-
-def my_ao2mo_1e(nmo,nao,int_1e_nuc,int_1e_kin,C):
-    one_e_int_kin = np.zeros(shape=(nmo,nmo))
-    one_e_int_nuc = np.zeros(shape=(nmo,nmo))
-
-    for a in range(nmo):
-        for b in range(nmo):
-            term1 = 0
-            term2 = 0
-            term3 = 0
-            term4 = 0
-            for mu in range(nao):
-                for nu in range(nao):
-                    term1 += C[mu,a]*C[nu,b]*int_1e_nuc[mu,nu]
-                    term2 += C[nao+mu,a]*C[nao+nu,b]*int_1e_nuc[mu,nu]
-                    term3 += C[mu,a]*C[nu,b]*int_1e_kin[mu,nu]
-                    term4 += C[nao+mu,a]*C[nao+nu,b]*int_1e_kin[mu,nu]
-            one_e_int_nuc[a,b] = term1 + term2 
-            one_e_int_kin[a,b] = term3 + term4
-    return np.add(one_e_int_kin, one_e_int_nuc)
-
-def ao2mo_2e_new(nmo,nao,C,int_2e_inp):
-    two_e_int = np.zeros(shape=(nmo,nmo,nmo,nmo))
-
-    int_2e = np.array(int_2e_inp)
-
-    temp1_1 = np.zeros(shape=(nmo,nao,nao,nao))
-    temp2_1 = np.zeros(shape=(nmo,nmo,nao,nao))
-    temp3_1 = np.zeros(shape=(nmo,nmo,nmo,nao))
-    temp1_2 = np.zeros(shape=(nmo,nao,nao,nao))
-    temp2_2 = np.zeros(shape=(nmo,nmo,nao,nao))
-    temp3_2 = np.zeros(shape=(nmo,nmo,nmo,nao))
-    temp1_3 = np.zeros(shape=(nmo,nao,nao,nao))
-    temp2_3 = np.zeros(shape=(nmo,nmo,nao,nao))
-    temp3_3 = np.zeros(shape=(nmo,nmo,nmo,nao))
-    temp1_4 = np.zeros(shape=(nmo,nao,nao,nao))
-    temp2_4 = np.zeros(shape=(nmo,nmo,nao,nao))
-    temp3_4 = np.zeros(shape=(nmo,nmo,nmo,nao))
-
-    for a in range(nmo):
-        for mu in range(nao):  
-            temp1_1[a,:,:,:] += C[mu,a]*int_2e[mu,:,:,:]
-            temp1_2[a,:,:,:] += C[mu,a]*int_2e[mu,:,:,:]
-            temp1_3[a,:,:,:] += C[nao+mu,a]*int_2e[mu,:,:,:]
-            temp1_4[a,:,:,:] += C[nao+mu,a]*int_2e[mu,:,:,:]
-        for b in range(nmo):
-            for nu in range(nao):  
-                temp2_1[a,b,:,:] += C[nu,b]*temp1_1[a,nu,:,:]
-                temp2_2[a,b,:,:] += C[nu,b]*temp1_2[a,nu,:,:]
-                temp2_3[a,b,:,:] += C[nao+nu,b]*temp1_3[a,nu,:,:]
-                temp2_4[a,b,:,:] += C[nao+nu,b]*temp1_4[a,nu,:,:]
-            for c in range(nmo):
-                for la in range(nao):  
-                    temp3_1[a,b,c,:] += C[la,c]*temp2_1[a,b,la,:]
-                    temp3_2[a,b,c,:] += C[nao+la,c]*temp2_2[a,b,la,:]
-                    temp3_3[a,b,c,:] += C[la,c]*temp2_3[a,b,la,:]
-                    temp3_4[a,b,c,:] += C[nao+la,c]*temp2_4[a,b,la,:]
-                for d in range(nmo):
-                    for si in range(nao):  
-                        two_e_int[a,b,c,d] += C[si,d]*temp3_1[a,b,c,si]
-                        two_e_int[a,b,c,d] += C[nao+si,d]*temp3_2[a,b,c,si] 
-                        two_e_int[a,b,c,d] += C[si,d]*temp3_3[a,b,c,si] 
-                        two_e_int[a,b,c,d] += C[nao+si,d]*temp3_4[a,b,c,si] 
-
-    return two_e_int
-
 def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     """.........."""
     print("active space:", {active_space})
@@ -221,6 +106,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     mf.scf()
     mf.kernel()
     c=mf.mo_coeff
+    e_nuc=mf.energy_nuc()
 
     h_core=mol.intor("int1e_kin")+mol.intor("int1e_nuc")
     h_1e = mol.intor("int1e_kin")
@@ -232,13 +118,13 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # # Slowquant
     
 
-    WF =WaveFunctionUPS(
+    WF =GeneralizedWaveFunctionUPS(
         mol.nelectron,
         active_space,
         mf.mo_coeff,
         h_core,
         g_eri,
-        "fuccsd",
+        "None",
         {"n_layers": 2},
         include_active_kappa=True,
     )
@@ -246,18 +132,54 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # LR = naive.LinearResponse(WF, excitations="SD")
     # LR.calc_excitation_energies()
     # print(LR.excitation_energies)
-    g_eri_mo= ao2mo_2e_new(c.shape[1],int(c.shape[0]/2),c,g_eri)
-    h_eri_mo=my_ao2mo_1e(c.shape[1],int(c.shape[0]/2),h_1e,h_nuc,c)
-    H=generalized_hamiltonian_full_space(h_eri_mo, g_eri_mo,int(c.shape[0]/2))
+
+    #call MO integrals
+    g_eri_mo = WF.g_mo
+    h_eri_mo=WF.h_mo
+    
+    rdm1=WF.rdm1
+    print(rdm1)
+    rdm2=WF.rdm2
+    print(rdm2)
+    
+    H=generalized_hamiltonian_full_space(h_eri_mo, g_eri_mo, c.shape[0])
     test=expectation_value(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
     print(test)
-
-
-
+    print(test+e_nuc)
+    print('huhuhub',WF.get_orbital_gradient_generalized_test)
 
 def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
+    basis = "STO-3G"
+    active_space_u = ((1, 1), 2)
+    active_space = (2, 2)
+    charge = 0
+    spin = 0
+
+    # def one_electron_gradient(k_int, f_int):
+    #     k=np.array(k_int)
+    #     f=np.array(f_int)
+    #     gradient=0
+    #     for P in range(nmo):
+    #         for Q in range(nmo):
+    #             for M in range(nmo):
+    #             gradient += k[M,N]*f[P*Q]*rdm1(Q,Q)-rdm2(M,P,N,Q)-(M==Q)*rdm1(P,N)+rdm2(P,M,Q,N))
+                        
+    #     return gradient
+    # # restricted(
+    #     geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    # )
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space_u, charge=charge, spin=spin, unit="angstrom"
+    )
+    # unrestricted(
+    #     geometry=geometry, basis=basis, active_space=active_space_u, charge=charge, spin=spin, unit="angstrom"
+    # )
+
+def O2():
+    geometry = """O  0.0   0.0  0.0;
+        O  0.0  0.0  3"""
     basis = "STO-3G"
     active_space_u = ((1, 1), 4)
     active_space = (2, 4)
@@ -268,7 +190,7 @@ def h2():
     #     geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     # )
     NR(
-        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+        geometry=geometry, basis=basis, active_space=active_space_u, charge=charge, spin=spin, unit="angstrom"
     )
     # unrestricted(
     #     geometry=geometry, basis=basis, active_space=active_space_u, charge=charge, spin=spin, unit="angstrom"
@@ -295,7 +217,6 @@ def h2o():
     # unrestricted(
     #     geometry=geometry, basis=basis, active_space=active_space_u, charge=charge, spin=spin, unit="angstrom"
     # )
-
 
 def HI():
     geometry = """H  0.0   0.0  0.0;
@@ -333,6 +254,7 @@ def HBr():
 ###SPIN ELLER RUMLIGE ORBITALER###
 
 h2()
+# O2()
 # h2o()
 
 # HI()
