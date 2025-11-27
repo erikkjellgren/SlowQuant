@@ -244,7 +244,7 @@ class RotoSolve:
             if abs(f_best - f_new) < self.threshold:
                 f_best = f_new
                 x_best = x.copy()
-                success = True
+                success = True # sucessful optimizaton
                 break
             if (f_new - f_best) > 0.0:
                 fails += 1

@@ -83,7 +83,7 @@ class WaveFunctionCircuit:
         self._h_mo = None
         self._g_mo = None
         self._energy_elec: float | None = None
-        self.num_energy_evals = 0
+        self.num_energy_evals = 0  # store number of energy measurements 
         active_space = []
         orbital_counter = 0
         for i in range(num_elec - cas[0], num_elec):
