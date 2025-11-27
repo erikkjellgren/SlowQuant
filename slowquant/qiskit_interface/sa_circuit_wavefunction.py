@@ -86,7 +86,7 @@ class WaveFunctionSACircuit:
         self._g_mo = None
         self._sa_energy: float | None = None
         self._state_energies = None
-        self.num_energy_evals = 0 # store number of energy measurements 
+        self.num_energy_evals = 0  # number of energy measurements on quanutm
         active_space = []
         orbital_counter = 0
         for i in range(num_elec - cas[0], num_elec):
@@ -486,7 +486,9 @@ class WaveFunctionSACircuit:
             # Do ansatz optimization
             if not is_silent_subiterations:
                 print("--------Ansatz optimization")
-                print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #")
+                print(
+                    "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
+                )
             if optimizer_name.lower() in ("rotosolve",):
                 # For RotoSolve type solvers the energy per state is needed in the optimization,
                 # instead of only the state-averaged energy.
@@ -527,7 +529,9 @@ class WaveFunctionSACircuit:
             if orbital_optimization and len(self.kappa) != 0:
                 if not is_silent_subiterations:
                     print("--------Orbital optimization")
-                    print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #")
+                    print(
+                        "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
+                    )
                 energy_oo = partial(
                     self._calc_energy_optimization,
                     theta_optimization=False,
@@ -566,7 +570,9 @@ class WaveFunctionSACircuit:
             e_new = res.fun
             time_str = f"{time.time() - full_start:7.2f}"
             e_str = f"{e_new:3.12f}"
-            print(f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {str(self.num_energy_evals).center(11)}")
+            print(
+                f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {str(self.num_energy_evals).center(11)}"
+            )
             if abs(e_new - e_old) < tol:
                 break
             e_old = e_new
@@ -652,7 +658,14 @@ class WaveFunctionSACircuit:
                 kappa_optimization=False,
                 return_all_states=True,
             )
-        optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol, energy_eval_callback=lambda: self.num_energy_evals)
+        optimizer = Optimizers(
+            energy,
+            optimizer_name,
+            grad=gradient,
+            maxiter=maxiter,
+            tol=tol,
+            energy_eval_callback=lambda: self.num_energy_evals,
+        )
         self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0
         res = optimizer.minimize(
@@ -864,7 +877,7 @@ class WaveFunctionSACircuit:
                     grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R * (np.sin(1 / 2 * x_mu)) ** 2)
                 gradient[i + num_kappa] += grad
             self.num_energy_evals += (
-                2 * np.sum(list(self.ups_layout.grad_param_R.values())) * self.num_states
+                2 * np.sum(list(self.QI.grad_param_R.values())) * self.num_states
             )  # Count energy measurements for all gradients
         return gradient
 

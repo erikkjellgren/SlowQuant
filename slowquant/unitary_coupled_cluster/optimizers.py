@@ -196,7 +196,7 @@ class RotoSolve:
         self._callback = callback
         self.max_iterations = maxiter
         self.threshold = tol
-        self.max_fail = 3 # heuristic allowed fails (e.g. due to noise)
+        self.max_fail = 3  # heuristic allowed fails (e.g. due to noise)
         self._R = R
         self._param_names = param_names
 
@@ -244,7 +244,7 @@ class RotoSolve:
             if abs(f_best - f_new) < self.threshold:
                 f_best = f_new
                 x_best = x.copy()
-                success = True # sucessful optimizaton
+                success = True  # sucessful optimization
                 break
             if (f_new - f_best) > 0.0:
                 fails += 1
