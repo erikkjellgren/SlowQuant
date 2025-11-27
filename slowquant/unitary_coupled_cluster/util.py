@@ -80,12 +80,14 @@ def iterate_t1_sa_generalized(
 def iterate_t1(
     active_occ_spin_idx: Sequence[int],
     active_unocc_spin_idx: Sequence[int],
+    is_spin_conserving: bool = True,
 ) -> Generator[tuple[int, int], None, None]:
     """Iterate over T1 spin-conserving operators.
 
     Args:
         active_occ_spin_idx: Spin indices of strongly occupied orbitals.
         active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
+        is_spin_conserving: If the operators are spin-conserving.
 
     Returns:
         T1 operator iteration.
@@ -102,7 +104,7 @@ def iterate_t1(
                 num_alpha -= 1
             else:
                 num_beta -= 1
-            if num_alpha != 0 or num_beta != 0:
+            if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
                 continue
             yield a, i
 
@@ -110,12 +112,14 @@ def iterate_t1(
 def iterate_t2(
     active_occ_spin_idx: Sequence[int],
     active_unocc_spin_idx: Sequence[int],
+    is_spin_conserving: bool = True,
 ) -> Generator[tuple[int, int, int, int], None, None]:
     """Iterate over T2 spin-conserving operators.
 
     Args:
         active_occ_spin_idx: Spin indices of strongly occupied orbitals.
         active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
+        is_spin_conserving: If the operators are spin-conserving.
 
     Returns:
         T2 operator iteration.
@@ -142,7 +146,7 @@ def iterate_t2(
                         num_alpha -= 1
                     else:
                         num_beta -= 1
-                    if num_alpha != 0 or num_beta != 0:
+                    if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
                         continue
                     yield a, i, b, j
 
@@ -150,12 +154,14 @@ def iterate_t2(
 def iterate_t3(
     active_occ_spin_idx: Sequence[int],
     active_unocc_spin_idx: Sequence[int],
+    is_spin_conserving: bool = True,
 ) -> Generator[tuple[int, int, int, int, int, int], None, None]:
     """Iterate over T3 spin-conserving operators.
 
     Args:
         active_occ_spin_idx: Spin indices of strongly occupied orbitals.
         active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
+        is_spin_conserving: If the operators are spin-conserving.
 
     Returns:
         T3 operator iteration.
@@ -192,7 +198,7 @@ def iterate_t3(
                                 num_alpha -= 1
                             else:
                                 num_beta -= 1
-                            if num_alpha != 0 or num_beta != 0:
+                            if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
                                 continue
                             yield a, i, b, j, c, k
 
@@ -200,12 +206,14 @@ def iterate_t3(
 def iterate_t4(
     active_occ_spin_idx: Sequence[int],
     active_unocc_spin_idx: Sequence[int],
+    is_spin_conserving: bool = True,
 ) -> Generator[tuple[int, int, int, int, int, int, int, int], None, None]:
     """Iterate over T4 spin-conserving operators.
 
     Args:
         active_occ_spin_idx: Spin indices of strongly occupied orbitals.
         active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
+        is_spin_conserving: If the operators are spin-conserving.
 
     Returns:
         T4 operator iteration.
@@ -252,7 +260,7 @@ def iterate_t4(
                                         num_alpha -= 1
                                     else:
                                         num_beta -= 1
-                                    if num_alpha != 0 or num_beta != 0:
+                                    if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
                                         continue
                                     yield a, i, b, j, c, k, d, l
 
@@ -260,12 +268,14 @@ def iterate_t4(
 def iterate_t5(
     active_occ_spin_idx: Sequence[int],
     active_unocc_spin_idx: Sequence[int],
+    is_spin_conserving: bool = True,
 ) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int], None, None]:
     """Iterate over T5 spin-conserving operators.
 
     Args:
         active_occ_spin_idx: Spin indices of strongly occupied orbitals.
         active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
+        is_spin_conserving: If the operators are spin-conserving.
 
     Returns:
         T5 operator iteration.
@@ -322,7 +332,7 @@ def iterate_t5(
                                                 num_alpha -= 1
                                             else:
                                                 num_beta -= 1
-                                            if num_alpha != 0 or num_beta != 0:
+                                            if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
                                                 continue
                                             yield a, i, b, j, c, k, d, l, e, m
 
@@ -330,12 +340,14 @@ def iterate_t5(
 def iterate_t6(
     active_occ_spin_idx: Sequence[int],
     active_unocc_spin_idx: Sequence[int],
+    is_spin_conserving: bool = True,
 ) -> Generator[tuple[int, int, int, int, int, int, int, int, int, int, int, int], None, None]:
     """Iterate over T6 spin-conserving operators.
 
     Args:
         active_occ_spin_idx: Spin indices of strongly occupied orbitals.
         active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
+        is_spin_conserving: If the operators are spin-conserving.
 
     Returns:
         T6 operator iteration.
@@ -406,7 +418,7 @@ def iterate_t6(
                                                         num_alpha -= 1
                                                     else:
                                                         num_beta -= 1
-                                                    if num_alpha != 0 or num_beta != 0:
+                                                    if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
                                                         continue
                                                     yield a, i, b, j, c, k, d, l, e, m, f, n
 
