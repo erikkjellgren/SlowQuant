@@ -856,7 +856,7 @@ class WaveFunctionSACircuit:
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             for i in range(len(self.thetas)):
                 R = self.QI.grad_param_R[self.QI.param_names[i]]
-                e_vals_grad = get_energy_evals_for_grad(H, self.QI, self.thetas, i, R)
+                e_vals_grad = get_energy_evals_for_grad(H, self.QI, self.thetas, i, R, self.states)
                 grad = 0.0
                 for j, mu in enumerate(list(range(1, 2 * R + 1))):
                     x_mu = (2 * mu - 1) / (2 * R) * np.pi
@@ -871,6 +871,7 @@ def get_energy_evals_for_grad(
     parameters: list[float],
     idx: int,
     R: int,
+    states: tuple[list[list[float]], list[list[str]]],
 ) -> list[float]:
     r"""Get energy evaluations needed for the gradient calculation.
 
@@ -883,6 +884,7 @@ def get_energy_evals_for_grad(
         parameters: Paramters.
         idx: Parameter idx.
         R: Parameter to control we get the needed points.
+        states: Reference states in the SA wave function.
 
     Returns:
         Energies in a few fixed points.
@@ -893,5 +895,12 @@ def get_energy_evals_for_grad(
     for mu in range(1, 2 * R + 1):
         x_mu = (2 * mu - 1) / (2 * R) * np.pi
         x[idx] = x_mu + x_shift
-        e_vals.append(quantum_interface.quantum_expectation_value(operator, custom_parameters=x))
+        energy_states = []
+        for coeffs, csf in zip(states[0], states[1]):
+            energy_states.append(
+                quantum_interface.quantum_expectation_value_csfs(
+                    (coeffs, csf), operator, (coeffs, csf), custom_parameters=x
+                )
+            )
+        e_vals.append(np.mean(energy_states))
     return e_vals
