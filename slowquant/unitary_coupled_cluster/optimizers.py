@@ -15,6 +15,7 @@ class Result:
         """Initialize result class."""
         self.x: np.ndarray
         self.fun: float
+        self.success: bool
 
 
 class Optimizers:
@@ -142,8 +143,9 @@ class Optimizers:
         result = Result()
         result.x = res.x
         result.fun = res.fun
-        if not res.success:
-            print(res.message)
+        result.success = res.success
+        if not result.success:
+            print("Optimization failed.")
         return result
 
 
@@ -194,7 +196,7 @@ class RotoSolve:
         self._callback = callback
         self.max_iterations = maxiter
         self.threshold = tol
-        self.max_fail = 3
+        self.max_fail = 3 # heuristic allowed fails (e.g. due to noise)
         self._R = R
         self._param_names = param_names
 
@@ -213,7 +215,8 @@ class RotoSolve:
         x_best = x.copy()
         fails = 0
         res = Result()
-        for _ in range(self.max_iterations):
+        success = False
+        for n_iter in range(self.max_iterations):
             for i, par_name in enumerate(self._param_names):
                 # Get the energy for specific values of theta_i, defined by the _R parameter.
                 e_vals = get_energy_evals(f, x, i, self._R[par_name])
@@ -241,6 +244,7 @@ class RotoSolve:
             if abs(f_best - f_new) < self.threshold:
                 f_best = f_new
                 x_best = x.copy()
+                success = True
                 break
             if (f_new - f_best) > 0.0:
                 fails += 1
@@ -248,11 +252,13 @@ class RotoSolve:
                 f_best = f_new
                 x_best = x.copy()
             if fails == self.max_fail:
+                print("Three energy raises detected.")
                 break
             if self._callback is not None:
                 self._callback(x)
         res.x = np.array(x_best)
         res.fun = f_best
+        res.success = success
         return res
 
 
