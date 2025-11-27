@@ -1070,9 +1070,9 @@ class WaveFunctionCircuit:
                     x_mu = (2 * mu - 1) / (2 * R) * np.pi
                     grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R * (np.sin(1 / 2 * x_mu)) ** 2)
                 gradient[num_kappa + i] = grad
-        self.num_energy_evals += 2 * np.sum(
-                list(self.ups_layout.grad_param_R.values())
-            )  # Count energy measurements for all gradients
+            self.num_energy_evals += 2 * np.sum(
+                    list(self.ups_layout.grad_param_R.values())
+                )  # Count energy measurements for all gradients
         return gradient
 
 
