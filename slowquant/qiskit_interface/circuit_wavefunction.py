@@ -909,7 +909,7 @@ class WaveFunctionCircuit:
             e_new = res.fun
             time_str = f"{time.time() - full_start:7.2f}"  # type: ignore
             e_str = f"{e_new:3.12f}"
-            print(f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}  | {str(self.num_energy_evals).center(11)}")  # type: ignore
+            print(f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {str(self.num_energy_evals).center(11)}")  # type: ignore
             if abs(e_new - e_old) < tol:
                 break
             e_old = e_new
@@ -1071,7 +1071,7 @@ class WaveFunctionCircuit:
                     grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R * (np.sin(1 / 2 * x_mu)) ** 2)
                 gradient[num_kappa + i] = grad
             self.num_energy_evals += 2 * np.sum(
-                    list(self.ups_layout.grad_param_R.values())
+                    list(self.QI.grad_param_R.values())
                 )  # Count energy measurements for all gradients
         return gradient
 

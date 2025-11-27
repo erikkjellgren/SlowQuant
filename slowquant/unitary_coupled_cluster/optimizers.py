@@ -216,7 +216,7 @@ class RotoSolve:
         fails = 0
         res = Result()
         success = False
-        for n_iter in range(self.max_iterations):
+        for _ in range(self.max_iterations):
             for i, par_name in enumerate(self._param_names):
                 # Get the energy for specific values of theta_i, defined by the _R parameter.
                 e_vals = get_energy_evals(f, x, i, self._R[par_name])
