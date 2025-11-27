@@ -1,7 +1,6 @@
 import networkx as nx
 import numpy as np
 from qiskit import QuantumCircuit
-from qiskit.quantum_info import Pauli
 from qiskit.transpiler import CouplingMap, PassManager
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
@@ -15,10 +14,12 @@ def to_CBS_measurement(op: str, transpiled: None | list[QuantumCircuit] = None) 
     .. math::
         \begin{align}
         I &\rightarrow I\\
-        Z &\rightarrow Z\\
-        X &\rightarrow XH\\
-        Y &\rightarrow YS^{\dagger}H
+        Z &\rightarrow I\\
+        X &\rightarrow H\\
+        Y &\rightarrow S^{\dagger}H
         \end{align}
+
+    #. https://learn.microsoft.com/en-us/azure/quantum/concepts-pauli-measurements, 14/11-2025
 
     Args:
         op: Pauli string.
@@ -32,10 +33,8 @@ def to_CBS_measurement(op: str, transpiled: None | list[QuantumCircuit] = None) 
         qc = QuantumCircuit(num_qubits)
         for i, pauli in enumerate(op[::-1]):  # turn order to q0,q1,...,qN
             if pauli == "X":
-                qc.append(Pauli("X"), [i])
                 qc.h(i)
             elif pauli == "Y":
-                qc.append(Pauli("Y"), [i])
                 qc.sdg(i)
                 qc.h(i)
     else:
