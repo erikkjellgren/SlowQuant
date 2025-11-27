@@ -38,9 +38,26 @@ class quantumLRBaseClass:
         """
         self.wf = wf
         # Create operators
-        self.H_0i_0a = unrestricted_hamiltonian_0i_0a(wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_inactive_orbs, wf.num_active_orbs)
+        self.H_0i_0a = unrestricted_hamiltonian_0i_0a(
+            wf.haa_mo,
+            wf.hbb_mo,
+            wf.gaaaa_mo,
+            wf.gbbbb_mo,
+            wf.gaabb_mo,
+            wf.gbbaa_mo,
+            wf.num_inactive_orbs,
+            wf.num_active_orbs,
+        )
         self.H_1i_1a = unrestricted_hamiltonian_1i_1a(
-            wf.haa_mo, wf.hbb_mo, wf.gaaaa_mo, wf.gbbbb_mo, wf.gaabb_mo, wf.gbbaa_mo, wf.num_inactive_orbs, wf.num_active_orbs, wf.num_virtual_orbs
+            wf.haa_mo,
+            wf.hbb_mo,
+            wf.gaaaa_mo,
+            wf.gbbbb_mo,
+            wf.gaabb_mo,
+            wf.gbbaa_mo,
+            wf.num_inactive_orbs,
+            wf.num_active_orbs,
+            wf.num_virtual_orbs,
         )
 
         self.G_ops = []

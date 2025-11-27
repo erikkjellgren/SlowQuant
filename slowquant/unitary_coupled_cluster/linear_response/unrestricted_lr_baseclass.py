@@ -1,6 +1,5 @@
 from collections.abc import Sequence
 
-import io
 import numpy as np
 import scipy
 
@@ -28,6 +27,7 @@ from slowquant.unitary_coupled_cluster.util import (
     iterate_t5,
     iterate_t6,
 )
+
 
 class LinearResponseBaseClass:
     index_info: tuple[CI_Info, list[float], UpsStructure]
@@ -121,7 +121,7 @@ class LinearResponseBaseClass:
         # with io.open("/mnt/c/Users/Pernille/Seafile/phd/code/SlowQuant/a_test/test_a_SDTQ.txt", 'w', encoding='utf-8') as file:
         #     file.write(f'{self.A}\n\n')
         # file.close()
-        
+
         # file.close()
         E2[:size, :size] = self.A
         E2[:size, size:] = self.B

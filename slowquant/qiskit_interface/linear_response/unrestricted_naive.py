@@ -11,20 +11,20 @@ from slowquant.qiskit_interface.linear_response.unrestricted_lr_baseclass import
     quantumLRBaseClass,
 )
 from slowquant.qiskit_interface.util import Clique
+from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
+from slowquant.unitary_coupled_cluster.operators import (
+    commutator,
+    double_commutator,
+)
 from slowquant.unitary_coupled_cluster.unrestricted_density_matrix import (
     get_orbital_gradient_response_unrestricted,
     get_orbital_response_hessian_block_unrestricted,
     get_orbital_response_metric_sigma_unrestricted,
     get_orbital_response_property_gradient_unrestricted,
 )
-from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
-from slowquant.unitary_coupled_cluster.operators import (
-    commutator,
-    double_commutator,
-)
 from slowquant.unitary_coupled_cluster.unrestricted_operators import (
+    unrestricted_hamiltonian_2i_2a,
     unrestricted_one_elec_op_full_space,
-    unrestricted_hamiltonian_2i_2a
 )
 
 
@@ -141,7 +141,7 @@ class quantumLR(quantumLRBaseClass):
                     self.wf.rdm1aa,
                     self.wf.rdm1bb,
                 )
-            else: 
+            else:
                 self.H_2i_2a = unrestricted_hamiltonian_2i_2a(
                     self.wf.haa_mo,
                     self.wf.hbb_mo,
@@ -521,9 +521,15 @@ class quantumLR(quantumLRBaseClass):
         muy_bb = one_electron_integral_transform(self.wf.c_b_mo, dipole_integrals[1])
         muz_aa = one_electron_integral_transform(self.wf.c_a_mo, dipole_integrals[2])
         muz_bb = one_electron_integral_transform(self.wf.c_b_mo, dipole_integrals[2])
-        mux_op = unrestricted_one_elec_op_full_space(mux_aa, mux_bb, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-        muy_op = unrestricted_one_elec_op_full_space(muy_aa, muy_bb, self.wf.num_inactive_orbs, self.wf.num_active_orbs)
-        muz_op = unrestricted_one_elec_op_full_space(muz_aa, muz_bb,  self.wf.num_inactive_orbs, self.wf.num_active_orbs)
+        mux_op = unrestricted_one_elec_op_full_space(
+            mux_aa, mux_bb, self.wf.num_inactive_orbs, self.wf.num_active_orbs
+        )
+        muy_op = unrestricted_one_elec_op_full_space(
+            muy_aa, muy_bb, self.wf.num_inactive_orbs, self.wf.num_active_orbs
+        )
+        muz_op = unrestricted_one_elec_op_full_space(
+            muz_aa, muz_bb, self.wf.num_inactive_orbs, self.wf.num_active_orbs
+        )
         transition_dipole_x = 0.0
         transition_dipole_y = 0.0
         transition_dipole_z = 0.0

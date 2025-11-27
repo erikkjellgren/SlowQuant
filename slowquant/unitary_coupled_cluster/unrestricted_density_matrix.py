@@ -1,6 +1,6 @@
 import numba as nb
 import numpy as np
-import io
+
 
 @nb.jit(nopython=True)
 def RDM1xx(p: int, q: int, num_inactive_orbs: int, num_active_orbs: int, rdm1xx: np.ndarray) -> float:
@@ -710,16 +710,16 @@ def get_orbital_gradient_response_unrestricted(
     for idx, (n, m) in enumerate(kappa_idx):
         # 1e contribution
         for p in range(num_inactive_orbs + num_active_orbs):
-            gradient[idx+ shift2] += h_int_aa[n, p] * RDM1xx(
+            gradient[idx + shift2] += h_int_aa[n, p] * RDM1xx(
                 m, p, num_inactive_orbs, num_active_orbs, rdm1aa
             )
-            gradient[idx+ shift2] -= h_int_aa[m, p] * RDM1xx(
+            gradient[idx + shift2] -= h_int_aa[m, p] * RDM1xx(
                 n, p, num_inactive_orbs, num_active_orbs, rdm1aa
             )
-            gradient[idx+ shift2] -= h_int_aa[p, m] * RDM1xx(
+            gradient[idx + shift2] -= h_int_aa[p, m] * RDM1xx(
                 p, n, num_inactive_orbs, num_active_orbs, rdm1aa
             )
-            gradient[idx+ shift2] += h_int_aa[p, n] * RDM1xx(
+            gradient[idx + shift2] += h_int_aa[p, n] * RDM1xx(
                 p, m, num_inactive_orbs, num_active_orbs, rdm1aa
             )
             gradient[idx + shift3] += h_int_bb[n, p] * RDM1xx(
@@ -739,42 +739,42 @@ def get_orbital_gradient_response_unrestricted(
             for q in range(num_inactive_orbs + num_active_orbs):
                 for r in range(num_inactive_orbs + num_active_orbs):
                     # aaaa
-                    gradient[idx+ shift2] += (
+                    gradient[idx + shift2] += (
                         0.5
                         * g_int_aaaa[n, p, q, r]
                         * RDM2xxxx(m, q, r, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
-                    gradient[idx+ shift2] -= (
+                    gradient[idx + shift2] -= (
                         0.5
                         * g_int_aaaa[p, q, n, r]
                         * RDM2xxxx(m, p, r, q, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
-                    gradient[idx+ shift2] -= (
+                    gradient[idx + shift2] -= (
                         0.5
                         * g_int_aaaa[m, p, q, r]
                         * RDM2xxxx(n, q, r, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
-                    gradient[idx+ shift2] += (
+                    gradient[idx + shift2] += (
                         0.5
                         * g_int_aaaa[p, q, m, r]
                         * RDM2xxxx(n, p, r, q, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
-                    gradient[idx+ shift2] -= (
+                    gradient[idx + shift2] -= (
                         0.5
                         * g_int_aaaa[p, m, q, r]
                         * RDM2xxxx(p, q, r, n, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
-                    gradient[idx+ shift2] += (
+                    gradient[idx + shift2] += (
                         0.5
                         * g_int_aaaa[p, q, r, m]
                         * RDM2xxxx(p, r, q, n, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
-                    gradient[idx+ shift2] += (
+                    gradient[idx + shift2] += (
                         0.5
                         * g_int_aaaa[p, n, q, r]
                         * RDM2xxxx(p, q, r, m, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
                     )
-                    gradient[idx+ shift2] -= (
+                    gradient[idx + shift2] -= (
                         0.5
                         * g_int_aaaa[p, q, r, n]
                         * RDM2xxxx(p, r, q, m, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa)
@@ -933,10 +933,14 @@ def get_orbital_response_metric_sigma_unrestricted(
         for idx2, (m, n) in enumerate(kappa_idx):
             if p == n:
                 sigma[idx1, idx2] -= RDM1xx(m, q, num_inactive_orbs, num_active_orbs, rdm1aa)
-                sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] -= RDM1xx(m, q, num_inactive_orbs, num_active_orbs, rdm1bb)
+                sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] -= RDM1xx(
+                    m, q, num_inactive_orbs, num_active_orbs, rdm1bb
+                )
             if m == q:
                 sigma[idx1, idx2] += RDM1xx(p, n, num_inactive_orbs, num_active_orbs, rdm1aa)
-                sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] += RDM1xx(p, n, num_inactive_orbs, num_active_orbs, rdm1bb)
+                sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] += RDM1xx(
+                    p, n, num_inactive_orbs, num_active_orbs, rdm1bb
+                )
     return sigma
 
 
@@ -1059,14 +1063,10 @@ def get_orbital_response_hessian_block_unrestricted(
     for idx1, (t, u) in enumerate(kappa_idx1):
         for idx2, (m, n) in enumerate(kappa_idx2):
             # with io.open("/mnt/c/Users/Pernille/Seafile/phd/code/SlowQuant/slowquant/b.txt", 'a+', encoding='utf-8') as file:
-            #     file.write(f"idx1:{idx1} and idx2:{idx2}\n\n")                
+            #     file.write(f"idx1:{idx1} and idx2:{idx2}\n\n")
             # file.close()
-            A1e[idx1, idx2] += h_int_aa[u, m] * RDM1xx(
-                t, n, num_inactive_orbs, num_active_orbs, rdm1aa
-            )
-            A1e[idx1, idx2] += h_int_aa[n, t] * RDM1xx(
-                m, u, num_inactive_orbs, num_active_orbs, rdm1aa
-            )
+            A1e[idx1, idx2] += h_int_aa[u, m] * RDM1xx(t, n, num_inactive_orbs, num_active_orbs, rdm1aa)
+            A1e[idx1, idx2] += h_int_aa[n, t] * RDM1xx(m, u, num_inactive_orbs, num_active_orbs, rdm1aa)
             A1e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] += h_int_bb[u, m] * RDM1xx(
                 t, n, num_inactive_orbs, num_active_orbs, rdm1bb
             )
@@ -1205,7 +1205,7 @@ def get_orbital_response_hessian_block_unrestricted(
                     # mu, sigma = beta, nu, tau = alpha
                     A2e[idx1 + len(kappa_idx1), idx2] += g_int_bbaa[u, p, q, m] * RDM2xxyy(
                         t, q, n, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
-                    )  
+                    )
                     A2e[idx1 + len(kappa_idx1), idx2] -= g_int_bbaa[u, p, n, q] * RDM2xxyy(
                         t, m, q, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
                     )
@@ -1214,26 +1214,26 @@ def get_orbital_response_hessian_block_unrestricted(
                     )
                     A2e[idx1 + len(kappa_idx1), idx2] += g_int_bbaa[p, t, n, q] * RDM2xxyy(
                         p, m, q, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
-                    )  
+                    )
 
                     # mu, tau = beta, nu, sigma = alpha
                     A2e[idx1 + len(kappa_idx1), idx2] += g_int_aabb[p, m, u, q] * RDM2xxyy(
                         p, t, q, n, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
-                    )  
+                    )
                     A2e[idx1 + len(kappa_idx1), idx2] -= g_int_aabb[n, p, u, q] * RDM2xxyy(
                         m, t, q, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
-                    )  
+                    )
                     A2e[idx1 + len(kappa_idx1), idx2] -= g_int_aabb[p, m, q, t] * RDM2xxyy(
                         p, q, u, n, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
-                    )  
+                    )
                     A2e[idx1 + len(kappa_idx1), idx2] += g_int_aabb[n, p, q, t] * RDM2xxyy(
                         m, q, u, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
-                    )  
+                    )
 
                     # mu, sigma = alpha, nu, tau = beta
                     A2e[idx1, idx2 + len(kappa_idx1)] += g_int_aabb[u, p, q, m] * RDM2xxyy(
                         t, q, n, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
-                    )  
+                    )
                     A2e[idx1, idx2 + len(kappa_idx1)] -= g_int_aabb[u, p, n, q] * RDM2xxyy(
                         t, m, q, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
                     )
@@ -1242,21 +1242,21 @@ def get_orbital_response_hessian_block_unrestricted(
                     )
                     A2e[idx1, idx2 + len(kappa_idx1)] += g_int_aabb[p, t, n, q] * RDM2xxyy(
                         p, m, q, u, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
-                    )  
+                    )
 
                     # mu, tau = alpha, nu, sigma = beta
                     A2e[idx1, idx2 + len(kappa_idx1)] += g_int_bbaa[p, m, u, q] * RDM2xxyy(
                         p, t, q, n, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
-                    )  
+                    )
                     A2e[idx1, idx2 + len(kappa_idx1)] -= g_int_bbaa[n, p, u, q] * RDM2xxyy(
                         m, t, q, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
-                    )  
+                    )
                     A2e[idx1, idx2 + len(kappa_idx1)] -= g_int_bbaa[p, m, q, t] * RDM2xxyy(
                         p, q, u, n, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
-                    )  
+                    )
                     A2e[idx1, idx2 + len(kappa_idx1)] += g_int_bbaa[n, p, q, t] * RDM2xxyy(
                         m, q, u, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
-                    )  
+                    )
 
             for p in range(num_inactive_orbs + num_active_orbs):
                 for q in range(num_inactive_orbs + num_active_orbs):
@@ -1268,22 +1268,26 @@ def get_orbital_response_hessian_block_unrestricted(
                             A2e[idx1, idx2] += g_int_aaaa[p, q, n, r] * RDM2xxxx(
                                 t, p, r, q, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa
                             )
-                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_bbbb[n, p, q, r] * RDM2xxxx(
-                                t, q, r, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb
-                            )
-                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] += g_int_bbbb[p, q, n, r] * RDM2xxxx(
-                                t, p, r, q, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb
-                            )
+                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_bbbb[
+                                n, p, q, r
+                            ] * RDM2xxxx(t, q, r, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb)
+                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] += g_int_bbbb[
+                                p, q, n, r
+                            ] * RDM2xxxx(t, p, r, q, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb)
                             A2e[idx1, idx2] -= g_int_bbaa[p, q, n, r] * RDM2xxyy(
                                 t, p, q, r, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
-                            )  
+                            )
                             A2e[idx1, idx2] -= g_int_aabb[n, p, q, r] * RDM2xxyy(
                                 t, q, r, p, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
                             )
-                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_aabb[p, q, n, r] * RDM2xxyy(
+                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_aabb[
+                                p, q, n, r
+                            ] * RDM2xxyy(
                                 t, p, q, r, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
-                            )  
-                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_bbaa[n, p, q, r] * RDM2xxyy(
+                            )
+                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_bbaa[
+                                n, p, q, r
+                            ] * RDM2xxyy(
                                 t, q, r, p, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
                             )
                         if t == n:
@@ -1293,22 +1297,26 @@ def get_orbital_response_hessian_block_unrestricted(
                             A2e[idx1, idx2] += g_int_aaaa[p, q, r, m] * RDM2xxxx(
                                 p, r, q, u, num_inactive_orbs, num_active_orbs, rdm1aa, rdm2aaaa
                             )
-                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_bbbb[p, m, q, r] * RDM2xxxx(
-                                p, q, r, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb
-                            )
-                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] += g_int_bbbb[p, q, r, m] * RDM2xxxx(
-                                p, r, q, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb
-                            )
+                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_bbbb[
+                                p, m, q, r
+                            ] * RDM2xxxx(p, q, r, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb)
+                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] += g_int_bbbb[
+                                p, q, r, m
+                            ] * RDM2xxxx(p, r, q, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm2bbbb)
                             A2e[idx1, idx2] -= g_int_bbaa[p, q, r, m] * RDM2xxyy(
                                 r, p, q, u, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
-                            )  
+                            )
                             A2e[idx1, idx2] -= g_int_aabb[p, m, q, r] * RDM2xxyy(
                                 p, q, r, u, num_inactive_orbs, num_active_orbs, rdm1aa, rdm1bb, rdm2aabb
                             )
-                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_aabb[p, q, r, m] * RDM2xxyy(
+                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_aabb[
+                                p, q, r, m
+                            ] * RDM2xxyy(
                                 r, p, q, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
-                            )  
-                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_bbaa[p, m, q, r] * RDM2xxyy(
+                            )
+                            A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= g_int_bbaa[
+                                p, m, q, r
+                            ] * RDM2xxyy(
                                 p, q, r, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
                             )
             # A2e[idx1, idx2] = A2e[idx2, idx1]
@@ -1316,9 +1324,8 @@ def get_orbital_response_hessian_block_unrestricted(
             # A2e[idx1, idx2 + len(kappa_idx1)] = A2e[idx2 + len(kappa_idx1), idx1]
             # A2e[idx1 + len(kappa_idx1), idx2] = A2e[idx2, idx1 + len(kappa_idx1)]
             # with io.open("/mnt/c/Users/Pernille/Seafile/phd/code/SlowQuant/slowquant/b.txt", 'a+', encoding='utf-8') as file:
-            #     file.write(f"{A1e + 1/2 * A2e}\n\n")                
-            # file.close()                
+            #     file.write(f"{A1e + 1/2 * A2e}\n\n")
+            # file.close()
 
-    return 1/2* (A1e + A1e.T + ((1 / 2 * A2e) + (1/2*A2e.T)))
+    return 1 / 2 * (A1e + A1e.T + ((1 / 2 * A2e) + (1 / 2 * A2e.T)))
     # return A1e + (1/2 *A2e)
-
