@@ -333,6 +333,8 @@ def HBr():
 ###SPIN ELLER RUMLIGE ORBITALER###
 
 h2()
+
+
 # h2o()
 
 # HI()

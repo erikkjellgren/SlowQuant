@@ -27,9 +27,10 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
 )
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import UpsStructure
+from slowquant.unitary_coupled_cluster.generalized_density_matrix_annika import get_orbital_gradient
 
 
-class GeneralizedWaveFunctionUPS:
+class GeneralizedWaveFunctionUPS_A:
     def __init__(
         self,
         num_elec: int,
@@ -85,16 +86,16 @@ class GeneralizedWaveFunctionUPS:
         self.num_elec_alpha = (num_elec - np.sum(cas[0])) // 2 + cas[0][0]
         self.num_elec_beta = (num_elec - np.sum(cas[0])) // 2 + cas[0][1]
         # Number of spin orbitals:
-        self.num_spin_orbs = 2 * len(h_ao)
+        self.num_spin_orbs = len(h_ao)
         self._include_active_kappa = include_active_kappa
         # Do we need these?
         self.num_active_elec_alpha = cas[0][0]
         self.num_active_elec_beta = cas[0][1]
         self.num_active_elec = self.num_active_elec_alpha + self.num_active_elec_beta
         # This does not work in spatial basis for generalized?
-        self.num_active_spin_orbs = 2 * cas[1]
+        self.num_active_spin_orbs = cas[1]
         self.num_inactive_spin_orbs = self.num_elec - self.num_active_elec
-        self.num_virtual_spin_orbs = 2 * len(h_ao) - self.num_inactive_spin_orbs - self.num_active_spin_orbs
+        self.num_virtual_spin_orbs = len(h_ao) - self.num_inactive_spin_orbs - self.num_active_spin_orbs
         # Find non-redundant kappas
         self._kappa_real = []
         self._kappa_imag = []
@@ -661,4 +662,15 @@ class GeneralizedWaveFunctionUPS:
             Electronic gradient.
         """
         gradient = np.zeros(len(parameters))
+
+        get_orbital_gradient(
+            self.h_mo,
+            self.g_mo,
+            self.kappa_spin_idx,
+            self.num_inactive_spin_orbs,
+            self.num_active_spin_orbs,
+            self.rdm1,
+            self.rdm2,
+            )
+
         return gradient
