@@ -183,7 +183,7 @@ def get_orbital_gradient(
 
                 # Imaginary
                 gradient_I[idx] += h_int[Q, T] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
-                gradient_I[idx] += h_int[P, T] * RDM1(P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+                gradient_I[idx] += h_int[P, T] * RDM1(Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
 
                 gradient_I[idx] -= h_int[T, P] * RDM1(T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
                 gradient_I[idx] -= h_int[T, Q] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
@@ -258,5 +258,5 @@ def get_orbital_gradient(
                         )
 
                         
-    return gradient_R, gradient_I
+    return gradient_R, 1j*gradient_I
 

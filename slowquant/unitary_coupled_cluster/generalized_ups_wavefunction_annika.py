@@ -13,6 +13,7 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_generalized
 from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, a_op_spin
+from slowquant.unitary_coupled_cluster.operators_annika import generalized_hamiltonian_0i_0a
 
 # from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
 #    get_electronic_energy,
@@ -28,13 +29,14 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import UpsStructure
 from slowquant.unitary_coupled_cluster.generalized_density_matrix_annika import get_orbital_gradient
+from slowquant.unitary_coupled_cluster.density_matrix import get_electronic_energy
 
 
 class GeneralizedWaveFunctionUPS_A:
     def __init__(
         self,
         num_elec: int,
-        cas: tuple[tuple[int, int], int],
+        cas: tuple[int, int],
         mo_coeffs: np.ndarray,
         h_ao: np.ndarray,
         g_ao: np.ndarray,
@@ -47,7 +49,7 @@ class GeneralizedWaveFunctionUPS_A:
         Args:
             num_elec: Number of electrons.
             cas: CAS(num_active_elec, num_active_orbs),
-                 orbitals are counted in spatial basis.
+                 orbitals are counted in spin basis.
             mo_coeffs: Initial orbital coefficients.
             h_ao: One-electron integrals in AO for Hamiltonian.
             g_ao: Two-electron integrals in AO.
@@ -82,16 +84,11 @@ class GeneralizedWaveFunctionUPS_A:
         self.active_unocc_spin_idx_shifted = []
         # Number of electrons:
         self.num_elec = num_elec
-        # Do we need this?
-        self.num_elec_alpha = (num_elec - np.sum(cas[0])) // 2 + cas[0][0]
-        self.num_elec_beta = (num_elec - np.sum(cas[0])) // 2 + cas[0][1]
         # Number of spin orbitals:
         self.num_spin_orbs = len(h_ao)
         self._include_active_kappa = include_active_kappa
         # Do we need these?
-        self.num_active_elec_alpha = cas[0][0]
-        self.num_active_elec_beta = cas[0][1]
-        self.num_active_elec = self.num_active_elec_alpha + self.num_active_elec_beta
+        self.num_active_elec = cas[0]
         # This does not work in spatial basis for generalized?
         self.num_active_spin_orbs = cas[1]
         self.num_inactive_spin_orbs = self.num_elec - self.num_active_elec
@@ -156,23 +153,21 @@ class GeneralizedWaveFunctionUPS_A:
                 self._kappa_real_old.append(0.0)
                 self._kappa_imag_old.append(0.0)
                 self.kappa_spin_idx.append((p, q))
+        self.num_active_elec_alpha = 0
+        self.num_active_elec_beta = 0
         # Construct determinant basis
         self.ci_info = get_indexing_generalized(
             self.num_inactive_spin_orbs,
             self.num_active_spin_orbs,
             self.num_virtual_spin_orbs,
             self.num_active_elec_alpha,
-            self.num_active_elec_beta,
+            self.num_active_elec_beta
         )
         self.num_det = len(self.ci_info.idx2det)
         self.csf_coeffs = np.zeros(self.num_det)
         hf_string = ""
-        for i in range(self.num_active_spin_orbs // 2):
-            if i < self.num_active_elec_alpha:
-                hf_string += "1"
-            else:
-                hf_string += "0"
-            if i < self.num_active_elec_beta:
+        for i in range(self.num_active_spin_orbs):
+            if i < self.num_active_elec:
                 hf_string += "1"
             else:
                 hf_string += "0"
@@ -419,8 +414,8 @@ class GeneralizedWaveFunctionUPS_A:
             self._energy_elec = expectation_value(
                 self.ci_coeffs,
                 # Skal ændres til generalized_hamiltonian_0i_0a på et tidspunkt.
-                # [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
-                [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
+                [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
+                # [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
             )
@@ -445,7 +440,7 @@ class GeneralizedWaveFunctionUPS_A:
         """
         print("### Parameters information:")
         if orbital_optimization:
-            print(f"### Number kappa: {len(self.kappa)}")
+            print(f"### Number kappa: {2*len(self.kappa_real)}")
         print(f"### Number theta: {self.ups_layout.n_params}")
         e_old = 1e12
         print("Full optimization")
@@ -486,7 +481,7 @@ class GeneralizedWaveFunctionUPS_A:
             )
             self.thetas = res.x.tolist()
 
-            if orbital_optimization and len(self.kappa) != 0:
+            if orbital_optimization and len(self.kappa_real) != 0:
                 if not is_silent_subiterations:
                     print("--------Orbital optimization")
                     print(
@@ -512,16 +507,18 @@ class GeneralizedWaveFunctionUPS_A:
                     is_silent=is_silent_subiterations,
                     energy_eval_callback=lambda: self.num_energy_evals,
                 )
-                self._old_opt_parameters = np.zeros(len(self.kappa_idx)) + 10**20
+                self._old_opt_parameters = np.zeros(2*len(self.kappa_spin_idx)) + 10**20
                 self._E_opt_old = 0.0
-                res = optimizer.minimize([0.0] * len(self.kappa_idx))
-                for i in range(len(self.kappa)):
-                    self._kappa[i] = 0.0
-                    self._kappa_old[i] = 0.0
+                res = optimizer.minimize([0.0] * len(self.kappa_spin_idx))
+                for i in range(len(self.kappa_real)):
+                    self._kappa_real[i] = 0.0
+                    self._kappa_real_old[i] = 0.0
+                    self._kappa_imag[i] = 0.0
+                    self._kappa_imag_old[i] = 0.0
             else:
                 # If there is no orbital optimization, then the algorithm is already converged.
                 e_new = res.fun
-                if orbital_optimization and len(self.kappa) == 0:
+                if orbital_optimization and len(self.kappa_real) == 0:
                     print(
                         "WARNING: No orbital optimization performed, because there is no non-redundant orbital parameters."
                     )
@@ -555,10 +552,10 @@ class GeneralizedWaveFunctionUPS_A:
         """
         print("### Parameters information:")
         if orbital_optimization:
-            print(f"### Number kappa: {len(self.kappa)}")
+            print(f"### Number kappa: {2*len(self.kappa_real)}")
         print(f"### Number theta: {self.ups_layout.n_params}")
         if optimizer_name.lower() == "rotosolve":
-            if orbital_optimization and len(self.kappa) != 0:
+            if orbital_optimization and len(self.kappa_real) != 0:
                 raise ValueError(
                     "Cannot use RotoSolve together with orbital optimization in the one-step solver."
                 )
@@ -600,9 +597,9 @@ class GeneralizedWaveFunctionUPS_A:
             )
         if orbital_optimization:
             if len(self.thetas) > 0:
-                parameters = self.kappa + self.thetas
+                parameters = self.kappa_real + self.kappa_imag + self.thetas
             else:
-                parameters = self.kappa
+                parameters = self.kappa_real + self.kappa_imag
         else:
             parameters = self.thetas
         optimizer = Optimizers(
@@ -620,10 +617,12 @@ class GeneralizedWaveFunctionUPS_A:
             extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
         )
         if orbital_optimization:
-            self.thetas = res.x[len(self.kappa) :].tolist()
-            for i in range(len(self.kappa)):
-                self._kappa[i] = 0.0
-                self._kappa_old[i] = 0.0
+            self.thetas = res.x[2*len(self.kappa_real):].tolist()
+            for i in range(len(self.kappa_real)):
+                self._kappa_real[i] = 0.0
+                self._kappa_real_old[i] = 0.0
+                self._kappa_imag[i] = 0.0
+                self._kappa_imag_old[i] = 0.0
         else:
             self.thetas = res.x.tolist()
         self._energy_elec = res.fun
@@ -644,8 +643,32 @@ class GeneralizedWaveFunctionUPS_A:
         # Avoid recalculating energy in callback
         if np.max(np.abs(np.array(self._old_opt_parameters) - np.array(parameters))) < 10**-14:
             return self._E_opt_old
+        
         num_kappa = 0
-        E = 0
+        if kappa_optimization:
+            num_kappa = len(self.kappa_spin_idx)
+            self.kappa_real = parameters[:num_kappa]
+            self.kappa_real = parameters[num_kappa:2*num_kappa]
+        if theta_optimization:
+            self.thetas = parameters[2*num_kappa:]
+        if kappa_optimization:
+            # RDM is more expensive than evaluation of the Hamiltonian.
+            # Thus only construct these if orbital-optimization is turned on,
+            # since the RDMs will be reused in the oo gradient calculation.
+            E = get_electronic_energy(
+                self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs, self.rdm1, self.rdm2
+            )
+        else:
+            E = expectation_value(
+                self.ci_coeffs,
+                [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
+                self.ci_coeffs,
+                self.ci_info,
+            )
+
+        self._E_opt_old = E
+        self._old_opt_parameters = np.copy(parameters)
+        self.num_energy_evals += 1  # count one measurement
         return E
 
     def _calc_gradient_optimization(

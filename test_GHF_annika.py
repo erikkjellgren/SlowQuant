@@ -7,6 +7,7 @@ from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction_annika import GeneralizedWaveFunctionUPS_A
 from slowquant.unitary_coupled_cluster.linear_response import naive
 from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
+from slowquant.unitary_coupled_cluster.operators_annika import generalized_hamiltonian_0i_0a, generalized_hamiltonian_1i_1a
 
 
 def unrestricted(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
@@ -233,7 +234,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # # Slowquant
     
 
-    WF =WaveFunctionUPS(
+    WF = WaveFunctionUPS(
         mol.nelectron,
         active_space,
         mf.mo_coeff,
@@ -249,10 +250,19 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # print(LR.excitation_energies)
     g_eri_mo= ao2mo_2e_new(c.shape[1],int(c.shape[0]/2),c,g_eri)
     h_eri_mo=my_ao2mo_1e(c.shape[1],int(c.shape[0]/2),h_1e,h_nuc,c)
+
     H=generalized_hamiltonian_full_space(h_eri_mo, g_eri_mo,int(c.shape[0]/2))
+    H2=generalized_hamiltonian_0i_0a(h_eri_mo, g_eri_mo,int(c.shape[0]/2),active_space[0])
+    H3=generalized_hamiltonian_1i_1a(h_eri_mo, g_eri_mo,int(c.shape[0]/2),active_space[0],WF.num_virtual_spin_orbs)
+
     test_energy=expectation_value(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
+    test_energy2=expectation_value(WF.ci_coeffs, [H2], WF.ci_coeffs, WF.ci_info)
+    test_energy3=expectation_value(WF.ci_coeffs, [H3], WF.ci_coeffs, WF.ci_info)
+    
     print(test_energy)
-    print(WF._calc_gradient_optimization(kappa_optimization=True, theta_optimization=False))
+    print(test_energy2)
+    print(test_energy3)
+    #print(WF._calc_gradient_optimization(kappa_optimization=True, theta_optimization=False))
 
 
 
