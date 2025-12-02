@@ -638,7 +638,7 @@ def construct_ucc_state(
     # Evil matrix construction
     Tmat = build_operator_matrix(T, ci_info)
     if dagger:
-        return ss.linalg.expm_multiply(-Tmat, state, traceA=0.0)
+        return ss.linalg.expm_multiply(-Tmat.conj(), state, traceA=0.0)
     return ss.linalg.expm_multiply(Tmat, state, traceA=0.0)
 
 
@@ -744,7 +744,7 @@ def construct_ups_state(
         if abs(theta) < 10**-14:
             continue
         if dagger:
-            theta = -theta
+            theta = -theta.conj()
         if exc_type in ("sa_single",):
             A = 1  # 2**(-1/2)
             (i, a) = np.array(exc_indices) + offset
@@ -1184,7 +1184,7 @@ def construct_ups_state_SA(
         if abs(theta) < 10**-14:
             continue
         if dagger:
-            theta = -theta
+            theta = -theta.conj()
         if exc_type in ("sa_single",):
             A = 1  # 2**(-1/2)
             (i, a) = np.array(exc_indices) + offset

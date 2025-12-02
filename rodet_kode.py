@@ -4,11 +4,10 @@ from pyscf import mcscf, scf, gto, x2c
 
 # from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
-from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
+from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS 
 from slowquant.unitary_coupled_cluster.linear_response import naive
 from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
-from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, hamiltonian_0i_0a, hamiltonian_1i_1a
-from slowquant.unitary_coupled_cluster.operators import a_op_spin
+from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space
 
 def unrestricted(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     """Calculate hyperfine coupling constant (fermi-contact term) for a molecule"""
@@ -93,6 +92,88 @@ def restricted(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=1
     LR.calc_excitation_energies()
     print(LR.excitation_energies)
 
+def my_ao2mo_1e(nmo,nao,int_1e_nuc,int_1e_kin,C):
+    # one_e_int_kin = np.zeros(shape=(nmo,nmo))
+    # one_e_int_nuc = np.zeros(shape=(nmo,nmo))
+    # for a in range(nmo):
+    #     for b in range(nmo):
+    #         term1 = 0
+    #         term2 = 0
+    #         # term3 = 0
+    #         # term4 = 0
+    #         for mu in range(nao):
+    #             for nu in range(nao):
+    #                 term1 += C[mu,a]*C[nu,b]*int_1e_nuc[mu,nu]
+    #                 term2 += C[nao+mu,a]*C[nao+nu,b]*int_1e_nuc[mu,nu]
+    #                 # term3 += C[mu,a]*C[nu,b]*int_1e_kin[mu,nu]
+    #                 # term4 += C[nao+mu,a]*C[nao+nu,b]*int_1e_kin[mu,nu]
+    #         one_e_int_nuc[a,b] = term1 + term2 
+    #         # one_e_int_kin[a,b] = term3 + term4
+    cont1=np.einsum("aP,bQ, ab->PQ", C[:nao].conj(),C[:nao],(int_1e_kin+int_1e_nuc)) #alpha alpha
+    cont2=np.einsum("aP,bQ, ab->PQ", C[nao:nao*2].conj(),C[nao:nao*2],(int_1e_kin+int_1e_nuc)) #beta beta
+    return np.add(cont1,cont2)
+
+
+    
+
+# g_eri_mo= ao2mo_2e_new(c.shape[1],int(c.shape[0]/2),c,g_eri)
+
+# def ao2mo_2e_new(nmo,nao,C,int_2e_inp):
+#     two_e_int = np.zeros(shape=(nmo,nmo,nmo,nmo))
+
+#     int_2e = np.array(int_2e_inp)
+
+#     temp1_1 = np.zeros(shape=(nmo,nao,nao,nao))
+#     temp2_1 = np.zeros(shape=(nmo,nmo,nao,nao))
+#     temp3_1 = np.zeros(shape=(nmo,nmo,nmo,nao))
+#     temp1_2 = np.zeros(shape=(nmo,nao,nao,nao))
+#     temp2_2 = np.zeros(shape=(nmo,nmo,nao,nao))
+#     temp3_2 = np.zeros(shape=(nmo,nmo,nmo,nao))
+#     temp1_3 = np.zeros(shape=(nmo,nao,nao,nao))
+#     temp2_3 = np.zeros(shape=(nmo,nmo,nao,nao))
+#     temp3_3 = np.zeros(shape=(nmo,nmo,nmo,nao))
+#     temp1_4 = np.zeros(shape=(nmo,nao,nao,nao))
+#     temp2_4 = np.zeros(shape=(nmo,nmo,nao,nao))
+#     temp3_4 = np.zeros(shape=(nmo,nmo,nmo,nao))
+
+#     for a in range(nmo):
+#         for mu in range(nao):  
+#             temp1_1[a,:,:,:] += C[mu,a]*int_2e[mu,:,:,:]
+#             temp1_2[a,:,:,:] += C[mu,a]*int_2e[mu,:,:,:]
+#             temp1_3[a,:,:,:] += C[nao+mu,a]*int_2e[mu,:,:,:]
+#             temp1_4[a,:,:,:] += C[nao+mu,a]*int_2e[mu,:,:,:]
+#         for b in range(nmo):
+#             for nu in range(nao):  
+#                 temp2_1[a,b,:,:] += C[nu,b]*temp1_1[a,nu,:,:]
+#                 temp2_2[a,b,:,:] += C[nu,b]*temp1_2[a,nu,:,:]
+#                 temp2_3[a,b,:,:] += C[nao+nu,b]*temp1_3[a,nu,:,:]
+#                 temp2_4[a,b,:,:] += C[nao+nu,b]*temp1_4[a,nu,:,:]
+#             for c in range(nmo):
+#                 for la in range(nao):  
+#                     temp3_1[a,b,c,:] += C[la,c]*temp2_1[a,b,la,:]
+#                     temp3_2[a,b,c,:] += C[nao+la,c]*temp2_2[a,b,la,:]
+#                     temp3_3[a,b,c,:] += C[la,c]*temp2_3[a,b,la,:]
+#                     temp3_4[a,b,c,:] += C[nao+la,c]*temp2_4[a,b,la,:]
+#                 for d in range(nmo):
+#                     for si in range(nao):  
+#                         two_e_int[a,b,c,d] += C[si,d]*temp3_1[a,b,c,si]
+#                         two_e_int[a,b,c,d] += C[nao+si,d]*temp3_2[a,b,c,si] 
+#                         two_e_int[a,b,c,d] += C[si,d]*temp3_3[a,b,c,si] 
+#                         two_e_int[a,b,c,d] += C[nao+si,d]*temp3_4[a,b,c,si] 
+
+#     return two_e_int
+
+def ao2mo_2e_test(C,int_2e_inp):
+    #int(C.shape[0]/2) is number of occupied orbitals to assure that we get the correct alpha and beta terms from the coefficient matrix
+    #alpha alpha alpha alpha
+    cont1=np.einsum("aP,bQ,cR,dS,abcd->PQRS", C[:int(C.shape[0]/2)].conj(),C[:int(C.shape[0]/2)],C[:int(C.shape[0]/2)].conj(),C[:int(C.shape[0]/2)],int_2e_inp)
+    #beta beta beta beta
+    cont2=np.einsum("aP,bQ,cR,dS,abcd->PQRS", C[int(C.shape[0]/2):int(C.shape[0]/2)*2].conj(),C[int(C.shape[0]/2):int(C.shape[0]/2)*2],C[int(C.shape[0]/2):int(C.shape[0]/2)*2].conj(),C[int(C.shape[0]/2):int(C.shape[0]/2)*2],int_2e_inp)
+    #alpha alpha, beta beta
+    cont3=np.einsum("aP,bQ,cR,dS,abcd->PQRS", C[:int(C.shape[0]/2)].conj(),C[:int(C.shape[0]/2)],C[int(C.shape[0]/2):int(C.shape[0]/2)*2].conj(),C[int(C.shape[0]/2):int(C.shape[0]/2)*2],int_2e_inp)
+    #beta beta alpha alpha
+    cont4=np.einsum("aP,bQ,cR,dS,abcd->PQRS", C[int(C.shape[0]/2):int(C.shape[0]/2)*2].conj(),C[int(C.shape[0]/2):int(C.shape[0]/2)*2],C[:int(C.shape[0]/2)].conj(),C[:int(C.shape[0]/2)],int_2e_inp)
+    return cont1+cont2+cont3+cont4
 def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     """.........."""
     print("active space:", {active_space})
@@ -133,69 +214,25 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # LR.calc_excitation_energies()
     # print(LR.excitation_energies)
 
-    #call MO integrals
-    g_eri_mo = WF.g_mo
-    h_eri_mo=WF.h_mo
-   
-    num_active_spin_orbs=WF.num_active_spin_orbs
-    num_inactive_spin_orbs=WF.num_inactive_spin_orbs
-    num_virtual_spin_orbs=WF.num_virtual_spin_orbs
-
-    # print(num_active_spin_orbs)
-    # rdm1=WF.rdm1
-    # print(rdm1)
-    # rdm2=WF.rdm2
-    # print(rdm2)
-    
+    # g_eri_mo= ao2mo_2e_test(c,g_eri)
+    g_eri_mo = WF.g_mo   # <-- no parentheses!
+    h_eri_mo=my_ao2mo_1e(c.shape[1],int(c.shape[0]/2),h_1e,h_nuc,c)
     H=generalized_hamiltonian_full_space(h_eri_mo, g_eri_mo, c.shape[0])
-    H_test=hamiltonian_0i_0a(h_eri_mo, g_eri_mo,num_inactive_spin_orbs,num_active_spin_orbs)
     test=expectation_value(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
-    print(test, test+e_nuc)
-    test2=expectation_value(WF.ci_coeffs, [H_test], WF.ci_coeffs, WF.ci_info)
-    print(test2, test2+e_nuc)
-    H_1iai=hamiltonian_1i_1a(h_eri_mo, g_eri_mo,num_inactive_spin_orbs,num_active_spin_orbs, num_virtual_spin_orbs)
-    test3=expectation_value(WF.ci_coeffs, [H_1iai], WF.ci_coeffs, WF.ci_info)
-    print(test3, test3+e_nuc)
-    # print('huhuhub',WF.get_orbital_gradient_generalized_test)
-    # gradient = np.zeros(len(WF.kappa_spin_idx))
-    # for idx, (M,N) in enumerate(WF.kappa_spin_idx):
-    #     for P in range(WF.num_inactive_spin_orbs+WF.num_active_spin_orbs):
-            
-    #         e1 = expectation_value(WF.ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
-    #                                 WF.ci_coeffs, WF.ci_info)
-                        
-    #         e1 -= expectation_value(WF.ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
-    #                                 WF.ci_coeffs, WF.ci_info)
-            
-    #         gradient[idx]= e1
-            
-    # print('habab',gradient)
-    
-
-
-
+    print(test)
+    print(test+e_nuc)
 
 
 def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
     basis = "STO-3G"
-    active_space_u = ((1, 1), 2)
-    active_space = (2, 2)
+    active_space_u = ((1, 1), 4)
+    active_space = (2, 4)
     charge = 0
     spin = 0
 
-    # def one_electron_gradient(k_int, f_int):
-    #     k=np.array(k_int)
-    #     f=np.array(f_int)
-    #     gradient=0
-    #     for P in range(nmo):
-    #         for Q in range(nmo):
-    #             for M in range(nmo):
-    #             gradient += k[M,N]*f[P*Q]*rdm1(Q,Q)-rdm2(M,P,N,Q)-(M==Q)*rdm1(P,N)+rdm2(P,M,Q,N))
-                        
-    #     return gradient
-    # # restricted(
+    # restricted(
     #     geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     # )
     NR(
@@ -282,9 +319,7 @@ def HBr():
 ###SPIN ELLER RUMLIGE ORBITALER###
 
 h2()
-
 # O2()
-
 # h2o()
 
 # HI()
