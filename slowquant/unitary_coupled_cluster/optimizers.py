@@ -135,7 +135,12 @@ class Optimizers:
                 tol=self.tol,
                 callback=print_progress,
             )
-            res = optimizer.minimize(self.fun, x0)
+            if "f_rotosolve_optimized" in extra_options:
+                res = optimizer.minimize(
+                    self.fun, x0, f_rotosolve_optimized=extra_options["f_rotosolve_optimized"]
+                )
+            else:
+                res = optimizer.minimize(self.fun, x0)
 
         else:
             raise ValueError(f"Got an unkonwn optimizer {self.method}")
@@ -196,7 +201,7 @@ class RotoSolve:
         self._R = R
         self._param_names = param_names
 
-    def minimize(self, f: Callable[[list[float]], float | np.ndarray], x0: Sequence[float]) -> Result:
+    def minimize(self, f: Callable[[list[float]], float | np.ndarray], x0: Sequence[float], f_rotosolve_optimized: None |  Callable[[list[float], list[float], int], list[float]] = None) -> Result:
         """Run minimization.
 
         Args:
@@ -214,7 +219,10 @@ class RotoSolve:
         for _ in range(self.max_iterations):
             for i, par_name in enumerate(self._param_names):
                 # Get the energy for specific values of theta_i, defined by the _R parameter.
-                e_vals = get_energy_evals(f, x, i, self._R[par_name])
+                if f_rotosolve_optimized is not None:
+                    e_vals = get_energy_evals_optimized(f_rotosolve_optimized, x, i, self._R[par_name])
+                else:
+                    e_vals = get_energy_evals(f, x, i, self._R[par_name])
                 # Do an analytic construction of the energy as a function of theta_i.
                 f_reconstructed = partial(reconstructed_f, energy_vals=e_vals, R=self._R[par_name])
                 # Evaluate the energy in many points.
@@ -324,3 +332,23 @@ def reconstructed_f(x_vals: np.ndarray, energy_vals: list[float] | list[np.ndarr
                     )
         e = e / len(energy_vals)
     return e
+
+
+def get_energy_evals_optimized(
+    f: Callable[[list[float], list[float], int], list[float]], x: list[float], idx: int, R: int
+) -> list[float]:
+    """Evaluate the function in all points needed for the reconstruction in Rotosolve.
+
+    Args:
+        f: Function to evaluate.
+        x: Parameters of f.
+        idx: Index of parameter to be changed.
+        R: Parameter to control how many points are needed.
+
+    Returns:
+        All needed function evaluations.
+    """
+    theta_diffs = []
+    for mu in range(-R, R + 1):
+        theta_diffs.append(2 * mu / (2 * R + 1) * np.pi)
+    return f(x, theta_diffs, idx)
