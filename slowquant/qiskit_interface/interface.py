@@ -579,13 +579,21 @@ class QuantumInterface:
             self.shots = self._shots
 
     def _reset_cliques(self, verbose: bool = True) -> None:
-        """Reset cliques to empty."""
+        """Reset cliques to empty.
+
+        Args:
+            verbose: Print additional details.
+        """
         self.saver = {}
         if verbose:
             print("Pauli saving has been reset.")
 
     def _reset_M(self, verbose: bool = True) -> None:
-        """Reset M to None."""
+        """Reset M to None.
+
+        Args:
+            verbose: Print additional details.
+        """
         self._Minv = None
         if verbose:
             print("M matrix for error mitigation has been reset.")
@@ -674,6 +682,7 @@ class QuantumInterface:
         custom_parameters: list[float] | None = None,
         ISA_csfs_option: int = 0,
         reverse_csfs_order: bool = False,
+        verbose: bool = False,
     ) -> float:
         r"""Calculate expectation value using different bra and ket of a Hermitian operator.
 
@@ -713,6 +722,7 @@ class QuantumInterface:
                 4: Fixed layout, fixed order, with optimizing circuit after composing.
             reverse_csfs_order: If true, the pair-entangled superposition states' order is reversed.
                 This might be relevant as the order can influence the circuit depths.
+            verbose: Print additional details.
 
         Returns:
             Expectation value of operator.
@@ -738,7 +748,8 @@ class QuantumInterface:
                 ISA_csfs_option = 2
                 if self.mitigation_flags.do_M_ansatz0:
                     ISA_csfs_option = 4  # could also be 3
-        print("CSFs expectation value with circuit composing option: ", ISA_csfs_option)
+        if verbose:
+            print("CSFs expectation value with circuit composing option: ", ISA_csfs_option)
 
         if custom_parameters is None:
             run_parameters = self.parameters
