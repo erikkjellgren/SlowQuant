@@ -7,8 +7,8 @@ from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.linear_response import naive
 from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
-from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space
-from slowquant.unitary_coupled_cluster.generalized_density_matrix import get_orbital_gradient_generalized
+from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, hamiltonian_0i_0a, hamiltonian_1i_1a
+from slowquant.unitary_coupled_cluster.operators import a_op_spin
 
 def unrestricted(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     """Calculate hyperfine coupling constant (fermi-contact term) for a molecule"""
@@ -136,17 +136,45 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #call MO integrals
     g_eri_mo = WF.g_mo
     h_eri_mo=WF.h_mo
-    
-    rdm1=WF.rdm1
-    print(rdm1)
-    rdm2=WF.rdm2
-    print(rdm2)
+   
+    num_active_spin_orbs=WF.num_active_spin_orbs
+    num_inactive_spin_orbs=WF.num_inactive_spin_orbs
+    num_virtual_spin_orbs=WF.num_virtual_spin_orbs
+
+    # print(num_active_spin_orbs)
+    # rdm1=WF.rdm1
+    # print(rdm1)
+    # rdm2=WF.rdm2
+    # print(rdm2)
     
     H=generalized_hamiltonian_full_space(h_eri_mo, g_eri_mo, c.shape[0])
+    H_test=hamiltonian_0i_0a(h_eri_mo, g_eri_mo,num_inactive_spin_orbs,num_active_spin_orbs)
     test=expectation_value(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
-    print(test)
-    print(test+e_nuc)
-    print('huhuhub',WF.get_orbital_gradient_generalized_test)
+    print(test, test+e_nuc)
+    test2=expectation_value(WF.ci_coeffs, [H_test], WF.ci_coeffs, WF.ci_info)
+    print(test2, test2+e_nuc)
+    H_1iai=hamiltonian_1i_1a(h_eri_mo, g_eri_mo,num_inactive_spin_orbs,num_active_spin_orbs, num_virtual_spin_orbs)
+    test3=expectation_value(WF.ci_coeffs, [H_1iai], WF.ci_coeffs, WF.ci_info)
+    print(test3, test3+e_nuc)
+    # print('huhuhub',WF.get_orbital_gradient_generalized_test)
+    # gradient = np.zeros(len(WF.kappa_spin_idx))
+    # for idx, (M,N) in enumerate(WF.kappa_spin_idx):
+    #     for P in range(WF.num_inactive_spin_orbs+WF.num_active_spin_orbs):
+            
+    #         e1 = expectation_value(WF.ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
+    #                                 WF.ci_coeffs, WF.ci_info)
+                        
+    #         e1 -= expectation_value(WF.ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
+    #                                 WF.ci_coeffs, WF.ci_info)
+            
+    #         gradient[idx]= e1
+            
+    # print('habab',gradient)
+    
+
+
+
+
 
 def h2():
     geometry = """H  0.0   0.0  0.0;
