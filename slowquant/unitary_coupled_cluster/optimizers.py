@@ -180,8 +180,8 @@ class RotoSolve:
         self,
         R: dict[str, int],
         param_names: Sequence[str],
-        maxiter: int = 30,
-        tol: float = 1e-6,
+        maxiter: int = 1000,
+        tol: float = 1e-8,
         callback: Callable[[list[float]], None] | None = None,
     ) -> None:
         """Initialize Rotosolver.
