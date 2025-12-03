@@ -228,7 +228,17 @@ class WaveFunctionUPS:
         )
         self.num_det = len(self.ci_info.idx2det)
         self.csf_coeffs = np.zeros(self.num_det)
-        hf_det = int("1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec), 2)
+        hf_string = ""
+        for i in range(self.num_active_orbs):
+            if i < self.num_active_elec_alpha:
+                hf_string += "1"
+            else:
+                hf_string += "0"
+            if i < self.num_active_elec_beta:
+                hf_string += "1"
+            else:
+                hf_string += "0"
+        hf_det = int(hf_string, 2)
         self.csf_coeffs[self.ci_info.det2idx[hf_det]] = 1
         self.ci_coeffs = np.copy(self.csf_coeffs)
         # Construct UPS Structure
