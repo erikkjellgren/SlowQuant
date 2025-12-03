@@ -355,7 +355,7 @@ def propagate_state(
     if len(operators) == 0:
         return np.copy(state)
     new_state = np.copy(state)
-    tmp_state = np.zeros_like(state)
+    tmp_state = np.zeros_like(state)        #np.zeros_like(state,dtype=complex)
     # Create bitstrings for parity check. Contains occupied determinant up to orbital index.
     parity_check = np.zeros(2 * num_active_orbs + 1, dtype=np.int64)
     num = 0

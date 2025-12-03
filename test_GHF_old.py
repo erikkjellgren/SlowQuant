@@ -156,6 +156,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     H_1iai=hamiltonian_1i_1a(h_eri_mo, g_eri_mo,num_inactive_spin_orbs,num_active_spin_orbs, num_virtual_spin_orbs)
     test3=expectation_value(WF.ci_coeffs, [H_1iai], WF.ci_coeffs, WF.ci_info)
     print(test3, test3+e_nuc)
+    
     # print('huhuhub',WF.get_orbital_gradient_generalized_test)
     # gradient = np.zeros(len(WF.kappa_spin_idx))
     # for idx, (M,N) in enumerate(WF.kappa_spin_idx):

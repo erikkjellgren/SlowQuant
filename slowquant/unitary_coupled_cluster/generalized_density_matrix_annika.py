@@ -164,8 +164,9 @@ def get_orbital_gradient(
     Returns:
         Orbital gradient.
     """
-    gradient_R = np.zeros(len(kappa_idx))
-    gradient_I = np.zeros(len(kappa_idx))
+
+    gradient_R = np.zeros(len(kappa_idx),dtype=complex)
+    gradient_I = np.zeros(len(kappa_idx),dtype=complex)
     for idx, (Q, P) in enumerate(kappa_idx):
         # 1e contribution
         for T in range(num_inactive_spin_orbs + num_active_spin_orbs):
@@ -179,7 +180,7 @@ def get_orbital_gradient(
                 gradient_R[idx] += h_int[T, Q] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
 
                 gradient_R[idx] -= h_int[P, T] * RDM1(Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
-                gradient_R[idx] -= h_int[P, Q] * RDM1(T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+                gradient_R[idx] -= h_int[T, P] * RDM1(T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
 
                 # Imaginary
                 gradient_I[idx] += h_int[Q, T] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
@@ -258,5 +259,5 @@ def get_orbital_gradient(
                         )
 
                         
-    return gradient_R, 1j*gradient_I
+    return np.concatenate((gradient_R, gradient_I))
 

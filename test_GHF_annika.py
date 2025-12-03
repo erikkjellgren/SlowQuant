@@ -5,9 +5,12 @@ from pyscf import mcscf, scf, gto, x2c
 # from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction_annika import GeneralizedWaveFunctionUPS_A
+from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.linear_response import naive
 from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
 from slowquant.unitary_coupled_cluster.operators_annika import generalized_hamiltonian_0i_0a, generalized_hamiltonian_1i_1a
+from slowquant.molecularintegrals.integralfunctions import generalized_two_electron_transform
+from slowquant.unitary_coupled_cluster.generalized_density_matrix_annika import get_orbital_gradient
 
 
 def unrestricted(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
@@ -222,7 +225,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     mf.scf()
     mf.kernel()
-    c=mf.mo_coeff
+    c=np.array(mf.mo_coeff,dtype=complex)
 
     h_core=mol.intor("int1e_kin")+mol.intor("int1e_nuc")
     h_1e = mol.intor("int1e_kin")
@@ -232,15 +235,19 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # mc = mcscf.UCASCI(mf, active_space[1], active_space[0])
     # # Slowquant
+
+    g_eri_mo= generalized_two_electron_transform(c,g_eri)
+    h_eri_mo=my_ao2mo_1e(c.shape[1],int(c.shape[0]/2),h_1e,h_nuc,c)
     
 
-    WF = WaveFunctionUPS(
+    WF = GeneralizedWaveFunctionUPS_A(
         mol.nelectron,
         active_space,
         mf.mo_coeff,
         h_core,
         g_eri,
-        "fuccsd",
+        "none",
+        #"fuccsd",
         {"n_layers": 2},
         include_active_kappa=True,
     )
@@ -248,23 +255,46 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # LR = naive.LinearResponse(WF, excitations="SD")
     # LR.calc_excitation_energies()
     # print(LR.excitation_energies)
-    g_eri_mo= ao2mo_2e_new(c.shape[1],int(c.shape[0]/2),c,g_eri)
-    h_eri_mo=my_ao2mo_1e(c.shape[1],int(c.shape[0]/2),h_1e,h_nuc,c)
 
     H=generalized_hamiltonian_full_space(h_eri_mo, g_eri_mo,int(c.shape[0]/2))
-    H2=generalized_hamiltonian_0i_0a(h_eri_mo, g_eri_mo,int(c.shape[0]/2),active_space[0])
-    H3=generalized_hamiltonian_1i_1a(h_eri_mo, g_eri_mo,int(c.shape[0]/2),active_space[0],WF.num_virtual_spin_orbs)
+    H2=generalized_hamiltonian_0i_0a(h_eri_mo, g_eri_mo,int(c.shape[0]/2),WF.num_active_elec)
+    H3=generalized_hamiltonian_1i_1a(h_eri_mo, g_eri_mo,int(c.shape[0]/2),WF.num_active_elec,
+                                     WF.num_virtual_spin_orbs)
 
     test_energy=expectation_value(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
     test_energy2=expectation_value(WF.ci_coeffs, [H2], WF.ci_coeffs, WF.ci_info)
     test_energy3=expectation_value(WF.ci_coeffs, [H3], WF.ci_coeffs, WF.ci_info)
-    
+
     print(test_energy)
     print(test_energy2)
     print(test_energy3)
-    #print(WF._calc_gradient_optimization(kappa_optimization=True, theta_optimization=False))
 
 
+    one = get_orbital_gradient(WF.h_mo,
+            WF.g_mo,
+            WF.kappa_spin_idx,
+            WF.num_inactive_spin_orbs,
+            WF.num_active_spin_orbs,
+            WF.rdm1,
+            WF.rdm2)
+    print(one)
+
+    # print('huhuhub',WF.get_orbital_gradient_generalized_test)
+    gradient = np.zeros(len(WF.kappa_spin_idx))
+    for idx, (M,N) in enumerate(WF.kappa_spin_idx):
+        for P in range(WF.num_inactive_spin_orbs+WF.num_active_spin_orbs):
+            
+            e1 = expectation_value(WF.ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
+                                   WF.ci_coeffs, WF.ci_info)
+                        
+            e1 -= expectation_value(WF.ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
+                                    WF.ci_coeffs, WF.ci_info)
+            
+            gradient[idx]= e1
+            
+    print('habab',gradient)
+
+    WF.run_wf_optimization_1step("BFGS",orbital_optimization=True)
 
 
 
@@ -272,9 +302,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
-    basis = "STO-3G"
-    active_space_u = ((1, 1), 4)
-    active_space = (2, 4)
+    #basis = "cc-pvtz"
+    basis = "631-g"
+    #basis = "sto-3g"
+    active_space = ((1, 1), 4)
+    #active_space = (2, 4)
     charge = 0
     spin = 0
 
@@ -295,8 +327,9 @@ def h2o():
     H  0.0   0.75545  -0.47116;
     H  0.0  -0.75545  -0.47116"""
     basis = "dyall-v2z"
-    active_space_u = ((2, 2), 4)
-    active_space = (4, 4)
+    #basis = "cc-pvdz"
+    #active_space = ((1, 1), 4)
+    active_space = (2, 4)
     charge = 0
     spin = 0
 
