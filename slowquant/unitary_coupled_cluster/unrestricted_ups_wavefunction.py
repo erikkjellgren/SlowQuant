@@ -124,7 +124,7 @@ class UnrestrictedWaveFunctionUPS:
         self.inactive_spin_idx = [x for x in range(self.num_inactive_spin_orbs)]
         self.active_spin_idx = [x + self.num_inactive_spin_orbs for x in range(self.num_active_spin_orbs)]
         self.virtual_spin_idx = [
-            x + self.num_inactive_spin_orbs + self.num_virtual_spin_orbs
+            x + self.num_inactive_spin_orbs + self.num_active_spin_orbs
             for x in range(self.num_virtual_spin_orbs)
         ]
         self.active_occ_spin_idx = []

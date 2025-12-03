@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Sequence
 from functools import partial
 from typing import Any
 
@@ -53,7 +52,7 @@ class WaveFunctionUPS:
     def __init__(
         self,
         num_elec: int,
-        cas: Sequence[int],
+        cas: tuple[int, int] | tuple[tuple[int, int], int],
         mo_coeffs: np.ndarray,
         h_ao: np.ndarray,
         g_ao: np.ndarray,
@@ -94,51 +93,54 @@ class WaveFunctionUPS:
         self.active_occ_idx_shifted = []
         self.active_unocc_idx_shifted = []
         self.num_elec = num_elec
-        self.num_elec_alpha = num_elec // 2
-        self.num_elec_beta = num_elec // 2
+        if isinstance(cas[0], int):
+            self.num_elec_alpha = num_elec // 2
+            self.num_elec_beta = num_elec // 2
+            self.num_active_elec_alpha = cas[0] // 2
+            self.num_active_elec_beta = cas[0] // 2
+            if cas[0] % 2 != 0:
+                self.num_elec_alpha += 1
+                self.num_active_elec_alpha += 1
+        else:
+            self.num_elec_alpha = (num_elec - np.sum(cas[0])) // 2 + cas[0][0]
+            self.num_elec_beta = (num_elec - np.sum(cas[0])) // 2 + cas[0][1]
+            self.num_active_elec_alpha = cas[0][0]
+            self.num_active_elec_beta = cas[0][1]
         self.num_spin_orbs = 2 * len(h_ao)
         self.num_orbs = len(h_ao)
-        self.num_active_elec = 0
-        self.num_active_spin_orbs = 0
-        self.num_inactive_spin_orbs = 0
-        self.num_virtual_spin_orbs = 0
+        self.num_active_elec = np.sum(cas[0])
+        self.num_active_spin_orbs = 2 * cas[1]
+        self.num_inactive_spin_orbs = self.num_elec - self.num_active_elec
+        self.num_virtual_spin_orbs = 2 * len(h_ao) - self.num_inactive_spin_orbs - self.num_active_spin_orbs
+        self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
+        self.num_active_orbs = self.num_active_spin_orbs // 2
+        self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
         self._rdm1 = None
         self._rdm2 = None
+        self._rdm3 = None
+        self._rdm4 = None
         self._h_mo = None
         self._g_mo = None
         self._energy_elec: float | None = None
         self.ansatz_options = ansatz_options
         self.num_energy_evals = 0
         # Construct spin orbital spaces and indices
-        active_space = []
-        orbital_counter = 0
-        for i in range(num_elec - cas[0], num_elec):
-            active_space.append(i)
-            orbital_counter += 1
-        for i in range(num_elec, num_elec + 2 * cas[1] - orbital_counter):
-            active_space.append(i)
-        for i in range(num_elec):
-            if i in active_space:
-                self.active_spin_idx.append(i)
-                self.active_occ_spin_idx.append(i)
-                self.num_active_spin_orbs += 1
-                self.num_active_elec += 1
-            else:
-                self.inactive_spin_idx.append(i)
-                self.num_inactive_spin_orbs += 1
-        for i in range(num_elec, self.num_spin_orbs):
-            if i in active_space:
-                self.active_spin_idx.append(i)
+        self.inactive_spin_idx = [x for x in range(self.num_inactive_spin_orbs)]
+        self.active_spin_idx = [x + self.num_inactive_spin_orbs for x in range(self.num_active_spin_orbs)]
+        self.virtual_spin_idx = [
+            x + self.num_inactive_spin_orbs + self.num_active_spin_orbs
+            for x in range(self.num_virtual_spin_orbs)
+        ]
+        self.active_occ_spin_idx = []
+        for i in range(self.num_active_elec_alpha):
+            self.active_occ_spin_idx.append(2 * i + self.num_inactive_spin_orbs)
+        for i in range(self.num_active_elec_beta):
+            self.active_occ_spin_idx.append(2 * i + 1 + self.num_inactive_spin_orbs)
+        self.active_occ_spin_idx.sort()
+        self.active_unocc_spin_idx = []
+        for i in range(self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs):
+            if i not in self.active_occ_spin_idx:
                 self.active_unocc_spin_idx.append(i)
-                self.num_active_spin_orbs += 1
-            else:
-                self.virtual_spin_idx.append(i)
-                self.num_virtual_spin_orbs += 1
-        self.num_active_elec_alpha = self.num_active_elec // 2
-        self.num_active_elec_beta = self.num_active_elec // 2
-        self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
-        self.num_active_orbs = self.num_active_spin_orbs // 2
-        self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
         # Construct spatial idx
         self.inactive_idx: list[int] = []
         self.virtual_idx: list[int] = []
@@ -242,11 +244,25 @@ class WaveFunctionUPS:
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
-            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
+            self.ups_layout.create_fUCC(
+                self.active_occ_idx_shifted,
+                self.active_unocc_idx_shifted,
+                self.active_occ_spin_idx_shifted,
+                self.active_unocc_spin_idx_shifted,
+                self.num_active_orbs,
+                self.ansatz_options,
+            )
         elif ansatz.lower() == "ksafupccgsd":
             self.ansatz_options["SAGS"] = True
             self.ansatz_options["GpD"] = True
-            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
+            self.ups_layout.create_fUCC(
+                self.active_occ_idx_shifted,
+                self.active_unocc_idx_shifted,
+                self.active_occ_spin_idx_shifted,
+                self.active_unocc_spin_idx_shifted,
+                self.num_active_orbs,
+                self.ansatz_options,
+            )
         elif ansatz.lower() == "sdsfuccsd":
             self.ansatz_options["D"] = True
             if "n_layers" not in self.ansatz_options.keys():
@@ -260,7 +276,14 @@ class WaveFunctionUPS:
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
-            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
+            self.ups_layout.create_fUCC(
+                self.active_occ_idx_shifted,
+                self.active_unocc_idx_shifted,
+                self.active_occ_spin_idx_shifted,
+                self.active_unocc_spin_idx_shifted,
+                self.num_active_orbs,
+                self.ansatz_options,
+            )
         elif ansatz.lower() == "sdsfucc":
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
@@ -291,6 +314,8 @@ class WaveFunctionUPS:
         self._g_mo = None
         self._energy_elec = None
         self._kappa = k.copy()
+        if isinstance(self._kappa, np.ndarray):
+            self._kappa = self._kappa.tolist()
         # Move current expansion point.
         self._c_mo = self.c_mo
         self._kappa_old = self.kappa
@@ -319,6 +344,8 @@ class WaveFunctionUPS:
         self._rdm4 = None
         self._energy_elec = None
         self._thetas = theta_vals.copy()
+        if isinstance(self._thetas, np.ndarray):
+            self._thetas = self._thetas.tolist()
         self.ci_coeffs = construct_ups_state(
             self.csf_coeffs,
             self.ci_info,
