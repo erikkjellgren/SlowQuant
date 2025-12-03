@@ -3,6 +3,13 @@ import numpy as np
 import slowquant.hartreefock.hartreefock_in_memory as hf_in_mem
 import slowquant.hartreefock.unrestricted_hartreefock_in_memory as uhf_in_mem
 from slowquant.logger import _Logger
+from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
+from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
+
+from slowquant.molecularintegrals.integralfunctions import (
+    one_electron_integral_transform,
+    two_electron_integral_transform,
+)
 
 
 class _HartreeFock:
@@ -127,3 +134,18 @@ class _HartreeFock:
             for j in range(self.mol_obj.number_electrons_beta):
                 spin_contamination += S_alpha_beta[i, j] ** 2
         return self.mol_obj.number_electrons_beta - spin_contamination
+    
+    def _get_hamiltonian(self, qiskit_form: bool = False) -> FermionicOperator:
+        """Return electronic Hamiltonian as FermionicOperator.
+
+        Returns:
+            FermionicOperator.
+        """
+        h_mo = one_electron_integral_transform(self.mo_coeff, self.int_obj.kinetic_energy_matrix + self.int_obj.nuclear_attraction_matrix)
+        g_mo = two_electron_integral_transform(self.mo_coeff, self.int_obj.electron_repulsion_tensor)
+        num_orbs = self.mol_obj.number_bf
+        H = hamiltonian_0i_0a(h_mo, g_mo, 0, num_orbs)
+
+        if qiskit_form:
+            return H.get_qiskit_form(num_orbs)
+        return H
