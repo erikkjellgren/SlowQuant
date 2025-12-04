@@ -1,6 +1,7 @@
 import numpy as np
 import pyscf
 from pyscf import mcscf, scf, gto, x2c
+from scipy.stats import unitary_group
 
 # from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
@@ -110,7 +111,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
     #make a random unitary transformation
-    u=np.linalg.qr(np.random.randn(c.shape[1],c.shape[1])) #this returns a tuple
+    u = unitary_group.rvs(c.shape[0])
+    print(np.dot(u, u.conj().T))
+
     C_u = c @ u[0] 
 
     h_core=mol.intor("int1e_kin")+mol.intor("int1e_nuc")
@@ -133,7 +136,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         {"n_layers": 2},
         include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("bfgs", orbital_optimization=True)
+    # WF.run_wf_optimization_1step("bfgs", orbital_optimization=True)
     # print("kappa_real:", WF.kappa_real)
     # print("kappa_imag:", WF.kappa_imag)
     # print("E_opt:", WF._energy_elec)
@@ -163,13 +166,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # print(test2, test2+e_nuc)
     H_1iai=hamiltonian_1i_1a(h_eri_mo, g_eri_mo,num_inactive_spin_orbs,num_active_spin_orbs, num_virtual_spin_orbs)
     test3=expectation_value(WF.ci_coeffs, [H_1iai], WF.ci_coeffs, WF.ci_info)
-<<<<<<< HEAD:test_GHF.py
-    # print(test3, test3+e_nuc)
-    print(WF.get_orbital_gradient_generalized_annika_test)
-=======
-    print(test3, test3+e_nuc)
     
->>>>>>> 2d4059eb2c4a675b88f826bd4739b55c0fadd880:test_GHF_old.py
+    
     # print('huhuhub',WF.get_orbital_gradient_generalized_test)
     # gradient = np.zeros(len(WF.kappa_spin_idx))
     # for idx, (M,N) in enumerate(WF.kappa_spin_idx):
