@@ -65,18 +65,18 @@ def restricted(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=1
     # # Slowquant
 
     
-    # WF =WaveFunctionUPS(
-    #     mol.nelectron,
-    #     active_space,
-    #     mf.mo_coeff,
-    #     h_core,
-    #     g_eri,
-    #     "fuccsd",
-    #     {"n_layers": 2},
-    #     include_active_kappa=True,
-    # )
-    # print('Antal elektroner',mol.nelectron)
-    # WF.run_wf_optimization_1step("bfgs", True)
+    WF =WaveFunctionUPS(
+        mol.nelectron,
+        active_space,
+        mf.mo_coeff,
+        h_core,
+        g_eri,
+        "fuccsd",
+        {"n_layers": 2},
+        include_active_kappa=True,
+    )
+    print('Antal elektroner',mol.nelectron)
+    WF.run_wf_optimization_1step("bfgs", True)
     
     WF =WaveFunctionUPS(
         mol.nelectron,
@@ -108,6 +108,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     c=mf.mo_coeff
     e_nuc=mf.energy_nuc()
 
+
+    #make a random unitary transformation
+    u=np.linalg.qr(np.random.randn(c.shape[1],c.shape[1])) #this returns a tuple
+    C_u = c @ u[0] 
+
     h_core=mol.intor("int1e_kin")+mol.intor("int1e_nuc")
     h_1e = mol.intor("int1e_kin")
     h_nuc=mol.intor("int1e_nuc")
@@ -128,7 +133,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         {"n_layers": 2},
         include_active_kappa=True,
     )
-    # WF.run_wf_optimization_1step("bfgs", True)
+    WF.run_wf_optimization_1step("bfgs", orbital_optimization=True)
+    # print("kappa_real:", WF.kappa_real)
+    # print("kappa_imag:", WF.kappa_imag)
+    # print("E_opt:", WF._energy_elec)
     # LR = naive.LinearResponse(WF, excitations="SD")
     # LR.calc_excitation_energies()
     # print(LR.excitation_energies)
@@ -150,12 +158,13 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     H=generalized_hamiltonian_full_space(h_eri_mo, g_eri_mo, c.shape[0])
     H_test=hamiltonian_0i_0a(h_eri_mo, g_eri_mo,num_inactive_spin_orbs,num_active_spin_orbs)
     test=expectation_value(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
-    print(test, test+e_nuc)
+    # print(test, test+e_nuc)
     test2=expectation_value(WF.ci_coeffs, [H_test], WF.ci_coeffs, WF.ci_info)
-    print(test2, test2+e_nuc)
+    # print(test2, test2+e_nuc)
     H_1iai=hamiltonian_1i_1a(h_eri_mo, g_eri_mo,num_inactive_spin_orbs,num_active_spin_orbs, num_virtual_spin_orbs)
     test3=expectation_value(WF.ci_coeffs, [H_1iai], WF.ci_coeffs, WF.ci_info)
-    print(test3, test3+e_nuc)
+    # print(test3, test3+e_nuc)
+    print(WF.get_orbital_gradient_generalized_annika_test)
     # print('huhuhub',WF.get_orbital_gradient_generalized_test)
     # gradient = np.zeros(len(WF.kappa_spin_idx))
     # for idx, (M,N) in enumerate(WF.kappa_spin_idx):
@@ -179,23 +188,13 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
-    basis = "STO-3G"
+    basis = "631-g"
     active_space_u = ((1, 1), 2)
-    active_space = (2, 2)
+    active_space = (2, 4)
     charge = 0
     spin = 0
 
-    # def one_electron_gradient(k_int, f_int):
-    #     k=np.array(k_int)
-    #     f=np.array(f_int)
-    #     gradient=0
-    #     for P in range(nmo):
-    #         for Q in range(nmo):
-    #             for M in range(nmo):
-    #             gradient += k[M,N]*f[P*Q]*rdm1(Q,Q)-rdm2(M,P,N,Q)-(M==Q)*rdm1(P,N)+rdm2(P,M,Q,N))
-                        
-    #     return gradient
-    # # restricted(
+    # restricted(
     #     geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     # )
     NR(
