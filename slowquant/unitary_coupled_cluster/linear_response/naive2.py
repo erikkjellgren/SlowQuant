@@ -6,9 +6,6 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
 )
 from slowquant.unitary_coupled_cluster.density_matrix import (
-    get_orbital_gradient_response,
-    get_orbital_response_hessian_block,
-    get_orbital_response_metric_sigma,
     get_orbital_response_property_gradient,
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
@@ -19,7 +16,12 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     expectation_value,
     propagate_state,
 )
-from slowquant.unitary_coupled_cluster.operators import one_elec_op_0i_0a
+from slowquant.unitary_coupled_cluster.operators import (
+    commutator,
+    double_commutator,
+    hamiltonian_2i_2a,
+    one_elec_op_0i_0a,
+)
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
@@ -42,19 +44,6 @@ class LinearResponse(LinearResponseBaseClass):
         idx_shift = len(self.q_ops)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
-        if len(self.q_ops) != 0:
-            grad = get_orbital_gradient_response(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.rdm1,
-                self.wf.rdm2,
-            )
-            print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-            if np.max(np.abs(grad)) > 10**-3:
-                raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
 
         grad = np.zeros(2 * len(self.G_ops))
         H00_ket = propagate_state([self.H_0i_0a], self.wf.ci_coeffs, *self.index_info)
@@ -89,38 +78,32 @@ class LinearResponse(LinearResponseBaseClass):
                 Gd_ket,
                 *self.index_info,
             )
-        if len(grad) != 0:
-            print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-            if np.max(np.abs(grad)) > 10**-3:
-                raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
         if len(self.q_ops) != 0:
-            # Do orbital-orbital blocks
-            self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
+            Ham = hamiltonian_2i_2a(
                 self.wf.h_mo,
                 self.wf.g_mo,
-                self.wf.kappa_no_activeactive_idx_dagger,
-                self.wf.kappa_no_activeactive_idx,
                 self.wf.num_inactive_orbs,
                 self.wf.num_active_orbs,
-                self.wf.rdm1,
-                self.wf.rdm2,
+                self.wf.num_virtual_orbs,
             )
-            self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.kappa_no_activeactive_idx_dagger,
-                self.wf.kappa_no_activeactive_idx_dagger,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.rdm1,
-                self.wf.rdm2,
-            )
-            self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.rdm1,
-            )
+            for j, qJ in enumerate(self.q_ops):
+                for i, qI in enumerate(self.q_ops[j:], j):
+                    # Do orbital-orbital blocks
+                    self.A[i, j] = self.A[j, i] = expectation_value(
+                        self.wf.ci_coeffs,
+                        [double_commutator(qI, Ham, qJ.dagger)],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                    self.B[i, j] = self.B[j, i] = expectation_value(
+                        self.wf.ci_coeffs,
+                        [double_commutator(qI.dagger, Ham, qJ.dagger)],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                    self.Sigma[i, j] = self.Sigma[i, j] = -expectation_value(
+                        self.wf.ci_coeffs, [commutator(qI.dagger, qJ)], self.wf.ci_coeffs, *self.index_info
+                    )
         for j, qJ in enumerate(self.q_ops):
             Hq_ket = propagate_state([self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info)
             qdH_ket = propagate_state([qJ.dagger * self.H_1i_1a], self.wf.ci_coeffs, *self.index_info)
@@ -305,6 +288,23 @@ class LinearResponse(LinearResponseBaseClass):
                     *self.index_info,
                 )
                 self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = val
+        finite_excitations_idx = []
+        for i in range(len(self.A)):
+            if abs(self.A[i, i]) > 10**-6:  # whatever rimeligt threshold
+                finite_excitations_idx.append(True)
+            else:
+                finite_excitations_idx.append(False)
+        finite_excitations_idx = np.array(finite_excitations_idx)
+        self.A = self.A[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape(
+            (np.sum(finite_excitations_idx), np.sum(finite_excitations_idx))
+        )
+        self.B = self.B[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape(
+            (np.sum(finite_excitations_idx), np.sum(finite_excitations_idx))
+        )
+        self.Sigma = self.Sigma[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape(
+            (np.sum(finite_excitations_idx), np.sum(finite_excitations_idx))
+        )
+        self.Delta = np.zeros((len(self.Sigma), len(self.Sigma)))
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.
