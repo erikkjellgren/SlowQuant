@@ -32,7 +32,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
 )
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import UpsStructure
-from slowquant.unitary_coupled_cluster.generalized_density_matrix import get_orbital_gradient_generalized
+from slowquant.unitary_coupled_cluster.generalized_density_matrix import get_orbital_gradient_generalized, get_orbital_gradient_2, get_electronic_energy_generalized
 
 class GeneralizedWaveFunctionUPS:
     def __init__(
@@ -303,8 +303,8 @@ class GeneralizedWaveFunctionUPS:
                 for kappa_val, kappa_old, (p, q) in zip(
                     self.kappa_imag, self._kappa_imag_old, self.kappa_spin_idx
                 ):
-                    kappa_mat[p, q] = (kappa_val - kappa_old) * 1.0j
-                    kappa_mat[q, p] = (kappa_val - kappa_old) * 1.0j
+                    kappa_mat[p, q] += (kappa_val - kappa_old) * 1.0j
+                    kappa_mat[q, p] += (kappa_val - kappa_old) * 1.0j
         # Apply orbital rotation unitary to MO coefficients
         return np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
 
@@ -352,7 +352,7 @@ class GeneralizedWaveFunctionUPS:
                         self.ci_info,
                     )
                     self._rdm1[P_idx, Q_idx] = val  # type: ignore
-                    self._rdm1[Q_idx, P_idx] = val  # type: ignore
+                    self._rdm1[Q_idx, P_idx] = val.conjugate() # type: ignore (1.7.7 EST)
         return self._rdm1
 
     @property
@@ -405,9 +405,9 @@ class GeneralizedWaveFunctionUPS:
                             if q == r:
                                 val -= self.rdm1[p_idx, s_idx]
                             self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
+                            self._rdm2[q_idx, p_idx, s_idx, r_idx] = val.conjugate()  # type: ignore
                             self._rdm2[r_idx, s_idx, p_idx, q_idx] = val  # type: ignore
-                            self._rdm2[q_idx, p_idx, s_idx, r_idx] = val  # type: ignore
-                            self._rdm2[s_idx, r_idx, q_idx, p_idx] = val  # type: ignore
+                            self._rdm2[s_idx, r_idx, q_idx, p_idx] = val.conjugate()  # type: ignore
         return self._rdm2
 
     def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
@@ -654,18 +654,27 @@ class GeneralizedWaveFunctionUPS:
             parameters,
             extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
         )
+        print(res)
         if orbital_optimization:
-            thetas_r = []
-            thetas_i = []
-            for i in range(len(self.thetas)):
-                thetas_r.append(res.x[2 * i + 2 * len(self.kappa_real)])
-                thetas_i.append(res.x[2 * i + 1 + 2 * len(self.kappa_real)])
-            self.set_thetas(thetas_r, thetas_i)
+            if len(self.thetas) > 0:
+                thetas_r = []
+                thetas_i = []
+                for i in range(len(self.thetas)):
+                    thetas_r.append(res.x[2 * i + 2 * len(self.kappa_real)])
+                    thetas_i.append(res.x[2 * i + 1 + 2 * len(self.kappa_real)])
+                self.set_thetas(thetas_r, thetas_i)
             for i in range(len(self.kappa_real)):
                 self._kappa_real[i] = 0.0
                 self._kappa_imag[i] = 0.0
                 self._kappa_real_old[i] = 0.0
                 self._kappa_imag_old[i] = 0.0
+            else:
+                kappa_r=[]
+                kappa_i=[]
+                for i in range(len(self.kappa_real)):
+                    kappa_r.append(res.x[2*i])
+                    kappa_i.append(res.x[2*i+1])
+                self.set_kappa_cep(kappa_r,kappa_i)
         else:
             thetas_r = []
             thetas_i = []
@@ -745,10 +754,11 @@ class GeneralizedWaveFunctionUPS:
         Returns:
             Electronic gradient.
         """
+        
         gradient = np.zeros(len(parameters))
         num_kappa = 0
         if kappa_optimization:
-            num_kappa = 2 * len(self.kappa_spin_idx)
+            num_kappa = len(self.kappa_spin_idx)
             kappa_r = []
             kappa_i = []
             for i in range(len(self.kappa_real)):
@@ -763,14 +773,12 @@ class GeneralizedWaveFunctionUPS:
                 thetas_i.append(parameters[2 * i + 1 + num_kappa])
             self.set_thetas(thetas_r, thetas_i)
         if kappa_optimization:
-            gradient[:num_kappa] = get_orbital_gradient_generalized(
-                self.h_mo,
-                self.g_mo,
-                self.kappa_spin_idx,
-                self.num_inactive_spin_orbs,
-                self.num_active_spin_orbs,
-                self.rdm1,
-                self.rdm2,
+            gradient[:num_kappa] = get_orbital_gradient_2(self.h_mo, self.g_mo, 
+            self.kappa_spin_idx,
+            self.num_inactive_spin_orbs,
+            self.num_active_spin_orbs,
+            self.rdm1,
+            self.rdm2
             )
         if theta_optimization:
             # Hamiltonian = generalized_hamiltonian_0i_0a(
@@ -831,10 +839,17 @@ class GeneralizedWaveFunctionUPS:
             )  # Count energy measurements for all gradients
         return gradient
 
-
     @property
     def get_orbital_gradient_generalized_test(self):
         return get_orbital_gradient_generalized(self.h_mo, self.g_mo, self.kappa_spin_idx,
+        self.num_inactive_spin_orbs,
+        self.num_active_spin_orbs,
+        self.rdm1,
+        self.rdm2)
+    
+    @property
+    def get_orbital_gradient_generalized_2(self):
+        return get_orbital_gradient_2(self.h_mo, self.g_mo, self.kappa_spin_idx,
         self.num_inactive_spin_orbs,
         self.num_active_spin_orbs,
         self.rdm1,
