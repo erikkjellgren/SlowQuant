@@ -32,7 +32,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
 )
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import UpsStructure
-from slowquant.unitary_coupled_cluster.generalized_density_matrix import get_orbital_gradient_generalized, get_orbital_gradient_2, get_electronic_energy_generalized
+from slowquant.unitary_coupled_cluster.generalized_density_matrix import get_orbital_gradient_generalized, get_orbital_gradient_2, get_electronic_energy_generalized, get_orbital_gradient_test_anna
 
 class GeneralizedWaveFunctionUPS:
     def __init__(
@@ -855,3 +855,10 @@ class GeneralizedWaveFunctionUPS:
         self.rdm1,
         self.rdm2)
         
+    @property
+    def get_orbital_gradient_generalized_anna(self):
+        return get_orbital_gradient_test_anna(self.h_mo, self.g_mo, self.kappa_spin_idx,
+        self.num_inactive_spin_orbs,
+        self.num_active_spin_orbs,
+        self.rdm1,
+        self.rdm2)

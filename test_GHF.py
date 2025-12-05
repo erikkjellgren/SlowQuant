@@ -111,9 +111,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
     #make a random unitary transformation
-    u = unitary_group.rvs(c.shape[0])
-    print(np.dot(u, u.conj().T))
-
+    u = unitary_group.rvs(c.shape[0]) 
+    # print(np.dot(u, u.conj().T))
     C_u = c @ u[0] 
 
     h_core=mol.intor("int1e_kin")+mol.intor("int1e_nuc")
@@ -122,10 +121,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     g_eri = mol.intor("int2e")
     mc = mcscf.CASCI(mf, active_space[1], active_space[0])
 
-    # mc = mcscf.UCASCI(mf, active_space[1], active_space[0])
     # # Slowquant
     
-
     WF =GeneralizedWaveFunctionUPS(
         mol.nelectron,
         active_space,
@@ -158,6 +155,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # rdm2=WF.rdm2
     # print(rdm2)
     
+    
+    'Test of Hamiltonians'
     H=generalized_hamiltonian_full_space(h_eri_mo, g_eri_mo, c.shape[0])
     H_test=hamiltonian_0i_0a(h_eri_mo, g_eri_mo,num_inactive_spin_orbs,num_active_spin_orbs)
     test=expectation_value(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
@@ -168,8 +167,13 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     test3=expectation_value(WF.ci_coeffs, [H_1iai], WF.ci_coeffs, WF.ci_info)
     
     
-    # print('huhuhub',WF.get_orbital_gradient_generalized_test)
-    # gradient = np.zeros(len(WF.kappa_spin_idx))
+    'Test of gradients'
+    print('huhuhub',WF.get_orbital_gradient_generalized_anna)
+    print('habab',WF.get_orbital_gradient_generalized_test)
+    print('hihihihb',WF.get_orbital_gradient_generalized_2)
+
+    
+    # gradient = np.ze    print('habab',WF.get_orbital_gradient_generalized_test)
     # for idx, (M,N) in enumerate(WF.kappa_spin_idx):
     #     for P in range(WF.num_inactive_spin_orbs+WF.num_active_spin_orbs):
             
@@ -191,7 +195,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
-    basis = "631-g"
+    basis = "STO-3G"
     active_space_u = ((1, 1), 2)
     active_space = (2, 4)
     charge = 0
