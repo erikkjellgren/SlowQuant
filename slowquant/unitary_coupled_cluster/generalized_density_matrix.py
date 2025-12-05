@@ -411,17 +411,17 @@ def exp_val_gradient(
 
     for idx, (M,N) in enumerate(kappa_idx):
         if M == N:
-            gradient_I[idx] += 1j * expectation_value_for_gradient(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
+            gradient_I[idx] +=  expectation_value_for_gradient(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
                                 ci_coeffs, ci_info)
             
-            gradient_I[idx] -= 1j * expectation_value_for_gradient(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
+            gradient_I[idx] -=  expectation_value_for_gradient(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
                                 ci_coeffs, ci_info)
         else:
             # Real  
-            gradient_R[idx] += expectation_value_for_gradient(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
+            gradient_R[idx] +=  expectation_value_for_gradient(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
                                 ci_coeffs, ci_info)
                         
-            gradient_R[idx] -= expectation_value_for_gradient(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
+            gradient_R[idx] -=  expectation_value_for_gradient(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
                                     ci_coeffs, ci_info)
             
             gradient_R[idx] += -expectation_value_for_gradient(ci_coeffs, [(a_op_spin(N,True)*a_op_spin(M,False))*H], 
@@ -431,19 +431,19 @@ def exp_val_gradient(
                                     ci_coeffs, ci_info)
 
             # Imaginary
-            gradient_I[idx] += 1j*expectation_value_for_gradient(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
+            gradient_I[idx] +=  expectation_value_for_gradient(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
                                 ci_coeffs, ci_info)
                         
-            gradient_I[idx] -= 1j*expectation_value_for_gradient(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
+            gradient_I[idx] -=  expectation_value_for_gradient(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
                                     ci_coeffs, ci_info)
             
-            gradient_I[idx] += 1j*expectation_value_for_gradient(ci_coeffs, [(a_op_spin(N,True)*a_op_spin(M,False))*H], 
+            gradient_I[idx] +=  expectation_value_for_gradient(ci_coeffs, [(a_op_spin(N,True)*a_op_spin(M,False))*H], 
                                 ci_coeffs, ci_info)
                         
-            gradient_I[idx] -= 1j*expectation_value_for_gradient(ci_coeffs, [H*(a_op_spin(N,True)*a_op_spin(M,False))], 
+            gradient_I[idx] -=  expectation_value_for_gradient(ci_coeffs, [H*(a_op_spin(N,True)*a_op_spin(M,False))], 
                                     ci_coeffs, ci_info)
         
-    gradient_total = np.concatenate((gradient_R, gradient_I))
+    gradient_total = np.concatenate((gradient_R, 1j*gradient_I))
     gradient_total_real = strip_imag(gradient_total)  
 
     return gradient_total_real

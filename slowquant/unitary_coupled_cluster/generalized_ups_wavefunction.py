@@ -117,10 +117,10 @@ class GeneralizedWaveFunctionUPS:
         self._include_active_kappa = include_active_kappa
         self.num_active_elec_alpha = cas[0][0]
         self.num_active_elec_beta = cas[0][1]
-        self.num_active_elec = cas[0][0] + cas[0][1]
+        self.num_active_elec = self.num_active_elec_alpha + self.num_active_elec_beta
         self.num_active_spin_orbs = cas[1]
-        self.num_inactive_spin_orbs = num_elec - cas[0][0] - cas[0][1]
-        self.num_virtual_spin_orbs = mo_coeffs.shape[0] - (num_elec - cas[0][0] - cas[0][1]) - cas[1]
+        self.num_inactive_spin_orbs = num_elec - self.num_active_elec
+        self.num_virtual_spin_orbs = self.num_spin_orbs - self.num_active_spin_orbs - self.num_inactive_spin_orbs
         # Find non-redundant kappas
         self._kappa_real = []
         self._kappa_imag = []
@@ -176,6 +176,7 @@ class GeneralizedWaveFunctionUPS:
                 if not (p in self.active_spin_idx and q in self.active_spin_idx):
                     self.kappa_no_activeactive_spin_idx.append((p, q))
                     self.kappa_no_activeactive_spin_idx_dagger.append((q, p))
+                # Annika testing potential extra redundant rotations?
                 '''if p == 1 and q == 4:
                     self._kappa_real_redundant.append(0.0)
                     self._kappa_imag_redundant.append(0.0)
@@ -893,6 +894,7 @@ class GeneralizedWaveFunctionUPS:
         tol: float = 1e-10,
         maxiter: int = 1000,
         is_silent: bool = False,
+        test_gradient: bool = True,
     ) -> None:
         """Run one step optimization of wave function.
 
@@ -937,6 +939,7 @@ class GeneralizedWaveFunctionUPS:
                     self._calc_gradient_optimization,
                     theta_optimization=False,
                     kappa_optimization=True,
+                    test_gradient = test_gradient,
                 )
         else:
             energy = partial(
@@ -1165,7 +1168,7 @@ class GeneralizedWaveFunctionUPS:
         return E
 
     def _calc_gradient_optimization(
-        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool, test_gradient = True
+        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool, test_gradient: bool
     ) -> np.ndarray:
         """Calculate electronic gradient.
 
