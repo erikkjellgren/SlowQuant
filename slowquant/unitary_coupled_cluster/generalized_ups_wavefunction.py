@@ -36,7 +36,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     propagate_unitary,
 )
 from slowquant.unitary_coupled_cluster.operators import G1, G2
-from slowquant.unitary_coupled_cluster.operators_annika import generalized_hamiltonian_0i_0a
+from slowquant.unitary_coupled_cluster.operators import generalized_hamiltonian_0i_0a_spinidx
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import (
     UpsStructure,
@@ -437,8 +437,9 @@ class GeneralizedWaveFunctionUPS:
         Returns:
             One-electron reduced density matrix.
         """
+        # Annika has added dtype=complex
         if self._rdm1 is None:
-            self._rdm1 = np.zeros((self.num_active_spin_orbs, self.num_active_spin_orbs))
+            self._rdm1 = np.zeros((self.num_active_spin_orbs, self.num_active_spin_orbs), dtype=complex)
             for P in range(
                 self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
             ):
@@ -454,6 +455,33 @@ class GeneralizedWaveFunctionUPS:
                     self._rdm1[P_idx, Q_idx] = val  # type: ignore
                     self._rdm1[Q_idx, P_idx] = val.conjugate()  # type: ignore (1.7.7 EST)
         return self._rdm1
+    
+    @property
+    def rdm1_FULL(self) -> np.ndarray:
+        """Calculate one-electron reduced density matrix in the active space.
+
+        Returns:
+            One-electron reduced density matrix.
+        """
+        # Annika has added dtype=complex
+        if self._rdm1 is None:
+            self._rdm1 = np.zeros((self.num_active_spin_orbs, self.num_active_spin_orbs), dtype=complex)
+            for P in range(
+                self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
+            ):
+                P_idx = P - self.num_inactive_spin_orbs
+                for Q in range(
+                    self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
+                ):
+                    Q_idx = Q - self.num_inactive_spin_orbs
+                    val = expectation_value(
+                        self.ci_coeffs,
+                        [(a_op_spin(P, True) * a_op_spin(Q, False))],
+                        self.ci_coeffs,
+                        self.ci_info,
+                    )
+                    self._rdm1[P_idx, Q_idx] = val  # type: ignore
+        return self._rdm1
 
     @property
     def rdm2(self) -> np.ndarray:
@@ -462,6 +490,7 @@ class GeneralizedWaveFunctionUPS:
         Returns:
             Two-electron reduced density matrix.
         """
+        # Annika has added dtype=complex
         if self._rdm2 is None:
             self._rdm2 = np.zeros(
                 (
@@ -469,8 +498,8 @@ class GeneralizedWaveFunctionUPS:
                     self.num_active_spin_orbs,
                     self.num_active_spin_orbs,
                     self.num_active_spin_orbs,
-                )
-            )
+                ),
+            dtype=complex)
             for p in range(
                 self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
             ):
@@ -508,6 +537,56 @@ class GeneralizedWaveFunctionUPS:
                             self._rdm2[q_idx, p_idx, s_idx, r_idx] = val.conjugate()  # type: ignore
                             self._rdm2[r_idx, s_idx, p_idx, q_idx] = val  # type: ignore
                             self._rdm2[s_idx, r_idx, q_idx, p_idx] = val.conjugate()  # type: ignore
+        return self._rdm2
+    
+
+    @property
+    def rdm2_FULL(self) -> np.ndarray:
+        """Calculate two-electron reduced density matrix in the active space.
+
+        Returns:
+            Two-electron reduced density matrix.
+        """
+        # Annika has added dtype=complex
+        if self._rdm2 is None:
+            self._rdm2 = np.zeros(
+                (
+                    self.num_active_spin_orbs,
+                    self.num_active_spin_orbs,
+                    self.num_active_spin_orbs,
+                    self.num_active_spin_orbs,
+                ),
+            dtype=complex)
+            for p in range(
+                self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
+            ):
+                p_idx = p - self.num_inactive_spin_orbs
+                for q in range(
+                    self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
+                ):
+                    q_idx = q - self.num_inactive_spin_orbs
+                    for r in range(
+                        self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
+                    ):
+                        r_idx = r - self.num_inactive_spin_orbs
+                        for s in range(
+                            self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
+                        ):
+                            s_idx = s - self.num_inactive_spin_orbs
+                            val = expectation_value(
+                                self.ci_coeffs,
+                                [
+                                    (
+                                        a_op_spin(p, True)
+                                        * a_op_spin(r, True)
+                                        * a_op_spin(s, False)
+                                        * a_op_spin(q, False)
+                                    )
+                                ],
+                                self.ci_coeffs,
+                                self.ci_info,
+                            )
+                            self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
         return self._rdm2
 
     @property
@@ -969,7 +1048,7 @@ class GeneralizedWaveFunctionUPS:
         )
         start = time.time()
         for iteration in range(maxiter):
-            Hamiltonian = generalized_hamiltonian_0i_0a(
+            Hamiltonian = generalized_hamiltonian_0i_0a_spinidx(
                 self.h_mo,
                 self.g_mo,
                 self.num_inactive_spin_orbs,
