@@ -241,6 +241,8 @@ class RotoSolve:
             else:
                 # Single state case
                 f_new = f_tmp
+            if self._callback is not None:
+                self._callback(x)
             if abs(f_best - f_new) < self.threshold:
                 f_best = f_new
                 x_best = x.copy()
@@ -254,8 +256,6 @@ class RotoSolve:
             if fails == self.max_fail:
                 print("Three energy raises detected.")
                 break
-            if self._callback is not None:
-                self._callback(x)
         res.x = np.array(x_best)
         res.fun = f_best
         res.success = success
