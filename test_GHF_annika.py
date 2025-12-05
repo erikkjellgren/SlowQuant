@@ -9,8 +9,10 @@ from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import Gener
 from slowquant.unitary_coupled_cluster.linear_response import naive
 from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
 from slowquant.unitary_coupled_cluster.operators_annika import generalized_hamiltonian_0i_0a, generalized_hamiltonian_1i_1a
-from slowquant.molecularintegrals.integralfunctions import generalized_two_electron_transform
+from slowquant.molecularintegrals.integralfunctions import generalized_two_electron_transform, generalized_one_electron_transform
 from slowquant.unitary_coupled_cluster.generalized_density_matrix_annika import get_orbital_gradient
+
+
 
 
 def unrestricted(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
@@ -236,14 +238,18 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # mc = mcscf.UCASCI(mf, active_space[1], active_space[0])
     # # Slowquant
 
-    g_eri_mo= generalized_two_electron_transform(c,g_eri)
-    h_eri_mo=my_ao2mo_1e(c.shape[1],int(c.shape[0]/2),h_1e,h_nuc,c)
+    u=np.linalg.qr(np.random.randn(c.shape[1],c.shape[1])) #this returns a tuple
+    c_u = c @ u[0]
     
+
+    g_eri_mo = generalized_two_electron_transform(c,g_eri)
+    h_eri_mo = generalized_one_electron_transform(c,h_core)
+
 
     WF = GeneralizedWaveFunctionUPS_A(
         mol.nelectron,
         active_space,
-        mf.mo_coeff,
+        c,
         h_core,
         g_eri,
         "none",
@@ -260,6 +266,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     H2=generalized_hamiltonian_0i_0a(h_eri_mo, g_eri_mo,int(c.shape[0]/2),WF.num_active_elec)
     H3=generalized_hamiltonian_1i_1a(h_eri_mo, g_eri_mo,int(c.shape[0]/2),WF.num_active_elec,
                                      WF.num_virtual_spin_orbs)
+    
 
     test_energy=expectation_value(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
     test_energy2=expectation_value(WF.ci_coeffs, [H2], WF.ci_coeffs, WF.ci_info)
