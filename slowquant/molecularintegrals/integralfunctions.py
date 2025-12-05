@@ -6,6 +6,25 @@ from numba import float64, int64, jit
 from slowquant.molecule.moleculefunctions import factorial2
 
 
+def strip_imag(A, tol=1e-10):
+    """
+    If the imaginary part of A is smaller than tol everywhere,
+    return A.real as float; otherwise return A unchanged.
+    """
+    # Ensure it's an array
+    A = np.asarray(A)
+
+    # Compute max magnitude of imaginary part
+    max_imag = np.max(np.abs(A.imag))
+
+    if max_imag < tol:
+        # Imaginary part is negligible → return real matrix
+        return A.real.astype(np.float64)
+    else:
+        # Imaginary part is relevant → keep complex
+        print("WARNING: MO integrals are complex!!")
+        return A
+
 @jit(float64[:, :, :](float64, float64, float64, float64, int64, int64), nopython=True, cache=True)
 def expansion_coefficients(
     A_x: float, B_x: float, a: float, b: float, angular_a: int, angular_b: int
@@ -207,7 +226,9 @@ def generalized_one_electron_transform(C: np.ndarray, int_1e_inp: np.ndarray) ->
         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
         (int_1e_inp),
     )  # beta beta
-    return np.add(cont1, cont2)
+    mat = np.add(cont1, cont2)
+    #mat_return = strip_imag(mat)
+    return mat
 
 
 def two_electron_integral_transform(C: np.ndarray, int2e: np.ndarray) -> np.ndarray:
@@ -263,4 +284,6 @@ def generalized_two_electron_transform(C: np.ndarray, int_2e_inp: np.ndarray) ->
         C[: int(C.shape[0] / 2)],
         int_2e_inp,
     )
-    return cont1 + cont2 + cont3 + cont4
+    mat = cont1 + cont2 + cont3 + cont4
+    #mat_return = strip_imag(mat)
+    return mat

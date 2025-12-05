@@ -4,6 +4,24 @@ import numpy as np
 import numba as nb
 import numpy as np
 
+def strip_imag(A, tol=1e-10):
+    """
+    If the imaginary part of A is smaller than tol everywhere,
+    return A.real as float; otherwise return A unchanged.
+    """
+    # Ensure it's an array
+    A = np.asarray(A)
+
+    # Compute max magnitude of imaginary part
+    max_imag = np.max(np.abs(A.imag))
+
+    if max_imag < tol:
+        # Imaginary part is negligible → return real matrix
+        return A.real.astype(np.float64)
+    else:
+        # Imaginary part is relevant → keep complex
+        print("WARNING: MO integrals are complex!!")
+        return A
 
 @nb.jit(nopython=True)
 def RDM1(p: int, q: int, num_inactive_spin_orbs: int, num_active_spin_orbs: int, rdm1: np.ndarray) -> float:
@@ -234,7 +252,7 @@ def get_orbital_gradient_generalized(
 
 
 @nb.jit(nopython=True)
-def get_orbital_gradient_2(
+def get_orbital_gradient_generalized_real_imag(
     h_int: np.ndarray,
     g_int: np.ndarray,
     kappa_idx: list[tuple[int, int]],
@@ -275,7 +293,7 @@ def get_orbital_gradient_2(
                 gradient_R[idx] += h_int[T, Q] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
 
                 gradient_R[idx] -= h_int[P, T] * RDM1(Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
-                gradient_R[idx] -= h_int[P, Q] * RDM1(T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+                gradient_R[idx] -= h_int[T, P] * RDM1(T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
 
                 # Imaginary
                 gradient_I[idx] += h_int[Q, T] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
@@ -353,8 +371,10 @@ def get_orbital_gradient_2(
                             T, P, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
 
-        kappa_list=np.concatenate((gradient_R, gradient_I))                  
-    return kappa_list
+        gradient_total = np.concatenate((gradient_R, 1j*gradient_I)) 
+        gradient_total_real = strip_imag(gradient_total)   
+
+    return gradient_total_real
 
 
 @nb.jit(nopython=True)

@@ -39,7 +39,7 @@ def bitcount(x: int) -> int:
     return b
 
 
-@nb.jit(nopython=True)
+#@nb.jit(nopython=True)
 def apply_operator(
     state: np.ndarray,
     anni_idxs: np.ndarray,
