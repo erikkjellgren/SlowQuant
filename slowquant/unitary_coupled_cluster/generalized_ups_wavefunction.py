@@ -597,7 +597,7 @@ class GeneralizedWaveFunctionUPS:
         """
         # Annika has added dtype=complex
         if self._rdm1 is None:
-            self._rdm1 = np.zeros((self.num_active_spin_orbs, self.num_active_spin_orbs))
+            self._rdm1 = np.zeros((self.num_active_spin_orbs, self.num_active_spin_orbs),dtype=complex)
             for P in range(
                 self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
             ):
@@ -628,7 +628,8 @@ class GeneralizedWaveFunctionUPS:
                     self.num_active_spin_orbs,
                     self.num_active_spin_orbs,
                     self.num_active_spin_orbs,
-                )
+                ),
+            dtype=complex
             )
             for p in range(
                 self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
