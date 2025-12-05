@@ -1065,7 +1065,7 @@ class GeneralizedWaveFunctionUPS:
         )
         start = time.time()
         for iteration in range(maxiter):
-            Hamiltonian = generalized_hamiltonian_0i_0a_spinidx(
+            Hamiltonian = generalized_hamiltonian_0i_0a(
                 self.h_mo,
                 self.g_mo,
                 self.num_inactive_spin_orbs,
