@@ -291,7 +291,7 @@ def get_orbital_gradient_generalized_real_imag(
 
     for idx, (P, Q) in enumerate(kappa_idx):
         # 1e contribution
-        for T in range(num_inactive_spin_orbs + num_active_spin_orbs):
+        for T in range(num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs):
             if Q == P:
                 # Imaginary
                 gradient_I[idx] += h_int[P, T] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
@@ -311,9 +311,9 @@ def get_orbital_gradient_generalized_real_imag(
                 gradient_I[idx] -= h_int[T, P] * RDM1(T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
                 gradient_I[idx] -= h_int[T, Q] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
         # 2e contribution
-        for T in range(num_inactive_spin_orbs + num_active_spin_orbs):
-            for R in range(num_inactive_spin_orbs + num_active_spin_orbs):
-                for S in range(num_inactive_spin_orbs + num_active_spin_orbs):
+        for T in range(num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs):
+            for R in range(num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs):
+                for S in range(num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs):
                     if Q == P:
                         gradient_I[idx] += g_int[P, T, R, S] * RDM2(
                             P, T, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
@@ -380,8 +380,8 @@ def get_orbital_gradient_generalized_real_imag(
                             T, P, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
 
-        gradient_total = np.concatenate((gradient_R, 0j*gradient_I)) 
-        gradient_total_real = strip_imag(gradient_total)   
+    gradient_total = np.concatenate((gradient_R, 1j*gradient_I)) 
+    gradient_total_real = strip_imag(gradient_total)   
 
     return gradient_total_real
 
