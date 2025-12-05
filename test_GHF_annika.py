@@ -273,11 +273,13 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print(test_energy2)
     print(test_energy3)
 
+    print(WF.num_spin_orbs)
+
 
     one = get_orbital_gradient_generalized_real_imag(WF.h_mo,
             WF.g_mo,
             WF.kappa_spin_idx,
-            WF.num_inactive_spin_orbs,
+            WF.num_inactive_spin_orbs, 
             WF.num_active_spin_orbs,
             WF.num_virtual_spin_orbs,
             WF.rdm1_FULL,
@@ -326,6 +328,26 @@ def h2():
     #     geometry=geometry, basis=basis, active_space=active_space_u, charge=charge, spin=spin, unit="angstrom"
     # )
 
+def LiH():
+    geometry = """H  0.0   0.0  0.0;
+        Li  0.0  0.0  1"""
+    #basis = "cc-pvdz"
+    basis = "631-g"
+    #basis = "sto-3g"
+    active_space = ((1, 1), 8)
+    #active_space = (2, 4)
+    charge = 0
+    spin = 0
+
+    # restricted(
+    #     geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    # )
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+    # unrestricted(
+    #     geometry=geometry, basis=basis, active_space=active_space_u, charge=charge, spin=spin, unit="angstrom"
+    # )
 
 def h2o():
     geometry = """

@@ -383,6 +383,10 @@ def get_orbital_gradient_generalized_real_imag(
     gradient_total = np.concatenate((gradient_R, 1j*gradient_I)) 
     gradient_total_real = strip_imag(gradient_total)   
 
+    for idx, (P, Q) in enumerate(kappa_idx):
+        print(kappa_idx[idx])
+        print(gradient_R[idx])
+
     return gradient_total_real
 
 
