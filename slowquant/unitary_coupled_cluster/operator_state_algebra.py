@@ -624,7 +624,7 @@ def expectation_value_for_gradient(
     # not isinstance(val, float):
         # ValueError(f"Calculated expectation value is not a float, got type {type(val)}")
 
-    return val.real
+    return val
 
 
 def expectation_value_SA(

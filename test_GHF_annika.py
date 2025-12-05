@@ -296,7 +296,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
             
     print('total gradient_before',np.round(total_gradient_before,10))
 
-    WF.run_wf_optimization_1step("BFGS",orbital_optimization=True,test_gradient=False)
+    WF.run_wf_optimization_1step("BFGS",orbital_optimization=True,test_gradient=True)
 
 
     my_gradient_after = get_orbital_gradient_generalized_real_imag(WF.h_mo,
