@@ -106,7 +106,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     mf.scf()
     mf.kernel()
-    c=mf.mo_coeff
+    c=np.array(mf.mo_coeff, dtype=complex)
     e_nuc=mf.energy_nuc()
 
 
@@ -133,7 +133,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         {"n_layers": 2},
         include_active_kappa=True,
     )
-    # WF.run_wf_optimization_1step("bfgs", orbital_optimization=True)
+    WF.run_wf_optimization_1step("bfgs", orbital_optimization=True)
     # print("kappa_real:", WF.kappa_real)
     # print("kappa_imag:", WF.kappa_imag)
     # print("E_opt:", WF._energy_elec)
@@ -168,9 +168,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     
     
     'Test of gradients'
-    print('huhuhub',WF.get_orbital_gradient_generalized_anna)
+    # print('huhuhub',WF.get_orbital_gradient_generalized_anna)
     # print('habab',WF.get_orbital_gradient_generalized_test)
-    # print('hihihihb',WF.get_orbital_gradient_generalized_2)
+    # print('hihihihb',WF.get_orbital_gradient_generalized_real_imag)
 
     
     # gradient = np.ze    print('habab',WF.get_orbital_gradient_generalized_test)

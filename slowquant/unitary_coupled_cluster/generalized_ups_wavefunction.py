@@ -16,7 +16,7 @@ from slowquant.molecularintegrals.integralfunctions import (
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_generalized
 from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_electronic_energy_generalized,
-    get_orbital_gradient_generalized_real_imag,
+    get_orbital_gradient_generalized_real_imag, get_orbital_gradient_test_anna,
     get_orbital_gradient_generalized,
     get_orbital_gradient_test_anna,
     exp_val_gradient
