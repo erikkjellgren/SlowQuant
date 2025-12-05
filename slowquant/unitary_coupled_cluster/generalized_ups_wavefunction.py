@@ -37,7 +37,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     propagate_unitary,
 )
 from slowquant.unitary_coupled_cluster.operators import G1, G2
-from slowquant.unitary_coupled_cluster.operators import generalized_hamiltonian_0i_0a_spinidx
+from slowquant.unitary_coupled_cluster.operators import generalized_hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import (
     UpsStructure,

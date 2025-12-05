@@ -558,7 +558,7 @@ def hamiltonian_0i_0a(
     return hamiltonian_operator
 
 
-def generalized_hamiltonian_0i_0a_spinidx(
+def generalized_hamiltonian_0i_0a(
     h_mo: np.ndarray,
     g_mo: np.ndarray,
     num_inactive_spin_orbs: int,
@@ -683,7 +683,7 @@ def hamiltonian_1i_1a(
                         hamiltonian_operator += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s)
     return hamiltonian_operator
 
-def generalized_hamiltonian_1i_1a_spinidx(
+def generalized_hamiltonian_1i_1a(
     h_mo: np.ndarray,
     g_mo: np.ndarray,
     num_inactive_spin_orbs: int,
