@@ -18,6 +18,7 @@ from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_electronic_energy_generalized,
     get_orbital_gradient_generalized_real_imag,
     get_orbital_gradient_generalized,
+    exp_val_gradient
 )
 from slowquant.unitary_coupled_cluster.generalized_operators import (
     a_op_spin,
@@ -36,7 +37,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     propagate_unitary,
 )
 from slowquant.unitary_coupled_cluster.operators import G1, G2
-from slowquant.unitary_coupled_cluster.operators import generalized_hamiltonian_0i_0a_spinidx
+from slowquant.unitary_coupled_cluster.operators import generalized_hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import (
     UpsStructure,
@@ -81,9 +82,9 @@ class GeneralizedWaveFunctionUPS:
             raise ValueError(
                 "Number of electrons in the active space must be specified as a tuple of (alpha, beta)."
             )
-        if cas[1] > len(h_ao):
+        if cas[1] > mo_coeffs.shape[0]:
             raise ValueError(
-                f"More spatial active orbitls than total orbitals. Got {cas[1]} active orbitals, and {len(h_ao)} total orbitals."
+                f"More spatial active orbitls than total orbitals. Got {cas[1]} active orbitals, and {mo_coeffs.shape[0]} total orbitals."
             )
         if np.sum(cas[0]) > num_elec:
             raise ValueError(
@@ -112,14 +113,14 @@ class GeneralizedWaveFunctionUPS:
         self.num_elec = num_elec
         self.num_elec_alpha = (num_elec - np.sum(cas[0])) // 2 + cas[0][0]
         self.num_elec_beta = (num_elec - np.sum(cas[0])) // 2 + cas[0][1]
-        self.num_spin_orbs = 2 * len(h_ao)
+        self.num_spin_orbs = mo_coeffs.shape[0]
         self._include_active_kappa = include_active_kappa
         self.num_active_elec_alpha = cas[0][0]
         self.num_active_elec_beta = cas[0][1]
         self.num_active_elec = self.num_active_elec_alpha + self.num_active_elec_beta
-        self.num_active_spin_orbs = 2 * cas[1]
-        self.num_inactive_spin_orbs = self.num_elec - self.num_active_elec
-        self.num_virtual_spin_orbs = 2 * len(h_ao) - self.num_inactive_spin_orbs - self.num_active_spin_orbs
+        self.num_active_spin_orbs = cas[1]
+        self.num_inactive_spin_orbs = num_elec - self.num_active_elec
+        self.num_virtual_spin_orbs = self.num_spin_orbs - self.num_active_spin_orbs - self.num_inactive_spin_orbs
         # Find non-redundant kappas
         self._kappa_real = []
         self._kappa_imag = []
@@ -175,6 +176,21 @@ class GeneralizedWaveFunctionUPS:
                 if not (p in self.active_spin_idx and q in self.active_spin_idx):
                     self.kappa_no_activeactive_spin_idx.append((p, q))
                     self.kappa_no_activeactive_spin_idx_dagger.append((q, p))
+                # Annika testing potential extra redundant rotations?
+                '''if p == 1 and q == 4:
+                    self._kappa_real_redundant.append(0.0)
+                    self._kappa_imag_redundant.append(0.0)
+                    self._kappa_real_redundant_old.append(0.0)
+                    self._kappa_imag_redundant_old.append(0.0)
+                    self.kappa_redundant_spin_idx.append((p, q))
+                    continue
+                if p == 1 and q == 5:
+                    self._kappa_real_redundant.append(0.0)
+                    self._kappa_imag_redundant.append(0.0)
+                    self._kappa_real_redundant_old.append(0.0)
+                    self._kappa_imag_redundant_old.append(0.0)
+                    self.kappa_redundant_spin_idx.append((p, q))
+                    continue'''
                 self._kappa_real.append(0.0)
                 self._kappa_imag.append(0.0)
                 self._kappa_real_old.append(0.0)
@@ -597,7 +613,7 @@ class GeneralizedWaveFunctionUPS:
         """
         # Annika has added dtype=complex
         if self._rdm1 is None:
-            self._rdm1 = np.zeros((self.num_active_spin_orbs, self.num_active_spin_orbs))
+            self._rdm1 = np.zeros((self.num_active_spin_orbs, self.num_active_spin_orbs),dtype=complex)
             for P in range(
                 self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
             ):
@@ -628,7 +644,8 @@ class GeneralizedWaveFunctionUPS:
                     self.num_active_spin_orbs,
                     self.num_active_spin_orbs,
                     self.num_active_spin_orbs,
-                )
+                ),
+            dtype=complex
             )
             for p in range(
                 self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
@@ -877,6 +894,7 @@ class GeneralizedWaveFunctionUPS:
         tol: float = 1e-10,
         maxiter: int = 1000,
         is_silent: bool = False,
+        test_gradient: bool = True,
     ) -> None:
         """Run one step optimization of wave function.
 
@@ -921,6 +939,7 @@ class GeneralizedWaveFunctionUPS:
                     self._calc_gradient_optimization,
                     theta_optimization=False,
                     kappa_optimization=True,
+                    test_gradient = test_gradient,
                 )
         else:
             energy = partial(
@@ -959,11 +978,12 @@ class GeneralizedWaveFunctionUPS:
         )
         self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0
+        #print(parameters)
         res = optimizer.minimize(
             parameters,
             extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
         )
-        print(res)
+        #print(res)
         if orbital_optimization:
             if len(self.thetas) > 0:
                 thetas_r = []
@@ -1048,7 +1068,7 @@ class GeneralizedWaveFunctionUPS:
         )
         start = time.time()
         for iteration in range(maxiter):
-            Hamiltonian = generalized_hamiltonian_0i_0a_spinidx(
+            Hamiltonian = generalized_hamiltonian_0i_0a(
                 self.h_mo,
                 self.g_mo,
                 self.num_inactive_spin_orbs,
@@ -1148,7 +1168,7 @@ class GeneralizedWaveFunctionUPS:
         return E
 
     def _calc_gradient_optimization(
-        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
+        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool, test_gradient: bool
     ) -> np.ndarray:
         """Calculate electronic gradient.
 
@@ -1163,7 +1183,7 @@ class GeneralizedWaveFunctionUPS:
         gradient = np.zeros(len(parameters))
         num_kappa = 0
         if kappa_optimization:
-            num_kappa = len(self.kappa_spin_idx)
+            num_kappa = 2*len(self.kappa_spin_idx)
             kappa_r = []
             kappa_i = []
             for i in range(len(self.kappa_real)):
@@ -1178,13 +1198,18 @@ class GeneralizedWaveFunctionUPS:
                 thetas_i.append(parameters[2 * i + 1 + num_kappa])
             self.set_thetas(thetas_r, thetas_i)
         if kappa_optimization:
-            gradient[:num_kappa] = get_orbital_gradient_generalized_real_imag(self.h_mo, self.g_mo, 
-            self.kappa_spin_idx,
-            self.num_inactive_spin_orbs,
-            self.num_active_spin_orbs,
-            self.rdm1,
-            self.rdm2
-            )
+            if test_gradient == True:
+                gradient[:num_kappa] = get_orbital_gradient_generalized_real_imag(self.h_mo, self.g_mo, 
+                self.kappa_spin_idx,
+                self.num_inactive_spin_orbs,
+                self.num_active_spin_orbs,
+                self.num_virtual_spin_orbs,
+                self.rdm1,
+                self.rdm2
+                )
+            else:
+                gradient[:num_kappa] = exp_val_gradient(self.ci_coeffs,self.ci_info,self.h_mo,self.g_mo,
+                                                        self.num_spin_orbs,self.kappa_spin_idx)
         if theta_optimization:
             # Hamiltonian = generalized_hamiltonian_0i_0a(
             #    self.h_mo,
@@ -1242,6 +1267,7 @@ class GeneralizedWaveFunctionUPS:
             self.num_energy_evals += 2 * np.sum(
                 list(self.ups_layout.grad_param_R.values())
             )  # Count energy measurements for all gradients
+        #print(gradient)
         return gradient
 
     @property

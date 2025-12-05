@@ -575,6 +575,55 @@ def expectation_value(
     # not isinstance(val, float):
         # ValueError(f"Calculated expectation value is not a float, got type {type(val)}")
 
+    if val.imag > 0:
+        print("Warning: Expectation value is complex!!")
+
+    return val.real
+
+
+def expectation_value_for_gradient(
+    bra: np.ndarray,
+    operators: list[FermionicOperator | str],
+    ket: np.ndarray,
+    ci_info: CI_Info,
+    thetas: list[float | complex] | None = None,
+    wf_struct: UpsStructure | UccStructure | None = None,
+    do_folding: bool = True,
+    do_unsafe: bool = False,
+) -> float:
+    """Calculate expectation value of operator using propagate state.
+
+    Args:
+        bra: Bra state.
+        operators: Operator.
+        ket: Ket state.
+        ci_info: Information about the CI space.
+        thetas: Active-space parameters.
+               Ordered as (S, D, T, ...).
+        wf_struct: Wave function structure object.
+        do_folding: Do folding of operator (default: True).
+        do_unsafe: Ignore elements that are outside the space defined in ci_info. (default: False)
+                If not ignored, getting elements outside the space will stop the calculation.
+
+    Returns:
+        Expectation value.
+    """
+    # build state vector of operator on ket
+    op_ket = propagate_state(
+        operators,
+        ket,
+        ci_info,
+        thetas,
+        wf_struct,
+        do_folding=do_folding,
+        do_unsafe=do_unsafe,
+    )
+    val = bra.conj() @ op_ket
+
+    # Changes by Annika to test if we can run with complex MO integrals and density matrices
+    # not isinstance(val, float):
+        # ValueError(f"Calculated expectation value is not a float, got type {type(val)}")
+
     return val
 
 

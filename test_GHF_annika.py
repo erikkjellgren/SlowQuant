@@ -1,6 +1,7 @@
 import numpy as np
 import pyscf
 from pyscf import mcscf, scf, gto, x2c
+from scipy.stats import unitary_group
 
 # from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
@@ -8,9 +9,8 @@ from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import Gener
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.linear_response import naive
 from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
-from slowquant.unitary_coupled_cluster.operators import generalized_hamiltonian_0i_0a_spinidx, generalized_hamiltonian_1i_1a_spinidx
-from slowquant.molecularintegrals.integralfunctions import generalized_two_electron_transform, generalized_one_electron_transform
-from slowquant.unitary_coupled_cluster.generalized_density_matrix import get_orbital_gradient_generalized_real_imag
+from slowquant.unitary_coupled_cluster.operators import generalized_hamiltonian_0i_0a, generalized_hamiltonian_1i_1a
+from slowquant.unitary_coupled_cluster.generalized_density_matrix import get_orbital_gradient_generalized_real_imag, exp_val_gradient
 
 
 
@@ -238,18 +238,15 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # mc = mcscf.UCASCI(mf, active_space[1], active_space[0])
     # # Slowquant
 
-    u=np.linalg.qr(np.random.randn(c.shape[1],c.shape[1])) #this returns a tuple
-    c_u = c @ u[0]
-    
-
-    g_eri_mo = generalized_two_electron_transform(c,g_eri)
-    h_eri_mo = generalized_one_electron_transform(c,h_core)
+    u = unitary_group.rvs(c.shape[0]) 
+    #print(np.dot(u, u.conj().T))
+    c_u = c @ u  
 
 
     WF = GeneralizedWaveFunctionUPS(
         mol.nelectron,
         active_space,
-        c,
+        c_u,
         h_core,
         g_eri,
         "fuccsd",
@@ -261,11 +258,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # LR.calc_excitation_energies()
     # print(LR.excitation_energies)
 
-    H=generalized_hamiltonian_full_space(h_eri_mo, g_eri_mo,int(c.shape[0]/2))
-    H2=generalized_hamiltonian_0i_0a_spinidx(h_eri_mo, g_eri_mo,int(c.shape[0]/2),WF.num_active_elec)
-    H3=generalized_hamiltonian_1i_1a_spinidx(h_eri_mo, g_eri_mo,int(c.shape[0]/2),WF.num_active_elec,
-                                     WF.num_virtual_spin_orbs)
-    
+    H=generalized_hamiltonian_full_space(WF.h_mo, WF.g_mo,WF.num_spin_orbs)
+    H2=generalized_hamiltonian_0i_0a(WF.h_mo, WF.g_mo,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs)
+    H3=generalized_hamiltonian_1i_1a(WF.h_mo, WF.g_mo,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,WF.num_virtual_spin_orbs)
 
     test_energy=expectation_value(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
     test_energy2=expectation_value(WF.ci_coeffs, [H2], WF.ci_coeffs, WF.ci_info)
@@ -275,44 +270,64 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print(test_energy2)
     print(test_energy3)
 
+    print(WF.num_spin_orbs)
+    print(len(WF.kappa_spin_idx))
 
-    one = get_orbital_gradient_generalized_real_imag(WF.h_mo,
+
+    my_gradient_before = get_orbital_gradient_generalized_real_imag(WF.h_mo,
             WF.g_mo,
             WF.kappa_spin_idx,
-            WF.num_inactive_spin_orbs,
+            WF.num_inactive_spin_orbs, 
             WF.num_active_spin_orbs,
-            WF.rdm1,
-            WF.rdm2)
+            WF.num_virtual_spin_orbs,
+            WF.rdm1_FULL,
+            WF.rdm2_FULL)
 
-    print("hubub",one)
+    print("my_gradient_before:",np.round(my_gradient_before,10))
 
-    # print('huhuhub',WF.get_orbital_gradient_generalized_test)
-    gradient = np.zeros(len(WF.kappa_spin_idx),dtype=complex)
-    for idx, (M,N) in enumerate(WF.kappa_spin_idx):
-        for P in range(WF.num_inactive_spin_orbs+WF.num_active_spin_orbs):
+
+    total_gradient_before = exp_val_gradient(
+        WF.ci_coeffs,
+        WF.ci_info,
+        WF.h_mo,
+        WF.g_mo,
+        WF.num_spin_orbs,
+        WF.kappa_spin_idx)
             
-            e1 = expectation_value(WF.ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
-                                   WF.ci_coeffs, WF.ci_info)
-                        
-            e1 -= expectation_value(WF.ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
-                                    WF.ci_coeffs, WF.ci_info)
+    print('total gradient_before',np.round(total_gradient_before,10))
+
+    WF.run_wf_optimization_1step("BFGS",orbital_optimization=True,test_gradient=True)
+
+
+    my_gradient_after = get_orbital_gradient_generalized_real_imag(WF.h_mo,
+            WF.g_mo,
+            WF.kappa_spin_idx,
+            WF.num_inactive_spin_orbs, 
+            WF.num_active_spin_orbs,
+            WF.num_virtual_spin_orbs,
+            WF.rdm1_FULL,
+            WF.rdm2_FULL)
+
+    print("my gradient after:",np.round(my_gradient_after,10))
+
+    total_gradient_after = exp_val_gradient(
+        WF.ci_coeffs,
+        WF.ci_info,
+        WF.h_mo,
+        WF.g_mo,
+        WF.num_spin_orbs,
+        WF.kappa_spin_idx)
             
-            gradient[idx]= e1
-            
-    #print('habab',gradient)
-
-    #WF.run_wf_optimization_1step("BFGS",orbital_optimization=True)
-
-
+    print('total gradient_after',np.round(total_gradient_after,10))
 
 
 def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
-    #basis = "cc-pvtz"
+    #basis = "cc-pvdz"
     basis = "631-g"
     #basis = "sto-3g"
-    active_space = ((1, 1), 4)
+    active_space = ((1, 1), 8)
     #active_space = (2, 4)
     charge = 0
     spin = 0
@@ -327,6 +342,26 @@ def h2():
     #     geometry=geometry, basis=basis, active_space=active_space_u, charge=charge, spin=spin, unit="angstrom"
     # )
 
+def LiH():
+    geometry = """H  0.0   0.0  0.0;
+        Li  0.0  0.0  1"""
+    #basis = "cc-pvdz"
+    basis = "631-g"
+    #basis = "sto-3g"
+    active_space = ((1, 1), 8)
+    #active_space = (2, 4)
+    charge = 0
+    spin = 0
+
+    # restricted(
+    #     geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    # )
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    )
+    # unrestricted(
+    #     geometry=geometry, basis=basis, active_space=active_space_u, charge=charge, spin=spin, unit="angstrom"
+    # )
 
 def h2o():
     geometry = """
