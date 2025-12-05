@@ -129,7 +129,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         mf.mo_coeff,
         h_core,
         g_eri,
-        "None",
+        "fuccsd",
         {"n_layers": 2},
         include_active_kappa=True,
     )
@@ -169,8 +169,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     
     'Test of gradients'
     print('huhuhub',WF.get_orbital_gradient_generalized_anna)
-    print('habab',WF.get_orbital_gradient_generalized_test)
-    print('hihihihb',WF.get_orbital_gradient_generalized_2)
+    # print('habab',WF.get_orbital_gradient_generalized_test)
+    # print('hihihihb',WF.get_orbital_gradient_generalized_2)
 
     
     # gradient = np.ze    print('habab',WF.get_orbital_gradient_generalized_test)
@@ -195,7 +195,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
-    basis = "STO-3G"
+    basis = "631-g"
     active_space_u = ((1, 1), 2)
     active_space = (2, 4)
     charge = 0

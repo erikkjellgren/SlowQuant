@@ -510,7 +510,78 @@ class GeneralizedWaveFunctionUPS:
                             self._rdm2[s_idx, r_idx, q_idx, p_idx] = val.conjugate()  # type: ignore
         return self._rdm2
 
-
+    @property
+    def rdm1_FULL(self) -> np.ndarray:
+        """Calculate one-electron reduced density matrix in the active space.
+        Returns:
+            One-electron reduced density matrix.
+        """
+        # Annika has added dtype=complex
+        if self._rdm1 is None:
+            self._rdm1 = np.zeros((self.num_active_spin_orbs, self.num_active_spin_orbs))
+            for P in range(
+                self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
+            ):
+                P_idx = P - self.num_inactive_spin_orbs
+                for Q in range(
+                    self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
+                ):
+                    Q_idx = Q - self.num_inactive_spin_orbs
+                    val = expectation_value(
+                        self.ci_coeffs,
+                        [(a_op_spin(P, True) * a_op_spin(Q, False))],
+                        self.ci_coeffs,
+                        self.ci_info,
+                    )
+                    self._rdm1[P_idx, Q_idx] = val  # type: ignore
+        return self._rdm1
+    @property
+    def rdm2_FULL(self) -> np.ndarray:
+        """Calculate two-electron reduced density matrix in the active space.
+        Returns:
+            Two-electron reduced density matrix.
+        """
+        # Annika has added dtype=complex
+        if self._rdm2 is None:
+            self._rdm2 = np.zeros(
+                (
+                    self.num_active_spin_orbs,
+                    self.num_active_spin_orbs,
+                    self.num_active_spin_orbs,
+                    self.num_active_spin_orbs,
+                )
+            )
+            for p in range(
+                self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
+            ):
+                p_idx = p - self.num_inactive_spin_orbs
+                for q in range(
+                    self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
+                ):
+                    q_idx = q - self.num_inactive_spin_orbs
+                    for r in range(
+                        self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
+                    ):
+                        r_idx = r - self.num_inactive_spin_orbs
+                        for s in range(
+                            self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
+                        ):
+                            s_idx = s - self.num_inactive_spin_orbs
+                            val = expectation_value(
+                                self.ci_coeffs,
+                                [
+                                    (
+                                        a_op_spin(p, True)
+                                        * a_op_spin(r, True)
+                                        * a_op_spin(s, False)
+                                        * a_op_spin(q, False)
+                                    )
+                                ],
+                                self.ci_coeffs,
+                                self.ci_info,
+                            )
+                            self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
+        return self._rdm2
     @property
     def rdm2_symmetry(self) -> np.ndarray:
         """Calculate two-electron reduced density matrix in the active space based on complex spin orbitals.
