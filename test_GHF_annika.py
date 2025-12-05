@@ -285,24 +285,51 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
             WF.rdm1_FULL,
             WF.rdm2_FULL)
 
-    print("hubub",one)
+    #print("hubub",one)
 
     # print('huhuhub',WF.get_orbital_gradient_generalized_test)
     gradient = np.zeros(len(WF.kappa_spin_idx),dtype=complex)
+
     for idx, (M,N) in enumerate(WF.kappa_spin_idx):
-        for P in range(WF.num_inactive_spin_orbs+WF.num_active_spin_orbs):
+        e1 = 0 + 0j
+        if M == N:
+            e1 += 1j * expectation_value(WF.ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
+                                WF.ci_coeffs, WF.ci_info)
             
-            e1 = expectation_value(WF.ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
-                                   WF.ci_coeffs, WF.ci_info)
+            e1 -= 1j * expectation_value(WF.ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
+                                WF.ci_coeffs, WF.ci_info)
+        else:
+            # Real  
+            e1 += expectation_value(WF.ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
+                                WF.ci_coeffs, WF.ci_info)
                         
             e1 -= expectation_value(WF.ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
                                     WF.ci_coeffs, WF.ci_info)
             
-            gradient[idx]= e1
-            
-    #print('habab',gradient)
+            e1 += -expectation_value(WF.ci_coeffs, [(a_op_spin(N,True)*a_op_spin(M,False))*H], 
+                                WF.ci_coeffs, WF.ci_info)
+                        
+            e1 -= -expectation_value(WF.ci_coeffs, [H*(a_op_spin(N,True)*a_op_spin(M,False))], 
+                                    WF.ci_coeffs, WF.ci_info)
 
-    #WF.run_wf_optimization_1step("BFGS",orbital_optimization=True)
+            # Imaginary
+            e1 += 1j*expectation_value(WF.ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
+                                WF.ci_coeffs, WF.ci_info)
+                        
+            e1 -= 1j*expectation_value(WF.ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
+                                    WF.ci_coeffs, WF.ci_info)
+            
+            e1 += 1j*expectation_value(WF.ci_coeffs, [(a_op_spin(N,True)*a_op_spin(M,False))*H], 
+                                WF.ci_coeffs, WF.ci_info)
+                        
+            e1 -= 1j*expectation_value(WF.ci_coeffs, [H*(a_op_spin(N,True)*a_op_spin(M,False))], 
+                                    WF.ci_coeffs, WF.ci_info)
+
+        gradient[idx]= e1
+            
+    print('habab',gradient)
+
+    WF.run_wf_optimization_1step("BFGS",orbital_optimization=True)
 
 
 
