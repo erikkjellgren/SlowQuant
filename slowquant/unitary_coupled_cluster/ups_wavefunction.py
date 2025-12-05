@@ -23,8 +23,8 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     expectation_value,
     get_grad_action,
     propagate_state,
-    propagate_unitary,
     propagate_state_SA,
+    propagate_unitary,
     propagate_unitary_SA,
 )
 from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
@@ -1078,52 +1078,38 @@ class WaveFunctionUPS:
 
         Args:
             parameters: Ansatz and orbital rotation parameters.
+            theta_diffs: Differences in theta for RotoSolve.
+            theta_idx: Index of theta being optimized.
 
         Returns:
             Electronic energy.
         """
-        self.thetas = parameters[:]
+        # avoid mutating self.thetas (which triggers construct_ups_state)
+        thetas_local = parameters[:]
+
         state_vec = np.copy(self.csf_coeffs)
         for i in range(0, theta_idx):
-            state_vec = propagate_unitary(
-                state_vec,
-                i,
-                self.ci_info,
-                self.thetas,
-                self.ups_layout,
-            )
+            state_vec = propagate_unitary(state_vec, i, self.ci_info, thetas_local, self.ups_layout)
+
         state_vecs = []
-        theta_tmp = np.copy(self.thetas).tolist()
+        theta_tmp_base = np.copy(thetas_local).tolist()
         for theta_diff in theta_diffs:
+            theta_tmp = theta_tmp_base.copy()
             theta_tmp[theta_idx] = theta_diff
             state_vecs.append(
-                propagate_unitary(
-                    state_vec,
-                    theta_idx,
-                    self.ci_info,
-                    theta_tmp,
-                    self.ups_layout,
-                )
+                propagate_unitary(state_vec, theta_idx, self.ci_info, theta_tmp, self.ups_layout)
             )
+
         state_vecs = np.array(state_vecs)
-        for i in range(theta_idx + 1, len(self.thetas)):
-            state_vecs = propagate_unitary_SA(
-                state_vecs,
-                i,
-                self.ci_info,
-                self.thetas,
-                self.ups_layout,
-            )
+        for i in range(theta_idx + 1, len(thetas_local)):
+            state_vecs = propagate_unitary_SA(state_vecs, i, self.ci_info, thetas_local, self.ups_layout)
+
         Hamiltonian = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
-        bra_vec = propagate_state_SA(
-            [Hamiltonian],
-            state_vecs,
-            self.ci_info,
-            self.thetas,
-            self.ups_layout,
-        )
+        bra_vec = propagate_state_SA([Hamiltonian], state_vecs, self.ci_info, thetas_local, self.ups_layout)
+
         energies = []
         for bra, ket in zip(bra_vec, state_vecs):
             energies.append(bra @ ket)
-            self.num_energy_evals += 1
+        self.num_energy_evals += len(energies)
+
         return energies
