@@ -413,54 +413,60 @@ def get_orbital_gradient_test_anna(
     Returns:
         Orbital gradient.
     """
-    gradient = np.zeros(len(kappa_idx))
+    gradient_r = np.zeros(len(kappa_idx))
+    gradient_i = np.zeros(len(kappa_idx))
     for idx, (M, N) in enumerate(kappa_idx):
         # 1-electron contribution
         for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
             if M==N:
-                gradient[idx] += h_int[M,P]*RDM1(M,P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #diagonal element 
-                gradient[idx] -= h_int[P,M]*RDM1(P,M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #diagonal element 
-            else: ##M>N???
-                gradient[idx] += h_int[N,P]*RDM1(M,P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
-                gradient[idx] += h_int[M,P]*RDM1(N,P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
-                gradient[idx] -= h_int[P,M]*RDM1(P,N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
-                gradient[idx] -= h_int[P,N]*RDM1(P,M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
-
-                gradient[idx] += h_int[N,P]*RDM1(M,P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
-                gradient[idx] -= h_int[M,P]*RDM1(N,P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
-                gradient[idx] -= h_int[P,M]*RDM1(P,N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
-                gradient[idx] += h_int[P,N]*RDM1(P,M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
+                #Imaginary diagonal contribution
+                gradient_i[idx] += h_int[M,P]*RDM1(M,P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #diagonal element 
+                gradient_i[idx] -= h_int[P,M]*RDM1(P,M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #diagonal element 
+            else: 
+                # #Imaginary off-diagonal contribution
+                gradient_i[idx] += h_int[N,P]*RDM1(M,P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
+                gradient_i[idx] += h_int[M,P]*RDM1(N,P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
+                gradient_i[idx] -= h_int[P,M]*RDM1(P,N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
+                gradient_i[idx] -= h_int[P,N]*RDM1(P,M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
+                #Real off-diagonal contribution 
+                gradient_r[idx] += h_int[N,P]*RDM1(M,P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
+                gradient_r[idx] -= h_int[M,P]*RDM1(N,P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
+                gradient_r[idx] -= h_int[P,M]*RDM1(P,N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
+                gradient_r[idx] += h_int[P,N]*RDM1(P,M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
 
         #2-electron contribution
         for P in range(num_inactive_spin_orbs+num_active_spin_orbs):
             for Q in range(num_inactive_spin_orbs+num_active_spin_orbs):
                 for R in range(num_inactive_spin_orbs+num_active_spin_orbs):
                     if M==N:
-                        gradient[idx] += g_int[M,P,Q,R]*RDM2(M,P,Q,R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient[idx] -= g_int[P,Q,M,R]*RDM2(M,Q,P,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient[idx] -= g_int[P,M,Q,R]*RDM2(P,M,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient[idx] += g_int[P,Q,R,M]*RDM2(P,M,R,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        #Imaginray off-diagonal contribution
+                        gradient_i[idx] += g_int[M,P,Q,R]*RDM2(M,P,Q,R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] -= g_int[P,Q,M,R]*RDM2(M,Q,P,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] -= g_int[P,M,Q,R]*RDM2(P,M,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] += g_int[P,Q,R,M]*RDM2(P,M,R,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
 
-                    else: ##M>N???
-                        gradient[idx] += g_int[N,P,Q,R]*RDM2(M,P,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient[idx] -= g_int[P,Q,N,R]*RDM2(M,Q,P,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient[idx] += g_int[M,P,Q,R]*RDM2(N,P,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient[idx] -= g_int[P,Q,M,R]*RDM2(N,Q,P,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient[idx] -= g_int[P,M,Q,R]*RDM2(P,N,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient[idx] += g_int[P,Q,R,M]*RDM2(P,N,R,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient[idx] -= g_int[P,Q,R,M]*RDM2(P,M,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient[idx] += g_int[P,Q,R,N]*RDM2(P,M,R,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                    else: 
+                        #Imaginary off-diagonal contribution 
+                        gradient_i[idx] += g_int[N,P,Q,R]*RDM2(M,P,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] += g_int[N,R,P,Q]*RDM2(M,R,P,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] += g_int[M,P,Q,R]*RDM2(N,P,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] += g_int[M,R,P,Q]*RDM2(N,R,P,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] -= g_int[P,M,Q,R]*RDM2(P,N,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] -= g_int[R,M,P,Q]*RDM2(R,N,P,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] -= g_int[P,N,Q,R]*RDM2(P,M,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] -= g_int[R,N,P,Q]*RDM2(R,M,P,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
                         
-                        gradient[idx] += g_int[N,P,Q,R]*RDM2(M,P,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient[idx] -= g_int[P,Q,N,R]*RDM2(M,Q,P,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient[idx] -= g_int[M,Q,R,P]*RDM2(N,P,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient[idx] += g_int[P,Q,M,R]*RDM2(N,Q,P,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient[idx] -= g_int[P,M,Q,R]*RDM2(P,N,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient[idx] += g_int[P,Q,R,M]*RDM2(P,N,R,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient[idx] += g_int[P,N,Q,R]*RDM2(P,M,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient[idx] -= g_int[P,Q,R,N]*RDM2(P,M,R,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        #Real off-diagonal contribution
+                        gradient_r[idx] += g_int[N,P,Q,R]*RDM2(M,P,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] += g_int[N,R,P,Q]*RDM2(M,R,P,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] -= g_int[M,P,Q,R]*RDM2(N,P,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] -= g_int[M,R,P,Q]*RDM2(N,R,P,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] -= g_int[P,M,Q,R]*RDM2(P,N,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] -= g_int[R,M,P,Q]*RDM2(R,N,P,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] += g_int[P,N,Q,R]*RDM2(P,M,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] += g_int[R,N,P,Q]*RDM2(R,M,P,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
                         
-                        
+        gradient = np.concatenate((gradient_r, 1j*gradient_i))     
     ###Fortegn med i.
     return gradient
 
