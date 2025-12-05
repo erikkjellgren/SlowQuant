@@ -81,9 +81,9 @@ class GeneralizedWaveFunctionUPS:
             raise ValueError(
                 "Number of electrons in the active space must be specified as a tuple of (alpha, beta)."
             )
-        if cas[1] > mo_coeffs.shape[1]:
+        if cas[1] > mo_coeffs.shape[0]:
             raise ValueError(
-                f"More spatial active orbitls than total orbitals. Got {cas[1]} active orbitals, and {mo_coeffs.shape[1]} total orbitals."
+                f"More spatial active orbitls than total orbitals. Got {cas[1]} active orbitals, and {mo_coeffs.shape[0]} total orbitals."
             )
         if np.sum(cas[0]) > num_elec:
             raise ValueError(
@@ -112,7 +112,7 @@ class GeneralizedWaveFunctionUPS:
         self.num_elec = num_elec
         self.num_elec_alpha = (num_elec - np.sum(cas[0])) // 2 + cas[0][0]
         self.num_elec_beta = (num_elec - np.sum(cas[0])) // 2 + cas[0][1]
-        self.num_spin_orbs = mo_coeffs.shape[1]
+        self.num_spin_orbs = mo_coeffs.shape[0]
         self._include_active_kappa = include_active_kappa
         self.num_active_elec_alpha = cas[0][0]
         self.num_active_elec_beta = cas[0][1]
