@@ -285,9 +285,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
             WF.rdm1_FULL,
             WF.rdm2_FULL)
 
-    #print("hubub",one)
+    print("hubub",one)
 
-    # print('huhuhub',WF.get_orbital_gradient_generalized_test)
+
     gradient = np.zeros(len(WF.kappa_spin_idx),dtype=complex)
 
     for idx, (M,N) in enumerate(WF.kappa_spin_idx):
@@ -330,6 +330,18 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print('habab',gradient)
 
     WF.run_wf_optimization_1step("BFGS",orbital_optimization=True)
+
+
+    two = get_orbital_gradient_generalized_real_imag(WF.h_mo,
+            WF.g_mo,
+            WF.kappa_spin_idx,
+            WF.num_inactive_spin_orbs, 
+            WF.num_active_spin_orbs,
+            WF.num_virtual_spin_orbs,
+            WF.rdm1_FULL,
+            WF.rdm2_FULL)
+
+    print("hobob",two)
 
 
 

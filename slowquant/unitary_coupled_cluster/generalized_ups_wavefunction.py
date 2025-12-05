@@ -960,11 +960,12 @@ class GeneralizedWaveFunctionUPS:
         )
         self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0
+        #print(parameters)
         res = optimizer.minimize(
             parameters,
             extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
         )
-        print(res)
+        #print(res)
         if orbital_optimization:
             if len(self.thetas) > 0:
                 thetas_r = []
@@ -1164,7 +1165,7 @@ class GeneralizedWaveFunctionUPS:
         gradient = np.zeros(len(parameters))
         num_kappa = 0
         if kappa_optimization:
-            num_kappa = len(self.kappa_spin_idx)
+            num_kappa = 2*len(self.kappa_spin_idx)
             kappa_r = []
             kappa_i = []
             for i in range(len(self.kappa_real)):
@@ -1183,6 +1184,7 @@ class GeneralizedWaveFunctionUPS:
             self.kappa_spin_idx,
             self.num_inactive_spin_orbs,
             self.num_active_spin_orbs,
+            self.num_virtual_spin_orbs,
             self.rdm1,
             self.rdm2
             )
@@ -1243,6 +1245,7 @@ class GeneralizedWaveFunctionUPS:
             self.num_energy_evals += 2 * np.sum(
                 list(self.ups_layout.grad_param_R.values())
             )  # Count energy measurements for all gradients
+        #print(gradient)
         return gradient
 
     @property

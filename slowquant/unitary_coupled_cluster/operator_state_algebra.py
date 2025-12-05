@@ -575,7 +575,10 @@ def expectation_value(
     # not isinstance(val, float):
         # ValueError(f"Calculated expectation value is not a float, got type {type(val)}")
 
-    return val
+    if val.imag > 0:
+        print("Warning: Energy is complex!!")
+
+    return val.real
 
 
 def expectation_value_SA(
