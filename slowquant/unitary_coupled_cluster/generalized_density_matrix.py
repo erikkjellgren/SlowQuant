@@ -328,28 +328,28 @@ def get_orbital_gradient_generalized_real_imag(
                         )
                     else:
                         # Real
-                        gradient_I[idx] += g_int[Q, T, R, S] * RDM2(
+                        gradient_R[idx] += g_int[Q, T, R, S] * RDM2(
                             P, T, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_I[idx] -= g_int[S, T, R, P] * RDM2(
+                        gradient_R[idx] -= g_int[S, T, R, P] * RDM2(
                             S, T, R, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_I[idx] += g_int[S, T, R, Q] * RDM2(
+                        gradient_R[idx] += g_int[S, T, R, Q] * RDM2(
                             S, T, R, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_I[idx] -= g_int[P, T, R, S] * RDM2(
+                        gradient_R[idx] -= g_int[P, T, R, S] * RDM2(
                             Q, T, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_I[idx] += g_int[T, Q, R, S] * RDM2(
+                        gradient_R[idx] += g_int[T, Q, R, S] * RDM2(
                             T, P, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_I[idx] -= g_int[T, P, R, S] * RDM2(
+                        gradient_R[idx] -= g_int[T, P, R, S] * RDM2(
                             T, Q, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_I[idx] += g_int[T, R, Q, S] * RDM2(
+                        gradient_R[idx] += g_int[T, R, Q, S] * RDM2(
                             T, R, P, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_I[idx] -= g_int[T, R, P, S] * RDM2(
+                        gradient_R[idx] -= g_int[T, R, P, S] * RDM2(
                             T, R, Q, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
 
