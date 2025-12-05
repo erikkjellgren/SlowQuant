@@ -16,7 +16,7 @@ from slowquant.molecularintegrals.integralfunctions import (
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_generalized
 from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_electronic_energy_generalized,
-    get_orbital_gradient_generalized_real_imag,
+    get_orbital_gradient_generalized_real_imag, get_orbital_gradient_test_anna,
     get_orbital_gradient_generalized,
     exp_val_gradient
 )
@@ -1199,11 +1199,10 @@ class GeneralizedWaveFunctionUPS:
             self.set_thetas(thetas_r, thetas_i)
         if kappa_optimization:
             if test_gradient == True:
-                gradient[:num_kappa] = get_orbital_gradient_generalized_real_imag(self.h_mo, self.g_mo, 
+                gradient[:num_kappa] = get_orbital_gradient_test_anna(self.h_mo, self.g_mo, 
                 self.kappa_spin_idx,
                 self.num_inactive_spin_orbs,
                 self.num_active_spin_orbs,
-                self.num_virtual_spin_orbs,
                 self.rdm1,
                 self.rdm2
                 )
@@ -1287,6 +1286,7 @@ class GeneralizedWaveFunctionUPS:
         return get_orbital_gradient_generalized_real_imag(self.h_mo, self.g_mo, self.kappa_spin_idx,
         self.num_inactive_spin_orbs,
         self.num_active_spin_orbs,
+        self.num_virtual_spin_orbs,
         self.rdm1,
         self.rdm2)
         
