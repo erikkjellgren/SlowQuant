@@ -10,7 +10,7 @@ from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import Gener
 from slowquant.unitary_coupled_cluster.linear_response import naive
 from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
 from slowquant.unitary_coupled_cluster.operators import generalized_hamiltonian_0i_0a, generalized_hamiltonian_1i_1a
-from slowquant.unitary_coupled_cluster.generalized_density_matrix import get_orbital_gradient_generalized_real_imag, exp_val_gradient
+from slowquant.unitary_coupled_cluster.generalized_density_matrix import get_orbital_gradient_generalized_real_imag, exp_val_gradient, get_orbital_gradient_test_anna
 
 
 
@@ -279,11 +279,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
             WF.kappa_spin_idx,
             WF.num_inactive_spin_orbs, 
             WF.num_active_spin_orbs,
-            WF.num_virtual_spin_orbs,
             WF.rdm1_FULL,
             WF.rdm2_FULL)
 
-    print("my_gradient_before:",np.round(my_gradient_before,10))
+    print("my gradient_before:",np.round(my_gradient_before,10))
 
 
     total_gradient_before = exp_val_gradient(
@@ -296,7 +295,19 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
             
     print('total gradient_before',np.round(total_gradient_before,10))
 
-    WF.run_wf_optimization_1step("BFGS",orbital_optimization=True,test_gradient=True)
+
+    anna_gradient_before = get_orbital_gradient_test_anna(WF.h_mo,
+            WF.g_mo,
+            WF.kappa_spin_idx,
+            WF.num_inactive_spin_orbs, 
+            WF.num_active_spin_orbs,
+            WF.rdm1_FULL,
+            WF.rdm2_FULL)
+
+    print("anna gradient_before:",np.round(anna_gradient_before,10))
+
+
+    WF.run_wf_optimization_1step("BFGS",orbital_optimization=True,test_gradient="anna")
 
 
     my_gradient_after = get_orbital_gradient_generalized_real_imag(WF.h_mo,
@@ -304,7 +315,6 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
             WF.kappa_spin_idx,
             WF.num_inactive_spin_orbs, 
             WF.num_active_spin_orbs,
-            WF.num_virtual_spin_orbs,
             WF.rdm1_FULL,
             WF.rdm2_FULL)
 
@@ -319,6 +329,18 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         WF.kappa_spin_idx)
             
     print('total gradient_after',np.round(total_gradient_after,10))
+
+    anna_gradient_after = get_orbital_gradient_test_anna(WF.h_mo,
+            WF.g_mo,
+            WF.kappa_spin_idx,
+            WF.num_inactive_spin_orbs, 
+            WF.num_active_spin_orbs,
+            WF.rdm1_FULL,
+            WF.rdm2_FULL)
+
+    print("anna gradient after:",np.round(anna_gradient_after,10))
+
+
 
 
 def h2():
