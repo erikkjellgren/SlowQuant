@@ -168,9 +168,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     
     
     'Test of gradients'
-    print('huhuhub',WF.get_orbital_gradient_generalized_anna)
+    # print('huhuhub',WF.get_orbital_gradient_generalized_anna)
     # print('habab',WF.get_orbital_gradient_generalized_test)
-    print('hihihihb',WF.get_orbital_gradient_generalized_real_imag)
+    # print('hihihihb',WF.get_orbital_gradient_generalized_real_imag)
 
     
     # gradient = np.ze    print('habab',WF.get_orbital_gradient_generalized_test)

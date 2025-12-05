@@ -18,6 +18,7 @@ from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_electronic_energy_generalized,
     get_orbital_gradient_generalized_real_imag, get_orbital_gradient_test_anna,
     get_orbital_gradient_generalized,
+    get_orbital_gradient_test_anna,
     exp_val_gradient
 )
 from slowquant.unitary_coupled_cluster.generalized_operators import (
@@ -894,7 +895,7 @@ class GeneralizedWaveFunctionUPS:
         tol: float = 1e-10,
         maxiter: int = 1000,
         is_silent: bool = False,
-        test_gradient: bool = True,
+        test_gradient: str = "no",
     ) -> None:
         """Run one step optimization of wave function.
 
@@ -1168,7 +1169,7 @@ class GeneralizedWaveFunctionUPS:
         return E
 
     def _calc_gradient_optimization(
-        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool, test_gradient: bool
+        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool, test_gradient: str
     ) -> np.ndarray:
         """Calculate electronic gradient.
 
@@ -1198,7 +1199,15 @@ class GeneralizedWaveFunctionUPS:
                 thetas_i.append(parameters[2 * i + 1 + num_kappa])
             self.set_thetas(thetas_r, thetas_i)
         if kappa_optimization:
-            if test_gradient == True:
+            if test_gradient == "annika":
+                gradient[:num_kappa] = get_orbital_gradient_generalized_real_imag(self.h_mo, self.g_mo, 
+                self.kappa_spin_idx,
+                self.num_inactive_spin_orbs,
+                self.num_active_spin_orbs,
+                self.rdm1,
+                self.rdm2
+                )
+            elif test_gradient == "anna":
                 gradient[:num_kappa] = get_orbital_gradient_test_anna(self.h_mo, self.g_mo, 
                 self.kappa_spin_idx,
                 self.num_inactive_spin_orbs,
@@ -1286,7 +1295,6 @@ class GeneralizedWaveFunctionUPS:
         return get_orbital_gradient_generalized_real_imag(self.h_mo, self.g_mo, self.kappa_spin_idx,
         self.num_inactive_spin_orbs,
         self.num_active_spin_orbs,
-        self.num_virtual_spin_orbs,
         self.rdm1,
         self.rdm2)
         
