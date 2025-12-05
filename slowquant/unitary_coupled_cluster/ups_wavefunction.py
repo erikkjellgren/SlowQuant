@@ -1077,30 +1077,36 @@ class WaveFunctionUPS:
         """Calculate electronic energy.
 
         Args:
-            parameters: Ansatz and orbital rotation parameters.
-            theta_diffs: Differences in theta for RotoSolve.
-            theta_idx: Index of theta being optimized.
+            parameters: Ansatz parameters.
+            theta_diffs: List of theta shifts for RotoSolve.
+            theta_idx: Index of theta parameter being optimized.
 
         Returns:
-            Electronic energy.
+            Electronic energies for all shifted thetas.
         """
-        # avoid mutating self.thetas (which triggers construct_ups_state)
-        thetas_local = parameters[:]
+        # avoid triggering construct_ups_state
+        thetas_local = np.asarray(parameters)
 
+        # Prepare reference state up to theta_idx
         state_vec = np.copy(self.csf_coeffs)
         for i in range(0, theta_idx):
             state_vec = propagate_unitary(state_vec, i, self.ci_info, thetas_local, self.ups_layout)
 
-        state_vecs = []
-        theta_tmp_base = np.copy(thetas_local).tolist()
-        for theta_diff in theta_diffs:
-            theta_tmp = theta_tmp_base.copy()
+        n_shifts = len(theta_diffs)
+        n_state = state_vec.size
+
+        # Preallocate array for shifted states to avoid append
+        state_vecs = np.empty((n_shifts, n_state), dtype=state_vec.dtype)
+
+        # Propagate unitary with all shifted theta at theta_idx
+        theta_tmp = thetas_local.copy()
+        for j, theta_diff in enumerate(theta_diffs):
             theta_tmp[theta_idx] = theta_diff
-            state_vecs.append(
-                propagate_unitary(state_vec, theta_idx, self.ci_info, theta_tmp, self.ups_layout)
+            state_vecs[j, :] = propagate_unitary(
+                state_vec, theta_idx, self.ci_info, theta_tmp, self.ups_layout
             )
 
-        state_vecs = np.array(state_vecs)
+        # Propagate remaining unitaries for all shifted states in batch using SA propagation
         for i in range(theta_idx + 1, len(thetas_local)):
             state_vecs = propagate_unitary_SA(state_vecs, i, self.ci_info, thetas_local, self.ups_layout)
 

@@ -77,8 +77,8 @@ def apply_operator(
     create_idxs = create_idxs[::-1]
     # loop over all determinants in new_state
     for i, det in enumerate(idx2det):
-        if abs(state[i]) < 10**-14:
-            continue
+        # if abs(state[i]) < 10**-14:
+        #    continue
         phase_changes = 0
         is_killstate = False
         # evaluate how string of annihilation operator change det
@@ -223,13 +223,13 @@ def apply_operator_SA(
     create_idxs = create_idxs[::-1]
     # loop over all determinants in new_state
     for i, det in enumerate(idx2det):
-        is_non_zero = False
-        for val in state[:, i]:
-            if abs(val) > 10**-14:
-                is_non_zero = True
-                break
-        if not is_non_zero:
-            continue
+        # is_non_zero = False
+        # for val in state[:, i]:
+        #    if abs(val) > 10**-14:
+        #        is_non_zero = True
+        #        break
+        # if not is_non_zero:
+        #    continue
         phase_changes = 0
         is_killstate = False
         # evaluate how string of annihilation operator change det
