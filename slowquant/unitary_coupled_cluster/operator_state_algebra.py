@@ -355,7 +355,8 @@ def propagate_state(
     if len(operators) == 0:
         return np.copy(state)
     new_state = np.copy(state)
-    tmp_state = np.zeros_like(state)        #np.zeros_like(state,dtype=complex)
+    # Annika has forced this to be of type complex
+    tmp_state = np.zeros_like(state,dtype=complex)
     # Create bitstrings for parity check. Contains occupied determinant up to orbital index.
     parity_check = np.zeros(2 * num_active_orbs + 1, dtype=np.int64)
     num = 0
@@ -569,8 +570,11 @@ def expectation_value(
         do_unsafe=do_unsafe,
     )
     val = bra.conj() @ op_ket
-    if not isinstance(val, float):
-        raise ValueError(f"Calculated expectation value is not a float, got type {type(val)}")
+
+    # Changes by Annika to test if we can run with complex MO integrals and density matrices
+    # not isinstance(val, float):
+        # ValueError(f"Calculated expectation value is not a float, got type {type(val)}")
+
     return val
 
 

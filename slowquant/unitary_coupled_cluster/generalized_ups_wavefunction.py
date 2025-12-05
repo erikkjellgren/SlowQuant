@@ -36,7 +36,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     propagate_unitary,
 )
 from slowquant.unitary_coupled_cluster.operators import G1, G2
-from slowquant.unitary_coupled_cluster.operators_annika import generalized_hamiltonian_0i_0a
+from slowquant.unitary_coupled_cluster.operators import generalized_hamiltonian_0i_0a_spinidx
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import (
     UpsStructure,
@@ -437,8 +437,9 @@ class GeneralizedWaveFunctionUPS:
         Returns:
             One-electron reduced density matrix.
         """
+        # Annika has added dtype=complex
         if self._rdm1 is None:
-            self._rdm1 = np.zeros((self.num_active_spin_orbs, self.num_active_spin_orbs))
+            self._rdm1 = np.zeros((self.num_active_spin_orbs, self.num_active_spin_orbs), dtype=complex)
             for P in range(
                 self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
             ):
@@ -462,6 +463,7 @@ class GeneralizedWaveFunctionUPS:
         Returns:
             Two-electron reduced density matrix.
         """
+        # Annika has added dtype=complex
         if self._rdm2 is None:
             self._rdm2 = np.zeros(
                 (
@@ -469,8 +471,8 @@ class GeneralizedWaveFunctionUPS:
                     self.num_active_spin_orbs,
                     self.num_active_spin_orbs,
                     self.num_active_spin_orbs,
-                )
-            )
+                ),
+            dtype=complex)
             for p in range(
                 self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
             ):
