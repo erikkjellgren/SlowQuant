@@ -1165,7 +1165,7 @@ class GeneralizedWaveFunctionUPS:
         return E
 
     def _calc_gradient_optimization(
-        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool, test_gradient = False
+        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool, test_gradient = True
     ) -> np.ndarray:
         """Calculate electronic gradient.
 
