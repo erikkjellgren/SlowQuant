@@ -674,6 +674,7 @@ def generalized_hamiltonian_1i_1a_spinidx(
         Modified Hamiltonian fermionic operator.
     """
     num_spin_orbs = num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs
+    print(num_spin_orbs)
     hamiltonian_operator = FermionicOperator({})
     virtual_start = num_inactive_spin_orbs + num_active_spin_orbs
     for P in range(num_spin_orbs):

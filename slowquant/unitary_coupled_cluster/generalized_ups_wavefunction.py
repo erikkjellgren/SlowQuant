@@ -116,10 +116,10 @@ class GeneralizedWaveFunctionUPS:
         self._include_active_kappa = include_active_kappa
         self.num_active_elec_alpha = cas[0][0]
         self.num_active_elec_beta = cas[0][1]
-        self.num_active_elec = self.num_active_elec_alpha + self.num_active_elec_beta
+        self.num_active_elec = cas[0][0] + cas[0][1]
         self.num_active_spin_orbs = cas[1]
-        self.num_inactive_spin_orbs = self.num_elec - self.num_active_elec
-        self.num_virtual_spin_orbs = mo_coeffs.shape[1] - self.num_inactive_spin_orbs - self.num_active_spin_orbs
+        self.num_inactive_spin_orbs = num_elec - cas[0][0] - cas[0][1]
+        self.num_virtual_spin_orbs = mo_coeffs.shape[1] - (num_elec - cas[0][0] - cas[0][1]) - cas[1]
         # Find non-redundant kappas
         self._kappa_real = []
         self._kappa_imag = []
