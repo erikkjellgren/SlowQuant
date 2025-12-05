@@ -412,8 +412,8 @@ def get_orbital_gradient_test_anna(
     Returns:
         Orbital gradient.
     """
-    gradient_r = np.zeros(len(kappa_idx))
-    gradient_i = np.zeros(len(kappa_idx))
+    gradient_r = np.zeros(len(kappa_idx), dtype=np.complex128)
+    gradient_i = np.zeros(len(kappa_idx), dtype=np.complex128)
     for idx, (M, N) in enumerate(kappa_idx):
         # 1-electron contribution
         for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
@@ -465,9 +465,9 @@ def get_orbital_gradient_test_anna(
                         gradient_r[idx] += g_int[P,N,Q,R]*RDM2(P,M,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
                         gradient_r[idx] += g_int[R,N,P,Q]*RDM2(R,M,P,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
                         
-        gradient = np.concatenate((gradient_r, 1j*gradient_i))     
-    ###Fortegn med i.
-    return gradient
+        gradient = np.concatenate((gradient_r, 1j*gradient_i))
+        final_gradient = strip_imag(gradient)     
+    return final_gradient
 
 @nb.jit(nopython=True)
 def get_orbital_gradient_response(

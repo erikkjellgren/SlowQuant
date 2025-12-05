@@ -106,7 +106,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     mf.scf()
     mf.kernel()
-    c=mf.mo_coeff
+    c=np.array(mf.mo_coeff, dtype=complex)
     e_nuc=mf.energy_nuc()
 
 
