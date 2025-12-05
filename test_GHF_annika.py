@@ -1,6 +1,7 @@
 import numpy as np
 import pyscf
 from pyscf import mcscf, scf, gto, x2c
+from scipy.stats import unitary_group
 
 # from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
@@ -10,7 +11,7 @@ from slowquant.unitary_coupled_cluster.linear_response import naive
 from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
 from slowquant.unitary_coupled_cluster.operators import generalized_hamiltonian_0i_0a_spinidx, generalized_hamiltonian_1i_1a_spinidx
 from slowquant.molecularintegrals.integralfunctions import generalized_two_electron_transform, generalized_one_electron_transform
-from slowquant.unitary_coupled_cluster.generalized_density_matrix import get_orbital_gradient_generalized_real_imag
+from slowquant.unitary_coupled_cluster.generalized_density_matrix import get_orbital_gradient_generalized_real_imag, exp_val_gradient
 
 
 
@@ -238,9 +239,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # mc = mcscf.UCASCI(mf, active_space[1], active_space[0])
     # # Slowquant
 
-    u=np.linalg.qr(np.random.randn(c.shape[1],c.shape[1])) #this returns a tuple
-    c_u = c @ u[0]
-    
+    u = unitary_group.rvs(c.shape[0]) 
+    #print(np.dot(u, u.conj().T))
+    c_u = c @ u  
+
 
     g_eri_mo = generalized_two_electron_transform(c,g_eri)
     h_eri_mo = generalized_one_electron_transform(c,h_core)
@@ -249,7 +251,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF = GeneralizedWaveFunctionUPS(
         mol.nelectron,
         active_space,
-        c,
+        c_u,
         h_core,
         g_eri,
         "fuccsd",
@@ -288,46 +290,16 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("hubub",one)
 
 
-    gradient = np.zeros(len(WF.kappa_spin_idx),dtype=complex)
-
-    for idx, (M,N) in enumerate(WF.kappa_spin_idx):
-        e1 = 0 + 0j
-        if M == N:
-            e1 += 1j * expectation_value(WF.ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
-                                WF.ci_coeffs, WF.ci_info)
+    '''gradient = exp_val_gradient(WF.h_mo,
+            WF.g_mo,
+            WF.kappa_spin_idx,
+            WF.num_inactive_spin_orbs, 
+            WF.num_active_spin_orbs,
+            WF.num_virtual_spin_orbs,
+            WF.rdm1_FULL,
+            WF.rdm2_FULL)
             
-            e1 -= 1j * expectation_value(WF.ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
-                                WF.ci_coeffs, WF.ci_info)
-        else:
-            # Real  
-            e1 += expectation_value(WF.ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
-                                WF.ci_coeffs, WF.ci_info)
-                        
-            e1 -= expectation_value(WF.ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
-                                    WF.ci_coeffs, WF.ci_info)
-            
-            e1 += -expectation_value(WF.ci_coeffs, [(a_op_spin(N,True)*a_op_spin(M,False))*H], 
-                                WF.ci_coeffs, WF.ci_info)
-                        
-            e1 -= -expectation_value(WF.ci_coeffs, [H*(a_op_spin(N,True)*a_op_spin(M,False))], 
-                                    WF.ci_coeffs, WF.ci_info)
-
-            # Imaginary
-            e1 += 1j*expectation_value(WF.ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
-                                WF.ci_coeffs, WF.ci_info)
-                        
-            e1 -= 1j*expectation_value(WF.ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
-                                    WF.ci_coeffs, WF.ci_info)
-            
-            e1 += 1j*expectation_value(WF.ci_coeffs, [(a_op_spin(N,True)*a_op_spin(M,False))*H], 
-                                WF.ci_coeffs, WF.ci_info)
-                        
-            e1 -= 1j*expectation_value(WF.ci_coeffs, [H*(a_op_spin(N,True)*a_op_spin(M,False))], 
-                                    WF.ci_coeffs, WF.ci_info)
-
-        gradient[idx]= e1
-            
-    print('habab',gradient)
+    print('habab',gradient)'''
 
     WF.run_wf_optimization_1step("BFGS",orbital_optimization=True)
 

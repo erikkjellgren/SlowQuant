@@ -4,6 +4,9 @@ import numpy as np
 import numba as nb
 import numpy as np
 
+from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
+from slowquant.unitary_coupled_cluster.operators import a_op_spin, generalized_hamiltonian_full_space
+
 
 @nb.jit(nopython=True)
 def strip_imag(A, tol=1e-10):
@@ -317,68 +320,68 @@ def get_orbital_gradient_generalized_real_imag(
             for R in range(num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs):
                 for S in range(num_inactive_spin_orbs + num_active_spin_orbs + num_virtual_spin_orbs):
                     if Q == P:
-                        gradient_I[idx] += g_int[P, T, R, S] * RDM2(
+                        gradient_I[idx] += (0.5+0j)*g_int[P, T, R, S] * RDM2(
                             P, T, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_I[idx] -= g_int[T, S, R, P] * RDM2(
+                        gradient_I[idx] -= (0.5+0j)*g_int[T, S, R, P] * RDM2(
                             T, S, R, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_I[idx] += g_int[T, R, P, S] * RDM2(
+                        gradient_I[idx] += (0.5+0j)*g_int[T, R, P, S] * RDM2(
                             T, R, P, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_I[idx] -= g_int[T, P, R, S] * RDM2(
+                        gradient_I[idx] -= (0.5+0j)*g_int[T, P, R, S] * RDM2(
                             T, P, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
                     else:
                         # Real
-                        gradient_R[idx] += g_int[Q, T, R, S] * RDM2(
+                        gradient_R[idx] += (0.5+0j)*g_int[Q, T, R, S] * RDM2(
                             P, T, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_R[idx] -= g_int[S, T, R, P] * RDM2(
+                        gradient_R[idx] -= (0.5+0j)*g_int[S, T, R, P] * RDM2(
                             S, T, R, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_R[idx] += g_int[S, T, R, Q] * RDM2(
+                        gradient_R[idx] += (0.5+0j)*g_int[S, T, R, Q] * RDM2(
                             S, T, R, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_R[idx] -= g_int[P, T, R, S] * RDM2(
+                        gradient_R[idx] -= (0.5+0j)*g_int[P, T, R, S] * RDM2(
                             Q, T, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_R[idx] += g_int[T, Q, R, S] * RDM2(
+                        gradient_R[idx] += (0.5+0j)*g_int[T, Q, R, S] * RDM2(
                             T, P, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_R[idx] -= g_int[T, P, R, S] * RDM2(
+                        gradient_R[idx] -= (0.5+0j)*g_int[T, P, R, S] * RDM2(
                             T, Q, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_R[idx] += g_int[T, R, Q, S] * RDM2(
+                        gradient_R[idx] += (0.5+0j)*g_int[T, R, Q, S] * RDM2(
                             T, R, P, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_R[idx] -= g_int[T, R, P, S] * RDM2(
+                        gradient_R[idx] -= (0.5+0j)*g_int[T, R, P, S] * RDM2(
                             T, R, Q, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
 
                         # Imaginary
-                        gradient_I[idx] += g_int[Q, T, R, S] * RDM2(
+                        gradient_I[idx] += (0.5+0j)*g_int[Q, T, R, S] * RDM2(
                             P, T, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_I[idx] -= g_int[T, S, R, P] * RDM2(
+                        gradient_I[idx] -= (0.5+0j)*g_int[T, S, R, P] * RDM2(
                             T, S, R, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_I[idx] += g_int[T, R, Q, S] * RDM2(
+                        gradient_I[idx] += (0.5+0j)*g_int[T, R, Q, S] * RDM2(
                             T, R, P, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_I[idx] -= g_int[T, P, R, S] * RDM2(
+                        gradient_I[idx] -= (0.5+0j)*g_int[T, P, R, S] * RDM2(
                             T, Q, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_I[idx] += g_int[P, T, R, S] * RDM2(
+                        gradient_I[idx] += (0.5+0j)*g_int[P, T, R, S] * RDM2(
                             Q, T, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_I[idx] -= g_int[T, S, R, Q] * RDM2(
+                        gradient_I[idx] -= (0.5+0j)*g_int[T, S, R, Q] * RDM2(
                             T, S, R, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_I[idx] += g_int[T, R, P, S] * RDM2(
+                        gradient_I[idx] += (0.5+0j)*g_int[T, R, P, S] * RDM2(
                             T, R, Q, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
-                        gradient_I[idx] -= g_int[T, Q, R, S] * RDM2(
+                        gradient_I[idx] -= (0.5+0j)*g_int[T, Q, R, S] * RDM2(
                             T, P, R, S, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                         )
 
@@ -389,6 +392,59 @@ def get_orbital_gradient_generalized_real_imag(
     #for idx, (P, Q) in enumerate(kappa_idx):
     #    print(kappa_idx[idx])
     #    print(gradient_R[idx])
+
+    return gradient_total_real
+
+def exp_val_gradient(
+    ci_coeffs,
+    ci_info,
+    h_eri_mo,
+    g_eri_mo,
+    num_spin_orbs,
+    kappa_idx: list[tuple[int, int]],
+) -> tuple[np.ndarray]:
+    
+    H = generalized_hamiltonian_full_space(h_eri_mo, g_eri_mo,num_spin_orbs)
+
+    gradient_R = np.zeros(len(kappa_idx),dtype=complex)
+    gradient_I = np.zeros(len(kappa_idx),dtype=complex)
+
+    for idx, (M,N) in enumerate(kappa_idx):
+        if M == N:
+            gradient_I[idx] += 1j * expectation_value(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
+                                ci_coeffs, ci_info)
+            
+            gradient_I[idx] -= 1j * expectation_value(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
+                                ci_coeffs, ci_info)
+        else:
+            # Real  
+            gradient_R[idx] += expectation_value(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
+                                ci_coeffs, ci_info)
+                        
+            gradient_R[idx] -= expectation_value(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
+                                    ci_coeffs, ci_info)
+            
+            gradient_R[idx] += -expectation_value(ci_coeffs, [(a_op_spin(N,True)*a_op_spin(M,False))*H], 
+                                ci_coeffs, ci_info)
+                        
+            gradient_R[idx] -= -expectation_value(ci_coeffs, [H*(a_op_spin(N,True)*a_op_spin(M,False))], 
+                                    ci_coeffs, ci_info)
+
+            # Imaginary
+            gradient_I[idx] += 1j*expectation_value(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
+                                ci_coeffs, ci_info)
+                        
+            gradient_I[idx] -= 1j*expectation_value(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
+                                    ci_coeffs, ci_info)
+            
+            gradient_I[idx] += 1j*expectation_value(ci_coeffs, [(a_op_spin(N,True)*a_op_spin(M,False))*H], 
+                                ci_coeffs, ci_info)
+                        
+            gradient_I[idx] -= 1j*expectation_value(ci_coeffs, [H*(a_op_spin(N,True)*a_op_spin(M,False))], 
+                                    ci_coeffs, ci_info)
+        
+    gradient_total = np.concatenate((gradient_R, gradient_I))
+    gradient_total_real = strip_imag(gradient_total)  
 
     return gradient_total_real
 
