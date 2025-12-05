@@ -245,6 +245,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     g_eri_mo = generalized_two_electron_transform(c,g_eri)
     h_eri_mo = generalized_one_electron_transform(c,h_core)
 
+    print(c.shape[1])
 
     WF = GeneralizedWaveFunctionUPS(
         mol.nelectron,
@@ -263,17 +264,17 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     H=generalized_hamiltonian_full_space(h_eri_mo, g_eri_mo,int(c.shape[0]/2))
     H2=generalized_hamiltonian_0i_0a_spinidx(h_eri_mo, g_eri_mo,int(c.shape[0]/2),WF.num_active_elec)
-    H3=generalized_hamiltonian_1i_1a_spinidx(h_eri_mo, g_eri_mo,int(c.shape[0]/2),WF.num_active_elec,
-                                     WF.num_virtual_spin_orbs)
+    #H3=generalized_hamiltonian_1i_1a_spinidx(h_eri_mo, g_eri_mo,int(c.shape[0]/2),WF.num_active_elec,
+    #                                 WF.num_virtual_spin_orbs)
     
 
     test_energy=expectation_value(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
     test_energy2=expectation_value(WF.ci_coeffs, [H2], WF.ci_coeffs, WF.ci_info)
-    test_energy3=expectation_value(WF.ci_coeffs, [H3], WF.ci_coeffs, WF.ci_info)
+    #test_energy3=expectation_value(WF.ci_coeffs, [H3], WF.ci_coeffs, WF.ci_info)
 
     print(test_energy)
     print(test_energy2)
-    print(test_energy3)
+    #print(test_energy3)
 
 
     one = get_orbital_gradient_generalized_real_imag(WF.h_mo,
@@ -281,8 +282,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
             WF.kappa_spin_idx,
             WF.num_inactive_spin_orbs,
             WF.num_active_spin_orbs,
-            WF.rdm1,
-            WF.rdm2)
+            WF.num_virtual_spin_orbs,
+            WF.rdm1_FULL,
+            WF.rdm2_FULL)
 
     print("hubub",one)
 
@@ -309,7 +311,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
-    #basis = "cc-pvtz"
+    #basis = "cc-pvdz"
     basis = "631-g"
     #basis = "sto-3g"
     active_space = ((1, 1), 4)

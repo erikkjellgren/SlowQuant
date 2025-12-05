@@ -265,6 +265,7 @@ def get_orbital_gradient_generalized_real_imag(
     kappa_idx: list[tuple[int, int]],
     num_inactive_spin_orbs: int,
     num_active_spin_orbs: int,
+    num_virtual_spin_orbs: int,
     rdm1: np.ndarray,
     rdm2: np.ndarray,
 ) -> tuple[np.ndarray]:
@@ -288,7 +289,7 @@ def get_orbital_gradient_generalized_real_imag(
     gradient_R = np.zeros(len(kappa_idx),dtype=np.complex128)
     gradient_I = np.zeros(len(kappa_idx),dtype=np.complex128)
 
-    for idx, (Q, P) in enumerate(kappa_idx):
+    for idx, (P, Q) in enumerate(kappa_idx):
         # 1e contribution
         for T in range(num_inactive_spin_orbs + num_active_spin_orbs):
             if Q == P:
