@@ -1205,7 +1205,7 @@ class GeneralizedWaveFunctionUPS:
                 self.num_inactive_spin_orbs,
                 self.num_active_spin_orbs,
                 self.rdm1,
-                self.rdm2
+                self.rdm2_symmetry
                 )
             elif test_gradient == "anna":
                 gradient[:num_kappa] = get_orbital_gradient_test_anna(self.h_mo, self.g_mo, 
@@ -1213,7 +1213,7 @@ class GeneralizedWaveFunctionUPS:
                 self.num_inactive_spin_orbs,
                 self.num_active_spin_orbs,
                 self.rdm1,
-                self.rdm2
+                self.rdm2_symmetry
                 )
             else:
                 gradient[:num_kappa] = exp_val_gradient(self.ci_coeffs,self.ci_info,self.h_mo,self.g_mo,
