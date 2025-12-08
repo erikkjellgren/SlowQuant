@@ -2,8 +2,8 @@
 import numpy as np
 
 import slowquant.SlowQuant as sq
-import slowquant.unitary_coupled_cluster.linear_response.naive as naivelr
-import slowquant.unitary_coupled_cluster.linear_response.selfconsistent as selfconsistentlr
+import SlowQuant.slowquant.unitary_coupled_cluster.linear_response.generalized_naive as naivelr
+import SlowQuant.slowquant.unitary_coupled_cluster.linear_response.generalized_selfconsistent as selfconsistentlr
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import (
     WaveFunctionUCC,
     load_wavefunction,

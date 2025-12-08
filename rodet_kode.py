@@ -5,7 +5,7 @@ from pyscf import mcscf, scf, gto, x2c
 # from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS 
-from slowquant.unitary_coupled_cluster.linear_response import naive
+from SlowQuant.slowquant.unitary_coupled_cluster.linear_response import generalized_naive
 from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
 from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space
 
@@ -88,7 +88,7 @@ def restricted(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=1
     )
     WF.do_adapt(["GS", "GD"], orbital_optimization=True)
     
-    LR = naive.LinearResponse(WF, excitations="SD")
+    LR = generalized_naive.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     print(LR.excitation_energies)
 

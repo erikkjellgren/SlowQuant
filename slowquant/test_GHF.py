@@ -6,7 +6,7 @@ from pyscf import mcscf, scf, gto, x2c
 # from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
-from slowquant.unitary_coupled_cluster.linear_response import naive
+from SlowQuant.slowquant.unitary_coupled_cluster.linear_response import generalized_naive
 
 
 def unrestricted(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
