@@ -575,8 +575,10 @@ def expectation_value(
     # not isinstance(val, float):
         # ValueError(f"Calculated expectation value is not a float, got type {type(val)}")
 
-    if val.imag > 0:
-        print("Warning: Expectation value is complex!!")
+
+
+    #if val.imag > 0:
+        #print("Warning: Expectation value is complex!!")
 
     return val.real
 
@@ -797,7 +799,7 @@ def construct_ups_state(
         if abs(theta) < 10**-14:
             continue
         if dagger:
-            theta = -theta.conj()
+            theta = -theta.conjugate()
         if exc_type in ("sa_single",):
             A = 1  # 2**(-1/2)
             (i, a) = np.array(exc_indices) + offset

@@ -29,6 +29,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     get_grad_action,
     propagate_state,
     propagate_unitary,
+    expectation_value_for_gradient
 )
 from slowquant.unitary_coupled_cluster.operators import G1, G2
 from slowquant.unitary_coupled_cluster.operators import generalized_hamiltonian_0i_0a
@@ -448,7 +449,7 @@ class GeneralizedWaveFunctionUPS:
         """
         # Annika has added dtype=complex
         if self._rdm1 is None:
-            self._rdm1 = np.zeros((self.num_active_spin_orbs, self.num_active_spin_orbs), dtype=complex)
+            self._rdm1 = np.zeros((self.num_active_spin_orbs, self.num_active_spin_orbs), dtype=np.complex128)
             for P in range(
                 self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
             ):
@@ -480,7 +481,8 @@ class GeneralizedWaveFunctionUPS:
                     self.num_active_spin_orbs,
                     self.num_active_spin_orbs,
                     self.num_active_spin_orbs,
-                )
+                ),
+                dtype=np.complex128 
             )
             for P in range(self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs):
                 P_idx = P - self.num_inactive_spin_orbs
@@ -943,6 +945,7 @@ class GeneralizedWaveFunctionUPS:
             )
             grad = []
 
+
             for idx, exc_type in enumerate(excitation_pool_type):
                 if exc_type == "single":
                     (i, a) = np.array(excitation_pool[idx])
@@ -964,6 +967,7 @@ class GeneralizedWaveFunctionUPS:
 
             self._thetas_real.append(0.0)
             self._thetas_imag.append(0.0)
+            #print("running 1step")
             self.run_wf_optimization_1step("bfgs", orbital_optimization=orbital_optimization, is_silent=True)
             time_str = f"{time.time() - start:7.2f}"
             e_str = f"{self.energy_elec:3.12f}"
@@ -1043,6 +1047,7 @@ class GeneralizedWaveFunctionUPS:
             Electronic gradient.
         """
         gradient = np.zeros(len(parameters))
+        temp = np.zeros(len(parameters),dtype=np.complex128)
         num_kappa = 0
         if kappa_optimization:
             num_kappa = 2*len(self.kappa_spin_idx)
@@ -1104,7 +1109,10 @@ class GeneralizedWaveFunctionUPS:
                     self.ci_info,
                     self.ups_layout,
                 )
-                gradient[i + num_kappa] += 2 * np.matmul(bra_vec, ket_vec_tmp)
+                temp = 2 * np.matmul(bra_vec, ket_vec_tmp)
+                #if temp.imag > 0:
+                #    print ("gradient is complex!")
+                gradient[i + num_kappa] += 2 * np.matmul(bra_vec, ket_vec_tmp).real
                 # Product rule implications on reference bra and CSF ket
                 # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
                 bra_vec = propagate_unitary(
