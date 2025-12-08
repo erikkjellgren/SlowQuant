@@ -77,8 +77,8 @@ def apply_operator(
     create_idxs = create_idxs[::-1]
     # loop over all determinants in new_state
     for i, det in enumerate(idx2det):
-        # if abs(state[i]) < 10**-14:
-        #    continue
+        if abs(state[i]) < 10**-30:
+            continue
         phase_changes = 0
         is_killstate = False
         # evaluate how string of annihilation operator change det
@@ -223,13 +223,13 @@ def apply_operator_SA(
     create_idxs = create_idxs[::-1]
     # loop over all determinants in new_state
     for i, det in enumerate(idx2det):
-        # is_non_zero = False
-        # for val in state[:, i]:
-        #    if abs(val) > 10**-14:
-        #        is_non_zero = True
-        #        break
-        # if not is_non_zero:
-        #    continue
+        is_non_zero = False
+        for val in state[:, i]:
+            if abs(val) > 10**-30:
+                is_non_zero = True
+                break
+        if not is_non_zero:
+            continue
         phase_changes = 0
         is_killstate = False
         # evaluate how string of annihilation operator change det
@@ -1614,7 +1614,7 @@ def propagate_unitary(
     exc_indices = ups_struct.excitation_indices[idx]
     theta = thetas[idx]
     offset = ci_info.space_extension_offset
-    if abs(theta) < 10**-30:
+    if abs(theta) < 10**-14:
         return np.copy(state)
     if exc_type in ("sa_single",):
         A = 1  # 2**(-1/2)
@@ -2047,7 +2047,7 @@ def propagate_unitary_SA(
     exc_indices = ups_struct.excitation_indices[idx]
     theta = thetas[idx]
     offset = ci_info.space_extension_offset
-    if abs(theta) < 10**-30:
+    if abs(theta) < 10**-14:
         return np.copy(state)
     if exc_type in ("sa_single",):
         A = 1  # 2**(-1/2)
