@@ -283,7 +283,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         c_u,
         h_core,
         g_eri,
-        "fuccsd",
+        "adapt",
         {"n_layers": 2},
         include_active_kappa=True,
     )
