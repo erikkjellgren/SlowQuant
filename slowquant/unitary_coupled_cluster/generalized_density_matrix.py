@@ -211,13 +211,8 @@ def get_electronic_energy_generalized(
     return energy.real
 
 
-<<<<<<< HEAD
 @nb.jit(nopython=True)
 def get_orbital_gradient_generalized_total(
-=======
-@nb.jit(nopython=True) #TJEK LIGE OM INDICES PASSER 
-def get_orbital_gradient_generalized(
->>>>>>> 1af9f6006e4d8553e012481f2ae0b66a40dbb245
     h_int: np.ndarray,
     g_int: np.ndarray,
     kappa_idx: list[tuple[int, int]],
