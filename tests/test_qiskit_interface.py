@@ -1,6 +1,7 @@
 import numpy as np
 import pyscf
 from numpy.testing import assert_allclose
+from SlowQuant.slowquant.unitary_coupled_cluster.linear_response import generalized_allprojected
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel, depolarizing_error
 from qiskit_aer.noise.errors import (
@@ -21,9 +22,8 @@ import slowquant.SlowQuant as sq
 from slowquant.qiskit_interface.circuit_wavefunction import WaveFunctionCircuit
 from slowquant.qiskit_interface.interface import QuantumInterface
 from slowquant.qiskit_interface.sa_circuit_wavefunction import WaveFunctionSACircuit
-from slowquant.unitary_coupled_cluster.linear_response import (
-    allprojected,
-    naive,
+from SlowQuant.slowquant.unitary_coupled_cluster.linear_response import (
+    generalized_naive,
 )
 from slowquant.unitary_coupled_cluster.operators import hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.sa_ups_wavefunction import WaveFunctionSAUPS
@@ -79,7 +79,7 @@ def test_LiH_naive() -> None:
     qWF.run_wf_optimization_2step("rotosolve", True)
 
     # LR with SQ
-    LR = naive.LinearResponse(WF, excitations="SD")
+    LR = generalized_naive.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
 
     # LR with QSQ
@@ -214,7 +214,7 @@ def test_LiH_allprojected() -> None:
     qWF.run_wf_optimization_2step("rotosolve", True)
 
     # LR with SQ
-    LR = allprojected.LinearResponse(WF, excitations="SD")
+    LR = generalized_allprojected.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
 
     # LR with QSQ

@@ -6,7 +6,7 @@ from scipy.stats import unitary_group
 # from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
-from slowquant.unitary_coupled_cluster.linear_response import naive
+from SlowQuant.slowquant.unitary_coupled_cluster.linear_response import generalized_naive
 from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
 from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, hamiltonian_0i_0a, hamiltonian_1i_1a
 from slowquant.unitary_coupled_cluster.operators import a_op_spin
@@ -90,7 +90,7 @@ def restricted(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=1
     )
     WF.do_adapt(["GS", "GD"], orbital_optimization=True)
     
-    LR = naive.LinearResponse(WF, excitations="SD")
+    LR = generalized_naive.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     print(LR.excitation_energies)
 
@@ -137,7 +137,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # print("kappa_real:", WF.kappa_real)
     # print("kappa_imag:", WF.kappa_imag)
     # print("E_opt:", WF._energy_elec)
-    LR = naive.LinearResponse(WF, excitations="sd")
+    LR = generalized_naive.LinearResponse(WF, excitations="sd")
     # LR.calc_excitation_energies()
     # print(LR.excitation_energies)
 

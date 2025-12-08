@@ -4,7 +4,7 @@ from pyscf import mcscf, scf, gto, x2c
 
 # from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
-from slowquant.unitary_coupled_cluster.linear_response import naive
+from SlowQuant.slowquant.unitary_coupled_cluster.linear_response import generalized_naive
 
 
 def unrestricted(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
@@ -119,7 +119,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         include_active_kappa=True,
     )
     WF.run_wf_optimization_1step("bfgs", True)
-    LR = naive.LinearResponse(WF, excitations="SD")
+    LR = generalized_naive.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     print(LR.excitation_energies)
 

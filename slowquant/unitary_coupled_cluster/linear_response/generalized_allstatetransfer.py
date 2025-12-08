@@ -10,7 +10,7 @@ from slowquant.unitary_coupled_cluster.ci_spaces import (
     get_indexing_extended,
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
-from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
+from slowquant.unitary_coupled_cluster.linear_response.generalized_lr_baseclass import (
     LinearResponseBaseClass,
 )
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
@@ -50,7 +50,7 @@ class LinearResponse(LinearResponseBaseClass):
             self.wf.num_virtual_orbs,
             self.wf.num_active_elec_alpha,
             self.wf.num_active_elec_beta,
-            2,
+            1,
         )
         if isinstance(self.wf, WaveFunctionUCC):
             self.index_info_extended = (
@@ -101,12 +101,16 @@ class LinearResponse(LinearResponseBaseClass):
             if np.max(np.abs(grad)) > 10**-3:
                 raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
         grad = np.zeros(2 * len(self.G_ops))
-        UdH00_ket = propagate_state(["Ud", self.H_0i_0a], self.ci_coeffs, *self.index_info_extended)
+        UdH_ket = propagate_state(
+            ["Ud", self.H_0i_0a],
+            self.ci_coeffs,
+            *self.index_info_extended,
+        )
         for i, op in enumerate(self.G_ops):
             G_ket = propagate_state([op], self.csf_coeffs, *self.index_info_extended)
             # - <0| H U G |CSF>
             grad[i] = -expectation_value(
-                UdH00_ket,
+                UdH_ket,
                 [],
                 G_ket,
                 *self.index_info_extended,
@@ -115,165 +119,63 @@ class LinearResponse(LinearResponseBaseClass):
             grad[i + len(self.G_ops)] = expectation_value(
                 G_ket,
                 [],
-                UdH00_ket,
+                UdH_ket,
                 *self.index_info_extended,
             )
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
                 raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
-        H_ket = propagate_state([H_2i_2a], self.ci_coeffs, *self.index_info_extended, do_unsafe=True)  # type: ignore
-        UdH_ket = propagate_state(["Ud"], H_ket, *self.index_info_extended, do_unsafe=True)  # type: ignore
         for j, qJ in enumerate(self.q_ops):
-            UdHUqJ_ket = propagate_state(
+            UdHUqJ = propagate_state(
                 ["Ud", H_2i_2a, "U", qJ],
                 self.csf_coeffs,
                 *self.index_info_extended,
                 do_unsafe=True,  # type: ignore
             )
-            qJUdH_ket = propagate_state([qJ], UdH_ket, *self.index_info_extended, do_unsafe=True)  # type: ignore
-            qJdUdH_ket = propagate_state([qJ.dagger], UdH_ket, *self.index_info_extended, do_unsafe=True)  # type: ignore
             for i, qI in enumerate(self.q_ops[j:], j):
-                qI_ket = propagate_state([qI], self.csf_coeffs, *self.index_info_extended, do_unsafe=True)  # type: ignore
                 # Make A
                 # <CSF| qId Ud H U qJ |CSF>
                 val = expectation_value(
-                    qI_ket,
-                    [],
-                    UdHUqJ_ket,
+                    self.csf_coeffs,
+                    [qI.dagger],
+                    UdHUqJ,
                     *self.index_info_extended,
                 )
-                # - 1/2<CSF| qId qJ Ud H |0>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
-                        qI_ket,
-                        [],
-                        qJUdH_ket,
-                        *self.index_info_extended,
-                    )
-                )
-                # - 1/2<0| H U qId qJ |CSF>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
-                        UdH_ket,
-                        [qI.dagger, qJ],
-                        self.csf_coeffs,
-                        *self.index_info_extended,
-                    )
-                )
+                if i == j:
+                    val -= self.wf.energy_elec
                 self.A[i, j] = self.A[j, i] = val
-                # Make B
-                # -<CSF| qId qJd Ud H |0>
-                val = -expectation_value(
-                    qI_ket,
-                    [],
-                    qJdUdH_ket,
-                    *self.index_info_extended,
-                )
-                self.B[i, j] = self.B[j, i] = val
                 # Make Sigma
                 if i == j:
                     self.Sigma[i, j] = self.Sigma[j, i] = 1
-        for j, qJ in enumerate(self.q_ops):
-            UdHUq_ket = propagate_state(
-                ["Ud", self.H_1i_1a, "U", qJ],
-                self.csf_coeffs,
-                *self.index_info_extended,
-                do_unsafe=True,  # type: ignore
-            )
-            qdUdH_ket = propagate_state(
-                [qJ.dagger, "Ud", self.H_1i_1a],
-                self.ci_coeffs,
-                *self.index_info_extended,
-                do_unsafe=True,  # type: ignore
-            )
             for i, GI in enumerate(self.G_ops):
-                G_ket = propagate_state([GI], self.csf_coeffs, *self.index_info_extended)
                 # Make A
                 # <CSF| Gd Ud H U q |CSF>
                 val = expectation_value(
-                    G_ket,
-                    [],
-                    UdHUq_ket,
+                    self.csf_coeffs,
+                    [GI.dagger],
+                    UdHUqJ,
                     *self.index_info_extended,
                 )
-                self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
-                # Make B
-                # - 1/2*<CSF| Gd qd Ud H |0>
-                val = (
-                    -1
-                    / 2
-                    * expectation_value(
-                        G_ket,
-                        [],
-                        qdUdH_ket,
-                        *self.index_info_extended,
-                    )
-                )
-                # - 1/2<CSF| qd Gd Ud H |0>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
-                        self.csf_coeffs,
-                        [qJ.dagger, GI.dagger],
-                        UdH_ket,
-                        *self.index_info_extended,
-                    )
-                )
-                self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
+                self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = val
         for j, GJ in enumerate(self.G_ops):
-            UdHUGJ_ket = propagate_state(
-                ["Ud", self.H_0i_0a, "U", GJ], self.csf_coeffs, *self.index_info_extended
+            UdHUGJ = propagate_state(
+                ["Ud", self.H_0i_0a, "U", GJ],
+                self.csf_coeffs,
+                *self.index_info_extended,
             )
-            GJUdH_ket = propagate_state([GJ], UdH00_ket, *self.index_info_extended)
-            GJdUdH_ket = propagate_state([GJ.dagger], UdH00_ket, *self.index_info_extended)
             for i, GI in enumerate(self.G_ops[j:], j):
-                GI_ket = propagate_state([GI], self.csf_coeffs, *self.index_info_extended)
                 # Make A
                 # <CSF| GId Ud H U GJ |CSF>
                 val = expectation_value(
-                    GI_ket,
-                    [],
-                    UdHUGJ_ket,
+                    self.csf_coeffs,
+                    [GI.dagger],
+                    UdHUGJ,
                     *self.index_info_extended,
                 )
-                # - 1/2<CSF| GId GJ Ud H |0>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
-                        GI_ket,
-                        [],
-                        GJUdH_ket,
-                        *self.index_info_extended,
-                    )
-                )
-                # - 1/2<0| H U GId GJ |CSF>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
-                        UdH00_ket,
-                        [GI.dagger, GJ],
-                        self.csf_coeffs,
-                        *self.index_info_extended,
-                    )
-                )
+                if i == j:
+                    val -= self.wf.energy_elec
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
-                # Make B
-                # - <CSF| GId GJd Ud H |0>
-                val = -expectation_value(
-                    GI_ket,
-                    [],
-                    GJdUdH_ket,
-                    *self.index_info_extended,
-                )
-                self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
                 # Make Sigma
                 if i == j:
                     self.Sigma[i + idx_shift, j + idx_shift] = 1

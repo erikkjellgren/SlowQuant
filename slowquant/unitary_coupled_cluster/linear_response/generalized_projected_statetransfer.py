@@ -7,18 +7,19 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_gradient_response,
-    get_orbital_response_hessian_block,
-    get_orbital_response_metric_sigma,
     get_orbital_response_property_gradient,
 )
-from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
+from slowquant.unitary_coupled_cluster.linear_response.generalized_lr_baseclass import (
     LinearResponseBaseClass,
 )
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     expectation_value,
     propagate_state,
 )
-from slowquant.unitary_coupled_cluster.operators import one_elec_op_0i_0a
+from slowquant.unitary_coupled_cluster.operators import (
+    hamiltonian_2i_2a,
+    one_elec_op_0i_0a,
+)
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
@@ -37,11 +38,19 @@ class LinearResponse(LinearResponseBaseClass):
         """
         super().__init__(wave_function, excitations)
 
+        H_2i_2a = hamiltonian_2i_2a(
+            self.wf.h_mo,
+            self.wf.g_mo,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
+        )
+
         idx_shift = len(self.q_ops)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
         if len(self.q_ops) != 0:
-            grad = get_orbital_gradient_response(
+            grad = get_orbital_gradient_response(  # proj-q and naive-q lead to same working equations
                 self.wf.h_mo,
                 self.wf.g_mo,
                 self.wf.kappa_no_activeactive_idx,
@@ -61,14 +70,14 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.csf_coeffs,
                 *self.index_info,
             )
-            # - <0| H U G |CSF>
+            # <0| H U G |CSF>
             grad[i] = -expectation_value(
                 UdH00_ket,
                 [],
                 G_ket,
                 *self.index_info,
             )
-            # <0| Gd Ud H |0>
+            # <CSF| Gd Ud H |0>
             grad[i + len(self.G_ops)] = expectation_value(
                 G_ket,
                 [],
@@ -79,37 +88,31 @@ class LinearResponse(LinearResponseBaseClass):
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
                 raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
-        if len(self.q_ops) != 0:
-            # Do orbital-orbital blocks
-            self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.kappa_no_activeactive_idx_dagger,
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.rdm1,
-                self.wf.rdm2,
-            )
-            self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.kappa_no_activeactive_idx_dagger,
-                self.wf.kappa_no_activeactive_idx_dagger,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.rdm1,
-                self.wf.rdm2,
-            )
-            self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.rdm1,
-            )
+        for j, qJ in enumerate(self.q_ops):
+            for i, qI in enumerate(self.q_ops[j:], j):
+                # Make A
+                val = expectation_value(
+                    self.wf.ci_coeffs,
+                    [qI.dagger * H_2i_2a * qJ],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
+                )
+                val -= (
+                    expectation_value(
+                        self.wf.ci_coeffs, [qI.dagger * qJ], self.wf.ci_coeffs, *self.index_info
+                    )
+                    * self.wf.energy_elec
+                )
+                self.A[i, j] = self.A[j, i] = val
+                # Make Sigma
+                self.Sigma[i, j] = self.Sigma[j, i] = expectation_value(
+                    self.wf.ci_coeffs,
+                    [qI.dagger * qJ],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
+                )
         for j, qJ in enumerate(self.q_ops):
             UdHq_ket = propagate_state(["Ud", self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info)
-            UdqdH_ket = propagate_state(["Ud", qJ.dagger * self.H_1i_1a], self.wf.ci_coeffs, *self.index_info)
             for i, GI in enumerate(self.G_ops):
                 G_ket = propagate_state([GI], self.wf.csf_coeffs, *self.index_info)
                 # Make A
@@ -121,32 +124,19 @@ class LinearResponse(LinearResponseBaseClass):
                     *self.index_info,
                 )
                 self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = val
-                # Make B
-                # - 1/2<CSF| Gd Ud qd H |0>
-                val = (
-                    -1
-                    / 2
-                    * expectation_value(
-                        G_ket,
-                        [],
-                        UdqdH_ket,
-                        *self.index_info,
-                    )
-                )
-                self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = val
         for j, GJ in enumerate(self.G_ops):
-            UdHUGJ = propagate_state(
+            UdHUGJ_ket = propagate_state(
                 ["Ud", self.H_0i_0a, "U", GJ],
                 self.wf.csf_coeffs,
                 *self.index_info,
             )
             for i, GI in enumerate(self.G_ops[j:], j):
                 # Make A
-                # <CSF| GId Ud H U GJ | CSF>
+                # <CSF| GId Ud H U GJ |CSF>
                 val = expectation_value(
                     self.wf.csf_coeffs,
                     [GI.dagger],
-                    UdHUGJ,
+                    UdHUGJ_ket,
                     *self.index_info,
                 )
                 if i == j:

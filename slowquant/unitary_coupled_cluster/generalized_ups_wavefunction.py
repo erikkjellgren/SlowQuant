@@ -16,20 +16,13 @@ from slowquant.molecularintegrals.integralfunctions import (
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_generalized
 from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_electronic_energy_generalized,
-    get_orbital_gradient_generalized_real_imag, get_orbital_gradient_test_anna,
-    get_orbital_gradient_generalized,
-    get_orbital_gradient_test_anna,
-    exp_val_gradient
+    get_orbital_gradient_generalized_real_imag,
 )
 from slowquant.unitary_coupled_cluster.generalized_operators import (
     a_op_spin,
     generalized_hamiltonian_full_space,
 )
 
-# from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
-#    get_electronic_energy_generalized,
-#    get_orbital_gradient_generalized,
-# )
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     construct_ups_state,
     expectation_value,
@@ -48,7 +41,6 @@ from slowquant.unitary_coupled_cluster.util import (
     iterate_t2_generalized,
 )
 from slowquant.unitary_coupled_cluster.util import UpsStructure
-from slowquant.unitary_coupled_cluster.generalized_density_matrix import get_orbital_gradient_generalized, get_orbital_gradient_generalized_real_imag, get_electronic_energy_generalized, get_orbital_gradient_test_anna
 
 class GeneralizedWaveFunctionUPS:
     def __init__(
@@ -473,41 +465,14 @@ class GeneralizedWaveFunctionUPS:
                     self._rdm1[Q_idx, P_idx] = val.conjugate()  # type: ignore (1.7.7 EST)
         return self._rdm1
     
-    @property
-    def rdm1_FULL(self) -> np.ndarray:
-        """Calculate one-electron reduced density matrix in the active space.
-
-        Returns:
-            One-electron reduced density matrix.
-        """
-        # Annika has added dtype=complex
-        if self._rdm1 is None:
-            self._rdm1 = np.zeros((self.num_active_spin_orbs, self.num_active_spin_orbs), dtype=complex)
-            for P in range(
-                self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
-            ):
-                P_idx = P - self.num_inactive_spin_orbs
-                for Q in range(
-                    self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
-                ):
-                    Q_idx = Q - self.num_inactive_spin_orbs
-                    val = expectation_value(
-                        self.ci_coeffs,
-                        [(a_op_spin(P, True) * a_op_spin(Q, False))],
-                        self.ci_coeffs,
-                        self.ci_info,
-                    )
-                    self._rdm1[P_idx, Q_idx] = val  # type: ignore
-        return self._rdm1
 
     @property
     def rdm2(self) -> np.ndarray:
-        """Calculate two-electron reduced density matrix in the active space.
+        """Calculate two-electron reduced density matrix in the active space based on complex spin orbitals.
 
         Returns:
             Two-electron reduced density matrix.
         """
-        # Annika has added dtype=complex
         if self._rdm2 is None:
             self._rdm2 = np.zeros(
                 (
@@ -515,96 +480,45 @@ class GeneralizedWaveFunctionUPS:
                     self.num_active_spin_orbs,
                     self.num_active_spin_orbs,
                     self.num_active_spin_orbs,
-                ),
-            dtype=complex)
-            for p in range(
-                self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
-            ):
-                p_idx = p - self.num_inactive_spin_orbs
-                for q in range(self.num_inactive_spin_orbs, p + 1):
-                    q_idx = q - self.num_inactive_spin_orbs
-                    for r in range(self.num_inactive_spin_orbs, p + 1):
-                        r_idx = r - self.num_inactive_spin_orbs
-                        if p == q:
-                            s_lim = r + 1
-                        elif p == r:
-                            s_lim = q + 1
-                        elif q < r:
-                            s_lim = p
+                )
+            )
+            for P in range(self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs):
+                P_idx = P - self.num_inactive_spin_orbs
+                for Q in range(self.num_inactive_spin_orbs, P + 1):
+                    Q_idx = Q - self.num_inactive_spin_orbs
+                    for R in range(self.num_inactive_spin_orbs, P + 1):
+                        R_idx = R - self.num_inactive_spin_orbs
+                        if P == Q:
+                            S_lim = R + 1
+                        elif P == R:
+                            S_lim = Q + 1
+                        elif Q < R:
+                            S_lim = P # Not sure I understand this limit? Why not R?
                         else:
-                            s_lim = p + 1
-                        for s in range(self.num_inactive_spin_orbs, s_lim):
-                            s_idx = s - self.num_inactive_spin_orbs
+                            S_lim = P + 1
+                        for S in range(self.num_inactive_spin_orbs, S_lim):
+                            S_idx = S - self.num_inactive_spin_orbs
                             val = expectation_value(
                                 self.ci_coeffs,
-                                [
-                                    (
-                                        a_op_spin(p, True)
-                                        * a_op_spin(r, True)
-                                        * a_op_spin(s, False)
-                                        * a_op_spin(q, False)
-                                    )
-                                ],
+                                [a_op_spin(P,dagger=True)*a_op_spin(R,dagger=True)*
+                                 a_op_spin(S,dagger=False)*a_op_spin(Q,dagger=False)],
                                 self.ci_coeffs,
                                 self.ci_info,
+                                do_folding=False,
                             )
-                            if q == r:
-                                val -= self.rdm1[p_idx, s_idx]
-                            self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
-                            self._rdm2[q_idx, p_idx, s_idx, r_idx] = val.conjugate()  # type: ignore
-                            self._rdm2[r_idx, s_idx, p_idx, q_idx] = val  # type: ignore
-                            self._rdm2[s_idx, r_idx, q_idx, p_idx] = val.conjugate()  # type: ignore
+                            #if Q == R: # No comprehendo
+                            #    val -= self.rdm1[P_idx, S_idx]
+
+                            self._rdm2[P_idx, Q_idx, R_idx, S_idx] =  val  # type: ignore
+                            self._rdm2[Q_idx, P_idx, S_idx, R_idx] =  val.conjugate()  # type: ignore
+                            self._rdm2[R_idx, S_idx, P_idx, Q_idx] =  val  # type: ignore
+                            self._rdm2[S_idx, R_idx, Q_idx, P_idx] =  val.conjugate()  # type: ignore
+
+                            self._rdm2[R_idx, Q_idx, P_idx, S_idx] = -val  # type: ignore
+                            self._rdm2[P_idx, S_idx, R_idx, Q_idx] = -val  # type: ignore
+                            
         return self._rdm2
     
-
-    @property
-    def rdm2_FULL(self) -> np.ndarray:
-        """Calculate two-electron reduced density matrix in the active space.
-
-        Returns:
-            Two-electron reduced density matrix.
-        """
-        # Annika has added dtype=complex
-        if self._rdm2 is None:
-            self._rdm2 = np.zeros(
-                (
-                    self.num_active_spin_orbs,
-                    self.num_active_spin_orbs,
-                    self.num_active_spin_orbs,
-                    self.num_active_spin_orbs,
-                ),
-            dtype=complex)
-            for p in range(
-                self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
-            ):
-                p_idx = p - self.num_inactive_spin_orbs
-                for q in range(
-                    self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
-                ):
-                    q_idx = q - self.num_inactive_spin_orbs
-                    for r in range(
-                        self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
-                    ):
-                        r_idx = r - self.num_inactive_spin_orbs
-                        for s in range(
-                            self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
-                        ):
-                            s_idx = s - self.num_inactive_spin_orbs
-                            val = expectation_value(
-                                self.ci_coeffs,
-                                [
-                                    (
-                                        a_op_spin(p, True)
-                                        * a_op_spin(r, True)
-                                        * a_op_spin(s, False)
-                                        * a_op_spin(q, False)
-                                    )
-                                ],
-                                self.ci_coeffs,
-                                self.ci_info,
-                            )
-                            self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
-        return self._rdm2
 
     @property
     def rdm1_FULL(self) -> np.ndarray:
@@ -679,58 +593,7 @@ class GeneralizedWaveFunctionUPS:
                             )
                             self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
         return self._rdm2
-    @property
-    def rdm2_symmetry(self) -> np.ndarray:
-        """Calculate two-electron reduced density matrix in the active space based on complex spin orbitals.
-
-        Returns:
-            Two-electron reduced density matrix.
-        """
-        if self._rdm2 is None:
-            self._rdm2 = np.zeros(
-                (
-                    self.num_active_spin_orbs,
-                    self.num_active_spin_orbs,
-                    self.num_active_spin_orbs,
-                    self.num_active_spin_orbs,
-                )
-            )
-            for P in range(self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs):
-                P_idx = P - self.num_inactive_spin_orbs
-                for Q in range(self.num_inactive_spin_orbs, P + 1):
-                    Q_idx = Q - self.num_inactive_spin_orbs
-                    for R in range(self.num_inactive_spin_orbs, P + 1):
-                        R_idx = R - self.num_inactive_spin_orbs
-                        if P == Q:
-                            S_lim = R + 1
-                        elif P == R:
-                            S_lim = Q + 1
-                        elif Q < R:
-                            S_lim = P # Not sure I understand this limit? Why not R?
-                        else:
-                            S_lim = P + 1
-                        for S in range(self.num_inactive_spin_orbs, S_lim):
-                            S_idx = S - self.num_inactive_spin_orbs
-                            val = expectation_value(
-                                self.ci_coeffs,
-                                [a_op_spin(P,dagger=True)*a_op_spin(R,dagger=True)*
-                                 a_op_spin(S,dagger=False)*a_op_spin(Q,dagger=False)],
-                                self.ci_coeffs,
-                                self.ci_info,
-                                do_folding=False,
-                            )
-                            #if Q == R: # No comprehendo
-                            #    val -= self.rdm1[P_idx, S_idx]
-
-                            self._rdm2[P_idx, Q_idx, R_idx, S_idx] =  val  # type: ignore
-                            self._rdm2[Q_idx, P_idx, S_idx, R_idx] =  val.conjugate()  # type: ignore
-                            self._rdm2[R_idx, S_idx, P_idx, Q_idx] =  val  # type: ignore
-                            self._rdm2[S_idx, R_idx, Q_idx, P_idx] =  val.conjugate()  # type: ignore
-
-                            self._rdm2[R_idx, Q_idx, P_idx, S_idx] = -val  # type: ignore
-                            self._rdm2[P_idx, S_idx, R_idx, Q_idx] = -val  # type: ignore
-                            
-        return self._rdm2
+    
 
     def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
         r"""Check orthonormality of orbitals.
@@ -757,8 +620,8 @@ class GeneralizedWaveFunctionUPS:
             self._energy_elec = expectation_value(
                 self.ci_coeffs,
                 # Skal ændres til generalized_hamiltonian_0i_0a på et tidspunkt.
-                # [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
-                [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
+                [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
+                #[generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
             )
@@ -895,7 +758,6 @@ class GeneralizedWaveFunctionUPS:
         tol: float = 1e-10,
         maxiter: int = 1000,
         is_silent: bool = False,
-        test_gradient: str = "anna",
     ) -> None:
         """Run one step optimization of wave function.
 
@@ -940,7 +802,6 @@ class GeneralizedWaveFunctionUPS:
                     self._calc_gradient_optimization,
                     theta_optimization=False,
                     kappa_optimization=True,
-                    test_gradient = test_gradient,
                 )
         else:
             energy = partial(
@@ -1158,8 +1019,8 @@ class GeneralizedWaveFunctionUPS:
         else:
             E = expectation_value(
                 self.ci_coeffs,
-                # [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
-                [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
+                [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
+                # [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
             )
@@ -1169,7 +1030,7 @@ class GeneralizedWaveFunctionUPS:
         return E
 
     def _calc_gradient_optimization(
-        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool, test_gradient: str
+        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
     ) -> np.ndarray:
         """Calculate electronic gradient.
 
@@ -1199,25 +1060,13 @@ class GeneralizedWaveFunctionUPS:
                 thetas_i.append(parameters[2 * i + 1 + num_kappa])
             self.set_thetas(thetas_r, thetas_i)
         if kappa_optimization:
-            if test_gradient == "annika":
-                gradient[:num_kappa] = get_orbital_gradient_generalized_real_imag(self.h_mo, self.g_mo, 
-                self.kappa_spin_idx,
-                self.num_inactive_spin_orbs,
-                self.num_active_spin_orbs,
-                self.rdm1,
-                self.rdm2_symmetry
-                )
-            elif test_gradient == "anna":
-                gradient[:num_kappa] = get_orbital_gradient_test_anna(self.h_mo, self.g_mo, 
-                self.kappa_spin_idx,
-                self.num_inactive_spin_orbs,
-                self.num_active_spin_orbs,
-                self.rdm1,
-                self.rdm2_symmetry
-                )
-            else:
-                gradient[:num_kappa] = exp_val_gradient(self.ci_coeffs,self.ci_info,self.h_mo,self.g_mo,
-                                                        self.num_spin_orbs,self.kappa_spin_idx)
+            gradient[:num_kappa] = get_orbital_gradient_generalized_real_imag(self.h_mo, self.g_mo, 
+            self.kappa_spin_idx,
+            self.num_inactive_spin_orbs,
+            self.num_active_spin_orbs,
+            self.rdm1,
+            self.rdm2
+            )
         if theta_optimization:
             # Hamiltonian = generalized_hamiltonian_0i_0a(
             #    self.h_mo,
@@ -1279,18 +1128,6 @@ class GeneralizedWaveFunctionUPS:
         return gradient
 
     @property
-    def get_orbital_gradient_generalized_test(self):
-        return get_orbital_gradient_generalized(
-            self.h_mo,
-            self.g_mo,
-            self.kappa_spin_idx,
-            self.num_inactive_spin_orbs,
-            self.num_active_spin_orbs,
-            self.rdm1,
-            self.rdm2,
-        )
-
-    @property
     def get_orbital_gradient_generalized_real_imag(self):
         return get_orbital_gradient_generalized_real_imag(self.h_mo, self.g_mo, self.kappa_spin_idx,
         self.num_inactive_spin_orbs,
@@ -1298,10 +1135,3 @@ class GeneralizedWaveFunctionUPS:
         self.rdm1,
         self.rdm2)
         
-    @property
-    def get_orbital_gradient_generalized_anna(self):
-        return get_orbital_gradient_test_anna(self.h_mo, self.g_mo, self.kappa_spin_idx,
-        self.num_inactive_spin_orbs,
-        self.num_active_spin_orbs,
-        self.rdm1,
-        self.rdm2)
