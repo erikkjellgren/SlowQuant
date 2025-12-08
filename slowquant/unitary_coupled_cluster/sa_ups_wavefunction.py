@@ -989,10 +989,12 @@ class WaveFunctionSAUPS:
         """Calculate electronic energy.
 
         Args:
-            parameters: Ansatz and orbital rotation parameters.
+            parameters: Ansatz parameters.
+            theta_diffs: List of theta shifts for RotoSolve.
+            theta_idx: Index of theta parameter being optimized.
 
         Returns:
-            Electronic energy.
+            Electronic energies for all shifted thetas.
         """
         self.thetas = parameters[:]
         state_vec = np.copy(self.csf_coeffs)
