@@ -15,8 +15,8 @@ from slowquant.unitary_coupled_cluster.operators import (
     hamiltonian_0i_0a,
     hamiltonian_1i_1a,
 )
-from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
-from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
+# from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
+from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.util import (
     UccStructure,
     UpsStructure,
@@ -34,7 +34,7 @@ class LinearResponseBaseClass:
 
     def __init__(
         self,
-        wave_function: WaveFunctionUCC | WaveFunctionUPS,
+        wave_function: GeneralizedWaveFunctionUPS, #Anna har fjernet WaveFunctionUCC + ændret til at alt løber over spin orbitaler
         excitations: str,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
@@ -44,13 +44,13 @@ class LinearResponseBaseClass:
             excitations: Which excitation orders to include in response.
         """
         self.wf = wave_function
-        if isinstance(self.wf, WaveFunctionUCC):
-            self.index_info = (
-                self.wf.ci_info,
-                self.wf.thetas,
-                self.wf.ucc_layout,
-            )
-        elif isinstance(self.wf, WaveFunctionUPS):
+        # if isinstance(self.wf, WaveFunctionUCC): udkommenteret for at køre uden UCC.
+        #     self.index_info = (
+        #         self.wf.ci_info,
+        #         self.wf.thetas,
+        #         self.wf.ucc_layout,
+        #     )
+        if isinstance(self.wf, GeneralizedWaveFunctionUPS):
             self.index_info = (
                 self.wf.ci_info,
                 self.wf.thetas,
@@ -64,10 +64,10 @@ class LinearResponseBaseClass:
         excitations = excitations.lower()
 
         if "s" in excitations:
-            for a, i, _ in iterate_t1_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
+            for a, i, _ in iterate_t1_sa(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
                 self.G_ops.append(G1_sa(i, a))
         if "d" in excitations:
-            for a, i, b, j, _, op_type in iterate_t2_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
+            for a, i, b, j, _, op_type in iterate_t2_sa(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
                 self.G_ops.append(G2_sa(i, j, a, b, op_type))
         if "t" in excitations:
             for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
@@ -87,7 +87,7 @@ class LinearResponseBaseClass:
                 self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx
             ):
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
-        for p, q in self.wf.kappa_no_activeactive_idx:
+        for p, q in self.wf.kappa_no_activeactive_spin_idx:
             self.q_ops.append(G1_sa(p, q))
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
@@ -98,15 +98,15 @@ class LinearResponseBaseClass:
         self.H_1i_1a = hamiltonian_1i_1a(
             self.wf.h_mo,
             self.wf.g_mo,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
+            self.wf.num_inactive_spin_orbs,
+            self.wf.num_active_spin_orbs,
+            self.wf.num_virtual_spin_orbs,
         )
         self.H_0i_0a = hamiltonian_0i_0a(
             self.wf.h_mo,
             self.wf.g_mo,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
+            self.wf.num_inactive_spin_orbs,
+            self.wf.num_active_spin_orbs,
         )
 
     def calc_excitation_energies(self) -> None:

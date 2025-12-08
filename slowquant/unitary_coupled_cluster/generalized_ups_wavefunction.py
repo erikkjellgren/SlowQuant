@@ -758,6 +758,10 @@ class GeneralizedWaveFunctionUPS:
         tol: float = 1e-10,
         maxiter: int = 1000,
         is_silent: bool = False,
+<<<<<<< HEAD
+=======
+        test_gradient: str = "anna",
+>>>>>>> 1af9f6006e4d8553e012481f2ae0b66a40dbb245
     ) -> None:
         """Run one step optimization of wave function.
 

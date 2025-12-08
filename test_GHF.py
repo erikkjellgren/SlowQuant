@@ -137,7 +137,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # print("kappa_real:", WF.kappa_real)
     # print("kappa_imag:", WF.kappa_imag)
     # print("E_opt:", WF._energy_elec)
-    # LR = naive.LinearResponse(WF, excitations="SD")
+    LR = naive.LinearResponse(WF, excitations="sd")
     # LR.calc_excitation_energies()
     # print(LR.excitation_energies)
 

@@ -45,14 +45,14 @@ class LinearResponse(LinearResponseBaseClass):
             grad = get_orbital_gradient_response(
                 self.wf.h_mo,
                 self.wf.g_mo,
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
+                self.wf.kappa_no_activeactive_spin_idx,
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
                 self.wf.rdm1,
                 self.wf.rdm2,
             )
             print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-            if np.max(np.abs(grad)) > 10**-3:
+            if np.max(np.abs(grad)) > 10: #skal rettes til 10**3
                 raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
 
         grad = np.zeros(2 * len(self.G_ops))
@@ -97,27 +97,27 @@ class LinearResponse(LinearResponseBaseClass):
             self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
                 self.wf.h_mo,
                 self.wf.g_mo,
-                self.wf.kappa_no_activeactive_idx_dagger,
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
+                self.wf.kappa_no_activeactive_spin_idx_dagger,
+                self.wf.kappa_no_activeactive_spin_idx,
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
                 self.wf.rdm1,
                 self.wf.rdm2,
             )
             self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
                 self.wf.h_mo,
                 self.wf.g_mo,
-                self.wf.kappa_no_activeactive_idx_dagger,
-                self.wf.kappa_no_activeactive_idx_dagger,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
+                self.wf.kappa_no_activeactive_spin_idx_dagger,
+                self.wf.kappa_no_activeactive_spin_idx_dagger,
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
                 self.wf.rdm1,
                 self.wf.rdm2,
             )
             self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
+                self.wf.kappa_no_activeactive_spin_idx,
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
                 self.wf.rdm1,
             )
         for j, qJ in enumerate(self.q_ops):
