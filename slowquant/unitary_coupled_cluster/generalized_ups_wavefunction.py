@@ -620,8 +620,8 @@ class GeneralizedWaveFunctionUPS:
             self._energy_elec = expectation_value(
                 self.ci_coeffs,
                 # Skal ændres til generalized_hamiltonian_0i_0a på et tidspunkt.
-                # [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
-                [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
+                [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
+                #[generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
             )

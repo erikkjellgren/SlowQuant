@@ -10,7 +10,7 @@ from scipy.linalg import expm
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
-from SlowQuant.slowquant.unitary_coupled_cluster.linear_response import generalized_naive
+from slowquant.unitary_coupled_cluster.linear_response import generalized_naive
 from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
 from slowquant.unitary_coupled_cluster.operators import generalized_hamiltonian_0i_0a, generalized_hamiltonian_1i_1a
 from slowquant.unitary_coupled_cluster.generalized_density_matrix import get_orbital_gradient_generalized_real_imag, get_orbital_gradient_expvalue_real_imag
@@ -287,28 +287,24 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         {"n_layers": 2},
         include_active_kappa=True,
     )
-    # WF.run_wf_optimization_1step("bfgs", True)
-    # LR = naive.LinearResponse(WF, excitations="SD")
-    # LR.calc_excitation_energies()
-    # print(LR.excitation_energies)
-
-    #H=generalized_hamiltonian_full_space(WF.h_mo, WF.g_mo,WF.num_spin_orbs)
-    #H2=generalized_hamiltonian_0i_0a(WF.h_mo, WF.g_mo,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs)
-    #H3=generalized_hamiltonian_1i_1a(WF.h_mo, WF.g_mo,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,WF.num_virtual_spin_orbs)
-
-    #test_energy=expectation_value(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
-    #test_energy2=expectation_value(WF.ci_coeffs, [H2], WF.ci_coeffs, WF.ci_info)
-    #test_energy3=expectation_value(WF.ci_coeffs, [H3], WF.ci_coeffs, WF.ci_info)
-
-    #print(test_energy)
-    #print(test_energy2)
-    #print(test_energy3)
 
     print(WF.num_spin_orbs)
     print(len(WF.kappa_spin_idx))
 
+    '''H=generalized_hamiltonian_full_space(WF.h_mo, WF.g_mo,WF.num_spin_orbs)
+    H2=generalized_hamiltonian_0i_0a(WF.h_mo, WF.g_mo,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs)
+    H3=generalized_hamiltonian_1i_1a(WF.h_mo, WF.g_mo,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,WF.num_virtual_spin_orbs)
 
-    my_gradient_before = get_orbital_gradient_generalized_real_imag(WF.h_mo,
+    test_energy=expectation_value(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
+    test_energy2=expectation_value(WF.ci_coeffs, [H2], WF.ci_coeffs, WF.ci_info)
+    test_energy3=expectation_value(WF.ci_coeffs, [H3], WF.ci_coeffs, WF.ci_info)
+
+    print(test_energy)
+    print(test_energy2)
+    print(test_energy3)'''
+
+
+    '''my_gradient_before = get_orbital_gradient_generalized_real_imag(WF.h_mo,
         WF.g_mo,
         WF.kappa_spin_idx,
         WF.num_inactive_spin_orbs, 
@@ -351,9 +347,18 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         WF.num_spin_orbs,
         WF.kappa_spin_idx)
             
-    print('total gradient_after',np.round(total_gradient_after,10))
+    print('total gradient_after',np.round(total_gradient_after,10))'''
 
 
+    WF.do_adapt(
+        operator_pool = ["S","D"],
+        orbital_optimization = True,
+    )
+
+
+    '''LR = naive.LinearResponse(WF, excitations="SD")
+    LR.calc_excitation_energies()
+    print(LR.excitation_energies)'''
 
 
 def h2():
