@@ -15,6 +15,7 @@ class Result:
         """Initialize result class."""
         self.x: np.ndarray
         self.fun: float
+        self.success: bool
 
 
 class Optimizers:
@@ -99,7 +100,7 @@ class Optimizers:
                     method=self.method,
                     tol=self.tol,
                     callback=print_progress,
-                    options={"maxiter": self.maxiter},
+                    options={"maxiter": self.maxiter, "disp": True},
                 )
             else:
                 res = scipy.optimize.minimize(
@@ -108,7 +109,7 @@ class Optimizers:
                     method=self.method,
                     tol=self.tol,
                     callback=print_progress,
-                    options={"maxiter": self.maxiter},
+                    options={"maxiter": self.maxiter, "disp": True},
                 )
         elif self.method in ("cobyla", "cobyqa"):
             res = scipy.optimize.minimize(
@@ -117,7 +118,7 @@ class Optimizers:
                 method=self.method,
                 tol=self.tol,
                 callback=print_progress,
-                options={"maxiter": self.maxiter},
+                options={"maxiter": self.maxiter, "disp": True},
             )
         elif self.method in ("rotosolve",):
             if not isinstance(extra_options, dict):
@@ -142,6 +143,9 @@ class Optimizers:
         result = Result()
         result.x = res.x
         result.fun = res.fun
+        result.success = res.success
+        if not result.success:
+            print("Optimization failed.")
         return result
 
 
@@ -176,8 +180,8 @@ class RotoSolve:
         self,
         R: dict[str, int],
         param_names: Sequence[str],
-        maxiter: int = 30,
-        tol: float = 1e-6,
+        maxiter: int = 1000,
+        tol: float = 1e-8,
         callback: Callable[[list[float]], None] | None = None,
     ) -> None:
         """Initialize Rotosolver.
@@ -192,7 +196,7 @@ class RotoSolve:
         self._callback = callback
         self.max_iterations = maxiter
         self.threshold = tol
-        self.max_fail = 3
+        self.max_fail = 3  # heuristic allowed fails (e.g. due to noise)
         self._R = R
         self._param_names = param_names
 
@@ -211,6 +215,7 @@ class RotoSolve:
         x_best = x.copy()
         fails = 0
         res = Result()
+        success = False
         for _ in range(self.max_iterations):
             for i, par_name in enumerate(self._param_names):
                 # Get the energy for specific values of theta_i, defined by the _R parameter.
@@ -236,9 +241,12 @@ class RotoSolve:
             else:
                 # Single state case
                 f_new = f_tmp
+            if self._callback is not None:
+                self._callback(x)
             if abs(f_best - f_new) < self.threshold:
                 f_best = f_new
                 x_best = x.copy()
+                success = True  # sucessful optimization
                 break
             if (f_new - f_best) > 0.0:
                 fails += 1
@@ -246,11 +254,11 @@ class RotoSolve:
                 f_best = f_new
                 x_best = x.copy()
             if fails == self.max_fail:
+                print("Three energy raises detected.")
                 break
-            if self._callback is not None:
-                self._callback(x)
         res.x = np.array(x_best)
         res.fun = f_best
+        res.success = success
         return res
 
 
