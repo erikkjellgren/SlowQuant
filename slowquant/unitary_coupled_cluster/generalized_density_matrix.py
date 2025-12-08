@@ -573,11 +573,42 @@ def get_orbital_gradient_response(
     return 2 ** (-1 / 2) * gradient
 
 
+# @nb.jit(nopython=True)
+# def get_orbital_response_metric_sigma(
+#     kappa_idx: list[tuple[int, int]],
+#     num_inactive_orbs: int,
+#     num_active_orbs: int,
+#     rdm1: np.ndarray,
+# ) -> np.ndarray:
+#     r"""Calculate the Sigma matrix orbital-orbital block.
+
+#     .. math::
+#         \Sigma_{pq,pq}^{\hat{q},\hat{q}} = \left<0\left|\left[\hat{q}_{pq}^\dagger,\hat{q}_{pq}\right]\right|0\right>
+
+#     Args:
+#         kappa_idx: Orbital parameter indices in spatial basis.
+#         num_inactive_orbs: Number of inactive orbitals in spatial basis.
+#         num_active_orbs: Number of active orbitals in spatial basis.
+#         rdm1: Active part of 1-RDM.
+
+#     Returns:
+#         Sigma matrix orbital-orbital block.
+#     """
+#     sigma = np.zeros((len(kappa_idx), len(kappa_idx)))
+#     for idx1, (n, m) in enumerate(kappa_idx):
+#         for idx2, (p, q) in enumerate(kappa_idx):
+#             if p == n:
+#                 sigma[idx1, idx2] += RDM1(m, q, num_inactive_orbs, num_active_orbs, rdm1)
+#             if m == q:
+#                 sigma[idx1, idx2] -= RDM1(p, n, num_inactive_orbs, num_active_orbs, rdm1)
+#     return -1 / 2 * sigma
+
+
 @nb.jit(nopython=True)
 def get_orbital_response_metric_sigma(
-    kappa_idx: list[tuple[int, int]],
-    num_inactive_orbs: int,
-    num_active_orbs: int,
+    kappa_spin_idx: list[tuple[int, int]],
+    num_inactive_spin_orbs: int,
+    num_active_spin_orbs: int,
     rdm1: np.ndarray,
 ) -> np.ndarray:
     r"""Calculate the Sigma matrix orbital-orbital block.
@@ -594,14 +625,14 @@ def get_orbital_response_metric_sigma(
     Returns:
         Sigma matrix orbital-orbital block.
     """
-    sigma = np.zeros((len(kappa_idx), len(kappa_idx)))
-    for idx1, (n, m) in enumerate(kappa_idx):
-        for idx2, (p, q) in enumerate(kappa_idx):
-            if p == n:
-                sigma[idx1, idx2] += RDM1(m, q, num_inactive_orbs, num_active_orbs, rdm1)
-            if m == q:
-                sigma[idx1, idx2] -= RDM1(p, n, num_inactive_orbs, num_active_orbs, rdm1)
-    return -1 / 2 * sigma
+    sigma = np.zeros((len(kappa_spin_idx), len(kappa_spin_idx)), dtype=np.complex128)
+    for idx1, (N, M) in enumerate(kappa_spin_idx):
+        for idx2, (P, Q) in enumerate(kappa_spin_idx):
+            if P == N:
+                sigma[idx1, idx2] -= RDM1(M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            if M == Q:
+                sigma[idx1, idx2] += RDM1(P, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+    return sigma
 
 
 @nb.jit(nopython=True)
@@ -706,14 +737,115 @@ def get_orbital_response_property_gradient(
     return 2 ** (-1 / 2) * prop_grad
 
 
+# @nb.jit(nopython=True)
+# def get_orbital_response_hessian_block(
+#     h: np.ndarray,
+#     g: np.ndarray,
+#     kappa_idx1: list[tuple[int, int]],
+#     kappa_idx2: list[tuple[int, int]],
+#     num_inactive_orbs: int,
+#     num_active_orbs: int,
+#     rdm1: np.ndarray,
+#     rdm2: np.ndarray,
+# ) -> np.ndarray:
+#     r"""Calculate Hessian-like orbital-orbital block.
+
+#     .. math::
+#         H^{\hat{q},\hat{q}}_{tu,mn} = \left<0\left|\left[\hat{q}_{tu},\left[\hat{H},\hat{q}_{mn}\right]\right]\right|0\right>
+
+#     Args:
+#         h: Hamiltonian one-electron integrals in MO basis.
+#         g: Hamiltonian two-electron integrals in MO basis.
+#         kappa_idx1: Orbital parameter indices in spatial basis.
+#         kappa_idx2: Orbital parameter indices in spatial basis.
+#         num_inactive_orbs: Number of inactive orbitals in spatial basis.
+#         num_active_orbs: Number of active orbitals in spatial basis.
+#         rdm1: Active part of 1-RDM.
+#         rdm2: Active part of 2-RDM.
+
+#     Returns:
+#         Hessian-like orbital-orbital block.
+#     """
+#     A1e = np.zeros((len(kappa_idx1), len(kappa_idx1)))
+#     A2e = np.zeros((len(kappa_idx1), len(kappa_idx1)))
+#     for idx1, (t, u) in enumerate(kappa_idx1):
+#         for idx2, (m, n) in enumerate(kappa_idx2):
+#             # 1e contribution
+#             A1e[idx1, idx2] += h[n, t] * RDM1(m, u, num_inactive_orbs, num_active_orbs, rdm1)
+#             A1e[idx1, idx2] += h[u, m] * RDM1(t, n, num_inactive_orbs, num_active_orbs, rdm1)
+#             for p in range(num_inactive_orbs + num_active_orbs):
+#                 if m == u:
+#                     A1e[idx1, idx2] -= h[n, p] * RDM1(t, p, num_inactive_orbs, num_active_orbs, rdm1)
+#                 if t == n:
+#                     A1e[idx1, idx2] -= h[p, m] * RDM1(p, u, num_inactive_orbs, num_active_orbs, rdm1)
+#             # 2e contribution
+#             for p in range(num_inactive_orbs + num_active_orbs):
+#                 for q in range(num_inactive_orbs + num_active_orbs):
+#                     A2e[idx1, idx2] += g[n, t, p, q] * RDM2(
+#                         m, u, p, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+#                     )
+#                     A2e[idx1, idx2] -= g[n, p, u, q] * RDM2(
+#                         m, p, t, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+#                     )
+#                     A2e[idx1, idx2] += g[n, p, q, t] * RDM2(
+#                         m, p, q, u, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+#                     )
+#                     A2e[idx1, idx2] += g[u, m, p, q] * RDM2(
+#                         t, n, p, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+#                     )
+#                     A2e[idx1, idx2] += g[p, m, u, q] * RDM2(
+#                         p, n, t, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+#                     )
+#                     A2e[idx1, idx2] -= g[p, m, q, t] * RDM2(
+#                         p, n, q, u, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+#                     )
+#                     A2e[idx1, idx2] -= g[u, p, n, q] * RDM2(
+#                         t, p, m, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+#                     )
+#                     A2e[idx1, idx2] += g[p, t, n, q] * RDM2(
+#                         p, u, m, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+#                     )
+#                     A2e[idx1, idx2] += g[p, q, n, t] * RDM2(
+#                         p, q, m, u, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+#                     )
+#                     A2e[idx1, idx2] += g[u, p, q, m] * RDM2(
+#                         t, p, q, n, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+#                     )
+#                     A2e[idx1, idx2] -= g[p, t, q, m] * RDM2(
+#                         p, u, q, n, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+#                     )
+#                     A2e[idx1, idx2] += g[p, q, u, m] * RDM2(
+#                         p, q, t, n, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+#                     )
+#             for p in range(num_inactive_orbs + num_active_orbs):
+#                 for q in range(num_inactive_orbs + num_active_orbs):
+#                     for r in range(num_inactive_orbs + num_active_orbs):
+#                         if m == u:
+#                             A2e[idx1, idx2] -= g[n, p, q, r] * RDM2(
+#                                 t, p, q, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+#                             )
+#                         if t == n:
+#                             A2e[idx1, idx2] -= g[p, m, q, r] * RDM2(
+#                                 p, u, q, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+#                             )
+#                         if m == u:
+#                             A2e[idx1, idx2] -= g[p, q, n, r] * RDM2(
+#                                 p, q, t, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+#                             )
+#                         if t == n:
+#                             A2e[idx1, idx2] -= g[p, q, r, m] * RDM2(
+#                                 p, q, r, u, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+#                             )
+#     return 1 / 2 * A1e + 1 / 4 * A2e
+
 @nb.jit(nopython=True)
 def get_orbital_response_hessian_block(
     h: np.ndarray,
     g: np.ndarray,
-    kappa_idx1: list[tuple[int, int]],
-    kappa_idx2: list[tuple[int, int]],
-    num_inactive_orbs: int,
-    num_active_orbs: int,
+    kappa_spin_idx1: list[tuple[int, int]],
+    kappa_spin_idx2: list[tuple[int, int]],
+    num_inactive_spin_orbs: int,
+    num_active_spin_orbs: int,
     rdm1: np.ndarray,
     rdm2: np.ndarray,
 ) -> np.ndarray:
@@ -735,74 +867,73 @@ def get_orbital_response_hessian_block(
     Returns:
         Hessian-like orbital-orbital block.
     """
-    A1e = np.zeros((len(kappa_idx1), len(kappa_idx1)))
-    A2e = np.zeros((len(kappa_idx1), len(kappa_idx1)))
-    for idx1, (t, u) in enumerate(kappa_idx1):
-        for idx2, (m, n) in enumerate(kappa_idx2):
+    A1e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx1)), dtype=np.complex128)
+    A2e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx1)), dtype=np.complex128)
+    for idx1, (T, U) in enumerate(kappa_spin_idx1):
+        for idx2, (M, N) in enumerate(kappa_spin_idx2):
             # 1e contribution
-            A1e[idx1, idx2] += h[n, t] * RDM1(m, u, num_inactive_orbs, num_active_orbs, rdm1)
-            A1e[idx1, idx2] += h[u, m] * RDM1(t, n, num_inactive_orbs, num_active_orbs, rdm1)
-            for p in range(num_inactive_orbs + num_active_orbs):
-                if m == u:
-                    A1e[idx1, idx2] -= h[n, p] * RDM1(t, p, num_inactive_orbs, num_active_orbs, rdm1)
-                if t == n:
-                    A1e[idx1, idx2] -= h[p, m] * RDM1(p, u, num_inactive_orbs, num_active_orbs, rdm1)
+            A1e[idx1, idx2] += h[N, T] * RDM1(M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            A1e[idx1, idx2] += h[U, M] * RDM1(T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
+                if M == U:
+                    A1e[idx1, idx2] -= h[N, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+                if T == N:
+                    A1e[idx1, idx2] -= h[P, M] * RDM1(P, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             # 2e contribution
-            for p in range(num_inactive_orbs + num_active_orbs):
-                for q in range(num_inactive_orbs + num_active_orbs):
-                    A2e[idx1, idx2] += g[n, t, p, q] * RDM2(
-                        m, u, p, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+            for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
+                for Q in range(num_inactive_spin_orbs + num_active_spin_orbs):
+                    A2e[idx1, idx2] += g[U, M, P, Q] * RDM2(
+                        T, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                    )                   
+                    A2e[idx1, idx2] -= g[P, M, U, Q] * RDM2(
+                        T, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
-                    A2e[idx1, idx2] -= g[n, p, u, q] * RDM2(
-                        m, p, t, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                    A2e[idx1, idx2] -= g[U, P, Q, M] * RDM2(
+                        T, N, Q, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
-                    A2e[idx1, idx2] += g[n, p, q, t] * RDM2(
-                        m, p, q, u, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                    A2e[idx1, idx2] += g[P, Q, U, M] * RDM2(
+                        T, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
-                    A2e[idx1, idx2] += g[u, m, p, q] * RDM2(
-                        t, n, p, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                    A2e[idx1, idx2] += g[N, P, U, Q] * RDM2(
+                        T, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
-                    A2e[idx1, idx2] += g[p, m, u, q] * RDM2(
-                        p, n, t, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                    A2e[idx1, idx2] -= g[U, P, N, Q] * RDM2(
+                        T, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
-                    A2e[idx1, idx2] -= g[p, m, q, t] * RDM2(
-                        p, n, q, u, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                    A2e[idx1, idx2] += g[P, M, Q, T] * RDM2(
+                        P, U, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
-                    A2e[idx1, idx2] -= g[u, p, n, q] * RDM2(
-                        t, p, m, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                    A2e[idx1, idx2] -= g[P, T, Q, M] * RDM2(
+                        P, U, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
-                    A2e[idx1, idx2] += g[p, t, n, q] * RDM2(
-                        p, u, m, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                    A2e[idx1, idx2] += g[N, T, P, Q] * RDM2(
+                        M, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
-                    A2e[idx1, idx2] += g[p, q, n, t] * RDM2(
-                        p, q, m, u, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                    A2e[idx1, idx2] -= g[N, P, Q, T] * RDM2(
+                        M, U, Q, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
-                    A2e[idx1, idx2] += g[u, p, q, m] * RDM2(
-                        t, p, q, n, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                    A2e[idx1, idx2] -= g[P, T, N, Q] * RDM2(
+                        M, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
-                    A2e[idx1, idx2] -= g[p, t, q, m] * RDM2(
-                        p, u, q, n, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                    A2e[idx1, idx2] += g[P, Q, N, T] * RDM2(
+                        M, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
-                    A2e[idx1, idx2] += g[p, q, u, m] * RDM2(
-                        p, q, t, n, num_inactive_orbs, num_active_orbs, rdm1, rdm2
-                    )
-            for p in range(num_inactive_orbs + num_active_orbs):
-                for q in range(num_inactive_orbs + num_active_orbs):
-                    for r in range(num_inactive_orbs + num_active_orbs):
-                        if m == u:
-                            A2e[idx1, idx2] -= g[n, p, q, r] * RDM2(
-                                t, p, q, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+            for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
+                for Q in range(num_inactive_spin_orbs + num_active_spin_orbs):
+                    for R in range(num_inactive_spin_orbs + num_active_spin_orbs):
+                        if M == U:
+                            A2e[idx1, idx2] -= g[N, P, Q, R] * RDM2(
+                                T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                             )
-                        if t == n:
-                            A2e[idx1, idx2] -= g[p, m, q, r] * RDM2(
-                                p, u, q, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                            A2e[idx1, idx2] += g[P,Q,N,R]* RDM2(
+                                T, Q, P, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                             )
-                        if m == u:
-                            A2e[idx1, idx2] -= g[p, q, n, r] * RDM2(
-                                p, q, t, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                        if T == N:
+                            A2e[idx1, idx2] -= g[P, M, Q, R] * RDM2(
+                                P, U, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                             )
-                        if t == n:
-                            A2e[idx1, idx2] -= g[p, q, r, m] * RDM2(
-                                p, q, r, u, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                            A2e[idx1, idx2] += g[P, Q, R, M] * RDM2(
+                                P, U, R, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                             )
-    return 1 / 2 * A1e + 1 / 4 * A2e
+    # return 1 / 2 * A1e + 1 / 4 * A2e
+    return A1e + (1/2)*A2e
