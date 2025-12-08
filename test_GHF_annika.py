@@ -283,13 +283,15 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         c_u,
         h_core,
         g_eri,
-        "fuccsd",
+        "adapt",
         {"n_layers": 2},
         include_active_kappa=True,
     )
 
-    print(WF.num_spin_orbs)
-    print(len(WF.kappa_spin_idx))
+    print("Nr. of spin orbitals:", WF.num_spin_orbs)
+    print("Nr. of kappas:", len(WF.kappa_spin_idx))
+    print("Nr. of occ active spind idx shifted orbitals:", WF.active_occ_spin_idx_shifted)
+    print("Nr. of unocc active spind idx shifted orbitals:",WF.active_unocc_spin_idx_shifted)
 
     '''H=generalized_hamiltonian_full_space(WF.h_mo, WF.g_mo,WF.num_spin_orbs)
     H2=generalized_hamiltonian_0i_0a(WF.h_mo, WF.g_mo,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs)
@@ -351,7 +353,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
     WF.do_adapt(
-        operator_pool = ["S","D"],
+        operator_pool = ["gs","gd"],
         orbital_optimization = True,
     )
 
