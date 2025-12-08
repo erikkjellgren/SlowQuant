@@ -1084,7 +1084,7 @@ class WaveFunctionUPS:
         Returns:
             Electronic energies for all shifted thetas.
         """
-        # avoid triggering construct_ups_state
+        # copy of parameters
         thetas_local = np.asarray(parameters)
 
         # Prepare reference state up to theta_idx
@@ -1095,7 +1095,7 @@ class WaveFunctionUPS:
         n_shifts = len(theta_diffs)
         n_state = state_vec.size
 
-        # Preallocate array for shifted states to avoid append
+        # Preallocate array for shifted states
         state_vecs = np.empty((n_shifts, n_state), dtype=state_vec.dtype)
 
         # Propagate unitary with all shifted theta at theta_idx

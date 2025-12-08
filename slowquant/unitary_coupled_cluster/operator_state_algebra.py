@@ -1614,7 +1614,7 @@ def propagate_unitary(
     exc_indices = ups_struct.excitation_indices[idx]
     theta = thetas[idx]
     offset = ci_info.space_extension_offset
-    if abs(theta) < 10**-14:
+    if abs(theta) < 10**-30:
         return np.copy(state)
     if exc_type in ("sa_single",):
         A = 1  # 2**(-1/2)
@@ -2047,7 +2047,7 @@ def propagate_unitary_SA(
     exc_indices = ups_struct.excitation_indices[idx]
     theta = thetas[idx]
     offset = ci_info.space_extension_offset
-    if abs(theta) < 10**-14:
+    if abs(theta) < 10**-30:
         return np.copy(state)
     if exc_type in ("sa_single",):
         A = 1  # 2**(-1/2)
