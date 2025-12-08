@@ -195,7 +195,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
-    basis = "631-g"
+    basis = "STO-3g"
     active_space_u = ((1, 1), 2)
     active_space = (2, 4)
     charge = 0
