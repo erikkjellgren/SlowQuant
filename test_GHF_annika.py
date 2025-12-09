@@ -12,7 +12,7 @@ from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import Gener
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.linear_response import generalized_naive
 from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
-from slowquant.unitary_coupled_cluster.operators import generalized_hamiltonian_0i_0a, generalized_hamiltonian_1i_1a
+from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, generalized_hamiltonian_0i_0a, generalized_hamiltonian_1i_1a
 from slowquant.unitary_coupled_cluster.generalized_density_matrix import get_orbital_gradient_generalized_real_imag, get_orbital_gradient_expvalue_real_imag
 
 from slowquant.unitary_coupled_cluster.fermionic_operator import (
@@ -54,48 +54,6 @@ def unrestricted(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c
     # # print(WF.energy_elec_RDM)
     # WF.run_wf_optimization_1step("bfgs", True)
 
-
-def a_op_spin(spin_idx: int, dagger: bool) -> FermionicOperator:
-    """Construct annihilation/creation operator.
-
-    Args:
-        spin_idx: Spin orbital index.
-        dagger: If creation operator.
-
-    Returns:
-        Annihilation/creation operator.
-    """
-    return FermionicOperator({((spin_idx, dagger),): 1})
-
-def generalized_hamiltonian_full_space(h_spin_mo: np.ndarray, g_spin_mo: np.ndarray, num_spin_orbs: int) -> FermionicOperator:
-    r"""Construct full-space generalized electronic Hamiltonian.
-
-    .. math::
-        \hat{H} = ?
-
-    Args:
-        h_spin_mo: Core one-electron integrals in spin MO basis.
-        g_spin_mo: Two-electron integrals in spin MO basis.
-        num_spin_orbs: Number of spin orbitals.
-
-    Returns:
-        Generalized Hamiltonian operator in full-space.
-    """
-    H_operator = FermionicOperator({})
-    # Build operator
-    for p in range(num_spin_orbs):
-        for q in range(num_spin_orbs):
-            if abs(h_spin_mo[p, q]) < 10**-14:
-                continue
-            H_operator += h_spin_mo[p, q] * (a_op_spin(p, True)*a_op_spin(q, False))
-    for p in range(num_spin_orbs):
-        for q in range(num_spin_orbs):
-            for r in range(num_spin_orbs):
-                for s in range(num_spin_orbs):
-                    if abs(g_spin_mo[p, q, r, s]) < 10**-14:
-                        continue
-                    H_operator += 1 / 2 * g_spin_mo[p, q, r, s] * (a_op_spin(p, True)*a_op_spin(r, True)*a_op_spin(s, False)*a_op_spin(q, False))
-    return H_operator
 
 
 def restricted(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
@@ -280,10 +238,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF = GeneralizedWaveFunctionUPS(
         mol.nelectron,
         active_space,
-        c_u,
+        c,
         h_core,
         g_eri,
-        "adapt",
+        "fuccsd",
         {"n_layers": 2},
         include_active_kappa=True,
     )
@@ -292,12 +250,19 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     print("Nr. of spin orbitals:", WF.num_spin_orbs)
     print("Nr. of kappas:", len(WF.kappa_spin_idx))
+    print("Nr. of spin orbitals:", WF.num_spin_orbs)
+    print("Nr. of inactive spin orbitals:", WF.num_inactive_spin_orbs)
+    print("Nr. of active spin orbitals:", WF.num_active_spin_orbs)
+    print("Nr. of virtual spin orbitals:", WF.num_virtual_spin_orbs)
+
+
+
     #print("Nr. of occ active spind idx shifted orbitals:", WF.active_occ_spin_idx_shifted)
     #print("Nr. of unocc active spind idx shifted orbitals:",WF.active_unocc_spin_idx_shifted)
 
-    '''H=generalized_hamiltonian_full_space(WF.h_mo, WF.g_mo,WF.num_spin_orbs)
-    H2=generalized_hamiltonian_0i_0a(WF.h_mo, WF.g_mo,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs)
-    H3=generalized_hamiltonian_1i_1a(WF.h_mo, WF.g_mo,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,WF.num_virtual_spin_orbs)
+    H=generalized_hamiltonian_full_space(WF.h_mo, WF.g_mo,WF.num_spin_orbs)
+    H2=generalized_hamiltonian_0i_0a(WF.h_mo, WF.g_mo, WF.num_inactive_spin_orbs, WF.num_active_spin_orbs)
+    H3=generalized_hamiltonian_1i_1a(WF.h_mo, WF.g_mo, WF.num_inactive_spin_orbs, WF.num_active_spin_orbs, WF.num_virtual_spin_orbs)
 
     test_energy=expectation_value(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
     test_energy2=expectation_value(WF.ci_coeffs, [H2], WF.ci_coeffs, WF.ci_info)
@@ -305,18 +270,18 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     print(test_energy)
     print(test_energy2)
-    print(test_energy3)'''
+    print(test_energy3)
 
 
     my_gradient_before = get_orbital_gradient_generalized_real_imag(WF.h_mo,
         WF.g_mo,
         WF.kappa_spin_idx,
         WF.num_inactive_spin_orbs, 
-        WF.num_active_spin_orbs,
+        WF.num_active_spin_orbs, 
         WF.rdm1,
         WF.rdm2)
 
-    print("my gradient_before:",np.round(my_gradient_before,3))
+    print("my gradient_before:",np.round(my_gradient_before,10))
 
 
     total_gradient_before = get_orbital_gradient_expvalue_real_imag(
@@ -327,10 +292,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         WF.num_spin_orbs,
         WF.kappa_spin_idx)
             
-    print('total gradient_before',np.round(total_gradient_before,3))
+    print('total gradient_before',np.round(total_gradient_before,10))
 
 
-    #WF.run_wf_optimization_1step("BFGS",orbital_optimization=True,test=False)
+    WF.run_wf_optimization_1step("BFGS",orbital_optimization=True,test=True)
 
 
     my_gradient_after = get_orbital_gradient_generalized_real_imag(WF.h_mo,
@@ -341,7 +306,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         WF.rdm1,
         WF.rdm2)
 
-    print("my gradient after:",np.round(my_gradient_after,10))
+    print("my gradient after:",np.round(my_gradient_after,3))
 
     total_gradient_after = get_orbital_gradient_expvalue_real_imag(
         WF.ci_coeffs,
@@ -351,7 +316,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         WF.num_spin_orbs,
         WF.kappa_spin_idx)
             
-    print('total gradient_after',np.round(total_gradient_after,10))
+    print('total gradient_after',np.round(total_gradient_after,3))
 
 
     '''WF.do_adapt(
@@ -437,7 +402,8 @@ def h2o():
     #basis = "dyall-v2z"
     #basis = "cc-pvdz"
     basis = "sto-3g"
-    active_space = ((1, 1), 4)
+    #active_space = ((5, 5), 14)
+    active_space = ((1,1),4)
     #active_space = (2, 4)
     charge = 0
     spin = 0

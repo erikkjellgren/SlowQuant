@@ -226,9 +226,7 @@ def generalized_one_electron_transform(C: np.ndarray, int_1e_inp: np.ndarray) ->
         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
         (int_1e_inp),
     )  # beta beta
-    mat = np.add(cont1, cont2)
-    #mat_return = strip_imag(mat)
-    return mat
+    return np.add(cont1, cont2)
 
 
 def two_electron_integral_transform(C: np.ndarray, int2e: np.ndarray) -> np.ndarray:
@@ -284,6 +282,4 @@ def generalized_two_electron_transform(C: np.ndarray, int_2e_inp: np.ndarray) ->
         C[: int(C.shape[0] / 2)],
         int_2e_inp,
     )
-    mat = cont1 + cont2 + cont3 + cont4
-    #mat_return = strip_imag(mat)
-    return mat
+    return cont1 + cont2 + cont3 + cont4

@@ -51,7 +51,7 @@ def generalized_hamiltonian_full_space(h_spin_mo: np.ndarray, g_spin_mo: np.ndar
 
 
 
-def hamiltonian_0i_0a(
+def generalized_hamiltonian_0i_0a(
     h_mo: np.ndarray,
     g_mo: np.ndarray,
     num_inactive_spin_orbs: int,
@@ -83,7 +83,6 @@ def hamiltonian_0i_0a(
         for j in range(num_inactive_spin_orbs):
             if i != j and abs(g_mo[i, i, j, j]) > 10**-14:
                 hamiltonian_operator += 1 / 2 * g_mo[i, i, j, j] * (a_op_spin(i, True)*a_op_spin(j, True)*a_op_spin(j, False)*a_op_spin(i, False))
-
     # Inactive-Active two-electron
     for i in range(num_inactive_spin_orbs):
         for p in range(num_inactive_spin_orbs, num_inactive_spin_orbs + num_active_spin_orbs):
@@ -103,7 +102,7 @@ def hamiltonian_0i_0a(
 
 
 
-def hamiltonian_1i_1a(
+def generalized_hamiltonian_1i_1a(
     h_mo: np.ndarray,
     g_mo: np.ndarray,
     num_inactive_spin_orbs: int,
