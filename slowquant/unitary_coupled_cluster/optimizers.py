@@ -375,7 +375,6 @@ def get_energy_evals_optimized(
     return f(x, theta_diffs, idx)
 
 
-@nb.jit(nopython=True)
 def _sinc_derivative(u: np.ndarray) -> np.ndarray:
     """Derivative of numpy's sinc(x) = sin(pi*x)/(pi*x) w.r.t x.
 
@@ -390,12 +389,10 @@ def _sinc_derivative(u: np.ndarray) -> np.ndarray:
         ui = u[i]
         if abs(ui) > 1e-12:  # avoid 0/0 as limit exists.
             du[i] = np.cos(np.pi * ui) / ui - np.sin(np.pi * ui) / (np.pi * ui**2)
-        else:
-            du[i] = 0.0
+
     return du
 
 
-@nb.jit(nopython=True)
 def reconstructed_f_derivative(
     x_vals: np.ndarray, energy_vals: list[float] | list[np.ndarray], R: int
 ) -> np.ndarray:
