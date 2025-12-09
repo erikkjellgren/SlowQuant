@@ -83,7 +83,7 @@ class LinearResponseUPS(LinearResponseBaseClass):
                 finite_excitations_idx.append(False)
 
         finite_excitations_idx = np.array(finite_excitations_idx)
-
+        print("finite", len(finite_excitations_idx), "q", len(self.q_ops), "G", len(self.G_ops  ))
         idx_shift = len(self.q_ops)
         G_shift = int(len(self.G_ops) / 2)
         q_shift = int(len(self.q_ops) / 2)
