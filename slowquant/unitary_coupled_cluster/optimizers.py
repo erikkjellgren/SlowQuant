@@ -375,6 +375,7 @@ def get_energy_evals_optimized(
     return f(x, theta_diffs, idx)
 
 
+@nb.jit(nopython=True)
 def _sinc_derivative(u: np.ndarray) -> np.ndarray:
     """Derivative of numpy's sinc(x) = sin(pi*x)/(pi*x) w.r.t x.
 
@@ -384,16 +385,13 @@ def _sinc_derivative(u: np.ndarray) -> np.ndarray:
     Returns:
         Derivative of sinc at each point in u.
     """
-    u = np.asarray(u, dtype=float)
     du = np.zeros_like(u)
-
-    mask = np.abs(u) > 1e-12  # avoid division by 0
-    um = u[mask]
-
-    # s'(u) = cos(pi*u)/u - sin(pi*u)/(pi*u^2)
-    du[mask] = np.cos(np.pi * um) / um - np.sin(np.pi * um) / (np.pi * um**2)
-
-    # derivative at u = 0 is 0 (already set)
+    for i in range(len(u)):
+        ui = u[i]
+        if abs(ui) > 1e-12:  # avoid 0/0 as limit exists.
+            du[i] = np.cos(np.pi * ui) / ui - np.sin(np.pi * ui) / (np.pi * ui**2)
+        else:
+            du[i] = 0.0
     return du
 
 
