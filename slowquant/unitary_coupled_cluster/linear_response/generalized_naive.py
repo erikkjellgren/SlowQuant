@@ -3,9 +3,9 @@ from collections.abc import Sequence
 import numpy as np
 
 from slowquant.molecularintegrals.integralfunctions import (
-    one_electron_integral_transform,
+    one_electron_integral_transform, generalized_one_electron_transform
 )
-from slowquant.unitary_coupled_cluster.density_matrix import (
+from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_orbital_gradient_response,
     get_orbital_response_hessian_block,
     get_orbital_response_metric_sigma,
@@ -20,14 +20,13 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     propagate_state,
 )
 from slowquant.unitary_coupled_cluster.operators import one_elec_op_0i_0a
-from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
-from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
-
+# from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
+from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
 
 class LinearResponse(LinearResponseBaseClass):
     def __init__(
         self,
-        wave_function: WaveFunctionUCC | WaveFunctionUPS,
+        wave_function: GeneralizedWaveFunctionUPS, # WaveFunctionUCC |  slettet
         excitations: str,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
