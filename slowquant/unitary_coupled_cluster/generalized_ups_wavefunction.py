@@ -17,6 +17,7 @@ from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_generalized
 from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_electronic_energy_generalized,
     get_orbital_gradient_generalized_real_imag,
+    get_orbital_gradient_expvalue_real_imag,
 )
 from slowquant.unitary_coupled_cluster.generalized_operators import (
     a_op_spin,
@@ -760,6 +761,7 @@ class GeneralizedWaveFunctionUPS:
         tol: float = 1e-10,
         maxiter: int = 1000,
         is_silent: bool = False,
+        test: bool = True, 
     ) -> None:
         """Run one step optimization of wave function.
 
@@ -804,6 +806,7 @@ class GeneralizedWaveFunctionUPS:
                     self._calc_gradient_optimization,
                     theta_optimization=False,
                     kappa_optimization=True,
+                    test = test,
                 )
         else:
             energy = partial(
@@ -1034,7 +1037,7 @@ class GeneralizedWaveFunctionUPS:
         return E
 
     def _calc_gradient_optimization(
-        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
+        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool, test:bool
     ) -> np.ndarray:
         """Calculate electronic gradient.
 
@@ -1065,13 +1068,21 @@ class GeneralizedWaveFunctionUPS:
                 thetas_i.append(parameters[2 * i + 1 + num_kappa])
             self.set_thetas(thetas_r, thetas_i)
         if kappa_optimization:
-            gradient[:num_kappa] = get_orbital_gradient_generalized_real_imag(self.h_mo, self.g_mo, 
-            self.kappa_spin_idx,
-            self.num_inactive_spin_orbs,
-            self.num_active_spin_orbs,
-            self.rdm1,
-            self.rdm2
-            )
+            if test:
+                gradient[:num_kappa] = get_orbital_gradient_generalized_real_imag(self.h_mo, self.g_mo, 
+                self.kappa_spin_idx,
+                self.num_inactive_spin_orbs,
+                self.num_active_spin_orbs,
+                self.rdm1_FULL,
+                self.rdm2_FULL
+                )
+            else:
+                gradient[:num_kappa] = get_orbital_gradient_expvalue_real_imag(self.ci_coeffs,
+                self.ci_info,
+                self.h_mo,
+                self.g_mo,
+                self.num_spin_orbs,
+                self.kappa_spin_idx)
         if theta_optimization:
             # Hamiltonian = generalized_hamiltonian_0i_0a(
             #    self.h_mo,

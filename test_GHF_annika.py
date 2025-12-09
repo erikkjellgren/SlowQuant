@@ -288,10 +288,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         include_active_kappa=True,
     )
 
+    print(mf.energy_elec()[0])
+
     print("Nr. of spin orbitals:", WF.num_spin_orbs)
     print("Nr. of kappas:", len(WF.kappa_spin_idx))
-    print("Nr. of occ active spind idx shifted orbitals:", WF.active_occ_spin_idx_shifted)
-    print("Nr. of unocc active spind idx shifted orbitals:",WF.active_unocc_spin_idx_shifted)
+    #print("Nr. of occ active spind idx shifted orbitals:", WF.active_occ_spin_idx_shifted)
+    #print("Nr. of unocc active spind idx shifted orbitals:",WF.active_unocc_spin_idx_shifted)
 
     '''H=generalized_hamiltonian_full_space(WF.h_mo, WF.g_mo,WF.num_spin_orbs)
     H2=generalized_hamiltonian_0i_0a(WF.h_mo, WF.g_mo,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs)
@@ -306,7 +308,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print(test_energy3)'''
 
 
-    '''my_gradient_before = get_orbital_gradient_generalized_real_imag(WF.h_mo,
+    my_gradient_before = get_orbital_gradient_generalized_real_imag(WF.h_mo,
         WF.g_mo,
         WF.kappa_spin_idx,
         WF.num_inactive_spin_orbs, 
@@ -314,7 +316,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         WF.rdm1,
         WF.rdm2)
 
-    print("my gradient_before:",np.round(my_gradient_before,10))
+    print("my gradient_before:",np.round(my_gradient_before,3))
 
 
     total_gradient_before = get_orbital_gradient_expvalue_real_imag(
@@ -325,10 +327,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         WF.num_spin_orbs,
         WF.kappa_spin_idx)
             
-    print('total gradient_before',np.round(total_gradient_before,10))
+    print('total gradient_before',np.round(total_gradient_before,3))
 
 
-    WF.run_wf_optimization_1step("BFGS",orbital_optimization=True)
+    #WF.run_wf_optimization_1step("BFGS",orbital_optimization=True,test=False)
 
 
     my_gradient_after = get_orbital_gradient_generalized_real_imag(WF.h_mo,
@@ -349,13 +351,13 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         WF.num_spin_orbs,
         WF.kappa_spin_idx)
             
-    print('total gradient_after',np.round(total_gradient_after,10))'''
+    print('total gradient_after',np.round(total_gradient_after,10))
 
 
-    WF.do_adapt(
+    '''WF.do_adapt(
         operator_pool = ["gs","gd"],
         orbital_optimization = True,
-    )
+    )'''
 
 
     '''LR = naive.LinearResponse(WF, excitations="SD")
@@ -432,10 +434,11 @@ def h2o():
     O  0.0   0.0  0.11779 
     H  0.0   0.75545  -0.47116;
     H  0.0  -0.75545  -0.47116"""
-    basis = "dyall-v2z"
+    #basis = "dyall-v2z"
     #basis = "cc-pvdz"
-    #active_space = ((1, 1), 4)
-    active_space = (2, 4)
+    basis = "sto-3g"
+    active_space = ((1, 1), 4)
+    #active_space = (2, 4)
     charge = 0
     spin = 0
 
@@ -485,7 +488,7 @@ def HBr():
     
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-h2()
+h2o()
 
 
 # h2o()
