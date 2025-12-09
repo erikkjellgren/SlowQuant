@@ -450,8 +450,8 @@ def reconstructed_f_derivative(
             x_mu = 2 * mu / (2 * R + 1) * np.pi
             delta = x_vals - x_mu
 
-            u = A * delta / np.pi  # argument of numerator sinc
-            v = B * delta / np.pi  # argument of denominator sinc
+            u = A * delta / np.pi  # argument of numerator sinc (with np pi factor)
+            v = B * delta / np.pi  # argument of denominator sinc (with np pi factor)
 
             s1 = np.sinc(u)  # numerator sinc
             s2 = np.sinc(v)  # denominator sinc
