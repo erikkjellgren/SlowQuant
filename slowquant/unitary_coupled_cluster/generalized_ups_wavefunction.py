@@ -16,8 +16,7 @@ from slowquant.molecularintegrals.integralfunctions import (
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_generalized
 from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_electronic_energy_generalized,
-    get_orbital_gradient_generalized_real_imag,
-    get_orbital_gradient_expvalue_real_imag,
+    get_orbital_gradient_generalized_real_imag, get_orbital_gradient_expvalue_real_imag
 )
 from slowquant.unitary_coupled_cluster.generalized_operators import (
     a_op_spin,
@@ -1176,12 +1175,19 @@ class GeneralizedWaveFunctionUPS:
 
     @property
     def get_orbital_gradient_generalized_real_imag(self):
-        return get_orbital_gradient_generalized_real_imag(
-            self.h_mo,
-            self.g_mo,
-            self.kappa_spin_idx,
-            self.num_inactive_spin_orbs,
-            self.num_active_spin_orbs,
-            self.rdm1,
-            self.rdm2,
-        )
+        return get_orbital_gradient_generalized_real_imag(self.h_mo, self.g_mo, self.kappa_spin_idx,
+        self.num_inactive_spin_orbs,
+        self.num_active_spin_orbs,
+        self.num_virtual_spin_orbs,
+        self.rdm1,
+        self.rdm2)
+        
+    @property
+    def get_orbital_gradient_generalized_expvalue_real_imag(self):
+        return get_orbital_gradient_expvalue_real_imag(self.ci_coeffs,
+    self.ci_info,
+    self.h_mo,
+    self.g_mo,
+    self.num_spin_orbs,
+    self.kappa_spin_idx
+)
