@@ -28,6 +28,7 @@ class LinearResponse(LinearResponseBaseClass):
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
+        do_spin_adapted: bool = True,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
@@ -35,7 +36,7 @@ class LinearResponse(LinearResponseBaseClass):
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
         """
-        super().__init__(wave_function, excitations)
+        super().__init__(wave_function, excitations, do_spin_adapted)
 
         idx_shift = len(self.q_ops)
         print("Gs", len(self.G_ops))
