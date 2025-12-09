@@ -16,12 +16,7 @@ from slowquant.molecularintegrals.integralfunctions import (
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_generalized
 from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_electronic_energy_generalized,
-<<<<<<< HEAD
     get_orbital_gradient_generalized_real_imag, get_orbital_gradient_expvalue_real_imag
-=======
-    get_orbital_gradient_generalized_real_imag,
-    get_orbital_gradient_expvalue_real_imag,
->>>>>>> 89ea799626abd579467655e43a128ea5154ab807
 )
 from slowquant.unitary_coupled_cluster.generalized_operators import (
     a_op_spin,
@@ -1100,15 +1095,6 @@ class GeneralizedWaveFunctionUPS:
                 thetas_i.append(parameters[2 * i + 1 + num_kappa])
             self.set_thetas(thetas_r, thetas_i)
         if kappa_optimization:
-<<<<<<< HEAD
-            gradient[:num_kappa] = get_orbital_gradient_generalized_real_imag(self.h_mo, self.g_mo, 
-            self.kappa_spin_idx,
-            self.num_inactive_spin_orbs,
-            self.num_active_spin_orbs,
-            self.rdm1_FULL,
-            self.rdm2_FULL
-            )
-=======
             if test:
                 gradient[:num_kappa] = get_orbital_gradient_generalized_real_imag(self.h_mo, self.g_mo, 
                 self.kappa_spin_idx,
@@ -1124,7 +1110,6 @@ class GeneralizedWaveFunctionUPS:
                 self.g_mo,
                 self.num_spin_orbs,
                 self.kappa_spin_idx)
->>>>>>> 89ea799626abd579467655e43a128ea5154ab807
         if theta_optimization:
             # Hamiltonian = generalized_hamiltonian_0i_0a(
             #    self.h_mo,
@@ -1190,10 +1175,10 @@ class GeneralizedWaveFunctionUPS:
 
     @property
     def get_orbital_gradient_generalized_real_imag(self):
-<<<<<<< HEAD
         return get_orbital_gradient_generalized_real_imag(self.h_mo, self.g_mo, self.kappa_spin_idx,
         self.num_inactive_spin_orbs,
         self.num_active_spin_orbs,
+        self.num_virtual_spin_orbs,
         self.rdm1,
         self.rdm2)
         
@@ -1206,14 +1191,3 @@ class GeneralizedWaveFunctionUPS:
     self.num_spin_orbs,
     self.kappa_spin_idx
 )
-=======
-        return get_orbital_gradient_generalized_real_imag(
-            self.h_mo,
-            self.g_mo,
-            self.kappa_spin_idx,
-            self.num_inactive_spin_orbs,
-            self.num_active_spin_orbs,
-            self.rdm1,
-            self.rdm2,
-        )
->>>>>>> 89ea799626abd579467655e43a128ea5154ab807

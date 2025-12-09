@@ -81,8 +81,11 @@ def hamiltonian_0i_0a(
     # Inactive two-electron
     for i in range(num_inactive_spin_orbs):
         for j in range(num_inactive_spin_orbs):
-            if i != j and abs(g_mo[i, i, j, j]) > 10**-14:
+            # if i != j and abs(g_mo[i, i, j, j]) > 10**-14: det her er udkommenteret
+            if abs(g_mo[i,i,j,j]) > 10**-14:
                 hamiltonian_operator += 1 / 2 * g_mo[i, i, j, j] * (a_op_spin(i, True)*a_op_spin(j, True)*a_op_spin(j, False)*a_op_spin(i, False))
+            if i !=j and abs(g_mo[j,i,i,j]) > 10**-14: #Anna har tilføjet disse 2 linjer 
+                hamiltonian_operator += 1/2 * g_mo[j,i,i,j] *(a_op_spin(j, True)*a_op_spin(i, True)*a_op_spin(j, False)*a_op_spin(i, False))
 
     # Inactive-Active two-electron
     for i in range(num_inactive_spin_orbs):
@@ -92,6 +95,10 @@ def hamiltonian_0i_0a(
                     hamiltonian_operator += 1 / 2 * g_mo[i, i, p, q] * (a_op_spin(i, True)*a_op_spin(p, True)*a_op_spin(q, False)*a_op_spin(i, False))
                 if abs(g_mo[p, q, i, i]) > 10**-14:
                     hamiltonian_operator += 1 / 2 * g_mo[p, q, i, i] * (a_op_spin(p, True)*a_op_spin(i, True)*a_op_spin(i, False)*a_op_spin(q, False))
+                if abs(g_mo[p, i, i, q]) > 10**-14: #Anna har tilføjet følgende 4 linjer 
+                    hamiltonian_operator += 1 / 2 * g_mo[p, i, i, q] * (a_op_spin(p, True)*a_op_spin(i, True)*a_op_spin(q, False)*a_op_spin(i, False))
+                if abs(g_mo[i, p, q, i]) > 10**-14:
+                    hamiltonian_operator += 1 / 2 * g_mo[i, p, q, i] * (a_op_spin(i, True)*a_op_spin(q, True)*a_op_spin(i, False)*a_op_spin(p, False))
     # Active two-electron
     for p in range(num_inactive_spin_orbs, num_inactive_spin_orbs + num_active_spin_orbs):
         for q in range(num_inactive_spin_orbs, num_inactive_spin_orbs + num_active_spin_orbs):

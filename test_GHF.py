@@ -160,12 +160,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     H=generalized_hamiltonian_full_space(h_eri_mo, g_eri_mo, c.shape[0])
     H_test=hamiltonian_0i_0a(h_eri_mo, g_eri_mo,num_inactive_spin_orbs,num_active_spin_orbs)
     test=expectation_value(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
-    # print(test, test+e_nuc)
+    print(test, test+e_nuc)
     test2=expectation_value(WF.ci_coeffs, [H_test], WF.ci_coeffs, WF.ci_info)
-    # print(test2, test2+e_nuc)
+    print(test2, test2+e_nuc)
     H_1iai=hamiltonian_1i_1a(h_eri_mo, g_eri_mo,num_inactive_spin_orbs,num_active_spin_orbs, num_virtual_spin_orbs)
     test3=expectation_value(WF.ci_coeffs, [H_1iai], WF.ci_coeffs, WF.ci_info)
-    
+    print(test3, test3+e_nuc)
     
     # 'Test of gradients'
     print('Expectation Value',WF.get_orbital_gradient_generalized_expvalue_real_imag)
