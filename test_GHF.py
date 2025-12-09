@@ -133,11 +133,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         {"n_layers": 2},
         include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("bfgs", orbital_optimization=True)
+    # WF.run_wf_optimization_1step("bfgs", orbital_optimization=True)
     # print("kappa_real:", WF.kappa_real)
     # print("kappa_imag:", WF.kappa_imag)
     # print("E_opt:", WF._energy_elec)
-    LR = generalized_naive.LinearResponse(WF, excitations="sd")
+    # LR = generalized_naive.LinearResponse(WF, excitations="sd")
     # LR.calc_excitation_energies()
     # print(LR.excitation_energies)
 
@@ -167,28 +167,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     test3=expectation_value(WF.ci_coeffs, [H_1iai], WF.ci_coeffs, WF.ci_info)
     
     
-    'Test of gradients'
-    # print('huhuhub',WF.get_orbital_gradient_generalized_anna)
-    # print('habab',WF.get_orbital_gradient_generalized_test)
-    # print('hihihihb',WF.get_orbital_gradient_generalized_real_imag)
-
-    
-    # gradient = np.ze    print('habab',WF.get_orbital_gradient_generalized_test)
-    # for idx, (M,N) in enumerate(WF.kappa_spin_idx):
-    #     for P in range(WF.num_inactive_spin_orbs+WF.num_active_spin_orbs):
-            
-    #         e1 = expectation_value(WF.ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
-    #                                 WF.ci_coeffs, WF.ci_info)
-                        
-    #         e1 -= expectation_value(WF.ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
-    #                                 WF.ci_coeffs, WF.ci_info)
-            
-    #         gradient[idx]= e1
-            
-    # print('habab',gradient)
-    
-
-
+    # 'Test of gradients'
+    print('Expectation Value',WF.get_orbital_gradient_generalized_expvalue_real_imag)
+    print('From RDMs',WF.get_orbital_gradient_generalized_real_imag)
 
 
 
@@ -236,9 +217,9 @@ def h2o():
     O  0.0   0.0  0.11779 
     H  0.0   0.75545  -0.47116;
     H  0.0  -0.75545  -0.47116"""
-    basis = "dyall-v2z"
-    active_space_u = ((2, 2), 4)
-    active_space = (4, 4)
+    basis = "STO-3g"
+    active_space_u = ((1, 1), 4)
+    # active_space = (4, 4)
     charge = 0
     spin = 0
 
@@ -246,7 +227,7 @@ def h2o():
     #     geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     # )
     NR(
-        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+        geometry=geometry, basis=basis, active_space=active_space_u, charge=charge, spin=spin, unit="angstrom"
     )
     # unrestricted(
     #     geometry=geometry, basis=basis, active_space=active_space_u, charge=charge, spin=spin, unit="angstrom"
@@ -287,11 +268,11 @@ def HBr():
     
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-h2()
+# h2()
 
 # O2()
 
-# h2o()
+h2o()
 
 # HI()
 # HBr()

@@ -315,7 +315,7 @@ def get_orbital_gradient_expvalue_real_imag(
     gradient_total = np.concatenate((gradient_R, 1j*gradient_I))
     gradient_total_real = strip_imag(gradient_total)  
 
-    return gradient_total_real
+    return np.round(gradient_total_real,3)
 
 
 @nb.jit(nopython=True)
@@ -400,7 +400,7 @@ def get_orbital_gradient_generalized_real_imag(
                         
     gradient = np.concatenate((gradient_r, 1j*gradient_i))
     final_gradient = strip_imag(gradient)     
-    return final_gradient
+    return np.round(final_gradient,3)
 
 # @nb.jit(nopython=True) 'dette er den rigtige, som jeg ikke har pillet ved'
 # def get_orbital_gradient_response(
@@ -632,7 +632,7 @@ def get_orbital_response_metric_sigma(
                 sigma[idx1, idx2] -= RDM1(M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             if M == Q:
                 sigma[idx1, idx2] += RDM1(P, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
-    return sigma
+    return sigma.real ####TJEK FOR STØRRELSE AF IMAGINÆR###
 
 
 @nb.jit(nopython=True)
@@ -868,7 +868,7 @@ def get_orbital_response_hessian_block(
         Hessian-like orbital-orbital block.
     """
     A1e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx1)), dtype=np.complex128)
-    A2e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx1)), dtype=np.complex128)
+    A2e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx1)),  dtype=np.complex128)
     for idx1, (T, U) in enumerate(kappa_spin_idx1):
         for idx2, (M, N) in enumerate(kappa_spin_idx2):
             # 1e contribution
@@ -936,4 +936,4 @@ def get_orbital_response_hessian_block(
                                 P, U, R, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                             )
     # return 1 / 2 * A1e + 1 / 4 * A2e
-    return A1e + (1/2)*A2e
+    return A1e.real + (1/2)*A2e.real ####TJEK FOR STØRRELSE AF IMAGINÆR###
