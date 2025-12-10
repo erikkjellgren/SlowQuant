@@ -1113,8 +1113,8 @@ class GeneralizedWaveFunctionUPS:
                     self.kappa_spin_idx,
                     self.num_inactive_spin_orbs,
                     self.num_active_spin_orbs,
-                    self.rdm1_FULL,
-                    self.rdm2_FULL,
+                    self.rdm1,
+                    self.rdm2,
                 )
             else:
                 gradient[:num_kappa] = get_orbital_gradient_expvalue_real_imag(
