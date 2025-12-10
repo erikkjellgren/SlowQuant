@@ -1,9 +1,11 @@
 import numpy as np
 
-from SlowQuant.slowquant.unitary_coupled_cluster.linear_response import generalized_allstatetransfer, generalized_naive, generalized_projected
 import slowquant.SlowQuant as sq
-from SlowQuant.slowquant.unitary_coupled_cluster.linear_response import (
-    generalized_statetransfer,
+from slowquant.unitary_coupled_cluster.linear_response import (
+    allstatetransfer,
+    naive,
+    projected,
+    statetransfer,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
@@ -35,9 +37,9 @@ def test_H2_631g_naive():
     WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
-    LR = generalized_naive.LinearResponse(WF, excitations="SD")
+    LR = naive.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
-    genericLR = generalized_naive.LinearResponse(WF, excitations="SD")
+    genericLR = naive.LinearResponse(WF, excitations="SD")
     genericLR.calc_excitation_energies()
 
     thresh = 10**-4
@@ -98,9 +100,9 @@ def test_LiH_sto3g_naive():
     WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
-    LR = generalized_naive.LinearResponse(WF, excitations="SD")
+    LR = naive.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
-    genericLR = generalized_naive.LinearResponse(WF, excitations="SD")
+    genericLR = naive.LinearResponse(WF, excitations="SD")
     genericLR.calc_excitation_energies()
 
     thresh = 10**-4
@@ -175,7 +177,7 @@ def test_H2_631g_projLR():
     WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
-    LR = generalized_projected.LinearResponse(WF, excitations="SD")
+    LR = projected.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
 
     thresh = 10**-4
@@ -232,7 +234,7 @@ def test_LiH_sto3g_proj():
     )
     WF.run_wf_optimization_1step("SLSQP", True)
 
-    LR = generalized_projected.LinearResponse(WF, excitations="SD")
+    LR = projected.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
 
     thresh = 10**-4
@@ -303,7 +305,7 @@ def test_H2_631g_STLR():
     WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
-    LR = generalized_statetransfer.LinearResponse(
+    LR = statetransfer.LinearResponse(
         WF,
         excitations="SD",
     )
@@ -363,7 +365,7 @@ def test_LiH_sto3g_st():
     WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
-    LR = generalized_statetransfer.LinearResponse(
+    LR = statetransfer.LinearResponse(
         WF,
         excitations="SD",
     )
@@ -437,7 +439,7 @@ def test_H2_631g_allST():
     WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
-    LR = generalized_allstatetransfer.LinearResponse(
+    LR = allstatetransfer.LinearResponse(
         WF,
         excitations="SD",
     )
@@ -493,7 +495,7 @@ def test_LiH_sto3g_allST():
     WF.run_wf_optimization_1step("SLSQP", True)
 
     # Linear Response
-    LR = generalized_allstatetransfer.LinearResponse(
+    LR = allstatetransfer.LinearResponse(
         WF,
         excitations="SD",
     )

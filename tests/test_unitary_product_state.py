@@ -2,8 +2,8 @@
 import numpy as np
 
 import slowquant.SlowQuant as sq
-import SlowQuant.slowquant.unitary_coupled_cluster.linear_response.generalized_allstatetransfer as allstlr
-import SlowQuant.slowquant.unitary_coupled_cluster.linear_response.generalized_naive as naivelr
+import slowquant.unitary_coupled_cluster.linear_response.allstatetransfer as allstlr
+import slowquant.unitary_coupled_cluster.linear_response.naive as naivelr
 from slowquant.unitary_coupled_cluster.sa_ups_wavefunction import WaveFunctionSAUPS
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
