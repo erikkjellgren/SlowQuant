@@ -20,7 +20,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     propagate_state,
 )
 # from slowquant.unitary_coupled_cluster.operators import one_elec_op_0i_0a
-from slowquant.unitary_coupled_cluster.generalized_operators import hamiltonian_1i_1a
+from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_1i_1a
 
 # from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS

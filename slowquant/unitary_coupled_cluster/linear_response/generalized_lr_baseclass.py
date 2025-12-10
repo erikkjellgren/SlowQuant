@@ -16,8 +16,8 @@ from slowquant.unitary_coupled_cluster.operators import (
     # hamiltonian_1i_1a,
 )
 from slowquant.unitary_coupled_cluster.generalized_operators import (
-    hamiltonian_0i_0a,
-    hamiltonian_1i_1a,
+    generalized_hamiltonian_0i_0a,
+    generalized_hamiltonian_1i_1a,
     generalized_hamiltonian_full_space,
 )
 # from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC

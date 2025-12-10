@@ -277,7 +277,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         WF.g_mo,
         WF.kappa_spin_idx,
         WF.num_inactive_spin_orbs, 
-        WF.num_active_spin_orbs, 
+        WF.num_active_spin_orbs,
         WF.rdm1,
         WF.rdm2)
 
@@ -295,10 +295,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print('total gradient_before',np.round(total_gradient_before,10))
 
 
-    WF.run_wf_optimization_1step("BFGS",orbital_optimization=True,test=True)
+    #WF.run_wf_optimization_1step("BFGS",orbital_optimization=True,test=True)
 
 
-    my_gradient_after = get_orbital_gradient_generalized_real_imag(WF.h_mo,
+    '''my_gradient_after = get_orbital_gradient_generalized_real_imag(WF.h_mo,
         WF.g_mo,
         WF.kappa_spin_idx,
         WF.num_inactive_spin_orbs, 
@@ -316,7 +316,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         WF.num_spin_orbs,
         WF.kappa_spin_idx)
             
-    print('total gradient_after',np.round(total_gradient_after,3))
+    print('total gradient_after',np.round(total_gradient_after,3))'''
 
 
     '''WF.do_adapt(

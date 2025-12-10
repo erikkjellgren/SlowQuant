@@ -618,6 +618,7 @@ class GeneralizedWaveFunctionUPS:
                             )
                             self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
         return self._rdm2
+    
 
     def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
         r"""Check orthonormality of orbitals.
