@@ -49,7 +49,7 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.rdm2,
             )
             print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-            if np.max(np.abs(grad)) > 10: #skal rettes til 10**3
+            if np.max(np.abs(grad)) > 10**3:
                 raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
 
         grad = np.zeros(2 * len(self.G_ops))
@@ -118,7 +118,7 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.rdm1,
             )
         for j, qJ in enumerate(self.q_ops):
-            Hq_ket = generalized_propagate_state([self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info) # do_unsafe=True
+            Hq_ket = generalized_propagate_state([self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info, do_unsafe=True) # do_unsafe=True
             qdH_ket = generalized_propagate_state([qJ.dagger * self.H_1i_1a], self.wf.ci_coeffs, *self.index_info)
             for i, GI in enumerate(self.G_ops):
                 G_ket = generalized_propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
