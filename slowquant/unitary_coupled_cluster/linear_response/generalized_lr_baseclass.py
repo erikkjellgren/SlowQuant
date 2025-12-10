@@ -100,14 +100,14 @@ class LinearResponseBaseClass:
         self.B = np.zeros((num_parameters, num_parameters))
         self.Sigma = np.zeros((num_parameters, num_parameters))
         self.Delta = np.zeros((num_parameters, num_parameters))
-        self.H_1i_1a = hamiltonian_1i_1a( #hamiltonian_1i_1a 
+        self.H_1i_1a = generalized_hamiltonian_1i_1a( #hamiltonian_1i_1a 
             self.wf.h_mo,
             self.wf.g_mo,
             self.wf.num_inactive_spin_orbs,
             self.wf.num_active_spin_orbs,
             self.wf.num_virtual_spin_orbs,
         )
-        self.H_0i_0a = hamiltonian_0i_0a(
+        self.H_0i_0a = generalized_hamiltonian_0i_0a(
             self.wf.h_mo,
             self.wf.g_mo,
             self.wf.num_inactive_spin_orbs,

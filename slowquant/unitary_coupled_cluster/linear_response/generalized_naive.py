@@ -122,7 +122,7 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.rdm1,
             )
         for j, qJ in enumerate(self.q_ops):
-            Hq_ket = propagate_state([self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info) # do_unsafe=True
+            Hq_ket = propagate_state([self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info, do_unsafe=True) # do_unsafe=True
             qdH_ket = propagate_state([qJ.dagger * self.H_1i_1a], self.wf.ci_coeffs, *self.index_info)
             for i, GI in enumerate(self.G_ops):
                 G_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
