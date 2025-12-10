@@ -159,21 +159,11 @@ def RDM2(
     elif p < num_inactive_spin_orbs and q < num_inactive_spin_orbs and r < num_inactive_spin_orbs and s < num_inactive_spin_orbs:
         # All inactive index
         val = 0 + 0j
-<<<<<<< HEAD
-        if p == q == r == s:
-            val = 0 + 0j
-        elif p == q and r == s:
-            val = +1 + 0j
-        elif q == r and p == s:
-            val = -1 + 0j
-        return  val
-=======
         if p == q and r == s:
             val += (1 + 0j)
         if q == r and p == s:
             val -= (1 - 0j)
         return val
->>>>>>> a1fa8a5a41eee82e694e406eb887254858d9458f
     # Everything else
     return 0 + 0j
 
