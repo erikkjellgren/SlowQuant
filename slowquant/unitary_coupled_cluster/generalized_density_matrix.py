@@ -628,12 +628,12 @@ def get_orbital_response_metric_sigma(
         Sigma matrix orbital-orbital block.
     """
     sigma = np.zeros((len(kappa_spin_idx), len(kappa_spin_idx)), dtype=np.complex128)
-    for idx1, (N, M) in enumerate(kappa_spin_idx):
+    for idx1, (M, N) in enumerate(kappa_spin_idx):
         for idx2, (P, Q) in enumerate(kappa_spin_idx):
-            if P == N:
-                sigma[idx1, idx2] -= RDM1(M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
-            if M == Q:
-                sigma[idx1, idx2] += RDM1(P, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            if P == M:
+                sigma[idx1, idx2] += RDM1(Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            if Q == N:
+                sigma[idx1, idx2] -= RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
     return sigma.real ####TJEK FOR STØRRELSE AF IMAGINÆR###
 
 
