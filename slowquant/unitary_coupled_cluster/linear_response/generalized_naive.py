@@ -20,7 +20,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     propagate_state,
 )
 # from slowquant.unitary_coupled_cluster.operators import one_elec_op_0i_0a
-from slowquant.unitary_coupled_cluster.generalized_operators import hamiltonian_1i_1a
+from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_1i_1a
 
 # from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
@@ -122,7 +122,7 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.rdm1,
             )
         for j, qJ in enumerate(self.q_ops):
-            Hq_ket = propagate_state([self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info) # do_unsafe=True
+            Hq_ket = propagate_state([self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info, do_unsafe=True) # do_unsafe=True
             qdH_ket = propagate_state([qJ.dagger * self.H_1i_1a], self.wf.ci_coeffs, *self.index_info)
             for i, GI in enumerate(self.G_ops):
                 G_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
