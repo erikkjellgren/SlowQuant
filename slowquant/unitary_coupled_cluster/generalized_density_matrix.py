@@ -132,7 +132,7 @@ def RDM2(
     ):
         # iuvj type index
         if p == s:
-            return -rdm1[q - num_inactive_spin_orbs, r - num_inactive_spin_orbs]
+            return -rdm1[r - num_inactive_spin_orbs, q - num_inactive_spin_orbs]
         return 0 + 0j
     elif (
         p >= num_inactive_spin_orbs and q < num_inactive_spin_orbs and r < num_inactive_spin_orbs and s >= num_inactive_spin_orbs
@@ -159,9 +159,9 @@ def RDM2(
         # All inactive index
         val = 0 + 0j
         if p == q and r == s:
-            val = + 1 + 0j
+            val += (1 + 0j)
         if q == r and p == s:
-            val = - 1 + 0j
+            val -= (1 - 0j)
         return val
     # Everything else
     return 0 + 0j
@@ -315,7 +315,7 @@ def get_orbital_gradient_expvalue_real_imag(
     gradient_total = np.concatenate((gradient_R, 1j*gradient_I))
     gradient_total_real = strip_imag(gradient_total)  
 
-    return np.round(gradient_total_real,3)
+    return gradient_total_real
 
 
 @nb.jit(nopython=True)
@@ -401,7 +401,7 @@ def get_orbital_gradient_generalized_real_imag(
                         
     gradient = np.concatenate((gradient_r, 1j*gradient_i))
     final_gradient = strip_imag(gradient)     
-    return np.round(final_gradient,3)
+    return final_gradient
 
 # @nb.jit(nopython=True) 'dette er den rigtige, som jeg ikke har pillet ved'
 # def get_orbital_gradient_response(

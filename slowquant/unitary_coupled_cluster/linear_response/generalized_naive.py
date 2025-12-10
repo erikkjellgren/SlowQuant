@@ -53,7 +53,7 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.rdm2,
             )
             print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-            if np.max(np.abs(grad)) > 10: #skal rettes til 10**3
+            if np.max(np.abs(grad)) > 10**3:
                 raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
 
         grad = np.zeros(2 * len(self.G_ops))
