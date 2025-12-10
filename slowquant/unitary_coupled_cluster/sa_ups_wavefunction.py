@@ -996,19 +996,29 @@ class WaveFunctionSAUPS:
         Returns:
             Electronic energies for all shifted thetas.
         """
-        self.thetas = parameters[:]
+        # copy of parameters
+        thetas_local = np.asarray(parameters)
+
+        # Prepare reference state up to theta_idx
         state_vec = np.copy(self.csf_coeffs)
         for i in range(0, theta_idx):
             state_vec = propagate_unitary_SA(
                 state_vec,
                 i,
                 self.ci_info,
-                self.thetas,
+                thetas_local,
                 self.ups_layout,
             )
-        state_vecs = []
-        theta_tmp = np.copy(self.thetas).tolist()
-        for theta_diff in theta_diffs:
+
+        n_shifts = len(theta_diffs)
+        n_state = state_vec[0].size
+
+        # Preallocate array for shifted states
+        state_vecs = np.empty((n_shifts * self.num_states, n_state), dtype=state_vec.dtype)
+
+        # Propagate unitary with all shifted theta at theta_idx
+        theta_tmp = thetas_local.copy()
+        for j, theta_diff in enumerate(theta_diffs):
             theta_tmp[theta_idx] = theta_diff
             state_tmp = propagate_unitary_SA(
                 state_vec,
@@ -1017,29 +1027,34 @@ class WaveFunctionSAUPS:
                 theta_tmp,
                 self.ups_layout,
             )
-            for state in state_tmp:
-                state_vecs.append(state)
-        state_vecs = np.array(state_vecs)
+            for k, state in enumerate(state_tmp):
+                state_vecs[j * self.num_states + k, :] = state
+
+        # Propagate remaining unitaries for all shifted states in batch using SA propagation
         for i in range(theta_idx + 1, len(self.thetas)):
             state_vecs = propagate_unitary_SA(
                 state_vecs,
                 i,
                 self.ci_info,
-                self.thetas,
+                thetas_local,
                 self.ups_layout,
             )
+
         Hamiltonian = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
         bra_vec = propagate_state_SA(
             [Hamiltonian],
             state_vecs,
             self.ci_info,
-            self.thetas,
+            thetas_local,
             self.ups_layout,
         )
+
         energies = np.zeros(len(theta_diffs))
         idx = -1
         for i, (bra, ket) in enumerate(zip(bra_vec, state_vecs)):
             if i % len(self.csf_coeffs) == 0:
                 idx += 1
             energies[idx] += bra @ ket
+        self.num_energy_evals += self.num_states  # count one measurement per state
+
         return energies
