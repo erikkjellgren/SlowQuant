@@ -88,13 +88,8 @@ class LinearResponseBaseClass:
                 self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx
             ):
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
-<<<<<<< HEAD
-        for p, q in self.wf.kappa_spin_idx:
-            self.q_ops.append(G1_sa(p, q))
-=======
         for p, q in self.wf.kappa_no_activeactive_spin_idx:
             self.q_ops.append(G1(p, q))
->>>>>>> c7fb9287605fddd648f848360e0c77fc97d0167f
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters))
