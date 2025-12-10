@@ -375,6 +375,7 @@ def get_energy_evals_optimized(
     return f(x, theta_diffs, idx)
 
 
+@nb.jit(nopython=True)
 def _sinc_derivative(u: np.ndarray) -> np.ndarray:
     """Derivative of numpy's sinc(x) = sin(pi*x)/(pi*x) w.r.t x.
 
@@ -433,8 +434,7 @@ def reconstructed_f_derivative(
     Returns:
         Derivative of function value in list of points.
     """
-    x_vals = np.asarray(x_vals, dtype=float)
-    de = np.zeros_like(x_vals, dtype=float)
+    de = np.zeros_like(x_vals)
 
     A = (2 * R + 1) / 2.0  # factor in numerator sinc
     B = 0.5  # factor in denominator sinc
