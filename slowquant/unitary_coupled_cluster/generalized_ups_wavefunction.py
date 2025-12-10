@@ -23,12 +23,12 @@ from slowquant.unitary_coupled_cluster.generalized_operators import (
     a_op_spin,
     generalized_hamiltonian_full_space,
 )
-from slowquant.unitary_coupled_cluster.operator_state_algebra import (
-    construct_ups_state,
-    expectation_value,
-    get_grad_action,
-    propagate_state,
-    propagate_unitary,
+from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import (
+    generalized_construct_ups_state,
+    generalized_expectation_value,
+    generalized_get_grad_action,
+    generalized_propagate_state,
+    generalized_propagate_unitary,
 )
 from slowquant.unitary_coupled_cluster.operators import G1, G2, generalized_hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
@@ -261,72 +261,6 @@ class GeneralizedWaveFunctionUPS:
                 self.num_active_spin_orbs // 2,
                 self.ansatz_options,
             )
-        elif ansatz.lower() == "fuccsdt":
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.ansatz_options["S"] = True
-            self.ansatz_options["D"] = True
-            self.ansatz_options["T"] = True
-            self.ups_layout.create_fUCC(
-                [],
-                [],
-                self.active_occ_spin_idx_shifted,
-                self.active_unocc_spin_idx_shifted,
-                self.num_active_spin_orbs // 2,
-                self.ansatz_options,
-            )
-        elif ansatz.lower() == "fuccsdtq":
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.ansatz_options["S"] = True
-            self.ansatz_options["D"] = True
-            self.ansatz_options["T"] = True
-            self.ansatz_options["Q"] = True
-            self.ups_layout.create_fUCC(
-                [],
-                [],
-                self.active_occ_spin_idx_shifted,
-                self.active_unocc_spin_idx_shifted,
-                self.num_active_spin_orbs // 2,
-                self.ansatz_options,
-            )
-        elif ansatz.lower() == "fuccsdtq5":
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.ansatz_options["S"] = True
-            self.ansatz_options["D"] = True
-            self.ansatz_options["T"] = True
-            self.ansatz_options["Q"] = True
-            self.ansatz_options["5"] = True
-            self.ups_layout.create_fUCC(
-                [],
-                [],
-                self.active_occ_spin_idx_shifted,
-                self.active_unocc_spin_idx_shifted,
-                self.num_active_spin_orbs // 2,
-                self.ansatz_options,
-            )
-        elif ansatz.lower() == "fuccsdtq56":
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.ansatz_options["S"] = True
-            self.ansatz_options["D"] = True
-            self.ansatz_options["T"] = True
-            self.ansatz_options["Q"] = True
-            self.ansatz_options["5"] = True
-            self.ansatz_options["6"] = True
-            self.ups_layout.create_fUCC(
-                [],
-                [],
-                self.active_occ_spin_idx_shifted,
-                self.active_unocc_spin_idx_shifted,
-                self.num_active_spin_orbs // 2,
-                self.ansatz_options,
-            )
         elif ansatz.lower() == "adapt":
             None
         else:
@@ -408,7 +342,7 @@ class GeneralizedWaveFunctionUPS:
         self._energy_elec = None
         self._thetas_real = theta_real.copy()
         self._thetas_imag = theta_imag.copy()
-        self.ci_coeffs = construct_ups_state(
+        self.ci_coeffs = generalized_construct_ups_state(
             self.csf_coeffs,
             self.ci_info,
             self.thetas,
@@ -481,7 +415,7 @@ class GeneralizedWaveFunctionUPS:
                 P_idx = P - self.num_inactive_spin_orbs
                 for Q in range(self.num_inactive_spin_orbs, P + 1):
                     Q_idx = Q - self.num_inactive_spin_orbs
-                    val = expectation_value(
+                    val = generalized_expectation_value(
                         self.ci_coeffs,
                         [(a_op_spin(P, True) * a_op_spin(Q, False))],
                         self.ci_coeffs,
@@ -526,7 +460,7 @@ class GeneralizedWaveFunctionUPS:
                             S_lim = P + 1
                         for S in range(self.num_inactive_spin_orbs, S_lim):
                             S_idx = S - self.num_inactive_spin_orbs
-                            val = expectation_value(
+                            val = generalized_expectation_value(
                                 self.ci_coeffs,
                                 [
                                     a_op_spin(P, dagger=True)
@@ -569,7 +503,7 @@ class GeneralizedWaveFunctionUPS:
                     self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
                 ):
                     Q_idx = Q - self.num_inactive_spin_orbs
-                    val = expectation_value(
+                    val = generalized_expectation_value(
                         self.ci_coeffs,
                         [(a_op_spin(P, True) * a_op_spin(Q, False))],
                         self.ci_coeffs,
@@ -613,7 +547,7 @@ class GeneralizedWaveFunctionUPS:
                             self.num_inactive_spin_orbs + self.num_active_spin_orbs,
                         ):
                             s_idx = s - self.num_inactive_spin_orbs
-                            val = expectation_value(
+                            val = generalized_expectation_value(
                                 self.ci_coeffs,
                                 [
                                     (
@@ -652,7 +586,7 @@ class GeneralizedWaveFunctionUPS:
             Electronic energy.
         """
         if self._energy_elec is None:
-            self._energy_elec = expectation_value(
+            self._energy_elec = generalized_expectation_value(
                 self.ci_coeffs,
                 # Skal ændres til generalized_hamiltonian_0i_0a på et tidspunkt.
                 [
@@ -976,7 +910,7 @@ class GeneralizedWaveFunctionUPS:
                 self.num_inactive_spin_orbs,
                 self.num_active_spin_orbs,
             )
-            H_ket = propagate_state(
+            H_ket = generalized_propagate_state(
                 [Hamiltonian],
                 self.ci_coeffs,
                 self.ci_info,
@@ -992,8 +926,8 @@ class GeneralizedWaveFunctionUPS:
                     T = G2(i, j, a, b, True)
                 else:
                     raise ValueError(f"Got unknown excitation type {exc_type}")
-                gr = expectation_value(self.ci_coeffs, [T], H_ket, self.ci_info, do_folding=False)
-                gr -= expectation_value(H_ket, [T], self.ci_coeffs, self.ci_info, do_folding=False)
+                gr = generalized_expectation_value(self.ci_coeffs, [T], H_ket, self.ci_info, do_folding=False)
+                gr -= generalized_expectation_value(H_ket, [T], self.ci_coeffs, self.ci_info, do_folding=False)
                 grad.append(gr)
             if np.max(np.abs(grad)) < grad_threshold:
                 break
@@ -1058,7 +992,7 @@ class GeneralizedWaveFunctionUPS:
                 self.rdm2,
             )
         else:
-            E = expectation_value(
+            E = generalized_expectation_value(
                 self.ci_coeffs,
                 [
                     generalized_hamiltonian_0i_0a(
@@ -1113,8 +1047,8 @@ class GeneralizedWaveFunctionUPS:
                     self.kappa_spin_idx,
                     self.num_inactive_spin_orbs,
                     self.num_active_spin_orbs,
-                    self.rdm1_FULL,
-                    self.rdm2_FULL,
+                    self.rdm1,
+                    self.rdm2,
                 )
             else:
                 gradient[:num_kappa] = get_orbital_gradient_expvalue_real_imag(
@@ -1138,12 +1072,12 @@ class GeneralizedWaveFunctionUPS:
                 self.num_spin_orbs,
             )
             # Reference bra state (no differentiations)
-            bra_vec = propagate_state(
+            bra_vec = generalized_propagate_state(
                 [Hamiltonian],
                 self.ci_coeffs,
                 self.ci_info,
             )
-            bra_vec = construct_ups_state(
+            bra_vec = generalized_construct_ups_state(
                 bra_vec,
                 self.ci_info,
                 self.thetas,
@@ -1156,7 +1090,7 @@ class GeneralizedWaveFunctionUPS:
             # Calculate analytical derivative w.r.t. each theta using gradient_action function
             for i in range(len(self.thetas)):
                 # Derivative action w.r.t. i-th theta on CSF ket
-                ket_vec_tmp = get_grad_action(
+                ket_vec_tmp = generalized_get_grad_action(
                     ket_vec,
                     i,
                     self.ci_info,
@@ -1168,14 +1102,14 @@ class GeneralizedWaveFunctionUPS:
                 gradient[i + num_kappa] += 2 * np.matmul(bra_vec, ket_vec_tmp).real
                 # Product rule implications on reference bra and CSF ket
                 # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
-                bra_vec = propagate_unitary(
+                bra_vec = generalized_propagate_unitary(
                     bra_vec,
                     i,
                     self.ci_info,
                     self.thetas,
                     self.ups_layout,
                 )
-                ket_vec = propagate_unitary(
+                ket_vec = generalized_propagate_unitary(
                     ket_vec,
                     i,
                     self.ci_info,

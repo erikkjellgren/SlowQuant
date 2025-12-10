@@ -1,4 +1,5 @@
 import math
+from collections.abc import Sequence
 
 import numba as nb
 import numpy as np
@@ -39,7 +40,7 @@ def bitcount(x: int) -> int:
     return b
 
 
-#@nb.jit(nopython=True)
+@nb.jit(nopython=True)
 def apply_operator(
     state: np.ndarray,
     anni_idxs: np.ndarray,
@@ -50,7 +51,7 @@ def apply_operator(
     det2idx: dict[int, int],
     do_unsafe: bool,
     tmp_state: np.ndarray,
-    factor: float | complex,
+    factor: float,
 ) -> np.ndarray:
     """Apply operator to state for a single state wave function.
 
@@ -124,7 +125,7 @@ def add_operator_matrix(
     idx2det: np.ndarray,
     det2idx: dict[int, int],
     do_unsafe: bool,
-    factor: float | complex,
+    factor: float,
 ) -> np.ndarray:
     """Add matrix representation of annihilation string.
 
@@ -196,7 +197,7 @@ def apply_operator_SA(
     det2idx: dict[int, int],
     do_unsafe: bool,
     tmp_state: np.ndarray,
-    factor: float | complex,
+    factor: float,
 ) -> np.ndarray:
     """Apply operator to state for a state-averaged wave function.
 
@@ -319,7 +320,7 @@ def propagate_state(
     operators: list[FermionicOperator | str],
     state: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float | complex] | None = None,
+    thetas: Sequence[float] | None = None,
     wf_struct: UpsStructure | UccStructure | None = None,
     do_folding: bool = True,
     do_unsafe: bool = False,
@@ -355,8 +356,7 @@ def propagate_state(
     if len(operators) == 0:
         return np.copy(state)
     new_state = np.copy(state)
-    # Annika has forced this to be of type complex
-    tmp_state = np.zeros_like(state,dtype=complex)
+    tmp_state = np.zeros_like(state)
     # Create bitstrings for parity check. Contains occupied determinant up to orbital index.
     parity_check = np.zeros(2 * num_active_orbs + 1, dtype=np.int64)
     num = 0
@@ -433,7 +433,7 @@ def propagate_state_SA(
     operators: list[FermionicOperator | str],
     state: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float | complex] | None = None,
+    thetas: Sequence[float] | None = None,
     wf_struct: UpsStructure | None = None,
     do_folding: bool = True,
     do_unsafe: bool = False,
@@ -537,7 +537,7 @@ def expectation_value(
     operators: list[FermionicOperator | str],
     ket: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float | complex] | None = None,
+    thetas: Sequence[float] | None = None,
     wf_struct: UpsStructure | UccStructure | None = None,
     do_folding: bool = True,
     do_unsafe: bool = False,
@@ -569,63 +569,9 @@ def expectation_value(
         do_folding=do_folding,
         do_unsafe=do_unsafe,
     )
-    val = bra.conj() @ op_ket
-
-    # Changes by Annika to test if we can run with complex MO integrals and density matrices
-    # not isinstance(val, float):
-        # ValueError(f"Calculated expectation value is not a float, got type {type(val)}")
-
-
-
-    #if val.imag > 0:
-        #print("Warning: Expectation value is complex!!")
-
-    return val.real
-
-
-def expectation_value_for_gradient(
-    bra: np.ndarray,
-    operators: list[FermionicOperator | str],
-    ket: np.ndarray,
-    ci_info: CI_Info,
-    thetas: list[float | complex] | None = None,
-    wf_struct: UpsStructure | UccStructure | None = None,
-    do_folding: bool = True,
-    do_unsafe: bool = False,
-) -> float:
-    """Calculate expectation value of operator using propagate state.
-
-    Args:
-        bra: Bra state.
-        operators: Operator.
-        ket: Ket state.
-        ci_info: Information about the CI space.
-        thetas: Active-space parameters.
-               Ordered as (S, D, T, ...).
-        wf_struct: Wave function structure object.
-        do_folding: Do folding of operator (default: True).
-        do_unsafe: Ignore elements that are outside the space defined in ci_info. (default: False)
-                If not ignored, getting elements outside the space will stop the calculation.
-
-    Returns:
-        Expectation value.
-    """
-    # build state vector of operator on ket
-    op_ket = propagate_state(
-        operators,
-        ket,
-        ci_info,
-        thetas,
-        wf_struct,
-        do_folding=do_folding,
-        do_unsafe=do_unsafe,
-    )
-    val = bra.conj() @ op_ket
-
-    # Changes by Annika to test if we can run with complex MO integrals and density matrices
-    # not isinstance(val, float):
-        # ValueError(f"Calculated expectation value is not a float, got type {type(val)}")
-
+    val = bra @ op_ket
+    if not isinstance(val, float):
+        raise ValueError(f"Calculated expectation value is not a float, got type {type(val)}")
     return val
 
 
@@ -634,7 +580,7 @@ def expectation_value_SA(
     operators: list[FermionicOperator | str],
     ket: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float | complex] | None = None,
+    thetas: Sequence[float] | None = None,
     wf_struct: UpsStructure | None = None,
     do_folding: bool = True,
 ) -> float:
@@ -662,7 +608,7 @@ def expectation_value_SA(
         wf_struct,
         do_folding=do_folding,
     )
-    val = np.einsum("ij,ij->", bra.conj(), op_ket)
+    val = np.einsum("ij,ij->", bra, op_ket)
     if not isinstance(val, float):
         raise ValueError(f"Calculated expectation value is not a float, got type {type(val)}")
     return val / len(bra)
@@ -671,7 +617,7 @@ def expectation_value_SA(
 def construct_ucc_state(
     state: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float | complex],
+    thetas: Sequence[float],
     ucc_struct: UccStructure,
     dagger: bool = False,
 ) -> np.ndarray:
@@ -693,12 +639,12 @@ def construct_ucc_state(
     # Evil matrix construction
     Tmat = build_operator_matrix(T, ci_info)
     if dagger:
-        return ss.linalg.expm_multiply(-Tmat.conj(), state, traceA=0.0)
+        return ss.linalg.expm_multiply(-Tmat, state, traceA=0.0)
     return ss.linalg.expm_multiply(Tmat, state, traceA=0.0)
 
 
 def get_ucc_T(
-    thetas: list[float | complex],
+    thetas: Sequence[float],
     ucc_struct: UccStructure,
     offset: int = 0,
 ) -> FermionicOperator:
@@ -764,7 +710,7 @@ def get_ucc_T(
 def construct_ups_state(
     state: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float | complex],
+    thetas: Sequence[float],
     ups_struct: UpsStructure,
     dagger: bool = False,
 ) -> np.ndarray:
@@ -799,7 +745,7 @@ def construct_ups_state(
         if abs(theta) < 10**-14:
             continue
         if dagger:
-            theta = -theta.conjugate()
+            theta = -theta
         if exc_type in ("sa_single",):
             A = 1  # 2**(-1/2)
             (i, a) = np.array(exc_indices) + offset
@@ -1204,7 +1150,7 @@ def construct_ups_state(
 def construct_ups_state_SA(
     state: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float | complex],
+    thetas: Sequence[float],
     ups_struct: UpsStructure,
     dagger: bool = False,
 ) -> np.ndarray:
@@ -1239,7 +1185,7 @@ def construct_ups_state_SA(
         if abs(theta) < 10**-14:
             continue
         if dagger:
-            theta = -theta.conj()
+            theta = -theta
         if exc_type in ("sa_single",):
             A = 1  # 2**(-1/2)
             (i, a) = np.array(exc_indices) + offset
@@ -1645,7 +1591,7 @@ def propagate_unitary(
     state: np.ndarray,
     idx: int,
     ci_info: CI_Info,
-    thetas: list[float | complex],
+    thetas: Sequence[float],
     ups_struct: UpsStructure,
 ) -> np.ndarray:
     """Apply unitary from UPS operator number 'idx' to state.
@@ -2078,7 +2024,7 @@ def propagate_unitary_SA(
     state: np.ndarray,
     idx: int,
     ci_info: CI_Info,
-    thetas: list[float | complex],
+    thetas: Sequence[float],
     ups_struct: UpsStructure,
 ) -> np.ndarray:
     """Apply unitary from UPS operator number 'idx' to state.
@@ -2702,7 +2648,7 @@ def get_determinant_expansion_from_operator_on_HF(
     num_active_orbs: int,
     num_active_elec_alpha: int,
     num_active_elec_beta: int,
-) -> tuple[list[float | complex], list[str]]:
+) -> tuple[list[float], list[str]]:
     """Get determinant expansion from applying operator to HF state.
 
     Args:
