@@ -1,10 +1,7 @@
 import numba as nb
 import numpy as np
 
-import numba as nb
-import numpy as np
-
-from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value,expectation_value_for_gradient
+from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import expectation_value_for_gradient
 from slowquant.unitary_coupled_cluster.operators import a_op_spin, generalized_hamiltonian_full_space
 
 

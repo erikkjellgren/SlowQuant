@@ -10,23 +10,19 @@ from slowquant.unitary_coupled_cluster.operators import (
     G4,
     G5,
     G6,
-    G1_sa,
-    G2_sa,
-    # hamiltonian_0i_0a,
-    # hamiltonian_1i_1a,
+    G1,
+    G2,
 )
 from slowquant.unitary_coupled_cluster.generalized_operators import (
-    hamiltonian_0i_0a,
-    hamiltonian_1i_1a,
+    generalized_hamiltonian_0i_0a,
+    generalized_hamiltonian_1i_1a,
     generalized_hamiltonian_full_space,
 )
-# from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.util import (
-    UccStructure,
     UpsStructure,
-    iterate_t1_sa,
-    iterate_t2_sa,
+    iterate_t1,
+    iterate_t2,
     iterate_t3,
     iterate_t4,
     iterate_t5,
@@ -35,7 +31,7 @@ from slowquant.unitary_coupled_cluster.util import (
 
 
 class LinearResponseBaseClass:
-    index_info: tuple[CI_Info, list[float], UpsStructure] | tuple[CI_Info, list[float], UccStructure]
+    index_info: tuple[CI_Info, list[float | complex], UpsStructure]
 
     def __init__(
         self,
@@ -69,11 +65,11 @@ class LinearResponseBaseClass:
         excitations = excitations.lower()
 
         if "s" in excitations:
-            for a, i, _ in iterate_t1_sa(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
-                self.G_ops.append(G1_sa(i, a))
+            for a, i in iterate_t1(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
+                self.G_ops.append(G1(i, a))
         if "d" in excitations:
-            for a, i, b, j, _, op_type in iterate_t2_sa(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
-                self.G_ops.append(G2_sa(i, j, a, b, op_type))
+            for a, i, b, j in iterate_t2(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
+                self.G_ops.append(G2(i, j, a, b))
         if "t" in excitations:
             for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
                 self.G_ops.append(G3(i, j, k, a, b, c))
@@ -93,14 +89,14 @@ class LinearResponseBaseClass:
             ):
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
         for p, q in self.wf.kappa_no_activeactive_spin_idx:
-            self.q_ops.append(G1_sa(p, q))
+            self.q_ops.append(G1(p, q))
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters))
         self.B = np.zeros((num_parameters, num_parameters))
         self.Sigma = np.zeros((num_parameters, num_parameters))
         self.Delta = np.zeros((num_parameters, num_parameters))
-        self.H_1i_1a = generalized_hamiltonian_full_space( #hamiltonian_1i_1a 
+        self.H_1i_1a = generalized_hamiltonian_full_space( #generalized_hamiltonian_1i_1a 
             self.wf.h_mo,
             self.wf.g_mo,
             self.wf.num_spin_orbs,
@@ -108,7 +104,7 @@ class LinearResponseBaseClass:
             # self.wf.num_active_spin_orbs,
             # self.wf.num_virtual_spin_orbs,
         )
-        self.H_0i_0a = hamiltonian_0i_0a(
+        self.H_0i_0a = generalized_hamiltonian_0i_0a(
             self.wf.h_mo,
             self.wf.g_mo,
             self.wf.num_inactive_spin_orbs,
