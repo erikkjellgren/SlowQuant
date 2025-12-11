@@ -137,9 +137,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # print("kappa_real:", WF.kappa_real)
     # print("kappa_imag:", WF.kappa_imag)
     # print("E_opt:", WF._energy_elec)
-    LR = generalized_naive.LinearResponse(WF, excitations="sd")
-    LR.calc_excitation_energies()
-    print(LR.excitation_energies)
+    # LR = generalized_naive.LinearResponse(WF, excitations="sd")
+    # LR.calc_excitation_energies()
+    # print(LR.excitation_energies)
 
     #call MO integrals
     g_eri_mo = WF.g_mo
@@ -168,8 +168,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # print(test3, test3+e_nuc)
     
     # # 'Test of gradients'
-    # print('Expectation Value',WF.get_orbital_gradient_generalized_expvalue_real_imag)
-    # print('From RDMs',WF.get_orbital_gradient_generalized_real_imag)
+    print('Expectation Value',np.round(WF.get_orbital_gradient_generalized_expvalue_real_imag,10))
+    print('From RDMs',np.round(WF.get_orbital_gradient_generalized_real_imag,10))
 
 
 
@@ -268,11 +268,11 @@ def HBr():
     
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-h2()
+# h2()
 
 # O2()
 
-# h2o()
+h2o()
 
 # HI()
 # HBr()

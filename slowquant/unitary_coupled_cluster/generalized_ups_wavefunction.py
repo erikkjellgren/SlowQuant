@@ -446,9 +446,9 @@ class GeneralizedWaveFunctionUPS:
                 self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
             ):
                 P_idx = P - self.num_inactive_spin_orbs
-                for Q in range(self.num_inactive_spin_orbs, P + 1):
+                for Q in range(self.num_inactive_spin_orbs, P+1):
                     Q_idx = Q - self.num_inactive_spin_orbs
-                    for R in range(self.num_inactive_spin_orbs, P + 1):
+                    for R in range(self.num_inactive_spin_orbs, P+1):
                         R_idx = R - self.num_inactive_spin_orbs
                         if P == Q:
                             S_lim = R + 1
@@ -472,8 +472,8 @@ class GeneralizedWaveFunctionUPS:
                                 self.ci_info,
                                 do_folding=False,
                             )
-                            # if Q == R: # No comprehendo
-                            #    val -= self.rdm1[P_idx, S_idx]
+                            if Q == R: # No comprehendo
+                               val -= self.rdm1[P_idx, S_idx]
 
                             self._rdm2[P_idx, Q_idx, R_idx, S_idx] = val  # type: ignore
                             self._rdm2[Q_idx, P_idx, S_idx, R_idx] = val.conjugate()  # type: ignore
@@ -1130,7 +1130,6 @@ class GeneralizedWaveFunctionUPS:
             self.kappa_spin_idx,
             self.num_inactive_spin_orbs,
             self.num_active_spin_orbs,
-            self.num_virtual_spin_orbs,
             self.rdm1,
             self.rdm2,
         )
