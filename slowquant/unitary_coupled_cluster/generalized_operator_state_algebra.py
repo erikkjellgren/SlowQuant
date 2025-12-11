@@ -228,14 +228,8 @@ def generalized_expectation_value(
     )
     val = bra.conj() @ op_ket
 
-    # Changes by Annika to test if we can run with complex MO integrals and density matrices
-    # not isinstance(val, float):
-        # ValueError(f"Calculated expectation value is not a float, got type {type(val)}")
-
-
-
-    #if val.imag > 0:
-        #print("Warning: Expectation value is complex!!")
+    if val.imag > 0:
+        print("Warning: Expectation value is complex!!")
 
     return val.real
 
@@ -278,10 +272,6 @@ def expectation_value_for_gradient(
         do_unsafe=do_unsafe,
     )
     val = bra.conj() @ op_ket
-
-    # Changes by Annika to test if we can run with complex MO integrals and density matrices
-    # not isinstance(val, float):
-        # ValueError(f"Calculated expectation value is not a float, got type {type(val)}")
 
     return val
 

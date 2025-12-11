@@ -450,12 +450,7 @@ class GeneralizedWaveFunctionUPS:
                             S_lim = P + 1
                         for S in range(self.num_inactive_spin_orbs, S_lim):
                             S_idx = S - self.num_inactive_spin_orbs
-<<<<<<< HEAD
-
-                            val = expectation_value(
-=======
                             val = generalized_expectation_value(
->>>>>>> 7e5fe2dfbef1366368d915b98e1a335af5db358d
                                 self.ci_coeffs,
                                 [
                                     a_op_spin(P, dagger=True)

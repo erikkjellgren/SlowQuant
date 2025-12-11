@@ -323,8 +323,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
                             print(WF.kappa_spin_idx[i-len(WF.kappa_spin_idx)],WF.kappa_spin_idx[j-len(WF.kappa_spin_idx)])'''
 
 
-    #WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True,tol=1e-8)
-    WF.do_adapt(["S","D"])
+    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True,tol=1e-8)
+    #WF.do_adapt(["S","D"])
 
 
     my_gradient_after = get_orbital_gradient_generalized_real_imag(WF.h_mo,
