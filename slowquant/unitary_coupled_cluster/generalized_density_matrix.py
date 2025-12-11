@@ -111,7 +111,7 @@ def RDM2(
     virt_start = num_inactive_spin_orbs + num_active_spin_orbs
     if p >= virt_start or q >= virt_start or r >= virt_start or s >= virt_start:
         # Zero if any virtual index
-        return 0 + 0j
+        return 0 +0j
     elif (
         p >= num_inactive_spin_orbs
         and q >= num_inactive_spin_orbs
@@ -130,7 +130,7 @@ def RDM2(
     ):
         # iuvj type index
         if p == s:
-            return -rdm1[r - num_inactive_spin_orbs, q - num_inactive_spin_orbs]
+            return  -rdm1[r - num_inactive_spin_orbs, q - num_inactive_spin_orbs]
         return 0 + 0j
     elif (
         p >= num_inactive_spin_orbs and q < num_inactive_spin_orbs and r < num_inactive_spin_orbs and s >= num_inactive_spin_orbs
@@ -162,8 +162,21 @@ def RDM2(
             val -= (1 - 0j)
         return val
     # Everything else
-    return 0 + 0j
+    return 0+0j
 
+
+@nb.jit(nopython=True)
+def RDM2_new(
+    p: int,
+    q: int,
+    r: int,
+    s: int,
+    num_inactive_spin_orbs: int,
+    num_active_spin_orbs: int,
+    rdm1: np.ndarray,
+    rdm2: np.ndarray,
+) -> float:
+    return rdm2[p,q,r,s]
 
 
 @nb.jit(nopython=True)
