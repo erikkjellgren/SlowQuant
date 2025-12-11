@@ -577,8 +577,8 @@ def expectation_value(
 
 
 
-    #if val.imag > 0:
-        #print("Warning: Expectation value is complex!!")
+    if val.imag > 0:
+        print("Warning: Expectation value is complex!!")
 
     return val.real
 

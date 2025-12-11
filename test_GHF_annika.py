@@ -209,23 +209,23 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     mf.chkfile = '/home/annika4ee/SlowQuant/uhf_guess.chk'
 
     # Change initial guess:
-    #mf.init_guess = "chkfile"
+    mf.init_guess = "chkfile"
 
     mf.scf()
     mf.kernel()
     c=np.array(mf.mo_coeff,dtype=complex)
 
-    h_core=mol.intor("int1e_kin")+mol.intor("int1e_nuc")
+    h_core = mol.intor("int1e_kin") + mol.intor("int1e_nuc")
     h_1e = mol.intor("int1e_kin")
-    h_nuc=mol.intor("int1e_nuc")
+    h_nuc = mol.intor("int1e_nuc")
     g_eri = mol.intor("int2e")
-    mc = mcscf.CASCI(mf, active_space[1], active_space[0])
+    #mc = mcscf.CASCI(mf, active_space[1], active_space[0])
 
     # mc = mcscf.UCASCI(mf, active_space[1], active_space[0])
     # # Slowquant
 
      # small random anti-Hermitian
-    eps = 0.3  # controls "step size"
+    eps = 0.1  # controls "step size"
     X_anti = np.random.randn(c.shape[0],c.shape[0]) + 1j*np.random.randn(c.shape[0],c.shape[0])
     A_mat = eps * (X_anti - X_anti.conj().T)/2  # make anti-Hermitian
 
@@ -238,11 +238,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF = GeneralizedWaveFunctionUPS(
         mol.nelectron,
         active_space,
-        c_u,
+        c,
         h_core,
         g_eri,
-        "fuccsd",
-        {"n_layers": 0},
+        "adapt",
+        {"n_layers": 2},
         include_active_kappa=True,
     )
 
@@ -253,7 +253,6 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Nr. of inactive spin orbitals:", WF.num_inactive_spin_orbs)
     print("Nr. of active spin orbitals:", WF.num_active_spin_orbs)
     print("Nr. of virtual spin orbitals:", WF.num_virtual_spin_orbs)
-
 
 
     #print("Nr. of occ active spind idx shifted orbitals:", WF.active_occ_spin_idx_shifted)
@@ -280,10 +279,13 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         WF.rdm1,
         WF.rdm2)
 
-    print("my gradient_before:",np.round(my_gradient_before,3))
+    print(f"my gradient_before:\n\n",np.round(my_gradient_before,10))
+
+    #my_gradient_before = np.array(my_gradient_before)
+    #print("my_gradient_before:",np.linalg.norm(my_gradient_before, ord=2))
 
 
-    total_gradient_before = get_orbital_gradient_expvalue_real_imag(
+    '''total_gradient_before = get_orbital_gradient_expvalue_real_imag(
         WF.ci_coeffs,
         WF.ci_info,
         WF.h_mo,
@@ -291,12 +293,41 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         WF.num_spin_orbs,
         WF.kappa_spin_idx)
             
-    print('total gradient_before',np.round(total_gradient_before,3))
+    print(f'total gradient_before:\n\n',np.round(total_gradient_before,10))'''
 
-    WF.run_wf_optimization_1step("BFGS",orbital_optimization=True, test=False)
+    print(WF.kappa_spin_idx)
+    '''mask = np.isclose(my_gradient_before, total_gradient_before, atol=1e-10)
+    k_array = np.array(WF.kappa_spin_idx)
+
+    print(k_array[~mask[:len(WF.kappa_spin_idx)]])
+    Wrong_gradient_elements = my_gradient_before[~mask]
+    Wrong_gradient_elements_exp = total_gradient_before[~mask]
+    print(Wrong_gradient_elements[:int(len(Wrong_gradient_elements)/2)])
+    print(Wrong_gradient_elements_exp[:int(len(Wrong_gradient_elements)/2)])
+    print(k_array[~mask[len(WF.kappa_spin_idx):]])
+    print(Wrong_gradient_elements[int(len(Wrong_gradient_elements)/2):])
+    print(Wrong_gradient_elements_exp[int(len(Wrong_gradient_elements)/2):])'''
+
+    '''for i in range(len(my_gradient_before)):
+        for j in range(len(my_gradient_before)):
+            if i != j:
+                if np.abs([i]) > 1e-10 and np.abs(my_gradient_before[j]) > 1e-10:
+                    if i < len(WF.kappa_spin_idx) and j < len(WF.kappa_spin_idx):
+                        if np.abs(my_gradient_before[i]-my_gradient_before[j]) < 1e-10:
+                            print("real part")
+                            print(WF.kappa_spin_idx[i],WF.kappa_spin_idx[j])
+                            print(my_gradient_before[i],my_gradient_before[j])
+                    elif i > len(WF.kappa_spin_idx) and j > len(WF.kappa_spin_idx):
+                        if np.abs(my_gradient_before[i]-my_gradient_before[j]) < 1e-10:
+                            print("imaginary part")
+                            print(WF.kappa_spin_idx[i-len(WF.kappa_spin_idx)],WF.kappa_spin_idx[j-len(WF.kappa_spin_idx)])'''
 
 
-    '''my_gradient_after = get_orbital_gradient_generalized_real_imag(WF.h_mo,
+    #WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True,tol=1e-8)
+    WF.do_adapt(["S","D"])
+
+
+    my_gradient_after = get_orbital_gradient_generalized_real_imag(WF.h_mo,
         WF.g_mo,
         WF.kappa_spin_idx,
         WF.num_inactive_spin_orbs, 
@@ -304,9 +335,14 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         WF.rdm1,
         WF.rdm2)
 
-    print("my gradient after:",np.round(my_gradient_after,3))
+    print(f"my gradient_after:\n\n",np.round(my_gradient_after,10))
 
-    total_gradient_after = get_orbital_gradient_expvalue_real_imag(
+
+    #my_gradient_after = np.array(my_gradient_after)
+    #print("Gradient norm after:",np.linalg.norm(my_gradient_after, ord=2))
+
+
+    '''total_gradient_after = get_orbital_gradient_expvalue_real_imag(
         WF.ci_coeffs,
         WF.ci_info,
         WF.h_mo,
@@ -314,7 +350,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         WF.num_spin_orbs,
         WF.kappa_spin_idx)
             
-    print('total gradient_after',np.round(total_gradient_after,3))'''
+    print(f'total gradient_after:\n\n',np.round(total_gradient_after,10))'''
+
 
 
     '''WF.do_adapt(
@@ -334,7 +371,7 @@ def h2():
     #basis = "cc-pvdz"
     basis = "631-g"
     #basis = "sto-3g"
-    active_space = ((1, 1), 4)
+    active_space = ((1, 1), 2)
     #active_space = (2, 4)
     charge = 0
     spin = 0
@@ -353,10 +390,10 @@ def h3():
     geometry = """H  0.000000   0.000000       0.000000;
                   H  1.000000   0.000000       0.000000;
                   H  0.500000   0.8660254038   0.000000"""
-    basis = "cc-pvdz"
+    #basis = "cc-pvdz"
     #basis = "631-g"
-    #basis = "sto-3g"
-    active_space = ((1, 2), 4)
+    basis = "sto-3g"
+    active_space = ((1, 2), 6)
     #active_space = (2, 4)
     charge = 0
     spin = 1
@@ -375,8 +412,8 @@ def LiH():
     geometry = """H  0.0   0.0  0.0;
         Li  0.0  0.0  1"""
     #basis = "cc-pvdz"
-    basis = "631-g"
-    #basis = "sto-3g"
+    #basis = "631-g"
+    basis = "sto-3g"
     active_space = ((1, 1), 8)
     #active_space = (2, 4)
     charge = 0
@@ -399,6 +436,7 @@ def h2o():
     H  0.0  -0.75545  -0.47116"""
     #basis = "dyall-v2z"
     #basis = "cc-pvdz"
+    #basis = "631-g"
     basis = "sto-3g"
     #active_space = ((5, 5), 14)
     active_space = ((1,1),4)
