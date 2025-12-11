@@ -157,21 +157,23 @@ class GeneralizedWaveFunctionUPS:
         for P in range(0, self.num_spin_orbs):
             for Q in range(P, self.num_spin_orbs):
                 if P in self.inactive_spin_idx and Q in self.inactive_spin_idx:
-                    if P != Q:
-                        self._kappa_real_redundant.append(0.0)
-                        self._kappa_imag_redundant.append(0.0)
-                        self._kappa_real_redundant_old.append(0.0)
-                        self._kappa_imag_redundant_old.append(0.0)
-                        self.kappa_redundant_spin_idx.append((P, Q))
-                        continue
+                    #Det her if-statement er nyt:
+                    #if P != Q:
+                    self._kappa_real_redundant.append(0.0)
+                    self._kappa_imag_redundant.append(0.0)
+                    self._kappa_real_redundant_old.append(0.0)
+                    self._kappa_imag_redundant_old.append(0.0)
+                    self.kappa_redundant_spin_idx.append((P, Q))
+                    continue
                 if P in self.virtual_spin_idx and Q in self.virtual_spin_idx:
-                    if P != Q:
-                        self._kappa_real_redundant.append(0.0)
-                        self._kappa_imag_redundant.append(0.0)
-                        self._kappa_real_redundant_old.append(0.0)
-                        self._kappa_imag_redundant_old.append(0.0)
-                        self.kappa_redundant_spin_idx.append((P, Q))
-                        continue
+                    # Det her if-statement er nyt:
+                    #if P != Q:
+                    self._kappa_real_redundant.append(0.0)
+                    self._kappa_imag_redundant.append(0.0)
+                    self._kappa_real_redundant_old.append(0.0)
+                    self._kappa_imag_redundant_old.append(0.0)
+                    self.kappa_redundant_spin_idx.append((P, Q))
+                    continue
                 if not include_active_kappa:
                     if P in self.active_spin_idx and Q in self.active_spin_idx:
                         self._kappa_real_redundant.append(0.0)
@@ -182,21 +184,23 @@ class GeneralizedWaveFunctionUPS:
                         continue
                 if include_active_kappa:
                     if P in self.active_occ_spin_idx and Q in self.active_occ_spin_idx:
-                        if P != Q:
-                            self._kappa_real_redundant.append(0.0)
-                            self._kappa_imag_redundant.append(0.0)
-                            self._kappa_real_redundant_old.append(0.0)
-                            self._kappa_imag_redundant_old.append(0.0)
-                            self.kappa_redundant_spin_idx.append((P, Q))
-                            continue
+                        # Det her if-statement er nyt:
+                        # if P != Q:
+                        self._kappa_real_redundant.append(0.0)
+                        self._kappa_imag_redundant.append(0.0)
+                        self._kappa_real_redundant_old.append(0.0)
+                        self._kappa_imag_redundant_old.append(0.0)
+                        self.kappa_redundant_spin_idx.append((P, Q))
+                        continue
                     if P in self.active_unocc_spin_idx and Q in self.active_unocc_spin_idx:
-                        if P != Q:
-                            self._kappa_real_redundant.append(0.0)
-                            self._kappa_imag_redundant.append(0.0)
-                            self._kappa_real_redundant_old.append(0.0)
-                            self._kappa_imag_redundant_old.append(0.0)
-                            self.kappa_redundant_spin_idx.append((P, Q))
-                            continue
+                        # det her if-statement er nyt:
+                        #if P != Q:
+                        self._kappa_real_redundant.append(0.0)
+                        self._kappa_imag_redundant.append(0.0)
+                        self._kappa_real_redundant_old.append(0.0)
+                        self._kappa_imag_redundant_old.append(0.0)
+                        self.kappa_redundant_spin_idx.append((P, Q))
+                        continue
                 if not (P in self.active_spin_idx and Q in self.active_spin_idx):
                     self.kappa_no_activeactive_spin_idx.append((P, Q))
                     self.kappa_no_activeactive_spin_idx_dagger.append((Q, P))
@@ -453,7 +457,7 @@ class GeneralizedWaveFunctionUPS:
                             val = generalized_expectation_value(
                                 self.ci_coeffs,
                                 [
-                                    a_op_spin(P, dagger=True)
+                                      a_op_spin(P, dagger=True)
                                     * a_op_spin(R, dagger=True)
                                     * a_op_spin(S, dagger=False)
                                     * a_op_spin(Q, dagger=False)
