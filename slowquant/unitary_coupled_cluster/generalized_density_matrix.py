@@ -576,7 +576,7 @@ def get_orbital_gradient_response(
         for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
             for Q in range(num_inactive_spin_orbs + num_active_spin_orbs):
                 for R in range(num_inactive_spin_orbs + num_active_spin_orbs):
-                    # Same corrections as above
+                    # Same comments as above
                     gradient[idx+shift] += (1/2)*g_int[N, P, Q, R] * RDM2(
                         M, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
