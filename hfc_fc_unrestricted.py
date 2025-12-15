@@ -91,7 +91,7 @@ def get_hcf_fc_unrestricted(geometry, basis, active_space, unit='bohr', charge=0
 def OH_rad_hfc():
     geometry = """O  0.0   0.0  0.0;
         H  0.0  0.0  0.9697;"""
-    basis = '6-311++gss-j'
+    basis = 'sto-3g'
     active_space = ((1,2),3)
     charge = 0
     #the pyscf spin parameter is the value of 2S (tne number of unpaired electrons, or the difference between the number of alpha and beta electrons)
@@ -102,7 +102,7 @@ def OH_rad_hfc():
 def OH_cat_hfc():
     geometry = """O  0.0   0.0  0.0;
         H  0.0  0.0  1.0289;"""
-    basis="6-311++gss-j"
+    basis="sto-3g"
     active_space = ((1,3),4)
     charge = 1
     #the pyscf spin parameter is the value of 2S (tne number of unpaired electrons, or the difference between the number of alpha and beta electrons)
@@ -113,7 +113,7 @@ def OH_cat_hfc():
 def NO_rad_hfc():
     geometry = """O  0.0   0.0  0.0;
         N  0.0  0.0  1.1508;"""
-    basis = "6311++gss-j"
+    basis = "sto-3g"
     active_space = ((1,2),3)
     charge = 0
     #the pyscf spin parameter is the value of 2S (tne number of unpaired electrons, or the difference between the number of alpha and beta electrons)
@@ -122,7 +122,7 @@ def NO_rad_hfc():
     get_hcf_fc_unrestricted(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit='angstrom')
 
 
-# OH_rad_hfc()
-# OH_cat_hfc()
+OH_rad_hfc()
+OH_cat_hfc()
 NO_rad_hfc()
 
