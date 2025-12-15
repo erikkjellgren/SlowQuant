@@ -83,6 +83,7 @@ class WaveFunctionCircuit:
         self._h_mo = None
         self._g_mo = None
         self._energy_elec: float | None = None
+        self.num_energy_evals = 0  # number of energy measurements on quanutm
         active_space = []
         orbital_counter = 0
         for i in range(num_elec - cas[0], num_elec):
@@ -786,7 +787,7 @@ class WaveFunctionCircuit:
             self._energy_elec = self._calc_energy_elec()
         return self._energy_elec
 
-    def _get_hamiltonian(self) -> FermionicOperator:
+    def _get_hamiltonian(self, qiskit_form: bool = False) -> FermionicOperator | dict[str, float]:
         """Return electronic Hamiltonian as FermionicOperator.
 
         Returns:
@@ -795,6 +796,8 @@ class WaveFunctionCircuit:
         H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
         H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
 
+        if qiskit_form:
+            return H.get_qiskit_form(self.num_orbs)
         return H
 
     def _calc_energy_elec(self) -> float:
@@ -833,14 +836,16 @@ class WaveFunctionCircuit:
         print(f"### Number theta: {len(self.thetas)}")
         e_old = 1e12
         print("Full optimization")
-        print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+        print("Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #")
         for full_iter in range(0, int(maxiter)):
             full_start = time.time()
 
             # Do ansatz optimization
             if not is_silent_subiterations:
                 print("--------Ansatz optimization")
-                print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+                print(
+                    "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
+                )
             energy_theta = partial(
                 self._calc_energy_optimization,
                 theta_optimization=True,
@@ -858,6 +863,7 @@ class WaveFunctionCircuit:
                 maxiter=maxiter,
                 tol=tol,
                 is_silent=is_silent_subiterations,
+                energy_eval_callback=lambda: self.num_energy_evals,
             )
             res = optimizer.minimize(
                 self.thetas,
@@ -887,6 +893,7 @@ class WaveFunctionCircuit:
                     maxiter=maxiter,
                     tol=tol,
                     is_silent=is_silent_subiterations,
+                    energy_eval_callback=lambda: self.num_energy_evals,
                 )
                 res = optimizer.minimize([0.0] * len(self.kappa_idx))
                 for i in range(len(self.kappa)):
@@ -904,7 +911,9 @@ class WaveFunctionCircuit:
             e_new = res.fun
             time_str = f"{time.time() - full_start:7.2f}"  # type: ignore
             e_str = f"{e_new:3.12f}"
-            print(f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+            print(
+                f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {str(self.num_energy_evals).center(11)}"
+            )  # type: ignore
             if abs(e_new - e_old) < tol:
                 break
             e_old = e_new
@@ -937,7 +946,7 @@ class WaveFunctionCircuit:
                     "Cannot use RotoSolve together with orbital optimization in the one-step solver."
                 )
 
-        print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+        print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #")
         if orbital_optimization:
             if len(self.thetas) > 0:
                 energy = partial(
@@ -979,7 +988,14 @@ class WaveFunctionCircuit:
                 parameters = self.kappa
         else:
             parameters = self.thetas
-        optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
+        optimizer = Optimizers(
+            energy,
+            optimizer_name,
+            grad=gradient,
+            maxiter=maxiter,
+            tol=tol,
+            energy_eval_callback=lambda: self.num_energy_evals,
+        )
         res = optimizer.minimize(
             parameters, extra_options={"R": self.QI.grad_param_R, "param_names": self.QI.param_names}
         )
@@ -1006,6 +1022,7 @@ class WaveFunctionCircuit:
             Electronic energy.
         """
         num_kappa = 0
+        self.num_energy_evals += 1  # count one measurement
         if kappa_optimization:
             num_kappa = len(self.kappa_idx)
             self.kappa = parameters[:num_kappa]
@@ -1063,6 +1080,9 @@ class WaveFunctionCircuit:
                     x_mu = (2 * mu - 1) / (2 * R) * np.pi
                     grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R * (np.sin(1 / 2 * x_mu)) ** 2)
                 gradient[num_kappa + i] = grad
+            self.num_energy_evals += 2 * np.sum(
+                list(self.QI.grad_param_R.values())
+            )  # Count energy measurements for all gradients
         return gradient
 
 
