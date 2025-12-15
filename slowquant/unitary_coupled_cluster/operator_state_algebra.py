@@ -77,7 +77,7 @@ def apply_operator(
     create_idxs = create_idxs[::-1]
     # loop over all determinants in new_state
     for i, det in enumerate(idx2det):
-        if abs(state[i]) < 10**-14:
+        if abs(state[i]) < 10**-28:
             continue
         phase_changes = 0
         is_killstate = False
@@ -225,7 +225,7 @@ def apply_operator_SA(
     for i, det in enumerate(idx2det):
         is_non_zero = False
         for val in state[:, i]:
-            if abs(val) > 10**-14:
+            if abs(val) > 10**-28:
                 is_non_zero = True
                 break
         if not is_non_zero:
@@ -608,7 +608,11 @@ def expectation_value_SA(
         wf_struct,
         do_folding=do_folding,
     )
-    val = np.einsum("ij,ij->", bra, op_ket)
+
+    val = 0.0
+    for a, b in zip(bra, op_ket):
+        val += a @ b
+
     if not isinstance(val, float):
         raise ValueError(f"Calculated expectation value is not a float, got type {type(val)}")
     return val / len(bra)
@@ -664,7 +668,7 @@ def get_ucc_T(
     for exc_type, exc_indices, theta in zip(
         ucc_struct.excitation_operator_type, ucc_struct.excitation_indices, thetas
     ):
-        if abs(theta) < 10**-14:
+        if abs(theta) < 10**-28:
             continue
         if exc_type == "sa_single":
             (i, a) = np.array(exc_indices) + offset
@@ -742,7 +746,7 @@ def construct_ups_state(
     for exc_type, exc_indices, theta in zip(
         ups_struct.excitation_operator_type[::order], ups_struct.excitation_indices[::order], thetas[::order]
     ):
-        if abs(theta) < 10**-14:
+        if abs(theta) < 10**-28:
             continue
         if dagger:
             theta = -theta
@@ -1182,7 +1186,7 @@ def construct_ups_state_SA(
     for exc_type, exc_indices, theta in zip(
         ups_struct.excitation_operator_type[::order], ups_struct.excitation_indices[::order], thetas[::order]
     ):
-        if abs(theta) < 10**-14:
+        if abs(theta) < 10**-28:
             continue
         if dagger:
             theta = -theta
@@ -1614,7 +1618,7 @@ def propagate_unitary(
     exc_indices = ups_struct.excitation_indices[idx]
     theta = thetas[idx]
     offset = ci_info.space_extension_offset
-    if abs(theta) < 10**-14:
+    if abs(theta) < 10**-28:
         return np.copy(state)
     if exc_type in ("sa_single",):
         A = 1  # 2**(-1/2)
@@ -2047,7 +2051,7 @@ def propagate_unitary_SA(
     exc_indices = ups_struct.excitation_indices[idx]
     theta = thetas[idx]
     offset = ci_info.space_extension_offset
-    if abs(theta) < 10**-14:
+    if abs(theta) < 10**-28:
         return np.copy(state)
     if exc_type in ("sa_single",):
         A = 1  # 2**(-1/2)
