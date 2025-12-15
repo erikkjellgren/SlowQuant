@@ -165,7 +165,7 @@ class GeneralizedWaveFunctionUPS:
                         self.kappa_redundant_spin_idx.append((P, Q))
                         continue
                 if P in self.virtual_spin_idx and Q in self.virtual_spin_idx:
-                    if P != Q:
+                    # if P != Q: virker ikke med denne...
                         self._kappa_real_redundant.append(0.0)
                         self._kappa_imag_redundant.append(0.0)
                         self._kappa_real_redundant_old.append(0.0)
@@ -460,15 +460,10 @@ class GeneralizedWaveFunctionUPS:
                                 ],
                                 self.ci_coeffs,
                                 self.ci_info,
-                                do_folding=True,
+                                do_folding=False,
                             )
-<<<<<<< HEAD
-                            if Q == R: # No comprehendo
-                               val -= self.rdm1[P_idx, S_idx]
-=======
-                            #if Q == R: # No comprehendo
+                            # if Q == R: # No comprehendo
                             #    val -= self.rdm1[P_idx, S_idx]
->>>>>>> 8878a433f37400b895d59611329c156d293be4ea
 
                             self._rdm2[P_idx, Q_idx, R_idx, S_idx] = val  # type: ignore
                             self._rdm2[Q_idx, P_idx, S_idx, R_idx] = val.conjugate()  # type: ignore

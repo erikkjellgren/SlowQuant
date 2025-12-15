@@ -114,7 +114,6 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     u = unitary_group.rvs(c.shape[0]) 
     # print(np.dot(u, u.conj().T))
     C_u = c @ u[0] 
-
     h_core=mol.intor("int1e_kin")+mol.intor("int1e_nuc")
     h_1e = mol.intor("int1e_kin")
     h_nuc=mol.intor("int1e_nuc")
@@ -127,19 +126,19 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         mol.nelectron,
         active_space,
         mf.mo_coeff,
+        # C_u,
         h_core,
         g_eri,
         "fuccsd",
-        {"n_layers": 2},
+        {"n_layers": 0},
         include_active_kappa=True,
     )
-    # WF.run_wf_optimization_1step("bfgs", orbital_optimization=True)
-    # print("kappa_real:", WF.kappa_real)
-    # print("kappa_imag:", WF.kappa_imag)
+    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True,tol=1e-8)
+
     # print("E_opt:", WF._energy_elec)
-    # LR = generalized_naive.LinearResponse(WF, excitations="sd")
-    # LR.calc_excitation_energies()
-    # print(LR.excitation_energies)
+    LR = generalized_naive.LinearResponse(WF, excitations="sd")
+    LR.calc_excitation_energies()
+    print(LR.excitation_energies)
 
     #call MO integrals
     g_eri_mo = WF.g_mo
@@ -176,7 +175,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
-    basis = "STO-3g"
+    basis = "631-g"
     active_space_u = ((1, 1), 2)
     active_space = (2, 4)
     charge = 0
@@ -217,7 +216,7 @@ def h2o():
     O  0.0   0.0  0.11779 
     H  0.0   0.75545  -0.47116;
     H  0.0  -0.75545  -0.47116"""
-    basis = "STO-3g"
+    basis = "631-g"
     active_space_u = ((1, 1), 4)
     # active_space = (4, 4)
     charge = 0
@@ -236,15 +235,16 @@ def h2o():
 def HI():
     geometry = """H  0.0   0.0  0.0;
         I  0.0  0.0  1.60916 """
-    basis = "dyall-v2z"
-    active_space = (4, 6)
+    basis = "STO-3g"
+    # active_space = (4, 6)
+    active_space = ((2,2), 6)
     charge = 0
     spin = 0
 
-    print("Restricted HI")
-    restricted(
-        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
-    )
+    # print("Restricted HI")
+    # restricted(
+    #     geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    # )
     print("Nonrelativistic HI")
     NR(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
@@ -268,11 +268,11 @@ def HBr():
     
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-# h2()
+h2()
 
 # O2()
 
-h2o()
+# h2o()
 
 # HI()
 # HBr()

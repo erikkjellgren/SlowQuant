@@ -414,103 +414,6 @@ def get_orbital_gradient_generalized_real_imag(
     final_gradient = strip_imag(gradient)     
     return final_gradient
 
-# @nb.jit(nopython=True) 'dette er den rigtige, som jeg ikke har pillet ved'
-# def get_orbital_gradient_response(
-#     h_int: np.ndarray,
-#     g_int: np.ndarray,
-#     kappa_idx: list[tuple[int, int]],
-#     num_inactive_orbs: int,
-#     num_active_orbs: int,
-#     rdm1: np.ndarray,
-#     rdm2: np.ndarray,
-# ) -> np.ndarray:
-#     r"""Calculate the response orbital parameter gradient.
-
-#     .. math::
-#         g_{pq}^{\hat{q}} = \left<0\left|\left[\hat{q}_{pq},\hat{H}\right]\right|0\right>
-
-#     Args:
-#         h_int: One-electron integrals in MO in Hamiltonian.
-#         g_int: Two-electron integrals in MO in Hamiltonian.
-#         kappa_idx: Orbital parameter indices in spatial basis.
-#         num_inactive_orbs: Number of inactive orbitals in spatial basis.
-#         num_active_orbs: Number of active orbitals in spatial basis.
-#         rdm1: Active part of 1-RDM.
-#         rdm2: Active part of 2-RDM.
-
-#     Returns:
-#         Orbital response parameter gradient.
-#     """
-#     gradient = np.zeros(2 * len(kappa_idx))
-#     for idx, (m, n) in enumerate(kappa_idx):
-#         # 1e contribution
-#         for p in range(num_inactive_orbs + num_active_orbs):
-#             gradient[idx] += h_int[n, p] * RDM1(m, p, num_inactive_orbs, num_active_orbs, rdm1)
-#             gradient[idx] -= h_int[p, m] * RDM1(p, n, num_inactive_orbs, num_active_orbs, rdm1)
-#         # 2e contribution
-#         for p in range(num_inactive_orbs + num_active_orbs):
-#             for q in range(num_inactive_orbs + num_active_orbs):
-#                 for r in range(num_inactive_orbs + num_active_orbs):
-#                     gradient[idx] += (
-#                         1
-#                         / 2
-#                         * g_int[n, p, q, r]
-#                         * RDM2(m, p, q, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2)
-#                     )
-#                     gradient[idx] -= (
-#                         1
-#                         / 2
-#                         * g_int[p, m, q, r]
-#                         * RDM2(p, n, q, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2)
-#                     )
-#                     gradient[idx] -= (
-#                         1
-#                         / 2
-#                         * g_int[m, p, q, r]
-#                         * RDM2(n, p, q, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2)
-#                     )
-#                     gradient[idx] += (
-#                         1
-#                         / 2
-#                         * g_int[p, n, q, r]
-#                         * RDM2(p, m, q, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2)
-#                     )
-#     shift = len(kappa_idx)
-#     for idx, (n, m) in enumerate(kappa_idx):
-#         # 1e contribution
-#         for p in range(num_inactive_orbs + num_active_orbs):
-#             gradient[idx + shift] += h_int[n, p] * RDM1(m, p, num_inactive_orbs, num_active_orbs, rdm1)
-#             gradient[idx + shift] -= h_int[p, m] * RDM1(p, n, num_inactive_orbs, num_active_orbs, rdm1)
-#         # 2e contribution
-#         for p in range(num_inactive_orbs + num_active_orbs):
-#             for q in range(num_inactive_orbs + num_active_orbs):
-#                 for r in range(num_inactive_orbs + num_active_orbs):
-#                     gradient[idx + shift] += (
-#                         1
-#                         / 2
-#                         * g_int[n, p, q, r]
-#                         * RDM2(m, p, q, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2)
-#                     )
-#                     gradient[idx + shift] -= (
-#                         1
-#                         / 2
-#                         * g_int[p, m, q, r]
-#                         * RDM2(p, n, q, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2)
-#                     )
-#                     gradient[idx + shift] -= (
-#                         1
-#                         / 2
-#                         * g_int[m, p, q, r]
-#                         * RDM2(n, p, q, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2)
-#                     )
-#                     gradient[idx + shift] += (
-#                         1
-#                         / 2
-#                         * g_int[p, n, q, r]
-#                         * RDM2(p, m, q, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2)
-#                     )
-#     return 2 ** (-1 / 2) * gradient
-
 @nb.jit(nopython=True)
 def get_orbital_gradient_response(
     h_int: np.ndarray,
@@ -544,7 +447,7 @@ def get_orbital_gradient_response(
         # 1e contribution
         for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
             gradient[idx] += h_int[N, P] * RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
-            gradient[idx] -= h_int[P, M] * RDM1(M, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            gradient[idx] -= h_int[P, M] * RDM1(P, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
         # 2e contribution
         for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
             for Q in range(num_inactive_spin_orbs + num_active_spin_orbs):
@@ -556,10 +459,10 @@ def get_orbital_gradient_response(
                         M, Q, P, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
                     gradient[idx] -= (1/2)*g_int[P, M, Q, R] * RDM2(
-                        P, N, Q, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-                    )
-                    gradient[idx] += (1/2)*g_int[P, Q, R, N] * RDM2(
                         P, N, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                    )
+                    gradient[idx] += (1/2)*g_int[P, Q, R, M] * RDM2(
+                        P, N, R, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
     for idx, (N, M) in enumerate(kappa_idx):
         # 1e contribution
@@ -570,50 +473,19 @@ def get_orbital_gradient_response(
         for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
             for Q in range(num_inactive_spin_orbs + num_active_spin_orbs):
                 for R in range(num_inactive_spin_orbs + num_active_spin_orbs):
-                    gradient[idx+shift] += (1/2)*g_int[N, P, Q, R] * RDM2(
+                    gradient[idx] += (1/2)*g_int[N, P, Q, R] * RDM2(
                         M, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
-                    gradient[idx+shift] -= (1/2)*g_int[P, Q, N, R] * RDM2(
+                    gradient[idx] -= (1/2)*g_int[P, Q, N, R] * RDM2(
                         M, Q, P, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
-                    gradient[idx+shift] -= (1/2)*g_int[P, M, Q, R] * RDM2(
-                        P, N, Q, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-                    )
-                    gradient[idx+shift] += (1/2)*g_int[P, Q, R, N] * RDM2(
+                    gradient[idx] -= (1/2)*g_int[P, M, Q, R] * RDM2(
                         P, N, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-                    )    
-    return 2 ** (-1 / 2) * gradient
-
-
-# @nb.jit(nopython=True)
-# def get_orbital_response_metric_sigma(
-#     kappa_idx: list[tuple[int, int]],
-#     num_inactive_orbs: int,
-#     num_active_orbs: int,
-#     rdm1: np.ndarray,
-# ) -> np.ndarray:
-#     r"""Calculate the Sigma matrix orbital-orbital block.
-
-#     .. math::
-#         \Sigma_{pq,pq}^{\hat{q},\hat{q}} = \left<0\left|\left[\hat{q}_{pq}^\dagger,\hat{q}_{pq}\right]\right|0\right>
-
-#     Args:
-#         kappa_idx: Orbital parameter indices in spatial basis.
-#         num_inactive_orbs: Number of inactive orbitals in spatial basis.
-#         num_active_orbs: Number of active orbitals in spatial basis.
-#         rdm1: Active part of 1-RDM.
-
-#     Returns:
-#         Sigma matrix orbital-orbital block.
-#     """
-#     sigma = np.zeros((len(kappa_idx), len(kappa_idx)))
-#     for idx1, (n, m) in enumerate(kappa_idx):
-#         for idx2, (p, q) in enumerate(kappa_idx):
-#             if p == n:
-#                 sigma[idx1, idx2] += RDM1(m, q, num_inactive_orbs, num_active_orbs, rdm1)
-#             if m == q:
-#                 sigma[idx1, idx2] -= RDM1(p, n, num_inactive_orbs, num_active_orbs, rdm1)
-#     return -1 / 2 * sigma
+                    )
+                    gradient[idx] += (1/2)*g_int[P, Q, R, M] * RDM2(
+                        P, N, R, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                    )   
+    return gradient
 
 
 @nb.jit(nopython=True)
@@ -642,7 +514,7 @@ def get_orbital_response_metric_sigma(
         for idx2, (P, Q) in enumerate(kappa_spin_idx):
             if P == M:
                 sigma[idx1, idx2] += RDM1(Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
-            if Q == N:
+            if N == Q:
                 sigma[idx1, idx2] -= RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
     return sigma.real ####TJEK FOR STØRRELSE AF IMAGINÆR###
 
@@ -704,12 +576,13 @@ def get_orbital_response_vector_norm(
     return 1 / 2 * norm
 
 
+
 @nb.jit(nopython=True)
 def get_orbital_response_property_gradient(
     x_mo: np.ndarray,
-    kappa_idx: list[tuple[int, int]],
-    num_inactive_orbs: int,
-    num_active_orbs: int,
+    kappa_spin_idx: list[tuple[int, int]],
+    num_inactive_spin_orbs: int,
+    num_active_spin_orbs: int,
     rdm1: np.ndarray,
     response_vectors: np.ndarray,
     state_number: int,
@@ -734,121 +607,20 @@ def get_orbital_response_property_gradient(
         Orbital part of property gradient.
     """
     prop_grad = 0
-    for i, (m, n) in enumerate(kappa_idx):
-        for p in range(num_inactive_orbs + num_active_orbs):
+    for i, (P, Q) in enumerate(kappa_spin_idx):
+        for M in range(num_inactive_spin_orbs + num_active_spin_orbs):
             prop_grad += (
                 (response_vectors[i + number_excitations, state_number] - response_vectors[i, state_number])
-                * x_mo[n, p]
-                * RDM1(m, p, num_inactive_orbs, num_active_orbs, rdm1)
+                * x_mo[Q, M]
+                * RDM1(P, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             )
             prop_grad += (
                 (response_vectors[i, state_number] - response_vectors[i + number_excitations, state_number])
-                * x_mo[m, p]
-                * RDM1(n, p, num_inactive_orbs, num_active_orbs, rdm1)
+                * x_mo[M, P]
+                * RDM1(M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             )
-    return 2 ** (-1 / 2) * prop_grad
+    return prop_grad
 
-
-# @nb.jit(nopython=True)
-# def get_orbital_response_hessian_block(
-#     h: np.ndarray,
-#     g: np.ndarray,
-#     kappa_idx1: list[tuple[int, int]],
-#     kappa_idx2: list[tuple[int, int]],
-#     num_inactive_orbs: int,
-#     num_active_orbs: int,
-#     rdm1: np.ndarray,
-#     rdm2: np.ndarray,
-# ) -> np.ndarray:
-#     r"""Calculate Hessian-like orbital-orbital block.
-
-#     .. math::
-#         H^{\hat{q},\hat{q}}_{tu,mn} = \left<0\left|\left[\hat{q}_{tu},\left[\hat{H},\hat{q}_{mn}\right]\right]\right|0\right>
-
-#     Args:
-#         h: Hamiltonian one-electron integrals in MO basis.
-#         g: Hamiltonian two-electron integrals in MO basis.
-#         kappa_idx1: Orbital parameter indices in spatial basis.
-#         kappa_idx2: Orbital parameter indices in spatial basis.
-#         num_inactive_orbs: Number of inactive orbitals in spatial basis.
-#         num_active_orbs: Number of active orbitals in spatial basis.
-#         rdm1: Active part of 1-RDM.
-#         rdm2: Active part of 2-RDM.
-
-#     Returns:
-#         Hessian-like orbital-orbital block.
-#     """
-#     A1e = np.zeros((len(kappa_idx1), len(kappa_idx1)))
-#     A2e = np.zeros((len(kappa_idx1), len(kappa_idx1)))
-#     for idx1, (t, u) in enumerate(kappa_idx1):
-#         for idx2, (m, n) in enumerate(kappa_idx2):
-#             # 1e contribution
-#             A1e[idx1, idx2] += h[n, t] * RDM1(m, u, num_inactive_orbs, num_active_orbs, rdm1)
-#             A1e[idx1, idx2] += h[u, m] * RDM1(t, n, num_inactive_orbs, num_active_orbs, rdm1)
-#             for p in range(num_inactive_orbs + num_active_orbs):
-#                 if m == u:
-#                     A1e[idx1, idx2] -= h[n, p] * RDM1(t, p, num_inactive_orbs, num_active_orbs, rdm1)
-#                 if t == n:
-#                     A1e[idx1, idx2] -= h[p, m] * RDM1(p, u, num_inactive_orbs, num_active_orbs, rdm1)
-#             # 2e contribution
-#             for p in range(num_inactive_orbs + num_active_orbs):
-#                 for q in range(num_inactive_orbs + num_active_orbs):
-#                     A2e[idx1, idx2] += g[n, t, p, q] * RDM2(
-#                         m, u, p, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
-#                     )
-#                     A2e[idx1, idx2] -= g[n, p, u, q] * RDM2(
-#                         m, p, t, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
-#                     )
-#                     A2e[idx1, idx2] += g[n, p, q, t] * RDM2(
-#                         m, p, q, u, num_inactive_orbs, num_active_orbs, rdm1, rdm2
-#                     )
-#                     A2e[idx1, idx2] += g[u, m, p, q] * RDM2(
-#                         t, n, p, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
-#                     )
-#                     A2e[idx1, idx2] += g[p, m, u, q] * RDM2(
-#                         p, n, t, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
-#                     )
-#                     A2e[idx1, idx2] -= g[p, m, q, t] * RDM2(
-#                         p, n, q, u, num_inactive_orbs, num_active_orbs, rdm1, rdm2
-#                     )
-#                     A2e[idx1, idx2] -= g[u, p, n, q] * RDM2(
-#                         t, p, m, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
-#                     )
-#                     A2e[idx1, idx2] += g[p, t, n, q] * RDM2(
-#                         p, u, m, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
-#                     )
-#                     A2e[idx1, idx2] += g[p, q, n, t] * RDM2(
-#                         p, q, m, u, num_inactive_orbs, num_active_orbs, rdm1, rdm2
-#                     )
-#                     A2e[idx1, idx2] += g[u, p, q, m] * RDM2(
-#                         t, p, q, n, num_inactive_orbs, num_active_orbs, rdm1, rdm2
-#                     )
-#                     A2e[idx1, idx2] -= g[p, t, q, m] * RDM2(
-#                         p, u, q, n, num_inactive_orbs, num_active_orbs, rdm1, rdm2
-#                     )
-#                     A2e[idx1, idx2] += g[p, q, u, m] * RDM2(
-#                         p, q, t, n, num_inactive_orbs, num_active_orbs, rdm1, rdm2
-#                     )
-#             for p in range(num_inactive_orbs + num_active_orbs):
-#                 for q in range(num_inactive_orbs + num_active_orbs):
-#                     for r in range(num_inactive_orbs + num_active_orbs):
-#                         if m == u:
-#                             A2e[idx1, idx2] -= g[n, p, q, r] * RDM2(
-#                                 t, p, q, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2
-#                             )
-#                         if t == n:
-#                             A2e[idx1, idx2] -= g[p, m, q, r] * RDM2(
-#                                 p, u, q, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2
-#                             )
-#                         if m == u:
-#                             A2e[idx1, idx2] -= g[p, q, n, r] * RDM2(
-#                                 p, q, t, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2
-#                             )
-#                         if t == n:
-#                             A2e[idx1, idx2] -= g[p, q, r, m] * RDM2(
-#                                 p, q, r, u, num_inactive_orbs, num_active_orbs, rdm1, rdm2
-#                             )
-#     return 1 / 2 * A1e + 1 / 4 * A2e
 
 @nb.jit(nopython=True)
 def get_orbital_response_hessian_block(
