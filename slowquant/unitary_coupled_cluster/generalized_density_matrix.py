@@ -452,12 +452,15 @@ def get_orbital_gradient_response(
         for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
             for Q in range(num_inactive_spin_orbs + num_active_spin_orbs):
                 for R in range(num_inactive_spin_orbs + num_active_spin_orbs):
+                    # I Have this times 2:
                     gradient[idx] += (1/2)*g_int[N, P, Q, R] * RDM2(
                         M, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
+                    # Here I have -g(P,M,Q,R)*RDM2(P,N,Q,R)(Corresponds to this term twice):
                     gradient[idx] -= (1/2)*g_int[P, Q, N, R] * RDM2(
                         M, Q, P, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
+                    # I don't have this:
                     gradient[idx] -= (1/2)*g_int[P, M, Q, R] * RDM2(
                         P, N, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
@@ -468,6 +471,7 @@ def get_orbital_gradient_response(
         # 1e contribution
         for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
             gradient[idx+shift] += h_int[N, P] * RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            # I think this is supposed to be RDM1(P,N)?
             gradient[idx+shift] -= h_int[P, M] * RDM1(M, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
         # 2e contribution
         for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
@@ -513,9 +517,12 @@ def get_orbital_response_metric_sigma(
     for idx1, (M, N) in enumerate(kappa_spin_idx):
         for idx2, (P, Q) in enumerate(kappa_spin_idx):
             if P == M:
+                # I have +RDM1(N,Q)
                 sigma[idx1, idx2] += RDM1(Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             if N == Q:
                 sigma[idx1, idx2] -= RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+    if sigma.imag > 1e-10:
+        print("Warning: Response metric is complex!")
     return sigma.real ####TJEK FOR STØRRELSE AF IMAGINÆR###
 
 
@@ -651,6 +658,7 @@ def get_orbital_response_hessian_block(
     Returns:
         Hessian-like orbital-orbital block.
     """
+
     A1e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx1)), dtype=np.complex128)
     A2e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx1)),  dtype=np.complex128)
     for idx1, (T, U) in enumerate(kappa_spin_idx1):
@@ -659,6 +667,7 @@ def get_orbital_response_hessian_block(
             A1e[idx1, idx2] += h[N, T] * RDM1(M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             A1e[idx1, idx2] += h[U, M] * RDM1(T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
+                # I agree with all terms :)
                 if M == U:
                     A1e[idx1, idx2] -= h[N, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
                 if T == N:
@@ -666,9 +675,10 @@ def get_orbital_response_hessian_block(
             # 2e contribution
             for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
                 for Q in range(num_inactive_spin_orbs + num_active_spin_orbs):
+                    # I agree with all terms :)
                     A2e[idx1, idx2] += g[U, M, P, Q] * RDM2(
                         T, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-                    )                   
+                    )                 
                     A2e[idx1, idx2] -= g[P, M, U, Q] * RDM2(
                         T, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
@@ -705,6 +715,7 @@ def get_orbital_response_hessian_block(
             for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
                 for Q in range(num_inactive_spin_orbs + num_active_spin_orbs):
                     for R in range(num_inactive_spin_orbs + num_active_spin_orbs):
+                        # I agree with all terms :)
                         if M == U:
                             A2e[idx1, idx2] -= g[N, P, Q, R] * RDM2(
                                 T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
@@ -720,4 +731,6 @@ def get_orbital_response_hessian_block(
                                 P, U, R, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                             )
     # return 1 / 2 * A1e + 1 / 4 * A2e
+    if A1e.imag > 1e-10 or A2e.imag > 1e-10:
+        print("Warning: Response Hessian is complex!")
     return A1e.real + (1/2)*A2e.real ####TJEK FOR STØRRELSE AF IMAGINÆR###
