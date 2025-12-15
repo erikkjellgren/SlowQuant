@@ -30,7 +30,8 @@ from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import
     generalized_propagate_state,
     generalized_propagate_unitary,
 )
-from slowquant.unitary_coupled_cluster.operators import G1, G2, generalized_hamiltonian_0i_0a
+from slowquant.unitary_coupled_cluster.operators import G1, G2
+from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import (
     UpsStructure,

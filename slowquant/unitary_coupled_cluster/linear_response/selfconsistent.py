@@ -15,7 +15,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_response_metric_sigma,
     get_orbital_response_property_gradient,
 )
-from slowquant.unitary_coupled_cluster.linear_response.generalized_lr_baseclass import (
+from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
     LinearResponseBaseClass,
 )
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
