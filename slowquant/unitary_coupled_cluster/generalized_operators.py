@@ -3,7 +3,7 @@ import numpy as np
 from slowquant.unitary_coupled_cluster.fermionic_operator import (
     FermionicOperator, 
 )
-from unitary_coupled_cluster.operators import a_op_spin
+from slowquant.unitary_coupled_cluster.operators import a_op_spin
 
 
 def generalized_hamiltonian_full_space(h_spin_mo: np.ndarray, g_spin_mo: np.ndarray, num_spin_orbs: int) -> FermionicOperator:
