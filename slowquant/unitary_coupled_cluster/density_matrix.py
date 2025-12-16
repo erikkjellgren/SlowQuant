@@ -257,7 +257,7 @@ def get_orbital_gradient_response(
     Returns:
         Orbital response parameter gradient.
     """
-    gradient = np.zeros(2 * len(kappa_idx),dtype=np.complex128)
+    gradient = np.zeros(2 * len(kappa_idx))
     for idx, (m, n) in enumerate(kappa_idx):
         # 1e contribution
         for p in range(num_inactive_orbs + num_active_orbs):
@@ -349,7 +349,7 @@ def get_orbital_response_metric_sigma(
     Returns:
         Sigma matrix orbital-orbital block.
     """
-    sigma = np.zeros((len(kappa_idx), len(kappa_idx)), dtype=np.complex128)
+    sigma = np.zeros((len(kappa_idx), len(kappa_idx)))
     for idx1, (n, m) in enumerate(kappa_idx):
         for idx2, (p, q) in enumerate(kappa_idx):
             if p == n:
@@ -490,8 +490,8 @@ def get_orbital_response_hessian_block(
     Returns:
         Hessian-like orbital-orbital block.
     """
-    A1e = np.zeros((len(kappa_idx1), len(kappa_idx1)), dtype=np.complex128)
-    A2e = np.zeros((len(kappa_idx1), len(kappa_idx1)), dtype=np.complex128)
+    A1e = np.zeros((len(kappa_idx1), len(kappa_idx1)))
+    A2e = np.zeros((len(kappa_idx1), len(kappa_idx1)))
     for idx1, (t, u) in enumerate(kappa_idx1):
         for idx2, (m, n) in enumerate(kappa_idx2):
             # 1e contribution

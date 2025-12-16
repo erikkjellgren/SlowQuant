@@ -30,7 +30,8 @@ from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import
     generalized_propagate_state,
     generalized_propagate_unitary, generalized_propagate_unitary_modified,
 )
-from slowquant.unitary_coupled_cluster.operators import G1, G2, generalized_hamiltonian_0i_0a
+from slowquant.unitary_coupled_cluster.operators import G1, G2
+from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import (
     UpsStructure,
@@ -471,9 +472,9 @@ class GeneralizedWaveFunctionUPS:
                                 ],
                                 self.ci_coeffs,
                                 self.ci_info,
-                                do_folding=True,
+                                do_folding=False,
                             )
-                            #if Q == R: # No comprehendo
+                            # if Q == R: # No comprehendo
                             #    val -= self.rdm1[P_idx, S_idx]
 
                             self._rdm2[P_idx, Q_idx, R_idx, S_idx] = val  # type: ignore
@@ -1202,7 +1203,6 @@ class GeneralizedWaveFunctionUPS:
             self.kappa_spin_idx,
             self.num_inactive_spin_orbs,
             self.num_active_spin_orbs,
-            self.num_virtual_spin_orbs,
             self.rdm1,
             self.rdm2,
         )
