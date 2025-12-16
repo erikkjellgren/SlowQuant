@@ -433,9 +433,9 @@ def get_orbital_gradient_response(
     Args:
         h_int: One-electron integrals in MO in Hamiltonian.
         g_int: Two-electron integrals in MO in Hamiltonian.
-        kappa_idx: Orbital parameter indices in spatial basis.
-        num_inactive_orbs: Number of inactive orbitals in spatial basis.
-        num_active_orbs: Number of active orbitals in spatial basis.
+        kappa_idx: Orbital parameter indices in spin basis.
+        num_inactive_orbs: Number of inactive orbitals in spin basis.
+        num_active_orbs: Number of active orbitals in spin basis.
         rdm1: Active part of 1-RDM.
         rdm2: Active part of 2-RDM.
 
@@ -472,8 +472,7 @@ def get_orbital_gradient_response(
         # 1e contribution
         for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
             gradient[idx+shift] += h_int[N, P] * RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
-            # I think this is supposed to be RDM1(P,N)?
-            gradient[idx+shift] -= h_int[P, M] * RDM1(M, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            gradient[idx+shift] -= h_int[P, M] * RDM1(P, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
         # 2e contribution
         for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
             for Q in range(num_inactive_spin_orbs + num_active_spin_orbs):
@@ -522,9 +521,9 @@ def get_orbital_response_metric_sigma(
                 sigma[idx1, idx2] += RDM1(Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             if N == Q:
                 sigma[idx1, idx2] -= RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
-    if sigma.imag > 1e-10:
+    if sigma.imag.any() > 1e-10:
         print("Warning: Response metric is complex!")
-    return sigma.real ####TJEK FOR STØRRELSE AF IMAGINÆR###
+    return sigma.real 
 
 
 @nb.jit(nopython=True)
@@ -732,6 +731,6 @@ def get_orbital_response_hessian_block(
                                 P, U, R, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                             )
     # return 1 / 2 * A1e + 1 / 4 * A2e
-    if A1e.imag > 1e-10 or A2e.imag > 1e-10:
+    if A1e.imag.any() > 1e-10 or A2e.imag.any() > 1e-10:
         print("Warning: Response Hessian is complex!")
-    return A1e.real + (1/2)*A2e.real ####TJEK FOR STØRRELSE AF IMAGINÆR###
+    return A1e.real + (1/2)*A2e.real

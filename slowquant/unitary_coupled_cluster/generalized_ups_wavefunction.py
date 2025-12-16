@@ -464,7 +464,7 @@ class GeneralizedWaveFunctionUPS:
                                 ],
                                 self.ci_coeffs,
                                 self.ci_info,
-                                do_folding=False,
+                                do_folding=True,
                             )
                             # if Q == R: # No comprehendo
                             #    val -= self.rdm1[P_idx, S_idx]
@@ -592,7 +592,7 @@ class GeneralizedWaveFunctionUPS:
                             self.num_spin_orbs
                         ):
                             s_idx = s
-                            val = expectation_value(
+                            val = generalized_expectation_value(
                                 self.ci_coeffs,
                                 [
                                     (
