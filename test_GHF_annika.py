@@ -9,11 +9,10 @@ from scipy.linalg import expm
 # from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
-from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.linear_response import generalized_naive
 from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
 from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, generalized_hamiltonian_0i_0a, generalized_hamiltonian_1i_1a
-from slowquant.unitary_coupled_cluster.generalized_density_matrix import get_orbital_gradient_generalized_real_imag, get_orbital_gradient_expvalue_real_imag
+from slowquant.unitary_coupled_cluster.generalized_density_matrix import get_orbital_gradient_generalized_real_imag, get_orbital_gradient_expvalue_real_imag, get_nonsplit_gradient_expvalue
 
 from slowquant.unitary_coupled_cluster.fermionic_operator import (
     FermionicOperator, 
@@ -225,7 +224,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # # Slowquant
 
      # small random anti-Hermitian
-    eps = 0.1  # controls "step size"
+    eps = 0.05  # controls "step size"
     X_anti = np.random.randn(c.shape[0],c.shape[0]) + 1j*np.random.randn(c.shape[0],c.shape[0])
     A_mat = eps * (X_anti - X_anti.conj().T)/2  # make anti-Hermitian
 
@@ -238,11 +237,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF = GeneralizedWaveFunctionUPS(
         mol.nelectron,
         active_space,
-        c_u,
+        c,
         h_core,
         g_eri,
-        "adapt",
-        {"n_layers": 2},
+        "fuccsd",
+        {"n_layers": 1},
         include_active_kappa=True,
     )
 
@@ -271,7 +270,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print(test_energy3)'''
 
 
-    my_gradient_before = get_orbital_gradient_generalized_real_imag(WF.h_mo,
+    '''my_gradient_before = get_orbital_gradient_generalized_real_imag(WF.h_mo,
         WF.g_mo,
         WF.kappa_spin_idx,
         WF.num_inactive_spin_orbs, 
@@ -279,7 +278,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         WF.rdm1,
         WF.rdm2)
 
-    print(f"my gradient_before:\n\n",np.round(my_gradient_before,10))
+    print(f"my gradient_before:\n\n",np.round(my_gradient_before,10))'''
 
     #my_gradient_before = np.array(my_gradient_before)
     #print("my_gradient_before:",np.linalg.norm(my_gradient_before, ord=2))
@@ -295,7 +294,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
             
     print(f'total gradient_before:\n\n',np.round(total_gradient_before,10))'''
 
-    print(WF.kappa_spin_idx)
+    #print(WF.kappa_spin_idx)
+
     '''mask = np.isclose(my_gradient_before, total_gradient_before, atol=1e-10)
     k_array = np.array(WF.kappa_spin_idx)
 
@@ -323,11 +323,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
                             print(WF.kappa_spin_idx[i-len(WF.kappa_spin_idx)],WF.kappa_spin_idx[j-len(WF.kappa_spin_idx)])'''
 
 
-    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True,tol=1e-7)
+    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True, tol=1e-10)
     #WF.do_adapt(["S","D"])
 
 
-    my_gradient_after = get_orbital_gradient_generalized_real_imag(WF.h_mo,
+    '''my_gradient_after = get_orbital_gradient_generalized_real_imag(WF.h_mo,
         WF.g_mo,
         WF.kappa_spin_idx,
         WF.num_inactive_spin_orbs, 
@@ -335,7 +335,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         WF.rdm1,
         WF.rdm2)
 
-    print(f"my gradient_after:\n\n",np.round(my_gradient_after,10))
+    print(f"my gradient_after:\n\n",np.round(my_gradient_after,10))'''
 
 
     #my_gradient_after = np.array(my_gradient_after)
@@ -353,16 +353,27 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print(f'total gradient_after:\n\n',np.round(total_gradient_after,10))'''
 
 
-
     '''WF.do_adapt(
-        operator_pool = ["gs","gd"],
+        operator_pool = ["s","g"],
         orbital_optimization = True,
     )'''
 
 
-    '''LR = naive.LinearResponse(WF, excitations="SD")
+    '''LR = generalized_naive.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     print(LR.excitation_energies)'''
+
+    '''exp_value_gradient_nonsplit = get_nonsplit_gradient_expvalue(
+            WF.ci_coeffs,
+            WF.ci_info,
+            WF.h_mo,
+            WF.g_mo,
+            WF.num_spin_orbs,
+            WF.kappa_spin_idx,
+        )
+    
+    print(exp_value_gradient_nonsplit)'''
+
 
 
 def h2():
@@ -439,7 +450,7 @@ def h2o():
     #basis = "631-g"
     basis = "sto-3g"
     #active_space = ((5, 5), 14)
-    active_space = ((1,1),4)
+    active_space = ((2,2),8)
     #active_space = (2, 4)
     charge = 0
     spin = 0
@@ -490,10 +501,9 @@ def HBr():
     
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-h3()
+h2o()
 
 
 # h2o()
-
 # HI()
 # HBr()

@@ -3,8 +3,8 @@ import numpy as np
 from slowquant.unitary_coupled_cluster.ci_spaces import CI_Info
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.operators import (
-    G1,
-    G2,
+    G1, G1_generalized,
+    G2, G2_generalized,
 )
 from slowquant.unitary_coupled_cluster.util import UpsStructure
 from slowquant.unitary_coupled_cluster.operator_state_algebra import bitcount
@@ -144,7 +144,8 @@ def generalized_propagate_state(
             if isinstance(wf_struct, UpsStructure):
                 if thetas is None:
                     raise ValueError("theta must be different from None")
-                new_state = generalized_construct_ups_state(
+                # OBS!!!!!Changed to generalized_construct_ups_state_modified!!!!!!
+                new_state = generalized_construct_ups_state_modified(
                     new_state,
                     ci_info,
                     thetas,
@@ -228,8 +229,8 @@ def generalized_expectation_value(
     )
     val = bra.conj() @ op_ket
 
-    if val.imag > 0:
-        print("Warning: Expectation value is complex!!")
+    if val.imag > 1e-8:
+        print("Warning: Expectation value is complex!!", val)
 
     return val.real
 
@@ -348,6 +349,156 @@ def generalized_construct_ups_state(
     return out
 
 
+def generalized_construct_ups_state_modified(
+    state: np.ndarray,
+    ci_info: CI_Info,
+    thetas: list[float | complex],
+    ups_struct: UpsStructure,
+    dagger: bool = False,
+) -> np.ndarray:
+    r"""Construct unitary product state by applying UPS unitary to reference state.
+
+    .. math::
+        \boldsymbol{U}_N...\boldsymbol{U}_0\left|\nu\right> = \left|\tilde\nu\right>
+
+    #. 10.48550/arXiv.2303.10825, Eq. 15
+    #. 10.48550/arXiv.2505.00883, Eq. 45, 47, and, 49 (SA doubles)
+    #. 10.48550/arXiv.2505.02984, Eq. 35, D1, and, D2 (SA doubles)
+
+    Args:
+        state: Reference state vector.
+        ci_info: Information about the CI space.
+        thetas: Ansatz parameters values.
+        ups_struct: Unitary product state structure.
+        dagger: If true, do dagger unitaries.
+
+    Returns:
+        New state vector with unitaries applied.
+    """
+    out = state.copy()
+    n_thetas = int(len(thetas)/2)
+    order = 1
+    offset = ci_info.space_extension_offset
+    if dagger:
+        order = -1
+    # Loop over all excitation in UPSStructure
+    for exc_type, exc_indices, theta_R, theta_I in zip(
+        ups_struct.excitation_operator_type[::order], ups_struct.excitation_indices[::order],
+        thetas[:n_thetas][::order], thetas[n_thetas:2*n_thetas][::order]
+    ):
+        if dagger:
+            theta_R = -theta_R
+            theta_I = -theta_I
+        if exc_type in ("single", "double"):
+            # Create T matrix Imaginary:
+            if abs(theta_I) < 10**-14:
+                continue
+            else:
+                if exc_type == "single":
+                    (i, a) = np.array(exc_indices) + 2 * offset
+                    T_R = G1_generalized(i, a, True, Real = False)
+                elif exc_type == "double":
+                    (i, j, a, b) = np.array(exc_indices) + 2 * offset
+                    T_R = G2_generalized(i, j, a, b, True, Real = False)
+                else:
+                    raise ValueError(f"Got unknown excitation type: {exc_type}")
+            # Create T matrix Real:
+            if abs(theta_R) < 10**-14:
+                continue
+            else:
+                if exc_type == "single":
+                    (i, a) = np.array(exc_indices) + 2 * offset
+                    T_I = G1_generalized(i, a, True, Real = True)
+                elif exc_type == "double":
+                    (i, j, a, b) = np.array(exc_indices) + 2 * offset
+                    T_I = G2_generalized(i, j, a, b, True, Real = True)
+                else:
+                    raise ValueError(f"Got unknown excitation type: {exc_type}")
+            
+            if not dagger:
+                if abs(theta_I) < 10**-14:
+                    # Analytical application on state vector
+                    out = (
+                        out
+                        + np.sin(theta_I)
+                        * generalized_propagate_state(
+                            [T_I],
+                            out,
+                            ci_info,
+                            do_folding=False,
+                        )
+                        + (1 - np.cos(theta_I))
+                        * generalized_propagate_state(
+                            [T_I, T_I],
+                            out,
+                            ci_info,
+                            do_folding=False,
+                        )
+                    )
+                if abs(theta_R) < 10**-14:
+                    # Analytical application on state vector
+                    out = (
+                        out
+                        + np.sin(theta_R)
+                        * generalized_propagate_state(
+                            [T_R],
+                            out,
+                            ci_info,
+                            do_folding=False,
+                        )
+                        + (1 - np.cos(theta_R))
+                        * generalized_propagate_state(
+                            [T_R, T_R],
+                            out,
+                            ci_info,
+                            do_folding=False,
+                        )
+                    )
+            else:
+                if abs(theta_R) < 10**-14:
+                    # Analytical application on state vector
+                    out = (
+                        out
+                        + np.sin(theta_R)
+                        * generalized_propagate_state(
+                            [T_R],
+                            out,
+                            ci_info,
+                            do_folding=False,
+                        )
+                        + (1 - np.cos(theta_R))
+                        * generalized_propagate_state(
+                            [T_R, T_R],
+                            out,
+                            ci_info,
+                            do_folding=False,
+                        )
+                    )
+                if abs(theta_I) < 10**-14:
+                    # Analytical application on state vector
+                    out = (
+                        out
+                        + np.sin(theta_I)
+                        * generalized_propagate_state(
+                            [T_I],
+                            out,
+                            ci_info,
+                            do_folding=False,
+                        )
+                        + (1 - np.cos(theta_I))
+                        * generalized_propagate_state(
+                            [T_I, T_I],
+                            out,
+                            ci_info,
+                            do_folding=False,
+                        )
+                    )              
+        else:
+            raise ValueError(f"Got unknown excitation type, {exc_type}")
+    return out
+
+
+
 def generalized_propagate_unitary(
     state: np.ndarray,
     idx: int,
@@ -405,6 +556,109 @@ def generalized_propagate_unitary(
                 do_folding=False,
             )
         )
+    else:
+        raise ValueError(f"Got unknown excitation type, {exc_type}")
+    return out
+
+
+def generalized_propagate_unitary_modified(
+    state: np.ndarray,
+    idx: int,
+    ci_info: CI_Info,
+    thetas: list[float | complex],
+    ups_struct: UpsStructure,
+) -> np.ndarray:
+    """Apply unitary from UPS operator number 'idx' to state.
+
+    #. 10.48550/arXiv.2505.00883, Eq. 45, 47, and, 49 (SA doubles)
+    #. 10.48550/arXiv.2505.02984, Eq. 35, D1, and, D2 (SA doubles)
+
+    Args:
+        state: State vector.
+        idx: Index of operator in the ups_struct.
+        ci_info: Information about the CI space.
+        thetas: Values for ansatz parameters.
+        ups_struct: UPS structure object.
+
+    Returns:
+        State with unitary applied.
+    """
+    # Select unitary operation based on idx
+    real = True
+    if idx >= len(ups_struct.excitation_indices):
+        idx = idx - len(ups_struct.excitation_indices)
+        real = False
+
+    exc_type = ups_struct.excitation_operator_type[idx]
+    exc_indices = ups_struct.excitation_indices[idx]
+    n_thetas = int(len(thetas)/2)
+    theta_R = thetas[idx]
+    theta_I = thetas[n_thetas + idx]
+    offset = ci_info.space_extension_offset
+    
+    if exc_type in ("single", "double"):
+        if real:
+            # Create T matrix Real:
+            if abs(theta_R) < 10**-14:
+                return np.copy(state)
+            else:
+                if exc_type == "single":
+                    (i, a) = np.array(exc_indices) + 2 * offset
+                    T = G1_generalized(i, a, True, Real = True)
+                elif exc_type == "double":
+                    (i, j, a, b) = np.array(exc_indices) + 2 * offset
+                    T = G2_generalized(i, j, a, b, True, Real = True)
+                else:
+                    raise ValueError(f"Got unknown excitation type: {exc_type}")
+                # Analytical application on state vector
+                out = (
+                    state
+                    + np.sin(theta_R)
+                    * generalized_propagate_state(
+                        [T],
+                        state,
+                        ci_info,
+                        do_folding=False,
+                    )
+                    + (1 - np.cos(theta_R))
+                    * generalized_propagate_state(
+                        [T, T],
+                        state,
+                        ci_info,
+                        do_folding=False,
+                    )
+                )
+        else:
+            # Create T matrix Imaginary:
+            if abs(theta_I) < 10**-14:
+                return np.copy(state)
+            else:
+                if exc_type == "single":
+                    (i, a) = np.array(exc_indices) + 2 * offset
+                    T = G1_generalized(i, a, True, Real = False)
+                elif exc_type == "double":
+                    (i, j, a, b) = np.array(exc_indices) + 2 * offset
+                    T = G2_generalized(i, j, a, b, True, Real = False)
+                else:
+                    raise ValueError(f"Got unknown excitation type: {exc_type}")
+                # Analytical application on state vector
+                out = (
+                    state
+                    + np.sin(theta_I)
+                    * generalized_propagate_state(
+                        [T],
+                        state,
+                        ci_info,
+                        do_folding=False,
+                    )
+                    + (1 - np.cos(theta_I))
+                    * generalized_propagate_state(
+                        [T, T],
+                        state,
+                        ci_info,
+                        do_folding=False,
+                    )
+                )
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")
     return out
@@ -470,3 +724,90 @@ def generalized_get_grad_action(
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")
     return tmp
+
+
+
+def generalized_get_grad_action_modified(
+    state: np.ndarray,
+    idx: int,
+    ci_info: CI_Info,
+    ups_struct: UpsStructure,
+) -> np.ndarray:
+    r"""Get effect of differentiation with respect to "idx" operator in the UPS expansion.
+
+    .. math::
+        \frac{\partial}{\partial \theta_i}\left(\left<\text{CSF}\right|\boldsymbol{U}(\theta_{i-1})\boldsymbol{U}(\theta_i)\right) =
+        \left<\text{CSF}\right|\boldsymbol{U}(\theta_{i-1})\frac{\partial \boldsymbol{U}(\theta_i)}{\partial \theta_i}
+
+    With,
+
+    .. math::
+        \begin{align}
+        \frac{\partial \boldsymbol{U}(\theta_i)}{\partial \theta_i} &= \frac{\partial}{\partial \theta_i}\exp\left(\theta_i \hat{T}_i\right)\\
+                &= \exp\left(\theta_i \hat{T}_i\right)\hat{T}_i
+        \end{align}
+
+    This function only applies the $\hat{T}_i$ part to the state.
+
+    #. 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
+
+    Args:
+        state: State vector.
+        idx: Index of operator in the ups_struct.
+        ci_info: Information about the CI space.
+        ups_struct: UPS structure object.
+
+    Returns:
+        State with derivative of the idx'th unitary applied.
+    """
+    # Select unitary operation based on idx
+    real = True
+    if idx >= len(ups_struct.excitation_indices):
+        idx = idx - len(ups_struct.excitation_indices)
+        real = False
+
+    exc_type = ups_struct.excitation_operator_type[idx]
+    exc_indices = ups_struct.excitation_indices[idx]
+    offset = ci_info.space_extension_offset
+    if exc_type in (
+        "single",
+        "double",
+    ):
+        if real:
+            # Create T matrix real:
+            if exc_type == "single":
+                (i, a) = np.array(exc_indices) + 2 * offset
+                T = G1_generalized(i, a, True, Real = True)
+            elif exc_type == "double":
+                (i, j, a, b) = np.array(exc_indices) + 2 * offset
+                T = G2_generalized(i, j, a, b, True, Real = True)
+            else:
+                raise ValueError(f"Got unknown excitation type: {exc_type}")
+            # Apply missing T factor of derivative
+            tmp = generalized_propagate_state(
+                [T],
+                state,
+                ci_info,
+                do_folding=False,
+            )
+        else:
+            # Create T matrix imaginary:
+            if exc_type == "single":
+                (i, a) = np.array(exc_indices) + 2 * offset
+                T = G1_generalized(i, a, True, Real = True)
+            elif exc_type == "double":
+                (i, j, a, b) = np.array(exc_indices) + 2 * offset
+                T = G2_generalized(i, j, a, b, True, Real = True)
+            else:
+                raise ValueError(f"Got unknown excitation type: {exc_type}")
+            # Apply missing T factor of derivative
+            tmp = generalized_propagate_state(
+                [T],
+                state,
+                ci_info,
+                do_folding=False,
+            )
+    else:
+        raise ValueError(f"Got unknown excitation type, {exc_type}")
+    return tmp
+
