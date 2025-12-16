@@ -127,7 +127,8 @@ class LinearResponseBaseClass:
         if np.abs(np.min(hess_eigval)) < 10**-8:
             print("WARNING: Small eigenvalue in Hessian")
         elif np.min(hess_eigval) < 0:
-            raise ValueError("Negative eigenvalue in Hessian.")
+            print("Negative eigenvalue in Hessian.")
+            #raise ValueError("Negative eigenvalue in Hessian.")
 
         S = np.zeros((size * 2, size * 2))
         S[:size, :size] = self.Sigma

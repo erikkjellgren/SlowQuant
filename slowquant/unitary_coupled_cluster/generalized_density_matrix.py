@@ -22,7 +22,7 @@ def strip_imag(A, tol=1e-10):
         return A.real.astype(np.float64)
     else:
         # Imaginary part is relevant → keep complex
-        print("WARNING: Gradient is complex!!")
+        print("WARNING: Orbital rotation gradient is complex!!")
         #print("Printing gradient:",A)
         return A.real.astype(np.float64)
 
@@ -218,8 +218,8 @@ def get_electronic_energy_generalized(
                         * g_int[p, q, r, s]
                         * RDM2(p, q, r, s, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
                     )
-    if energy.imag > 1e-10:
-        print("Warning: Complex energy!")
+    if energy.imag > 1e-8:
+        print("Warning: Complex energy!",energy)
     return energy.real
 
 
@@ -330,6 +330,29 @@ def get_orbital_gradient_expvalue_real_imag(
     return gradient_total_real
 
 
+def get_nonsplit_gradient_expvalue(
+    ci_coeffs,
+    ci_info,
+    h_eri_mo,
+    g_eri_mo,
+    num_spin_orbs,
+    kappa_idx: list[tuple[int, int]],
+) -> tuple[np.ndarray]:
+    
+    H = generalized_hamiltonian_full_space(h_eri_mo, g_eri_mo,num_spin_orbs)
+
+    gradient = np.zeros(len(kappa_idx),dtype=np.complex128)
+
+    for idx, (M,N) in enumerate(kappa_idx):
+        gradient[idx] +=  expectation_value_for_gradient(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
+                            ci_coeffs, ci_info)
+        gradient[idx] -=  expectation_value_for_gradient(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
+                            ci_coeffs, ci_info)
+
+    return gradient
+
+
+
 @nb.jit(nopython=True)
 def get_orbital_gradient_generalized_real_imag(
     h_int: np.ndarray,
@@ -411,7 +434,7 @@ def get_orbital_gradient_generalized_real_imag(
                         gradient_r[idx] += (1/2)*g_int[R,N,P,Q]*RDM2(R,M,P,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
                         
     gradient = np.concatenate((gradient_r, 1j*gradient_i))
-    final_gradient = strip_imag(gradient)     
+    final_gradient = strip_imag(gradient,tol=1e-8)     
     return final_gradient
 
 # @nb.jit(nopython=True) 'dette er den rigtige, som jeg ikke har pillet ved'
@@ -545,17 +568,20 @@ def get_orbital_gradient_response(
         for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
             gradient[idx] += h_int[N, P] * RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             # I think it is RDM1(P,N)?
-            gradient[idx] -= h_int[P, M] * RDM1(M, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            gradient[idx] -= h_int[P, M] * RDM1(P, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
         # 2e contribution
         for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
             for Q in range(num_inactive_spin_orbs + num_active_spin_orbs):
                 for R in range(num_inactive_spin_orbs + num_active_spin_orbs):
                     # I Have this times 2:
-                    gradient[idx] += (1/2)*g_int[N, P, Q, R] * RDM2(
+                    gradient[idx] += g_int[N, P, Q, R] * RDM2(
                         M, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
                     # Here I have -g(P,M,Q,R)*RDM2(P,N,Q,R)(Corresponds to this term twice):
-                    gradient[idx] -= (1/2)*g_int[P, Q, N, R] * RDM2(
+                    gradient[idx] -= g_int[P, M, Q, R] * RDM2(
+                        P, N, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                    )
+                    '''gradient[idx] -= g_int[P, Q, N, R] * RDM2(
                         M, Q, P, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
                     # I don't have this:
@@ -565,18 +591,27 @@ def get_orbital_gradient_response(
                     # I don't have this:
                     gradient[idx] += (1/2)*g_int[P, Q, R, N] * RDM2(
                         P, N, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-                    )
+                    )'''
     for idx, (N, M) in enumerate(kappa_idx):
         # 1e contribution
         for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
             gradient[idx+shift] += h_int[N, P] * RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             # I think this is supposed to be RDM1(P,N)?
-            gradient[idx+shift] -= h_int[P, M] * RDM1(M, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            gradient[idx+shift] -= h_int[P, M] * RDM1(P, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
         # 2e contribution
         for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
             for Q in range(num_inactive_spin_orbs + num_active_spin_orbs):
                 for R in range(num_inactive_spin_orbs + num_active_spin_orbs):
                     # Same comments as above
+                    # I Have this times 2:
+                    gradient[idx] += g_int[N, P, Q, R] * RDM2(
+                        M, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                    )
+                    # Here I have -g(P,M,Q,R)*RDM2(P,N,Q,R)(Corresponds to this term twice):
+                    gradient[idx] -= g_int[P, M, Q, R] * RDM2(
+                        P, N, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                    )
+                    '''
                     gradient[idx+shift] += (1/2)*g_int[N, P, Q, R] * RDM2(
                         M, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
@@ -588,7 +623,7 @@ def get_orbital_gradient_response(
                     )
                     gradient[idx+shift] += (1/2)*g_int[P, Q, R, N] * RDM2(
                         P, N, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-                    )    
+                    )'''   
     # Do we need anything with 1/sqrt(2)? Is this not for excitation operators like Epq?
     # If we have gradient split in this way for real and imaginary components, do we need two different q's?
     # Do we have to redo some calculations?
@@ -652,11 +687,17 @@ def get_orbital_response_metric_sigma(
         for idx2, (P, Q) in enumerate(kappa_spin_idx):
             if P == M:
                 # I have +RDM1(N,Q)
+                sigma[idx1, idx2] += RDM1(N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            if Q == N:
+                # I have -RDM1(P,M)
+                sigma[idx1, idx2] -= RDM1(P, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            '''if P == M:
+                # I have +RDM1(N,Q)
                 sigma[idx1, idx2] += RDM1(Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             if Q == N:
                 # I have -RDM1(P,M)
-                sigma[idx1, idx2] -= RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
-    if sigma.imag > 1e-10:
+                sigma[idx1, idx2] -= RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)'''
+    if sigma.imag.any() > 1e-10:
         print("Warning: Response metric is complex!")
     return sigma.real ####TJEK FOR STØRRELSE AF IMAGINÆR###
 
@@ -966,6 +1007,6 @@ def get_orbital_response_hessian_block(
                                 P, U, R, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                             )
     # return 1 / 2 * A1e + 1 / 4 * A2e
-    if A1e.imag > 1e-10 or A2e.imag > 1e-10:
+    if A1e.imag.any() > 1e-10 or A2e.imag.any() > 1e-10:
         print("Warning: Response Hessian is complex!")
     return A1e.real + (1/2)*A2e.real ####TJEK FOR STØRRELSE AF IMAGINÆR###

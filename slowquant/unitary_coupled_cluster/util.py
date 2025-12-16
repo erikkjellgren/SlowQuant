@@ -143,6 +143,40 @@ def iterate_t1(
                 continue
             yield a, i
 
+# Includes ap(dagger)*ap (diagonal) excitations
+def iterate_t1_incl_diag(
+    active_occ_spin_idx: Sequence[int],
+    active_unocc_spin_idx: Sequence[int],
+    is_spin_conserving: bool = True,
+) -> Generator[tuple[int, int], None, None]:
+    """Iterate over T1 spin-conserving operators.
+
+    Args:
+        active_occ_spin_idx: Spin indices of strongly occupied orbitals.
+        active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
+        is_spin_conserving: If the operators are spin-conserving.
+
+    Returns:
+        T1 operator iteration.
+    """
+    for a in active_unocc_spin_idx:
+        for i in active_occ_spin_idx:
+            if a == active_unocc_spin_idx[0]:
+                yield i, i
+            num_alpha = 0
+            num_beta = 0
+            if a % 2 == 0:
+                num_alpha += 1
+            else:
+                num_beta += 1
+            if i % 2 == 0:
+                num_alpha -= 1
+            else:
+                num_beta -= 1
+            if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
+                continue
+            yield a, i
+
 
 def iterate_t1_generalized(
     num_spin_orbs: int,
@@ -880,7 +914,7 @@ class UpsStructure:
         if "is_spin_conserving" in ansatz_options.keys():
             is_spin_conserving = ansatz_options["ansatz_options.keys"]
             if not is_spin_conserving:
-                print("WARNING: Specified both spin-adapted oprerators and not is_spin_conserving.")
+                print("WARNING: Specified both spin-adapted operators and not is_spin_conserving.")
                 print("The requested spin-adapted operators will still be spin-conserving.")
         else:
             is_spin_conserving = True
@@ -888,7 +922,8 @@ class UpsStructure:
         # Layer loop
         for _ in range(n_layers):
             if do_S:
-                for a, i in iterate_t1(occ_spin_idx, unocc_spin_idx, is_spin_conserving=is_spin_conserving):
+                # OBS!!!! Changed to iterate_t1_incl_diag!!!!!
+                for a, i in iterate_t1_incl_diag(occ_spin_idx, unocc_spin_idx, is_spin_conserving=is_spin_conserving):
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((i, a))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
