@@ -786,7 +786,7 @@ class WaveFunctionUPS:
             )
         return self._energy_elec
 
-    def _get_hamiltonian(self, qiskit_form: bool = False) -> FermionicOperator:
+    def _get_hamiltonian(self, qiskit_form: bool = False) -> FermionicOperator | dict[str, float]:
         """Return electronic Hamiltonian as FermionicOperator.
 
         Returns:
@@ -796,7 +796,7 @@ class WaveFunctionUPS:
         H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
 
         if qiskit_form:
-            return H.get_qiskit_form(self.num_orbs)
+            return H.get_qiskit_form(self.num_active_orbs)
         return H
 
     def run_wf_optimization_2step(

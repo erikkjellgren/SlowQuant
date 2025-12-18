@@ -266,7 +266,14 @@ class WaveFunctionSAUPS:
         elif ansatz.lower() == "ksafupccgsd":
             self.ansatz_options["SAGS"] = True
             self.ansatz_options["GpD"] = True
-            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
+            self.ups_layout.create_fUCC(
+                self.active_occ_idx_shifted,
+                self.active_unocc_idx_shifted,
+                self.active_occ_spin_idx_shifted,
+                self.active_unocc_spin_idx_shifted,
+                self.num_active_orbs,
+                self.ansatz_options,
+            )
         elif ansatz.lower() == "ksasdsfupccgsd":
             self.ansatz_options["GpD"] = True
             self.ups_layout.create_SDSfUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
@@ -276,7 +283,14 @@ class WaveFunctionSAUPS:
                 self.ansatz_options["n_layers"] = 1
             self.ansatz_options["SAS"] = True
             self.ansatz_options["SAD"] = True
-            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
+            self.ups_layout.create_fUCC(
+                self.active_occ_idx_shifted,
+                self.active_unocc_idx_shifted,
+                self.active_occ_spin_idx_shifted,
+                self.active_unocc_spin_idx_shifted,
+                self.num_active_orbs,
+                self.ansatz_options,
+            )
         elif ansatz.lower() == "adapt":
             None
         else:

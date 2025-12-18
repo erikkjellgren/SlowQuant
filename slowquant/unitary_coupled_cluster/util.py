@@ -696,7 +696,7 @@ class UpsStructure:
             do_uqnp = False
         if sum((do_tups, do_qnp, do_utups, do_uqnp)) == 0:
             raise ValueError("No tiled ansatz specified.")
-        elif sum((do_tups, do_qnp, do_utups, do_uqnp)) > 0:
+        elif sum((do_tups, do_qnp, do_utups, do_uqnp)) > 1:
             raise ValueError("More than one tiled ansatz specfied.")
         if "skip_last_singles" in ansatz_options.keys():
             skip_last_singles = ansatz_options["skip_last_singles"]
