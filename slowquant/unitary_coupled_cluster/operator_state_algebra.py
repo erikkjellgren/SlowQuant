@@ -20,7 +20,7 @@ from slowquant.unitary_coupled_cluster.operators import (
 from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
 
 
-@nb.jit(nopython=True)
+@nb.jit(nopython=True, inline='always')
 def bitcount(x: int) -> int:
     """Count number of ones in binary representation of an integer.
 
@@ -43,12 +43,13 @@ def bitcount(x: int) -> int:
 @nb.jit(nopython=True)
 def apply_operator(
     state: np.ndarray,
-    anni_idxs: np.ndarray,
-    create_idxs: np.ndarray,
+    a_string: np.ndarray,
+    create_screen,
+    anni_idx,
     num_active_orbs: int,
     parity_check: np.ndarray,
     idx2det: np.ndarray,
-    det2idx: dict[int, int],
+    det2idx,
     do_unsafe: bool,
     tmp_state: np.ndarray,
     factor: float,
@@ -73,35 +74,26 @@ def apply_operator(
     Returns:
         New state.
     """
-    anni_idxs = anni_idxs[::-1]
-    create_idxs = create_idxs[::-1]
-    # loop over all determinants in new_state
-    for i, det in enumerate(idx2det):
-        if abs(state[i]) < 10**-28:
+    num_spin_orbs_m1 = 2 * num_active_orbs - 1
+    anni_mask = 0
+    for orb_idx in anni_idx:
+        anni_mask |= 1 << (num_spin_orbs_m1 - orb_idx)
+    create_mask = 0
+    for orb_idx in create_screen:
+        create_mask |= 1 << (num_spin_orbs_m1 - orb_idx)
+    for i in nb.prange(len(idx2det)):
+        det = idx2det[i]
+        if (det & anni_mask) != anni_mask:
+            continue
+        if (det & create_mask) != 0:
+            continue
+        state_i = state[i]
+        if abs(state_i) < 10**-28:
             continue
         phase_changes = 0
-        is_killstate = False
-        # evaluate how string of annihilation operator change det
-        for orb_idx in anni_idxs:
-            if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 0:
-                # If an annihilation operator works on zero, then we reach kill-state.
-                is_killstate = True
-                break
-            det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
-            # take care of phases using parity_check
+        for orb_idx in a_string:
+            det = det ^ (1 << (num_spin_orbs_m1 - orb_idx))
             phase_changes += bitcount(det & parity_check[orb_idx])
-        if is_killstate:
-            continue
-        for orb_idx in create_idxs:
-            if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 1:
-                # If creation operator works on one, then we reach kill-state.
-                is_killstate = True
-                break
-            det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
-            # take care of phases using parity_check
-            phase_changes += bitcount(det & parity_check[orb_idx])
-        if is_killstate:
-            continue
         if do_unsafe:
             # For some algorithms it is guaranteed that the application of operators will always
             # keep the new determinants within a pre-defined space (in det2idx and idx2det).
@@ -111,7 +103,8 @@ def apply_operator(
             # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
             if det not in det2idx:
                 continue
-        tmp_state[det2idx[det]] += factor * (-1) ** phase_changes * state[i]
+        sign = -1.0 if (phase_changes & 1) else 1.0
+        tmp_state[det2idx[det]] += factor * sign * state_i
     return tmp_state
 
 
@@ -356,7 +349,7 @@ def propagate_state(
     if len(operators) == 0:
         return np.copy(state)
     new_state = np.copy(state)
-    tmp_state = np.zeros_like(state)
+    tmp_state = np.zeros_like(state, dtype=np.float64)
     # Create bitstrings for parity check. Contains occupied determinant up to orbital index.
     parity_check = np.zeros(2 * num_active_orbs + 1, dtype=np.int64)
     num = 0
@@ -411,12 +404,22 @@ def propagate_state(
                         create_idx.append(fermi_op[0])
                     else:
                         anni_idx.append(fermi_op[0])
-                anni_idx = np.array(anni_idx, dtype=np.int64)
+                # When screening determinants,
+                # no need to consider the annihilation index of an 
+                # operator that has the same creation index.
+                create_screen = []
+                for idx in create_idx:
+                    if idx not in anni_idx:
+                        create_screen.append(idx)
+                a_string = np.array(anni_idx + create_idx, dtype=np.int64)
+                create_screen = np.array(create_screen, dtype=np.int64)
                 create_idx = np.array(create_idx, dtype=np.int64)
+                anni_idx = np.array(anni_idx, dtype=np.int64)
                 tmp_state = apply_operator(
                     new_state,
+                    a_string,
+                    create_screen,
                     anni_idx,
-                    create_idx,
                     num_active_orbs,
                     parity_check,
                     idx2det,
