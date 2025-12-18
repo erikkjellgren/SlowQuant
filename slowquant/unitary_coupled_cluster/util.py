@@ -652,7 +652,7 @@ class UpsStructure:
         self.grad_param_R: dict[str, int] = {}
         self.param_names: list[str] = []
 
-    def create_tups(self, num_active_orbs: int, ansatz_options: dict[str, Any]) -> None:
+    def create_tiled(self, num_active_orbs: int, ansatz_options: dict[str, Any]) -> None:
         """Create tUPS ansatz.
 
         #. 10.1103/PhysRevResearch.6.023300 (tUPS)
@@ -671,17 +671,33 @@ class UpsStructure:
             tUPS ansatz.
         """
         # Options
-        valid_options = ("n_layers", "do_qnp", "skip_last_singles")
+        valid_options = ("n_layers", "do_qnp", "skip_last_singles", "do_utups", "do_tups", "do_uqnp")
         for option in ansatz_options:
             if option not in valid_options:
                 raise ValueError(f"Got unknown option for tUPS, {option}. Valid options are: {valid_options}")
         if "n_layers" not in ansatz_options.keys():
             raise ValueError("tUPS require the option 'n_layers'")
         n_layers = ansatz_options["n_layers"]
+        if "do_tups" in ansatz_options.keys():
+            do_tups = ansatz_options["do_tups"]
+        else:
+            do_tups = False
+        if "do_utups" in ansatz_options.keys():
+            do_utups = ansatz_options["do_utups"]
+        else:
+            do_utups = False
         if "do_qnp" in ansatz_options.keys():
             do_qnp = ansatz_options["do_qnp"]
         else:
             do_qnp = False
+        if "do_uqnp" in ansatz_options.keys():
+            do_uqnp = ansatz_options["do_uqnp"]
+        else:
+            do_uqnp = False
+        if sum((do_tups, do_qnp, do_utups, do_uqnp)) == 0:
+            raise ValueError("No tiled ansatz specified.")
+        elif sum((do_tups, do_qnp, do_utups, do_uqnp)) > 0:
+            raise ValueError("More than one tiled ansatz specfied.")
         if "skip_last_singles" in ansatz_options.keys():
             skip_last_singles = ansatz_options["skip_last_singles"]
         else:
@@ -689,11 +705,24 @@ class UpsStructure:
         # Layer loop
         for n in range(n_layers):
             for p in range(0, num_active_orbs - 1, 2):  # first column of brick-wall
-                if not do_qnp:
+                # QNP does not have this single
+                if do_tups:
                     # First single
                     self.excitation_operator_type.append("sa_single")
                     self.excitation_indices.append((p, p + 1))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+                elif do_utups:
+                    # First single
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p, 2 * p + 2))
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p + 1, 2 * p + 3))
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
                 # Double
@@ -708,17 +737,43 @@ class UpsStructure:
                     # Here the layer is only one block, thus,
                     # the last single excitation is earlier than expected.
                     continue
-                self.excitation_operator_type.append("sa_single")
-                self.excitation_indices.append((p, p + 1))
-                self.grad_param_R[f"p{self.n_params:09d}"] = 4
-                self.param_names.append(f"p{self.n_params:09d}")
-                self.n_params += 1
+                if do_tups or do_qnp:
+                    self.excitation_operator_type.append("sa_single")
+                    self.excitation_indices.append((p, p + 1))
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 4
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+                elif do_utups or do_uqnp:
+                    # First single
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p, 2 * p + 2))
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p + 1, 2 * p + 3))
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
             for p in range(1, num_active_orbs - 1, 2):  # second column of brick-wall
-                if not do_qnp:
+                # QNP does not have this single
+                if do_tups:
                     # First single
                     self.excitation_operator_type.append("sa_single")
                     self.excitation_indices.append((p, p + 1))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+                elif do_utups:
+                    # First single
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p, 2 * p + 2))
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p + 1, 2 * p + 3))
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
                 # Double
@@ -730,11 +785,24 @@ class UpsStructure:
                 # Second single
                 if n + 1 == n_layers and skip_last_singles:
                     continue
-                self.excitation_operator_type.append("sa_single")
-                self.excitation_indices.append((p, p + 1))
-                self.grad_param_R[f"p{self.n_params:09d}"] = 4
-                self.param_names.append(f"p{self.n_params:09d}")
-                self.n_params += 1
+                if do_tups or do_qnp:
+                    self.excitation_operator_type.append("sa_single")
+                    self.excitation_indices.append((p, p + 1))
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 4
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+                elif do_utups or do_uqnp:
+                    # First single
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p, 2 * p + 2))
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+                    self.excitation_operator_type.append("single")
+                    self.excitation_indices.append((2 * p + 1, 2 * p + 3))
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
 
     def create_fUCC(
         self,
