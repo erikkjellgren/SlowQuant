@@ -20,7 +20,17 @@ from slowquant.unitary_coupled_cluster.operators import (
 from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
 
 
-@nb.jit(nopython=True)
+def _init() -> None:
+    # This runs the first time file is imported
+    print("\nSetting number of Numba threads to 1\n")
+    # Defaulting to one thread
+    nb.set_num_threads(1)
+
+
+_init()
+
+
+@nb.jit(nopython=True, inline="always")
 def bitcount(x: int) -> int:
     """Count number of ones in binary representation of an integer.
 
@@ -41,10 +51,82 @@ def bitcount(x: int) -> int:
 
 
 @nb.jit(nopython=True)
-def apply_operator(
+def apply_operator_serial(
     state: np.ndarray,
-    anni_idxs: np.ndarray,
-    create_idxs: np.ndarray,
+    a_string: np.ndarray,
+    create_screen: np.ndarray,
+    anni_idx: np.ndarray,
+    num_active_orbs: int,
+    parity_check: np.ndarray,
+    idx2det: np.ndarray,
+    det2idx: dict[int, int],
+    do_unsafe: bool,
+    tmp_state: np.ndarray,
+    factor: float,
+) -> np.ndarray:
+    """Apply operator to state for a single state wave function.
+
+    This part is outside of propagate_state for performance reasons,
+    i.e., Numba JIT.
+
+
+
+    Args:
+        state: Original state.
+        a_string: Creation and annihilation operator indices.
+        create_screen: Creation operator indices without indices in anni_idx.
+        anni_idxs: Indices for annihilation operators.
+        num_active_orbs: Number of active spatial orbitals.
+        parity_check: Array used to check the parity when an operator is applied.
+        idx2det: Maps index to determinant.
+        det2idx: Maps determinant to index.
+        do_unsafe: Do unsafe.
+        tmp_state: New state.
+        factor: Factor in front of operator.
+
+    Returns:
+        New state.
+    """
+    num_spin_orbs_m1 = 2 * num_active_orbs - 1
+    anni_mask = 0
+    for orb_idx in anni_idx:
+        anni_mask |= 1 << (num_spin_orbs_m1 - orb_idx)
+    create_mask = 0
+    for orb_idx in create_screen:
+        create_mask |= 1 << (num_spin_orbs_m1 - orb_idx)
+    for i in range(len(idx2det)):
+        det = idx2det[i]
+        if (det & anni_mask) != anni_mask:
+            continue
+        if (det & create_mask) != 0:
+            continue
+        state_i = state[i]
+        if abs(state_i) < 10**-28:
+            continue
+        phase_changes = 0
+        for orb_idx in a_string:
+            det = det ^ (1 << (num_spin_orbs_m1 - orb_idx))
+            phase_changes += bitcount(det & parity_check[orb_idx])
+        if do_unsafe:
+            # For some algorithms it is guaranteed that the application of operators will always
+            # keep the new determinants within a pre-defined space (in det2idx and idx2det).
+            # For these algorithms it is a sign of bug if a keyerror when calling det2idx is found.
+            # These algorithms thus does also not need to check for the exsistence of the new determinant
+            # in det2idx.
+            # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
+            if det not in det2idx:
+                continue
+        fac = -factor if (phase_changes & 1) else factor
+        tmp_state[det2idx[det]] += fac * state_i
+    return tmp_state
+
+
+@nb.jit(nopython=True, parallel=True)
+def apply_operator_threaded(
+    state: np.ndarray,
+    a_string: np.ndarray,
+    create_idx: np.ndarray,
+    anni_screen: np.ndarray,
     num_active_orbs: int,
     parity_check: np.ndarray,
     idx2det: np.ndarray,
@@ -73,35 +155,26 @@ def apply_operator(
     Returns:
         New state.
     """
-    anni_idxs = anni_idxs[::-1]
-    create_idxs = create_idxs[::-1]
-    # loop over all determinants in new_state
-    for i, det in enumerate(idx2det):
-        if abs(state[i]) < 10**-28:
+    num_spin_orbs_m1 = 2 * num_active_orbs - 1
+    create_mask = 0
+    for orb_idx in create_idx:
+        create_mask |= 1 << (num_spin_orbs_m1 - orb_idx)
+    # Uses anni_screen instead of anni_idx, because anni_screen
+    # has no overlap in indices with create_idx.
+    # This is how number operators are handled.
+    anni_mask = 0
+    for orb_idx in anni_screen:
+        anni_mask |= 1 << (num_spin_orbs_m1 - orb_idx)
+    for i in nb.prange(len(idx2det)):
+        det = idx2det[i]
+        if (det & create_mask) != create_mask:
+            continue
+        if (det & anni_mask) != 0:
             continue
         phase_changes = 0
-        is_killstate = False
-        # evaluate how string of annihilation operator change det
-        for orb_idx in anni_idxs:
-            if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 0:
-                # If an annihilation operator works on zero, then we reach kill-state.
-                is_killstate = True
-                break
-            det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
-            # take care of phases using parity_check
+        for orb_idx in a_string:
+            det = det ^ (1 << (num_spin_orbs_m1 - orb_idx))
             phase_changes += bitcount(det & parity_check[orb_idx])
-        if is_killstate:
-            continue
-        for orb_idx in create_idxs:
-            if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 1:
-                # If creation operator works on one, then we reach kill-state.
-                is_killstate = True
-                break
-            det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
-            # take care of phases using parity_check
-            phase_changes += bitcount(det & parity_check[orb_idx])
-        if is_killstate:
-            continue
         if do_unsafe:
             # For some algorithms it is guaranteed that the application of operators will always
             # keep the new determinants within a pre-defined space (in det2idx and idx2det).
@@ -111,15 +184,17 @@ def apply_operator(
             # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
             if det not in det2idx:
                 continue
-        tmp_state[det2idx[det]] += factor * (-1) ** phase_changes * state[i]
+        fac = -factor if (phase_changes & 1) else factor
+        tmp_state[i] += fac * state[det2idx[det]]
     return tmp_state
 
 
 @nb.jit(nopython=True)
 def add_operator_matrix(
     op_mat: np.ndarray,
-    anni_idxs: np.ndarray,
-    create_idxs: np.ndarray,
+    a_string: np.ndarray,
+    create_screen: np.ndarray,
+    anni_idx: np.ndarray,
     num_active_orbs: int,
     parity_check: np.ndarray,
     idx2det: np.ndarray,
@@ -146,33 +221,23 @@ def add_operator_matrix(
     Returns:
         Operator matrix.
     """
-    anni_idxs = anni_idxs[::-1]
-    create_idxs = create_idxs[::-1]
-    # loop over all determinants in new_state
-    for i, det in enumerate(idx2det):
+    num_spin_orbs_m1 = 2 * num_active_orbs - 1
+    anni_mask = 0
+    for orb_idx in anni_idx:
+        anni_mask |= 1 << (num_spin_orbs_m1 - orb_idx)
+    create_mask = 0
+    for orb_idx in create_screen:
+        create_mask |= 1 << (num_spin_orbs_m1 - orb_idx)
+    for i in range(len(idx2det)):
+        det = idx2det[i]
+        if (det & anni_mask) != anni_mask:
+            continue
+        if (det & create_mask) != 0:
+            continue
         phase_changes = 0
-        is_killstate = False
-        # evaluate how string of annihilation operator change det
-        for orb_idx in anni_idxs:
-            if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 0:
-                # If an annihilation operator works on zero, then we reach kill-state.
-                is_killstate = True
-                break
-            det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
-            # take care of phases using parity_check
+        for orb_idx in a_string:
+            det = det ^ (1 << (num_spin_orbs_m1 - orb_idx))
             phase_changes += bitcount(det & parity_check[orb_idx])
-        if is_killstate:
-            continue
-        for orb_idx in create_idxs:
-            if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 1:
-                # If creation operator works on one, then we reach kill-state.
-                is_killstate = True
-                break
-            det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
-            # take care of phases using parity_check
-            phase_changes += bitcount(det & parity_check[orb_idx])
-        if is_killstate:
-            continue
         if do_unsafe:
             # For some algorithms it is guaranteed that the application of operators will always
             # keep the new determinants within a pre-defined space (in det2idx and idx2det).
@@ -182,15 +247,17 @@ def add_operator_matrix(
             # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
             if det not in det2idx:
                 continue
-        op_mat[det2idx[det], i] += factor * (-1) ** phase_changes
+        fac = -factor if (phase_changes & 1) else factor
+        op_mat[det2idx[det], i] += fac
     return op_mat
 
 
 @nb.jit(nopython=True)
-def apply_operator_SA(
+def apply_operator_SA_serial(
     state: np.ndarray,
-    anni_idxs: np.ndarray,
-    create_idxs: np.ndarray,
+    a_string: np.ndarray,
+    create_screen: np.ndarray,
+    anni_idx: np.ndarray,
     num_active_orbs: int,
     parity_check: np.ndarray,
     idx2det: np.ndarray,
@@ -219,10 +286,19 @@ def apply_operator_SA(
     Returns:
         New state.
     """
-    anni_idxs = anni_idxs[::-1]
-    create_idxs = create_idxs[::-1]
-    # loop over all determinants in new_state
-    for i, det in enumerate(idx2det):
+    num_spin_orbs_m1 = 2 * num_active_orbs - 1
+    anni_mask = 0
+    for orb_idx in anni_idx:
+        anni_mask |= 1 << (num_spin_orbs_m1 - orb_idx)
+    create_mask = 0
+    for orb_idx in create_screen:
+        create_mask |= 1 << (num_spin_orbs_m1 - orb_idx)
+    for i in range(len(idx2det)):
+        det = idx2det[i]
+        if (det & anni_mask) != anni_mask:
+            continue
+        if (det & create_mask) != 0:
+            continue
         is_non_zero = False
         for val in state[:, i]:
             if abs(val) > 10**-28:
@@ -231,28 +307,9 @@ def apply_operator_SA(
         if not is_non_zero:
             continue
         phase_changes = 0
-        is_killstate = False
-        # evaluate how string of annihilation operator change det
-        for orb_idx in anni_idxs:
-            if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 0:
-                # If an annihilation operator works on zero, then we reach kill-state.
-                is_killstate = True
-                break
-            det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
-            # take care of phases using parity_check
+        for orb_idx in a_string:
+            det = det ^ (1 << (num_spin_orbs_m1 - orb_idx))
             phase_changes += bitcount(det & parity_check[orb_idx])
-        if is_killstate:
-            continue
-        for orb_idx in create_idxs:
-            if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 1:
-                # If creation operator works on one, then we reach kill-state.
-                is_killstate = True
-                break
-            det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
-            # take care of phases using parity_check
-            phase_changes += bitcount(det & parity_check[orb_idx])
-        if is_killstate:
-            continue
         if do_unsafe:
             # For some algorithms it is guaranteed that the application of operators will always
             # keep the new determinants within a pre-defined space (in det2idx and idx2det).
@@ -262,8 +319,76 @@ def apply_operator_SA(
             # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
             if det not in det2idx:
                 continue
-        val = factor * (-1) ** phase_changes
-        tmp_state[:, det2idx[det]] += val * state[:, i]  # Update value
+        fac = -factor if (phase_changes & 1) else factor
+        tmp_state[:, det2idx[det]] += fac * state[:, i]  # Update value
+    return tmp_state
+
+
+@nb.jit(nopython=True, parallel=True)
+def apply_operator_SA_threaded(
+    state: np.ndarray,
+    a_string: np.ndarray,
+    create_idx: np.ndarray,
+    anni_screen: np.ndarray,
+    num_active_orbs: int,
+    parity_check: np.ndarray,
+    idx2det: np.ndarray,
+    det2idx: dict[int, int],
+    do_unsafe: bool,
+    tmp_state: np.ndarray,
+    factor: float,
+) -> np.ndarray:
+    """Apply operator to state for a state-averaged wave function.
+
+    This part is outside of propagate_state for performance reasons,
+    i.e., Numba JIT.
+
+    Args:
+        state: Original state.
+        anni_idxs: Indicies for annihilation operators.
+        create_idxs: Indicies for creation operators.
+        num_active_orbs: Number of active spatial orbitals.
+        parity_check: Array used to check the parity when an operator is applied.
+        idx2det: Maps index to determinant.
+        det2idx: Maps determinant to index.
+        do_unsafe: Do unsafe.
+        tmp_state: New state.
+        factor: Factor in front of operator.
+
+    Returns:
+        New state.
+    """
+    num_spin_orbs_m1 = 2 * num_active_orbs - 1
+    create_mask = 0
+    for orb_idx in create_idx:
+        create_mask |= 1 << (num_spin_orbs_m1 - orb_idx)
+    # Uses anni_screen instead of anni_idx, because anni_screen
+    # has no overlap in indices with create_idx.
+    # This is how number operators are handled.
+    anni_mask = 0
+    for orb_idx in anni_screen:
+        anni_mask |= 1 << (num_spin_orbs_m1 - orb_idx)
+    for i in nb.prange(len(idx2det)):
+        det = idx2det[i]
+        if (det & create_mask) != create_mask:
+            continue
+        if (det & anni_mask) != 0:
+            continue
+        phase_changes = 0
+        for orb_idx in a_string:
+            det = det ^ (1 << (num_spin_orbs_m1 - orb_idx))
+            phase_changes += bitcount(det & parity_check[orb_idx])
+        if do_unsafe:
+            # For some algorithms it is guaranteed that the application of operators will always
+            # keep the new determinants within a pre-defined space (in det2idx and idx2det).
+            # For these algorithms it is a sign of bug if a keyerror when calling det2idx is found.
+            # These algorithms thus does also not need to check for the exsistence of the new determinant
+            # in det2idx.
+            # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
+            if det not in det2idx:
+                continue
+        fac = -factor if (phase_changes & 1) else factor
+        tmp_state[:, det2idx[det]] += fac * state[:, i]  # Update value
     return tmp_state
 
 
@@ -283,9 +408,9 @@ def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bo
     det2idx = ci_info.det2idx
     num_active_orbs = ci_info.num_active_orbs
     num_dets = len(idx2det)  # number of spin and particle conserving determinants
-    op_mat = np.zeros((num_dets, num_dets))  # basis
+    op_mat = np.zeros((num_dets, num_dets), dtype=np.float64)  # basis
     # Create bitstrings for parity check. Contains occupied determinant up to orbital index.
-    parity_check = np.zeros(2 * num_active_orbs + 1, dtype=int)
+    parity_check = np.zeros(2 * num_active_orbs + 1, dtype=np.int64)
     num = 0
     for i in range(2 * num_active_orbs - 1, -1, -1):
         num += 2**i
@@ -300,12 +425,22 @@ def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bo
                 create_idx.append(fermi_op[0])
             else:
                 anni_idx.append(fermi_op[0])
-        anni_idx = np.array(anni_idx, dtype=np.int64)
+        # When screening determinants,
+        # no need to consider the annihilation index of an
+        # operator that has the same creation index.
+        create_screen = []
+        for idx in create_idx:
+            if idx not in anni_idx:
+                create_screen.append(idx)
+        a_string = np.array(anni_idx + create_idx, dtype=np.int64)
+        create_screen = np.array(create_screen, dtype=np.int64)
         create_idx = np.array(create_idx, dtype=np.int64)
+        anni_idx = np.array(anni_idx, dtype=np.int64)
         op_mat = add_operator_matrix(
             op_mat,
+            a_string,
+            create_screen,
             anni_idx,
-            create_idx,
             num_active_orbs,
             parity_check,
             idx2det,
@@ -348,15 +483,19 @@ def propagate_state(
     Returns:
         New state.
     """
+    if len(operators) == 0:
+        return np.copy(state)
     idx2det = ci_info.idx2det
     det2idx = ci_info.det2idx
     num_inactive_orbs = ci_info.num_inactive_orbs
     num_active_orbs = ci_info.num_active_orbs
     num_virtual_orbs = ci_info.num_virtual_orbs
-    if len(operators) == 0:
-        return np.copy(state)
+    if nb.get_num_threads() == 1:
+        is_parallel = False
+    else:
+        is_parallel = True
     new_state = np.copy(state)
-    tmp_state = np.zeros_like(state)
+    tmp_state = np.zeros_like(state, dtype=np.float64)
     # Create bitstrings for parity check. Contains occupied determinant up to orbital index.
     parity_check = np.zeros(2 * num_active_orbs + 1, dtype=np.int64)
     num = 0
@@ -402,29 +541,73 @@ def propagate_state(
             else:
                 op_folded = op
             # loop over all strings of annihilation operators in FermionicOperator sum
-            for fermi_label in op_folded.operators.keys():
-                # Separate each annihilation operator string in creation and annihilation indices
-                anni_idx = []
-                create_idx = []
-                for fermi_op in fermi_label:
-                    if fermi_op[1]:
-                        create_idx.append(fermi_op[0])
-                    else:
-                        anni_idx.append(fermi_op[0])
-                anni_idx = np.array(anni_idx, dtype=np.int64)
-                create_idx = np.array(create_idx, dtype=np.int64)
-                tmp_state = apply_operator(
-                    new_state,
-                    anni_idx,
-                    create_idx,
-                    num_active_orbs,
-                    parity_check,
-                    idx2det,
-                    det2idx,
-                    do_unsafe,
-                    tmp_state,
-                    op_folded.operators[fermi_label],
-                )
+            if is_parallel:
+                for fermi_label in op_folded.operators.keys():
+                    # Separate each annihilation operator string in creation and annihilation indices
+                    anni_idx = []
+                    create_idx = []
+                    for fermi_op in fermi_label:
+                        if fermi_op[1]:
+                            create_idx.append(fermi_op[0])
+                        else:
+                            anni_idx.append(fermi_op[0])
+                    # When screening determinants,
+                    # no need to consider the annihilation index of an
+                    # operator that has the same creation index.
+                    anni_screen = []
+                    for idx in anni_idx:
+                        if idx not in create_idx:
+                            anni_screen.append(idx)
+                    a_string = np.array(create_idx + anni_idx, dtype=np.int64)
+                    anni_screen = np.array(anni_screen, dtype=np.int64)
+                    create_idx = np.array(create_idx, dtype=np.int64)
+                    tmp_state = apply_operator_threaded(
+                        new_state,
+                        a_string,
+                        create_idx,
+                        anni_screen,
+                        num_active_orbs,
+                        parity_check,
+                        idx2det,
+                        det2idx,
+                        do_unsafe,
+                        tmp_state,
+                        op_folded.operators[fermi_label],
+                    )
+            else:
+                for fermi_label in op_folded.operators.keys():
+                    # Separate each annihilation operator string in creation and annihilation indices
+                    anni_idx = []
+                    create_idx = []
+                    for fermi_op in fermi_label:
+                        if fermi_op[1]:
+                            create_idx.append(fermi_op[0])
+                        else:
+                            anni_idx.append(fermi_op[0])
+                    # When screening determinants,
+                    # no need to consider the annihilation index of an
+                    # operator that has the same creation index.
+                    create_screen = []
+                    for idx in create_idx:
+                        if idx not in anni_idx:
+                            create_screen.append(idx)
+                    a_string = np.array(anni_idx + create_idx, dtype=np.int64)
+                    create_screen = np.array(create_screen, dtype=np.int64)
+                    create_idx = np.array(create_idx, dtype=np.int64)
+                    anni_idx = np.array(anni_idx, dtype=np.int64)
+                    tmp_state = apply_operator_serial(
+                        new_state,
+                        a_string,
+                        create_screen,
+                        anni_idx,
+                        num_active_orbs,
+                        parity_check,
+                        idx2det,
+                        det2idx,
+                        do_unsafe,
+                        tmp_state,
+                        op_folded.operators[fermi_label],
+                    )
             new_state = np.copy(tmp_state)
     return new_state
 
@@ -461,17 +644,21 @@ def propagate_state_SA(
     Returns:
         New state.
     """
+    if len(operators) == 0:
+        return np.copy(state)
     idx2det = ci_info.idx2det
     det2idx = ci_info.det2idx
     num_inactive_orbs = ci_info.num_inactive_orbs
     num_active_orbs = ci_info.num_active_orbs
     num_virtual_orbs = ci_info.num_virtual_orbs
-    if len(operators) == 0:
-        return np.copy(state)
+    if nb.get_num_threads() == 1:
+        is_parallel = False
+    else:
+        is_parallel = True
     new_state = np.copy(state)
-    tmp_state = np.zeros_like(state)
+    tmp_state = np.zeros_like(state, dtype=np.float64)
     # Create bitstrings for parity check. Contains occupied determinant up to orbital index.
-    parity_check = np.zeros(2 * num_active_orbs + 1, dtype=int)
+    parity_check = np.zeros(2 * num_active_orbs + 1, dtype=np.int64)
     num = 0
     for i in range(2 * num_active_orbs - 1, -1, -1):
         num += 2**i
@@ -498,36 +685,80 @@ def propagate_state_SA(
                 raise TypeError(f"Got unknown wave function structure type, {type(wf_struct)}")
         # FermionicOperator in operators
         else:
-            tmp_state[:] = 0.0
+            tmp_state[:, :] = 0.0
             # Fold operator to only get active contributions
             if do_folding:
                 op_folded = op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs)
             else:
                 op_folded = op
             # loop over all strings of annihilation operators in FermionicOperator sum
-            for fermi_label in op_folded.operators.keys():
-                # Separate each annihilation operator string in creation and annihilation indices
-                anni_idx = []
-                create_idx = []
-                for fermi_op in fermi_label:
-                    if fermi_op[1]:
-                        create_idx.append(fermi_op[0])
-                    else:
-                        anni_idx.append(fermi_op[0])
-                anni_idx = np.array(anni_idx, dtype=np.int64)
-                create_idx = np.array(create_idx, dtype=np.int64)
-                tmp_state = apply_operator_SA(
-                    new_state,
-                    anni_idx,
-                    create_idx,
-                    num_active_orbs,
-                    parity_check,
-                    idx2det,
-                    det2idx,
-                    do_unsafe,
-                    tmp_state,
-                    op_folded.operators[fermi_label],
-                )
+            if is_parallel:
+                for fermi_label in op_folded.operators.keys():
+                    # Separate each annihilation operator string in creation and annihilation indices
+                    anni_idx = []
+                    create_idx = []
+                    for fermi_op in fermi_label:
+                        if fermi_op[1]:
+                            create_idx.append(fermi_op[0])
+                        else:
+                            anni_idx.append(fermi_op[0])
+                    # When screening determinants,
+                    # no need to consider the annihilation index of an
+                    # operator that has the same creation index.
+                    anni_screen = []
+                    for idx in anni_idx:
+                        if idx not in create_idx:
+                            anni_screen.append(idx)
+                    a_string = np.array(create_idx + anni_idx, dtype=np.int64)
+                    anni_screen = np.array(anni_screen, dtype=np.int64)
+                    create_idx = np.array(create_idx, dtype=np.int64)
+                    tmp_state = apply_operator_SA_threaded(
+                        new_state,
+                        a_string,
+                        create_idx,
+                        anni_screen,
+                        num_active_orbs,
+                        parity_check,
+                        idx2det,
+                        det2idx,
+                        do_unsafe,
+                        tmp_state,
+                        op_folded.operators[fermi_label],
+                    )
+            else:
+                for fermi_label in op_folded.operators.keys():
+                    # Separate each annihilation operator string in creation and annihilation indices
+                    anni_idx = []
+                    create_idx = []
+                    for fermi_op in fermi_label:
+                        if fermi_op[1]:
+                            create_idx.append(fermi_op[0])
+                        else:
+                            anni_idx.append(fermi_op[0])
+                    # When screening determinants,
+                    # no need to consider the annihilation index of an
+                    # operator that has the same creation index.
+                    create_screen = []
+                    for idx in create_idx:
+                        if idx not in anni_idx:
+                            create_screen.append(idx)
+                    a_string = np.array(anni_idx + create_idx, dtype=np.int64)
+                    create_screen = np.array(create_screen, dtype=np.int64)
+                    create_idx = np.array(create_idx, dtype=np.int64)
+                    anni_idx = np.array(anni_idx, dtype=np.int64)
+                    tmp_state = apply_operator_SA_serial(
+                        new_state,
+                        a_string,
+                        create_screen,
+                        anni_idx,
+                        num_active_orbs,
+                        parity_check,
+                        idx2det,
+                        det2idx,
+                        do_unsafe,
+                        tmp_state,
+                        op_folded.operators[fermi_label],
+                    )
             new_state = np.copy(tmp_state)
     return new_state
 
