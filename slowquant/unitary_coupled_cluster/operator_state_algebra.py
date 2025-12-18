@@ -116,8 +116,8 @@ def apply_operator_serial(
             # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
             if det not in det2idx:
                 continue
-        fac = -factor if (phase_changes & 1) else factor
-        tmp_state[det2idx[det]] += fac * state_i
+        sign = 1.0 - 2.0 * (phase_changes & 1)
+        tmp_state[det2idx[det]] += sign * factor * state_i
     return tmp_state
 
 
@@ -184,8 +184,8 @@ def apply_operator_threaded(
             # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
             if det not in det2idx:
                 continue
-        fac = -factor if (phase_changes & 1) else factor
-        tmp_state[i] += fac * state[det2idx[det]]
+        sign = 1.0 - 2.0 * (phase_changes & 1)
+        tmp_state[i] += sign * factor * state[det2idx[det]]
     return tmp_state
 
 
@@ -247,8 +247,8 @@ def add_operator_matrix(
             # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
             if det not in det2idx:
                 continue
-        fac = -factor if (phase_changes & 1) else factor
-        op_mat[det2idx[det], i] += fac
+        sign = 1.0 - 2.0 * (phase_changes & 1)
+        op_mat[det2idx[det], i] += sign * factor
     return op_mat
 
 
@@ -319,8 +319,8 @@ def apply_operator_SA_serial(
             # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
             if det not in det2idx:
                 continue
-        fac = -factor if (phase_changes & 1) else factor
-        tmp_state[:, det2idx[det]] += fac * state[:, i]  # Update value
+        sign = 1.0 - 2.0 * (phase_changes & 1)
+        tmp_state[:, det2idx[det]] += sign * factor * state[:, i]  # Update value
     return tmp_state
 
 
@@ -387,8 +387,8 @@ def apply_operator_SA_threaded(
             # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
             if det not in det2idx:
                 continue
-        fac = -factor if (phase_changes & 1) else factor
-        tmp_state[:, det2idx[det]] += fac * state[:, i]  # Update value
+        sign = 1.0 - 2.0 * (phase_changes & 1)
+        tmp_state[:, i] += sign * factor * state[:, det2idx[det]]  # Update value
     return tmp_state
 
 
