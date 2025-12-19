@@ -456,9 +456,9 @@ def get_orbital_gradient_response(
     Args:
         h_int: One-electron integrals in MO in Hamiltonian.
         g_int: Two-electron integrals in MO in Hamiltonian.
-        kappa_idx: Orbital parameter indices in spatial basis.
-        num_inactive_orbs: Number of inactive orbitals in spatial basis.
-        num_active_orbs: Number of active orbitals in spatial basis.
+        kappa_idx: Orbital parameter indices in spin basis.
+        num_inactive_orbs: Number of inactive orbitals in spin basis.
+        num_active_orbs: Number of active orbitals in spin basis.
         rdm1: Active part of 1-RDM.
         rdm2: Active part of 2-RDM.
 
@@ -536,7 +536,7 @@ def get_orbital_response_metric_sigma(
                 sigma[idx1, idx2] -= RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
     if sigma.imag.any() > 1e-10:
         print("Warning: Response metric is complex!")
-    return sigma.real
+    return sigma.real 
 
 
 @nb.jit(nopython=True)
