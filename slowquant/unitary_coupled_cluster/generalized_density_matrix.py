@@ -536,11 +536,7 @@ def get_orbital_response_metric_sigma(
                 sigma[idx1, idx2] -= RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
     if sigma.imag.any() > 1e-10:
         print("Warning: Response metric is complex!")
-<<<<<<< HEAD
     return sigma.real 
-=======
-    return sigma.real
->>>>>>> 18d0658fe907cc76a87ddc8a916fc72a9d996942
 
 
 @nb.jit(nopython=True)
