@@ -229,7 +229,7 @@ def generalized_expectation_value(
     )
     val = bra.conj() @ op_ket
 
-    if val.imag > 1e-8:
+    if val.imag > 1e-10:
         print("Warning: Expectation value is complex!!", val)
 
     return val.real
@@ -794,10 +794,10 @@ def generalized_get_grad_action_modified(
             # Create T matrix imaginary:
             if exc_type == "single":
                 (i, a) = np.array(exc_indices) + 2 * offset
-                T = G1_generalized(i, a, True, Real = True)
+                T = G1_generalized(i, a, True, Real = False)
             elif exc_type == "double":
                 (i, j, a, b) = np.array(exc_indices) + 2 * offset
-                T = G2_generalized(i, j, a, b, True, Real = True)
+                T = G2_generalized(i, j, a, b, True, Real = False)
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
             # Apply missing T factor of derivative

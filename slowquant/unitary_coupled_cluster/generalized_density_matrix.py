@@ -219,7 +219,7 @@ def get_electronic_energy_generalized(
                         * g_int[p, q, r, s]
                         * RDM2(p, q, r, s, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
                     )
-    if energy.imag > 1e-8:
+    if energy.imag > 1e-10:
         print("Warning: Complex energy!",energy)
     return energy.real
 
@@ -435,7 +435,7 @@ def get_orbital_gradient_generalized_real_imag(
                         gradient_r[idx] += (1/2)*g_int[R,N,P,Q]*RDM2(R,M,P,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
                         
     gradient = np.concatenate((gradient_r, 1j*gradient_i))
-    final_gradient = strip_imag(gradient,tol=1e-8)     
+    final_gradient = strip_imag(gradient,tol=1e-10)     
     return final_gradient
 
 @nb.jit(nopython=True)
