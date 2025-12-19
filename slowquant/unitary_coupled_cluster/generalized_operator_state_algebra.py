@@ -89,7 +89,7 @@ def generalized_propagate_state(
     operators: list[FermionicOperator | str],
     state: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float | complex] | None = None,
+    thetas: list[float] | None = None,
     wf_struct: UpsStructure | None = None,
     do_folding: bool = True,
     do_unsafe: bool = False,
@@ -126,7 +126,7 @@ def generalized_propagate_state(
         return np.copy(state)
     new_state = np.copy(state)
     # Annika has forced this to be of type complex
-    tmp_state = np.zeros_like(state,dtype=complex)
+    tmp_state = np.zeros_like(state,dtype=np.complex128)
     # Create bitstrings for parity check. Contains occupied determinant up to orbital index.
     parity_check = np.zeros(2 * num_active_orbs + 1, dtype=np.int64)
     num = 0
@@ -195,11 +195,11 @@ def generalized_expectation_value(
     operators: list[FermionicOperator | str],
     ket: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float | complex] | None = None,
+    thetas: list[float] | None = None,
     wf_struct: UpsStructure | None = None,
     do_folding: bool = True,
     do_unsafe: bool = False,
-) -> float:
+) -> complex:
     """Calculate expectation value of operator using propagate state.
 
     Args:
@@ -229,10 +229,7 @@ def generalized_expectation_value(
     )
     val = bra.conj() @ op_ket
 
-    if val.imag > 1e-10:
-        print("Warning: Expectation value is complex!!", val)
-
-    return val.real
+    return val
 
 
 def expectation_value_for_gradient(
@@ -240,11 +237,11 @@ def expectation_value_for_gradient(
     operators: list[FermionicOperator | str],
     ket: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float | complex] | None = None,
+    thetas: list[float] | None = None,
     wf_struct: UpsStructure | None = None,
     do_folding: bool = True,
     do_unsafe: bool = False,
-) -> float:
+) -> complex:
     """Calculate expectation value of operator using propagate state.
 
     Args:
@@ -280,7 +277,7 @@ def expectation_value_for_gradient(
 def generalized_construct_ups_state(
     state: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float | complex],
+    thetas: list[float],
     ups_struct: UpsStructure,
     dagger: bool = False,
 ) -> np.ndarray:
@@ -352,7 +349,7 @@ def generalized_construct_ups_state(
 def generalized_construct_ups_state_modified(
     state: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float | complex],
+    thetas: list[float],
     ups_struct: UpsStructure,
     dagger: bool = False,
 ) -> np.ndarray:
@@ -503,7 +500,7 @@ def generalized_propagate_unitary(
     state: np.ndarray,
     idx: int,
     ci_info: CI_Info,
-    thetas: list[float | complex],
+    thetas: list[float],
     ups_struct: UpsStructure,
 ) -> np.ndarray:
     """Apply unitary from UPS operator number 'idx' to state.
@@ -565,7 +562,7 @@ def generalized_propagate_unitary_modified(
     state: np.ndarray,
     idx: int,
     ci_info: CI_Info,
-    thetas: list[float | complex],
+    thetas: list[float],
     ups_struct: UpsStructure,
 ) -> np.ndarray:
     """Apply unitary from UPS operator number 'idx' to state.
