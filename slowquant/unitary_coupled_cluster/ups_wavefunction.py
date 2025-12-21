@@ -18,6 +18,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_electronic_energy,
     get_orbital_gradient,
 )
+from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     construct_ups_state,
     expectation_value,
@@ -30,7 +31,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
 from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import UpsStructure
-from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
+
 
 class WaveFunctionUPS:
     def __init__(
@@ -722,8 +723,8 @@ class WaveFunctionUPS:
                 self.ci_info,
             )
         return self._energy_elec
-    
-    def _get_hamiltonian(self, qiskit_form: bool = False) -> FermionicOperator:
+
+    def _get_hamiltonian(self, qiskit_form: bool = False) -> FermionicOperator | dict[str, float]:
         """Return electronic Hamiltonian as FermionicOperator.
 
         Returns:
@@ -733,7 +734,7 @@ class WaveFunctionUPS:
         H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
 
         if qiskit_form:
-            return H.get_qiskit_form(self.num_orbs)
+            return H.get_qiskit_form(self.num_active_orbs)
         return H
 
     def run_wf_optimization_2step(
