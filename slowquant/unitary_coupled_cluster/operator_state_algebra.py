@@ -292,6 +292,9 @@ def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bo
         parity_check[2 * num_active_orbs - i] = num
     # loop over all strings of annihilation operators in FermionicOperator sum
     for fermi_label in op.operators.keys():
+        factor = op.operators[fermi_label]
+        if not isinstance(factor, float):
+            raise ValueError(f"Got factor, {factor}, of type {type(factor)}, expected type float.")
         # Separate each annihilation operator string in creation and annihilation indices
         anni_idx = []
         create_idx = []
@@ -311,7 +314,7 @@ def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bo
             idx2det,
             det2idx,
             do_unsafe,
-            op.operators[fermi_label],
+            factor,
         )
     return op_mat
 
@@ -403,6 +406,9 @@ def propagate_state(
                 op_folded = op
             # loop over all strings of annihilation operators in FermionicOperator sum
             for fermi_label in op_folded.operators.keys():
+                factor = op.operators[fermi_label]
+                if not isinstance(factor, float):
+                    raise ValueError(f"Got factor, {factor}, of type {type(factor)}, expected type float.")
                 # Separate each annihilation operator string in creation and annihilation indices
                 anni_idx = []
                 create_idx = []
@@ -423,7 +429,7 @@ def propagate_state(
                     det2idx,
                     do_unsafe,
                     tmp_state,
-                    op_folded.operators[fermi_label],
+                    factor,
                 )
             new_state = np.copy(tmp_state)
     return new_state
@@ -506,6 +512,9 @@ def propagate_state_SA(
                 op_folded = op
             # loop over all strings of annihilation operators in FermionicOperator sum
             for fermi_label in op_folded.operators.keys():
+                factor = op.operators[fermi_label]
+                if not isinstance(factor, float):
+                    raise ValueError(f"Got factor, {factor}, of type {type(factor)}, expected type float.")
                 # Separate each annihilation operator string in creation and annihilation indices
                 anni_idx = []
                 create_idx = []
@@ -526,7 +535,7 @@ def propagate_state_SA(
                     det2idx,
                     do_unsafe,
                     tmp_state,
-                    op_folded.operators[fermi_label],
+                    factor,
                 )
             new_state = np.copy(tmp_state)
     return new_state
