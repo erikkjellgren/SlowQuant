@@ -15,6 +15,7 @@ class Result:
         """Initialize result class."""
         self.x: np.ndarray
         self.fun: float
+        self.success: bool
 
 
 class Optimizers:
@@ -99,7 +100,7 @@ class Optimizers:
                     method=self.method,
                     tol=self.tol,
                     callback=print_progress,
-                    options={"maxiter": self.maxiter},
+                    options={"maxiter": self.maxiter, "disp": True},
                 )
             else:
                 res = scipy.optimize.minimize(
@@ -108,7 +109,7 @@ class Optimizers:
                     method=self.method,
                     tol=self.tol,
                     callback=print_progress,
-                    options={"maxiter": self.maxiter},
+                    options={"maxiter": self.maxiter, "disp": True},
                 )
         elif self.method in ("cobyla", "cobyqa"):
             res = scipy.optimize.minimize(
@@ -117,7 +118,7 @@ class Optimizers:
                 method=self.method,
                 tol=self.tol,
                 callback=print_progress,
-                options={"maxiter": self.maxiter},
+                options={"maxiter": self.maxiter, "disp": True},
             )
         elif self.method in ("rotosolve",):
             if not isinstance(extra_options, dict):
@@ -135,13 +136,21 @@ class Optimizers:
                 tol=self.tol,
                 callback=print_progress,
             )
-            res = optimizer.minimize(self.fun, x0)
+            if "f_rotosolve_optimized" in extra_options:
+                res = optimizer.minimize(
+                    self.fun, x0, f_rotosolve_optimized=extra_options["f_rotosolve_optimized"]
+                )
+            else:
+                res = optimizer.minimize(self.fun, x0)
 
         else:
             raise ValueError(f"Got an unkonwn optimizer {self.method}")
         result = Result()
         result.x = res.x
         result.fun = res.fun
+        result.success = res.success
+        if not result.success:
+            print("Optimization failed.")
         return result
 
 
@@ -176,8 +185,8 @@ class RotoSolve:
         self,
         R: dict[str, int],
         param_names: Sequence[str],
-        maxiter: int = 30,
-        tol: float = 1e-6,
+        maxiter: int = 1000,
+        tol: float = 1e-8,
         callback: Callable[[list[float]], None] | None = None,
     ) -> None:
         """Initialize Rotosolver.
@@ -197,7 +206,7 @@ class RotoSolve:
         self._callback = callback
         self.max_iterations = maxiter
         self.threshold = tol
-        self.max_fail = 3
+        self.max_fail = 3  # heuristic allowed fails (e.g. due to noise)
         self._R = R
         self._param_names = param_names
         if len(self._param_names) != len(self._R):
@@ -205,12 +214,18 @@ class RotoSolve:
                 f"Number of parameter names, {len(self._param_names)}, does not match number of R values, {len(self._R)}"
             )
 
-    def minimize(self, f: Callable[[list[float]], float | np.ndarray], x0: Sequence[float]) -> Result:
+    def minimize(
+        self,
+        f: Callable[[list[float]], float | np.ndarray],
+        x0: Sequence[float],
+        f_rotosolve_optimized: None | Callable[[list[float], list[float], int], list[float]] = None,
+    ) -> Result:
         """Run minimization.
 
         Args:
             f: Function to be minimized, can only take one argument.
             x0: Initial guess of changeable parameters of f.
+            f_rotosolve_optimized: Optimized function for Rotosolve.
 
         Returns:
             Minimization results.
@@ -224,19 +239,30 @@ class RotoSolve:
         x_best = x.copy()
         fails = 0
         res = Result()
+        success = False
         for _ in range(self.max_iterations):
             for i, par_name in enumerate(self._param_names):
                 # Get the energy for specific values of theta_i, defined by the _R parameter.
-                e_vals = get_energy_evals(f, x, i, self._R[par_name])
+                if f_rotosolve_optimized is not None:
+                    e_vals = get_energy_evals_optimized(f_rotosolve_optimized, x, i, self._R[par_name])
+                else:
+                    e_vals = get_energy_evals(f, x, i, self._R[par_name])
                 # Do an analytic construction of the energy as a function of theta_i.
                 f_reconstructed = partial(reconstructed_f, energy_vals=e_vals, R=self._R[par_name])
+
+                f_reconstructed_f_derivative = partial(
+                    reconstructed_f_derivative, energy_vals=e_vals, R=self._R[par_name]
+                )
+
                 # Evaluate the energy in many points.
                 values = f_reconstructed(np.linspace(-np.pi, np.pi, int(1e4)))
                 # Find the theta_i that gives the lowest energy.
                 theta = np.linspace(-np.pi, np.pi, int(1e4))[np.argmin(values)]
                 # Run an optimization on the theta_i that gives to the lowest energy in the previous step.
                 # This is to get more digits precision in value of theta_i.
-                res = scipy.optimize.minimize(f_reconstructed, x0=[theta], method="BFGS", tol=1e-12)
+                res = scipy.optimize.minimize(
+                    f_reconstructed, x0=[theta], jac=f_reconstructed_f_derivative, method="BFGS", tol=1e-12
+                )
                 x[i] = res.x[0]
                 while x[i] < np.pi:
                     x[i] += 2 * np.pi
@@ -249,9 +275,12 @@ class RotoSolve:
             else:
                 # Single state case
                 f_new = f_tmp
+            if self._callback is not None:
+                self._callback(x)
             if abs(f_best - f_new) < self.threshold:
                 f_best = f_new
                 x_best = x.copy()
+                success = True  # sucessful optimization
                 break
             if (f_new - f_best) > 0.0:
                 fails += 1
@@ -259,11 +288,11 @@ class RotoSolve:
                 f_best = f_new
                 x_best = x.copy()
             if fails == self.max_fail:
+                print("Three energy raises detected.")
                 break
-            if self._callback is not None:
-                self._callback(x)
         res.x = np.array(x_best)
         res.fun = f_best
+        res.success = success
         return res
 
 
@@ -337,3 +366,128 @@ def reconstructed_f(x_vals: np.ndarray, energy_vals: list[float] | list[np.ndarr
                     )
         e = e / len(energy_vals)
     return e
+
+
+def get_energy_evals_optimized(
+    f: Callable[[list[float], list[float], int], list[float]], x: list[float], idx: int, R: int
+) -> list[float]:
+    """Evaluate the function in all points needed for the reconstruction in Rotosolve.
+
+    Args:
+        f: Function to evaluate.
+        x: Parameters of f.
+        idx: Index of parameter to be changed.
+        R: Parameter to control how many points are needed.
+
+    Returns:
+        All needed function evaluations.
+    """
+    theta_diffs = []
+    for mu in range(-R, R + 1):
+        theta_diffs.append(2 * mu / (2 * R + 1) * np.pi)
+    return f(x, theta_diffs, idx)
+
+
+@nb.jit(nopython=True)
+def _sinc_derivative(u: np.ndarray) -> np.ndarray:
+    """Derivative of numpy's sinc(x) = sin(pi*x)/(pi*x) w.r.t x.
+
+    Args:
+        u: Input array.
+
+    Returns:
+        Derivative of sinc at each point in u.
+    """
+    du = np.zeros_like(u)
+    for i in range(len(u)):
+        ui = u[i]
+        if abs(ui) > 1e-12:  # avoid 0/0 as limit exists.
+            du[i] = np.cos(np.pi * ui) / ui - np.sin(np.pi * ui) / (np.pi * ui**2)
+
+    return du
+
+
+def reconstructed_f_derivative(
+    x_vals: np.ndarray, energy_vals: list[float] | list[np.ndarray], R: int
+) -> np.ndarray:
+    r"""Derivative of reconstructed_f w.r.t. x.
+
+    .. math::
+
+        f'(x)
+        = \\sum_{\\mu=-R}^{R} E(x_\\mu)\\,
+        \frac{
+            \frac{2R+1}{2\\pi}\\,
+            \\operatorname{sinc}'\\!\\left(\frac{2R+1}{2\\pi}(x - x_\\mu)\right)
+            \\operatorname{sinc}\\!\\left(\frac{1}{2\\pi}(x - x_\\mu)\right)
+            \\;-\\;
+            \frac{1}{2\\pi}\\,
+            \\operatorname{sinc}'\\!\\left(\frac{1}{2\\pi}(x - x_\\mu)\right)
+            \\operatorname{sinc}\\!\\left(\frac{2R+1}{2\\pi}(x - x_\\mu)\right)
+        }{
+            \\operatorname{sinc}^2\\!\\left(\frac{1}{2\\pi}(x - x_\\mu)\right)
+        }.
+
+    Here :math:`\\operatorname{sinc}'` denotes the derivative of NumPy's
+    normalized sinc with respect to its argument. For :math:`u \neq 0`,
+
+    .. math::
+
+        \\operatorname{sinc}'(u)
+        = \frac{\\cos(\\pi u)}{u}
+          - \frac{\\sin(\\pi u)}{\\pi u^2},
+
+    and :math:`\\operatorname{sinc}'(0) = 0`.
+
+    Args:
+        x_vals: List of points to evaluate the derivative at.
+        energy_vals: Pre-calculated points of original function.
+        R: Parameter to control how many points are needed.
+
+    Returns:
+        Derivative of function value in list of points.
+    """
+    de = np.zeros_like(x_vals)
+
+    A = (2 * R + 1) / 2.0  # factor in numerator sinc
+    B = 0.5  # factor in denominator sinc
+
+    if isinstance(energy_vals[0], float):
+        # Single state case
+        for i, mu in enumerate(range(-R, R + 1)):
+            x_mu = 2 * mu / (2 * R + 1) * np.pi
+            delta = x_vals - x_mu
+
+            u = A * delta / np.pi  # argument of numerator sinc (with np pi factor)
+            v = B * delta / np.pi  # argument of denominator sinc (with np pi factor)
+
+            s1 = np.sinc(u)  # numerator sinc
+            s2 = np.sinc(v)  # denominator sinc
+
+            # chain rule: d/dx sinc(u(x)) = sinc'(u) * du/dx
+            s1_prime = _sinc_derivative(u) * (A / np.pi)
+            s2_prime = _sinc_derivative(v) * (B / np.pi)
+
+            # quotient rule: (N/D)' = (N' D - N D') / D^2
+            de += energy_vals[i] * (s1_prime * s2 - s1 * s2_prime) / (s2**2)
+    else:
+        # State-averaged case
+        for k in range(len(energy_vals[0])):
+            for i, mu in enumerate(range(-R, R + 1)):
+                x_mu = 2 * mu / (2 * R + 1) * np.pi
+                delta = x_vals - x_mu
+
+                u = A * delta / np.pi  # argument of numerator sinc
+                v = B * delta / np.pi  # argument of denominator sinc
+
+                s1 = np.sinc(u)  # numerator sinc
+                s2 = np.sinc(v)  # denominator sinc
+
+                # chain rule: d/dx sinc(u(x)) = sinc'(u) * du/dx
+                s1_prime = _sinc_derivative(u) * (A / np.pi)
+                s2_prime = _sinc_derivative(v) * (B / np.pi)
+
+                # quotient rule: (N/D)' = (N' D - N D') / D^2
+                de += energy_vals[i][k] * (s1_prime * s2 - s1 * s2_prime) / (s2**2)  # type: ignore
+        de = de / len(energy_vals)
+    return de

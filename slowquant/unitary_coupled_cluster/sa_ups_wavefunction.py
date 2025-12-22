@@ -557,21 +557,11 @@ class WaveFunctionSAUPS:
                 print(
                     "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
                 )
-            if optimizer_name.lower() in ("rotosolve",):
-                # For RotoSolve type solvers the energy per state is needed in the optimization,
-                # instead of only the state-averaged energy.
-                energy_theta = partial(
-                    self._calc_energy_optimization,
-                    theta_optimization=True,
-                    kappa_optimization=False,
-                    return_all_states=True,
-                )
-            else:
-                energy_theta = partial(
-                    self._calc_energy_optimization,
-                    theta_optimization=True,
-                    kappa_optimization=False,
-                )
+            energy_theta = partial(
+                self._calc_energy_optimization,
+                theta_optimization=True,
+                kappa_optimization=False,
+            )
             gradient_theta = partial(
                 self._calc_gradient_optimization,
                 theta_optimization=True,
@@ -588,10 +578,19 @@ class WaveFunctionSAUPS:
             )
             self._old_opt_parameters = np.zeros_like(self.thetas) + 10**20
             self._E_opt_old = 0.0
-            res = optimizer.minimize(
-                self.thetas,
-                extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
-            )
+            if optimizer_name.lower() == "rotosolve":
+                res = optimizer.minimize(
+                    self.thetas,
+                    extra_options={
+                        "R": self.ups_layout.grad_param_R,
+                        "param_names": self.ups_layout.param_names,
+                        "f_rotosolve_optimized": self._calc_energy_rotosolve_optimization,
+                    },
+                )
+            else:
+                res = optimizer.minimize(
+                    self.thetas,
+                )
             self.thetas = res.x.tolist()
 
             if orbital_optimization and len(self.kappa) != 0:
@@ -721,15 +720,6 @@ class WaveFunctionSAUPS:
                 parameters = self.kappa
         else:
             parameters = self.thetas
-        if optimizer_name.lower() in ("rotosolve",):
-            # For RotoSolve type solvers the energy per state is needed in the optimization,
-            # instead of only the state-averaged energy.
-            energy = partial(
-                self._calc_energy_optimization,
-                theta_optimization=True,
-                kappa_optimization=False,
-                return_all_states=True,
-            )
         optimizer = Optimizers(
             energy,
             optimizer_name,
@@ -741,10 +731,19 @@ class WaveFunctionSAUPS:
         )
         self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0
-        res = optimizer.minimize(
-            parameters,
-            extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
-        )
+        if optimizer_name.lower() == "rotosolve":
+            res = optimizer.minimize(
+                parameters,
+                extra_options={
+                    "R": self.ups_layout.grad_param_R,
+                    "param_names": self.ups_layout.param_names,
+                    "f_rotosolve_optimized": self._calc_energy_rotosolve_optimization,
+                },
+            )
+        else:
+            res = optimizer.minimize(
+                parameters,
+            )
         if orbital_optimization:
             self.thetas = res.x[len(self.kappa) :].tolist()
             for i in range(len(self.kappa)):
@@ -1193,3 +1192,82 @@ class WaveFunctionSAUPS:
                 2 * np.sum(list(self.ups_layout.grad_param_R.values())) * self.num_states
             )  # Count energy measurements for all gradients
         return gradient
+
+    def _calc_energy_rotosolve_optimization(
+        self,
+        parameters: list[float],
+        theta_diffs: list[float],
+        theta_idx: int,
+    ) -> list[float]:
+        """Calculate electronic energy.
+
+        Args:
+            parameters: Ansatz parameters.
+            theta_diffs: List of theta shifts for RotoSolve.
+            theta_idx: Index of theta parameter being optimized.
+
+        Returns:
+            Electronic energies for all shifted thetas.
+        """
+        # copy of parameters
+        thetas_local = np.asarray(parameters)
+
+        # Prepare reference state up to theta_idx
+        state_vec = np.copy(self.csf_coeffs)
+        for i in range(0, theta_idx):
+            state_vec = propagate_unitary_SA(
+                state_vec,
+                i,
+                self.ci_info,
+                thetas_local,
+                self.ups_layout,
+            )
+
+        n_shifts = len(theta_diffs)
+        n_state = state_vec[0].size
+
+        # Preallocate array for shifted states
+        state_vecs = np.empty((n_shifts * self.num_states, n_state), dtype=state_vec.dtype)
+
+        # Propagate unitary with all shifted theta at theta_idx
+        theta_tmp = thetas_local.copy()
+        for j, theta_diff in enumerate(theta_diffs):
+            theta_tmp[theta_idx] = theta_diff
+            state_tmp = propagate_unitary_SA(
+                state_vec,
+                theta_idx,
+                self.ci_info,
+                theta_tmp,
+                self.ups_layout,
+            )
+            for k, state in enumerate(state_tmp):
+                state_vecs[j * self.num_states + k, :] = state
+
+        # Propagate remaining unitaries for all shifted states in batch using SA propagation
+        for i in range(theta_idx + 1, len(self.thetas)):
+            state_vecs = propagate_unitary_SA(
+                state_vecs,
+                i,
+                self.ci_info,
+                thetas_local,
+                self.ups_layout,
+            )
+
+        Hamiltonian = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+        bra_vec = propagate_state_SA(
+            [Hamiltonian],
+            state_vecs,
+            self.ci_info,
+            thetas_local,
+            self.ups_layout,
+        )
+
+        energies = np.zeros(len(theta_diffs))
+        idx = -1
+        for i, (bra, ket) in enumerate(zip(bra_vec, state_vecs)):
+            if i % len(self.csf_coeffs) == 0:
+                idx += 1
+            energies[idx] += bra @ ket
+        self.num_energy_evals += self.num_states  # count one measurement per state
+
+        return energies
