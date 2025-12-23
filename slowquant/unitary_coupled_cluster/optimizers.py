@@ -151,6 +151,8 @@ class Optimizers:
         result.success = res.success
         if not result.success:
             print("Optimization failed.")
+            if hasattr(res, "message"):
+                print(res.message)
         return result
 
 
