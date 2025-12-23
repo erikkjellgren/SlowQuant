@@ -203,7 +203,7 @@ class RotoSolve:
         self._callback = callback
         self.max_iterations = maxiter
         self.threshold = tol
-        self.max_fail = 3  # heuristic allowed fails (e.g. due to noise)
+        self.max_fail = 6  # heuristic allowed fails (e.g. due to noise)
         self._R = R
         self._param_names = param_names
 
