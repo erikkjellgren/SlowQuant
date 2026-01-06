@@ -21,7 +21,7 @@ def generalized_apply_operator(
     det2idx: dict[int, int],
     do_unsafe: bool,
     tmp_state: np.ndarray,
-    factor: float | complex,
+    factor: complex,
 ) -> np.ndarray:
     """Apply operator to state for a single state wave function.
 
@@ -85,11 +85,81 @@ def generalized_apply_operator(
     return tmp_state
 
 
+def generalized_add_operator_matrix(
+    op_mat: np.ndarray,
+    anni_idxs: np.ndarray,
+    create_idxs: np.ndarray,
+    num_active_orbs: int,
+    parity_check: np.ndarray,
+    idx2det: np.ndarray,
+    det2idx: dict[int, int],
+    do_unsafe: bool,
+    factor: complex,
+) -> np.ndarray:
+    """Add matrix representation of annihilation string.
+
+    This part is outside of propagate_state for performance reasons,
+    i.e., Numba JIT.
+
+    Args:
+        op_mat: Matrix representation of operator.
+        anni_idxs: Indicies for annihilation operators.
+        create_idxs: Indicies for creation operators.
+        num_active_orbs: Number of active spatial orbitals.
+        parity_check: Array used to check the parity when an operator is applied.
+        idx2det: Maps index to determinant.
+        det2idx: Maps determinant to index.
+        do_unsafe: Do unsafe.
+        factor: Factor in front of operator.
+
+    Returns:
+        Operator matrix.
+    """
+    anni_idxs = anni_idxs[::-1]
+    create_idxs = create_idxs[::-1]
+    # loop over all determinants in new_state
+    for i, det in enumerate(idx2det):
+        phase_changes = 0
+        is_killstate = False
+        # evaluate how string of annihilation operator change det
+        for orb_idx in anni_idxs:
+            if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 0:
+                # If an annihilation operator works on zero, then we reach kill-state.
+                is_killstate = True
+                break
+            det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
+            # take care of phases using parity_check
+            phase_changes += bitcount(det & parity_check[orb_idx])
+        if is_killstate:
+            continue
+        for orb_idx in create_idxs:
+            if (det >> 2 * num_active_orbs - 1 - orb_idx) & 1 == 1:
+                # If creation operator works on one, then we reach kill-state.
+                is_killstate = True
+                break
+            det = det ^ (1 << (2 * num_active_orbs - 1 - orb_idx))
+            # take care of phases using parity_check
+            phase_changes += bitcount(det & parity_check[orb_idx])
+        if is_killstate:
+            continue
+        if do_unsafe:
+            # For some algorithms it is guaranteed that the application of operators will always
+            # keep the new determinants within a pre-defined space (in det2idx and idx2det).
+            # For these algorithms it is a sign of bug if a keyerror when calling det2idx is found.
+            # These algorithms thus does also not need to check for the exsistence of the new determinant
+            # in det2idx.
+            # For other algorithms this 'safety' is not guaranteed, hence the keyword is called 'do_unsafe'.
+            if det not in det2idx:
+                continue
+        op_mat[det2idx[det], i] += factor * (-1) ** phase_changes
+    return op_mat
+
+
 def generalized_propagate_state(
     operators: list[FermionicOperator | str],
     state: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float | complex] | None = None,
+    thetas: list[float] | None = None,
     wf_struct: UpsStructure | None = None,
     do_folding: bool = True,
     do_unsafe: bool = False,
@@ -126,7 +196,7 @@ def generalized_propagate_state(
         return np.copy(state)
     new_state = np.copy(state)
     # Annika has forced this to be of type complex
-    tmp_state = np.zeros_like(state,dtype=complex)
+    tmp_state = np.zeros_like(state,dtype=np.complex128)
     # Create bitstrings for parity check. Contains occupied determinant up to orbital index.
     parity_check = np.zeros(2 * num_active_orbs + 1, dtype=np.int64)
     num = 0
@@ -190,16 +260,65 @@ def generalized_propagate_state(
     return new_state
 
 
+def generalized_build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bool = False) -> np.ndarray:
+    """Build matrix representation of operator.
+
+    Args:
+        op: Fermionic number and spin conserving operator.
+        ci_info: Information about the CI space.
+        do_unsafe: Ignore elements that are outside the space defined in ci_info. (default: False)
+                If not ignored, getting elements outside the space will stop the calculation.
+
+    Returns:
+        Matrix representation of operator.
+    """
+    idx2det = ci_info.idx2det
+    det2idx = ci_info.det2idx
+    num_active_orbs = ci_info.num_active_orbs
+    num_dets = len(idx2det)  # number of spin and particle conserving determinants
+    op_mat = np.zeros((num_dets, num_dets), np.complex128)  # basis
+    # Create bitstrings for parity check. Contains occupied determinant up to orbital index.
+    parity_check = np.zeros(2 * num_active_orbs + 1, dtype=np.int64)
+    num = 0
+    for i in range(2 * num_active_orbs - 1, -1, -1):
+        num += 2**i
+        parity_check[2 * num_active_orbs - i] = num
+    # loop over all strings of annihilation operators in FermionicOperator sum
+    for fermi_label in op.operators.keys():
+        # Separate each annihilation operator string in creation and annihilation indices
+        anni_idx = []
+        create_idx = []
+        for fermi_op in fermi_label:
+            if fermi_op[1]:
+                create_idx.append(fermi_op[0])
+            else:
+                anni_idx.append(fermi_op[0])
+        anni_idx = np.array(anni_idx, dtype=np.int64)
+        create_idx = np.array(create_idx, dtype=np.int64)
+        op_mat = generalized_add_operator_matrix(
+            op_mat,
+            anni_idx,
+            create_idx,
+            num_active_orbs,
+            parity_check,
+            idx2det,
+            det2idx,
+            do_unsafe,
+            op.operators[fermi_label],
+        )
+    return op_mat
+
+
 def generalized_expectation_value(
     bra: np.ndarray,
     operators: list[FermionicOperator | str],
     ket: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float | complex] | None = None,
+    thetas: list[float] | None = None,
     wf_struct: UpsStructure | None = None,
     do_folding: bool = True,
     do_unsafe: bool = False,
-) -> float:
+) -> complex:
     """Calculate expectation value of operator using propagate state.
 
     Args:
@@ -228,11 +347,7 @@ def generalized_expectation_value(
         do_unsafe=do_unsafe,
     )
     val = bra.conj() @ op_ket
-
-    if val.imag > 1e-10:
-        print("Warning: Expectation value is complex!!", val)
-
-    return val.real
+    return val
 
 
 def expectation_value_for_gradient(
@@ -240,11 +355,11 @@ def expectation_value_for_gradient(
     operators: list[FermionicOperator | str],
     ket: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float | complex] | None = None,
+    thetas: list[float] | None = None,
     wf_struct: UpsStructure | None = None,
     do_folding: bool = True,
     do_unsafe: bool = False,
-) -> float:
+) -> complex:
     """Calculate expectation value of operator using propagate state.
 
     Args:
@@ -273,14 +388,13 @@ def expectation_value_for_gradient(
         do_unsafe=do_unsafe,
     )
     val = bra.conj() @ op_ket
-
     return val
 
 
 def generalized_construct_ups_state(
     state: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float | complex],
+    thetas: list[float],
     ups_struct: UpsStructure,
     dagger: bool = False,
 ) -> np.ndarray:
@@ -352,7 +466,7 @@ def generalized_construct_ups_state(
 def generalized_construct_ups_state_modified(
     state: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float | complex],
+    thetas: list[float],
     ups_struct: UpsStructure,
     dagger: bool = False,
 ) -> np.ndarray:
@@ -503,7 +617,7 @@ def generalized_propagate_unitary(
     state: np.ndarray,
     idx: int,
     ci_info: CI_Info,
-    thetas: list[float | complex],
+    thetas: list[float],
     ups_struct: UpsStructure,
 ) -> np.ndarray:
     """Apply unitary from UPS operator number 'idx' to state.
@@ -565,7 +679,7 @@ def generalized_propagate_unitary_modified(
     state: np.ndarray,
     idx: int,
     ci_info: CI_Info,
-    thetas: list[float | complex],
+    thetas: list[float],
     ups_struct: UpsStructure,
 ) -> np.ndarray:
     """Apply unitary from UPS operator number 'idx' to state.
