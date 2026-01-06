@@ -7,8 +7,7 @@ from slowquant.molecule.moleculefunctions import factorial2
 
 
 def strip_imag(A, tol=1e-10):
-    """
-    If the imaginary part of A is smaller than tol everywhere,
+    """If the imaginary part of A is smaller than tol everywhere,
     return A.real as float; otherwise return A unchanged.
     """
     # Ensure it's an array
@@ -24,6 +23,7 @@ def strip_imag(A, tol=1e-10):
         # Imaginary part is relevant → keep complex
         print("WARNING: MO integrals are complex!!")
         return A
+
 
 @jit(float64[:, :, :](float64, float64, float64, float64, int64, int64), nopython=True, cache=True)
 def expansion_coefficients(
@@ -218,15 +218,20 @@ def one_electron_integral_transform(C: np.ndarray, int1e: np.ndarray) -> np.ndar
 def generalized_one_electron_transform(C: np.ndarray, int_1e_inp: np.ndarray) -> np.ndarray:
     """int_1e_inp = int_1e_kin+int_1e_nuc"""
     cont1 = np.einsum(
-        "aP,bQ, ab->PQ", C[: int(C.shape[0] / 2)].conj(), C[: int(C.shape[0] / 2)], (int_1e_inp)
+        "aP,bQ, ab->PQ",
+        C[: int(C.shape[0] / 2)].conj(),
+        C[: int(C.shape[0] / 2)],
+        int_1e_inp,
+        optimize=["einsum_path", (0, 2), (0, 1)],
     )  # alpha alpha
     cont2 = np.einsum(
         "aP,bQ, ab->PQ",
         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
-        (int_1e_inp),
+        int_1e_inp,
+        optimize=["einsum_path", (0, 2), (0, 1)],
     )  # beta beta
-    return np.add(cont1, cont2)
+    return cont1 + cont2
 
 
 def two_electron_integral_transform(C: np.ndarray, int2e: np.ndarray) -> np.ndarray:
@@ -254,6 +259,7 @@ def generalized_two_electron_transform(C: np.ndarray, int_2e_inp: np.ndarray) ->
         C[: int(C.shape[0] / 2)].conj(),
         C[: int(C.shape[0] / 2)],
         int_2e_inp,
+        optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
     )
     # beta beta beta beta
     cont2 = np.einsum(
@@ -263,6 +269,7 @@ def generalized_two_electron_transform(C: np.ndarray, int_2e_inp: np.ndarray) ->
         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
         int_2e_inp,
+        optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
     )
     # alpha alpha, beta beta
     cont3 = np.einsum(
@@ -272,6 +279,7 @@ def generalized_two_electron_transform(C: np.ndarray, int_2e_inp: np.ndarray) ->
         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
         int_2e_inp,
+        optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
     )
     # beta beta alpha alpha
     cont4 = np.einsum(
@@ -281,5 +289,6 @@ def generalized_two_electron_transform(C: np.ndarray, int_2e_inp: np.ndarray) ->
         C[: int(C.shape[0] / 2)].conj(),
         C[: int(C.shape[0] / 2)],
         int_2e_inp,
+        optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
     )
     return cont1 + cont2 + cont3 + cont4

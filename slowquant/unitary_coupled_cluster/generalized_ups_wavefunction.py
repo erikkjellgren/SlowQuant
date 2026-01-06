@@ -336,6 +336,7 @@ class GeneralizedWaveFunctionUPS:
         self._energy_elec = None
         self._thetas_real = theta_real.copy()
         self._thetas_imag = theta_imag.copy()
+
         self.ci_coeffs = generalized_construct_ups_state_modified(
             self.csf_coeffs,
             self.ci_info,
@@ -1052,12 +1053,8 @@ class GeneralizedWaveFunctionUPS:
         else:
             E = generalized_expectation_value(
                 self.ci_coeffs,
-                [
-                    generalized_hamiltonian_0i_0a(
-                        self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs
-                    )
-                ],
-                # [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
+                # [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
+                [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
             )
@@ -1162,11 +1159,13 @@ class GeneralizedWaveFunctionUPS:
                     self.ups_layout,
                 )
                 temp = 2 * np.matmul(bra_vec, ket_vec_tmp)
-                if temp.imag > 1e-7:
+                if temp.imag > 1e-9:
                     print ("temp_gradient is complex!",temp)
                     if i >= len(self.ups_layout.excitation_indices):
+                        print("imag component")
                         print(self.ups_layout.excitation_indices[i-len(self.ups_layout.excitation_indices)])
                     else:
+                        print("real component")
                         print(self.ups_layout.excitation_indices[i])
                 gradient[i + num_kappa] += 2 * np.matmul(bra_vec, ket_vec_tmp).real
                 # Product rule implications on reference bra and CSF ket
