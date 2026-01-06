@@ -1,9 +1,17 @@
 import numba as nb
 import numpy as np
+import scipy as scipy
 
-from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import expectation_value_for_gradient
+from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import expectation_value_for_gradient, generalized_expectation_value
 from slowquant.unitary_coupled_cluster.operators import a_op_spin
-from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space
+from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, generalized_hamiltonian_0i_0a
+
+
+from slowquant.molecularintegrals.integralfunctions import (
+    generalized_one_electron_transform,
+    generalized_two_electron_transform,
+    one_electron_integral_transform,
+)
 
 
 @nb.jit(nopython=True)
@@ -351,6 +359,115 @@ def get_nonsplit_gradient_expvalue(
                             ci_coeffs, ci_info)
 
     return gradient
+
+def get_gradient_finite_diff(
+    ci_coeffs,
+    ci_info,
+    h_ao,
+    g_ao,
+    num_inactive_spin_orbs,
+    num_active_spin_orbs,
+    kappa_idx: list[tuple[int, int]],
+    kappa_real,
+    kappa_imag,
+    c_mo,
+) -> tuple[np.ndarray]:
+
+    gradient_R = np.zeros(len(kappa_idx),dtype=np.complex128)
+    gradient_I = np.zeros(len(kappa_idx),dtype=np.complex128)
+
+    step = 1e-2
+
+    for idx, (M,N) in enumerate(kappa_idx):
+        if M == N:
+            # Imaginary
+            kappa_mat_high = np.zeros_like(c_mo)
+            kappa_mat_high[M, N] = step*1j
+            kappa_mat_high[N, M] = step*1j
+        
+            c_mo_high = np.matmul(c_mo, scipy.linalg.expm(-kappa_mat_high))
+
+            h_mo_high = generalized_one_electron_transform(c_mo_high,h_ao)
+
+            g_mo_high = generalized_two_electron_transform(c_mo_high,g_ao)
+
+            H_high = generalized_hamiltonian_0i_0a(h_mo_high,g_mo_high,num_inactive_spin_orbs,num_active_spin_orbs)
+
+            kappa_mat_low = np.zeros_like(c_mo)
+            kappa_mat_low[M, N] = -step*1j
+            kappa_mat_low[N, M] = -step*1j
+          
+            c_mo_low = np.matmul(c_mo, scipy.linalg.expm(-kappa_mat_low))
+
+            h_mo_low = generalized_one_electron_transform(c_mo_low,h_ao)
+
+            g_mo_low = generalized_two_electron_transform(c_mo_low,g_ao)
+
+            H_low = generalized_hamiltonian_0i_0a(h_mo_low,g_mo_low,num_inactive_spin_orbs,num_active_spin_orbs)
+
+            gradient_I[idx] =  (expectation_value_for_gradient(ci_coeffs, [H_high], ci_coeffs, ci_info) 
+                            -   expectation_value_for_gradient(ci_coeffs, [H_low], ci_coeffs, ci_info)) / (2*step)
+            
+        else:
+            # Real
+            kappa_mat_high = np.zeros_like(c_mo)
+            kappa_mat_high[M, N] =  step
+            kappa_mat_high[N, M] = -step
+           
+            c_mo_high = np.matmul(c_mo, scipy.linalg.expm(-kappa_mat_high))
+
+            h_mo_high = generalized_one_electron_transform(c_mo_high,h_ao)
+
+            g_mo_high = generalized_two_electron_transform(c_mo_high,g_ao)
+
+            H_high = generalized_hamiltonian_0i_0a(h_mo_high,g_mo_high,num_inactive_spin_orbs,num_active_spin_orbs)
+
+            kappa_mat_low = np.zeros_like(c_mo)
+            kappa_mat_low[M, N] = -step
+            kappa_mat_low[N, M] =  step
+            
+            c_mo_low = np.matmul(c_mo, scipy.linalg.expm(-kappa_mat_low))
+
+            h_mo_low = generalized_one_electron_transform(c_mo_low,h_ao)
+
+            g_mo_low = generalized_two_electron_transform(c_mo_low,g_ao)
+
+            H_low = generalized_hamiltonian_0i_0a(h_mo_low,g_mo_low,num_inactive_spin_orbs,num_active_spin_orbs)
+
+
+            gradient_R[idx] =  (expectation_value_for_gradient(ci_coeffs, [H_high], ci_coeffs, ci_info) 
+                            -   expectation_value_for_gradient(ci_coeffs, [H_low], ci_coeffs, ci_info)) / (2*step)
+
+            # Imaginary
+            kappa_mat_high = np.zeros_like(c_mo)
+            kappa_mat_high[M, N] = step*1j
+            kappa_mat_high[N, M] = step*1j
+            
+            c_mo_high = np.matmul(c_mo, scipy.linalg.expm(-kappa_mat_high))
+
+            h_mo_high = generalized_one_electron_transform(c_mo_high,h_ao)
+
+            g_mo_high = generalized_two_electron_transform(c_mo_high,g_ao)
+
+            H_high = generalized_hamiltonian_0i_0a(h_mo_high,g_mo_high,num_inactive_spin_orbs,num_active_spin_orbs)
+
+            kappa_mat_low = np.zeros_like(c_mo)
+            kappa_mat_low[M, N] = -step*1j
+            kappa_mat_low[N, M] = -step*1j
+            c_mo_low = np.matmul(c_mo, scipy.linalg.expm(-kappa_mat_low))
+
+            h_mo_low = generalized_one_electron_transform(c_mo_low,h_ao)
+
+            g_mo_low = generalized_two_electron_transform(c_mo_low,g_ao)
+
+            H_low = generalized_hamiltonian_0i_0a(h_mo_low,g_mo_low,num_inactive_spin_orbs,num_active_spin_orbs)
+
+            gradient_I[idx] =  (expectation_value_for_gradient(ci_coeffs, [H_high], ci_coeffs, ci_info) 
+                            -   expectation_value_for_gradient(ci_coeffs, [H_low], ci_coeffs, ci_info)) / (2*step)
+        
+    gradient_total = np.concatenate((gradient_R, gradient_I)) 
+
+    return strip_imag(gradient_total)
 
 
 

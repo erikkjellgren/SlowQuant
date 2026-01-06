@@ -12,7 +12,7 @@ from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import Gener
 from slowquant.unitary_coupled_cluster.linear_response import generalized_naive
 from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
 from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, generalized_hamiltonian_0i_0a, generalized_hamiltonian_1i_1a
-from slowquant.unitary_coupled_cluster.generalized_density_matrix import get_orbital_gradient_generalized_real_imag, get_orbital_gradient_expvalue_real_imag, get_nonsplit_gradient_expvalue
+from slowquant.unitary_coupled_cluster.generalized_density_matrix import get_orbital_gradient_generalized_real_imag, get_orbital_gradient_expvalue_real_imag, get_nonsplit_gradient_expvalue, get_gradient_finite_diff
 
 from slowquant.unitary_coupled_cluster.fermionic_operator import (
     FermionicOperator, 
@@ -240,7 +240,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF = GeneralizedWaveFunctionUPS(
         mol.nelectron,
         active_space,
-        c,
+        c_u,
         h_core,
         g_eri,
         "fuccsd",
@@ -274,6 +274,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print(test_energy2)
     print(test_energy3)'''
 
+    #print("integrals before:\n", WF.h_mo)
 
     my_gradient_before = get_orbital_gradient_generalized_real_imag(WF.h_mo,
         WF.g_mo,
@@ -284,6 +285,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         WF.rdm2)
 
     print(f"my gradient_before:\n\n",np.round(my_gradient_before,10))
+
+    finite_diff = get_gradient_finite_diff(WF.ci_coeffs,WF.ci_info,WF._h_ao,WF._g_ao,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,
+                                           WF.kappa_spin_idx, WF.kappa_real,WF.kappa_imag,WF._c_mo)
+
+    print(f"Finite difference gradient, delta 1e-2, centered:\n\n", finite_diff)
 
     #my_gradient_before = np.array(my_gradient_before)
     #print("my_gradient_before:",np.linalg.norm(my_gradient_before, ord=2))
@@ -331,7 +337,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True, tol=1e-10)
     #WF.do_adapt(["S","D"])
 
-    print(WF.ups_layout.excitation_indices)
+    #print(WF.ups_layout.excitation_indices)
 
     my_gradient_after = get_orbital_gradient_generalized_real_imag(WF.h_mo,
         WF.g_mo,
@@ -342,6 +348,14 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         WF.rdm2)
 
     print(f"my gradient_after:\n\n",np.round(my_gradient_after,10))
+
+
+    finite_diff_2 = get_gradient_finite_diff(WF.ci_coeffs,WF.ci_info,WF._h_ao,WF._g_ao,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,
+                                           WF.kappa_spin_idx, WF.kappa_real,WF.kappa_imag,WF._c_mo)
+
+    print(f"Finite difference gradient, delta 1e-2, centered:\n\n", finite_diff_2)
+
+    #print("integrals after:\n", WF.h_mo)
 
 
     #my_gradient_after = np.array(my_gradient_after)
