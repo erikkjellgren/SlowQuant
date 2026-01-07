@@ -7,7 +7,7 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_orbital_gradient_response,
-    get_orbital_response_hessian_block,
+    get_orbital_response_hessian_block_real_imag_changesign,
     get_orbital_response_metric_sigma,
     get_orbital_response_property_gradient,
 )
@@ -92,7 +92,7 @@ class LinearResponse(LinearResponseBaseClass):
                 #raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
         if len(self.q_ops) != 0:
             # Do orbital-orbital blocks
-            self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
+            self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block_real_imag_changesign(
                 self.wf.h_mo,
                 self.wf.g_mo,
                 self.wf.kappa_no_activeactive_spin_idx_dagger,
@@ -102,7 +102,7 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.rdm1,
                 self.wf.rdm2,
             )
-            self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
+            self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block_real_imag_changesign(
                 self.wf.h_mo,
                 self.wf.g_mo,
                 self.wf.kappa_no_activeactive_spin_idx_dagger,
