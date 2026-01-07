@@ -7,7 +7,6 @@ from typing import Any
 
 import numpy as np
 import scipy
-import scipy.optimize
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
