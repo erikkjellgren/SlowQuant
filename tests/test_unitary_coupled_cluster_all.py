@@ -36,7 +36,7 @@ def test_h2_sto3g_uccsd_lr() -> None:
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", False)
+    WF.run_wf_optimization_1step("BFGS", False)
     # SC
     LR = allselfconsistent.LinearResponse(
         WF,
@@ -76,7 +76,7 @@ def test_LiH_atmethods_energies() -> None:
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     threshold = 10 ** (-3)
 
@@ -148,7 +148,7 @@ def test_LiH_naiveq_methods_energies() -> None:
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     threshold = 10 ** (-5)
 
@@ -275,7 +275,7 @@ def test_LiH_naiveq_methods_matrices() -> None:
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     threshold = 10 ** (-5)
 
@@ -343,7 +343,7 @@ def test_LiH_allproj_energies() -> None:
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     threshold = 10 ** (-5)
 
@@ -394,7 +394,7 @@ def test_LiH_STproj_energies() -> None:
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     threshold = 10 ** (-5)
 

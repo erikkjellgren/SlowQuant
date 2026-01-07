@@ -34,7 +34,7 @@ def test_H2_631g_naive():
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     # Linear Response
     LR = naive.LinearResponse(WF, excitations="SD")
@@ -97,7 +97,7 @@ def test_LiH_sto3g_naive():
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     # Linear Response
     LR = naive.LinearResponse(WF, excitations="SD")
@@ -174,7 +174,7 @@ def test_H2_631g_projLR():
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     # Linear Response
     LR = projected.LinearResponse(WF, excitations="SD")
@@ -232,7 +232,7 @@ def test_LiH_sto3g_proj():
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     LR = projected.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
@@ -302,7 +302,7 @@ def test_H2_631g_STLR():
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     # Linear Response
     LR = statetransfer.LinearResponse(
@@ -362,7 +362,7 @@ def test_LiH_sto3g_st():
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     # Linear Response
     LR = statetransfer.LinearResponse(
@@ -436,7 +436,7 @@ def test_H2_631g_allST():
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     # Linear Response
     LR = allstatetransfer.LinearResponse(
@@ -492,7 +492,7 @@ def test_LiH_sto3g_allST():
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     # Linear Response
     LR = allstatetransfer.LinearResponse(
