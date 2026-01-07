@@ -243,8 +243,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         c,
         h_core,
         g_eri,
-        "fuccd",
-        {"n_layers": 1, "is_spin_conserving" : False},
+        "fuccsd",
+        {"n_layers": 0, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
@@ -334,7 +334,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
                             print(WF.kappa_spin_idx[i-len(WF.kappa_spin_idx)],WF.kappa_spin_idx[j-len(WF.kappa_spin_idx)])'''
 
 
-    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True, tol=1e-10,maxiter = 10000)
+    WF.run_wf_optimization_1step("bfgs", orbital_optimization=True, test=True, tol=1e-10,maxiter = 10000,is_silent=True)
     #WF.do_adapt(["S","D"])
 
     #print(WF.ups_layout.excitation_indices)
