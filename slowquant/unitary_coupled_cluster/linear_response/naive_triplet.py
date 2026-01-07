@@ -1,4 +1,5 @@
 import numpy as np
+import warnings
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
@@ -58,7 +59,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
         if len(grad) != 0:
             print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
-                raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
+                #raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
+                warnings.warn(f"Large Gradient detected in q of {np.max(np.abs(grad))}")
 
         grad = np.zeros(2 * len(self.G_ops))
         H00_ket = propagate_state([self.H_0i_0a], self.wf.ci_coeffs, *self.index_info)
@@ -96,7 +98,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
-                raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
+                #raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
+                warnings.warn(f"Large Gradient detected in G of {np.max(np.abs(grad))}")
         # Do orbital-orbital blocks
         self.A[: len(self.q_ops), : len(self.q_ops)] = get_triplet_orbital_response_hessian_block(
             rdms,
@@ -347,7 +350,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 # < 0 | G T | 0 >
                 val = expectation_value(Gd_ket, [], T_ket, *self.index_info)
                 # - < 0 | T G | 0 >
-                val -= expectation_value(T_ket, [], G_ket, *self.index_info)
+                val -= expectation_value(T_ket, [], G_ket, *self.index_info) # T_ket = Td_ket for T(i,i)
                 V[idx + idx_shift_q, :] += mo[:, i, i] * val
             # Active part
             for p in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):

@@ -532,7 +532,9 @@ class QuantumInterface:
         Returns:
             Qubit representation of operator.
         """
+        print(FermionicOp(op.get_qiskit_form(self.num_orbs), self.num_spin_orbs))
         mapped_op = self.mapper.map(FermionicOp(op.get_qiskit_form(self.num_orbs), self.num_spin_orbs))
+        print(mapped_op)
         if not isinstance(mapped_op, SparsePauliOp):
             raise TypeError(f"The qubit form of the operator is not SparsePauliOp got, {type(mapped_op)}")
         return mapped_op

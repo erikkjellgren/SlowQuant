@@ -512,7 +512,7 @@ def G2_3_sa_t(i: int, j: int, a: int, b: int) -> FermionicOperator:
     fac = 1
     if i == j:
         fac *= 2
-    return 1 / (2 * 2 ** (1 / 2)) * (Epq(b, j) * Tpq(a, i) + Epq(b, i) * Tpq(a, j))
+    return 1 / (2 * fac ** (1 / 2)) * (Epq(b, j) * Tpq(a, i) + Epq(b, i) * Tpq(a, j))
 
 
 def hamiltonian_full_space(h_mo: np.ndarray, g_mo: np.ndarray, num_orbs: int) -> FermionicOperator:

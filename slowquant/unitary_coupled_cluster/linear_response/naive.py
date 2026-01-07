@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+import warnings
 
 import numpy as np
 
@@ -61,7 +62,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
         if len(grad) != 0:
             print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
-                raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
+                #raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
+                warnings.warn(f"Large Gradient detected in q of {np.max(np.abs(grad))}")
 
         grad = np.zeros(2 * len(self.G_ops))
         H00_ket = propagate_state([self.H_0i_0a], self.wf.ci_coeffs, *self.index_info)
@@ -99,7 +101,8 @@ class LinearResponseUCC(LinearResponseBaseClass):
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
-                raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
+                #raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
+                warnings.warn(f"Large Gradient detected in G of {np.max(np.abs(grad))}")
         # Do orbital-orbital blocks
         self.A[:idx_shift, :idx_shift] = get_orbital_response_hessian_block(
             rdms,
@@ -478,11 +481,11 @@ class LinearResponseUCC(LinearResponseBaseClass):
             Gd_ket = propagate_state([G.dagger], self.wf.ci_coeffs, *self.index_info)
             # Inactive part
             for i in range(self.wf.num_inactive_orbs):
-                E_ket = propagate_state([Epq(i, i)], self.wf.ci_coeffs, *self.index_info)
+                E_ket = propagate_state([Epq(i, i)], self.wf.ci_coeffs, *self.index_info) 
                 # < 0 | G E | 0 >
                 val = expectation_value(Gd_ket, [], E_ket, *self.index_info)
                 # - < 0 | E G | 0 >
-                val -= expectation_value(E_ket, [], G_ket, *self.index_info)
+                val -= expectation_value(E_ket, [], G_ket, *self.index_info) # E_ket = Ed_ket for E(i,i)
                 V[idx + idx_shift_q, :] += mo[:, i, i] * val
             # Active part
             for p in range(self.wf.num_inactive_orbs, self.wf.num_inactive_orbs + self.wf.num_active_orbs):

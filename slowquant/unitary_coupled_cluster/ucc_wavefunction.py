@@ -94,10 +94,10 @@ class WaveFunctionUCC:
         active_space = []
         orbital_counter = 0
         for i in range(num_elec - cas[0], num_elec):
-            active_space.append(i)
-            orbital_counter += 1
+          active_space.append(i)
+          orbital_counter += 1
         for i in range(num_elec, num_elec + 2 * cas[1] - orbital_counter):
-            active_space.append(i)
+          active_space.append(i)
         for i in range(num_elec):
             if i in active_space:
                 self.active_spin_idx.append(i)

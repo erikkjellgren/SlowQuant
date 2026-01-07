@@ -596,11 +596,11 @@ def get_orbital_response_static_property_gradient(
     kappa_idx: list[tuple[int, int]],
     num_inactive_orbs: int,
     num_active_orbs: int,
-) -> float:
+) -> np.ndarray:
     r"""Calculate the orbital part of static property gradient.
 
     .. math::
-        P^{\hat{q}} = \frac{1}{\sqrt{2}}\sum_{p}\left(-x_{np}\Gamma^{[1]}_{mp} + x_{pm}\Gamma^{[1]}_{pn}\right)
+        P^{\hat{q}} = \frac{1}{\sqrt{2}}\sum_{p}\left(x_{np}\Gamma^{[1]}_{mp} - x_{pm}\Gamma^{[1]}_{pn}\right)
 
     Args:
        rdms: Reduced density matrix class.
