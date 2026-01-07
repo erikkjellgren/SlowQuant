@@ -59,7 +59,7 @@ def test_LiH_naive() -> None:
     )
 
     # Optimize WF
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     # Optimize WF with QSQ
     sampler = SamplerAer()
@@ -128,7 +128,7 @@ def test_LiH_projected() -> None:
         mol.intor("int2e"),
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     # CircuitWF with QSQ
     sampler = SamplerAer()
@@ -193,7 +193,7 @@ def test_LiH_allprojected() -> None:
     )
 
     # Optimize WF
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     # Optimize WF with QSQ
     sampler = SamplerAer()
@@ -265,7 +265,7 @@ def test_LiH_naive_sampler_ISA() -> None:
     )
 
     # Optimize WF
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     # Optimize WF with QSQ
     sampler = SamplerAer()
@@ -332,7 +332,7 @@ def test_LiH_oscillator_strength() -> None:
     )
 
     # Optimize WF
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     # Optimize WF with QSQ
     sampler = SamplerAer()
@@ -450,7 +450,7 @@ def test_gradient_optimizer_H2() -> None:
         QI,
     )
 
-    WF.run_wf_optimization_2step("SLSQP", False)
+    WF.run_wf_optimization_2step("BFGS", False)
     assert abs(WF.energy_elec - -1.8572750819575072) < 10**-6
 
 
@@ -742,7 +742,7 @@ def test_mitigation_nocm() -> None:
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
         include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     sampler = SamplerAer(backend_options={"noise_model": noise_model})
     mapper = JordanWignerMapper()
@@ -767,23 +767,23 @@ def test_mitigation_nocm() -> None:
     )
     qWF.thetas = WF.thetas
 
-    assert abs(qWF._calc_energy_elec() + 9.418338703183217) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.418383329562078) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0]
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() + 9.602482843766479) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.602601639646656) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8]
 
     QI.update_mitigation_flags(do_postselection=False, do_M_ansatz0=True)
-    assert abs(qWF._calc_energy_elec() + 9.683868081526128) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.683988916881479) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3]
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() + 9.703076902990484) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.70319667962837) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3, 11]
 
     QI.update_mitigation_flags(do_M_ansatz0_plus=True)
-    assert abs(qWF._calc_energy_elec() + 9.703076902990484) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.70319667962837) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3, 11, 15]
 
 
@@ -813,7 +813,7 @@ def test_mitigation() -> None:
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
         include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     sampler = SamplerAer(backend_options={"noise_model": noise_model})
     mapper = JordanWignerMapper()
@@ -839,23 +839,23 @@ def test_mitigation() -> None:
     )
     qWF.thetas = WF.thetas
 
-    assert abs(qWF._calc_energy_elec() + 9.233704347719785) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.233747228500063) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0]
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() + 9.53043695063921) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.530550958752345) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8]
 
     QI.update_mitigation_flags(do_postselection=False, do_M_ansatz0=True)
-    assert abs(qWF._calc_energy_elec() + 9.66182548793073) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.66182116795791) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3]
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() + 9.711973973591553) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.712021766284208) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3, 11]
 
     QI.update_mitigation_flags(do_M_ansatz0_plus=True)
-    assert abs(qWF._calc_energy_elec() + 9.711973973591553) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.712021766284208) < 10**-6  # type: ignore
     assert list(QI.saver[12].cliques[0].distr.data.keys()) == [0, 8, 3, 11, 15]
 
 
@@ -895,7 +895,7 @@ def test_state_average_layout() -> None:
         "tUPS",
         ansatz_options={"n_layers": 1},
     )
-    WF.run_wf_optimization_1step("SLSQP")
+    WF.run_wf_optimization_1step("BFGS")
 
     sampler = SamplerAer()
     mapper = JordanWignerMapper()
@@ -967,7 +967,7 @@ def test_state_average_M() -> None:
         "tUPS",
         ansatz_options={"n_layers": 1},
     )
-    WF.run_wf_optimization_1step("SLSQP")
+    WF.run_wf_optimization_1step("BFGS")
 
     sampler = SamplerAer(backend_options={"noise_model": noise_model})
     mapper = JordanWignerMapper()
@@ -1042,7 +1042,7 @@ def test_state_average_Mplus() -> None:
         "tUPS",
         ansatz_options={"n_layers": 1},
     )
-    WF.run_wf_optimization_1step("SLSQP")
+    WF.run_wf_optimization_1step("BFGS")
 
     sampler = SamplerAer()
     mapper = JordanWignerMapper()
@@ -1131,7 +1131,7 @@ def test_no_saving() -> None:
         "tUPS",
         ansatz_options={"n_layers": 1},
     )
-    WF.run_wf_optimization_1step("SLSQP")
+    WF.run_wf_optimization_1step("BFGS")
 
     sampler = SamplerAer()
     mapper = JordanWignerMapper()
@@ -1200,7 +1200,7 @@ def test_variance_nocm() -> None:
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
         include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     sampler = SamplerAer(backend_options={"noise_model": noise_model})
     mapper = JordanWignerMapper()
@@ -1225,12 +1225,12 @@ def test_variance_nocm() -> None:
     )
     qWF.thetas = WF.thetas
 
-    assert abs(qWF._calc_energy_elec() + 9.418338703183217) < 10**-6  # type: ignore
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.10217194060776572) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.418383329562078) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.10213270381462243) < 10**-6  # type: ignore
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() + 9.602482843766479) < 10**-6  # type: ignore
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.05290224959732125) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.602601639646656) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.052830412154174874) < 10**-6  # type: ignore
 
 
 def test_variance() -> None:
@@ -1259,7 +1259,7 @@ def test_variance() -> None:
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
         include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     sampler = SamplerAer(backend_options={"noise_model": noise_model})
     mapper = JordanWignerMapper()
@@ -1285,9 +1285,9 @@ def test_variance() -> None:
     )
     qWF.thetas = WF.thetas
 
-    assert abs(qWF._calc_energy_elec() + 9.233704347719785) < 10**-6  # type: ignore
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.1366838468187367) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.233747228500063) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.13667860748213662) < 10**-6  # type: ignore
 
     QI.update_mitigation_flags(do_postselection=True)
-    assert abs(qWF._calc_energy_elec() + 9.53043695063921) < 10**-6  # type: ignore
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.08154141827228366) < 10**-6  # type: ignore
+    assert abs(qWF._calc_energy_elec() - -9.530550958752345) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.08149072047975339) < 10**-6  # type: ignore
