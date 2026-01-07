@@ -8,7 +8,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     two_electron_integral_transform,
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
-from slowquant.unitary_coupled_cluster.operators import hamiltonian_0i_0a
+from slowquant.unitary_coupled_cluster.operators import hamiltonian_full_space
 
 
 class _HartreeFock:
@@ -145,7 +145,7 @@ class _HartreeFock:
         )
         g_mo = two_electron_integral_transform(self.mo_coeff, self.int_obj.electron_repulsion_tensor)
         num_orbs = self.mol_obj.number_bf
-        H = hamiltonian_0i_0a(h_mo, g_mo, 0, num_orbs)
+        H = hamiltonian_full_space(h_mo, g_mo, num_orbs)
 
         if qiskit_form:
             return H.get_qiskit_form(num_orbs)

@@ -7,7 +7,6 @@ from functools import partial
 
 import numpy as np
 import scipy
-import scipy.optimize
 import scipy.sparse as ss
 
 from slowquant.molecularintegrals.integralfunctions import (
