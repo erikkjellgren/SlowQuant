@@ -6,7 +6,7 @@ from scipy.stats import unitary_group
 # from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
-from slowquant.unitary_coupled_cluster.linear_response import generalized_naive
+from slowquant.unitary_coupled_cluster.linear_response import generalized_naive, naive
 from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
 from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, generalized_hamiltonian_0i_0a, generalized_hamiltonian_1i_1a
 from slowquant.unitary_coupled_cluster.operators import a_op_spin
@@ -73,11 +73,14 @@ def restricted(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=1
         h_core,
         g_eri,
         "fuccsd",
-        {"n_layers": 2},
+        {"n_layers": 0},
         include_active_kappa=True,
     )
     print('Antal elektroner',mol.nelectron)
-    WF.run_wf_optimization_1step("bfgs", True)
+    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True,tol=1e-8)
+    LR = naive.LinearResponse(WF, excitations="sd")
+    LR.calc_excitation_energies()
+    print(LR.excitation_energies)
     
     WF =WaveFunctionUPS(
         mol.nelectron,
@@ -103,6 +106,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #X2C
     # mf = scf.HF(mol)
     mf = scf.GHF(mol)
+    
+    mf.conv_tol_grad = 1e-10 #gradient tolerance form PYSCF
+    
 
     mf.scf()
     mf.kernel()
@@ -175,7 +181,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
-    basis = "631-g"
+    basis = "STO-3g"
     active_space_u = ((1, 1), 2)
     active_space = (2, 4)
     charge = 0
@@ -216,9 +222,9 @@ def h2o():
     O  0.0   0.0  0.11779 
     H  0.0   0.75545  -0.47116;
     H  0.0  -0.75545  -0.47116"""
-    basis = "631-g"
+    basis = "STO-3g"
     active_space_u = ((1, 1), 4)
-    # active_space = (4, 4)
+    # active_space = (2, 4)
     charge = 0
     spin = 0
 
@@ -276,3 +282,4 @@ h2()
 
 # HI()
 # HBr()
+

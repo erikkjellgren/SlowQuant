@@ -79,7 +79,7 @@ def restricted(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=1
         h_core,
         g_eri,
         "fuccsd",
-        {"n_layers": 2},
+        {"n_layers": 0},
         include_active_kappa=True)
     WF.energy_elec
     # print('Antal elektroner',mol.nelectron)
@@ -105,24 +105,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # mc = mcscf.UCASCI(mf, active_space[1], active_space[0])
     # # Slowquant
-    
 
-    # WF =WaveFunctionUPS(
-    #     mol.nelectron,
-    #     active_space,
-    #     mf.mo_coeff,
-    #     h_core,
-    #     g_eri,
-    #     "fuccsd",
-    #     {"n_layers": 2},
-    #     include_active_kappa=True,
-    # )
-    # WF.run_wf_optimization_1step("bfgs", True)
-    # LR = naive.LinearResponse(WF, excitations="SD")
-    # LR.calc_excitation_energies()
-    # print(LR.excitation_energies)
-    
-    
     WF = GeneralizedWaveFunctionUPS(
         mol.nelectron,
         active_space,
@@ -132,8 +115,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         "fuccsd",
         {"n_layers": 2},
         include_active_kappa=True)
-    # WF.run_wf_optimization_1step("bfgs", True)
-    WF.energy_elec
+    WF.run_wf_optimization_1step("bfgs", True)
+    # WF.energy_elec
+    # LR = naive.LinearResponse(WF, excitations="SD")
+    # LR.calc_excitation_energies()
+    # print(LR.excitation_energies)
 
 
 
@@ -141,17 +127,16 @@ def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
     basis = "sto-3g"
-    # active_space_u = ((1, 1), 4)
-    active_space = (2, 4)
+    active_space_u = ((1, 1), 4)
+    # active_space = (2, 4)
     charge = 0
     spin = 0
 
- 
     # restricted(
     #     geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     # )
     NR(
-        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+        geometry=geometry, basis=basis, active_space=active_space_u, charge=charge, spin=spin, unit="angstrom"
     )
     # unrestricted(
     #     geometry=geometry, basis=basis, active_space=active_space_u, charge=charge, spin=spin, unit="angstrom"
@@ -215,7 +200,7 @@ def HBr():
     
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-h2()
+# h2()
 # h2o()
 
 # HI()

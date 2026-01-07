@@ -38,7 +38,7 @@ def test_tups() -> None:
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
         include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     assert abs(WF.energy_elec - -8.82891657651419) < 10**-8
 
@@ -87,7 +87,7 @@ def test_fucc() -> None:
         ansatz_options={},
         include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     assert abs(WF.energy_elec - -8.828916576513892) < 10**-8
 
@@ -134,7 +134,7 @@ def test_ksafupccgsd() -> None:
         ansatz_options={"n_layers": 1},
         include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     assert abs(WF.energy_elec - -8.828916576543133) < 10**-8
 
@@ -181,7 +181,7 @@ def test_sdsfuccsd() -> None:
         ansatz_options={},
         include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     assert abs(WF.energy_elec - -8.82891657653415) < 10**-8
 
@@ -228,7 +228,7 @@ def test_ksasdsfupccgsd() -> None:
         ansatz_options={"n_layers": 1},
         include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     assert abs(WF.energy_elec - -8.828916576542285) < 10**-8
 
@@ -309,7 +309,7 @@ def test_lih_fucc_mappings() -> None:
         mol.intor("int2e"),
         "fUCCSD",
     )
-    WF.run_wf_optimization_1step("SLSQP", False)
+    WF.run_wf_optimization_1step("BFGS", False)
     assert abs(WF.energy_elec - -8.82972563114591) < 10**-10
 
     sampler = Sampler()
@@ -359,7 +359,7 @@ def test_lih_sdsfucc_mappings() -> None:
         mol.intor("int2e"),
         "SDSfUCCSD",
     )
-    WF.run_wf_optimization_1step("SLSQP", False)
+    WF.run_wf_optimization_1step("BFGS", False)
     assert abs(WF.energy_elec - -8.829725631105443) < 10**-10
 
     sampler = Sampler()
@@ -410,7 +410,7 @@ def test_lih_tups_mappings() -> None:
         "tUPS",
         ansatz_options={"n_layers": 4},
     )
-    WF.run_wf_optimization_1step("SLSQP", False)
+    WF.run_wf_optimization_1step("BFGS", False)
     assert abs(WF.energy_elec - -8.825023029148799) < 10**-10
 
     sampler = Sampler()

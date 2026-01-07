@@ -37,7 +37,7 @@ def test_ups_naivelr() -> None:
         SQobj.integral.get_multipole_matrix([0, 1, 0]),
         SQobj.integral.get_multipole_matrix([0, 0, 1]),
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
     LR = naivelr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.129476) < 10**-4
@@ -92,7 +92,7 @@ def test_LiH_sto3g_allST():
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
     WF2 = WaveFunctionUPS(
         SQobj.molecule.number_electrons,
         (2, 2),
@@ -102,7 +102,7 @@ def test_LiH_sto3g_allST():
         "tUPS",
         ansatz_options={"n_layers": 1},
     )
-    WF2.run_wf_optimization_1step("SLSQP", False)
+    WF2.run_wf_optimization_1step("BFGS", False)
     # Linear Response
     LR = allstlr.LinearResponse(
         WF2,
@@ -170,11 +170,10 @@ def test_ups_water_44() -> None:
         h_core,
         g_eri,
         "fUCCSD",
-        ansatz_options={},
         include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
-    assert abs(WF.energy_elec - -83.97256228053688) < 10**-8
+    WF.run_wf_optimization_1step("BFGS", True)
+    assert abs(WF.energy_elec - -84.00619882980777) < 10**-8
 
 
 def test_saups_h2_3states() -> None:
@@ -217,7 +216,7 @@ def test_saups_h2_3states() -> None:
         include_active_kappa=True,
     )
 
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
 
     dipole_integrals = (
         SQobj.integral.get_multipole_matrix([1, 0, 0]),
@@ -308,7 +307,7 @@ def test_sa_doubles() -> None:
         ansatz="fUCC",
         ansatz_options={"n_layers": 1, "SAS": True, "SAD": True},
     )
-    WF.run_wf_optimization_1step("SLSQP")
+    WF.run_wf_optimization_1step("BFGS")
     assert abs(WF.energy_elec - -8.874521029611891) < 10**-8
 
 
@@ -335,5 +334,5 @@ def test_SA_sa_doubles() -> None:
         ansatz="SAfUCCSD",
         ansatz_options={"n_layers": 1, "SAS": True, "SAD": True},
     )
-    WF.run_wf_optimization_1step("SLSQP")
+    WF.run_wf_optimization_1step("BFGS")
     assert abs(WF.energy_states[0] - -8.874521029611891) < 10**-8
