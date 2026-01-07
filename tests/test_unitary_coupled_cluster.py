@@ -25,7 +25,7 @@ def test_heh_sto3g_hf() -> None:
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
     WF = WaveFunctionUCC(A.molecule.number_electrons, (2, 1), S_sqrt, h_core, g_eri, "S")
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
     assert abs(WF.energy_elec - (-4.262632309847)) < 10**-8
 
 
@@ -43,7 +43,7 @@ def test_lih_sto3g_hf() -> None:
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
     WF = WaveFunctionUCC(A.molecule.number_electrons, (2, 1), S_sqrt, h_core, g_eri, "S")
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
     assert abs(WF.energy_elec - (-8.862246324082243)) < 10**-8
 
 
@@ -62,7 +62,7 @@ def test_heh_sto3g_uccs() -> None:
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
     WF = WaveFunctionUCC(A.molecule.number_electrons, (2, 2), S_sqrt, h_core, g_eri, "S")
-    WF.run_wf_optimization_1step("SLSQP", False)
+    WF.run_wf_optimization_1step("BFGS", False)
     assert abs(WF.energy_elec - (-4.262632309847)) < 10**-8
 
 
@@ -98,7 +98,7 @@ def test_h10_sto3g_uccsd() -> None:
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", False)
+    WF.run_wf_optimization_1step("BFGS", False)
     assert abs(WF.energy_elec - (-18.839645894737956)) < 10**-8
 
 
@@ -124,7 +124,7 @@ def test_h2_431g_oouccd() -> None:
         "D",
         include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
     assert abs(WF.energy_elec - (-1.860533598715)) < 10**-8
 
 
@@ -151,7 +151,7 @@ def test_h4_sto3g_oouccsd() -> None:
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
     assert abs(WF.energy_elec - (-5.211066791547)) < 10**-8
 
 
@@ -179,7 +179,7 @@ def test_h4_sto3g_oouccd() -> None:
         "D",
         include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
     assert abs(WF.energy_elec - (-5.211066791547)) < 10**-8
 
 
@@ -209,7 +209,7 @@ def test_h2_sto3g_uccsd_lr() -> None:
         SQobj.integral.get_multipole_matrix([0, 1, 0]),
         SQobj.integral.get_multipole_matrix([0, 0, 1]),
     )
-    WF.run_wf_optimization_1step("SLSQP", False)
+    WF.run_wf_optimization_1step("BFGS", False)
     LR = selfconsistentlr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 1.015738) < 10**-4
@@ -246,7 +246,7 @@ def test_h4_sto3g_uccdq() -> None:
         g_eri,
         "DQ",
     )
-    WF.run_wf_optimization_1step("SLSQP", False)
+    WF.run_wf_optimization_1step("BFGS", False)
     assert abs(WF.energy_elec + A.molecule.nuclear_repulsion - (-1.968914822185857)) < 10**-7
 
 
@@ -271,7 +271,7 @@ def test_h2_631g_hf_lr() -> None:
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
     LR = selfconsistentlr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     dipole_integrals = (
@@ -309,7 +309,7 @@ def test_h2_631g_oouccsd_lr() -> None:
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", True, tol=10**-11)
+    WF.run_wf_optimization_1step("BFGS", True, tol=10**-11)
     LR = selfconsistentlr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     dipole_integrals = (
@@ -355,7 +355,7 @@ def test_h4_sto3g_uccsd_lr_naive() -> None:
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", False)
+    WF.run_wf_optimization_1step("BFGS", False)
     LR = naivelr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     dipole_integrals = (
@@ -445,7 +445,7 @@ def test_be_sto3g_uccsd_lr_naive() -> None:
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
     LR = selfconsistentlr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     dipole_integrals = (
@@ -528,7 +528,7 @@ def test_lih_sto3g_uccsd_lr_naive() -> None:
         SQobj.integral.get_multipole_matrix([0, 1, 0]),
         SQobj.integral.get_multipole_matrix([0, 0, 1]),
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
     LR = selfconsistentlr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.129476) < 10**-4
@@ -615,7 +615,7 @@ def test_LiH_sto3g_uccsd_lr() -> None:
         SQobj.integral.get_multipole_matrix([0, 1, 0]),
         SQobj.integral.get_multipole_matrix([0, 0, 1]),
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
+    WF.run_wf_optimization_1step("BFGS", True)
     LR = naivelr.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     assert abs(LR.excitation_energies[0] - 0.129476) < 10**-4
@@ -699,7 +699,7 @@ def test_H4_sto3g_uccsdtq() -> None:
         g_eri,
         "SDTQ",
     )
-    WF.run_wf_optimization_1step("SLSQP", False)
+    WF.run_wf_optimization_1step("BFGS", False)
     assert abs(WF.energy_elec - (-3.714153922167)) < 10**-8
 
 
@@ -724,7 +724,7 @@ def test_H2_sto3g_uccsd_saveload() -> None:
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP")
+    WF.run_wf_optimization_1step("BFGS")
     WF.save_wavefunction("test_h2_save", force_overwrite=True)
     WF2 = load_wavefunction("test_h2_save")
     LR = naivelr.LinearResponse(WF2, "SD")
