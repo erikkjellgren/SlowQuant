@@ -347,7 +347,11 @@ def generalized_expectation_value(
         do_unsafe=do_unsafe,
     )
     val = bra.conj() @ op_ket
-    return val
+
+    if val.imag > 1e-10:
+        print("Warning! Complex energy!")
+
+    return val.real 
 
 
 def expectation_value_for_gradient(

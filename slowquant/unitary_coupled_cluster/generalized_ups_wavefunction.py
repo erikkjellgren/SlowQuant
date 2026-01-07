@@ -252,6 +252,20 @@ class GeneralizedWaveFunctionUPS:
                 self.num_active_spin_orbs // 2,
                 self.ansatz_options,
             )
+
+        elif ansatz.lower() == "fuccd":
+            if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
+            self.ansatz_options["D"] = True
+            self.ups_layout.create_fUCC(
+                [],
+                [],
+                self.active_occ_spin_idx_shifted,
+                self.active_unocc_spin_idx_shifted,
+                self.num_active_spin_orbs // 2,
+                self.ansatz_options,
+            )
         elif ansatz.lower() == "adapt":
             None
         else:
@@ -1038,7 +1052,7 @@ class GeneralizedWaveFunctionUPS:
                 # Silence the imaginary part if you wish to run with real-valued thetas:
                 thetas_i.append(parameters[i + num_kappa + len(self.thetas)])
             self.set_thetas(thetas_r, thetas_i)
-        if kappa_optimization:
+        '''if kappa_optimization:
             # RDM is more expensive than evaluation of the Hamiltonian.
             # Thus only construct these if orbital-optimization is turned on,
             # since the RDMs will be reused in the oo gradient calculation.
@@ -1049,12 +1063,12 @@ class GeneralizedWaveFunctionUPS:
                 self.num_active_spin_orbs,
                 self.rdm1,
                 self.rdm2,
-            )
-        else:
+            )'''
+        if True:
             E = generalized_expectation_value(
                 self.ci_coeffs,
-                # [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
-                [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
+                [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
+                #[generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
             )
@@ -1159,14 +1173,14 @@ class GeneralizedWaveFunctionUPS:
                     self.ups_layout,
                 )
                 temp = 2 * np.matmul(bra_vec, ket_vec_tmp)
-                if temp.imag > 1e-9:
+                '''if temp.imag > 1e-9:
                     print ("temp_gradient is complex!",temp)
                     if i >= len(self.ups_layout.excitation_indices):
                         print("imag component")
                         print(self.ups_layout.excitation_indices[i-len(self.ups_layout.excitation_indices)])
                     else:
                         print("real component")
-                        print(self.ups_layout.excitation_indices[i])
+                        print(self.ups_layout.excitation_indices[i])'''
                 gradient[i + num_kappa] += 2 * np.matmul(bra_vec, ket_vec_tmp).real
                 # Product rule implications on reference bra and CSF ket
                 # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)

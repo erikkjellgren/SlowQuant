@@ -211,7 +211,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     mf.init_guess = "chkfile"
     mf.conv_tol = 1e-8        # Energy convergence (Hartree)
     mf.conv_tol_grad = 1e-8   # Optional: gradient convergence
-    mf.max_cycle = 200
+    mf.max_cycle = 1000
 
     mf.scf()
     mf.kernel()
@@ -240,11 +240,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF = GeneralizedWaveFunctionUPS(
         mol.nelectron,
         active_space,
-        c_u,
+        c,
         h_core,
         g_eri,
-        "fuccsd",
-        {"n_layers": 0, "is_spin_conserving" : False},
+        "fuccd",
+        {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
@@ -258,7 +258,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
     #print("Nr. of occ active spind idx shifted orbitals:", WF.active_occ_spin_idx_shifted)
-    #print("Nr. of unocc active spind idx shifted orbitals:",WF.active_unocc_spin_idx_shifted)
+    #print("Nr. of unocc active spind idx shifted orbitals:", WF.active_unocc_spin_idx_shifted)
 
     #print(c)
 
@@ -276,7 +276,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     #print("integrals before:\n", WF.h_mo)
 
-    my_gradient_before = get_orbital_gradient_generalized_real_imag(WF.h_mo,
+    '''my_gradient_before = get_orbital_gradient_generalized_real_imag(WF.h_mo,
         WF.g_mo,
         WF.kappa_spin_idx,
         WF.num_inactive_spin_orbs, 
@@ -284,12 +284,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         WF.rdm1,
         WF.rdm2)
 
-    print(f"my gradient_before:\n\n",np.round(my_gradient_before,10))
+    print(f"my gradient_before:\n\n",np.round(my_gradient_before,10))'''
 
-    finite_diff = get_gradient_finite_diff(WF.ci_coeffs,WF.ci_info,WF._h_ao,WF._g_ao,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,
+    '''finite_diff = get_gradient_finite_diff(WF.ci_coeffs,WF.ci_info,WF._h_ao,WF._g_ao,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,
                                            WF.kappa_spin_idx, WF.kappa_real,WF.kappa_imag,WF._c_mo)
 
-    print(f"Finite difference gradient, delta 1e-2, centered:\n\n", finite_diff)
+    print(f"Finite difference gradient, delta 1e-2, centered:\n\n", finite_diff)'''
 
     #my_gradient_before = np.array(my_gradient_before)
     #print("my_gradient_before:",np.linalg.norm(my_gradient_before, ord=2))
@@ -334,12 +334,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
                             print(WF.kappa_spin_idx[i-len(WF.kappa_spin_idx)],WF.kappa_spin_idx[j-len(WF.kappa_spin_idx)])'''
 
 
-    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True, tol=1e-10)
+    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True, tol=1e-10,maxiter = 10000)
     #WF.do_adapt(["S","D"])
 
     #print(WF.ups_layout.excitation_indices)
 
-    my_gradient_after = get_orbital_gradient_generalized_real_imag(WF.h_mo,
+    ''' my_gradient_after = get_orbital_gradient_generalized_real_imag(WF.h_mo,
         WF.g_mo,
         WF.kappa_spin_idx,
         WF.num_inactive_spin_orbs, 
@@ -347,13 +347,13 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         WF.rdm1,
         WF.rdm2)
 
-    print(f"my gradient_after:\n\n",np.round(my_gradient_after,10))
+    print(f"my gradient_after:\n\n",np.round(my_gradient_after,10))'''
 
 
-    finite_diff_2 = get_gradient_finite_diff(WF.ci_coeffs,WF.ci_info,WF._h_ao,WF._g_ao,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,
+    '''finite_diff_2 = get_gradient_finite_diff(WF.ci_coeffs,WF.ci_info,WF._h_ao,WF._g_ao,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,
                                            WF.kappa_spin_idx, WF.kappa_real,WF.kappa_imag,WF._c_mo)
 
-    print(f"Finite difference gradient, delta 1e-2, centered:\n\n", finite_diff_2)
+    print(f"Finite difference gradient, delta 1e-2, centered:\n\n", finite_diff_2)'''
 
     #print("integrals after:\n", WF.h_mo)
 
@@ -421,8 +421,8 @@ def h3():
     geometry = """H  0.000000   0.000000       0.000000;
                   H  1.000000   0.000000       0.000000;
                   H  0.500000   0.8660254038   0.000000"""
-    #basis = "cc-pvdz"
-    basis = "631-g"
+    basis = "cc-pvdz"
+    #basis = "631-g"
     #basis = "sto-3g"
     active_space = ((1, 2), 6)
     #active_space = (2, 4)
@@ -467,8 +467,8 @@ def h2o():
     H  0.0  -0.75545  -0.47116"""
     #basis = "dyall-v2z"
     #basis = "cc-pvdz"
-    #basis = "631-g"
-    basis = "sto-3g"
+    basis = "631-g"
+    #basis = "sto-3g"
     #active_space = ((5, 5), 14)
     active_space = ((2,2),8)
     #active_space = (2, 4)
@@ -521,7 +521,7 @@ def HBr():
     
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-h3()
+h2o()
 
 
 # h2o()
