@@ -937,6 +937,103 @@ def get_orbital_response_property_gradient(
     return prop_grad
 
 
+
+@nb.jit(nopython=True)
+def get_orbital_response_property_gradient_real_imag(
+    x_mo: np.ndarray,
+    kappa_spin_idx: list[tuple[int, int]],
+    num_inactive_spin_orbs: int,
+    num_active_spin_orbs: int,
+    rdm1: np.ndarray,
+    response_vectors: np.ndarray,
+    state_number: int,
+    number_excitations: int,
+) -> float:
+    r"""Calculate the orbital part of property gradient.
+
+    .. math::
+        P^{\hat{q}} = \sum_k\left<0\left|\left[\hat{O}_{k},\hat{X}\right]\right|0\right>
+
+    Args:
+        x_mo: Property integral in MO basis.
+        kappa_idx: Orbital parameter indices in spatial basis.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        rdm1: Active part of 1-RDM.
+        response_vectors: Response vectors.
+        state_number: State number counting from zero.
+        number_excitations: Total number of excitations.
+
+    Returns:
+        Orbital part of property gradient.
+    """
+    prop_grad = 0
+    for i, (M, N) in enumerate(kappa_spin_idx):
+        for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
+            #Q diagonal
+            prop_grad -= (
+                (response_vectors[i + number_excitations, state_number] - response_vectors[i, state_number])
+                * x_mo[N, P]
+                * RDM1(M, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            )
+            prop_grad += (
+                (response_vectors[i, state_number] - response_vectors[i + number_excitations, state_number])
+                * x_mo[M, P]
+                * RDM1(M, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            )
+            #Q imag (1)
+            prop_grad -= (
+                (response_vectors[i, state_number] - response_vectors[i + number_excitations, state_number])
+                * x_mo[N, P]
+                * RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            )
+            
+            prop_grad += (
+                (response_vectors[i, state_number] - response_vectors[i + number_excitations, state_number])
+                * x_mo[P, M]
+                * RDM1(P, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) 
+            ) 
+            #Q imag (2)
+            prop_grad -= (
+                (response_vectors[i, state_number] - response_vectors[i + number_excitations, state_number])
+                * x_mo[P, N]
+                * RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            )
+            
+            prop_grad += (
+                (response_vectors[i, state_number] - response_vectors[i + number_excitations, state_number])
+                * x_mo[M, P]
+                * RDM1(P, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) 
+            ) 
+            
+            #Q real (1)
+            prop_grad -= (
+                (response_vectors[i, state_number] - response_vectors[i + number_excitations, state_number])
+                * x_mo[N, P]
+                * RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            )
+            
+            prop_grad += (
+                (response_vectors[i, state_number] - response_vectors[i + number_excitations, state_number])
+                * x_mo[P, M]
+                * RDM1(P, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) 
+            ) 
+            #Q real (2)
+            prop_grad += (
+                (response_vectors[i, state_number] - response_vectors[i + number_excitations, state_number])
+                * x_mo[P, N]
+                * RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            )
+            
+            prop_grad -= (
+                (response_vectors[i, state_number] - response_vectors[i + number_excitations, state_number])
+                * x_mo[M, P]
+                * RDM1(P, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) 
+            ) 
+            
+    return prop_grad
+
+
 @nb.jit(nopython=True)
 def get_orbital_response_hessian_block(
     h: np.ndarray,

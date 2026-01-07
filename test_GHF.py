@@ -187,9 +187,9 @@ def h2():
     charge = 0
     spin = 0
 
-    restricted(
-        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
-    )
+    # restricted(
+    #     geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    # )
     NR(
         geometry=geometry, basis=basis, active_space=active_space_u, charge=charge, spin=spin, unit="angstrom"
     )

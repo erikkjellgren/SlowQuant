@@ -6,10 +6,10 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform, generalized_one_electron_transform
 )
 from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
-    get_orbital_gradient_response,
+    get_orbital_gradient_response, get_orbital_gradient_response_real_imag,
     get_orbital_response_hessian_block_real_imag_changesign,
-    get_orbital_response_metric_sigma,
-    get_orbital_response_property_gradient,
+    get_orbital_response_metric_sigma_real_imag,
+    get_orbital_response_property_gradient, get_orbital_response_property_gradient_real_imag
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.linear_response.generalized_lr_baseclass import (
@@ -39,7 +39,7 @@ class LinearResponse(LinearResponseBaseClass):
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
         if len(self.q_ops) != 0:
-            grad = get_orbital_gradient_response(
+            grad = get_orbital_gradient_response_real_imag(
                 self.wf.h_mo,
                 self.wf.g_mo,
                 self.wf.kappa_no_activeactive_spin_idx,
@@ -112,7 +112,7 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.rdm1,
                 self.wf.rdm2,
             )
-            self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
+            self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma_real_imag(
                 self.wf.kappa_no_activeactive_spin_idx,
                 self.wf.num_inactive_spin_orbs,
                 self.wf.num_active_spin_orbs,
@@ -353,7 +353,7 @@ class LinearResponse(LinearResponseBaseClass):
             q_part_y = 0.0
             q_part_z = 0.0
             if len(self.q_ops) != 0:
-                q_part_x = get_orbital_response_property_gradient(
+                q_part_x = get_orbital_response_property_gradient_real_imag(
                     mux,
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
@@ -363,7 +363,7 @@ class LinearResponse(LinearResponseBaseClass):
                     state_number,
                     number_excitations,
                 )
-                q_part_y = get_orbital_response_property_gradient(
+                q_part_y = get_orbital_response_property_gradient_real_imag(
                     muy,
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
@@ -373,7 +373,7 @@ class LinearResponse(LinearResponseBaseClass):
                     state_number,
                     number_excitations,
                 )
-                q_part_z = get_orbital_response_property_gradient(
+                q_part_z = get_orbital_response_property_gradient_real_imag(
                     muz,
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
