@@ -263,7 +263,13 @@ class UnrestrictedWaveFunctionUPS:
         self.csf_coeffs[self.ci_info.det2idx[hf_det]] = 1
         self.ci_coeffs = np.copy(self.csf_coeffs)
         self.ups_layout = UpsStructure()
-        if ansatz.lower() == "fuccsd":
+        if ansatz.lower() == "utups":
+            self.ansatz_options["do_utups"] = True
+            self.ups_layout.create_tiled(self.num_active_orbs, self.ansatz_options)
+        elif ansatz.lower() == "uqnp":
+            self.ansatz_options["do_uqnp"] = True
+            self.ups_layout.create_tiled(self.num_active_orbs, self.ansatz_options)
+        elif ansatz.lower() == "fuccsd":
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1

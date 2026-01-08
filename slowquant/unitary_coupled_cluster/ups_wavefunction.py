@@ -6,7 +6,6 @@ from typing import Any
 
 import numpy as np
 import scipy
-import scipy.optimize
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
@@ -247,10 +246,11 @@ class WaveFunctionUPS:
         # Construct UPS Structure
         self.ups_layout = UpsStructure()
         if ansatz.lower() == "tups":
-            self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
+            self.ansatz_options["do_tups"] = True
+            self.ups_layout.create_tiled(self.num_active_orbs, self.ansatz_options)
         elif ansatz.lower() == "qnp":
             self.ansatz_options["do_qnp"] = True
-            self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
+            self.ups_layout.create_tiled(self.num_active_orbs, self.ansatz_options)
         elif ansatz.lower() == "fuccsd":
             self.ansatz_options["S"] = True
             self.ansatz_options["D"] = True
@@ -785,7 +785,7 @@ class WaveFunctionUPS:
             )
         return self._energy_elec
 
-    def _get_hamiltonian(self, qiskit_form: bool = False) -> FermionicOperator:
+    def _get_hamiltonian(self, qiskit_form: bool = False) -> FermionicOperator | dict[str, float]:
         """Return electronic Hamiltonian as FermionicOperator.
 
         Returns:
@@ -795,7 +795,7 @@ class WaveFunctionUPS:
         H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
 
         if qiskit_form:
-            return H.get_qiskit_form(self.num_orbs)
+            return H.get_qiskit_form(self.num_active_orbs)
         return H
 
     def run_wf_optimization_2step(

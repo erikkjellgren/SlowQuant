@@ -161,7 +161,6 @@ class LinearResponseBaseClass:
         self.normed_response_vectors = np.zeros_like(self.response_vectors)
         self.num_q = len(self.q_ops)
         self.num_G = size - self.num_q
-        """
         self.Z_q = self.response_vectors[: self.num_q, :]
         self.Z_G = self.response_vectors[self.num_q : self.num_q + self.num_G, :]
         self.Y_q = self.response_vectors[self.num_q + self.num_G : 2 * self.num_q + self.num_G]
@@ -182,7 +181,6 @@ class LinearResponseBaseClass:
             self.normed_response_vectors[:, state_number] = (
                 self.response_vectors[:, state_number] * (1 / norm) ** 0.5
             )
-        """
 
     def get_excited_state_norm(self) -> np.ndarray:
         """Calculate the norm of excited states.
