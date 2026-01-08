@@ -252,19 +252,18 @@ def G2_generalized(i: int, j: int, a: int, b: int, return_anti_hermitian: bool =
             op += op.dagger
         return 1j*op
         
-
-    if i < a:
-        op = a_op_spin(a, dagger=True)
-        op *= a_op_spin(i, dagger=False)
-        if return_anti_hermitian:
-            op -= op.dagger
-        return op
-    elif i > a:
-        op = a_op_spin(a, dagger=True)
-        op *= a_op_spin(i, dagger=False)
-        if return_anti_hermitian:
-            op += op.dagger  
-        return 1j*op
+    # if i < a: ser lidt spøjst ud
+    #     op = a_op_spin(a, dagger=True)
+    #     op *= a_op_spin(i, dagger=False)
+    #     if return_anti_hermitian:
+    #         op -= op.dagger
+    #     return op
+    # elif i > a:
+    #     op = a_op_spin(a, dagger=True)
+    #     op *= a_op_spin(i, dagger=False)
+    #     if return_anti_hermitian:
+    #         op += op.dagger  
+    #     return 1j*op
 
 
 def G3(
