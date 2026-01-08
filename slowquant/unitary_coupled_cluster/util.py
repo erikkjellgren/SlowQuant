@@ -923,7 +923,7 @@ class UpsStructure:
         for _ in range(n_layers):
             if do_S:
                 # OBS!!!! Changed to iterate_t1_incl_diag!!!!!
-                for a, i in iterate_t1(occ_spin_idx, unocc_spin_idx, is_spin_conserving=is_spin_conserving):
+                for a, i in iterate_t1_incl_diag(occ_spin_idx, unocc_spin_idx, is_spin_conserving=is_spin_conserving):
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((i, a))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
