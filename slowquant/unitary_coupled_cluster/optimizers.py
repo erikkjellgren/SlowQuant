@@ -63,6 +63,7 @@ class Optimizers:
             fun: Function.
             silent: Silence progress print.
         """
+
         if not silent:
             e = fun(list(x))
             if isinstance(e, np.ndarray):

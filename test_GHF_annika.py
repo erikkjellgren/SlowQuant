@@ -240,7 +240,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF = GeneralizedWaveFunctionUPS(
         mol.nelectron,
         active_space,
-        c,
+        c_u,
         h_core,
         g_eri,
         "fuccsd",
@@ -334,7 +334,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
                             print(WF.kappa_spin_idx[i-len(WF.kappa_spin_idx)],WF.kappa_spin_idx[j-len(WF.kappa_spin_idx)])'''
 
 
-    WF.run_wf_optimization_1step("bfgs", orbital_optimization=True, test=True, tol=1e-10,maxiter = 10000,is_silent=True)
+    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True, tol=1e-10,maxiter = 10000)
     #WF.do_adapt(["S","D"])
 
     #print(WF.ups_layout.excitation_indices)
@@ -421,8 +421,8 @@ def h3():
     geometry = """H  0.000000   0.000000       0.000000;
                   H  1.000000   0.000000       0.000000;
                   H  0.500000   0.8660254038   0.000000"""
-    basis = "cc-pvdz"
-    #basis = "631-g"
+    #basis = "cc-pvdz"
+    basis = "631-g"
     #basis = "sto-3g"
     active_space = ((1, 2), 6)
     #active_space = (2, 4)
@@ -521,7 +521,7 @@ def HBr():
     
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-h2o()
+h3()
 
 
 # h2o()
