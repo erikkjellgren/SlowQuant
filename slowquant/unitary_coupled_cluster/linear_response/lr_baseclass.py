@@ -36,6 +36,7 @@ class LinearResponseBaseClass:
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
+        do_orbital_response: bool,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
@@ -87,21 +88,23 @@ class LinearResponseBaseClass:
                 self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx
             ):
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
-        for p, q in self.wf.kappa_no_activeactive_idx:
-            self.q_ops.append(G1_sa(p, q))
+        if do_orbital_response:
+            for p, q in self.wf.kappa_no_activeactive_idx:
+                self.q_ops.append(G1_sa(p, q))
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters))
         self.B = np.zeros((num_parameters, num_parameters))
         self.Sigma = np.zeros((num_parameters, num_parameters))
         self.Delta = np.zeros((num_parameters, num_parameters))
-        self.H_1i_1a = hamiltonian_1i_1a(
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-        )
+        if do_orbital_response:
+            self.H_1i_1a = hamiltonian_1i_1a(
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.num_virtual_orbs,
+            )
         self.H_0i_0a = hamiltonian_0i_0a(
             self.wf.h_mo,
             self.wf.g_mo,

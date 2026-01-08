@@ -42,7 +42,7 @@ class LinearResponse(LinearResponseBaseClass):
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
         """
-        super().__init__(wave_function, excitations)
+        super().__init__(wave_function, excitations, True)
         # Overwrite Superclass
         ci_info = get_indexing_extended(
             self.wf.num_inactive_orbs,

@@ -36,7 +36,7 @@ class LinearResponse(LinearResponseBaseClass):
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
         """
-        super().__init__(wave_function, excitations)
+        super().__init__(wave_function, excitations, True)
 
         H_2i_2a = hamiltonian_2i_2a(
             self.wf.h_mo,
