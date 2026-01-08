@@ -905,12 +905,6 @@ class GeneralizedWaveFunctionUPS:
                 self._kappa_imag[i] = 0.0
                 self._kappa_real_old[i] = 0.0
                 self._kappa_imag_old[i] = 0.0
-            kappa_r = []
-            kappa_i = []
-            for i in range(len(self.kappa_real)):
-                kappa_r.append(res.x[i])
-                kappa_i.append(res.x[i + len(self.kappa_real)])
-            self.set_kappa_cep(kappa_r, kappa_i)
         else:
             thetas_r = []
             thetas_i = []
@@ -1205,7 +1199,7 @@ class GeneralizedWaveFunctionUPS:
             self.num_energy_evals += 2 * np.sum(
                 list(self.ups_layout.grad_param_R.values())
             )  # Count energy measurements for all gradients
-        # print(gradient)
+        print(gradient)
         return gradient
 
     @property
