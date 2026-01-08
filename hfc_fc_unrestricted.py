@@ -10,7 +10,7 @@ def get_hcf_fc_unrestricted(geometry, basis, active_space, unit='bohr', charge=0
     """
     Calculate hyperfine coupling constant (fermi-contact term) for a molecule
     """
-    print("active space:", {active_space})
+    print("active space:", {active_space}, "basis:", {basis})
     #Slowquant UHF
     # SQobj = sq.SlowQuant()
     # SQobj.set_molecule(geometry, distance_unit=unit)
@@ -49,8 +49,10 @@ def get_hcf_fc_unrestricted(geometry, basis, active_space, unit='bohr', charge=0
         {"n_layers":2},
         include_active_kappa=True,
     )
+    
+    # WF.run_wf_optimization_1step("bfgs", True)
+    WF.run_wf_optimization_1step("slsqp", True)
     print(WF.energy_elec_RDM)
-    WF.run_wf_optimization_1step("bfgs", True)
 
     # FC
     r""" a_{iso}^K = \frac{f_k}{2\pi M} \bigg\{\bigg [[A^K_{\alpha}]_I - [A^K_{\beta}]_I\bigg] + \bigg[[A^K_{\alpha}]_A \Gamma^{[1]}_{\alpha} - [A^K_{\beta}]_A \Gamma^{[1]}_{\beta}\bigg] \bigg\}"""
@@ -87,11 +89,10 @@ def get_hcf_fc_unrestricted(geometry, basis, active_space, unit='bohr', charge=0
     
 
 
-
 def OH_rad_hfc():
     geometry = """O  0.0   0.0  0.0;
         H  0.0  0.0  0.9697;"""
-    basis = 'sto-3g'
+    basis = "aug-cc-pvtz-j.nw"
     active_space = ((1,2),3)
     charge = 0
     #the pyscf spin parameter is the value of 2S (tne number of unpaired electrons, or the difference between the number of alpha and beta electrons)
@@ -123,6 +124,6 @@ def NO_rad_hfc():
 
 
 OH_rad_hfc()
-OH_cat_hfc()
-NO_rad_hfc()
+# OH_cat_hfc()
+# NO_rad_hfc()
 

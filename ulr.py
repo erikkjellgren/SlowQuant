@@ -48,8 +48,6 @@ def my_read_xyz_file(inp):
     
     return input, geometry
 
-
-
 def get_unrestricted_excitation_energy(geometry, basis, active_space, charge=0, spin=0, unit="bohr"):
     """
     Calculate unrestricted excitation energies
