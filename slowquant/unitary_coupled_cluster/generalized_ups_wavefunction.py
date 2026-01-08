@@ -1199,7 +1199,7 @@ class GeneralizedWaveFunctionUPS:
             self.num_energy_evals += 2 * np.sum(
                 list(self.ups_layout.grad_param_R.values())
             )  # Count energy measurements for all gradients
-        print(gradient)
+        # print(gradient)
         return gradient
 
     @property
