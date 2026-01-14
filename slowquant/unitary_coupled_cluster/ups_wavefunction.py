@@ -337,9 +337,23 @@ class WaveFunctionUPS:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._h_mo is None:
-            self._h_mo = one_electron_integral_transform(
-                self.c_mo, self.int_gen.kinetic_energy + self.int_gen.nuclear_electron_attraction
-            )
+            hcore_ao = self.int_gen.kinetic_energy + self.int_gen.nuclear_electron_attraction
+            if self.use_PE:
+                fakemol = pyscf.gto.fakemol_for_charges(self.PE_data.coordinates)
+                mol = self.int_gen.int_obj
+                # static contribution, from charges, dipoles, quadrupoles
+                v_PE_ao = np.zeros_like(hcore_ao)
+                if 0 in self.PE_data.multipoles:
+                    v_PE_ao += -np.sum(pyscf.df.incore.aux_e2(mol, fakemol, 'int3c2e')*self.PE_data.multipoles[0], axis=2)
+                if 1 in self.PE_data.multipoles:
+                    field_integrals = pyscf.df.incore.aux_e2(mol, fakemol, 'int3c2e_ip1').transpose(1,2,3,0)
+                    v_dip = -np.sum(field_integrals*self.PE_data.multipoles[1], axis=(2,3))
+                    v_PE_ao += v_dip + v_dip.T
+                if 2 in self.PE_data.multipoles:
+                    v_quad = -0.5*np.sum((pyscf.df.incore.aux_e2(mol, fakemol, 'int3c2e_ipip1') +  pyscf.df.incore.aux_e2(mol fakemol, 'int3c2e_ipvip1')).transpose(1,2,3,0) * self.PE_data.multipoles[2], axis=(2,3))
+                    v_PE_ao = v_quad + v_quad.T
+                hcore_ao += v_PE_ao
+            self._h_mo = one_electron_integral_transform(self.c_mo, hcore_ao)
         return self._h_mo
 
     @property

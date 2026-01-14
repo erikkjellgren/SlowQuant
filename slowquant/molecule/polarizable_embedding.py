@@ -30,6 +30,8 @@ def read_potfile(filename:str) -> namedtuple:
             # read the data
             if section == 'multipoles':
                 order = int(f.readline().split()[-1])
+                if order > 2:
+                    raise ValueError('Only support for multipoles up to quadrupoles')
                 # num_multipoles may or may not be less than num_sites
                 num_multipoles = int(f.readline())
                 multipoles[order] = np.zeros((num_sites, multipole_length(order)))
@@ -38,6 +40,22 @@ def read_potfile(filename:str) -> namedtuple:
                     index = int(index) - 1
                     values = list(map(float, values))
                     multipoles[order][index, :] = values
+                if order == 2:
+                    # unpack quadrupoles from packed index (xx, xy, xz, yy, yz, zz) -> (xx, xy, xz, yx, yy, yz, zx, zy, zz)
+                    # and remove trace
+                    unpacked = np.zeros((num_multipoles, 9))
+                    quadrupoles = multipoles[2]
+                    trace = quadrupoles[:, 0] + quadrupoles[:, 3] + quadrupoles[:, 5]
+                    unpacked[:, 0] = quadrupoles[:, 0] - trace / 3 # xx
+                    unpacked[:, 1] = quadrupoles[:, 1]             # xy
+                    unpacked[:, 2] = quadrupoles[:, 2]             # xz
+                    unpacked[:, 3] = quadrupoles[:, 1]             # yx=xy
+                    unpacked[:, 4] = quadrupoles[:, 3] - trace / 3 # yy 
+                    unpacked[:, 5] = quadrupoles[:, 4]             # yz
+                    unpacked[:, 6] = quadrupoles[:, 2]             # zx=xz
+                    unpacked[:, 7] = quadrupoles[:, 4]             # zy=yz
+                    unpacked[:, 8] = quadrupoles[:, 5] - trace / 3 # zz
+                    multipoles[order] = unpacked
             if section == 'polarizabilities':
                 order = f.readline().strip()
                 num_polarizabilities = int(f.readline())
