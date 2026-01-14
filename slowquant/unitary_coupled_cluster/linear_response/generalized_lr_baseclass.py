@@ -12,6 +12,8 @@ from slowquant.unitary_coupled_cluster.operators import (
     G6,
     G1,
     G2,
+    G1_generalized, #AE added
+    G2_generalized,
 )
 from slowquant.unitary_coupled_cluster.generalized_operators import (
     generalized_hamiltonian_0i_0a,
@@ -66,10 +68,10 @@ class LinearResponseBaseClass:
 
         if "s" in excitations:
             for a, i in iterate_t1(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
-                self.G_ops.append(G1(i, a))
+                self.G_ops.append(G1_generalized(i, a)) #AE from G1
         if "d" in excitations:
             for a, i, b, j in iterate_t2(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
-                self.G_ops.append(G2(i, j, a, b))
+                self.G_ops.append(G2_generalized(i, j, a, b)) #AE from G2
         if "t" in excitations:
             for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
                 self.G_ops.append(G3(i, j, k, a, b, c))
@@ -90,8 +92,7 @@ class LinearResponseBaseClass:
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
 
         for p, q in self.wf.kappa_no_activeactive_spin_idx:
-            self.q_ops.append(G1(p, q))
-
+            self.q_ops.append(G1_generalized(p, q)) #AE from G1
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters))
         self.B = np.zeros((num_parameters, num_parameters))
@@ -118,8 +119,8 @@ class LinearResponseBaseClass:
         E2 = np.zeros((size * 2, size * 2))
         E2[:size, :size] = self.A
         E2[:size, size:] = self.B
-        E2[size:, :size] = self.B
-        E2[size:, size:] = self.A
+        E2[size:, :size] = self.B.conjugate() #AE added conjugtate 
+        E2[size:, size:] = self.A.conjugate() #AE added conjugtate 
         (
             hess_eigval,
             _,
@@ -134,8 +135,8 @@ class LinearResponseBaseClass:
         S = np.zeros((size * 2, size * 2))
         S[:size, :size] = self.Sigma
         S[:size, size:] = self.Delta
-        S[size:, :size] = -self.Delta
-        S[size:, size:] = -self.Sigma
+        S[size:, :size] = -self.Delta.conjugate()
+        S[size:, size:] = -self.Sigma.conjugate()
         print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma)))}")
 
         self.hessian = E2

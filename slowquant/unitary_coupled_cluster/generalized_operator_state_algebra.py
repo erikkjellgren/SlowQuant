@@ -6,7 +6,7 @@ from slowquant.unitary_coupled_cluster.operators import (
     G1, G1_generalized,
     G2, G2_generalized,
 )
-from slowquant.unitary_coupled_cluster.util import UpsStructure
+from slowquant.unitary_coupled_cluster.util_anna import UpsStructure ##AE
 from slowquant.unitary_coupled_cluster.operator_state_algebra import bitcount
 
 
@@ -214,8 +214,8 @@ def generalized_propagate_state(
             if isinstance(wf_struct, UpsStructure):
                 if thetas is None:
                     raise ValueError("theta must be different from None")
-                # OBS!!!!!Changed to generalized_construct_ups_state_modified!!!!!!
-                new_state = generalized_construct_ups_state_modified(
+                # OBS!!!!!Changed to generalized_construct_ups_state_modified!!!!!! ##AE changed here
+                new_state = generalized_construct_ups_state_modified_split(
                     new_state,
                     ci_info,
                     thetas,
@@ -353,8 +353,7 @@ def generalized_expectation_value(
 
     return val.real 
 
-
-def expectation_value_for_gradient(
+def generalized_expectation_value_complex(
     bra: np.ndarray,
     operators: list[FermionicOperator | str],
     ket: np.ndarray,
@@ -576,7 +575,6 @@ def generalized_construct_ups_state_test_anna(
     return out
 
 
-
 def generalized_construct_ups_state_modified(
     state: np.ndarray,
     ci_info: CI_Info,
@@ -725,9 +723,7 @@ def generalized_construct_ups_state_modified(
             raise ValueError(f"Got unknown excitation type, {exc_type}")
     return out
 
-
-
-def generalized_construct_ups_state_modified_test(
+def generalized_construct_ups_state_modified_split(
     state: np.ndarray,
     ci_info: CI_Info,
     thetas: list[float],
@@ -760,39 +756,40 @@ def generalized_construct_ups_state_modified_test(
     if dagger:
         order = -1
     # Loop over all excitation in UPSStructure
-    for exc_type, exc_indices, theta_R, theta_I in zip(
-        ups_struct.excitation_operator_type[::order], ups_struct.excitation_indices[::order],
+    for exc_type_real, exc_type_imag, exc_indices, theta_R, theta_I in zip(
+        ups_struct.excitation_operator_type_real[::order], ups_struct.excitation_operator_type_imag[::order], ups_struct.excitation_indices[::order], #har sat den til real, tænker, at længden af real og imag må være ens.
         thetas[:n_thetas][::order], thetas[n_thetas:2*n_thetas][::order]
     ):
         if dagger:
             theta_R = -theta_R
             theta_I = -theta_I
-        if exc_type in ("single_real", "single_imag", "double_real", "double_imag"):
+        if exc_type_real in ("single_real","double_real"):
             # Create T matrix real:
             if abs(theta_R) < 10**-14:
                 continue
             else:
-                if exc_type == "single_real":
+                if exc_type_real == "single_real":
                     (i, a) = np.array(exc_indices) + 2 * offset
                     T_R = G1_generalized(i, a, True, Real = True)
-                elif exc_type == "double_real":
+                elif exc_type_real == "double_real":
                     (i, j, a, b) = np.array(exc_indices) + 2 * offset
                     T_R = G2_generalized(i, j, a, b, True, Real = True)
                 else:
-                    raise ValueError(f"Got unknown excitation type: {exc_type}")
+                    raise ValueError(f"Got unknown excitation type: {exc_type_real}")
             # Create T matrix imaginary:
-            if abs(theta_I) < 10**-14:
-                continue
-            else:
-                if exc_type == "single_imag":
-                    (i, a) = np.array(exc_indices) + 2 * offset
-                    T_I = G1_generalized(i, a, True, Real = False)
-                elif exc_type == "double_imag":
-                    (i, j, a, b) = np.array(exc_indices) + 2 * offset
-                    T_I = G2_generalized(i, j, a, b, True, Real = False)
+            if exc_type_imag in ("single_imag","double_imag"):
+                if abs(theta_I) < 10**-14:
+                    continue
                 else:
-                    raise ValueError(f"Got unknown excitation type: {exc_type}")
-            
+                    if exc_type_imag == "single_imag":
+                        (i, a) = np.array(exc_indices) + 2 * offset
+                        T_I = G1_generalized(i, a, True, Real = False)
+                    elif exc_type_imag == "double_imag":
+                        (i, j, a, b) = np.array(exc_indices) + 2 * offset
+                        T_I = G2_generalized(i, j, a, b, True, Real = False)
+                    else:
+                        raise ValueError(f"Got unknown excitation type: {exc_type_imag}")
+                
             if not dagger:
                 if abs(theta_I) < 10**-14:
                     # Analytical application on state vector
@@ -872,16 +869,9 @@ def generalized_construct_ups_state_modified_test(
                         )
                     )              
         else:
-            raise ValueError(f"Got unknown excitation type, {exc_type}")
+            raise ValueError(f"Got unknown excitation type, {exc_type_imag}")
+            raise ValueError(f"Got unknown excitation type, {exc_type_real}")
     return out
-
-
-
-
-
-
-
-
 
 def generalized_propagate_unitary(
     state: np.ndarray,
@@ -943,7 +933,6 @@ def generalized_propagate_unitary(
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")
     return out
-
 
 def generalized_propagate_unitary_modified(
     state: np.ndarray,
@@ -1047,6 +1036,111 @@ def generalized_propagate_unitary_modified(
         raise ValueError(f"Got unknown excitation type, {exc_type}")
     return out
 
+def generalized_propagate_unitary_modified_split(
+    state: np.ndarray,
+    idx: int,
+    ci_info: CI_Info,
+    thetas: list[float],
+    ups_struct: UpsStructure,
+    ) -> np.ndarray:
+    """Apply unitary from UPS operator number 'idx' to state.
+
+    #. 10.48550/arXiv.2505.00883, Eq. 45, 47, and, 49 (SA doubles)
+    #. 10.48550/arXiv.2505.02984, Eq. 35, D1, and, D2 (SA doubles)
+
+    Args:
+        state: State vector.
+        idx: Index of operator in the ups_struct.
+        ci_info: Information about the CI space.
+        thetas: Values for ansatz parameters.
+        ups_struct: UPS structure object.
+
+    Returns:
+        State with unitary applied.
+    """
+    # Select unitary operation based on idx
+    real = True
+    if idx >= len(ups_struct.excitation_indices):
+        idx = idx - len(ups_struct.excitation_indices)
+        real = False
+
+    exc_type_real = ups_struct.excitation_operator_type_real[idx]  #har sat den til real, tænker at index på real og imag må være ens AE.
+    exc_type_imag = ups_struct.excitation_operator_type_imag[idx]  #har sat den til real, tænker at index på real og imag må være ens AE.
+    exc_indices = ups_struct.excitation_indices[idx]
+    n_thetas = int(len(thetas)/2)
+    theta_R = thetas[idx]
+    theta_I = thetas[n_thetas + idx]
+    offset = ci_info.space_extension_offset
+    
+    if exc_type_real in ("single_real", "double_real"):
+        if real:
+            # Create T matrix Real:
+            if abs(theta_R) < 10**-14:
+                return np.copy(state)
+            else:
+                if exc_type_real == "single_real":
+                    (i, a) = np.array(exc_indices) + 2 * offset
+                    T = G1_generalized(i, a, True, Real = True)
+                elif exc_type_real == "double_real":
+                    (i, j, a, b) = np.array(exc_indices) + 2 * offset
+                    T = G2_generalized(i, j, a, b, True, Real = True)
+                else:
+                    raise ValueError(f"Got unknown excitation type: {exc_type_real}")
+                # Analytical application on state vector
+                out = (
+                    state
+                    + np.sin(theta_R)
+                    * generalized_propagate_state(
+                        [T],
+                        state,
+                        ci_info,
+                        do_folding=False,
+                    )
+                    + (1 - np.cos(theta_R))
+                    * generalized_propagate_state(
+                        [T, T],
+                        state,
+                        ci_info,
+                        do_folding=False,
+                    )
+                )
+        else:
+            if exc_type_imag in ("single_imag","double_imag"):
+            # Create T matrix Imaginary:
+                if abs(theta_I) < 10**-14:
+                    return np.copy(state)
+                else:
+                    if exc_type_imag == "single_imag":
+                        (i, a) = np.array(exc_indices) + 2 * offset
+                        T = G1_generalized(i, a, True, Real = False)
+                    elif exc_type_imag == "double_imag":
+                        (i, j, a, b) = np.array(exc_indices) + 2 * offset
+                        T = G2_generalized(i, j, a, b, True, Real = False)
+                    else:
+                        raise ValueError(f"Got unknown excitation type: {exc_type_imag}")
+                    # Analytical application on state vector
+                    out = (
+                        state
+                        + np.sin(theta_I)
+                        * generalized_propagate_state(
+                            [T],
+                            state,
+                            ci_info,
+                            do_folding=False,
+                        )
+                        + (1 - np.cos(theta_I))
+                        * generalized_propagate_state(
+                            [T, T],
+                            state,
+                            ci_info,
+                            do_folding=False,
+                        )
+                    )
+            else:
+                raise ValueError(f"Got unknown excitation type, {exc_type_real}")
+                raise ValueError(f"Got unknown excitation type, {exc_type_imag}")
+        return out
+
 
 def generalized_get_grad_action(
     state: np.ndarray,
@@ -1108,8 +1202,6 @@ def generalized_get_grad_action(
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")
     return tmp
-
-
 
 def generalized_get_grad_action_modified(
     state: np.ndarray,
@@ -1195,16 +1287,7 @@ def generalized_get_grad_action_modified(
         raise ValueError(f"Got unknown excitation type, {exc_type}")
     return tmp
 
-
-
-
-
-
-
-
-
-
-def generalized_get_grad_action_modified_test(
+def generalized_get_grad_action_modified_split(
     state: np.ndarray,
     idx: int,
     ci_info: CI_Info,
@@ -1243,12 +1326,17 @@ def generalized_get_grad_action_modified_test(
         idx = idx - len(ups_struct.excitation_indices)
         real = False
 
-    exc_type = ups_struct.excitation_operator_type[idx]
+    exc_type = (
+    ups_struct.excitation_operator_type_real[idx]
+    if real
+    else ups_struct.excitation_operator_type_imag[idx]
+    )
+    # exc_type = ups_struct.excitation_operator_type_real[idx] #har sat den til real, tænker at index på real og imag må være ens AE.
     exc_indices = ups_struct.excitation_indices[idx]
     offset = ci_info.space_extension_offset
     if exc_type in (
         "single_real",
-        "single_imag"
+        "single_imag",
         "double_real",
         "double_imag",
     ):

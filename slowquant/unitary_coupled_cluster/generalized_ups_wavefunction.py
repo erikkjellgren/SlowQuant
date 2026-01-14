@@ -29,11 +29,13 @@ from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import
     generalized_get_grad_action, generalized_get_grad_action_modified,
     generalized_propagate_state,
     generalized_propagate_unitary, generalized_propagate_unitary_modified,
+    generalized_construct_ups_state_modified_split, generalized_get_grad_action_modified_split,
+    generalized_propagate_unitary_modified_split,
 )
 from slowquant.unitary_coupled_cluster.operators import G1, G2
 from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
-from slowquant.unitary_coupled_cluster.util import (
+from slowquant.unitary_coupled_cluster.util import ( #AE changed
     UpsStructure,
     iterate_t1,
     iterate_t1_generalized,
@@ -158,14 +160,12 @@ class GeneralizedWaveFunctionUPS:
         for P in range(0, self.num_spin_orbs):
             for Q in range(P, self.num_spin_orbs):
                 if P in self.inactive_spin_idx and Q in self.inactive_spin_idx:
-                    # Det her if-statement er nyt:
-                    if P != Q:
-                        self._kappa_real_redundant.append(0.0)
-                        self._kappa_imag_redundant.append(0.0)
-                        self._kappa_real_redundant_old.append(0.0)
-                        self._kappa_imag_redundant_old.append(0.0)
-                        self.kappa_redundant_spin_idx.append((P, Q))
-                        continue
+                    self._kappa_real_redundant.append(0.0)
+                    self._kappa_imag_redundant.append(0.0)
+                    self._kappa_real_redundant_old.append(0.0)
+                    self._kappa_imag_redundant_old.append(0.0)
+                    self.kappa_redundant_spin_idx.append((P, Q))
+                    continue
                 if P in self.virtual_spin_idx and Q in self.virtual_spin_idx:
                     self._kappa_real_redundant.append(0.0)
                     self._kappa_imag_redundant.append(0.0)
@@ -183,7 +183,6 @@ class GeneralizedWaveFunctionUPS:
                         continue
                 if include_active_kappa:
                     if P in self.active_occ_spin_idx and Q in self.active_occ_spin_idx:
-                        # Det her if-statement er nyt:
                         if P != Q:
                             self._kappa_real_redundant.append(0.0)
                             self._kappa_imag_redundant.append(0.0)
@@ -351,7 +350,7 @@ class GeneralizedWaveFunctionUPS:
         self._thetas_real = theta_real.copy()
         self._thetas_imag = theta_imag.copy()
 
-        self.ci_coeffs = generalized_construct_ups_state_modified(
+        self.ci_coeffs = generalized_construct_ups_state_modified( ##AE changed
             self.csf_coeffs,
             self.ci_info,
             np.concatenate((theta_real, theta_imag)),
@@ -1027,6 +1026,7 @@ class GeneralizedWaveFunctionUPS:
             Electronic energy.
         """
         # Avoid recalculating energy in callback
+        # print(self._old_opt_parameters, parameters)
         if np.max(np.abs(np.array(self._old_opt_parameters) - np.array(parameters))) < 10**-14:
             return self._E_opt_old
         num_kappa = 0
@@ -1145,7 +1145,7 @@ class GeneralizedWaveFunctionUPS:
             # OBS!!!!! Remember to change then call to iterate_t1 to iterate_t1_incl_diag in Ups_structure -> fucc
             # OBS!!!!! Changed self.thetas to thetas_total/self.thetas_real in the remaining function calls of this method!!!!
             thetas_total = np.concatenate((self.thetas_real, self.thetas_imag))
-            bra_vec = generalized_construct_ups_state_modified(
+            bra_vec = generalized_construct_ups_state_modified( ##AE changed
                 bra_vec,
                 self.ci_info,
                 # For real-valued thetas
@@ -1160,7 +1160,7 @@ class GeneralizedWaveFunctionUPS:
             # Calculate analytical derivative w.r.t. each theta using gradient_action function
             for i in range(2*len(self.thetas)): # OBS!! run over len(self.thetas) if using real-valued thetas
                 # Derivative action w.r.t. i-th theta on CSF ket
-                ket_vec_tmp = generalized_get_grad_action_modified(
+                ket_vec_tmp = generalized_get_grad_action_modified( ##AE changed
                     ket_vec,
                     i,
                     self.ci_info,
@@ -1178,7 +1178,7 @@ class GeneralizedWaveFunctionUPS:
                 gradient[i + num_kappa] += 2 * np.matmul(bra_vec, ket_vec_tmp).real
                 # Product rule implications on reference bra and CSF ket
                 # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
-                bra_vec = generalized_propagate_unitary_modified( 
+                bra_vec = generalized_propagate_unitary_modified(  ##AE changed
                     bra_vec,
                     i,
                     self.ci_info,
@@ -1187,7 +1187,7 @@ class GeneralizedWaveFunctionUPS:
                     thetas_total,
                     self.ups_layout,
                 )
-                ket_vec = generalized_propagate_unitary_modified(
+                ket_vec = generalized_propagate_unitary_modified( ##AE changed
                     ket_vec,
                     i,
                     self.ci_info,

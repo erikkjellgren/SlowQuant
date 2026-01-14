@@ -6,17 +6,17 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform, generalized_one_electron_transform
 )
 from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
-    get_orbital_gradient_response, get_orbital_gradient_response_real_imag,
-    get_orbital_response_hessian_block_real_imag_changesign,
-    get_orbital_response_metric_sigma_real_imag,
-    get_orbital_response_property_gradient, get_orbital_response_property_gradient_real_imag
+    get_orbital_gradient_response, get_orbital_gradient_response,
+    get_orbital_response_hessian_block,
+    get_orbital_response_metric_sigma,
+    get_orbital_response_property_gradient, get_orbital_response_property_gradient
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.linear_response.generalized_lr_baseclass import (
     LinearResponseBaseClass,
 )
 from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import (
-    generalized_expectation_value,
+    generalized_expectation_value_complex,
     generalized_propagate_state,
 )
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
@@ -39,7 +39,7 @@ class LinearResponse(LinearResponseBaseClass):
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
         if len(self.q_ops) != 0:
-            grad = get_orbital_gradient_response_real_imag(
+            grad = get_orbital_gradient_response(
                 self.wf.h_mo,
                 self.wf.g_mo,
                 self.wf.kappa_no_activeactive_spin_idx,
@@ -58,28 +58,28 @@ class LinearResponse(LinearResponseBaseClass):
             G_ket = generalized_propagate_state([op], self.wf.ci_coeffs, *self.index_info)
             Gd_ket = generalized_propagate_state([op.dagger], self.wf.ci_coeffs, *self.index_info)
             # <0 | H G |0>
-            grad[i] = generalized_expectation_value(
+            grad[i] = generalized_expectation_value_complex(
                 H00_ket,
                 [],
                 G_ket,
                 *self.index_info,
             )
             # - <0| G H |0>
-            grad[i] -= generalized_expectation_value(
+            grad[i] -= generalized_expectation_value_complex(
                 Gd_ket,
                 [],
                 H00_ket,
                 *self.index_info,
             )
             # <0| Gd H |0>
-            grad[i + len(self.G_ops)] = generalized_expectation_value(
+            grad[i + len(self.G_ops)] = generalized_expectation_value_complex(
                 G_ket,
                 [],
                 H00_ket,
                 *self.index_info,
             )
             # - <0| H Gd |0>
-            grad[i + len(self.G_ops)] -= generalized_expectation_value(
+            grad[i + len(self.G_ops)] -= generalized_expectation_value_complex(
                 H00_ket,
                 [],
                 Gd_ket,
@@ -92,7 +92,7 @@ class LinearResponse(LinearResponseBaseClass):
                 #raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
         if len(self.q_ops) != 0:
             # Do orbital-orbital blocks
-            self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block_real_imag_changesign(
+            self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
                 self.wf.h_mo,
                 self.wf.g_mo,
                 self.wf.kappa_no_activeactive_spin_idx_dagger,
@@ -102,7 +102,8 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.rdm1,
                 self.wf.rdm2,
             )
-            self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block_real_imag_changesign(
+            
+            self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
                 self.wf.h_mo,
                 self.wf.g_mo,
                 self.wf.kappa_no_activeactive_spin_idx_dagger,
@@ -112,7 +113,7 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.rdm1,
                 self.wf.rdm2,
             )
-            self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma_real_imag(
+            self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
                 self.wf.kappa_no_activeactive_spin_idx,
                 self.wf.num_inactive_spin_orbs,
                 self.wf.num_active_spin_orbs,
@@ -126,7 +127,7 @@ class LinearResponse(LinearResponseBaseClass):
                 Gd_ket = generalized_propagate_state([GI.dagger], self.wf.ci_coeffs, *self.index_info)
                 # Make A
                 # <0| Gd H q |0>
-                val = generalized_expectation_value(
+                val = generalized_expectation_value_complex(
                     G_ket,
                     [],
                     Hq_ket,
@@ -136,7 +137,7 @@ class LinearResponse(LinearResponseBaseClass):
                 val -= (
                     1
                     / 2
-                    * generalized_expectation_value(
+                    * generalized_expectation_value_complex(
                         qdH_ket,
                         [],
                         Gd_ket,
@@ -147,7 +148,7 @@ class LinearResponse(LinearResponseBaseClass):
                 val -= (
                     1
                     / 2
-                    * generalized_expectation_value(
+                    * generalized_expectation_value_complex(
                         self.wf.ci_coeffs,
                         [self.H_1i_1a * GI.dagger * qJ],
                         self.wf.ci_coeffs,
@@ -157,7 +158,7 @@ class LinearResponse(LinearResponseBaseClass):
                 self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
                 # Make B
                 # <0| qd H Gd |0>
-                val = generalized_expectation_value(
+                val = generalized_expectation_value_complex(
                     Hq_ket,
                     [],
                     Gd_ket,
@@ -167,7 +168,7 @@ class LinearResponse(LinearResponseBaseClass):
                 val -= (
                     1
                     / 2
-                    * generalized_expectation_value(
+                    * generalized_expectation_value_complex(
                         G_ket,
                         [],
                         qdH_ket,
@@ -178,7 +179,7 @@ class LinearResponse(LinearResponseBaseClass):
                 val -= (
                     1
                     / 2
-                    * generalized_expectation_value(
+                    * generalized_expectation_value_complex(
                         self.wf.ci_coeffs,
                         [qJ.dagger * GI.dagger * self.H_1i_1a],
                         self.wf.ci_coeffs,
@@ -198,14 +199,14 @@ class LinearResponse(LinearResponseBaseClass):
                 GId_ket = generalized_propagate_state([GI.dagger], self.wf.ci_coeffs, *self.index_info)
                 # Make A
                 # <0| GId H GJ |0>
-                val = generalized_expectation_value(
+                val = generalized_expectation_value_complex(
                     GI_ket,
                     [],
                     HGJ_ket,
                     *self.index_info,
                 )
                 # <0| GJ H GId |0>
-                val += generalized_expectation_value(
+                val += generalized_expectation_value_complex(
                     HGJd_ket,
                     [],
                     GId_ket,
@@ -215,7 +216,7 @@ class LinearResponse(LinearResponseBaseClass):
                 val -= (
                     1
                     / 2
-                    * generalized_expectation_value(
+                    * generalized_expectation_value_complex(
                         GI_ket,
                         [],
                         GJH_ket,
@@ -226,7 +227,7 @@ class LinearResponse(LinearResponseBaseClass):
                 val -= (
                     1
                     / 2
-                    * generalized_expectation_value(
+                    * generalized_expectation_value_complex(
                         GJdH_ket,
                         [],
                         GId_ket,
@@ -237,7 +238,7 @@ class LinearResponse(LinearResponseBaseClass):
                 val -= (
                     1
                     / 2
-                    * generalized_expectation_value(
+                    * generalized_expectation_value_complex(
                         GJd_ket,
                         [GI.dagger],
                         H00_ket,
@@ -248,7 +249,7 @@ class LinearResponse(LinearResponseBaseClass):
                 val -= (
                     1
                     / 2
-                    * generalized_expectation_value(
+                    * generalized_expectation_value_complex(
                         H00_ket,
                         [GI.dagger],
                         GJ_ket,
@@ -258,28 +259,28 @@ class LinearResponse(LinearResponseBaseClass):
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
                 # Make B
                 # <0| GId H GJd |0>
-                val = generalized_expectation_value(
+                val = generalized_expectation_value_complex(
                     GI_ket,
                     [],
                     HGJd_ket,
                     *self.index_info,
                 )
                 # - <0| GId GJd H |0>
-                val -= generalized_expectation_value(
+                val -= generalized_expectation_value_complex(
                     GI_ket,
                     [],
                     GJdH_ket,
                     *self.index_info,
                 )
                 # - <0| H GJd GId |0>
-                val -= generalized_expectation_value(
+                val -= generalized_expectation_value_complex(
                     GJH_ket,
                     [],
                     GId_ket,
                     *self.index_info,
                 )
                 # <0| GJd H GId |0>
-                val += generalized_expectation_value(
+                val += generalized_expectation_value_complex(
                     HGJ_ket,
                     [],
                     GId_ket,
@@ -288,14 +289,14 @@ class LinearResponse(LinearResponseBaseClass):
                 self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
                 # Make Sigma
                 # <0| GId GJ |0>
-                val = generalized_expectation_value(
+                val = generalized_expectation_value_complex(
                     GI_ket,
                     [],
                     GJ_ket,
                     *self.index_info,
                 )
                 # - <0| GJ GId |0>
-                val -= generalized_expectation_value(
+                val -= generalized_expectation_value_complex(
                     GJd_ket,
                     [],
                     GId_ket,
@@ -353,7 +354,7 @@ class LinearResponse(LinearResponseBaseClass):
             q_part_y = 0.0
             q_part_z = 0.0
             if len(self.q_ops) != 0:
-                q_part_x = get_orbital_response_property_gradient_real_imag(
+                q_part_x = get_orbital_response_property_gradient(
                     mux,
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
@@ -363,7 +364,7 @@ class LinearResponse(LinearResponseBaseClass):
                     state_number,
                     number_excitations,
                 )
-                q_part_y = get_orbital_response_property_gradient_real_imag(
+                q_part_y = get_orbital_response_property_gradient(
                     muy,
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
@@ -373,7 +374,7 @@ class LinearResponse(LinearResponseBaseClass):
                     state_number,
                     number_excitations,
                 )
-                q_part_z = get_orbital_response_property_gradient_real_imag(
+                q_part_z = get_orbital_response_property_gradient(
                     muz,
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
@@ -386,42 +387,42 @@ class LinearResponse(LinearResponseBaseClass):
             transfer_ket = generalized_propagate_state([transfer_op], self.wf.ci_coeffs, *self.index_info)
             transferd_ket = generalized_propagate_state([transfer_op.dagger], self.wf.ci_coeffs, *self.index_info)
             # <0| mux T |0>
-            transition_dipole_x = generalized_expectation_value(
+            transition_dipole_x = generalized_expectation_value_complex(
                 muxd_ket,
                 [],
                 transfer_ket,
                 *self.index_info,
             )
             # - <0| T mux |0>
-            transition_dipole_x -= generalized_expectation_value(
+            transition_dipole_x -= generalized_expectation_value_complex(
                 transferd_ket,
                 [],
                 mux_ket,
                 *self.index_info,
             )
             # <0| muy T |0>
-            transition_dipole_y = generalized_expectation_value(
+            transition_dipole_y = generalized_expectation_value_complex(
                 muyd_ket,
                 [],
                 transfer_ket,
                 *self.index_info,
             )
             # - <0| T muy |0>
-            transition_dipole_y -= generalized_expectation_value(
+            transition_dipole_y -= generalized_expectation_value_complex(
                 transferd_ket,
                 [],
                 muy_ket,
                 *self.index_info,
             )
             # <0| muz T |0>
-            transition_dipole_z = generalized_expectation_value(
+            transition_dipole_z = generalized_expectation_value_complex(
                 muzd_ket,
                 [],
                 transfer_ket,
                 *self.index_info,
             )
             # - <0| T muz |0>
-            transition_dipole_z -= generalized_expectation_value(
+            transition_dipole_z -= generalized_expectation_value_complex(
                 transferd_ket,
                 [],
                 muz_ket,
