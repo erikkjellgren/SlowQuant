@@ -57,7 +57,11 @@ def read_potfile(filename:str) -> namedtuple:
                     values = list(map(lambda val: int(val) - 1, f.readline().split()))
                     index = values[0]
                     exclusion_lists[index, :] = values
-
-
-                    
+    if unit == 'AU':
+        unit_factor = 1.0
+    elif unit == 'AA':
+        unit_factor = 1.889725989
+    else:
+        raise ValueError(f'Invalid coordinate unit ({unit}) in potfile)')
+    coordinates *= unit_factor
     return namedtuple('potfile', ('coordinates', 'multipoles', 'polarizabilities', 'exclusion_lists'))(coordinates, multipoles, polarizabilities, exclusion_lists)
