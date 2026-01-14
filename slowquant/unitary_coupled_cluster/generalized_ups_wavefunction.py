@@ -357,7 +357,7 @@ class GeneralizedWaveFunctionUPS:
             self.ups_layout,
         )
 
-        # For runnign with real-valued thetas:
+        # For running with real-valued thetas:
         '''self.ci_coeffs = generalized_construct_ups_state(
             self.csf_coeffs,
             self.ci_info,
@@ -889,7 +889,6 @@ class GeneralizedWaveFunctionUPS:
             parameters,
             extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
         )
-        # print(res)
         if orbital_optimization:
             if len(self.thetas) > 0:
                 thetas_r = []
@@ -1046,7 +1045,7 @@ class GeneralizedWaveFunctionUPS:
                 # Silence the imaginary part if you wish to run with real-valued thetas:
                 thetas_i.append(parameters[i + num_kappa + len(self.thetas)])
             self.set_thetas(thetas_r, thetas_i)
-        '''if kappa_optimization:
+        '''if True:
             # RDM is more expensive than evaluation of the Hamiltonian.
             # Thus only construct these if orbital-optimization is turned on,
             # since the RDMs will be reused in the oo gradient calculation.
@@ -1061,8 +1060,8 @@ class GeneralizedWaveFunctionUPS:
         if True:
             E = generalized_expectation_value(
                 self.ci_coeffs,
-                [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
-                #[generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
+                #[generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
+                [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
             )
@@ -1166,8 +1165,8 @@ class GeneralizedWaveFunctionUPS:
                     self.ci_info,
                     self.ups_layout,
                 )
-                temp = 2 * np.matmul(bra_vec, ket_vec_tmp)
-                '''if temp.imag > 1e-9:
+                '''temp = 2 * np.matmul(bra_vec, ket_vec_tmp)
+                if temp.imag > 1e-9:
                     print ("temp_gradient is complex!",temp)
                     if i >= len(self.ups_layout.excitation_indices):
                         print("imag component")
