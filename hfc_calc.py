@@ -39,7 +39,13 @@ def my_read_xyz_file(inp):
                     geometry_list.append(";")
                 else:
                     continue
-            active_space = ((active_space_list[0], active_space_list[1]), active_space_list[2])
+            if len(active_space_list) >= 3:
+                active_space_list_str = []
+                for num in range(len(active_space_list)):
+                    active_space_list_str.append(str(active_space_list[num]))
+                active_orb = "".join(active_space_list_str[2:])
+            
+            active_space = ((active_space_list[0], active_space_list[1]), int(active_orb))
             input[-1] = active_space
             geometry = " ".join(geometry_list)
     except FileNotFoundError: 
@@ -114,8 +120,9 @@ def get_hcf_fc_unrestricted(geometry, basis, active_space, unit='bohr', charge=0
     g_eri = mol.intor("int2e")
     
     # Print info on Slowquant calculation
-    print("Method: fuccsd, Layers: 2, Orbital Optimization: True")
-
+    # print("Method: fuccsd, Layers: 2, Orbital Optimization: True")
+    # print("Method: HF")
+    print("Method: fuccsd, Layers: 2, Orbital optimization: False")
     # Slowquant
     WF = UnrestrictedWaveFunctionUPS(
         mol.nelectron,
@@ -128,7 +135,7 @@ def get_hcf_fc_unrestricted(geometry, basis, active_space, unit='bohr', charge=0
         include_active_kappa=True,
     )
 
-    WF.run_wf_optimization_1step("bfgs", orbital_optimization=True)
+    WF.run_wf_optimization_1step("bfgs", orbital_optimization=False)
 
     print(WF.energy_elec_RDM)
     
