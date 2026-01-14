@@ -358,7 +358,7 @@ class GeneralizedWaveFunctionUPS:
             self.ups_layout,
         )
 
-        # For runnign with real-valued thetas:
+        # For running with real-valued thetas:
         '''self.ci_coeffs = generalized_construct_ups_state(
             self.csf_coeffs,
             self.ci_info,
