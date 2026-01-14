@@ -813,18 +813,16 @@ class WaveFunctionSAUPS:
             transition_property[i] = self._state_ci_coeffs[:, i + 1] @ state_op @ self._state_ci_coeffs[:, 0]
         return transition_property
 
-    def get_oscillator_strenghts(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_oscillator_strenghts(self) -> np.ndarray:
         r"""Get oscillator strengths between ground state and excited states.
 
         .. math::
             f_n = \frac{2}{3}\varepsilon_n\left|\left<0\left|\hat{\boldsymbol{\mu}}\right|n\right>\right|^2
 
-        Args:
-            dipole_integrals: Dipole integrals in AO basis.
-
         Returns:
             Oscillator strengths.
         """
+        dipole_integrals = self.int_gen.electric_dipole
         transition_dipole_x = self.get_transition_property(dipole_integrals[0])
         transition_dipole_y = self.get_transition_property(dipole_integrals[1])
         transition_dipole_z = self.get_transition_property(dipole_integrals[2])

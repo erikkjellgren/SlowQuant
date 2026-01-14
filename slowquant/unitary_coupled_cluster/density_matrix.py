@@ -361,7 +361,7 @@ def get_orbital_response_metric_sigma(
 
 @nb.jit(nopython=True)
 def get_orbital_response_vector_norm(
-    kappa_idx: list[list[int]],
+    kappa_idx: np.ndarray,
     num_inactive_orbs: int,
     num_active_orbs: int,
     rdm1: np.ndarray,

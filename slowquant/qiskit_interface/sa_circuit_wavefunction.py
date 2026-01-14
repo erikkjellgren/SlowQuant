@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from functools import partial
 
 import numpy as np
+import pyscf
 import scipy
 from qiskit import QuantumCircuit
 from qiskit.primitives import BaseEstimatorV1, BaseEstimatorV2, BaseSamplerV1, BaseSamplerV2
@@ -12,10 +13,12 @@ from slowquant.molecularintegrals.integralfunctions import (
     two_electron_integral_transform,
 )
 from slowquant.qiskit_interface.interface import QuantumInterface
+from slowquant.SlowQuant import SlowQuant
 from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_gradient,
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
+from slowquant.unitary_coupled_cluster.integral_manager import IntegralManager
 from slowquant.unitary_coupled_cluster.operators import (
     Epq,
     hamiltonian_0i_0a,
@@ -30,8 +33,7 @@ class WaveFunctionSACircuit:
         num_elec: int,
         cas: Sequence[int],
         mo_coeffs: np.ndarray,
-        h_ao: np.ndarray,
-        g_ao: np.ndarray,
+        integral_generator: SlowQuant | pyscf.gto.mole.Mole,
         states: tuple[list[list[float]], list[list[str]]],
         quantum_interface: QuantumInterface,
         include_active_kappa: bool = False,
@@ -43,8 +45,7 @@ class WaveFunctionSACircuit:
             cas: CAS(num_active_elec, num_active_orbs),
                  orbitals are counted in spatial basis.
             mo_coeffs: Initial orbital coefficients.
-            h_ao: One-electron integrals in AO for Hamiltonian.
-            g_ao: Two-electron integrals in AO.
+            integral_generator: Integral generator object.
             states: States to include in the state-averaged expansion.
                     Tuple of lists containing weights and determinants.
                     Each state in SA can be constructed of several dets.
@@ -60,9 +61,8 @@ class WaveFunctionSACircuit:
             raise ValueError(
                 f"Wave function only implemented for an even number of active electrons. Got; {cas[0]}"
             )
+        self.int_gen = IntegralManager(integral_generator)
         self._c_mo = mo_coeffs
-        self._h_ao = h_ao
-        self._g_ao = g_ao
         self.inactive_spin_idx = []
         self.virtual_spin_idx = []
         self.active_spin_idx = []
@@ -72,8 +72,8 @@ class WaveFunctionSACircuit:
         self.active_occ_spin_idx_shifted = []
         self.active_unocc_spin_idx_shifted = []
         self.num_elec = num_elec
-        self.num_spin_orbs = 2 * len(h_ao)
-        self.num_orbs = len(h_ao)
+        self.num_spin_orbs = 2 * len(self.int_gen.kinetic_energy)
+        self.num_orbs = len(self.int_gen.kinetic_energy)
         self.num_active_elec = cas[0]
         self.num_active_elec_alpha = self.num_active_elec // 2
         self.num_active_elec_beta = self.num_active_elec // 2
@@ -145,6 +145,7 @@ class WaveFunctionSACircuit:
         # Find non-redundant kappas
         self._kappa = []
         self.kappa_idx = []
+        self.kappa_idx_dagger = []
         self.kappa_no_activeactive_idx = []
         self.kappa_no_activeactive_idx_dagger = []
         self.kappa_redundant_idx = []
@@ -168,6 +169,7 @@ class WaveFunctionSACircuit:
                 self._kappa.append(0.0)
                 self._kappa_old.append(0.0)
                 self.kappa_idx.append((p, q))
+                self.kappa_idx_dagger.append((q, p))
         # HF like orbital rotation indices
         self.kappa_hf_like_idx = []
         for p in range(0, self.num_orbs):
@@ -178,6 +180,10 @@ class WaveFunctionSACircuit:
                     self.kappa_hf_like_idx.append((p, q))
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     self.kappa_hf_like_idx.append((p, q))
+        self.kappa_idx = np.array(self.kappa_idx)
+        self.kappa_idx_dagger = np.array(self.kappa_idx_dagger)
+        self.kappa_redundant_idx = np.array(self.kappa_redundant_idx)
+        self.kappa_hf_like_idx = np.array(self.kappa_hf_like_idx)
         self.num_states = len(states[0])
         self.states = states
         # Setup Qiskit stuff
@@ -233,7 +239,9 @@ class WaveFunctionSACircuit:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._h_mo is None:
-            self._h_mo = one_electron_integral_transform(self.c_mo, self._h_ao)
+            self._h_mo = one_electron_integral_transform(
+                self.c_mo, self.int_gen.kinetic_energy + self.int_gen.nuclear_electron_attraction
+            )
         return self._h_mo
 
     @property
@@ -244,7 +252,7 @@ class WaveFunctionSACircuit:
             Two-electron Hamiltonian integrals in MO basis.
         """
         if self._g_mo is None:
-            self._g_mo = two_electron_integral_transform(self.c_mo, self._g_ao)
+            self._g_mo = two_electron_integral_transform(self.c_mo, self.int_gen.electron_electron_repulsion)
         return self._g_mo
 
     @property
@@ -766,18 +774,16 @@ class WaveFunctionSACircuit:
             transition_property[i] = self._state_ci_coeffs[:, i + 1] @ state_op @ self._state_ci_coeffs[:, 0]
         return transition_property
 
-    def get_oscillator_strenghts(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_oscillator_strenghts(self) -> np.ndarray:
         r"""Get oscillator strengths between ground state and excited states.
 
         .. math::
             f_n = \frac{2}{3}\varepsilon_n\left|\left<0\left|\hat{\boldsymbol{\mu}}\right|n\right>\right|^2
 
-        Args:
-            dipole_integrals: Dipole integrals in AO basis.
-
         Returns:
             Oscillator strengths.
         """
+        dipole_integrals = self.int_gen.electric_dipole
         transition_dipole_x = self.get_transition_property(dipole_integrals[0])
         transition_dipole_y = self.get_transition_property(dipole_integrals[1])
         transition_dipole_z = self.get_transition_property(dipole_integrals[2])
