@@ -144,9 +144,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True, tol=1e-10, maxiter = 10000)
 
     print("E_opt:", WF._energy_elec)
-    LR = generalized_naive.LinearResponse(WF, excitations="sd")
-    LR.calc_excitation_energies()
-    print(LR.excitation_energies)
+    # LR = generalized_naive.LinearResponse(WF, excitations="sd")
+    # LR.calc_excitation_energies()
+    # print(LR.excitation_energies)
 
     #call MO integrals
     g_eri_mo = WF.g_mo

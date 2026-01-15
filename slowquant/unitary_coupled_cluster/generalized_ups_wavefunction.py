@@ -24,7 +24,7 @@ from slowquant.unitary_coupled_cluster.generalized_operators import (
     generalized_hamiltonian_full_space,
 )
 from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import (
-    generalized_construct_ups_state, generalized_construct_ups_state_modified,
+    generalized_construct_ups_state, generalized_construct_ups_state_modified, generalized_construct_ups_state_test_anna,
     generalized_expectation_value,
     generalized_get_grad_action, generalized_get_grad_action_modified,
     generalized_propagate_state,
@@ -350,14 +350,14 @@ class GeneralizedWaveFunctionUPS:
         self._thetas_real = theta_real.copy()
         self._thetas_imag = theta_imag.copy()
 
-        self.ci_coeffs = generalized_construct_ups_state_modified( ##AE changed
+        self.ci_coeffs = generalized_construct_ups_state_test_anna( ##AE changed
             self.csf_coeffs,
             self.ci_info,
-            np.concatenate((theta_real, theta_imag)),
+            (np.asarray(theta_real, dtype=float) + 1j*np.asarray(theta_imag, dtype=float)), #AE np.concatenate((theta_real, theta_imag))
             self.ups_layout,
         )
 
-        # For running with real-valued thetas:
+        # For runnign with real-valued thetas:
         '''self.ci_coeffs = generalized_construct_ups_state(
             self.csf_coeffs,
             self.ci_info,
@@ -889,6 +889,8 @@ class GeneralizedWaveFunctionUPS:
             parameters,
             extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
         )
+
+        # print(res)
         if orbital_optimization:
             if len(self.thetas) > 0:
                 thetas_r = []
@@ -1045,7 +1047,7 @@ class GeneralizedWaveFunctionUPS:
                 # Silence the imaginary part if you wish to run with real-valued thetas:
                 thetas_i.append(parameters[i + num_kappa + len(self.thetas)])
             self.set_thetas(thetas_r, thetas_i)
-        '''if True:
+        '''if kappa_optimization:
             # RDM is more expensive than evaluation of the Hamiltonian.
             # Thus only construct these if orbital-optimization is turned on,
             # since the RDMs will be reused in the oo gradient calculation.
@@ -1060,8 +1062,8 @@ class GeneralizedWaveFunctionUPS:
         if True:
             E = generalized_expectation_value(
                 self.ci_coeffs,
-                #[generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
-                [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
+                [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
+                #[generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
             )
@@ -1143,8 +1145,9 @@ class GeneralizedWaveFunctionUPS:
             # OBS!!!!! Changed to generalized_construct_ups_state_modified!!!!
             # OBS!!!!! Remember to change then call to iterate_t1 to iterate_t1_incl_diag in Ups_structure -> fucc
             # OBS!!!!! Changed self.thetas to thetas_total/self.thetas_real in the remaining function calls of this method!!!!
-            thetas_total = np.concatenate((self.thetas_real, self.thetas_imag))
-            bra_vec = generalized_construct_ups_state_modified( ##AE changed
+            # thetas_total = np.concatenate((self.thetas_real, self.thetas_imag))
+            thetas_total =  (np.asarray(self.thetas_real, dtype=float) + 1j*np.asarray(self.thetas_imag, dtype=float)) #AE changed from thetas_total = np.concatenate((self.thetas_real, self.thetas_imag))
+            bra_vec = generalized_construct_ups_state_test_anna( ##AE changed
                 bra_vec,
                 self.ci_info,
                 # For real-valued thetas
@@ -1157,16 +1160,16 @@ class GeneralizedWaveFunctionUPS:
             ket_vec = np.copy(self.csf_coeffs)
             ket_vec_tmp = np.copy(self.csf_coeffs)
             # Calculate analytical derivative w.r.t. each theta using gradient_action function
-            for i in range(2*len(self.thetas)): # OBS!! run over len(self.thetas) if using real-valued thetas
+            for i in range(len(self.thetas)): # OBS!! run over len(self.thetas) if using real-valued thetas #AE removed 2*self-thetas
                 # Derivative action w.r.t. i-th theta on CSF ket
-                ket_vec_tmp = generalized_get_grad_action_modified( ##AE changed
+                ket_vec_tmp = generalized_get_grad_action( ##AE changed
                     ket_vec,
                     i,
                     self.ci_info,
                     self.ups_layout,
                 )
-                '''temp = 2 * np.matmul(bra_vec, ket_vec_tmp)
-                if temp.imag > 1e-9:
+                temp = 2 * np.matmul(bra_vec, ket_vec_tmp)
+                '''if temp.imag > 1e-9:
                     print ("temp_gradient is complex!",temp)
                     if i >= len(self.ups_layout.excitation_indices):
                         print("imag component")
@@ -1177,7 +1180,7 @@ class GeneralizedWaveFunctionUPS:
                 gradient[i + num_kappa] += 2 * np.matmul(bra_vec, ket_vec_tmp).real
                 # Product rule implications on reference bra and CSF ket
                 # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
-                bra_vec = generalized_propagate_unitary_modified(  ##AE changed
+                bra_vec = generalized_propagate_unitary(  ##AE changed
                     bra_vec,
                     i,
                     self.ci_info,
@@ -1186,7 +1189,7 @@ class GeneralizedWaveFunctionUPS:
                     thetas_total,
                     self.ups_layout,
                 )
-                ket_vec = generalized_propagate_unitary_modified( ##AE changed
+                ket_vec = generalized_propagate_unitary( ##AE changed
                     ket_vec,
                     i,
                     self.ci_info,

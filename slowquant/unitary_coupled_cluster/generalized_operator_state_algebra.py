@@ -6,7 +6,7 @@ from slowquant.unitary_coupled_cluster.operators import (
     G1, G1_generalized,
     G2, G2_generalized,
 )
-from slowquant.unitary_coupled_cluster.util_anna import UpsStructure ##AE
+from slowquant.unitary_coupled_cluster.util import UpsStructure ##AE
 from slowquant.unitary_coupled_cluster.operator_state_algebra import bitcount
 
 
@@ -468,7 +468,7 @@ def generalized_construct_ups_state(
 def generalized_construct_ups_state_test_anna(
     state: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float],
+    thetas: list[complex],
     ups_struct: UpsStructure,
     dagger: bool = False,
 ) -> np.ndarray:
@@ -494,26 +494,26 @@ def generalized_construct_ups_state_test_anna(
     out = state.copy()
     order = 1
     offset = ci_info.space_extension_offset
-    if dagger:
-        order = -1
+
+
     # Loop over all excitation in UPSStructure
     for exc_type, exc_indices, theta in zip(
         ups_struct.excitation_operator_type[::order], ups_struct.excitation_indices[::order], thetas[::order]
     ):
-        if abs(theta) < 10**-14:
-            continue
         if dagger:
-            theta = -theta.conjugate()
+            theta = -theta    
+        if np.abs(theta) < 1e-12:
+            continue
         if exc_type in ("single", "double"):
             # Create T matrix
             if exc_type == "single":
                 (i, a) = np.array(exc_indices) + 2 * offset
-                T = G1(i, a, True)
-                T_dag = G1(i, a, False)
+                T = G1_generalized(i, a, True)
+                T_dag = G1_generalized(i, a, False)
             elif exc_type == "double":
                 (i, j, a, b) = np.array(exc_indices) + 2 * offset
-                T = G2(i, j, a, b, True)
-                T_dag = G2(i, j, a, b, False)
+                T = G2_generalized(i, j, a, b, True)
+                T_dag = G2_generalized(i, j, a, b, False)
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
             # Analytical application on state vector
@@ -1064,8 +1064,8 @@ def generalized_propagate_unitary_modified_split(
         idx = idx - len(ups_struct.excitation_indices)
         real = False
 
-    exc_type_real = ups_struct.excitation_operator_type_real[idx]  #har sat den til real, tænker at index på real og imag må være ens AE.
-    exc_type_imag = ups_struct.excitation_operator_type_imag[idx]  #har sat den til real, tænker at index på real og imag må være ens AE.
+    exc_type_real = ups_struct.excitation_operator_type_real[idx]  #AE.
+    exc_type_imag = ups_struct.excitation_operator_type_imag[idx]  #AE.
     exc_indices = ups_struct.excitation_indices[idx]
     n_thetas = int(len(thetas)/2)
     theta_R = thetas[idx]
@@ -1176,6 +1176,14 @@ def generalized_get_grad_action(
         State with derivative of the idx'th unitary applied.
     """
     # Select unitary operation based on idx
+    # n_idx = len(ups_struct.excitation_indices)
+    # n_type = len(ups_struct.excitation_operator_type)
+    # print(n_idx, n_type)
+    # n = len(ups_struct.excitation_operator_type)
+    # print("idx =", idx, "n =", n)
+    # print("idx type =", type(idx))
+    # assert 0 <= idx < n, f"BAD IDX: idx={idx}, n={n}"
+    exc_type = ups_struct.excitation_operator_type[idx]
     exc_type = ups_struct.excitation_operator_type[idx]
     exc_indices = ups_struct.excitation_indices[idx]
     offset = ci_info.space_extension_offset
@@ -1331,7 +1339,6 @@ def generalized_get_grad_action_modified_split(
     if real
     else ups_struct.excitation_operator_type_imag[idx]
     )
-    # exc_type = ups_struct.excitation_operator_type_real[idx] #har sat den til real, tænker at index på real og imag må være ens AE.
     exc_indices = ups_struct.excitation_indices[idx]
     offset = ci_info.space_extension_offset
     if exc_type in (
