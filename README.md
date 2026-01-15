@@ -85,6 +85,7 @@ Just use [PySCF](https://github.com/pyscf/pyscf) instead.
 
 | Feature                                        | Last living commit                       |
 |------------------------------------------------|------------------------------------------|
+| UCC wavefunction save and load                 | 30c3385a500dc4f97ba1076b0004583e667e1738 |
 | Qiskit Estimator                               | 1fe8c4cac7ff5a620b760ee18ff1a8179cf40898 |
 | RDM trace correction quantum wave function     | e26074fc8aae8dc0f6528308022ad265c5ca18bc |
 | No submatrix saving in proj and all-proj LR    | 3f5df6818c4dbbb2b54606d0a1a4e00badfb766d |
