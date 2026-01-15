@@ -575,6 +575,79 @@ def generalized_construct_ups_state_test_anna(
     return out
 
 
+def generalized_construct_ups_state_test_erik(
+    state: np.ndarray,
+    ci_info: CI_Info,
+    thetas: list[complex],
+    ups_struct: UpsStructure,
+    dagger: bool = False,
+) -> np.ndarray:
+    r"""Construct unitary product state by applying UPS unitary to reference state.
+
+    .. math::
+        \boldsymbol{U}_N...\boldsymbol{U}_0\left|\nu\right> = \left|\tilde\nu\right>
+
+    #. 10.48550/arXiv.2303.10825, Eq. 15
+    #. 10.48550/arXiv.2505.00883, Eq. 45, 47, and, 49 (SA doubles)
+    #. 10.48550/arXiv.2505.02984, Eq. 35, D1, and, D2 (SA doubles)
+
+    Args:
+        state: Reference state vector.
+        ci_info: Information about the CI space.
+        thetas: Ansatz parameters values.
+        ups_struct: Unitary product state structure.
+        dagger: If true, do dagger unitaries.
+
+    Returns:
+        New state vector with unitaries applied.
+    """
+    out = state.copy()
+    order = 1
+    offset = ci_info.space_extension_offset
+    if dagger:
+        order = -1
+    # Loop over all excitation in UPSStructure
+    for exc_type, exc_indices, theta in zip(
+        ups_struct.excitation_operator_type[::order], ups_struct.excitation_indices[::order], thetas[::order]
+    ):
+        if abs(theta) < 10**-14:
+            continue
+        if dagger:
+            theta = -theta.conjugate()
+        if exc_type in ("single", "double"):
+            # Create T matrix
+            if exc_type == "single":
+                (i, a) = np.array(exc_indices) + 2 * offset
+                T = G1(i, a, True)
+            elif exc_type == "double":
+                (i, j, a, b) = np.array(exc_indices) + 2 * offset
+                T = G2(i, j, a, b, True)
+            else:
+                raise ValueError(f"Got unknown excitation type: {exc_type}")
+            # Analytical application on state vector
+            #husk exp(i phi/2 N)
+            out = (
+                out
+                + np.sin(np.abs(theta))
+                * generalized_propagate_state(
+                    [T],
+                    out,
+                    ci_info,
+                    do_folding=False,
+                )
+                + (1 - np.cos(np.aps(theta)))
+                * generalized_propagate_state(
+                    [T, T],
+                    out,
+                    ci_info,
+                    do_folding=False,
+                )
+            )
+        else:
+            raise ValueError(f"Got unknown excitation type, {exc_type}")
+    return out
+
+
 def generalized_construct_ups_state_modified(
     state: np.ndarray,
     ci_info: CI_Info,

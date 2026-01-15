@@ -353,7 +353,7 @@ class GeneralizedWaveFunctionUPS:
         self.ci_coeffs = generalized_construct_ups_state_test_anna( ##AE changed
             self.csf_coeffs,
             self.ci_info,
-            (np.asarray(theta_real, dtype=float) + 1j*np.asarray(theta_imag, dtype=float)), #AE np.concatenate((theta_real, theta_imag))
+            (np.asarray(theta_real, dtype=float) + 1j*np.asarray(theta_imag, dtype=float)), #AE before: np.concatenate((theta_real, theta_imag))
             self.ups_layout,
         )
 
