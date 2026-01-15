@@ -34,6 +34,8 @@ from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import UpsStructure
 
+from slowquant.molecule.polarizable_embedding import read_potfile
+
 
 class WaveFunctionUPS:
     def __init__(
@@ -45,6 +47,7 @@ class WaveFunctionUPS:
         ansatz: str,
         ansatz_options: dict[str, Any] | None = None,
         include_active_kappa: bool = False,
+        potfile: str = "",
     ) -> None:
         """Initialize for UPS wave function.
 
@@ -57,6 +60,7 @@ class WaveFunctionUPS:
             ansatz: Name of ansatz.
             ansatz_options: Ansatz options.
             include_active_kappa: Include active-active orbital rotations.
+            potfile: Polarizable embedding potential file
         """
         if ansatz_options is None:
             ansatz_options = {}
@@ -257,6 +261,10 @@ class WaveFunctionUPS:
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
+        self.use_PE = False
+        if potfile:
+            self.use_PE = True
+            self.PE_data = read_potfile(potfile)
 
     @property
     def kappa(self) -> list[float]:
@@ -344,13 +352,13 @@ class WaveFunctionUPS:
                 # static contribution, from charges, dipoles, quadrupoles
                 v_PE_ao = np.zeros_like(hcore_ao)
                 if 0 in self.PE_data.multipoles:
-                    v_PE_ao += -np.sum(pyscf.df.incore.aux_e2(mol, fakemol, 'int3c2e')*self.PE_data.multipoles[0], axis=2)
+                    v_PE_ao += -np.sum(pyscf.df.incore.aux_e2(mol, fakemol, 'int3c2e')*self.PE_data.multipoles[0].ravel(), axis=2)
                 if 1 in self.PE_data.multipoles:
                     field_integrals = pyscf.df.incore.aux_e2(mol, fakemol, 'int3c2e_ip1').transpose(1,2,3,0)
                     v_dip = -np.sum(field_integrals*self.PE_data.multipoles[1], axis=(2,3))
                     v_PE_ao += v_dip + v_dip.T
                 if 2 in self.PE_data.multipoles:
-                    v_quad = -0.5*np.sum((pyscf.df.incore.aux_e2(mol, fakemol, 'int3c2e_ipip1') +  pyscf.df.incore.aux_e2(mol fakemol, 'int3c2e_ipvip1')).transpose(1,2,3,0) * self.PE_data.multipoles[2], axis=(2,3))
+                    v_quad = -0.5*np.sum((pyscf.df.incore.aux_e2(mol, fakemol, 'int3c2e_ipip1') +  pyscf.df.incore.aux_e2(mol, fakemol, 'int3c2e_ipvip1')).transpose(1,2,3,0) * self.PE_data.multipoles[2], axis=(2,3))
                     v_PE_ao = v_quad + v_quad.T
                 hcore_ao += v_PE_ao
             self._h_mo = one_electron_integral_transform(self.c_mo, hcore_ao)

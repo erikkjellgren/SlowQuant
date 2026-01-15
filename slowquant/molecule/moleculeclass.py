@@ -7,11 +7,10 @@ from slowquant.molecule.moleculefunctions import (
     primitive_gauss,
     primitive_normalization,
 )
-from slowquant.polarizable_embedding import read_potfile
 
 
 class _Molecule:
-    def __init__(self, molecule_file: str, molecular_charge_: int = 0, distance_unit: str = "bohr", potfile: str = "") -> None:
+    def __init__(self, molecule_file: str, molecular_charge_: int = 0, distance_unit: str = "bohr") -> None:
         """Initialize molecule instance.
 
         Args:
@@ -79,11 +78,6 @@ class _Molecule:
             raise ValueError(
                 "Does only support:\n    .xyz files for molecule coordinates.\n    A string with the elements and coordinates (; delimited)."
             )
-        self.use_PE = False
-        if potfile:
-            self.potfile = potfile
-            self.use_PE = True
-            self.PE_data = read_potfile(self.potfile)
 
     def _set_basis_set(self, basis_set: str) -> None:
         """Set basis set.
