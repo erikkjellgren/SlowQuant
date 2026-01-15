@@ -7,7 +7,20 @@ from slowquant.SlowQuant import SlowQuant
 
 
 class IntegralManager:
+    __slots__ = (
+        "_electric_dipole",
+        "_electron_electron_repulsion",
+        "_kinetic_energy",
+        "_nuclear_electron_attraction",
+        "int_obj",
+    )
+
     def __init__(self, integral_obj: SlowQuant | pyscf.gto.mole.Mole) -> None:
+        """Initilize the integral manager.
+
+        Args:
+            integral_obj: Integral generator object, can either be from SlowQuant or PySCF.
+        """
         self.int_obj = copy.deepcopy(integral_obj)
         self._kinetic_energy: np.ndarray | None = None
         self._nuclear_electron_attraction: np.ndarray | None = None
@@ -16,6 +29,7 @@ class IntegralManager:
 
     @property
     def kinetic_energy(self) -> np.ndarray:
+        """Electron kinetic energy integrals."""
         if isinstance(self._kinetic_energy, np.ndarray):
             return self._kinetic_energy
         if isinstance(self.int_obj, SlowQuant):
@@ -29,6 +43,7 @@ class IntegralManager:
 
     @property
     def nuclear_electron_attraction(self) -> np.ndarray:
+        """Nuclear-electron attraction integrals."""
         if isinstance(self._nuclear_electron_attraction, np.ndarray):
             return self._nuclear_electron_attraction
         if isinstance(self.int_obj, SlowQuant):
@@ -42,6 +57,7 @@ class IntegralManager:
 
     @property
     def electron_electron_repulsion(self) -> np.ndarray:
+        """Electron-electron repulsion integrals."""
         if isinstance(self._electron_electron_repulsion, np.ndarray):
             return self._electron_electron_repulsion
         if isinstance(self.int_obj, SlowQuant):
@@ -55,6 +71,7 @@ class IntegralManager:
 
     @property
     def nuclear_nuclear_repulsion(self) -> float:
+        """Nuclear-nuclear repulsion."""
         if isinstance(self.int_obj, SlowQuant):
             return self.int_obj.molecule.nuclear_repulsion
         elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
@@ -64,6 +81,7 @@ class IntegralManager:
 
     @property
     def electric_dipole(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Electric dipole integrals."""
         if isinstance(self._electric_dipole, tuple):
             return self._electric_dipole
         if isinstance(self.int_obj, SlowQuant):
