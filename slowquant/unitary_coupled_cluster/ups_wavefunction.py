@@ -34,8 +34,7 @@ from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import UpsStructure
 
-from slowquant.molecule.polarizable_embedding import read_potfile
-
+from slowquant.molecule.polarizable_embedding import read_potfile, compute_nuclear_field, compute_multipole_field, induced_dipole_solver
 
 class WaveFunctionUPS:
     def __init__(
@@ -1007,12 +1006,33 @@ class WaveFunctionUPS:
             self.kappa = parameters[:num_kappa]
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
-        if kappa_optimization:
+        if kappa_optimization or self.use_PE:
             # RDM is more expensive than evaluation of the Hamiltonian.
             # Thus only construct these if orbital-optimization is turned on,
             # since the RDMs will be reused in the oo gradient calculation.
+
+            if self.use_PE:
+                # we need to update the induction operator with the current density
+                fakemol = pyscf.gto.fakemol_for_charges(self.PE_data.coordinates)
+                mol = self.int_gen.int_obj
+                field_integrals = pyscf.df.incore.aux_e2(mol, fakemol, 'int3c2e_ip1').transpose(1,2,3,0)
+                mo_occ = self.c_mo[:, 0:self.num_inactive_orbs]
+                rdm1_ao = 2.0*mo_occ @ mo_occ.T
+                mo_cas = self.c_mo[:, self.num_inactive_orbs:self.num_inactive_orbs+self.num_active_orbs]
+                rdm1_ao += mo_cas @ self.rdm1 @ mo_cas.T
+                electronic_field = 2.0 * np.einsum('mn,mnpx->px', rdm1_ao, field_integrals)
+                nuclear_charges = mol.atom_charges()
+                nuclear_positions = mol.atom_coords()
+                nuclear_field = compute_nuclear_field(nuclear_charges, nuclear_positions, self.PE_data.coordinates)
+                multipole_field = compute_multipole_field(self.PE_data.multipoles, self.PE_data.coordinates, self.PE_data.coordinates, self.PE_data.exclusion_lists)
+                rhs_field = electronic_field + nuclear_field + multipole_field
+                induced_dipoles = induced_dipole_solver(rhs_field, self.PE_data.coordinates, self.PE_data.polarizabilities, self.PE_data.exclusion_lists)
+                induction_operator = -np.einsum('px,mnpx->mn', induced_dipoles, field_integrals)
+                induction_operator += induction_operator.T
+                induction_operator = one_electron_integral_transform(self.c_mo, induction_operator)
+            h1 = self.h_mo + induction_operator if self.use_PE else self.h_mo
             E = get_electronic_energy(
-                self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.rdm1, self.rdm2
+                h1, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.rdm1, self.rdm2
             )
         else:
             E = expectation_value(
@@ -1039,6 +1059,25 @@ class WaveFunctionUPS:
         Returns:
             Electronic gradient.
         """
+        if self.use_PE:
+            fakemol = pyscf.gto.fakemol_for_charges(self.PE_data.coordinates)
+            mol = self.int_gen.int_obj
+            field_integrals = pyscf.df.incore.aux_e2(mol, fakemol, 'int3c2e_ip1').transpose(1,2,3,0)
+            mo_occ = self.c_mo[:, 0:self.num_inactive_orbs]
+            rdm1_ao = 2.0*mo_occ @ mo_occ.T
+            mo_cas = self.c_mo[:, self.num_inactive_orbs:self.num_inactive_orbs+self.num_active_orbs]
+            rdm1_ao += mo_cas @ self.rdm1 @ mo_cas.T
+            electronic_field = 2.0 * np.einsum('mn,mnpx->px', rdm1_ao, field_integrals)
+            nuclear_charges = mol.atom_charges()
+            nuclear_positions = mol.atom_coords()
+            nuclear_field = compute_nuclear_field(nuclear_charges, nuclear_positions, self.PE_data.coordinates)
+            multipole_field = compute_multipole_field(self.PE_data.multipoles, self.PE_data.coordinates, self.PE_data.coordinates, self.PE_data.exclusion_lists)
+            rhs_field = electronic_field + nuclear_field + multipole_field
+            induced_dipoles = induced_dipole_solver(rhs_field, self.PE_data.coordinates, self.PE_data.polarizabilities, self.PE_data.exclusion_lists)
+            induction_operator = -np.einsum('px,mnpx->mn', induced_dipoles, field_integrals)
+            induction_operator += induction_operator.T
+            induction_operator = one_electron_integral_transform(self.c_mo, induction_operator)
+        h1 = self.h_mo + induction_operator if self.use_PE else self.h_mo
         gradient = np.zeros(len(parameters))
         num_kappa = 0
         if kappa_optimization:
@@ -1048,7 +1087,7 @@ class WaveFunctionUPS:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:
             gradient[:num_kappa] = get_orbital_gradient(
-                self.h_mo,
+                h1,
                 self.g_mo,
                 self.kappa_idx,
                 self.num_inactive_orbs,
@@ -1058,7 +1097,7 @@ class WaveFunctionUPS:
             )
         if theta_optimization:
             Hamiltonian = hamiltonian_0i_0a(
-                self.h_mo,
+                h1,
                 self.g_mo,
                 self.num_inactive_orbs,
                 self.num_active_orbs,
