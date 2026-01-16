@@ -64,12 +64,21 @@ def read_potfile(filename:str) -> namedtuple:
                 if order != 'ORDER 1 1':
                     raise ValueError(f'Cannot handle polarizability order: {order}')
                 # num_polarizabilities may or may not be less than num_site s
-                polarizabilities = np.zeros((num_sites, 6))
+                polarizabilities = np.zeros((num_sites, 3, 3))
                 for i in range(num_polarizabilities):
                     index, *values = f.readline().split()
                     index = int(index) - 1
                     values = list(map(float, values))
-                    polarizabilities[index, :] = values
+                    # expand packed to full 3x3
+                    polarizabilities[index, 0, 0] = values[0]
+                    polarizabilities[index, 0, 1] = values[1]
+                    polarizabilities[index, 1, 0] = values[1]
+                    polarizabilities[index, 0, 2] = values[2]
+                    polarizabilities[index, 2, 0] = values[2]
+                    polarizabilities[index, 1, 1] = values[3]
+                    polarizabilities[index, 1, 2] = values[4]
+                    polarizabilities[index, 2, 1] = values[4]
+                    polarizabilities[index, 2, 2] = values[5]
             if section == 'exclusion_lists':
                 num_exclusions, max_length = list(map(int, f.readline().split()))
                 exclusion_lists = np.zeros((num_exclusions, max_length), dtype=np.int64)
@@ -230,3 +239,40 @@ def compute_multipole_field(multipoles, multipole_coordinates, target_coordinate
         for exclusion in exclusion_lists[i]:
             mask[exclusion] = True
     return field
+
+def compute_induced_field(induced_dipoles, coordinates, exclusion_lists):
+    field = np.zeros_like(induced_dipoles)
+    mask = np.ones(induced_dipoles.shape[0], dtype=bool)
+    for i in range(induced_dipoles.shape[0]):
+        # set mask
+        for exclusion in exclusion_lists[i]:
+            mask[exclusion] = False
+        Rab = coordinates[mask, :] - coordinates[i, :]
+        field[i, :] = np.einsum('pjx,pj->x', T2(Rab), induced_dipoles[mask, :])
+        # release mask
+        for exclusion in exclusion_lists[i]:
+            mask[exclusion] = True
+    return field
+
+def induced_dipole_solver(rhs_field, coordinates, polarizabilities, exclusion_lists, guess=None, maxiter=100, tol=1e-10, verbose=False):
+    if guess is not None:
+        induced_dipoles_old = guess
+    else:
+        print(polarizabilities.shape, rhs_field.shape)
+        induced_dipoles_old = np.einsum('pij,pj->pi', polarizabilities, rhs_field) 
+    residual_norm = tol*10
+    iteration = 0
+    while ((iteration < maxiter) and (residual_norm > tol)):
+        induced_field = compute_induced_field(induced_dipoles_old, coordinates, exclusion_lists)
+        induced_dipoles = np.einsum('pij,pj->pi', polarizabilities, rhs_field + induced_field)
+        delta = induced_dipoles - induced_dipoles_old
+        induced_dipoles_old[:] = induced_dipoles[:]
+        residual_norm = np.linalg.norm(delta)
+        iteration += 1
+        if verbose:
+            print(f'{iteration=} {residual_norm}')
+
+    converged = residual_norm < tol
+    if not converged:
+        raise ValueError('Induced dipole solver did not converge in {maxiter=} iterations ({residual_norm=})')
+    return induced_dipoles
