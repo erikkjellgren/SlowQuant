@@ -264,6 +264,9 @@ class WaveFunctionUPS:
         if potfile:
             self.use_PE = True
             self.PE_data = read_potfile(potfile)
+            self.induced_dipoles = None
+            self._multipole_field = None
+            self._nuclear_field = None
 
     @property
     def kappa(self) -> list[float]:
@@ -751,6 +754,21 @@ class WaveFunctionUPS:
             )
         return self._energy_elec
 
+    @property
+    def multipole_field(self):
+        if self._multipole_field is None:
+            self._multipole_field = compute_multipole_field(self.PE_data.multipoles, self.PE_data.coordinates, self.PE_data.coordinates, self.PE_data.exclusion_lists)
+        return self._multipole_field
+
+    @property
+    def nuclear_field(self):
+        mol = self.int_gen.int_obj
+        nuclear_charges = mol.atom_charges()
+        nuclear_positions = mol.atom_coords()
+        if self._nuclear_field is None:
+            self._nuclear_field = compute_nuclear_field(nuclear_charges, nuclear_positions, self.PE_data.coordinates)
+        return self._nuclear_field
+
     def _get_hamiltonian(self, qiskit_form: bool = False) -> FermionicOperator | dict[str, float]:
         """Return electronic Hamiltonian as FermionicOperator.
 
@@ -1021,12 +1039,9 @@ class WaveFunctionUPS:
                 mo_cas = self.c_mo[:, self.num_inactive_orbs:self.num_inactive_orbs+self.num_active_orbs]
                 rdm1_ao += mo_cas @ self.rdm1 @ mo_cas.T
                 electronic_field = 2.0 * np.einsum('mn,mnpx->px', rdm1_ao, field_integrals)
-                nuclear_charges = mol.atom_charges()
-                nuclear_positions = mol.atom_coords()
-                nuclear_field = compute_nuclear_field(nuclear_charges, nuclear_positions, self.PE_data.coordinates)
-                multipole_field = compute_multipole_field(self.PE_data.multipoles, self.PE_data.coordinates, self.PE_data.coordinates, self.PE_data.exclusion_lists)
-                rhs_field = electronic_field + nuclear_field + multipole_field
-                induced_dipoles = induced_dipole_solver(rhs_field, self.PE_data.coordinates, self.PE_data.polarizabilities, self.PE_data.exclusion_lists)
+                rhs_field = electronic_field + self.nuclear_field + self.multipole_field
+                induced_dipoles = induced_dipole_solver(rhs_field, self.PE_data.coordinates, self.PE_data.polarizabilities, self.PE_data.exclusion_lists, guess=self.induced_dipoles)
+                self.induced_dipoles = induced_dipoles
                 induction_operator = -np.einsum('px,mnpx->mn', induced_dipoles, field_integrals)
                 induction_operator += induction_operator.T
                 induction_operator = one_electron_integral_transform(self.c_mo, induction_operator)
@@ -1068,12 +1083,9 @@ class WaveFunctionUPS:
             mo_cas = self.c_mo[:, self.num_inactive_orbs:self.num_inactive_orbs+self.num_active_orbs]
             rdm1_ao += mo_cas @ self.rdm1 @ mo_cas.T
             electronic_field = 2.0 * np.einsum('mn,mnpx->px', rdm1_ao, field_integrals)
-            nuclear_charges = mol.atom_charges()
-            nuclear_positions = mol.atom_coords()
-            nuclear_field = compute_nuclear_field(nuclear_charges, nuclear_positions, self.PE_data.coordinates)
-            multipole_field = compute_multipole_field(self.PE_data.multipoles, self.PE_data.coordinates, self.PE_data.coordinates, self.PE_data.exclusion_lists)
-            rhs_field = electronic_field + nuclear_field + multipole_field
-            induced_dipoles = induced_dipole_solver(rhs_field, self.PE_data.coordinates, self.PE_data.polarizabilities, self.PE_data.exclusion_lists)
+            rhs_field = electronic_field + self.nuclear_field + self.multipole_field
+            induced_dipoles = induced_dipole_solver(rhs_field, self.PE_data.coordinates, self.PE_data.polarizabilities, self.PE_data.exclusion_lists, guess=self.induced_dipoles)
+            self.induced_dipoles = induced_dipoles
             induction_operator = -np.einsum('px,mnpx->mn', induced_dipoles, field_integrals)
             induction_operator += induction_operator.T
             induction_operator = one_electron_integral_transform(self.c_mo, induction_operator)
