@@ -308,15 +308,16 @@ def induced_dipole_solver(rhs_field, coordinates, polarizabilities, exclusion_li
     return induced_dipoles
 
 class PolarizableEmbedding:
-    def __init__(self, potfile, int_gen):
+    def __init__(self, potfile, int_obj):
         PE_data = read_potfile(potfile)
-        self.int_gen = int_gen
+        self.int_obj = int_obj
         self.coordinates = PE_data.coordinates
         self.multipoles = PE_data.multipoles
         self.polarizabilities = PE_data.polarizabilities
         self.exclusion_lists = PE_data.exclusion_lists
 
         self.induced_dipoles = None
+        self._polarization_energy = None
         self._nuclear_field = None
         self._multipole_field = None
         self._energy_nuclear_multipole = None
@@ -330,13 +331,19 @@ class PolarizableEmbedding:
 
     @property
     def nuclear_field(self):
-        mol = self.int_gen.int_obj
-        nuclear_charges = mol.atom_charges()
-        nuclear_positions = mol.atom_coords()
         if self._nuclear_field is None:
+            mol = self.int_obj
+            nuclear_charges = mol.atom_charges()
+            nuclear_positions = mol.atom_coords()
             self._nuclear_field = compute_nuclear_field(nuclear_charges, nuclear_positions, self.coordinates)
         return self._nuclear_field
 
+    @property
+    def polarization_energy(self):
+        assert self._polarization_energy is not None
+        return self._polarization_energy
+
     def solve_induced_dipoles(self, rhs_field):
         self.induced_dipoles = induced_dipole_solver(rhs_field, self.coordinates, self.polarizabilities, self.exclusion_lists, guess=self.induced_dipoles)
+        self._polarization_energy = -0.5*np.dot(self.induced_dipoles.ravel(), rhs_field.ravel())
         return self.induced_dipoles

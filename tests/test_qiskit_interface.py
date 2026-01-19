@@ -53,8 +53,7 @@ def test_LiH_naive() -> None:
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         "SD",
     )
 
@@ -71,8 +70,7 @@ def test_LiH_naive() -> None:
         mol.nelectron,
         (2, 2),
         WF.c_mo,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
 
@@ -124,8 +122,7 @@ def test_LiH_projected() -> None:
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         "SD",
     )
     WF.run_wf_optimization_1step("BFGS", True)
@@ -141,8 +138,7 @@ def test_LiH_projected() -> None:
         mol.nelectron,
         (2, 2),
         WF.c_mo,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
     qWF.run_wf_optimization_2step("rotosolve", True)
@@ -187,8 +183,7 @@ def test_LiH_allprojected() -> None:
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         "SD",
     )
 
@@ -206,8 +201,7 @@ def test_LiH_allprojected() -> None:
         mol.nelectron,
         (2, 2),
         WF.c_mo,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
 
@@ -259,8 +253,7 @@ def test_LiH_naive_sampler_ISA() -> None:
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         "SD",
     )
 
@@ -277,8 +270,7 @@ def test_LiH_naive_sampler_ISA() -> None:
         mol.nelectron,
         (2, 2),
         WF.c_mo,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
 
@@ -319,15 +311,12 @@ def test_LiH_oscillator_strength() -> None:
     mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
     rhf = pyscf.scf.RHF(mol).run()
 
-    x, y, z = mol.intor("int1e_r", comp=3)
-
     # SlowQuant
     WF = WaveFunctionUCC(
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         "SD",
     )
 
@@ -344,8 +333,7 @@ def test_LiH_oscillator_strength() -> None:
         mol.nelectron,
         (2, 2),
         WF.c_mo,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
 
@@ -356,7 +344,7 @@ def test_LiH_oscillator_strength() -> None:
     qLR_naive.run(do_rdm=True)
     qLR_naive.get_excitation_energies()
     qLR_naive.get_normed_excitation_vectors()
-    osc_strengths = qLR_naive.get_oscillator_strength([x, y, z])
+    osc_strengths = qLR_naive.get_oscillator_strength()
 
     solution = [
         0.04994476,
@@ -381,7 +369,7 @@ def test_LiH_oscillator_strength() -> None:
     qLR_proj.run(do_rdm=True)
     qLR_proj.get_excitation_energies()
     qLR_proj.get_normed_excitation_vectors()
-    osc_strengths = qLR_proj.get_oscillator_strength([x, y, z])
+    osc_strengths = qLR_proj.get_oscillator_strength()
 
     solution = [
         0.04994581,
@@ -406,7 +394,7 @@ def test_LiH_oscillator_strength() -> None:
     qLR_allproj.run()
     qLR_allproj.get_excitation_energies()
     qLR_allproj.get_normed_excitation_vectors()
-    osc_strengths = qLR_allproj.get_oscillator_strength([x, y, z])
+    osc_strengths = qLR_allproj.get_oscillator_strength()
 
     solution = [
         0.05010188,
@@ -445,8 +433,7 @@ def test_gradient_optimizer_H2() -> None:
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
 
@@ -474,8 +461,7 @@ def test_sampler_changes() -> None:
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
 
@@ -538,8 +524,7 @@ def test_shots() -> None:
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
 
@@ -561,8 +546,7 @@ def test_fUCC_h2o() -> None:
         mol.nelectron,
         (4, 4),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
 
@@ -594,8 +578,7 @@ def test_samplerV2() -> None:
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
 
@@ -627,8 +610,7 @@ def test_samplerV2_ibm() -> None:
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
 
@@ -655,8 +637,7 @@ def test_custom() -> None:
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
     qWF.run_wf_optimization_2step("rotosolve", True, is_silent_subiterations=True)
@@ -702,8 +683,7 @@ def test_H2_sampler_layout() -> None:
         mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         QI,
     )
 
@@ -728,16 +708,13 @@ def test_mitigation_nocm() -> None:
     SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
 
     # Conventional UPS wave function
     WF = WaveFunctionUPS(
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
         include_active_kappa=True,
@@ -761,8 +738,7 @@ def test_mitigation_nocm() -> None:
         SQobj.molecule.number_electrons,
         (2, 2),
         WF.c_mo,
-        h_core,
-        g_eri,
+        SQobj,
         QI,
     )
     qWF.thetas = WF.thetas
@@ -791,24 +767,21 @@ def test_mitigation() -> None:
     """Test mitigations."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
-        """Li  0.0           0.0  0.0;
-        H  0.735           0.0  0.0;
+        """Li  0.0  0.0  0.0;
+        H  0.735  0.0  0.0;
         """,
         distance_unit="angstrom",
     )
     SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
 
     # Conventional UPS wave function
     WF = WaveFunctionUPS(
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
         include_active_kappa=True,
@@ -833,8 +806,7 @@ def test_mitigation() -> None:
         SQobj.molecule.number_electrons,
         (2, 2),
         WF.c_mo,
-        h_core,
-        g_eri,
+        SQobj,
         QI,
     )
     qWF.thetas = WF.thetas
@@ -872,16 +844,12 @@ def test_state_average_layout() -> None:
     SQobj.init_hartree_fock()
 
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    c_mo = SQobj.hartree_fock.mo_coeff
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
 
     WF = WaveFunctionSAUPS(
         SQobj.molecule.number_electrons,
         (2, 4),
-        c_mo,
-        h_core,
-        g_eri,
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
         (
             [
                 [1],
@@ -911,9 +879,8 @@ def test_state_average_layout() -> None:
     QWF = WaveFunctionSACircuit(
         SQobj.molecule.number_electrons,
         (2, 4),
-        c_mo,
-        h_core,
-        g_eri,
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
         (
             [
                 [1],
@@ -944,16 +911,12 @@ def test_state_average_M() -> None:
     SQobj.init_hartree_fock()
 
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    c_mo = SQobj.hartree_fock.mo_coeff
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
 
     WF = WaveFunctionSAUPS(
         SQobj.molecule.number_electrons,
         (2, 2),
-        c_mo,
-        h_core,
-        g_eri,
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
         (
             [
                 [1],
@@ -986,9 +949,8 @@ def test_state_average_M() -> None:
     QWF = WaveFunctionSACircuit(
         SQobj.molecule.number_electrons,
         (2, 2),
-        c_mo,
-        h_core,
-        g_eri,
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
         (
             [
                 [1],
@@ -1019,16 +981,12 @@ def test_state_average_Mplus() -> None:
     SQobj.init_hartree_fock()
 
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    c_mo = SQobj.hartree_fock.mo_coeff
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
 
     WF = WaveFunctionSAUPS(
         SQobj.molecule.number_electrons,
         (2, 2),
-        c_mo,
-        h_core,
-        g_eri,
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
         (
             [
                 [1],
@@ -1051,9 +1009,8 @@ def test_state_average_Mplus() -> None:
     QWF = WaveFunctionSACircuit(
         SQobj.molecule.number_electrons,
         (2, 2),
-        c_mo,
-        h_core,
-        g_eri,
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
         (
             [
                 [1],
@@ -1108,16 +1065,12 @@ def test_no_saving() -> None:
     SQobj.init_hartree_fock()
 
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    c_mo = SQobj.hartree_fock.mo_coeff
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
 
     WF = WaveFunctionSAUPS(
         SQobj.molecule.number_electrons,
         (2, 2),
-        c_mo,
-        h_core,
-        g_eri,
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
         (
             [
                 [1],
@@ -1140,9 +1093,8 @@ def test_no_saving() -> None:
     QWF = WaveFunctionSACircuit(
         SQobj.molecule.number_electrons,
         (2, 2),
-        c_mo,
-        h_core,
-        g_eri,
+        SQobj.hartree_fock.mo_coeff,
+        SQobj,
         (
             [
                 [1],
@@ -1186,16 +1138,13 @@ def test_variance_nocm() -> None:
     SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
 
     # Conventional UPS wave function
     WF = WaveFunctionUPS(
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
         include_active_kappa=True,
@@ -1219,8 +1168,7 @@ def test_variance_nocm() -> None:
         SQobj.molecule.number_electrons,
         (2, 2),
         WF.c_mo,
-        h_core,
-        g_eri,
+        SQobj,
         QI,
     )
     qWF.thetas = WF.thetas
@@ -1245,16 +1193,13 @@ def test_variance() -> None:
     SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
 
     # Conventional UPS wave function
     WF = WaveFunctionUPS(
         SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "tUPS",
         ansatz_options={"n_layers": 1, "skip_last_singles": True},
         include_active_kappa=True,
@@ -1279,8 +1224,7 @@ def test_variance() -> None:
         SQobj.molecule.number_electrons,
         (2, 2),
         WF.c_mo,
-        h_core,
-        g_eri,
+        SQobj,
         QI,
     )
     qWF.thetas = WF.thetas
