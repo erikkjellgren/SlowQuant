@@ -211,13 +211,8 @@ def compute_potential(multipoles, multipole_coordinates, target_coordinates):
         potential += np.einsum('pijk,pjk->i', T2(Rab), multipoles[2].reshape(-1,3,3)) / 2
     return potential
 
-def compute_nuclear_multipole_energy(nuclear_charges):
-    potential = compute_potential(multipoles, multipole_coordinates, nuclear_coordinates)
-    energy = np.dot(potential, nuclear_charges)
-    return energy
-
-def compute_nuclear_field(nuclear_charges, nuclear_positions, target_coordinates):
-    Rab = nuclear_positions[:,None] - target_coordinates
+def compute_nuclear_field(nuclear_charges, nuclear_coordinates, target_coordinates):
+    Rab = nuclear_coordinates[:,None] - target_coordinates
     field = np.einsum('pix,p->ix', T1(Rab), nuclear_charges)
     return field
 
@@ -317,11 +312,22 @@ class PolarizableEmbedding:
         self.exclusion_lists = PE_data.exclusion_lists
 
         self.induced_dipoles = None
+        self._nuclear_multipole_energy = None
         self._polarization_energy = None
         self._nuclear_field = None
         self._multipole_field = None
         self._energy_nuclear_multipole = None
         self._v_static_ao = None
+
+    @property
+    def nuclear_multipole_energy(self):
+        if self._nuclear_multipole_energy is None:
+            mol = self.int_obj
+            nuclear_charges = mol.atom_charges()
+            nuclear_coordinates = mol.atom_coords()
+            potential = compute_potential(self.multipoles, self.coordinates, nuclear_coordinates)
+            self._nuclear_multipole_energy = np.dot(potential, nuclear_charges)
+        return self._nuclear_multipole_energy
 
     @property
     def multipole_field(self):
@@ -334,8 +340,8 @@ class PolarizableEmbedding:
         if self._nuclear_field is None:
             mol = self.int_obj
             nuclear_charges = mol.atom_charges()
-            nuclear_positions = mol.atom_coords()
-            self._nuclear_field = compute_nuclear_field(nuclear_charges, nuclear_positions, self.coordinates)
+            nuclear_coordinates = mol.atom_coords()
+            self._nuclear_field = compute_nuclear_field(nuclear_charges, nuclear_coordinates, self.coordinates)
         return self._nuclear_field
 
     @property
