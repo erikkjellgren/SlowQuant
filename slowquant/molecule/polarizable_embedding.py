@@ -261,18 +261,48 @@ def induced_dipole_solver(rhs_field, coordinates, polarizabilities, exclusion_li
         print(polarizabilities.shape, rhs_field.shape)
         induced_dipoles_old = np.einsum('pij,pj->pi', polarizabilities, rhs_field) 
     residual_norm = tol*10
-    iteration = 0
-    while ((iteration < maxiter) and (residual_norm > tol)):
+    iterations = 0
+
+    diis_errors = []
+    diis_vectors = []
+    diis_maxdim = 10
+
+    while ((iterations < maxiter) and (residual_norm > tol)):
         induced_field = compute_induced_field(induced_dipoles_old, coordinates, exclusion_lists)
         induced_dipoles = np.einsum('pij,pj->pi', polarizabilities, rhs_field + induced_field)
-        delta = induced_dipoles - induced_dipoles_old
+        error = induced_dipoles - induced_dipoles_old
         induced_dipoles_old[:] = induced_dipoles[:]
-        residual_norm = np.linalg.norm(delta)
-        iteration += 1
+        residual_norm = np.linalg.norm(error)
+
+        diis_vectors.append(np.copy(induced_dipoles))
+        diis_errors.append(error)
+
+        if len(diis_vectors) > diis_maxdim:
+            diis_vectors.pop(0)
+            diis_errors.pop(0)
+
+        if len(diis_vectors) > 1:
+            B = np.zeros((len(diis_errors)+1, len(diis_errors)+1))
+            B[:,-1] = B[-1,:] = -1.0
+            for i in range(len(diis_errors)):
+                for j in range(len(diis_errors)):
+                    B[i,j] = np.dot(diis_errors[i].ravel(), diis_errors[j].ravel())
+            rhs = np.zeros(len(diis_errors)+1)
+            rhs[-1] = -1
+            weights = np.linalg.solve(B, rhs)[:-1]
+            wsum = 0.
+            induced_dipoles_old[:] = 0.0
+            for (mu, w) in zip(diis_vectors, weights):
+                induced_dipoles_old += w*mu
+                wsum += w
+
+        iterations += 1
         if verbose:
-            print(f'{iteration=} {residual_norm}')
+            print(f'{iterations=} {residual_norm}')
 
     converged = residual_norm < tol
     if not converged:
         raise ValueError('Induced dipole solver did not converge in {maxiter=} iterations ({residual_norm=})')
+    if verbose:
+        print(f'Converged in {iterations} {residual_norm=}')
     return induced_dipoles
