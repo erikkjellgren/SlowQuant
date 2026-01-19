@@ -10,6 +10,7 @@ class IntegralManager:
     __slots__ = (
         "_electric_dipole",
         "_electron_electron_repulsion",
+        "_h_ao",
         "_kinetic_energy",
         "_nuclear_electron_attraction",
         "int_obj",
@@ -26,6 +27,7 @@ class IntegralManager:
         self._nuclear_electron_attraction: np.ndarray | None = None
         self._electron_electron_repulsion: np.ndarray | None = None
         self._electric_dipole: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
+        self._h_ao: np.ndarray | None = None
 
     @property
     def kinetic_energy(self) -> np.ndarray:
@@ -97,3 +99,17 @@ class IntegralManager:
             raise ValueError("Got unknown integral object, {type(self.int_obj)}")
         self._electric_dipole = dipole_integrals
         return dipole_integrals
+
+    @property
+    def h_ao(self) -> np.ndarray:
+        """One-electron core hamiltonian in AO."""
+        if isinstance(self._h_ao, np.ndarray):
+            return self._h_ao
+        if isinstance(self.int_obj, SlowQuant):
+            h_core = self.nuclear_electron_attraction + self.kinetic_energy
+        elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
+            h_core = self.nuclear_electron_attraction + self.kinetic_energy
+        else:
+            raise ValueError("Got unknown integral object, {type(self.int_obj)}")
+        self._h_ao = h_core
+        return h_core
