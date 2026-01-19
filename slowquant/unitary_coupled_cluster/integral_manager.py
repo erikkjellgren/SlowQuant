@@ -30,6 +30,16 @@ class IntegralManager:
         self._h_ao: np.ndarray | None = None
 
     @property
+    def num_elec(self) -> int:
+        """Number of electrons."""
+        if isinstance(self.int_obj, SlowQuant):
+            return self.int_obj.molecule.number_electrons
+        elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
+            return self.int_obj.nelectron
+        else:
+            raise ValueError("Got unknown integral object, {type(self.int_obj)}")
+
+    @property
     def kinetic_energy(self) -> np.ndarray:
         """Electron kinetic energy integrals."""
         if isinstance(self._kinetic_energy, np.ndarray):

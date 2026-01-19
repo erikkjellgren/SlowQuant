@@ -21,7 +21,7 @@ def test_heh_sto3g_hf() -> None:
     A.set_basis_set("sto-3g")
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
-    WF = WaveFunctionUCC(A.molecule.number_electrons, (2, 1), S_sqrt, A, "S")
+    WF = WaveFunctionUCC((2, 1), S_sqrt, A, "S")
     WF.run_wf_optimization_1step("BFGS", True)
     assert abs(WF.energy_elec - (-4.262632309847)) < 10**-8
 
@@ -37,7 +37,7 @@ def test_lih_sto3g_hf() -> None:
     A.set_basis_set("sto-3g")
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
-    WF = WaveFunctionUCC(A.molecule.number_electrons, (2, 1), S_sqrt, A, "S")
+    WF = WaveFunctionUCC((2, 1), S_sqrt, A, "S")
     WF.run_wf_optimization_1step("BFGS", True)
     assert abs(WF.energy_elec - (-8.862246324082243)) < 10**-8
 
@@ -54,7 +54,7 @@ def test_heh_sto3g_uccs() -> None:
     A.set_basis_set("sto-3g")
     Lambda_S, L_S = np.linalg.eigh(A.integral.overlap_matrix)
     S_sqrt = np.dot(np.dot(L_S, np.diag(Lambda_S ** (-1 / 2))), np.transpose(L_S))
-    WF = WaveFunctionUCC(A.molecule.number_electrons, (2, 2), S_sqrt, A, "S")
+    WF = WaveFunctionUCC((2, 2), S_sqrt, A, "S")
     WF.run_wf_optimization_1step("BFGS", False)
     assert abs(WF.energy_elec - (-4.262632309847)) < 10**-8
 
@@ -82,7 +82,6 @@ def test_h10_sto3g_uccsd() -> None:
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUCC(
-        A.molecule.number_electrons,
         (2, 2),
         A.hartree_fock.mo_coeff,
         A,
@@ -104,7 +103,6 @@ def test_h2_431g_oouccd() -> None:
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUCC(
-        A.molecule.number_electrons,
         (2, 2),
         A.hartree_fock.mo_coeff,
         A,
@@ -129,7 +127,6 @@ def test_h4_sto3g_oouccsd() -> None:
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUCC(
-        A.molecule.number_electrons,
         (2, 2),
         A.hartree_fock.mo_coeff,
         A,
@@ -153,7 +150,6 @@ def test_h4_sto3g_oouccd() -> None:
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUCC(
-        A.molecule.number_electrons,
         (2, 2),
         A.hartree_fock.mo_coeff,
         A,
@@ -176,7 +172,6 @@ def test_h2_sto3g_uccsd_lr() -> None:
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -210,7 +205,6 @@ def test_h4_sto3g_uccdq() -> None:
     A.init_hartree_fock()
     A.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUCC(
-        A.molecule.number_electrons,
         (4, 4),
         A.hartree_fock.mo_coeff,
         A,
@@ -232,7 +226,6 @@ def test_h2_631g_hf_lr() -> None:
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 1),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -262,7 +255,6 @@ def test_h2_631g_oouccsd_lr() -> None:
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -300,7 +292,6 @@ def test_h4_sto3g_uccsd_lr_naive() -> None:
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (4, 4),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -382,7 +373,6 @@ def test_be_sto3g_uccsd_lr_naive() -> None:
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -452,7 +442,6 @@ def test_lih_sto3g_uccsd_lr_naive() -> None:
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -531,7 +520,6 @@ def test_LiH_sto3g_uccsd_lr() -> None:
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -612,7 +600,6 @@ def test_H4_sto3g_uccsdtq() -> None:
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (4, 4),
         SQobj.hartree_fock.mo_coeff,
         SQobj,

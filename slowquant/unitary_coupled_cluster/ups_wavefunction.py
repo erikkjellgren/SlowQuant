@@ -38,7 +38,6 @@ from slowquant.unitary_coupled_cluster.util import UpsStructure
 class WaveFunctionUPS:
     def __init__(
         self,
-        num_elec: int,
         cas: Sequence[int],
         mo_coeffs: np.ndarray,
         integral_generator: SlowQuant | pyscf.gto.mole.Mole,
@@ -49,7 +48,6 @@ class WaveFunctionUPS:
         """Initialize for UPS wave function.
 
         Args:
-            num_elec: Number of electrons.
             cas: CAS(num_active_elec, num_active_orbs),
                  orbitals are counted in spatial basis.
             mo_coeffs: Initial orbital coefficients.
@@ -76,9 +74,6 @@ class WaveFunctionUPS:
         self.active_idx_shifted = []
         self.active_occ_idx_shifted = []
         self.active_unocc_idx_shifted = []
-        self.num_elec = num_elec
-        self.num_elec_alpha = num_elec // 2
-        self.num_elec_beta = num_elec // 2
         self.num_spin_orbs = 2 * len(self.int_gen.kinetic_energy)
         self.num_orbs = len(self.int_gen.kinetic_energy)
         self.num_active_elec = 0
@@ -95,6 +90,7 @@ class WaveFunctionUPS:
         # Construct spin orbital spaces and indices
         active_space = []
         orbital_counter = 0
+        num_elec = self.int_gen.num_elec
         for i in range(num_elec - cas[0], num_elec):
             active_space.append(i)
             orbital_counter += 1
@@ -162,10 +158,10 @@ class WaveFunctionUPS:
                 self.active_unocc_idx_shifted.append(active_idx - active_shift)
         # Find non-redundant kappas
         self._kappa = []
-        self.kappa_idx = []
-        self.kappa_no_activeactive_idx = []
-        self.kappa_no_activeactive_idx_dagger = []
-        self.kappa_redundant_idx = []
+        kappa_idx = []
+        kappa_no_activeactive_idx = []
+        kappa_no_activeactive_idx_dagger = []
+        kappa_redundant_idx = []
         self._kappa_old = []
         # kappa can be optimized in spatial basis
         # Loop over all q>p orb combinations and find redundant kappas
@@ -173,37 +169,37 @@ class WaveFunctionUPS:
             for q in range(p + 1, self.num_orbs):
                 # find redundant kappas
                 if p in self.inactive_idx and q in self.inactive_idx:
-                    self.kappa_redundant_idx.append((p, q))
+                    kappa_redundant_idx.append((p, q))
                     continue
                 if p in self.virtual_idx and q in self.virtual_idx:
-                    self.kappa_redundant_idx.append((p, q))
+                    kappa_redundant_idx.append((p, q))
                     continue
                 if not include_active_kappa:
                     if p in self.active_idx and q in self.active_idx:
-                        self.kappa_redundant_idx.append((p, q))
+                        kappa_redundant_idx.append((p, q))
                         continue
                 if not (p in self.active_idx and q in self.active_idx):
-                    self.kappa_no_activeactive_idx.append((p, q))
-                    self.kappa_no_activeactive_idx_dagger.append((q, p))
+                    kappa_no_activeactive_idx.append((p, q))
+                    kappa_no_activeactive_idx_dagger.append((q, p))
                 # the rest is non-redundant
                 self._kappa.append(0.0)
                 self._kappa_old.append(0.0)
-                self.kappa_idx.append((p, q))
+                kappa_idx.append((p, q))
         # HF like orbital rotation indices
-        self.kappa_hf_like_idx = []
+        kappa_hf_like_idx = []
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
                 if p in self.inactive_idx and q in self.virtual_idx:
-                    self.kappa_hf_like_idx.append((p, q))
+                    kappa_hf_like_idx.append((p, q))
                 elif p in self.inactive_idx and q in self.active_unocc_idx:
-                    self.kappa_hf_like_idx.append((p, q))
+                    kappa_hf_like_idx.append((p, q))
                 elif p in self.active_occ_idx and q in self.virtual_idx:
-                    self.kappa_hf_like_idx.append((p, q))
-        self.kappa_idx = np.array(self.kappa_idx)
-        self.kappa_no_activeactive_idx = np.array(self.kappa_no_activeactive_idx)
-        self.kappa_no_activeactive_idx_dagger = np.array(self.kappa_no_activeactive_idx_dagger)
-        self.kappa_redundant_idx = np.array(self.kappa_redundant_idx)
-        self.kappa_hf_like_idx = np.array(self.kappa_hf_like_idx)
+                    kappa_hf_like_idx.append((p, q))
+        self.kappa_idx = np.array(kappa_idx, dtype=int)
+        self.kappa_no_activeactive_idx = np.array(kappa_no_activeactive_idx, dtype=int)
+        self.kappa_no_activeactive_idx_dagger = np.array(kappa_no_activeactive_idx_dagger, dtype=int)
+        self.kappa_redundant_idx = np.array(kappa_redundant_idx, dtype=int)
+        self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
         # Construct determinant basis
         self.ci_info = get_indexing(
             self.num_inactive_orbs,

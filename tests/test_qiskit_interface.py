@@ -50,7 +50,6 @@ def test_LiH_naive() -> None:
 
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
         mol,
@@ -67,7 +66,6 @@ def test_LiH_naive() -> None:
     QI = QuantumInterface(sampler, "fUCCSD", mapper)
 
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         WF.c_mo,
         mol,
@@ -119,7 +117,6 @@ def test_LiH_projected() -> None:
 
     # Conventional UCC wave function
     WF = WaveFunctionUCC(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
         mol,
@@ -135,7 +132,6 @@ def test_LiH_projected() -> None:
 
     # Pass converged UCC orbitals to circuit wave function but still do optimization (just a speed-up)
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         WF.c_mo,
         mol,
@@ -180,7 +176,6 @@ def test_LiH_allprojected() -> None:
 
     # Conventional UCC wave function
     WF = WaveFunctionUCC(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
         mol,
@@ -198,7 +193,6 @@ def test_LiH_allprojected() -> None:
 
     # Pass converged UCC orbitals to circuit wave function but still do optimization (just a speed-up)
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         WF.c_mo,
         mol,
@@ -250,7 +244,6 @@ def test_LiH_naive_sampler_ISA() -> None:
 
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
         mol,
@@ -267,7 +260,6 @@ def test_LiH_naive_sampler_ISA() -> None:
     QI = QuantumInterface(sampler, "fUCCSD", mapper, ISA=True)
 
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         WF.c_mo,
         mol,
@@ -313,7 +305,6 @@ def test_LiH_oscillator_strength() -> None:
 
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
         mol,
@@ -330,7 +321,6 @@ def test_LiH_oscillator_strength() -> None:
     QI = QuantumInterface(sampler, "fUCCSD", mapper)
 
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         WF.c_mo,
         mol,
@@ -430,7 +420,6 @@ def test_gradient_optimizer_H2() -> None:
     QI = QuantumInterface(sampler, "fUCCD", mapper)
 
     WF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
         mol,
@@ -458,7 +447,6 @@ def test_sampler_changes() -> None:
     QI = QuantumInterface(sampler, "fUCCSD", mapper)
 
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
         mol,
@@ -521,7 +509,6 @@ def test_shots() -> None:
     QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=10)
 
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
         mol,
@@ -543,7 +530,6 @@ def test_fUCC_h2o() -> None:
     QI = QuantumInterface(sampler, "fUCCSD", mapper)
 
     WF = WaveFunctionCircuit(
-        mol.nelectron,
         (4, 4),
         rhf.mo_coeff,
         mol,
@@ -575,7 +561,6 @@ def test_samplerV2() -> None:
     QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=10)
 
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
         mol,
@@ -607,7 +592,6 @@ def test_samplerV2_ibm() -> None:
     QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=10)
 
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
         mol,
@@ -634,7 +618,6 @@ def test_custom() -> None:
     QI = QuantumInterface(sampler, "fUCCSD", mapper, shots=None)
 
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
         mol,
@@ -680,7 +663,6 @@ def test_H2_sampler_layout() -> None:
     QI = QuantumInterface(sampler, "fUCCSD", mapper, ISA=True)
 
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 2),
         rhf.mo_coeff,
         mol,
@@ -711,7 +693,6 @@ def test_mitigation_nocm() -> None:
 
     # Conventional UPS wave function
     WF = WaveFunctionUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -735,7 +716,6 @@ def test_mitigation_nocm() -> None:
     )
 
     qWF = WaveFunctionCircuit(
-        SQobj.molecule.number_electrons,
         (2, 2),
         WF.c_mo,
         SQobj,
@@ -778,7 +758,6 @@ def test_mitigation() -> None:
 
     # Conventional UPS wave function
     WF = WaveFunctionUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -803,7 +782,6 @@ def test_mitigation() -> None:
     )
 
     qWF = WaveFunctionCircuit(
-        SQobj.molecule.number_electrons,
         (2, 2),
         WF.c_mo,
         SQobj,
@@ -846,7 +824,6 @@ def test_state_average_layout() -> None:
     SQobj.hartree_fock.run_restricted_hartree_fock()
 
     WF = WaveFunctionSAUPS(
-        SQobj.molecule.number_electrons,
         (2, 4),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -877,7 +854,6 @@ def test_state_average_layout() -> None:
     )
 
     QWF = WaveFunctionSACircuit(
-        SQobj.molecule.number_electrons,
         (2, 4),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -913,7 +889,6 @@ def test_state_average_M() -> None:
     SQobj.hartree_fock.run_restricted_hartree_fock()
 
     WF = WaveFunctionSAUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -947,7 +922,6 @@ def test_state_average_M() -> None:
     )
 
     QWF = WaveFunctionSACircuit(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -983,7 +957,6 @@ def test_state_average_Mplus() -> None:
     SQobj.hartree_fock.run_restricted_hartree_fock()
 
     WF = WaveFunctionSAUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -1007,7 +980,6 @@ def test_state_average_Mplus() -> None:
     QI = QuantumInterface(sampler, "tUPS", mapper, ansatz_options={"n_layers": 1})
 
     QWF = WaveFunctionSACircuit(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -1067,7 +1039,6 @@ def test_no_saving() -> None:
     SQobj.hartree_fock.run_restricted_hartree_fock()
 
     WF = WaveFunctionSAUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -1091,7 +1062,6 @@ def test_no_saving() -> None:
     QI = QuantumInterface(sampler, "tUPS", mapper, ansatz_options={"n_layers": 1})
 
     QWF = WaveFunctionSACircuit(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -1141,7 +1111,6 @@ def test_variance_nocm() -> None:
 
     # Conventional UPS wave function
     WF = WaveFunctionUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -1165,7 +1134,6 @@ def test_variance_nocm() -> None:
     )
 
     qWF = WaveFunctionCircuit(
-        SQobj.molecule.number_electrons,
         (2, 2),
         WF.c_mo,
         SQobj,
@@ -1196,7 +1164,6 @@ def test_variance() -> None:
 
     # Conventional UPS wave function
     WF = WaveFunctionUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -1221,7 +1188,6 @@ def test_variance() -> None:
     )
 
     qWF = WaveFunctionCircuit(
-        SQobj.molecule.number_electrons,
         (2, 2),
         WF.c_mo,
         SQobj,

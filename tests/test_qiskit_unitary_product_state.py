@@ -27,7 +27,6 @@ def test_tups() -> None:
 
     # Conventional UPS wave function
     WF = WaveFunctionUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -46,7 +45,6 @@ def test_tups() -> None:
         primitive, "tUPS", mapper, ansatz_options={"n_layers": 1, "skip_last_singles": True}
     )
     qWF = WaveFunctionCircuit(
-        SQobj.molecule.number_electrons,
         (2, 2),
         WF.c_mo,
         SQobj,
@@ -72,7 +70,6 @@ def test_fucc() -> None:
 
     # Conventional UPS wave function
     WF = WaveFunctionUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -89,7 +86,6 @@ def test_fucc() -> None:
     primitive = Sampler(run_options={"shots": None})
     QI = QuantumInterface(primitive, "fUCCSD", mapper, ansatz_options={})
     qWF = WaveFunctionCircuit(
-        SQobj.molecule.number_electrons,
         (2, 2),
         WF.c_mo,
         SQobj,
@@ -115,7 +111,6 @@ def test_ksafupccgsd() -> None:
 
     # Conventional UPS wave function
     WF = WaveFunctionUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -132,7 +127,6 @@ def test_ksafupccgsd() -> None:
     primitive = Sampler(run_options={"shots": None})
     QI = QuantumInterface(primitive, "kSAfUpCCGSD", mapper, ansatz_options={"n_layers": 1})
     qWF = WaveFunctionCircuit(
-        SQobj.molecule.number_electrons,
         (2, 2),
         WF.c_mo,
         SQobj,
@@ -158,7 +152,6 @@ def test_sdsfuccsd() -> None:
 
     # Conventional UPS wave function
     WF = WaveFunctionUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -175,7 +168,6 @@ def test_sdsfuccsd() -> None:
     primitive = Sampler(run_options={"shots": None})
     QI = QuantumInterface(primitive, "SDSfUCCSD", mapper, ansatz_options={})
     qWF = WaveFunctionCircuit(
-        SQobj.molecule.number_electrons,
         (2, 2),
         WF.c_mo,
         SQobj,
@@ -201,7 +193,6 @@ def test_ksasdsfupccgsd() -> None:
 
     # Conventional UPS wave function
     WF = WaveFunctionUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -218,7 +209,6 @@ def test_ksasdsfupccgsd() -> None:
     primitive = Sampler(run_options={"shots": None})
     QI = QuantumInterface(primitive, "kSASDSfUpCCGSD", mapper, ansatz_options={"n_layers": 1})
     qWF = WaveFunctionCircuit(
-        SQobj.molecule.number_electrons,
         (2, 2),
         WF.c_mo,
         SQobj,
@@ -243,7 +233,6 @@ def test_lih_fucc_allparameters() -> None:
 
     # SlowQuant
     WF = WaveFunctionUPS(
-        mol.nelectron,
         (2, 3),
         rhf.mo_coeff,
         mol,
@@ -255,7 +244,6 @@ def test_lih_fucc_allparameters() -> None:
     QI = QuantumInterface(sampler, "fUCCSD", mapper)
 
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 3),
         WF.c_mo,
         mol,
@@ -280,7 +268,6 @@ def test_lih_fucc_mappings() -> None:
 
     # SlowQuant
     WF = WaveFunctionUPS(
-        mol.nelectron,
         (2, 5),
         rhf.mo_coeff,
         mol,
@@ -293,7 +280,6 @@ def test_lih_fucc_mappings() -> None:
     mapper = JordanWignerMapper()
     QI = QuantumInterface(sampler, "fUCCSD", mapper)
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 5),
         WF.c_mo,
         mol,
@@ -306,7 +292,6 @@ def test_lih_fucc_mappings() -> None:
     mapper = ParityMapper((1, 1))
     QI = QuantumInterface(sampler, "fUCCSD", mapper)
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 5),
         WF.c_mo,
         mol,
@@ -327,7 +312,6 @@ def test_lih_sdsfucc_mappings() -> None:
 
     # SlowQuant
     WF = WaveFunctionUPS(
-        mol.nelectron,
         (2, 5),
         rhf.mo_coeff,
         mol,
@@ -340,7 +324,6 @@ def test_lih_sdsfucc_mappings() -> None:
     mapper = JordanWignerMapper()
     QI = QuantumInterface(sampler, "SDSfUCCSD", mapper)
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 5),
         WF.c_mo,
         mol,
@@ -353,7 +336,6 @@ def test_lih_sdsfucc_mappings() -> None:
     mapper = ParityMapper((1, 1))
     QI = QuantumInterface(sampler, "SDSfUCCSD", mapper)
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 5),
         WF.c_mo,
         mol,
@@ -374,7 +356,6 @@ def test_lih_tups_mappings() -> None:
 
     # SlowQuant
     WF = WaveFunctionUPS(
-        mol.nelectron,
         (2, 5),
         rhf.mo_coeff,
         mol,
@@ -388,7 +369,6 @@ def test_lih_tups_mappings() -> None:
     mapper = JordanWignerMapper()
     QI = QuantumInterface(sampler, "tUPS", mapper, ansatz_options={"n_layers": 4})
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 5),
         WF.c_mo,
         mol,
@@ -401,7 +381,6 @@ def test_lih_tups_mappings() -> None:
     mapper = ParityMapper((1, 1))
     QI = QuantumInterface(sampler, "tUPS", mapper, ansatz_options={"n_layers": 4})
     qWF = WaveFunctionCircuit(
-        mol.nelectron,
         (2, 5),
         WF.c_mo,
         mol,
@@ -423,7 +402,6 @@ def test_h2_selfconsistent_lr() -> None:
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -440,7 +418,6 @@ def test_h2_selfconsistent_lr() -> None:
         primitive, "tUPS", mapper, ansatz_options={"n_layers": 1, "skip_last_singles": True}
     )
     qWF = WaveFunctionCircuit(
-        SQobj.molecule.number_electrons,
         (2, 2),
         WF.c_mo,
         SQobj,
@@ -471,7 +448,6 @@ def test_h2_statetransfer_lr() -> None:
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -488,7 +464,6 @@ def test_h2_statetransfer_lr() -> None:
         primitive, "tUPS", mapper, ansatz_options={"n_layers": 1, "skip_last_singles": True}
     )
     qWF = WaveFunctionCircuit(
-        SQobj.molecule.number_electrons,
         (2, 2),
         WF.c_mo,
         SQobj,
