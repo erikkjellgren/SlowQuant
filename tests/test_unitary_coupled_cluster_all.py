@@ -27,7 +27,6 @@ def test_h2_sto3g_uccsd_lr() -> None:
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -64,7 +63,6 @@ def test_LiH_atmethods_energies() -> None:
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -133,7 +131,6 @@ def test_LiH_naiveq_methods_energies() -> None:
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -257,7 +254,6 @@ def test_LiH_naiveq_methods_matrices() -> None:
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -322,7 +318,6 @@ def test_LiH_allproj_energies() -> None:
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -370,7 +365,6 @@ def test_LiH_STproj_energies() -> None:
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,

@@ -21,7 +21,6 @@ def test_ups_naivelr() -> None:
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -75,7 +74,6 @@ def test_LiH_sto3g_allST():
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -83,7 +81,6 @@ def test_LiH_sto3g_allST():
     )
     WF.run_wf_optimization_1step("BFGS", True)
     WF2 = WaveFunctionUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
         WF.c_mo,
         SQobj,
@@ -143,7 +140,6 @@ def test_ups_water_44() -> None:
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUPS(
-        SQobj.molecule.number_electrons,
         (4, 4),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -170,7 +166,6 @@ def test_saups_h2_3states() -> None:
     SQobj.hartree_fock.run_restricted_hartree_fock()
 
     WF = WaveFunctionSAUPS(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -215,7 +210,6 @@ def test_saups_h3_3states() -> None:
     SQobj.hartree_fock.run_restricted_hartree_fock()
 
     WF = WaveFunctionSAUPS(
-        SQobj.molecule.number_electrons,
         (2, 3),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -257,7 +251,6 @@ def test_sa_doubles() -> None:
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionUPS(
-        SQobj.molecule.number_electrons,
         (4, 6),
         SQobj.hartree_fock.mo_coeff,
         SQobj,
@@ -280,7 +273,6 @@ def test_SA_sa_doubles() -> None:
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
     WF = WaveFunctionSAUPS(
-        SQobj.molecule.number_electrons,
         (4, 6),
         SQobj.hartree_fock.mo_coeff,
         SQobj,

@@ -66,7 +66,9 @@ class LinearResponse(LinearResponseBaseClass):
             raise ValueError(f"Got incompatible wave function type, {type(self.wf)}")
         num_det = len(ci_info.idx2det)
         self.csf_coeffs = np.zeros(num_det)
-        hf_det = int("1" * self.wf.num_elec + "0" * (self.wf.num_spin_orbs - self.wf.num_elec), 2)
+        hf_det = int(
+            "1" * self.wf.int_gen.num_elec + "0" * (self.wf.num_spin_orbs - self.wf.int_gen.num_elec), 2
+        )
         self.csf_coeffs[ci_info.det2idx[hf_det]] = 1
         self.ci_coeffs = propagate_state(["U"], self.csf_coeffs, *self.index_info_extended)
         self.q_ops: list[FermionicOperator] = []
