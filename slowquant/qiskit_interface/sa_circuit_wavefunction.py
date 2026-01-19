@@ -239,9 +239,7 @@ class WaveFunctionSACircuit:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._h_mo is None:
-            self._h_mo = one_electron_integral_transform(
-                self.c_mo, self.int_gen.kinetic_energy + self.int_gen.nuclear_electron_attraction
-            )
+            self._h_mo = one_electron_integral_transform(self.c_mo, self.int_gen.h_ao)
         return self._h_mo
 
     @property
