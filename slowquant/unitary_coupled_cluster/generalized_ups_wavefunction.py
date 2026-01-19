@@ -26,9 +26,9 @@ from slowquant.unitary_coupled_cluster.generalized_operators import (
 from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import (
     generalized_construct_ups_state, generalized_construct_ups_state_modified, generalized_construct_ups_state_test_anna,
     generalized_expectation_value,
-    generalized_get_grad_action, generalized_get_grad_action_modified,
+    generalized_get_grad_action, generalized_get_grad_action_modified, generalized_get_grad_action_test_anna,
     generalized_propagate_state,
-    generalized_propagate_unitary, generalized_propagate_unitary_modified,
+    generalized_propagate_unitary, generalized_propagate_unitary_modified, generalized_propagate_unitary_test_anna,
     generalized_construct_ups_state_modified_split, generalized_get_grad_action_modified_split,
     generalized_propagate_unitary_modified_split,
 )
@@ -353,7 +353,7 @@ class GeneralizedWaveFunctionUPS:
         self.ci_coeffs = generalized_construct_ups_state_test_anna( ##AE changed
             self.csf_coeffs,
             self.ci_info,
-            (np.asarray(theta_real, dtype=float) + 1j*np.asarray(theta_imag, dtype=float)), #AE before: np.concatenate((theta_real, theta_imag))
+            self.thetas, #AE before: np.concatenate((theta_real, theta_imag))
             self.ups_layout,
         )
 
@@ -871,6 +871,8 @@ class GeneralizedWaveFunctionUPS:
             parameters = thetas
             # This is for running with real valued thetas:
             # parameters = self.thetas_real
+        print("før")
+        print(self.thetas)
         optimizer = Optimizers(
             energy,
             optimizer_name,
@@ -884,11 +886,15 @@ class GeneralizedWaveFunctionUPS:
         self._E_opt_old = 0.0
         # print(self.ups_layout.param_names)
         # print(self.ups_layout.excitation_indices)
-        # print(parameters)
+        #parameters = np.ones_like(parameters)
+        print("parameters")
+        print(parameters)
         res = optimizer.minimize(
             parameters,
             extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
         )
+        print("efter")
+        print(parameters)
 
         # print(res)
         if orbital_optimization:
@@ -914,6 +920,8 @@ class GeneralizedWaveFunctionUPS:
                 thetas_i.append(res.x[i + len(self.thetas)])
             self.set_thetas(thetas_r, thetas_i)
         self._energy_elec = res.fun
+        print("slut")
+        print(self.thetas)
 
     def do_adapt(
         self,
@@ -1146,13 +1154,13 @@ class GeneralizedWaveFunctionUPS:
             # OBS!!!!! Remember to change then call to iterate_t1 to iterate_t1_incl_diag in Ups_structure -> fucc
             # OBS!!!!! Changed self.thetas to thetas_total/self.thetas_real in the remaining function calls of this method!!!!
             # thetas_total = np.concatenate((self.thetas_real, self.thetas_imag))
-            thetas_total =  (np.asarray(self.thetas_real, dtype=float) + 1j*np.asarray(self.thetas_imag, dtype=float)) #AE changed from thetas_total = np.concatenate((self.thetas_real, self.thetas_imag))
+            # thetas_total =  (np.asarray(self.thetas_real, dtype=float) + 1j*np.asarray(self.thetas_imag, dtype=float)) #AE changed from thetas_total = np.concatenate((self.thetas_real, self.thetas_imag))
             bra_vec = generalized_construct_ups_state_test_anna( ##AE changed
                 bra_vec,
                 self.ci_info,
                 # For real-valued thetas
                 # self.thetas_real,
-                thetas_total,
+                self.thetas,
                 self.ups_layout,
                 dagger=True,
             )
@@ -1160,15 +1168,15 @@ class GeneralizedWaveFunctionUPS:
             ket_vec = np.copy(self.csf_coeffs)
             ket_vec_tmp = np.copy(self.csf_coeffs)
             # Calculate analytical derivative w.r.t. each theta using gradient_action function
-            for i in range(len(self.thetas)): # OBS!! run over len(self.thetas) if using real-valued thetas #AE removed 2*self-thetas
+            for i in range(2*len(self.thetas)): # OBS!! run over len(self.thetas) if using real-valued thetas #AE removed 2*self-thetas
                 # Derivative action w.r.t. i-th theta on CSF ket
-                ket_vec_tmp = generalized_get_grad_action( ##AE changed
+                ket_vec_tmp = generalized_get_grad_action_test_anna( ##AE changed
                     ket_vec,
                     i,
                     self.ci_info,
                     self.ups_layout,
                 )
-                temp = 2 * np.matmul(bra_vec, ket_vec_tmp)
+                #temp = 2 * np.matmul(bra_vec, ket_vec_tmp)
                 '''if temp.imag > 1e-9:
                     print ("temp_gradient is complex!",temp)
                     if i >= len(self.ups_layout.excitation_indices):
@@ -1178,24 +1186,26 @@ class GeneralizedWaveFunctionUPS:
                         print("real component")
                         print(self.ups_layout.excitation_indices[i])'''
                 gradient[i + num_kappa] += 2 * np.matmul(bra_vec, ket_vec_tmp).real
+                print(self.thetas)
+                print(gradient)
                 # Product rule implications on reference bra and CSF ket
                 # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
-                bra_vec = generalized_propagate_unitary(  ##AE changed
+                bra_vec = generalized_propagate_unitary_test_anna(  ##AE changed
                     bra_vec,
                     i,
                     self.ci_info,
                     # For real-valued thetas
                     # self.thetas_real,
-                    thetas_total,
+                    self.thetas,
                     self.ups_layout,
                 )
-                ket_vec = generalized_propagate_unitary( ##AE changed
+                ket_vec = generalized_propagate_unitary_test_anna( ##AE changed
                     ket_vec,
                     i,
                     self.ci_info,
                     # For real-valued thetas
                     # self.thetas_real,
-                    thetas_total,
+                    self.thetas,
                     self.ups_layout,
                 )
             self.num_energy_evals += 2 * np.sum(

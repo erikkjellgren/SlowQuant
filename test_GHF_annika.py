@@ -240,13 +240,15 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF = GeneralizedWaveFunctionUPS(
         mol.nelectron,
         active_space,
-        c_u,
+        c,
         h_core,
         g_eri,
         "fuccsd",
-        {"n_layers": 0, "is_spin_conserving" : False},
+        {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
+
+
 
     print(mf.energy_elec()[0])
 
@@ -334,11 +336,15 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
                             print(WF.kappa_spin_idx[i-len(WF.kappa_spin_idx)],WF.kappa_spin_idx[j-len(WF.kappa_spin_idx)])'''
 
 
-    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True, tol=1e-10,maxiter = 10000)
+    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=False, test=True, tol=1e-10,maxiter = 10000)
     #WF.do_adapt(["S","D"])
 
     #print(WF.ups_layout.excitation_indices)
-    print(WF.c_mo)
+    #print(WF.c_mo)
+
+    print("efter optimering")
+
+    print(WF.thetas)
 
     ''' my_gradient_after = get_orbital_gradient_generalized_real_imag(WF.h_mo,
         WF.g_mo,
@@ -403,7 +409,7 @@ def h2():
     #basis = "cc-pvdz"
     basis = "631-g"
     #basis = "sto-3g"
-    active_space = ((1, 1), 2)
+    active_space = ((1, 1), 4)
     #active_space = (2, 4)
     charge = 0
     spin = 0
@@ -522,7 +528,7 @@ def HBr():
     
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-h3()
+h2o()
 
 
 # h2o()

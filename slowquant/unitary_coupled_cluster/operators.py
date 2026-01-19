@@ -162,7 +162,7 @@ def G1(i: int, a: int, return_anti_hermitian: bool = False) -> FermionicOperator
         op -= op.dagger
     return op
 
-def G1_generalized(i: int, a: int, return_anti_hermitian: bool = False, Real: bool = False) -> FermionicOperator:
+def G1_generalized_old(i: int, a: int, return_anti_hermitian: bool = False, Real: bool = False) -> FermionicOperator:
     r"""Construct one-electron excitation operator.
 
     .. math::
@@ -192,6 +192,31 @@ def G1_generalized(i: int, a: int, return_anti_hermitian: bool = False, Real: bo
         if return_anti_hermitian:
             op += op.dagger  
         return 1j*op
+    
+
+def G1_generalized(i: int, a: int, dagger: bool = False) -> FermionicOperator:
+    """Construct one-electron excitation operator.
+
+    .. math::
+        \hat{G}^{[1]}_{ia} = \hat{a}_{a}^\dagger\hat{a}_i
+
+    Args:
+        i: Spin orbital index.
+        a: Spin orbital index.
+        return_anti_hermitian: Return anti-hermitian version of operator, i.e. op - op^\dagger
+
+    Returns:
+        One-electron excitation operator.
+    """
+    if not dagger:
+        op  = a_op_spin(a, dagger=True)
+        op *= a_op_spin(i, dagger=False)
+        return op
+    
+    elif dagger:
+        op  = a_op_spin(a, dagger=True)
+        op *= a_op_spin(i, dagger=False)
+        return op.dagger
 
 
 
@@ -219,7 +244,7 @@ def G2(i: int, j: int, a: int, b: int, return_anti_hermitian: bool = False) -> F
         op -= op.dagger
     return op
 
-def G2_generalized(i: int, j: int, a: int, b: int, return_anti_hermitian: bool = False, Real: bool = False) -> FermionicOperator:
+def G2_generalized_old(i: int, j: int, a: int, b: int, return_anti_hermitian: bool = False, Real: bool = False) -> FermionicOperator:
     r"""Construct two-electron excitation operator.
 
     .. math::
@@ -252,18 +277,36 @@ def G2_generalized(i: int, j: int, a: int, b: int, return_anti_hermitian: bool =
             op += op.dagger
         return 1j*op
         
-    # if i < a: ser lidt spøjst ud
-    #     op = a_op_spin(a, dagger=True)
-    #     op *= a_op_spin(i, dagger=False)
-    #     if return_anti_hermitian:
-    #         op -= op.dagger
-    #     return op
-    # elif i > a:
-    #     op = a_op_spin(a, dagger=True)
-    #     op *= a_op_spin(i, dagger=False)
-    #     if return_anti_hermitian:
-    #         op += op.dagger  
-    #     return 1j*op
+def G2_generalized(i: int, j: int, a: int, b: int, dagger: bool = False) -> FermionicOperator:
+    r"""Construct two-electron excitation operator.
+
+    .. math::
+        \hat{G}^{[2]}_{ijab} = \hat{a}_{a}^\dagger\hat{a}_{b}^\dagger\hat{a}_j\hat{a}_i
+
+    Args:
+        i: Spin orbital index.
+        j: Spin orbital index.
+        a: Spin orbital index.
+        b: Spin orbital index.
+        return_anti_hermitian: Return anti-hermitian version of operator, i.e. op - op^\dagger.
+
+    Returns:
+        Two-electron excitation operator.
+    """
+    if not dagger:
+        op  = a_op_spin(a, dagger=True)
+        op *= a_op_spin(b, dagger=True)
+        op *= a_op_spin(j, dagger=False)
+        op *= a_op_spin(i, dagger=False)
+        return op
+    
+    elif dagger:
+        op  = a_op_spin(a, dagger=True)
+        op *= a_op_spin(b, dagger=True)
+        op *= a_op_spin(j, dagger=False)
+        op *= a_op_spin(i, dagger=False)
+        return op.dagger
+   
 
 
 def G3(
