@@ -306,3 +306,37 @@ def induced_dipole_solver(rhs_field, coordinates, polarizabilities, exclusion_li
     if verbose:
         print(f'Converged in {iterations} {residual_norm=}')
     return induced_dipoles
+
+class PolarizableEmbedding:
+    def __init__(self, potfile, int_gen):
+        PE_data = read_potfile(potfile)
+        self.int_gen = int_gen
+        self.coordinates = PE_data.coordinates
+        self.multipoles = PE_data.multipoles
+        self.polarizabilities = PE_data.polarizabilities
+        self.exclusion_lists = PE_data.exclusion_lists
+
+        self.induced_dipoles = None
+        self._nuclear_field = None
+        self._multipole_field = None
+        self._energy_nuclear_multipole = None
+        self._v_static_ao = None
+
+    @property
+    def multipole_field(self):
+        if self._multipole_field is None:
+            self._multipole_field = compute_multipole_field(self.multipoles, self.coordinates, self.coordinates, self.exclusion_lists)
+        return self._multipole_field
+
+    @property
+    def nuclear_field(self):
+        mol = self.int_gen.int_obj
+        nuclear_charges = mol.atom_charges()
+        nuclear_positions = mol.atom_coords()
+        if self._nuclear_field is None:
+            self._nuclear_field = compute_nuclear_field(nuclear_charges, nuclear_positions, self.coordinates)
+        return self._nuclear_field
+
+    def solve_induced_dipoles(self, rhs_field):
+        self.induced_dipoles = induced_dipole_solver(rhs_field, self.coordinates, self.polarizabilities, self.exclusion_lists, guess=self.induced_dipoles)
+        return self.induced_dipoles
