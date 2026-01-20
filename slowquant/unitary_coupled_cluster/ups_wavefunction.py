@@ -255,7 +255,9 @@ class WaveFunctionUPS:
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
-        self.PE = self.int_gen.PE
+        self.PE = None
+        if potfile:
+            self.PE = self.int_gen.PE
 
     @property
     def kappa(self) -> list[float]:
@@ -339,7 +341,7 @@ class WaveFunctionUPS:
         if self._h_mo is None:
             self._v_PE_induction_mo = None
             self._h_mo = one_electron_integral_transform(self.c_mo, self.int_gen.h_ao)
-        if self.int_gen.PE:
+        if self.PE:
             if self.int_gen.PE.polarizabilities is not None:
                 if self._v_PE_induction_mo is None:
                     # need to recompute density for induction operator
@@ -1010,9 +1012,10 @@ class WaveFunctionUPS:
                 self.ci_coeffs,
                 self.ci_info,
             )
-        if self.PE.polarizabilities is not None:
-            # Remove polarization energy double counting
-            E -= 0.5 * self.PE.polarization_energy
+        if self.PE:
+            if self.PE.polarizabilities is not None:
+                # Remove polarization energy double counting
+                E -= 0.5 * self.PE.polarization_energy
         self._E_opt_old = E
         self._old_opt_parameters = np.copy(parameters)
         self.num_energy_evals += 1  # count one measurement

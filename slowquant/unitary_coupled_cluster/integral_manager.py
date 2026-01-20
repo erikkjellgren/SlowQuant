@@ -31,6 +31,7 @@ class IntegralManager:
         self._electric_dipole: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
         self._h_ao: np.ndarray | None = None
         self._v_PE_multipole_ao: np.ndarray | None = None
+        self.PE = None
         if potfile:
             self.PE = PolarizableEmbedding(potfile, self.int_obj)
 
@@ -116,28 +117,28 @@ class IntegralManager:
         return dipole_integrals
 
     @property
-    def v_pe_multipole_ao(self):
+    def v_PE_multipole_ao(self):
         if isinstance(self._v_PE_multipole_ao, np.ndarray):
-            return self._v_pe_multipole_ao
+            return self._v_PE_multipole_ao
         if not isinstance(self.int_obj, pyscf.gto.mole.Mole):
             raise NotImplementedError
         fakemol = pyscf.gto.fakemol_for_charges(self.PE.coordinates)
         mol = self.int_obj
-        v_pe_multipole_ao = 0.0
+        v_PE_multipole_ao = 0.0
         # charges
         if 0 in self.PE.multipoles:
-            v_pe_multipole_ao += -np.sum(pyscf.df.incore.aux_e2(mol, fakemol, 'int3c2e')*self.PE.multipoles[0].ravel(), axis=2)
+            v_PE_multipole_ao += -np.sum(pyscf.df.incore.aux_e2(mol, fakemol, 'int3c2e')*self.PE.multipoles[0].ravel(), axis=2)
         # dipoles
         if 1 in self.PE.multipoles:
             field_integrals = pyscf.df.incore.aux_e2(mol, fakemol, 'int3c2e_ip1').transpose(1,2,3,0)
             v_dip = -np.sum(field_integrals*self.PE.multipoles[1], axis=(2,3))
-            v_pe_multipole_ao += v_dip + v_dip.T
+            v_PE_multipole_ao += v_dip + v_dip.T
         # quadrupoles
         if 2 in self.PE.multipoles:
             v_quad = -0.5*np.sum((pyscf.df.incore.aux_e2(mol, fakemol, 'int3c2e_ipip1') +  pyscf.df.incore.aux_e2(mol, fakemol, 'int3c2e_ipvip1')).transpose(1,2,3,0) * self.PE.multipoles[2], axis=(2,3))
-            v_pe_multipole_ao = v_quad + v_quad.T
-        self._v_pe_multipole_ao = v_pe_multipole_ao
-        return self._v_pe_multipole_ao
+            v_PE_multipole_ao += v_quad + v_quad.T
+        self._v_PE_multipole_ao = v_PE_multipole_ao
+        return self._v_PE_multipole_ao
 
     def v_PE_induction_ao(self, density_ao):
         if not isinstance(self.int_obj, pyscf.gto.mole.Mole):
@@ -149,9 +150,9 @@ class IntegralManager:
         electronic_field = 2.0 * np.einsum('mn,mnpx->px', density_ao, field_integrals)
         rhs_field = electronic_field + self.PE.nuclear_field + self.PE.multipole_field
         induced_dipoles = self.PE.solve_induced_dipoles(rhs_field)
-        v_pe_induction_ao = -np.einsum('px,mnpx->mn', induced_dipoles, field_integrals)
-        v_pe_induction_ao += v_pe_induction_ao.T
-        return v_pe_induction_ao
+        v_PE_induction_ao = -np.einsum('px,mnpx->mn', induced_dipoles, field_integrals)
+        v_PE_induction_ao += v_PE_induction_ao.T
+        return v_PE_induction_ao
 
     @property
     def h_ao(self) -> np.ndarray:
@@ -165,4 +166,6 @@ class IntegralManager:
         else:
             raise ValueError("Got unknown integral object, {type(self.int_obj)}")
         self._h_ao = h_core
+        if self.PE:
+            self._h_ao += self.v_PE_multipole_ao
         return h_core
