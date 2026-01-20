@@ -31,7 +31,7 @@ class IntegralManager:
         self._electron_electron_repulsion: np.ndarray | None = None
         self._electric_dipole: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
         self._h_ao: np.ndarray | None = None
-        self._v_PE_multipole_ao: float | None = None
+        self._v_PE_multipole_ao: np.ndarray | None = None
         self.PE = None
         if potfile:
             if not isinstance(self.int_obj, pyscf.gto.mole.Mole):
@@ -120,8 +120,8 @@ class IntegralManager:
         return dipole_integrals
 
     @property
-    def v_PE_multipole_ao(self) -> float:
-        if isinstance(self._v_PE_multipole_ao, float):
+    def v_PE_multipole_ao(self) -> np.ndarray:
+        if isinstance(self._v_PE_multipole_ao, np.ndarray):
             return self._v_PE_multipole_ao
         if self.PE is None:
             raise ValueError("Polarizable Embedding is not activated.")
@@ -129,26 +129,31 @@ class IntegralManager:
             raise NotImplementedError
         fakemol = pyscf.gto.fakemol_for_charges(self.PE.coordinates)
         mol = self.int_obj
-        v_PE_multipole_ao = 0.0
+        v_PE_multipole_ao = np.zeros((mol.nao, mol.nao), dtype=np.float64)
         # charges
         if 0 in self.PE.multipoles:
-            v_PE_multipole_ao += -np.sum(
-                pyscf.df.incore.aux_e2(mol, fakemol, "int3c2e") * self.PE.multipoles[0].ravel(), axis=2
+            v_PE_multipole_ao += -np.einsum(
+                "ijk,k->ij",
+                pyscf.df.incore.aux_e2(mol, fakemol, "int3c2e"),
+                self.PE.multipoles[0].ravel(),
             )
         # dipoles
         if 1 in self.PE.multipoles:
-            field_integrals = pyscf.df.incore.aux_e2(mol, fakemol, "int3c2e_ip1").transpose(1, 2, 3, 0)
-            v_dip = -np.sum(field_integrals * self.PE.multipoles[1], axis=(2, 3))
+            # transpose of the integrals .transpose(1, 2, 3, 0) is merged into the einsum.
+            v_dip = -np.einsum(
+                "aijk,ka->ij",
+                pyscf.df.incore.aux_e2(mol, fakemol, "int3c2e_ip1"),
+                self.PE.multipoles[1],
+            )
             v_PE_multipole_ao += v_dip + v_dip.T
         # quadrupoles
         if 2 in self.PE.multipoles:
-            v_quad = -0.5 * np.sum(
-                (
-                    pyscf.df.incore.aux_e2(mol, fakemol, "int3c2e_ipip1")
-                    + pyscf.df.incore.aux_e2(mol, fakemol, "int3c2e_ipvip1")
-                ).transpose(1, 2, 3, 0)
-                * self.PE.multipoles[2],
-                axis=(2, 3),
+            # transpose of the integrals .transpose(1, 2, 3, 0) is merged into the einsum.
+            v_quad = -0.5 * np.einsum(
+                "aijk,ka->ij",
+                pyscf.df.incore.aux_e2(mol, fakemol, "int3c2e_ipip1")
+                + pyscf.df.incore.aux_e2(mol, fakemol, "int3c2e_ipvip1"),
+                self.PE.multipoles[2],
             )
             v_PE_multipole_ao += v_quad + v_quad.T
         self._v_PE_multipole_ao = v_PE_multipole_ao
@@ -162,11 +167,12 @@ class IntegralManager:
         fakemol = pyscf.gto.fakemol_for_charges(self.PE.coordinates)
         mol = self.int_obj
         # contribution from induced dipoles
-        field_integrals = pyscf.df.incore.aux_e2(mol, fakemol, "int3c2e_ip1").transpose(1, 2, 3, 0)
-        electronic_field = 2.0 * np.einsum("mn,mnpx->px", density_ao, field_integrals)
+        # transpose of the integrals .transpose(1, 2, 3, 0) is merged into the einsums.
+        field_integrals = pyscf.df.incore.aux_e2(mol, fakemol, "int3c2e_ip1")
+        electronic_field = 2.0 * np.einsum("mn,xmnp->px", density_ao, field_integrals)
         rhs_field = electronic_field + self.PE.nuclear_field + self.PE.multipole_field
         induced_dipoles = self.PE.solve_induced_dipoles(rhs_field)
-        v_PE_induction_ao = -np.einsum("px,mnpx->mn", induced_dipoles, field_integrals)
+        v_PE_induction_ao = -np.einsum("px,xmnp->mn", induced_dipoles, field_integrals)
         v_PE_induction_ao += v_PE_induction_ao.T
         return v_PE_induction_ao
 

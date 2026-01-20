@@ -334,6 +334,21 @@ def induced_dipole_solver(
 
 
 class PolarizableEmbedding:
+    __slots__ = (
+        "_energy_nuclear_multipole",
+        "_multipole_field",
+        "_nuclear_field",
+        "_nuclear_multipole_energy",
+        "_polarization_energy",
+        "_v_PE_induction_trace",
+        "coordinates",
+        "exclusion_lists",
+        "induced_dipoles",
+        "int_obj",
+        "multipoles",
+        "polarizabilities",
+    )
+
     def __init__(self, potfile: str, int_obj: pyscf.gto.mole.Mole) -> None:
         PE_data = read_potfile(potfile)
         self.int_obj = int_obj
@@ -341,7 +356,6 @@ class PolarizableEmbedding:
         self.multipoles = PE_data.multipoles
         self.polarizabilities = PE_data.polarizabilities
         self.exclusion_lists = PE_data.exclusion_lists
-
         self.induced_dipoles = None
         self._nuclear_multipole_energy = None
         self._polarization_energy = None
