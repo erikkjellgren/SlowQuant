@@ -1,5 +1,3 @@
-from collections.abc import Sequence
-
 import numpy as np
 
 from slowquant.molecularintegrals.integralfunctions import (
@@ -305,18 +303,14 @@ class LinearResponse(LinearResponseBaseClass):
                 )
                 self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = val
 
-    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_transition_dipole(self) -> np.ndarray:
         """Calculate transition dipole moment.
-
-        Args:
-            dipole_integrals: Dipole integrals ordered as (x,y,z).
 
         Returns:
             Transition dipole moment.
         """
-        if len(dipole_integrals) != 3:
-            raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
         number_excitations = len(self.excitation_energies)
+        dipole_integrals = self.wf.int_gen.electric_dipole
         mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
         muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
         muz = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[2])
