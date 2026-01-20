@@ -7,6 +7,8 @@ import slowquant.unitary_coupled_cluster.linear_response.naive as naivelr
 from slowquant.unitary_coupled_cluster.sa_ups_wavefunction import WaveFunctionSAUPS
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
+import pyscf
+import pathlib
 
 
 def test_ups_naivelr() -> None:
@@ -282,3 +284,27 @@ def test_SA_sa_doubles() -> None:
     )
     WF.run_wf_optimization_1step("BFGS")
     assert abs(WF.energy_states[0] - -8.874521029611891) < 10**-8
+
+def test_polarizable_embedding() -> None:
+    """Polarizable embedding test, LiH (2,5) / STO-3G with a PE water cluster"""
+    testpath = pathlib.Path(__file__).resolve().parent
+    ref_casscf_energy = -8.155100644408
+    ref_nuclear_multipole_energy = -0.000668140372
+    atom = "Li 0.0 0.0 0.0; H 0.0 0.0 1.672"
+    basis = "STO-3G"
+    potfile = testpath / "data/water_cluster.pot" 
+    mol = pyscf.M(atom=atom, basis=basis, unit="angstrom")
+    rhf = pyscf.scf.RHF(mol).run()
+    
+    # casscf 
+    WF = WaveFunctionUPS(
+        (2, 5),
+        rhf.mo_coeff,
+        mol,
+        "fUCCSD",
+        potfile=potfile,
+    )
+    WF.run_wf_optimization_1step("BFGS", True)
+    total_energy = WF.energy_elec + rhf.energy_nuc() + WF.PE.nuclear_multipole_energy
+    assert abs(ref_nuclear_multipole_energy - WF.PE.nuclear_multipole_energy) < 1e-8
+    assert abs(total_energy - ref_casscf_energy) < 1e-8
