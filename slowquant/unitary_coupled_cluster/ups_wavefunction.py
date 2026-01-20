@@ -340,8 +340,6 @@ class WaveFunctionUPS:
             self._v_PE_induction_mo = None
             self._h_mo = one_electron_integral_transform(self.c_mo, self.int_gen.h_ao)
         if self.int_gen.PE:
-            if self.int_gen.PE is None:
-                raise ValueError("Polarizable Embedding not set in integral generator.")
             if self.int_gen.PE.polarizabilities is not None:
                 if self._v_PE_induction_mo is None:
                     # need to recompute density for induction operator
