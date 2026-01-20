@@ -1,5 +1,3 @@
-from collections import namedtuple
-
 import numpy as np
 import pyscf
 
@@ -8,7 +6,7 @@ def multipole_length(n: int) -> int:
     return (n + 1) * (n + 2) // 2
 
 
-def read_potfile(filename: str):
+def read_potfile(filename: str) -> tuple[np.ndarray, dict[int, np.ndarray], np.ndarray, np.ndarray]:
     with open(filename, "r") as f:
         section = None
         multipoles = {}
@@ -18,7 +16,7 @@ def read_potfile(filename: str):
             if "@COORDINATES" in line:
                 num_sites = int(f.readline())
                 unit = f.readline().strip()
-                coordinates = np.zeros((num_sites, 3))
+                coordinates = np.zeros((num_sites, 3), dtype=np.float64)
                 for i in range(num_sites):
                     _, x, y, z, *_ = f.readline().split()
                     coordinates[i, :] = [float(x), float(y), float(z)]
@@ -37,7 +35,7 @@ def read_potfile(filename: str):
                     raise ValueError("Only support for multipoles up to quadrupoles")
                 # num_multipoles may or may not be less than num_sites
                 num_multipoles = int(f.readline())
-                multipoles[order] = np.zeros((num_sites, multipole_length(order)))
+                multipoles[order] = np.zeros((num_sites, multipole_length(order)), dtype=np.float64)
                 for i in range(num_multipoles):
                     index, *values = f.readline().split()
                     index = int(index) - 1
@@ -46,7 +44,7 @@ def read_potfile(filename: str):
                 if order == 2:
                     # unpack quadrupoles from packed index (xx, xy, xz, yy, yz, zz) -> (xx, xy, xz, yx, yy, yz, zx, zy, zz)
                     # and remove trace
-                    unpacked = np.zeros((num_multipoles, 9))
+                    unpacked = np.zeros((num_multipoles, 9), dtype=np.float64)
                     quadrupoles = multipoles[2]
                     trace = quadrupoles[:, 0] + quadrupoles[:, 3] + quadrupoles[:, 5]
                     unpacked[:, 0] = quadrupoles[:, 0] - trace / 3  # xx
@@ -65,7 +63,7 @@ def read_potfile(filename: str):
                 if order != "ORDER 1 1":
                     raise ValueError(f"Cannot handle polarizability order: {order}")
                 # num_polarizabilities may or may not be less than num_site s
-                polarizabilities = np.zeros((num_sites, 3, 3))
+                polarizabilities = np.zeros((num_sites, 3, 3), dtype=np.float64)
                 for i in range(num_polarizabilities):
                     index, *values = f.readline().split()
                     index = int(index) - 1
@@ -94,9 +92,7 @@ def read_potfile(filename: str):
     else:
         raise ValueError(f"Invalid coordinate unit ({unit}) in potfile)")
     coordinates *= unit_factor
-    return namedtuple("potfile", ("coordinates", "multipoles", "polarizabilities", "exclusion_lists"))(
-        coordinates, multipoles, polarizabilities, exclusion_lists
-    )
+    return coordinates, multipoles, polarizabilities, exclusion_lists
 
 
 def T0(Rab: np.ndarray) -> np.ndarray:
@@ -208,7 +204,7 @@ def T3(Rab: np.ndarray) -> np.ndarray:
 
 
 def compute_potential(
-    multipoles: np.ndarray, multipole_coordinates: np.ndarray, target_coordinates: np.ndarray
+    multipoles: dict[int, np.ndarray], multipole_coordinates: np.ndarray, target_coordinates: np.ndarray
 ) -> np.ndarray:
     potential = np.zeros(target_coordinates.shape[0])
     Rab = multipole_coordinates[:, None] - target_coordinates
@@ -230,12 +226,12 @@ def compute_nuclear_field(
 
 
 def compute_multipole_field(
-    multipoles: np.ndarray,
+    multipoles: dict[int, np.ndarray],
     multipole_coordinates: np.ndarray,
     target_coordinates: np.ndarray,
     exclusion_lists: np.ndarray,
 ) -> np.ndarray:
-    field = np.zeros((target_coordinates.shape[0], 3))
+    field = np.zeros((target_coordinates.shape[0], 3), dtype=np.float64)
     mask = np.ones(target_coordinates.shape[0], dtype=bool)
     for i in range(target_coordinates.shape[0]):
         # set mask
@@ -257,7 +253,7 @@ def compute_multipole_field(
 def compute_induced_field(
     induced_dipoles: np.ndarray, coordinates: np.ndarray, exclusion_lists: np.ndarray
 ) -> np.ndarray:
-    field = np.zeros_like(induced_dipoles)
+    field = np.zeros_like(induced_dipoles, dtype=np.float64)
     mask = np.ones(induced_dipoles.shape[0], dtype=bool)
     for i in range(induced_dipoles.shape[0]):
         # set mask
@@ -350,12 +346,8 @@ class PolarizableEmbedding:
     )
 
     def __init__(self, potfile: str, int_obj: pyscf.gto.mole.Mole) -> None:
-        PE_data = read_potfile(potfile)
+        self.coordinates, self.multipoles, self.polarizabilities, self.exclusion_lists = read_potfile(potfile)
         self.int_obj = int_obj
-        self.coordinates = PE_data.coordinates
-        self.multipoles = PE_data.multipoles
-        self.polarizabilities = PE_data.polarizabilities
-        self.exclusion_lists = PE_data.exclusion_lists
         self.induced_dipoles = None
         self._nuclear_multipole_energy = None
         self._polarization_energy = None
