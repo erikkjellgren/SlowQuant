@@ -7,7 +7,7 @@ from scipy.stats import unitary_group
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.linear_response import generalized_naive, naive
-from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
+from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import generalized_expectation_value, generalized_propagate_state
 from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, generalized_hamiltonian_0i_0a, generalized_hamiltonian_1i_1a
 from slowquant.unitary_coupled_cluster.operators import a_op_spin
 
@@ -108,7 +108,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     mf = scf.GHF(mol)
     
     mf.conv_tol_grad = 1e-10 #gradient tolerance form PYSCF
-    
+    mf.max_cycle = 10000
 
     mf.scf()
     mf.kernel()
@@ -144,6 +144,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True, tol=1e-10, maxiter = 10000)
 
     print("E_opt:", WF._energy_elec)
+    print(WF.thetas)
+    
+    
+  
     # LR = generalized_naive.LinearResponse(WF, excitations="sd")
     # LR.calc_excitation_energies()
     # print(LR.excitation_energies)
@@ -151,10 +155,67 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #call MO integrals
     g_eri_mo = WF.g_mo
     h_eri_mo=WF.h_mo
-   
+    
     num_active_spin_orbs=WF.num_active_spin_orbs
     num_inactive_spin_orbs=WF.num_inactive_spin_orbs
     num_virtual_spin_orbs=WF.num_virtual_spin_orbs
+    num_spin_orbs = WF.num_spin_orbs
+    
+    ci_coeff = WF.ci_coeffs
+    ci_info = WF.ci_info
+    # print('coeff',ci_coeff)
+    # print('info',ci_coeff)
+    wf_struct = WF.ups_layout
+    
+    thetas = np.array([0, 0, 0, 0, -0.11284015184], dtype=float).tolist()
+    
+    # H = generalized_hamiltonian_0i_0a(h_eri_mo, g_eri_mo,
+    #                                 num_inactive_spin_orbs, num_active_spin_orbs)
+
+    H=generalized_hamiltonian_full_space(h_eri_mo, g_eri_mo, num_spin_orbs)
+    # thetas = [0, 0, 0, 0, -0.11284015184]
+
+    # # 1) THIS function applies thetas (because of "U")
+    # psi = generalized_propagate_state(["U"], ci_coeff, ci_info, thetas=thetas, wf_struct=wf_struct)
+
+    # # 2) Now measure energy
+    # tester = generalized_expectation_value(psi, [H], psi, ci_info)
+
+    # H = generalized_hamiltonian_0i_0a(
+    #     WF.h_mo, WF.g_mo,
+    #     WF.num_inactive_spin_orbs, WF.num_active_spin_orbs
+    # )
+
+    #    Build the REFERENCE CI state (the SCF determinant) from ci_info
+    #    This finds the determinant with the largest amplitude in WF.ci_coeffs,
+    #    which is the reference used by your setup.
+    ref_idx = int(np.argmax(np.abs(WF.ci_coeffs)))
+    ref = np.zeros_like(WF.ci_coeffs, dtype=np.complex128)
+    ref[ref_idx] = 1.0
+
+    thetas = [0, 0, 0, 0, -0.11284015184]
+
+    # 3) Make psi(thetas) and compute energy
+    psi = generalized_propagate_state(
+        ["U"], ref, WF.ci_info,
+        thetas=thetas,
+        wf_struct=WF.ups_layout
+    )
+    E = generalized_expectation_value(psi, [H], psi, WF.ci_info)
+    # print(E)
+
+    
+    # tester = generalized_expectation_value(
+    #         ci_coeff,
+    #         [generalized_hamiltonian_0i_0a(h_eri_mo,  g_eri_mo, num_inactive_spin_orbs, num_active_spin_orbs)],
+    #         # [generalized_hamiltonian_full_space(h_eri_mo, g_eri_mo, num_spin_orbs)],
+    #         ci_coeff,
+    #         ci_info, thetas = thetas
+    #         )
+    
+    # print('tester',tester)
+    
+
 
     # print(num_active_spin_orbs)
     # rdm1=WF.rdm1
@@ -183,7 +244,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
-    basis = "STO-6g"
+    basis = "sto-3g"
     active_space_u = ((1, 1), 4) #spin orbitaler
     # active_space = (2, 4)
     charge = 0

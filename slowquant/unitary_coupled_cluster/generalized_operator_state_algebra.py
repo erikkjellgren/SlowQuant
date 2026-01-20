@@ -342,8 +342,8 @@ def generalized_expectation_value(
         do_folding=do_folding,
         do_unsafe=do_unsafe,
     )
+     
     val = bra.conj() @ op_ket
-
     if val.imag > 1e-10:
         print("Warning! Complex energy!")
 
@@ -490,10 +490,10 @@ def generalized_construct_ups_state_test_anna(
     order = 1
     offset = ci_info.space_extension_offset
 
-
     # Loop over all excitation in UPSStructure
     for exc_type, exc_indices, theta in zip(
         ups_struct.excitation_operator_type[::order], ups_struct.excitation_indices[::order], thetas[::order]
+        
     ):
         if not dagger:  
             if np.abs(theta) < 1e-12:
@@ -511,6 +511,7 @@ def generalized_construct_ups_state_test_anna(
                 else:
                     raise ValueError(f"Got unknown excitation type: {exc_type}")
                 # Analytical application on state vector
+
                 out = (
                     out
                     + (np.sin(np.abs(theta)) / np.abs(theta))
@@ -1072,7 +1073,7 @@ def generalized_propagate_unitary_test_anna(
     exc_indices = ups_struct.excitation_indices[idx]
     theta = thetas[idx]
     offset = ci_info.space_extension_offset
-    if abs(theta) < 10**-12: # OBS!!! was 1e-14
+    if abs(theta) < 1e-12: # OBS!!! was 1e-14 AE CHANGED!!
         return np.copy(state)
     if exc_type in ("single", "double"):
         # Create T matrix
@@ -1469,7 +1470,7 @@ def generalized_get_grad_action_test_anna(
         elif exc_type == "double":
             (i, j, a, b) = np.array(exc_indices) + 2 * offset
             T = G2_generalized(i, j, a, b, False)
-            T_dag = G2_generalized(i, j, a, b, False)
+            T_dag = G2_generalized(i, j, a, b, True) #true right??
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Apply missing T factor of derivative
