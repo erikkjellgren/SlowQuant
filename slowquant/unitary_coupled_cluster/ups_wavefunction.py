@@ -350,6 +350,7 @@ class WaveFunctionUPS:
                     mo_cas = self.c_mo[:, self.num_inactive_orbs:self.num_inactive_orbs+self.num_active_orbs]
                     rdm1_ao += mo_cas @ self.rdm1 @ mo_cas.T
                     v_PE_induction_ao = self.int_gen.v_PE_induction_ao(rdm1_ao)
+                    self.PE.v_PE_induction_trace = np.dot(v_PE_induction_ao.ravel(), rdm1_ao.ravel())
                     self._v_PE_induction_mo = one_electron_integral_transform(self.c_mo, v_PE_induction_ao)
                 return self._h_mo + self._v_PE_induction_mo
         return self._h_mo
@@ -1014,8 +1015,7 @@ class WaveFunctionUPS:
             )
         if self.PE:
             if self.PE.polarizabilities is not None:
-                # Remove polarization energy double counting
-                E -= 0.5 * self.PE.polarization_energy
+                E += self.PE.polarization_energy - self.PE.v_PE_induction_trace
         self._E_opt_old = E
         self._old_opt_parameters = np.copy(parameters)
         self.num_energy_evals += 1  # count one measurement

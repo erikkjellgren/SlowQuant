@@ -253,7 +253,6 @@ def induced_dipole_solver(rhs_field, coordinates, polarizabilities, exclusion_li
     if guess is not None:
         induced_dipoles_old = guess
     else:
-        print(polarizabilities.shape, rhs_field.shape)
         induced_dipoles_old = np.einsum('pij,pj->pi', polarizabilities, rhs_field) 
     residual_norm = tol*10
     iterations = 0
@@ -317,7 +316,7 @@ class PolarizableEmbedding:
         self._nuclear_field = None
         self._multipole_field = None
         self._energy_nuclear_multipole = None
-        self._v_static_ao = None
+        self.v_PE_induction_trace = None
 
     @property
     def nuclear_multipole_energy(self):
