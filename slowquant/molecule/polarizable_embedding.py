@@ -8,7 +8,7 @@ def multipole_length(n: int) -> int:
     return (n + 1) * (n + 2) // 2
 
 
-def read_potfile(filename: str) -> namedtuple:
+def read_potfile(filename: str):
     with open(filename, "r") as f:
         section = None
         multipoles = {}
@@ -348,7 +348,7 @@ class PolarizableEmbedding:
         self._nuclear_field = None
         self._multipole_field = None
         self._energy_nuclear_multipole = None
-        self.v_PE_induction_trace = None
+        self._v_PE_induction_trace = None
 
     @property
     def nuclear_multipole_energy(self) -> float:
@@ -394,3 +394,13 @@ class PolarizableEmbedding:
         )
         self._polarization_energy = -0.5 * np.dot(self.induced_dipoles.ravel(), rhs_field.ravel())
         return self.induced_dipoles
+
+    @property
+    def v_PE_induction_trace(self) -> float:
+        if self._v_PE_induction_trace is None:
+            raise ValueError("_v_PE_induction_trace is None")
+        return self._v_PE_induction_trace
+
+    @v_PE_induction_trace.setter
+    def v_PE_induction_trace(self, induction_trace: float) -> None:
+        self._v_PE_induction_trace = induction_trace

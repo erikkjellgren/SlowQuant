@@ -290,7 +290,7 @@ def test_SA_sa_doubles() -> None:
 
 
 def test_polarizable_embedding() -> None:
-    """Polarizable embedding test, LiH (2,5) / STO-3G with a PE water cluster"""
+    """Polarizable embedding test, LiH (2,5) / STO-3G with a PE water cluster."""
     testpath = pathlib.Path(__file__).resolve().parent
     ref_casscf_energy = -8.155100644408
     ref_nuclear_multipole_energy = -0.000668140372
@@ -309,6 +309,6 @@ def test_polarizable_embedding() -> None:
         potfile=potfile,
     )
     WF.run_wf_optimization_1step("BFGS", True)
-    total_energy = WF.energy_elec + rhf.energy_nuc() + WF.PE.nuclear_multipole_energy
-    assert abs(ref_nuclear_multipole_energy - WF.PE.nuclear_multipole_energy) < 1e-8
+    total_energy = WF.energy_elec + rhf.energy_nuc() + WF.int_gen.PE.nuclear_multipole_energy
+    assert abs(ref_nuclear_multipole_energy - WF.int_gen.PE.nuclear_multipole_energy) < 1e-8
     assert abs(total_energy - ref_casscf_energy) < 1e-8

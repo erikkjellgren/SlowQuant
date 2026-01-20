@@ -154,7 +154,7 @@ class IntegralManager:
         self._v_PE_multipole_ao = v_PE_multipole_ao
         return self._v_PE_multipole_ao
 
-    def v_PE_induction_ao(self, density_ao: np.ndarray) -> float:
+    def v_PE_induction_ao(self, density_ao: np.ndarray) -> np.ndarray:
         if self.PE is None:
             raise ValueError("Polarizable Embedding is not activated.")
         if not isinstance(self.int_obj, pyscf.gto.mole.Mole):

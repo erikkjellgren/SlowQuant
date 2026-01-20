@@ -56,7 +56,7 @@ class WaveFunctionUPS:
             ansatz: Name of ansatz.
             ansatz_options: Ansatz options.
             include_active_kappa: Include active-active orbital rotations.
-            potfile: Polarizable embedding potential file
+            potfile: Polarizable embedding potential file.
         """
         if ansatz_options is None:
             ansatz_options = {}
@@ -256,9 +256,6 @@ class WaveFunctionUPS:
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
-        self.PE = None
-        if potfile:
-            self.PE = self.int_gen.PE
 
     @property
     def kappa(self) -> list[float]:
@@ -342,7 +339,9 @@ class WaveFunctionUPS:
         if self._h_mo is None:
             self._v_PE_induction_mo = None
             self._h_mo = one_electron_integral_transform(self.c_mo, self.int_gen.h_ao)
-        if self.PE:
+        if self.int_gen.PE:
+            if self.int_gen.PE is None:
+                raise ValueError("Polarizable Embedding not set in integral generator.")
             if self.int_gen.PE.polarizabilities is not None:
                 if self._v_PE_induction_mo is None:
                     # need to recompute density for induction operator
@@ -353,7 +352,7 @@ class WaveFunctionUPS:
                     ]
                     rdm1_ao += mo_cas @ self.rdm1 @ mo_cas.T
                     v_PE_induction_ao = self.int_gen.v_PE_induction_ao(rdm1_ao)
-                    self.PE.v_PE_induction_trace = np.dot(v_PE_induction_ao.ravel(), rdm1_ao.ravel())
+                    self.int_gen.PE.v_PE_induction_trace = np.dot(v_PE_induction_ao.ravel(), rdm1_ao.ravel())
                     self._v_PE_induction_mo = one_electron_integral_transform(self.c_mo, v_PE_induction_ao)
                 return self._h_mo + self._v_PE_induction_mo
         return self._h_mo
@@ -744,6 +743,11 @@ class WaveFunctionUPS:
                 self.ci_coeffs,
                 self.ci_info,
             )
+            if self.int_gen.PE:
+                if self.int_gen.PE.polarizabilities is not None:
+                    self._energy_elec += (
+                        self.int_gen.PE.polarization_energy - self.int_gen.PE.v_PE_induction_trace
+                    )
         return self._energy_elec
 
     def _get_hamiltonian(self, qiskit_form: bool = False) -> FermionicOperator | dict[str, float]:
@@ -1015,9 +1019,9 @@ class WaveFunctionUPS:
                 self.ci_coeffs,
                 self.ci_info,
             )
-        if self.PE:
-            if self.PE.polarizabilities is not None:
-                E += self.PE.polarization_energy - self.PE.v_PE_induction_trace
+        if self.int_gen.PE:
+            if self.int_gen.PE.polarizabilities is not None:
+                E += self.int_gen.PE.polarization_energy - self.int_gen.PE.v_PE_induction_trace
         self._E_opt_old = E
         self._old_opt_parameters = np.copy(parameters)
         self.num_energy_evals += 1  # count one measurement
