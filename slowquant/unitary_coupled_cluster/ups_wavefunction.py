@@ -34,6 +34,7 @@ from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import UpsStructure
 
+
 class WaveFunctionUPS:
     def __init__(
         self,
@@ -345,9 +346,11 @@ class WaveFunctionUPS:
             if self.int_gen.PE.polarizabilities is not None:
                 if self._v_PE_induction_mo is None:
                     # need to recompute density for induction operator
-                    mo_occ = self.c_mo[:, 0:self.num_inactive_orbs]
-                    rdm1_ao = 2.0*mo_occ @ mo_occ.T
-                    mo_cas = self.c_mo[:, self.num_inactive_orbs:self.num_inactive_orbs+self.num_active_orbs]
+                    mo_occ = self.c_mo[:, 0 : self.num_inactive_orbs]
+                    rdm1_ao = 2.0 * mo_occ @ mo_occ.T
+                    mo_cas = self.c_mo[
+                        :, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs
+                    ]
                     rdm1_ao += mo_cas @ self.rdm1 @ mo_cas.T
                     v_PE_induction_ao = self.int_gen.v_PE_induction_ao(rdm1_ao)
                     self.PE.v_PE_induction_trace = np.dot(v_PE_induction_ao.ravel(), rdm1_ao.ravel())
@@ -742,7 +745,6 @@ class WaveFunctionUPS:
                 self.ci_info,
             )
         return self._energy_elec
-
 
     def _get_hamiltonian(self, qiskit_form: bool = False) -> FermionicOperator | dict[str, float]:
         """Return electronic Hamiltonian as FermionicOperator.

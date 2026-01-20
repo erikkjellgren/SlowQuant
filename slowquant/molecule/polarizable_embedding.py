@@ -1,39 +1,40 @@
-#!/usr/bin/env python
+from collections import namedtuple
 
 import numpy as np
-from collections import namedtuple
-from pyscf.data.nist import BOHR
+import pyscf
 
-def multipole_length(n:int)->int:
-    return (n+1)*(n+2)//2
 
-def read_potfile(filename:str) -> namedtuple:
-    with open(filename, 'r') as f:
+def multipole_length(n: int) -> int:
+    return (n + 1) * (n + 2) // 2
+
+
+def read_potfile(filename: str) -> namedtuple:
+    with open(filename, "r") as f:
         section = None
         multipoles = {}
         polarizabilities = None
         exclusion_lists = None
-        while (line := f.readline()):
-            if '@COORDINATES' in line:
+        while line := f.readline():
+            if "@COORDINATES" in line:
                 num_sites = int(f.readline())
                 unit = f.readline().strip()
                 coordinates = np.zeros((num_sites, 3))
                 for i in range(num_sites):
-                    element, x, y, z, *_ = f.readline().split()
-                    coordinates[i,:] = [float(x), float(y), float(z)]
+                    _, x, y, z, *_ = f.readline().split()
+                    coordinates[i, :] = [float(x), float(y), float(z)]
             # section headers
-            if '@MULTIPOLES' in line:
-                section = 'multipoles'
+            if "@MULTIPOLES" in line:
+                section = "multipoles"
                 line = f.readline()
-            if '@POLARIZABILITIES' in line:
-                section = 'polarizabilities'
-            if 'EXCLISTS' in line:
-                section = 'exclusion_lists'
+            if "@POLARIZABILITIES" in line:
+                section = "polarizabilities"
+            if "EXCLISTS" in line:
+                section = "exclusion_lists"
             # read the data
-            if section == 'multipoles':
+            if section == "multipoles":
                 order = int(line.split()[-1])
                 if order > 2:
-                    raise ValueError('Only support for multipoles up to quadrupoles')
+                    raise ValueError("Only support for multipoles up to quadrupoles")
                 # num_multipoles may or may not be less than num_sites
                 num_multipoles = int(f.readline())
                 multipoles[order] = np.zeros((num_sites, multipole_length(order)))
@@ -48,21 +49,21 @@ def read_potfile(filename:str) -> namedtuple:
                     unpacked = np.zeros((num_multipoles, 9))
                     quadrupoles = multipoles[2]
                     trace = quadrupoles[:, 0] + quadrupoles[:, 3] + quadrupoles[:, 5]
-                    unpacked[:, 0] = quadrupoles[:, 0] - trace / 3 # xx
-                    unpacked[:, 1] = quadrupoles[:, 1]             # xy
-                    unpacked[:, 2] = quadrupoles[:, 2]             # xz
-                    unpacked[:, 3] = quadrupoles[:, 1]             # yx=xy
-                    unpacked[:, 4] = quadrupoles[:, 3] - trace / 3 # yy 
-                    unpacked[:, 5] = quadrupoles[:, 4]             # yz
-                    unpacked[:, 6] = quadrupoles[:, 2]             # zx=xz
-                    unpacked[:, 7] = quadrupoles[:, 4]             # zy=yz
-                    unpacked[:, 8] = quadrupoles[:, 5] - trace / 3 # zz
+                    unpacked[:, 0] = quadrupoles[:, 0] - trace / 3  # xx
+                    unpacked[:, 1] = quadrupoles[:, 1]  # xy
+                    unpacked[:, 2] = quadrupoles[:, 2]  # xz
+                    unpacked[:, 3] = quadrupoles[:, 1]  # yx=xy
+                    unpacked[:, 4] = quadrupoles[:, 3] - trace / 3  # yy
+                    unpacked[:, 5] = quadrupoles[:, 4]  # yz
+                    unpacked[:, 6] = quadrupoles[:, 2]  # zx=xz
+                    unpacked[:, 7] = quadrupoles[:, 4]  # zy=yz
+                    unpacked[:, 8] = quadrupoles[:, 5] - trace / 3  # zz
                     multipoles[order] = unpacked
-            if section == 'polarizabilities':
+            if section == "polarizabilities":
                 order = f.readline().strip()
                 num_polarizabilities = int(f.readline())
-                if order != 'ORDER 1 1':
-                    raise ValueError(f'Cannot handle polarizability order: {order}')
+                if order != "ORDER 1 1":
+                    raise ValueError(f"Cannot handle polarizability order: {order}")
                 # num_polarizabilities may or may not be less than num_site s
                 polarizabilities = np.zeros((num_sites, 3, 3))
                 for i in range(num_polarizabilities):
@@ -79,54 +80,59 @@ def read_potfile(filename:str) -> namedtuple:
                     polarizabilities[index, 1, 2] = values[4]
                     polarizabilities[index, 2, 1] = values[4]
                     polarizabilities[index, 2, 2] = values[5]
-            if section == 'exclusion_lists':
+            if section == "exclusion_lists":
                 num_exclusions, max_length = list(map(int, f.readline().split()))
                 exclusion_lists = np.zeros((num_exclusions, max_length), dtype=np.int64)
                 for i in range(num_exclusions):
                     values = list(map(lambda val: int(val) - 1, f.readline().split()))
                     index = values[0]
                     exclusion_lists[index, :] = values
-    if unit == 'AU':
+    if unit == "AU":
         unit_factor = 1.0
-    elif unit == 'AA':
-        unit_factor = 1/BOHR
+    elif unit == "AA":
+        unit_factor = 1 / pyscf.data.nist.BOHR
     else:
-        raise ValueError(f'Invalid coordinate unit ({unit}) in potfile)')
+        raise ValueError(f"Invalid coordinate unit ({unit}) in potfile)")
     coordinates *= unit_factor
-    return namedtuple('potfile', ('coordinates', 'multipoles', 'polarizabilities', 'exclusion_lists'))(coordinates, multipoles, polarizabilities, exclusion_lists)
+    return namedtuple("potfile", ("coordinates", "multipoles", "polarizabilities", "exclusion_lists"))(
+        coordinates, multipoles, polarizabilities, exclusion_lists
+    )
 
-def T0(Rab):
+
+def T0(Rab: np.ndarray) -> np.ndarray:
     x = Rab[..., 0]
     y = Rab[..., 1]
     z = Rab[..., 2]
-    shape = Rab.shape[:-1] + (3, ) * 0
+    shape = Rab.shape[:-1] + (3,) * 0
     result = np.zeros(shape, dtype=np.float64)
-    result[..., ] = 1 / np.sqrt(x**2 + y**2 + z**2)
+    result[...,] = 1 / np.sqrt(x**2 + y**2 + z**2)
     return result
 
-def T1(Rab):
+
+def T1(Rab: np.ndarray) -> np.ndarray:
     x = Rab[..., 0]
     y = Rab[..., 1]
     z = Rab[..., 2]
-    shape = Rab.shape[:-1] + (3, ) * 1
+    shape = Rab.shape[:-1] + (3,) * 1
     result = np.zeros(shape, dtype=np.float64)
-    x0 = (x**2 + y**2 + z**2)**(-3 / 2)
+    x0 = (x**2 + y**2 + z**2) ** (-3 / 2)
     result[..., 0] = -x * x0
     result[..., 1] = -x0 * y
     result[..., 2] = -x0 * z
     return result
 
-def T2(Rab):
+
+def T2(Rab: np.ndarray) -> np.ndarray:
     x = Rab[..., 0]
     y = Rab[..., 1]
     z = Rab[..., 2]
-    shape = Rab.shape[:-1] + (3, ) * 2
+    shape = Rab.shape[:-1] + (3,) * 2
     result = np.zeros(shape, dtype=np.float64)
     x0 = x**2
     x1 = y**2
     x2 = z**2
     x3 = x1 + x2
-    x4 = (x0 + x3)**(-5 / 2)
+    x4 = (x0 + x3) ** (-5 / 2)
     x5 = 3 * x * x4
     x6 = x5 * y
     x7 = x5 * z
@@ -143,11 +149,11 @@ def T2(Rab):
     return result
 
 
-def T3(Rab):
+def T3(Rab: np.ndarray) -> np.ndarray:
     x = Rab[..., 0]
     y = Rab[..., 1]
     z = Rab[..., 2]
-    shape = Rab.shape[:-1] + (3, ) * 3
+    shape = Rab.shape[:-1] + (3,) * 3
     result = np.zeros(shape, dtype=np.float64)
     x0 = x**2
     x1 = y**2
@@ -155,7 +161,7 @@ def T3(Rab):
     x3 = z**2
     x4 = 3 * x3
     x5 = x1 + x3
-    x6 = (x0 + x5)**(-7 / 2)
+    x6 = (x0 + x5) ** (-7 / 2)
     x7 = 3 * x6
     x8 = x * x7
     x9 = x7 * (-4 * x0 + x5)
@@ -200,23 +206,35 @@ def T3(Rab):
     result[..., 2, 2, 2] = x19 * (x17 + x2 - 2 * x3)
     return result
 
-def compute_potential(multipoles, multipole_coordinates, target_coordinates):
+
+def compute_potential(
+    multipoles: np.ndarray, multipole_coordinates: np.ndarray, target_coordinates: np.ndarray
+) -> np.ndarray:
     potential = np.zeros(target_coordinates.shape[0])
-    Rab = multipole_coordinates[:,None] - target_coordinates
+    Rab = multipole_coordinates[:, None] - target_coordinates
     if 0 in multipoles:
-        potential += np.einsum('pi,p->i', T0(Rab), multipoles[0].ravel())
+        potential += np.einsum("pi,p->i", T0(Rab), multipoles[0].ravel())
     if 1 in multipoles:
-        potential += np.einsum('pij,pj->i', T1(Rab), multipoles[1])
+        potential += np.einsum("pij,pj->i", T1(Rab), multipoles[1])
     if 2 in multipoles:
-        potential += np.einsum('pijk,pjk->i', T2(Rab), multipoles[2].reshape(-1,3,3)) / 2
+        potential += np.einsum("pijk,pjk->i", T2(Rab), multipoles[2].reshape(-1, 3, 3)) / 2
     return potential
 
-def compute_nuclear_field(nuclear_charges, nuclear_coordinates, target_coordinates):
-    Rab = nuclear_coordinates[:,None] - target_coordinates
-    field = np.einsum('pix,p->ix', T1(Rab), nuclear_charges)
+
+def compute_nuclear_field(
+    nuclear_charges: np.ndarray, nuclear_coordinates: np.ndarray, target_coordinates: np.ndarray
+) -> np.ndarray:
+    Rab = nuclear_coordinates[:, None] - target_coordinates
+    field = np.einsum("pix,p->ix", T1(Rab), nuclear_charges)
     return field
 
-def compute_multipole_field(multipoles, multipole_coordinates, target_coordinates, exclusion_lists):
+
+def compute_multipole_field(
+    multipoles: np.ndarray,
+    multipole_coordinates: np.ndarray,
+    target_coordinates: np.ndarray,
+    exclusion_lists: np.ndarray,
+) -> np.ndarray:
     field = np.zeros((target_coordinates.shape[0], 3))
     mask = np.ones(target_coordinates.shape[0], dtype=bool)
     for i in range(target_coordinates.shape[0]):
@@ -225,17 +243,20 @@ def compute_multipole_field(multipoles, multipole_coordinates, target_coordinate
             mask[exclusion] = False
         Rab = multipole_coordinates[mask, :] - target_coordinates[i, :]
         if 0 in multipoles:
-            field[i, :] += np.einsum('px,p->x', T1(Rab), multipoles[0][mask, :].ravel())
+            field[i, :] += np.einsum("px,p->x", T1(Rab), multipoles[0][mask, :].ravel())
         if 1 in multipoles:
-            field[i, :] += np.einsum('pjx,pj->x', T2(Rab), multipoles[1][mask, :])
+            field[i, :] += np.einsum("pjx,pj->x", T2(Rab), multipoles[1][mask, :])
         if 2 in multipoles:
-            field[i, :] += np.einsum('pjkx,pjk->x', T3(Rab), multipoles[2][mask, :].reshape(-1,3,3)) / 2
+            field[i, :] += np.einsum("pjkx,pjk->x", T3(Rab), multipoles[2][mask, :].reshape(-1, 3, 3)) / 2
         # release mask
         for exclusion in exclusion_lists[i]:
             mask[exclusion] = True
     return field
 
-def compute_induced_field(induced_dipoles, coordinates, exclusion_lists):
+
+def compute_induced_field(
+    induced_dipoles: np.ndarray, coordinates: np.ndarray, exclusion_lists: np.ndarray
+) -> np.ndarray:
     field = np.zeros_like(induced_dipoles)
     mask = np.ones(induced_dipoles.shape[0], dtype=bool)
     for i in range(induced_dipoles.shape[0]):
@@ -243,27 +264,37 @@ def compute_induced_field(induced_dipoles, coordinates, exclusion_lists):
         for exclusion in exclusion_lists[i]:
             mask[exclusion] = False
         Rab = coordinates[mask, :] - coordinates[i, :]
-        field[i, :] = np.einsum('pjx,pj->x', T2(Rab), induced_dipoles[mask, :])
+        field[i, :] = np.einsum("pjx,pj->x", T2(Rab), induced_dipoles[mask, :])
         # release mask
         for exclusion in exclusion_lists[i]:
             mask[exclusion] = True
     return field
 
-def induced_dipole_solver(rhs_field, coordinates, polarizabilities, exclusion_lists, guess=None, maxiter=100, tol=1e-10, verbose=False):
+
+def induced_dipole_solver(
+    rhs_field: np.ndarray,
+    coordinates: np.ndarray,
+    polarizabilities: np.ndarray,
+    exclusion_lists: np.ndarray,
+    guess: np.ndarray | None = None,
+    maxiter: int = 100,
+    tol: float = 1e-10,
+    verbose: bool = False,
+) -> np.ndarray:
     if guess is not None:
         induced_dipoles_old = guess
     else:
-        induced_dipoles_old = np.einsum('pij,pj->pi', polarizabilities, rhs_field) 
-    residual_norm = tol*10
+        induced_dipoles_old = np.einsum("pij,pj->pi", polarizabilities, rhs_field)
+    residual_norm = tol * 10
     iterations = 0
 
     diis_errors = []
     diis_vectors = []
     diis_maxdim = 10
 
-    while ((iterations < maxiter) and (residual_norm > tol)):
+    while (iterations < maxiter) and (residual_norm > tol):
         induced_field = compute_induced_field(induced_dipoles_old, coordinates, exclusion_lists)
-        induced_dipoles = np.einsum('pij,pj->pi', polarizabilities, rhs_field + induced_field)
+        induced_dipoles = np.einsum("pij,pj->pi", polarizabilities, rhs_field + induced_field)
         error = induced_dipoles - induced_dipoles_old
         induced_dipoles_old[:] = induced_dipoles[:]
         residual_norm = np.linalg.norm(error)
@@ -276,33 +307,34 @@ def induced_dipole_solver(rhs_field, coordinates, polarizabilities, exclusion_li
             diis_errors.pop(0)
 
         if len(diis_vectors) > 1:
-            B = np.zeros((len(diis_errors)+1, len(diis_errors)+1))
-            B[:,-1] = B[-1,:] = -1.0
+            B = np.zeros((len(diis_errors) + 1, len(diis_errors) + 1))
+            B[:, -1] = B[-1, :] = -1.0
             for i in range(len(diis_errors)):
                 for j in range(len(diis_errors)):
-                    B[i,j] = np.dot(diis_errors[i].ravel(), diis_errors[j].ravel())
-            rhs = np.zeros(len(diis_errors)+1)
+                    B[i, j] = np.dot(diis_errors[i].ravel(), diis_errors[j].ravel())
+            rhs = np.zeros(len(diis_errors) + 1)
             rhs[-1] = -1
             weights = np.linalg.solve(B, rhs)[:-1]
-            wsum = 0.
+            wsum = 0.0
             induced_dipoles_old[:] = 0.0
-            for (mu, w) in zip(diis_vectors, weights):
-                induced_dipoles_old += w*mu
+            for mu, w in zip(diis_vectors, weights):
+                induced_dipoles_old += w * mu
                 wsum += w
 
         iterations += 1
         if verbose:
-            print(f'{iterations=} {residual_norm}')
+            print(f"{iterations=} {residual_norm}")
 
     converged = residual_norm < tol
     if not converged:
-        raise ValueError('Induced dipole solver did not converge in {maxiter=} iterations ({residual_norm=})')
+        raise ValueError("Induced dipole solver did not converge in {maxiter=} iterations ({residual_norm=})")
     if verbose:
-        print(f'Converged in {iterations} {residual_norm=}')
+        print(f"Converged in {iterations} {residual_norm=}")
     return induced_dipoles
 
+
 class PolarizableEmbedding:
-    def __init__(self, potfile, int_obj):
+    def __init__(self, potfile: str, int_obj: pyscf.gto.mole.Mole) -> None:
         PE_data = read_potfile(potfile)
         self.int_obj = int_obj
         self.coordinates = PE_data.coordinates
@@ -319,7 +351,7 @@ class PolarizableEmbedding:
         self.v_PE_induction_trace = None
 
     @property
-    def nuclear_multipole_energy(self):
+    def nuclear_multipole_energy(self) -> float:
         if self._nuclear_multipole_energy is None:
             mol = self.int_obj
             nuclear_charges = mol.atom_charges()
@@ -329,26 +361,36 @@ class PolarizableEmbedding:
         return self._nuclear_multipole_energy
 
     @property
-    def multipole_field(self):
+    def multipole_field(self) -> np.ndarray:
         if self._multipole_field is None:
-            self._multipole_field = compute_multipole_field(self.multipoles, self.coordinates, self.coordinates, self.exclusion_lists)
+            self._multipole_field = compute_multipole_field(
+                self.multipoles, self.coordinates, self.coordinates, self.exclusion_lists
+            )
         return self._multipole_field
 
     @property
-    def nuclear_field(self):
+    def nuclear_field(self) -> np.ndarray:
         if self._nuclear_field is None:
             mol = self.int_obj
             nuclear_charges = mol.atom_charges()
             nuclear_coordinates = mol.atom_coords()
-            self._nuclear_field = compute_nuclear_field(nuclear_charges, nuclear_coordinates, self.coordinates)
+            self._nuclear_field = compute_nuclear_field(
+                nuclear_charges, nuclear_coordinates, self.coordinates
+            )
         return self._nuclear_field
 
     @property
-    def polarization_energy(self):
+    def polarization_energy(self) -> float:
         assert self._polarization_energy is not None
         return self._polarization_energy
 
-    def solve_induced_dipoles(self, rhs_field):
-        self.induced_dipoles = induced_dipole_solver(rhs_field, self.coordinates, self.polarizabilities, self.exclusion_lists, guess=self.induced_dipoles)
-        self._polarization_energy = -0.5*np.dot(self.induced_dipoles.ravel(), rhs_field.ravel())
+    def solve_induced_dipoles(self, rhs_field: np.ndarray) -> np.ndarray:
+        self.induced_dipoles = induced_dipole_solver(
+            rhs_field,
+            self.coordinates,
+            self.polarizabilities,
+            self.exclusion_lists,
+            guess=self.induced_dipoles,
+        )
+        self._polarization_energy = -0.5 * np.dot(self.induced_dipoles.ravel(), rhs_field.ravel())
         return self.induced_dipoles
