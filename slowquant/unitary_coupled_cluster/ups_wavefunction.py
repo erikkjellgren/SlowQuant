@@ -1125,6 +1125,10 @@ class WaveFunctionUPS:
         Returns:
             Electronic energies for all shifted thetas.
         """
+        if self.int_gen.PE:
+            # The RotoSolve energy needs the self.int_gen.PE.polarization_energy - self.int_gen.PE.v_PE_induction_trace
+            # contribution, which does not come easily with the current implementation?
+            raise ValueError("RotoSolve is not implemented with PE.")
         # copy of parameters
         thetas_local = np.asarray(parameters)
 
