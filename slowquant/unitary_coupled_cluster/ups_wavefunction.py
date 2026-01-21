@@ -857,6 +857,75 @@ class WaveFunctionUPS:
             e_old = e_new
         self._energy_elec = e_new
 
+    def run_orbital_optimization(
+        self,
+        tol: float = 1e-10,
+        maxiter: int = 1000,
+        is_silent_subiterations: bool = False,
+    ) -> None:
+        """Run orbital optimization.
+
+        Args:
+            tol: Convergence tolerance.
+            maxiter: Maximum number of iterations.
+            is_silent_subiterations: Silence subiterations.
+        """
+        print("### Parameters information:")
+        print(f"### Number kappa: {len(self.kappa)}")
+        e_old = 1e12
+        print("Optimization")
+        print("Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #")
+        for full_iter in range(0, int(maxiter)):
+            full_start = time.time()
+
+            if len(self.kappa) != 0:
+                if not is_silent_subiterations:
+                    print("--------Orbital optimization")
+                    print(
+                        "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
+                    )
+                energy_oo = partial(
+                    self._calc_energy_optimization,
+                    theta_optimization=False,
+                    kappa_optimization=True,
+                )
+                gradient_oo = partial(
+                    self._calc_gradient_optimization,
+                    theta_optimization=False,
+                    kappa_optimization=True,
+                )
+                optimizer = Optimizers(
+                    energy_oo,
+                    "l-bfgs-b",
+                    grad=gradient_oo,
+                    maxiter=maxiter,
+                    tol=tol,
+                    is_silent=is_silent_subiterations,
+                    energy_eval_callback=lambda: self.num_energy_evals,
+                )
+                self._old_opt_parameters = np.zeros(len(self.kappa_idx)) + 10**20
+                self._E_opt_old = 0.0
+                res = optimizer.minimize([0.0] * len(self.kappa_idx))
+                for i in range(len(self.kappa)):
+                    self._kappa[i] = 0.0
+                    self._kappa_old[i] = 0.0
+            else:
+                # If there is no orbital optimization, then the algorithm is already converged.
+                raise ValueError(
+                    "WARNING: No orbital optimization performed, because there is no non-redundant orbital parameters."
+                )
+
+            e_new = res.fun
+            time_str = f"{time.time() - full_start:7.2f}"
+            e_str = f"{e_new:3.12f}"
+            print(
+                f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {str(self.num_energy_evals).center(11)}"
+            )
+            if abs(e_new - e_old) < tol:
+                break
+            e_old = e_new
+        self._energy_elec = e_new
+
     def run_wf_optimization_1step(
         self,
         optimizer_name: str,
