@@ -342,12 +342,13 @@ def generalized_expectation_value(
         do_folding=do_folding,
         do_unsafe=do_unsafe,
     )
-     
+ 
     val = bra.conj() @ op_ket
     if val.imag > 1e-10:
         print("Warning! Complex energy!")
 
     return val.real 
+
 
 def generalized_expectation_value_complex(
     bra: np.ndarray,
@@ -387,12 +388,16 @@ def generalized_expectation_value_complex(
         do_unsafe=do_unsafe,
     )
     val = bra.conj() @ op_ket
+    #print("\n\n")
+    #print(operators[0].operators_readable)
+    #print(bra, op_ket, val)
+    #print("\n\n")
     return val
 
 def generalized_construct_ups_state(
     state: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float],
+    thetas: list[complex],
     ups_struct: UpsStructure,
     dagger: bool = False,
 ) -> np.ndarray:
@@ -489,12 +494,48 @@ def generalized_construct_ups_state_test_anna(
     out = state.copy()
     order = 1
     offset = ci_info.space_extension_offset
-
     # Loop over all excitation in UPSStructure
     for exc_type, exc_indices, theta in zip(
         ups_struct.excitation_operator_type[::order], ups_struct.excitation_indices[::order], thetas[::order]
         
     ):
+        if np.abs(theta) < 1e-12:
+             continue
+        if exc_type in ("single", "double"):
+            # Create T matrix
+            if exc_type == "single":
+                (i, a) = np.array(exc_indices) + 2 * offset
+                T = G1_generalized(i, a, False)
+            elif exc_type == "double":
+                (i, j, a, b) = np.array(exc_indices) + 2 * offset
+                T = G2_generalized(i, j, a, b, False)
+            else:
+                raise ValueError(f"Got unknown excitation type: {exc_type}")
+            if dagger:
+                A = -theta*T + theta.conjugate()*T.dagger
+            else:
+                A = theta*T - theta.conjugate()*T.dagger
+           # print("before", out.conj()@out, exc_indices, theta)
+            out = (
+                out
+                + np.sin(np.abs(theta)) / np.abs(theta)
+                    * generalized_propagate_state(
+                        [A],
+                        out,
+                        ci_info,
+                        do_folding=False,
+                    )
+                + (1 - np.cos(np.abs(theta))) / np.abs(theta) ** 2
+                        * generalized_propagate_state(
+                            [A, A],
+                            out,
+                            ci_info,
+                            do_folding=False,
+                        )
+                )
+            #print("after", out.conj()@out, exc_indices, theta)
+        """
+        #print("before", out.conj()@out, exc_indices, theta)
         if not dagger:  
             if np.abs(theta) < 1e-12:
                 continue
@@ -609,6 +650,8 @@ def generalized_construct_ups_state_test_anna(
                 )
             else:
                 raise ValueError(f"Got unknown excitation type, {exc_type}")
+        #print("after", out.conj()@out, exc_indices, theta)
+        """
     return out
 
 

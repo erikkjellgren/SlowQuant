@@ -26,6 +26,7 @@ from slowquant.unitary_coupled_cluster.generalized_operators import (
 from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import (
     generalized_construct_ups_state, generalized_construct_ups_state_modified, generalized_construct_ups_state_test_anna,
     generalized_expectation_value,
+    generalized_expectation_value_complex,
     generalized_get_grad_action, generalized_get_grad_action_modified, generalized_get_grad_action_test_anna,
     generalized_propagate_state,
     generalized_propagate_unitary, generalized_propagate_unitary_modified, generalized_propagate_unitary_test_anna,
@@ -86,7 +87,7 @@ class GeneralizedWaveFunctionUPS:
                 f"More active electrons than total electrons. Got {np.sum(cas[0])} active electrons, and {num_elec} total electrons."
             )
         # Init stuff
-        self._c_mo = mo_coeffs
+        self._c_mo = np.copy(mo_coeffs).astype(np.complex128)
         self._h_ao = h_ao
         self._g_ao = g_ao
         self._rdm1 = None
@@ -216,7 +217,7 @@ class GeneralizedWaveFunctionUPS:
             self.num_active_elec_beta,
         )
         self.num_det = len(self.ci_info.idx2det)
-        self.csf_coeffs = np.zeros(self.num_det)
+        self.csf_coeffs = np.zeros(self.num_det, dtype=np.complex128)
         hf_string = ""
         for i in range(self.num_active_spin_orbs // 2):
             if i < self.num_active_elec_alpha:
@@ -383,6 +384,8 @@ class GeneralizedWaveFunctionUPS:
                 for kappa_val, kappa_old, (p, q) in zip(
                     self.kappa_real, self._kappa_real_old, self.kappa_spin_idx
                 ):
+                    if p == q:
+                        continue
                     kappa_mat[p, q] = kappa_val - kappa_old
                     kappa_mat[q, p] = -(kappa_val - kappa_old)
             if np.max(np.abs(np.array(self.kappa_imag) - np.array(self._kappa_imag_old))) > 0.0:
@@ -511,7 +514,7 @@ class GeneralizedWaveFunctionUPS:
         """
         # Annika has added dtype=complex
         if self._rdm1 is None:
-            self._rdm1 = np.zeros((self.num_active_spin_orbs, self.num_active_spin_orbs), dtype=complex)
+            self._rdm1 = np.zeros((self.num_active_spin_orbs, self.num_active_spin_orbs), dtype=np.complex128)
             for P in range(
                 self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
             ):
@@ -545,7 +548,7 @@ class GeneralizedWaveFunctionUPS:
                     self.num_active_spin_orbs,
                     self.num_active_spin_orbs,
                 ),
-                dtype=complex,
+                dtype=np.complex128,
             )
             for p in range(
                 self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
@@ -597,7 +600,7 @@ class GeneralizedWaveFunctionUPS:
                     self.num_spin_orbs,
                     self.num_spin_orbs,
                 ),
-                dtype=complex,
+                dtype=np.complex128,
             )
             for p in range(
                 self.num_spin_orbs
@@ -1047,8 +1050,10 @@ class GeneralizedWaveFunctionUPS:
             kappa_i = []
             for i in range(len(self.kappa_real)):
                 kappa_r.append(parameters[i])
-                kappa_i.append(parameters[i + len(self.kappa_real)])
+                #kappa_i.append(parameters[i + len(self.kappa_real)])
+                kappa_i.append(0.0)
             self.set_kappa_cep(kappa_r, kappa_i)
+
         if theta_optimization:
             thetas_r = []
             thetas_i = []
@@ -1070,17 +1075,17 @@ class GeneralizedWaveFunctionUPS:
                 self.rdm2,
             )'''
         if True:
-            E = generalized_expectation_value(
+            E = generalized_expectation_value_complex(
                 self.ci_coeffs,
                 [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
                 #[generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
             )
-        self._E_opt_old = E
+        self._E_opt_old = E.real
         self._old_opt_parameters = np.copy(parameters)
         self.num_energy_evals += 1  # count one measurement
-        return E
+        return E.real
 
     def _calc_gradient_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool, test = True
