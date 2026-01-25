@@ -725,23 +725,13 @@ class GeneralizedWaveFunctionUPS:
                 is_silent=is_silent_subiterations,
                 energy_eval_callback=lambda: self.num_energy_evals,
             )
-            self._old_opt_parameters = 2 * np.zeros_like(self.thetas) + 10**20
+            self._old_opt_parameters = np.zeros(2*len(self.thetas)) + 10**20
             self._E_opt_old = 0.0
-            thetas = []
-            for theta_r, theta_i in zip(self.thetas_real, self.thetas_imag):
-                thetas.append(theta_r)
-                thetas.append(theta_i)
+            thetas = np.concatenate((self.thetas_real, self.thetas_imag))
             res = optimizer.minimize(
                 thetas,
                 extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
             )
-            thetas_r = []
-            thetas_i = []
-            # OBS!! Thetas are in the order 00_real,00_imag,01_real,01_imag,...
-            for i in range(len(self.thetas)):
-                thetas_r.append(res.x[2 * i])
-                thetas_i.append(res.x[2 * i + 1])
-            self.set_thetas(thetas_r, thetas_i)
 
             if orbital_optimization and len(self.kappa_real) != 0:
                 if not is_silent_subiterations:
@@ -762,7 +752,7 @@ class GeneralizedWaveFunctionUPS:
 
                 optimizer = Optimizers(
                     energy_oo,
-                    "l-bfgs-b",
+                    "bfgs",
                     grad=gradient_oo,
                     maxiter=maxiter,
                     tol=tol,
@@ -771,7 +761,9 @@ class GeneralizedWaveFunctionUPS:
                 )
                 self._old_opt_parameters = np.zeros(2 * len(self.kappa_spin_idx)) + 10**20
                 self._E_opt_old = 0.0
+                print("energy", self.energy_elec)
                 res = optimizer.minimize([0.0] * 2 * len(self.kappa_spin_idx))
+                print("energy", self.energy_elec)
                 for i in range(len(self.kappa_real)):
                     self._kappa_real[i] = 0.0
                     self._kappa_imag[i] = 0.0
