@@ -342,12 +342,13 @@ def generalized_expectation_value(
         do_folding=do_folding,
         do_unsafe=do_unsafe,
     )
-     
+ 
     val = bra.conj() @ op_ket
     if val.imag > 1e-10:
         print("Warning! Complex energy!")
 
     return val.real 
+
 
 def generalized_expectation_value_complex(
     bra: np.ndarray,
@@ -387,12 +388,16 @@ def generalized_expectation_value_complex(
         do_unsafe=do_unsafe,
     )
     val = bra.conj() @ op_ket
+    #print("\n\n")
+    #print(operators[0].operators_readable)
+    #print(bra, op_ket, val)
+    #print("\n\n")
     return val
 
 def generalized_construct_ups_state(
     state: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float],
+    thetas: list[complex],
     ups_struct: UpsStructure,
     dagger: bool = False,
 ) -> np.ndarray:
@@ -489,15 +494,14 @@ def generalized_construct_ups_state_test_anna(
     out = state.copy()
     order = 1
     offset = ci_info.space_extension_offset
-
     # Loop over all excitation in UPSStructure
     for exc_type, exc_indices, theta in zip(
         ups_struct.excitation_operator_type[::order], ups_struct.excitation_indices[::order], thetas[::order]
         
     ):
+        if np.abs(theta) < 1e-12:
+             continue
         if not dagger:  
-            if np.abs(theta) < 1e-6:
-                continue
             if exc_type in ("single", "double"):
                 # Create T matrix
                 if exc_type == "single":
@@ -552,9 +556,7 @@ def generalized_construct_ups_state_test_anna(
             else:
                 raise ValueError(f"Got unknown excitation type, {exc_type}")
 
-        elif dagger:
-            if np.abs(theta) < 1e-6:
-                continue
+        elif dagger:  
             if exc_type in ("single", "double"):
                 # Create T matrix
                 if exc_type == "single":

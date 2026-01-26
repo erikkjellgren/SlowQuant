@@ -138,21 +138,17 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         mol.nelectron,
         active_space,
         c,
-        # C_u,
+        #C_u,
         h_core,
         g_eri,
-        "fuccsd",
+        "fUCCSD",
         {"n_layers": 1},
         include_active_kappa=False,
     )
     # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True,tol=1e-8)
-    print(type(WF.thetas))
+    # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True, tol=1e-10, maxiter = 2000)
 
-    # WF.thetas = np.random.uniform(-0.01+0j, 0.01+0j, size=len(WF.thetas)).tolist()
-    # WF.thetas = (np.array([0.01+0j, 0j, 0j, 0j, 0j, 0j, 0j, 0j, 0j, 0j, 0j])).tolist()
-    # WF.thetas[:] = np.random.uniform(-1,1, len(WF.thetas)).tolist()
-
-    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=False, test=True, tol=1e-10, maxiter = 10000)
+    WF.run_wf_optimization_2step("cobyla", orbital_optimization=True, tol=1e-5, maxiter = 2000)
 
     print("E_opt:", WF._energy_elec)
     
