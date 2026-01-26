@@ -1188,7 +1188,6 @@ class GeneralizedWaveFunctionUPS:
                         print("real component")
                         print(self.ups_layout.excitation_indices[i])'''
                 gradient[i + num_kappa] += 2 * np.matmul(bra_vec, ket_vec_tmp).real
-                # print(self.thetas) #print statement
                 # Product rule implications on reference bra and CSF ket
                 # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
                 bra_vec = generalized_propagate_unitary_test_anna(  ##AE changed
@@ -1213,6 +1212,7 @@ class GeneralizedWaveFunctionUPS:
                 list(self.ups_layout.grad_param_R.values())
             )  # Count energy measurements for all gradients
         # print('bra', bra_vec,'ket', ket_vec_tmp,) #print statement
+        # print('gradient', gradient)
         return gradient
 
     @property

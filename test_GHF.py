@@ -62,6 +62,7 @@ def restricted(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=1
     g_eri = mol.intor("int2e")
     mc = mcscf.CASCI(mf, active_space[1], active_space[0])
 
+    print('h core',h_core, '..')
     # mc = mcscf.UCASCI(mf, active_space[1], active_space[0])
     # # Slowquant
 
@@ -114,7 +115,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     mf.kernel()
     c=np.array(mf.mo_coeff, dtype=complex)
     e_nuc=mf.energy_nuc()
+    h_core=mol.intor("int1e_kin")  + mol.intor("int1e_nuc")
+    h_1e = mol.intor("int1e_kin")  
+    h_nuc=mol.intor("int1e_nuc")
 
+    g_eri = mol.intor("int2e")
+    mc = mcscf.CASCI(mf, active_space[1], active_space[0])
 
     #make a random unitary transformation
     u = unitary_group.rvs(c.shape[0]) 
@@ -137,14 +143,18 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         g_eri,
         "fuccsd",
         {"n_layers": 1},
-        include_active_kappa=True,
+        include_active_kappa=False,
     )
     # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True,tol=1e-8)
+    print(type(WF.thetas))
 
-    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True, tol=1e-10, maxiter = 10000)
+    # WF.thetas = np.random.uniform(-0.01+0j, 0.01+0j, size=len(WF.thetas)).tolist()
+    # WF.thetas = (np.array([0.01+0j, 0j, 0j, 0j, 0j, 0j, 0j, 0j, 0j, 0j, 0j])).tolist()
+    # WF.thetas[:] = np.random.uniform(-1,1, len(WF.thetas)).tolist()
+
+    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=False, test=True, tol=1e-10, maxiter = 10000)
 
     print("E_opt:", WF._energy_elec)
-    print(WF.thetas)
     
     
   
@@ -285,7 +295,7 @@ def h2o():
     O  0.0   0.0  0.11779 
     H  0.0   0.75545  -0.47116;
     H  0.0  -0.75545  -0.47116"""
-    basis = "631-g"
+    basis = "sto-6g"
     active_space_u = ((2, 2), 8)
     # active_space = (2, 4)
     charge = 0

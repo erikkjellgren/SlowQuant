@@ -173,8 +173,8 @@ def iterate_t1_incl_diag(
                 num_alpha -= 1
             else:
                 num_beta -= 1
-            if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
-                continue
+            # if (num_alpha != 0 or num_beta != 0) and is_spin_conserving: #AE
+            #     continue
             yield a, i
 
 
@@ -285,8 +285,8 @@ def iterate_t2_generalized(
                         num_alpha -= 1
                     else:
                         num_beta -= 1
-                    if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
-                        continue
+                    # if (num_alpha != 0 or num_beta != 0) and is_spin_conserving: #AE
+                    #     continue 
                     yield a, i, b, j
 
 

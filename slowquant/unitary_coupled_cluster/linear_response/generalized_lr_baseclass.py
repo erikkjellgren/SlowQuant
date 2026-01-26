@@ -138,7 +138,6 @@ class LinearResponseBaseClass:
         S[size:, :size] = -self.Delta.conjugate()
         S[size:, size:] = -self.Sigma.conjugate()
         print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma)))}")
-
         self.hessian = E2
         self.metric = S
 

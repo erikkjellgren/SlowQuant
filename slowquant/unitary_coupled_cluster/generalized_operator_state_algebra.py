@@ -496,7 +496,7 @@ def generalized_construct_ups_state_test_anna(
         
     ):
         if not dagger:  
-            if np.abs(theta) < 1e-12:
+            if np.abs(theta) < 1e-6:
                 continue
             if exc_type in ("single", "double"):
                 # Create T matrix
@@ -511,7 +511,6 @@ def generalized_construct_ups_state_test_anna(
                 else:
                     raise ValueError(f"Got unknown excitation type: {exc_type}")
                 # Analytical application on state vector
-
                 out = (
                     out
                     + (np.sin(np.abs(theta)) / np.abs(theta))
@@ -523,7 +522,7 @@ def generalized_construct_ups_state_test_anna(
                             ci_info,
                             do_folding=False,
                         )
-                        - np.conj(theta)
+                        - np.conjugate(theta)
                         * generalized_propagate_state(
                             [T_dag],
                             out,
@@ -553,8 +552,8 @@ def generalized_construct_ups_state_test_anna(
             else:
                 raise ValueError(f"Got unknown excitation type, {exc_type}")
 
-        elif dagger:  
-            if np.abs(theta) < 1e-12:
+        elif dagger:
+            if np.abs(theta) < 1e-6:
                 continue
             if exc_type in ("single", "double"):
                 # Create T matrix
@@ -580,19 +579,16 @@ def generalized_construct_ups_state_test_anna(
                             ci_info,
                             do_folding=False,
                         )
-                        + np.conj(theta)
+                        + np.conjugate(theta)
                         * generalized_propagate_state(
                             [T_dag],
                             out,
                             ci_info,
                             do_folding=False,
                         )
-                    )
-                    + ((1 - np.cos(np.abs(theta))) / (np.abs(theta) ** 2))
-                    * (
-                        - (np.abs(theta) ** 2)
-                        *   (
-                            generalized_propagate_state(
+                        +((1-np.cos(np.abs(theta)))/(np.abs(theta)**2)
+                        *np.abs(theta)**2*
+                            (generalized_propagate_state(
                                 [T, T_dag],
                                 out,
                                 ci_info,
@@ -603,10 +599,11 @@ def generalized_construct_ups_state_test_anna(
                                 out,
                                 ci_info,
                                 do_folding=False,
-                            )
+                            ))
                         )
                     )
                 )
+            
             else:
                 raise ValueError(f"Got unknown excitation type, {exc_type}")
     return out
@@ -1470,7 +1467,7 @@ def generalized_get_grad_action_test_anna(
         elif exc_type == "double":
             (i, j, a, b) = np.array(exc_indices) + 2 * offset
             T = G2_generalized(i, j, a, b, False)
-            T_dag = G2_generalized(i, j, a, b, True) #true right??
+            T_dag = G2_generalized(i, j, a, b, True) 
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Apply missing T factor of derivative
