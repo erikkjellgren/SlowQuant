@@ -113,29 +113,33 @@ def get_hcf_fc_unrestricted(geometry, basis, active_space, unit='bohr', charge=0
     mf = scf.UHF(mol)
     mf.kernel()
 
-    mc = mcscf.UCASCI(mf, active_space[1], active_space[0])
-    res = mc.kernel(mf.mo_coeff)
+    mc = mcscf.UCASSCF(mf, active_space[1], active_space[0])
+    emc1 = mc.kernel()[0]
+
+    # mc = mcscf.UCASCI(mf, active_space[1], active_space[0])
+    # res = mc.kernel(mf.mo_coeff)
     
     h_core = mol.intor("int1e_kin") + mol.intor("int1e_nuc")
     g_eri = mol.intor("int2e")
     
+    # print(h_core)
+    # print("mf", len(mf.mo_coeff))
+    # print("mc", len(mc.mo_coeff))
     # Print info on Slowquant calculation
-    # print("Method: fuccsd, Layers: 2, Orbital Optimization: True")
-    # print("Method: HF")
-    print("Method: fuccsd, Layers: 2, Orbital optimization: False")
+    print("Method: fuccsd, Layers: 1, include active kappa:True Orbital optimization: True")
     # Slowquant
     WF = UnrestrictedWaveFunctionUPS(
         mol.nelectron,
         active_space,
-        mf.mo_coeff,
+        mc.mo_coeff,
         h_core,
         g_eri,
         "fuccsd",
-        {"n_layers":2},
+        {"n_layers":1},
         include_active_kappa=True,
     )
 
-    WF.run_wf_optimization_1step("bfgs", orbital_optimization=False)
+    WF.run_wf_optimization_1step("bfgs", orbital_optimization=True, tol=1e-6)
 
     print(WF.energy_elec_RDM)
     

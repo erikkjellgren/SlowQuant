@@ -83,7 +83,7 @@ class LinearResponseUPS(LinearResponseBaseClass):
                 finite_excitations_idx.append(False)
 
         finite_excitations_idx = np.array(finite_excitations_idx)
-        print("finite", len(finite_excitations_idx), "q", len(self.q_ops), "G", len(self.G_ops  ))
+        # print("finite", len(finite_excitations_idx), "q", len(self.q_ops), "G", len(self.G_ops  ))
         idx_shift = len(self.q_ops)
         G_shift = int(len(self.G_ops) / 2)
         q_shift = int(len(self.q_ops) / 2)
@@ -405,7 +405,9 @@ class LinearResponseUPS(LinearResponseBaseClass):
                             int(j - (j / 2 + 0.5)) + q_shift, int(i - (i / 2 + 0.5)) + idx_shift + G_shift
                         ] = val  # beta beta
                     # self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
+                    
         for j, GJ in enumerate(self.G_ops):
+            # print(j, GJ)
             GJH_ket = propagate_state([GJ], H00_ket, *self.index_info)
             GJdH_ket = propagate_state([GJ.dagger], H00_ket, *self.index_info)
             HGJd_ket = propagate_state([self.H_0i_0a, GJ.dagger], self.wf.ci_coeffs, *self.index_info)
@@ -475,27 +477,27 @@ class LinearResponseUPS(LinearResponseBaseClass):
                     )
                 )
                 # Forsøg på at inddele i blokke
-                if i % 2 == 0:
-                    if j % 2 == 0:
-                        self.A[int(i - (i / 2)) + idx_shift, int(j - (j / 2)) + idx_shift] = self.A[
-                            int(j - (j / 2)) + idx_shift, int(i - (i / 2)) + idx_shift
-                        ] = val
-                    else:
-                        self.A[
-                            int(i - (i / 2 + 0.5)) + idx_shift, int(j - (j / 2 + 0.5)) + idx_shift + G_shift
-                        ] = self.A[
-                            int(j - (j / 2 + 0.5)) + idx_shift, int(i - (i / 2 + 0.5)) + idx_shift + G_shift
-                        ] = val
-                else:
-                    self.A[
-                        int(i - (i / 2 + 0.5)) + idx_shift + G_shift,
-                        int(j - (j / 2 + 0.5)) + idx_shift + G_shift,
-                    ] = self.A[
-                        int(j - (j / 2 + 0.5)) + idx_shift + G_shift,
-                        int(i - (i / 2 + 0.5)) + idx_shift + G_shift,
-                    ] = val
+                # if i % 2 == 0:
+                #     if j % 2 == 0:
+                #         self.A[int(i - (i / 2)) + idx_shift, int(j - (j / 2)) + idx_shift] = self.A[
+                #             int(j - (j / 2)) + idx_shift, int(i - (i / 2)) + idx_shift
+                #         ] = val
+                #     else:
+                #         self.A[
+                #             int(i - (i / 2 + 0.5)) + idx_shift, int(j - (j / 2 + 0.5)) + idx_shift + G_shift
+                #         ] = self.A[
+                #             int(j - (j / 2 + 0.5)) + idx_shift, int(i - (i / 2 + 0.5)) + idx_shift + G_shift
+                #         ] = val
+                # else:
+                #     self.A[
+                #         int(i - (i / 2 + 0.5)) + idx_shift + G_shift,
+                #         int(j - (j / 2 + 0.5)) + idx_shift + G_shift,
+                #     ] = self.A[
+                #         int(j - (j / 2 + 0.5)) + idx_shift + G_shift,
+                #         int(i - (i / 2 + 0.5)) + idx_shift + G_shift,
+                #     ] = val
                 # gammel måde gem
-                # self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
+                self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
 
                 # Make B
                 # <0| GId H GJd |0>
@@ -526,27 +528,27 @@ class LinearResponseUPS(LinearResponseBaseClass):
                     GId_ket,
                     *self.index_info,
                 )
-                if i % 2 == 0:
-                    if j % 2 == 0:
-                        self.B[int(i - (i / 2)) + idx_shift, int(j - (j / 2)) + idx_shift] = self.B[
-                            int(j - (j / 2)) + idx_shift, int(i - (i / 2)) + idx_shift
-                        ] = val
-                    else:
-                        self.B[
-                            int(i - (i / 2 + 0.5)) + idx_shift, int(j - (j / 2 + 0.5)) + idx_shift + G_shift
-                        ] = self.B[
-                            int(j - (j / 2 + 0.5)) + idx_shift, int(i - (i / 2 + 0.5)) + idx_shift + G_shift
-                        ] = val
-                else:
-                    self.B[
-                        int(i - (i / 2 + 0.5)) + idx_shift + G_shift,
-                        int(j - (j / 2 + 0.5)) + idx_shift + G_shift,
-                    ] = self.B[
-                        int(j - (j / 2 + 0.5)) + idx_shift + G_shift,
-                        int(i - (i / 2 + 0.5)) + idx_shift + G_shift,
-                    ] = val
+                # if i % 2 == 0:
+                #     if j % 2 == 0:
+                #         self.B[int(i - (i / 2)) + idx_shift, int(j - (j / 2)) + idx_shift] = self.B[
+                #             int(j - (j / 2)) + idx_shift, int(i - (i / 2)) + idx_shift
+                #         ] = val
+                #     else:
+                #         self.B[
+                #             int(i - (i / 2 + 0.5)) + idx_shift, int(j - (j / 2 + 0.5)) + idx_shift + G_shift
+                #         ] = self.B[
+                #             int(j - (j / 2 + 0.5)) + idx_shift, int(i - (i / 2 + 0.5)) + idx_shift + G_shift
+                #         ] = val
+                # else:
+                #     self.B[
+                #         int(i - (i / 2 + 0.5)) + idx_shift + G_shift,
+                #         int(j - (j / 2 + 0.5)) + idx_shift + G_shift,
+                #     ] = self.B[
+                #         int(j - (j / 2 + 0.5)) + idx_shift + G_shift,
+                #         int(i - (i / 2 + 0.5)) + idx_shift + G_shift,
+                #     ] = val
 
-                # self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
+                self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
                 # Make Sigma
                 # <0| GId GJ |0>
                 val = expectation_value(
@@ -562,29 +564,30 @@ class LinearResponseUPS(LinearResponseBaseClass):
                     GId_ket,
                     *self.index_info,
                 )
-                if i % 2 == 0:
-                    if j % 2 == 0:
-                        self.Sigma[int(i - (i / 2)) + idx_shift, int(j - (j / 2)) + idx_shift] = self.Sigma[
-                            int(j - (j / 2)) + idx_shift, int(i - (i / 2)) + idx_shift
-                        ] = val
-                    else:
-                        self.Sigma[
-                            int(i - (i / 2 + 0.5)) + idx_shift, int(j - (j / 2 + 0.5)) + idx_shift + G_shift
-                        ] = self.Sigma[
-                            int(j - (j / 2 + 0.5)) + idx_shift, int(i - (i / 2 + 0.5)) + idx_shift + G_shift
-                        ] = val
-                else:
-                    self.Sigma[
-                        int(i - (i / 2 + 0.5)) + idx_shift + G_shift,
-                        int(j - (j / 2 + 0.5)) + idx_shift + G_shift,
-                    ] = self.Sigma[
-                        int(j - (j / 2 + 0.5)) + idx_shift + G_shift,
-                        int(i - (i / 2 + 0.5)) + idx_shift + G_shift,
-                    ] = val
-                # self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = val
+                # if i % 2 == 0:
+                #     if j % 2 == 0:
+                #         self.Sigma[int(i - (i / 2)) + idx_shift, int(j - (j / 2)) + idx_shift] = self.Sigma[
+                #             int(j - (j / 2)) + idx_shift, int(i - (i / 2)) + idx_shift
+                #         ] = val
+                #     else:
+                #         self.Sigma[
+                #             int(i - (i / 2 + 0.5)) + idx_shift, int(j - (j / 2 + 0.5)) + idx_shift + G_shift
+                #         ] = self.Sigma[
+                #             int(j - (j / 2 + 0.5)) + idx_shift, int(i - (i / 2 + 0.5)) + idx_shift + G_shift
+                #         ] = val
+                # else:
+                #     self.Sigma[
+                #         int(i - (i / 2 + 0.5)) + idx_shift + G_shift,
+                #         int(j - (j / 2 + 0.5)) + idx_shift + G_shift,
+                #     ] = self.Sigma[
+                #         int(j - (j / 2 + 0.5)) + idx_shift + G_shift,
+                #         int(i - (i / 2 + 0.5)) + idx_shift + G_shift,
+                #     ] = val
+                self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = val
         self.A = self.A[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape(
             (np.sum(finite_excitations_idx), np.sum(finite_excitations_idx))
         )
+        # print("A", self.A)
         self.B = self.B[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape(
             (np.sum(finite_excitations_idx), np.sum(finite_excitations_idx))
         )

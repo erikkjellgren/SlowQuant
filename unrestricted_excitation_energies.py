@@ -23,10 +23,11 @@ def get_unrestricted_excitation_energy(geometry, basis, active_space, charge=0, 
 
     mc = mcscf.UCASCI(mf, active_space[1], active_space[0]) 
     res = mc.kernel(mf.mo_coeff)
-
+    
     h_core = mol.intor("int1e_kin") + mol.intor("int1e_nuc")
     g_eri = mol.intor("int2e")
     
+    # print(mf.mo_coeff)
     # SlowQuant
     
     WF = UnrestrictedWaveFunctionUPS(
@@ -35,11 +36,15 @@ def get_unrestricted_excitation_energy(geometry, basis, active_space, charge=0, 
         mf.mo_coeff,
         h_core,
         g_eri,
-        "fuccsdtq",
-        {"n_layers":2},
+        "fuccsd",
+        {"n_layers":1},
         include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("slsqp", False)
+    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True)
+    # print(WF.thetas)
+    # print(WF.ci_coeffs)
+    # print(g_eri)
+    # print(WF.gaaaa_mo, WF.gbbbb_mo)
     # WF.run_wf_optimization_1step("bfgs", True)
     
     # WF = UnrestrictedWaveFunctionUPS(
@@ -57,7 +62,7 @@ def get_unrestricted_excitation_energy(geometry, basis, active_space, charge=0, 
 
     print("Electronic energy", WF.energy_elec_RDM)
 
-    ULR = unaive.LinearResponseUPS(WF, excitations="SDTQ")
+    ULR = unaive.LinearResponseUPS(WF, excitations="SD")
     ULR.calc_excitation_energies()
     print(f'excitation energies: {ULR.excitation_energies}')
         
@@ -185,19 +190,31 @@ def h2_res():
 
     get_restricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
 
-def lih_plus():
+def lih():
     geometry = """ Li 0.0 0.0 0.0;
-        H 0.0 0.0 1.5949;"""
-    basis = '6-31g'
-    active_space = ((1,0),2)
-    charge = 1
-    spin = 1
+        H 0.0 0.0 1.5957;"""#1.5949
+    basis = 'sto-3g'
+    active_space = ((2,2),4)
+    charge = 0
+    spin = 0
+    get_unrestricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
+
+def h4_rektangle():
+    geometry = """H  0.0   0.0  0.0;
+        H  0.0  0.0  0.74;
+        H  0.0  1.11  0.74;
+        H  0.0  1.11  0.0;"""
+    basis = "sto-3g"
+    active_space = ((2,2), 4)
+    charge = 0
+    spin = 0
     get_unrestricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
 
 # OH_cation()
-oh_radical()
+# oh_radical()
 # h2()
+h4_rektangle()
 # h2_res()
 # NO_radical()
 # h2_ion()
-#lih_plus()
+# lih()

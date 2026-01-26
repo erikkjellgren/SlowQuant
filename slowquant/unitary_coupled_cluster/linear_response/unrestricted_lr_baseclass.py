@@ -59,9 +59,11 @@ class LinearResponseBaseClass:
 
         if "s" in excitations:
             for a, i in iterate_t1(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
+                print("single index", a, i)
                 self.G_ops.append(G1(i, a))
         if "d" in excitations:
             for a, i, b, j in iterate_t2(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
+                # print("double", i, j, a, b)
                 self.G_ops.append(G2(i, j, a, b))
         if "t" in excitations:
             for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
@@ -81,7 +83,10 @@ class LinearResponseBaseClass:
                 self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx
             ):
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
+        print("no_active",self.wf.kappa_no_activeactive_idx)
         for i, a in self.wf.kappa_no_activeactive_idx:
+            print("alpha", 2*a, 2*i)
+            print("beta", 2*a+1, 2*i+1)
             op = G1(2 * a, 2 * i)
             self.q_ops.append(op)
             op = G1(2 * a + 1, 2 * i + 1)
@@ -147,7 +152,6 @@ class LinearResponseBaseClass:
 
         self.hessian = E2
         self.metric = S
-        print("size:", size)
         eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)
         sorting = np.argsort(eigval)
         self.excitation_energies = np.real(eigval[sorting][size:])
@@ -156,7 +160,8 @@ class LinearResponseBaseClass:
         self.num_q = len(self.q_ops)
         self.num_G = size - self.num_q
         self.num_qG = size
-        print("response_vector and len q and len G", len(self.response_vectors), self.num_q, self.num_G, self.num_qG)
+        
+
         # self.Z_q = self.response_vectors[: self.num_q, :]
         # self.Z_G = self.response_vectors[self.num_q : self.num_q + self.num_G, :]
         # self.Y_q = self.response_vectors[self.num_q + self.num_G : 2 * self.num_q + self.num_G]
