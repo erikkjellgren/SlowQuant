@@ -25,6 +25,7 @@ from slowquant.unitary_coupled_cluster.generalized_operators import (
 )
 from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import (
     generalized_construct_ups_state, generalized_construct_ups_state_modified, generalized_construct_ups_state_test_anna,
+    generalized_construct_ups_state_test_erik,
     generalized_expectation_value,
     generalized_expectation_value_complex,
     generalized_get_grad_action, generalized_get_grad_action_modified, generalized_get_grad_action_test_anna,
@@ -1340,3 +1341,153 @@ class GeneralizedWaveFunctionUPS:
         return get_orbital_gradient_expvalue_real_imag(
             self.ci_coeffs, self.ci_info, self.h_mo, self.g_mo, self.num_spin_orbs, self.kappa_spin_idx
         )
+
+
+    def _calc_gradient_optimization_erik(
+        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool, test = True
+    ) -> np.ndarray:
+        """Calculate electronic gradient.
+
+        Args:
+            parameters: Ansatz and orbital rotation parameters.
+            theta_optimization: If used in theta optimization.
+            kappa_optimization: If used in kappa optimization.
+
+        Returns:
+            Electronic gradient.
+        """
+        gradient = np.zeros(len(parameters))
+        num_kappa = 0
+        if kappa_optimization:
+            num_kappa = 2 * len(self.kappa_spin_idx)
+            kappa_r = []
+            kappa_i = []
+            for i in range(len(self.kappa_real)):
+                kappa_r.append(parameters[i])
+                kappa_i.append(parameters[i + len(self.kappa_real)])
+            self.set_kappa_cep(kappa_r, kappa_i)
+        if theta_optimization:
+            thetas_r = []
+            thetas_i = []
+            for i in range(len(self.thetas)):
+                thetas_r.append(parameters[i + num_kappa])
+                # Silence the imaginary part if you wish to run with real-valued thetas:
+                thetas_i.append(parameters[i + num_kappa + len(self.thetas)])
+            self.set_thetas(thetas_r, thetas_i)
+        if kappa_optimization:
+            if test:
+                gradient[:num_kappa] = get_orbital_gradient_generalized_real_imag(
+                    self.h_mo,
+                    self.g_mo,
+                    self.kappa_spin_idx,
+                    self.num_inactive_spin_orbs,
+                    self.num_active_spin_orbs,
+                    self.rdm1,
+                    self.rdm2,
+                )
+            else:
+                gradient[:num_kappa] = get_orbital_gradient_expvalue_real_imag(
+                    self.ci_coeffs,
+                    self.ci_info,
+                    self.h_mo,
+                    self.g_mo,
+                    self.num_spin_orbs,
+                    self.kappa_spin_idx,
+                )
+        if theta_optimization:
+            # Hamiltonian = generalized_hamiltonian_0i_0a(
+            #    self.h_mo,
+            #    self.g_mo,
+            #    self.num_inactive_spin_orbs,
+            #    self.num_active_spin_orbs,
+            # )
+            Hamiltonian = generalized_hamiltonian_full_space(
+                self.h_mo,
+                self.g_mo,
+                self.num_spin_orbs,
+            )
+            # Reference bra state (no differentiations)
+            bra_vec1 = generalized_propagate_state(
+                [Hamiltonian],
+                self.ci_coeffs.conjugate(),
+                self.ci_info,
+            )
+            # Reference ket state (no differentiations)
+            ket_vec2 = generalized_propagate_state(
+                [Hamiltonian],
+                self.ci_coeffs,
+                self.ci_info,
+            )
+            bra_vec1 = generalized_construct_ups_state_test_erik(
+                bra_vec1,
+                self.ci_info,
+                self.thetas,
+                self.ups_layout,
+                dagger=True,
+            )
+            ket_vec2 = generalized_construct_ups_state_test_erik(
+                ket_vec2,
+                self.ci_info,
+                self.thetas,
+                self.ups_layout,
+                dagger=True,
+            )
+            # CSF reference state on ket
+            ket_vec1 = np.copy(self.csf_coeffs)
+            bra_vec2 = np.copy(self.csf_coeffs)
+            ket_vec_tmp = np.copy(self.csf_coeffs)
+            bra_vec_tmp = np.copy(self.csf_coeffs)
+            # Calculate analytical derivative w.r.t. each theta using gradient_action function
+            for i in range(len(self.thetas)):
+                # Derivative action w.r.t. i-th theta on CSF ket
+                ket_vec_tmp = generalized_get_grad_action_test_anna(
+                    ket_vec1,
+                    i,
+                    self.ci_info,
+                    self.ups_layout,
+                )
+                
+                bra_vec_tmp = generalized_get_grad_action_test_anna(
+                    bra_vec2,
+                    i,
+                    self.ci_info,
+                    self.ups_layout,
+               )
+                grad = np.matmul(bra_vec1.conj(), ket_vec_tmp) + np.matmul(bra_vec_tmp.conj(), ket_vec2)
+                gradient[i + num_kappa] += grad.real
+                gradient[i + num_kappa + len(self.thetas)] += grad.imag
+               
+                # Product rule implications on reference bra and CSF ket
+                # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
+                bra_vec1 = generalized_propagate_unitary(
+                    bra_vec1,
+                    i,
+                    self.ci_info,
+                    self.thetas,
+                    self.ups_layout,
+                )
+                bra_vec2 = generalized_propagate_unitary(
+                    bra_vec2,
+                    i,
+                    self.ci_info,
+                    self.thetas,
+                    self.ups_layout,
+                )
+                ket_vec1 = generalized_propagate_unitary(
+                    ket_vec1,
+                    i,
+                    self.ci_info,
+                    self.thetas,
+                    self.ups_layout,
+                )
+                ket_vec2 = generalized_propagate_unitary(
+                    ket_vec2,
+                    i,
+                    self.ci_info,
+                    self.thetas,
+                    self.ups_layout,
+                )
+            self.num_energy_evals += 2 * np.sum(
+                list(self.ups_layout.grad_param_R.values())
+            )  # Count energy measurements for all gradients
+        return gradient

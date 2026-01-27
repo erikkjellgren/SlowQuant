@@ -407,8 +407,10 @@ def propagate_state(
             # loop over all strings of annihilation operators in FermionicOperator sum
             for fermi_label in op_folded.operators.keys():
                 factor = op.operators[fermi_label]
-                if not isinstance(factor, float):
-                    raise ValueError(f"Got factor, {factor}, of type {type(factor)}, expected type float.")
+                if isinstance(factor, int):
+                    factor = float(factor)
+                #if not isinstance(factor, float):
+                #    raise ValueError(f"Got factor, {factor}, of type {type(factor)}, expected type float.")
                 # Separate each annihilation operator string in creation and annihilation indices
                 anni_idx = []
                 create_idx = []
