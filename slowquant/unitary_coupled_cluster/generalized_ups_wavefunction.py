@@ -886,10 +886,25 @@ class GeneralizedWaveFunctionUPS:
         #parameters = np.ones_like(parameters)
         # print("parameters") #print statement 
         # print(parameters,'slut')
+
+
         res = optimizer.minimize(
             parameters,
             extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
         )
+        
+        # finite diff
+        g_an = gradient(parameters)
+        # finite-diff gradient at same parameters
+        g_fd = self.get_gradient_finite_diff_theta(
+            self.thetas,
+        )
+
+        diff = g_fd - g_an
+        print("diff =", np.max(np.abs(diff)))
+        # print("diff2 =", diff)
+        
+        
         # print("efter") #print statement 
         # print(parameters)
 
@@ -1093,6 +1108,7 @@ class GeneralizedWaveFunctionUPS:
             Electronic gradient.
         """
         gradient = np.zeros(len(parameters))
+        gradient2 = np.zeros(len(parameters), dtype=np.complex128)
         temp = np.zeros(len(parameters), dtype=np.complex128)
         num_kappa = 0
         if kappa_optimization:
@@ -1149,11 +1165,17 @@ class GeneralizedWaveFunctionUPS:
                 self.ci_coeffs,
                 self.ci_info,
             )
+            
+            # Reference ket state (no differentiations)
+            ket_vec_anna = generalized_propagate_state(
+                [Hamiltonian],
+                self.ci_coeffs,
+                self.ci_info,
+            )
             # OBS!!!!! Changed to generalized_construct_ups_state_modified!!!!
             # OBS!!!!! Remember to change then call to iterate_t1 to iterate_t1_incl_diag in Ups_structure -> fucc
             # OBS!!!!! Changed self.thetas to thetas_total/self.thetas_real in the remaining function calls of this method!!!!
             # thetas_total = np.concatenate((self.thetas_real, self.thetas_imag))
-            # thetas_total =  (np.asarray(self.thetas_real, dtype=float) + 1j*np.asarray(self.thetas_imag, dtype=float)) #AE changed from thetas_total = np.concatenate((self.thetas_real, self.thetas_imag))
             bra_vec = generalized_construct_ups_state_test_anna( ##AE changed
                 bra_vec,
                 self.ci_info,
@@ -1163,14 +1185,32 @@ class GeneralizedWaveFunctionUPS:
                 self.ups_layout,
                 dagger=True,
             )
+            ket_vec_anna = generalized_construct_ups_state_test_anna( ##AE changed
+                ket_vec_anna,
+                self.ci_info,
+                # For real-valued thetas
+                # self.thetas_real,
+                self.thetas,
+                self.ups_layout,
+                dagger=False,
+            )
             # CSF reference state on ket
             ket_vec = np.copy(self.csf_coeffs)
             ket_vec_tmp = np.copy(self.csf_coeffs)
+            bra_vec_anna = np.copy(self.csf_coeffs)
+            bra_vec_tmp = np.copy(self.csf_coeffs)
             # Calculate analytical derivative w.r.t. each theta using gradient_action function
             for i in range(2*len(self.thetas)): # OBS!! run over len(self.thetas) if using real-valued thetas 
                 # Derivative action w.r.t. i-th theta on CSF ket
                 ket_vec_tmp = generalized_get_grad_action_test_anna( ##AE changed
                     ket_vec,
+                    i,
+                    self.ci_info,
+                    self.ups_layout,
+                )
+                
+                bra_vec_tmp = generalized_get_grad_action_test_anna( ##AE changed
+                    bra_vec_anna,
                     i,
                     self.ci_info,
                     self.ups_layout,
@@ -1185,6 +1225,10 @@ class GeneralizedWaveFunctionUPS:
                         print("real component")
                         print(self.ups_layout.excitation_indices[i])'''
                 gradient[i + num_kappa] += 2 * np.matmul(bra_vec, ket_vec_tmp).real
+                
+                gradient2[i + num_kappa] +=  (np.matmul(bra_vec, ket_vec_tmp) + np.matmul(bra_vec_tmp, ket_vec_anna)) #vdot okay??
+
+               
                 # Product rule implications on reference bra and CSF ket
                 # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
                 bra_vec = generalized_propagate_unitary_test_anna(  ##AE changed
@@ -1196,8 +1240,8 @@ class GeneralizedWaveFunctionUPS:
                     self.thetas,
                     self.ups_layout,
                 )
-                ket_vec = generalized_propagate_unitary_test_anna( ##AE changed
-                    ket_vec,
+                ket_vec_anna = generalized_propagate_unitary_test_anna( ##AE changed
+                    ket_vec_anna,
                     i,
                     self.ci_info,
                     # For real-valued thetas
@@ -1210,7 +1254,74 @@ class GeneralizedWaveFunctionUPS:
             )  # Count energy measurements for all gradients
         # print('bra', bra_vec,'ket', ket_vec_tmp,) #print statement
         # print('gradient', gradient)
-        return gradient
+        # print('thetas lastly', self.thetas)
+        
+        
+        
+        # gradient2[num_kappa:num_kappa+len(self.thetas)] = gradient2[num_kappa:num_kappa+len(self.thetas)].real
+        # gradient2[num_kappa+len(self.thetas):num_kappa+2*len(self.thetas)]   = gradient2[num_kappa+len(self.thetas):num_kappa+2*len(self.thetas)].imag
+
+        print('Gradient gammel', gradient)
+        print('Gradient ny', gradient2)
+        print('Gradient ny as float', gradient2.astype(float))
+        return gradient2
+
+    def get_gradient_finite_diff_theta(self,
+            parameters: list[complex], 
+        ) -> np.ndarray:
+            thetas= parameters
+            gradient_R = np.zeros(len(thetas), dtype=np.complex128)
+            gradient_I = np.zeros(len(thetas), dtype=np.complex128)
+
+            step = 1e-8
+            thetas = np.asarray(thetas, dtype=np.complex128)
+            p0 = np.concatenate([thetas.real, thetas.imag]).astype(float)
+            # print(p0)
+
+            #Real
+            for idx in range(len(thetas)):
+                p_high = p0.copy()
+                p_low  = p0.copy()
+                p_high[idx] += step
+                p_low[idx]  -= step
+
+                E_high = self._calc_energy_optimization(p_high,
+                        theta_optimization=True,
+                        kappa_optimization=False)
+                # print('E high',E_high)
+                E_low  = self._calc_energy_optimization(p_low, theta_optimization=True,
+                        kappa_optimization=False)
+                # print('E low',E_low)
+
+                gradient_R[idx] = (E_high - E_low) / (2.0 * step)
+                
+                # print("gr", gradient_R)
+
+            #Imag
+            for idx in range(len(thetas)):
+                j = idx + len(thetas)
+                p_high = p0.copy()
+                p_low  = p0.copy()
+                p_high[j] += step
+                p_low[j]  -= step
+                
+                E_high = self._calc_energy_optimization(p_high,
+                        theta_optimization=True,
+                        kappa_optimization=False)
+                # print('E high',E_high)
+                E_low  = self._calc_energy_optimization(p_low, theta_optimization=True,
+                        kappa_optimization=False)
+                # print('E low',E_low)
+
+
+                gradient_I[idx] = (E_high - E_low) / (2.0 * step)
+                # print("gi", gradient_I)
+
+            gradient_total = np.concatenate((gradient_R, gradient_I))
+            
+            print('Finite diff', gradient_total)
+
+            return gradient_total
 
     @property
     def get_orbital_gradient_generalized_real_imag(self):

@@ -52,7 +52,7 @@ class LinearResponse(LinearResponseBaseClass):
             if np.max(np.abs(grad)) > 10**3:
                 raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
 
-        grad = np.zeros(2 * len(self.G_ops))
+        grad = np.zeros(2 * len(self.G_ops), dtype=complex) #AE complex
         H00_ket = generalized_propagate_state([self.H_0i_0a], self.wf.ci_coeffs, *self.index_info)
         for i, op in enumerate(self.G_ops):
             G_ket = generalized_propagate_state([op], self.wf.ci_coeffs, *self.index_info)

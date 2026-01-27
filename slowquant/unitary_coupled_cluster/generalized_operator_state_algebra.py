@@ -526,7 +526,7 @@ def generalized_construct_ups_state_test_anna(
                             ci_info,
                             do_folding=False,
                         )
-                        - np.conjugate(theta)
+                        - np.conj(theta)
                         * generalized_propagate_state(
                             [T_dag],
                             out,
@@ -581,7 +581,7 @@ def generalized_construct_ups_state_test_anna(
                             ci_info,
                             do_folding=False,
                         )
-                        + np.conjugate(theta)
+                        + np.conj(theta)
                         * generalized_propagate_state(
                             [T_dag],
                             out,

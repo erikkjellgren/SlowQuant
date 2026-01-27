@@ -67,10 +67,10 @@ class LinearResponseBaseClass:
         excitations = excitations.lower()
 
         if "s" in excitations:
-            for a, i in iterate_t1(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
+            for a, i in iterate_t1(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx): ## -diagonal jf HJ. Cross?
                 self.G_ops.append(G1_generalized(i, a)) #AE from G1
         if "d" in excitations:
-            for a, i, b, j in iterate_t2(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
+            for a, i, b, j in iterate_t2(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx): #cross?
                 self.G_ops.append(G2_generalized(i, j, a, b)) #AE from G2
         if "t" in excitations:
             for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
@@ -94,10 +94,10 @@ class LinearResponseBaseClass:
         for p, q in self.wf.kappa_no_activeactive_spin_idx:
             self.q_ops.append(G1_generalized(p, q)) #AE from G1
         num_parameters = len(self.G_ops) + len(self.q_ops)
-        self.A = np.zeros((num_parameters, num_parameters))
-        self.B = np.zeros((num_parameters, num_parameters))
-        self.Sigma = np.zeros((num_parameters, num_parameters))
-        self.Delta = np.zeros((num_parameters, num_parameters))
+        self.A = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
+        self.B = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
+        self.Sigma = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
+        self.Delta = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
         self.H_1i_1a = generalized_hamiltonian_1i_1a(
             self.wf.h_mo,
             self.wf.g_mo,
@@ -116,7 +116,7 @@ class LinearResponseBaseClass:
     def calc_excitation_energies(self) -> None:
         """Calculate excitation energies."""
         size = len(self.A)
-        E2 = np.zeros((size * 2, size * 2))
+        E2 = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
         E2[:size, :size] = self.A
         E2[:size, size:] = self.B
         E2[size:, :size] = self.B.conjugate() #AE added conjugtate 
@@ -132,7 +132,7 @@ class LinearResponseBaseClass:
             print("Negative eigenvalue in Hessian.")
             #raise ValueError("Negative eigenvalue in Hessian.")
 
-        S = np.zeros((size * 2, size * 2))
+        S = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
         S[:size, :size] = self.Sigma
         S[:size, size:] = self.Delta
         S[size:, :size] = -self.Delta.conjugate()
