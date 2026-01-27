@@ -39,7 +39,7 @@ class WaveFunctionCircuit:
         quantum_interface: QuantumInterface,
         include_active_kappa: bool = False,
     ) -> None:
-        """Initialize for UCC wave function.
+        """Initialize circuit based UPS wave function.
 
         Args:
             cas: CAS(num_active_elec, num_active_orbs),

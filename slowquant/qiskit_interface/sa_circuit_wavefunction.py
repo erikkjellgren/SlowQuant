@@ -37,7 +37,7 @@ class WaveFunctionSACircuit:
         quantum_interface: QuantumInterface,
         include_active_kappa: bool = False,
     ) -> None:
-        """Initialize for circuit based state-averaged wave function.
+        """Initialize circuit based state-averaged UPS wave function.
 
         Args:
             cas: CAS(num_active_elec, num_active_orbs),
