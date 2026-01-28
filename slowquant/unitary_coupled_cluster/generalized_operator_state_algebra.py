@@ -1390,65 +1390,84 @@ def generalized_get_grad_action(
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         theta = thetas[idx]
-        A = theta*T - theta.conjugate()*T.dagger
-        # Apply U^dagger
-        #tmp = generalized_propagate_unitary(state, idx, ci_info, thetas, ups_struct, dagger = True)
-        # Apply derivative
-        """
-        tmp = (
-                np.sin(np.abs(theta))/np.abs(theta)
-                    * generalized_propagate_state(
-                        [T],
-                        tmp,
-                        ci_info,
-                        do_folding=False,
-                    )
-                + theta.conjugate()/(2*np.abs(theta)**2)*(np.abs(theta)*np.cos(np.abs(theta)) - np.sin(np.abs(theta)))
-                    * generalized_propagate_state(
-                        [A],
-                        tmp,
-                        ci_info,
-                        do_folding=False,
-                    )
-                )
-        tmp = (
-            np.cos(theta)
-                * generalized_propagate_state(
-                    [T-T.dagger],
-                    state,
-                    ci_info,
-                    do_folding=False,
-                )
-            + np.sin(theta)
-                * generalized_propagate_state(
-                    [T-T.dagger, T-T.dagger],
-                    state,
-                    ci_info,
-                    do_folding=False,
-                )
-        )
-        """
+        VR = T - T.dagger
+        VI = 1j*(T + T.dagger)
+        A = theta.real*VR + theta.imag*VI
         r = np.abs(theta)
-        coeff_T = np.sin(r)/r
-        coeff_A = theta.conjugate()*(r*np.cos(r)-np.sin(r))/(2*r**2)
-        tmp = (
-            coeff_T * generalized_propagate_state(
-                        [T],
-                        state,
-                        ci_info,
-                        do_folding=False,
-                    )
-            + coeff_A * generalized_propagate_state(
-                        [A],
-                        state,
-                        ci_info,
-                        do_folding=False,
-                    )
+        # Apply derivative
+        tmp_R = (
+                np.sin(r)/r * 
+                generalized_propagate_state(
+                    [VR],
+                    state,
+                    ci_info,
+                    do_folding=False,
+                )
+                +(1-np.cos(r))/r**2*
+                generalized_propagate_state(
+                    [VR,A],
+                    state,
+                    ci_info,
+                    do_folding=False,
+                )
+                +(1-np.cos(r))/r**2*
+                generalized_propagate_state(
+                    [A,VR],
+                    state,
+                    ci_info,
+                    do_folding=False,
+                )
+                +theta.real*(r*np.cos(r) - np.sin(r))/r**3*
+                generalized_propagate_state(
+                    [A],
+                    state,
+                    ci_info,
+                    do_folding=False,
+                )
+                +theta.real*(r*np.sin(r) - 2 +2*np.cos(r))/r**4*
+                generalized_propagate_state(
+                    [A,A],
+                    state,
+                    ci_info,
+                    do_folding=False,
+                )
         )
-        tmp = generalized_propagate_unitary(tmp, idx, ci_info, thetas, ups_struct, dagger = True)
+        tmp_I = (
+                np.sin(r)/r * 
+                generalized_propagate_state(
+                    [VI],
+                    state,
+                    ci_info,
+                    do_folding=False,
+                )
+                +(1-np.cos(r))/r**2*
+                generalized_propagate_state(
+                    [VI*A+A*VI],
+                    state,
+                    ci_info,
+                    do_folding=False,
+                )
+                +theta.imag*(r*np.cos(r) - np.sin(r))/r**3*
+                generalized_propagate_state(
+                    [A],
+                    state,
+                    ci_info,
+                    do_folding=False,
+                )
+                +theta.imag*(r*np.sin(r) - 2 +2*np.cos(r))/r**4*
+                generalized_propagate_state(
+                    [A,A],
+                    state,
+                    ci_info,
+                    do_folding=False,
+                )
+        )
+        # Apply U^dagger
+        tmp_R = generalized_propagate_unitary(tmp_R, idx, ci_info, thetas, ups_struct, dagger = True)
+        tmp_I = generalized_propagate_unitary(tmp_I, idx, ci_info, thetas, ups_struct, dagger = True)
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")
-    return tmp
+    return tmp_R, tmp_I
 
 def generalized_get_grad_action_test_anna(
     state: np.ndarray,

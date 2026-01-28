@@ -1161,7 +1161,7 @@ class GeneralizedWaveFunctionUPS:
             # Reference bra state (no differentiations)
             bra_vec1 = generalized_propagate_state(
                 [Hamiltonian],
-                self.ci_coeffs.conjugate(),
+                self.ci_coeffs,
                 self.ci_info,
             )
             # Reference ket state (no differentiations)
@@ -1187,12 +1187,10 @@ class GeneralizedWaveFunctionUPS:
             # CSF reference state on ket
             ket_vec1 = np.copy(self.csf_coeffs)
             bra_vec2 = np.copy(self.csf_coeffs)
-            ket_vec_tmp = np.copy(self.csf_coeffs)
-            bra_vec_tmp = np.copy(self.csf_coeffs)
             # Calculate analytical derivative w.r.t. each theta using gradient_action function
             for i in range(len(self.thetas)):
                 # Derivative action w.r.t. i-th theta on CSF ket
-                ket_vec_tmp = generalized_get_grad_action(
+                ket_vec_tmp_R, ket_vec_tmp_I = generalized_get_grad_action(
                     ket_vec1,
                     i,
                     self.ci_info,
@@ -1200,16 +1198,17 @@ class GeneralizedWaveFunctionUPS:
                     self.ups_layout,
                 )
                 
-                bra_vec_tmp = generalized_get_grad_action(
+                bra_vec_tmp_R, bra_vec_tmp_I = generalized_get_grad_action(
                     bra_vec2,
                     i,
                     self.ci_info,
                     self.thetas,
                     self.ups_layout,
                 )
-                grad = np.matmul(bra_vec1.conj(), ket_vec_tmp) + np.matmul(bra_vec_tmp.conj(), ket_vec2)
-                gradient[i + num_kappa] += grad.real
-                gradient[i + num_kappa + len(self.thetas)] += grad.imag
+                grad_R = np.matmul(bra_vec1.conj(), ket_vec_tmp_R) + np.matmul(bra_vec_tmp_R.conj(), ket_vec2)
+                grad_I = np.matmul(bra_vec1.conj(), ket_vec_tmp_I) + np.matmul(bra_vec_tmp_I.conj(), ket_vec2)
+                gradient[i + num_kappa] += grad_R.real
+                gradient[i + num_kappa + len(self.thetas)] += grad_I.real
                
                 # Product rule implications on reference bra and CSF ket
                 # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
