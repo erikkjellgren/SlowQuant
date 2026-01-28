@@ -1022,7 +1022,7 @@ def generalized_propagate_unitary(
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         if dagger:
-            A = theta*T - theta.conjugate()*T.dagger
+            A = -theta*T + theta.conjugate()*T.dagger
         else:
             A = theta*T - theta.conjugate()*T.dagger
         # Analytical application on state vector
@@ -1345,23 +1345,21 @@ def generalized_get_grad_action(
     state: np.ndarray,
     idx: int,
     ci_info: CI_Info,
+    thetas: list[complex],
     ups_struct: UpsStructure,
 ) -> np.ndarray:
     r"""Get effect of differentiation with respect to "idx" operator in the UPS expansion.
 
     .. math::
-        \frac{\partial}{\partial \theta_i}\left(\left<\text{CSF}\right|\boldsymbol{U}(\theta_{i-1})\boldsymbol{U}(\theta_i)\right) =
-        \left<\text{CSF}\right|\boldsymbol{U}(\theta_{i-1})\frac{\partial \boldsymbol{U}(\theta_i)}{\partial \theta_i}
+        \frac{\partial}{\partial \theta_i}\left(\left<\text{ref}\right|\boldsymbol{U}(\theta_{i-1})\boldsymbol{U}(\theta_i)\right) =
+        \left<\text{ref}\right|\boldsymbol{U}(\theta_{i-1})\frac{\partial \boldsymbol{U}(\theta_i)}{\partial \theta_i}
 
-    With,
+    Since the target already contains :math:`\boldsymbol{U}(\theta_i)`, this function actually does,
 
     .. math::
-        \begin{align}
-        \frac{\partial \boldsymbol{U}(\theta_i)}{\partial \theta_i} &= \frac{\partial}{\partial \theta_i}\exp\left(\theta_i \hat{T}_i\right)\\
-                &= \exp\left(\theta_i \hat{T}_i\right)\hat{T}_i
-        \end{align}
-
-    This function only applies the $\hat{T}_i$ part to the state.
+        \frac{\partial}{\partial \theta_i}\left(\left<\text{ref}\right|\boldsymbol{U}(\theta_{i-1})\boldsymbol{U}(\theta_i)\right) =
+        \left<\text{ref}\right|\boldsymbol{U}(\theta_{i-1})\frac{\partial \boldsymbol{U}(\theta_i)}\boldsymbol{U}^\dagger(\theta_i)\right){\partial \theta_i} =
+        \left<\text{ref}\right|\boldsymbol{U}(\theta_{i-1})\frac{\partial \boldsymbol{U}(\theta_i)}{\partial \theta_i}
 
     #. 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
 
@@ -1385,20 +1383,69 @@ def generalized_get_grad_action(
         # Create T matrix
         if exc_type == "single":
             (i, a) = np.array(exc_indices) + 2 * offset
-            T = G1_generalized(i, a, True)
+            T = G1_generalized(i, a, False)
         elif exc_type == "double":
             (i, j, a, b) = np.array(exc_indices) + 2 * offset
-            T = G2_generalized(i, j, a, b, True)
+            T = G2_generalized(i, j, a, b, False)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
-        A = T - T.dagger
-        # Apply missing T factor of derivative
-        tmp = generalized_propagate_state(
-            [A],
-            state,
-            ci_info,
-            do_folding=False,
+        theta = thetas[idx]
+        A = theta*T - theta.conjugate()*T.dagger
+        # Apply U^dagger
+        #tmp = generalized_propagate_unitary(state, idx, ci_info, thetas, ups_struct, dagger = True)
+        # Apply derivative
+        """
+        tmp = (
+                np.sin(np.abs(theta))/np.abs(theta)
+                    * generalized_propagate_state(
+                        [T],
+                        tmp,
+                        ci_info,
+                        do_folding=False,
+                    )
+                + theta.conjugate()/(2*np.abs(theta)**2)*(np.abs(theta)*np.cos(np.abs(theta)) - np.sin(np.abs(theta)))
+                    * generalized_propagate_state(
+                        [A],
+                        tmp,
+                        ci_info,
+                        do_folding=False,
+                    )
+                )
+        tmp = (
+            np.cos(theta)
+                * generalized_propagate_state(
+                    [T-T.dagger],
+                    state,
+                    ci_info,
+                    do_folding=False,
+                )
+            + np.sin(theta)
+                * generalized_propagate_state(
+                    [T-T.dagger, T-T.dagger],
+                    state,
+                    ci_info,
+                    do_folding=False,
+                )
         )
+        """
+        r = np.abs(theta)
+        coeff_T = np.sin(r)/r
+        coeff_A = theta.conjugate()*(r*np.cos(r)-np.sin(r))/(2*r**2)
+        tmp = (
+            coeff_T * generalized_propagate_state(
+                        [T],
+                        state,
+                        ci_info,
+                        do_folding=False,
+                    )
+            + coeff_A * generalized_propagate_state(
+                        [A],
+                        state,
+                        ci_info,
+                        do_folding=False,
+                    )
+        )
+        tmp = generalized_propagate_unitary(tmp, idx, ci_info, thetas, ups_struct, dagger = True)
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")
     return tmp
