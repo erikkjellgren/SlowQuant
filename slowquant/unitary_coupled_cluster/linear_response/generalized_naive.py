@@ -16,7 +16,7 @@ from slowquant.unitary_coupled_cluster.linear_response.generalized_lr_baseclass 
     LinearResponseBaseClass,
 )
 from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import (
-    generalized_expectation_value_complex,
+    generalized_expectation_value,
     generalized_propagate_state,
 )
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
@@ -58,28 +58,28 @@ class LinearResponse(LinearResponseBaseClass):
             G_ket = generalized_propagate_state([op], self.wf.ci_coeffs, *self.index_info)
             Gd_ket = generalized_propagate_state([op.dagger], self.wf.ci_coeffs, *self.index_info)
             # <0 | H G |0>
-            grad[i] = generalized_expectation_value_complex(
+            grad[i] = generalized_expectation_value(
                 H00_ket,
                 [],
                 G_ket,
                 *self.index_info,
             )
             # - <0| G H |0>
-            grad[i] -= generalized_expectation_value_complex(
+            grad[i] -= generalized_expectation_value(
                 Gd_ket,
                 [],
                 H00_ket,
                 *self.index_info,
             )
             # <0| Gd H |0>
-            grad[i + len(self.G_ops)] = generalized_expectation_value_complex(
+            grad[i + len(self.G_ops)] = generalized_expectation_value(
                 G_ket,
                 [],
                 H00_ket,
                 *self.index_info,
             )
             # - <0| H Gd |0>
-            grad[i + len(self.G_ops)] -= generalized_expectation_value_complex(
+            grad[i + len(self.G_ops)] -= generalized_expectation_value(
                 H00_ket,
                 [],
                 Gd_ket,
@@ -127,7 +127,7 @@ class LinearResponse(LinearResponseBaseClass):
                 Gd_ket = generalized_propagate_state([GI.dagger], self.wf.ci_coeffs, *self.index_info)
                 # Make A
                 # <0| Gd H q |0>
-                val = generalized_expectation_value_complex(
+                val = generalized_expectation_value(
                     G_ket,
                     [],
                     Hq_ket,
@@ -137,7 +137,7 @@ class LinearResponse(LinearResponseBaseClass):
                 val -= (
                     1
                     / 2
-                    * generalized_expectation_value_complex(
+                    * generalized_expectation_value(
                         qdH_ket,
                         [],
                         Gd_ket,
@@ -148,7 +148,7 @@ class LinearResponse(LinearResponseBaseClass):
                 val -= (
                     1
                     / 2
-                    * generalized_expectation_value_complex(
+                    * generalized_expectation_value(
                         self.wf.ci_coeffs,
                         [self.H_1i_1a * GI.dagger * qJ],
                         self.wf.ci_coeffs,
@@ -158,7 +158,7 @@ class LinearResponse(LinearResponseBaseClass):
                 self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
                 # Make B
                 # <0| qd H Gd |0>
-                val = generalized_expectation_value_complex(
+                val = generalized_expectation_value(
                     Hq_ket,
                     [],
                     Gd_ket,
@@ -168,7 +168,7 @@ class LinearResponse(LinearResponseBaseClass):
                 val -= (
                     1
                     / 2
-                    * generalized_expectation_value_complex(
+                    * generalized_expectation_value(
                         G_ket,
                         [],
                         qdH_ket,
@@ -179,7 +179,7 @@ class LinearResponse(LinearResponseBaseClass):
                 val -= (
                     1
                     / 2
-                    * generalized_expectation_value_complex(
+                    * generalized_expectation_value(
                         self.wf.ci_coeffs,
                         [qJ.dagger * GI.dagger * self.H_1i_1a],
                         self.wf.ci_coeffs,
@@ -199,14 +199,14 @@ class LinearResponse(LinearResponseBaseClass):
                 GId_ket = generalized_propagate_state([GI.dagger], self.wf.ci_coeffs, *self.index_info)
                 # Make A
                 # <0| GId H GJ |0>
-                val = generalized_expectation_value_complex(
+                val = generalized_expectation_value(
                     GI_ket,
                     [],
                     HGJ_ket,
                     *self.index_info,
                 )
                 # <0| GJ H GId |0>
-                val += generalized_expectation_value_complex(
+                val += generalized_expectation_value(
                     HGJd_ket,
                     [],
                     GId_ket,
@@ -216,7 +216,7 @@ class LinearResponse(LinearResponseBaseClass):
                 val -= (
                     1
                     / 2
-                    * generalized_expectation_value_complex(
+                    * generalized_expectation_value(
                         GI_ket,
                         [],
                         GJH_ket,
@@ -227,7 +227,7 @@ class LinearResponse(LinearResponseBaseClass):
                 val -= (
                     1
                     / 2
-                    * generalized_expectation_value_complex(
+                    * generalized_expectation_value(
                         GJdH_ket,
                         [],
                         GId_ket,
@@ -238,7 +238,7 @@ class LinearResponse(LinearResponseBaseClass):
                 val -= (
                     1
                     / 2
-                    * generalized_expectation_value_complex(
+                    * generalized_expectation_value(
                         GJd_ket,
                         [GI.dagger],
                         H00_ket,
@@ -249,7 +249,7 @@ class LinearResponse(LinearResponseBaseClass):
                 val -= (
                     1
                     / 2
-                    * generalized_expectation_value_complex(
+                    * generalized_expectation_value(
                         H00_ket,
                         [GI.dagger],
                         GJ_ket,
@@ -259,28 +259,28 @@ class LinearResponse(LinearResponseBaseClass):
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
                 # Make B
                 # <0| GId H GJd |0>
-                val = generalized_expectation_value_complex(
+                val = generalized_expectation_value(
                     GI_ket,
                     [],
                     HGJd_ket,
                     *self.index_info,
                 )
                 # - <0| GId GJd H |0>
-                val -= generalized_expectation_value_complex(
+                val -= generalized_expectation_value(
                     GI_ket,
                     [],
                     GJdH_ket,
                     *self.index_info,
                 )
                 # - <0| H GJd GId |0>
-                val -= generalized_expectation_value_complex(
+                val -= generalized_expectation_value(
                     GJH_ket,
                     [],
                     GId_ket,
                     *self.index_info,
                 )
                 # <0| GJd H GId |0>
-                val += generalized_expectation_value_complex(
+                val += generalized_expectation_value(
                     HGJ_ket,
                     [],
                     GId_ket,
@@ -289,14 +289,14 @@ class LinearResponse(LinearResponseBaseClass):
                 self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
                 # Make Sigma
                 # <0| GId GJ |0>
-                val = generalized_expectation_value_complex(
+                val = generalized_expectation_value(
                     GI_ket,
                     [],
                     GJ_ket,
                     *self.index_info,
                 )
                 # - <0| GJ GId |0>
-                val -= generalized_expectation_value_complex(
+                val -= generalized_expectation_value(
                     GJd_ket,
                     [],
                     GId_ket,
@@ -387,42 +387,42 @@ class LinearResponse(LinearResponseBaseClass):
             transfer_ket = generalized_propagate_state([transfer_op], self.wf.ci_coeffs, *self.index_info)
             transferd_ket = generalized_propagate_state([transfer_op.dagger], self.wf.ci_coeffs, *self.index_info)
             # <0| mux T |0>
-            transition_dipole_x = generalized_expectation_value_complex(
+            transition_dipole_x = generalized_expectation_value(
                 muxd_ket,
                 [],
                 transfer_ket,
                 *self.index_info,
             )
             # - <0| T mux |0>
-            transition_dipole_x -= generalized_expectation_value_complex(
+            transition_dipole_x -= generalized_expectation_value(
                 transferd_ket,
                 [],
                 mux_ket,
                 *self.index_info,
             )
             # <0| muy T |0>
-            transition_dipole_y = generalized_expectation_value_complex(
+            transition_dipole_y = generalized_expectation_value(
                 muyd_ket,
                 [],
                 transfer_ket,
                 *self.index_info,
             )
             # - <0| T muy |0>
-            transition_dipole_y -= generalized_expectation_value_complex(
+            transition_dipole_y -= generalized_expectation_value(
                 transferd_ket,
                 [],
                 muy_ket,
                 *self.index_info,
             )
             # <0| muz T |0>
-            transition_dipole_z = generalized_expectation_value_complex(
+            transition_dipole_z = generalized_expectation_value(
                 muzd_ket,
                 [],
                 transfer_ket,
                 *self.index_info,
             )
             # - <0| T muz |0>
-            transition_dipole_z -= generalized_expectation_value_complex(
+            transition_dipole_z -= generalized_expectation_value(
                 transferd_ket,
                 [],
                 muz_ket,

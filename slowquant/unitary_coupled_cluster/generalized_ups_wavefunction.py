@@ -27,7 +27,7 @@ from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import
     generalized_construct_ups_state, generalized_construct_ups_state_test_anna,
     generalized_construct_ups_state_test_erik,
     generalized_expectation_value,
-    generalized_expectation_value_complex,
+    generalized_expectation_value_energy,
     generalized_get_grad_action, generalized_get_grad_action_test_anna,
     generalized_propagate_state,
     generalized_propagate_unitary, generalized_propagate_unitary_test_anna,
@@ -657,7 +657,7 @@ class GeneralizedWaveFunctionUPS:
             Electronic energy.
         """
         if self._energy_elec is None:
-            self._energy_elec = generalized_expectation_value(
+            self._energy_elec = generalized_expectation_value_energy(
                 self.ci_coeffs,
                 # Skal ændres til generalized_hamiltonian_0i_0a på et tidspunkt.
                 [
@@ -1075,7 +1075,7 @@ class GeneralizedWaveFunctionUPS:
                 self.rdm2,
             )'''
         if True:
-            E = generalized_expectation_value_complex(
+            E = generalized_expectation_value_energy(
                 self.ci_coeffs,
                 [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
                 #[generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],

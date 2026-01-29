@@ -344,13 +344,11 @@ def generalized_expectation_value(
     )
  
     val = bra.conj() @ op_ket
-    if val.imag > 1e-10:
-        print("Warning! Complex energy!")
 
-    return val.real 
+    return val
 
 
-def generalized_expectation_value_complex(
+def generalized_expectation_value_energy(
     bra: np.ndarray,
     operators: list[FermionicOperator | str],
     ket: np.ndarray,
@@ -388,11 +386,15 @@ def generalized_expectation_value_complex(
         do_unsafe=do_unsafe,
     )
     val = bra.conj() @ op_ket
+
+    if val.imag > 1e-10:
+        print("Warning! Complex energy!")
+
     #print("\n\n")
     #print(operators[0].operators_readable)
     #print(bra, op_ket, val)
     #print("\n\n")
-    return val
+    return val.real
 
 def generalized_construct_ups_state(
     state: np.ndarray,

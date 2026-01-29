@@ -2,7 +2,8 @@ import numba as nb
 import numpy as np
 import scipy as scipy
 
-from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import generalized_expectation_value, generalized_expectation_value_complex
+from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import (generalized_expectation_value,
+generalized_expectation_value_energy)
 from slowquant.unitary_coupled_cluster.operators import a_op_spin
 from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, generalized_hamiltonian_0i_0a
 
@@ -301,36 +302,36 @@ def get_orbital_gradient_expvalue_real_imag(
 
     for idx, (M,N) in enumerate(kappa_idx):
         if M == N:
-            gradient_I[idx] +=  generalized_expectation_value_complex(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
+            gradient_I[idx] +=  generalized_expectation_value(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
                                 ci_coeffs, ci_info)
             
-            gradient_I[idx] -=  generalized_expectation_value_complex(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
+            gradient_I[idx] -=  generalized_expectation_value(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
                                 ci_coeffs, ci_info)
         else:
             # Real  
-            gradient_R[idx] +=  generalized_expectation_value_complex(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
+            gradient_R[idx] +=  generalized_expectation_value(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
                                 ci_coeffs, ci_info)
                         
-            gradient_R[idx] -=  generalized_expectation_value_complex(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
+            gradient_R[idx] -=  generalized_expectation_value(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
                                     ci_coeffs, ci_info)
             
-            gradient_R[idx] -=  generalized_expectation_value_complex(ci_coeffs, [(a_op_spin(N,True)*a_op_spin(M,False))*H], 
+            gradient_R[idx] -=  generalized_expectation_value(ci_coeffs, [(a_op_spin(N,True)*a_op_spin(M,False))*H], 
                                 ci_coeffs, ci_info)
                         
-            gradient_R[idx] +=  generalized_expectation_value_complex(ci_coeffs, [H*(a_op_spin(N,True)*a_op_spin(M,False))], 
+            gradient_R[idx] +=  generalized_expectation_value(ci_coeffs, [H*(a_op_spin(N,True)*a_op_spin(M,False))], 
                                     ci_coeffs, ci_info)
 
             # Imaginary
-            gradient_I[idx] +=  generalized_expectation_value_complex(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
+            gradient_I[idx] +=  generalized_expectation_value(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
                                 ci_coeffs, ci_info)
                         
-            gradient_I[idx] -=  generalized_expectation_value_complex(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
+            gradient_I[idx] -=  generalized_expectation_value(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
                                     ci_coeffs, ci_info)
             
-            gradient_I[idx] +=  generalized_expectation_value_complex(ci_coeffs, [(a_op_spin(N,True)*a_op_spin(M,False))*H], 
+            gradient_I[idx] +=  generalized_expectation_value(ci_coeffs, [(a_op_spin(N,True)*a_op_spin(M,False))*H], 
                                 ci_coeffs, ci_info)
                         
-            gradient_I[idx] -=  generalized_expectation_value_complex(ci_coeffs, [H*(a_op_spin(N,True)*a_op_spin(M,False))], 
+            gradient_I[idx] -=  generalized_expectation_value(ci_coeffs, [H*(a_op_spin(N,True)*a_op_spin(M,False))], 
                                     ci_coeffs, ci_info)
         
     gradient_total = np.concatenate((gradient_R, 1j*gradient_I))
@@ -353,9 +354,9 @@ def get_nonsplit_gradient_expvalue(
     gradient = np.zeros(len(kappa_idx),dtype=np.complex128)
 
     for idx, (M,N) in enumerate(kappa_idx):
-        gradient[idx] +=  generalized_expectation_value_complex(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
+        gradient[idx] +=  generalized_expectation_value(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
                             ci_coeffs, ci_info)
-        gradient[idx] -=  generalized_expectation_value_complex(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
+        gradient[idx] -=  generalized_expectation_value(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
                             ci_coeffs, ci_info)
 
     return gradient
@@ -405,8 +406,8 @@ def get_gradient_finite_diff(
 
             H_low = generalized_hamiltonian_0i_0a(h_mo_low,g_mo_low,num_inactive_spin_orbs,num_active_spin_orbs)
 
-            gradient_I[idx] =  (generalized_expectation_value_complex(ci_coeffs, [H_high], ci_coeffs, ci_info) 
-                            -   generalized_expectation_value_complex(ci_coeffs, [H_low], ci_coeffs, ci_info)) / (2*step)
+            gradient_I[idx] =  (generalized_expectation_value(ci_coeffs, [H_high], ci_coeffs, ci_info) 
+                            -   generalized_expectation_value(ci_coeffs, [H_low], ci_coeffs, ci_info)) / (2*step)
             
         else:
             # Real
@@ -435,8 +436,8 @@ def get_gradient_finite_diff(
             H_low = generalized_hamiltonian_0i_0a(h_mo_low,g_mo_low,num_inactive_spin_orbs,num_active_spin_orbs)
 
 
-            gradient_R[idx] =  (generalized_expectation_value_complex(ci_coeffs, [H_high], ci_coeffs, ci_info) 
-                            -   generalized_expectation_value_complex(ci_coeffs, [H_low], ci_coeffs, ci_info)) / (2*step)
+            gradient_R[idx] =  (generalized_expectation_value(ci_coeffs, [H_high], ci_coeffs, ci_info) 
+                            -   generalized_expectation_value(ci_coeffs, [H_low], ci_coeffs, ci_info)) / (2*step)
 
             # Imaginary
             kappa_mat_high = np.zeros_like(c_mo)
@@ -462,8 +463,8 @@ def get_gradient_finite_diff(
 
             H_low = generalized_hamiltonian_0i_0a(h_mo_low,g_mo_low,num_inactive_spin_orbs,num_active_spin_orbs)
 
-            gradient_I[idx] =  (expectation_value_for_gradient(ci_coeffs, [H_high], ci_coeffs, ci_info) 
-                            -   expectation_value_for_gradient(ci_coeffs, [H_low], ci_coeffs, ci_info)) / (2*step)
+            gradient_I[idx] =  (generalized_expectation_value(ci_coeffs, [H_high], ci_coeffs, ci_info) 
+                            -   generalized_expectation_value(ci_coeffs, [H_low], ci_coeffs, ci_info)) / (2*step)
         
     gradient_total = np.concatenate((gradient_R, gradient_I)) 
 
