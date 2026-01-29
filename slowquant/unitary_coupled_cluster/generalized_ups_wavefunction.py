@@ -1159,82 +1159,47 @@ class GeneralizedWaveFunctionUPS:
                 self.num_spin_orbs,
             )
             # Reference bra state (no differentiations)
-            bra_vec1 = generalized_propagate_state(
+            bra_vec = generalized_propagate_state(
                 [Hamiltonian],
                 self.ci_coeffs,
                 self.ci_info,
             )
             # Reference ket state (no differentiations)
-            ket_vec2 = generalized_propagate_state(
-                [Hamiltonian],
-                self.ci_coeffs,
-                self.ci_info,
-            )
-            bra_vec1 = generalized_construct_ups_state_test_erik(
-                bra_vec1,
-                self.ci_info,
-                self.thetas,
-                self.ups_layout,
-                dagger=True,
-            )
-            ket_vec2 = generalized_construct_ups_state_test_erik(
-                ket_vec2,
+            bra_vec = generalized_construct_ups_state_test_erik(
+                bra_vec,
                 self.ci_info,
                 self.thetas,
                 self.ups_layout,
                 dagger=True,
             )
             # CSF reference state on ket
-            ket_vec1 = np.copy(self.csf_coeffs)
-            bra_vec2 = np.copy(self.csf_coeffs)
+            ket_vec = np.copy(self.csf_coeffs)
             # Calculate analytical derivative w.r.t. each theta using gradient_action function
             for i in range(len(self.thetas)):
+                # Remove the i-th U^dagger from bra_vec.
+                # The effect of this unitary will be included from the derivative added to ket_vec.
+                bra_vec = generalized_propagate_unitary_test_anna(
+                    bra_vec,
+                    i,
+                    self.ci_info,
+                    self.thetas,
+                    self.ups_layout,
+                )
                 # Derivative action w.r.t. i-th theta on CSF ket
                 ket_vec_tmp_R, ket_vec_tmp_I = generalized_get_grad_action(
-                    ket_vec1,
+                    ket_vec,
                     i,
                     self.ci_info,
                     self.thetas,
                     self.ups_layout,
                 )
-                
-                bra_vec_tmp_R, bra_vec_tmp_I = generalized_get_grad_action(
-                    bra_vec2,
-                    i,
-                    self.ci_info,
-                    self.thetas,
-                    self.ups_layout,
-                )
-                grad_R = np.matmul(bra_vec1.conj(), ket_vec_tmp_R) + np.matmul(bra_vec_tmp_R.conj(), ket_vec2)
-                grad_I = np.matmul(bra_vec1.conj(), ket_vec_tmp_I) + np.matmul(bra_vec_tmp_I.conj(), ket_vec2)
-                gradient[i + num_kappa] += grad_R.real
-                gradient[i + num_kappa + len(self.thetas)] += grad_I.real
+                gradient[i + num_kappa] += 2*np.matmul(bra_vec.conj(), ket_vec_tmp_R).real
+                gradient[i + num_kappa + len(self.thetas)] += 2*np.matmul(bra_vec.conj(), ket_vec_tmp_I).real
                
                 # Product rule implications on reference bra and CSF ket
                 # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
-                bra_vec1 = generalized_propagate_unitary(
-                    bra_vec1,
-                    i,
-                    self.ci_info,
-                    self.thetas,
-                    self.ups_layout,
-                )
-                bra_vec2 = generalized_propagate_unitary(
-                    bra_vec2,
-                    i,
-                    self.ci_info,
-                    self.thetas,
-                    self.ups_layout,
-                )
-                ket_vec1 = generalized_propagate_unitary(
-                    ket_vec1,
-                    i,
-                    self.ci_info,
-                    self.thetas,
-                    self.ups_layout,
-                )
-                ket_vec2 = generalized_propagate_unitary(
-                    ket_vec2,
+                ket_vec = generalized_propagate_unitary_test_anna(
+                    ket_vec,
                     i,
                     self.ci_info,
                     self.thetas,

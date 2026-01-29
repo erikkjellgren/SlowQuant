@@ -987,7 +987,6 @@ def generalized_propagate_unitary(
     ci_info: CI_Info,
     thetas: list[complex],
     ups_struct: UpsStructure,
-    dagger: bool = False,
 ) -> np.ndarray:
     """Apply unitary from UPS operator number 'idx' to state.
 
@@ -1021,10 +1020,7 @@ def generalized_propagate_unitary(
             T = G2_generalized(i, j, a, b, False)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
-        if dagger:
-            A = -theta*T + theta.conjugate()*T.dagger
-        else:
-            A = theta*T - theta.conjugate()*T.dagger
+        A = theta*T - theta.conjugate()*T.dagger
         # Analytical application on state vector
         out = (
             state
@@ -1347,18 +1343,11 @@ def generalized_get_grad_action(
     ci_info: CI_Info,
     thetas: list[complex],
     ups_struct: UpsStructure,
-) -> np.ndarray:
+) -> tuple[np.ndarray, np.ndarray]:
     r"""Get effect of differentiation with respect to "idx" operator in the UPS expansion.
 
     .. math::
         \frac{\partial}{\partial \theta_i}\left(\left<\text{ref}\right|\boldsymbol{U}(\theta_{i-1})\boldsymbol{U}(\theta_i)\right) =
-        \left<\text{ref}\right|\boldsymbol{U}(\theta_{i-1})\frac{\partial \boldsymbol{U}(\theta_i)}{\partial \theta_i}
-
-    Since the target already contains :math:`\boldsymbol{U}(\theta_i)`, this function actually does,
-
-    .. math::
-        \frac{\partial}{\partial \theta_i}\left(\left<\text{ref}\right|\boldsymbol{U}(\theta_{i-1})\boldsymbol{U}(\theta_i)\right) =
-        \left<\text{ref}\right|\boldsymbol{U}(\theta_{i-1})\frac{\partial \boldsymbol{U}(\theta_i)}\boldsymbol{U}^\dagger(\theta_i)\right){\partial \theta_i} =
         \left<\text{ref}\right|\boldsymbol{U}(\theta_{i-1})\frac{\partial \boldsymbol{U}(\theta_i)}{\partial \theta_i}
 
     #. 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
@@ -1462,9 +1451,6 @@ def generalized_get_grad_action(
                     do_folding=False,
                 )
         )
-        # Apply U^dagger
-        tmp_R = generalized_propagate_unitary(tmp_R, idx, ci_info, thetas, ups_struct, dagger = True)
-        tmp_I = generalized_propagate_unitary(tmp_I, idx, ci_info, thetas, ups_struct, dagger = True)
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")
     return tmp_R, tmp_I
