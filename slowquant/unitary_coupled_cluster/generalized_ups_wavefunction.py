@@ -890,16 +890,16 @@ class GeneralizedWaveFunctionUPS:
             extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
         )
         
-        # finite diff
-        g_an = gradient(parameters)
-        # finite-diff gradient at same parameters
-        g_fd = self.get_gradient_finite_diff_theta(
-            self.thetas,
-        )
+        # # finite diff
+        # g_an = gradient(parameters)
+        # # finite-diff gradient at same parameters
+        # g_fd = self.get_gradient_finite_diff_theta(
+        #     self.thetas,
+        # )
 
-        diff = g_fd - g_an
-        print("diff =", np.max(np.abs(diff)))
-        # print("diff2 =", diff)
+        # diff = g_fd - g_an
+        # print("diff =", np.max(np.abs(diff)))
+        # # print("diff2 =", diff)
         
         
         # print("efter") #print statement 
