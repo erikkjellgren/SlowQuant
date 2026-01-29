@@ -830,7 +830,6 @@ class GeneralizedWaveFunctionUPS:
                     self._calc_gradient_optimization,
                     theta_optimization=True,
                     kappa_optimization=True,
-                    test=test,
                 )
             else:
                 energy = partial(
@@ -842,7 +841,6 @@ class GeneralizedWaveFunctionUPS:
                     self._calc_gradient_optimization,
                     theta_optimization=False,
                     kappa_optimization=True,
-                    test=test,
                 )
         else:
             energy = partial(
@@ -1096,7 +1094,7 @@ class GeneralizedWaveFunctionUPS:
         return E.real
 
     def _calc_gradient_optimization(
-        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool, test = True
+        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
     ) -> np.ndarray:
         """Calculate electronic gradient.
 
@@ -1127,25 +1125,15 @@ class GeneralizedWaveFunctionUPS:
                 thetas_i.append(parameters[i + num_kappa + len(self.thetas)])
             self.set_thetas(thetas_r, thetas_i)
         if kappa_optimization:
-            if test:
-                gradient[:num_kappa] = get_orbital_gradient_generalized_real_imag(
-                    self.h_mo,
-                    self.g_mo,
-                    self.kappa_spin_idx,
-                    self.num_inactive_spin_orbs,
-                    self.num_active_spin_orbs,
-                    self.rdm1,
-                    self.rdm2,
-                )
-            else:
-                gradient[:num_kappa] = get_orbital_gradient_expvalue_real_imag(
-                    self.ci_coeffs,
-                    self.ci_info,
-                    self.h_mo,
-                    self.g_mo,
-                    self.num_spin_orbs,
-                    self.kappa_spin_idx,
-                )
+            gradient[:num_kappa] = get_orbital_gradient_generalized_real_imag(
+                self.h_mo,
+                self.g_mo,
+                self.kappa_spin_idx,
+                self.num_inactive_spin_orbs,
+                self.num_active_spin_orbs,
+                self.rdm1,
+                self.rdm2,
+            )
         if theta_optimization:
             # Hamiltonian = generalized_hamiltonian_0i_0a(
             #    self.h_mo,
