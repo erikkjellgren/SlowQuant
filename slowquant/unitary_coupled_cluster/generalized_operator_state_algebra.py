@@ -310,7 +310,7 @@ def generalized_expectation_value(
     operators: list[FermionicOperator | str],
     ket: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float] | None = None,
+    thetas: list[complex] | None = None,
     wf_struct: UpsStructure | None = None,
     do_folding: bool = True,
     do_unsafe: bool = False,
@@ -355,7 +355,7 @@ def generalized_expectation_value_complex(
     operators: list[FermionicOperator | str],
     ket: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float] | None = None,
+    thetas: list[complex] | None = None,
     wf_struct: UpsStructure | None = None,
     do_folding: bool = True,
     do_unsafe: bool = False,
@@ -686,7 +686,7 @@ def generalized_construct_ups_state_test_erik(
 def generalized_construct_ups_state_modified(
     state: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float],
+    thetas: list[complex],
     ups_struct: UpsStructure,
     dagger: bool = False,
 ) -> np.ndarray:
@@ -834,7 +834,7 @@ def generalized_construct_ups_state_modified(
 def generalized_construct_ups_state_modified_split(
     state: np.ndarray,
     ci_info: CI_Info,
-    thetas: list[float],
+    thetas: list[complex],
     ups_struct: UpsStructure,
     dagger: bool = False,
 ) -> np.ndarray:
@@ -1134,7 +1134,7 @@ def generalized_propagate_unitary_modified(
     state: np.ndarray,
     idx: int,
     ci_info: CI_Info,
-    thetas: list[float],
+    thetas: list[complex],
     ups_struct: UpsStructure,
 ) -> np.ndarray:
     """Apply unitary from UPS operator number 'idx' to state.
@@ -1236,7 +1236,7 @@ def generalized_propagate_unitary_modified_split(
     state: np.ndarray,
     idx: int,
     ci_info: CI_Info,
-    thetas: list[float],
+    thetas: list[complex],
     ups_struct: UpsStructure,
     ) -> np.ndarray:
     """Apply unitary from UPS operator number 'idx' to state.
