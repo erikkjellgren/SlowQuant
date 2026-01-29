@@ -275,8 +275,8 @@ class GeneralizedWaveFunctionUPS:
             self._thetas_real = []
             self._thetas_imag = []
         else:
-            self._thetas_real = np.zeros(self.ups_layout.n_params).tolist()
-            self._thetas_imag = np.zeros(self.ups_layout.n_params).tolist()
+            self._thetas_real = np.zeros(self.ups_layout.n_params, dtype=float).tolist()
+            self._thetas_imag = np.zeros(self.ups_layout.n_params, dtype=float).tolist()
 
     @property
     def kappa_real(self) -> list[float]:
@@ -299,6 +299,10 @@ class GeneralizedWaveFunctionUPS:
         self._energy_elec = None
         self._kappa_real = k_real.copy()
         self._kappa_imag = k_imag.copy()
+        if isinstance(self._kappa_real, np.ndarray):
+            self._kappa_real = self._kappa_real.tolist()
+        if isinstance(self._kappa_imag, np.ndarray):
+            self._kappa_img = self._kappa_imag.tolist()
         # Move current expansion point.
         self._c_mo = self.c_mo
         self._kappa_real_old = self.kappa_real
@@ -329,9 +333,7 @@ class GeneralizedWaveFunctionUPS:
         Returns:
             theta values.
         """
-        return (np.array(self._thetas_real.copy()) + 1.0j * np.array(self._thetas_imag.copy())).tolist()
-        # This is for running with real valued thetas:
-        # return (np.array(self._thetas_real.copy()))
+        return (np.array(self.thetas_real) + 1.0j * np.array(self.thetas_imag)).tolist()
 
     def set_thetas(self, theta_real: list[float], theta_imag: list[float]) -> None:
         """Set theta values.
@@ -351,20 +353,17 @@ class GeneralizedWaveFunctionUPS:
         self._energy_elec = None
         self._thetas_real = theta_real.copy()
         self._thetas_imag = theta_imag.copy()
+        if isinstance(self._thetas_real, np.ndarray):
+            self._thetas_real = self._thetas_real.tolist()
+        if isinstance(self._thetas_imag, np.ndarray):
+            self._thetas_img = self._thetas_imag.tolist()
         
-        self.ci_coeffs = generalized_construct_ups_state_test_anna( ##AE changed
-            self.csf_coeffs,
-            self.ci_info,
-            self.thetas, #AE before: np.concatenate((theta_real, theta_imag))
-            self.ups_layout,
-        )
-        # For runnign with real-valued thetas:
-        '''self.ci_coeffs = generalized_construct_ups_state(
+        self.ci_coeffs = generalized_construct_ups_state_test_anna(
             self.csf_coeffs,
             self.ci_info,
             self.thetas,
             self.ups_layout,
-        )'''
+        )
 
     @property
     def c_mo(self) -> np.ndarray:
@@ -724,9 +723,9 @@ class GeneralizedWaveFunctionUPS:
                 is_silent=is_silent_subiterations,
                 energy_eval_callback=lambda: self.num_energy_evals,
             )
-            self._old_opt_parameters = np.zeros(2*len(self.thetas)) + 10**20
+            self._old_opt_parameters = np.zeros(2*len(self.thetas), dtype=np.float64) + 10**20
             self._E_opt_old = 0.0
-            thetas = np.concatenate((self.thetas_real, self.thetas_imag))
+            thetas = self.thetas_real + self.thetas_imag
             res = optimizer.minimize(
                 thetas,
                 extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
@@ -758,7 +757,7 @@ class GeneralizedWaveFunctionUPS:
                     is_silent=is_silent_subiterations,
                     energy_eval_callback=lambda: self.num_energy_evals,
                 )
-                self._old_opt_parameters = np.zeros(2 * len(self.kappa_spin_idx)) + 10**20
+                self._old_opt_parameters = np.zeros(2 * len(self.kappa_spin_idx), dtype=np.float64) + 10**20
                 self._E_opt_old = 0.0
                 print("energy", self.energy_elec)
                 res = optimizer.minimize([0.0] * 2 * len(self.kappa_spin_idx))
@@ -854,15 +853,12 @@ class GeneralizedWaveFunctionUPS:
             
         if orbital_optimization:
             if len(self.thetas) > 0:
-                thetas = np.concatenate((self.thetas_real, self.thetas_imag))
-                parameters = np.concatenate((np.zeros(2 * len(self.kappa_real)).tolist(), thetas))
-                # This is for runnign with real valued thetas:
-                # parameters = np.concatenate((2*np.zeros(len(self.kappa_real)).tolist(), self.thetas_real))
+                thetas = self.thetas_real + self.thetas_imag
+                parameters = np.zeros(2 * len(self.kappa_real), dtype=float).tolist() + thetas
             else:
-                parameters = np.zeros(2 * len(self.kappa_real)).tolist()
+                parameters = np.zeros(2 * len(self.kappa_real), dtype=float).tolist()
         else:
-            thetas = np.concatenate((self.thetas_real, self.thetas_imag))
-            parameters = thetas
+            parameters = self.thetas_real + self.thetas_imag
             # This is for running with real valued thetas:
             # parameters = self.thetas_real
         # print("før") #print statement 
@@ -876,7 +872,7 @@ class GeneralizedWaveFunctionUPS:
             energy_eval_callback=lambda: self.num_energy_evals,
             is_silent=is_silent,
         )
-        self._old_opt_parameters = np.zeros_like(parameters) + 10**20
+        self._old_opt_parameters = np.zeros_like(parameters, dtype=np.float64) + 10**20
         self._E_opt_old = 0.0
         # print(self.ups_layout.param_names)
         # print(self.ups_layout.excitation_indices)
@@ -1104,7 +1100,7 @@ class GeneralizedWaveFunctionUPS:
         Returns:
             Electronic gradient.
         """
-        gradient = np.zeros(len(parameters))
+        gradient = np.zeros(len(parameters), dtype=np.float64)
         num_kappa = 0
         if kappa_optimization:
             num_kappa = 2 * len(self.kappa_spin_idx)
