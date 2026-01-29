@@ -528,7 +528,7 @@ def HBr():
     
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-h2o()
+h2()
 
 
 # h2o()
