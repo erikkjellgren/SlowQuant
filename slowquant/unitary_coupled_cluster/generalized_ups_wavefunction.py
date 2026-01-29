@@ -24,15 +24,13 @@ from slowquant.unitary_coupled_cluster.generalized_operators import (
     generalized_hamiltonian_full_space,
 )
 from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import (
-    generalized_construct_ups_state, generalized_construct_ups_state_modified, generalized_construct_ups_state_test_anna,
+    generalized_construct_ups_state, generalized_construct_ups_state_test_anna,
     generalized_construct_ups_state_test_erik,
     generalized_expectation_value,
     generalized_expectation_value_complex,
-    generalized_get_grad_action, generalized_get_grad_action_modified, generalized_get_grad_action_test_anna,
+    generalized_get_grad_action, generalized_get_grad_action_test_anna,
     generalized_propagate_state,
-    generalized_propagate_unitary, generalized_propagate_unitary_modified, generalized_propagate_unitary_test_anna,
-    generalized_construct_ups_state_modified_split, generalized_get_grad_action_modified_split,
-    generalized_propagate_unitary_modified_split,
+    generalized_propagate_unitary, generalized_propagate_unitary_test_anna,
 )
 from slowquant.unitary_coupled_cluster.operators import G1, G2
 from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_0i_0a
