@@ -213,7 +213,7 @@ def generalized_propagate_state(
                 if thetas is None:
                     raise ValueError("theta must be different from None")
                 # OBS!!!!!Changed to generalized_construct_ups_state_modified!!!!!! ##AE changed here
-                new_state = generalized_construct_ups_state_test_anna(
+                new_state = generalized_construct_ups_state_test_erik(
                     new_state,
                     ci_info,
                     thetas,
