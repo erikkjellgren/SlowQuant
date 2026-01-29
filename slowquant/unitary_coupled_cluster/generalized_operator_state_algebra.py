@@ -835,7 +835,6 @@ def generalized_propagate_unitary_test_anna(
     return out
 
 
-
 def generalized_get_grad_action(
     state: np.ndarray,
     idx: int,
@@ -861,7 +860,7 @@ def generalized_get_grad_action(
         State with derivative of the idx'th unitary applied.
     """
     exc_type = ups_struct.excitation_operator_type[idx]
-    exc_type = ups_struct.excitation_operator_type[idx]
+    exc_type = ups_struct.excitation_operator_type[idx] ##????
     exc_indices = ups_struct.excitation_indices[idx]
     offset = ci_info.space_extension_offset
     if exc_type in (
@@ -883,73 +882,88 @@ def generalized_get_grad_action(
         A = theta.real*VR + theta.imag*VI
         r = np.abs(theta)
         # Apply derivative
-        tmp_R = (
-                np.sin(r)/r * 
-                generalized_propagate_state(
-                    [VR],
-                    state,
-                    ci_info,
-                    do_folding=False,
-                )
-                +(1-np.cos(r))/r**2*
-                generalized_propagate_state(
-                    [VR,A],
-                    state,
-                    ci_info,
-                    do_folding=False,
-                )
-                +(1-np.cos(r))/r**2*
-                generalized_propagate_state(
-                    [A,VR],
-                    state,
-                    ci_info,
-                    do_folding=False,
-                )
-                +theta.real*(r*np.cos(r) - np.sin(r))/r**3*
-                generalized_propagate_state(
-                    [A],
-                    state,
-                    ci_info,
-                    do_folding=False,
-                )
-                +theta.real*(r*np.sin(r) - 2 +2*np.cos(r))/r**4*
-                generalized_propagate_state(
-                    [A,A],
-                    state,
-                    ci_info,
-                    do_folding=False,
-                )
-        )
-        tmp_I = (
-                np.sin(r)/r * 
-                generalized_propagate_state(
-                    [VI],
-                    state,
-                    ci_info,
-                    do_folding=False,
-                )
-                +(1-np.cos(r))/r**2*
-                generalized_propagate_state(
-                    [VI*A+A*VI],
-                    state,
-                    ci_info,
-                    do_folding=False,
-                )
-                +theta.imag*(r*np.cos(r) - np.sin(r))/r**3*
-                generalized_propagate_state(
-                    [A],
-                    state,
-                    ci_info,
-                    do_folding=False,
-                )
-                +theta.imag*(r*np.sin(r) - 2 +2*np.cos(r))/r**4*
-                generalized_propagate_state(
-                    [A,A],
-                    state,
-                    ci_info,
-                    do_folding=False,
-                )
-        )
+        
+        if r < 1e-8:
+            tmp_R =((1-r**2/6)*generalized_propagate_state([VR], state, ci_info, do_folding=False)
+                    +(1/2-r**2/24)*generalized_propagate_state([VR, A], state, ci_info, do_folding=False)
+                    +(1/2-r**2/24)*generalized_propagate_state([A, VR], state, ci_info, do_folding=False)
+                    +theta.real*(-1/3+r**2/30)*generalized_propagate_state([A], state, ci_info, do_folding=False)
+                    +theta.real*(-1/12+r**2/180)*generalized_propagate_state([A, A], state, ci_info, do_folding=False))
+
+            tmp_I = ((1-r**2/6)*generalized_propagate_state([VI], state, ci_info, do_folding=False)
+                    +(1/2-r**2/24)*generalized_propagate_state([VI, A], state, ci_info, do_folding=False)
+                    +(1/2-r**2/24)*generalized_propagate_state([A, VI], state, ci_info, do_folding=False)
+                    +theta.imag*(-1/3+r**2/30)*generalized_propagate_state([A], state, ci_info, do_folding=False)
+                    +theta.imag*(-1/12+r**2/180)*generalized_propagate_state([A, A], state, ci_info, do_folding=False))
+            return tmp_R, tmp_I
+        else:
+            tmp_R = (
+                    np.sin(r)/r * 
+                    generalized_propagate_state(
+                        [VR],
+                        state,
+                        ci_info,
+                        do_folding=False,
+                    )
+                    +(1-np.cos(r))/r**2*
+                    generalized_propagate_state(
+                        [VR,A],
+                        state,
+                        ci_info,
+                        do_folding=False,
+                    )
+                    +(1-np.cos(r))/r**2*
+                    generalized_propagate_state(
+                        [A,VR],
+                        state,
+                        ci_info,
+                        do_folding=False,
+                    )
+                    +theta.real*(r*np.cos(r) - np.sin(r))/r**3*
+                    generalized_propagate_state(
+                        [A],
+                        state,
+                        ci_info,
+                        do_folding=False,
+                    )
+                    +theta.real*(r*np.sin(r) - 2 +2*np.cos(r))/r**4*
+                    generalized_propagate_state(
+                        [A,A],
+                        state,
+                        ci_info,
+                        do_folding=False,
+                    )
+            )
+            tmp_I = (
+                    np.sin(r)/r * 
+                    generalized_propagate_state(
+                        [VI],
+                        state,
+                        ci_info,
+                        do_folding=False,
+                    )
+                    +(1-np.cos(r))/r**2*
+                    generalized_propagate_state(
+                        [VI*A+A*VI],
+                        state,
+                        ci_info,
+                        do_folding=False,
+                    )
+                    +theta.imag*(r*np.cos(r) - np.sin(r))/r**3*
+                    generalized_propagate_state(
+                        [A],
+                        state,
+                        ci_info,
+                        do_folding=False,
+                    )
+                    +theta.imag*(r*np.sin(r) - 2 +2*np.cos(r))/r**4*
+                    generalized_propagate_state(
+                        [A,A],
+                        state,
+                        ci_info,
+                        do_folding=False,
+                    )
+            )
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")
     return tmp_R, tmp_I
