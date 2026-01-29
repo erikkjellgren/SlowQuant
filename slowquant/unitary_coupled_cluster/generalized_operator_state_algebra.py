@@ -212,7 +212,7 @@ def generalized_propagate_state(
             if isinstance(wf_struct, UpsStructure):
                 if thetas is None:
                     raise ValueError("theta must be different from None")
-                # OBS!!!!!Change this?
+                # OBS!!!!!Change this! #AWE
                 new_state = generalized_construct_ups_state_test_erik(
                     new_state,
                     ci_info,
@@ -662,23 +662,24 @@ def generalized_construct_ups_state_test_erik(
                 A = -theta*T + theta.conjugate()*T.dagger
             else:
                 A = theta*T - theta.conjugate()*T.dagger
-            out = (
-                out
-                + np.sin(np.abs(theta)) / np.abs(theta)
-                * generalized_propagate_state(
-                    [A],
-                    out,
-                    ci_info,
-                    do_folding=False,
+            if np.abs(theta) > 1e-12:
+                out = (
+                    out
+                    + np.sin(np.abs(theta)) / np.abs(theta)
+                    * generalized_propagate_state(
+                        [A],
+                        out,
+                        ci_info,
+                        do_folding=False,
+                    )
+                    + (1 - np.cos(np.abs(theta))) / np.abs(theta)**2
+                    * generalized_propagate_state(
+                        [A, A],
+                        out,
+                        ci_info,
+                        do_folding=False,
+                    )
                 )
-                + (1 - np.cos(np.abs(theta))) / np.abs(theta)**2
-                * generalized_propagate_state(
-                    [A, A],
-                    out,
-                    ci_info,
-                    do_folding=False,
-                )
-            )
         else:
             raise ValueError(f"Got unknown excitation type, {exc_type}")
     return out
