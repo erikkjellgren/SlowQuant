@@ -77,7 +77,6 @@ def restricted(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=1
         {"n_layers": 0},
         include_active_kappa=True,
     )
-    print('Antal elektroner',mol.nelectron)
     WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True,tol=1e-8)
     LR = naive.LinearResponse(WF, excitations="sd")
     LR.calc_excitation_energies()
@@ -113,7 +112,24 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     mf.scf()
     mf.kernel()
-    c=np.array(mf.mo_coeff, dtype=complex)
+    # c=np.array(mf.mo_coeff, dtype=complex)
+    # print(c)
+    c= np.array([[ 0.2328374 +0.j, -0.2295067 +0.j, -0.09973118+0.j, -0.07138934+0.j,
+                    0.54049766+0.j,  0.54323164+0.j, -0.79382251+0.j, -0.79382251+0.j],
+                    [0.19357538+0.j, -0.19080632+0.j, -1.39445627+0.j, -0.99817651+0.j,
+                    -0.48402791+0.j, -0.48647625+0.j,  0.95419254+0.j,  0.95419254+0.j],
+                    [ 0.2328374 +0.j, -0.2295067 +0.j,  0.09973118+0.j,  0.07138934+0.j,
+                    0.54049766+0.j,  0.54323164+0.j,  0.79382251+0.j,  0.79382251+0.j],
+                    [0.19357538+0.j, -0.19080632+0.j,  1.39445627+0.j,  0.99817651+0.j,
+                    -0.48402791+0.j, -0.48647625+0.j, -0.95419254+0.j, -0.95419254+0.j],
+                    [ 0.2295067 +0.j,  0.2328374 +0.j,  0.07138934+0.j, -0.09973118+0.j,
+                    0.54323164+0.j, -0.54049766+0.j, -0.79382251+0.j,  0.79382251+0.j],
+                    [ 0.19080632+0.j,  0.19357538+0.j,  0.99817651+0.j, -1.39445627+0.j,
+                    -0.48647625+0.j,  0.48402791+0.j,  0.95419254+0.j, -0.95419254+0.j],
+                    [ 0.2295067 +0.j,  0.2328374 +0.j, -0.07138934+0.j,  0.09973118+0.j,
+                    0.54323164+0.j, -0.54049766+0.j,  0.79382251+0.j, -0.79382251+0.j],
+                    [ 0.19080632+0.j,  0.19357538+0.j, -0.99817651+0.j,  1.39445627+0.j,
+                    -0.48647625+0.j,  0.48402791+0.j, -0.95419254+0.j,  0.95419254+0.j]])
     e_nuc=mf.energy_nuc()
     h_core=mol.intor("int1e_kin")  + mol.intor("int1e_nuc")
     h_1e = mol.intor("int1e_kin")  
@@ -146,7 +162,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         include_active_kappa=False,
     )
     # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True,tol=1e-8)
-    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=False, test=True, tol=1e-10, maxiter = 2000)
+    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True, tol=1e-10, maxiter = 2000)
 
     # WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=False, tol=1e-5, maxiter = 2000)
 
@@ -154,9 +170,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     
     
   
-    # LR = generalized_naive.LinearResponse(WF, excitations="sd")
-    # LR.calc_excitation_energies()
-    # print(LR.excitation_energies)
+    LR = generalized_naive.LinearResponse(WF, excitations="s")
+    LR.calc_excitation_energies()
+    print(LR.excitation_energies)
 
     #call MO integrals
     g_eri_mo = WF.g_mo
@@ -250,7 +266,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
-    basis = "sto-3g"
+    basis = "631-g"
     active_space_u = ((1, 1), 4) #spin orbitaler
     # active_space = (2, 4)
     charge = 0
@@ -364,5 +380,5 @@ def h3():
     # )
 
   
-h3()
-# h2()
+# h3()
+h2()

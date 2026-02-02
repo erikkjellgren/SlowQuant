@@ -29,6 +29,8 @@ from slowquant.unitary_coupled_cluster.util import (
     iterate_t4,
     iterate_t5,
     iterate_t6,
+    iterate_t6,
+    iterate_t1_incl_cross
 )
 
 
@@ -71,7 +73,7 @@ class LinearResponseBaseClass:
                 self.G_ops.append(G1_generalized(i, a)) #AE from G1
         if "d" in excitations:
             for a, i, b, j in iterate_t2(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx): #cross?
-                self.G_ops.append(G2_generalized(i, j, a, b)) #AE from G2
+                self.G_ops.append(G2(i, j, a, b)) #AE from G2
         if "t" in excitations:
             for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
                 self.G_ops.append(G3(i, j, k, a, b, c))
@@ -121,6 +123,8 @@ class LinearResponseBaseClass:
         E2[:size, size:] = self.B
         E2[size:, :size] = self.B.conjugate() #AE added conjugtate 
         E2[size:, size:] = self.A.conjugate() #AE added conjugtate 
+        
+        # print(E2)
         (
             hess_eigval,
             _,
@@ -137,25 +141,28 @@ class LinearResponseBaseClass:
         S[:size, size:] = self.Delta
         S[size:, :size] = -self.Delta.conjugate()
         S[size:, size:] = -self.Sigma.conjugate()
+        
+        # print(S)
         print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma)))}")
         self.hessian = E2
         self.metric = S
 
+      
         eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)
         sorting = np.argsort(eigval)
         self.excitation_energies = np.real(eigval[sorting][size:])
         self.response_vectors = np.real(eigvec[:, sorting][:, size:])
-        self.normed_response_vectors = np.zeros_like(self.response_vectors)
+        self.normed_response_vectors = np.zeros_like(self.response_vectors, dtype=complex) #AE
         self.num_q = len(self.q_ops)
         self.num_G = size - self.num_q
         self.Z_q = self.response_vectors[: self.num_q, :]
         self.Z_G = self.response_vectors[self.num_q : self.num_q + self.num_G, :]
         self.Y_q = self.response_vectors[self.num_q + self.num_G : 2 * self.num_q + self.num_G]
         self.Y_G = self.response_vectors[2 * self.num_q + self.num_G :]
-        self.Z_q_normed = np.zeros_like(self.Z_q)
-        self.Z_G_normed = np.zeros_like(self.Z_G)
-        self.Y_q_normed = np.zeros_like(self.Y_q)
-        self.Y_G_normed = np.zeros_like(self.Y_G)
+        self.Z_q_normed = np.zeros_like(self.Z_q, dtype=complex) #AE
+        self.Z_G_normed = np.zeros_like(self.Z_G, dtype=complex) #AE
+        self.Y_q_normed = np.zeros_like(self.Y_q, dtype=complex) #AE
+        self.Y_G_normed = np.zeros_like(self.Y_G, dtype=complex) #AE
         norms = self.get_excited_state_norm()
         for state_number, norm in enumerate(norms):
             if norm < 10**-10:
@@ -175,7 +182,7 @@ class LinearResponseBaseClass:
         Returns:
             Norm of excited states.
         """
-        norms = np.zeros(len(self.response_vectors[0]))
+        norms = np.zeros(len(self.response_vectors[0]),dtype=complex) #AE complex
         for state_number in range(len(self.response_vectors[0])):
             # Get Z_q Z_G Y_q and Y_G matrices
             ZZq = np.outer(self.Z_q[:, state_number], self.Z_q[:, state_number].transpose())
@@ -187,69 +194,68 @@ class LinearResponseBaseClass:
                 self.metric[self.num_q : self.num_q + self.num_G, self.num_q : self.num_q + self.num_G]
                 * (ZZG - YYG)
             )
-
         return norms
 
-    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
-        """Calculate transition dipole moment.
+    # def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    #     """Calculate transition dipole moment.
 
-        Args:
-            dipole_integrals: Dipole integrals (x,y,z) in AO basis.
+    #     Args:
+    #         dipole_integrals: Dipole integrals (x,y,z) in AO basis.
 
-        Returns:
-            Transition dipole moment.
-        """
-        raise NotImplementedError
+    #     Returns:
+    #         Transition dipole moment.
+    #     """
+    #     raise NotImplementedError
 
-    def get_oscillator_strength(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
-        r"""Calculate oscillator strength.
+    # def get_oscillator_strength(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    #     r"""Calculate oscillator strength.
 
-        .. math::
-            f_n = \frac{2}{3}e_n\left|\left<0\left|\hat{\mu}\right|n\right>\right|^2
+    #     .. math::
+    #         f_n = \frac{2}{3}e_n\left|\left<0\left|\hat{\mu}\right|n\right>\right|^2
 
-        Args:
-            dipole_integrals: Dipole integrals (x,y,z) in AO basis.
+    #     Args:
+    #         dipole_integrals: Dipole integrals (x,y,z) in AO basis.
 
-        Returns:
-            Oscillator Strength.
-        """
-        transition_dipoles = self.get_transition_dipole(dipole_integrals)
-        osc_strs = np.zeros(len(transition_dipoles))
-        for idx, (excitation_energy, transition_dipole) in enumerate(
-            zip(self.excitation_energies, transition_dipoles)
-        ):
-            osc_strs[idx] = (
-                2
-                / 3
-                * excitation_energy
-                * (transition_dipole[0] ** 2 + transition_dipole[1] ** 2 + transition_dipole[2] ** 2)
-            )
-        self.oscillator_strengths = osc_strs
-        return osc_strs
+    #     Returns:
+    #         Oscillator Strength.
+    #     """
+    #     transition_dipoles = self.get_transition_dipole(dipole_integrals)
+    #     osc_strs = np.zeros(len(transition_dipoles))
+    #     for idx, (excitation_energy, transition_dipole) in enumerate(
+    #         zip(self.excitation_energies, transition_dipoles)
+    #     ):
+    #         osc_strs[idx] = (
+    #             2
+    #             / 3
+    #             * excitation_energy
+    #             * (transition_dipole[0] ** 2 + transition_dipole[1] ** 2 + transition_dipole[2] ** 2)
+    #         )
+    #     self.oscillator_strengths = osc_strs
+    #     return osc_strs
 
-    def get_formatted_oscillator_strength(self) -> str:
-        """Create table of excitation energies and oscillator strengths.
+    # def get_formatted_oscillator_strength(self) -> str:
+    #     """Create table of excitation energies and oscillator strengths.
 
-        Args:
-            dipole_integrals: Dipole integrals (x,y,z) in AO basis.
+    #     Args:
+    #         dipole_integrals: Dipole integrals (x,y,z) in AO basis.
 
-        Returns:
-            Nicely formatted table.
-        """
-        if not hasattr(self, "oscillator_strengths"):
-            raise ValueError(
-                "Oscillator strengths have not been calculated. Run get_oscillator_strength() first."
-            )
+    #     Returns:
+    #         Nicely formatted table.
+    #     """
+    #     if not hasattr(self, "oscillator_strengths"):
+    #         raise ValueError(
+    #             "Oscillator strengths have not been calculated. Run get_oscillator_strength() first."
+    #         )
 
-        output = (
-            "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n"
-        )
+    #     output = (
+    #         "Excitation # | Excitation energy [Hartree] | Excitation energy [eV] | Oscillator strengths\n"
+    #     )
 
-        for i, (exc_energy, osc_strength) in enumerate(
-            zip(self.excitation_energies, self.oscillator_strengths)
-        ):
-            exc_str = f"{exc_energy:2.6f}"
-            exc_str_ev = f"{exc_energy * 27.2114079527:3.6f}"
-            osc_str = f"{osc_strength:1.6f}"
-            output += f"{str(i + 1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
-        return output
+    #     for i, (exc_energy, osc_strength) in enumerate(
+    #         zip(self.excitation_energies, self.oscillator_strengths)
+    #     ):
+    #         exc_str = f"{exc_energy:2.6f}"
+    #         exc_str_ev = f"{exc_energy * 27.2114079527:3.6f}"
+    #         osc_str = f"{osc_strength:1.6f}"
+    #         output += f"{str(i + 1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
+    #     return output

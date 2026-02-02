@@ -1134,7 +1134,6 @@ def get_orbital_response_hessian_block(
                             )
     if A1e.imag.any() > 1e-10 or A2e.imag.any() > 1e-10:
         print("Warning: Response Hessian is complex!")
-    print('her',A1e + (1/2)*A2e)
     return A1e + (1/2)*A2e
 
 

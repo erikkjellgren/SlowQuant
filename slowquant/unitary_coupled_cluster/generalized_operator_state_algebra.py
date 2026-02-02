@@ -343,7 +343,7 @@ def generalized_expectation_value(
         do_unsafe=do_unsafe,
     )
  
-    val = bra.conj() @ op_ket
+    val = bra.conj() @ op_ket 
 
     return val
 
