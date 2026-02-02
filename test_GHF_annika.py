@@ -339,7 +339,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
     #WF.do_adapt(["S","D"])
 
-    #print(WF.ups_layout.excitation_indices)
+    print(WF.ups_layout.excitation_indices)
     #print(WF.c_mo)
 
     print("efter optimering")
