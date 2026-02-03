@@ -139,7 +139,7 @@ def get_hcf_fc_unrestricted(geometry, basis, active_space, unit='bohr', charge=0
         include_active_kappa=True,
     )
 
-    WF.run_wf_optimization_1step("bfgs", orbital_optimization=True, tol=1e-6)
+    WF.run_wf_optimization_1step("bfgs", orbital_optimization=True, tol=1e-6, maxiter=5000)
 
     print(WF.energy_elec_RDM)
     

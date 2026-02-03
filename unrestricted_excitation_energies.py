@@ -2,7 +2,7 @@ import pyscf
 from pyscf import scf, mcscf
 import slowquant.SlowQuant as sq
 import io
-
+import numpy as np
 import slowquant.unitary_coupled_cluster.linear_response.unrestricted_naive as unaive
 from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
@@ -29,7 +29,16 @@ def get_unrestricted_excitation_energy(geometry, basis, active_space, charge=0, 
     
     # print(mf.mo_coeff)
     # SlowQuant
-    
+
+    a_mo = [[0.32693516, -0.12264882,  0.76631477, -1.12263456],
+            [ 0.27180594, -1.714895,   -0.68625227,  1.34943195],
+            [ 0.32693516,  0.12264882,  0.76631477,  1.12263456],
+            [ 0.27180594,  1.714895,   -0.68625227, -1.34943195]]
+    b_mo = [[ 0.32693517, -0.12264882, 0.76631476, -1.12263456],
+            [ 0.27180592, -1.71489499, -0.68625228,  1.34943196],
+            [ 0.32693517,  0.12264882,  0.76631476,  1.12263456],
+            [ 0.27180592,  1.71489499, -0.68625228, -1.34943196]]
+    mo_coef = (a_mo, b_mo)
     WF = UnrestrictedWaveFunctionUPS(
         mol.nelectron,
         active_space,
@@ -164,7 +173,7 @@ def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74;"""
     basis = '6-31g'
-    active_space = ((1,1),4)
+    active_space = ((1,1),2)
     charge = 0
     spin=0
 
@@ -205,7 +214,7 @@ def h4_rektangle():
         H  0.0  1.11  0.74;
         H  0.0  1.11  0.0;"""
     basis = "sto-3g"
-    active_space = ((2,2), 4)
+    active_space = ((1,1), 3)
     charge = 0
     spin = 0
     get_unrestricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")

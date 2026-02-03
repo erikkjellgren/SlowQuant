@@ -59,11 +59,9 @@ class LinearResponseBaseClass:
 
         if "s" in excitations:
             for a, i in iterate_t1(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
-                print("single index", a, i)
                 self.G_ops.append(G1(i, a))
         if "d" in excitations:
             for a, i, b, j in iterate_t2(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
-                # print("double", i, j, a, b)
                 self.G_ops.append(G2(i, j, a, b))
         if "t" in excitations:
             for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
@@ -83,14 +81,14 @@ class LinearResponseBaseClass:
                 self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx
             ):
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
-        print("no_active",self.wf.kappa_no_activeactive_idx)
-        for i, a in self.wf.kappa_no_activeactive_idx:
-            print("alpha", 2*a, 2*i)
-            print("beta", 2*a+1, 2*i+1)
-            op = G1(2 * a, 2 * i)
-            self.q_ops.append(op)
-            op = G1(2 * a + 1, 2 * i + 1)
-            self.q_ops.append(op)
+        q_list_a = []
+        q_list_b = []
+        for idx, (i, a) in enumerate(self.wf.kappa_no_activeactive_idx):
+            op = G1(2 * i, 2 * a)
+            q_list_a.append(op)
+            op = G1(2 * i + 1, 2 * a + 1)
+            q_list_b.append(op)
+        self.q_ops = q_list_a + q_list_b # Ordering of q_ops, so it matches the RDM calculated qq-block
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters))
@@ -123,11 +121,6 @@ class LinearResponseBaseClass:
         """Calculate excitation energies."""
         size = len(self.A)
         E2 = np.zeros((size * 2, size * 2))
-        # with io.open("/mnt/c/Users/Pernille/Seafile/phd/code/SlowQuant/a_test/test_a_SDTQ.txt", 'w', encoding='utf-8') as file:
-        #     file.write(f'{self.A}\n\n')
-        # file.close()
-
-        # file.close()
         E2[:size, :size] = self.A
         E2[:size, size:] = self.B
         E2[size:, :size] = self.B
@@ -136,6 +129,7 @@ class LinearResponseBaseClass:
             hess_eigval,
             _,
         ) = np.linalg.eig(E2)
+        print("hess eigenvalue", hess_eigval)
         print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
         if np.abs(np.min(hess_eigval)) < 10**-8:
             print("WARNING: Small eigenvalue in Hessian")
@@ -155,6 +149,7 @@ class LinearResponseBaseClass:
         eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)
         sorting = np.argsort(eigval)
         self.excitation_energies = np.real(eigval[sorting][size:])
+        print("alle eigenvalue", np.real(eigval[sorting]))
         self.response_vectors = np.real(eigvec[:, sorting][:, size:])
         self.normed_response_vectors = np.zeros_like(self.response_vectors)
         self.num_q = len(self.q_ops)
@@ -204,7 +199,6 @@ class LinearResponseBaseClass:
             # YYG = np.outer(self.Y_G[:, state_number], self.Y_G[:, state_number].transpose())
             ZZqG = np.outer(self.Z_qG[:, state_number], self.Z_qG[:, state_number].transpose())
             YYqG = np.outer(self.Y_qG[:, state_number], self.Y_qG[:, state_number].transpose())
-            # print("Z", len(ZZq), "Y", len(YYq))
             # norms[state_number] = np.sum(self.metric[: self.num_q, : self.num_q] * (ZZq - YYq)) + np.sum(
             #     self.metric[self.num_q : self.num_q + self.num_G, self.num_q : self.num_q + self.num_G]
             #     * (ZZG - YYG)

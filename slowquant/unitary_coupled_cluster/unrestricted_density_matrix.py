@@ -929,18 +929,19 @@ def get_orbital_response_metric_sigma_unrestricted(
         Unrestricted sigma matrix orbital-orbital block.
     """
     sigma = np.zeros((2 * len(kappa_idx), 2 * len(kappa_idx)))
-    for idx1, (q, p) in enumerate(kappa_idx):
-        for idx2, (m, n) in enumerate(kappa_idx):
-            if p == n:
-                sigma[idx1, idx2] -= RDM1xx(m, q, num_inactive_orbs, num_active_orbs, rdm1aa)
+    for idx1, (m, n) in enumerate(kappa_idx):
+        for idx2, (p, q) in enumerate(kappa_idx):
+            if p == m:
+                sigma[idx1, idx2] -= RDM1xx(q, n, num_inactive_orbs, num_active_orbs, rdm1aa)
                 sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] -= RDM1xx(
-                    m, q, num_inactive_orbs, num_active_orbs, rdm1bb
+                    q, n, num_inactive_orbs, num_active_orbs, rdm1bb
                 )
-            if m == q:
-                sigma[idx1, idx2] += RDM1xx(p, n, num_inactive_orbs, num_active_orbs, rdm1aa)
+            if n == q:
+                sigma[idx1, idx2] += RDM1xx(m, p, num_inactive_orbs, num_active_orbs, rdm1aa)
                 sigma[idx1 + len(kappa_idx), idx2 + len(kappa_idx)] += RDM1xx(
-                    p, n, num_inactive_orbs, num_active_orbs, rdm1bb
+                    m, p, num_inactive_orbs, num_active_orbs, rdm1bb
                 )
+            
     return sigma
 
 
@@ -1015,7 +1016,7 @@ def get_orbital_response_property_gradient_unrestricted(
     return prop_grad
 
 
-# @nb.jit(nopython=True)
+@nb.jit(nopython=True)
 def get_orbital_response_hessian_block_unrestricted(
     h_int_aa: np.ndarray,
     h_int_bb: np.ndarray,
@@ -1055,16 +1056,10 @@ def get_orbital_response_hessian_block_unrestricted(
     Returns:
         Unrestricted Hessian-like orbital-orbital block.
     """
-    # with io.open("/mnt/c/Users/Pernille/Seafile/phd/code/SlowQuant/slowquant/b.txt", 'w', encoding='utf-8') as file:
-    #     file.write(f"start\n\n")
-    # file.close()
     A1e = np.zeros((2 * len(kappa_idx1), 2 * len(kappa_idx2)))
     A2e = np.zeros((2 * len(kappa_idx1), 2 * len(kappa_idx2)))
     for idx1, (t, u) in enumerate(kappa_idx1):
         for idx2, (m, n) in enumerate(kappa_idx2):
-            # with io.open("/mnt/c/Users/Pernille/Seafile/phd/code/SlowQuant/slowquant/b.txt", 'a+', encoding='utf-8') as file:
-            #     file.write(f"idx1:{idx1} and idx2:{idx2}\n\n")
-            # file.close()
             A1e[idx1, idx2] += h_int_aa[u, m] * RDM1xx(t, n, num_inactive_orbs, num_active_orbs, rdm1aa)
             A1e[idx1, idx2] += h_int_aa[n, t] * RDM1xx(m, u, num_inactive_orbs, num_active_orbs, rdm1aa)
             A1e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] += h_int_bb[u, m] * RDM1xx(
@@ -1088,10 +1083,6 @@ def get_orbital_response_hessian_block_unrestricted(
                     A1e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] -= h_int_bb[p, m] * RDM1xx(
                         p, u, num_inactive_orbs, num_active_orbs, rdm1bb
                     )
-            # et forsøg på at lave hessian matrix symmetrisk
-            # print(idx1, idx2)
-            # A1e[idx1, idx2] = A1e[idx2, idx1]
-            # A1e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] = A1e[idx2 + len(kappa_idx1), idx1 + len(kappa_idx1)]
             for p in range(num_inactive_orbs + num_active_orbs):
                 for q in range(num_inactive_orbs + num_active_orbs):
                     # mu, nu, sigma, tau = alpha
@@ -1319,13 +1310,4 @@ def get_orbital_response_hessian_block_unrestricted(
                             ] * RDM2xxyy(
                                 p, q, r, u, num_inactive_orbs, num_active_orbs, rdm1bb, rdm1aa, rdm2bbaa
                             )
-            # A2e[idx1, idx2] = A2e[idx2, idx1]
-            # A2e[idx1 + len(kappa_idx1), idx2 + len(kappa_idx1)] = A2e[idx2 + len(kappa_idx1), idx1 + len(kappa_idx1)]
-            # A2e[idx1, idx2 + len(kappa_idx1)] = A2e[idx2 + len(kappa_idx1), idx1]
-            # A2e[idx1 + len(kappa_idx1), idx2] = A2e[idx2, idx1 + len(kappa_idx1)]
-            # with io.open("/mnt/c/Users/Pernille/Seafile/phd/code/SlowQuant/slowquant/b.txt", 'a+', encoding='utf-8') as file:
-            #     file.write(f"{A1e + 1/2 * A2e}\n\n")
-            # file.close()
-
-    return 1 / 2 * (A1e + A1e.T + ((1 / 2 * A2e) + (1 / 2 * A2e.T)))
-    # return A1e + (1/2 *A2e)
+    return A1e + (1/2 *A2e)

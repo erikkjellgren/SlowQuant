@@ -83,7 +83,6 @@ class LinearResponseUPS(LinearResponseBaseClass):
                 finite_excitations_idx.append(False)
 
         finite_excitations_idx = np.array(finite_excitations_idx)
-        # print("finite", len(finite_excitations_idx), "q", len(self.q_ops), "G", len(self.G_ops  ))
         idx_shift = len(self.q_ops)
         G_shift = int(len(self.G_ops) / 2)
         q_shift = int(len(self.q_ops) / 2)
@@ -150,6 +149,7 @@ class LinearResponseUPS(LinearResponseBaseClass):
             if np.max(np.abs(grad)) > 10**-3:
                 raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
         # Start RDM version
+        # """
         if len(self.q_ops) != 0:
             self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block_unrestricted(
                 self.wf.haa_mo,
@@ -169,7 +169,6 @@ class LinearResponseUPS(LinearResponseBaseClass):
                 self.wf.rdm2aabb,
                 self.wf.rdm2bbaa,
             )
-            # print(self.A)
             self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block_unrestricted(
                 self.wf.haa_mo,
                 self.wf.hbb_mo,
@@ -195,9 +194,10 @@ class LinearResponseUPS(LinearResponseBaseClass):
                 self.wf.rdm1aa,
                 self.wf.rdm1bb,
             )
+            # """
         # End RDM
 
-        # Start manual version
+        # Start manual version of qq block
         """
         from slowquant.unitary_coupled_cluster.unrestricted_operators import unrestricted_hamiltonian_full_space
         H = unrestricted_hamiltonian_full_space(
@@ -220,19 +220,35 @@ class LinearResponseUPS(LinearResponseBaseClass):
                     *self.index_info,
                 )
                 # -<0| qd q H |0>
-                val -= expectation_value(
+                val -= (1/2 * expectation_value(
                     self.wf.ci_coeffs,
                     [qJ.dagger * qI * H],
                     self.wf.ci_coeffs,
                     *self.index_info,
-                )
+                ))
                 # -<0| H q qd |0>
-                val -= expectation_value(
+                val -= (1/2 * expectation_value(
                     self.wf.ci_coeffs,
                     [H * qI * qJ.dagger],
                     self.wf.ci_coeffs,
                     *self.index_info,
-                )
+                ))
+
+                # Annas tilføjelse
+                # - 1/2*<0| qI qJd H |0> # minus Pernille
+                val -= (1/ 2 * expectation_value(
+                    self.wf.ci_coeffs,
+                    [qI*qJ.dagger* H],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
+                    ))
+                # # - 1/2*<0| H qJd qI |0> # minus Pernille
+                val -= (1/ 2 * expectation_value(
+                    self.wf.ci_coeffs,
+                    [H*qJ.dagger*qI],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
+                    ))
                 # <0| q H qd |0>
                 val += expectation_value(
                     self.wf.ci_coeffs,
@@ -240,6 +256,8 @@ class LinearResponseUPS(LinearResponseBaseClass):
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
+                # print("val", val)
+                # quit()    
                 self.A[i, j] = val
                 # make B
                 # <0| qd H qd |0>
@@ -249,44 +267,62 @@ class LinearResponseUPS(LinearResponseBaseClass):
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
-                # -<0| qd qd H |0>
-                val -= expectation_value(
+                # # -<0| qd qd H |0>
+                val -= (1/2 *expectation_value(
                     self.wf.ci_coeffs,
                     [qJ.dagger * qI.dagger * H],
                     self.wf.ci_coeffs,
                     *self.index_info,
-                )
-                # -<0| H qd qd |0>
-                val -= expectation_value(
+                ))
+                # # -<0| H qd qd |0>
+                val -= (1/2 *expectation_value(
                     self.wf.ci_coeffs,
                     [H * qI.dagger * qJ.dagger],
                     self.wf.ci_coeffs,
                     *self.index_info,
-                )
-                # <0| qd H qd |0>
+                ))
+                # # <0| qd H qd |0>
                 val += expectation_value(
                     self.wf.ci_coeffs,
                     [qI.dagger * H * qJ.dagger],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
+                # <0| qd qd H |0>
+                val -=(1/2 * expectation_value(
+                    self.wf.ci_coeffs,
+                    [qI.dagger * qJ.dagger * H],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
+                ))
+                # <0| H qd qd |0>
+                val -=(1/2 * expectation_value(
+                    self.wf.ci_coeffs,
+                    [H * qJ.dagger * qI.dagger],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
+                ))
                 self.B[i, j] = val
-                # make sigma
+                # # make sigma
                 val = expectation_value(
                     self.wf.ci_coeffs,
-                    [qJ.dagger * qI],
+                    [qI.dagger * qJ],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
                 val -= expectation_value(
                     self.wf.ci_coeffs,
-                    [qI * qJ.dagger],
+                    [qJ * qI.dagger],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
                 self.Sigma[i, j] = val
+        # print("A", self.A)
+        # print("B", self.B)
+        # print("Sigma", self.Sigma)        
         """
         # End manual version
+
         if len(self.q_ops) != 0:
             for j, qJ in enumerate(self.q_ops):
                 Hq_ket = propagate_state([self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info)
@@ -324,32 +360,7 @@ class LinearResponseUPS(LinearResponseBaseClass):
                             *self.index_info,
                         )
                     )
-                    # i er G, j er q (j kaldes først i loopet)
-                    if j % 2 == 0:
-                        if i % 2 == 0:
-                            # print(int(i-i/2), j, int(i-i/2)+idx_shift)
-                            self.A[int(i - (i / 2)) + idx_shift, int(j - (j / 2))] = self.A[
-                                int(j - (j / 2)), int(i - (i / 2)) + idx_shift
-                            ] = val  # alpha alpha
-                        else:
-                            # print(i, int(i-(i/2+0.5)), int(i-(i/2+0.5)) + idx_shift + G_shift, j, int(j-(j/2+0.5)), int(j-(j/2+0.5)) + q_shift) #find ud af hvordan jeg kan få den til ikke at gå ud af matrice grænsen....
-                            self.A[
-                                int(i - (i / 2 + 0.5)) + idx_shift + G_shift, int(j - (j / 2 + 0.5))
-                            ] = self.A[
-                                int(j - (j / 2 + 0.5)) + q_shift, int(i - (i / 2 + 0.5)) + idx_shift
-                            ] = val  # up right alpha beta/beta alpha
-                            self.A[
-                                int(i - (i / 2 + 0.5)) + idx_shift, int(j - (j / 2 + 0.5)) + q_shift
-                            ] = self.A[
-                                int(j - (j / 2 + 0.5)), int(i - (i / 2 + 0.5)) + idx_shift + G_shift
-                            ] = val  # bottom left alpha beta/ beta alpha
-                    else:
-                        self.A[
-                            int(i - (i / 2 + 0.5)) + idx_shift + G_shift, int(j - (j / 2 + 0.5)) + q_shift
-                        ] = self.A[
-                            int(j - (j / 2 + 0.5)) + q_shift, int(i - (i / 2 + 0.5)) + idx_shift + G_shift
-                        ] = val  # beta beta
-                    # self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
+                    self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
 
                     # Make B
                     # <0| qd H Gd |0>
@@ -381,33 +392,9 @@ class LinearResponseUPS(LinearResponseBaseClass):
                             *self.index_info,
                         )
                     )
-                    # i er G, j er q (j kaldes først i loopet)
-                    if j % 2 == 0:
-                        if i % 2 == 0:
-                            self.B[int(i - (i / 2)) + idx_shift, int(j - (j / 2))] = self.B[
-                                int(j - (j / 2)), int(i - (i / 2)) + idx_shift
-                            ] = val  # alpha alpha
-                        else:
-                            self.B[
-                                int(i - (i / 2 + 0.5)) + idx_shift + G_shift, int(j - (j / 2 + 0.5))
-                            ] = self.B[
-                                int(j - (j / 2 + 0.5)) + q_shift, int(i - (i / 2 + 0.5)) + idx_shift
-                            ] = val  # up right alpha beta/beta alpha
-                            self.B[
-                                int(i - (i / 2 + 0.5)) + idx_shift, int(j - (j / 2 + 0.5)) + q_shift
-                            ] = self.B[
-                                int(j - (j / 2 + 0.5)), int(i - (i / 2 + 0.5)) + idx_shift + G_shift
-                            ] = val  # bottom left alpha beta/ beta alpha
-                    else:
-                        self.B[
-                            int(i - (i / 2 + 0.5)) + idx_shift + G_shift, int(j - (j / 2 + 0.5)) + q_shift
-                        ] = self.B[
-                            int(j - (j / 2 + 0.5)) + q_shift, int(i - (i / 2 + 0.5)) + idx_shift + G_shift
-                        ] = val  # beta beta
-                    # self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
+                    self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
                     
         for j, GJ in enumerate(self.G_ops):
-            # print(j, GJ)
             GJH_ket = propagate_state([GJ], H00_ket, *self.index_info)
             GJdH_ket = propagate_state([GJ.dagger], H00_ket, *self.index_info)
             HGJd_ket = propagate_state([self.H_0i_0a, GJ.dagger], self.wf.ci_coeffs, *self.index_info)
@@ -476,27 +463,6 @@ class LinearResponseUPS(LinearResponseBaseClass):
                         *self.index_info,
                     )
                 )
-                # Forsøg på at inddele i blokke
-                # if i % 2 == 0:
-                #     if j % 2 == 0:
-                #         self.A[int(i - (i / 2)) + idx_shift, int(j - (j / 2)) + idx_shift] = self.A[
-                #             int(j - (j / 2)) + idx_shift, int(i - (i / 2)) + idx_shift
-                #         ] = val
-                #     else:
-                #         self.A[
-                #             int(i - (i / 2 + 0.5)) + idx_shift, int(j - (j / 2 + 0.5)) + idx_shift + G_shift
-                #         ] = self.A[
-                #             int(j - (j / 2 + 0.5)) + idx_shift, int(i - (i / 2 + 0.5)) + idx_shift + G_shift
-                #         ] = val
-                # else:
-                #     self.A[
-                #         int(i - (i / 2 + 0.5)) + idx_shift + G_shift,
-                #         int(j - (j / 2 + 0.5)) + idx_shift + G_shift,
-                #     ] = self.A[
-                #         int(j - (j / 2 + 0.5)) + idx_shift + G_shift,
-                #         int(i - (i / 2 + 0.5)) + idx_shift + G_shift,
-                #     ] = val
-                # gammel måde gem
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
 
                 # Make B
@@ -528,25 +494,6 @@ class LinearResponseUPS(LinearResponseBaseClass):
                     GId_ket,
                     *self.index_info,
                 )
-                # if i % 2 == 0:
-                #     if j % 2 == 0:
-                #         self.B[int(i - (i / 2)) + idx_shift, int(j - (j / 2)) + idx_shift] = self.B[
-                #             int(j - (j / 2)) + idx_shift, int(i - (i / 2)) + idx_shift
-                #         ] = val
-                #     else:
-                #         self.B[
-                #             int(i - (i / 2 + 0.5)) + idx_shift, int(j - (j / 2 + 0.5)) + idx_shift + G_shift
-                #         ] = self.B[
-                #             int(j - (j / 2 + 0.5)) + idx_shift, int(i - (i / 2 + 0.5)) + idx_shift + G_shift
-                #         ] = val
-                # else:
-                #     self.B[
-                #         int(i - (i / 2 + 0.5)) + idx_shift + G_shift,
-                #         int(j - (j / 2 + 0.5)) + idx_shift + G_shift,
-                #     ] = self.B[
-                #         int(j - (j / 2 + 0.5)) + idx_shift + G_shift,
-                #         int(i - (i / 2 + 0.5)) + idx_shift + G_shift,
-                #     ] = val
 
                 self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
                 # Make Sigma
@@ -564,30 +511,11 @@ class LinearResponseUPS(LinearResponseBaseClass):
                     GId_ket,
                     *self.index_info,
                 )
-                # if i % 2 == 0:
-                #     if j % 2 == 0:
-                #         self.Sigma[int(i - (i / 2)) + idx_shift, int(j - (j / 2)) + idx_shift] = self.Sigma[
-                #             int(j - (j / 2)) + idx_shift, int(i - (i / 2)) + idx_shift
-                #         ] = val
-                #     else:
-                #         self.Sigma[
-                #             int(i - (i / 2 + 0.5)) + idx_shift, int(j - (j / 2 + 0.5)) + idx_shift + G_shift
-                #         ] = self.Sigma[
-                #             int(j - (j / 2 + 0.5)) + idx_shift, int(i - (i / 2 + 0.5)) + idx_shift + G_shift
-                #         ] = val
-                # else:
-                #     self.Sigma[
-                #         int(i - (i / 2 + 0.5)) + idx_shift + G_shift,
-                #         int(j - (j / 2 + 0.5)) + idx_shift + G_shift,
-                #     ] = self.Sigma[
-                #         int(j - (j / 2 + 0.5)) + idx_shift + G_shift,
-                #         int(i - (i / 2 + 0.5)) + idx_shift + G_shift,
-                #     ] = val
                 self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = val
+       
         self.A = self.A[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape(
             (np.sum(finite_excitations_idx), np.sum(finite_excitations_idx))
         )
-        # print("A", self.A)
         self.B = self.B[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape(
             (np.sum(finite_excitations_idx), np.sum(finite_excitations_idx))
         )
@@ -597,6 +525,7 @@ class LinearResponseUPS(LinearResponseBaseClass):
         self.Delta = np.zeros(
             (len(self.Sigma), len(self.Sigma))
         )  # Delta er defineret her fordi den ellers har forkert dimension i unrestricted_lr_baseclass.py
+
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.
@@ -609,7 +538,7 @@ class LinearResponseUPS(LinearResponseBaseClass):
         """
         if len(dipole_integrals) != 3:
             raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
-        number_excitations = len(self.excitation_energies)
+        number_excitations = len(elf.excitation_energies)
         mux_aa = one_electron_integral_transform(self.wf.c_a_mo, dipole_integrals[0])
         mux_bb = one_electron_integral_transform(self.wf.c_b_mo, dipole_integrals[0])
         muy_aa = one_electron_integral_transform(self.wf.c_a_mo, dipole_integrals[1])
@@ -684,7 +613,6 @@ class LinearResponseUPS(LinearResponseBaseClass):
                 state_number,
                 number_excitations,
             )
-            # print(q_part_x)
             transfer_ket = propagate_state([transfer_op], self.wf.ci_coeffs, *self.index_info)
             transferd_ket = propagate_state([transfer_op.dagger], self.wf.ci_coeffs, *self.index_info)
             # <0| mux T |0>

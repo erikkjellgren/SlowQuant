@@ -192,7 +192,6 @@ class UnrestrictedWaveFunctionUPS:
         self._kappa_a_redundant_old = []
         self._kappa_b_redundant_old = []
         # kappa can be optimized in spatial basis
-        # print(self.active_idx)
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
                 if p in self.inactive_idx and q in self.inactive_idx:
@@ -233,7 +232,6 @@ class UnrestrictedWaveFunctionUPS:
                         self.kappa_redundant_idx.append((p, q))
                         continue
                 if not (p in self.active_idx and q in self.active_idx):
-                    # print(p,q)
                     self.kappa_no_activeactive_idx.append((p, q))
                     self.kappa_no_activeactive_idx_dagger.append((q, p))
                 self._kappa_a.append(0.0)
