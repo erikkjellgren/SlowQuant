@@ -6,7 +6,6 @@ from typing import Any
 
 import numpy as np
 import scipy
-import scipy.optimize
 
 from slowquant.molecularintegrals.integralfunctions import (
     generalized_one_electron_transform,
@@ -60,7 +59,7 @@ class GeneralizedWaveFunctionUPS:
         Args:
             num_elec: Number of electrons.
             cas: CAS(num_active_elec, num_active_orbs),
-                 orbitals are counted in spatial basis.
+                 orbitals are counted in spin basis.
             mo_coeffs: Initial orbital coefficients.
             h_ao: One-electron integrals in AO for Hamiltonian.
             g_ao: Two-electron integrals in AO.
@@ -632,7 +631,6 @@ class GeneralizedWaveFunctionUPS:
                             self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
         return self._rdm2
 
-
     def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
         r"""Check orthonormality of orbitals.
 
@@ -728,6 +726,12 @@ class GeneralizedWaveFunctionUPS:
                 thetas,
                 extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
             )
+            thetas_r = []
+            thetas_i = []
+            for i in range(len(self.thetas)):
+                thetas_r.append(res.x[i])
+                thetas_i.append(res.x[i + len(self.thetas)])
+            self.set_thetas(thetas_r, thetas_i)
 
             if orbital_optimization and len(self.kappa_real) != 0:
                 if not is_silent_subiterations:
@@ -792,7 +796,6 @@ class GeneralizedWaveFunctionUPS:
         tol: float = 1e-10,
         maxiter: int = 1000,
         is_silent: bool = False,
-        test = True,
     ) -> None:
         """Run one step optimization of wave function.
 
@@ -857,10 +860,6 @@ class GeneralizedWaveFunctionUPS:
                 parameters = np.zeros(2 * len(self.kappa_real), dtype=float).tolist()
         else:
             parameters = self.thetas_real + self.thetas_imag
-            # This is for running with real valued thetas:
-            # parameters = self.thetas_real
-        # print("før") #print statement 
-        # print(self.thetas)
         optimizer = Optimizers(
             energy,
             optimizer_name,
@@ -872,40 +871,16 @@ class GeneralizedWaveFunctionUPS:
         )
         self._old_opt_parameters = np.zeros_like(parameters, dtype=np.float64) + 10**20
         self._E_opt_old = 0.0
-        # print(self.ups_layout.param_names)
-        # print(self.ups_layout.excitation_indices)
-        #parameters = np.ones_like(parameters)
-        # print("parameters") #print statement 
-        # print(parameters,'slut')
-
-
         res = optimizer.minimize(
             parameters,
             extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
         )
-        
-        # # finite diff
-        # g_an = gradient(parameters)
-        # # finite-diff gradient at same parameters
-        # g_fd = self.get_gradient_finite_diff_theta(
-        #     self.thetas,
-        # )
-
-        # diff = g_fd - g_an
-        # print("diff =", np.max(np.abs(diff)))
-        # # print("diff2 =", diff)
-        
-        
-        # print("efter") #print statement 
-        # print(parameters)
-
         if orbital_optimization:
             if len(self.thetas) > 0:
                 thetas_r = []
                 thetas_i = []
                 for i in range(len(self.thetas)):
                     thetas_r.append(res.x[i + 2 * len(self.kappa_real)])
-                    # Silence the imaginary part if you wish to run with real-valued thetas:
                     thetas_i.append(res.x[i + 2 * len(self.kappa_real) + len(self.thetas)])
                 self.set_thetas(thetas_r, thetas_i)
             for i in range(len(self.kappa_real)):
@@ -918,13 +893,9 @@ class GeneralizedWaveFunctionUPS:
             thetas_i = []
             for i in range(len(self.thetas)):
                 thetas_r.append(res.x[i])
-                # Silence the imaginary part if you wish to run with real-valued thetas:
                 thetas_i.append(res.x[i + len(self.thetas)])
             self.set_thetas(thetas_r, thetas_i)
         self._energy_elec = res.fun
-        # print("slut") #print statement det var her
-        # print(self.thetas)
-        # print('res.x',res.x)
 
     def do_adapt(
         self,
@@ -1048,16 +1019,13 @@ class GeneralizedWaveFunctionUPS:
             kappa_i = []
             for i in range(len(self.kappa_real)):
                 kappa_r.append(parameters[i])
-                #kappa_i.append(parameters[i + len(self.kappa_real)])
-                kappa_i.append(0.0)
+                kappa_i.append(parameters[i + len(self.kappa_real)])
             self.set_kappa_cep(kappa_r, kappa_i)
-
         if theta_optimization:
             thetas_r = []
             thetas_i = []
             for i in range(len(self.thetas)):
                 thetas_r.append(parameters[i + num_kappa])
-                # Silence the imaginary part if you wish to run with real-valued thetas:
                 thetas_i.append(parameters[i + num_kappa + len(self.thetas)])
             self.set_thetas(thetas_r, thetas_i)
         '''if kappa_optimization:
@@ -1113,7 +1081,6 @@ class GeneralizedWaveFunctionUPS:
             thetas_i = []
             for i in range(len(self.thetas)):
                 thetas_r.append(parameters[i + num_kappa])
-                # Silence the imaginary part if you wish to run with real-valued thetas:
                 thetas_i.append(parameters[i + num_kappa + len(self.thetas)])
             self.set_thetas(thetas_r, thetas_i)
         if kappa_optimization:
