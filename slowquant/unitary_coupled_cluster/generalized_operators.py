@@ -81,7 +81,15 @@ def generalized_hamiltonian_0i_0a(
                     hamiltonian_operator += (1 / 2 * g_mo[P, Q, I, I] 
                                             *a_op_spin(P,dagger=True)*a_op_spin(I,dagger=True)
                                             *a_op_spin(I,dagger=False)*a_op_spin(Q,dagger=False))
-    # Active two-electron
+                if abs(g_mo[P, I, I, Q]) > 10**-14: #AE added
+                    hamiltonian_operator += (1/2*g_mo[P,I,I,Q]
+                                             *a_op_spin(P,dagger=True)*a_op_spin(I,dagger=True)
+                                             *a_op_spin(Q,dagger=False)*a_op_spin(I,dagger=False))
+                if abs(g_mo[P, I, I, Q]) > 10**-14:
+                    hamiltonian_operator += (1/2*g_mo[I,P,Q,I]
+                                            *a_op_spin(I,dagger=True)*a_op_spin(Q,dagger=True)
+                                            *a_op_spin(I,dagger=False)*a_op_spin(P,dagger=False))
+                    
     for P in range(num_inactive_spin_orbs, num_inactive_spin_orbs + num_active_spin_orbs):
         for Q in range(num_inactive_spin_orbs, num_inactive_spin_orbs + num_active_spin_orbs):
             for R in range(num_inactive_spin_orbs, num_inactive_spin_orbs + num_active_spin_orbs):
