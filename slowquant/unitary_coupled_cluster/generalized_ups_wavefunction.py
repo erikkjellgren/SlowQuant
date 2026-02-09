@@ -438,6 +438,7 @@ class GeneralizedWaveFunctionUPS:
                         [(a_op_spin(P, True) * a_op_spin(Q, False))],
                         self.ci_coeffs,
                         self.ci_info,
+                        do_folding = True,
                     )
                     self._rdm1[P_idx, Q_idx] = val  # type: ignore
                     self._rdm1[Q_idx, P_idx] = val.conjugate()  # type: ignore (1.7.7 EST)
@@ -1062,7 +1063,7 @@ class GeneralizedWaveFunctionUPS:
                 # Silence the imaginary part if you wish to run with real-valued thetas:
                 thetas_i.append(parameters[i + num_kappa + len(self.thetas)])
             self.set_thetas(thetas_r, thetas_i)
-        '''if kappa_optimization:
+        if kappa_optimization:
             # RDM is more expensive than evaluation of the Hamiltonian.
             # Thus only construct these if orbital-optimization is turned on,
             # since the RDMs will be reused in the oo gradient calculation.
@@ -1073,8 +1074,8 @@ class GeneralizedWaveFunctionUPS:
                 self.num_active_spin_orbs,
                 self.rdm1,
                 self.rdm2,
-            )'''
-        if True:
+            )
+        else:
             E = generalized_expectation_value_energy(
                 self.ci_coeffs,
                 [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],

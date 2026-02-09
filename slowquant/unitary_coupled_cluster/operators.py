@@ -828,7 +828,6 @@ def one_elec_op_0i_0a(ints_mo: np.ndarray, num_inactive_orbs: int, num_active_or
                 one_elec_op += ints_mo[p, q] * Epq(p, q)
     return one_elec_op
 
-
 def one_elec_op_1i_1a(
     ints_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int, num_virtual_orbs: int
 ) -> FermionicOperator:

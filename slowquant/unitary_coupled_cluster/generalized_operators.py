@@ -152,3 +152,28 @@ def generalized_hamiltonian_1i_1a(
                                          *a_op_spin(S,dagger=False)*a_op_spin(Q,dagger=False))
     return hamiltonian_operator
 
+
+def generalized_one_elec_op_0i_0a(ints_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int) -> FermionicOperator:
+    """Create one-electron operator that makes no changes in the inactive and virtual orbitals.
+
+    Args:
+        ints_mo: One-electron integrals for operator in MO basis.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+
+    Returns:
+        One-electron operator for active-space.
+    """
+    one_elec_op = FermionicOperator({})
+    # Inactive one-electron
+    for i in range(num_inactive_orbs):
+        if abs(ints_mo[i, i]) > 10**-14:
+            one_elec_op += ints_mo[i, i] * a_op_spin(i, True) * a_op_spin(i, False)
+    # Active one-electron
+    for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+        for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+            if abs(ints_mo[p, q]) > 10**-14:
+                one_elec_op += ints_mo[p, q] * a_op_spin(p, True) * a_op_spin(q, False)
+    return one_elec_op
+
+
