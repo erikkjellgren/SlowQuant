@@ -6,10 +6,11 @@ from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform, generalized_one_electron_transform
 )
 from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
-    get_orbital_gradient_response, get_orbital_gradient_response, get_orbital_gradient_response_real_imag,
+    get_orbital_gradient_response, get_orbital_gradient_response_real_imag,
     get_orbital_response_hessian_block,
     get_orbital_response_metric_sigma,
-    get_orbital_response_property_gradient, get_orbital_response_property_gradient, get_orbital_response_metric_sigma_real_imag
+    get_orbital_response_property_gradient_annika, get_orbital_response_property_gradient_real_imag, 
+    get_orbital_response_metric_sigma_real_imag
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.linear_response.generalized_lr_baseclass import (
@@ -491,23 +492,23 @@ class LinearResponse(LinearResponseBaseClass):
         if len(dipole_integrals) != 3:
             raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
         number_excitations = len(self.excitation_energies)
-        mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
-        muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
-        muz = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[2])
+        mux = generalized_one_electron_transform(self.wf.c_mo, dipole_integrals[0])
+        muy = generalized_one_electron_transform(self.wf.c_mo, dipole_integrals[1])
+        muz = generalized_one_electron_transform(self.wf.c_mo, dipole_integrals[2])
         mux_op = generalized_one_elec_op_0i_0a(
             mux,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
+            self.wf.num_inactive_spin_orbs,
+            self.wf.num_active_spin_orbs,
         )
         muy_op = generalized_one_elec_op_0i_0a(
             muy,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
+            self.wf.num_inactive_spin_orbs,
+            self.wf.num_active_spin_orbs,
         )
         muz_op = generalized_one_elec_op_0i_0a(
             muz,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
+            self.wf.num_inactive_spin_orbs,
+            self.wf.num_active_spin_orbs,
         )
         mux_ket = generalized_propagate_state([mux_op], self.wf.ci_coeffs, *self.index_info)
         muxd_ket = generalized_propagate_state([mux_op.dagger], self.wf.ci_coeffs, *self.index_info)
@@ -515,10 +516,10 @@ class LinearResponse(LinearResponseBaseClass):
         muyd_ket = generalized_propagate_state([muy_op.dagger], self.wf.ci_coeffs, *self.index_info)
         muz_ket = generalized_propagate_state([muz_op], self.wf.ci_coeffs, *self.index_info)
         muzd_ket = generalized_propagate_state([muz_op.dagger], self.wf.ci_coeffs, *self.index_info)
-        transition_dipole_x = 0.0
-        transition_dipole_y = 0.0
-        transition_dipole_z = 0.0
-        transition_dipoles = np.zeros((number_excitations, 3))
+        transition_dipole_x = 0.0 + 0.0j
+        transition_dipole_y = 0.0 + 0.0j
+        transition_dipole_z = 0.0 + 0.0j
+        transition_dipoles = np.zeros((number_excitations, 3), dtype=np.complex128)
         for state_number in range(number_excitations):
             transfer_op = FermionicOperator({})
             for i, G in enumerate(self.G_ops):
@@ -529,31 +530,31 @@ class LinearResponse(LinearResponseBaseClass):
             q_part_y = 0.0
             q_part_z = 0.0
             if len(self.q_ops) != 0:
-                q_part_x = get_orbital_response_property_gradient(
+                q_part_x = get_orbital_response_property_gradient_annika(
                     mux,
-                    self.wf.kappa_no_activeactive_idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
+                    self.wf.kappa_no_activeactive_spin_idx,
+                    self.wf.num_inactive_spin_orbs,
+                    self.wf.num_active_spin_orbs,
                     self.wf.rdm1,
                     self.normed_response_vectors,
                     state_number,
                     number_excitations,
                 )
-                q_part_y = get_orbital_response_property_gradient(
+                q_part_y = get_orbital_response_property_gradient_annika(
                     muy,
-                    self.wf.kappa_no_activeactive_idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
+                    self.wf.kappa_no_activeactive_spin_idx,
+                    self.wf.num_inactive_spin_orbs,
+                    self.wf.num_active_spin_orbs,
                     self.wf.rdm1,
                     self.normed_response_vectors,
                     state_number,
                     number_excitations,
                 )
-                q_part_z = get_orbital_response_property_gradient(
+                q_part_z = get_orbital_response_property_gradient_annika(
                     muz,
-                    self.wf.kappa_no_activeactive_idx,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
+                    self.wf.kappa_no_activeactive_spin_idx,
+                    self.wf.num_inactive_spin_orbs,
+                    self.wf.num_active_spin_orbs,
                     self.wf.rdm1,
                     self.normed_response_vectors,
                     state_number,

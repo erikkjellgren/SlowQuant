@@ -894,7 +894,7 @@ def get_orbital_response_vector_norm(
 
 
 @nb.jit(nopython=True)
-def get_orbital_response_property_gradient(
+def get_orbital_response_property_gradient_annika(
     x_mo: np.ndarray,
     kappa_spin_idx: list[tuple[int, int]],
     num_inactive_spin_orbs: int,
@@ -903,7 +903,7 @@ def get_orbital_response_property_gradient(
     response_vectors: np.ndarray,
     state_number: int,
     number_excitations: int,
-) -> float:
+) -> complex:
     r"""Calculate the orbital part of property gradient.
 
     .. math::
@@ -974,7 +974,7 @@ def get_orbital_response_property_gradient_real_imag(
     response_vectors: np.ndarray,
     state_number: int,
     number_excitations: int,
-) -> float:
+) -> complex:
     r"""Calculate the orbital part of property gradient.
 
     .. math::

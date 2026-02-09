@@ -222,6 +222,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     h_1e = mol.intor("int1e_kin")
     h_nuc = mol.intor("int1e_nuc")
     g_eri = mol.intor("int2e")
+    dip_int = mol.intor("int1e_r")
     #mc = mcscf.CASCI(mf, active_space[1], active_space[0])
 
     # mc = mcscf.UCASCI(mf, active_space[1], active_space[0])
@@ -298,9 +299,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #print("Nr. of unocc active spind idx shifted orbitals:", WF.active_unocc_spin_idx_shifted)
 
 
-    mask1 = (np.abs(c.real - WF._c_mo.real) <= threshold) & (np.abs(c.imag - WF._c_mo.imag) <= threshold)
+    #mask1 = (np.abs(c.real - WF._c_mo.real) <= threshold) & (np.abs(c.imag - WF._c_mo.imag) <= threshold)
 
-    mask2 = (np.abs(c.real - WF.c_mo.real) <= threshold) & (np.abs(c.imag - WF.c_mo.imag) <= threshold)
+    #mask2 = (np.abs(c.real - WF.c_mo.real) <= threshold) & (np.abs(c.imag - WF.c_mo.imag) <= threshold)
 
     #print(mask1, "\n\n")
     #print(mask2, "\n\n")
@@ -388,9 +389,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #WF.do_adapt(["S","D"])
 
     #print(WF.ups_layout.excitation_indices)
-    #print(WF.c_mo)
+    print(WF.c_mo)
 
-    print("efter optimering")
+    #print("efter optimering")
 
     #print(WF.thetas)
 
@@ -434,10 +435,6 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     )'''
 
 
-    '''LR = generalized_naive.LinearResponse(WF, excitations="SD")
-    LR.calc_excitation_energies()
-    print(LR.excitation_energies)'''
-
     '''exp_value_gradient_nonsplit = get_nonsplit_gradient_expvalue(
             WF.ci_coeffs,
             WF.ci_info,
@@ -449,15 +446,23 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     
     print(exp_value_gradient_nonsplit)'''
 
+    #WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
+
+
+    LR = generalized_naive.LinearResponse(WF, excitations="SD")
+    LR.calc_excitation_energies()
+    print(LR.excitation_energies)
+    print(LR.get_transition_dipole(dip_int))
+
 
 
 def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
     #basis = "cc-pvdz"
-    #basis = "631-g"
+    basis = "631-g"
     #basis = "sto-3g"
-    basis = "sto-6g"
+    #basis = "sto-6g"
     active_space = ((1, 1), 4)
     #active_space = (2, 4)
     charge = 0
@@ -540,7 +545,6 @@ def h2o():
     # unrestricted(
     #     geometry=geometry, basis=basis, active_space=active_space_u, charge=charge, spin=spin, unit="angstrom"
     # )
-
 
 def HI():
     geometry = """H  0.0   0.0  0.0;
