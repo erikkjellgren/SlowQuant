@@ -30,7 +30,6 @@ from slowquant.unitary_coupled_cluster.util import (
     iterate_t5,
     iterate_t6,
     iterate_t6,
-    iterate_t1_incl_cross
 )
 
 
@@ -70,10 +69,12 @@ class LinearResponseBaseClass:
 
         if "s" in excitations:
             for a, i in iterate_t1(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx): ## -diagonal jf HJ. Cross?
-                self.G_ops.append(G1_generalized(i, a)) #AE from G1
+                self.G_ops.append(G1(i, a)) #AE from G1
+                # print('G1', i,a)
         if "d" in excitations:
             for a, i, b, j in iterate_t2(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx): #cross?
                 self.G_ops.append(G2(i, j, a, b)) #AE from G2
+                # print('G2',i, j, a, b)
         if "t" in excitations:
             for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
                 self.G_ops.append(G3(i, j, k, a, b, c))
@@ -94,7 +95,9 @@ class LinearResponseBaseClass:
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
 
         for p, q in self.wf.kappa_no_activeactive_spin_idx:
-            self.q_ops.append(G1_generalized(p, q)) #AE from G1
+            # print('no active active', self.wf.kappa_no_activeactive_spin_idx)
+            self.q_ops.append(G1_generalized(p, q)) #AE from G1 skal det være generalized??
+            # print('qs:',p,q)
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
         self.B = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
@@ -107,12 +110,12 @@ class LinearResponseBaseClass:
             self.wf.num_active_spin_orbs,
             self.wf.num_virtual_spin_orbs,
         )
-        self.H_0i_0a = generalized_hamiltonian_0i_0a(
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.num_inactive_spin_orbs,
-            self.wf.num_active_spin_orbs,
-        )
+        # self.H_0i_0a = generalized_hamiltonian_0i_0a( AE: virker ikke!
+        #     self.wf.h_mo,
+        #     self.wf.g_mo,
+        #     self.wf.num_inactive_spin_orbs,
+        #     self.wf.num_active_spin_orbs,
+        # )
         
 
     def calc_excitation_energies(self) -> None:

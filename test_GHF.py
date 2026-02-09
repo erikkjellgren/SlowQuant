@@ -103,40 +103,49 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # PySCF
     mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin)
     mol.build()
-    #X2C
+
     # mf = scf.HF(mol)
-    mf = scf.GHF(mol)
+    # mf = scf.GHF(mol)
+    
+    #relativistic X2C
+    mf = scf.GHF(mol).sfx2c1e()
     
     mf.conv_tol_grad = 1e-10 #gradient tolerance form PYSCF
     mf.max_cycle = 10000
 
     mf.scf()
     mf.kernel()
-    # c=np.array(mf.mo_coeff, dtype=complex)
-    # print(c)
-    c= np.array([[ 0.2328374 +0.j, -0.2295067 +0.j, -0.09973118+0.j, -0.07138934+0.j,
-                    0.54049766+0.j,  0.54323164+0.j, -0.79382251+0.j, -0.79382251+0.j],
-                    [0.19357538+0.j, -0.19080632+0.j, -1.39445627+0.j, -0.99817651+0.j,
-                    -0.48402791+0.j, -0.48647625+0.j,  0.95419254+0.j,  0.95419254+0.j],
-                    [ 0.2328374 +0.j, -0.2295067 +0.j,  0.09973118+0.j,  0.07138934+0.j,
-                    0.54049766+0.j,  0.54323164+0.j,  0.79382251+0.j,  0.79382251+0.j],
-                    [0.19357538+0.j, -0.19080632+0.j,  1.39445627+0.j,  0.99817651+0.j,
-                    -0.48402791+0.j, -0.48647625+0.j, -0.95419254+0.j, -0.95419254+0.j],
-                    [ 0.2295067 +0.j,  0.2328374 +0.j,  0.07138934+0.j, -0.09973118+0.j,
-                    0.54323164+0.j, -0.54049766+0.j, -0.79382251+0.j,  0.79382251+0.j],
-                    [ 0.19080632+0.j,  0.19357538+0.j,  0.99817651+0.j, -1.39445627+0.j,
-                    -0.48647625+0.j,  0.48402791+0.j,  0.95419254+0.j, -0.95419254+0.j],
-                    [ 0.2295067 +0.j,  0.2328374 +0.j, -0.07138934+0.j,  0.09973118+0.j,
-                    0.54323164+0.j, -0.54049766+0.j,  0.79382251+0.j, -0.79382251+0.j],
-                    [ 0.19080632+0.j,  0.19357538+0.j, -0.99817651+0.j,  1.39445627+0.j,
-                    -0.48647625+0.j,  0.48402791+0.j, -0.95419254+0.j,  0.95419254+0.j]])
+    c=np.array(mf.mo_coeff, dtype=complex)
+    print(c)
+    # c= np.array([[ 0.2328374 +0.j, -0.2295067 +0.j, -0.09973118+0.j, -0.07138934+0.j,
+    #                 0.54049766+0.j,  0.54323164+0.j, -0.79382251+0.j, -0.79382251+0.j],
+    #                 [0.19357538+0.j, -0.19080632+0.j, -1.39445627+0.j, -0.99817651+0.j,
+    #                 -0.48402791+0.j, -0.48647625+0.j,  0.95419254+0.j,  0.95419254+0.j],
+    #                 [ 0.2328374 +0.j, -0.2295067 +0.j,  0.09973118+0.j,  0.07138934+0.j,
+    #                 0.54049766+0.j,  0.54323164+0.j,  0.79382251+0.j,  0.79382251+0.j],
+    #                 [0.19357538+0.j, -0.19080632+0.j,  1.39445627+0.j,  0.99817651+0.j,
+    #                 -0.48402791+0.j, -0.48647625+0.j, -0.95419254+0.j, -0.95419254+0.j],
+    #                 [ 0.2295067 +0.j,  0.2328374 +0.j,  0.07138934+0.j, -0.09973118+0.j,
+    #                 0.54323164+0.j, -0.54049766+0.j, -0.79382251+0.j,  0.79382251+0.j],
+    #                 [ 0.19080632+0.j,  0.19357538+0.j,  0.99817651+0.j, -1.39445627+0.j,
+    #                 -0.48647625+0.j,  0.48402791+0.j,  0.95419254+0.j, -0.95419254+0.j],
+    #                 [ 0.2295067 +0.j,  0.2328374 +0.j, -0.07138934+0.j,  0.09973118+0.j,
+    #                 0.54323164+0.j, -0.54049766+0.j,  0.79382251+0.j, -0.79382251+0.j],
+    #                 [ 0.19080632+0.j,  0.19357538+0.j, -0.99817651+0.j,  1.39445627+0.j,
+    #                 -0.48647625+0.j,  0.48402791+0.j, -0.95419254+0.j,  0.95419254+0.j]])
     e_nuc=mf.energy_nuc()
-    h_core=mol.intor("int1e_kin")  + mol.intor("int1e_nuc")
+    # h_core=mol.intor("int1e_kin")  + mol.intor("int1e_nuc") #non relativistic
     h_1e = mol.intor("int1e_kin")  
     h_nuc=mol.intor("int1e_nuc")
 
+
+
+    # #relativistic integrals
+    h_core=mf.get_hcore()
+
     g_eri = mol.intor("int2e")
     mc = mcscf.CASCI(mf, active_space[1], active_space[0])
+
 
     #make a random unitary transformation
     u = unitary_group.rvs(c.shape[0]) 
@@ -159,7 +168,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         g_eri,
         "fUCCSD",
         {"n_layers": 1},
-        include_active_kappa=False,
+        include_active_kappa=True,
     )
     # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True,tol=1e-8)
     WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True, tol=1e-10, maxiter = 2000)
@@ -170,7 +179,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     
     
   
-    LR = generalized_naive.LinearResponse(WF, excitations="s")
+    LR = generalized_naive.LinearResponse(WF, excitations="sd")
     LR.calc_excitation_energies()
     print(LR.excitation_energies)
 
@@ -249,12 +258,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     'Test of Hamiltonians'
     # H=generalized_hamiltonian_full_space(h_eri_mo, g_eri_mo, c.shape[0])
     # H_test=generalized_hamiltonian_0i_0a(h_eri_mo, g_eri_mo,num_inactive_spin_orbs,num_active_spin_orbs)
-    # test=expectation_value(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
+    # test=generalized_expectation_value(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
     # print(test, test+e_nuc)
-    # test2=expectation_value(WF.ci_coeffs, [H_test], WF.ci_coeffs, WF.ci_info)
+    # test2=generalized_expectation_value(WF.ci_coeffs, [H_test], WF.ci_coeffs, WF.ci_info)
     # print(test2, test2+e_nuc)
     # H_1iai=generalized_hamiltonian_1i_1a(h_eri_mo, g_eri_mo,num_inactive_spin_orbs,num_active_spin_orbs, num_virtual_spin_orbs)
-    # test3=expectation_value(WF.ci_coeffs, [H_1iai], WF.ci_coeffs, WF.ci_info)
+    # test3=generalized_expectation_value(WF.ci_coeffs, [H_1iai], WF.ci_coeffs, WF.ci_info)
     # print(test3, test3+e_nuc)
     
     # # 'Test of gradients'
@@ -266,7 +275,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
-    basis = "631-g"
+    basis = "STO-3G"
     active_space_u = ((1, 1), 4) #spin orbitaler
     # active_space = (2, 4)
     charge = 0
@@ -362,7 +371,7 @@ def h3():
                   H  1.000000   0.000000       0.000000;
                   H  0.500000   0.8660254038   0.000000"""
     # basis = "cc-pvdz"
-    basis = "STO-6G"
+    basis = "sto-3g"
     #basis = "sto-3g"
     active_space = ((1, 2), 6)
     #active_space = (2, 4)
@@ -379,6 +388,17 @@ def h3():
     #     geometry=geometry, basis=basis, active_space=active_space_u, charge=charge, spin=spin, unit="angstrom"
     # )
 
+def h4_rektangle():
+    geometry = """H 0.0 0.0 0.0;
+                  H 0.0 0.0 0.74;
+                  H 0.0 1.11 0.74;
+                  H 0.0 1.11 0.0;"""
+    basis = "sto-3g"
+    active_space = ((1,1), 4)
+    charge = 0
+    spin = 0
+    NR(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
   
 # h3()
-h2()
+# h2()
+# h4_rektangle()

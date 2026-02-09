@@ -157,7 +157,7 @@ class GeneralizedWaveFunctionUPS:
         self._kappa_imag_redundant_old = []
         # Annika has modified this, since non-redundant orbital rotations had been left out!
         for P in range(0, self.num_spin_orbs):
-            for Q in range(P, self.num_spin_orbs):
+            for Q in range(P, self.num_spin_orbs): 
                 if P in self.inactive_spin_idx and Q in self.inactive_spin_idx:
                     self._kappa_real_redundant.append(0.0)
                     self._kappa_imag_redundant.append(0.0)
@@ -188,7 +188,7 @@ class GeneralizedWaveFunctionUPS:
                             self._kappa_real_redundant_old.append(0.0)
                             self._kappa_imag_redundant_old.append(0.0)
                             self.kappa_redundant_spin_idx.append((P, Q))
-                            continue
+                        continue
                     if P in self.active_unocc_spin_idx and Q in self.active_unocc_spin_idx:
                         self._kappa_real_redundant.append(0.0)
                         self._kappa_imag_redundant.append(0.0)
@@ -357,13 +357,12 @@ class GeneralizedWaveFunctionUPS:
         if isinstance(self._thetas_imag, np.ndarray):
             self._thetas_img = self._thetas_imag.tolist()
         
-        self.ci_coeffs = generalized_construct_ups_state_test_anna(
+        self.ci_coeffs = generalized_construct_ups_state_test_erik(
             self.csf_coeffs,
             self.ci_info,
             self.thetas,
             self.ups_layout,
         )
-
     @property
     def c_mo(self) -> np.ndarray:
         """Get molecular orbital coefficients.
@@ -658,12 +657,12 @@ class GeneralizedWaveFunctionUPS:
             self._energy_elec = generalized_expectation_value_energy(
                 self.ci_coeffs,
                 # Skal ændres til generalized_hamiltonian_0i_0a på et tidspunkt.
-                [
-                    generalized_hamiltonian_0i_0a(
-                        self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs
-                    )
-                ],
-                # [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
+                # [ virker ikke AE
+                #     generalized_hamiltonian_0i_0a(
+                #         self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs
+                #     )
+                # ],
+                [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
             )
@@ -981,7 +980,13 @@ class GeneralizedWaveFunctionUPS:
         )
         start = time.time()
         for iteration in range(maxiter):
-            Hamiltonian = generalized_hamiltonian_0i_0a(
+            # Hamiltonian = generalized_hamiltonian_0i_0a(
+            #     self.h_mo,
+            #     self.g_mo,
+            #     self.num_inactive_spin_orbs,
+            #     self.num_active_spin_orbs,
+            # )
+            Hamiltonian = generalized_hamiltonian_full_space( #AE rettet virker ikke (H0i_ai)
                 self.h_mo,
                 self.g_mo,
                 self.num_inactive_spin_orbs,
@@ -1075,8 +1080,8 @@ class GeneralizedWaveFunctionUPS:
         if True:
             E = generalized_expectation_value_energy(
                 self.ci_coeffs,
-                [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
-                #[generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
+                # [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
+                [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
             )
