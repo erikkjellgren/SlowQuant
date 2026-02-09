@@ -220,6 +220,7 @@ def generalized_propagate_state(
                     wf_struct,
                     dagger=dagger,
                 )
+
             else:
                 raise TypeError(f"Got unknown wave function structure type, {type(wf_struct)}")
         # FermionicOperator in operators
@@ -254,7 +255,9 @@ def generalized_propagate_state(
                     tmp_state,
                     op_folded.operators[fermi_label],
                 )
+
             new_state = np.copy(tmp_state)
+            # print('new state', new_state)
     return new_state
 
 def generalized_build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bool = False) -> np.ndarray:
@@ -343,8 +346,7 @@ def generalized_expectation_value(
         do_unsafe=do_unsafe,
     )
  
-    val = bra.conj() @ op_ket
-
+    val = bra.conj() @ op_ket 
     return val
 
 
@@ -648,7 +650,7 @@ def generalized_construct_ups_state_test_erik(
     for exc_type, exc_indices, theta in zip(
         ups_struct.excitation_operator_type[::order], ups_struct.excitation_indices[::order], thetas[::order]
     ):
-        if abs(theta) < 10**-14:
+        if abs(theta) < 10**-28:
             continue
         if exc_type in ("single", "double"):
             # Create T matrix

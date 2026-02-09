@@ -195,7 +195,7 @@ def G1_generalized_old(i: int, a: int, return_anti_hermitian: bool = False, Real
     
 
 def G1_generalized(i: int, a: int, dagger: bool = False) -> FermionicOperator:
-    """Construct one-electron excitation operator.
+    r"""Construct one-electron excitation operator.
 
     .. math::
         \hat{G}^{[1]}_{ia} = \hat{a}_{a}^\dagger\hat{a}_i

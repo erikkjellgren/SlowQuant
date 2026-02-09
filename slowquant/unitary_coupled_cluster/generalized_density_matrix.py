@@ -732,13 +732,13 @@ def get_orbital_response_metric_sigma(
     sigma = np.zeros((len(kappa_spin_idx), len(kappa_spin_idx)), dtype=np.complex128)
     for idx1, (M, N) in enumerate(kappa_spin_idx):
         for idx2, (P, Q) in enumerate(kappa_spin_idx):
+            if Q == N:
+                sigma[idx1, idx2] += RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             if P == M:
-                sigma[idx1, idx2] += RDM1(Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
-            if N == Q:
-                sigma[idx1, idx2] -= RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+                sigma[idx1, idx2] -= RDM1(Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
     if sigma.imag.any() > 1e-10:
         print("Warning: Response metric is complex!")
-    return sigma.real 
+    return sigma
 
 
 
@@ -1159,7 +1159,6 @@ def get_orbital_response_hessian_block(
                             )
     if A1e.imag.any() > 1e-10 or A2e.imag.any() > 1e-10:
         print("Warning: Response Hessian is complex!")
-    print('her',A1e + (1/2)*A2e)
     return A1e + (1/2)*A2e
 
 

@@ -29,6 +29,7 @@ from slowquant.unitary_coupled_cluster.util import (
     iterate_t4,
     iterate_t5,
     iterate_t6,
+    iterate_t6,
 )
 
 
@@ -68,10 +69,12 @@ class LinearResponseBaseClass:
 
         if "s" in excitations:
             for a, i in iterate_t1(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx): ## -diagonal jf HJ. Cross?
-                self.G_ops.append(G1_generalized(i, a)) #AE from G1
+                self.G_ops.append(G1(i, a)) #AE from G1
+                # print('G1', i,a)
         if "d" in excitations:
             for a, i, b, j in iterate_t2(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx): #cross?
-                self.G_ops.append(G2_generalized(i, j, a, b)) #AE from G2
+                self.G_ops.append(G2(i, j, a, b)) #AE from G2
+                # print('G2',i, j, a, b)
         if "t" in excitations:
             for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
                 self.G_ops.append(G3(i, j, k, a, b, c))
@@ -92,7 +95,9 @@ class LinearResponseBaseClass:
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
 
         for p, q in self.wf.kappa_no_activeactive_spin_idx:
-            self.q_ops.append(G1_generalized(p, q)) #AE from G1
+            # print('no active active', self.wf.kappa_no_activeactive_spin_idx)
+            self.q_ops.append(G1_generalized(p, q)) #AE from G1 skal det være generalized??
+            # print('qs:',p,q)
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
         self.B = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
@@ -105,12 +110,12 @@ class LinearResponseBaseClass:
             self.wf.num_active_spin_orbs,
             self.wf.num_virtual_spin_orbs,
         )
-        self.H_0i_0a = generalized_hamiltonian_0i_0a(
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.num_inactive_spin_orbs,
-            self.wf.num_active_spin_orbs,
-        )
+        # self.H_0i_0a = generalized_hamiltonian_0i_0a( AE: virker ikke!
+        #     self.wf.h_mo,
+        #     self.wf.g_mo,
+        #     self.wf.num_inactive_spin_orbs,
+        #     self.wf.num_active_spin_orbs,
+        # )
         
 
     def calc_excitation_energies(self) -> None:
@@ -121,6 +126,8 @@ class LinearResponseBaseClass:
         E2[:size, size:] = self.B
         E2[size:, :size] = self.B.conjugate() #AE added conjugtate 
         E2[size:, size:] = self.A.conjugate() #AE added conjugtate 
+        
+        # print(E2)
         (
             hess_eigval,
             _,
@@ -137,25 +144,28 @@ class LinearResponseBaseClass:
         S[:size, size:] = self.Delta
         S[size:, :size] = -self.Delta.conjugate()
         S[size:, size:] = -self.Sigma.conjugate()
+        
+        # print(S)
         print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma)))}")
         self.hessian = E2
         self.metric = S
 
+      
         eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)
         sorting = np.argsort(eigval)
         self.excitation_energies = np.real(eigval[sorting][size:])
         self.response_vectors = np.real(eigvec[:, sorting][:, size:])
-        self.normed_response_vectors = np.zeros_like(self.response_vectors)
+        self.normed_response_vectors = np.zeros_like(self.response_vectors, dtype=complex) #AE
         self.num_q = len(self.q_ops)
         self.num_G = size - self.num_q
         self.Z_q = self.response_vectors[: self.num_q, :]
         self.Z_G = self.response_vectors[self.num_q : self.num_q + self.num_G, :]
         self.Y_q = self.response_vectors[self.num_q + self.num_G : 2 * self.num_q + self.num_G]
         self.Y_G = self.response_vectors[2 * self.num_q + self.num_G :]
-        self.Z_q_normed = np.zeros_like(self.Z_q)
-        self.Z_G_normed = np.zeros_like(self.Z_G)
-        self.Y_q_normed = np.zeros_like(self.Y_q)
-        self.Y_G_normed = np.zeros_like(self.Y_G)
+        self.Z_q_normed = np.zeros_like(self.Z_q, dtype=complex) #AE
+        self.Z_G_normed = np.zeros_like(self.Z_G, dtype=complex) #AE
+        self.Y_q_normed = np.zeros_like(self.Y_q, dtype=complex) #AE
+        self.Y_G_normed = np.zeros_like(self.Y_G, dtype=complex) #AE
         norms = self.get_excited_state_norm()
         for state_number, norm in enumerate(norms):
             if norm < 10**-10:
@@ -175,7 +185,7 @@ class LinearResponseBaseClass:
         Returns:
             Norm of excited states.
         """
-        norms = np.zeros(len(self.response_vectors[0]))
+        norms = np.zeros(len(self.response_vectors[0]),dtype=complex) #AE complex
         for state_number in range(len(self.response_vectors[0])):
             # Get Z_q Z_G Y_q and Y_G matrices
             ZZq = np.outer(self.Z_q[:, state_number], self.Z_q[:, state_number].transpose())
@@ -187,7 +197,6 @@ class LinearResponseBaseClass:
                 self.metric[self.num_q : self.num_q + self.num_G, self.num_q : self.num_q + self.num_G]
                 * (ZZG - YYG)
             )
-
         return norms
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:

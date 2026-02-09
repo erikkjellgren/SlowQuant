@@ -6,12 +6,10 @@ from typing import Any
 
 import numpy as np
 import scipy
-import scipy.optimize
 
 from slowquant.molecularintegrals.integralfunctions import (
     generalized_one_electron_transform,
     generalized_two_electron_transform,
-    one_electron_integral_transform,
 )
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_generalized
 from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
@@ -61,7 +59,7 @@ class GeneralizedWaveFunctionUPS:
         Args:
             num_elec: Number of electrons.
             cas: CAS(num_active_elec, num_active_orbs),
-                 orbitals are counted in spatial basis.
+                 orbitals are counted in spin basis.
             mo_coeffs: Initial orbital coefficients.
             h_ao: One-electron integrals in AO for Hamiltonian.
             g_ao: Two-electron integrals in AO.
@@ -158,7 +156,7 @@ class GeneralizedWaveFunctionUPS:
         self._kappa_imag_redundant_old = []
         # Annika has modified this, since non-redundant orbital rotations had been left out!
         for P in range(0, self.num_spin_orbs):
-            for Q in range(P, self.num_spin_orbs):
+            for Q in range(P, self.num_spin_orbs): 
                 if P in self.inactive_spin_idx and Q in self.inactive_spin_idx:
                     self._kappa_real_redundant.append(0.0)
                     self._kappa_imag_redundant.append(0.0)
@@ -189,7 +187,7 @@ class GeneralizedWaveFunctionUPS:
                             self._kappa_real_redundant_old.append(0.0)
                             self._kappa_imag_redundant_old.append(0.0)
                             self.kappa_redundant_spin_idx.append((P, Q))
-                            continue
+                        continue
                     if P in self.active_unocc_spin_idx and Q in self.active_unocc_spin_idx:
                         self._kappa_real_redundant.append(0.0)
                         self._kappa_imag_redundant.append(0.0)
@@ -358,13 +356,12 @@ class GeneralizedWaveFunctionUPS:
         if isinstance(self._thetas_imag, np.ndarray):
             self._thetas_img = self._thetas_imag.tolist()
         
-        self.ci_coeffs = generalized_construct_ups_state_test_anna(
+        self.ci_coeffs = generalized_construct_ups_state_test_erik(
             self.csf_coeffs,
             self.ci_info,
             self.thetas,
             self.ups_layout,
         )
-
     @property
     def c_mo(self) -> np.ndarray:
         """Get molecular orbital coefficients.
@@ -634,8 +631,6 @@ class GeneralizedWaveFunctionUPS:
                             self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
         return self._rdm2
 
-
-
     def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
         r"""Check orthonormality of orbitals.
 
@@ -645,7 +640,7 @@ class GeneralizedWaveFunctionUPS:
         Args:
             overlap_integral: Overlap integral in AO basis.
         """
-        S_ortho = one_electron_integral_transform(self.c_mo, overlap_integral)
+        S_ortho = generalized_one_electron_transform(self.c_mo, overlap_integral)
         one = np.identity(len(S_ortho))
         diff = np.abs(S_ortho - one)
         print("Max ortho-normal diff:", np.max(diff))
@@ -661,12 +656,12 @@ class GeneralizedWaveFunctionUPS:
             self._energy_elec = generalized_expectation_value_energy(
                 self.ci_coeffs,
                 # Skal ændres til generalized_hamiltonian_0i_0a på et tidspunkt.
-                [
-                    generalized_hamiltonian_0i_0a(
-                        self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs
-                    )
-                ],
-                # [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
+                # [ virker ikke AE
+                #     generalized_hamiltonian_0i_0a(
+                #         self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs
+                #     )
+                # ],
+                [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
             )
@@ -731,6 +726,12 @@ class GeneralizedWaveFunctionUPS:
                 thetas,
                 extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
             )
+            thetas_r = []
+            thetas_i = []
+            for i in range(len(self.thetas)):
+                thetas_r.append(res.x[i])
+                thetas_i.append(res.x[i + len(self.thetas)])
+            self.set_thetas(thetas_r, thetas_i)
 
             if orbital_optimization and len(self.kappa_real) != 0:
                 if not is_silent_subiterations:
@@ -795,7 +796,6 @@ class GeneralizedWaveFunctionUPS:
         tol: float = 1e-10,
         maxiter: int = 1000,
         is_silent: bool = False,
-        test = True,
     ) -> None:
         """Run one step optimization of wave function.
 
@@ -860,10 +860,6 @@ class GeneralizedWaveFunctionUPS:
                 parameters = np.zeros(2 * len(self.kappa_real), dtype=float).tolist()
         else:
             parameters = self.thetas_real + self.thetas_imag
-            # This is for running with real valued thetas:
-            # parameters = self.thetas_real
-        # print("før") #print statement 
-        # print(self.thetas)
         optimizer = Optimizers(
             energy,
             optimizer_name,
@@ -875,40 +871,16 @@ class GeneralizedWaveFunctionUPS:
         )
         self._old_opt_parameters = np.zeros_like(parameters, dtype=np.float64) + 10**20
         self._E_opt_old = 0.0
-        # print(self.ups_layout.param_names)
-        # print(self.ups_layout.excitation_indices)
-        #parameters = np.ones_like(parameters)
-        # print("parameters") #print statement 
-        # print(parameters,'slut')
-
-
         res = optimizer.minimize(
             parameters,
             extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
         )
-        
-        # # finite diff
-        # g_an = gradient(parameters)
-        # # finite-diff gradient at same parameters
-        # g_fd = self.get_gradient_finite_diff_theta(
-        #     self.thetas,
-        # )
-
-        # diff = g_fd - g_an
-        # print("diff =", np.max(np.abs(diff)))
-        # # print("diff2 =", diff)
-        
-        
-        # print("efter") #print statement 
-        # print(parameters)
-
         if orbital_optimization:
             if len(self.thetas) > 0:
                 thetas_r = []
                 thetas_i = []
                 for i in range(len(self.thetas)):
                     thetas_r.append(res.x[i + 2 * len(self.kappa_real)])
-                    # Silence the imaginary part if you wish to run with real-valued thetas:
                     thetas_i.append(res.x[i + 2 * len(self.kappa_real) + len(self.thetas)])
                 self.set_thetas(thetas_r, thetas_i)
             for i in range(len(self.kappa_real)):
@@ -921,13 +893,9 @@ class GeneralizedWaveFunctionUPS:
             thetas_i = []
             for i in range(len(self.thetas)):
                 thetas_r.append(res.x[i])
-                # Silence the imaginary part if you wish to run with real-valued thetas:
                 thetas_i.append(res.x[i + len(self.thetas)])
             self.set_thetas(thetas_r, thetas_i)
         self._energy_elec = res.fun
-        # print("slut") #print statement det var her
-        # print(self.thetas)
-        # print('res.x',res.x)
 
     def do_adapt(
         self,
@@ -984,7 +952,13 @@ class GeneralizedWaveFunctionUPS:
         )
         start = time.time()
         for iteration in range(maxiter):
-            Hamiltonian = generalized_hamiltonian_0i_0a(
+            # Hamiltonian = generalized_hamiltonian_0i_0a(
+            #     self.h_mo,
+            #     self.g_mo,
+            #     self.num_inactive_spin_orbs,
+            #     self.num_active_spin_orbs,
+            # )
+            Hamiltonian = generalized_hamiltonian_full_space( #AE rettet virker ikke (H0i_ai)
                 self.h_mo,
                 self.g_mo,
                 self.num_inactive_spin_orbs,
@@ -1051,16 +1025,13 @@ class GeneralizedWaveFunctionUPS:
             kappa_i = []
             for i in range(len(self.kappa_real)):
                 kappa_r.append(parameters[i])
-                #kappa_i.append(parameters[i + len(self.kappa_real)])
-                kappa_i.append(0.0)
+                kappa_i.append(parameters[i + len(self.kappa_real)])
             self.set_kappa_cep(kappa_r, kappa_i)
-
         if theta_optimization:
             thetas_r = []
             thetas_i = []
             for i in range(len(self.thetas)):
                 thetas_r.append(parameters[i + num_kappa])
-                # Silence the imaginary part if you wish to run with real-valued thetas:
                 thetas_i.append(parameters[i + num_kappa + len(self.thetas)])
             self.set_thetas(thetas_r, thetas_i)
         if kappa_optimization:
@@ -1078,8 +1049,8 @@ class GeneralizedWaveFunctionUPS:
         else:
             E = generalized_expectation_value_energy(
                 self.ci_coeffs,
-                [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
-                #[generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
+                # [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
+                [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
             )
@@ -1116,7 +1087,6 @@ class GeneralizedWaveFunctionUPS:
             thetas_i = []
             for i in range(len(self.thetas)):
                 thetas_r.append(parameters[i + num_kappa])
-                # Silence the imaginary part if you wish to run with real-valued thetas:
                 thetas_i.append(parameters[i + num_kappa + len(self.thetas)])
             self.set_thetas(thetas_r, thetas_i)
         if kappa_optimization:
