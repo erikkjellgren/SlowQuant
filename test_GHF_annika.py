@@ -446,13 +446,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     
     print(exp_value_gradient_nonsplit)'''
 
-    #WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
-
 
     LR = generalized_naive.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     print(LR.excitation_energies)
-    print(LR.get_transition_dipole(dip_int))
+    #print(LR.get_transition_dipole(dip_int))
+    print(LR.get_oscillator_strengths(dip_int))
 
 
 
@@ -581,7 +580,7 @@ def HBr():
     
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-h3()
+h2()
 
 
 # h2o()
