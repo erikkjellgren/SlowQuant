@@ -5,13 +5,15 @@ import pyscf
 from scipy.linalg import solve
 
 import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
-import slowquant.unitary_coupled_cluster.linear_response.naive_triplet as naive_t  # pylint: disable=consider-using-from-import
+import slowquant.unitary_coupled_cluster.linear_response.naive_triplet as naive_t
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
 def dso_integral(mol, orig1, orig2):
-    '''Integral of vec{r}vec{r}/(|r-orig1|^3 |r-orig2|^3)
-    Ref. JCP, 73, 5718'''
+    '''
+    Integral of vec{r}vec{r}/(|r-orig1|^3 |r-orig2|^3)
+    Ref. JCP, 73, 5718
+    '''
     NUMINT_GRIDS = 30
     from pyscf import gto
     t, w = np.polynomial.legendre.leggauss(NUMINT_GRIDS)
@@ -66,7 +68,7 @@ def convert_unit(e11, mol, nuc_pair):
 
 def get_sscc(geometry, basis, active_space, charge=0, unit='bohr'):
     """
-    Calculate the spin-spin coupling constant for a system
+    Calculate the spin-spin coupling constant
     """
     # PySCF
     mol = pyscf.M(atom=geometry, basis=basis, charge=charge, unit=unit)
@@ -167,36 +169,34 @@ def get_sscc(geometry, basis, active_space, charge=0, unit='bohr'):
 
 def test_H2_sto3g_naive():
     """
-    Test of sscc for naive LR
+    Test of spin-spin coupling constants for naive LR with H2(2,2)/STO-3G
     """
     geometry = """H  0.0   0.0  0.0;
-            H  0.74  0.0  0.0;"""
+            H  1.39  0.0  0.0;"""
     basis = 'STO-3G'
     active_space = (2,2)
 
-    sscc = get_sscc(geometry=geometry, basis=basis, active_space=active_space, unit='angstrom')
+    sscc = get_sscc(geometry=geometry, basis=basis, active_space=active_space, unit='bohr')
     
-    thresh = 10**-2
+    thresh = 10**-3
 
     # Check coupling constant - reference dalton mcscf
-    assert abs(383.685042 - sscc[0,1]) < thresh
+    assert abs(381.5641 - sscc[0,1]) < thresh
 
 
 def test_LiH_sto3g_naive():
     """
-    Test of sscc for naive LR
+    Test of spin-spin coupling constants for naive LR with LiH(2,2)/STO-3G
     """
     geometry = """H  0.0   0.0  0.0;
-            Li  0.8  0.0  0.0;"""
+            Li  1.5  0.0  0.0;"""
     basis = "STO-3G"
     active_space = (2,2)
 
-    sscc = get_sscc(geometry=geometry, basis=basis, active_space=active_space, unit='angstrom')
+    sscc = get_sscc(geometry=geometry, basis=basis, active_space=active_space, unit='bohr')
     
     thresh = 10**-2
 
     # Check coupling constant - reference dalton mcscf
-    assert abs(-63.380071 - sscc[0,1]) < thresh
+    assert abs(-68.2687 - sscc[0,1]) < thresh
 
-test_H2_sto3g_naive()
-test_LiH_sto3g_naive()
