@@ -55,6 +55,8 @@ class LinearResponseBaseClass:
 
         self.G_ops: list[FermionicOperator] = []
         self.q_ops: list[FermionicOperator] = []
+        self.G_ops_finite: int = 0
+        self.q_ops_finite: int = 0
         excitations = excitations.lower()
 
         if "s" in excitations:
@@ -120,6 +122,7 @@ class LinearResponseBaseClass:
     def calc_excitation_energies(self) -> None:
         """Calculate excitation energies."""
         size = len(self.A)
+        
         E2 = np.zeros((size * 2, size * 2))
         E2[:size, :size] = self.A
         E2[:size, size:] = self.B
@@ -129,7 +132,6 @@ class LinearResponseBaseClass:
             hess_eigval,
             _,
         ) = np.linalg.eig(E2)
-        print("hess eigenvalue", hess_eigval)
         print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
         if np.abs(np.min(hess_eigval)) < 10**-8:
             print("WARNING: Small eigenvalue in Hessian")
@@ -149,13 +151,12 @@ class LinearResponseBaseClass:
         eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)
         sorting = np.argsort(eigval)
         self.excitation_energies = np.real(eigval[sorting][size:])
-        print("alle eigenvalue", np.real(eigval[sorting]))
         self.response_vectors = np.real(eigvec[:, sorting][:, size:])
         self.normed_response_vectors = np.zeros_like(self.response_vectors)
-        self.num_q = len(self.q_ops)
+        
+        self.num_q = self.q_ops_finite
         self.num_G = size - self.num_q
         self.num_qG = size
-        
 
         # self.Z_q = self.response_vectors[: self.num_q, :]
         # self.Z_G = self.response_vectors[self.num_q : self.num_q + self.num_G, :]
@@ -169,6 +170,7 @@ class LinearResponseBaseClass:
         # self.Y_G_normed = np.zeros_like(self.Y_G)
         self.Z_qG_normed = np.zeros_like(self.Z_qG)
         self.Y_qG_normed = np.zeros_like(self.Y_qG)
+        
         norms = self.get_excited_state_norm()
         for state_number, norm in enumerate(norms):
             if norm < 10**-10:
@@ -183,6 +185,7 @@ class LinearResponseBaseClass:
             self.normed_response_vectors[:, state_number] = (
                 self.response_vectors[:, state_number] * (1 / norm) ** 0.5
             )
+        # print(self.Z_qG_normed)
 
     def get_excited_state_norm(self) -> np.ndarray:
         """Calculate the norm of excited states.

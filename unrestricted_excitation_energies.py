@@ -29,16 +29,6 @@ def get_unrestricted_excitation_energy(geometry, basis, active_space, charge=0, 
     
     # print(mf.mo_coeff)
     # SlowQuant
-
-    a_mo = [[0.32693516, -0.12264882,  0.76631477, -1.12263456],
-            [ 0.27180594, -1.714895,   -0.68625227,  1.34943195],
-            [ 0.32693516,  0.12264882,  0.76631477,  1.12263456],
-            [ 0.27180594,  1.714895,   -0.68625227, -1.34943195]]
-    b_mo = [[ 0.32693517, -0.12264882, 0.76631476, -1.12263456],
-            [ 0.27180592, -1.71489499, -0.68625228,  1.34943196],
-            [ 0.32693517,  0.12264882,  0.76631476,  1.12263456],
-            [ 0.27180592,  1.71489499, -0.68625228, -1.34943196]]
-    mo_coef = (a_mo, b_mo)
     WF = UnrestrictedWaveFunctionUPS(
         mol.nelectron,
         active_space,
@@ -50,12 +40,9 @@ def get_unrestricted_excitation_energy(geometry, basis, active_space, charge=0, 
         include_active_kappa=True,
     )
     WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True)
-    # print(WF.thetas)
-    # print(WF.ci_coeffs)
-    # print(g_eri)
-    # print(WF.gaaaa_mo, WF.gbbbb_mo)
     # WF.run_wf_optimization_1step("bfgs", True)
     
+    # Do ADAPT
     # WF = UnrestrictedWaveFunctionUPS(
     #     mol.nelectron,
     #     active_space,
@@ -75,61 +62,13 @@ def get_unrestricted_excitation_energy(geometry, basis, active_space, charge=0, 
     ULR.calc_excitation_energies()
     print(f'excitation energies: {ULR.excitation_energies}')
         
-    # dipole_integrals = (mol.intor('int1e_r')[0,:],
-    #                     mol.intor('int1e_r')[1,:],
-    #                     mol.intor('int1e_r')[2,:]
-    #                     )
-    # osc_strengths = ULR.get_oscillator_strength(dipole_integrals=dipole_integrals)
-    # print(f'oscillator strengths: {osc_strengths}')
+    dipole_integrals = (mol.intor('int1e_r')[0,:],
+                        mol.intor('int1e_r')[1,:],
+                        mol.intor('int1e_r')[2,:]
+                        )
+    osc_strengths = ULR.get_oscillator_strength(dipole_integrals=dipole_integrals)
+    print(f'oscillator strengths: {osc_strengths}')
 
-    # with io.open("/mnt/c/Users/Pernille/Seafile/phd/code/SlowQuant/a_test/test_a_SDTQ.txt", 'a+', encoding='utf-8') as file:
-    #         # print_matrix(self.A, 4, "b", file)
-    #     file.write(f'geometry: {geometry}, basis: {basis}, active space: {active_space}, charge: {charge}, spin (2S+1): {spin+1}\n\n')
-    #     file.write(f'UHF energy (pyscf) {mf.kernel()}\n\n')
-    #     file.write(f'UCC energy {WF.energy_elec_RDM}\n\n')
-    #     file.write(f'Excitation energies {ULR.excitation_energies}\n\n')
-    # file.close()
-
-
-# def get_restricted_excitation_energy(geometry, basis, active_space, charge=0, spin=0, unit="bohr"):
-#     """
-#     Calculate unrestricted excitation energies
-#     """
-#     # PySCF
-
-#     mol = pyscf.M(atom=geometry, basis=basis, charge=charge, spin=spin, unit=unit)
-#     mol.build()
-#     mf = scf.RHF(mol)
-#     mf.kernel()
-
-#     #mc = mcscf.UCASCI(mf, active_space[1], active_space[0]) 
-#     #res = mc.kernel(mf.mo_coeff)
-
-#     h_core = mol.intor("int1e_kin") + mol.intor("int1e_nuc")
-#     g_eri = mol.intor("int2e")
-
-#     # SlowQuant
-
-#     WF = WaveFunctionUPS(
-#         mol.nelectron,
-#         active_space,
-#         mf.mo_coeff,
-#         h_core,
-#         g_eri,
-#         "fuccsd",
-#         {"n_layers":1},
-#         include_active_kappa=True,
-#     )
-
-#     #WF.run_wf_optimization_1step("slsqp", False)
-#     WF.run_wf_optimization_1step("slsqp", True)
-    
-
-#     print("Energy elec", WF.energy_elec)
-
-#     LR = naive.LinearResponseUCC(WF, excitations="SD")
-#     LR.calc_excitation_energies()
-#     print(LR.excitation_energies)
 
 def oh_radical(): 
     geometry = """O  0.0   0.0  0.0;
@@ -172,32 +111,12 @@ def NO_radical():
 def h2(): 
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74;"""
-    basis = '6-31g'
+    basis = 'sto-3g'
     active_space = ((1,1),2)
     charge = 0
     spin=0
 
     get_unrestricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
-
-def h2_ion(): 
-    geometry = """H  0.0   0.0  0.0;
-        H  0.0  0.0  0.74;"""
-    basis = '6-31g'
-    active_space = ((1,0),2)
-    charge = 1
-    spin=1
-
-    get_unrestricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
-
-def h2_res(): 
-    geometry = """H  0.0   0.0  0.0;
-        H  0.0  0.0  0.74;"""
-    basis = '6-31g'
-    active_space = (2,2)
-    charge = 0
-    spin=0
-
-    get_restricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
 
 def lih():
     geometry = """ Li 0.0 0.0 0.0;
@@ -219,11 +138,25 @@ def h4_rektangle():
     spin = 0
     get_unrestricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
 
+def h3():
+    geometry = """H  0.000000   0.000000       0.000000;
+                  H  1.000000   0.000000       0.000000;
+                  H  0.500000   0.8660254038   0.000000"""
+    # basis = "cc-pvdz"
+    basis = "sto-3g"
+    #basis = "sto-3g"
+    active_space = ((1, 2), 3)
+    #active_space = (2, 4)
+    charge = 0
+    spin = 1
+    get_unrestricted_excitation_energy(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
+
 # OH_cation()
 # oh_radical()
-# h2()
-h4_rektangle()
+h2()
+# h4_rektangle()
 # h2_res()
 # NO_radical()
 # h2_ion()
 # lih()
+# h3()

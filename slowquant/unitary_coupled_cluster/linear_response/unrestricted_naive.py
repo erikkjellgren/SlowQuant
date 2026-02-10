@@ -41,32 +41,33 @@ class LinearResponseUPS(LinearResponseBaseClass):
         super().__init__(wave_function, excitations)
 
         # Screen for A_ii = 0
-        finite_excitations_idx = []
-        A = get_orbital_response_hessian_block_unrestricted(
-            self.wf.haa_mo,
-            self.wf.hbb_mo,
-            self.wf.gaaaa_mo,
-            self.wf.gbbbb_mo,
-            self.wf.gaabb_mo,
-            self.wf.gbbaa_mo,
-            self.wf.kappa_no_activeactive_idx_dagger,
-            self.wf.kappa_no_activeactive_idx,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.rdm1aa,
-            self.wf.rdm1bb,
-            self.wf.rdm2aaaa,
-            self.wf.rdm2bbbb,
-            self.wf.rdm2aabb,
-            self.wf.rdm2bbaa,
-        )
+        finite_excitations = []
+        if len(self.q_ops) != 0:
+            A = get_orbital_response_hessian_block_unrestricted(
+                self.wf.haa_mo,
+                self.wf.hbb_mo,
+                self.wf.gaaaa_mo,
+                self.wf.gbbbb_mo,
+                self.wf.gaabb_mo,
+                self.wf.gbbaa_mo,
+                self.wf.kappa_no_activeactive_idx_dagger,
+                self.wf.kappa_no_activeactive_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.rdm1aa,
+                self.wf.rdm1bb,
+                self.wf.rdm2aaaa,
+                self.wf.rdm2bbbb,
+                self.wf.rdm2aabb,
+                self.wf.rdm2bbaa,
+            )
         # Man behøver ikke regne hele A, men det er bare lige nemt at gøre for qq
         for i, q in enumerate(self.q_ops):
             if abs(A[i, i]) > 10**-6:  # whatever rimeligt threshold
-                finite_excitations_idx.append(True)
+                finite_excitations.append(True)
             else:
-                finite_excitations_idx.append(False)
-
+                finite_excitations.append(False)
+        self.q_ops_finite = sum(bool(x) for x in finite_excitations)
         for i, G in enumerate(self.G_ops):
             GI_ket = propagate_state([G], self.wf.ci_coeffs, *self.index_info)
             HGI_ket = propagate_state([self.H_0i_0a, G], self.wf.ci_coeffs, *self.index_info)
@@ -78,14 +79,14 @@ class LinearResponseUPS(LinearResponseBaseClass):
                 *self.index_info,
             )
             if abs(A) > 10**-6:  # whatever rimeligt threshold
-                finite_excitations_idx.append(True)
+                finite_excitations.append(True)
             else:
-                finite_excitations_idx.append(False)
-
-        finite_excitations_idx = np.array(finite_excitations_idx)
+                finite_excitations.append(False)
+        self.G_ops_finite = sum(bool(x) for x in finite_excitations[len(self.q_ops):])
+        finite_excitations_idx = np.array(finite_excitations)
         idx_shift = len(self.q_ops)
-        G_shift = int(len(self.G_ops) / 2)
-        q_shift = int(len(self.q_ops) / 2)
+        # G_shift = int(len(self.G_ops) / 2)
+        # q_shift = int(len(self.q_ops) / 2)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
         if len(self.q_ops) != 0:
@@ -526,7 +527,6 @@ class LinearResponseUPS(LinearResponseBaseClass):
             (len(self.Sigma), len(self.Sigma))
         )  # Delta er defineret her fordi den ellers har forkert dimension i unrestricted_lr_baseclass.py
 
-
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.
 
@@ -538,7 +538,7 @@ class LinearResponseUPS(LinearResponseBaseClass):
         """
         if len(dipole_integrals) != 3:
             raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
-        number_excitations = len(elf.excitation_energies)
+        number_excitations = len(self.excitation_energies)
         mux_aa = one_electron_integral_transform(self.wf.c_a_mo, dipole_integrals[0])
         mux_bb = one_electron_integral_transform(self.wf.c_b_mo, dipole_integrals[0])
         muy_aa = one_electron_integral_transform(self.wf.c_a_mo, dipole_integrals[1])
@@ -571,48 +571,53 @@ class LinearResponseUPS(LinearResponseBaseClass):
         transition_dipole_y = 0.0
         transition_dipole_z = 0.0
         transition_dipoles = np.zeros((number_excitations, 3))
+        shift = self.q_ops_finite
         for state_number in range(number_excitations):
             transfer_op = FermionicOperator({})
             for i, G in enumerate(self.G_ops):
                 transfer_op += (
-                    self.Z_G_normed[i, state_number] * G.dagger + self.Y_G_normed[i, state_number] * G
+                    self.Z_qG_normed[i+shift, state_number] * G.dagger + self.Y_qG_normed[i+shift, state_number] * G
                 )
-            q_part_x = get_orbital_response_property_gradient_unrestricted(
-                mux_aa,
-                mux_bb,
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.rdm1aa,
-                self.wf.rdm1bb,
-                self.normed_response_vectors,
-                state_number,
-                number_excitations,
-            )
-            q_part_y = get_orbital_response_property_gradient_unrestricted(
-                muy_aa,
-                muy_bb,
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.rdm1aa,
-                self.wf.rdm1bb,
-                self.normed_response_vectors,
-                state_number,
-                number_excitations,
-            )
-            q_part_z = get_orbital_response_property_gradient_unrestricted(
-                muz_aa,
-                muz_bb,
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.rdm1aa,
-                self.wf.rdm1bb,
-                self.normed_response_vectors,
-                state_number,
-                number_excitations,
-            )
+            q_part_x = 0.0
+            q_part_y = 0.0
+            q_part_z = 0.0
+            if len(self.q_ops) != 0:
+                q_part_x = get_orbital_response_property_gradient_unrestricted(
+                    mux_aa,
+                    mux_bb,
+                    self.wf.kappa_no_activeactive_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1aa,
+                    self.wf.rdm1bb,
+                    self.normed_response_vectors,
+                    state_number,
+                    number_excitations,
+                )
+                q_part_y = get_orbital_response_property_gradient_unrestricted(
+                    muy_aa,
+                    muy_bb,
+                    self.wf.kappa_no_activeactive_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1aa,
+                    self.wf.rdm1bb,
+                    self.normed_response_vectors,
+                    state_number,
+                    number_excitations,
+                )
+                q_part_z = get_orbital_response_property_gradient_unrestricted(
+                    muz_aa,
+                    muz_bb,
+                    self.wf.kappa_no_activeactive_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1aa,
+                    self.wf.rdm1bb,
+                    self.normed_response_vectors,
+                    state_number,
+                    number_excitations,
+                )
             transfer_ket = propagate_state([transfer_op], self.wf.ci_coeffs, *self.index_info)
             transferd_ket = propagate_state([transfer_op.dagger], self.wf.ci_coeffs, *self.index_info)
             # <0| mux T |0>
