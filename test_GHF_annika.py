@@ -246,7 +246,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         h_core,
         g_eri,
         "fuccsd",
-        {"n_layers": 1, "is_spin_conserving" : False},
+        {"n_layers": 0, "is_spin_conserving" : True},
         include_active_kappa=True,
     )
 
@@ -450,7 +450,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     LR = generalized_naive.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
     print(LR.excitation_energies)
-    #print(LR.get_transition_dipole(dip_int))
+    print(np.round(LR.get_transition_dipole(dip_int).real,5))
     print(LR.get_oscillator_strengths(dip_int))
 
 
@@ -527,11 +527,11 @@ def h2o():
     H  0.0  -0.75545  -0.47116"""
     #basis = "dyall-v2z"
     #basis = "cc-pvdz"
-    basis = "631-g"
+    #basis = "631-g"
     #basis = "sto-3g"
+    basis = "sto-6g"
     #active_space = ((5, 5), 14)
-    active_space = ((2,2),8)
-    #active_space = (2, 4)
+    active_space = ((2,2),6)
     charge = 0
     spin = 0
 

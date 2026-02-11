@@ -903,7 +903,7 @@ def get_orbital_response_property_gradient_annika(
     response_vectors: np.ndarray,
     state_number: int,
     number_excitations: int,
-) -> complex:
+) -> float:
     r"""Calculate the orbital part of property gradient.
 
     .. math::
@@ -974,7 +974,7 @@ def get_orbital_response_property_gradient_real_imag(
     response_vectors: np.ndarray,
     state_number: int,
     number_excitations: int,
-) -> complex:
+) -> float:
     r"""Calculate the orbital part of property gradient.
 
     .. math::

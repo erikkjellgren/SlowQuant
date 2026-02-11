@@ -167,7 +167,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         h_core,
         g_eri,
         "fUCCSD",
-        {"n_layers": 1},
+        {"n_layers": 0},
         include_active_kappa=True,
     )
     # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True,tol=1e-8)
