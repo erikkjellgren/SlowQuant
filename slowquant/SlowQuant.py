@@ -1,4 +1,3 @@
-# pylint: disable=C0103
 from slowquant.hartreefock.hartreefockclass import _HartreeFock
 from slowquant.logger import _Logger
 from slowquant.molecularintegrals.integralclass import _Integral
@@ -30,7 +29,7 @@ class SlowQuant:
         """
         self.molecule = _Molecule(molecule_file, molecular_charge, distance_unit)
         if basis_set is not None:
-            self.molecule._set_basis_set(basis_set)  # pylint: disable=W0212
+            self.molecule._set_basis_set(basis_set)
             self.integral = _Integral(self.molecule)
 
     def set_basis_set(self, basis_set: str) -> None:
@@ -40,7 +39,7 @@ class SlowQuant:
             basis_set: Name of basis set.
         """
         if hasattr(self, "molecule"):
-            self.molecule._set_basis_set(basis_set)  # pylint: disable=W0212
+            self.molecule._set_basis_set(basis_set)
             self.integral = _Integral(self.molecule)
         else:
             self.logger.add_to_log("Cannot set basis set, molecule is not defined.", is_warning=True)

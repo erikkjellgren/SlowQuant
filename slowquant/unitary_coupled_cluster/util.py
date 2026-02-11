@@ -46,14 +46,21 @@ def iterate_t2_sa(
                     if i == j:
                         fac *= 2.0
                     fac = 1 / 2 * (fac) ** (-1 / 2)
-                    yield a, i, b, j, fac, 1
+                    if i == j and a == b:
+                        yield a, i, b, j, fac, 1
+                    elif i == j:
+                        yield a, i, b, j, fac, 2
+                    elif a == b:
+                        yield a, i, b, j, fac, 3
+                    else:
+                        yield a, i, b, j, fac, 4
                     if i == j or a == b:
                         continue
                     fac = 1 / (2 * 3 ** (1 / 2))
-                    yield a, i, b, j, fac, 2
+                    yield a, i, b, j, fac, 5
 
 
-def iterate_t2_sa_t(
+def iterate_t2_tsa(
     active_occ_idx: Sequence[int],
     active_unocc_idx: Sequence[int],
 ) -> Generator[tuple[int, int, int, int, float, int], None, None]:
@@ -76,12 +83,12 @@ def iterate_t2_sa_t(
                     elif a == b:
                         yield a, i, b, j, fac, 2
                     elif i == j:
-                        yield a, i, b, j, fac, 3
+                        yield a, i, b, j, fac, 4
                     else:
                         yield a, i, b, j, fac, 1
                         fac = 1 / 2
-                        yield a, i, b, j, fac, 2
                         yield a, i, b, j, fac, 3
+                        yield a, i, b, j, fac, 5
 
 
 def iterate_t1_sa_generalized(
@@ -108,8 +115,8 @@ def iterate_t1(
     """Iterate over T1 spin-conserving operators.
 
     Args:
-        active_occ_idx: Spin indices of strongly occupied orbitals.
-        active_unocc_idx: Spin indices of weakly occupied orbitals.
+        active_occ_spin_idx: Spin indices of strongly occupied orbitals.
+        active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
 
     Returns:
         T1 operator iteration.
@@ -138,8 +145,8 @@ def iterate_t2(
     """Iterate over T2 spin-conserving operators.
 
     Args:
-        active_occ_idx: Spin indices of strongly occupied orbitals.
-        active_unocc_idx: Spin indices of weakly occupied orbitals.
+        active_occ_spin_idx: Spin indices of strongly occupied orbitals.
+        active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
 
     Returns:
         T2 operator iteration.
@@ -178,8 +185,8 @@ def iterate_t3(
     """Iterate over T3 spin-conserving operators.
 
     Args:
-        active_occ_idx: Spin indices of strongly occupied orbitals.
-        active_unocc_idx: Spin indices of weakly occupied orbitals.
+        active_occ_spin_idx: Spin indices of strongly occupied orbitals.
+        active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
 
     Returns:
         T3 operator iteration.
@@ -228,8 +235,8 @@ def iterate_t4(
     """Iterate over T4 spin-conserving operators.
 
     Args:
-        active_occ_idx: Spin indices of strongly occupied orbitals.
-        active_unocc_idx: Spin indices of weakly occupied orbitals.
+        active_occ_spin_idx: Spin indices of strongly occupied orbitals.
+        active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
 
     Returns:
         T4 operator iteration.
@@ -288,8 +295,8 @@ def iterate_t5(
     """Iterate over T5 spin-conserving operators.
 
     Args:
-        active_occ_idx: Spin indices of strongly occupied orbitals.
-        active_unocc_idx: Spin indices of weakly occupied orbitals.
+        active_occ_spin_idx: Spin indices of strongly occupied orbitals.
+        active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
 
     Returns:
         T5 operator iteration.
@@ -358,8 +365,8 @@ def iterate_t6(
     """Iterate over T6 spin-conserving operators.
 
     Args:
-        active_occ_idx: Spin indices of strongly occupied orbitals.
-        active_unocc_idx: Spin indices of weakly occupied orbitals.
+        active_occ_spin_idx: Spin indices of strongly occupied orbitals.
+        active_unocc_spin_idx: Spin indices of weakly occupied orbitals.
 
     Returns:
         T6 operator iteration.
@@ -503,6 +510,12 @@ class UccStructure:
                 self.excitation_operator_type.append("sa_double_1")
             elif op_type == 2:
                 self.excitation_operator_type.append("sa_double_2")
+            elif op_type == 3:
+                self.excitation_operator_type.append("sa_double_3")
+            elif op_type == 4:
+                self.excitation_operator_type.append("sa_double_4")
+            elif op_type == 5:
+                self.excitation_operator_type.append("sa_double_5")
             self.n_params += 1
 
     def add_triples(self, active_occ_spin_idx: Sequence[int], active_unocc_spin_idx: Sequence[int]) -> None:
@@ -559,7 +572,7 @@ class UccStructure:
 
 
 class UpsStructure:
-    __slots__ = ("excitation_indices", "excitation_operator_type", "n_params", "grad_param_R", "param_names")
+    __slots__ = ("excitation_indices", "excitation_operator_type", "grad_param_R", "n_params", "param_names")
 
     def __init__(self) -> None:
         """Initialize the unitary product state ansatz structure."""
@@ -676,7 +689,7 @@ class UpsStructure:
             Factorized UCC ansatz.
         """
         # Options
-        valid_options = ("n_layers", "S", "D", "SAGS", "pD", "GpD", "SAS")
+        valid_options = ("n_layers", "S", "D", "SAGS", "pD", "GpD", "SAS", "SAD")
         for option in ansatz_options:
             if option not in valid_options:
                 raise ValueError(f"Got unknown option for fUCC, {option}. Valid options are: {valid_options}")
@@ -688,6 +701,7 @@ class UpsStructure:
         do_D = False
         do_pD = False
         do_GpD = False
+        do_SAD = False
         if "S" in ansatz_options.keys():
             if ansatz_options["S"]:
                 do_S = True
@@ -706,23 +720,32 @@ class UpsStructure:
         if "GpD" in ansatz_options.keys():
             if ansatz_options["GpD"]:
                 do_GpD = True
-        if True not in (do_S, do_SAS, do_SAGS, do_D, do_pD, do_GpD):
+        if "SAD" in ansatz_options.keys():
+            if ansatz_options["SAD"]:
+                do_SAD = True
+        if True not in (do_S, do_SAS, do_SAGS, do_D, do_pD, do_GpD, do_SAD):
             raise ValueError("fUCC requires some excitations got none.")
         n_layers = ansatz_options["n_layers"]
         num_spin_orbs = 2 * num_orbs
+        occ_spin = []
+        unocc_spin = []
         occ = []
         unocc = []
         idx = 0
         for _ in range(np.sum(num_elec)):
-            occ.append(idx)
+            occ_spin.append(idx)
+            if idx % 2 == 0:
+                occ.append(idx // 2)
             idx += 1
         for _ in range(num_spin_orbs - np.sum(num_elec)):
-            unocc.append(idx)
+            unocc_spin.append(idx)
+            if idx % 2 == 0:
+                unocc.append(idx // 2)
             idx += 1
         # Layer loop
         for _ in range(n_layers):
             if do_S:
-                for a, i in iterate_t1(occ, unocc):
+                for a, i in iterate_t1(occ_spin, unocc_spin):
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((i, a))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
@@ -743,7 +766,7 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_D:
-                for a, i, b, j in iterate_t2(occ, unocc):
+                for a, i, b, j in iterate_t2(occ_spin, unocc_spin):
                     self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
@@ -761,6 +784,14 @@ class UpsStructure:
                     self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+            if do_SAD:
+                for a, i, b, j, _, op_case in iterate_t2_sa(occ, unocc):
+                    self.excitation_operator_type.append(f"sa_double_{op_case}")
+                    self.excitation_indices.append((i, j, a, b))
+                    # Rotosolve not implemented for SA doubles
+                    # self.grad_param_R[f"p{self.n_params:09d}"] = None
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
 

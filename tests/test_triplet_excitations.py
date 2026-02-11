@@ -3,7 +3,7 @@ import slowquant.unitary_coupled_cluster.linear_response.naive_triplet as naive_
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
-def get_triplet_excita(geometry, basis, active_space, charge=0, unit='bohr'):
+def get_triplet_excita(geometry, basis, active_space, unit='bohr'):
     """
     Calculate the triplet spin-adapted excitation energies
     """
@@ -21,7 +21,7 @@ def get_triplet_excita(geometry, basis, active_space, charge=0, unit='bohr'):
     # OO-UCCSD
     WF = WaveFunctionUCC(
         SQobj.molecule.number_electrons,
-        (2, 2),
+        active_space,
         SQobj.hartree_fock.mo_coeff,
         h_core,
         g_eri,

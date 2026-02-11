@@ -6,7 +6,7 @@ import numpy as np
 import scipy
 from qiskit import QuantumCircuit
 from qiskit.primitives import (
-    BaseEstimator,
+    BaseEstimatorV1,
     BaseEstimatorV2,
     BaseSamplerV1,
     BaseSamplerV2,
@@ -19,7 +19,6 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.qiskit_interface.interface import QuantumInterface
 from slowquant.unitary_coupled_cluster.density_matrix import (
-    ReducedDenstiyMatrix,
     get_electronic_energy,
     get_orbital_gradient,
 )
@@ -71,7 +70,9 @@ class WaveFunctionCircuit:
         self.num_elec = num_elec
         self.num_spin_orbs = 2 * len(h_ao)
         self.num_orbs = len(h_ao)
-        self.num_active_elec = 0
+        self.num_active_elec = cas[0]
+        self.num_active_elec_alpha = self.num_active_elec // 2
+        self.num_active_elec_beta = self.num_active_elec // 2
         self.num_active_spin_orbs = 0
         self.num_inactive_spin_orbs = 0
         self.num_virtual_spin_orbs = 0
@@ -83,7 +84,7 @@ class WaveFunctionCircuit:
         self._h_mo = None
         self._g_mo = None
         self._energy_elec: float | None = None
-        self.do_trace_corrected = True
+        self.num_energy_evals = 0  # number of energy measurements on quanutm
         active_space = []
         orbital_counter = 0
         for i in range(num_elec - cas[0], num_elec):
@@ -96,7 +97,6 @@ class WaveFunctionCircuit:
                 self.active_spin_idx.append(i)
                 self.active_occ_spin_idx.append(i)
                 self.num_active_spin_orbs += 1
-                self.num_active_elec += 1
             else:
                 self.inactive_spin_idx.append(i)
                 self.num_inactive_spin_orbs += 1
@@ -179,7 +179,7 @@ class WaveFunctionCircuit:
         # Setup Qiskit stuff
         self.QI = quantum_interface
         self.QI.construct_circuit(
-            self.num_active_orbs, (self.num_active_elec // 2, self.num_active_elec // 2)
+            self.num_active_orbs, (self.num_active_elec_alpha, self.num_active_elec_beta)
         )
 
     @property
@@ -266,9 +266,7 @@ class WaveFunctionCircuit:
         self._energy_elec = None
         self.QI.parameters = parameters
 
-    def change_primitive(
-        self, primitive: BaseEstimator | BaseSamplerV1 | BaseSamplerV2, verbose: bool = True
-    ) -> None:
+    def change_primitive(self, primitive: BaseSamplerV1 | BaseSamplerV2, verbose: bool = True) -> None:
         """Change the primitive expectation value calculator.
 
         Args:
@@ -281,13 +279,13 @@ class WaveFunctionCircuit:
                 Multiple switching back and forth can lead to un-expected outcomes and is an experimental feature.\n"
             )
 
-        if isinstance(primitive, BaseEstimatorV2):
-            raise ValueError("EstimatorV2 is not currently supported.")
-        if isinstance(primitive, BaseSamplerV2) and verbose:
-            print("WARNING: Using SamplerV2 is an experimental feature.")
-        self.QI._primitive = primitive  # pylint: disable=protected-access
+        if isinstance(primitive, (BaseEstimatorV1, BaseEstimatorV2)):
+            raise ValueError("Estimator is not supported.")
+        elif not isinstance(primitive, (BaseSamplerV1, BaseSamplerV2)):
+            raise TypeError(f"Unsupported primitive, {type(primitive)}")
+        self.QI._primitive = primitive
         if verbose:
-            if self.QI.do_M_ansatz0:
+            if self.QI.mitigation_flags.do_M_ansatz0:
                 print("Reset RDMs, energies, QI metrics, and correlation matrix.")
             else:
                 print("Reset RDMs, energies, and QI metrics.")
@@ -304,6 +302,7 @@ class WaveFunctionCircuit:
         # Reset circuit and initiate re-transpiling
         ISA_old = self.QI.ISA
         self._reconstruct_circuit()  # Reconstruct circuit but keeping parameters
+        self.QI._transpiled = False
         self.QI.ISA = ISA_old  # Redo ISA including transpilation if requested
         self.QI.shots = self.QI.shots  # Redo shots parameter check
 
@@ -312,12 +311,9 @@ class WaveFunctionCircuit:
 
     def _reconstruct_circuit(self) -> None:
         """Construct circuit again."""
-        # force ISA = False
-        self.QI._ISA = False  # pylint: disable=protected-access
         self.QI.construct_circuit(
-            self.num_active_orbs, (self.num_active_elec // 2, self.num_active_elec // 2)
+            self.num_active_orbs, (self.num_active_elec_alpha, self.num_active_elec_beta)
         )
-        self.QI._transpiled = False  # pylint: disable=protected-access
 
     @property
     def rdm1(self) -> np.ndarray:
@@ -343,12 +339,6 @@ class WaveFunctionCircuit:
                     val = self.QI.quantum_expectation_value(rdm1_op)
                     self._rdm1[p_idx, q_idx] = val  # type: ignore [index]
                     self._rdm1[q_idx, p_idx] = val  # type: ignore [index]
-            if self.do_trace_corrected:
-                trace = 0.0
-                for i in range(self.num_active_orbs):
-                    trace += self._rdm1[i, i]  # type: ignore [index]
-                for i in range(self.num_active_orbs):
-                    self._rdm1[i, i] = self._rdm1[i, i] * self.num_active_elec / trace  # type: ignore [index]
         return self._rdm1
 
     @property
@@ -398,16 +388,6 @@ class WaveFunctionCircuit:
                             self._rdm2[r_idx, s_idx, p_idx, q_idx] = val  # type: ignore [index]
                             self._rdm2[q_idx, p_idx, s_idx, r_idx] = val  # type: ignore [index]
                             self._rdm2[s_idx, r_idx, q_idx, p_idx] = val  # type: ignore [index]
-            if self.do_trace_corrected:
-                trace = 0.0
-                for i in range(self.num_active_orbs):
-                    for j in range(self.num_active_orbs):
-                        trace += self._rdm2[i, i, j, j]  # type: ignore [index]
-                for i in range(self.num_active_orbs):
-                    for j in range(self.num_active_orbs):
-                        self._rdm2[i, i, j, j] = (  # type: ignore [index]
-                            self._rdm2[i, i, j, j] * self.num_active_elec * (self.num_active_elec - 1) / trace  # type: ignore [index]
-                        )
         return self._rdm2
 
     @property
@@ -518,18 +498,6 @@ class WaveFunctionCircuit:
                                     self._rdm3[s_idx, r_idx, u_idx, t_idx, q_idx, p_idx] = val  # type: ignore
                                     self._rdm3[u_idx, t_idx, q_idx, p_idx, s_idx, r_idx] = val  # type: ignore
                                     self._rdm3[u_idx, t_idx, s_idx, r_idx, q_idx, p_idx] = val  # type: ignore
-            if self.do_trace_corrected:
-                trace = 0.0
-                for i in range(self.num_active_orbs):
-                    for j in range(self.num_active_orbs):
-                        for k in range(self.num_active_orbs):
-                            trace += self._rdm3[i, i, j, j, k, k]  # type: ignore [index]
-                for i in range(self.num_active_orbs):
-                    for j in range(self.num_active_orbs):
-                        for k in range(self.num_active_orbs):
-                            self._rdm3[i, i, j, j, k, k] = (  # type: ignore [index]
-                                self._rdm3[i, i, j, j, k, k] * self.num_active_elec * (self.num_active_elec - 1) * (self.num_active_elec - 2) / trace  # type: ignore [index]
-                            )
         return self._rdm3
 
     @property
@@ -753,25 +721,6 @@ class WaveFunctionCircuit:
                                             self._rdm4[  # type: ignore
                                                 n_idx, m_idx, u_idx, t_idx, s_idx, r_idx, q_idx, p_idx
                                             ] = val
-            if self.do_trace_corrected:
-                trace = 0.0
-                for i in range(self.num_active_orbs):
-                    for j in range(self.num_active_orbs):
-                        for k in range(self.num_active_orbs):
-                            for l in range(self.num_active_orbs):
-                                trace += self._rdm4[i, i, j, j, k, k, l, l]  # type: ignore [index]
-                for i in range(self.num_active_orbs):
-                    for j in range(self.num_active_orbs):
-                        for k in range(self.num_active_orbs):
-                            for l in range(self.num_active_orbs):
-                                self._rdm4[i, i, j, j, k, k, l, l] = (  # type: ignore [index]
-                                    self._rdm4[i, i, j, j, k, k, l, l]  # type: ignore [index]
-                                    * self.num_active_elec
-                                    * (self.num_active_elec - 1)
-                                    * (self.num_active_elec - 2)
-                                    * (self.num_active_elec - 3)
-                                    / trace
-                                )
         return self._rdm4
 
     def precalc_rdm_paulis(self, rdm_order: int) -> None:
@@ -784,10 +733,11 @@ class WaveFunctionCircuit:
             rdm_order: Max order RDM.
         """
         if not isinstance(
-            self.QI._primitive, (BaseSamplerV1, BaseSamplerV2)  # pylint: disable=protected-access
+            self.QI._primitive,
+            (BaseSamplerV1, BaseSamplerV2),
         ):
             raise TypeError(
-                f"This feature is only supported for Sampler got {type(self.QI._primitive)} from QuantumInterface"  # pylint: disable=protected-access
+                f"This feature is only supported for Sampler got {type(self.QI._primitive)} from QuantumInterface"
             )
         if rdm_order > 4:
             raise ValueError(f"Precalculation only supported up to order 4 got {rdm_order}")
@@ -860,7 +810,7 @@ class WaveFunctionCircuit:
         # Calling expectation value to put all Paulis in cliques
         # and compute distributions for the cliques.
         # The coefficients are set to one, so the Paulis cannot cancel out.
-        _ = self.QI._sampler_quantum_expectation_value(  # pylint: disable=protected-access
+        _ = self.QI._sampler_quantum_expectation_value(
             SparsePauliOp(cumulated_paulis, np.ones(len(cumulated_paulis)))  # type: ignore[arg-type]
         )
 
@@ -889,8 +839,21 @@ class WaveFunctionCircuit:
             self._energy_elec = self._calc_energy_elec()
         return self._energy_elec
 
+    def _get_hamiltonian(self, qiskit_form: bool = False) -> FermionicOperator | dict[str, float]:
+        """Return electronic Hamiltonian as FermionicOperator.
+
+        Returns:
+            FermionicOperator.
+        """
+        H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+        H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+
+        if qiskit_form:
+            return H.get_qiskit_form(self.num_orbs)
+        return H
+
     def _calc_energy_elec(self) -> float:
-        """Run electronic energy simulation, regardless of self.energy_elec variable.
+        """Run electronic energy simulation, regardless of self._energy_elec variable.
 
         Returns:
             Electronic energy.
@@ -917,7 +880,7 @@ class WaveFunctionCircuit:
             maxiter: Maximum number of iterations.
             is_silent_subiterations: Silence subiterations.
         """
-        if isinstance(self.QI.ansatz, QuantumCircuit) and not optimizer_name.lower() in ("cobyla", "cobyqa"):
+        if isinstance(self.QI.ansatz, QuantumCircuit) and optimizer_name.lower() not in ("cobyla", "cobyqa"):
             raise ValueError("Custom Ansatz in QI only works with COBYLA and COBYQA as optimizer.")
         print("### Parameters information:")
         if orbital_optimization:
@@ -925,14 +888,16 @@ class WaveFunctionCircuit:
         print(f"### Number theta: {len(self.thetas)}")
         e_old = 1e12
         print("Full optimization")
-        print("Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+        print("Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #")
         for full_iter in range(0, int(maxiter)):
             full_start = time.time()
 
             # Do ansatz optimization
             if not is_silent_subiterations:
                 print("--------Ansatz optimization")
-                print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+                print(
+                    "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
+                )
             energy_theta = partial(
                 self._calc_energy_optimization,
                 theta_optimization=True,
@@ -950,6 +915,7 @@ class WaveFunctionCircuit:
                 maxiter=maxiter,
                 tol=tol,
                 is_silent=is_silent_subiterations,
+                energy_eval_callback=lambda: self.num_energy_evals,
             )
             res = optimizer.minimize(
                 self.thetas,
@@ -979,9 +945,10 @@ class WaveFunctionCircuit:
                     maxiter=maxiter,
                     tol=tol,
                     is_silent=is_silent_subiterations,
+                    energy_eval_callback=lambda: self.num_energy_evals,
                 )
                 res = optimizer.minimize([0.0] * len(self.kappa_idx))
-                for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
+                for i in range(len(self.kappa)):
                     self._kappa[i] = 0.0
                     self._kappa_old[i] = 0.0
             else:
@@ -996,7 +963,9 @@ class WaveFunctionCircuit:
             e_new = res.fun
             time_str = f"{time.time() - full_start:7.2f}"  # type: ignore
             e_str = f"{e_new:3.12f}"
-            print(f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+            print(
+                f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {str(self.num_energy_evals).center(11)}"
+            )  # type: ignore
             if abs(e_new - e_old) < tol:
                 break
             e_old = e_new
@@ -1017,7 +986,7 @@ class WaveFunctionCircuit:
             tol: Convergence tolerance.
             maxiter: Maximum number of iterations.
         """
-        if isinstance(self.QI.ansatz, QuantumCircuit) and not optimizer_name.lower() in ("cobyla", "cobyqa"):
+        if isinstance(self.QI.ansatz, QuantumCircuit) and optimizer_name.lower() not in ("cobyla", "cobyqa"):
             raise ValueError("Custom Ansatz in QI only works with COBYLA and COBYQA as optimizer.")
         print("### Parameters information:")
         if orbital_optimization:
@@ -1029,7 +998,7 @@ class WaveFunctionCircuit:
                     "Cannot use RotoSolve together with orbital optimization in the one-step solver."
                 )
 
-        print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
+        print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #")
         if orbital_optimization:
             if len(self.thetas) > 0:
                 energy = partial(
@@ -1071,13 +1040,20 @@ class WaveFunctionCircuit:
                 parameters = self.kappa
         else:
             parameters = self.thetas
-        optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
+        optimizer = Optimizers(
+            energy,
+            optimizer_name,
+            grad=gradient,
+            maxiter=maxiter,
+            tol=tol,
+            energy_eval_callback=lambda: self.num_energy_evals,
+        )
         res = optimizer.minimize(
             parameters, extra_options={"R": self.QI.grad_param_R, "param_names": self.QI.param_names}
         )
         if orbital_optimization:
             self.thetas = res.x[len(self.kappa) :].tolist()
-            for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
+            for i in range(len(self.kappa)):
                 self._kappa[i] = 0.0
                 self._kappa_old[i] = 0.0
         else:
@@ -1098,6 +1074,7 @@ class WaveFunctionCircuit:
             Electronic energy.
         """
         num_kappa = 0
+        self.num_energy_evals += 1  # count one measurement
         if kappa_optimization:
             num_kappa = len(self.kappa_idx)
             self.kappa = parameters[:num_kappa]
@@ -1110,14 +1087,9 @@ class WaveFunctionCircuit:
         # RDM is more expensive than evaluation of the Hamiltonian.
         # Thus only construct these if orbital-optimization is turned on,
         # since the RDMs will be reused in the oo gradient calculation.
-        rdms = ReducedDenstiyMatrix(
-            self.num_inactive_orbs,
-            self.num_active_orbs,
-            self.num_virtual_orbs,
-            rdm1=self.rdm1,
-            rdm2=self.rdm2,
+        return get_electronic_energy(
+            self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.rdm1, self.rdm2
         )
-        return get_electronic_energy(rdms, self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
 
     def _calc_gradient_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
@@ -1141,20 +1113,19 @@ class WaveFunctionCircuit:
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:
-            rdms = ReducedDenstiyMatrix(
+            gradient[:num_kappa] = get_orbital_gradient(
+                self.h_mo,
+                self.g_mo,
+                self.kappa_idx,
                 self.num_inactive_orbs,
                 self.num_active_orbs,
-                self.num_virtual_orbs,
-                rdm1=self.rdm1,
-                rdm2=self.rdm2,
-            )
-            gradient[:num_kappa] = get_orbital_gradient(
-                rdms, self.h_mo, self.g_mo, self.kappa_idx, self.num_inactive_orbs, self.num_active_orbs
+                self.rdm1,
+                self.rdm2,
             )
         if theta_optimization:
             H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-            for i in range(len(parameters[num_kappa:])):  # pylint: disable=consider-using-enumerate
+            for i in range(len(parameters[num_kappa:])):
                 R = self.QI.grad_param_R[self.QI.param_names[i]]
                 e_vals_grad = _get_energy_evals_for_grad(H, self.QI, parameters, i, R)
                 grad = 0.0
@@ -1162,6 +1133,9 @@ class WaveFunctionCircuit:
                     x_mu = (2 * mu - 1) / (2 * R) * np.pi
                     grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R * (np.sin(1 / 2 * x_mu)) ** 2)
                 gradient[num_kappa + i] = grad
+            self.num_energy_evals += 2 * np.sum(
+                list(self.QI.grad_param_R.values())
+            )  # Count energy measurements for all gradients
         return gradient
 
 
@@ -1179,6 +1153,7 @@ def _get_energy_evals_for_grad(
 
     Args:
         operator: Operator which the derivative is with respect to.
+        quantum_interface: Quantum interface class object.
         parameters: Parameters.
         idx: Parameter idx.
         R: Parameter to control we get the needed points.
