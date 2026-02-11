@@ -5,14 +5,12 @@ import scipy
 
 from slowquant.qiskit_interface.circuit_wavefunction import WaveFunctionCircuit
 from slowquant.unitary_coupled_cluster.operators import (
-    G1_sa_t,
-    G2_1_sa_t,
-    G2_2_sa_t,
-    G2_3_sa_t,
+    G1_tsa,
+    G2_tsa,
     hamiltonian_0i_0a,
     hamiltonian_1i_1a,
 )
-from slowquant.unitary_coupled_cluster.util import iterate_t1_sa, iterate_t2_sa_t
+from slowquant.unitary_coupled_cluster.util import iterate_t1_sa, iterate_t2_tsa
 
 
 class quantumLRBaseClass:
@@ -20,6 +18,7 @@ class quantumLRBaseClass:
     def __init__(
         self,
         wf: WaveFunctionCircuit,
+        excitations: str
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
@@ -36,23 +35,14 @@ class quantumLRBaseClass:
         self.G_ops = []
         # G1
         for a, i, _ in iterate_t1_sa(wf.active_occ_idx, wf.active_unocc_idx):
-            self.G_ops.append(G1_sa_t(i, a))
+            self.G_ops.append(G1_tsa(i, a))
         # G2
-        for a, i, b, j, _, type_idx in iterate_t2_sa_t(wf.active_occ_idx, wf.active_unocc_idx):
-            if type_idx == 1:
-                # G2_1
-                self.G_ops.append(G2_1_sa_t(i, j, a, b))
-            elif type_idx == 2:
-                # G2_2
-                self.G_ops.append(G2_2_sa_t(i, j, a, b))
-            elif type_idx == 3:
-                # G3_3
-                self.G_ops.append(G2_3_sa_t(i, j, a, b))
-
+        for a, i, b, j, _, op_type in iterate_t2_tsa(wf.active_occ_idx, wf.active_unocc_idx):
+            self.G_ops.append(G2_tsa(i, j, a, b, op_type))
         # q
         self.q_ops = []
         for p, q in wf.kappa_no_activeactive_idx:
-            self.q_ops.append(G1_sa_t(p, q))
+            self.q_ops.append(G1_tsa(p, q))
 
         num_parameters = len(self.q_ops) + len(self.G_ops)
         self.num_params = num_parameters

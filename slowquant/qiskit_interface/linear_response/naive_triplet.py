@@ -1,5 +1,4 @@
 import numpy as np
-from qiskit.primitives import BaseSampler
 
 from slowquant.qiskit_interface.linear_response.lr_baseclass_triplet import (
     get_num_CBS_elements,
@@ -8,7 +7,6 @@ from slowquant.qiskit_interface.linear_response.lr_baseclass_triplet import (
 )
 from slowquant.qiskit_interface.util import Clique
 from slowquant.unitary_coupled_cluster.density_matrix import (
-    ReducedDenstiyMatrix,
     get_orbital_gradient_response,
     get_triplet_orbital_response_hessian_block,
     get_orbital_response_metric_sigma,
@@ -38,26 +36,17 @@ class quantumLR(quantumLRBaseClass):
 
         if self.num_q != 0:
             if do_rdm:
-                if isinstance(self.wf.QI._primitive, BaseSampler):  # pylint: disable=protected-access
-                    self.wf.precalc_rdm_paulis(2)
-                # RDMs
-                rdms = ReducedDenstiyMatrix(
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
-                    self.wf.rdm1,
-                    rdm2=self.wf.rdm2,
-                    t_rdm2=self.wf.t_rdm2,
-                )
+                self.wf.precalc_rdm_paulis(2)
                 if do_gradients:
                     # Check gradients
                     grad = get_orbital_gradient_response(
-                        rdms,
                         self.wf.h_mo,
                         self.wf.g_mo,
                         self.wf.kappa_no_activeactive_idx,
                         self.wf.num_inactive_orbs,
                         self.wf.num_active_orbs,
+                        self.wf.rdm1,
+                        self.wf.rdm2,
                     )
             else:
                 if do_gradients:
@@ -92,25 +81,32 @@ class quantumLR(quantumLRBaseClass):
         if self.num_q != 0:
             if do_rdm:
                 self.A[: self.num_q, : self.num_q] = get_triplet_orbital_response_hessian_block(
-                    rdms,
                     self.wf.h_mo,
                     self.wf.g_mo,
                     self.wf.kappa_no_activeactive_idx_dagger,
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
                     self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.wf.rdm2,
+                    self.wf.t_rdm2
                 )
                 self.B[: self.num_q, : self.num_q] = get_triplet_orbital_response_hessian_block(
-                    rdms,
                     self.wf.h_mo,
                     self.wf.g_mo,
                     self.wf.kappa_no_activeactive_idx_dagger,
                     self.wf.kappa_no_activeactive_idx_dagger,
                     self.wf.num_inactive_orbs,
                     self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.wf.rdm2,
+                    self.wf.t_rdm2
                 )
                 self.Sigma[: self.num_q, : self.num_q] = get_orbital_response_metric_sigma(
-                    rdms, self.wf.kappa_no_activeactive_idx
+                    self.wf.kappa_no_activeactive_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1
                 )
             else:
                 self.H_2i_2a = hamiltonian_2i_2a(
