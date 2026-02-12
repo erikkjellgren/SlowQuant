@@ -11,8 +11,9 @@ from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.generalized_ups_wavefunction import GeneralizedWaveFunctionUPS
 from slowquant.unitary_coupled_cluster.linear_response import generalized_naive
 from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
+from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import generalized_expectation_value_energy
 from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, generalized_hamiltonian_0i_0a, generalized_hamiltonian_1i_1a
-from slowquant.unitary_coupled_cluster.generalized_density_matrix import get_orbital_gradient_generalized_real_imag, get_orbital_gradient_expvalue_real_imag, get_nonsplit_gradient_expvalue, get_gradient_finite_diff
+from slowquant.unitary_coupled_cluster.generalized_density_matrix import get_orbital_gradient_generalized_real_imag, get_orbital_gradient_expvalue_real_imag, get_nonsplit_gradient_expvalue, get_gradient_finite_diff, get_electronic_energy_generalized
 
 from slowquant.unitary_coupled_cluster.fermionic_operator import (
     FermionicOperator, 
@@ -221,6 +222,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     h_1e = mol.intor("int1e_kin")
     h_nuc = mol.intor("int1e_nuc")
     g_eri = mol.intor("int2e")
+    dip_int = mol.intor("int1e_r")
     #mc = mcscf.CASCI(mf, active_space[1], active_space[0])
 
     # mc = mcscf.UCASCI(mf, active_space[1], active_space[0])
@@ -244,13 +246,47 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         h_core,
         g_eri,
         "fuccsd",
-        {"n_layers": 1, "is_spin_conserving" : False},
+        {"n_layers": 0, "is_spin_conserving" : True},
         include_active_kappa=True,
     )
 
 
-
     print(mf.energy_elec()[0])
+
+
+    H = generalized_hamiltonian_full_space(WF.h_mo, WF.g_mo, WF.num_spin_orbs)
+
+    threshold = 1e-15
+
+    mask1 = (np.abs(c.real - WF._c_mo.real) <= threshold) & (np.abs(c.imag - WF._c_mo.imag) <= threshold)
+
+    mask2 = (np.abs(c.real - WF.c_mo.real) <= threshold) & (np.abs(c.imag - WF.c_mo.imag) <= threshold)
+
+    #print(mask1, "\n\n")
+    #print(mask2, "\n\n")
+
+    test_energy = generalized_expectation_value_energy(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
+
+    mask1 = (np.abs(c.real - WF._c_mo.real) <= threshold) & (np.abs(c.imag - WF._c_mo.imag) <= threshold)
+
+    mask2 = (np.abs(c.real - WF.c_mo.real) <= threshold) & (np.abs(c.imag - WF.c_mo.imag) <= threshold)
+
+    #print(mask1, "\n\n")
+    #print(mask2, "\n\n")
+
+    print(test_energy)
+
+    E_tester = get_electronic_energy_generalized(
+                WF.h_mo,
+                WF.g_mo,
+                WF.num_inactive_spin_orbs,
+                WF.num_active_spin_orbs,
+                WF.rdm1,
+                WF.rdm2,
+            )
+    
+    print(E_tester)
+
 
     print("Nr. of kappas:", len(WF.kappa_spin_idx))
     print("Nr. of spin orbitals:", WF.num_spin_orbs)
@@ -262,9 +298,22 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #print("Nr. of occ active spind idx shifted orbitals:", WF.active_occ_spin_idx_shifted)
     #print("Nr. of unocc active spind idx shifted orbitals:", WF.active_unocc_spin_idx_shifted)
 
-    #print(c)
 
-    '''H=generalized_hamiltonian_full_space(WF.h_mo, WF.g_mo,WF.num_spin_orbs)
+    #mask1 = (np.abs(c.real - WF._c_mo.real) <= threshold) & (np.abs(c.imag - WF._c_mo.imag) <= threshold)
+
+    #mask2 = (np.abs(c.real - WF.c_mo.real) <= threshold) & (np.abs(c.imag - WF.c_mo.imag) <= threshold)
+
+    #print(mask1, "\n\n")
+    #print(mask2, "\n\n")
+
+    #print("pyscf", c, "\n\n")
+
+    #print("wf variable", WF._c_mo, "\n\n")
+
+    #print("wf function", WF.c_mo, "\n\n")
+
+
+    '''H=generalized_hamiltonian_full_space(WF.h_mo, WF.g_mo, WF.num_spin_orbs)
     H2=generalized_hamiltonian_0i_0a(WF.h_mo, WF.g_mo, WF.num_inactive_spin_orbs, WF.num_active_spin_orbs)
     H3=generalized_hamiltonian_1i_1a(WF.h_mo, WF.g_mo, WF.num_inactive_spin_orbs, WF.num_active_spin_orbs, WF.num_virtual_spin_orbs)
 
@@ -339,12 +388,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
     #WF.do_adapt(["S","D"])
 
-    print(WF.ups_layout.excitation_indices)
-    #print(WF.c_mo)
+    #print(WF.ups_layout.excitation_indices)
+    print(WF.c_mo)
 
-    print("efter optimering")
+    #print("efter optimering")
 
-    print(WF.thetas)
+    #print(WF.thetas)
 
     ''' my_gradient_after = get_orbital_gradient_generalized_real_imag(WF.h_mo,
         WF.g_mo,
@@ -386,10 +435,6 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     )'''
 
 
-    '''LR = generalized_naive.LinearResponse(WF, excitations="SD")
-    LR.calc_excitation_energies()
-    print(LR.excitation_energies)'''
-
     '''exp_value_gradient_nonsplit = get_nonsplit_gradient_expvalue(
             WF.ci_coeffs,
             WF.ci_info,
@@ -402,6 +447,13 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print(exp_value_gradient_nonsplit)'''
 
 
+    LR = generalized_naive.LinearResponse(WF, excitations="SD")
+    LR.calc_excitation_energies()
+    print(LR.excitation_energies)
+    print(np.round(LR.get_transition_dipole(dip_int).real,5))
+    print(LR.get_oscillator_strengths(dip_int))
+
+
 
 def h2():
     geometry = """H  0.0   0.0  0.0;
@@ -409,6 +461,7 @@ def h2():
     #basis = "cc-pvdz"
     basis = "631-g"
     #basis = "sto-3g"
+    #basis = "sto-6g"
     active_space = ((1, 1), 4)
     #active_space = (2, 4)
     charge = 0
@@ -431,7 +484,7 @@ def h3():
     #basis = "cc-pvdz"
     basis = "631-g"
     #basis = "sto-3g"
-    active_space = ((1, 2), 6)
+    active_space = ((2, 1), 6)
     #active_space = (2, 4)
     charge = 0
     spin = 1
@@ -474,11 +527,11 @@ def h2o():
     H  0.0  -0.75545  -0.47116"""
     #basis = "dyall-v2z"
     #basis = "cc-pvdz"
-    basis = "631-g"
+    #basis = "631-g"
     #basis = "sto-3g"
+    basis = "sto-6g"
     #active_space = ((5, 5), 14)
-    active_space = ((2,2),8)
-    #active_space = (2, 4)
+    active_space = ((2,2),6)
     charge = 0
     spin = 0
 
@@ -491,7 +544,6 @@ def h2o():
     # unrestricted(
     #     geometry=geometry, basis=basis, active_space=active_space_u, charge=charge, spin=spin, unit="angstrom"
     # )
-
 
 def HI():
     geometry = """H  0.0   0.0  0.0;
@@ -528,7 +580,7 @@ def HBr():
     
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-h3()
+h2()
 
 
 # h2o()

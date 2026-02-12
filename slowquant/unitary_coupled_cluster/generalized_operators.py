@@ -161,35 +161,27 @@ def generalized_hamiltonian_1i_1a(
     return hamiltonian_operator
 
 
-
-
-
-def generalized_hamiltonian_full_space_spinor(h_spin_mo: np.ndarray, g_spin_mo: np.ndarray, num_spinors: int) -> FermionicOperator:
-    r"""Construct full-space generalized electronic Hamiltonian.
-
-    .. math::
-        \hat{H} = ?
+def generalized_one_elec_op_0i_0a(ints_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int) -> FermionicOperator:
+    """Create one-electron operator that makes no changes in the inactive and virtual orbitals.
 
     Args:
-        h_spin_mo: Core one-electron integrals in spin MO basis.
-        g_spin_mo: Two-electron integrals in spin MO basis.
-        num_spin_orbs: Number of spin orbitals.
+        ints_mo: One-electron integrals for operator in MO basis.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
 
     Returns:
-        Generalized Hamiltonian operator in full-space.
+        One-electron operator for active-space.
     """
-    H_operator = FermionicOperator({})
-    # Build operator
-    for p in range(num_spinors):
-        for q in range(num_spinors):
-            if abs(h_spin_mo[p, q]) < 10**-14:
-                continue
-            H_operator += h_spin_mo[p, q] * (a_op_spin(p, True)*a_op_spin(q, False))
-    for p in range(num_spinors):
-        for q in range(num_spinors):
-            for r in range(num_spinors):
-                for s in range(num_spinors):
-                    if abs(g_spin_mo[p, q, r, s]) < 10**-14:
-                        continue
-                    H_operator += 1 / 2 * g_spin_mo[p, q, r, s] * (a_op_spin(p, True)*a_op_spin(r, True)*a_op_spin(s, False)*a_op_spin(q, False))
-    return H_operator
+    one_elec_op = FermionicOperator({})
+    # Inactive one-electron
+    for i in range(num_inactive_orbs):
+        if abs(ints_mo[i, i]) > 10**-14:
+            one_elec_op += ints_mo[i, i] * a_op_spin(i, True) * a_op_spin(i, False)
+    # Active one-electron
+    for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+        for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+            if abs(ints_mo[p, q]) > 10**-14:
+                one_elec_op += ints_mo[p, q] * a_op_spin(p, True) * a_op_spin(q, False)
+    return one_elec_op
+
+

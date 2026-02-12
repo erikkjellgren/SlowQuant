@@ -894,7 +894,7 @@ def get_orbital_response_vector_norm(
 
 
 @nb.jit(nopython=True)
-def get_orbital_response_property_gradient(
+def get_orbital_response_property_gradient_annika(
     x_mo: np.ndarray,
     kappa_spin_idx: list[tuple[int, int]],
     num_inactive_spin_orbs: int,
@@ -922,7 +922,7 @@ def get_orbital_response_property_gradient(
     Returns:
         Orbital part of property gradient.
     """
-    prop_grad = 0
+    '''prop_grad = 0
     for i, (P, Q) in enumerate(kappa_spin_idx):
         for M in range(num_inactive_spin_orbs + num_active_spin_orbs):
             prop_grad += (
@@ -934,6 +934,31 @@ def get_orbital_response_property_gradient(
                 (response_vectors[i, state_number] - response_vectors[i + number_excitations, state_number])
                 * x_mo[M, P]
                 * RDM1(M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            )
+    return prop_grad'''
+
+    prop_grad = 0
+    for i, (P, Q) in enumerate(kappa_spin_idx):
+        for M in range(num_inactive_spin_orbs + num_active_spin_orbs):
+            prop_grad += (
+                response_vectors[i + number_excitations, state_number]
+                * x_mo[Q, M]
+                * RDM1(P, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            )
+            prop_grad += (
+                response_vectors[i, state_number]
+                * x_mo[P, M]
+                * RDM1(Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            )
+            prop_grad -= (
+                response_vectors[i + number_excitations, state_number]
+                * x_mo[M, P]
+                * RDM1(M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            )
+            prop_grad -= (
+                response_vectors[i, state_number]
+                * x_mo[M, Q]
+                * RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             )
     return prop_grad
 
