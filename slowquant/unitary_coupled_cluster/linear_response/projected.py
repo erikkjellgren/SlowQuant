@@ -29,14 +29,16 @@ class LinearResponseUCC(LinearResponseBaseClass):
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
+        tda: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
+            tda: Whether to use Tamm-Dancoff Approximation.
         """
-        super().__init__(wave_function, excitations)
+        super().__init__(wave_function, excitations, tda)
 
         rdms = ReducedDenstiyMatrix(
             self.wf.num_inactive_orbs,
@@ -98,15 +100,16 @@ class LinearResponseUCC(LinearResponseBaseClass):
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
         )
-        self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
-            rdms,
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.kappa_no_activeactive_idx_dagger,
-            self.wf.kappa_no_activeactive_idx_dagger,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
+        if not self.tda:
+            self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
+                rdms,
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.kappa_no_activeactive_idx_dagger,
+                self.wf.kappa_no_activeactive_idx_dagger,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+            )
         self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
             rdms, self.wf.kappa_no_activeactive_idx
         )
@@ -124,19 +127,20 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     *self.index_info,
                 )
                 self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = val
-                # Make B
-                # - 1/2<0| Gd qd H |0>
-                val = (
-                    -1
-                    / 2
-                    * expectation_value(
-                        G_ket,
-                        [],
-                        qdH_ket,
-                        *self.index_info,
+                if not self.tda:
+                    # Make B
+                    # - 1/2<0| Gd qd H |0>
+                    val = (
+                        -1
+                        / 2
+                        * expectation_value(
+                            G_ket,
+                            [],
+                            qdH_ket,
+                            *self.index_info,
+                        )
                     )
-                )
-                self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = val
+                    self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = val
         for j, GJ in enumerate(self.G_ops):
             GJ_ket = propagate_state([GJ], self.wf.ci_coeffs, *self.index_info)
             HGJ_ket = propagate_state([self.H_0i_0a], GJ_ket, *self.index_info)
@@ -211,58 +215,59 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     )
                 )
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
-                # Make B
-                # 1/2<0| GId H |0> * <0| GJd |0>
-                val = (
-                    1
-                    / 2
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [GI.dagger, self.H_0i_0a],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
+                if not self.tda:
+                    # Make B
+                    # 1/2<0| GId H |0> * <0| GJd |0>
+                    val = (
+                        1
+                        / 2
+                        * expectation_value(
+                            self.wf.ci_coeffs,
+                            [GI.dagger, self.H_0i_0a],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                        * expectation_value(
+                            self.wf.ci_coeffs,
+                            [GJ.dagger],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
                     )
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [GJ.dagger],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
+                    # 1/2<0| GJd H |0> * <0| GId |0>
+                    val += (
+                        1
+                        / 2
+                        * expectation_value(
+                            self.wf.ci_coeffs,
+                            [GJ.dagger, self.H_0i_0a],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                        * expectation_value(
+                            self.wf.ci_coeffs,
+                            [GI.dagger],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
                     )
-                )
-                # 1/2<0| GJd H |0> * <0| GId |0>
-                val += (
-                    1
-                    / 2
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [GJ.dagger, self.H_0i_0a],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
+                    # - <0| GId |0> * <0| GJd |0> * E
+                    val -= (
+                        expectation_value(
+                            GI_ket,
+                            [],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                        * expectation_value(
+                            GJ_ket,
+                            [],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                        * self.wf.energy_elec
                     )
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [GI.dagger],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                )
-                # - <0| GId |0> * <0| GJd |0> * E
-                val -= (
-                    expectation_value(
-                        GI_ket,
-                        [],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    * expectation_value(
-                        GJ_ket,
-                        [],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    * self.wf.energy_elec
-                )
-                self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
+                    self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
                 # Make Sigma
                 # <0| GId GJ |0>
                 val = expectation_value(
@@ -389,16 +394,16 @@ class LinearResponseUCC(LinearResponseBaseClass):
 
                 g_part_x += self.Z_G_normed[i, state_number] * exp_G * exp_mux
                 g_part_x -= self.Z_G_normed[i, state_number] * exp_Gmux
-                g_part_x -= self.Y_G_normed[i, state_number] * exp_G * exp_mux
-                g_part_x += self.Y_G_normed[i, state_number] * exp_Gmux
+                g_part_x -= self.Y_G_normed[i, state_number] * exp_G * exp_mux if not self.tda else 0.0
+                g_part_x += self.Y_G_normed[i, state_number] * exp_Gmux if not self.tda else 0.0
                 g_part_y += self.Z_G_normed[i, state_number] * exp_G * exp_muy
                 g_part_y -= self.Z_G_normed[i, state_number] * exp_Gmuy
-                g_part_y -= self.Y_G_normed[i, state_number] * exp_G * exp_muy
-                g_part_y += self.Y_G_normed[i, state_number] * exp_Gmuy
+                g_part_y -= self.Y_G_normed[i, state_number] * exp_G * exp_muy if not self.tda else 0.0
+                g_part_y += self.Y_G_normed[i, state_number] * exp_Gmuy if not self.tda else 0.0
                 g_part_z += self.Z_G_normed[i, state_number] * exp_G * exp_muz
                 g_part_z -= self.Z_G_normed[i, state_number] * exp_Gmuz
-                g_part_z -= self.Y_G_normed[i, state_number] * exp_G * exp_muz
-                g_part_z += self.Y_G_normed[i, state_number] * exp_Gmuz
+                g_part_z -= self.Y_G_normed[i, state_number] * exp_G * exp_muz if not self.tda else 0.0
+                g_part_z += self.Y_G_normed[i, state_number] * exp_Gmuz if not self.tda else 0.0
 
             transition_dipoles[state_number, 0] = q_part_x + g_part_x
             transition_dipoles[state_number, 1] = q_part_y + g_part_y
