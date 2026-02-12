@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 
 import numpy as np
-from qiskit.primitives import BaseSampler
+from qiskit.primitives import BaseSamplerV1 as BaseSampler
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,

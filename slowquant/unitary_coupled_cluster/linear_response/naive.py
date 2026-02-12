@@ -32,14 +32,16 @@ class LinearResponseUCC(LinearResponseBaseClass):
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
+        tda: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
+            tda: Whether to use Tamm-Dancoff Approximation.
         """
-        super().__init__(wave_function, excitations)
+        super().__init__(wave_function, excitations, tda)
 
         rdms = ReducedDenstiyMatrix(
             self.wf.num_inactive_orbs,
@@ -113,15 +115,16 @@ class LinearResponseUCC(LinearResponseBaseClass):
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
         )
-        self.B[:idx_shift, :idx_shift] = get_orbital_response_hessian_block(
-            rdms,
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.kappa_no_activeactive_idx_dagger,
-            self.wf.kappa_no_activeactive_idx_dagger,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
+        if not self.tda:
+            self.B[:idx_shift, :idx_shift] = get_orbital_response_hessian_block(
+                rdms,
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.kappa_no_activeactive_idx_dagger,
+                self.wf.kappa_no_activeactive_idx_dagger,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+            )
         self.Sigma[:idx_shift, :idx_shift] = get_orbital_response_metric_sigma(
             rdms, self.wf.kappa_no_activeactive_idx
         )
@@ -162,37 +165,38 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     )
                 )
                 self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
-                # Make B
-                # <0| qd H Gd |0>
-                val = expectation_value(
-                    Hq_ket,
-                    [],
-                    Gd_ket,
-                    *self.index_info,
-                )
-                # - 1/2*<0| Gd qd H |0>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
-                        G_ket,
+                if not self.tda:
+                    # Make B
+                    # <0| qd H Gd |0>
+                    val = expectation_value(
+                        Hq_ket,
                         [],
-                        qdH_ket,
+                        Gd_ket,
                         *self.index_info,
                     )
-                )
-                # - 1/2*<0| qd Gd H |0>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [qJ.dagger * GI.dagger * self.H_1i_1a],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
+                    # - 1/2*<0| Gd qd H |0>
+                    val -= (
+                        1
+                        / 2
+                        * expectation_value(
+                            G_ket,
+                            [],
+                            qdH_ket,
+                            *self.index_info,
+                        )
                     )
-                )
-                self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
+                    # - 1/2*<0| qd Gd H |0>
+                    val -= (
+                        1
+                        / 2
+                        * expectation_value(
+                            self.wf.ci_coeffs,
+                            [qJ.dagger * GI.dagger * self.H_1i_1a],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                    )
+                    self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
         for j, GJ in enumerate(self.G_ops):
             GJH_ket = propagate_state([GJ], H00_ket, *self.index_info)
             GJdH_ket = propagate_state([GJ.dagger], H00_ket, *self.index_info)
@@ -263,36 +267,37 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     )
                 )
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
-                # Make B
-                # <0| GId H GJd |0>
-                val = expectation_value(
-                    GI_ket,
-                    [],
-                    HGJd_ket,
-                    *self.index_info,
-                )
-                # - <0| GId GJd H |0>
-                val -= expectation_value(
-                    GI_ket,
-                    [],
-                    GJdH_ket,
-                    *self.index_info,
-                )
-                # - <0| H GJd GId |0>
-                val -= expectation_value(
-                    GJH_ket,
-                    [],
-                    GId_ket,
-                    *self.index_info,
-                )
-                # <0| GJd H GId |0>
-                val += expectation_value(
-                    HGJ_ket,
-                    [],
-                    GId_ket,
-                    *self.index_info,
-                )
-                self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
+                if not self.tda:
+                    # Make B
+                    # <0| GId H GJd |0>
+                    val = expectation_value(
+                        GI_ket,
+                        [],
+                        HGJd_ket,
+                        *self.index_info,
+                    )
+                    # - <0| GId GJd H |0>
+                    val -= expectation_value(
+                        GI_ket,
+                        [],
+                        GJdH_ket,
+                        *self.index_info,
+                    )
+                    # - <0| H GJd GId |0>
+                    val -= expectation_value(
+                        GJH_ket,
+                        [],
+                        GId_ket,
+                        *self.index_info,
+                    )
+                    # <0| GJd H GId |0>
+                    val += expectation_value(
+                        HGJ_ket,
+                        [],
+                        GId_ket,
+                        *self.index_info,
+                    )
+                    self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
                 # Make Sigma
                 # <0| GId GJ |0>
                 val = expectation_value(
@@ -360,9 +365,9 @@ class LinearResponseUCC(LinearResponseBaseClass):
         for state_number in range(number_excitations):
             transfer_op = FermionicOperator({}, {})
             for i, G in enumerate(self.G_ops):
-                transfer_op += (
-                    self.Z_G_normed[i, state_number] * G.dagger + self.Y_G_normed[i, state_number] * G
-                )
+                transfer_op += self.Z_G_normed[i, state_number] * G.dagger
+                if not self.tda:
+                    transfer_op += self.Y_G_normed[i, state_number] * G
             q_part_x = get_orbital_response_property_gradient(
                 rdms,
                 mux,
@@ -481,7 +486,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
             Gd_ket = propagate_state([G.dagger], self.wf.ci_coeffs, *self.index_info)
             # Inactive part
             for i in range(self.wf.num_inactive_orbs):
-                E_ket = propagate_state([Epq(i, i)], self.wf.ci_coeffs, *self.index_info) 
+                E_ket = propagate_state([Epq(i, i)], self.wf.ci_coeffs, *self.index_info)
                 # < 0 | G E | 0 >
                 val = expectation_value(Gd_ket, [], E_ket, *self.index_info)
                 # - < 0 | E G | 0 >
