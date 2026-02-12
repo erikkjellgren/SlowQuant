@@ -35,14 +35,16 @@ class LinearResponseUCC(LinearResponseBaseClass):
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
+        tda: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
+            tda: Whether to use Tamm-Dancoff Approximation.
         """
-        super().__init__(wave_function, excitations)
+        super().__init__(wave_function, excitations, tda)
         # Overwrite Superclass
         ci_info = get_indexing_extended(
             self.wf.num_inactive_orbs,
@@ -78,9 +80,9 @@ class LinearResponseUCC(LinearResponseBaseClass):
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters))
-        self.B = np.zeros((num_parameters, num_parameters))
+        self.B = np.zeros((num_parameters, num_parameters)) if not tda else np.zeros(())
         self.Sigma = np.zeros((num_parameters, num_parameters))
-        self.Delta = np.zeros((num_parameters, num_parameters))
+        self.Delta = np.zeros((num_parameters, num_parameters)) if not tda else np.zeros(())
 
         H_2i_2a = hamiltonian_2i_2a(
             self.wf.h_mo,
@@ -238,7 +240,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     self.ci_coeffs,
                     *self.index_info_extended,
                     do_unsafe=True,  # type: ignore
-                )
+                ) if not self.tda else 0.0
                 q_part_y -= self.Z_q_normed[i, state_number] * expectation_value(
                     self.ci_coeffs,
                     [muy_op_q, "U", q],
@@ -252,7 +254,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     self.ci_coeffs,
                     *self.index_info_extended,
                     do_unsafe=True,  # type: ignore
-                )
+                ) if not self.tda else 0.0
                 q_part_z -= self.Z_q_normed[i, state_number] * expectation_value(
                     self.ci_coeffs,
                     [muz_op_q, "U", q],
@@ -266,7 +268,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     self.ci_coeffs,
                     *self.index_info_extended,
                     do_unsafe=True,  # type: ignore
-                )
+                ) if not self.tda else 0.0
             g_part_x = 0.0
             g_part_y = 0.0
             g_part_z = 0.0
@@ -282,7 +284,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     [G.dagger, "Ud", mux_op_G],
                     self.ci_coeffs,
                     *self.index_info_extended,
-                )
+                ) if not self.tda else 0.0
                 g_part_y -= self.Z_G_normed[i, state_number] * expectation_value(
                     self.ci_coeffs,
                     [muy_op_G, "U", G],
@@ -294,7 +296,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     [G.dagger, "Ud", muy_op_G],
                     self.ci_coeffs,
                     *self.index_info_extended,
-                )
+                ) if not self.tda else 0.0
                 g_part_z -= self.Z_G_normed[i, state_number] * expectation_value(
                     self.ci_coeffs,
                     [muz_op_G, "U", G],
@@ -306,7 +308,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     [G.dagger, "Ud", muz_op_G],
                     self.ci_coeffs,
                     *self.index_info_extended,
-                )
+                ) if not self.tda else 0.0
             transition_dipoles[state_number, 0] = q_part_x + g_part_x
             transition_dipoles[state_number, 1] = q_part_y + g_part_y
             transition_dipoles[state_number, 2] = q_part_z + g_part_z

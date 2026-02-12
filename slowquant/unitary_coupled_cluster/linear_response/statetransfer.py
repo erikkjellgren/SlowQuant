@@ -29,14 +29,16 @@ class LinearResponseUCC(LinearResponseBaseClass):
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
+        tda: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
+            tda: Whether to use Tamm-Dancoff approximation.
         """
-        super().__init__(wave_function, excitations)
+        super().__init__(wave_function, excitations, tda)
 
         rdms = ReducedDenstiyMatrix(
             self.wf.num_inactive_orbs,
@@ -96,15 +98,16 @@ class LinearResponseUCC(LinearResponseBaseClass):
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
         )
-        self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
-            rdms,
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.kappa_no_activeactive_idx_dagger,
-            self.wf.kappa_no_activeactive_idx_dagger,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
+        if not self.tda:
+            self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
+                rdms,
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.kappa_no_activeactive_idx_dagger,
+                self.wf.kappa_no_activeactive_idx_dagger,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+            )
         self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
             rdms, self.wf.kappa_no_activeactive_idx
         )
@@ -122,19 +125,20 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     *self.index_info,
                 )
                 self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = val
-                # Make B
-                # - 1/2<CSF| Gd Ud qd H |0>
-                val = (
-                    -1
-                    / 2
-                    * expectation_value(
-                        G_ket,
-                        [],
-                        UdqdH_ket,
-                        *self.index_info,
+                if not self.tda:
+                    # Make B
+                    # - 1/2<CSF| Gd Ud qd H |0>
+                    val = (
+                        -1
+                        / 2
+                        * expectation_value(
+                            G_ket,
+                            [],
+                            UdqdH_ket,
+                            *self.index_info,
+                        )
                     )
-                )
-                self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = val
+                    self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = val
         for j, GJ in enumerate(self.G_ops):
             UdHUGJ = propagate_state(
                 ["Ud", self.H_0i_0a, "U", GJ],
@@ -254,7 +258,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     [],
                     Udmux_ket,
                     *self.index_info,
-                )
+                ) if not self.tda else 0.0
                 # -Z * <0| muy U G | CSF>
                 g_part_y -= self.Z_G_normed[i, state_number] * expectation_value(
                     Udmuyd_ket,
@@ -268,7 +272,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     [],
                     Udmuy_ket,
                     *self.index_info,
-                )
+                ) if not self.tda else 0.0
                 # -Z * <0| muz U G | CSF>
                 g_part_z -= self.Z_G_normed[i, state_number] * expectation_value(
                     Udmuzd_ket,
@@ -282,7 +286,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     [],
                     Udmuz_ket,
                     *self.index_info,
-                )
+                ) if not self.tda else 0.0
             transition_dipoles[state_number, 0] = q_part_x + g_part_x
             transition_dipoles[state_number, 1] = q_part_y + g_part_y
             transition_dipoles[state_number, 2] = q_part_z + g_part_z

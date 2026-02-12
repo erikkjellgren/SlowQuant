@@ -30,14 +30,16 @@ class LinearResponseUCC(LinearResponseBaseClass):
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
+        tda: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
+            tda: Whether to use Tamm-Dancoff Approximation.
         """
-        super().__init__(wave_function, excitations)
+        super().__init__(wave_function, excitations, tda)
 
         H_2i_2a = hamiltonian_2i_2a(
             self.wf.h_mo,
@@ -250,7 +252,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     [],
                     Udmux_ket,
                     *self.index_info,
-                )
+                ) if not self.tda else 0.0
                 # -Z * <0| muy U G | CSF>
                 g_part_y -= self.Z_G_normed[i, state_number] * expectation_value(
                     Udmuyd_ket,
@@ -264,7 +266,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     [],
                     Udmuy_ket,
                     *self.index_info,
-                )
+                ) if not self.tda else 0.0
                 # -Z * <0| muz U G | CSF>
                 g_part_z -= self.Z_G_normed[i, state_number] * expectation_value(
                     Udmuzd_ket,
@@ -278,7 +280,7 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     [],
                     Udmuz_ket,
                     *self.index_info,
-                )
+                ) if not self.tda else 0.0
             transition_dipoles[state_number, 0] = q_part_x + g_part_x
             transition_dipoles[state_number, 1] = q_part_y + g_part_y
             transition_dipoles[state_number, 2] = q_part_z + g_part_z

@@ -30,14 +30,16 @@ class LinearResponseUCC(LinearResponseBaseClass):
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
+        tda: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
+            tda: Whether to use Tamm-Dancoff Approximation.
         """
-        super().__init__(wave_function, excitations)
+        super().__init__(wave_function, excitations, tda)
 
         H_2i_2a = hamiltonian_2i_2a(
             self.wf.h_mo,
@@ -220,58 +222,59 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     )
                 )
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
-                # Make B
-                # 1/2<0| GId H |0> * <0| GJd |0>
-                val = (
-                    1
-                    / 2
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [GI.dagger, self.H_0i_0a],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
+                if not self.tda:
+                    # Make B
+                    # 1/2<0| GId H |0> * <0| GJd |0>
+                    val = (
+                        1
+                        / 2
+                        * expectation_value(
+                            self.wf.ci_coeffs,
+                            [GI.dagger, self.H_0i_0a],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                        * expectation_value(
+                            self.wf.ci_coeffs,
+                            [GJ.dagger],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
                     )
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [GJ.dagger],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
+                    # 1/2<0| GJd H |0> * <0| GId |0>
+                    val += (
+                        1
+                        / 2
+                        * expectation_value(
+                            self.wf.ci_coeffs,
+                            [GJ.dagger, self.H_0i_0a],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                        * expectation_value(
+                            self.wf.ci_coeffs,
+                            [GI.dagger],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
                     )
-                )
-                # 1/2<0| GJd H |0> * <0| GId |0>
-                val += (
-                    1
-                    / 2
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [GJ.dagger, self.H_0i_0a],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
+                    # - <0| GId |0> * <0| GJd |0> * E
+                    val -= (
+                        expectation_value(
+                            GI_ket,
+                            [],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                        * expectation_value(
+                            GJ_ket,
+                            [],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                        * self.wf.energy_elec
                     )
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [GI.dagger],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                )
-                # - <0| GId |0> * <0| GJd |0> * E
-                val -= (
-                    expectation_value(
-                        GI_ket,
-                        [],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    * expectation_value(
-                        GJ_ket,
-                        [],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    * self.wf.energy_elec
-                )
-                self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
+                    self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
                 # Make Sigma
                 # <0| GId GJ |0>
                 val = expectation_value(
@@ -416,14 +419,14 @@ class LinearResponseUCC(LinearResponseBaseClass):
                         mux_ket,
                         *self.index_info,
                     )
-                )
+                ) if not self.tda else 0.0
                 # Y * <0| mux G |0>
                 g_part_x += self.Y_G_normed[i, state_number] * expectation_value(
                     muxd_ket,
                     [],
                     G_ket,
                     *self.index_info,
-                )
+                ) if not self.tda else 0.0
                 # Z * <0| Gd |0> * <0| muy |0>
                 g_part_y += (
                     self.Z_G_normed[i, state_number]
@@ -452,14 +455,14 @@ class LinearResponseUCC(LinearResponseBaseClass):
                         muy_ket,
                         *self.index_info,
                     )
-                )
+                ) if not self.tda else 0.0
                 # Y * <0| muy G |0>
                 g_part_y += self.Y_G_normed[i, state_number] * expectation_value(
                     muyd_ket,
                     [],
                     G_ket,
                     *self.index_info,
-                )
+                ) if not self.tda else 0.0
                 # Z * <0| Gd |0> * <0| muz |0>
                 g_part_z += (
                     self.Z_G_normed[i, state_number]
@@ -488,14 +491,14 @@ class LinearResponseUCC(LinearResponseBaseClass):
                         muz_ket,
                         *self.index_info,
                     )
-                )
+                ) if not self.tda else 0.0
                 # Y * <0| muz G |0>
                 g_part_z += self.Y_G_normed[i, state_number] * expectation_value(
                     muzd_ket,
                     [],
                     G_ket,
                     *self.index_info,
-                )
+                ) if not self.tda else 0.0
             transition_dipoles[state_number, 0] = q_part_x + g_part_x
             transition_dipoles[state_number, 1] = q_part_y + g_part_y
             transition_dipoles[state_number, 2] = q_part_z + g_part_z
