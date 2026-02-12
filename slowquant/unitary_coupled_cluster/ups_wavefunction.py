@@ -1008,6 +1008,7 @@ class WaveFunctionUPS:
         orbital_optimization: bool = False,
         optimizer_name: str = "bfgs",
         optimizer_type: str = "1step",
+        do_noplaceback: bool = False,
     ) -> None:
         """Do ADAPT optimization.
 
@@ -1031,6 +1032,7 @@ class WaveFunctionUPS:
             orbital_optimization: Do orbital optimization.
             optimizer_name: Name of optimizer to do wave function parameter optimizer.
             optimizer_type: Can be '1step' or '2step'.
+            do_noplaceback: Remove operator from pool when picked.
         """
         excitation_pool: list[tuple[int, ...]] = []
         excitation_pool_type = []
@@ -1152,6 +1154,9 @@ class WaveFunctionUPS:
             else:
                 raise ValueError(f"Got unknown excitation type, {excitation_pool_type[max_arg]}")
             self.ups_layout.n_params += 1
+            if do_noplaceback:
+                excitation_pool.pop(max_arg)
+                excitation_pool_type.pop(max_arg)
 
             self._thetas.append(0.0)
             if optimizer_type == "1step":
