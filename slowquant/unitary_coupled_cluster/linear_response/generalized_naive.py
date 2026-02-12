@@ -195,7 +195,6 @@ class LinearResponse(LinearResponseBaseClass):
         #             )
         #         )
                 
-        #         # quit()
         #         self.A[i,j] =  val
                 
         # # print('qq blok regnet med expectation values',self.A)

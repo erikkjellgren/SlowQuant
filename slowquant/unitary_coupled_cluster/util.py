@@ -139,8 +139,8 @@ def iterate_t1(
                 num_alpha -= 1
             else:
                 num_beta -= 1
-            # if (num_alpha != 0 or num_beta != 0) and is_spin_conserving: #AE UDKOMMENTERET!!
-            #     continue
+            if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
+                continue
             yield a, i
 
 # Includes ap(dagger)*ap (diagonal) excitations
@@ -173,8 +173,8 @@ def iterate_t1_incl_diag(
                 num_alpha -= 1
             else:
                 num_beta -= 1
-            # if (num_alpha != 0 or num_beta != 0) and is_spin_conserving: #AE
-            #     continue
+            if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
+                continue
             yield a, i
 
 
@@ -245,8 +245,8 @@ def iterate_t2(
                         num_alpha -= 1
                     else:
                         num_beta -= 1
-                    # if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
-                    #     continue
+                    if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
+                        continue
                     yield a, i, b, j
 
 
@@ -285,8 +285,8 @@ def iterate_t2_generalized(
                         num_alpha -= 1
                     else:
                         num_beta -= 1
-                    # if (num_alpha != 0 or num_beta != 0) and is_spin_conserving: #AE
-                    #     continue 
+                    if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
+                        continue 
                     yield a, i, b, j
 
 

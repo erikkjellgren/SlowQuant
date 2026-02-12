@@ -85,7 +85,7 @@ def generalized_hamiltonian_0i_0a(
                     hamiltonian_operator += (1/2*g_mo[P,I,I,Q]
                                              *a_op_spin(P,dagger=True)*a_op_spin(I,dagger=True)
                                              *a_op_spin(Q,dagger=False)*a_op_spin(I,dagger=False))
-                if abs(g_mo[P, I, I, Q]) > 10**-14:
+                if abs(g_mo[P, I, I, Q]) > 10**-14: #AE added
                     hamiltonian_operator += (1/2*g_mo[I,P,Q,I]
                                             *a_op_spin(I,dagger=True)*a_op_spin(Q,dagger=True)
                                             *a_op_spin(I,dagger=False)*a_op_spin(P,dagger=False))
@@ -160,3 +160,36 @@ def generalized_hamiltonian_1i_1a(
                                          *a_op_spin(S,dagger=False)*a_op_spin(Q,dagger=False))
     return hamiltonian_operator
 
+
+
+
+
+def generalized_hamiltonian_full_space_spinor(h_spin_mo: np.ndarray, g_spin_mo: np.ndarray, num_spinors: int) -> FermionicOperator:
+    r"""Construct full-space generalized electronic Hamiltonian.
+
+    .. math::
+        \hat{H} = ?
+
+    Args:
+        h_spin_mo: Core one-electron integrals in spin MO basis.
+        g_spin_mo: Two-electron integrals in spin MO basis.
+        num_spin_orbs: Number of spin orbitals.
+
+    Returns:
+        Generalized Hamiltonian operator in full-space.
+    """
+    H_operator = FermionicOperator({})
+    # Build operator
+    for p in range(num_spinors):
+        for q in range(num_spinors):
+            if abs(h_spin_mo[p, q]) < 10**-14:
+                continue
+            H_operator += h_spin_mo[p, q] * (a_op_spin(p, True)*a_op_spin(q, False))
+    for p in range(num_spinors):
+        for q in range(num_spinors):
+            for r in range(num_spinors):
+                for s in range(num_spinors):
+                    if abs(g_spin_mo[p, q, r, s]) < 10**-14:
+                        continue
+                    H_operator += 1 / 2 * g_spin_mo[p, q, r, s] * (a_op_spin(p, True)*a_op_spin(r, True)*a_op_spin(s, False)*a_op_spin(q, False))
+    return H_operator
