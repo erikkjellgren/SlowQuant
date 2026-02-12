@@ -7,7 +7,7 @@ import numpy as np
 from qiskit import QuantumCircuit
 from qiskit.circuit import ClassicalRegister
 from qiskit.primitives import (
-    BaseEstimator,
+    BaseEstimatorV1 as BaseEstimator,
     BaseEstimatorV2,
     BaseSamplerV1,
     BaseSamplerV2,

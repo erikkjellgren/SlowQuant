@@ -39,11 +39,11 @@ def test_H2_sto3g_naive():
     LR.calc_excitation_energies()
 
     # Calculate dipole integrals
-    dipole_integrals = (
+    dipole_integrals = np.array([
         SQobj.integral.get_multipole_matrix([1, 0, 0]),
         SQobj.integral.get_multipole_matrix([0, 1, 0]),
         SQobj.integral.get_multipole_matrix([0, 0, 1]),
-    )
+    ])
 
     property_gradient = LR.get_property_gradient(dipole_integrals)
     resp = solve(LR.hessian, property_gradient)
@@ -90,11 +90,11 @@ def test_LiH_sto3g_naive():
     LR.calc_excitation_energies()
 
     # Calculate dipole integrals
-    dipole_integrals = (
+    dipole_integrals = np.array([
         SQobj.integral.get_multipole_matrix([1, 0, 0]),
         SQobj.integral.get_multipole_matrix([0, 1, 0]),
         SQobj.integral.get_multipole_matrix([0, 0, 1]),
-    )
+    ])
 
     property_gradient = LR.get_property_gradient(dipole_integrals)
     resp = solve(LR.hessian, property_gradient)
@@ -149,11 +149,11 @@ def test_H10_sto3g_naive():
     LR.calc_excitation_energies()
 
     # Calculate dipole integrals
-    dipole_integrals = (
+    dipole_integrals = np.array([
         SQobj.integral.get_multipole_matrix([1, 0, 0]),
         SQobj.integral.get_multipole_matrix([0, 1, 0]),
         SQobj.integral.get_multipole_matrix([0, 0, 1]),
-    )
+    ])
 
     property_gradient = LR.get_property_gradient(dipole_integrals)
     resp = solve(LR.hessian, property_gradient)

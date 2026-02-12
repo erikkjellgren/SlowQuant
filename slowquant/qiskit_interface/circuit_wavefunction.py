@@ -6,7 +6,7 @@ import numpy as np
 import scipy
 from qiskit import QuantumCircuit
 from qiskit.primitives import (
-    BaseEstimator,
+    BaseEstimatorV1 as BaseEstimator,
     BaseEstimatorV2,
     BaseSamplerV1,
     BaseSamplerV2,

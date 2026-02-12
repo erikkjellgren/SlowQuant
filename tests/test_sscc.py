@@ -147,7 +147,7 @@ def get_sscc(geometry, basis, active_space, charge=0, unit='bohr'):
         h1ao = -(a01p[:,:3] + a01p[:,:3].transpose(0,1,3,2))
         property_gradient = LR.get_property_gradient(h1ao)
         h1.append(property_gradient)
-        d1.append(solve(LR.hessian, property_gradient))
+        d1.append(solve(LR.hessian, property_gradient.reshape(-1,9)).reshape(-1,3,3))
 
     fcsd = np.zeros_like(dso)
     for k, (i,j) in enumerate(nuc_pair):
@@ -175,7 +175,7 @@ def test_H2_sto3g_naive():
     active_space = (2,2)
 
     sscc = get_sscc(geometry=geometry, basis=basis, active_space=active_space, unit='angstrom')
-    
+
     thresh = 10**-2
 
     # Check coupling constant - reference dalton mcscf
@@ -192,11 +192,11 @@ def test_LiH_sto3g_naive():
     active_space = (2,2)
 
     sscc = get_sscc(geometry=geometry, basis=basis, active_space=active_space, unit='angstrom')
-    
+
     thresh = 10**-2
 
     # Check coupling constant - reference dalton mcscf
     assert abs(-63.380071 - sscc[0,1]) < thresh
 
-test_H2_sto3g_naive()
-test_LiH_sto3g_naive()
+# test_H2_sto3g_naive()
+# test_LiH_sto3g_naive()

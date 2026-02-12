@@ -1,6 +1,6 @@
 import numpy as np
 import pyscf
-from qiskit.primitives import Estimator, Sampler
+from qiskit.primitives import StatevectorEstimator as Estimator, StatevectorSampler as Sampler
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_aer import AerSimulator
 from qiskit_aer.primitives import Sampler as SamplerAer
