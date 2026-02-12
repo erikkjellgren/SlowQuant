@@ -1,7 +1,6 @@
 import numpy as np
 
 from slowquant.unitary_coupled_cluster.density_matrix import (
-    ReducedDenstiyMatrix,
     get_orbital_gradient_response,
     get_triplet_orbital_response_hessian_block,
     get_orbital_response_metric_sigma,
@@ -33,24 +32,17 @@ class LinearResponseUCC(LinearResponseBaseClass):
         """
         super().__init__(wave_function, excitations, tda)
 
-        rdms = ReducedDenstiyMatrix(
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-            self.wf.rdm1,
-            rdm2=self.wf.rdm2,
-            t_rdm2=self.wf.t_rdm2,
-        )
         idx_shift = len(self.q_ops)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
         grad = get_orbital_gradient_response(
-            rdms,
             self.wf.h_mo,
             self.wf.g_mo,
             self.wf.kappa_no_activeactive_idx,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
+            self.wf.rdm1,
+            self.wf.rdm2,
         )
         if len(grad) != 0:
             print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
@@ -86,26 +78,33 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
         # Do orbital-orbital blocks
         self.A[: len(self.q_ops), : len(self.q_ops)] = get_triplet_orbital_response_hessian_block(
-            rdms,
             self.wf.h_mo,
             self.wf.g_mo,
             self.wf.kappa_no_activeactive_idx_dagger,
             self.wf.kappa_no_activeactive_idx,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
+            self.wf.rdm1,
+            self.wf.rdm2,
+            self.wf.t_rdm2,
         )
         if not self.tda:
             self.B[: len(self.q_ops), : len(self.q_ops)] = get_triplet_orbital_response_hessian_block(
-                rdms,
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.kappa_no_activeactive_idx_dagger,
-                self.wf.kappa_no_activeactive_idx_dagger,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
+            self.wf.h_mo,
+            self.wf.g_mo,
+            self.wf.kappa_no_activeactive_idx_dagger,
+            self.wf.kappa_no_activeactive_idx,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.rdm1,
+            self.wf.rdm2,
+            self.wf.t_rdm2,
             )
         self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
-            rdms, self.wf.kappa_no_activeactive_idx
+                self.wf.kappa_no_activeactive_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.rdm1,
         )
         for j, qJ in enumerate(self.q_ops):
             Hq_ket = propagate_state([self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info)
