@@ -12,6 +12,7 @@ def multipole_integral_driver(mol_obj: _Molecule, multipole_moment: np.ndarray) 
 
     Args:
         mol_obj: Molecule object.
+        multipole_moment: Cartesian multipole moment (x, y, z).
 
     Returns:
         Multipole integrals.

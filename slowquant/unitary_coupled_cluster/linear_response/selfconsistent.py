@@ -10,7 +10,6 @@ from slowquant.unitary_coupled_cluster.ci_spaces import (
     get_indexing_extended,
 )
 from slowquant.unitary_coupled_cluster.density_matrix import (
-    ReducedDenstiyMatrix,
     get_orbital_gradient_response,
     get_orbital_response_hessian_block,
     get_orbital_response_metric_sigma,
@@ -31,7 +30,7 @@ from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
 
 
-class LinearResponseUCC(LinearResponseBaseClass):
+class LinearResponse(LinearResponseBaseClass):
     index_info_extended: tuple[CI_Info, list[float], UpsStructure] | tuple[CI_Info, list[float], UccStructure]
 
     def __init__(
@@ -69,32 +68,26 @@ class LinearResponseUCC(LinearResponseBaseClass):
                 self.wf.thetas,
                 self.wf.ups_layout,
             )
+        else:
             raise ValueError(f"Got incompatible wave function type, {type(self.wf)}")
         num_det = len(ci_info.idx2det)
         self.csf_coeffs = np.zeros(num_det)
         hf_det = int("1" * self.wf.num_elec + "0" * (self.wf.num_spin_orbs - self.wf.num_elec), 2)
         self.csf_coeffs[ci_info.det2idx[hf_det]] = 1
         self.ci_coeffs = propagate_state(["U"], self.csf_coeffs, *self.index_info_extended)
-
-        rdms = ReducedDenstiyMatrix(
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-            self.wf.rdm1,
-            rdm2=self.wf.rdm2,
-        )
         idx_shift = len(self.q_ops)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
-        grad = get_orbital_gradient_response(
-            rdms,
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.kappa_no_activeactive_idx,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        if len(grad) != 0:
+        if len(self.q_ops) != 0:
+            grad = get_orbital_gradient_response(
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.kappa_no_activeactive_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.rdm1,
+                self.wf.rdm2,
+            )
             print("idx, max(abs(grad orb)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
                 raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
@@ -124,35 +117,47 @@ class LinearResponseUCC(LinearResponseBaseClass):
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
                 raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
-        # Do orbital-orbital blocks
-        self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
-            rdms,
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.kappa_no_activeactive_idx_dagger,
-            self.wf.kappa_no_activeactive_idx,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-        )
-        if not self.tda:
-            self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
-                rdms,
+        if len(self.q_ops) != 0:
+            # Do orbital-orbital blocks
+            self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
                 self.wf.h_mo,
                 self.wf.g_mo,
                 self.wf.kappa_no_activeactive_idx_dagger,
-                self.wf.kappa_no_activeactive_idx_dagger,
+                self.wf.kappa_no_activeactive_idx,
                 self.wf.num_inactive_orbs,
                 self.wf.num_active_orbs,
+                self.wf.rdm1,
+                self.wf.rdm2,
             )
-        self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
-            rdms, self.wf.kappa_no_activeactive_idx
-        )
+            if not self.tda:
+                self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
+                            self.wf.h_mo,
+                        self.wf.g_mo,
+                        self.wf.kappa_no_activeactive_idx_dagger,
+                        self.wf.kappa_no_activeactive_idx_dagger,
+                        self.wf.num_inactive_orbs,
+                        self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.wf.rdm2,
+                    )
+            self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
+                self.wf.kappa_no_activeactive_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.rdm1,
+            )
         for j, qJ in enumerate(self.q_ops):
             UdHq_ket = propagate_state(
-                ["Ud", self.H_1i_1a, qJ], self.ci_coeffs, *self.index_info_extended, do_unsafe=True  # type: ignore
+                ["Ud", self.H_1i_1a, qJ],
+                self.ci_coeffs,
+                *self.index_info_extended,
+                do_unsafe=True,  # type: ignore
             )
             UdqdH_ket = propagate_state(
-                ["Ud", qJ.dagger, self.H_1i_1a], self.ci_coeffs, *self.index_info_extended, do_unsafe=True  # type: ignore
+                ["Ud", qJ.dagger, self.H_1i_1a],
+                self.ci_coeffs,
+                *self.index_info_extended,
+                do_unsafe=True,  # type: ignore
             )
             for i, GI in enumerate(self.G_ops):
                 G_ket = propagate_state(
@@ -286,13 +291,6 @@ class LinearResponseUCC(LinearResponseBaseClass):
         if len(dipole_integrals) != 3:
             raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
         number_excitations = len(self.excitation_energies)
-        rdms = ReducedDenstiyMatrix(
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-            self.wf.rdm1,
-            rdm2=self.wf.rdm2,
-        )
         mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
         muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
         muz = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[2])
@@ -319,36 +317,40 @@ class LinearResponseUCC(LinearResponseBaseClass):
         Udmuz_ket = propagate_state(["Ud", muz_op], self.ci_coeffs, *self.index_info_extended)
         transition_dipoles = np.zeros((len(self.normed_response_vectors[0]), 3))
         for state_number in range(len(self.normed_response_vectors[0])):
-            q_part_x = get_orbital_response_property_gradient(
-                rdms,
-                mux,
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.normed_response_vectors,
-                state_number,
-                number_excitations,
-            )
-            q_part_y = get_orbital_response_property_gradient(
-                rdms,
-                muy,
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.normed_response_vectors,
-                state_number,
-                number_excitations,
-            )
-            q_part_z = get_orbital_response_property_gradient(
-                rdms,
-                muz,
-                self.wf.kappa_no_activeactive_idx,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.normed_response_vectors,
-                state_number,
-                number_excitations,
-            )
+            q_part_x = 0.0
+            q_part_y = 0.0
+            q_part_z = 0.0
+            if len(self.q_ops) != 0:
+                q_part_x = get_orbital_response_property_gradient(
+                    mux,
+                    self.wf.kappa_no_activeactive_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.normed_response_vectors,
+                    state_number,
+                    number_excitations,
+                )
+                q_part_y = get_orbital_response_property_gradient(
+                    muy,
+                    self.wf.kappa_no_activeactive_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.normed_response_vectors,
+                    state_number,
+                    number_excitations,
+                )
+                q_part_z = get_orbital_response_property_gradient(
+                    muz,
+                    self.wf.kappa_no_activeactive_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.normed_response_vectors,
+                    state_number,
+                    number_excitations,
+                )
             g_part_x = 0.0
             g_part_y = 0.0
             g_part_z = 0.0

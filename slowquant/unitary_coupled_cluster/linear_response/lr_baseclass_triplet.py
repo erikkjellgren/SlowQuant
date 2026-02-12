@@ -8,11 +8,8 @@ from slowquant.unitary_coupled_cluster.operators import (
     G4,
     G5,
     G6,
-    G1_sa_t,
-    G2_1_sa_t,
-    G2_2_sa_t,
-    G2_3_sa_t,
-    Tpq,
+    G1_tsa,
+    G2_tsa,
     hamiltonian_0i_0a,
     hamiltonian_1i_1a,
 )
@@ -22,7 +19,7 @@ from slowquant.unitary_coupled_cluster.util import (
     UccStructure,
     UpsStructure,
     iterate_t1_sa,
-    iterate_t2_sa_t,
+    iterate_t2_tsa,
     iterate_t3,
     iterate_t4,
     iterate_t5,
@@ -69,15 +66,10 @@ class LinearResponseBaseClass:
 
         if "s" in excitations:
             for a, i, _ in iterate_t1_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
-                self.G_ops.append(G1_sa_t(i, a))
+                self.G_ops.append(G1_tsa(i, a))
         if "d" in excitations:
-            for a, i, b, j, _, op_type in iterate_t2_sa_t(self.wf.active_occ_idx, self.wf.active_unocc_idx):
-                if op_type == 1:
-                    self.G_ops.append(G2_1_sa_t(i, j, a, b))
-                elif op_type == 2:
-                    self.G_ops.append(G2_2_sa_t(i, j, a, b))
-                elif op_type == 3:
-                    self.G_ops.append(G2_3_sa_t(i, j, a, b))
+            for a, i, b, j, _, op_type in iterate_t2_tsa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
+                self.G_ops.append(G2_tsa(i, j, a, b, op_type))
         if "t" in excitations:
             for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
                 self.G_ops.append(G3(i, j, k, a, b, c))
@@ -96,9 +88,8 @@ class LinearResponseBaseClass:
                 self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx
             ):
                 self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
-        for i, a in self.wf.kappa_no_activeactive_idx:
-            op = 2 ** (-1 / 2) * Tpq(a, i)
-            self.q_ops.append(op)
+        for p, q in self.wf.kappa_no_activeactive_idx:
+            self.q_ops.append(G1_tsa(p, q))
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters))

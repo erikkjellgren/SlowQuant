@@ -155,6 +155,26 @@ def electron_repulsion_integral(
     r"""Calculate electron-repulsion integral over shells.
 
     Args:
+        center1: Center of first shell.
+        center2: Center of second shell.
+        center3: Center of third shell.
+        center4: Center of fourth shell.
+        exponents1: Exponents of primitives in first shell.
+        exponents2: Exponents of primitives in second shell.
+        exponents3: Exponents of primitives in third shell.
+        exponents4: Exponents of primitives in fourth shell.
+        contra_coeff1: Contraction coefficients of primitives in first shell.
+        contra_coeff2: Contraction coefficients of primitives in second shell.
+        contra_coeff3: Contraction coefficients of primitives in third shell.
+        contra_coeff4: Contraction coefficients of primitives in fourth shell.
+        norm1: Normalization constant of basis-functions in first shell.
+        norm2: Normalization constant of basis-functions in second shell.
+        norm3: Normalization constant of basis-functions in third shell.
+        norm4: Normalization constant of basis-functions in fourth shell.
+        angular_moments1: Cartesian angular moments of basis-functions in first shell.
+        angular_moments2: Cartesian angular moments of basis-functions in second shell.
+        angular_moments3: Cartesian angular moments of basis-functions in third shell.
+        angular_moments4: Cartesian angular moments of basis-functions in fourth shell.
 
     Returns:
         Electron-repulsion integral between two shells.

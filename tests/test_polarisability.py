@@ -1,53 +1,55 @@
 import numpy as np
 from scipy.linalg import solve
-
-import slowquant.SlowQuant as sq
+import pyscf
 import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
-def test_H2_sto3g_naive():
+def get_polarisability(geometry, basis, active_space, charge=0, unit='bohr'):
     """
-    Test of polarisability for naive LR with working equations
+    Calculate the polarisability
     """
-    # Slowquant Object with parameters and setup
-    SQobj = sq.SlowQuant()
-    SQobj.set_molecule(
-        """H  0.0   0.0  0.0;
-            H  0.74  0.0  0.0;""",
-        distance_unit="angstrom",
-    )
-    SQobj.set_basis_set("STO-3G")
-    # HF
-    SQobj.init_hartree_fock()
-    SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
-    # OO-UCCSD
+    # PySCF
+    mol = pyscf.M(atom=geometry, basis=basis, charge=charge, unit=unit)
+    rhf = mol.RHF().run()
+    mo_coeff = rhf.mo_coeff
+
+    # SlowQuant
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
-        (2, 2),
-        SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        mol.nelectron,
+        active_space,
+        mo_coeff,
+        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
+        mol.intor("int2e"),
         "SD",
     )
-    WF.run_wf_optimization_1step("SLSQP", True)
 
-    # Linear Response
-    LR = naive.LinearResponseUCC(WF, excitations="SD")
+    # Optimize WF
+    WF.run_wf_optimization_1step('SLSQP', True)
+    print("Energy elec", WF.energy_elec)
+
+    # Singlet Linear Response
+    LR = naive.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
 
-    # Calculate dipole integrals
-    dipole_integrals = np.array([
-        SQobj.integral.get_multipole_matrix([1, 0, 0]),
-        SQobj.integral.get_multipole_matrix([0, 1, 0]),
-        SQobj.integral.get_multipole_matrix([0, 0, 1]),
-    ])
+    # Dipole integrals
+    dip_ao = mol.intor('int1e_r')
+    prop_grad = LR.get_property_gradient(dip_ao)
+    response = solve(LR.hessian, prop_grad)
+    alpha = np.einsum('ix,ix->x', prop_grad, response)
 
-    property_gradient = LR.get_property_gradient(dipole_integrals)
-    resp = solve(LR.hessian, property_gradient)
-    alpha = np.einsum("xi,xi->i", resp, property_gradient)
+    print(f'Polarisabilities:\n \t xx: {alpha[0]:.4f} \t yy: {alpha[1]:.4f} \t zz: {alpha[2]:.4f}')
+
+    return alpha
+
+
+def test_H2_sto3g_naive():
+    """
+    Test of polarisability for naive LR with H2(2,2)/STO-3G
+    """
+    geometry = """H  0.0   0.0  0.0;
+            H  0.74  0.0  0.0;"""
+    alpha = get_polarisability(geometry, basis='sto-3g', active_space=(2,2), unit='angstrom')
 
     thresh = 10**-4
 
@@ -59,46 +61,11 @@ def test_H2_sto3g_naive():
 
 def test_LiH_sto3g_naive():
     """
-    Test of polarisability for naive LR with working equations
+    Test of polarisability for naive LR with LiH(2,2)/STO-3G
     """
-    # Slowquant Object with parameters and setup
-    SQobj = sq.SlowQuant()
-    SQobj.set_molecule(
-        """H  0.0   0.0  0.0;
-            Li  0.8  0.0  0.0;""",
-        distance_unit="angstrom",
-    )
-    SQobj.set_basis_set("STO-3G")
-    # HF
-    SQobj.init_hartree_fock()
-    SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
-    # OO-UCCSD
-    WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
-        (2, 2),
-        SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
-        "SD",
-    )
-    WF.run_wf_optimization_1step("SLSQP", True)
-
-    # Linear Response
-    LR = naive.LinearResponseUCC(WF, excitations="SD")
-    LR.calc_excitation_energies()
-
-    # Calculate dipole integrals
-    dipole_integrals = np.array([
-        SQobj.integral.get_multipole_matrix([1, 0, 0]),
-        SQobj.integral.get_multipole_matrix([0, 1, 0]),
-        SQobj.integral.get_multipole_matrix([0, 0, 1]),
-    ])
-
-    property_gradient = LR.get_property_gradient(dipole_integrals)
-    resp = solve(LR.hessian, property_gradient)
-    alpha = np.einsum("xi,xi->i", resp, property_gradient)
+    geometry = """H  0.0   0.0  0.0;
+            Li  0.8  0.0  0.0;"""
+    alpha = get_polarisability(geometry, basis='sto-3g', active_space=(2,2), unit='angstrom')
 
     thresh = 10**-2
 
@@ -110,12 +77,9 @@ def test_LiH_sto3g_naive():
 
 def test_H10_sto3g_naive():
     """
-    Test of polarisability for naive LR with working equations
+    Test of polarisability for naive LR with H10(2,2)/STO-3G
     """
-    # Slowquant Object with parameters and setup
-    SQobj = sq.SlowQuant()
-    SQobj.set_molecule(
-        """H  0.0  0.0  0.0;
+    geometry = """H  0.0  0.0  0.0;
            H  1.4  0.0  0.0;
            H  2.8  0.0  0.0;
            H  4.2  0.0  0.0;
@@ -124,40 +88,9 @@ def test_H10_sto3g_naive():
            H  8.4  0.0  0.0;
            H  9.8  0.0  0.0;
            H 11.2  0.0  0.0;
-           H 12.6  0.0  0.0;""",
-        distance_unit="bohr",
-    )
-    SQobj.set_basis_set("STO-3G")
-    # HF
-    SQobj.init_hartree_fock()
-    SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
-    # OO-UCCSD
-    WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
-        (2, 2),
-        SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
-        "SD",
-    )
-    WF.run_wf_optimization_1step("SLSQP", True)
+           H 12.6  0.0  0.0;"""
 
-    # Linear Response
-    LR = naive.LinearResponseUCC(WF, excitations="SD")
-    LR.calc_excitation_energies()
-
-    # Calculate dipole integrals
-    dipole_integrals = np.array([
-        SQobj.integral.get_multipole_matrix([1, 0, 0]),
-        SQobj.integral.get_multipole_matrix([0, 1, 0]),
-        SQobj.integral.get_multipole_matrix([0, 0, 1]),
-    ])
-
-    property_gradient = LR.get_property_gradient(dipole_integrals)
-    resp = solve(LR.hessian, property_gradient)
-    alpha = np.einsum("xi,xi->i", resp, property_gradient)
+    alpha = get_polarisability(geometry, basis='sto-3g', active_space=(2,2), unit='bohr')
 
     thresh = 10**-3
 

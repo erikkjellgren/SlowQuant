@@ -7,7 +7,6 @@ from functools import partial
 
 import numpy as np
 import scipy
-import scipy.optimize
 import scipy.sparse as ss
 
 from slowquant.molecularintegrals.integralfunctions import (
@@ -16,7 +15,6 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
 from slowquant.unitary_coupled_cluster.density_matrix import (
-    ReducedDenstiyMatrix,
     get_electronic_energy,
     get_orbital_gradient,
 )
@@ -379,8 +377,6 @@ class WaveFunctionUCC:
                         [Epq(p, q)],
                         self.ci_coeffs,
                         self.ci_info,
-                        self.thetas,
-                        self.ucc_layout,
                     )
                     self._rdm1[p_idx, q_idx] = val  # type: ignore
                     self._rdm1[q_idx, p_idx] = val  # type: ignore
@@ -423,8 +419,6 @@ class WaveFunctionUCC:
                                 [Epq(p, q), Epq(r, s)],
                                 self.ci_coeffs,
                                 self.ci_info,
-                                self.thetas,
-                                self.ucc_layout,
                             )
                             if q == r:
                                 val -= self.rdm1[p_idx, s_idx]
@@ -519,8 +513,6 @@ class WaveFunctionUCC:
                                         [Epq(p, q), Epq(r, s), Epq(t, u)],
                                         self.ci_coeffs,
                                         self.ci_info,
-                                        self.thetas,
-                                        self.ucc_layout,
                                     )
                                     if t == s:
                                         val -= self.rdm2[p_idx, q_idx, r_idx, u_idx]
@@ -587,8 +579,6 @@ class WaveFunctionUCC:
                                                 [Epq(p, q), Epq(r, s), Epq(t, u), Epq(m, n)],
                                                 self.ci_coeffs,
                                                 self.ci_info,
-                                                self.thetas,
-                                                self.ucc_layout,
                                             )
                                             if r == q:
                                                 val -= self.rdm3[p_idx, s_idx, t_idx, u_idx, m_idx, n_idx]
@@ -798,8 +788,6 @@ class WaveFunctionUCC:
                 ],
                 self.ci_coeffs,
                 self.ci_info,
-                self.thetas,
-                self.ucc_layout,
             )
         return self._energy_elec
 
@@ -833,7 +821,7 @@ class WaveFunctionUCC:
         for exc_type in self.ucc_layout.excitation_operator_type:
             if exc_type == "sa_single":
                 num_theta1 += 1
-            elif exc_type in ("sa_double_1", "sa_double_2"):
+            elif exc_type in ("sa_double_1", "sa_double_2", "sa_double_3", "sa_double_4", "sa_double_5"):
                 num_theta2 += 1
             elif exc_type == "triple":
                 num_theta3 += 1
@@ -916,7 +904,7 @@ class WaveFunctionUCC:
                 self._old_opt_parameters = np.zeros(len(self.kappa_idx)) + 10**20
                 self._E_opt_old = 0.0
                 res = optimizer.minimize([0.0] * len(self.kappa_idx))
-                for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
+                for i in range(len(self.kappa)):
                     self.kappa[i] = 0.0
                     self._kappa_old[i] = 0.0
             else:
@@ -929,9 +917,9 @@ class WaveFunctionUCC:
                 break
 
             e_new = res.fun
-            time_str = f"{time.time() - full_start:7.2f}"  # type: ignore
+            time_str = f"{time.time() - full_start:7.2f}"
             e_str = f"{e_new:3.12f}"
-            print(f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")  # type: ignore
+            print(f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)}")
             if abs(e_new - e_old) < tol:
                 break
             e_old = e_new
@@ -965,7 +953,7 @@ class WaveFunctionUCC:
         for exc_type in self.ucc_layout.excitation_operator_type:
             if exc_type == "sa_single":
                 num_theta1 += 1
-            elif exc_type in ("sa_double_1", "sa_double_2"):
+            elif exc_type in ("sa_double_1", "sa_double_2", "sa_double_3", "sa_double_4", "sa_double_5"):
                 num_theta2 += 1
             elif exc_type == "triple":
                 num_theta3 += 1
@@ -1039,7 +1027,7 @@ class WaveFunctionUCC:
         )
         if orbital_optimization:
             self.thetas = res.x[len(self.kappa) :].tolist()
-            for i in range(len(self.kappa)):  # pylint: disable=consider-using-enumerate
+            for i in range(len(self.kappa)):
                 self._kappa[i] = 0.0
                 self._kappa_old[i] = 0.0
         else:
@@ -1079,15 +1067,13 @@ class WaveFunctionUCC:
             # RDM is more expensive than evaluation of the Hamiltonian.
             # Thus only construct these if orbital-optimization is turned on,
             # since the RDMs will be reused in the oo gradient calculation.
-            rdms = ReducedDenstiyMatrix(
+            E = get_electronic_energy(
+                self.h_mo,
+                self.g_mo,
                 self.num_inactive_orbs,
                 self.num_active_orbs,
-                self.num_virtual_orbs,
-                rdm1=self.rdm1,
-                rdm2=self.rdm2,
-            )
-            E = get_electronic_energy(
-                rdms, self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
+                self.rdm1,
+                self.rdm2,
             )
         else:
             E = expectation_value(
@@ -1102,8 +1088,6 @@ class WaveFunctionUCC:
                 ],
                 self.ci_coeffs,
                 self.ci_info,
-                self.thetas,
-                self.ucc_layout,
             )
         self._E_opt_old = E
         self._old_opt_parameters = np.copy(parameters)
@@ -1137,15 +1121,14 @@ class WaveFunctionUCC:
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:
-            rdms = ReducedDenstiyMatrix(
+            gradient[:num_kappa] = get_orbital_gradient(
+                self.h_mo,
+                self.g_mo,
+                self.kappa_idx,
                 self.num_inactive_orbs,
                 self.num_active_orbs,
-                self.num_virtual_orbs,
-                rdm1=self.rdm1,
-                rdm2=self.rdm2,
-            )
-            gradient[:num_kappa] = get_orbital_gradient(
-                rdms, self.h_mo, self.g_mo, self.kappa_idx, self.num_inactive_orbs, self.num_active_orbs
+                self.rdm1,
+                self.rdm2,
             )
         if theta_optimization:
             Hamiltonian = hamiltonian_0i_0a(
@@ -1164,8 +1147,6 @@ class WaveFunctionUCC:
                 [Hamiltonian],
                 self.ci_coeffs,
                 self.ci_info,
-                self.thetas,
-                self.ucc_layout,
             )
             E = self.ci_coeffs @ Hket
             theta_params = np.zeros_like(self.thetas)
@@ -1173,7 +1154,7 @@ class WaveFunctionUCC:
                 get_ucc_T(self.thetas, self.ucc_layout),
                 self.ci_info,
             )
-            for i in range(len(theta_params)):  # pylint: disable=consider-using-enumerate
+            for i in range(len(theta_params)):
                 sign_step = (theta_params[i] >= 0).astype(float) * 2 - 1  # type: ignore [attr-defined]
                 step_size = eps * sign_step * max(1, abs(theta_params[i]))
                 theta_params[i] += step_size
@@ -1210,7 +1191,7 @@ def load_wavefunction(filename: str) -> WaveFunctionUCC:
     wf.thetas = dat["thetas"]
     if abs(wf.energy_elec - float(dat["energy_elec"])) > 10**-6:
         raise ValueError(
-            f'Calculate energy is different from saved energy: {wf.energy_elec} and {float(dat["energy_elec"])}.'
+            f"Calculate energy is different from saved energy: {wf.energy_elec} and {float(dat['energy_elec'])}."
         )
     print(f"Electronic energy of loaded wave function is {wf.energy_elec}")
     return wf

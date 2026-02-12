@@ -28,7 +28,7 @@ from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
 
 
-class LinearResponseUCC(LinearResponseBaseClass):
+class LinearResponse(LinearResponseBaseClass):
     index_info_extended: tuple[CI_Info, list[float], UpsStructure] | tuple[CI_Info, list[float], UccStructure]
 
     def __init__(
@@ -128,7 +128,10 @@ class LinearResponseUCC(LinearResponseBaseClass):
         UdH_ket = propagate_state(["Ud"], H_ket, *self.index_info_extended, do_unsafe=True)  # type: ignore
         for j, qJ in enumerate(self.q_ops):
             UdHUqJ_ket = propagate_state(
-                ["Ud", H_2i_2a, "U", qJ], self.csf_coeffs, *self.index_info_extended, do_unsafe=True  # type: ignore
+                ["Ud", H_2i_2a, "U", qJ],
+                self.csf_coeffs,
+                *self.index_info_extended,
+                do_unsafe=True,  # type: ignore
             )
             qJUdH_ket = propagate_state([qJ], UdH_ket, *self.index_info_extended, do_unsafe=True)  # type: ignore
             qJdUdH_ket = propagate_state([qJ.dagger], UdH_ket, *self.index_info_extended, do_unsafe=True)  # type: ignore
@@ -180,10 +183,16 @@ class LinearResponseUCC(LinearResponseBaseClass):
                     self.Sigma[i, j] = self.Sigma[j, i] = 1
         for j, qJ in enumerate(self.q_ops):
             UdHUq_ket = propagate_state(
-                ["Ud", self.H_1i_1a, "U", qJ], self.csf_coeffs, *self.index_info_extended, do_unsafe=True  # type: ignore
+                ["Ud", self.H_1i_1a, "U", qJ],
+                self.csf_coeffs,
+                *self.index_info_extended,
+                do_unsafe=True,  # type: ignore
             )
             qdUdH_ket = propagate_state(
-                [qJ.dagger, "Ud", self.H_1i_1a], self.ci_coeffs, *self.index_info_extended, do_unsafe=True  # type: ignore
+                [qJ.dagger, "Ud", self.H_1i_1a],
+                self.ci_coeffs,
+                *self.index_info_extended,
+                do_unsafe=True,  # type: ignore
             )
             for i, GI in enumerate(self.G_ops):
                 G_ket = propagate_state([GI], self.csf_coeffs, *self.index_info_extended)
