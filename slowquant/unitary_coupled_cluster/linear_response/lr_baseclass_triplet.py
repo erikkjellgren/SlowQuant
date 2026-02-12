@@ -37,12 +37,14 @@ class LinearResponseBaseClass:
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
+        tda: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
+            tda: Whether to use Tamm-Dancoff Approximation.
         """
         self.wf = wave_function
         if isinstance(self.wf, WaveFunctionUCC):
@@ -63,6 +65,7 @@ class LinearResponseBaseClass:
         self.G_ops: list[FermionicOperator] = []
         self.q_ops: list[FermionicOperator] = []
         excitations = excitations.lower()
+        self.tda = tda
 
         if "s" in excitations:
             for a, i, _ in iterate_t1_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
@@ -99,9 +102,9 @@ class LinearResponseBaseClass:
 
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters))
-        self.B = np.zeros((num_parameters, num_parameters))
+        self.B = np.zeros((num_parameters, num_parameters)) if not self.tda else np.zeros(())
         self.Sigma = np.zeros((num_parameters, num_parameters))
-        self.Delta = np.zeros((num_parameters, num_parameters))
+        self.Delta = np.zeros((num_parameters, num_parameters)) if not self.tda else np.zeros(())
         self.H_1i_1a = hamiltonian_1i_1a(
             self.wf.h_mo,
             self.wf.g_mo,
@@ -119,42 +122,45 @@ class LinearResponseBaseClass:
     def calc_excitation_energies(self) -> None:
         """Calculate excitation energies."""
         size = len(self.A)
-        E2 = np.zeros((size * 2, size * 2))
-        E2[:size, :size] = self.A
-        E2[:size, size:] = self.B
-        E2[size:, :size] = self.B
-        E2[size:, size:] = self.A
+        E2 = np.zeros((size * 2, size * 2)) if not self.tda else np.zeros(())
+        if not self.tda:
+            E2[:size, :size] = self.A
+            E2[:size, size:] = self.B
+            E2[size:, :size] = self.B
+            E2[size:, size:] = self.A
+
         (
             hess_eigval,
             _,
-        ) = np.linalg.eig(E2)
+        ) = np.linalg.eig(self.A) if self.tda else np.linalg.eig(E2)
         print(f"Smallest Hessian eigenvalue: {np.min(hess_eigval)}")
         if np.abs(np.min(hess_eigval)) < 10**-8:
             print("WARNING: Small eigenvalue in Hessian")
         elif np.min(hess_eigval) < 0:
             raise ValueError("Negative eigenvalue in Hessian.")
 
-        S = np.zeros((size * 2, size * 2))
-        S[:size, :size] = self.Sigma
-        S[:size, size:] = self.Delta
-        S[size:, :size] = -self.Delta
-        S[size:, size:] = -self.Sigma
+        S = np.zeros((size * 2, size * 2)) if not self.tda else np.zeros(())
+        if not self.tda:
+            S[:size, :size] = self.Sigma
+            S[:size, size:] = self.Delta
+            S[size:, :size] = -self.Delta
+            S[size:, size:] = -self.Sigma
         print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma)))}")
 
-        self.hessian = E2
-        self.metric = S
+        self.hessian = E2 if not self.tda else self.A
+        self.metric = S if not self.tda else self.Sigma
 
         eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)
         sorting = np.argsort(eigval)
-        self.excitation_energies = np.real(eigval[sorting][size:])
-        self.response_vectors = np.real(eigvec[:, sorting][:, size:])
+        self.excitation_energies = np.real(eigval[sorting][size:]) if not self.tda else np.real(eigval[sorting])
+        self.response_vectors = np.real(eigvec[:, sorting][:, size:]) if not self.tda else np.real(eigvec[:, sorting])
         self.normed_response_vectors = np.zeros_like(self.response_vectors)
         self.num_q = len(self.q_ops)
         self.num_G = size - self.num_q
         self.Z_q = self.response_vectors[: self.num_q, :]
         self.Z_G = self.response_vectors[self.num_q : self.num_q + self.num_G, :]
-        self.Y_q = self.response_vectors[self.num_q + self.num_G : 2 * self.num_q + self.num_G]
-        self.Y_G = self.response_vectors[2 * self.num_q + self.num_G :]
+        self.Y_q = self.response_vectors[self.num_q + self.num_G : 2 * self.num_q + self.num_G] if not self.tda else np.zeros(())
+        self.Y_G = self.response_vectors[2 * self.num_q + self.num_G :] if not self.tda else np.zeros(())
         self.Z_q_normed = np.zeros_like(self.Z_q)
         self.Z_G_normed = np.zeros_like(self.Z_G)
         self.Y_q_normed = np.zeros_like(self.Y_q)
