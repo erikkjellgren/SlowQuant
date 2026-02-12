@@ -40,24 +40,16 @@ class quantumLR(quantumLRBaseClass):
             if do_rdm:
                 if isinstance(self.wf.QI._primitive, BaseSampler):  # pylint: disable=protected-access
                     self.wf.precalc_rdm_paulis(2)
-                # RDMs
-                rdms = ReducedDenstiyMatrix(
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
-                    self.wf.rdm1,
-                    rdm2=self.wf.rdm2,
-                    t_rdm2=self.wf.t_rdm2,
-                )
                 if do_gradients:
                     # Check gradients
                     grad = get_orbital_gradient_response(
-                        rdms,
                         self.wf.h_mo,
                         self.wf.g_mo,
                         self.wf.kappa_no_activeactive_idx,
                         self.wf.num_inactive_orbs,
                         self.wf.num_active_orbs,
+                        self.wf.rdm1,
+                        self.wf.rdm2,
                     )
             else:
                 if do_gradients:
@@ -92,25 +84,33 @@ class quantumLR(quantumLRBaseClass):
         if self.num_q != 0:
             if do_rdm:
                 self.A[: self.num_q, : self.num_q] = get_triplet_orbital_response_hessian_block(
-                    rdms,
                     self.wf.h_mo,
                     self.wf.g_mo,
                     self.wf.kappa_no_activeactive_idx_dagger,
                     self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
                     self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.wf.rdm2,
+                    self.wf.t_rdm2,
                 )
-                self.B[: self.num_q, : self.num_q] = get_triplet_orbital_response_hessian_block(
-                    rdms,
-                    self.wf.h_mo,
-                    self.wf.g_mo,
-                    self.wf.kappa_no_activeactive_idx_dagger,
-                    self.wf.kappa_no_activeactive_idx_dagger,
+                if not self.tda:
+                    self.B[: self.num_q, : self.num_q] = get_triplet_orbital_response_hessian_block(
+                        self.wf.h_mo,
+                        self.wf.g_mo,
+                        self.wf.kappa_no_activeactive_idx_dagger,
+                        self.wf.kappa_no_activeactive_idx,
+                        self.wf.num_inactive_orbs,
+                        self.wf.num_active_orbs,
+                        self.wf.rdm1,
+                        self.wf.rdm2,
+                        self.wf.t_rdm2,
+                    )
+                self.Sigma[: self.num_q, : self.num_q] = get_orbital_response_metric_sigma(
+                    self.wf.kappa_no_activeactive_idx,
                     self.wf.num_inactive_orbs,
                     self.wf.num_active_orbs,
-                )
-                self.Sigma[: self.num_q, : self.num_q] = get_orbital_response_metric_sigma(
-                    rdms, self.wf.kappa_no_activeactive_idx
+                    self.wf.rdm1,
                 )
             else:
                 self.H_2i_2a = hamiltonian_2i_2a(
@@ -128,12 +128,13 @@ class quantumLR(quantumLRBaseClass):
                         ) - self.wf.QI.quantum_expectation_value(
                             (qI.dagger * qJ * self.H_2i_2a).get_folded_operator(*self.orbs)
                         )
-                        # Make B
-                        self.B[i, j] = self.B[j, i] = -(
-                            self.wf.QI.quantum_expectation_value(
-                                (qI.dagger * qJ.dagger * self.H_2i_2a).get_folded_operator(*self.orbs)
+                        if not self.tda:
+                            # Make B
+                            self.B[i, j] = self.B[j, i] = -(
+                                self.wf.QI.quantum_expectation_value(
+                                    (qI.dagger * qJ.dagger * self.H_2i_2a).get_folded_operator(*self.orbs)
+                                )
                             )
-                        )
                         # Make Sigma
                         self.Sigma[i, j] = self.Sigma[j, i] = self.wf.QI.quantum_expectation_value(
                             (qI.dagger * qJ).get_folded_operator(*self.orbs)
@@ -149,13 +150,14 @@ class quantumLR(quantumLRBaseClass):
                         (self.H_1i_1a * qJ * GI.dagger).get_folded_operator(*self.orbs)
                     )
                     self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
-                    # Make B
-                    val = self.wf.QI.quantum_expectation_value(
-                        (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs)
-                    ) - self.wf.QI.quantum_expectation_value(
-                        (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
-                    )
-                    self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
+                    if not self.tda:
+                        # Make B
+                        val = self.wf.QI.quantum_expectation_value(
+                            (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs)
+                        ) - self.wf.QI.quantum_expectation_value(
+                            (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                        )
+                        self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
 
         # GG
         for j, GJ in enumerate(self.G_ops):
@@ -166,12 +168,13 @@ class quantumLR(quantumLRBaseClass):
                         double_commutator(GI.dagger, self.H_0i_0a, GJ).get_folded_operator(*self.orbs)
                     )
                 )
-                # Make B
-                self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = (
-                    self.wf.QI.quantum_expectation_value(
-                        double_commutator(GI.dagger, self.H_0i_0a, GJ.dagger).get_folded_operator(*self.orbs)
+                if not self.tda:
+                    # Make B
+                    self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = (
+                        self.wf.QI.quantum_expectation_value(
+                            double_commutator(GI.dagger, self.H_0i_0a, GJ.dagger).get_folded_operator(*self.orbs)
+                        )
                     )
-                )
                 # Make Sigma
                 self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = (
                     self.wf.QI.quantum_expectation_value(
@@ -220,10 +223,11 @@ class quantumLR(quantumLRBaseClass):
                             (qI.dagger * qJ * self.H_2i_2a).get_folded_operator(*self.orbs)
                         ).paulis.to_labels()
                     )
-                    # Make B
-                    B[i][j] = B[j][i] = self.wf.QI.op_to_qbit(
-                        (qI.dagger * qJ.dagger * self.H_2i_2a).get_folded_operator(*self.orbs)
-                    ).paulis.to_labels()
+                    if not self.tda:
+                        # Make B
+                        B[i][j] = B[j][i] = self.wf.QI.op_to_qbit(
+                            (qI.dagger * qJ.dagger * self.H_2i_2a).get_folded_operator(*self.orbs)
+                        ).paulis.to_labels()
                     # Make Sigma
                     Sigma[i][j] = Sigma[j][i] = self.wf.QI.op_to_qbit(
                         (qI.dagger * qJ).get_folded_operator(*self.orbs)
@@ -242,16 +246,17 @@ class quantumLR(quantumLRBaseClass):
                     ).paulis.to_labels()
                 )
                 A[i + idx_shift][j] = A[j][i + idx_shift] = val
-                # Make B
-                val = (
-                    self.wf.QI.op_to_qbit(
-                        (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs)
-                    ).paulis.to_labels()
-                    + self.wf.QI.op_to_qbit(
-                        (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
-                    ).paulis.to_labels()
-                )
-                B[i + idx_shift][j] = B[j][i + idx_shift] = val
+                if not self.tda:
+                    # Make B
+                    val = (
+                        self.wf.QI.op_to_qbit(
+                            (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs)
+                        ).paulis.to_labels()
+                        + self.wf.QI.op_to_qbit(
+                            (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs)
+                        ).paulis.to_labels()
+                    )
+                    B[i + idx_shift][j] = B[j][i + idx_shift] = val
 
         # GG
         for j, GJ in enumerate(self.G_ops):
@@ -260,10 +265,11 @@ class quantumLR(quantumLRBaseClass):
                 A[i + idx_shift][j + idx_shift] = A[j + idx_shift][i + idx_shift] = self.wf.QI.op_to_qbit(
                     double_commutator(GI.dagger, self.H_1i_1a, GJ).get_folded_operator(*self.orbs)
                 ).paulis.to_labels()
-                # Make B
-                B[i + idx_shift][j + idx_shift] = B[j + idx_shift][i + idx_shift] = self.wf.QI.op_to_qbit(
-                    double_commutator(GI.dagger, self.H_1i_1a, GJ.dagger).get_folded_operator(*self.orbs)
-                ).paulis.to_labels()
+                if not self.tda:
+                    # Make B
+                    B[i + idx_shift][j + idx_shift] = B[j + idx_shift][i + idx_shift] = self.wf.QI.op_to_qbit(
+                        double_commutator(GI.dagger, self.H_1i_1a, GJ.dagger).get_folded_operator(*self.orbs)
+                    ).paulis.to_labels()
                 # Make Sigma
                 Sigma[i + idx_shift][j + idx_shift] = Sigma[j + idx_shift][i + idx_shift] = (
                     self.wf.QI.op_to_qbit(
@@ -278,10 +284,11 @@ class quantumLR(quantumLRBaseClass):
                         clique = Clique()
                         clique.add_paulis([str(x) for x in A[i][j]])
                         A[i][j] = [x.head for x in clique.cliques]  # type: ignore [call-overload]
-                    if not B[i][j] == "":
-                        clique = Clique()
-                        clique.add_paulis([str(x) for x in B[i][j]])
-                        B[i][j] = [x.head for x in clique.cliques]  # type: ignore [call-overload]
+                    if not self.tda:
+                        if not B[i][j] == "":
+                            clique = Clique()
+                            clique.add_paulis([str(x) for x in B[i][j]])
+                            B[i][j] = [x.head for x in clique.cliques]  # type: ignore [call-overload]
                     if not Sigma[i][j] == "":
                         clique = Clique()
                         clique.add_paulis([str(x) for x in Sigma[i][j]])
@@ -293,8 +300,9 @@ class quantumLR(quantumLRBaseClass):
 
         CBS, nonCBS = get_num_CBS_elements(A)
         print("In A    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
-        CBS, nonCBS = get_num_CBS_elements(B)
-        print("In B    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
+        if not self.tda:
+            CBS, nonCBS = get_num_CBS_elements(B)
+            print("In B    , number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
         CBS, nonCBS = get_num_CBS_elements(Sigma)
         print("In Sigma, number of: CBS elements: ", CBS, ", non-CBS elements ", nonCBS)
 
@@ -331,7 +339,7 @@ class quantumLR(quantumLRBaseClass):
         )
 
         A = np.zeros((self.num_params, self.num_params))
-        B = np.zeros((self.num_params, self.num_params))
+        B = np.zeros((self.num_params, self.num_params)) if not self.tda else np.zeros(())
         Sigma = np.zeros((self.num_params, self.num_params))
 
         for j, qJ in enumerate(self.q_ops):
@@ -345,13 +353,14 @@ class quantumLR(quantumLRBaseClass):
                         (qI.dagger * qJ * self.H_2i_2a).get_folded_operator(*self.orbs), no_coeffs=no_coeffs
                     )
                 )
-                # Make B
-                B[i, j] = B[j, i] = np.sqrt(
-                    self.wf.QI.quantum_variance(
-                        (qI.dagger * qJ.dagger * self.H_2i_2a).get_folded_operator(*self.orbs),
-                        no_coeffs=no_coeffs,
+                if not self.tda:
+                    # Make B
+                    B[i, j] = B[j, i] = np.sqrt(
+                        self.wf.QI.quantum_variance(
+                            (qI.dagger * qJ.dagger * self.H_2i_2a).get_folded_operator(*self.orbs),
+                            no_coeffs=no_coeffs,
+                        )
                     )
-                )
                 # Make Sigma
                 Sigma[i, j] = Sigma[j, i] = np.sqrt(
                     self.wf.QI.quantum_variance(
@@ -372,18 +381,19 @@ class quantumLR(quantumLRBaseClass):
                     )
                 )
                 A[i + idx_shift, j] = A[j, i + idx_shift] = val
-                # Make B
-                val = np.sqrt(
-                    self.wf.QI.quantum_variance(
-                        (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs),
-                        no_coeffs=no_coeffs,
+                if not self.tda:
+                    # Make B
+                    val = np.sqrt(
+                        self.wf.QI.quantum_variance(
+                            (qJ.dagger * self.H_1i_1a * GI.dagger).get_folded_operator(*self.orbs),
+                            no_coeffs=no_coeffs,
+                        )
+                        + self.wf.QI.quantum_variance(
+                            (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs),
+                            no_coeffs=no_coeffs,
+                        )
                     )
-                    + self.wf.QI.quantum_variance(
-                        (GI.dagger * qJ.dagger * self.H_1i_1a).get_folded_operator(*self.orbs),
-                        no_coeffs=no_coeffs,
-                    )
-                )
-                B[i + idx_shift, j] = B[j, i + idx_shift] = val
+                    B[i + idx_shift, j] = B[j, i + idx_shift] = val
 
         # GG
         for j, GJ in enumerate(self.G_ops):
@@ -395,13 +405,14 @@ class quantumLR(quantumLRBaseClass):
                         no_coeffs=no_coeffs,
                     )
                 )
-                # Make B
-                B[i + idx_shift, j + idx_shift] = B[j + idx_shift, i + idx_shift] = np.sqrt(
-                    self.wf.QI.quantum_variance(
-                        double_commutator(GI.dagger, self.H_0i_0a, GJ.dagger).get_folded_operator(*self.orbs),
-                        no_coeffs=no_coeffs,
+                if not self.tda:
+                    # Make B
+                    B[i + idx_shift, j + idx_shift] = B[j + idx_shift, i + idx_shift] = np.sqrt(
+                        self.wf.QI.quantum_variance(
+                            double_commutator(GI.dagger, self.H_0i_0a, GJ.dagger).get_folded_operator(*self.orbs),
+                            no_coeffs=no_coeffs,
+                        )
                     )
-                )
                 # Make Sigma
                 Sigma[i + idx_shift, j + idx_shift] = Sigma[j + idx_shift, i + idx_shift] = np.sqrt(
                     self.wf.QI.quantum_variance(

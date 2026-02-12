@@ -5,14 +5,12 @@ import scipy
 
 from slowquant.qiskit_interface.circuit_wavefunction import WaveFunctionCircuit
 from slowquant.unitary_coupled_cluster.operators import (
-    G1_sa_t,
-    G2_1_sa_t,
-    G2_2_sa_t,
-    G2_3_sa_t,
+    G1_tsa,
+    G2_tsa,
     hamiltonian_0i_0a,
     hamiltonian_1i_1a,
 )
-from slowquant.unitary_coupled_cluster.util import iterate_t1_sa, iterate_t2_sa_t
+from slowquant.unitary_coupled_cluster.util import iterate_t1_sa, iterate_t2_tsa
 
 
 class quantumLRBaseClass:
@@ -20,13 +18,16 @@ class quantumLRBaseClass:
     def __init__(
         self,
         wf: WaveFunctionCircuit,
+        tda: bool = False
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wf: Wavefunction object.
+            tda: Whether to use Tamm-Dancoff Approximation.
         """
         self.wf = wf
+        self.tda = tda
         # Create operators
         self.H_0i_0a = hamiltonian_0i_0a(wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs)
         self.H_1i_1a = hamiltonian_1i_1a(
@@ -36,32 +37,24 @@ class quantumLRBaseClass:
         self.G_ops = []
         # G1
         for a, i, _ in iterate_t1_sa(wf.active_occ_idx, wf.active_unocc_idx):
-            self.G_ops.append(G1_sa_t(i, a))
+            self.G_ops.append(G1_tsa(i, a))
         # G2
-        for a, i, b, j, _, type_idx in iterate_t2_sa_t(wf.active_occ_idx, wf.active_unocc_idx):
-            if type_idx == 1:
-                # G2_1
-                self.G_ops.append(G2_1_sa_t(i, j, a, b))
-            elif type_idx == 2:
-                # G2_2
-                self.G_ops.append(G2_2_sa_t(i, j, a, b))
-            elif type_idx == 3:
-                # G3_3
-                self.G_ops.append(G2_3_sa_t(i, j, a, b))
+        for a, i, b, j, _, type_idx in iterate_t2_tsa(wf.active_occ_idx, wf.active_unocc_idx):
+            self.G_ops.append(G2_tsa(i, j, a, b, type_idx))
 
         # q
         self.q_ops = []
         for p, q in wf.kappa_no_activeactive_idx:
-            self.q_ops.append(G1_sa_t(p, q))
+            self.q_ops.append(G1_tsa(p, q))
 
         num_parameters = len(self.q_ops) + len(self.G_ops)
         self.num_params = num_parameters
         self.num_q = len(self.q_ops)
         self.num_G = len(self.G_ops)
         self.A = np.zeros((num_parameters, num_parameters))
-        self.B = np.zeros((num_parameters, num_parameters))
+        self.B = np.zeros((num_parameters, num_parameters)) if not self.tda else np.zeros(())
         self.Sigma = np.zeros((num_parameters, num_parameters))
-        self.Delta = np.zeros((num_parameters, num_parameters))
+        self.Delta = np.zeros((num_parameters, num_parameters)) if not self.tda else np.zeros(())
 
         self.orbs = [self.wf.num_inactive_orbs, self.wf.num_active_orbs, self.wf.num_virtual_orbs]
 
@@ -141,7 +134,7 @@ class quantumLRBaseClass:
         print("\n Condition numbers:\n")
         print(f"Hessian: {np.linalg.cond(self.hessian)}")
         print(f"A      : {np.linalg.cond(self.A)}")
-        print(f"B      : {np.linalg.cond(self.B)}")
+        print(f"B      : {np.linalg.cond(self.B) if not self.tda else 'N/A'}")
         print(f"Metric : {np.linalg.cond(self.metric)}")
         print(f"Sigma  : {np.linalg.cond(self.Sigma)}")
         print(f"S-1E   : {np.linalg.cond(np.linalg.inv(self.metric) @ self.hessian)}")
@@ -167,7 +160,7 @@ class quantumLRBaseClass:
                 print(f"Indices {indices[0][i], indices[1][i]}. Part of matrix block {area}")
         if verbose:
             A_row = np.sum(A, axis=1) / self.num_params
-            B_row = np.sum(B, axis=1) / self.num_params
+            B_row = np.sum(B, axis=1) / self.num_params if not self.tda else np.zeros_like(A_row)
             Sigma_row = np.sum(Sigma, axis=1) / self.num_params
             if save:
                 self._std_A_row = A_row
@@ -291,17 +284,21 @@ class quantumLRBaseClass:
         """Solve LR eigenvalue problem."""
         # Build Hessian and Metric
         size = len(self.A)
-        self.Delta = np.zeros_like(self.Sigma)
-        self.hessian = np.zeros((size * 2, size * 2))
-        self.hessian[:size, :size] = self.A
-        self.hessian[:size, size:] = self.B
-        self.hessian[size:, :size] = self.B
-        self.hessian[size:, size:] = self.A
-        self.metric = np.zeros((size * 2, size * 2))
-        self.metric[:size, :size] = self.Sigma
-        self.metric[:size, size:] = self.Delta
-        self.metric[size:, :size] = -self.Delta
-        self.metric[size:, size:] = -self.Sigma
+        if not self.tda:
+            self.Delta = np.zeros_like(self.Sigma)
+            self.hessian = np.zeros((size * 2, size * 2))
+            self.hessian[:size, :size] = self.A
+            self.hessian[:size, size:] = self.B
+            self.hessian[size:, :size] = self.B
+            self.hessian[size:, size:] = self.A
+            self.metric = np.zeros((size * 2, size * 2))
+            self.metric[:size, :size] = self.Sigma
+            self.metric[:size, size:] = self.Delta
+            self.metric[size:, :size] = -self.Delta
+            self.metric[size:, size:] = -self.Sigma
+        else:
+            self.hessian = self.A
+            self.metric = self.Sigma
 
         # Check eigenvalues of Hessian/Metric
         (
@@ -316,8 +313,8 @@ class quantumLRBaseClass:
         # Solve eigenvalue equation
         eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)
         sorting = np.argsort(eigval)
-        self.excitation_energies = np.real(eigval[sorting][size:])
-        self.excitation_vectors = np.real(eigvec[:, sorting][:, size:])
+        self.excitation_energies = np.real(eigval[sorting][size:]) if not self.tda else np.real(eigval[sorting])
+        self.excitation_vectors = np.real(eigvec[:, sorting][:, size:]) if not self.tda else np.real(eigvec[:, sorting])
 
         return self.excitation_energies
 
@@ -326,8 +323,8 @@ class quantumLRBaseClass:
         self.normed_excitation_vectors = np.zeros_like(self.excitation_vectors)
         self._Z_q = self.excitation_vectors[: self.num_q, :]
         self._Z_G = self.excitation_vectors[self.num_q : self.num_q + self.num_G, :]
-        self._Y_q = self.excitation_vectors[self.num_q + self.num_G : 2 * self.num_q + self.num_G]
-        self._Y_G = self.excitation_vectors[2 * self.num_q + self.num_G :]
+        self._Y_q = self.excitation_vectors[self.num_q + self.num_G : 2 * self.num_q + self.num_G] if not self.tda else np.zeros(())
+        self._Y_G = self.excitation_vectors[2 * self.num_q + self.num_G :] if not self.tda else np.zeros(())
         self._Z_q_normed = np.zeros_like(self._Z_q)
         self._Z_G_normed = np.zeros_like(self._Z_G)
         self._Y_q_normed = np.zeros_like(self._Y_q)
