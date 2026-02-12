@@ -74,7 +74,23 @@ def test_x2c(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137
     #compute the X transformation X=CS@CL**-1
     
     X = lstsq(CL.T,CS.T)[0].T
-    print(X)
+    
+    #build R
+    A = s + X.conj().T@(t/(2*c**2)) @ X
+    
+    A_sqrt     = sqrtm(A)
+    A_invsqrt  = inv(A_sqrt)
+    S_sqrt     = sqrtm(s)
+
+    R = A_invsqrt @ S_sqrt
+
+
+    h_fw = v + t + X.conj().T @ (w / (4 * c**2)) @ X
+
+    h_x2c = R.conj().T @ h_fw @ R
+    
+    
+    
 
 
         
