@@ -22,14 +22,16 @@ class LinearResponse(LinearResponseBaseClass):
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
+        tda: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
+            tda: Whether to use Tamm-Dancoff Approximation.
         """
-        super().__init__(wave_function, excitations)
+        super().__init__(wave_function, excitations, tda)
 
         H_2i_2a = hamiltonian_2i_2a(
             self.wf.h_mo,
@@ -206,58 +208,59 @@ class LinearResponse(LinearResponseBaseClass):
                     )
                 )
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
-                # Make B
-                # 1/2<0| GId H |0> * <0| GJd |0>
-                val = (
-                    1
-                    / 2
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [GI.dagger, self.H_0i_0a],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
+                if not self.tda:
+                    # Make B
+                    # 1/2<0| GId H |0> * <0| GJd |0>
+                    val = (
+                        1
+                        / 2
+                        * expectation_value(
+                            self.wf.ci_coeffs,
+                            [GI.dagger, self.H_0i_0a],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                        * expectation_value(
+                            self.wf.ci_coeffs,
+                            [GJ.dagger],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
                     )
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [GJ.dagger],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
+                    # 1/2<0| GJd H |0> * <0| GId |0>
+                    val += (
+                        1
+                        / 2
+                        * expectation_value(
+                            self.wf.ci_coeffs,
+                            [GJ.dagger, self.H_0i_0a],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                        * expectation_value(
+                            self.wf.ci_coeffs,
+                            [GI.dagger],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
                     )
-                )
-                # 1/2<0| GJd H |0> * <0| GId |0>
-                val += (
-                    1
-                    / 2
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [GJ.dagger, self.H_0i_0a],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
+                    # - <0| GId |0> * <0| GJd |0> * E
+                    val -= (
+                        expectation_value(
+                            GI_ket,
+                            [],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                        * expectation_value(
+                            GJ_ket,
+                            [],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                        * self.wf.energy_elec
                     )
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [GI.dagger],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                )
-                # - <0| GId |0> * <0| GJd |0> * E
-                val -= (
-                    expectation_value(
-                        GI_ket,
-                        [],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    * expectation_value(
-                        GJ_ket,
-                        [],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    * self.wf.energy_elec
-                )
-                self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
+                    self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
                 # Make Sigma
                 # <0| GId GJ |0>
                 val = expectation_value(

@@ -22,14 +22,16 @@ class LinearResponse(LinearResponseBaseClass):
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
+        tda: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
+            tda: Whether to use Tamm-Dancoff Approximation.
         """
-        super().__init__(wave_function, excitations)
+        super().__init__(wave_function, excitations, tda)
 
         H_2i_2a = hamiltonian_2i_2a(
             self.wf.h_mo,

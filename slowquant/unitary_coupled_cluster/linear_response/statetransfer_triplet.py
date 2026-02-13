@@ -21,14 +21,16 @@ class LinearResponse(LinearResponseBaseClass):
         self,
         wave_function: WaveFunctionUCC | WaveFunctionUPS,
         excitations: str,
+        tda: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
         Args:
             wave_function: Wave function object.
             excitations: Which excitation orders to include in response.
+            tda: Whether to use Tamm-Dancoff Approximation.
         """
-        super().__init__(wave_function, excitations)
+        super().__init__(wave_function, excitations, tda)
 
         idx_shift = len(self.q_ops)
         print("Gs", len(self.G_ops))
@@ -85,17 +87,18 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.rdm2,
                 self.wf.t_rdm2,
             )
-            self.B[: len(self.q_ops), : len(self.q_ops)] = get_triplet_orbital_response_hessian_block(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.kappa_no_activeactive_idx_dagger,
-                self.wf.kappa_no_activeactive_idx_dagger,
-                self.wf.num_inactive_orbs,
-                self.wf.num_active_orbs,
-                self.wf.rdm1,
-                self.wf.rdm2,
-                self.wf.t_rdm2,
-            )
+            if not self.tda:
+                self.B[: len(self.q_ops), : len(self.q_ops)] = get_triplet_orbital_response_hessian_block(
+                    self.wf.h_mo,
+                    self.wf.g_mo,
+                    self.wf.kappa_no_activeactive_idx_dagger,
+                    self.wf.kappa_no_activeactive_idx_dagger,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.wf.rdm2,
+                    self.wf.t_rdm2,
+                )
             self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
                 self.wf.kappa_no_activeactive_idx,
                 self.wf.num_inactive_orbs,
@@ -116,19 +119,20 @@ class LinearResponse(LinearResponseBaseClass):
                     *self.index_info,
                 )
                 self.A[j, i + idx_shift] = self.A[i + idx_shift, j] = val
-                # Make B
-                # - 1/2<CSF| Gd Ud qd H |0>
-                val = (
-                    -1
-                    / 2
-                    * expectation_value(
-                        G_ket,
-                        [],
-                        UdqdH_ket,
-                        *self.index_info,
+                if not self.tda:
+                    # Make B
+                    # - 1/2<CSF| Gd Ud qd H |0>
+                    val = (
+                        -1
+                        / 2
+                        * expectation_value(
+                            G_ket,
+                            [],
+                            UdqdH_ket,
+                            *self.index_info,
+                        )
                     )
-                )
-                self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = val
+                    self.B[j, i + idx_shift] = self.B[i + idx_shift, j] = val
         for j, GJ in enumerate(self.G_ops):
             UdHUGJ = propagate_state(
                 ["Ud", self.H_0i_0a, "U", GJ],
