@@ -215,21 +215,36 @@ class WaveFunctionUPS:
         # Construct UPS Structure
         self.ups_layout = UpsStructure()
         if ansatz.lower() == "tups":
-            self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
+            self.ansatz_options["do_tups"] = True
+            self.ups_layout.create_tiled(self.num_active_orbs, self.ansatz_options)
         elif ansatz.lower() == "qnp":
             self.ansatz_options["do_qnp"] = True
-            self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
+            self.ups_layout.create_tiled(self.num_active_orbs, self.ansatz_options)
         elif ansatz.lower() == "fuccsd":
             self.ansatz_options["S"] = True
             self.ansatz_options["D"] = True
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
-            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
+            self.ups_layout.create_fUCC(
+                self.active_occ_idx_shifted,
+                self.active_unocc_idx_shifted,
+                self.active_occ_spin_idx_shifted,
+                self.active_unocc_spin_idx_shifted,
+                self.num_active_orbs,
+                self.ansatz_options,
+            )
         elif ansatz.lower() == "ksafupccgsd":
             self.ansatz_options["SAGS"] = True
             self.ansatz_options["GpD"] = True
-            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
+            self.ups_layout.create_fUCC(
+                self.active_occ_idx_shifted,
+                self.active_unocc_idx_shifted,
+                self.active_occ_spin_idx_shifted,
+                self.active_unocc_spin_idx_shifted,
+                self.num_active_orbs,
+                self.ansatz_options,
+            )
         elif ansatz.lower() == "sdsfuccsd":
             self.ansatz_options["D"] = True
             if "n_layers" not in self.ansatz_options.keys():
@@ -243,12 +258,14 @@ class WaveFunctionUPS:
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
-            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
-        elif ansatz.lower() == "sdsfucc":
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.ups_layout.create_SDSfUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
+            self.ups_layout.create_fUCC(
+                self.active_occ_idx_shifted,
+                self.active_unocc_idx_shifted,
+                self.active_occ_spin_idx_shifted,
+                self.active_unocc_spin_idx_shifted,
+                self.num_active_orbs,
+                self.ansatz_options,
+            )
         else:
             raise ValueError(f"Got unknown ansatz, {ansatz}")
         self._thetas = np.zeros(self.ups_layout.n_params).tolist()
