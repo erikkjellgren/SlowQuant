@@ -25,7 +25,10 @@ def get_polarisability(geometry, basis, active_space, charge=0, unit='bohr'):
     )
 
     # Optimize WF
-    WF.run_wf_optimization_1step('SLSQP', True)
+    if active_space[1] == mol.nao:
+        WF.run_wf_optimization_1step('SLSQP', False)
+    else:
+        WF.run_wf_optimization_1step('SLSQP', True)
     print("Energy elec", WF.energy_elec)
 
     # Singlet Linear Response

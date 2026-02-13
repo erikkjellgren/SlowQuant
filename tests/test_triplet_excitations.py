@@ -1,5 +1,5 @@
 import slowquant.SlowQuant as sq
-import slowquant.unitary_coupled_cluster.linear_response.naive_triplet as naive_t
+from slowquant.unitary_coupled_cluster.linear_response import naive_triplet
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 
 
@@ -29,10 +29,13 @@ def get_triplet_excita(geometry, basis, active_space, unit='bohr'):
     )
 
     # Optimize wavefunction
-    WF.run_wf_optimization_1step("bfgs", True)
+    if active_space[1] == SQobj.molecule.number_bf:
+        WF.run_wf_optimization_1step('SLSQP', False)
+    else:
+        WF.run_wf_optimization_1step('SLSQP', True)
 
     # Linear Response
-    LR = naive_t.LinearResponseUCC(WF, excitations="SD")
+    LR = naive_triplet.LinearResponseUCC(WF, excitations="SD")
     LR.calc_excitation_energies()
 
     print('Triplet excitation energies (hartree):')

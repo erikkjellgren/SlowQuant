@@ -27,11 +27,12 @@ def get_shield(geometry, basis, active_space, charge=0, unit='bohr'):
     )
 
     # Optimize WF
-    WF.run_wf_optimization_1step('SLSQP', True)
+    if active_space[1] == mol.nao:
+        WF.run_wf_optimization_1step('SLSQP', False)
+    else:
+        WF.run_wf_optimization_1step('SLSQP', True)
     print("Energy elec", WF.energy_elec)
 
-    print(mol.nao)
-    print(WF.num_inactive_orbs + WF.num_active_orbs + WF.num_virtual_orbs)
 
     # full space 1-RDM
     RDM1 = np.zeros((WF.num_inactive_orbs + WF.num_active_orbs + WF.num_virtual_orbs, WF.num_inactive_orbs + WF.num_active_orbs + WF.num_virtual_orbs))
