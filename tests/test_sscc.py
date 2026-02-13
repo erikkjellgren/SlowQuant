@@ -88,12 +88,15 @@ def get_sscc(geometry, basis, active_space, charge=0, unit='bohr'):
     )
 
     # Optimize WF
-    WF.run_wf_optimization_1step('SLSQP', True)
+    if active_space[1] == mol.nao:
+        WF.run_wf_optimization_1step('SLSQP', False)
+    else:
+        WF.run_wf_optimization_1step('SLSQP', True)
     print("Energy elec", WF.energy_elec)
 
     # DSO term
     dso = np.zeros((len(nuc_pair), 3, 3))
-    RDM1 = np.zeros((WF.num_inactive_orbs + WF.num_active_orbs + WF.num_virtual_orbs, WF.num_inactive_orbs + WF.num_active_orbs + WF.num_virtual_orbs))
+    RDM1 = np.zeros((mol.nao, mol.nao))
     RDM1[:WF.num_inactive_orbs,:WF.num_inactive_orbs] += np.eye(WF.num_inactive_orbs) * 2
     RDM1[WF.num_inactive_orbs:WF.num_inactive_orbs + WF.num_active_orbs,WF.num_inactive_orbs:WF.num_inactive_orbs + WF.num_active_orbs] += (
     WF.rdm1

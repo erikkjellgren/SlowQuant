@@ -18,7 +18,8 @@ class quantumLRBaseClass:
     def __init__(
         self,
         wf: WaveFunctionCircuit,
-        tda: bool = False
+        excitations: str,
+        tda: bool = False,
     ) -> None:
         """Initialize linear response by calculating the needed matrices.
 
