@@ -140,6 +140,8 @@ def fUCC(
         * D [bool]: Add double excitations.
         * pD [bool]: Add pair double excitations.
         * GpD [bool]: Add generalized pair double excitations.
+        * cS [bool]: Add complex singles.
+        * cD [bool]: Add complex doubles.
 
     Args:
         num_orbs: Number of spatial orbitals.
@@ -150,7 +152,7 @@ def fUCC(
     Returns:
         Factorized UCC ansatz circuit and R parameters needed for gradients.
     """
-    valid_options = ("n_layers", "S", "D", "SAGS", "pD", "GpD", "SAS")
+    valid_options = ("n_layers", "S", "D", "SAGS", "pD", "GpD", "SAS", "cS", "cD")
     for option in ansatz_options:
         if option not in valid_options:
             raise ValueError(f"Got unknown option for fUCC, {option}. Valid options are: {valid_options}")
@@ -162,6 +164,8 @@ def fUCC(
     do_D = False
     do_pD = False
     do_GpD = False
+    do_cS = False
+    do_cD = False
     if "S" in ansatz_options.keys():
         if ansatz_options["S"]:
             do_S = True
@@ -180,7 +184,13 @@ def fUCC(
     if "GpD" in ansatz_options.keys():
         if ansatz_options["GpD"]:
             do_GpD = True
-    if True not in (do_S, do_SAS, do_SAGS, do_D, do_pD, do_GpD):
+    if "cS" in ansatz_options.keys():
+        if ansatz_options["cS"]:
+            do_cS = True
+    if "cD" in ansatz_options.keys():
+        if ansatz_options["cD"]:
+            do_cD = True
+    if True not in (do_S, do_SAS, do_SAGS, do_D, do_pD, do_GpD, do_cS, do_cD):
         raise ValueError("fUCC requires some excitations got none.")
     n_layers = ansatz_options["n_layers"]
     num_spin_orbs = 2 * num_orbs
@@ -213,6 +223,8 @@ def fUCC(
                 qc = sa_single_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 4
                 idx += 1
+        if do_cS:
+            # Add some code for complex singles
         if do_D:
             for a, i, b, j in iterate_t2(occ, unocc):
                 qc = double_excitation(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
@@ -228,6 +240,8 @@ def fUCC(
                 qc = double_excitation(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 2
                 idx += 1
+        if do_cD:
+            # Add some code for complex doubles
     return qc, grad_param_R
 
 
