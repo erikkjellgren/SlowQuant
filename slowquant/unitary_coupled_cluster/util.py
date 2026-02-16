@@ -678,14 +678,12 @@ class UpsStructure:
         if "n_layers" not in ansatz_options.keys():
             raise ValueError("tUPS require the option 'n_layers'")
         n_layers = ansatz_options["n_layers"]
+        do_tups = False
+        do_qnp = False
         if "do_tups" in ansatz_options.keys():
             do_tups = ansatz_options["do_tups"]
-        else:
-            do_tups = False
         if "do_qnp" in ansatz_options.keys():
             do_qnp = ansatz_options["do_qnp"]
-        else:
-            do_qnp = False
         if sum((do_tups, do_qnp)) == 0:
             raise ValueError("No tiled ansatz specified.")
         elif sum((do_tups, do_qnp)) > 1:
@@ -816,44 +814,31 @@ class UpsStructure:
         do_6 = False
         do_SAD = False
         if "S" in ansatz_options.keys():
-            if ansatz_options["S"]:
-                do_S = True
+            do_S = ansatz_options["S"]
         if "GS" in ansatz_options.keys():
-            if ansatz_options["GS"]:
-                do_GS = True
+            do_GS = ansatz_options["GS"]
         if "SAS" in ansatz_options.keys():
-            if ansatz_options["SAS"]:
-                do_SAS = True
+            do_SAS = ansatz_options["SAS"]
         if "SAGS" in ansatz_options.keys():
-            if ansatz_options["SAGS"]:
-                do_SAGS = True
+            do_SAGS = ansatz_options["SAGS"]
         if "D" in ansatz_options.keys():
-            if ansatz_options["D"]:
-                do_D = True
+            do_D = ansatz_options["D"]
         if "GD" in ansatz_options.keys():
-            if ansatz_options["GD"]:
-                do_GD = True
+            do_GD = ansatz_options["GD"]
         if "pD" in ansatz_options.keys():
-            if ansatz_options["pD"]:
-                do_pD = True
+            do_pD = ansatz_options["pD"]
         if "GpD" in ansatz_options.keys():
-            if ansatz_options["GpD"]:
-                do_GpD = True
+            do_GpD = ansatz_options["GpD"]
         if "T" in ansatz_options.keys():
-            if ansatz_options["T"]:
-                do_T = True
+            do_T = ansatz_options["T"]
         if "Q" in ansatz_options.keys():
-            if ansatz_options["Q"]:
-                do_Q = True
+            do_Q = ansatz_options["Q"]
         if "5" in ansatz_options.keys():
-            if ansatz_options["5"]:
-                do_5 = True
+            do_5 = ansatz_options["5"]
         if "6" in ansatz_options.keys():
-            if ansatz_options["6"]:
-                do_6 = True
+            do_6 = ansatz_options["6"]
         if "SAD" in ansatz_options.keys():
-            if ansatz_options["SAD"]:
-                do_SAD = True
+            do_SAD = ansatz_options["SAD"]
         if True not in (
             do_S,
             do_SAS,
@@ -1004,14 +989,11 @@ class UpsStructure:
         do_pD = False
         do_GpD = False
         if "D" in ansatz_options.keys():
-            if ansatz_options["D"]:
-                do_D = True
+            do_D = ansatz_options["D"]
         if "pD" in ansatz_options.keys():
-            if ansatz_options["pD"]:
-                do_pD = True
+            do_pD = ansatz_options["pD"]
         if "GpD" in ansatz_options.keys():
-            if ansatz_options["GpD"]:
-                do_GpD = True
+            do_GpD = ansatz_options["GpD"]
         if True not in (do_D, do_pD, do_GpD):
             raise ValueError("SDSfUCC requires some excitations got none.")
         n_layers = ansatz_options["n_layers"]
