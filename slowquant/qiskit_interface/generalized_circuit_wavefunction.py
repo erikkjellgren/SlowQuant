@@ -17,12 +17,11 @@ from slowquant.molecularintegrals.integralfunctions import (
     generalized_two_electron_transform,
 )
 from slowquant.qiskit_interface.interface import QuantumInterface
-from slowquant.unitary_coupled_cluster.density_matrix import (
-    get_electronic_energy,
-    get_orbital_gradient,
-)
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
-from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_0i_0a
+from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
+    get_electronic_energy_generalized,
+    get_orbital_gradient_generalized_real_imag,
+)
 from slowquant.unitary_coupled_cluster.generalized_operators import (
     a_op_spin,
     generalized_hamiltonian_full_space,
@@ -191,7 +190,7 @@ class WaveFunctionCircuit:
         # Setup Qiskit stuff
         self.QI = quantum_interface
         self.QI.construct_circuit(
-            2*self.num_active_spin_orbs, (self.num_active_elec_alpha, self.num_active_elec_beta)
+            2 * self.num_active_spin_orbs, (self.num_active_elec_alpha, self.num_active_elec_beta)
         )
 
     @property
@@ -370,43 +369,37 @@ class WaveFunctionCircuit:
     def _reconstruct_circuit(self) -> None:
         """Construct circuit again."""
         self.QI.construct_circuit(
-            2*self.num_active_spin_orbs, (self.num_active_elec_alpha, self.num_active_elec_beta)
+            2 * self.num_active_spin_orbs, (self.num_active_elec_alpha, self.num_active_elec_beta)
         )
 
     @property
     def rdm1(self) -> np.ndarray:
         r"""Calculate one-electron reduced density matrix.
 
-        The trace condition is enforced:
-
-        .. math::
-            \sum_i\Gamma^{[1]}_{ii} = N_e
-
         Returns:
             One-electron reduced density matrix.
         """
         if self._rdm1 is None:
-            self._rdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs))
-            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                p_idx = p - self.num_inactive_orbs
-                for q in range(self.num_inactive_orbs, p + 1):
-                    q_idx = q - self.num_inactive_orbs
-                    rdm1_op = Epq(p, q).get_folded_operator(
-                        self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+            self._rdm1 = np.zeros((self.num_active_spin_orbs, self.num_active_spin_orbs), dtype=np.complex128)
+            for P in range(
+                self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
+            ):
+                P_idx = P - self.num_inactive_spin_orbs
+                for Q in range(self.num_inactive_spin_orbs, P + 1):
+                    Q_idx = Q - self.num_inactive_spin_orbs
+                    rdm1_op = (a_op_spin(P, True) * a_op_spin(Q, False)).get_folded_operator(
+                        self.num_inactive_spin_orbs // 2,
+                        self.num_active_spin_orbs // 2,
+                        self.num_virtual_spin_orbs // 2,
                     )
-                    val = self.QI.quantum_expectation_value(rdm1_op)
-                    self._rdm1[p_idx, q_idx] = val  # type: ignore [index]
-                    self._rdm1[q_idx, p_idx] = val  # type: ignore [index]
+                    val = self.QI.quantum_expectation_value_complex(rdm1_op)
+                    self._rdm1[P_idx, Q_idx] = val  # type: ignore
+                    self._rdm1[Q_idx, P_idx] = val.conjugate()  # type: ignore (1.7.7 EST)
         return self._rdm1
 
     @property
     def rdm2(self) -> np.ndarray:
         r"""Calculate two-electron reduced density matrix.
-
-        The trace condition is enforced:
-
-        .. math::
-            \sum_{ij}\Gamma^{[2]}_{iijj} = N_e(N_e-1)
 
         Returns:
             Two-electron reduced density matrix.
@@ -414,38 +407,46 @@ class WaveFunctionCircuit:
         if self._rdm2 is None:
             self._rdm2 = np.zeros(
                 (
-                    self.num_active_orbs,
-                    self.num_active_orbs,
-                    self.num_active_orbs,
-                    self.num_active_orbs,
-                )
+                    self.num_active_spin_orbs,
+                    self.num_active_spin_orbs,
+                    self.num_active_spin_orbs,
+                    self.num_active_spin_orbs,
+                ),
+                dtype=np.complex128,
             )
-            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                p_idx = p - self.num_inactive_orbs
-                for q in range(self.num_inactive_orbs, p + 1):
-                    q_idx = q - self.num_inactive_orbs
-                    for r in range(self.num_inactive_orbs, p + 1):
-                        r_idx = r - self.num_inactive_orbs
-                        if p == q:
-                            s_lim = r + 1
-                        elif p == r:
-                            s_lim = q + 1
-                        elif q < r:
-                            s_lim = p
+            for P in range(
+                self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
+            ):
+                P_idx = P - self.num_inactive_spin_orbs
+                for Q in range(self.num_inactive_spin_orbs, P + 1):
+                    Q_idx = Q - self.num_inactive_spin_orbs
+                    for R in range(self.num_inactive_spin_orbs, P + 1):
+                        R_idx = R - self.num_inactive_spin_orbs
+                        if P == Q:
+                            S_lim = R + 1
+                        elif P == R:
+                            S_lim = Q + 1
+                        elif Q < R:
+                            S_lim = P  # Not sure I understand this limit? Why not R?
                         else:
-                            s_lim = p + 1
-                        for s in range(self.num_inactive_orbs, s_lim):
-                            s_idx = s - self.num_inactive_orbs
-                            pdm2_op = (Epq(p, q) * Epq(r, s)).get_folded_operator(
-                                self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+                            S_lim = P + 1
+                        for S in range(self.num_inactive_spin_orbs, S_lim):
+                            S_idx = S - self.num_inactive_spin_orbs
+                            pdm2_op = (
+                                a_op_spin(P, dagger=True)
+                                * a_op_spin(R, dagger=True)
+                                * a_op_spin(S, dagger=False)
+                                * a_op_spin(Q, dagger=False)
+                            ).get_folded_operator(
+                                self.num_inactive_spin_orbs // 2,
+                                self.num_active_spin_orbs // 2,
+                                self.num_virtual_spin_orbs // 2,
                             )
-                            val = self.QI.quantum_expectation_value(pdm2_op)
-                            if q == r:
-                                val -= self.rdm1[p_idx, s_idx]
-                            self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore [index]
-                            self._rdm2[r_idx, s_idx, p_idx, q_idx] = val  # type: ignore [index]
-                            self._rdm2[q_idx, p_idx, s_idx, r_idx] = val  # type: ignore [index]
-                            self._rdm2[s_idx, r_idx, q_idx, p_idx] = val  # type: ignore [index]
+                            val = self.QI.quantum_expectation_value_complex(pdm2_op)
+                            self._rdm2[P_idx, Q_idx, R_idx, S_idx] = val  # type: ignore
+                            self._rdm2[Q_idx, P_idx, S_idx, R_idx] = val.conjugate()  # type: ignore
+                            self._rdm2[R_idx, S_idx, P_idx, Q_idx] = val  # type: ignore
+                            self._rdm2[S_idx, R_idx, Q_idx, P_idx] = val.conjugate()  # type: ignore
         return self._rdm2
 
     def precalc_rdm_paulis(self, rdm_order: int) -> None:
@@ -471,10 +472,14 @@ class WaveFunctionCircuit:
         cumulated_paulis = None
         if rdm_order >= 1:
             self._rdm1 = None
-            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                for q in range(self.num_inactive_orbs, p + 1):
-                    rdm1_op = Epq(p, q).get_folded_operator(
-                        self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+            for P in range(
+                self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
+            ):
+                for Q in range(self.num_inactive_spin_orbs, P + 1):
+                    rdm1_op = (a_op_spin(P, True) * a_op_spin(Q, False)).get_folded_operator(
+                        self.num_inactive_spin_orbs // 2,
+                        self.num_active_spin_orbs // 2,
+                        self.num_virtual_spin_orbs // 2,
                     )
                     mapped_op = self.QI.op_to_qbit(rdm1_op)
                     if cumulated_paulis is None:
@@ -483,20 +488,29 @@ class WaveFunctionCircuit:
                         cumulated_paulis = cumulated_paulis.union(mapped_op.paulis)
         if rdm_order >= 2:
             self._rdm2 = None
-            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
-                for q in range(self.num_inactive_orbs, p + 1):
-                    for r in range(self.num_inactive_orbs, p + 1):
-                        if p == q:
-                            s_lim = r + 1
-                        elif p == r:
-                            s_lim = q + 1
-                        elif q < r:
-                            s_lim = p
+            for P in range(
+                self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
+            ):
+                for Q in range(self.num_inactive_spin_orbs, P + 1):
+                    for R in range(self.num_inactive_spin_orbs, P + 1):
+                        if P == Q:
+                            S_lim = R + 1
+                        elif P == R:
+                            S_lim = Q + 1
+                        elif Q < R:
+                            S_lim = P  # Not sure I understand this limit? Why not R?
                         else:
-                            s_lim = p + 1
-                        for s in range(self.num_inactive_orbs, s_lim):
-                            pdm2_op = (Epq(p, q) * Epq(r, s)).get_folded_operator(
-                                self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+                            S_lim = P + 1
+                        for S in range(self.num_inactive_spin_orbs, S_lim):
+                            pdm2_op = (
+                                a_op_spin(P, dagger=True)
+                                * a_op_spin(R, dagger=True)
+                                * a_op_spin(S, dagger=False)
+                                * a_op_spin(Q, dagger=False)
+                            ).get_folded_operator(
+                                self.num_inactive_spin_orbs // 2,
+                                self.num_active_spin_orbs // 2,
+                                self.num_virtual_spin_orbs // 2,
                             )
                             mapped_op = self.QI.op_to_qbit(pdm2_op)
                             cumulated_paulis = cumulated_paulis.union(mapped_op.paulis)  # type: ignore[union-attr]
@@ -538,10 +552,23 @@ class WaveFunctionCircuit:
         Returns:
             Electronic energy.
         """
-        H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
-        H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-        energy_elec = self.QI.quantum_expectation_value(H)
-        return energy_elec
+        # H = generalized_hamiltonian_0i_0a(
+        #     self.h_mo,
+        #     self.g_mo,
+        #     self.num_inactive_spin_orbs,
+        #     self.num_active_spin_orbs,
+        # )
+        H = generalized_hamiltonian_full_space(
+            self.h_mo,
+            self.g_mo,
+            self.num_spin_orbs,
+        )
+        H = H.get_folded_operator(
+            self.num_inactive_spin_orbs // 2, self.num_active_spin_orbs // 2, self.num_virtual_spin_orbs // 2
+        )
+        energy_elec = self.QI.quantum_expectation_value_complex(H)
+        # The Hamiltonian is Hermitian so the return should be real.
+        return energy_elec.real
 
     def run_wf_optimization_2step(
         self,
@@ -564,7 +591,7 @@ class WaveFunctionCircuit:
             raise ValueError("Custom Ansatz in QI only works with COBYLA and COBYQA as optimizer.")
         print("### Parameters information:")
         if orbital_optimization:
-            print(f"### Number kappa: {len(self.kappa)}")
+            print(f"### Number kappa: {len(self.kappa_real)}")
         print(f"### Number theta: {len(self.thetas)}")
         e_old = 1e12
         print("Full optimization")
@@ -609,7 +636,7 @@ class WaveFunctionCircuit:
                 thetas_i.append(res.x[i + len(self.thetas)])
             self.set_thetas(thetas_r, thetas_i)
 
-            if orbital_optimization and len(self.kappa) != 0:
+            if orbital_optimization and len(self.kappa_real) != 0:
                 if not is_silent_subiterations:
                     print("--------Orbital optimization")
                     print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree]")
@@ -642,7 +669,7 @@ class WaveFunctionCircuit:
             else:
                 # If there is no orbital optimization, then the algorithm is already converged.
                 e_new = res.fun
-                if orbital_optimization and len(self.kappa) == 0:
+                if orbital_optimization and len(self.kappa_real) == 0:
                     print(
                         "WARNING: No orbital optimization performed, because there is no non-redundant orbital parameters"
                     )
@@ -678,10 +705,10 @@ class WaveFunctionCircuit:
             raise ValueError("Custom Ansatz in QI only works with COBYLA and COBYQA as optimizer.")
         print("### Parameters information:")
         if orbital_optimization:
-            print(f"### Number kappa: {len(self.kappa)}")
+            print(f"### Number kappa: {len(self.kappa_real)}")
         print(f"### Number theta: {len(self.thetas)}")
         if optimizer_name.lower() == "rotosolve":
-            if orbital_optimization and len(self.kappa) != 0:
+            if orbital_optimization and len(self.kappa_real) != 0:
                 raise ValueError(
                     "Cannot use RotoSolve together with orbital optimization in the one-step solver."
                 )
@@ -764,7 +791,7 @@ class WaveFunctionCircuit:
         self._energy_elec = res.fun
 
     def _calc_energy_optimization(
-        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
+        self, parameters: list[complex], theta_optimization: bool, kappa_optimization: bool
     ) -> float:
         """Calculate electronic energy.
 
@@ -793,19 +820,43 @@ class WaveFunctionCircuit:
                 thetas_r.append(parameters[i + num_kappa])
                 thetas_i.append(parameters[i + num_kappa + len(self.thetas)])
             self.set_thetas(thetas_r, thetas_i)
+        if kappa_optimization:
+            # RDM is more expensive than evaluation of the Hamiltonian.
+            # Thus only construct these if orbital-optimization is turned on,
+            # since the RDMs will be reused in the oo gradient calculation.
+            E = get_electronic_energy_generalized(
+                self.h_mo,
+                self.g_mo,
+                self.num_inactive_spin_orbs,
+                self.num_active_spin_orbs,
+                self.rdm1,
+                self.rdm2,
+            )
+        else:
             # Build operator
-            H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
-            H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-            return self.QI.quantum_expectation_value(H)
-        # RDM is more expensive than evaluation of the Hamiltonian.
-        # Thus only construct these if orbital-optimization is turned on,
-        # since the RDMs will be reused in the oo gradient calculation.
-        return get_electronic_energy(
-            self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.rdm1, self.rdm2
-        )
+            # H = generalized_hamiltonian_0i_0a(
+            #     self.h_mo,
+            #     self.g_mo,
+            #     self.num_inactive_spin_orbs,
+            #     self.num_active_spin_orbs,
+            # )
+            H = generalized_hamiltonian_full_space(
+                self.h_mo,
+                self.g_mo,
+                self.num_spin_orbs,
+            )
+            H = H.get_folded_operator(
+                self.num_inactive_spin_orbs // 2,
+                self.num_active_spin_orbs // 2,
+                self.num_virtual_spin_orbs // 2,
+            )
+            # Hermitian so expecation value should be real
+            E = self.QI.quantum_expectation_value_complex(H)
+        # Hermitian so expecation value should be real
+        return E.real
 
     def _calc_gradient_optimization(
-        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
+        self, parameters: list[complex], theta_optimization: bool, kappa_optimization: bool
     ) -> np.ndarray:
         """Calculate electronic gradient.
 
@@ -837,36 +888,53 @@ class WaveFunctionCircuit:
                 thetas_i.append(parameters[i + num_kappa + len(self.thetas)])
             self.set_thetas(thetas_r, thetas_i)
         if kappa_optimization:
-            gradient[:num_kappa] = get_orbital_gradient(
+            gradient[:num_kappa] = get_orbital_gradient_generalized_real_imag(
                 self.h_mo,
                 self.g_mo,
-                self.kappa_idx,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
+                self.kappa_spin_idx,
+                self.num_inactive_spin_orbs,
+                self.num_active_spin_orbs,
                 self.rdm1,
                 self.rdm2,
             )
         if theta_optimization:
-            H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
-            H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-            for i in range(len(parameters[num_kappa:])):
-                R = self.QI.grad_param_R[self.QI.param_names[i]]
-                e_vals_grad = _get_energy_evals_for_grad(H, self.QI, parameters, i, R)
-                grad = 0.0
-                for j, mu in enumerate(list(range(1, 2 * R + 1))):
-                    x_mu = (2 * mu - 1) / (2 * R) * np.pi
-                    grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R * (np.sin(1 / 2 * x_mu)) ** 2)
-                gradient[num_kappa + i] = grad
-            self.num_energy_evals += 2 * np.sum(
-                list(self.QI.grad_param_R.values())
-            )  # Count energy measurements for all gradients
+            # H = generalized_hamiltonian_0i_0a(
+            #     self.h_mo,
+            #     self.g_mo,
+            #     self.num_inactive_spin_orbs,
+            #     self.num_active_spin_orbs,
+            # )
+            H = generalized_hamiltonian_full_space(
+                self.h_mo,
+                self.g_mo,
+                self.num_spin_orbs,
+            )
+            H = H.get_folded_operator(
+                self.num_inactive_spin_orbs // 2,
+                self.num_active_spin_orbs // 2,
+                self.num_virtual_spin_orbs // 2,
+            )
+            #
+            # Here we need to implement parameter-shift for complex.
+            #
+            # for i in range(len(parameters[num_kappa:])):
+            #    R = self.QI.grad_param_R[self.QI.param_names[i]]
+            #    e_vals_grad = _get_energy_evals_for_grad(H, self.QI, parameters, i, R)
+            #    grad = 0.0
+            #    for j, mu in enumerate(list(range(1, 2 * R + 1))):
+            #        x_mu = (2 * mu - 1) / (2 * R) * np.pi
+            #        grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R * (np.sin(1 / 2 * x_mu)) ** 2)
+            #    gradient[num_kappa + i] = grad
+            # self.num_energy_evals += 2 * np.sum(
+            #    list(self.QI.grad_param_R.values())
+            # )  # Count energy measurements for all gradients
         return gradient
 
 
 def _get_energy_evals_for_grad(
     operator: FermionicOperator,
     quantum_interface: QuantumInterface,
-    parameters: list[float],
+    parameters: list[complex],
     idx: int,
     R: int,
 ) -> list[float]:
@@ -891,5 +959,6 @@ def _get_energy_evals_for_grad(
     for mu in range(1, 2 * R + 1):
         x_mu = (2 * mu - 1) / (2 * R) * np.pi
         x[idx] = x_mu + x_shift
-        e_vals.append(quantum_interface.quantum_expectation_value(operator, custom_parameters=x))
+        # Real? because Hermitian?
+        e_vals.append(quantum_interface.quantum_expectation_value_complex(operator, custom_parameters=x).real)
     return e_vals
