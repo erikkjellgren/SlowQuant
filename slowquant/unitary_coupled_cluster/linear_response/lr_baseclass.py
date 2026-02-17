@@ -164,8 +164,9 @@ class LinearResponseBaseClass:
                 continue
             self.Z_q_normed[:, state_number] = self.Z_q[:, state_number] * (1 / norm) ** 0.5
             self.Z_G_normed[:, state_number] = self.Z_G[:, state_number] * (1 / norm) ** 0.5
-            self.Y_q_normed[:, state_number] = self.Y_q[:, state_number] * (1 / norm) ** 0.5
-            self.Y_G_normed[:, state_number] = self.Y_G[:, state_number] * (1 / norm) ** 0.5
+            if not self.tda:
+                self.Y_q_normed[:, state_number] = self.Y_q[:, state_number] * (1 / norm) ** 0.5
+                self.Y_G_normed[:, state_number] = self.Y_G[:, state_number] * (1 / norm) ** 0.5
             self.normed_response_vectors[:, state_number] = (
                 self.response_vectors[:, state_number] * (1 / norm) ** 0.5
             )
@@ -180,9 +181,9 @@ class LinearResponseBaseClass:
         for state_number in range(len(self.response_vectors[0])):
             # Get Z_q Z_G Y_q and Y_G matrices
             ZZq = np.outer(self.Z_q[:, state_number], self.Z_q[:, state_number].transpose())
-            YYq = np.outer(self.Y_q[:, state_number], self.Y_q[:, state_number].transpose())
+            YYq = np.outer(self.Y_q[:, state_number], self.Y_q[:, state_number].transpose()) if not self.tda else np.zeros(())
             ZZG = np.outer(self.Z_G[:, state_number], self.Z_G[:, state_number].transpose())
-            YYG = np.outer(self.Y_G[:, state_number], self.Y_G[:, state_number].transpose())
+            YYG = np.outer(self.Y_G[:, state_number], self.Y_G[:, state_number].transpose()) if not self.tda else np.zeros(())
 
             norms[state_number] = np.sum(self.metric[: self.num_q, : self.num_q] * (ZZq - YYq)) + np.sum(
                 self.metric[self.num_q : self.num_q + self.num_G, self.num_q : self.num_q + self.num_G]
