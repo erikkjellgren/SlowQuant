@@ -225,6 +225,7 @@ def fUCC(
                 idx += 1
         if do_cS:
             # Add some code for complex singles
+            None
         if do_D:
             for a, i, b, j in iterate_t2(occ, unocc):
                 qc = double_excitation(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
@@ -242,6 +243,7 @@ def fUCC(
                 idx += 1
         if do_cD:
             # Add some code for complex doubles
+            None
     return qc, grad_param_R
 
 
