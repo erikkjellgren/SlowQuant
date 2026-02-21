@@ -16,8 +16,9 @@ from slowquant.molecularintegrals.integralfunctions import (
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
 from slowquant.unitary_coupled_cluster.density_matrix import (
     get_electronic_energy,
-    get_orbital_gradient,
 )
+from slowquant.unitary_coupled_cluster.fock_matrix import build_fock_matrix, get_orbital_gradient
+from slowquant.unitary_coupled_cluster.integrals import Integrals
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     build_operator_matrix,
     construct_ucc_state,
@@ -84,6 +85,7 @@ class WaveFunctionUCC:
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
+        self._fock_mat = None
         self._h_mo = None
         self._g_mo = None
         self._energy_elec: float | None = None
@@ -117,6 +119,9 @@ class WaveFunctionUCC:
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
         self.num_active_orbs = self.num_active_spin_orbs // 2
         self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
+        self.ints = Integrals(
+            h_ao, g_ao, mo_coeffs, self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+        )
         # Construct spatial idx
         self.inactive_idx: list[int] = []
         self.virtual_idx: list[int] = []
@@ -267,10 +272,12 @@ class WaveFunctionUCC:
         """
         self._h_mo = None
         self._g_mo = None
+        self._fock_mat = None
         self._energy_elec = None
         self._kappa = k.copy()
         # Move current expansion point.
         self._c_mo = self.c_mo
+        self.ints.c_mo = self.c_mo
         self._kappa_old = self.kappa
 
     @property
@@ -311,6 +318,7 @@ class WaveFunctionUCC:
         self._rdm2 = None
         self._rdm3 = None
         self._rdm4 = None
+        self._fock_mat = None
         self._energy_elec = None
         self._ci_coeffs = None
         self._thetas = theta.copy()
@@ -356,6 +364,27 @@ class WaveFunctionUCC:
         if self._g_mo is None:
             self._g_mo = two_electron_integral_transform(self.c_mo, self._g_ao)
         return self._g_mo
+
+    @property
+    def fock_mat(self) -> np.ndarray:
+        if self._fock_mat is None:
+            self._fock_mat = build_fock_matrix(
+                self.rdm1,
+                self.rdm2,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.num_virtual_orbs,
+                self.ints.h_pi,
+                self.ints.g_pijj,
+                self.ints.g_piij,
+                self.ints.g_pivw,
+                self.ints.g_pvwi,
+                self.ints.h_pv,
+                self.ints.g_pvii,
+                self.ints.g_piiv,
+                self.ints.g_pvwx,
+            )
+        return self._fock_mat
 
     @property
     def rdm1(self) -> np.ndarray:
@@ -730,8 +759,15 @@ class WaveFunctionUCC:
                 self.ci_coeffs,
                 [
                     hamiltonian_0i_0a(
-                        self.h_mo,
-                        self.g_mo,
+                        self.ints.h_ii,
+                        self.ints.h_vw,
+                        self.ints.g_iijj,
+                        self.ints.g_ijji,
+                        self.ints.g_iivw,
+                        self.ints.g_vwii,
+                        self.ints.g_viiw,
+                        self.ints.g_ivwi,
+                        self.ints.g_vwxy,
                         self.num_inactive_orbs,
                         self.num_active_orbs,
                     )
@@ -1030,8 +1066,15 @@ class WaveFunctionUCC:
                 self.ci_coeffs,
                 [
                     hamiltonian_0i_0a(
-                        self.h_mo,
-                        self.g_mo,
+                        self.ints.h_ii,
+                        self.ints.h_vw,
+                        self.ints.g_iijj,
+                        self.ints.g_ijji,
+                        self.ints.g_iivw,
+                        self.ints.g_vwii,
+                        self.ints.g_viiw,
+                        self.ints.g_ivwi,
+                        self.ints.g_vwxy,
                         self.num_inactive_orbs,
                         self.num_active_orbs,
                     )
@@ -1071,19 +1114,18 @@ class WaveFunctionUCC:
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:
-            gradient[:num_kappa] = get_orbital_gradient(
-                self.h_mo,
-                self.g_mo,
-                self.kappa_idx,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.rdm1,
-                self.rdm2,
-            )
+            gradient[:num_kappa] = get_orbital_gradient(self.kappa_idx, self.fock_mat)
         if theta_optimization:
             Hamiltonian = hamiltonian_0i_0a(
-                self.h_mo,
-                self.g_mo,
+                self.ints.h_ii,
+                self.ints.h_vw,
+                self.ints.g_iijj,
+                self.ints.g_ijji,
+                self.ints.g_iivw,
+                self.ints.g_vwii,
+                self.ints.g_viiw,
+                self.ints.g_ivwi,
+                self.ints.g_vwxy,
                 self.num_inactive_orbs,
                 self.num_active_orbs,
             )

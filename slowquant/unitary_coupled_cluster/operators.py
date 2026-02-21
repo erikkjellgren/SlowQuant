@@ -474,8 +474,15 @@ def hamiltonian_full_space(h_mo: np.ndarray, g_mo: np.ndarray, num_orbs: int) ->
 
 
 def hamiltonian_0i_0a(
-    h_mo: np.ndarray,
-    g_mo: np.ndarray,
+    h_ii,
+    h_pq,
+    g_iijj,
+    g_ijji,
+    g_iipq,
+    g_pqii,
+    g_piiq,
+    g_ipqi,
+    g_pqrs,
     num_inactive_orbs: int,
     num_active_orbs: int,
 ) -> FermionicOperator:
@@ -493,39 +500,49 @@ def hamiltonian_0i_0a(
     hamiltonian_operator = FermionicOperator({})
     # Inactive one-electron
     for i in range(num_inactive_orbs):
-        if abs(h_mo[i, i]) > 10**-14:
-            hamiltonian_operator += h_mo[i, i] * Epq(i, i)
+        if abs(h_ii[i]) > 10**-14:
+            hamiltonian_operator += h_ii[i] * Epq(i, i)
     # Active one-electron
     for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+        pshift = p - num_inactive_orbs
         for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
-            if abs(h_mo[p, q]) > 10**-14:
-                hamiltonian_operator += h_mo[p, q] * Epq(p, q)
+            qshift = q - num_inactive_orbs
+            if abs(h_pq[pshift, qshift]) > 10**-14:
+                hamiltonian_operator += h_pq[pshift, qshift] * Epq(p, q)
     # Inactive two-electron
     for i in range(num_inactive_orbs):
         for j in range(num_inactive_orbs):
-            if abs(g_mo[i, i, j, j]) > 10**-14:
-                hamiltonian_operator += 1 / 2 * g_mo[i, i, j, j] * epqrs(i, i, j, j)
-            if i != j and abs(g_mo[j, i, i, j]) > 10**-14:
-                hamiltonian_operator += 1 / 2 * g_mo[j, i, i, j] * epqrs(j, i, i, j)
+            if abs(g_iijj[i, j]) > 10**-14:
+                hamiltonian_operator += 1 / 2 * g_iijj[i, j] * epqrs(i, i, j, j)
+            if i != j and abs(g_ijji[i, j]) > 10**-14:
+                hamiltonian_operator += 1 / 2 * g_ijji[i, j] * epqrs(j, i, i, j)
     # Inactive-Active two-electron
     for i in range(num_inactive_orbs):
         for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+            pshift = p - num_inactive_orbs
             for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
-                if abs(g_mo[i, i, p, q]) > 10**-14:
-                    hamiltonian_operator += 1 / 2 * g_mo[i, i, p, q] * epqrs(i, i, p, q)
-                if abs(g_mo[p, q, i, i]) > 10**-14:
-                    hamiltonian_operator += 1 / 2 * g_mo[p, q, i, i] * epqrs(p, q, i, i)
-                if abs(g_mo[p, i, i, q]) > 10**-14:
-                    hamiltonian_operator += 1 / 2 * g_mo[p, i, i, q] * epqrs(p, i, i, q)
-                if abs(g_mo[i, p, q, i]) > 10**-14:
-                    hamiltonian_operator += 1 / 2 * g_mo[i, p, q, i] * epqrs(i, p, q, i)
+                qshift = q - num_inactive_orbs
+                if abs(g_iipq[i, pshift, qshift]) > 10**-14:
+                    hamiltonian_operator += 1 / 2 * g_iipq[i, pshift, qshift] * epqrs(i, i, p, q)
+                if abs(g_pqii[pshift, qshift, i]) > 10**-14:
+                    hamiltonian_operator += 1 / 2 * g_pqii[pshift, qshift, i] * epqrs(p, q, i, i)
+                if abs(g_piiq[pshift, i, qshift]) > 10**-14:
+                    hamiltonian_operator += 1 / 2 * g_piiq[pshift, i, qshift] * epqrs(p, i, i, q)
+                if abs(g_ipqi[i, pshift, qshift]) > 10**-14:
+                    hamiltonian_operator += 1 / 2 * g_ipqi[i, pshift, qshift] * epqrs(i, p, q, i)
     # Active two-electron
     for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+        pshift = p - num_inactive_orbs
         for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+            qshift = q - num_inactive_orbs
             for r in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+                rshift = r - num_inactive_orbs
                 for s in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
-                    if abs(g_mo[p, q, r, s]) > 10**-14:
-                        hamiltonian_operator += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s)
+                    sshift = s - num_inactive_orbs
+                    if abs(g_pqrs[pshift, qshift, rshift, sshift]) > 10**-14:
+                        hamiltonian_operator += (
+                            1 / 2 * g_pqrs[pshift, qshift, rshift, sshift] * epqrs(p, q, r, s)
+                        )
     return hamiltonian_operator
 
 

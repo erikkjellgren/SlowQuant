@@ -103,8 +103,15 @@ class LinearResponseBaseClass:
             self.wf.num_virtual_orbs,
         )
         self.H_0i_0a = hamiltonian_0i_0a(
-            self.wf.h_mo,
-            self.wf.g_mo,
+            self.wf.ints.h_ii,
+            self.wf.ints.h_vw,
+            self.wf.ints.g_iijj,
+            self.wf.ints.g_ijji,
+            self.wf.ints.g_iivw,
+            self.wf.ints.g_vwii,
+            self.wf.ints.g_viiw,
+            self.wf.ints.g_ivwi,
+            self.wf.ints.g_vwxy,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
         )

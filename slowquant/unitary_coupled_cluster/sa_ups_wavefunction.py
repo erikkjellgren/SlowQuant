@@ -13,9 +13,11 @@ from slowquant.molecularintegrals.integralfunctions import (
     two_electron_integral_transform,
 )
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
-from slowquant.unitary_coupled_cluster.density_matrix import (
+from slowquant.unitary_coupled_cluster.fock_matrix import (
+    build_fock_matrix,
     get_orbital_gradient,
 )
+from slowquant.unitary_coupled_cluster.integrals import Integrals
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     construct_ups_state_SA,
     expectation_value,
@@ -92,6 +94,7 @@ class WaveFunctionSAUPS:
         self.num_virtual_spin_orbs = 0
         self._rdm1 = None
         self._rdm2 = None
+        self._fock_mat = None
         self._h_mo = None
         self._g_mo = None
         self._sa_energy: float | None = None
@@ -128,6 +131,9 @@ class WaveFunctionSAUPS:
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
         self.num_active_orbs = self.num_active_spin_orbs // 2
         self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
+        self.ints = Integrals(
+            h_ao, g_ao, mo_coeffs, self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+        )
         # Construct spatial idx
         self.inactive_idx: list[int] = []
         self.virtual_idx: list[int] = []
@@ -277,11 +283,13 @@ class WaveFunctionSAUPS:
         """
         self._h_mo = None
         self._g_mo = None
+        self._fock_mat = None
         self._sa_energy = None
         self._state_energies = None
         self._kappa = k.copy()
         # Move current expansion point.
         self._c_mo = self.c_mo
+        self.ints.c_mo = self.c_mo
         self._kappa_old = self.kappa
         self._state_ci_coeffs = None
 
@@ -321,6 +329,7 @@ class WaveFunctionSAUPS:
             raise ValueError(f"Expected {len(self._thetas)} theta1 values got {len(theta_vals)}")
         self._rdm1 = None
         self._rdm2 = None
+        self._fock_mat = None
         self._sa_energy = None
         self._state_energies = None
         self._state_ci_coeffs = None
@@ -368,6 +377,27 @@ class WaveFunctionSAUPS:
         if self._g_mo is None:
             self._g_mo = two_electron_integral_transform(self.c_mo, self._g_ao)
         return self._g_mo
+
+    @property
+    def fock_mat(self) -> np.ndarray:
+        if self._fock_mat is None:
+            self._fock_mat = build_fock_matrix(
+                self.rdm1,
+                self.rdm2,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.num_virtual_orbs,
+                self.ints.h_pi,
+                self.ints.g_pijj,
+                self.ints.g_piij,
+                self.ints.g_pivw,
+                self.ints.g_pvwi,
+                self.ints.h_pv,
+                self.ints.g_pvii,
+                self.ints.g_piiv,
+                self.ints.g_pvwx,
+            )
+        return self._fock_mat
 
     @property
     def rdm1(self) -> np.ndarray:
@@ -476,8 +506,15 @@ class WaveFunctionSAUPS:
         """
         if self._sa_energy is None:
             Hamiltonian = hamiltonian_0i_0a(
-                self.h_mo,
-                self.g_mo,
+                self.ints.h_ii,
+                self.ints.h_vw,
+                self.ints.g_iijj,
+                self.ints.g_ijji,
+                self.ints.g_iivw,
+                self.ints.g_vwii,
+                self.ints.g_viiw,
+                self.ints.g_ivwi,
+                self.ints.g_vwxy,
                 self.num_inactive_orbs,
                 self.num_active_orbs,
             )
@@ -720,8 +757,15 @@ class WaveFunctionSAUPS:
         """
         state_H = np.zeros((self.num_states, self.num_states))
         Hamiltonian = hamiltonian_0i_0a(
-            self.h_mo,
-            self.g_mo,
+            self.ints.h_ii,
+            self.ints.h_vw,
+            self.ints.g_iijj,
+            self.ints.g_ijji,
+            self.ints.g_iivw,
+            self.ints.g_vwii,
+            self.ints.g_viiw,
+            self.ints.g_ivwi,
+            self.ints.g_vwxy,
             self.num_inactive_orbs,
             self.num_active_orbs,
         ).get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
@@ -860,7 +904,17 @@ class WaveFunctionSAUPS:
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
         Hamiltonian = hamiltonian_0i_0a(
-            self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
+            self.ints.h_ii,
+            self.ints.h_vw,
+            self.ints.g_iijj,
+            self.ints.g_ijji,
+            self.ints.g_iivw,
+            self.ints.g_vwii,
+            self.ints.g_viiw,
+            self.ints.g_ivwi,
+            self.ints.g_vwxy,
+            self.num_inactive_orbs,
+            self.num_active_orbs,
         ).get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
         if return_all_states:
             energies = []
@@ -915,19 +969,18 @@ class WaveFunctionSAUPS:
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:
-            gradient[:num_kappa] = get_orbital_gradient(
-                self.h_mo,
-                self.g_mo,
-                self.kappa_idx,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.rdm1,
-                self.rdm2,
-            )
+            gradient[:num_kappa] = get_orbital_gradient(self.kappa_idx, self.fock_mat)
         if theta_optimization:
             Hamiltonian = hamiltonian_0i_0a(
-                self.h_mo,
-                self.g_mo,
+                self.ints.h_ii,
+                self.ints.h_vw,
+                self.ints.g_iijj,
+                self.ints.g_ijji,
+                self.ints.g_iivw,
+                self.ints.g_vwii,
+                self.ints.g_viiw,
+                self.ints.g_ivwi,
+                self.ints.g_vwxy,
                 self.num_inactive_orbs,
                 self.num_active_orbs,
             )
@@ -1039,7 +1092,19 @@ class WaveFunctionSAUPS:
                 self.ups_layout,
             )
 
-        Hamiltonian = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+        Hamiltonian = hamiltonian_0i_0a(
+            self.ints.h_ii,
+            self.ints.h_vw,
+            self.ints.g_iijj,
+            self.ints.g_ijji,
+            self.ints.g_iivw,
+            self.ints.g_vwii,
+            self.ints.g_viiw,
+            self.ints.g_ivwi,
+            self.ints.g_vwxy,
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+        )
         bra_vec = propagate_state_SA(
             [Hamiltonian],
             state_vecs,
