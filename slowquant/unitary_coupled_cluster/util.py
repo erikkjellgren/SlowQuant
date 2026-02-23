@@ -987,7 +987,7 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_GpD:
-                for a, i, b, j in iterate_pair_t2_generalized(2 * num_orbs):
+                for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
                     self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
