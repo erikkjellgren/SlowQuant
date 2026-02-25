@@ -474,7 +474,7 @@ class LinearResponse(LinearResponseBaseClass):
 
 
                 self.A[i + idx_shift, j + idx_shift] = val + val.conj() # AWE added conj()
-                self.A[j + idx_shift, i + idx_shift] = (val + val.conj()).conj() # AWE changed it to conj() instead of equal
+                self.A[j + idx_shift, i + idx_shift] = (val + val.conj()).conj() # AWE changed it to conj() instead of equal, but is not needed
                 # Make B
                 # <0| GId H GJd |0>
                 val = generalized_expectation_value(
@@ -505,7 +505,7 @@ class LinearResponse(LinearResponseBaseClass):
                     *self.index_info,
                 )
                 self.B[i + idx_shift, j + idx_shift] = val + val.conj() # AWE added conj()
-                self.B[j + idx_shift, i + idx_shift] = (val + val.conj()).conj() # AWE changed to conj() instead of equal
+                self.B[j + idx_shift, i + idx_shift] = (val + val.conj()).conj() # AWE changed to conj() instead of equal but is not needed
                 # Make Sigma
                 # <0| GId GJ |0>
                 val = generalized_expectation_value(

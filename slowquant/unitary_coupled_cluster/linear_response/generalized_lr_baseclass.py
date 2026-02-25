@@ -157,6 +157,8 @@ class LinearResponseBaseClass:
         S[:size, size:] = self.Delta
         S[size:, :size] = -self.Delta.conjugate()
         S[size:, size:] = -self.Sigma.conjugate()
+
+        #print(np.linalg.eig(S)) AWE
         
         # print(S)
         print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma)))}")
