@@ -154,6 +154,7 @@ class GeneralizedWaveFunctionUPS:
         self._kappa_real_redundant_old = []
         self._kappa_imag_redundant_old = []
         # Annika has modified this, since non-redundant orbital rotations had been left out!
+        
         for P in range(0, self.num_spin_orbs):
             for Q in range(P, self.num_spin_orbs):
                 if P in self.inactive_spin_idx and Q in self.inactive_spin_idx:
@@ -199,6 +200,17 @@ class GeneralizedWaveFunctionUPS:
                         self._kappa_imag_redundant_old.append(0.0)
                         self.kappa_redundant_spin_idx.append((P, Q))
                         continue
+
+                #AE ER IKKE SIKKER PÅ DETTE??
+                # if not (((P in self.inactive_spin_idx) or (P in self.active_occ_spin_idx)) and ((Q in self.active_unocc_spin_idx) or (Q in self.virtual_spin_idx))): #AE
+                #     self._kappa_real_redundant.append(0.0)
+                #     self._kappa_imag_redundant.append(0.0)
+                #     self._kappa_real_redundant_old.append(0.0)
+                #     self._kappa_imag_redundant_old.append(0.0)
+                #     self.kappa_redundant_spin_idx.append((P, Q))
+                #     continue
+                
+                
                 if not (P in self.active_spin_idx and Q in self.active_spin_idx):
                     self.kappa_no_activeactive_spin_idx.append((P, Q))
                     self.kappa_no_activeactive_spin_idx_dagger.append((Q, P))
@@ -207,7 +219,7 @@ class GeneralizedWaveFunctionUPS:
                 self._kappa_real_old.append(0.0)
                 self._kappa_imag_old.append(0.0)
                 self.kappa_spin_idx.append((P, Q))
-        # print('self.kappa_spin_idx', self.kappa_spin_idx) ###AE skal de krydse over (Juliane)
+        print('self.kappa_spin_idx', self.kappa_spin_idx) ###AE skal de krydse over (Juliane)
 
         # Construct determinant basis
         self.ci_info = get_indexing_generalized(
@@ -269,6 +281,21 @@ class GeneralizedWaveFunctionUPS:
                 self.num_active_spin_orbs // 2,
                 self.ansatz_options,
             )
+        elif ansatz.lower() == "fuccsdt": ##AE
+               if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
+                self.ansatz_options["S"] = True
+                self.ansatz_options["D"] = True
+                self.ansatz_options["T"] = True
+                self.ups_layout.create_fUCC(
+                    [],
+                    [],
+                    self.active_occ_spin_idx_shifted,
+                    self.active_unocc_spin_idx_shifted,
+                    self.num_active_spin_orbs // 2,
+                    self.ansatz_options,
+                )
         elif ansatz.lower() == "adapt":
             None
         else:
