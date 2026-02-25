@@ -72,12 +72,21 @@ class LinearResponseBaseClass:
         self.q_ops_finite: int = 0 #PERNILLE
 
         if "s" in excitations:
+<<<<<<< HEAD
             # print("Active occupied spin idx") #AWE
             # print(self.wf.active_occ_spin_idx)
             # print("Active unooccupied spin idx")
             # print(self.wf.active_unocc_spin_idx)
             # print("Excitation idx")
             for a, i in iterate_t1(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx, is_spin_conserving=False): ## -diagonal jf HJ. Cross?
+=======
+            print("Active occupied spin idx") # AWE
+            print(self.wf.active_occ_spin_idx) # AWE
+            print("Active unooccupied spin idx") # AWE
+            print(self.wf.active_unocc_spin_idx) # AWE
+            print("Excitation idx")
+            for a, i in iterate_t1(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx, is_spin_conserving=self.wf.ansatz_options["is_spin_conserving"]): ## -diagonal jf HJ. Cross?, # is_spin_conserving  AWE
+>>>>>>> 32ecd3e9c871c322e41832b6fc7ea19ecd50836c
                 self.G_ops.append(G1(i, a)) #AE from G1
                 print('G1', i,a)
         if "d" in excitations:
@@ -157,6 +166,8 @@ class LinearResponseBaseClass:
         S[:size, size:] = self.Delta
         S[size:, :size] = -self.Delta.conjugate()
         S[size:, size:] = -self.Sigma.conjugate()
+
+        #print(np.linalg.eig(S)) AWE
         
         # print(S)
         print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma)))}")

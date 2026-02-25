@@ -10,7 +10,7 @@ from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_orbital_response_hessian_block,
     get_orbital_response_metric_sigma,
     get_orbital_response_property_gradient_annika, get_orbital_response_property_gradient_real_imag, 
-    get_orbital_response_metric_sigma_real_imag,  get_orbital_response_static_property_gradient, 
+    get_orbital_response_metric_sigma_real_imag,  #get_orbital_response_static_property_gradient, 
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.linear_response.generalized_lr_baseclass import (
@@ -426,29 +426,28 @@ class LinearResponse(LinearResponseBaseClass):
 
                 # - 1/2<0| GId GJ H |0>
                 val -= (
-                    1
-                    / 2
-                    * generalized_expectation_value(
+                    generalized_expectation_value(
                         self.wf.ci_coeffs,
                         [GI.dagger*GJ*H],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
-                )
+                ) #AWE no 1/2
 
                 # - 1/2*<0| H GJ GId |0>
                 val -= (
-                    1
-                    / 2
-                    * generalized_expectation_value(
+                    generalized_expectation_value(
                         self.wf.ci_coeffs,
                         [H*GJ*GI.dagger],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
-                )
+                ) # AWE no 1/2
 
-                # - 1/2*<0| GJ GId H |0>
+
+
+
+                '''# - 1/2*<0| GJ GId H |0>
                 val -= (
                     1
                     / 2
@@ -458,7 +457,7 @@ class LinearResponse(LinearResponseBaseClass):
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
-                )
+                ) # AWE no?
 
                 # - 1/2*<0| H GId GJ |0>
                 val -= (
@@ -470,9 +469,12 @@ class LinearResponse(LinearResponseBaseClass):
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
-                )
+                ) # AWE no?'''
 
-                self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
+
+
+                self.A[i + idx_shift, j + idx_shift] = val + val.conj() # AWE added conj()
+                self.A[j + idx_shift, i + idx_shift] = (val + val.conj()).conj() # AWE changed it to conj() instead of equal, but is not needed
                 # Make B
                 # <0| GId H GJd |0>
                 val = generalized_expectation_value(
@@ -502,7 +504,8 @@ class LinearResponse(LinearResponseBaseClass):
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
-                self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
+                self.B[i + idx_shift, j + idx_shift] = val + val.conj() # AWE added conj()
+                self.B[j + idx_shift, i + idx_shift] = (val + val.conj()).conj() # AWE changed to conj() instead of equal but is not needed
                 # Make Sigma
                 # <0| GId GJ |0>
                 val = generalized_expectation_value(
@@ -518,7 +521,52 @@ class LinearResponse(LinearResponseBaseClass):
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
-                self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = val     
+
+                # Does it also need to have the hermetian conjugate added??
+                # Where is the Delta matrix? 
+
+                self.Sigma[i + idx_shift, j + idx_shift] =   val + val.conj()     
+                self.Sigma[j + idx_shift, i + idx_shift] =  (val + val.conj()).conj()
+
+                # Make Delta AWE
+                # <0| GI GJ |0>
+                val = generalized_expectation_value(
+                    self.wf.ci_coeffs,
+                    [GI*GJ],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
+                )
+                # - <0| GJ GI |0>
+                val -= generalized_expectation_value(
+                    self.wf.ci_coeffs,
+                    [GJ*GI],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
+                )
+
+                self.Delta[i + idx_shift, j + idx_shift] =   val + val.conj()     
+                self.Delta[j + idx_shift, i + idx_shift] =  (val + val.conj()).conj()
+
+
+        # Check hermiticity of the Metric:
+        print(f"Hermiticity check of the metric: max|S - S†| = "
+            f"{np.max(np.abs(self.Sigma - self.Sigma.conj().T)):.2e}")
+        
+        
+        
+        
+        # Check hermiticity of the Hessian:
+        top = np.concatenate((self.A, self.B), axis=1)
+        bottom = np.concatenate((self.B.conj(), self.A.conj()), axis=1)
+        Hessian_matrix = np.concatenate((top, bottom), axis=0)
+        print(f"Hermiticity check of the Hessian: max|E2 - E2†| = "
+            f"{np.max(np.abs(Hessian_matrix - Hessian_matrix.conj().T)):.2e}")  
+
+
+
+
+
+
                 
         # for i in range(len(self.A)): 
         #     print('self A',self.A[i,i])
