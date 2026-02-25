@@ -684,58 +684,58 @@ class LinearResponse(LinearResponseBaseClass):
         return np.round((2/3*np.multiply(self.excitation_energies,(np.square(tdm[:,0])+np.square(tdm[:,1])+np.square(tdm[:,2])))).real,8)
 
 
-    def get_property_gradient(self, property_integrals: np.ndarray) -> np.ndarray:
-        """Calculate property gradient.
+    # def get_property_gradient(self, property_integrals: np.ndarray) -> np.ndarray:
+    #     """Calculate property gradient.
 
-        Args:
-            property_integrals: Integrals in AO basis.
+    #     Args:
+    #         property_integrals: Integrals in AO basis.
 
-        Returns:
-            Property gradient.
-        """
-        in_shape = property_integrals.shape[:-2]
-        size_mo = self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs + self.wf.num_virtual_spin_orbs
-        # property_integrals = property_integrals.reshape(-1, size_mo, size_mo)
-        num_mo = len(property_integrals)
-        mo = np.zeros((num_mo, size_mo, size_mo), dtype=complex)
-        for i, ao in enumerate(property_integrals):
-            mo[i, :, :] += generalized_one_electron_transform(self.wf.c_mo, ao)
+    #     Returns:
+    #         Property gradient.
+    #     """
+    #     in_shape = property_integrals.shape[:-2]
+    #     size_mo = self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs + self.wf.num_virtual_spin_orbs
+    #     # property_integrals = property_integrals.reshape(-1, size_mo, size_mo)
+    #     num_mo = len(property_integrals)
+    #     mo = np.zeros((num_mo, size_mo, size_mo), dtype=complex)
+    #     for i, ao in enumerate(property_integrals):
+    #         mo[i, :, :] += generalized_one_electron_transform(self.wf.c_mo, ao)
 
-        idx_shift_q = len(self.q_ops)
-        V = np.zeros((len(self.q_ops + self.G_ops), num_mo), dtype=complex)
+    #     idx_shift_q = len(self.q_ops)
+    #     V = np.zeros((len(self.q_ops + self.G_ops), num_mo), dtype=complex)
 
-        if len(self.q_ops) != 0:
-            # Orbital response part
-            V[:idx_shift_q, :] =  get_orbital_response_static_property_gradient(
-                mo,
-                self.wf.kappa_no_activeactive_spin_idx,
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.rdm1,
-            )
-        for idx, G in enumerate(self.G_ops):
-            G_ket = generalized_propagate_state([G], self.wf.ci_coeffs, *self.index_info)
-            Gd_ket =generalized_propagate_state([G.dagger], self.wf.ci_coeffs, *self.index_info)
-            # Inactive part
-            for i in range(self.wf.num_inactive_spin_orbs):
-                E_ket = generalized_propagate_state([a_op_spin(i,True), a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info) 
-                # < 0 | G E | 0 >
-                val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-                # - < 0 | E G | 0 >
-                val -= generalized_expectation_value(E_ket, [], G_ket, *self.index_info) # E_ket = Ed_ket for E(i,i)
-                V[idx + idx_shift_q, :] += mo[:, i, i] * val
-            # Active part
-            for p in range(self.wf.num_inactive_spin_orbs, self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
-                for q in range(
-                    self.wf.num_inactive_spin_orbs, self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs
-                ):
-                    E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(q,False)], self.wf.ci_coeffs, *self.index_info)
-                    Ed_ket = generalized_propagate_state([a_op_spin(q,True)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
-                    # < 0 | G E | 0 >
-                    val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-                    # - < 0 | E G | 0 >
-                    val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
-                    V[idx + idx_shift_q, :] += mo[:, p, q] * val
-        if np.allclose(mo, mo.transpose(0, -1, -2)):
-            return np.vstack((V, -1 * V)).reshape(-1, *in_shape)
-        return np.vstack((V, V)).reshape(-1, *in_shape)
+    #     if len(self.q_ops) != 0:
+    #         # Orbital response part
+    #         V[:idx_shift_q, :] =  get_orbital_response_static_property_gradient(
+    #             mo,
+    #             self.wf.kappa_no_activeactive_spin_idx,
+    #             self.wf.num_inactive_spin_orbs,
+    #             self.wf.num_active_spin_orbs,
+    #             self.wf.rdm1,
+    #         )
+    #     for idx, G in enumerate(self.G_ops):
+    #         G_ket = generalized_propagate_state([G], self.wf.ci_coeffs, *self.index_info)
+    #         Gd_ket =generalized_propagate_state([G.dagger], self.wf.ci_coeffs, *self.index_info)
+    #         # Inactive part
+    #         for i in range(self.wf.num_inactive_spin_orbs):
+    #             E_ket = generalized_propagate_state([a_op_spin(i,True), a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info) 
+    #             # < 0 | G E | 0 >
+    #             val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
+    #             # - < 0 | E G | 0 >
+    #             val -= generalized_expectation_value(E_ket, [], G_ket, *self.index_info) # E_ket = Ed_ket for E(i,i)
+    #             V[idx + idx_shift_q, :] += mo[:, i, i] * val
+    #         # Active part
+    #         for p in range(self.wf.num_inactive_spin_orbs, self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
+    #             for q in range(
+    #                 self.wf.num_inactive_spin_orbs, self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs
+    #             ):
+    #                 E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(q,False)], self.wf.ci_coeffs, *self.index_info)
+    #                 Ed_ket = generalized_propagate_state([a_op_spin(q,True)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
+    #                 # < 0 | G E | 0 >
+    #                 val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
+    #                 # - < 0 | E G | 0 >
+    #                 val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+    #                 V[idx + idx_shift_q, :] += mo[:, p, q] * val
+    #     if np.allclose(mo, mo.transpose(0, -1, -2)):
+    #         return np.vstack((V, -1 * V)).reshape(-1, *in_shape)
+    #     return np.vstack((V, V)).reshape(-1, *in_shape)
