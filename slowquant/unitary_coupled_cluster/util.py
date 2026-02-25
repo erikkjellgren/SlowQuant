@@ -139,8 +139,8 @@ def iterate_t1(
                 num_alpha -= 1
             else:
                 num_beta -= 1
-            if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
-                continue
+            # if (num_alpha != 0 or num_beta != 0) and is_spin_conserving: #SKAL VÆK AE!
+            #     continue
             yield a, i
 
 # Includes ap(dagger)*ap (diagonal) excitations
@@ -245,8 +245,8 @@ def iterate_t2(
                         num_alpha -= 1
                     else:
                         num_beta -= 1
-                    if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
-                        continue
+                    # if (num_alpha != 0 or num_beta != 0) and is_spin_conserving: #Skal væk AE
+                    #     continue
                     yield a, i, b, j
 
 
@@ -337,8 +337,8 @@ def iterate_t3(
                                 num_alpha -= 1
                             else:
                                 num_beta -= 1
-                            if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
-                                continue
+                            # if (num_alpha != 0 or num_beta != 0) and is_spin_conserving: #AE 
+                            #     continue
                             yield a, i, b, j, c, k
 
 
