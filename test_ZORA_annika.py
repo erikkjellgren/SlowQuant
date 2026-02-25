@@ -322,8 +322,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF = GeneralizedWaveFunctionUPS(
         mol.nelectron,
         active_space,
-        c_u,
-        #c_MO,
+        #c_u,
+        c_MO,
         #h_core,
         h_core_pyscf,
         #h_core_tot,
@@ -477,7 +477,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     #WF.do_adapt(["S","D"])
 
     #print(WF.ups_layout.excitation_indices)
-    print(WF.c_mo)
+    #print(WF.c_mo)
 
     #print("efter optimering")
 
