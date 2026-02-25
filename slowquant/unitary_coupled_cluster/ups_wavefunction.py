@@ -18,6 +18,7 @@ from slowquant.unitary_coupled_cluster.fock_matrix import (
     build_fock_matrix,
     get_electronic_energy,
     get_orbital_gradient,
+    get_orbital_hessian,
 )
 from slowquant.unitary_coupled_cluster.integrals import Integrals
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
@@ -175,8 +176,11 @@ class WaveFunctionUPS:
         self.kappa_no_activeactive_idx_dagger = []
         self.kappa_redundant_idx = []
         self._kappa_old = []
+        self.kappa_iv = []
+        self.kappa_iv_idx = []
         # kappa can be optimized in spatial basis
         # Loop over all q>p orb combinations and find redundant kappas
+        idx_kappa = 0
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
                 # find redundant kappas
@@ -197,6 +201,10 @@ class WaveFunctionUPS:
                 self._kappa.append(0.0)
                 self._kappa_old.append(0.0)
                 self.kappa_idx.append((p, q))
+                if p in self.inactive_idx and q in self.active_idx:
+                    self.kappa_iv.append((p,q))
+                    self.kappa_iv_idx.append(idx_kappa)
+                idx_kappa += 1
         # HF like orbital rotation indices
         self.kappa_hf_like_idx = []
         for p in range(0, self.num_orbs):
@@ -879,11 +887,16 @@ class WaveFunctionUPS:
                     theta_optimization=False,
                     kappa_optimization=True,
                 )
-
+                hessian_oo = partial(
+                    self._calc_hessian_optimization,
+                    theta_optimization=False,
+                    kappa_optimization=True,
+                )
                 optimizer = Optimizers(
                     energy_oo,
-                    "l-bfgs-b",
+                    "newton",
                     grad=gradient_oo,
+                    hess=hessian_oo,
                     maxiter=maxiter,
                     tol=tol,
                     is_silent=is_silent_subiterations,
@@ -1156,6 +1169,35 @@ class WaveFunctionUPS:
                 list(self.ups_layout.grad_param_R.values())
             )  # Count energy measurements for all gradients
         return gradient
+
+    def _calc_hessian_optimization(
+        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
+    ) -> np.ndarray:
+        """Calculate electronic gradient.
+
+        Args:
+            parameters: Ansatz and orbital rotation parameters.
+            theta_optimization: If used in theta optimization.
+            kappa_optimization: If used in kappa optimization.
+
+        Returns:
+            Electronic gradient.
+        """
+        if theta_optimization:
+            raise ValueError("Hessian only implemented for orbital-optimization")
+        num_kappa = len(self.kappa_idx)
+        self.kappa = parameters[:num_kappa]
+        hess = get_orbital_hessian_block(
+            self.h_mo,
+            self.g_mo,
+            self.kappa_idx,
+            self.kappa_dagger_idx,
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+            self.rdm1,
+            self.rdm2,
+        )
+        return hess
 
     def _calc_energy_rotosolve_optimization(
         self,

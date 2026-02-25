@@ -29,6 +29,7 @@ class Optimizers:
         fun: Callable[[list[float]], float | np.ndarray],
         method: str,
         grad: Callable[[list[float]], np.ndarray] | None = None,
+        hess: Callable[[list[float]], np.ndarray] | None = None,
         maxiter: int = 1000,
         tol: float = 10e-8,
         is_silent: bool = False,
@@ -47,6 +48,7 @@ class Optimizers:
         """
         self.fun = fun
         self.grad = grad
+        self.hess = hess
         self.method = method.lower()
         self.maxiter = maxiter
         self.tol = tol
@@ -91,7 +93,7 @@ class Optimizers:
         self._start = time.time()
         self._iteration = 0
         print_progress = partial(self._print_progress, fun=self.fun, silent=self.is_silent)
-        if self.method in ("bfgs", "l-bfgs-b", "slsqp", "cg"):
+        if self.method in ("bfgs", "l-bfgs-b", "slsqp"):
             if self.grad is not None:
                 res = scipy.optimize.minimize(
                     self.fun,
@@ -120,6 +122,9 @@ class Optimizers:
                 callback=print_progress,
                 options={"maxiter": self.maxiter, "disp": True},
             )
+        elif self.method in ("newton",):
+            optimizer = Newton(callback=print_progress)
+            res = optimizer.minimize(self.fun, x0, self.grad, self.hess)
         elif self.method in ("rotosolve",):
             if not isinstance(extra_options, dict):
                 raise TypeError("extra_options is not set, but is required for RotoSolve")
@@ -480,3 +485,98 @@ def reconstructed_f_derivative(
                 de += energy_vals[i][k] * (s1_prime * s2 - s1 * s2_prime) / (s2**2)  # type: ignore
         de = de / len(energy_vals)
     return de
+
+
+from scipy.linalg import eigh, solve
+from scipy.linalg import cholesky, solve_triangular
+
+class Newton:
+    def __init__(
+        self,
+        callback: Callable[[list[float]], None] | None = None,
+    ) -> None:
+        self._callback = callback
+        self.maxiter = 1000
+        self.tol = 10**-4
+        self.beta = 1e-3
+        self.min_eig= 1e-6
+        self.freeze_steps = 10
+
+    def minimize(
+        self,
+        f,
+        x0,
+        grad_func,
+        hess_func,
+    ) -> Result:
+        f_best = float(10**20)
+        x = list(x0).copy()
+        x_best = x.copy()
+        res = Result()
+        success = False
+        L = None
+        for i in range(self.maxiter):
+            g = grad_func(x)
+            # Ensure we move toward a MINIMA (Hessian modification)
+            # We try Cholesky; if it fails, H is not positive definite.
+            # 2. Update Hessian Factor only every 'freeze_steps'
+            if i % self.freeze_steps == 0 or L is None:
+                H = hess_func(x)
+                
+                # 3. Ensure Positive Definiteness (The "Nudge" loop)
+                # This replaces the surgical clamping of 'eigh'
+                beta = 0
+                while True:
+                    try:
+                        # Attempt Cholesky: H + beta*I = L @ L.T
+                        H_mod = H + beta * np.eye(len(x))
+                        L = cholesky(H_mod, lower=True)
+                        break
+                    except np.linalg.LinAlgError:
+                        # If H is not PD, add/increase diagonal shift
+                        beta = max(beta * 2, 0.1)
+            
+            # 4. Solve the system using the Cholesky factor L
+            # Step 1: Solve L * y = -g
+            y = solve_triangular(L, -g, lower=True)
+            # Step 2: Solve L.T * step = y
+            step = solve_triangular(L.T, y, lower=False)
+
+            """
+            if i % self.freeze_steps == 0 or step is None:
+                H = hess_func(x)
+                current_beta = 0
+                while True:
+                    try:
+                        # Attempt Cholesky: H + beta*I = L @ L.T
+                        H_mod = H + current_beta * np.eye(len(x))
+                        L = cholesky(H_mod, lower=True)
+
+                        # Solve (L @ L.T) * step = -g
+                        # Using solve_triangular is faster than a general solve
+                        y = solve_triangular(L, -g, lower=True)
+                        step = solve_triangular(L.T, y, lower=False)
+                        break
+                    except np.linalg.LinAlgError:
+                        # If H is not positive definite, increase beta and try again
+                        current_beta = max(current_beta * 2, self.beta)
+            """
+            # Take the full Newton step
+            x = x + step
+            if self._callback is not None:
+                self._callback(x)
+            f_new = f(x)
+            # Convergence Check: Is the gradient flat enough?
+            grad_norm = np.linalg.norm(g)
+            if grad_norm < self.tol:
+                f_best = f_new
+                x_best = x.copy()
+                success = True  # sucessful optimization
+                break
+            if (f_new - f_best) < 0.0:
+                f_best = f_new
+                x_best = x.copy()
+        res.x = np.array(x_best)
+        res.fun = f_best
+        res.success = success
+        return res

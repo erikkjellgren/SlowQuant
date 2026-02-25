@@ -59,3 +59,9 @@ def get_electronic_energy(
     energy += 2 * np.einsum("vw,vw->", g_iivw_Ci, rdm1)
     energy += -np.einsum("vw,vw->", g_ivwi_Ci, rdm1)
     return energy
+
+
+def get_orbital_hessian(k_iu, k_ia, k_uv, k_ua, k_iu_idx, k_ia_idx, k_uv_idx, k_ua_idx) -> np.ndarray:
+    n_kappa = len(k_iu) + len(k_ia) + len(k_uv) + len(k_ua)
+    hess = np.zeros((n_kappa,n_kappa))
+    return hess

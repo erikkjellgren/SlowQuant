@@ -15,34 +15,9 @@ class Integrals:
         self.num_active_orbs = num_active_orbs
         self.num_virtual_orbs = num_virtual_orbs
         self.num_orbs = num_inactive_orbs + num_active_orbs + num_virtual_orbs
-        self._c_mo = np.copy(c_mo)
+        self.c_mo = np.copy(c_mo)
         self._h_ao = h_ao
         self._g_ao = g_ao
-        self._h_pv = None
-        self._h_pi = None
-        self._h_ii = None
-        self._h_vw = None
-        self._h_ii_Ci = None
-        self._g_pijj = None
-        self._g_piij = None
-        self._g_pivw = None
-        self._g_pvwi = None
-        self._g_pvii = None
-        self._g_piiv = None
-        self._g_vwxy = None
-        self._g_pvwx = None
-        self._g_iijj = None
-        self._g_ijji = None
-        self._g_iivw = None
-        self._g_vwii = None
-        self._g_viiw = None
-        self._g_ivwi = None
-        self._g_pvii_Ci = None
-        self._g_piiv_Ci = None
-        self._g_iijj_Cij = None
-        self._g_ijji_Cij = None
-        self._g_iivw_Ci = None
-        self._g_ivwi_Ci = None
 
     @property
     def c_mo(self) -> np.ndarray:
@@ -53,6 +28,7 @@ class Integrals:
         self._h_pv = None
         self._h_pi = None
         self._h_ii = None
+        self._h_ij = None
         self._h_vw = None
         self._h_ii_Ci = None
         self._g_pijj = None
@@ -75,6 +51,16 @@ class Integrals:
         self._g_ijji_Cij = None
         self._g_iivw_Ci = None
         self._g_ivwi_Ci = None
+        self._g_viwj = None
+        self._g_vwij = None
+        self._g_vwii_Ci = None
+        self._g_viwi_Ci = None
+        self._g_ivwj = None
+        self._g_ijvw = None
+        self._g_vijw = None
+        self._g_ijkk_Ck = None
+        self._g_ijkj_Cj = None
+        self._g_ivjw = None
         self._c_mo = np.copy(mo_coeffs)
 
     @property
@@ -103,6 +89,13 @@ class Integrals:
             Ci = self.c_mo[:, : self.num_inactive_orbs]
             self._h_ii = np.einsum("Pi,Qi,PQ->i", Ci, Ci, self._h_ao)
         return self._h_ii
+
+    @property
+    def h_ij(self) -> np.ndarray:
+        if self._h_ij is None:
+            Ci = self.c_mo[:, : self.num_inactive_orbs]
+            self._h_ij = np.einsum("Pi,Qj,PQ->ij", Ci, Ci, self._h_ao)
+        return self._h_ij
 
     @property
     def h_ii_Ci(self) -> np.ndarray:
@@ -440,3 +433,163 @@ class Integrals:
                 optimize=["einsum_path", (0, 3), (2, 3), (0, 2), (0, 1)],
             )
         return self._g_ivwi_Ci
+
+    @property
+    def g_viwj(self) -> np.ndarray:
+        if self._g_viwj is None:
+            Ci = self.c_mo[:, : self.num_inactive_orbs]
+            Ca = self.c_mo[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs]
+            self._g_viwj = np.einsum(
+                "Pv,Qi,Rw,Sj,PQRS->viwj",
+                Ca,
+                Ci,
+                Ca,
+                Ci,
+                self._g_ao,
+                #optimize=["einsum_path", (0, 3), (2, 3), (0, 2), (0, 1)],
+            )
+        return self._g_viwj
+
+    @property
+    def g_vwij(self) -> np.ndarray:
+        if self._g_vwij is None:
+            Ci = self.c_mo[:, : self.num_inactive_orbs]
+            Ca = self.c_mo[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs]
+            self._g_vwij = np.einsum(
+                "Pv,Qw,Ri,Sj,PQRS->vwij",
+                Ca,
+                Ca,
+                Ci,
+                Ci,
+                self._g_ao,
+                #optimize=["einsum_path", (0, 3), (2, 3), (0, 2), (0, 1)],
+            )
+        return self._g_vwij
+
+    @property
+    def g_vwii_Ci(self) -> np.ndarray:
+        if self._g_vwii_Ci is None:
+            Ci = self.c_mo[:, : self.num_inactive_orbs]
+            Ca = self.c_mo[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs]
+            self._g_vwii_Ci = np.einsum(
+                "Pv,Qw,Ri,Si,PQRS->vw",
+                Ca,
+                Ca,
+                Ci,
+                Ci,
+                self._g_ao,
+                #optimize=["einsum_path", (0, 3), (2, 3), (0, 2), (0, 1)],
+            )
+        return self._g_vwii_Ci
+
+    @property
+    def g_viwi_Ci(self) -> np.ndarray:
+        if self._g_viwi_Ci is None:
+            Ci = self.c_mo[:, : self.num_inactive_orbs]
+            Ca = self.c_mo[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs]
+            self._g_viwi_Ci = np.einsum(
+                "Pv,Qi,Rw,Si,PQRS->vw",
+                Ca,
+                Ci,
+                Ca,
+                Ci,
+                self._g_ao,
+                #optimize=["einsum_path", (0, 3), (2, 3), (0, 2), (0, 1)],
+            )
+        return self._g_viwi_Ci
+
+    @property
+    def g_ivwj(self) -> np.ndarray:
+        if self._g_ivwj is None:
+            Ci = self.c_mo[:, : self.num_inactive_orbs]
+            Ca = self.c_mo[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs]
+            self._g_ivwj = np.einsum(
+                "Pi,Qv,Rw,Sj,PQRS->ivwj",
+                Ci,
+                Ca,
+                Ca,
+                Ci,
+                self._g_ao,
+                #optimize=["einsum_path", (0, 3), (2, 3), (0, 2), (0, 1)],
+            )
+        return self._g_ivwj
+
+    @property
+    def g_ijvw(self) -> np.ndarray:
+        if self._g_ijvw is None:
+            Ci = self.c_mo[:, : self.num_inactive_orbs]
+            Ca = self.c_mo[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs]
+            self._g_ijvw = np.einsum(
+                "Pi,Qj,Rv,Sw,PQRS->ijvw",
+                Ci,
+                Ci,
+                Ca,
+                Ca,
+                self._g_ao,
+                #optimize=["einsum_path", (0, 3), (2, 3), (0, 2), (0, 1)],
+            )
+        return self._g_ijvw
+
+    @property
+    def g_vijw(self) -> np.ndarray:
+        if self._g_vijw is None:
+            Ci = self.c_mo[:, : self.num_inactive_orbs]
+            Ca = self.c_mo[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs]
+            self._g_vijw = np.einsum(
+                "Pv,Qi,Rj,Sw,PQRS->vijw",
+                Ca,
+                Ci,
+                Ci,
+                Ca,
+                self._g_ao,
+                #optimize=["einsum_path", (0, 3), (2, 3), (0, 2), (0, 1)],
+            )
+        return self._g_vijw
+
+    @property
+    def g_ijkk_Ck(self) -> np.ndarray:
+        if self._g_ijkk_Ck is None:
+            Ci = self.c_mo[:, : self.num_inactive_orbs]
+            self._g_ijkk_Ck = np.einsum(
+                "Pi,Qj,Rk,Sk,PQRS->ij",
+                Ci,
+                Ci,
+                Ci,
+                Ci,
+                self._g_ao,
+                #optimize=["einsum_path", (0, 3), (2, 3), (0, 2), (0, 1)],
+            )
+        return self._g_ijkk_Ck
+
+    @property
+    def g_ijkj_Cj(self) -> np.ndarray:
+        if self._g_ijkj_Cj is None:
+            Ci = self.c_mo[:, : self.num_inactive_orbs]
+            self._g_ijkj_Cj = np.einsum(
+                "Pi,Qj,Rk,Sj,PQRS->ik",
+                Ci,
+                Ci,
+                Ci,
+                Ci,
+                self._g_ao,
+                #optimize=["einsum_path", (0, 3), (2, 3), (0, 2), (0, 1)],
+            )
+        return self._g_ijkj_Cj
+
+    @property
+    def g_ivjw(self) -> np.ndarray:
+        if self._g_ivjw is None:
+            Ci = self.c_mo[:, : self.num_inactive_orbs]
+            Ca = self.c_mo[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs]
+            self._g_ivjw = np.einsum(
+                "Pi,Qv,Rj,Sw,PQRS->ivjw",
+                Ci,
+                Ca,
+                Ci,
+                Ca,
+                self._g_ao,
+                #optimize=["einsum_path", (0, 3), (2, 3), (0, 2), (0, 1)],
+            )
+        return self._g_ivjw
+
+
