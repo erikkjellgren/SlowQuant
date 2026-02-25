@@ -1,0 +1,29 @@
+#----------------------------------------------------------------------
+# Basis Set Exchange
+# Version 0.12
+# https://www.basissetexchange.org
+#----------------------------------------------------------------------
+#   Basis set: dyall-v2z
+# Description: Dyall's valence 2-zeta primitive basis set
+#        Role: orbital
+#     Version: 1  (Data from https://zenodo.org/records/7574629)
+#----------------------------------------------------------------------
+
+
+BASIS "ao basis" SPHERICAL PRINT
+#BASIS SET: (6s,1p) -> [6s,1p]
+H    S
+      8.29687389E+01         1.0
+H    S
+      1.24571508E+01         1.0
+H    S
+      2.83382422E+00         1.0
+H    S
+      8.00164139E-01         1.0
+H    S
+      2.58629441E-01         1.0
+H    S
+      8.99766770E-02         1.0
+H    P
+      5.02448897E-01         1.0
+END
