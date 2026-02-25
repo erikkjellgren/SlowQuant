@@ -519,6 +519,26 @@ class LinearResponse(LinearResponseBaseClass):
                     *self.index_info,
                 )
                 self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = val     
+
+        # Check hermiticity of the Metric:
+        print(f"Hermiticity check of the metric: max|S - S†| = "
+            f"{np.max(np.abs(self.Sigma - self.Sigma.conj().T)):.2e}")
+        
+        
+        
+        
+        # Check hermiticity of the Hessian:
+        top = np.concatenate((self.A, self.B), axis=1)
+        bottom = np.concatenate((-self.B.conj(), -self.A.conj()), axis=1)
+        Hessian_matrix = np.concatenate((top, bottom), axis=0)
+        print(f"Hermiticity check of the Hessian: max|H - H†| = "
+            f"{np.max(np.abs(Hessian_matrix - Hessian_matrix.conj().T)):.2e}")  
+
+
+
+
+
+
                 
         # for i in range(len(self.A)): 
         #     print('self A',self.A[i,i])
