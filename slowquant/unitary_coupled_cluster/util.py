@@ -144,6 +144,7 @@ def iterate_t1(
                 continue
             yield a, i
 
+
 # Includes ap(dagger)*ap (diagonal) excitations
 def iterate_t1_incl_diag(
     active_occ_spin_idx: Sequence[int],
@@ -287,7 +288,7 @@ def iterate_t2_generalized(
                     else:
                         num_beta -= 1
                     if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
-                        continue 
+                        continue
                     yield a, i, b, j
 
 
@@ -705,7 +706,7 @@ class UpsStructure:
         self.grad_param_R: dict[str, int] = {}
         self.param_names: list[str] = []
 
-    def create_tups(self, num_active_orbs: int, ansatz_options: dict[str, Any]) -> None:
+    def create_tiled(self, num_active_orbs: int, ansatz_options: dict[str, Any]) -> None:
         """Create tUPS ansatz.
 
         #. 10.1103/PhysRevResearch.6.023300 (tUPS)
@@ -724,17 +725,23 @@ class UpsStructure:
             tUPS ansatz.
         """
         # Options
-        valid_options = ("n_layers", "do_qnp", "skip_last_singles")
+        valid_options = ("n_layers", "do_qnp", "skip_last_singles", "do_tups")
         for option in ansatz_options:
             if option not in valid_options:
                 raise ValueError(f"Got unknown option for tUPS, {option}. Valid options are: {valid_options}")
         if "n_layers" not in ansatz_options.keys():
             raise ValueError("tUPS require the option 'n_layers'")
         n_layers = ansatz_options["n_layers"]
+        do_tups = False
+        do_qnp = False
+        if "do_tups" in ansatz_options.keys():
+            do_tups = ansatz_options["do_tups"]
         if "do_qnp" in ansatz_options.keys():
             do_qnp = ansatz_options["do_qnp"]
-        else:
-            do_qnp = False
+        if sum((do_tups, do_qnp)) == 0:
+            raise ValueError("No tiled ansatz specified.")
+        elif sum((do_tups, do_qnp)) > 1:
+            raise ValueError("More than one tiled ansatz specfied.")
         if "skip_last_singles" in ansatz_options.keys():
             skip_last_singles = ansatz_options["skip_last_singles"]
         else:
@@ -742,7 +749,8 @@ class UpsStructure:
         # Layer loop
         for n in range(n_layers):
             for p in range(0, num_active_orbs - 1, 2):  # first column of brick-wall
-                if not do_qnp:
+                # QNP does not have this single
+                if do_tups:
                     # First single
                     self.excitation_operator_type.append("sa_single")
                     self.excitation_indices.append((p, p + 1))
@@ -761,13 +769,15 @@ class UpsStructure:
                     # Here the layer is only one block, thus,
                     # the last single excitation is earlier than expected.
                     continue
-                self.excitation_operator_type.append("sa_single")
-                self.excitation_indices.append((p, p + 1))
-                self.grad_param_R[f"p{self.n_params:09d}"] = 4
-                self.param_names.append(f"p{self.n_params:09d}")
-                self.n_params += 1
+                if do_tups or do_qnp:
+                    self.excitation_operator_type.append("sa_single")
+                    self.excitation_indices.append((p, p + 1))
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 4
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
             for p in range(1, num_active_orbs - 1, 2):  # second column of brick-wall
-                if not do_qnp:
+                # QNP does not have this single
+                if do_tups:
                     # First single
                     self.excitation_operator_type.append("sa_single")
                     self.excitation_indices.append((p, p + 1))
@@ -783,11 +793,12 @@ class UpsStructure:
                 # Second single
                 if n + 1 == n_layers and skip_last_singles:
                     continue
-                self.excitation_operator_type.append("sa_single")
-                self.excitation_indices.append((p, p + 1))
-                self.grad_param_R[f"p{self.n_params:09d}"] = 4
-                self.param_names.append(f"p{self.n_params:09d}")
-                self.n_params += 1
+                if do_tups or do_qnp:
+                    self.excitation_operator_type.append("sa_single")
+                    self.excitation_indices.append((p, p + 1))
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 4
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
 
     def create_fUCC(
         self,
@@ -915,7 +926,7 @@ class UpsStructure:
         if "is_spin_conserving" in ansatz_options.keys():
             is_spin_conserving = ansatz_options["is_spin_conserving"]
             if not is_spin_conserving:
-                print("WARNING: Operators are not spin conserving.") # AWE
+                print("WARNING: Operators are not spin conserving.")  # AWE
                 # print("WARNING: Specified both spin-adapted operators and not is_spin_conserving.")
                 # print("The requested spin-adapted operators will still be spin-conserving.")
         else:
@@ -925,7 +936,7 @@ class UpsStructure:
         for _ in range(n_layers):
             if do_S:
                 # OBS!!!! Changed to iterate_t1_incl_diag!!!!! #AWE
-                #for a, i in iterate_t1_incl_diag(occ_spin_idx, unocc_spin_idx, is_spin_conserving=is_spin_conserving):
+                # for a, i in iterate_t1_incl_diag(occ_spin_idx, unocc_spin_idx, is_spin_conserving=is_spin_conserving):
                 for a, i in iterate_t1(occ_spin_idx, unocc_spin_idx, is_spin_conserving=is_spin_conserving):
                     self.excitation_operator_type.append("single")
                     self.excitation_indices.append((i, a))
@@ -977,7 +988,7 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_GpD:
-                for a, i, b, j in iterate_pair_t2_generalized(2 * num_orbs):
+                for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
                     self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
