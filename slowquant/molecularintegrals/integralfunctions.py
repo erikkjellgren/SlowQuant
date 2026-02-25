@@ -233,6 +233,19 @@ def generalized_one_electron_transform(C: np.ndarray, int_1e_inp: np.ndarray) ->
     )  # beta beta
     return cont1 + cont2
 
+def DHF_one_electron_transform(C: np.ndarray, int_1e_inp: np.ndarray) -> np.ndarray:
+    """h_core transformed"""
+
+    cont = np.einsum(
+        "aP,ab,bQ->PQ",
+        C.conj(),
+        int_1e_inp,
+        C,
+    )
+
+    return cont
+
+
 
 # def generalized_one_electron_transform(C: np.ndarray, int_1e_inp_spinor: np.ndarray): ##Spinor?? change name AE
 #     return np.einsum("aP,ab,bQ->PQ", C.conj(), int_1e_inp_spinor, C, optimize=True) ##Spinor??
@@ -296,6 +309,51 @@ def generalized_two_electron_transform(C: np.ndarray, int_2e_inp: np.ndarray) ->
         optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
     )
     return cont1 + cont2 + cont3 + cont4
+
+def DHF_two_electron_transform(C: np.ndarray, int_2e_inp: np.array) -> np.ndarray:
+    # LLLL
+    cont1 = np.einsum(
+        "aP,bQ,cR,dS,abcd->PQRS",
+        C[: int(C.shape[0] / 2)].conj(),
+        C[: int(C.shape[0] / 2)],
+        C[: int(C.shape[0] / 2)].conj(),
+        C[: int(C.shape[0] / 2)],
+        int_2e_inp[0],
+        optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
+    )
+    # SSSS
+    cont2 = np.einsum(
+        "aP,bQ,cR,dS,abcd->PQRS",
+        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
+        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
+        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
+        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
+        int_2e_inp[1],
+        optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
+    )
+    # LLSS
+    cont3 = np.einsum(
+        "aP,bQ,cR,dS,abcd->PQRS",
+        C[: int(C.shape[0] / 2)].conj(),
+        C[: int(C.shape[0] / 2)],
+        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
+        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
+        int_2e_inp[2],
+        optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
+    )
+    # SSLL
+    cont4 = np.einsum(
+        "aP,bQ,cR,dS,abcd->PQRS",
+        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
+        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
+        C[: int(C.shape[0] / 2)].conj(),
+        C[: int(C.shape[0] / 2)],
+        int_2e_inp[3],
+        optimize=["einsum_path", (0, 4), (0, 3), (0, 2), (0, 1)],
+    )
+    return cont1 + cont2 + cont3 + cont4
+
+
 
 # def generalized_two_electron_transform(C: np.ndarray, int_2e_inp_spinor: np.ndarray) -> np.ndarray: #change name AE
 #     # C: (nao2c, nmo), eri_ao: (nao2c,nao2c,nao2c,nao2c)

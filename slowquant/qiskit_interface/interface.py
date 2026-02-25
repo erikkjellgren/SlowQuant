@@ -378,7 +378,7 @@ class QuantumInterface:
         self._Minv = self._make_Minv(shots=shots)
 
     @property
-    def parameters(self) -> list[float]:
+    def parameters(self) -> list[float] | list[complex]:
         """Get ansatz parameters.
 
         Returns:
@@ -389,7 +389,7 @@ class QuantumInterface:
     @parameters.setter
     def parameters(
         self,
-        parameters: list[float],
+        parameters: list[float] | list[complex],
     ) -> None:
         """Set ansatz parameters.
 
@@ -641,9 +641,9 @@ class QuantumInterface:
             return 1
         return 2
 
-    def quantum_expectation_value(
-        self, op: FermionicOperator, custom_parameters: list[float] | None = None
-    ) -> float:
+    def _quantum_expectation_value(
+        self, op: FermionicOperator, custom_parameters: list[float] | list[complex] | None = None
+    ) -> complex:
         """Calculate expectation value of circuit and observables.
 
         Args:
@@ -673,6 +673,38 @@ class QuantumInterface:
         raise ValueError(
             "The Quantum Interface was initiated with an unknown Qiskit primitive, {type(self._primitive)}"
         )
+
+    def quantum_expectation_value(
+        self, op: FermionicOperator, custom_parameters: list[float] | None = None
+    ) -> float:
+        """Calculate expectation value of circuit and observables.
+
+        Args:
+            op: Operator as SlowQuant's FermionicOperator object.
+            custom_parameters: optional custom circuit parameters.
+
+        Returns:
+            Expectation value of fermionic operator.
+        """
+        val = self._quantum_expectation_value(op, custom_parameters)
+        if isinstance(val, complex):
+            if abs(val.imag) > 10**-2:
+                print("Warning: Complex number detected with Im = ", val.imag)
+        return val.real
+
+    def quantum_expectation_value_complex(
+        self, op: FermionicOperator, custom_parameters: list[complex] | None = None
+    ) -> complex:
+        """Calculate expectation value of circuit and observables.
+
+        Args:
+            op: Operator as SlowQuant's FermionicOperator object.
+            custom_parameters: optional custom circuit parameters.
+
+        Returns:
+            Expectation value of fermionic operator.
+        """
+        return self._quantum_expectation_value(op, custom_parameters)
 
     def quantum_expectation_value_csfs(
         self,
@@ -932,7 +964,10 @@ class QuantumInterface:
                             do_cliques=self._do_cliques,
                         )
                     )
-        return val
+        if isinstance(val, complex):
+            if abs(val.imag) > 10**-2:
+                print("Warning: Complex number detected with Im = ", val.imag)
+        return val.real
 
     def _sampler_quantum_expectation_value(
         self,
@@ -941,7 +976,7 @@ class QuantumInterface:
         det: str | None = None,
         circuit_M: None | QuantumCircuit = None,
         csfs_option: int = 1,
-    ) -> float:
+    ) -> complex:
         r"""Calculate expectation value of circuit and observables via Sampler.
 
         Calculated Pauli expectation values will be saved in memory.
@@ -1032,16 +1067,12 @@ class QuantumInterface:
                 result += value * get_bitstring_sign(pauli, key)
             values += result * coeff
 
-        if isinstance(values, complex):
-            if abs(values.imag) > 10**-2:
-                print("Warning: Complex number detected with Im = ", values.imag)
-
-        return values.real
+        return values
 
     def _sampler_quantum_expectation_value_nosave(
         self,
         op: FermionicOperator | SparsePauliOp,
-        run_parameters: list[float],
+        run_parameters: list[float] | list[complex],
         run_circuit: QuantumCircuit,
         do_cliques: bool = True,
         circuit_M: None | QuantumCircuit = None,
@@ -1119,18 +1150,14 @@ class QuantumInterface:
                     result += value * get_bitstring_sign(pauli, key)
                 values += result * coeff
 
-        if isinstance(values, complex):
-            if abs(values.imag) > 10**-2:
-                print("Warning: Complex number detected with Im = ", values.imag)
-
-        return values.real
+        return values
 
     def quantum_variance(
         self,
         op: FermionicOperator | SparsePauliOp,
         do_cliques: bool = True,
         no_coeffs: bool = False,
-        custom_parameters: list[float] | None = None,
+        custom_parameters: list[float] | list[complex] | None = None,
     ) -> float:
         """Calculate variance (std**2) of expectation value of circuit and observables.
 
@@ -1246,7 +1273,7 @@ class QuantumInterface:
     def _one_call_sampler_distributions(
         self,
         paulis: list[str] | str,
-        run_parameters: list[list[float]] | list[float],
+        run_parameters: list[list[float]] | list[list[complex]] | list[float] | list[complex],
         circuits_in: list[QuantumCircuit] | QuantumCircuit,
         overwrite_shots: int | None = None,
     ) -> list[dict[int, float]]:
@@ -1377,7 +1404,10 @@ class QuantumInterface:
         return dist_combined
 
     def _sampler_distributions(
-        self, pauli: str, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
+        self,
+        pauli: str,
+        run_parameters: list[float] | list[complex],
+        custom_circ: None | QuantumCircuit = None,
     ) -> dict[int, float]:
         r"""Get results from a sampler distribution for one given Pauli string.
 
@@ -1428,7 +1458,10 @@ class QuantumInterface:
         return distr
 
     def _sampler_distribution_p1(
-        self, pauli: str, run_parameters: list[float], custom_circ: None | QuantumCircuit = None
+        self,
+        pauli: str,
+        run_parameters: list[float] | list[complex],
+        custom_circ: None | QuantumCircuit = None,
     ) -> float:
         """Sample the probability of measuring one for a given Pauli string.
 

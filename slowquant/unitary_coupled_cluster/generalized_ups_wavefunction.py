@@ -10,6 +10,7 @@ import scipy
 from slowquant.molecularintegrals.integralfunctions import (
     generalized_one_electron_transform,
     generalized_two_electron_transform,
+    DHF_one_electron_transform,
 )
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_generalized
 from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
@@ -17,23 +18,21 @@ from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_orbital_gradient_expvalue_real_imag,
     get_orbital_gradient_generalized_real_imag,
 )
+from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import (
+    generalized_construct_ups_state_test_erik,
+    generalized_expectation_value,
+    generalized_expectation_value_energy,
+    generalized_get_grad_action,
+    generalized_propagate_state,
+    generalized_propagate_unitary_test_anna,
+)
 from slowquant.unitary_coupled_cluster.generalized_operators import (
     a_op_spin,
     generalized_hamiltonian_full_space,
 )
-from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import (
-    generalized_construct_ups_state, generalized_construct_ups_state_test_anna,
-    generalized_construct_ups_state_test_erik,
-    generalized_expectation_value,
-    generalized_expectation_value_energy,
-    generalized_get_grad_action, generalized_get_grad_action_test_anna,
-    generalized_propagate_state,
-    generalized_propagate_unitary, generalized_propagate_unitary_test_anna,
-)
 from slowquant.unitary_coupled_cluster.operators import G1, G2
-from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
-from slowquant.unitary_coupled_cluster.util import ( 
+from slowquant.unitary_coupled_cluster.util import (
     UpsStructure,
     iterate_t1,
     iterate_t1_generalized,
@@ -157,7 +156,7 @@ class GeneralizedWaveFunctionUPS:
         # Annika has modified this, since non-redundant orbital rotations had been left out!
         
         for P in range(0, self.num_spin_orbs):
-            for Q in range(P, self.num_spin_orbs): 
+            for Q in range(P, self.num_spin_orbs):
                 if P in self.inactive_spin_idx and Q in self.inactive_spin_idx:
                     self._kappa_real_redundant.append(0.0)
                     self._kappa_imag_redundant.append(0.0)
@@ -382,13 +381,14 @@ class GeneralizedWaveFunctionUPS:
             self._thetas_real = self._thetas_real.tolist()
         if isinstance(self._thetas_imag, np.ndarray):
             self._thetas_img = self._thetas_imag.tolist()
-        
+
         self.ci_coeffs = generalized_construct_ups_state_test_erik(
             self.csf_coeffs,
             self.ci_info,
             self.thetas,
             self.ups_layout,
         )
+
     @property
     def c_mo(self) -> np.ndarray:
         """Get molecular orbital coefficients.
@@ -448,7 +448,6 @@ class GeneralizedWaveFunctionUPS:
         Returns:
             One-electron reduced density matrix.
         """
-        # Annika has added dtype=complex
         if self._rdm1 is None:
             self._rdm1 = np.zeros((self.num_active_spin_orbs, self.num_active_spin_orbs), dtype=np.complex128)
             for P in range(
@@ -462,7 +461,7 @@ class GeneralizedWaveFunctionUPS:
                         [(a_op_spin(P, True) * a_op_spin(Q, False))],
                         self.ci_coeffs,
                         self.ci_info,
-                        do_folding = True,
+                        do_folding=True,
                     )
                     self._rdm1[P_idx, Q_idx] = val  # type: ignore
                     self._rdm1[Q_idx, P_idx] = val.conjugate()  # type: ignore (1.7.7 EST)
@@ -489,9 +488,9 @@ class GeneralizedWaveFunctionUPS:
                 self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
             ):
                 P_idx = P - self.num_inactive_spin_orbs
-                for Q in range(self.num_inactive_spin_orbs, P+1):
+                for Q in range(self.num_inactive_spin_orbs, P + 1):
                     Q_idx = Q - self.num_inactive_spin_orbs
-                    for R in range(self.num_inactive_spin_orbs, P+1):
+                    for R in range(self.num_inactive_spin_orbs, P + 1):
                         R_idx = R - self.num_inactive_spin_orbs
                         if P == Q:
                             S_lim = R + 1
@@ -506,7 +505,7 @@ class GeneralizedWaveFunctionUPS:
                             val = generalized_expectation_value(
                                 self.ci_coeffs,
                                 [
-                                      a_op_spin(P, dagger=True)
+                                    a_op_spin(P, dagger=True)
                                     * a_op_spin(R, dagger=True)
                                     * a_op_spin(S, dagger=False)
                                     * a_op_spin(Q, dagger=False)
@@ -523,8 +522,8 @@ class GeneralizedWaveFunctionUPS:
                             self._rdm2[R_idx, S_idx, P_idx, Q_idx] = val  # type: ignore
                             self._rdm2[S_idx, R_idx, Q_idx, P_idx] = val.conjugate()  # type: ignore
 
-                            #self._rdm2[R_idx, Q_idx, P_idx, S_idx] = -val  # type: ignore
-                            #self._rdm2[P_idx, S_idx, R_idx, Q_idx] = -val  # type: ignore
+                            # self._rdm2[R_idx, Q_idx, P_idx, S_idx] = -val  # type: ignore
+                            # self._rdm2[P_idx, S_idx, R_idx, Q_idx] = -val  # type: ignore
 
         return self._rdm2
 
@@ -602,11 +601,11 @@ class GeneralizedWaveFunctionUPS:
                                 ],
                                 self.ci_coeffs,
                                 self.ci_info,
-                                do_folding=False
+                                do_folding=False,
                             )
                             self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
         return self._rdm2
-    
+
     @property
     def rdm2_new(self) -> np.ndarray:
         """Calculate two-electron reduced density matrix in the active space.
@@ -625,21 +624,13 @@ class GeneralizedWaveFunctionUPS:
                 ),
                 dtype=np.complex128,
             )
-            for p in range(
-                self.num_spin_orbs
-            ):
-                p_idx = p 
-                for q in range(
-                    self.num_spin_orbs
-                ):
+            for p in range(self.num_spin_orbs):
+                p_idx = p
+                for q in range(self.num_spin_orbs):
                     q_idx = q
-                    for r in range(
-                        self.num_spin_orbs
-                    ):
-                        r_idx = r 
-                        for s in range(
-                            self.num_spin_orbs
-                        ):
+                    for r in range(self.num_spin_orbs):
+                        r_idx = r
+                        for s in range(self.num_spin_orbs):
                             s_idx = s
                             val = generalized_expectation_value(
                                 self.ci_coeffs,
@@ -653,7 +644,7 @@ class GeneralizedWaveFunctionUPS:
                                 ],
                                 self.ci_coeffs,
                                 self.ci_info,
-                                do_folding = True
+                                do_folding=True,
                             )
                             self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
         return self._rdm2
@@ -746,7 +737,7 @@ class GeneralizedWaveFunctionUPS:
                 is_silent=is_silent_subiterations,
                 energy_eval_callback=lambda: self.num_energy_evals,
             )
-            self._old_opt_parameters = np.zeros(2*len(self.thetas), dtype=np.float64) + 10**20
+            self._old_opt_parameters = np.zeros(2 * len(self.thetas), dtype=np.float64) + 10**20
             self._E_opt_old = 0.0
             thetas = self.thetas_real + self.thetas_imag
             res = optimizer.minimize(
@@ -878,7 +869,7 @@ class GeneralizedWaveFunctionUPS:
                 theta_optimization=True,
                 kappa_optimization=False,
             )
-            
+
         if orbital_optimization:
             if len(self.thetas) > 0:
                 thetas = self.thetas_real + self.thetas_imag
@@ -985,11 +976,10 @@ class GeneralizedWaveFunctionUPS:
             #     self.num_inactive_spin_orbs,
             #     self.num_active_spin_orbs,
             # )
-            Hamiltonian = generalized_hamiltonian_full_space( #AE rettet virker ikke (H0i_ai)
+            Hamiltonian = generalized_hamiltonian_full_space(  # AE rettet virker ikke (H0i_ai)
                 self.h_mo,
                 self.g_mo,
-                self.num_inactive_spin_orbs,
-                self.num_active_spin_orbs,
+                self.num_spin_orbs,
             )
             H_ket = generalized_propagate_state(
                 [Hamiltonian],
@@ -1008,7 +998,9 @@ class GeneralizedWaveFunctionUPS:
                 else:
                     raise ValueError(f"Got unknown excitation type {exc_type}")
                 gr = generalized_expectation_value(self.ci_coeffs, [T], H_ket, self.ci_info, do_folding=False)
-                gr -= generalized_expectation_value(H_ket, [T], self.ci_coeffs, self.ci_info, do_folding=False)
+                gr -= generalized_expectation_value(
+                    H_ket, [T], self.ci_coeffs, self.ci_info, do_folding=False
+                )
                 grad.append(gr)
             if np.max(np.abs(grad)) < grad_threshold:
                 break
@@ -1020,7 +1012,9 @@ class GeneralizedWaveFunctionUPS:
             self._thetas_real.append(0.0)
             self._thetas_imag.append(0.0)
             # print("running 1step")
-            self.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=orbital_optimization, is_silent=False)
+            self.run_wf_optimization_1step(
+                "l-bfgs-b", orbital_optimization=orbital_optimization, is_silent=False
+            )
             time_str = f"{time.time() - start:7.2f}"
             e_str = f"{self.energy_elec:3.12f}"
             grad_str = f"{np.abs(grad[max_arg]):3.12f}"
@@ -1173,9 +1167,11 @@ class GeneralizedWaveFunctionUPS:
                     self.thetas,
                     self.ups_layout,
                 )
-                gradient[i + num_kappa] += 2*np.matmul(bra_vec.conj(), ket_vec_tmp_R).real
-                gradient[i + num_kappa + len(self.thetas)] += 2*np.matmul(bra_vec.conj(), ket_vec_tmp_I).real
-               
+                gradient[i + num_kappa] += 2 * np.matmul(bra_vec.conj(), ket_vec_tmp_R).real
+                gradient[i + num_kappa + len(self.thetas)] += (
+                    2 * np.matmul(bra_vec.conj(), ket_vec_tmp_I).real
+                )
+
                 # Product rule implications on reference bra and CSF ket
                 # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
                 ket_vec = generalized_propagate_unitary_test_anna(
@@ -1190,62 +1186,56 @@ class GeneralizedWaveFunctionUPS:
             )  # Count energy measurements for all gradients
         return gradient
 
-    def get_gradient_finite_diff_theta(self,
-            parameters: list[complex], 
-        ) -> np.ndarray:
-            thetas= parameters
-            gradient_R = np.zeros(len(thetas), dtype=np.complex128)
-            gradient_I = np.zeros(len(thetas), dtype=np.complex128)
+    def get_gradient_finite_diff_theta(
+        self,
+        parameters: list[complex],
+    ) -> np.ndarray:
+        thetas = parameters
+        gradient_R = np.zeros(len(thetas), dtype=np.complex128)
+        gradient_I = np.zeros(len(thetas), dtype=np.complex128)
 
-            step = 1e-8
-            thetas = np.asarray(thetas, dtype=np.complex128)
-            p0 = np.concatenate([thetas.real, thetas.imag]).astype(float)
-            # print(p0)
+        step = 1e-8
+        thetas = np.asarray(thetas, dtype=np.complex128)
+        p0 = np.concatenate([thetas.real, thetas.imag]).astype(float)
+        # print(p0)
 
-            #Real
-            for idx in range(len(thetas)):
-                p_high = p0.copy()
-                p_low  = p0.copy()
-                p_high[idx] += step
-                p_low[idx]  -= step
+        # Real
+        for idx in range(len(thetas)):
+            p_high = p0.copy()
+            p_low = p0.copy()
+            p_high[idx] += step
+            p_low[idx] -= step
 
-                E_high = self._calc_energy_optimization(p_high,
-                        theta_optimization=True,
-                        kappa_optimization=False)
-                # print('E high',E_high)
-                E_low  = self._calc_energy_optimization(p_low, theta_optimization=True,
-                        kappa_optimization=False)
-                # print('E low',E_low)
+            E_high = self._calc_energy_optimization(p_high, theta_optimization=True, kappa_optimization=False)
+            # print('E high',E_high)
+            E_low = self._calc_energy_optimization(p_low, theta_optimization=True, kappa_optimization=False)
+            # print('E low',E_low)
 
-                gradient_R[idx] = (E_high - E_low) / (2.0 * step)
-                
-                # print("gr", gradient_R)
+            gradient_R[idx] = (E_high - E_low) / (2.0 * step)
 
-            #Imag
-            for idx in range(len(thetas)):
-                j = idx + len(thetas)
-                p_high = p0.copy()
-                p_low  = p0.copy()
-                p_high[j] += step
-                p_low[j]  -= step
-                
-                E_high = self._calc_energy_optimization(p_high,
-                        theta_optimization=True,
-                        kappa_optimization=False)
-                # print('E high',E_high)
-                E_low  = self._calc_energy_optimization(p_low, theta_optimization=True,
-                        kappa_optimization=False)
-                # print('E low',E_low)
+            # print("gr", gradient_R)
 
+        # Imag
+        for idx in range(len(thetas)):
+            j = idx + len(thetas)
+            p_high = p0.copy()
+            p_low = p0.copy()
+            p_high[j] += step
+            p_low[j] -= step
 
-                gradient_I[idx] = (E_high - E_low) / (2.0 * step)
-                # print("gi", gradient_I)
+            E_high = self._calc_energy_optimization(p_high, theta_optimization=True, kappa_optimization=False)
+            # print('E high',E_high)
+            E_low = self._calc_energy_optimization(p_low, theta_optimization=True, kappa_optimization=False)
+            # print('E low',E_low)
 
-            gradient_total = np.concatenate((gradient_R, gradient_I))
-            
-            print('Finite diff', gradient_total)
+            gradient_I[idx] = (E_high - E_low) / (2.0 * step)
+            # print("gi", gradient_I)
 
-            return gradient_total
+        gradient_total = np.concatenate((gradient_R, gradient_I))
+
+        print("Finite diff", gradient_total)
+
+        return gradient_total
 
     @property
     def get_orbital_gradient_generalized_real_imag(self):

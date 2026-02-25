@@ -316,11 +316,6 @@ class WaveFunctionCircuit:
     def rdm1(self) -> np.ndarray:
         r"""Calculate one-electron reduced density matrix.
 
-        The trace condition is enforced:
-
-        .. math::
-            \sum_i\Gamma^{[1]}_{ii} = N_e
-
         Returns:
             One-electron reduced density matrix.
         """
@@ -341,11 +336,6 @@ class WaveFunctionCircuit:
     @property
     def rdm2(self) -> np.ndarray:
         r"""Calculate two-electron reduced density matrix.
-
-        The trace condition is enforced:
-
-        .. math::
-            \sum_{ij}\Gamma^{[2]}_{iijj} = N_e(N_e-1)
 
         Returns:
             Two-electron reduced density matrix.

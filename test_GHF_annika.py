@@ -19,6 +19,7 @@ from slowquant.unitary_coupled_cluster.fermionic_operator import (
     FermionicOperator, 
 )
 
+from slowquant.molecularintegrals.integralfunctions import DHF_one_electron_transform, DHF_two_electron_transform
 
 
 
@@ -188,7 +189,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     nmo = uhf.mo_coeff[0].shape[1]
 
     # small random anti-Hermitian
-    epsilon = 0.6  # controls "step size"
+    epsilon = .6  # controls "step size"
     X = np.random.randn(nmo, nmo) + 1j*np.random.randn(nmo, nmo)
     A = epsilon * (X - X.conj().T)/2  # make anti-Hermitian
     # unitary
@@ -229,7 +230,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # # Slowquant
 
      # small random anti-Hermitian
-    eps = 0.05  # controls "step size"
+    eps = 0.005  # controls "step size"
     X_anti = np.random.randn(c.shape[0],c.shape[0]) + 1j*np.random.randn(c.shape[0],c.shape[0])
     A_mat = eps * (X_anti - X_anti.conj().T)/2  # make anti-Hermitian
 
@@ -246,7 +247,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         h_core,
         g_eri,
         "fuccsd",
-        {"n_layers": 0, "is_spin_conserving" : True},
+        {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
@@ -385,11 +386,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
                             print(WF.kappa_spin_idx[i-len(WF.kappa_spin_idx)],WF.kappa_spin_idx[j-len(WF.kappa_spin_idx)])'''
 
 
-    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
+    #WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
     #WF.do_adapt(["S","D"])
 
     #print(WF.ups_layout.excitation_indices)
-    print(WF.c_mo)
+    #print(WF.c_mo)
 
     #print("efter optimering")
 
@@ -447,11 +448,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print(exp_value_gradient_nonsplit)'''
 
 
-    LR = generalized_naive.LinearResponse(WF, excitations="SD")
-    LR.calc_excitation_energies()
-    print(LR.excitation_energies)
-    print(np.round(LR.get_transition_dipole(dip_int).real,5))
-    print(LR.get_oscillator_strengths(dip_int))
+    #LR = generalized_naive.LinearResponse(WF, excitations="SD")
+    #LR.calc_excitation_energies()
+    #print(LR.excitation_energies)
+    #print(np.round(LR.get_transition_dipole(dip_int).real,5))
+    #print(LR.get_oscillator_strengths(dip_int))
 
 
 
@@ -459,8 +460,8 @@ def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
     #basis = "cc-pvdz"
-    basis = "631-g"
-    #basis = "sto-3g"
+    #basis = "631-g"
+    basis = "sto-3g"
     #basis = "sto-6g"
     active_space = ((1, 1), 4)
     #active_space = (2, 4)
@@ -483,8 +484,9 @@ def h3():
                   H  0.500000   0.8660254038   0.000000"""
     #basis = "cc-pvdz"
     basis = "631-g"
-    #basis = "sto-3g"
-    active_space = ((2, 1), 6)
+    #basis = "sto-6g"
+    #basis = ""
+    active_space = ((2, 1), 12)
     #active_space = (2, 4)
     charge = 0
     spin = 1
@@ -528,8 +530,8 @@ def h2o():
     #basis = "dyall-v2z"
     #basis = "cc-pvdz"
     #basis = "631-g"
-    #basis = "sto-3g"
-    basis = "sto-6g"
+    basis = "sto-3g"
+    #basis = "sto-6g"
     #active_space = ((5, 5), 14)
     active_space = ((2,2),6)
     charge = 0
