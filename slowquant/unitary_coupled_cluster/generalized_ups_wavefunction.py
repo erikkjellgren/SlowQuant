@@ -181,18 +181,13 @@ class GeneralizedWaveFunctionUPS:
                         continue
                 if include_active_kappa:
                     if P in self.active_occ_spin_idx and Q in self.active_occ_spin_idx:
-                        #if P != Q:
-                        #    self._kappa_real_redundant.append(0.0)
-                        #    self._kappa_imag_redundant.append(0.0)
-                        #    self._kappa_real_redundant_old.append(0.0)
-                        #    self._kappa_imag_redundant_old.append(0.0)
-                        #    self.kappa_redundant_spin_idx.append((P, Q))
-                        #continue
-                        self._kappa_real_redundant.append(0.0)
-                        self._kappa_imag_redundant.append(0.0)
-                        self._kappa_real_redundant_old.append(0.0)
-                        self._kappa_imag_redundant_old.append(0.0)
-                        self.kappa_redundant_spin_idx.append((P, Q))
+                        if P != Q:
+                            self._kappa_real_redundant.append(0.0)
+                            self._kappa_imag_redundant.append(0.0)
+                            self._kappa_real_redundant_old.append(0.0)
+                            self._kappa_imag_redundant_old.append(0.0)
+                            self.kappa_redundant_spin_idx.append((P, Q))
+                        continue
                     if P in self.active_unocc_spin_idx and Q in self.active_unocc_spin_idx:
                         self._kappa_real_redundant.append(0.0)
                         self._kappa_imag_redundant.append(0.0)
@@ -432,7 +427,7 @@ class GeneralizedWaveFunctionUPS:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._h_mo is None:
-            self._h_mo = DHF_one_electron_transform(self.c_mo, self._h_ao)
+            self._h_mo = generalized_one_electron_transform(self.c_mo, self._h_ao)
         return self._h_mo
 
     @property

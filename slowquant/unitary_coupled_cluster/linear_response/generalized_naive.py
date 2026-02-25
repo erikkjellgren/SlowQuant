@@ -10,7 +10,7 @@ from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_orbital_response_hessian_block,
     get_orbital_response_metric_sigma,
     get_orbital_response_property_gradient_annika, get_orbital_response_property_gradient_real_imag, 
-    get_orbital_response_metric_sigma_real_imag,  get_orbital_response_static_property_gradient, 
+    get_orbital_response_metric_sigma_real_imag,  #get_orbital_response_static_property_gradient, 
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.linear_response.generalized_lr_baseclass import (

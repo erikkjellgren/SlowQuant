@@ -72,12 +72,12 @@ class LinearResponseBaseClass:
         self.q_ops_finite: int = 0 #PERNILLE
 
         if "s" in excitations:
-            print("Active occupied spin idx")
-            print(self.wf.active_occ_spin_idx)
-            print("Active unooccupied spin idx")
-            print(self.wf.active_unocc_spin_idx)
+            print("Active occupied spin idx") # AWE
+            print(self.wf.active_occ_spin_idx) # AWE
+            print("Active unooccupied spin idx") # AWE
+            print(self.wf.active_unocc_spin_idx) # AWE
             print("Excitation idx")
-            for a, i in iterate_t1(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx, is_spin_conserving=False): ## -diagonal jf HJ. Cross?
+            for a, i in iterate_t1(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx, is_spin_conserving=False): ## -diagonal jf HJ. Cross?, # is_spin_conserving = False AWE
                 self.G_ops.append(G1(i, a)) #AE from G1
                 print('G1', i,a)
         if "d" in excitations:
