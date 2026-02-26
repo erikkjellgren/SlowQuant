@@ -16,6 +16,8 @@ from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.fock_matrix import (
     build_fock_matrix,
+    build_fock_inactive,
+    build_fock_active,
     get_electronic_energy,
     get_orbital_gradient,
     get_orbital_hessian,
@@ -93,6 +95,8 @@ class WaveFunctionUPS:
         self._rdm3 = None
         self._rdm4 = None
         self._fock_mat = None
+        self._fock_mat_inactive = None
+        self._fock_mat_active = None
         self._h_mo = None
         self._g_mo = None
         self._energy_elec: float | None = None
@@ -284,6 +288,8 @@ class WaveFunctionUPS:
         self._h_mo = None
         self._g_mo = None
         self._fock_mat = None
+        self._fock_mat_inactive = None
+        self._fock_mat_active = None
         self._energy_elec = None
         self._kappa = k.copy()
         # Move current expansion point.
@@ -314,6 +320,7 @@ class WaveFunctionUPS:
         self._rdm3 = None
         self._rdm4 = None
         self._fock_mat = None
+        self._fock_mat_inactive = None
         self._energy_elec = None
         self._thetas = theta_vals.copy()
         self.ci_coeffs = construct_ups_state(
@@ -366,23 +373,67 @@ class WaveFunctionUPS:
         return self._g_mo
 
     @property
+    def fock_mat_inactive(self) -> np.ndarray:
+        if self._fock_mat_inactive is None:
+            self._fock_mat_inactive = build_fock_inactive(
+        self.ints.h_ij,
+        self.ints.h_iv,
+        self.ints.h_ia,
+        self.ints.h_vw,
+        self.ints.h_va,
+        self.ints.h_ab,
+        self.ints.g_ijkk_Ck,
+        self.ints.g_ikkj_Ck,
+        self.ints.g_iijv_Ci,
+        self.ints.g_ijjv_Cj,
+        self.ints.g_iija_Ci,
+        self.ints.g_ijja_Cj,
+        self.ints.g_iivw_Ci,
+        self.ints.g_ivwi_Ci,
+        self.ints.g_iiva_Ci,
+        self.ints.g_ivai_Ci,
+        self.ints.g_iiab_Ci,
+        self.ints.g_iabi_Ci,
+        self.ints.num_inactive_orbs,
+        self.ints.num_active_orbs,
+        self.ints.num_virtual_orbs,
+                    ) 
+        return self._fock_mat_inactive
+
+    @property
+    def fock_mat_active(self) -> np.ndarray:
+        if self._fock_mat_active is None:
+            self._fock_mat_active = build_fock_active(
+    self.rdm1,
+    self.ints.g_ijvw,
+    self.ints.g_ivjw,
+    self.ints.g_ivwx,
+    self.ints.g_iavw,
+    self.ints.g_ivwa,
+    self.ints.g_vwxy,
+    self.ints.g_vwxa,
+    self.ints.g_vwab,
+    self.ints.g_vawb,
+    self.num_inactive_orbs,
+    self.num_active_orbs,
+    self.num_virtual_orbs,
+                    )
+        return self._fock_mat_active
+
+    @property
     def fock_mat(self) -> np.ndarray:
         if self._fock_mat is None:
             self._fock_mat = build_fock_matrix(
-                self.rdm1,
-                self.rdm2,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.num_virtual_orbs,
-                self.ints.h_pi,
-                self.ints.g_pijj,
-                self.ints.g_piij,
-                self.ints.g_pivw,
-                self.ints.g_pvwi,
-                self.ints.h_pv,
-                self.ints.g_pvii_Ci,
-                self.ints.g_piiv_Ci,
-                self.ints.g_pvwx,
+    self.fock_mat_inactive,
+    self.fock_mat_active,
+    self.rdm1,
+    self.rdm2,
+    self.ints.g_ivwx,
+    self.ints.g_vwxy,
+    self.ints.g_vwxa,
+    self.ints.num_inactive_orbs,
+    self.num_active_orbs,
+    self.num_virtual_orbs,
             )
         return self._fock_mat
 
@@ -764,8 +815,6 @@ class WaveFunctionUPS:
                         self.ints.g_iijj,
                         self.ints.g_ijji,
                         self.ints.g_iivw,
-                        self.ints.g_vwii,
-                        self.ints.g_viiw,
                         self.ints.g_ivwi,
                         self.ints.g_vwxy,
                         self.num_inactive_orbs,
@@ -789,8 +838,6 @@ class WaveFunctionUPS:
             self.ints.g_iijj,
             self.ints.g_ijji,
             self.ints.g_iivw,
-            self.ints.g_vwii,
-            self.ints.g_viiw,
             self.ints.g_ivwi,
             self.ints.g_vwxy,
             self.num_inactive_orbs,
@@ -894,7 +941,7 @@ class WaveFunctionUPS:
                 )
                 optimizer = Optimizers(
                     energy_oo,
-                    "newton",
+                    "bfgs",
                     grad=gradient_oo,
                     hess=hessian_oo,
                     maxiter=maxiter,
@@ -1071,8 +1118,6 @@ class WaveFunctionUPS:
                         self.ints.g_iijj,
                         self.ints.g_ijji,
                         self.ints.g_iivw,
-                        self.ints.g_vwii,
-                        self.ints.g_viiw,
                         self.ints.g_ivwi,
                         self.ints.g_vwxy,
                         self.num_inactive_orbs,
@@ -1116,8 +1161,6 @@ class WaveFunctionUPS:
                 self.ints.g_iijj,
                 self.ints.g_ijji,
                 self.ints.g_iivw,
-                self.ints.g_vwii,
-                self.ints.g_viiw,
                 self.ints.g_ivwi,
                 self.ints.g_vwxy,
                 self.num_inactive_orbs,
@@ -1247,8 +1290,6 @@ class WaveFunctionUPS:
             self.ints.g_iijj,
             self.ints.g_ijji,
             self.ints.g_iivw,
-            self.ints.g_vwii,
-            self.ints.g_viiw,
             self.ints.g_ivwi,
             self.ints.g_vwxy,
             self.num_inactive_orbs,
