@@ -377,28 +377,11 @@ class WaveFunctionUPS:
         if self._fock_mat_inactive is None:
             self.ints.build_fock_matrix_integrals()
             self._fock_mat_inactive = build_fock_inactive(
-        self.ints.h_ij,
-        self.ints.h_iv,
-        self.ints.h_ia,
-        self.ints.h_vw,
-        self.ints.h_va,
-        self.ints.h_ab,
-        self.ints.g_ijkk_Ck,
-        self.ints.g_ikkj_Ck,
-        self.ints.g_iijv_Ci,
-        self.ints.g_ijjv_Cj,
-        self.ints.g_iija_Ci,
-        self.ints.g_ijja_Cj,
-        self.ints.g_iivw_Ci,
-        self.ints.g_iviw_Ci,
-        self.ints.g_iiva_Ci,
-        self.ints.g_ivia_Ci,
-        self.ints.g_iiab_Ci,
-        self.ints.g_iaib_Ci,
-        self.ints.num_inactive_orbs,
-        self.ints.num_active_orbs,
-        self.ints.num_virtual_orbs,
-                    ) 
+                    self._h_ao,
+                    self._g_ao,
+                    self.c_mo,
+                    self.num_inactive_orbs,
+            ) 
         return self._fock_mat_inactive
 
     @property
@@ -406,20 +389,12 @@ class WaveFunctionUPS:
         if self._fock_mat_active is None:
             self.ints.build_fock_matrix_integrals()
             self._fock_mat_active = build_fock_active(
-    self.rdm1,
-    self.ints.g_ijvw,
-    self.ints.g_ivjw,
-    self.ints.g_ivwx,
-    self.ints.g_iavw,
-    self.ints.g_ivwa,
-    self.ints.g_vwxy,
-    self.ints.g_vwxa,
-    self.ints.g_vwab,
-    self.ints.g_vawb,
-    self.num_inactive_orbs,
-    self.num_active_orbs,
-    self.num_virtual_orbs,
-                    )
+                    self._g_ao,
+                    self.c_mo,
+                    self.rdm1,
+                    self.num_inactive_orbs,
+                    self.num_active_orbs,
+            )
         return self._fock_mat_active
 
     @property
@@ -427,16 +402,15 @@ class WaveFunctionUPS:
         if self._fock_mat is None:
             self.ints.build_fock_matrix_integrals()
             self._fock_mat = build_fock_matrix(
-    self.fock_mat_inactive,
-    self.fock_mat_active,
-    self.rdm1,
-    self.rdm2,
-    self.ints.g_ivwx,
-    self.ints.g_vwxy,
-    self.ints.g_vwxa,
-    self.ints.num_inactive_orbs,
-    self.num_active_orbs,
-    self.num_virtual_orbs,
+                    self._g_ao,
+                    self.c_mo,
+                    self.fock_mat_inactive,
+                    self.fock_mat_active,
+                    self.rdm1,
+                    self.rdm2,
+                    self.num_inactive_orbs,
+                    self.num_active_orbs,
+                    self.num_virtual_orbs,
             )
         return self._fock_mat
 
