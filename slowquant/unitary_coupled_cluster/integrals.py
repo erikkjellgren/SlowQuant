@@ -299,4 +299,124 @@ class Integrals:
         return self._g_vawb
 
     def build_fock_matrix_integrals(self):
-        g_pQiS = np.einsum('Pp,Ri,PQRS->pQiS', self.c_mo[3], self.c_mo[0])
+        return None
+        do_inact = False
+        do_act = False
+        if self._g_ijkk_Ck is None:
+            do_inact = True
+        elif self._g_iijv_Ci  is None:
+            do_inact = True
+        elif self._g_iija_Ci  is None:
+            do_inact = True
+        elif self._g_iivw_Ci  is None:
+            do_inact = True
+        elif self._g_iiva_Ci  is None:
+            do_inact = True
+        elif self._g_iiab_Ci  is None:
+            do_inact = True
+        elif self._g_ikkj_Ck  is None:
+            do_inact = True
+        elif self._g_ijjv_Cj  is None:
+            do_inact = True
+        elif self._g_ijja_Cj  is None:
+            do_inact = True
+        elif self._g_iviw_Ci  is None:
+            do_inact = True
+        elif self._g_ivia_Ci  is None:
+            do_inact = True
+        elif self._g_iaib_Ci  is None:
+            do_inact = True
+        if self._g_ijvw  is None:
+            do_act = True
+        elif self._g_iavw is None:
+            do_act = True
+        elif self._g_vwxy is None:
+            do_act = True
+        elif self._g_vwxa is None:
+            do_act = True
+        elif self._g_vwab is None:
+            do_act = True
+        elif self._g_ivjw is None:
+            do_act = True
+        elif self._g_ivwx is None:
+            do_act = True
+        elif self._g_ivwa is None:
+            do_act = True
+        elif self._g_vawb is None:
+            do_act = True
+        inact = slice(0,self.num_inactive_orbs)
+        act = slice(self.num_inactive_orbs,self.num_inactive_orbs+self.num_active_orbs)
+        virt = slice(self.num_inactive_orbs+self.num_active_orbs, self.num_orbs)
+        if do_inact and do_act:
+            if 'fock_g_pQRS' not in self.opt_paths:
+                path_info = np.einsum_path('Pp,PQRS->pQRS', self.c_mo[3], self._g_ao)
+                self.opt_paths['fock_g_pQRS'] = path_info[0]
+            g_pQRS = np.einsum('Pp,PQRS->pQRS', self.c_mo[3], self._g_ao, optimize=self.opt_paths['fock_g_pQRS'])
+        if do_inact:
+            if do_act:
+                if 'fock_g_pQiS_1' not in self.opt_paths:
+                    path_info = np.einsum_path('Ri,pQRS->pQiS', self.c_mo[0], g_pQRS)
+                    self.opt_paths['fock_g_pQiS_1'] = path_info[0]
+                g_pQiS = np.einsum('Ri,pQRS->pQiS', self.c_mo[0], g_pQRS, optimize=self.opt_paths['fock_g_pQiS_1'])
+            else:
+                if 'fock_g_pQiS_2' not in self.opt_paths:
+                    path_info = np.einsum_path('Pp,Ri,PQRS->pQiS', self.c_mo[3], self.c_mo[0], self._g_ao)
+                    self.opt_paths['fock_g_pQiS_2'] = path_info[0]
+                g_pQiS = np.einsum('Pp,Ri,PQRS->pQiS', self.c_mo[3], self.c_mo[0], self._g_ao, optimize=self.opt_paths['fock_g_pQiS_2'])
+            if 'fock_g_iipq_Ci' not in self.opt_paths:
+                path_info = np.einsum_path('Qq,Si,pQiS->pq', self.c_mo[3], self.c_mo[0], g_pQiS)
+                self.opt_paths['fock_g_iipq_Ci'] = path_info[0]
+            g_iipq_Ci = np.einsum('Qq,Si,pQiS->pq', self.c_mo[3], self.c_mo[0], g_pQiS, optimize=self.opt_paths['fock_g_iipq_Ci'])
+            self._g_ijkk_Ck = g_iipq_Ci[inact,inact]
+            self._g_iijv_Ci = g_iipq_Ci[inact,act]
+            self._g_iija_Ci = g_iipq_Ci[inact, virt]
+            self._g_iivw_Ci = g_iipq_Ci[act,act]
+            self._g_iiva_Ci = g_iipq_Ci[act,virt]
+            self._g_iiab_Ci = g_iipq_Ci[virt, virt]
+            del g_iipq_Ci
+            if 'fock_g_ipiq_Ci' not in self.opt_paths:
+                path_info = np.einsum_path('Qi,Sq,pQiS->pq', self.c_mo[0], self.c_mo[3], g_pQiS)
+                self.opt_paths['fock_g_ipiq_Ci'] = path_info[0]
+            g_ipiq_Ci = np.einsum('Qi,Sq,pQiS->pq', self.c_mo[0], self.c_mo[3], g_pQiS, optimize=self.opt_paths['fock_g_ipiq_Ci'])
+            del g_pQiS
+            self._g_ikkj_Ck = g_ipiq_Ci[inact,inact]
+            self._g_ijjv_Cj = g_ipiq_Ci[inact,act]
+            self._g_ijja_Cj = g_ipiq_Ci[inact,virt]
+            self._g_iviw_Ci = g_ipiq_Ci[act,act]
+            self._g_ivia_Ci = g_ipiq_Ci[act,virt]
+            self._g_iaib_Ci = g_ipiq_Ci[virt,virt]
+            del g_ipiq_Ci
+        if do_act:
+            if do_inact:
+                if 'fock_g_pQvS_1' not in self.opt_paths:
+                    path_info = np.einsum_path('Rv,pQRS->pQvS', self.c_mo[1], g_pQRS)
+                    self.opt_paths['fock_g_pQvS_1'] = path_info[0]
+                g_pQvS = np.einsum('Rv,pQRS->pQvS', self.c_mo[1], g_pQRS, optimize=self.opt_paths['fock_g_pQvS_1'])
+                del g_pQRS
+            else:
+                if 'fock_g_pQvS_2' not in self.opt_paths:
+                    path_info = np.einsum_path('Pp,Rv,PQRS->pQvS', self.c_mo[3], self.c_mo[1], self._g_ao)
+                    self.opt_paths['fock_g_pQvS_2'] = path_info[0]
+                g_pQvS = np.einsum('Pp,Rv,PQRS->pQvS', self.c_mo[3], self.c_mo[1], self._g_ao, optimize=self.opt_paths['fock_g_pQvS_2'])
+            if 'fock_g_pqvw' not in self.opt_paths:
+                path_info = np.einsum_path('Qq,Sw,pQvS->pqvw', self.c_mo[3], self.c_mo[1], g_pQvS)
+                self.opt_paths['fock_g_pqvw'] = path_info[0]
+            g_pqvw = np.einsum('Qq,Sw,pQvS->pqvw', self.c_mo[3], self.c_mo[1], g_pQvS, optimize=self.opt_paths['fock_g_pqvw'])
+            self._g_ijvw = g_pqvw[inact, inact, :, :] 
+            self._g_iavw = g_pqvw[inact, virt, :, :]
+            self._g_vwxy = g_pqvw[act,act,:,:]
+            self._g_vwxa = (g_pqvw[act,virt,:,:]).transpose((2,3,0,1))
+            self._g_vwab = (g_pqvw[virt,virt,:,:]).transpose((2,3,0,1))
+            del g_pqvw
+            if 'fock_g_pvwq' not in self.opt_paths:
+                path_info = np.einsum_path('Qw,Sq,pQvS->pwvq', self.c_mo[1], self.c_mo[3], g_pQvS)
+                self.opt_paths['fock_g_pvwq'] = path_info[0]
+            g_pvwq= np.einsum('Qw,Sq,pQvS->pwvq', self.c_mo[1], self.c_mo[3], g_pQvS, optimize=self.opt_paths['fock_g_pvwq'])
+            self._g_ivjw = (g_pvwq[inact,:,:,inact]).transpose((0,1,3,2)) 
+            self._g_ivwx = g_pvwq[inact,:,:,act]
+            self._g_ivwa = g_pvwq[inact,:,:,virt]
+            self._g_vawb = (g_pvwq[virt,:,:,virt]).transpose((1,0,2,3))
+            del g_pvwq
+            del g_pQvS
+
+

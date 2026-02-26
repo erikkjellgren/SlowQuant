@@ -375,6 +375,7 @@ class WaveFunctionUPS:
     @property
     def fock_mat_inactive(self) -> np.ndarray:
         if self._fock_mat_inactive is None:
+            self.ints.build_fock_matrix_integrals()
             self._fock_mat_inactive = build_fock_inactive(
         self.ints.h_ij,
         self.ints.h_iv,
@@ -403,6 +404,7 @@ class WaveFunctionUPS:
     @property
     def fock_mat_active(self) -> np.ndarray:
         if self._fock_mat_active is None:
+            self.ints.build_fock_matrix_integrals()
             self._fock_mat_active = build_fock_active(
     self.rdm1,
     self.ints.g_ijvw,
@@ -423,6 +425,7 @@ class WaveFunctionUPS:
     @property
     def fock_mat(self) -> np.ndarray:
         if self._fock_mat is None:
+            self.ints.build_fock_matrix_integrals()
             self._fock_mat = build_fock_matrix(
     self.fock_mat_inactive,
     self.fock_mat_active,
