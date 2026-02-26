@@ -16,11 +16,11 @@ def build_fock_inactive(
         g_iija_Ci,
         g_ijja_Cj,
         g_iivw_Ci,
-        g_ivwi_Ci,
+        g_iviw_Ci,
         g_iiva_Ci,
-        g_ivai_Ci,
+        g_ivia_Ci,
         g_iiab_Ci,
-        g_iabi_Ci,
+        g_iaib_Ci,
         num_inactive_orbs,
         num_active_orbs,
         num_virtual_orbs,
@@ -39,12 +39,12 @@ def build_fock_inactive(
     F[inact, virt] = h_ia + 2*g_iija_Ci - g_ijja_Cj
     F[virt, inact] = F[inact, virt].T
     # active-active
-    F[act, act] = h_vw + 2*g_iivw_Ci - g_ivwi_Ci
+    F[act, act] = h_vw + 2*g_iivw_Ci - g_iviw_Ci
     # active-virtual
-    F[act, virt] = h_va + 2*g_iiva_Ci - g_ivai_Ci
+    F[act, virt] = h_va + 2*g_iiva_Ci - g_ivia_Ci
     F[virt, act] = F[act, virt].T
     # virtual-virtual
-    F[virt, virt] = h_ab + 2*g_iiab_Ci - g_iabi_Ci
+    F[virt, virt] = h_ab + 2*g_iiab_Ci - g_iaib_Ci
     return F
 
 

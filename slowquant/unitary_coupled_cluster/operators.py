@@ -479,7 +479,7 @@ def hamiltonian_0i_0a(
     g_iijj,
     g_ijji,
     g_iivw,
-    g_ivwi,
+    g_iviw,
     g_vwxy,
     num_inactive_orbs: int,
     num_active_orbs: int,
@@ -523,9 +523,9 @@ def hamiltonian_0i_0a(
                 if abs(g_iivw[i, vshift, wshift]) > 10**-14:
                     hamiltonian_operator += 1 / 2 * g_iivw[i, vshift, wshift] * epqrs(i, i, v, w)
                     hamiltonian_operator += 1 / 2 * g_iivw[i, vshift, wshift] * epqrs(v, w, i, i)
-                if abs(g_ivwi[i, vshift, wshift]) > 10**-14:
-                    hamiltonian_operator += 1 / 2 * g_ivwi[i, vshift, wshift] * epqrs(v, i, i, w)
-                    hamiltonian_operator += 1 / 2 * g_ivwi[i, vshift, wshift] * epqrs(i, v, w, i)
+                if abs(g_iviw[i, vshift, wshift]) > 10**-14:
+                    hamiltonian_operator += 1 / 2 * g_iviw[i, vshift, wshift] * epqrs(v, i, i, w)
+                    hamiltonian_operator += 1 / 2 * g_iviw[i, vshift, wshift] * epqrs(i, v, w, i)
     # Active two-electron
     for v in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
         vshift = v - num_inactive_orbs
