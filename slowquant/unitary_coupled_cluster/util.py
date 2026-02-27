@@ -247,9 +247,10 @@ def iterate_t2(
                         num_alpha -= 1
                     else:
                         num_beta -= 1
-                    # if (num_alpha != 0 or num_beta != 0) and is_spin_conserving: #Skal væk AE
-                    #     continue
+                    if (num_alpha != 0 or num_beta != 0) and is_spin_conserving: #Skal væk AE
+                         continue
                     yield a, i, b, j
+                    #yield a, j, b, i
 
 
 def iterate_t2_generalized(

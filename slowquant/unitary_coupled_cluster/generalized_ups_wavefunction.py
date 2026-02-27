@@ -197,13 +197,13 @@ class GeneralizedWaveFunctionUPS:
                         continue
 
                 #AE ER IKKE SIKKER PÅ DETTE??
-                # if not (((P in self.inactive_spin_idx) or (P in self.active_occ_spin_idx)) and ((Q in self.active_unocc_spin_idx) or (Q in self.virtual_spin_idx))): #AE
-                #     self._kappa_real_redundant.append(0.0)
-                #     self._kappa_imag_redundant.append(0.0)
-                #     self._kappa_real_redundant_old.append(0.0)
-                #     self._kappa_imag_redundant_old.append(0.0)
-                #     self.kappa_redundant_spin_idx.append((P, Q))
-                #     continue
+                if not (((P in self.inactive_spin_idx) or (P in self.active_occ_spin_idx)) and ((Q in self.active_unocc_spin_idx) or (Q in self.virtual_spin_idx))): #AE
+                     self._kappa_real_redundant.append(0.0)
+                     self._kappa_imag_redundant.append(0.0)
+                     self._kappa_real_redundant_old.append(0.0)
+                     self._kappa_imag_redundant_old.append(0.0)
+                     self.kappa_redundant_spin_idx.append((P, Q))
+                     continue
                 
                 
                 if not (P in self.active_spin_idx and Q in self.active_spin_idx):
@@ -427,7 +427,7 @@ class GeneralizedWaveFunctionUPS:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._h_mo is None:
-            self._h_mo = generalized_one_electron_transform(self.c_mo, self._h_ao)
+            self._h_mo = DHF_one_electron_transform(self.c_mo, self._h_ao)
         return self._h_mo
 
     @property

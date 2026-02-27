@@ -81,9 +81,9 @@ class LinearResponseBaseClass:
                 self.G_ops.append(G1(i, a)) #AE from G1
                 print('G1', i,a)
         if "d" in excitations:
-            for a, i, b, j in iterate_t2(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx): 
+            for a, i, b, j in iterate_t2(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx, is_spin_conserving=self.wf.ansatz_options["is_spin_conserving"]): 
                 self.G_ops.append(G2(i, j, a, b)) #AE from G2
-                # print('G2',i, j, a, b)
+                print('G2',i, j, a, b)
                 self.operator_labels_G.append(('G2',i,j,a,b))
         if "t" in excitations:
             for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
@@ -108,7 +108,7 @@ class LinearResponseBaseClass:
         for p, q in self.wf.kappa_no_activeactive_spin_idx:
             self.q_ops.append(G1(p, q)) #AE from G1 skal det være generalized??
             self.operator_labels_q.append(('q',p,q))
-        #     print('qs:',p,q)
+            print('qs:',p,q)
         # print('no active active', self.wf.kappa_no_activeactive_spin_idx)
         # print(operator_labels)
         num_parameters = len(self.G_ops) + len(self.q_ops)
@@ -261,10 +261,10 @@ class LinearResponseBaseClass:
         norms = np.zeros(len(self.response_vectors[0]),dtype=complex) #AE complex
         for state_number in range(len(self.response_vectors[0])):
             # Get Z_q Z_G Y_q and Y_G matrices
-            ZZq = np.outer(self.Z_q[:, state_number], self.Z_q[:, state_number].transpose())
-            YYq = np.outer(self.Y_q[:, state_number], self.Y_q[:, state_number].transpose())
-            ZZG = np.outer(self.Z_G[:, state_number], self.Z_G[:, state_number].transpose())
-            YYG = np.outer(self.Y_G[:, state_number], self.Y_G[:, state_number].transpose())
+            ZZq = np.outer(self.Z_q[:, state_number], self.Z_q[:, state_number].transpose().conj())
+            YYq = np.outer(self.Y_q[:, state_number], self.Y_q[:, state_number].transpose().conj())
+            ZZG = np.outer(self.Z_G[:, state_number], self.Z_G[:, state_number].transpose().conj())
+            YYG = np.outer(self.Y_G[:, state_number], self.Y_G[:, state_number].transpose().conj())
 
             #Pernille
             # ZZqG = np.outer(self.Z_qG[:, state_number], self.Z_qG[:, state_number].transpose())
