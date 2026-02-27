@@ -116,26 +116,26 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print(LR.excitation_energies)
     
     
-    "Calculate polarizability"
-    prop_grad = LR.get_property_gradient(dip_ao)
-    response = solve(LR.hessian, prop_grad)
-    alpha = np.einsum('ix,ix->x', prop_grad, response)
+    # "Calculate polarizability"
+    # prop_grad = LR.get_property_gradient(dip_ao)
+    # response = solve(LR.hessian, prop_grad)
+    # alpha = np.einsum('ix,ix->x', prop_grad, response)
 
-    print(f'Polarizabilities:\n \t xx: {alpha[0]:.4f} \t yy: {alpha[1]:.4f} \t zz: {alpha[2]:.4f}')
+    # print(f'Polarizabilities:\n \t xx: {alpha[0]:.4f} \t yy: {alpha[1]:.4f} \t zz: {alpha[2]:.4f}')
 
-    "Calculate dipole moments"
-    dipole = np.zeros(3)
-    mux = generalized_one_electron_transform(WF.c_mo, dip_ao[0])
-    muy = generalized_one_electron_transform(WF.c_mo, dip_ao[1])
-    muz = generalized_one_electron_transform(WF.c_mo, dip_ao[2])
-    mu_op_x = generalized_one_elec_op_0i_0a(mux, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
-    mu_op_y = generalized_one_elec_op_0i_0a(muy, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
-    mu_op_z = generalized_one_elec_op_0i_0a(muz, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
-    dip_x=generalized_expectation_value(WF.ci_coeffs, [mu_op_x], WF.ci_coeffs, WF.ci_info)
-    dip_y=generalized_expectation_value(WF.ci_coeffs, [mu_op_y], WF.ci_coeffs, WF.ci_info)
-    dip_z=generalized_expectation_value(WF.ci_coeffs, [mu_op_z], WF.ci_coeffs, WF.ci_info)
+    # "Calculate dipole moments"
+    # dipole = np.zeros(3)
+    # mux = generalized_one_electron_transform(WF.c_mo, dip_ao[0])
+    # muy = generalized_one_electron_transform(WF.c_mo, dip_ao[1])
+    # muz = generalized_one_electron_transform(WF.c_mo, dip_ao[2])
+    # mu_op_x = generalized_one_elec_op_0i_0a(mux, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
+    # mu_op_y = generalized_one_elec_op_0i_0a(muy, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
+    # mu_op_z = generalized_one_elec_op_0i_0a(muz, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
+    # dip_x=generalized_expectation_value(WF.ci_coeffs, [mu_op_x], WF.ci_coeffs, WF.ci_info)
+    # dip_y=generalized_expectation_value(WF.ci_coeffs, [mu_op_y], WF.ci_coeffs, WF.ci_info)
+    # dip_z=generalized_expectation_value(WF.ci_coeffs, [mu_op_z], WF.ci_coeffs, WF.ci_info)
 
-    print(f'Electric Dipolemoments:\n \t xx: {dip_x:.4f} \t yy: {dip_y:.4f} \t zz: {dip_z:.4f}')
+    # print(f'Electric Dipolemoments:\n \t xx: {dip_x:.4f} \t yy: {dip_y:.4f} \t zz: {dip_z:.4f}')
 
 
     #call MO integrals
@@ -293,7 +293,7 @@ def h4_rektangle():
                   H 0.0 1.11 0.74;
                   H 0.0 1.11 0.0;"""
     basis = "STO-3g"
-    active_space = ((1,1), 4)
+    active_space = ((2,2), 8)
     charge = 0
     spin = 0
     NR(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
@@ -311,8 +311,8 @@ def oh_radical():
 
 
 # h3()
-# h2()
-h4_rektangle()
+h2()
+# h4_rektangle()
 # HI()
 # HBr()
 # oh_radical()
