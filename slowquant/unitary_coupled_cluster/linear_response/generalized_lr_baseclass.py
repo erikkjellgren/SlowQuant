@@ -83,7 +83,7 @@ class LinearResponseBaseClass:
                 # print('G1', i,a)
                 self.operator_labels_G.append(('G1',i,a))
         if "d" in excitations:
-            for a, i, b, j in iterate_t2(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx): 
+            for a, i, b, j in iterate_t2(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx, is_spin_conserving=self.wf.ansatz_options["is_spin_conserving"]): 
                 self.G_ops.append(G2(i, j, a, b)) #AE from G2
                 # print('G2',i, j, a, b)
                 self.operator_labels_G.append(('G2',i,j,a,b))
@@ -184,6 +184,7 @@ class LinearResponseBaseClass:
         #     #     print(vec[j], self.operator_labels[j])
         
 
+        #AE
         operator_labels = np.array(
             self.operator_labels_q +
             self.operator_labels_G +

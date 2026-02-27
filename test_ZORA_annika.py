@@ -180,7 +180,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     """.........."""
     print("active space:", {active_space})
     # PySCF
-    mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin, cart = True)
+    mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin, cart = False)
     mol.build()
     #X2C
     uhf = scf.UHF(mol)
@@ -265,11 +265,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     W_0 = 0.25*(1/c**2)*(scalar_2c+soc_2c) # Remember to put back the soc_2c!!
 
-    W = np.linalg.inv(np.linalg.inv(W_0) - np.linalg.inv(T_2c))
+    #W = np.linalg.inv(np.linalg.inv(W_0) - np.linalg.inv(T_2c))
  
-    hcore = T_2c + W + V_2c
+    #hcore = T_2c + W + V_2c
 
-
+    #print(mol.nao)
 
 
 
@@ -277,11 +277,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     h_core_pyscf = np.kron(np.eye(2), h_core_pyscf_1dim)
 
-    H_zora= read_zora_so("H2_zora.zora_so")
+    H_zora= read_zora_so("Cl_so.zora_so")
 
     h_core_tot = (h_core_pyscf + H_zora)
 
-    #mf.get_hcore = lambda *args: h_core_tot
+    mf.get_hcore = lambda *args: h_core_tot
 
 
 
@@ -317,16 +317,19 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     c_u = c_MO @ U_step
 
+    print("MAX", np.max(c_MO.imag))
+    #print(mf.mo_coeff)
+
 
 
     WF = GeneralizedWaveFunctionUPS(
         mol.nelectron,
         active_space,
-        c_u,
-        #c_MO,
+        #c_u,
+        c_MO,
         #h_core,
-        h_core_pyscf,
-        #h_core_tot,
+        #h_core_pyscf,
+        h_core_tot,
         g_eri,
         "fuccsd",
         {"n_layers": 0, "is_spin_conserving" : False},
@@ -674,12 +677,13 @@ def HI():
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
     )
 
-def HBr():
+def HCl():
     geometry = """H  0.0   0.0  0.0;
-        Br  0.0  0.0  1.41443 """
+        Cl  0.0  0.0  1.1275 """
     #basis = "dyall-v2z"
-    basis = "cc-pvdz"
-    active_space = ((2,2), 6)
+    #basis = "cc-pvdz"
+    basis = "sto-3g"
+    active_space = ((9,9), 20)
     charge = 0
     spin = 0
     #print("Restricted HBr")
@@ -688,12 +692,30 @@ def HBr():
     #)
     #print("Nonrelativistic HBr")
     NR(
-        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom",
+    )
+
+def HBr():
+    geometry = """H  0.0   0.0  0.0;
+        Br  0.0  0.0  1.41443 """
+    #basis = "dyall-v2z"
+    #basis = "cc-pvdz"
+    basis = "sto-3g"
+    active_space = ((18,18), 38)
+    charge = 0
+    spin = 0
+    #print("Restricted HBr")
+    #restricted(
+    #    geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    #)
+    #print("Nonrelativistic HBr")
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom",
     )
     
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-h2()
+HCl()
 
 
 # h2o()
