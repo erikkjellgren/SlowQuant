@@ -171,9 +171,9 @@ class LinearResponseBaseClass:
         # for i in range(len(self.hessian)):
         #     print(self.hessian[i][i], i)
                 
-        # eigval, eigvec, sigma_eigs, keep = solve_lr_drop_sigma_null(self.hessian, self.metric, cut=1e-10)
+        eigval, eigvec, sigma_eigs, keep = solve_lr_drop_sigma_null(self.hessian, self.metric, cut=1e-10) #AE
 
-        eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)     
+        #eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)     
      
             
         #     # num=(eigvec.conj().T@(self.hessian)@eigvec)
