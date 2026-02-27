@@ -377,13 +377,13 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         active_space,
         c_u,
         #c_MO,
-        h_core,
-        #h_core_pyscf,
+        #h_core,
+        h_core_pyscf,
         #h_core_tot,
         #hcoreB,
         g_eri,
         "fuccsd",
-        {"n_layers": 1, "is_spin_conserving" : False},
+        {"n_layers": 0, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
@@ -606,7 +606,7 @@ def h2():
     geometry = """H  0.0   0.0  0;
                   H  0.0   0.0  0.74"""
     #basis = "cc-pvtz"
-    basis = "631-g**"
+    basis = "631-g"
     #basis = "sto-3g"
     #basis = "sto-6g"
     dyall2zp_H = bse.get_basis('dyall-v2z', elements=['H'], fmt='nwchem')
@@ -614,7 +614,7 @@ def h2():
         f.write(dyall2zp_H)
         f.close()
     #basis = {'H': gto.basis.load('dyall2zp_H.nwchem', 'H')}
-    active_space = ((1, 1),4)
+    active_space = ((1, 1),8)
     #active_space = (2, 4)
     charge = 0
     spin = 0
@@ -766,7 +766,7 @@ def HBr():
     
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-h3()
+h2()
 
 
 # h2o()
