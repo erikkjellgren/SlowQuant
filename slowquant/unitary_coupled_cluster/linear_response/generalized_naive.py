@@ -325,6 +325,7 @@ class LinearResponse(LinearResponseBaseClass):
                 )'''
 
         #manuel slut
+        
         if len(self.q_ops) != 0:                          
             for j, qJ in enumerate(self.q_ops):
                 Hq_ket = generalized_propagate_state([H * qJ], self.wf.ci_coeffs, *self.index_info) # do_unsafe=True
@@ -333,8 +334,8 @@ class LinearResponse(LinearResponseBaseClass):
                     G_ket = generalized_propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
                     Gd_ket = generalized_propagate_state([GI.dagger], self.wf.ci_coeffs, *self.index_info)
                     # # Make A
-                    # <0| Gd H q |0> #CHANGED
-                    val = 1/2*generalized_expectation_value(
+                    # <0| Gd H q |0>
+                    val = generalized_expectation_value(
                         self.wf.ci_coeffs,
                         [GI.dagger*H*qJ],
                         self.wf.ci_coeffs,
@@ -412,8 +413,8 @@ class LinearResponse(LinearResponseBaseClass):
                 GId_ket = generalized_propagate_state([GI.dagger], self.wf.ci_coeffs, *self.index_info)
                 #print(i)
                 # Make A
-                # <0| GId H GJ |0> #problemer med H0iai CHANGED
-                val = 1/2*generalized_expectation_value(
+                # <0| GId H GJ |0> #problemer med H0iai 
+                val = generalized_expectation_value(
                     self.wf.ci_coeffs,
                     [GI.dagger*H*GJ],
                     self.wf.ci_coeffs,
@@ -421,7 +422,7 @@ class LinearResponse(LinearResponseBaseClass):
                 )
 
                 # <0| GJ H GId |0>
-                val += 1/2*generalized_expectation_value(
+                val += generalized_expectation_value(
                     self.wf.ci_coeffs,
                     [GJ*H*GI.dagger],
                     self.wf.ci_coeffs,
@@ -474,31 +475,8 @@ class LinearResponse(LinearResponseBaseClass):
                     )
                 )
 
-                # #AE ADDED
-                # val += (
-                #     1
-                #     / 2
-                #     * generalized_expectation_value(
-                #         self.wf.ci_coeffs,
-                #         [GJ*H*GI.dagger],
-                #         self.wf.ci_coeffs,
-                #         *self.index_info,
-                #     ))
-                
-                # val += (
-                #     1
-                #     / 2
-                #     * generalized_expectation_value(
-                #         self.wf.ci_coeffs,
-                #         [GI.dagger*H*GJ],
-                #         self.wf.ci_coeffs,
-                #         *self.index_info,
-                #     ))
-                self.A[i + idx_shift, j + idx_shift] = val
-                self.A[j + idx_shift, i + idx_shift] = val.conj() 
-
                 self.A[i + idx_shift, j + idx_shift] = val 
-                self.A[j + idx_shift, i + idx_shift] = val.conj() # AWE changed it to conj() instead of equal
+                self.A[j + idx_shift, i + idx_shift] = val.conj()
                  
                 # Make B
                 # <0| GId H GJd |0>
@@ -531,7 +509,7 @@ class LinearResponse(LinearResponseBaseClass):
                 )
 
                 self.B[i + idx_shift, j + idx_shift] = val 
-                self.B[j + idx_shift, i + idx_shift] = val # AWE changed to conj() instead
+                self.B[j + idx_shift, i + idx_shift] = val
                 # Make Sigma
                 # <0| GId GJ |0>
                 val = generalized_expectation_value(
