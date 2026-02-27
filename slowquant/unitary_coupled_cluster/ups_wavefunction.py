@@ -15,12 +15,11 @@ from slowquant.molecularintegrals.integralfunctions import (
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.fock_matrix import (
-    build_fock_matrix,
-    build_fock_inactive,
     build_fock_active,
+    build_fock_inactive,
+    build_fock_matrix,
     get_electronic_energy,
     get_orbital_gradient,
-    get_orbital_hessian,
 )
 from slowquant.unitary_coupled_cluster.integrals import Integrals
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
@@ -96,7 +95,11 @@ class WaveFunctionUPS:
         self._rdm4 = None
         self._fock_mat = None
         self._fock_mat_inactive = None
+        self._fock_mat_inactive_ao = None
         self._fock_mat_active = None
+        self._fock_mat_active_ao = None
+        self._DI_ao = None
+        self._DA_ao = None
         self._h_mo = None
         self._g_mo = None
         self._energy_elec: float | None = None
@@ -206,7 +209,7 @@ class WaveFunctionUPS:
                 self._kappa_old.append(0.0)
                 self.kappa_idx.append((p, q))
                 if p in self.inactive_idx and q in self.active_idx:
-                    self.kappa_iv.append((p,q))
+                    self.kappa_iv.append((p, q))
                     self.kappa_iv_idx.append(idx_kappa)
                 idx_kappa += 1
         # HF like orbital rotation indices
@@ -289,7 +292,11 @@ class WaveFunctionUPS:
         self._g_mo = None
         self._fock_mat = None
         self._fock_mat_inactive = None
+        self._fock_mat_inactive_ao = None
         self._fock_mat_active = None
+        self._fock_mat_active_ao = None
+        self._DI_ao = None
+        self._DA_ao = None
         self._energy_elec = None
         self._kappa = k.copy()
         # Move current expansion point.
@@ -320,7 +327,9 @@ class WaveFunctionUPS:
         self._rdm3 = None
         self._rdm4 = None
         self._fock_mat = None
-        self._fock_mat_inactive = None
+        self._fock_mat_active = None
+        self._fock_mat_active_ao = None
+        self._DA_ao = None
         self._energy_elec = None
         self._thetas = theta_vals.copy()
         self.ci_coeffs = construct_ups_state(
@@ -375,44 +384,73 @@ class WaveFunctionUPS:
     @property
     def fock_mat_inactive(self) -> np.ndarray:
         if self._fock_mat_inactive is None:
-            self.ints.build_fock_matrix_integrals()
-            self._fock_mat_inactive = build_fock_inactive(
-                    self._h_ao,
-                    self._g_ao,
-                    self.c_mo,
-                    self.num_inactive_orbs,
-            ) 
+            self._fock_mat_inactive, self._fock_mat_inactive_ao = build_fock_inactive(
+                self._h_ao, self._g_ao, self.c_mo, self.DI_ao
+            )
         return self._fock_mat_inactive
+
+    @property
+    def fock_mat_inactive_ao(self) -> np.ndarray:
+        if self._fock_mat_inactive_ao is None:
+            self._fock_mat_inactive, self._fock_mat_inactive_ao = build_fock_inactive(
+                self._h_ao, self._g_ao, self.c_mo, self.DI_ao
+            )
+        return self._fock_mat_inactive_ao
 
     @property
     def fock_mat_active(self) -> np.ndarray:
         if self._fock_mat_active is None:
-            self.ints.build_fock_matrix_integrals()
-            self._fock_mat_active = build_fock_active(
-                    self._g_ao,
-                    self.c_mo,
-                    self.rdm1,
-                    self.num_inactive_orbs,
-                    self.num_active_orbs,
+            self._fock_mat_active, self._fock_mat_active_ao = build_fock_active(
+                self._g_ao,
+                self.c_mo,
+                self.DA_ao,
             )
         return self._fock_mat_active
 
     @property
+    def fock_mat_active_ao(self) -> np.ndarray:
+        if self._fock_mat_active_ao is None:
+            self._fock_mat_active, self._fock_mat_active_ao = build_fock_active(
+                self._g_ao,
+                self.c_mo,
+                self.DA_ao,
+            )
+        return self._fock_mat_active_ao
+
+    @property
     def fock_mat(self) -> np.ndarray:
         if self._fock_mat is None:
-            self.ints.build_fock_matrix_integrals()
             self._fock_mat = build_fock_matrix(
-                    self._g_ao,
-                    self.c_mo,
-                    self.fock_mat_inactive,
-                    self.fock_mat_active,
-                    self.rdm1,
-                    self.rdm2,
-                    self.num_inactive_orbs,
-                    self.num_active_orbs,
-                    self.num_virtual_orbs,
+                self.ints.g_Pvwx,
+                self.c_mo,
+                self.fock_mat_inactive,
+                self.fock_mat_active,
+                self.rdm1,
+                self.rdm2,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.num_virtual_orbs,
             )
         return self._fock_mat
+
+    @property
+    def DI_ao(self) -> np.ndarray:
+        if self._DI_ao is None:
+            self._DI_ao = 2 * np.einsum(
+                "Pi,Qi->PQ", self.c_mo[:, : self.num_inactive_orbs], self.c_mo[:, : self.num_inactive_orbs]
+            )
+        return self._DI_ao
+
+    @property
+    def DA_ao(self) -> np.ndarray:
+        if self._DA_ao is None:
+            self._DA_ao = np.einsum(
+                "vw,Pv,Qw->PQ",
+                self.rdm1,
+                self.c_mo[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs],
+                self.c_mo[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs],
+            )
+        return self._DA_ao
 
     @property
     def rdm1(self) -> np.ndarray:
@@ -1075,15 +1113,15 @@ class WaveFunctionUPS:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:
             E = get_electronic_energy(
+                self._h_ao,
+                self.ints.g_vwxy,
+                self.fock_mat_inactive_ao,
+                self.fock_mat_inactive,
+                self.DI_ao,
                 self.rdm1,
                 self.rdm2,
-                self.ints.h_ii_Ci,
-                self.ints.g_iijj_Cij,
-                self.ints.g_ijji_Cij,
-                self.ints.h_vw,
-                self.ints.g_vwxy,
-                self.ints.g_iivw_Ci,
-                self.ints.g_iviw_Ci,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
             )
         else:
             E = expectation_value(

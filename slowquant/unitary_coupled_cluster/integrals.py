@@ -34,7 +34,6 @@ class Integrals:
         self._h_ia = None
         self._h_va = None
         self._h_ab = None
-        self._g_vwxy = None
         self._g_iijj = None
         self._g_ijji = None
         self._g_iivw = None
@@ -63,360 +62,302 @@ class Integrals:
         self._g_vwab = None
         self._g_vawb = None
         self._g_ivwa = None
+        self._g_Pvwx = None
+        self._g_vwxy = None
         self._c_mo = (
-                mo_coeffs[:, : self.num_inactive_orbs],
-                mo_coeffs[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs],
-                mo_coeffs[:, self.num_inactive_orbs + self.num_active_orbs:],
-                np.copy(mo_coeffs),
-                )
+            mo_coeffs[:, : self.num_inactive_orbs],
+            mo_coeffs[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs],
+            mo_coeffs[:, self.num_inactive_orbs + self.num_active_orbs :],
+            np.copy(mo_coeffs),
+        )
 
     def h_PQ(self, name, path, sector1, sector2):
         if name not in self.opt_paths:
             path_info = np.einsum_path(path, self.c_mo[sector1], self.c_mo[sector2], self._h_ao)
             self.opt_paths[name] = path_info[0]
-        return np.einsum(path, self.c_mo[sector1], self.c_mo[sector2], self._h_ao, optimize=self.opt_paths[name])
+        return np.einsum(
+            path, self.c_mo[sector1], self.c_mo[sector2], self._h_ao, optimize=self.opt_paths[name]
+        )
 
     def g_PQRS(self, name, path, sector1, sector2, sector3, sector4):
         if name not in self.opt_paths:
-            path_info = np.einsum_path(path, self.c_mo[sector1], self.c_mo[sector2], self.c_mo[sector3], self.c_mo[sector4], self._g_ao)
+            path_info = np.einsum_path(
+                path,
+                self.c_mo[sector1],
+                self.c_mo[sector2],
+                self.c_mo[sector3],
+                self.c_mo[sector4],
+                self._g_ao,
+            )
             self.opt_paths[name] = path_info[0]
-        return np.einsum(path, self.c_mo[sector1], self.c_mo[sector2], self.c_mo[sector3], self.c_mo[sector4], self._g_ao, optimize=self.opt_paths[name])
+        return np.einsum(
+            path,
+            self.c_mo[sector1],
+            self.c_mo[sector2],
+            self.c_mo[sector3],
+            self.c_mo[sector4],
+            self._g_ao,
+            optimize=self.opt_paths[name],
+        )
 
     @property
     def h_ii(self) -> np.ndarray:
         if self._h_ii is None:
-            self._h_ii = self.h_PQ('h_ii', "Pi,Qi,PQ->i", 0, 0)
+            self._h_ii = self.h_PQ("h_ii", "Pi,Qi,PQ->i", 0, 0)
         return self._h_ii
 
     @property
     def h_ij(self) -> np.ndarray:
         if self._h_ij is None:
-            self._h_ij = self.h_PQ('h_ij', "Pi,Qj,PQ->ij", 0, 0)
+            self._h_ij = self.h_PQ("h_ij", "Pi,Qj,PQ->ij", 0, 0)
         return self._h_ij
 
     @property
     def h_ii_Ci(self) -> np.ndarray:
         if self._h_ii_Ci is None:
-            self._h_ii_Ci = self.h_PQ('h_ii_Ci', "Pi,Qi,PQ->", 0, 0)
+            self._h_ii_Ci = self.h_PQ("h_ii_Ci", "Pi,Qi,PQ->", 0, 0)
         return self._h_ii_Ci
 
     @property
     def h_vw(self) -> np.ndarray:
         if self._h_vw is None:
-            self._h_vw = self.h_PQ('h_vw', "Pv,Qw,PQ->vw", 1, 1)
+            self._h_vw = self.h_PQ("h_vw", "Pv,Qw,PQ->vw", 1, 1)
         return self._h_vw
 
     @property
     def h_iv(self) -> np.ndarray:
         if self._h_iv is None:
-            self._h_iv = self.h_PQ('h_iv', "Pi,Qv,PQ->iv", 0, 1)
+            self._h_iv = self.h_PQ("h_iv", "Pi,Qv,PQ->iv", 0, 1)
         return self._h_iv
 
     @property
     def h_ia(self) -> np.ndarray:
         if self._h_ia is None:
-            self._h_ia = self.h_PQ('h_ia', "Pi,Qa,PQ->ia", 0, 2)
+            self._h_ia = self.h_PQ("h_ia", "Pi,Qa,PQ->ia", 0, 2)
         return self._h_ia
 
     @property
     def h_va(self) -> np.ndarray:
         if self._h_va is None:
-            self._h_va = self.h_PQ('h_va', "Pv,Qa,PQ->va", 1, 2)
+            self._h_va = self.h_PQ("h_va", "Pv,Qa,PQ->va", 1, 2)
         return self._h_va
 
     @property
     def h_ab(self) -> np.ndarray:
         if self._h_ab is None:
-            self._h_ab = self.h_PQ('h_ab', "Pa,Qb,PQ->ab", 2, 2)
+            self._h_ab = self.h_PQ("h_ab", "Pa,Qb,PQ->ab", 2, 2)
         return self._h_ab
-
-    @property
-    def g_vwxy(self) -> np.ndarray:
-        if self._g_vwxy is None:
-            self._g_vwxy = self.g_PQRS('g_vwxy', "Pv,Qw,Rx,Sy,PQRS->vwxy", 1, 1, 1, 1)
-        return self._g_vwxy
 
     @property
     def g_iijj(self) -> np.ndarray:
         if self._g_iijj is None:
-            self._g_iijj = self.g_PQRS('g_iijj', "Pi,Qi,Rj,Sj,PQRS->ij", 0, 0, 0, 0)
+            self._g_iijj = self.g_PQRS("g_iijj", "Pi,Qi,Rj,Sj,PQRS->ij", 0, 0, 0, 0)
         return self._g_iijj
 
     @property
     def g_ijji(self) -> np.ndarray:
         if self._g_ijji is None:
-            self._g_ijji = self.g_PQRS('g_ijji', "Pi,Qj,Rj,Si,PQRS->ij", 0, 0, 0, 0)
+            self._g_ijji = self.g_PQRS("g_ijji", "Pi,Qj,Rj,Si,PQRS->ij", 0, 0, 0, 0)
         return self._g_ijji
 
     @property
     def g_iivw(self) -> np.ndarray:
         if self._g_iivw is None:
-            self._g_iivw = self.g_PQRS('g_iivw', "Pi,Qi,Rv,Sw,PQRS->ivw", 0, 0, 1, 1)
+            self._g_iivw = self.g_PQRS("g_iivw", "Pi,Qi,Rv,Sw,PQRS->ivw", 0, 0, 1, 1)
         return self._g_iivw
 
     @property
     def g_iviw(self) -> np.ndarray:
         if self._g_iviw is None:
-            self._g_iviw = self.g_PQRS('g_iviw', "Pi,Qv,Ri,Sw,PQRS->ivw", 0, 1, 0, 1)
+            self._g_iviw = self.g_PQRS("g_iviw", "Pi,Qv,Ri,Sw,PQRS->ivw", 0, 1, 0, 1)
         return self._g_iviw
 
     @property
     def g_iijj_Cij(self) -> np.ndarray:
         if self._g_iijj_Cij is None:
-            self._g_iijj_Cij = self.g_PQRS('g_iijj_Cij', 'Pi,Qi,Rj,Sj,PQRS->', 0, 0, 0, 0)
+            self._g_iijj_Cij = self.g_PQRS("g_iijj_Cij", "Pi,Qi,Rj,Sj,PQRS->", 0, 0, 0, 0)
         return self._g_iijj_Cij
 
     @property
     def g_ijji_Cij(self) -> np.ndarray:
         if self._g_ijji_Cij is None:
-            self._g_ijji_Cij = self.g_PQRS('g_ijji_Cij', "Pi,Qj,Rj,Si,PQRS->", 0, 0, 0, 0)
+            self._g_ijji_Cij = self.g_PQRS("g_ijji_Cij", "Pi,Qj,Rj,Si,PQRS->", 0, 0, 0, 0)
         return self._g_ijji_Cij
 
     @property
     def g_iivw_Ci(self) -> np.ndarray:
         if self._g_iivw_Ci is None:
-            self._g_iivw_Ci = self.g_PQRS('g_iivw_Ci', "Pi,Qi,Rv,Sw,PQRS->vw", 0, 0, 1, 1)
+            self._g_iivw_Ci = self.g_PQRS("g_iivw_Ci", "Pi,Qi,Rv,Sw,PQRS->vw", 0, 0, 1, 1)
         return self._g_iivw_Ci
 
     @property
     def g_iviw_Ci(self) -> np.ndarray:
         if self._g_iviw_Ci is None:
-            self._g_iviw_Ci = self.g_PQRS('g_iviw_Ci', "Pi,Qv,Ri,Sw,PQRS->vw", 0, 1, 0, 1)
+            self._g_iviw_Ci = self.g_PQRS("g_iviw_Ci", "Pi,Qv,Ri,Sw,PQRS->vw", 0, 1, 0, 1)
         return self._g_iviw_Ci
 
     @property
     def g_ijvw(self) -> np.ndarray:
         if self._g_ijvw is None:
-            self._g_ijvw = self.g_PQRS('g_ijvw', "Pi,Qj,Rv,Sw,PQRS->ijvw", 0, 0, 1, 1)
+            self._g_ijvw = self.g_PQRS("g_ijvw", "Pi,Qj,Rv,Sw,PQRS->ijvw", 0, 0, 1, 1)
         return self._g_ijvw
 
     @property
     def g_ijkk_Ck(self) -> np.ndarray:
         if self._g_ijkk_Ck is None:
-            self._g_ijkk_Ck = self.g_PQRS('g_ijkk_Ck', "Pi,Qj,Rk,Sk,PQRS->ij", 0, 0, 0, 0)
+            self._g_ijkk_Ck = self.g_PQRS("g_ijkk_Ck", "Pi,Qj,Rk,Sk,PQRS->ij", 0, 0, 0, 0)
         return self._g_ijkk_Ck
 
     @property
     def g_ijkj_Cj(self) -> np.ndarray:
         if self._g_ijkj_Cj is None:
-            self._g_ijkj_Cj = self.g_PQRS('g_ijkj_Cj', "Pi,Qj,Rk,Sj,PQRS->ik", 0, 0, 0, 0)
+            self._g_ijkj_Cj = self.g_PQRS("g_ijkj_Cj", "Pi,Qj,Rk,Sj,PQRS->ik", 0, 0, 0, 0)
         return self._g_ijkj_Cj
 
     @property
     def g_ivjw(self) -> np.ndarray:
         if self._g_ivjw is None:
-            self._g_ivjw = self.g_PQRS('g_ivjw', "Pi,Qv,Rj,Sw,PQRS->ivjw", 0, 1, 0, 1)
+            self._g_ivjw = self.g_PQRS("g_ivjw", "Pi,Qv,Rj,Sw,PQRS->ivjw", 0, 1, 0, 1)
         return self._g_ivjw
 
     @property
     def g_ikkj_Ck(self) -> np.ndarray:
         if self._g_ikkj_Ck is None:
-            self._g_ikkj_Ck = self.g_PQRS('g_ikkj_Ck', "Pi,Qk,Rk,Sj,PQRS->ij", 0, 0, 0, 0)
+            self._g_ikkj_Ck = self.g_PQRS("g_ikkj_Ck", "Pi,Qk,Rk,Sj,PQRS->ij", 0, 0, 0, 0)
         return self._g_ikkj_Ck
 
     @property
     def g_iijv_Ci(self) -> np.ndarray:
         if self._g_iijv_Ci is None:
-            self._g_iijv_Ci = self.g_PQRS('g_iijv_Ci', "Pi,Qi,Rj,Sv,PQRS->jv", 0, 0, 0, 1)
+            self._g_iijv_Ci = self.g_PQRS("g_iijv_Ci", "Pi,Qi,Rj,Sv,PQRS->jv", 0, 0, 0, 1)
         return self._g_iijv_Ci
 
     @property
     def g_ijjv_Cj(self) -> np.ndarray:
         if self._g_ijjv_Cj is None:
-            self._g_ijjv_Cj = self.g_PQRS('g_ijjv_Cj', "Pi,Qj,Rj,Sv,PQRS->iv", 0, 0, 0, 1)
+            self._g_ijjv_Cj = self.g_PQRS("g_ijjv_Cj", "Pi,Qj,Rj,Sv,PQRS->iv", 0, 0, 0, 1)
         return self._g_ijjv_Cj
 
     @property
     def g_iija_Ci(self) -> np.ndarray:
         if self._g_iija_Ci is None:
-            self._g_iija_Ci = self.g_PQRS('g_iija_Ci', "Pi,Qi,Rj,Sa,PQRS->ja", 0, 0, 0, 2)
+            self._g_iija_Ci = self.g_PQRS("g_iija_Ci", "Pi,Qi,Rj,Sa,PQRS->ja", 0, 0, 0, 2)
         return self._g_iija_Ci
 
     @property
     def g_ijja_Cj(self) -> np.ndarray:
         if self._g_ijja_Cj is None:
-            self._g_ijja_Cj = self.g_PQRS('g_ijja_Cj', "Pi,Qj,Rj,Sa,PQRS->ia", 0, 0, 0, 2)
+            self._g_ijja_Cj = self.g_PQRS("g_ijja_Cj", "Pi,Qj,Rj,Sa,PQRS->ia", 0, 0, 0, 2)
         return self._g_ijja_Cj
 
     @property
     def g_iiva_Ci(self) -> np.ndarray:
         if self._g_iiva_Ci is None:
-            self._g_iiva_Ci = self.g_PQRS('g_iiva_Ci', "Pi,Qi,Rv,Sa,PQRS->va", 0, 0, 1, 2)
+            self._g_iiva_Ci = self.g_PQRS("g_iiva_Ci", "Pi,Qi,Rv,Sa,PQRS->va", 0, 0, 1, 2)
         return self._g_iiva_Ci
 
     @property
     def g_ivia_Ci(self) -> np.ndarray:
         if self._g_ivia_Ci is None:
-            self._g_ivia_Ci = self.g_PQRS('g_ivia_Ci', "Pi,Qv,Ri,Sa,PQRS->va", 0, 1, 0, 2)
+            self._g_ivia_Ci = self.g_PQRS("g_ivia_Ci", "Pi,Qv,Ri,Sa,PQRS->va", 0, 1, 0, 2)
         return self._g_ivia_Ci
 
     @property
     def g_iiab_Ci(self) -> np.ndarray:
         if self._g_iiab_Ci is None:
-            self._g_iiab_Ci = self.g_PQRS('g_iiab_Ci', "Pi,Qi,Ra,Sb,PQRS->ab", 0, 0, 2, 2)
+            self._g_iiab_Ci = self.g_PQRS("g_iiab_Ci", "Pi,Qi,Ra,Sb,PQRS->ab", 0, 0, 2, 2)
         return self._g_iiab_Ci
 
     @property
     def g_iaib_Ci(self) -> np.ndarray:
         if self._g_iaib_Ci is None:
-            self._g_iaib_Ci = self.g_PQRS('g_iaib_Ci', "Pi,Qa,Ri,Sb,PQRS->ab", 0, 2, 0, 2)
+            self._g_iaib_Ci = self.g_PQRS("g_iaib_Ci", "Pi,Qa,Ri,Sb,PQRS->ab", 0, 2, 0, 2)
         return self._g_iaib_Ci
 
     @property
     def g_ivwx(self) -> np.ndarray:
         if self._g_ivwx is None:
-            self._g_ivwx = self.g_PQRS('g_ivwx', "Pi,Qv,Rw,Sx,PQRS->ivwx", 0, 1, 1, 1)
+            self._g_ivwx = self.g_PQRS("g_ivwx", "Pi,Qv,Rw,Sx,PQRS->ivwx", 0, 1, 1, 1)
         return self._g_ivwx
 
     @property
     def g_iavw(self) -> np.ndarray:
         if self._g_iavw is None:
-            self._g_iavw = self.g_PQRS('g_iavw', "Pi,Qa,Rv,Sw,PQRS->iavw", 0, 2, 1, 1)
+            self._g_iavw = self.g_PQRS("g_iavw", "Pi,Qa,Rv,Sw,PQRS->iavw", 0, 2, 1, 1)
         return self._g_iavw
 
     @property
     def g_ivwa(self) -> np.ndarray:
         if self._g_ivwa is None:
-            self._g_ivwa = self.g_PQRS('g_ivwa', "Pi,Qv,Rw,Sa,PQRS->ivwa", 0, 1, 1, 2)
+            self._g_ivwa = self.g_PQRS("g_ivwa", "Pi,Qv,Rw,Sa,PQRS->ivwa", 0, 1, 1, 2)
         return self._g_ivwa
 
     @property
     def g_vwxa(self) -> np.ndarray:
         if self._g_vwxa is None:
-            self._g_vwxa = self.g_PQRS('g_vwxa', "Pv,Qw,Rx,Sa,PQRS->vwxa", 1, 1, 1, 2)
+            self._g_vwxa = self.g_PQRS("g_vwxa", "Pv,Qw,Rx,Sa,PQRS->vwxa", 1, 1, 1, 2)
         return self._g_vwxa
 
     @property
     def g_vwab(self) -> np.ndarray:
         if self._g_vwab is None:
-            self._g_vwab = self.g_PQRS('g_vwab', "Pv,Qw,Ra,Sb,PQRS->vwab", 1, 1, 2, 2)
+            self._g_vwab = self.g_PQRS("g_vwab", "Pv,Qw,Ra,Sb,PQRS->vwab", 1, 1, 2, 2)
         return self._g_vwab
 
     @property
     def g_vawb(self) -> np.ndarray:
         if self._g_vawb is None:
-            self._g_vawb = self.g_PQRS('g_vawb', "Pv,Qa,Rw,Sb,PQRS->vawb", 1, 2, 1, 2)
+            self._g_vawb = self.g_PQRS("g_vawb", "Pv,Qa,Rw,Sb,PQRS->vawb", 1, 2, 1, 2)
         return self._g_vawb
 
-    def build_fock_matrix_integrals(self):
-        return None
-        do_inact = False
-        do_act = False
-        if self._g_ijkk_Ck is None:
-            do_inact = True
-        elif self._g_iijv_Ci  is None:
-            do_inact = True
-        elif self._g_iija_Ci  is None:
-            do_inact = True
-        elif self._g_iivw_Ci  is None:
-            do_inact = True
-        elif self._g_iiva_Ci  is None:
-            do_inact = True
-        elif self._g_iiab_Ci  is None:
-            do_inact = True
-        elif self._g_ikkj_Ck  is None:
-            do_inact = True
-        elif self._g_ijjv_Cj  is None:
-            do_inact = True
-        elif self._g_ijja_Cj  is None:
-            do_inact = True
-        elif self._g_iviw_Ci  is None:
-            do_inact = True
-        elif self._g_ivia_Ci  is None:
-            do_inact = True
-        elif self._g_iaib_Ci  is None:
-            do_inact = True
-        if self._g_ijvw  is None:
-            do_act = True
-        elif self._g_iavw is None:
-            do_act = True
-        elif self._g_vwxy is None:
-            do_act = True
-        elif self._g_vwxa is None:
-            do_act = True
-        elif self._g_vwab is None:
-            do_act = True
-        elif self._g_ivjw is None:
-            do_act = True
-        elif self._g_ivwx is None:
-            do_act = True
-        elif self._g_ivwa is None:
-            do_act = True
-        elif self._g_vawb is None:
-            do_act = True
-        inact = slice(0,self.num_inactive_orbs)
-        act = slice(self.num_inactive_orbs,self.num_inactive_orbs+self.num_active_orbs)
-        virt = slice(self.num_inactive_orbs+self.num_active_orbs, self.num_orbs)
-        if do_inact and do_act:
-            if 'fock_g_pQRS' not in self.opt_paths:
-                path_info = np.einsum_path('Pp,PQRS->pQRS', self.c_mo[3], self._g_ao)
-                self.opt_paths['fock_g_pQRS'] = path_info[0]
-            g_pQRS = np.einsum('Pp,PQRS->pQRS', self.c_mo[3], self._g_ao, optimize=self.opt_paths['fock_g_pQRS'])
-        if do_inact:
-            if do_act:
-                if 'fock_g_pQiS_1' not in self.opt_paths:
-                    path_info = np.einsum_path('Ri,pQRS->pQiS', self.c_mo[0], g_pQRS)
-                    self.opt_paths['fock_g_pQiS_1'] = path_info[0]
-                g_pQiS = np.einsum('Ri,pQRS->pQiS', self.c_mo[0], g_pQRS, optimize=self.opt_paths['fock_g_pQiS_1'])
-            else:
-                if 'fock_g_pQiS_2' not in self.opt_paths:
-                    path_info = np.einsum_path('Pp,Ri,PQRS->pQiS', self.c_mo[3], self.c_mo[0], self._g_ao)
-                    self.opt_paths['fock_g_pQiS_2'] = path_info[0]
-                g_pQiS = np.einsum('Pp,Ri,PQRS->pQiS', self.c_mo[3], self.c_mo[0], self._g_ao, optimize=self.opt_paths['fock_g_pQiS_2'])
-            if 'fock_g_iipq_Ci' not in self.opt_paths:
-                path_info = np.einsum_path('Qq,Si,pQiS->pq', self.c_mo[3], self.c_mo[0], g_pQiS)
-                self.opt_paths['fock_g_iipq_Ci'] = path_info[0]
-            g_iipq_Ci = np.einsum('Qq,Si,pQiS->pq', self.c_mo[3], self.c_mo[0], g_pQiS, optimize=self.opt_paths['fock_g_iipq_Ci'])
-            self._g_ijkk_Ck = g_iipq_Ci[inact,inact]
-            self._g_iijv_Ci = g_iipq_Ci[inact,act]
-            self._g_iija_Ci = g_iipq_Ci[inact, virt]
-            self._g_iivw_Ci = g_iipq_Ci[act,act]
-            self._g_iiva_Ci = g_iipq_Ci[act,virt]
-            self._g_iiab_Ci = g_iipq_Ci[virt, virt]
-            del g_iipq_Ci
-            if 'fock_g_ipiq_Ci' not in self.opt_paths:
-                path_info = np.einsum_path('Qi,Sq,pQiS->pq', self.c_mo[0], self.c_mo[3], g_pQiS)
-                self.opt_paths['fock_g_ipiq_Ci'] = path_info[0]
-            g_ipiq_Ci = np.einsum('Qi,Sq,pQiS->pq', self.c_mo[0], self.c_mo[3], g_pQiS, optimize=self.opt_paths['fock_g_ipiq_Ci'])
-            del g_pQiS
-            self._g_ikkj_Ck = g_ipiq_Ci[inact,inact]
-            self._g_ijjv_Cj = g_ipiq_Ci[inact,act]
-            self._g_ijja_Cj = g_ipiq_Ci[inact,virt]
-            self._g_iviw_Ci = g_ipiq_Ci[act,act]
-            self._g_ivia_Ci = g_ipiq_Ci[act,virt]
-            self._g_iaib_Ci = g_ipiq_Ci[virt,virt]
-            del g_ipiq_Ci
-        if do_act:
-            if do_inact:
-                if 'fock_g_pQvS_1' not in self.opt_paths:
-                    path_info = np.einsum_path('Rv,pQRS->pQvS', self.c_mo[1], g_pQRS)
-                    self.opt_paths['fock_g_pQvS_1'] = path_info[0]
-                g_pQvS = np.einsum('Rv,pQRS->pQvS', self.c_mo[1], g_pQRS, optimize=self.opt_paths['fock_g_pQvS_1'])
-                del g_pQRS
-            else:
-                if 'fock_g_pQvS_2' not in self.opt_paths:
-                    path_info = np.einsum_path('Pp,Rv,PQRS->pQvS', self.c_mo[3], self.c_mo[1], self._g_ao)
-                    self.opt_paths['fock_g_pQvS_2'] = path_info[0]
-                g_pQvS = np.einsum('Pp,Rv,PQRS->pQvS', self.c_mo[3], self.c_mo[1], self._g_ao, optimize=self.opt_paths['fock_g_pQvS_2'])
-            if 'fock_g_pqvw' not in self.opt_paths:
-                path_info = np.einsum_path('Qq,Sw,pQvS->pqvw', self.c_mo[3], self.c_mo[1], g_pQvS)
-                self.opt_paths['fock_g_pqvw'] = path_info[0]
-            g_pqvw = np.einsum('Qq,Sw,pQvS->pqvw', self.c_mo[3], self.c_mo[1], g_pQvS, optimize=self.opt_paths['fock_g_pqvw'])
-            self._g_ijvw = g_pqvw[inact, inact, :, :] 
-            self._g_iavw = g_pqvw[inact, virt, :, :]
-            self._g_vwxy = g_pqvw[act,act,:,:]
-            self._g_vwxa = (g_pqvw[act,virt,:,:]).transpose((2,3,0,1))
-            self._g_vwab = (g_pqvw[virt,virt,:,:]).transpose((2,3,0,1))
-            del g_pqvw
-            if 'fock_g_pvwq' not in self.opt_paths:
-                path_info = np.einsum_path('Qw,Sq,pQvS->pwvq', self.c_mo[1], self.c_mo[3], g_pQvS)
-                self.opt_paths['fock_g_pvwq'] = path_info[0]
-            g_pvwq= np.einsum('Qw,Sq,pQvS->pwvq', self.c_mo[1], self.c_mo[3], g_pQvS, optimize=self.opt_paths['fock_g_pvwq'])
-            self._g_ivjw = (g_pvwq[inact,:,:,inact]).transpose((0,1,3,2)) 
-            self._g_ivwx = g_pvwq[inact,:,:,act]
-            self._g_ivwa = g_pvwq[inact,:,:,virt]
-            self._g_vawb = (g_pvwq[virt,:,:,virt]).transpose((1,0,2,3))
-            del g_pvwq
-            del g_pQvS
+    @property
+    def g_Pvwx(self) -> np.ndarray:
+        if self._g_Pvwx is None:
+            n_ao = self.num_orbs
+            n_in = self.num_inactive_orbs
+            n_act = self.num_active_orbs
+            C_act = self.c_mo[3][:, n_in : n_in + n_act]
+            # Transform S -> y (Index 3), make g_PQRy
+            tmp = self._g_ao.reshape(-1, n_ao) @ C_act  # (P*Q*R, y)
+            tmp = tmp.reshape(n_ao, n_ao, n_ao, n_act)
+            # Transform R -> x (Index 2), make g_PQyx
+            tmp = tmp.transpose(0, 1, 3, 2).reshape(-1, n_ao) @ C_act  # (P*Q*y, x)
+            tmp = tmp.reshape(n_ao, n_ao, n_act, n_act)
+            # Transform Q -> w (Index 1), make g_Pyxw
+            tmp = tmp.transpose(0, 2, 3, 1).reshape(-1, n_ao) @ C_act  # (P*x*y, w)
+            tmp = tmp.reshape(n_ao, n_act, n_act, n_act)
+            # Resulting mixed integral: g_Pwxy (renamed to g_Pvwx)
+            self._g_Pvwx = tmp.transpose(0, 3, 2, 1)
+            # Also making g_vwxy
+            # Transform P -> v (Index 0), make g_yxwv
+            tmp = tmp.transpose(1, 2, 3, 0).reshape(-1, n_ao) @ C_act  # (w*x*y, v)
+            tmp = tmp.reshape(n_act, n_act, n_act, n_act)
+            # Resulting integral: g_vwxy
+            self._g_vwxy = tmp.reshape(n_act, n_act, n_act, n_act).transpose(3, 2, 1, 0)
+        return self._g_Pvwx
 
-
+    @property
+    def g_vwxy(self) -> np.ndarray:
+        if self._g_vwxy is None:
+            n_ao = self.num_orbs
+            n_in = self.num_inactive_orbs
+            n_act = self.num_active_orbs
+            C_act = self.c_mo[3][:, n_in : n_in + n_act]
+            # Transform S -> y (Index 3), make g_PQRy
+            tmp = self._g_ao.reshape(-1, n_ao) @ C_act  # (P*Q*R, y)
+            tmp = tmp.reshape(n_ao, n_ao, n_ao, n_act)
+            # Transform R -> x (Index 2), make g_PQyx
+            tmp = tmp.transpose(0, 1, 3, 2).reshape(-1, n_ao) @ C_act  # (P*Q*y, x)
+            tmp = tmp.reshape(n_ao, n_ao, n_act, n_act)
+            # Transform Q -> w (Index 1), make g_Pyxw
+            tmp = tmp.transpose(0, 2, 3, 1).reshape(-1, n_ao) @ C_act  # (P*x*y, w)
+            tmp = tmp.reshape(n_ao, n_act, n_act, n_act)
+            # Resulting mixed integral: g_Pwxy (renamed to g_Pvwx)
+            self._g_Pvwx = tmp.transpose(0, 3, 2, 1)
+            # Also making g_vwxy
+            # Transform P -> v (Index 0), make g_yxwv
+            tmp = tmp.transpose(1, 2, 3, 0).reshape(-1, n_ao) @ C_act  # (w*x*y, v)
+            tmp = tmp.reshape(n_act, n_act, n_act, n_act)
+            # Resulting integral: g_vwxy
+            self._g_vwxy = tmp.reshape(n_act, n_act, n_act, n_act).transpose(3, 2, 1, 0)
+        return self._g_vwxy
