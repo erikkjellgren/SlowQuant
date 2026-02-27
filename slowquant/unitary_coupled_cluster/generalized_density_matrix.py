@@ -1161,12 +1161,12 @@ def get_orbital_response_hessian_block(
         print("Warning: Response Hessian is complex!")
     return A1e + (1/2)*A2e
 
-@nb.jit(nopython=True) ##IKKE LAVET...
+@nb.jit(nopython=True) 
 def get_orbital_response_static_property_gradient(
     mo: np.ndarray,
-    kappa_idx: list[tuple[int, int]],
-    num_inactive_orbs: int,
-    num_active_orbs: int,
+    kappa_spin_idx: list[tuple[int, int]],
+    num_inactive_spin_orbs: int,
+    num_active_spin_orbs: int,
     rdm1: np.array,
 ) -> np.ndarray:
     r"""Calculate the orbital part of static property gradient.
@@ -1184,9 +1184,9 @@ def get_orbital_response_static_property_gradient(
     Returns:
         Orbital part of static property gradient.
     """
-    prop_grad = np.zeros((len(kappa_idx), len(mo)))
-    for idx, (n, m) in enumerate(kappa_idx):
-        for p in range(num_inactive_orbs + num_active_orbs):
-            prop_grad[idx, :] += mo[:, n, p] * RDM1(m, p, num_inactive_orbs, num_active_orbs, rdm1)
-            prop_grad[idx, :] -= mo[:, p, m] * RDM1(p, n, num_inactive_orbs, num_active_orbs, rdm1)
-    return 2 ** (-1 / 2) * prop_grad
+    prop_grad = np.zeros((len(kappa_spin_idx), len(mo)), dtype=np.complex128)
+    for idx, (M, N) in enumerate(kappa_spin_idx):
+        for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
+            prop_grad[idx, :] += mo[:, N, P] * RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            prop_grad[idx, :] -= mo[:, P, M] * RDM1(P, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+    return  prop_grad

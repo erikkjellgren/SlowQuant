@@ -5,6 +5,7 @@ from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperat
 from slowquant.unitary_coupled_cluster.operators import (
     G1, G1_generalized,
     G2, G2_generalized,
+    G3
 )
 from slowquant.unitary_coupled_cluster.util import UpsStructure ##AE
 from slowquant.unitary_coupled_cluster.operator_state_algebra import bitcount
@@ -652,7 +653,7 @@ def generalized_construct_ups_state_test_erik(
     ):
         if abs(theta) < 10**-28:
             continue
-        if exc_type in ("single", "double"):
+        if exc_type in ("single", "double", "triple"):
             # Create T matrix
             if exc_type == "single":
                 (i, a) = np.array(exc_indices) + 2 * offset
@@ -660,6 +661,9 @@ def generalized_construct_ups_state_test_erik(
             elif exc_type == "double":
                 (i, j, a, b) = np.array(exc_indices) + 2 * offset
                 T = G2_generalized(i, j, a, b, False)
+            elif exc_type == "triple":
+                (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
+                T = G3(i, j, k, a, b, c, False)
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
             if dagger:
@@ -870,6 +874,7 @@ def generalized_get_grad_action(
     if exc_type in (
         "single",
         "double",
+        "triple"
     ):
         # Create T matrix
         if exc_type == "single":
@@ -878,6 +883,9 @@ def generalized_get_grad_action(
         elif exc_type == "double":
             (i, j, a, b) = np.array(exc_indices) + 2 * offset
             T = G2_generalized(i, j, a, b, False)
+        elif exc_type == "triple":
+            (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
+            T = G3(i, j, k, a, b, c, False)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         theta = thetas[idx]

@@ -30,6 +30,7 @@ from slowquant.unitary_coupled_cluster.util import (
     iterate_t5,
     iterate_t6,
     iterate_t6,
+    iterate_t2_generalized
 )
 
 
@@ -72,32 +73,25 @@ class LinearResponseBaseClass:
         self.q_ops_finite: int = 0 #PERNILLE
 
         if "s" in excitations:
-<<<<<<< HEAD
-            # print("Active occupied spin idx") #AWE
-            # print(self.wf.active_occ_spin_idx)
-            # print("Active unooccupied spin idx")
-            # print(self.wf.active_unocc_spin_idx)
+            # print("Active occupied spin idx") # AWE
+            # print(self.wf.active_occ_spin_idx) # AWE
+            # print("Active unooccupied spin idx") # AWE
+            # print(self.wf.active_unocc_spin_idx) # AWE
             # print("Excitation idx")
-            for a, i in iterate_t1(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx, is_spin_conserving=False): ## -diagonal jf HJ. Cross?
-=======
-            print("Active occupied spin idx") # AWE
-            print(self.wf.active_occ_spin_idx) # AWE
-            print("Active unooccupied spin idx") # AWE
-            print(self.wf.active_unocc_spin_idx) # AWE
-            print("Excitation idx")
-            for a, i in iterate_t1(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx, is_spin_conserving=self.wf.ansatz_options["is_spin_conserving"]): ## -diagonal jf HJ. Cross?, # is_spin_conserving  AWE
->>>>>>> 32ecd3e9c871c322e41832b6fc7ea19ecd50836c
+            for a, i in iterate_t1(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx, is_spin_conserving=False): ## -diagonal jf HJ. Cross?, # is_spin_conserving  AWE
                 self.G_ops.append(G1(i, a)) #AE from G1
-                print('G1', i,a)
+                # print('G1', i,a)
+                self.operator_labels_G.append(('G1',i,a))
         if "d" in excitations:
             for a, i, b, j in iterate_t2(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx): 
                 self.G_ops.append(G2(i, j, a, b)) #AE from G2
-                print('G2',i, j, a, b)
+                # print('G2',i, j, a, b)
                 self.operator_labels_G.append(('G2',i,j,a,b))
         if "t" in excitations:
             for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
                 self.G_ops.append(G3(i, j, k, a, b, c))
-                print(i,k,k,a,b,c)
+                # print('G3',a, i, b, j, c, k)
+                # print(i,k,k,a,b,c)
         if "q" in excitations:
             for a, i, b, j, c, k, d, l in iterate_t4(
                 self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx
@@ -117,7 +111,7 @@ class LinearResponseBaseClass:
         for p, q in self.wf.kappa_no_activeactive_spin_idx:
             self.q_ops.append(G1(p, q)) #AE from G1 skal det være generalized??
             self.operator_labels_q.append(('q',p,q))
-            print('qs:',p,q)
+            # print('qs:',p,q)
         # print('no active active', self.wf.kappa_no_activeactive_spin_idx)
         # print(operator_labels)
         num_parameters = len(self.G_ops) + len(self.q_ops)
@@ -177,44 +171,49 @@ class LinearResponseBaseClass:
         # for i in range(len(self.hessian)):
         #     print(self.hessian[i][i], i)
                 
-        eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)      
-        # # print('eigenval',eigval)
-        # for i in range(len(eigval)):
-        #     print('eigenval',eigval[i])
-        #     print('eigvec ',eigvec[i])
-        #     print('eigenvectors', max(abs(eigvec[i])))
-        #     print('eigenvector index', np.argmax(abs(eigvec[i])))
-        #     print('NEW INDEX')
-        # print('eigvec ',eigvec)
-        
-      
-        # for i in range(len(eigval)):
-        #     print('eigenval',eigval[i])
-                # print('eigvec ',eigvec[i])
-                # print('eigenvectors', max(abs(eigvec[i])))
-                # print('eigenvector index', np.argmax(abs(eigvec[i])))
-                # print('NEW INDEX')
-                
-            # num=(eigvec.conj().T@(self.hessian)@eigvec)
-            # den=(eigvec.conj().T@(self.metric)@eigvec)
-            # print('eigenvalues on the diagonal?',num/den)
-            
-            # vec=eigvec[:,i]
-            # for j in range(len(vec)):
-            #     print(vec[j], self.operator_labels[j])
-                
-                
-            # print('Max value eigvec', max(abs(vec)), 'Max value eigvec index', np.argmax(abs(vec)))
-            # k = np.argmax(np.abs(vec))
-            # print("dominant operator:", self.operator_labels[k])
+        # eigval, eigvec, sigma_eigs, keep = solve_lr_drop_sigma_null(self.hessian, self.metric, cut=1e-10)
 
-            # print(self.operator_labels[k])
+        eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)     
+     
+            
+        #     # num=(eigvec.conj().T@(self.hessian)@eigvec)
+        #     # den=(eigvec.conj().T@(self.metric)@eigvec)
+        #     # print('eigenvalues on the diagonal?',num/den)
+            
+        #     # for j in range(len(vec)):
+        #     #     print(vec[j], self.operator_labels[j])
+        
+
+        operator_labels = np.array(
+            self.operator_labels_q +
+            self.operator_labels_G +
+            self.operator_labels_q +
+            self.operator_labels_G,
+            dtype=object)
+        for i in range(len(eigval)):
+            vec=eigvec[:,i]
+            absvec = np.abs(vec)
+        
+            print('Eigenvalue', eigval[i],'Max value eigvec', np.max(abs(vec)), 'Max value eigvec index', np.argmax(abs(vec)))
+            # k = np.argmax(np.abs(vec))
+            # print("dominant operator:", operator_labels[k])
+
+            # top 3 contributors
+            top3 = np.argsort(absvec)[-3:][::-1]
+            # print(len(top3))
+            for j in top3:
+                print(
+                "  operator:", operator_labels[j],
+                " weight:", absvec[j])
+
+
+        #     # print(self.operator_labels[k])
 
             
    
-        sorting = np.argsort(eigval)
-        self.excitation_energies = np.real(eigval[sorting][size:])
-        self.response_vectors = np.real(eigvec[:, sorting][:, size:])
+        sorting = np.argsort(np.real(eigval)) #AE added np.real
+        self.excitation_energies = np.real(eigval[sorting][size:]) 
+        self.response_vectors = (eigvec[:, sorting][:, size:]) #Removed np.real
         self.normed_response_vectors = np.zeros_like(self.response_vectors, dtype=complex) #AE
         self.num_q = len(self.q_ops)
         
@@ -241,24 +240,25 @@ class LinearResponseBaseClass:
         self.Z_G_normed = np.zeros_like(self.Z_G, dtype=complex) #AE
         self.Y_q_normed = np.zeros_like(self.Y_q, dtype=complex) #AE
         self.Y_G_normed = np.zeros_like(self.Y_G, dtype=complex) #AE
-        
+
+
         norms = self.get_excited_state_norm()
         for state_number, norm in enumerate(norms):
-            if norm < 10**-10:
+            if abs(norm) < 10**-10: #AE change to abs
                 print(f"WARNING: State number {state_number} could not be normalized. Norm of {norm}.")
                 continue
-            self.Z_q_normed[:, state_number] = self.Z_q[:, state_number] * (1 / norm) ** 0.5
-            self.Z_G_normed[:, state_number] = self.Z_G[:, state_number] * (1 / norm) ** 0.5
-            self.Y_q_normed[:, state_number] = self.Y_q[:, state_number] * (1 / norm) ** 0.5
-            self.Y_G_normed[:, state_number] = self.Y_G[:, state_number] * (1 / norm) ** 0.5
+            self.Z_q_normed[:, state_number] = self.Z_q[:, state_number] * (1/abs(norm))**0.5* np.sign(norm.real)#AE added abs and np.sign
+            self.Z_G_normed[:, state_number] = self.Z_G[:, state_number] *(1/abs(norm))**0.5* np.sign(norm.real)
+            self.Y_q_normed[:, state_number] = self.Y_q[:, state_number] *(1/abs(norm))**0.5* np.sign(norm.real)
+            self.Y_G_normed[:, state_number] = self.Y_G[:, state_number] *(1/abs(norm))**0.5* np.sign(norm.real)
             
-            #Pernille
+            # #Pernille
             # self.Z_qG_normed[:, state_number] = self.Z_qG[:, state_number] * (1 / norm) ** 0.5
             # self.Y_qG_normed[:, state_number] = self.Y_qG[:, state_number] * (1 / norm) ** 0.5
         
             
             self.normed_response_vectors[:, state_number] = (
-                self.response_vectors[:, state_number] * (1 / norm) ** 0.5
+                self.response_vectors[:, state_number] * (1/abs(norm))**0.5* np.sign(norm.real)  #AE added abs
             )
 
     def get_excited_state_norm(self) -> np.ndarray:
@@ -270,22 +270,25 @@ class LinearResponseBaseClass:
         norms = np.zeros(len(self.response_vectors[0]),dtype=complex) #AE complex
         for state_number in range(len(self.response_vectors[0])):
             # Get Z_q Z_G Y_q and Y_G matrices
-            ZZq = np.outer(self.Z_q[:, state_number], self.Z_q[:, state_number].transpose())
-            YYq = np.outer(self.Y_q[:, state_number], self.Y_q[:, state_number].transpose())
-            ZZG = np.outer(self.Z_G[:, state_number], self.Z_G[:, state_number].transpose())
-            YYG = np.outer(self.Y_G[:, state_number], self.Y_G[:, state_number].transpose())
+            ZZq = np.outer(self.Z_q[:, state_number], self.Z_q[:, state_number].conj().T) #AE transpose to conj
+            YYq = np.outer(self.Y_q[:, state_number], self.Y_q[:, state_number].conj().T)
+            ZZG = np.outer(self.Z_G[:, state_number], self.Z_G[:, state_number].conj().T)
+            YYG = np.outer(self.Y_G[:, state_number], self.Y_G[:, state_number].conj().T)
 
-            #Pernille
-            # ZZqG = np.outer(self.Z_qG[:, state_number], self.Z_qG[:, state_number].transpose())
-            # YYqG = np.outer(self.Y_qG[:, state_number], self.Y_qG[:, state_number].transpose())
-            # norms[state_number] = np.sum(self.metric[: self.num_qG, : self.num_qG] * (ZZqG - YYqG))
-            
             
             norms[state_number] = np.sum(self.metric[: self.num_q, : self.num_q] * (ZZq - YYq)) + np.sum(
                 self.metric[self.num_q : self.num_q + self.num_G, self.num_q : self.num_q + self.num_G]
                 * (ZZG - YYG)
             )
+            
+            #Pernille
+            # ZZqG = np.outer(self.Z_qG[:, state_number], self.Z_qG[:, state_number].transpose())
+            # YYqG = np.outer(self.Y_qG[:, state_number], self.Y_qG[:, state_number].transpose())
+            # norms[state_number] = np.sum(self.metric[: self.num_qG, : self.num_qG] * (ZZqG - YYqG))
+            
         return norms
+
+
 
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.
@@ -350,3 +353,27 @@ class LinearResponseBaseClass:
             osc_str = f"{osc_strength:1.6f}"
             output += f"{str(i + 1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
         return output
+    
+    
+    
+   
+   
+import scipy.linalg as la
+def solve_lr_drop_sigma_null(H, sigma, cut=1e-10):
+    # Hermitize (important for numerical stability)
+    Hh = 0.5*(H + H.conj().T)
+    Sh = 0.5*(sigma + sigma.conj().T)
+    # 1) eigen-decompose metric
+    s, U = la.eigh(Sh)
+    # 2) keep only non-null directions
+    keep = np.abs(s) > cut * np.max(np.abs(s))
+    Uk = U[:, keep]
+    # 3) project both matrices consistently
+    Hk = Uk.conj().T @ Hh @ Uk
+    Sk = Uk.conj().T @ Sh @ Uk
+    # 4) solve reduced generalized eigenproblem
+    w, y = la.eig(Hk, Sk)
+    # 5) backtransform eigenvectors
+    v = Uk @ y
+    return w, v, s, keep
+ 

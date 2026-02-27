@@ -10,7 +10,7 @@ from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_orbital_response_hessian_block,
     get_orbital_response_metric_sigma,
     get_orbital_response_property_gradient_annika, get_orbital_response_property_gradient_real_imag, 
-    get_orbital_response_metric_sigma_real_imag,  #get_orbital_response_static_property_gradient, 
+    get_orbital_response_metric_sigma_real_imag,  get_orbital_response_static_property_gradient, 
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.linear_response.generalized_lr_baseclass import (
@@ -56,19 +56,19 @@ class LinearResponse(LinearResponseBaseClass):
 
         
         
-        # Screen for A_ii = 0 Pernille
-        finite_excitations = []
-        if len(self.q_ops) != 0:
-            A = get_orbital_response_hessian_block(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.kappa_no_activeactive_spin_idx_dagger,
-                self.wf.kappa_no_activeactive_spin_idx,
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.rdm1,
-                self.wf.rdm2,
-            )
+        # # Screen for A_ii = 0 Pernille
+        # finite_excitations = []
+        # if len(self.q_ops) != 0:
+        #     A = get_orbital_response_hessian_block(
+        #         self.wf.h_mo,
+        #         self.wf.g_mo,
+        #         self.wf.kappa_no_activeactive_spin_idx_dagger,
+        #         self.wf.kappa_no_activeactive_spin_idx,
+        #         self.wf.num_inactive_spin_orbs,
+        #         self.wf.num_active_spin_orbs,
+        #         self.wf.rdm1,
+        #         self.wf.rdm2,
+        #     )
             
             
         # # # Man behøver ikke regne hele A, men det er bare lige nemt at gøre for qq
@@ -153,181 +153,205 @@ class LinearResponse(LinearResponseBaseClass):
             if np.max(np.abs(grad)) > 10**-3:
                 print("Large Gradient detected in G of ", np.max(np.abs(grad)))
         #         # raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad))) #AE udkommenteret
-        if len(self.q_ops) != 0:
-            # Do orbital-orbital blocks
-            self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.kappa_no_activeactive_spin_idx_dagger,
-                self.wf.kappa_no_activeactive_spin_idx,
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.rdm1,
-                self.wf.rdm2,
-            )
+        # if len(self.q_ops) != 0:
+        #     # Do orbital-orbital blocks
+        #     self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
+        #         self.wf.h_mo,
+        #         self.wf.g_mo,
+        #         self.wf.kappa_no_activeactive_spin_idx_dagger,
+        #         self.wf.kappa_no_activeactive_spin_idx,
+        #         self.wf.num_inactive_spin_orbs,
+        #         self.wf.num_active_spin_orbs,
+        #         self.wf.rdm1,
+        #         self.wf.rdm2,
+        #     )
 
-            self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
-                self.wf.h_mo,
-                self.wf.g_mo,
-                self.wf.kappa_no_activeactive_spin_idx_dagger,
-                self.wf.kappa_no_activeactive_spin_idx_dagger,
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.rdm1,
-                self.wf.rdm2,
-            )
-            self.Sigma[: len(self.q_ops), : len(self.q_ops)] =get_orbital_response_metric_sigma(
-                self.wf.kappa_no_activeactive_spin_idx,
-                self.wf.num_inactive_spin_orbs,
-                self.wf.num_active_spin_orbs,
-                self.wf.rdm1,
-            )
+        #     self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
+        #         self.wf.h_mo,
+        #         self.wf.g_mo,
+        #         self.wf.kappa_no_activeactive_spin_idx_dagger,
+        #         self.wf.kappa_no_activeactive_spin_idx_dagger,
+        #         self.wf.num_inactive_spin_orbs,
+        #         self.wf.num_active_spin_orbs,
+        #         self.wf.rdm1,
+        #         self.wf.rdm2,
+        #     )
+        #     self.Sigma[: len(self.q_ops), : len(self.q_ops)] =get_orbital_response_metric_sigma(
+        #         self.wf.kappa_no_activeactive_spin_idx,
+        #         self.wf.num_inactive_spin_orbs,
+        #         self.wf.num_active_spin_orbs,
+        #         self.wf.rdm1,
+        #     )
 
       
-        # # qq block manual
-        # for j, qJ in enumerate(self.q_ops):
-        #     for i, qI in enumerate(self.q_ops):
+        # qq block manual
+        for j, qJ in enumerate(self.q_ops):
+            for i, qI in enumerate(self.q_ops):
 
-        #         # Test Anna
-        #         # Make A
-        #         # <0| qJd H qI |0>
-        #         val = generalized_expectation_value(
-        #             self.wf.ci_coeffs,
-        #             [qJ.dagger*H*qI],
-        #             self.wf.ci_coeffs,
-        #             *self.index_info,
-        #         )
-        #         # <0| qI H qJd |0>
-        #         val += generalized_expectation_value(
-        #             self.wf.ci_coeffs,
-        #             [qI*H*qJ.dagger],
-        #             self.wf.ci_coeffs,
-        #             *self.index_info,
-        #         )
-        #         # - 1/2<0| qJd qI H |0>
-        #         val -= (
-        #             1
-        #             / 2
-        #             * generalized_expectation_value(
-        #                 self.wf.ci_coeffs,
-        #                 [qJ.dagger*qI*H],
-        #                 self.wf.ci_coeffs,
-        #                 *self.index_info,
-        #             )
-        #         )
-        #         # - 1/2*<0| H qI qJd |0>
-        #         val -= (
-        #             1/2
-        #             * generalized_expectation_value(
-        #                 self.wf.ci_coeffs,
-        #                 [H*qI*qJ.dagger],
-        #                 self.wf.ci_coeffs,
-        #                 *self.index_info,
-        #             )
-        #         )
-        #         # - 1/2*<0| qI qJd H |0> # minus Pernille
-        #         val -= (
-        #             1
-        #             / 2
-        #             * generalized_expectation_value(
-        #                 self.wf.ci_coeffs,
-        #                 [qI*qJ.dagger*H],
-        #                 self.wf.ci_coeffs,
-        #                 *self.index_info,
-        #             )
-        #         )
-        #         # - 1/2*<0| H qJd qI |0> # minus Pernille
-        #         val -= (
-        #             1
-        #             / 2
-        #             * generalized_expectation_value(
-        #                 self.wf.ci_coeffs,
-        #                 [H*qJ.dagger*qI],
-        #                 self.wf.ci_coeffs,
-        #                 *self.index_info,
-        #             )
-        #         )
+                # Test Anna
+                # Make A
+                # <0| qJd H qI |0> #CHANGED
+                val = 1/2*generalized_expectation_value(
+                    self.wf.ci_coeffs,
+                    [qJ.dagger*H*qI],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
+                )
+                # <0| qI H qJd |0> #CHANGED
+                val += 1/2*generalized_expectation_value(
+                    self.wf.ci_coeffs,
+                    [qI*H*qJ.dagger],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
+                )
+                # - 1/2<0| qJd qI H |0> CHANGED
+                val -= 1/2*(generalized_expectation_value(
+                        self.wf.ci_coeffs,
+                        [qJ.dagger*qI*H],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                )
+                # - 1/2*<0| H qI qJd |0>
+                val -= (
+                    1/2
+                    * generalized_expectation_value(
+                        self.wf.ci_coeffs,
+                        [H*qI*qJ.dagger],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                )
+                # - 1/2*<0| qI qJd H |0> # minus Pernille
+                val -= (
+                    1
+                    / 2
+                    * generalized_expectation_value(
+                        self.wf.ci_coeffs,
+                        [qI*qJ.dagger*H],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                )
+                # - 1/2*<0| H qJd qI |0> # minus Pernille
+                val -= (
+                    1
+                    / 2
+                    * generalized_expectation_value(
+                        self.wf.ci_coeffs,
+                        [H*qJ.dagger*qI],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                )
                 
-        #         self.A[i,j] =  val
                 
-        # # print('qq blok regnet med expectation values',self.A)
+                #anna added
+                val += (
+                    1
+                    / 2
+                    * generalized_expectation_value(
+                        self.wf.ci_coeffs,
+                        [qI*H*qJ.dagger],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                )
+                
+                #anna added
+                val += (
+                    1
+                    / 2
+                    * generalized_expectation_value(
+                        self.wf.ci_coeffs,
+                        [qJ.dagger*H*qI],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                )
+                
+                self.A[i,j] =  val
+                
+        # print('qq blok regnet med expectation values',self.A)
 
-                #Make B
+                # Make B
                 # <0| qJd H qId |0>
-                # val = generalized_expectation_value(
-                #     self.wf.ci_coeffs,
-                #     [qJ.dagger*H*qI.dagger],
-                #     self.wf.ci_coeffs,
-                #     *self.index_info,
-                # )
-                # # <0| qId H qJd |0>
-                # val += generalized_expectation_value(
-                #     self.wf.ci_coeffs,
-                #     [qI.dagger*H*qJ.dagger],
-                #     self.wf.ci_coeffs,
-                #     *self.index_info,
-                # )
-                # # - 1/2<0| qJd qId H |0>
-                # val -= (
-                #     1
-                #     / 2
-                #     * generalized_expectation_value(
-                #         self.wf.ci_coeffs,
-                #         [qJ.dagger*qI.dagger*H],
-                #         self.wf.ci_coeffs,
-                #         *self.index_info,
-                #     )
-                # )
-                # # - 1/2*<0| H qId qJd |0>
-                # val -= (
-                #     1/2
-                #     * generalized_expectation_value(
-                #         self.wf.ci_coeffs,
-                #         [H*qI.dagger*qJ.dagger],
-                #         self.wf.ci_coeffs,
-                #         *self.index_info,
-                #     )
-                # )
-                # # - 1/2*<0| qId qJd H |0> # minus Pernille
-                # val -= (
-                #     1
-                #     / 2
-                #     * generalized_expectation_value(
-                #         self.wf.ci_coeffs,
-                #         [qI.dagger*qJ.dagger*H],
-                #         self.wf.ci_coeffs,
-                #         *self.index_info,
-                #     )
-                # )
-                # # - 1/2*<0| H qJd qId |0> # minus Pernille
-                # val -= (
-                #     1
-                #     / 2
-                #     * generalized_expectation_value(
-                #         self.wf.ci_coeffs,
-                #         [H*qJ.dagger*qI.dagger],
-                #         self.wf.ci_coeffs,
-                #         *self.index_info,
-                #     )
-                # )
-                # self.B[i,j] =  val
+                val = generalized_expectation_value(
+                    self.wf.ci_coeffs,
+                    [qJ.dagger*H*qI.dagger],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
+                )
+                # <0| qId H qJd |0>
+                val += generalized_expectation_value(
+                    self.wf.ci_coeffs,
+                    [qI.dagger*H*qJ.dagger],
+                    self.wf.ci_coeffs,
+                    *self.index_info,
+                )
+                # - 1/2<0| qJd qId H |0>
+                val -= (
+                    1
+                    / 2
+                    * generalized_expectation_value(
+                        self.wf.ci_coeffs,
+                        [qJ.dagger*qI.dagger*H],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                )
+                # - 1/2*<0| H qId qJd |0>
+                val -= (
+                    1/2
+                    * generalized_expectation_value(
+                        self.wf.ci_coeffs,
+                        [H*qI.dagger*qJ.dagger],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                )
+                # - 1/2*<0| qId qJd H |0> # minus Pernille
+                val -= (
+                    1
+                    / 2
+                    * generalized_expectation_value(
+                        self.wf.ci_coeffs,
+                        [qI.dagger*qJ.dagger*H],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                )
+                # - 1/2*<0| H qJd qId |0> # minus Pernille
+                val -= (
+                    1
+                    / 2
+                    * generalized_expectation_value(
+                        self.wf.ci_coeffs,
+                        [H*qJ.dagger*qI.dagger],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                )
+                self.B[i,j] =  val
 
-                # #Make Sigma ##fejl rettet her??
-                # val = generalized_expectation_value(
-                #     self.wf.ci_coeffs,
-                #     [qI.dagger*qJ],
-                #     self.wf.ci_coeffs,
-                #     *self.index_info
-                # )
-                # val -= generalized_expectation_value(
-                #     self.wf.ci_coeffs,
-                #     [qJ*qI.dagger],
-                #     self.wf.ci_coeffs,
-                #     *self.index_info
-                # )
-                # self.Sigma[i,j] = val
+                #Make Sigma ##fejl rettet her??
+                val = generalized_expectation_value(
+                    self.wf.ci_coeffs,
+                    [qI.dagger*qJ],
+                    self.wf.ci_coeffs,
+                    *self.index_info
+                )
+                val -= generalized_expectation_value(
+                    self.wf.ci_coeffs,
+                    [qJ*qI.dagger],
+                    self.wf.ci_coeffs,
+                    *self.index_info
+                )
+                self.Sigma[i,j] = val
 
         #manuel slut
+        
+        
         if len(self.q_ops) != 0:
             for j, qJ in enumerate(self.q_ops):
                 Hq_ket = generalized_propagate_state([H * qJ], self.wf.ci_coeffs, *self.index_info) # do_unsafe=True
@@ -336,8 +360,8 @@ class LinearResponse(LinearResponseBaseClass):
                     G_ket = generalized_propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
                     Gd_ket = generalized_propagate_state([GI.dagger], self.wf.ci_coeffs, *self.index_info)
                     # # Make A
-                    # <0| Gd H q |0>
-                    val = generalized_expectation_value(
+                    # <0| Gd H q |0> #CHANGED
+                    val = 1/2*generalized_expectation_value(
                         self.wf.ci_coeffs,
                         [GI.dagger*H*qJ],
                         self.wf.ci_coeffs,
@@ -365,7 +389,53 @@ class LinearResponse(LinearResponseBaseClass):
                             *self.index_info,
                         )
                     )
-                    self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
+                    
+                    
+                    
+                    # AE ADDED
+                    val -= (
+                        1
+                        / 2
+                        * generalized_expectation_value(
+                            self.wf.ci_coeffs,
+                            [GI.dagger*qJ*H],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                    )
+                    #meningen, at det ikke er ganget med 2
+                    val += (
+                             generalized_expectation_value(
+                            self.wf.ci_coeffs,
+                            [qJ*H*GI.dagger],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                    )
+                    
+                    val -= (
+                        1
+                        / 2
+                        * generalized_expectation_value(
+                            self.wf.ci_coeffs,
+                            [qJ*GI.dagger*H],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                    )
+                    
+                    val += (
+                        1
+                        / 2
+                        * generalized_expectation_value(
+                            self.wf.ci_coeffs,
+                            [GI.dagger*H*qJ],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
+                        )
+                    )
+                    self.A[i + idx_shift, j] = val
+                    self.A[j, i + idx_shift] = val.conj()
                     # Make B
                     # <0| qd H Gd |0>
                     val = generalized_expectation_value(
@@ -396,7 +466,8 @@ class LinearResponse(LinearResponseBaseClass):
                             *self.index_info,
                         )
                     )
-                    self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
+                    self.B[i + idx_shift, j] = val
+                    self.B[j, i + idx_shift] = val.conj()
         for j, GJ in enumerate(self.G_ops):
             # GJH_ket = generalized_propagate_state([GJ], H00_ket, *self.index_info)
             # GJdH_ket = generalized_propagate_state([GJ.dagger], H00_ket, *self.index_info)
@@ -408,8 +479,8 @@ class LinearResponse(LinearResponseBaseClass):
                 GI_ket = generalized_propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
                 GId_ket = generalized_propagate_state([GI.dagger], self.wf.ci_coeffs, *self.index_info)
                 # Make A
-                # <0| GId H GJ |0> #problemer med H0iai
-                val = generalized_expectation_value(
+                # <0| GId H GJ |0> #problemer med H0iai CHANGED
+                val = 1/2*generalized_expectation_value(
                     self.wf.ci_coeffs,
                     [GI.dagger*H*GJ],
                     self.wf.ci_coeffs,
@@ -417,7 +488,7 @@ class LinearResponse(LinearResponseBaseClass):
                 )
 
                 # <0| GJ H GId |0>
-                val += generalized_expectation_value(
+                val += 1/2*generalized_expectation_value(
                     self.wf.ci_coeffs,
                     [GJ*H*GI.dagger],
                     self.wf.ci_coeffs,
@@ -425,7 +496,7 @@ class LinearResponse(LinearResponseBaseClass):
                 )
 
                 # - 1/2<0| GId GJ H |0>
-                val -= (
+                val -= 1/2*(
                     generalized_expectation_value(
                         self.wf.ci_coeffs,
                         [GI.dagger*GJ*H],
@@ -435,7 +506,7 @@ class LinearResponse(LinearResponseBaseClass):
                 ) #AWE no 1/2
 
                 # - 1/2*<0| H GJ GId |0>
-                val -= (
+                val -= (1/2*
                     generalized_expectation_value(
                         self.wf.ci_coeffs,
                         [H*GJ*GI.dagger],
@@ -444,10 +515,7 @@ class LinearResponse(LinearResponseBaseClass):
                     )
                 ) # AWE no 1/2
 
-
-
-
-                '''# - 1/2*<0| GJ GId H |0>
+                # - 1/2*<0| GJ GId H |0>
                 val -= (
                     1
                     / 2
@@ -469,12 +537,33 @@ class LinearResponse(LinearResponseBaseClass):
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
-                ) # AWE no?'''
+                ) # AWE no?
 
+                #AE ADDED
+                val += (
+                    1
+                    / 2
+                    * generalized_expectation_value(
+                        self.wf.ci_coeffs,
+                        [GJ*H*GI.dagger],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    ))
+                
+                val += (
+                    1
+                    / 2
+                    * generalized_expectation_value(
+                        self.wf.ci_coeffs,
+                        [GI.dagger*H*GJ],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    ))
+                self.A[i + idx_shift, j + idx_shift] = val
+                self.A[j + idx_shift, i + idx_shift] = val.conj() 
 
-
-                self.A[i + idx_shift, j + idx_shift] = val + val.conj() # AWE added conj()
-                self.A[j + idx_shift, i + idx_shift] = (val + val.conj()).conj() # AWE changed it to conj() instead of equal, but is not needed
+                # self.A[i + idx_shift, j + idx_shift] = val + val.conj() # AWE added conj()
+                # self.A[j + idx_shift, i + idx_shift] = (val + val.conj()).conj() # AWE changed it to conj() instead of equal, but is not needed
                 # Make B
                 # <0| GId H GJd |0>
                 val = generalized_expectation_value(
@@ -504,8 +593,12 @@ class LinearResponse(LinearResponseBaseClass):
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
-                self.B[i + idx_shift, j + idx_shift] = val + val.conj() # AWE added conj()
-                self.B[j + idx_shift, i + idx_shift] = (val + val.conj()).conj() # AWE changed to conj() instead of equal but is not needed
+                
+                self.B[i + idx_shift, j + idx_shift] = val 
+                self.B[j + idx_shift, i + idx_shift] = val.conj()
+                # self.B[i + idx_shift, j + idx_shift] = val + val.conj() # AWE added conj()
+                # self.B[j + idx_shift, i + idx_shift] = (val + val.conj()).conj() # AWE changed to conj() instead of equal but is not needed
+                
                 # Make Sigma
                 # <0| GId GJ |0>
                 val = generalized_expectation_value(
@@ -525,8 +618,11 @@ class LinearResponse(LinearResponseBaseClass):
                 # Does it also need to have the hermetian conjugate added??
                 # Where is the Delta matrix? 
 
-                self.Sigma[i + idx_shift, j + idx_shift] =   val + val.conj()     
-                self.Sigma[j + idx_shift, i + idx_shift] =  (val + val.conj()).conj()
+                self.Sigma[i + idx_shift, j + idx_shift] =  val    
+                self.Sigma[j + idx_shift, i + idx_shift] =  val.conj()
+
+                # self.Sigma[i + idx_shift, j + idx_shift] =   val + val.conj()     
+                # self.Sigma[j + idx_shift, i + idx_shift] =  (val + val.conj()).conj()
 
                 # Make Delta AWE
                 # <0| GI GJ |0>
@@ -543,9 +639,12 @@ class LinearResponse(LinearResponseBaseClass):
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
+                
+                self.Delta[i + idx_shift, j + idx_shift] =  val   
+                self.Delta[j + idx_shift, i + idx_shift] =  val.conj()
 
-                self.Delta[i + idx_shift, j + idx_shift] =   val + val.conj()     
-                self.Delta[j + idx_shift, i + idx_shift] =  (val + val.conj()).conj()
+                # self.Delta[i + idx_shift, j + idx_shift] =   val + val.conj()     
+                # self.Delta[j + idx_shift, i + idx_shift] =  (val + val.conj()).conj()
 
 
         # Check hermiticity of the Metric:
@@ -576,19 +675,19 @@ class LinearResponse(LinearResponseBaseClass):
         # print('Sigma', self.Sigma)
 
 
-# #Pernille fjernelse af A
-        # self.A = self.A[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape(
-        #             (np.sum(finite_excitations_idx), np.sum(finite_excitations_idx))
-        #         )
-        # self.B = self.B[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape(
-        #             (np.sum(finite_excitations_idx), np.sum(finite_excitations_idx))
-        #         )
-        # self.Sigma = self.Sigma[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape(
-        #             (np.sum(finite_excitations_idx), np.sum(finite_excitations_idx))
-        #         )
+# # #Pernille fjernelse af A
+#         self.A = self.A[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape(
+#                     (np.sum(finite_excitations_idx), np.sum(finite_excitations_idx))
+#                 )
+#         self.B = self.B[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape(
+#                     (np.sum(finite_excitations_idx), np.sum(finite_excitations_idx))
+#                 )
+#         self.Sigma = self.Sigma[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape(
+#                     (np.sum(finite_excitations_idx), np.sum(finite_excitations_idx))
+#                 )
                 
-        # self.Delta = np.zeros((len(self.Sigma), len(self.Sigma))
-        # )  # Delta er defineret her fordi den ellers har forkert dimension i unrestricted_lr_baseclass.py
+#         self.Delta = np.zeros((len(self.Sigma), len(self.Sigma))
+#         )  # Delta er defineret her fordi den ellers har forkert dimension i unrestricted_lr_baseclass.py
 
                 
                 
@@ -732,58 +831,58 @@ class LinearResponse(LinearResponseBaseClass):
         return np.round((2/3*np.multiply(self.excitation_energies,(np.square(tdm[:,0])+np.square(tdm[:,1])+np.square(tdm[:,2])))).real,8)
 
 
-    # def get_property_gradient(self, property_integrals: np.ndarray) -> np.ndarray:
-    #     """Calculate property gradient.
+    def get_property_gradient(self, property_integrals: np.ndarray) -> np.ndarray:
+        """Calculate property gradient.
 
-    #     Args:
-    #         property_integrals: Integrals in AO basis.
+        Args:
+            property_integrals: Integrals in AO basis.
 
-    #     Returns:
-    #         Property gradient.
-    #     """
-    #     in_shape = property_integrals.shape[:-2]
-    #     size_mo = self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs + self.wf.num_virtual_spin_orbs
-    #     # property_integrals = property_integrals.reshape(-1, size_mo, size_mo)
-    #     num_mo = len(property_integrals)
-    #     mo = np.zeros((num_mo, size_mo, size_mo), dtype=complex)
-    #     for i, ao in enumerate(property_integrals):
-    #         mo[i, :, :] += generalized_one_electron_transform(self.wf.c_mo, ao)
+        Returns:
+            Property gradient.
+        """
+        in_shape = property_integrals.shape[:-2]
+        size_mo = self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs + self.wf.num_virtual_spin_orbs
+        # property_integrals = property_integrals.reshape(-1, size_mo, size_mo)
+        num_mo = len(property_integrals)
+        mo = np.zeros((num_mo, size_mo, size_mo), dtype=complex)
+        for i, ao in enumerate(property_integrals):
+            mo[i, :, :] += generalized_one_electron_transform(self.wf.c_mo, ao)
 
-    #     idx_shift_q = len(self.q_ops)
-    #     V = np.zeros((len(self.q_ops + self.G_ops), num_mo), dtype=complex)
+        idx_shift_q = len(self.q_ops)
+        V = np.zeros((len(self.q_ops + self.G_ops), num_mo), dtype=complex)
 
-    #     if len(self.q_ops) != 0:
-    #         # Orbital response part
-    #         V[:idx_shift_q, :] =  get_orbital_response_static_property_gradient(
-    #             mo,
-    #             self.wf.kappa_no_activeactive_spin_idx,
-    #             self.wf.num_inactive_spin_orbs,
-    #             self.wf.num_active_spin_orbs,
-    #             self.wf.rdm1,
-    #         )
-    #     for idx, G in enumerate(self.G_ops):
-    #         G_ket = generalized_propagate_state([G], self.wf.ci_coeffs, *self.index_info)
-    #         Gd_ket =generalized_propagate_state([G.dagger], self.wf.ci_coeffs, *self.index_info)
-    #         # Inactive part
-    #         for i in range(self.wf.num_inactive_spin_orbs):
-    #             E_ket = generalized_propagate_state([a_op_spin(i,True), a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info) 
-    #             # < 0 | G E | 0 >
-    #             val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-    #             # - < 0 | E G | 0 >
-    #             val -= generalized_expectation_value(E_ket, [], G_ket, *self.index_info) # E_ket = Ed_ket for E(i,i)
-    #             V[idx + idx_shift_q, :] += mo[:, i, i] * val
-    #         # Active part
-    #         for p in range(self.wf.num_inactive_spin_orbs, self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
-    #             for q in range(
-    #                 self.wf.num_inactive_spin_orbs, self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs
-    #             ):
-    #                 E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(q,False)], self.wf.ci_coeffs, *self.index_info)
-    #                 Ed_ket = generalized_propagate_state([a_op_spin(q,True)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
-    #                 # < 0 | G E | 0 >
-    #                 val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
-    #                 # - < 0 | E G | 0 >
-    #                 val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
-    #                 V[idx + idx_shift_q, :] += mo[:, p, q] * val
-    #     if np.allclose(mo, mo.transpose(0, -1, -2)):
-    #         return np.vstack((V, -1 * V)).reshape(-1, *in_shape)
-    #     return np.vstack((V, V)).reshape(-1, *in_shape)
+        if len(self.q_ops) != 0:
+            # Orbital response part
+            V[:idx_shift_q, :] =  get_orbital_response_static_property_gradient(
+                mo,
+                self.wf.kappa_no_activeactive_spin_idx,
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.rdm1,
+            )
+        for idx, G in enumerate(self.G_ops):
+            G_ket = generalized_propagate_state([G], self.wf.ci_coeffs, *self.index_info)
+            Gd_ket =generalized_propagate_state([G.dagger], self.wf.ci_coeffs, *self.index_info)
+            # Inactive part
+            for i in range(self.wf.num_inactive_spin_orbs):
+                E_ket = generalized_propagate_state([a_op_spin(i,True), a_op_spin(i,False)], self.wf.ci_coeffs, *self.index_info) 
+                # < 0 | G E | 0 >
+                val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
+                # - < 0 | E G | 0 >
+                val -= generalized_expectation_value(E_ket, [], G_ket, *self.index_info) # E_ket = Ed_ket for E(i,i)
+                V[idx + idx_shift_q, :] += mo[:, i, i] * val
+            # Active part
+            for p in range(self.wf.num_inactive_spin_orbs, self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs):
+                for q in range(
+                    self.wf.num_inactive_spin_orbs, self.wf.num_inactive_spin_orbs + self.wf.num_active_spin_orbs
+                ):
+                    E_ket = generalized_propagate_state([a_op_spin(p,True)*a_op_spin(q,False)], self.wf.ci_coeffs, *self.index_info)
+                    Ed_ket = generalized_propagate_state([a_op_spin(q,True)*a_op_spin(p,False)], self.wf.ci_coeffs, *self.index_info)
+                    # < 0 | G E | 0 >
+                    val = generalized_expectation_value(Gd_ket, [], E_ket, *self.index_info)
+                    # - < 0 | E G | 0 >
+                    val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
+                    V[idx + idx_shift_q, :] += mo[:, p, q] * val
+        if np.allclose(mo, mo.transpose(0, -1, -2)):
+            return np.vstack((V, -1 * V)).reshape(-1, *in_shape)
+        return np.vstack((V, V)).reshape(-1, *in_shape)

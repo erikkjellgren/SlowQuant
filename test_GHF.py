@@ -107,7 +107,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=False, tol=1e-5, maxiter = 2000)
 
-    print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
+    print("E_opt:", WF._energy_elec)
+    # print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
     
   
     "Calculate Excitation energies"
@@ -148,6 +149,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     num_spin_orbs = WF.num_spin_orbs
     
     ci_coeff = WF.ci_coeffs
+    mo_coeff = WF.c_mo
+
     ci_info = WF.ci_info
     # print('coeff',ci_coeff)
     # print('info',ci_coeff)
@@ -303,15 +306,15 @@ def oh_radical():
     geometry = """O  0.0   0.0  0.0;
         H  0.0  0.0  0.9697;"""
     basis = 'sto-3g'
-    active_space = ((2,1),6)
+    active_space = ((1,0),2)
     charge = 0
     spin=1
     NR(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
 
 
 
-# h3()
-h2()
+h3()
+# h2()
 # h4_rektangle()
 # HI()
 # HBr()
