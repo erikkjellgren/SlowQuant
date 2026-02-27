@@ -313,8 +313,8 @@ def oh_radical():
 
 
 
-# h3()
-h2()
+h3()
+#h2()
 # h4_rektangle()
 # HI()
 # HBr()
