@@ -43,11 +43,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     
     
     
-    # dip_ao_picture_changed = mf.with_x2c.picture_change(('int1e_r_spinor',
-    #                                        'int1e_sprsp_spinor'))
+    dip_ao_picture_changed = mf.with_x2c.picture_change(('int1e_r_spinor',
+                                           'int1e_sprsp_spinor'))
     # dip_mom = mf.dip_moment(picture_change = True) #with picture change
     # print(dip_mom)
-    dip_ao = mol.intor('int1e_r')
+        # dip_ao = mol.intor('int1e_r')
     # dip_ao = mol.intor('int1e_r_spinor')
     
     # print(dip_ao)
@@ -114,7 +114,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     
   
     "Calculate Excitation energies"
-    LR = generalized_naive.LinearResponse(WF, excitations="sd")
+    LR = generalized_naive.LinearResponse(WF, excitations="s")
     LR.calc_excitation_energies()
     print(LR.excitation_energies)
     
@@ -152,6 +152,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     
     ci_coeff = WF.ci_coeffs
     mo_coeff = WF.c_mo
+    print(mo_coeff)
 
     ci_info = WF.ci_info
     # print('coeff',ci_coeff)
@@ -314,6 +315,14 @@ def oh_radical():
     spin=1
     NR(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
 
+def BeH(): 
+    geometry = """Be  0.0   0.0  0.0;
+        H  0.0  0.0  1.3426;"""
+    basis = 'sto-3g'
+    active_space = ((3,2),12)
+    charge = 0
+    spin=1
+    NR(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
 
 
 h3()
@@ -322,3 +331,5 @@ h3()
 # HI()
 # HBr()
 # oh_radical()
+# BeH()
+

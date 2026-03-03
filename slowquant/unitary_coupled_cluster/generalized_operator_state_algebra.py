@@ -1,4 +1,5 @@
 import numpy as np
+import numba as nb
 
 from slowquant.unitary_coupled_cluster.ci_spaces import CI_Info
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
