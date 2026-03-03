@@ -177,7 +177,8 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.rdm1,
                 self.wf.rdm2,
             )
-            self.Sigma[: len(self.q_ops), : len(self.q_ops)] =get_orbital_response_metric_sigma(
+
+            self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
                 self.wf.kappa_no_activeactive_spin_idx,
                 self.wf.num_inactive_spin_orbs,
                 self.wf.num_active_spin_orbs,
@@ -333,6 +334,7 @@ class LinearResponse(LinearResponseBaseClass):
                 for i, GI in enumerate(self.G_ops):
                     G_ket = generalized_propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
                     Gd_ket = generalized_propagate_state([GI.dagger], self.wf.ci_coeffs, *self.index_info)
+                    print("qG",i,j)
                     # # Make A
                     # <0| Gd H q |0>
                     val = generalized_expectation_value(
@@ -411,7 +413,7 @@ class LinearResponse(LinearResponseBaseClass):
             for i, GI in enumerate(self.G_ops[j:], j):
                 GI_ket = generalized_propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
                 GId_ket = generalized_propagate_state([GI.dagger], self.wf.ci_coeffs, *self.index_info)
-                #print(i)
+                print("GG",i,j)
                 # Make A
                 # <0| GId H GJ |0> #problemer med H0iai 
                 val = generalized_expectation_value(
@@ -546,8 +548,27 @@ class LinearResponse(LinearResponseBaseClass):
         E2[:size, size:] = self.B
         E2[size:, :size] = self.B.conjugate() #AE added conjugtate 
         E2[size:, size:] = self.A.conjugate() #AE added conjugtate 
+
         print(f"Hermiticity check of the Hessian: max|E2 - E2†| = "
             f"{np.max(np.abs(E2 - E2.conj().T)):.2e}")  
+
+        print(f"Hermiticity check of A: max|A - A†| = "
+            f"{np.max(np.abs(self.A - self.A.conj().T)):.2e}")  
+
+        print(f"Symmetry check of B: max|B - B.T| = "
+            f"{np.max(np.abs(self.B - self.B.T)):.2e}")  
+        
+        print(f"Hermiticity check of A qq: max|A - A†| = "
+            f"{np.max(np.abs(self.A[:idx_shift,:idx_shift] - self.A[:idx_shift,:idx_shift].conj().T)):.2e}")  
+        
+        print(f"Hermiticity check of A qG: max|A - A†| = "
+            f"{np.max(np.abs(self.A[:idx_shift,idx_shift:] - self.A[idx_shift:,:idx_shift].conj().T)):.2e}") 
+
+        print(f"Symmetry check of B qq: max|B - B.T| = "
+            f"{np.max(np.abs(self.B[:idx_shift,:idx_shift] - self.B[:idx_shift,:idx_shift].T)):.2e}") 
+
+        print(f"Symmetry check of B qG: max|B - B.T| = "
+            f"{np.max(np.abs(self.B[:idx_shift,idx_shift:] - self.B[idx_shift:,:idx_shift].T)):.2e}") 
         
         #print(np.round(np.diag(Hessian_matrix),5))
 

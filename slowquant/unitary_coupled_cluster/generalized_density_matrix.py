@@ -1157,8 +1157,8 @@ def get_orbital_response_hessian_block(
                             A2e[idx1, idx2] += g[P, Q, R, M] * RDM2(
                                 P, U, R, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                             )
-    if A1e.imag.any() > 1e-10 or A2e.imag.any() > 1e-10:
-        print("Warning: Response Hessian is complex!")
+    #if A1e.imag.any() > 1e-10 or A2e.imag.any() > 1e-10:
+        #print("Warning: Response Hessian is complex!")
     return A1e + (1/2)*A2e
 
 @nb.jit(nopython=True) 

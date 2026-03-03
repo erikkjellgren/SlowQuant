@@ -105,6 +105,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True,tol=1e-8)
     WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
 
+    print(WF.c_mo)
+
     # WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=False, tol=1e-5, maxiter = 2000)
 
     print("E_opt:", WF._energy_elec)
@@ -275,7 +277,8 @@ def h3():
                   H  0.500000   0.8660254038   0.000000"""
     # basis = "cc-pvdz"
     basis = "sto-3g"
-    active_space = ((1, 0), 2)
+    #active_space = ((2, 1), 6)
+    active_space = ((1,0), 2)
     #active_space = (2, 4)
     charge = 0
     spin = 1

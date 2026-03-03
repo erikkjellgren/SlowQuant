@@ -255,6 +255,20 @@ class GeneralizedWaveFunctionUPS:
                 self.ansatz_options,
             )
 
+        elif ansatz.lower() == "fuccs":
+            if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
+            self.ansatz_options["S"] = True
+            self.ups_layout.create_fUCC(
+                [],
+                [],
+                self.active_occ_spin_idx_shifted,
+                self.active_unocc_spin_idx_shifted,
+                self.num_active_spin_orbs // 2,
+                self.ansatz_options,
+            )
+
         elif ansatz.lower() == "fuccd":
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
@@ -419,6 +433,8 @@ class GeneralizedWaveFunctionUPS:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._h_mo is None:
+
+
             self._h_mo = generalized_one_electron_transform(self.c_mo, self._h_ao)
         return self._h_mo
 
