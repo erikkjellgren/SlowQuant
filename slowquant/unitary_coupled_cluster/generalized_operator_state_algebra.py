@@ -1,4 +1,5 @@
 import numpy as np
+import numba as nb
 
 from slowquant.unitary_coupled_cluster.ci_spaces import CI_Info
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
@@ -11,7 +12,7 @@ from slowquant.unitary_coupled_cluster.util import UpsStructure ##AE
 from slowquant.unitary_coupled_cluster.operator_state_algebra import bitcount
 
 
-#@nb.jit(nopython=True)
+@nb.jit(nopython=True)
 def generalized_apply_operator(
     state: np.ndarray,
     anni_idxs: np.ndarray,

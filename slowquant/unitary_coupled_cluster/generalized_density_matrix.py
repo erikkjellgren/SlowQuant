@@ -285,7 +285,7 @@ def get_orbital_gradient_generalized_total(
     return gradient
 
 
-
+@nb.jit(nopython=True)
 def get_orbital_gradient_expvalue_real_imag(
     ci_coeffs,
     ci_info,
@@ -340,6 +340,8 @@ def get_orbital_gradient_expvalue_real_imag(
     return gradient_total_real
 
 
+
+@nb.jit(nopython=True)
 def get_nonsplit_gradient_expvalue(
     ci_coeffs,
     ci_info,
