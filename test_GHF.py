@@ -36,10 +36,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     mf.conv_tol_grad = 1e-10 #gradient tolerance form PYSCF
     mf.max_cycle = 50000
 
-    # mf.scf()
+    mf.scf()
     mf.kernel()
     coeff=np.array(mf.mo_coeff, dtype=complex)
-    print('heyhey',len(mf.mo_coeff))
     
     
     
@@ -50,7 +49,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # print(dip_mom)
     #     dip_ao = mol.intor('int1e_r')
-    dip_ao = mol.intor('int1e_r')
+    # dip_ao = mol.intor('int1e_r')
     
     # print(dip_ao)
     
@@ -60,7 +59,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     
 
 
-    e_nuc=mf.energy_nuc()
+    # e_nuc=mf.energy_nuc()
     "Non-relativistic integrals"
     h_1e = mol.intor("int1e_kin")  
     h_nuc=mol.intor("int1e_nuc")
@@ -77,7 +76,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # print('Relativistic her',h_core_rel)
     # print(g_eri)
 
-    mc = mcscf.CASCI(mf, active_space[1], active_space[0])
+    # mc = mcscf.CASCI(mf, active_space[1], active_space[0])
 
     #make a random unitary transformation
     # u = unitary_group.rvs(c.shape[0]) 
@@ -85,7 +84,58 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # C_u = c @ u[0] 
     # mc = mcscf.CASCI(mf, active_space[1], active_space[0])
     
+
+
+#     #OH-
+#     a_coeff = np.array([[ 9.94283934e-01, -2.47147351e-01,  8.84345292e-02, -1.04931221e-16,
+#    4.98504451e-17,  8.87761432e-02],
+#  [ 2.46612046e-02,  9.23518351e-01, -4.60553400e-01,  5.63817654e-16,
+#   -3.29178647e-16, -6.02389631e-01],
+#  [ 6.41847722e-20,  3.70605100e-18, -6.64972350e-16, -9.54228556e-02,
+#    9.95436828e-01,  3.48320571e-18],
+#  [-2.40347744e-19,  3.37265339e-17,  1.12383261e-15,  9.95436828e-01,
+#    9.54228556e-02,  3.50915198e-18],
+#  [ 3.78067107e-03,  1.10921733e-01,  6.99509652e-01, -8.07764775e-16,
+#    2.20170396e-16, -8.60048674e-01],
+#  [-6.73367151e-03,  1.66893530e-01,  4.98356847e-01, -6.64122021e-16,
+#    5.92613678e-16,  1.14798745e+00]])
+
+#     b_coeff = np.array([[ 9.94838460e-01, -2.35098607e-01,  1.06423085e-01,  1.11493778e-18,
+#     1.41895386e-17,  9.53070591e-02],
+#     [ 2.23637389e-02, 8.64871528e-01, -5.39424304e-01, -3.10852643e-18,
+#     -9.11874175e-17, -6.23695073e-01],
+#     [ 3.34318062e-19, 3.05002044e-18,  1.35789227e-16,  9.95436828e-01,
+#     -9.54228556e-02,  1.35923643e-17],
+#     [-1.84716405e-19, -4.10677643e-17, -1.36337584e-16,  9.54228556e-02,
+#     9.95436828e-01, -7.13968485e-17],
+#     [ 3.50286689e-03,  1.15481521e-01,  6.60661375e-01, -1.24566491e-16,
+#     -6.15518707e-17, -8.89659314e-01],
+#     [-6.15012305e-03, 2.49307848e-01,  5.26233905e-01, -8.52475019e-18,
+#     1.61881459e-16,  1.12027638e+00]]
+#     )
+
+#     coeff = np.zeros((2*len(a_coeff),2*len(a_coeff)))
+#     coeff[:len(a_coeff), :len(a_coeff)] = a_coeff
+#     coeff[len(a_coeff):,len(a_coeff):] = b_coeff
+
+    # #H3 STO-3G ((2,1),6)
+    # a_coeff = np.array([[ 3.74624752e-01, -5.98253789e-01,  9.96507873e-01],
+    #     [ 3.74628137e-01, -5.98267504e-01, -9.96498366e-01],
+    #     [ 4.75551085e-01,  1.12478016e+00, -6.93261029e-06]])
     
+    # b_coeff = np.array([[ 4.48217211e-01,  9.96504863e-01, -5.45305999e-01],
+    #                      [ 4.48211173e-01, -9.96501377e-01, -5.45317332e-01],
+    #                     [ 3.27468962e-01, -7.68214821e-06,  1.17645371e+00]])
+
+    # coeff = np.zeros((2*len(a_coeff),2*len(a_coeff)))
+    # coeff[:len(a_coeff), :len(a_coeff)] = a_coeff
+    # coeff[len(a_coeff):,len(a_coeff):] = b_coeff
+
+
+    # coeff[0::2, 0::2] = a_coeff
+    # coeff[1::2, 1::2] = b_coeff
+
+
     # # Slowquant
     
     WF =GeneralizedWaveFunctionUPS(
@@ -99,10 +149,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
-    # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, test=True,tol=1e-8)
     WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
 
-    print(WF.c_mo)
+    # print(WF.c_mo)
 
     # WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=False, tol=1e-5, maxiter = 2000)
 
@@ -116,25 +165,25 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print(LR.excitation_energies)
     
     
-    # "Calculate polarizability"
-    prop_grad = LR.get_property_gradient(dip_ao)
-    response = solve(LR.hessian, prop_grad)
-    alpha = np.einsum('ix,ix->x', prop_grad, response)
+    # # "Calculate polarizability"
+    # prop_grad = LR.get_property_gradient(dip_ao)
+    # response = solve(LR.hessian, prop_grad)
+    # alpha = np.einsum('ix,ix->x', prop_grad, response)
 
-    print(f'Polarizabilities:\n \t xx: {alpha[0]:.4f} \t yy: {alpha[1]:.4f} \t zz: {alpha[2]:.4f}')
+    # print(f'Polarizabilities:\n \t xx: {alpha[0]:.4f} \t yy: {alpha[1]:.4f} \t zz: {alpha[2]:.4f}')
 
-    "Calculate dipole moments"
-    mux = generalized_one_electron_transform(WF.c_mo, dip_ao[0])
-    muy = generalized_one_electron_transform(WF.c_mo, dip_ao[1])
-    muz = generalized_one_electron_transform(WF.c_mo, dip_ao[2])
-    mu_op_x = generalized_one_elec_op_0i_0a(mux, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
-    mu_op_y = generalized_one_elec_op_0i_0a(muy, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
-    mu_op_z = generalized_one_elec_op_0i_0a(muz, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
-    dip_x=generalized_expectation_value(WF.ci_coeffs, [mu_op_x], WF.ci_coeffs, WF.ci_info)
-    dip_y=generalized_expectation_value(WF.ci_coeffs, [mu_op_y], WF.ci_coeffs, WF.ci_info)
-    dip_z=generalized_expectation_value(WF.ci_coeffs, [mu_op_z], WF.ci_coeffs, WF.ci_info)
+    # "Calculate dipole moments"
+    # mux = generalized_one_electron_transform(WF.c_mo, dip_ao[0])
+    # muy = generalized_one_electron_transform(WF.c_mo, dip_ao[1])
+    # muz = generalized_one_electron_transform(WF.c_mo, dip_ao[2])
+    # mu_op_x = generalized_one_elec_op_0i_0a(mux, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
+    # mu_op_y = generalized_one_elec_op_0i_0a(muy, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
+    # mu_op_z = generalized_one_elec_op_0i_0a(muz, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
+    # dip_x=generalized_expectation_value(WF.ci_coeffs, [mu_op_x], WF.ci_coeffs, WF.ci_info)
+    # dip_y=generalized_expectation_value(WF.ci_coeffs, [mu_op_y], WF.ci_coeffs, WF.ci_info)
+    # dip_z=generalized_expectation_value(WF.ci_coeffs, [mu_op_z], WF.ci_coeffs, WF.ci_info)
 
-    print(f'Electric Dipolemoments:\n \t xx: {dip_x:.4f} \t yy: {dip_y:.4f} \t zz: {dip_z:.4f}')
+    # print(f'Electric Dipolemoments:\n \t xx: {dip_x:.4f} \t yy: {dip_y:.4f} \t zz: {dip_z:.4f}')
 
 
 
@@ -327,6 +376,7 @@ def BeH():
 # h4_rektangle()
 # HI()
 # HBr()
-# oh_radical()
+oh_radical()
 # BeH()
+
 
