@@ -185,34 +185,34 @@ class LinearResponseBaseClass:
         
 
         #AE
-        operator_labels = np.array(
-            self.operator_labels_q +
-            self.operator_labels_G +
-            self.operator_labels_q +
-            self.operator_labels_G,
-            dtype=object)
-        for i in range(len(eigval)):
-            vec=eigvec[:,i]
-            absvec = np.abs(vec)
+        # operator_labels = np.array(
+        #     self.operator_labels_q +
+        #     self.operator_labels_G +
+        #     self.operator_labels_q +
+        #     self.operator_labels_G,
+        #     dtype=object)
+        # for i in range(len(eigval)):
+        #     vec=eigvec[:,i]
+        #     absvec = np.abs(vec)
         
-            print('Eigenvalue', eigval[i],'Max value eigvec', np.max(abs(vec)), 'Max value eigvec index', np.argmax(abs(vec)))
-            # k = np.argmax(np.abs(vec))
-            # print("dominant operator:", operator_labels[k])
+        #     print('Eigenvalue', eigval[i],'Max value eigvec', np.max(abs(vec)), 'Max value eigvec index', np.argmax(abs(vec)))
+        #     # k = np.argmax(np.abs(vec))
+        #     # print("dominant operator:", operator_labels[k])
 
-            # top 3 contributors
-            top3 = np.argsort(absvec)[-3:][::-1]
-            # print(len(top3))
-            for j in top3:
-                print(
-                "  operator:", operator_labels[j],
-                " weight:", absvec[j])
+        #     # top 3 contributors
+        #     top3 = np.argsort(absvec)[-3:][::-1]
+        #     # print(len(top3))
+        #     for j in top3:
+        #         print(
+        #         "  operator:", operator_labels[j],
+        #         " weight:", absvec[j])
 
 
         #     # print(self.operator_labels[k])
 
             
    
-        sorting = np.argsort(np.real(eigval)) #AE added np.real
+        sorting = np.argsort(np.real(eigval.real)) #AE added np.real
         self.excitation_energies = np.real(eigval[sorting][size:]) 
         self.response_vectors = (eigvec[:, sorting][:, size:]) #Removed np.real
         self.normed_response_vectors = np.zeros_like(self.response_vectors, dtype=complex) #AE
@@ -248,10 +248,10 @@ class LinearResponseBaseClass:
             if abs(norm) < 10**-10: #AE change to abs
                 print(f"WARNING: State number {state_number} could not be normalized. Norm of {norm}.")
                 continue
-            self.Z_q_normed[:, state_number] = self.Z_q[:, state_number] * (1/abs(norm))**0.5* np.sign(norm.real)#AE added abs and np.sign
-            self.Z_G_normed[:, state_number] = self.Z_G[:, state_number] *(1/abs(norm))**0.5* np.sign(norm.real)
-            self.Y_q_normed[:, state_number] = self.Y_q[:, state_number] *(1/abs(norm))**0.5* np.sign(norm.real)
-            self.Y_G_normed[:, state_number] = self.Y_G[:, state_number] *(1/abs(norm))**0.5* np.sign(norm.real)
+            self.Z_q_normed[:, state_number] = self.Z_q[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real) # AE added abs and np.sign
+            self.Z_G_normed[:, state_number] = self.Z_G[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real)
+            self.Y_q_normed[:, state_number] = self.Y_q[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real)
+            self.Y_G_normed[:, state_number] = self.Y_G[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real)
             
             # #Pernille
             # self.Z_qG_normed[:, state_number] = self.Z_qG[:, state_number] * (1 / norm) ** 0.5
@@ -259,8 +259,9 @@ class LinearResponseBaseClass:
         
             
             self.normed_response_vectors[:, state_number] = (
-                self.response_vectors[:, state_number] * (1/abs(norm))**0.5* np.sign(norm.real)  #AE added abs
+                self.response_vectors[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real)  #AE added abs
             )
+
 
     def get_excited_state_norm(self) -> np.ndarray:
         """Calculate the norm of excited states.
@@ -268,6 +269,8 @@ class LinearResponseBaseClass:
         Returns:
             Norm of excited states.
         """
+
+
         norms = np.zeros(len(self.response_vectors[0]),dtype=complex) #AE complex
         for state_number in range(len(self.response_vectors[0])):
             # Get Z_q Z_G Y_q and Y_G matrices
@@ -281,6 +284,7 @@ class LinearResponseBaseClass:
                 self.metric[self.num_q : self.num_q + self.num_G, self.num_q : self.num_q + self.num_G]
                 * (ZZG - YYG)
             )
+
             
             #Pernille
             # ZZqG = np.outer(self.Z_qG[:, state_number], self.Z_qG[:, state_number].transpose())

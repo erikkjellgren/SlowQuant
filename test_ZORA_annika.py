@@ -7,6 +7,7 @@ from scipy.linalg import expm
 import basis_set_exchange as bse
 from zora_build_new import read_zora_so
 import struct
+from pyscf.dft import mura_knowles, gen_grid, gauss_chebyshev
 
 
 # from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
@@ -191,7 +192,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     nmo = uhf.mo_coeff[0].shape[1]
 
     # small random anti-Hermitian
-    epsilon = 0.6  # controls "step size"
+    epsilon = 0  # controls "step size"
     X = np.random.randn(nmo, nmo) + 1j*np.random.randn(nmo, nmo)
     A = epsilon * (X - X.conj().T)/2  # make anti-Hermitian
     # unitary
@@ -208,14 +209,46 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     chkfile.dump('/home/annika4ee/SlowQuant/uhf_guess.chk','scf', data)
 
 
+
+
+    # mf_nr = scf.GKS(mol)
+    # mf_nr.xc = 'hf'
+    # mf_nr.conv_tol = 1e-10
+    # mf_nr.kernel()
+    # dm0 = mf_nr.make_rdm1()
+
+
+
+
     mf = scf.GHF(mol)
+    #mf.xc = "hf"
     mf.chkfile = '/home/annika4ee/SlowQuant/uhf_guess.chk'
 
     # Change initial guess:
-    #mf.init_guess = "chkfile"
+    mf.init_guess = "chkfile"
     mf.conv_tol = 1e-10        # Energy convergence (Hartree)
     mf.conv_tol_grad = 1e-10   # Optional: gradient convergence
     mf.max_cycle = 1000
+    # mf.grids.atom_grid = {
+    #     'H':  (70, 194),
+    #     'Li': (70, 194),
+    # }
+
+    # mf.grids.atom_grid = {
+    # 'H':  (205, 1454),
+    # 'F': (205, 1454),
+    # }
+
+    # # Key: control small density cutoff
+    # mf.grids.eps = 1e-12          # default 1e-14; larger -> lower accuracy
+
+    # # Key: control XC functional interpolation
+    # mf._numint._cint.libcint_precision = 1e-12   # controls integral precision
+    # mf.grids.prune = None
+    # mf.grids.radi_method = mura_knowles 
+    # mf.grids.radii_adjust = None
+    # mf.grids.becke_scheme = gen_grid.stratmann 
+    # mf.grids.build()
 
     
     T = mol.intor("int1e_kin")
@@ -269,7 +302,13 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
  
     #hcore = T_2c + W + V_2c
 
-    #print(mol.nao)
+
+
+
+
+    nbf = mol.nao
+
+
 
 
 
@@ -277,13 +316,124 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     h_core_pyscf = np.kron(np.eye(2), h_core_pyscf_1dim)
 
-    H_zora= read_zora_so("Cl_so.zora_so")
-
-    h_core_tot = (h_core_pyscf + H_zora)
-
-    mf.get_hcore = lambda *args: h_core_tot
+    H_zora, zora_scale_sf, zora_scale_so = read_zora_so("LiH_sto-3g_LiH.zora_so")
 
 
+
+
+    # # Build overlap matrix and compute AO norms
+    # S = mol.intor('int1e_ovlp')        # AO overlap (spatial)
+    # norms = np.sqrt(np.diag(S))        # 1D array of length nAO
+    # # ==============================
+    # # 3. Scale H_ZORA_corr to PySCF AO norms
+    # # ==============================
+    # # Repeat norms for 2c spinors (alpha, beta)
+    # norms_2c = np.tile(norms, 2)  # length = 2*nAO
+    # # Vectorized scaling
+    # H_ZORA_scaled = H_zora / (norms_2c[:, None] * norms_2c[None, :])
+
+
+
+
+
+    # h_core_tot = (h_core_pyscf + H_zora)
+
+    #mf.get_hcore = lambda *args: h_core_tot
+
+
+    # # Standard overlap from PySCF
+    # S = mol.intor('int1e_ovlp')
+    # S_4x4 = np.kron(np.eye(2), S)
+
+    # # Scalar ZORA scaling (block diagonal, alpha and beta)
+    # S_scale = np.zeros((2*nbf, 2*nbf))
+    # S_scale[:nbf, :nbf] = zora_scale_sf[0]  # alpha block
+    # S_scale[nbf:, nbf:] = zora_scale_sf[1]  # beta block
+
+    # # SO ZORA scaling from ga_dens_so source:
+    # # z: D_im[bb] - D_im[aa]  -> diagonal blocks, imaginary
+    # # x: -D_im[ab] - D_im[ba] -> off-diagonal blocks, imaginary  
+    # # y: D_re[ab] - D_re[ba]  -> off-diagonal blocks, real
+    # # soxyz = ['z','y','x'] -> scale_so(1)=z, scale_so(2)=y, scale_so(3)=x
+
+    # S_scale_so = np.zeros((2*nbf, 2*nbf), dtype=complex)
+
+    # # z component: diagonal blocks, imaginary
+    # S_scale_so[:nbf, :nbf] -= 1j * zora_scale_so[0]  # -i*z in alpha block
+    # S_scale_so[nbf:, nbf:] += 1j * zora_scale_so[0]  # +i*z in beta block
+
+    # # y component: off-diagonal blocks, real
+    # S_scale_so[:nbf, nbf:] += zora_scale_so[1]   # +y in alpha-beta block
+    # S_scale_so[nbf:, :nbf] -= zora_scale_so[1]   # -y in beta-alpha block
+
+    # # x component: off-diagonal blocks, imaginary
+    # S_scale_so[:nbf, nbf:] -= 1j * zora_scale_so[2]  # -i*x in alpha-beta block
+    # S_scale_so[nbf:, :nbf] -= 1j * zora_scale_so[2]  # -i*x in beta-alpha block
+
+    # # Full modified overlap
+    # S_zora = S_4x4.astype(complex) + S_scale.astype(complex) + S_scale_so
+
+    # # Set modified overlap in PySCF
+    # #mf.spin_square = lambda *args: (0.0, 1.0)  # skip spin_square check
+    # #mf.get_ovlp = lambda *args: S_zora
+
+    # def compute_zora_scaling_correction(mf, nbf, zora_scale_sf, zora_scale_so):
+    #     """
+    #     Compute scaled ZORA energy correction from van Lenthe, Baerends, Snijders
+    #     J. Chem. Phys. 101, 9783 (1994) and NWChem dft_zora_scale_so source.
+
+    #     E_scaled = E_ZORA + Σ_i [ -ε_i * s_i / (1 + s_i) ]
+
+    #     where s_i = <ψ_i|scale_sf(a)|ψ_ia> + <ψ_i|scale_sf(b)|ψ_ib>
+    #             + <ψ_i|scale_so(z)|ψ_iz> + <ψ_i|scale_so(y)|ψ_iy>
+    #             + <ψ_i|scale_so(x)|ψ_ix>
+
+    #     following exactly NWChem's dft_zora_scale_so with soxyz=['z','y','x']
+    #     """
+    #     mo_coeff  = mf.mo_coeff
+    #     mo_energy = mf.mo_energy
+    #     mo_occ    = mf.mo_occ
+
+    #     ener_scal = 0.0
+    #     for iorb in range(len(mo_occ)):
+    #         if mo_occ[iorb] > 0:
+    #             psi   = mo_coeff[:, iorb]
+    #             psi_a = psi[:nbf]
+    #             psi_b = psi[nbf:]
+
+    #             # Density matrix blocks D = psi psi† (one orbital)
+    #             D_re_aa = np.outer(psi_a.real, psi_a.real) + np.outer(psi_a.imag, psi_a.imag)
+    #             D_re_bb = np.outer(psi_b.real, psi_b.real) + np.outer(psi_b.imag, psi_b.imag)
+    #             D_re_ab = np.outer(psi_a.real, psi_b.real) + np.outer(psi_a.imag, psi_b.imag)
+    #             D_re_ba = np.outer(psi_b.real, psi_a.real) + np.outer(psi_b.imag, psi_a.imag)
+    #             D_im_aa = np.outer(psi_a.imag, psi_a.real) - np.outer(psi_a.real, psi_a.imag)
+    #             D_im_bb = np.outer(psi_b.imag, psi_b.real) - np.outer(psi_b.real, psi_b.imag)
+    #             D_im_ab = np.outer(psi_a.imag, psi_b.real) - np.outer(psi_a.real, psi_b.imag)
+    #             D_im_ba = np.outer(psi_b.imag, psi_a.real) - np.outer(psi_b.real, psi_a.imag)
+
+    #             # ga_dens_sf: scalar density contributions
+    #             ener_sf = (np.sum(D_re_aa * zora_scale_sf[0]) +
+    #                     np.sum(D_re_bb * zora_scale_sf[1]))
+
+    #             # ga_dens_so: SO density contributions
+    #             # soxyz = ['z','y','x'] -> scale_so(1)=z, scale_so(2)=y, scale_so(3)=x
+    #             dens_so_z =  D_im_bb - D_im_aa          # z component
+    #             dens_so_y =  D_re_ab - D_re_ba          # y component
+    #             dens_so_x = -D_im_ab - D_im_ba          # x component
+
+    #             ener_so = (np.sum(dens_so_z * zora_scale_so[0]) +
+    #                     np.sum(dens_so_y * zora_scale_so[1]) +
+    #                     np.sum(dens_so_x * zora_scale_so[2]))
+
+    #             # s_i = total scaling expectation value
+    #             ener_tot   = ener_sf + ener_so
+
+    #             # NWChem formula: ener_scal -= (ε_i / (1 + s_i)) * s_i
+    #             zora_denom = 1.0 + ener_tot
+    #             eval_scal  = mo_energy[iorb] / zora_denom
+    #             ener_scal -= eval_scal * ener_tot * mo_occ[iorb]
+
+    #     return ener_scal
 
 
 
@@ -291,6 +441,14 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     mf.kernel()
 
     
+
+    # print("h_core_pyscf shape:", h_core_pyscf.shape)
+    # print("H_zora shape:", H_zora.shape)
+    # print("h_core_pyscf[0,0]:", h_core_pyscf[0,0])
+    # print("H_zora[0,0]:", H_zora[0,0])
+    # print("h_core_tot[0,0]:", h_core_tot[0,0])
+    # print("H_zora max diagonal:", np.max(np.abs(np.diag(H_zora).real)))
+    # print("H_zora is Hermitian:", np.max(np.abs(H_zora - H_zora.conj().T)))
 
  
 
@@ -328,39 +486,29 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         #c_u,
         c_MO,
         #h_core,
-        #h_core_pyscf,
-        h_core_tot,
+        h_core_pyscf,
+        #h_core_tot,
         g_eri,
         "fuccsd",
-        {"n_layers": 0, "is_spin_conserving" : False},
+        {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
 
+    #rhf = scf.RHF(mol)
+
+    #rhf.kernel()
+
     print(mf.energy_elec()[0])
-    #print(mf.energy_nuc())
+    print(mf.energy_nuc())
     #print(mf.energy_elec()[0]+0.715104390540)
+    print(mol.nao)
+
+    # After mf.kernel():
+    #ener_scal = compute_zora_scaling_correction(mf, nbf, zora_scale_sf, zora_scale_so)
+    #E_scaled = mf.e_tot + ener_scal
 
 
-    #H = generalized_hamiltonian_full_space(WF.h_mo, WF.g_mo, WF.num_spin_orbs)
-
-    #threshold = 1e-15
-
-    #mask1 = (np.abs(c.real - WF._c_mo.real) <= threshold) & (np.abs(c.imag - WF._c_mo.imag) <= threshold)
-
-    #mask2 = (np.abs(c.real - WF.c_mo.real) <= threshold) & (np.abs(c.imag - WF.c_mo.imag) <= threshold)
-
-    #print(mask1, "\n\n")
-    #print(mask2, "\n\n")
-
-    #test_energy = generalized_expectation_value_energy(WF.ci_coeffs, [H], WF.ci_coeffs, WF.ci_info)
-
-    #mask1 = (np.abs(c.real - WF._c_mo.real) <= threshold) & (np.abs(c.imag - WF._c_mo.imag) <= threshold)
-
-    #mask2 = (np.abs(c.real - WF.c_mo.real) <= threshold) & (np.abs(c.imag - WF.c_mo.imag) <= threshold)
-
-    #print(mask1, "\n\n")
-    #print(mask2, "\n\n")
 
     #print(test_energy)
 
@@ -383,24 +531,6 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Nr. of virtual spin orbitals:", WF.num_virtual_spin_orbs)
 
 
-    #print("Nr. of occ active spind idx shifted orbitals:", WF.active_occ_spin_idx_shifted)
-    #print("Nr. of unocc active spind idx shifted orbitals:", WF.active_unocc_spin_idx_shifted)
-
-
-    #mask1 = (np.abs(c.real - WF._c_mo.real) <= threshold) & (np.abs(c.imag - WF._c_mo.imag) <= threshold)
-
-    #mask2 = (np.abs(c.real - WF.c_mo.real) <= threshold) & (np.abs(c.imag - WF.c_mo.imag) <= threshold)
-
-    #print(mask1, "\n\n")
-    #print(mask2, "\n\n")
-
-    #print("pyscf", c, "\n\n")
-
-    #print("wf variable", WF._c_mo, "\n\n")
-
-    #print("wf function", WF.c_mo, "\n\n")
-
-
     '''H=generalized_hamiltonian_full_space(WF.h_mo, WF.g_mo, WF.num_spin_orbs)
     H2=generalized_hamiltonian_0i_0a(WF.h_mo, WF.g_mo, WF.num_inactive_spin_orbs, WF.num_active_spin_orbs)
     H3=generalized_hamiltonian_1i_1a(WF.h_mo, WF.g_mo, WF.num_inactive_spin_orbs, WF.num_active_spin_orbs, WF.num_virtual_spin_orbs)
@@ -413,134 +543,24 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print(test_energy2)
     print(test_energy3)'''
 
-    #print("integrals before:\n", WF.h_mo)
 
-    '''my_gradient_before = get_orbital_gradient_generalized_real_imag(WF.h_mo,
-        WF.g_mo,
-        WF.kappa_spin_idx,
-        WF.num_inactive_spin_orbs, 
-        WF.num_active_spin_orbs,
-        WF.rdm1,
-        WF.rdm2)
-
-    print(f"my gradient_before:\n\n",np.round(my_gradient_before,10))'''
-
-    '''finite_diff = get_gradient_finite_diff(WF.ci_coeffs,WF.ci_info,WF._h_ao,WF._g_ao,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,
-                                           WF.kappa_spin_idx, WF.kappa_real,WF.kappa_imag,WF._c_mo)
-
-    print(f"Finite difference gradient, delta 1e-2, centered:\n\n", finite_diff)'''
-
-    #my_gradient_before = np.array(my_gradient_before)
-    #print("my_gradient_before:",np.linalg.norm(my_gradient_before, ord=2))
+    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-8, maxiter = 10000)
 
 
-    '''total_gradient_before = get_orbital_gradient_expvalue_real_imag(
-        WF.ci_coeffs,
-        WF.ci_info,
-        WF.h_mo,
-        WF.g_mo,
-        WF.num_spin_orbs,
-        WF.kappa_spin_idx)
-            
-    print(f'total gradient_before:\n\n',np.round(total_gradient_before,10))'''
-
-    #print(WF.kappa_spin_idx)
-
-    '''mask = np.isclose(my_gradient_before, total_gradient_before, atol=1e-10)
-    k_array = np.array(WF.kappa_spin_idx)
-
-    print(k_array[~mask[:len(WF.kappa_spin_idx)]])
-    Wrong_gradient_elements = my_gradient_before[~mask]
-    Wrong_gradient_elements_exp = total_gradient_before[~mask]
-    print(Wrong_gradient_elements[:int(len(Wrong_gradient_elements)/2)])
-    print(Wrong_gradient_elements_exp[:int(len(Wrong_gradient_elements)/2)])
-    print(k_array[~mask[len(WF.kappa_spin_idx):]])
-    print(Wrong_gradient_elements[int(len(Wrong_gradient_elements)/2):])
-    print(Wrong_gradient_elements_exp[int(len(Wrong_gradient_elements)/2):])'''
-
-    '''for i in range(len(my_gradient_before)):
-        for j in range(len(my_gradient_before)):
-            if i != j:
-                if np.abs([i]) > 1e-10 and np.abs(my_gradient_before[j]) > 1e-10:
-                    if i < len(WF.kappa_spin_idx) and j < len(WF.kappa_spin_idx):
-                        if np.abs(my_gradient_before[i]-my_gradient_before[j]) < 1e-10:
-                            print("real part")
-                            print(WF.kappa_spin_idx[i],WF.kappa_spin_idx[j])
-                            print(my_gradient_before[i],my_gradient_before[j])
-                    elif i > len(WF.kappa_spin_idx) and j > len(WF.kappa_spin_idx):
-                        if np.abs(my_gradient_before[i]-my_gradient_before[j]) < 1e-10:
-                            print("imaginary part")
-                            print(WF.kappa_spin_idx[i-len(WF.kappa_spin_idx)],WF.kappa_spin_idx[j-len(WF.kappa_spin_idx)])'''
-
-
-    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
-    
-    
-    
-    #WF.do_adapt(["S","D"])
-
-    #print(WF.ups_layout.excitation_indices)
-    #print(WF.c_mo)
-
-    #print("efter optimering")
-
-    #print(WF.thetas)
-
-
-
-    ''' my_gradient_after = get_orbital_gradient_generalized_real_imag(WF.h_mo,
-        WF.g_mo,
-        WF.kappa_spin_idx,
-        WF.num_inactive_spin_orbs, 
-        WF.num_active_spin_orbs,
-        WF.rdm1,
-        WF.rdm2)
-
-    print(f"my gradient_after:\n\n",np.round(my_gradient_after,10))'''
-
-
-    '''finite_diff_2 = get_gradient_finite_diff(WF.ci_coeffs,WF.ci_info,WF._h_ao,WF._g_ao,WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,
-                                           WF.kappa_spin_idx, WF.kappa_real,WF.kappa_imag,WF._c_mo)
-
-    print(f"Finite difference gradient, delta 1e-2, centered:\n\n", finite_diff_2)'''
-
-    #print("integrals after:\n", WF.h_mo)
-
-
-    #my_gradient_after = np.array(my_gradient_after)
-    #print("Gradient norm after:",np.linalg.norm(my_gradient_after, ord=2))
-
-
-    '''total_gradient_after = get_orbital_gradient_expvalue_real_imag(
-        WF.ci_coeffs,
-        WF.ci_info,
-        WF.h_mo,
-        WF.g_mo,
-        WF.num_spin_orbs,
-        WF.kappa_spin_idx)
-            
-    print(f'total gradient_after:\n\n',np.round(total_gradient_after,10))'''
-
-
-    '''WF.do_adapt(
-        operator_pool = ["s","g"],
-        orbital_optimization = True,
-    )'''
-
-
-    '''exp_value_gradient_nonsplit = get_nonsplit_gradient_expvalue(
-            WF.ci_coeffs,
-            WF.ci_info,
+    '''E_tester = get_electronic_energy_generalized(
             WF.h_mo,
             WF.g_mo,
-            WF.num_spin_orbs,
-            WF.kappa_spin_idx,
+            WF.num_inactive_spin_orbs,
+            WF.num_active_spin_orbs,
+            WF.rdm1,
+            WF.rdm2,
         )
     
-    print(exp_value_gradient_nonsplit)'''
+    print(E_tester)'''
 
 
-    LR = generalized_naive.LinearResponse(WF, excitations="S")  #, excitations="SD")
+
+    LR = generalized_naive.LinearResponse(WF, excitations="SD")  #, excitations="SD")
     LR.calc_excitation_energies()
     print("Excitation energies")
     print(LR.excitation_energies)
@@ -697,11 +717,28 @@ def HCl():
 
 def HBr():
     geometry = """H  0.0   0.0  0.0;
-        Br  0.0  0.0  1.41443 """
+        Br  0.0  0.0  2.672 """
     #basis = "dyall-v2z"
     #basis = "cc-pvdz"
-    basis = "sto-3g"
-    active_space = ((18,18), 38)
+    #basis = "sto-6g"
+    #basis ="def2-svp"
+    #basis = "sto-3g"
+    basis = "cc-pvtz"
+    # basis = {
+    # 'H':  gto.basis.load('basis_hbr.nw', 'H'),
+    # 'Br': gto.basis.load('basis_hbr.nw', 'Br'),
+    # }
+    # basis = {
+    # 'H':  gto.basis.load('basis_hbr.nw', 'H'),
+    # 'Br': gto.basis.load('basis_hbr.nw', 'Br'),
+    # }
+    basis = {
+    'H':  gto.basis.load('nwchem_def2svp.nw', 'H'),
+    'Br': gto.basis.load('nwchem_def2svp.nw', 'Br'),
+    }
+    
+    #active_space = ((18,18), 38)
+    active_space = ((1,1), 4)
     charge = 0
     spin = 0
     #print("Restricted HBr")
@@ -710,12 +747,79 @@ def HBr():
     #)
     #print("Nonrelativistic HBr")
     NR(
-        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom",
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="au",
+    )
+
+def HF():
+    geometry = """H  0.0   0.0  0.0;
+        F  0.0  0.0  1.7328 """
+    #basis = "dyall-v2z"
+    #basis = "cc-pvdz"
+    #basis = "sto-6g"
+    #basis ="def2-svp"
+    #basis = "cc-pvdz"
+    basis = "6-31g"
+    #active_space = ((18,18), 38)
+    active_space = ((1,1), 4)
+    charge = 0
+    spin = 0
+    #print("Restricted HBr")
+    #restricted(
+    #    geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    #)
+    #print("Nonrelativistic HBr")
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="au",
     )
     
+def LiH():
+    geometry = """H  0.0   0.0  0.0;
+                  Li  0.0  0.0  3.015 """
+    #basis = "dyall-v2z"
+    #basis = "cc-pvdz"
+    basis = "sto-3g"
+    #basis ="def2-svp"
+    #basis = "cc-pvdz"
+    #basis = "6-31g"
+    #active_space = ((18,18), 38)
+    active_space = ((1,1), 4)
+    charge = 0
+    spin = 0
+    #print("Restricted HBr")
+    #restricted(
+    #    geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    #)
+    #print("Nonrelativistic HBr")
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="au",
+    )
+
+def OH():
+    geometry = """O  0.0   0.0  0.0;
+                  H  0.0  0.0  1.833 """
+    #basis = "dyall-v2z"
+    #basis = "cc-pvdz"
+    basis = "sto-3g"
+    #basis ="def2-svp"
+    #basis = "cc-pvdz"
+    #basis = "6-31g"
+    #active_space = ((18,18), 38)
+    active_space = ((1,1), 4)
+    charge = -1
+    spin = 2
+    #print("Restricted HBr")
+    #restricted(
+    #    geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+    #)
+    #print("Nonrelativistic HBr")
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="au",
+    )
+
+
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-HCl()
+OH()
 
 
 # h2o()

@@ -1,4 +1,5 @@
 import numpy as np
+import numba as nb
 
 from slowquant.unitary_coupled_cluster.ci_spaces import CI_Info
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
@@ -9,9 +10,10 @@ from slowquant.unitary_coupled_cluster.operators import (
 )
 from slowquant.unitary_coupled_cluster.util import UpsStructure ##AE
 from slowquant.unitary_coupled_cluster.operator_state_algebra import bitcount
+import numba as nb
 
 
-#@nb.jit(nopython=True)
+@nb.jit(nopython=True)
 def generalized_apply_operator(
     state: np.ndarray,
     anni_idxs: np.ndarray,
@@ -85,6 +87,7 @@ def generalized_apply_operator(
         tmp_state[det2idx[det]] += factor * (-1) ** phase_changes * state[i]
     return tmp_state
 
+
 def generalized_add_operator_matrix(
     op_mat: np.ndarray,
     anni_idxs: np.ndarray,
@@ -153,6 +156,7 @@ def generalized_add_operator_matrix(
                 continue
         op_mat[det2idx[det], i] += factor * (-1) ** phase_changes
     return op_mat
+
 
 def generalized_propagate_state(
     operators: list[FermionicOperator | str],
@@ -261,6 +265,7 @@ def generalized_propagate_state(
             # print('new state', new_state)
     return new_state
 
+
 def generalized_build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bool = False) -> np.ndarray:
     """Build matrix representation of operator.
 
@@ -308,6 +313,7 @@ def generalized_build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, d
             op.operators[fermi_label],
         )
     return op_mat
+
 
 def generalized_expectation_value(
     bra: np.ndarray,
@@ -399,6 +405,7 @@ def generalized_expectation_value_energy(
     #print("\n\n")
     return val.real
 
+
 def generalized_construct_ups_state(
     state: np.ndarray,
     ci_info: CI_Info,
@@ -469,6 +476,7 @@ def generalized_construct_ups_state(
         else:
             raise ValueError(f"Got unknown excitation type, {exc_type}")
     return out
+
 
 def generalized_construct_ups_state_test_anna(
     state: np.ndarray,
@@ -755,6 +763,7 @@ def generalized_propagate_unitary(
         raise ValueError(f"Got unknown excitation type, {exc_type}")
     return out
 
+
 def generalized_propagate_unitary_test_anna(
     state: np.ndarray,
     idx: int,
@@ -979,6 +988,7 @@ def generalized_get_grad_action(
     else:
         raise ValueError(f"Got unknown excitation type, {exc_type}")
     return tmp_R, tmp_I
+
 
 def generalized_get_grad_action_test_anna(
     state: np.ndarray,

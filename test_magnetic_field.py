@@ -375,15 +375,15 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     WF = GeneralizedWaveFunctionUPS(
         mol.nelectron,
         active_space,
-        c_u,
-        #c_MO,
+        #c_u,
+        c_MO,
         #h_core,
         h_core_pyscf,
         #h_core_tot,
         #hcoreB,
         g_eri,
         "fuccsd",
-        {"n_layers": 0, "is_spin_conserving" : False},
+        {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
@@ -763,10 +763,22 @@ def HBr():
     NR(
         geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom",
     )
-    
+
+def BeH():
+    geometry = """Be 0.0 0.0 0.0;
+                  H 0.0 0.0 1.3426"""
+    basis="sto-3g"
+    active_space = ((3,2),12)
+    charge = 0
+    spin = 1
+    NR(
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom",
+    )
+  
+
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-h2()
+BeH()
 
 
 # h2o()

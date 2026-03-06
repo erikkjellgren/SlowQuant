@@ -57,6 +57,8 @@ def read_zora_so(filename):
         zora_so       = [read_matrix(f, nbf) for _ in range(3)]
         zora_scale_so = [read_matrix(f, nbf) for _ in range(3)]
 
+    #print(zora_sf[0],"\n\n")
+    #print(zora_sf[1])
     # Assemble 4x4 ZORA Hamiltonian (from ga_fock_so source):
     # Im(H_aa) += +Vx,  Im(H_bb) += -Vx   [g_so(1) = x]
     # Re(H_ab) += +Vy,  Re(H_ba) += -Vy   [g_so(2) = y]
@@ -66,25 +68,25 @@ def read_zora_so(filename):
     Vz = zora_so[2]
 
     H_zora = np.zeros((2*nbf, 2*nbf), dtype=complex)
-    H_zora[:nbf,  :nbf]  = zora_sf[0].astype(complex) + 1j * Vx
-    H_zora[nbf:,  nbf:]  = zora_sf[1].astype(complex) - 1j * Vx
-    H_zora[:nbf,  nbf:]  =  Vy.astype(complex) + 1j * Vz
+    H_zora[:nbf,  :nbf]  =   zora_sf[0].astype(complex) + 1j * Vx
+    H_zora[nbf:,  nbf:]  =   zora_sf[1].astype(complex) - 1j * Vx
+    H_zora[:nbf,  nbf:]  =   Vy.astype(complex) + 1j * Vz
     H_zora[nbf:,  :nbf]  =  -Vy.astype(complex) + 1j * Vz
 
-    return H_zora # zora_scale_sf, zora_scale_so
+    return H_zora, zora_scale_sf, zora_scale_so
 
 
 if __name__ == "__main__":
     import sys
-    zora_filename = sys.argv[1] if len(sys.argv) > 1 else "my_zora_so.zora_so"
+    zora_filename = sys.argv[1] if len(sys.argv) > 1 else "H2_zora.zora_so"
 
-    H_zora= read_zora_so(zora_filename)
+    H_zora, sf, sf_scale, so_scale = read_zora_so(zora_filename)
 
     #print(f"nbf = {nbf}")
     print(f"H_zora shape: {H_zora.shape}")
     print(f"Hermiticity check: max|H_zora - H_zora†| = "
           f"{np.max(np.abs(H_zora - H_zora.conj().T)):.2e}")
-    print("\nNOTE: To complete the Hamiltonian add T + V_ne to diagonal blocks:")
-    print("  H_full = H_zora.copy()")
-    print("  H_full[:nbf, :nbf] += T_V")
-    print("  H_full[nbf:, nbf:] += T_V")
+
+    print(sf_scale)
+    print(sf)
+    #print(so_scale)
