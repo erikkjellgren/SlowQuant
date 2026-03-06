@@ -10,7 +10,7 @@ import scipy
 from slowquant.molecularintegrals.integralfunctions import (
     generalized_one_electron_transform,
     generalized_two_electron_transform,
-    DHF_one_electron_transform,
+    # DHF_one_electron_transform,
 )
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_generalized
 from slowquant.unitary_coupled_cluster.generalized_density_matrix import (

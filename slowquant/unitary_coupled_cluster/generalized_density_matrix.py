@@ -1185,7 +1185,7 @@ def get_orbital_response_static_property_gradient(
         Orbital part of static property gradient.
     """
     prop_grad = np.zeros((len(kappa_spin_idx), len(mo)), dtype=np.complex128)
-    for idx, (M, N) in enumerate(kappa_spin_idx):
+    for idx, (N, M) in enumerate(kappa_spin_idx):
         for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
             prop_grad[idx, :] += mo[:, N, P] * RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             prop_grad[idx, :] -= mo[:, P, M] * RDM1(P, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
