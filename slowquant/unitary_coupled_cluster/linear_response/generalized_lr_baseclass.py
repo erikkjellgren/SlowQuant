@@ -80,12 +80,12 @@ class LinearResponseBaseClass:
             # print("Excitation idx")
             for a, i in iterate_t1(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx, is_spin_conserving=False): ## -diagonal jf HJ. Cross?, # is_spin_conserving  AWE
                 self.G_ops.append(G1(i, a)) #AE from G1
-                # print('G1', i,a)
+                print('G1', i,a)
                 self.operator_labels_G.append(('G1',i,a))
         if "d" in excitations:
-            for a, i, b, j in iterate_t2(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx, is_spin_conserving=self.wf.ansatz_options["is_spin_conserving"]): 
+            for a, i, b, j in iterate_t2(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx, is_spin_conserving=False): 
                 self.G_ops.append(G2(i, j, a, b)) #AE from G2
-                # print('G2',i, j, a, b)
+                print('G2',i, j, a, b)
                 self.operator_labels_G.append(('G2',i,j,a,b))
         if "t" in excitations:
             for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
@@ -171,9 +171,9 @@ class LinearResponseBaseClass:
         # for i in range(len(self.hessian)):
         #     print(self.hessian[i][i], i)
                 
-        eigval, eigvec, sigma_eigs, keep = solve_lr_drop_sigma_null(self.hessian, self.metric, cut=1e-10)
+        # eigval, eigvec, sigma_eigs, keep = solve_lr_drop_sigma_null(self.hessian, self.metric, cut=1e-10)
 
-        # eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)     
+        eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)     
      
             
         #     # num=(eigvec.conj().T@(self.hessian)@eigvec)

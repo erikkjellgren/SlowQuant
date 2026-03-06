@@ -562,17 +562,23 @@ class LinearResponse(LinearResponseBaseClass):
         print(f"Symmetry check of B: max|B - B.T| = "
             f"{np.max(np.abs(self.B - self.B.T)):.2e}")  
         
-        print(f"Hermiticity check of A qq: max|A - A†| = "
-            f"{np.max(np.abs(self.A[:idx_shift,:idx_shift] - self.A[:idx_shift,:idx_shift].conj().T)):.2e}")  
+                        
+        print("H shape:", E2.shape)
+        print("sigma shape:", self.Sigma.shape)
+        print("H diagonal:", np.diag(E2).real)
+        print("sigma diagonal:", np.diag(self.Sigma).real)
         
-        print(f"Hermiticity check of A qG: max|A - A†| = "
-            f"{np.max(np.abs(self.A[:idx_shift,idx_shift:] - self.A[idx_shift:,:idx_shift].conj().T)):.2e}") 
+        # print(f"Hermiticity check of A qq: max|A - A†| = "
+        #     f"{np.max(np.abs(self.A[:idx_shift,:idx_shift] - self.A[:idx_shift,:idx_shift].conj().T)):.2e}")  
+        
+        # print(f"Hermiticity check of A qG: max|A - A†| = "
+        #     f"{np.max(np.abs(self.A[:idx_shift,idx_shift:] - self.A[idx_shift:,:idx_shift].conj().T)):.2e}") 
 
-        print(f"Symmetry check of B qq: max|B - B.T| = "
-            f"{np.max(np.abs(self.B[:idx_shift,:idx_shift] - self.B[:idx_shift,:idx_shift].T)):.2e}") 
+        # print(f"Symmetry check of B qq: max|B - B.T| = "
+        #     f"{np.max(np.abs(self.B[:idx_shift,:idx_shift] - self.B[:idx_shift,:idx_shift].T)):.2e}") 
 
-        print(f"Symmetry check of B qG: max|B - B.T| = "
-            f"{np.max(np.abs(self.B[:idx_shift,idx_shift:] - self.B[idx_shift:,:idx_shift].T)):.2e}") 
+        # print(f"Symmetry check of B qG: max|B - B.T| = "
+        #     f"{np.max(np.abs(self.B[:idx_shift,idx_shift:] - self.B[idx_shift:,:idx_shift].T)):.2e}") 
         
         #print(np.round(np.diag(Hessian_matrix),5))
 
@@ -601,8 +607,8 @@ class LinearResponse(LinearResponseBaseClass):
 #         )  # Delta er defineret her fordi den ellers har forkert dimension i unrestricted_lr_baseclass.py
 
                 
-                
-                
+
+                                
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.
 
