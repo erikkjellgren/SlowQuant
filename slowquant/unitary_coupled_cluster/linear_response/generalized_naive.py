@@ -568,9 +568,6 @@ class LinearResponse(LinearResponseBaseClass):
         print("H diagonal:", np.diag(E2).real)
         print("sigma diagonal:", np.diag(self.Sigma).real)
         
-        # print(f"Hermiticity check of A qq: max|A - A†| = "
-        #     f"{np.max(np.abs(self.A[:idx_shift,:idx_shift] - self.A[:idx_shift,:idx_shift].conj().T)):.2e}")  
-        
         # print(f"Hermiticity check of A qG: max|A - A†| = "
         #     f"{np.max(np.abs(self.A[:idx_shift,idx_shift:] - self.A[idx_shift:,:idx_shift].conj().T)):.2e}") 
 

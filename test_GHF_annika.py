@@ -189,7 +189,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     nmo = uhf.mo_coeff[0].shape[1]
 
     # small random anti-Hermitian
-    epsilon = .6  # controls "step size"
+    epsilon = 0.0  # controls "step size"
     X = np.random.randn(nmo, nmo) + 1j*np.random.randn(nmo, nmo)
     A = epsilon * (X - X.conj().T)/2  # make anti-Hermitian
     # unitary
@@ -207,10 +207,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
     mf = scf.GHF(mol)
-    mf.chkfile = '/home/annika4ee/SlowQuant/uhf_guess.chk'
+    #mf.chkfile = '/home/annika4ee/SlowQuant/uhf_guess.chk'
 
     # Change initial guess:
-    mf.init_guess = "chkfile"
+    #mf.init_guess = "chkfile"
     mf.conv_tol = 1e-8        # Energy convergence (Hartree)
     mf.conv_tol_grad = 1e-8   # Optional: gradient convergence
     mf.max_cycle = 1000
@@ -218,6 +218,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     mf.scf()
     mf.kernel()
     c=np.array(mf.mo_coeff,dtype=complex)
+
+
 
     h_core = mol.intor("int1e_kin") + mol.intor("int1e_nuc")
     h_1e = mol.intor("int1e_kin")
@@ -238,6 +240,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     c_u = c @ U_step
 
+
+    print(np.round(c.real,3))
 
 
     WF = GeneralizedWaveFunctionUPS(

@@ -191,7 +191,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     nmo = uhf.mo_coeff[0].shape[1]
 
     # small random anti-Hermitian
-    epsilon = 0.6  # controls "step size"
+    epsilon = 0.0  # controls "step size"
     X = np.random.randn(nmo, nmo) + 1j*np.random.randn(nmo, nmo)
     A = epsilon * (X - X.conj().T)/2  # make anti-Hermitian
     # unitary
@@ -359,7 +359,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # # Slowquant
 
      # small random anti-Hermitian
-    eps = 0.5  # controls "step size"
+    eps = 0.7  # controls "step size"
     X_anti = np.random.randn(c_MO.shape[0],c_MO.shape[0]) + 1j*np.random.randn(c_MO.shape[0],c_MO.shape[0])
     A_mat = eps * (X_anti - X_anti.conj().T)/2  # make anti-Hermitian
 
@@ -383,7 +383,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         #hcoreB,
         g_eri,
         "fuccsd",
-        {"n_layers": 1, "is_spin_conserving" : False},
+        {"n_layers": 0, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
@@ -614,7 +614,7 @@ def h2():
         f.write(dyall2zp_H)
         f.close()
     #basis = {'H': gto.basis.load('dyall2zp_H.nwchem', 'H')}
-    active_space = ((1, 1),8)
+    active_space = ((1, 1),2)
     #active_space = (2, 4)
     charge = 0
     spin = 0
@@ -637,7 +637,7 @@ def h3():
     #basis = "631-g"
     basis = "sto-6g"
     #basis = ""
-    active_space = ((1, 0), 2)
+    active_space = ((1, 2), 4)
     #active_space = (2, 4)
     charge = 0
     spin = 1
@@ -768,7 +768,7 @@ def BeH():
     geometry = """Be 0.0 0.0 0.0;
                   H 0.0 0.0 1.3426"""
     basis="sto-3g"
-    active_space = ((3,2),12)
+    active_space = ((2,3),5)
     charge = 0
     spin = 1
     NR(
@@ -778,7 +778,7 @@ def BeH():
 
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-BeH()
+h3()
 
 
 # h2o()
