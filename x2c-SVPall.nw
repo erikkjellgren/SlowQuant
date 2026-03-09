@@ -1,0 +1,22 @@
+ #----------------------------------------------------------------------
+# Basis Set Exchange
+# Version 0.12
+# https://www.basissetexchange.org
+#----------------------------------------------------------------------
+#   Basis set: x2c-SV(P)all-s
+# Description: All-electron relativistic split-valence for NMR
+#                    shielding
+#        Role: orbital
+#     Version: 1  (Data from Supporting info)
+#----------------------------------------------------------------------
+
+
+BASIS "ao basis" SPHERICAL PRINT
+#BASIS SET: (4s) -> [2s]
+H    S
+     13.010701000            0.19682158000E-01
+      1.9622572000           0.13796524000
+      0.44453796000          0.47831935000
+H    S
+      0.12194962000          1.0000000000
+END
