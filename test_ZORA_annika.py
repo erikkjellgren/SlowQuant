@@ -6,6 +6,7 @@ from pyscf.lib import chkfile
 from scipy.linalg import expm
 import basis_set_exchange as bse
 from zora_build_new import read_zora_so
+from zora_build_new_sf import read_zora_sf
 import struct
 from pyscf.dft import mura_knowles, gen_grid, gauss_chebyshev
 
@@ -206,117 +207,159 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     data['mo_coeff'] = c_guess
 
     # dump everything back into a new chkfile
-    chkfile.dump('/home/annika4ee/SlowQuant/uhf_guess.chk','scf', data)
+    #chkfile.dump('/home/annika4ee/SlowQuant/uhf_guess.chk','scf', data)
+
+
+    
+    # RKS:
+    h_core_pyscf_1dim = mol.intor('int1e_kin') + mol.intor('int1e_nuc')
+
+    H_zora_so, H_zora_sf = read_zora_so("HI_SO.zora_so")
+
+    h_core_sf_1dim = H_zora_sf[:mol.nao,:mol.nao]
+
+    
+    mf_nr = scf.RKS(mol)
+    mf_nr.xc = 'PBE0'
+    mf_nr.conv_tol = 1e-8
+    mf_nr.conv_tol = 1e-8        # Energy convergence (Hartree)
+    mf_nr.conv_tol_grad = 1e-8   # Optional: gradient convergence
+    mf_nr.max_cycle = 1000
+    mf_nr.grids.atom_grid = {
+    'H':  (99, 434),
+    'I':  (99, 434),
+    }
+    #mf_nr.grids.prune = None
+    mf_nr.grids.radi_method = mura_knowles 
+    #mf_nr.grids.radii_adjust = None
+    mf_nr.grids.becke_scheme = gen_grid.stratmann 
+    mf_nr.grids.build()
+
+    mf_nr.kernel()
 
 
 
 
-    # mf_nr = scf.GKS(mol)
-    # mf_nr.xc = 'hf'
-    # mf_nr.conv_tol = 1e-10
-    # mf_nr.kernel()
-    # dm0 = mf_nr.make_rdm1()
+    mf_nr = scf.RKS(mol)
+    mf_nr.xc = 'PBE0'
+    mf_nr.conv_tol = 1e-8        # Energy convergence (Hartree)
+    mf_nr.conv_tol_grad = 1e-8   # Optional: gradient convergence
+    mf_nr.max_cycle = 1000
+    mf_nr.grids.atom_grid = {
+    'H':  (99, 434),
+    'I':  (99, 434),
+    }
+    #mf_nr.grids.prune = None
+    mf_nr.grids.radi_method = mura_knowles 
+    #mf_nr.grids.radii_adjust = None
+    mf_nr.grids.becke_scheme = gen_grid.stratmann 
+    mf_nr.grids.build()
+
+    mf_nr.get_hcore = lambda *args: h_core_pyscf_1dim + h_core_sf_1dim
+
+    mf_nr.kernel()
+
+
+
+    chkfile.dump('/home/annika4ee/SlowQuant/uhf_guess.chk','dft', mf_nr.mo_coeff)
 
 
 
 
-    mf = scf.GHF(mol)
-    #mf.xc = "hf"
-    mf.chkfile = '/home/annika4ee/SlowQuant/uhf_guess.chk'
+
+    mf = scf.GKS(mol)
+    mf.xc = "pbe0"
+    #mf.chkfile = '/home/annika4ee/SlowQuant/uhf_guess.chk'
 
     # Change initial guess:
-    mf.init_guess = "chkfile"
-    mf.conv_tol = 1e-10        # Energy convergence (Hartree)
-    mf.conv_tol_grad = 1e-10   # Optional: gradient convergence
+    #mf.init_guess = "chkfile"
+    mf.conv_tol = 1e-8        # Energy convergence (Hartree)
+    mf.conv_tol_grad = 1e-8   # Optional: gradient convergence
     mf.max_cycle = 1000
     # mf.grids.atom_grid = {
     #     'H':  (70, 194),
     #     'Li': (70, 194),
     # }
 
-    # mf.grids.atom_grid = {
-    # 'H':  (205, 1454),
-    # 'F': (205, 1454),
-    # }
+    mf.grids.atom_grid = {
+    'H':  (99, 434),
+    'I':  (99, 434),
+    }
 
-    # # Key: control small density cutoff
-    # mf.grids.eps = 1e-12          # default 1e-14; larger -> lower accuracy
+    # Key: control small density cutoff
+    #mf.grids.eps = 1e-14          # default 1e-14; larger -> lower accuracy
 
-    # # Key: control XC functional interpolation
-    # mf._numint._cint.libcint_precision = 1e-12   # controls integral precision
-    # mf.grids.prune = None
-    # mf.grids.radi_method = mura_knowles 
-    # mf.grids.radii_adjust = None
-    # mf.grids.becke_scheme = gen_grid.stratmann 
-    # mf.grids.build()
+    # Key: control XC functional interpolation
+    #mf._numint._cint.libcint_precision = 1e-14   # controls integral precision
+    mf.grids.prune = True
+    mf.grids.radi_method = mura_knowles 
+    mf.grids.radii_adjust = None
+    mf.grids.becke_scheme = gen_grid.stratmann 
+    mf.grids.build()
 
     
-    T = mol.intor("int1e_kin")
-    T_2c = np.kron(np.eye(2), T)
+    # T = mol.intor("int1e_kin")
+    # T_2c = np.kron(np.eye(2), T)
 
-    V = mol.intor("int1e_nuc")
-    V_2c = np.kron(np.eye(2), V)
+    # V = mol.intor("int1e_nuc")
+    # V_2c = np.kron(np.eye(2), V)
 
-    px = -1j * mol.intor('int1e_ipovlp', comp=3)[0]
-    py = -1j * mol.intor('int1e_ipovlp', comp=3)[1]
-    pz = -1j * mol.intor('int1e_ipovlp', comp=3)[2]
+    # px = -1j * mol.intor('int1e_ipovlp', comp=3)[0]
+    # py = -1j * mol.intor('int1e_ipovlp', comp=3)[1]
+    # pz = -1j * mol.intor('int1e_ipovlp', comp=3)[2]
 
-    PxVPx = px.conj().T @ V @ px
-    PyVPy = py.conj().T @ V @ py
-    PzVPz = pz.conj().T @ V @ pz
+    # PxVPx = px.conj().T @ V @ px
+    # PyVPy = py.conj().T @ V @ py
+    # PzVPz = pz.conj().T @ V @ pz
 
-    PxVPy = px.conj().T @ V @ py
-    PxVPz = px.conj().T @ V @ pz
+    # PxVPy = px.conj().T @ V @ py
+    # PxVPz = px.conj().T @ V @ pz
 
-    PyVPx = py.conj().T @ V @ px
-    PyVPz = py.conj().T @ V @ pz
+    # PyVPx = py.conj().T @ V @ px
+    # PyVPz = py.conj().T @ V @ pz
 
-    PzVPx = pz.conj().T @ V @ px
-    PzVPy = pz.conj().T @ V @ py
+    # PzVPx = pz.conj().T @ V @ px
+    # PzVPy = pz.conj().T @ V @ py
 
-    c = lib.param.LIGHT_SPEED
+    # c = lib.param.LIGHT_SPEED
 
-    sigma_x = np.array([[0, 1],
-                    [1, 0]], dtype=complex)
+    # sigma_x = np.array([[0, 1],
+    #                 [1, 0]], dtype=complex)
 
-    sigma_y = np.array([[0, -1j],
-                    [1j,  0]], dtype=complex)
+    # sigma_y = np.array([[0, -1j],
+    #                 [1j,  0]], dtype=complex)
 
-    sigma_z = np.array([[1,  0],
-                    [0, -1]], dtype=complex)
+    # sigma_z = np.array([[1,  0],
+    #                 [0, -1]], dtype=complex)
     
-    scalar = PxVPx + PyVPy + PzVPz
+    # scalar = PxVPx + PyVPy + PzVPz
 
-    scalar_2c = np.kron(np.eye(2), scalar)
+    # scalar_2c = np.kron(np.eye(2), scalar)
 
-    Wx = PyVPz - PzVPy
-    Wy = PzVPx - PxVPz
-    Wz = PxVPy - PyVPx
+    # Wx = PyVPz - PzVPy
+    # Wy = PzVPx - PxVPz
+    # Wz = PxVPy - PyVPx
 
-    soc_2c = (np.kron(sigma_x, 1j * Wx) + np.kron(sigma_y, 1j * Wy) + np.kron(sigma_z, 1j * Wz))
+    # soc_2c = (np.kron(sigma_x, 1j * Wx) + np.kron(sigma_y, 1j * Wy) + np.kron(sigma_z, 1j * Wz))
 
 
-    W_0 = 0.25*(1/c**2)*(scalar_2c+soc_2c) # Remember to put back the soc_2c!!
+    # W_0 = 0.25*(1/c**2)*(scalar_2c+soc_2c) # Remember to put back the soc_2c!!
 
-    #W = np.linalg.inv(np.linalg.inv(W_0) - np.linalg.inv(T_2c))
+    # #W = np.linalg.inv(np.linalg.inv(W_0) - np.linalg.inv(T_2c))
  
-    #hcore = T_2c + W + V_2c
+    # #hcore = T_2c + W + V_2c
 
 
 
 
-
-    nbf = mol.nao
-
-
-
-
-
-    h_core_pyscf_1dim = mol.intor('int1e_kin') + mol.intor('int1e_nuc')
 
     h_core_pyscf = np.kron(np.eye(2), h_core_pyscf_1dim)
 
-    H_zora, zora_scale_sf, zora_scale_so = read_zora_so("LiH_sto-3g_LiH.zora_so")
+    h_core_tot = (h_core_pyscf + H_zora_so)
+
+    mf.get_hcore = lambda *args: h_core_tot
+
+    mf.kernel()
 
 
 
@@ -333,12 +376,45 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # H_ZORA_scaled = H_zora / (norms_2c[:, None] * norms_2c[None, :])
 
 
+    # One-electron energy: T + Vne
 
 
 
-    # h_core_tot = (h_core_pyscf + H_zora)
+    
 
-    #mf.get_hcore = lambda *args: h_core_tot
+
+
+    # Get 2c density matrix
+    dm0 = mf.make_rdm1()
+    dms = [dm0]
+
+    # One-electron energy
+    hcore = mf.get_hcore()
+    e_one = (dm0 @ hcore).trace().real
+
+    # Exchange-Correlation energy — use get_veff and extract exc directly
+    veff = mf.get_veff(mf.mol, dm0)
+    exc = veff.exc  # XC energy stored on the veff object
+
+    # Coulomb energy
+    ecoul = veff.ecoul
+
+    # Nuclear repulsion
+    e_nuc = mf.mol.energy_nuc()
+
+    # Total energy
+    e_tot = e_one + ecoul + exc + e_nuc
+
+    print("=== 2c GKS Energy Breakdown ===")
+    print(f"One electron energy      = {e_one.real:20.12f} Eh")
+    print(f"Coulomb energy           = {ecoul:20.12f} Eh")
+    print(f"Exchange-Corr. energy    = {exc:20.12f} Eh")
+    print(f"Nuclear repulsion energy = {e_nuc:20.12f} Eh")
+    print(f"Total DFT energy         = {e_tot.real:20.12f} Eh")
+    print("================================\n")
+
+
+
 
 
     # # Standard overlap from PySCF
@@ -438,7 +514,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
 
-    mf.kernel()
+    
 
     
 
@@ -544,7 +620,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print(test_energy3)'''
 
 
-    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-8, maxiter = 10000)
+    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
 
 
     '''E_tester = get_electronic_energy_generalized(
@@ -681,9 +757,20 @@ def h2o():
 
 def HI():
     geometry = """H  0.0   0.0  0.0;
-        I  0.0  0.0  1.60916 """
+        I  0.0  0.0  3.04 """
     #basis = "dyall-v2z"
-    basis = "cc-pvdz"
+    #basis = "cc-pvdz"
+    dyall = bse.get_basis('dyall-acv3z', elements=['I'], fmt='nwchem')
+    with open('dyall.nwchem', 'w') as f:
+        f.write(dyall)
+        f.close()
+    basis = {
+    'H':  "def2-svp",
+    #'I': bse.get_basis('jorge-dzp-zora', elements=['I'], fmt='nwchem'),
+    #'I':  "def2-tzvppd",
+    #'I': "tzp-zora",
+    'I':  gto.basis.load('dyall_I.nw', 'I'),
+    }
     active_space = (4, 6)
     charge = 0
     spin = 0
@@ -694,7 +781,7 @@ def HI():
     #)
     print("Nonrelativistic HI")
     NR(
-        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom"
+        geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="au"
     )
 
 def HCl():
@@ -721,9 +808,9 @@ def HBr():
     #basis = "dyall-v2z"
     #basis = "cc-pvdz"
     #basis = "sto-6g"
-    #basis ="def2-svp"
+    basis ="def2-svp"
     #basis = "sto-3g"
-    basis = "cc-pvtz"
+    #basis = "cc-pvtz"
     # basis = {
     # 'H':  gto.basis.load('basis_hbr.nw', 'H'),
     # 'Br': gto.basis.load('basis_hbr.nw', 'Br'),
@@ -732,10 +819,10 @@ def HBr():
     # 'H':  gto.basis.load('basis_hbr.nw', 'H'),
     # 'Br': gto.basis.load('basis_hbr.nw', 'Br'),
     # }
-    basis = {
-    'H':  gto.basis.load('nwchem_def2svp.nw', 'H'),
-    'Br': gto.basis.load('nwchem_def2svp.nw', 'Br'),
-    }
+    # basis = {
+    # 'H':  gto.basis.load('nwchem_def2svp.nw', 'H'),
+    # 'Br': gto.basis.load('nwchem_def2svp.nw', 'Br'),
+    # }
     
     #active_space = ((18,18), 38)
     active_space = ((1,1), 4)
@@ -819,7 +906,7 @@ def OH():
 
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-OH()
+h2()
 
 
 # h2o()
