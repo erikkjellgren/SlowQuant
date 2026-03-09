@@ -435,7 +435,7 @@ class GeneralizedWaveFunctionUPS:
         if self._h_mo is None:
 
 
-            self._h_mo = DHF_one_electron_transform(self.c_mo, self._h_ao)
+            self._h_mo = generalized_one_electron_transform(self.c_mo, self._h_ao)
         return self._h_mo
 
     @property

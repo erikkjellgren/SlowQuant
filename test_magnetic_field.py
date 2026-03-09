@@ -637,7 +637,7 @@ def h3():
     #basis = "631-g"
     basis = "sto-6g"
     #basis = ""
-    active_space = ((1, 2), 3)
+    active_space = ((1, 2), 4)
     #active_space = (2, 4)
     charge = 0
     spin = 1
@@ -778,7 +778,7 @@ def BeH():
 
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-BeH()
+h3()
 
 
 # h2o()
