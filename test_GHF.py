@@ -4,6 +4,8 @@ from pyscf import mcscf, scf, gto, x2c
 from scipy.stats import unitary_group
 from scipy.linalg import solve
 from pyscf.x2c import sfx2c1e
+from pyscf import cc
+
 # from pyscf.x2c.x2c import dip_moment
 
 # from slowquant.unitary_coupled_cluster.unrestricted_ups_wavefunction import UnrestrictedWaveFunctionUPS
@@ -31,17 +33,18 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # mf = scf.GHF(mol).sfx2c1e() #spinfree
     # mf = scf.GHF(mol).x2c()
     # mf = scf.GHF(mol).x2c
+
     
-    # mf = scf.GHF(mol)
+    mf = scf.GHF(mol)
 
-    # mf.conv_tol_grad = 1e-10 #gradient tolerance form PYSCF
-    # mf.max_cycle = 50000
+    mf.conv_tol_grad = 1e-10 #gradient tolerance form PYSCF
+    mf.max_cycle = 50000
 
-    # mf.scf()
-    # mf.kernel()
-    # coeff=np.array(mf.mo_coeff, dtype=complex)
+    mf.scf()
+    mf.kernel()
+    coeff=np.array(mf.mo_coeff, dtype=complex)
     # print(np.round(np.array(mf.mo_coeff),3))
-    # print(pyscf.__version__)
+
     
     
     # dip_ao_picture_changed = mf.with_x2c.picture_change(('int1e_r_spinor',
@@ -121,17 +124,17 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 #     coeff[len(a_coeff):,len(a_coeff):] = b_coeff
 
     #H3 STO-3G ((2,1),6)
-    a_coeff = np.array([[ 3.74625869e-01, -5.98253789e-01,  9.96507453e-01],
- [ 3.74627020e-01, -5.98267504e-01, -9.96498786e-01],
- [ 4.75551085e-01,  1.12478016e+00, -7.46562486e-06]], dtype=complex)
+#     a_coeff = np.array([[ 3.74625869e-01, -5.98253789e-01,  9.96507453e-01],
+#  [ 3.74627020e-01, -5.98267504e-01, -9.96498786e-01],
+#  [ 4.75551085e-01,  1.12478016e+00, -7.46562486e-06]], dtype=complex)
     
-    b_coeff = np.array([[ 4.86934286e-01,  9.96504863e-01, -5.11030627e-01],
- [ 4.86929093e-01, -9.96501377e-01, -5.11042372e-01],
- [ 2.40466742e-01, -7.68214821e-06,  1.19726981e+00]], dtype=complex)
+#     b_coeff = np.array([[ 4.86934286e-01,  9.96504863e-01, -5.11030627e-01],
+#  [ 4.86929093e-01, -9.96501377e-01, -5.11042372e-01],
+#  [ 2.40466742e-01, -7.68214821e-06,  1.19726981e+00]], dtype=complex)
 
-    # coeff = np.zeros((2*len(a_coeff),2*len(a_coeff)))
-    # coeff[:len(a_coeff), :len(a_coeff)] = a_coeff
-    # coeff[len(a_coeff):,len(a_coeff):] = b_coeff
+#     coeff = np.zeros((2*len(a_coeff),2*len(a_coeff)))
+#     coeff[:len(a_coeff), :len(a_coeff)] = a_coeff
+#     coeff[len(a_coeff):,len(a_coeff):] = b_coeff
 
     # coeff[0::2, :len(a_coeff)] = a_coeff.T   # even rows: columns of a in left block
     # coeff[1::2, len(a_coeff):] = b_coeff.T   # odd rows: columns of b in right block
@@ -141,10 +144,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # coeff[:len(a_coeff), 0::2] = a_coeff
     # coeff[len(a_coeff):, 1::2] = b_coeff
 
-    n = len(a_coeff)
-    coeff = np.zeros((2*n, 2*n), dtype=complex)
-    coeff[:n, 0::2] = a_coeff   # alpha AOs, even columns = alpha MOs
-    coeff[n:, 1::2] = b_coeff   # beta AOs, odd columns = beta MOs
+    # n = len(a_coeff)
+    # coeff = np.zeros((2*n, 2*n), dtype=complex)
+    # coeff[:n, 0::2] = a_coeff   # alpha AOs, even columns = alpha MOs
+    # coeff[n:, 1::2] = b_coeff   # beta AOs, odd columns = beta MOs
 
     # # Slowquant
     
@@ -155,11 +158,11 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         #C_u,
         h_core,
         g_eri,
-        "fUCCSD",
+        "fUCCSDT",
         {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
-    # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
+    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
 
     # print(WF.c_mo)
 
@@ -168,12 +171,12 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("E_opt:", WF._energy_elec)
     # print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
     
+    print(WF.ci_coeffs)
   
     "Calculate Excitation energies"
-    LR = generalized_naive.LinearResponse(WF, excitations="sd")
+    LR = generalized_naive.LinearResponse(WF, excitations="sdt")
     LR.calc_excitation_energies()
     print(LR.excitation_energies)
-    
     
     # # "Calculate polarizability"
     # prop_grad = LR.get_property_gradient(dip_ao)
@@ -241,7 +244,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
-    basis = "sto-3g"
+    basis = "631-g"
     active_space = ((1, 1), 4) #spin orbitaler or spinor basis
     # active_space = (2, 4)
     charge = 0
@@ -366,7 +369,7 @@ def oh_radical():
     geometry = """O  0.0   0.0  0.0;
         H  0.0  0.0  0.9697;"""
     basis = 'sto-3g'
-    active_space = ((2,1),6)
+    active_space = ((5,4),12)
     charge = 0
     spin=1
     NR(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
@@ -381,12 +384,12 @@ def BeH():
     NR(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
 
 
-h3()
+# h3()
 # h2()
 # h4_rektangle()
 # HI()
 # HBr()
-# oh_radical()
+oh_radical()
 # BeH()
 # h2o()
 

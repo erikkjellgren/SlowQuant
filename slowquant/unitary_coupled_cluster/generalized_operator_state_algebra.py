@@ -796,7 +796,7 @@ def generalized_propagate_unitary_test_anna(
     offset = ci_info.space_extension_offset
     if abs(theta) < 1e-12: # OBS!!! was 1e-14 AE CHANGED!!
         return np.copy(state)
-    if exc_type in ("single", "double"):
+    if exc_type in ("single", "double", "triple"):
         # Create T matrix
         if exc_type == "single":
             (i, a) = np.array(exc_indices) + 2 * offset
@@ -806,6 +806,11 @@ def generalized_propagate_unitary_test_anna(
             (i, j, a, b) = np.array(exc_indices) + 2 * offset
             T = G2_generalized(i, j, a, b, False)
             T_dag = G2_generalized(i, j, a, b, True)
+        elif exc_type == "triple":
+            (i, j, k, a, b, c) = np.array(exc_indices) + 2 * offset
+            T = G3(i, j, k, a, b, c, False)
+            T_dag = G3(i, j, k, a, b, c, True)
+
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Analytical application on state vector
