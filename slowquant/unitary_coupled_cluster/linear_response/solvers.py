@@ -53,7 +53,7 @@ class Davidson(Solvers):
 
     def solve(
         self,
-        right_transform: Callable[[np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]],
+        right_transform: Callable[[np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray]],
         preconditioner: Sequence[np.ndarray],
         max_iteration: int,
         tolerance: float,
@@ -101,8 +101,8 @@ class Davidson(Solvers):
         for _ in range(max_iteration):
             self._iteration += 1
 
-            Ab, Bb, Sb, Db = right_transform(trial)
-            self._add_iteration_data(trial, Ab, Bb, Sb, Db)
+            sigma_plus, sigma_minus, tau_minus = right_transform(trial)
+            self._add_iteration_data(trial, sigma_plus, sigma_minus, tau_minus)
             omega, X, R_plus, R_minus = self._compute_residual_vectors(n_roots)
             converged, res_norms = self._check_convergence(R_plus, tolerance)
 
@@ -124,27 +124,25 @@ class Davidson(Solvers):
                 if not is_silent:
                     print(f"Davidson iter {self._iteration+1:4d}: subspace dimension {self._trial.shape[1]+trial.shape[1]} exceeds max_red_space {max_reduced_space}, restarting with current Ritz vectors")
                 self._trial = self._orthonormalize(X[:dim, :] + X[dim:, :])
-                self._Ab, self._Bb, self._Sb, self._Db = right_transform(self._trial)
+                self._sigma_plus, self._sigma_minus, self._tau_minus = right_transform(self._trial)
 
             if not is_silent:
                 self._print_iteration_info(res_norms, omega, tolerance)
 
         raise RuntimeError(f"Davidson did not converge.")
 
-    def _add_iteration_data(self, trial: np.ndarray, Ab: np.ndarray, Bb: np.ndarray, Sb: np.ndarray, Db: np.ndarray) -> None:
+    def _add_iteration_data(self, trial: np.ndarray, sigma_plus: np.ndarray, sigma_minus: np.ndarray, tau_minus: np.ndarray) -> None:
         """Add Z, Y, Ab, Bb, Sb, and Db matrices for the current iteration to the arrays."""
         if self._iteration == 1:
             self._trial = trial.copy()
-            self._Ab = Ab.copy()
-            self._Bb = Bb.copy()
-            self._Sb = Sb.copy()
-            self._Db = Db.copy()
+            self._sigma_plus = sigma_plus.copy()
+            self._sigma_minus = sigma_minus.copy()
+            self._tau_minus = tau_minus.copy()
         else:
             self._trial = np.hstack((self._trial, trial))
-            self._Ab = np.hstack((self._Ab, Ab))
-            self._Bb = np.hstack((self._Bb, Bb))
-            self._Sb = np.hstack((self._Sb, Sb))
-            self._Db = np.hstack((self._Db, Db))
+            self._sigma_plus = np.hstack((self._sigma_plus, sigma_plus))
+            self._sigma_minus = np.hstack((self._sigma_minus, sigma_minus))
+            self._tau_minus = np.hstack((self._tau_minus, tau_minus))
 
     @staticmethod
     def _orthonormalize(trial: np.ndarray) -> np.ndarray:
@@ -190,15 +188,10 @@ class Davidson(Solvers):
                 v[:, degen_idx[1::2]] = v[:, degen_idx[1::2]].imag
             return w.real, v.real
 
-        sigma_plus = lambda: self._Ab + self._Bb
-        sigma_minus = lambda: self._Ab - self._Bb
-        tau_plus = lambda: self._Sb + self._Db
-        tau_minus = lambda: self._Sb - self._Db
-
-        E_plus = 2 * self._trial.conj().T @ sigma_plus()
-        E_minus = 2 * self._trial.conj().T @ sigma_minus()
+        E_plus = 2 * self._trial.conj().T @ self._sigma_plus
+        E_minus = 2 * self._trial.conj().T @ self._sigma_minus
         # S_plus = S_minus.T
-        S_minus = 2 * self._trial.conj().T @ tau_minus()
+        S_minus = 2 * self._trial.conj().T @ self._tau_minus
 
         E = np.block([
             [E_plus, np.zeros_like(E_minus)],
@@ -234,8 +227,9 @@ class Davidson(Solvers):
         x_minus /= norm
         X = np.vstack((self._trial @ (x_plus + x_minus), self._trial @ (x_plus - x_minus)))
 
-        R_plus = sigma_plus() @ x_plus - tau_plus() @ x_minus * omega
-        R_minus = sigma_minus() @ x_minus - tau_minus() @ x_plus * omega
+        # tau_plus = tau_minus
+        R_plus = self._sigma_plus @ x_plus - self._tau_minus @ x_minus * omega
+        R_minus = self._sigma_minus @ x_minus - self._tau_minus @ x_plus * omega
 
         return omega, X, R_plus, R_minus
 

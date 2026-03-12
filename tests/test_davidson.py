@@ -49,12 +49,15 @@ def test_lih_naive():
     Sigma = LR_naive.Sigma
     Delta = LR_naive.Delta
 
-    def right_transform(trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def right_transform(trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         Ab = A @ trial
         Bb = B @ trial.conj()
         Sb = Sigma @ trial
-        Db = Delta @ trial.conj()
-        return Ab, Bb, Sb, Db
+
+        sigma_plus = Ab + Bb
+        sigma_minus = Ab - Bb
+        tau_minus = Sb
+        return sigma_plus, sigma_minus, tau_minus
 
     d = Davidson()
     eigvals, eigvecs = d.solve(
