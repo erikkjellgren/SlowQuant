@@ -3,6 +3,7 @@ from collections.abc import Sequence
 import numpy as np
 import scipy
 
+import scipy.linalg as la
 from slowquant.unitary_coupled_cluster.ci_spaces import CI_Info
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.operators import (
@@ -147,8 +148,27 @@ class LinearResponseBaseClass:
         print(f"Smallest diagonal element in the metric: {np.min(np.abs(np.diagonal(self.Sigma)))}")
 
         self.hessian = E2
+        print("removed", ((len(self.q_ops)+ len(self.G_ops))*2) - len(self.hessian) )
         self.metric = S
         eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)
+
+        # for i in range(len(eigval)):
+        #     # print("eigenvalue", eigval[idx])
+        #     # print(max(abs(eigvec[:, idx])), np.argmax(max(abs(eigvec[:,idx]))))
+        #     vec=eigvec[:,i]
+        #     # for j in range(len(vec)):
+        #     #     print(vec[j], self.operator_labels[j])
+        #     print("eigenval", eigval[i])
+        #     # print(max(abs(vec)), np.argmax(abs(vec)))
+        #     # k = np.argmax(np.abs(vec))
+        #     print('Max value eigvec', max(abs(vec)), 'Max value eigvec index', np.argmax(abs(vec)))
+        #     k = np.argmax(np.abs(vec))
+        #     # print("dominant operator:", self.operator_labels[k])
+        # eigval, eigvec, sigma_eigs, keep = solve_lr_drop_sigma_null(self.hessian, self.metric, cut=1e-10)
+        # print("dropped directions:", np.sum(~keep))
+        # print("kept directions:", np.sum(keep))
+        # print("all eigenvalues", eigval)
+        # print("eigenvectors", eigvec)
         sorting = np.argsort(eigval)
         self.excitation_energies = np.real(eigval[sorting][size:])
         self.response_vectors = np.real(eigvec[:, sorting][:, size:])
@@ -273,3 +293,22 @@ class LinearResponseBaseClass:
             osc_str = f"{osc_strength:1.6f}"
             output += f"{str(i + 1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
         return output
+
+
+def solve_lr_drop_sigma_null(H, sigma, cut=1e-10):
+    # Hermitize (important for numerical stability)
+    Hh = 0.5*(H + H.conj().T)
+    Sh = 0.5*(sigma + sigma.conj().T)
+    # 1) eigen-decompose metric
+    s, U = la.eigh(Sh)
+    # 2) keep only non-null directions
+    keep = np.abs(s) > cut
+    Uk = U[:, keep]
+    # 3) project both matrices consistently
+    Hk = Uk.conj().T @ Hh @ Uk
+    Sk = Uk.conj().T @ Sh @ Uk
+    # 4) solve reduced generalized eigenproblem
+    w, y = la.eig(Hk, Sk)
+    # 5) backtransform eigenvectors
+    v = Uk @ y
+    return w, v, s, keep

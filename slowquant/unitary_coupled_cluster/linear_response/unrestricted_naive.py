@@ -83,6 +83,7 @@ class LinearResponseUPS(LinearResponseBaseClass):
             else:
                 finite_excitations.append(False)
         self.G_ops_finite = sum(bool(x) for x in finite_excitations[len(self.q_ops):])
+        
         finite_excitations_idx = np.array(finite_excitations)
         idx_shift = len(self.q_ops)
         # G_shift = int(len(self.G_ops) / 2)
@@ -513,7 +514,7 @@ class LinearResponseUPS(LinearResponseBaseClass):
                     *self.index_info,
                 )
                 self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = val
-       
+        print("inden", len(self.A))
         self.A = self.A[np.outer(finite_excitations_idx, finite_excitations_idx)].reshape(
             (np.sum(finite_excitations_idx), np.sum(finite_excitations_idx))
         )
@@ -526,7 +527,7 @@ class LinearResponseUPS(LinearResponseBaseClass):
         self.Delta = np.zeros(
             (len(self.Sigma), len(self.Sigma))
         )  # Delta er defineret her fordi den ellers har forkert dimension i unrestricted_lr_baseclass.py
-
+        print("efter", len(self.A))
     def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
         """Calculate transition dipole moment.
 

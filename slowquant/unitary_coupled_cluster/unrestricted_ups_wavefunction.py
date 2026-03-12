@@ -259,7 +259,15 @@ class UnrestrictedWaveFunctionUPS:
                 hf_string += "1"
             else:
                 hf_string += "0"
+        print("hf_string:",hf_string)
+        if ansatz.lower() == "utups":
+            # perfect pairing of the reference determinant
+            hf1 = hf_string[:int(len(hf_string)/2)]
+            hf2 = hf_string[int(len(hf_string)/2):]
+            hf_string = "".join(hf1[i:i+2] + hf2[i:i+2] for i in range(0, len(hf1), 2))
+            print("hf_string", hf_string)
         hf_det = int(hf_string, 2)
+        print("hf_det", hf_det)
         self.csf_coeffs[self.ci_info.det2idx[hf_det]] = 1
         self.ci_coeffs = np.copy(self.csf_coeffs)
         self.ups_layout = UpsStructure()
