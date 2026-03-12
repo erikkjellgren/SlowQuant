@@ -226,8 +226,12 @@ class Davidson(Solvers):
         x = eigvec[:, :n_roots]
 
         # Compute Ritz vectors (X) and residuals (R)
-        x /= np.sqrt(np.abs(np.diag(x.T @ S @ x)))#[np.newaxis, :]
         x_plus, x_minus = _split_vector(x)
+        norm = np.sqrt(np.abs(np.diag(
+            x_minus.T @ S_minus @ x_plus + x_plus.T @ S_minus.T @ x_minus
+        )))
+        x_plus /= norm
+        x_minus /= norm
         X = np.vstack((self._trial @ (x_plus + x_minus), self._trial @ (x_plus - x_minus)))
 
         R_plus = sigma_plus() @ x_plus - tau_plus() @ x_minus * omega
