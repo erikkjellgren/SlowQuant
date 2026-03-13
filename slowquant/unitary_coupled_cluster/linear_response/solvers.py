@@ -75,10 +75,9 @@ class Davidson(Solvers):
         self._start = time.time()
         self._iteration = 0
         self._trial = np.array(())
-        self._Ab = np.array(())
-        self._Bb = np.array(())
-        self._Sb = np.array(())
-        self._Db = np.array(())
+        self._sigma_plus = np.array(())
+        self._sigma_minus = np.array(())
+        self._tau_minus = np.array(())
 
         if not is_silent:
             print(f" Iteration | Time [s] | Max. residual norm | Subspace size | Roots ...")
