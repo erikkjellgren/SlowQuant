@@ -215,23 +215,23 @@ def one_electron_integral_transform(C: np.ndarray, int1e: np.ndarray) -> np.ndar
     return np.einsum("ai,bj,ab->ij", C, C, int1e, optimize=["einsum_path", (0, 2), (0, 1)])
 
 
-# def generalized_one_electron_transform(C: np.ndarray, int_1e_inp: np.ndarray) -> np.ndarray:
-#     """int_1e_inp = int_1e_kin+int_1e_nuc"""
-#     cont1 = np.einsum(
-#         "aP,bQ, ab->PQ",
-#         C[: int(C.shape[0] / 2)].conj(),
-#         C[: int(C.shape[0] / 2)],
-#         int_1e_inp,
-#         optimize=["einsum_path", (0, 2), (0, 1)],
-#     )  # alpha alpha
-#     cont2 = np.einsum(
-#         "aP,bQ, ab->PQ",
-#         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
-#         C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
-#         int_1e_inp,
-#         optimize=["einsum_path", (0, 2), (0, 1)],
-#     )  # beta beta
-#     return cont1 + cont2
+def generalized_one_electron_transform(C: np.ndarray, int_1e_inp: np.ndarray) -> np.ndarray:
+    """int_1e_inp = int_1e_kin+int_1e_nuc"""
+    cont1 = np.einsum(
+        "aP,bQ, ab->PQ",
+        C[: int(C.shape[0] / 2)].conj(),
+        C[: int(C.shape[0] / 2)],
+        int_1e_inp,
+        optimize=["einsum_path", (0, 2), (0, 1)],
+    )  # alpha alpha
+    cont2 = np.einsum(
+        "aP,bQ, ab->PQ",
+        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2].conj(),
+        C[int(C.shape[0] / 2) : int(C.shape[0] / 2) * 2],
+        int_1e_inp,
+        optimize=["einsum_path", (0, 2), (0, 1)],
+    )  # beta beta
+    return cont1 + cont2
 
 def DHF_one_electron_transform(C: np.ndarray, int_1e_inp: np.ndarray) -> np.ndarray:
     """h_core transformed"""
@@ -247,8 +247,8 @@ def DHF_one_electron_transform(C: np.ndarray, int_1e_inp: np.ndarray) -> np.ndar
 
 
 
-def generalized_one_electron_transform(C: np.ndarray, int_1e_inp_spinor: np.ndarray): ##Spinor?? change name AE
-    return np.einsum("aP,ab,bQ->PQ", C.conj(), int_1e_inp_spinor, C, optimize=True) ##Spinor??
+# def generalized_one_electron_transform(C: np.ndarray, int_1e_inp_spinor: np.ndarray): ##Spinor?? change name AE
+#     return np.einsum("aP,ab,bQ->PQ", C.conj(), int_1e_inp_spinor, C, optimize=True) ##Spinor??
 
 
 def two_electron_integral_transform(C: np.ndarray, int2e: np.ndarray) -> np.ndarray:

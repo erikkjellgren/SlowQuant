@@ -29,23 +29,39 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # x2c = sfx2c1e.SpinFreeX2CHelper(mol)
 
     # mf = scf.GHF(mol).sfx2c1e() #spinfree
+    # mf = scf.GHF(mol).x2c()
     mf = scf.GHF(mol).x2c()
+
     # mf = scf.GHF(mol)
     
     mf.conv_tol_grad = 1e-10 #gradient tolerance form PYSCF
     mf.max_cycle = 50000
 
-    mf.scf()
+    # mf.scf()
     mf.kernel()
     coeff=np.array(mf.mo_coeff, dtype=complex)
     # print(coeff)
+
+    dm_mo = mf.make_rdm1()          # DM in spin-orbital (MO) basis
+    C = mf.mo_coeff                 # MO coefficients: AO -> MO
+
+    # Transform DM from MO basis back to AO basis
+    dm_ao = C @ dm_mo @ C.conj().T  # shape: (2*nao, 2*nao)
+  
+
+    with mol.with_common_orig((0,0,0)):
+        dip_ao_picture_changed = mf.with_x2c.picture_change(('int1e_r_spinor',
+                                            'int1e_sprsp_spinor'))
     
-    
-    # with mol.with_common_orig((0,0,0)):
-    dip_ao_picture_changed = mf.with_x2c.picture_change(('int1e_r_spinor',
-                                           'int1e_sprsp_spinor'))
-    
+    # dm=mf.make_rdm1()
     dip_ao=dip_ao_picture_changed
+    el_dip = np.einsum('xij,ji->x', dip_ao, dm_ao).real
+
+    charges = mol.atom_charges()
+    coords  = mol.atom_coords()
+    nucl_dip = np.einsum('i,ix->x', charges, coords)
+    mol_dip = nucl_dip - el_dip
+    print('mol_dip',mol_dip)
 
     dip_mom = mf.dip_moment(unit='Debye') #with picture change
     print(dip_mom)
@@ -95,10 +111,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=False, tol=1e-5, maxiter = 2000)
 
-    print("E_opt:", WF._energy_elec)
-    # print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
+    # print("E_opt:", WF._energy_elec)
+    # # print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
    
-    "Calculate Excitation energies"
+    # "Calculate Excitation energies"
     # LR = generalized_naive.LinearResponse(WF, excitations="sd")
     # LR.calc_excitation_energies()
     # print(LR.excitation_energies)
@@ -111,28 +127,28 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # print(f'Polarizabilities:\n \t xx: {alpha[0]:.4f} \t yy: {alpha[1]:.4f} \t zz: {alpha[2]:.4f}')
 
-    "Calculate dipole moments"
-    mux = generalized_one_electron_transform(WF.c_mo, dip_ao[0])
-    muy = generalized_one_electron_transform(WF.c_mo, dip_ao[1])
-    muz = generalized_one_electron_transform(WF.c_mo, dip_ao[2])
-    mu_op_x = generalized_one_elec_op_0i_0a(mux, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
-    mu_op_y = generalized_one_elec_op_0i_0a(muy, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
-    mu_op_z = generalized_one_elec_op_0i_0a(muz, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
-    dip_x=generalized_expectation_value(WF.ci_coeffs, [mu_op_x], WF.ci_coeffs, WF.ci_info)
-    dip_y=generalized_expectation_value(WF.ci_coeffs, [mu_op_y], WF.ci_coeffs, WF.ci_info)
-    dip_z=generalized_expectation_value(WF.ci_coeffs, [mu_op_z], WF.ci_coeffs, WF.ci_info)
+    # "Calculate dipole moments"
+    # mux = generalized_one_electron_transform(WF.c_mo, dip_ao[0])
+    # muy = generalized_one_electron_transform(WF.c_mo, dip_ao[1])
+    # muz = generalized_one_electron_transform(WF.c_mo, dip_ao[2])
+    # mu_op_x = generalized_one_elec_op_0i_0a(mux, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
+    # mu_op_y = generalized_one_elec_op_0i_0a(muy, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
+    # mu_op_z = generalized_one_elec_op_0i_0a(muz, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
+    # dip_x=generalized_expectation_value(WF.ci_coeffs, [mu_op_x], WF.ci_coeffs, WF.ci_info)
+    # dip_y=generalized_expectation_value(WF.ci_coeffs, [mu_op_y], WF.ci_coeffs, WF.ci_info)
+    # dip_z=generalized_expectation_value(WF.ci_coeffs, [mu_op_z], WF.ci_coeffs, WF.ci_info)
     
 
-    print(f'Electric Dipolemoments:\n \t xx: {dip_x:.4f} \t yy: {dip_y:.4f} \t zz: {dip_z:.4f}')
+    # print(f'Electric Dipolemoments:\n \t xx: {dip_x:.4f} \t yy: {dip_y:.4f} \t zz: {dip_z:.4f}')
 
-    charges = mol.atom_charges()
-    coords = mol.atom_coords()
-    nuclear_dipole = np.einsum('i,ij->j', charges, coords)
+    # charges = mol.atom_charges()
+    # coords = mol.atom_coords()
+    # nuclear_dipole = np.einsum('i,ij->j', charges, coords)
 
 
-    print('Nuclear dipole moments',nuclear_dipole)
+    # print('Nuclear dipole moments',nuclear_dipole)
 
-    print(f'Total Dipolemoments:\n \t xx: {-dip_x+nuclear_dipole[0]:.4f} \t yy: {-dip_y+nuclear_dipole[1]:.4f} \t zz: {-dip_z+nuclear_dipole[2]:.4f}')
+    # print(f'Total Dipolemoments:\n \t xx: {-dip_x+nuclear_dipole[0]:.4f} \t yy: {-dip_y+nuclear_dipole[1]:.4f} \t zz: {-dip_z+nuclear_dipole[2]:.4f}')
 
 
     #call MO integrals
@@ -176,10 +192,13 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # print('From RDMs',np.round(WF.get_orbital_gradient_generalized_real_imag,10))
 
 
+
 def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
-    basis = "x2c-SVPall.nw"
+    # basis = "x2c-SVPall.nw"
+    basis = "STO-3G"
+
     active_space = ((1, 1), 4) #spin orbitaler or spinor basis
     # active_space = (2, 4)
     charge = 0
@@ -330,12 +349,12 @@ def LiH():
 
 
 # h3()
-# h2()
+h2()
 # h4_rektangle()
 # HI()
 # HBr()
 # oh_radical()
 # BeH()
-LiH()
+# LiH()
 
 
