@@ -6,18 +6,21 @@ from functools import partial
 from typing import Any
 
 import numpy as np
+import pyscf
 import scipy
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
     two_electron_integral_transform,
 )
+from slowquant.SlowQuant import SlowQuant
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
 from slowquant.unitary_coupled_cluster.density_matrix import (
     get_electronic_energy,
     get_orbital_gradient,
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
+from slowquant.unitary_coupled_cluster.integral_manager import IntegralManager
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     construct_ups_state,
     expectation_value,
@@ -35,11 +38,9 @@ from slowquant.unitary_coupled_cluster.util import UpsStructure
 class WaveFunctionUPS:
     def __init__(
         self,
-        num_elec: int,
         cas: Sequence[int],
         mo_coeffs: np.ndarray,
-        h_ao: np.ndarray,
-        g_ao: np.ndarray,
+        integral_generator: SlowQuant | pyscf.gto.mole.Mole,
         ansatz: str,
         ansatz_options: dict[str, Any] | None = None,
         include_active_kappa: bool = False,
@@ -47,12 +48,10 @@ class WaveFunctionUPS:
         """Initialize for UPS wave function.
 
         Args:
-            num_elec: Number of electrons.
             cas: CAS(num_active_elec, num_active_orbs),
                  orbitals are counted in spatial basis.
             mo_coeffs: Initial orbital coefficients.
-            h_ao: One-electron integrals in AO for Hamiltonian.
-            g_ao: Two-electron integrals in AO.
+            integral_generator: Integral generator object.
             ansatz: Name of ansatz.
             ansatz_options: Ansatz options.
             include_active_kappa: Include active-active orbital rotations.
@@ -62,9 +61,8 @@ class WaveFunctionUPS:
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
         # Init stuff
+        self.int_gen = IntegralManager(integral_generator)
         self._c_mo = mo_coeffs
-        self._h_ao = h_ao
-        self._g_ao = g_ao
         self.inactive_spin_idx = []
         self.virtual_spin_idx = []
         self.active_spin_idx = []
@@ -76,11 +74,8 @@ class WaveFunctionUPS:
         self.active_idx_shifted = []
         self.active_occ_idx_shifted = []
         self.active_unocc_idx_shifted = []
-        self.num_elec = num_elec
-        self.num_elec_alpha = num_elec // 2
-        self.num_elec_beta = num_elec // 2
-        self.num_spin_orbs = 2 * len(h_ao)
-        self.num_orbs = len(h_ao)
+        self.num_spin_orbs = 2 * len(self.int_gen.kinetic_energy)
+        self.num_orbs = len(self.int_gen.kinetic_energy)
         self.num_active_elec = 0
         self.num_active_spin_orbs = 0
         self.num_inactive_spin_orbs = 0
@@ -95,6 +90,7 @@ class WaveFunctionUPS:
         # Construct spin orbital spaces and indices
         active_space = []
         orbital_counter = 0
+        num_elec = self.int_gen.num_elec
         for i in range(num_elec - cas[0], num_elec):
             active_space.append(i)
             orbital_counter += 1
@@ -162,10 +158,10 @@ class WaveFunctionUPS:
                 self.active_unocc_idx_shifted.append(active_idx - active_shift)
         # Find non-redundant kappas
         self._kappa = []
-        self.kappa_idx = []
-        self.kappa_no_activeactive_idx = []
-        self.kappa_no_activeactive_idx_dagger = []
-        self.kappa_redundant_idx = []
+        kappa_idx = []
+        kappa_no_activeactive_idx = []
+        kappa_no_activeactive_idx_dagger = []
+        kappa_redundant_idx = []
         self._kappa_old = []
         # kappa can be optimized in spatial basis
         # Loop over all q>p orb combinations and find redundant kappas
@@ -173,32 +169,37 @@ class WaveFunctionUPS:
             for q in range(p + 1, self.num_orbs):
                 # find redundant kappas
                 if p in self.inactive_idx and q in self.inactive_idx:
-                    self.kappa_redundant_idx.append((p, q))
+                    kappa_redundant_idx.append((p, q))
                     continue
                 if p in self.virtual_idx and q in self.virtual_idx:
-                    self.kappa_redundant_idx.append((p, q))
+                    kappa_redundant_idx.append((p, q))
                     continue
                 if not include_active_kappa:
                     if p in self.active_idx and q in self.active_idx:
-                        self.kappa_redundant_idx.append((p, q))
+                        kappa_redundant_idx.append((p, q))
                         continue
                 if not (p in self.active_idx and q in self.active_idx):
-                    self.kappa_no_activeactive_idx.append((p, q))
-                    self.kappa_no_activeactive_idx_dagger.append((q, p))
+                    kappa_no_activeactive_idx.append((p, q))
+                    kappa_no_activeactive_idx_dagger.append((q, p))
                 # the rest is non-redundant
                 self._kappa.append(0.0)
                 self._kappa_old.append(0.0)
-                self.kappa_idx.append((p, q))
+                kappa_idx.append((p, q))
         # HF like orbital rotation indices
-        self.kappa_hf_like_idx = []
+        kappa_hf_like_idx = []
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
                 if p in self.inactive_idx and q in self.virtual_idx:
-                    self.kappa_hf_like_idx.append((p, q))
+                    kappa_hf_like_idx.append((p, q))
                 elif p in self.inactive_idx and q in self.active_unocc_idx:
-                    self.kappa_hf_like_idx.append((p, q))
+                    kappa_hf_like_idx.append((p, q))
                 elif p in self.active_occ_idx and q in self.virtual_idx:
-                    self.kappa_hf_like_idx.append((p, q))
+                    kappa_hf_like_idx.append((p, q))
+        self.kappa_idx = np.array(kappa_idx, dtype=int)
+        self.kappa_no_activeactive_idx = np.array(kappa_no_activeactive_idx, dtype=int)
+        self.kappa_no_activeactive_idx_dagger = np.array(kappa_no_activeactive_idx_dagger, dtype=int)
+        self.kappa_redundant_idx = np.array(kappa_redundant_idx, dtype=int)
+        self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
         # Construct determinant basis
         self.ci_info = get_indexing(
             self.num_inactive_orbs,
@@ -332,7 +333,7 @@ class WaveFunctionUPS:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._h_mo is None:
-            self._h_mo = one_electron_integral_transform(self.c_mo, self._h_ao)
+            self._h_mo = one_electron_integral_transform(self.c_mo, self.int_gen.h_ao)
         return self._h_mo
 
     @property
@@ -343,7 +344,7 @@ class WaveFunctionUPS:
             Two-electron Hamiltonian integrals in MO basis.
         """
         if self._g_mo is None:
-            self._g_mo = two_electron_integral_transform(self.c_mo, self._g_ao)
+            self._g_mo = two_electron_integral_transform(self.c_mo, self.int_gen.electron_electron_repulsion)
         return self._g_mo
 
     @property
