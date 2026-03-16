@@ -299,15 +299,11 @@ def test_ups_water_44_threaded() -> None:
     SQobj.set_basis_set("STO-3G")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     nb.set_num_threads(2)
     WF = WaveFunctionUPS(
-        SQobj.molecule.number_electrons,
         (4, 4),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "fUCCSD",
         ansatz_options={},
         include_active_kappa=True,
@@ -330,16 +326,12 @@ def test_saups_h3_3states_threaded() -> None:
     SQobj.set_basis_set("STO-3G")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
 
     nb.set_num_threads(2)
     WF = WaveFunctionSAUPS(
-        SQobj.molecule.number_electrons,
         (2, 3),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         (
             [
                 [1],
@@ -359,15 +351,9 @@ def test_saups_h3_3states_threaded() -> None:
 
     WF.run_wf_optimization_2step("BFGS", True)
 
-    dipole_integrals = (
-        SQobj.integral.get_multipole_matrix([1, 0, 0]),
-        SQobj.integral.get_multipole_matrix([0, 1, 0]),
-        SQobj.integral.get_multipole_matrix([0, 0, 1]),
-    )
-
     assert abs(WF.excitation_energies[0] - 0.838466) < 10**-6
     assert abs(WF.excitation_energies[1] - 0.838466) < 10**-6
-    osc = WF.get_oscillator_strenghts(dipole_integrals)
+    osc = WF.get_oscillator_strenghts()
     assert abs(osc[0] - 0.7569) < 10**-3
     assert abs(osc[1] - 0.7569) < 10**-3
     nb.set_num_threads(1)
