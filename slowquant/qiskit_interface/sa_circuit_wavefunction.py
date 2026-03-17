@@ -1,57 +1,43 @@
-from __future__ import annotations
-
 import time
 from collections.abc import Sequence
 from functools import partial
-from typing import Any
 
 import numpy as np
 import pyscf
 import scipy
+from qiskit import QuantumCircuit
+from qiskit.primitives import BaseEstimatorV1, BaseEstimatorV2, BaseSamplerV1, BaseSamplerV2
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
     two_electron_integral_transform,
 )
+from slowquant.qiskit_interface.interface import QuantumInterface
 from slowquant.SlowQuant import SlowQuant
-from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
 from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_gradient,
 )
+from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.integral_manager import IntegralManager
-from slowquant.unitary_coupled_cluster.operator_state_algebra import (
-    construct_ups_state_SA,
-    expectation_value,
-    expectation_value_SA,
-    get_grad_action_SA,
-    propagate_state,
-    propagate_state_SA,
-    propagate_unitary_SA,
-)
 from slowquant.unitary_coupled_cluster.operators import (
     Epq,
-    G1_sa,
-    G2_sa,
     hamiltonian_0i_0a,
     one_elec_op_0i_0a,
 )
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
-from slowquant.unitary_coupled_cluster.util import UpsStructure, iterate_t1_sa, iterate_t2_sa
 
 
-class WaveFunctionSAUPS:
+class WaveFunctionSACircuit:
     def __init__(
         self,
         cas: Sequence[int],
         mo_coeffs: np.ndarray,
         integral_generator: SlowQuant | pyscf.gto.mole.Mole,
-        state_picks: str,
-        state_options: dict[str, Any],
-        ansatz: str,
-        ansatz_options: dict[str, Any] | None = None,
+        states: tuple[list[list[float]], list[list[str]]],
+        quantum_interface: QuantumInterface,
         include_active_kappa: bool = False,
     ) -> None:
-        """Initialize for SA-UPS wave function.
+        """Initialize circuit based state-averaged UPS wave function.
 
         Args:
             cas: CAS(num_active_elec, num_active_orbs),
@@ -61,15 +47,18 @@ class WaveFunctionSAUPS:
             states: States to include in the state-averaged expansion.
                     Tuple of lists containing weights and determinants.
                     Each state in SA can be constructed of several dets.
-            ansatz: Name of ansatz.
-            ansatz_options: Ansatz options.
+                    Ordering: left-to-right, alpha-beta alternating.
+            quantum_interface: QuantumInterface.
             include_active_kappa: Include active-active orbital rotations.
         """
-        if ansatz_options is None:
-            ansatz_options = {}
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
-        # Init stuff
+        if isinstance(quantum_interface.ansatz, QuantumCircuit):
+            print("WARNING: A QI with a custom Ansatz was passed. VQE will only work with COBYLA optimizer.")
+        if cas[0] % 2 == 1:
+            raise ValueError(
+                f"Wave function only implemented for an even number of active electrons. Got; {cas[0]}"
+            )
         self.int_gen = IntegralManager(integral_generator)
         self._c_mo = mo_coeffs
         self.inactive_spin_idx = []
@@ -80,12 +69,11 @@ class WaveFunctionSAUPS:
         self.active_spin_idx_shifted = []
         self.active_occ_spin_idx_shifted = []
         self.active_unocc_spin_idx_shifted = []
-        self.active_idx_shifted = []
-        self.active_occ_idx_shifted = []
-        self.active_unocc_idx_shifted = []
         self.num_spin_orbs = 2 * len(self.int_gen.kinetic_energy)
         self.num_orbs = len(self.int_gen.kinetic_energy)
-        self.num_active_elec = 0
+        self.num_active_elec = cas[0]
+        self.num_active_elec_alpha = self.num_active_elec // 2
+        self.num_active_elec_beta = self.num_active_elec // 2
         self.num_active_spin_orbs = 0
         self.num_inactive_spin_orbs = 0
         self.num_virtual_spin_orbs = 0
@@ -95,9 +83,7 @@ class WaveFunctionSAUPS:
         self._g_mo = None
         self._sa_energy: float | None = None
         self._state_energies = None
-        self.ansatz_options = ansatz_options
-        self.num_energy_evals = 0
-        # Construct spin orbital spaces and indices
+        self.num_energy_evals = 0  # number of energy measurements on quanutm
         active_space = []
         orbital_counter = 0
         num_elec = self.int_gen.num_elec
@@ -111,7 +97,6 @@ class WaveFunctionSAUPS:
                 self.active_spin_idx.append(i)
                 self.active_occ_spin_idx.append(i)
                 self.num_active_spin_orbs += 1
-                self.num_active_elec += 1
             else:
                 self.inactive_spin_idx.append(i)
                 self.num_inactive_spin_orbs += 1
@@ -123,8 +108,14 @@ class WaveFunctionSAUPS:
             else:
                 self.virtual_spin_idx.append(i)
                 self.num_virtual_spin_orbs += 1
-        self.num_active_elec_alpha = self.num_active_elec // 2
-        self.num_active_elec_beta = self.num_active_elec // 2
+        if len(self.active_spin_idx) != 0:
+            active_shift = np.min(self.active_spin_idx)
+            for active_idx in self.active_spin_idx:
+                self.active_spin_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_occ_spin_idx:
+                self.active_occ_spin_idx_shifted.append(active_idx - active_shift)
+            for active_idx in self.active_unocc_spin_idx:
+                self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
         self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
         self.num_active_orbs = self.num_active_spin_orbs // 2
         self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
@@ -149,34 +140,17 @@ class WaveFunctionSAUPS:
         for idx in self.active_unocc_spin_idx:
             if idx // 2 not in self.active_unocc_idx:
                 self.active_unocc_idx.append(idx // 2)
-        # Make shifted indices
-        if len(self.active_spin_idx) != 0:
-            active_shift = np.min(self.active_spin_idx)
-            for active_idx in self.active_spin_idx:
-                self.active_spin_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_occ_spin_idx:
-                self.active_occ_spin_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_unocc_spin_idx:
-                self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
-        if len(self.active_idx) != 0:
-            active_shift = np.min(self.active_idx)
-            for active_idx in self.active_idx:
-                self.active_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_occ_idx:
-                self.active_occ_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_unocc_idx:
-                self.active_unocc_idx_shifted.append(active_idx - active_shift)
         # Find non-redundant kappas
         self._kappa = []
         kappa_idx = []
         kappa_idx_dagger = []
+        kappa_no_activeactive_idx = []
+        kappa_no_activeactive_idx_dagger = []
         kappa_redundant_idx = []
         self._kappa_old = []
         # kappa can be optimized in spatial basis
-        # Loop over all q>p orb combinations and find redundant kappas
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
-                # find redundant kappas
                 if p in self.inactive_idx and q in self.inactive_idx:
                     kappa_redundant_idx.append((p, q))
                     continue
@@ -187,7 +161,9 @@ class WaveFunctionSAUPS:
                     if p in self.active_idx and q in self.active_idx:
                         kappa_redundant_idx.append((p, q))
                         continue
-                # the rest is non-redundant
+                if not (p in self.active_idx and q in self.active_idx):
+                    kappa_no_activeactive_idx.append((p, q))
+                    kappa_no_activeactive_idx_dagger.append((q, p))
                 self._kappa.append(0.0)
                 self._kappa_old.append(0.0)
                 kappa_idx.append((p, q))
@@ -206,145 +182,13 @@ class WaveFunctionSAUPS:
         self.kappa_idx_dagger = np.array(kappa_idx_dagger, dtype=int)
         self.kappa_redundant_idx = np.array(kappa_redundant_idx, dtype=int)
         self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
-        # Construct determinant basis
-        self.ci_info = get_indexing(
-            self.num_inactive_orbs,
-            self.num_active_orbs,
-            self.num_virtual_orbs,
-            self.num_active_elec_alpha,
-            self.num_active_elec_beta,
+        self.num_states = len(states[0])
+        self.states = states
+        # Setup Qiskit stuff
+        self.QI = quantum_interface
+        self.QI.construct_circuit(
+            self.num_active_orbs, (self.num_active_elec_alpha, self.num_active_elec_beta)
         )
-        self.num_det = len(self.ci_info.idx2det)
-        # SA details
-        if state_picks.lower() in ("cis_diag", "cisd_diag"):
-            if "num_states" not in state_options.keys():
-                raise ValueError("Requires 'num_states' in state_options.")
-            self.num_states = state_options["num_states"]
-            hf_state = np.zeros(self.num_det)
-            hf_det = int(
-                "1" * self.num_active_elec + "0" * (self.num_active_spin_orbs - self.num_active_elec), 2
-            )
-            hf_state[self.ci_info.det2idx[hf_det]] = 1
-            H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
-            energies = []
-            csfs_info = []
-            csf_tmp = []
-            for idx, val in enumerate(hf_state):
-                if abs(val) > 10**-10:
-                    csf_tmp.append([val, idx])
-            csfs_info.append(csf_tmp)
-            energies.append(expectation_value(hf_state, [H], hf_state, self.ci_info, None, None))
-            for a, i, _ in iterate_t1_sa(self.active_occ_idx, self.active_unocc_idx):
-                op = G1_sa(i, a)
-                state = propagate_state([op], hf_state, self.ci_info, None, None)
-                energy = expectation_value(state, [H], state, self.ci_info, None, None)
-                csf_tmp = []
-                for idx, val in enumerate(state):
-                    if abs(val) > 10**-10:
-                        csf_tmp.append([val, idx])
-                csfs_info.append(csf_tmp)
-                energies.append(energy)
-            if state_picks.lower() == "cisd_diag":
-                for a, i, b, j, _, case in iterate_t2_sa(self.active_occ_idx, self.active_unocc_idx):
-                    op = G2_sa(i, j, a, b, case)
-                    state = propagate_state([op], hf_state, self.ci_info, None, None)
-                    energy = expectation_value(state, [H], state, self.ci_info, None, None)
-                    energies.append(energy)
-                    csf_tmp = []
-                    for idx, val in enumerate(state):
-                        if abs(val) > 10**-10:
-                            csf_tmp.append([val, idx])
-                    csfs_info.append(csf_tmp)
-            sortidx = np.argsort(energies)
-            energies = np.array(energies)[sortidx]
-            csfs_info = np.array(csfs_info, dtype=object)[sortidx]
-            # Checking for degenerate states that should be included.
-            energy_max = energies[self.num_states - 1]
-            n_states = 0
-            for energy in energies:
-                if energy - energy_max > 10**-6:
-                    break
-                n_states += 1
-            if self.num_states != n_states:
-                print(
-                    f"Changing the number of states from {self.num_states} to {n_states} due to degeneracy."
-                )
-                self.num_states = n_states
-            self.csf_coeffs = np.zeros((self.num_states, self.num_det))  # state vector for each state in SA
-            print("Adding the states:")
-            for i in range(self.num_states):
-                state_str = ""
-                for coeff, idx in csfs_info[i]:
-                    self.csf_coeffs[i, idx] = coeff
-                    if coeff > 0:
-                        state_str += f" +{coeff:.2f}|{bin(self.ci_info.idx2det[idx])[2:].zfill(self.num_active_spin_orbs)}>"
-                    else:
-                        state_str += f" {coeff:.2f}|{bin(self.ci_info.idx2det[idx])[2:].zfill(self.num_active_spin_orbs)}>"
-                print(f"{energies[i]:.5f}", state_str)
-            print("Initial SA energy:", np.mean(energies[: self.num_states]))
-        elif state_picks.lower() == "manual":
-            if "states" in state_options.keys():
-                states = state_options["states"]
-                self.num_states = len(states)
-                self.csf_coeffs = np.zeros(
-                    (self.num_states, self.num_det)
-                )  # state vector for each state in SA
-                for i, state in enumerate(states):
-                    # Loop over all determinants of a given state
-                    for coeff, on_vec in state:
-                        if len(on_vec) != self.num_active_spin_orbs:
-                            raise ValueError(
-                                f"Length of determinant, {len(on_vec)}, does not match number of active spin orbitals, {self.num_active_spin_orbs}. For determinant, {on_vec}"
-                            )
-                        idx = self.ci_info.det2idx[int(on_vec, 2)]
-                        self.csf_coeffs[i, idx] = coeff
-                sa_energy = 0.0
-                H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
-                for i, state in enumerate(self.csf_coeffs):
-                    energy = expectation_value(state, [H], state, self.ci_info, None, None)
-                    print(f"state {i} energy:", energy)
-                    sa_energy += energy
-                print("Initial SA energy:", sa_energy / self.num_states)
-            else:
-                raise KeyError("state_options requires key 'states'")
-        else:
-            raise ValueError(f"Got unknown state_picks, {state_picks}")
-        self._ci_coeffs = np.copy(self.csf_coeffs)
-        for i, coeff_i in enumerate(self.ci_coeffs):
-            for j, coeff_j in enumerate(self.ci_coeffs):
-                if i == j:
-                    if abs(1 - coeff_i @ coeff_j) > 10**-10:
-                        raise ValueError(f"state {i} is not normalized got overlap of {coeff_i @ coeff_j}")
-                elif abs(coeff_i @ coeff_j) > 10**-10:
-                    raise ValueError(
-                        f"state {i} and {j} are not orthogonal got overlap of {coeff_i @ coeff_j}"
-                    )
-        # Construct UPS Structure
-        self.ups_layout = UpsStructure()
-        if ansatz.lower() == "tups":
-            self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
-        elif ansatz.lower() == "qnp":
-            self.ansatz_options["do_qnp"] = True
-            self.ups_layout.create_tups(self.num_active_orbs, self.ansatz_options)
-        elif ansatz.lower() == "ksafupccgsd":
-            self.ansatz_options["SAGS"] = True
-            self.ansatz_options["GpD"] = True
-            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
-        elif ansatz.lower() == "ksasdsfupccgsd":
-            self.ansatz_options["GpD"] = True
-            self.ups_layout.create_SDSfUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
-        elif ansatz.lower() == "safuccsd":
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.ansatz_options["SAS"] = True
-            self.ansatz_options["SAD"] = True
-            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
-        elif ansatz.lower() == "None":
-            None
-        else:
-            raise ValueError(f"Got unknown ansatz, {ansatz}")
-        self._thetas = np.zeros(self.ups_layout.n_params).tolist()
 
     @property
     def kappa(self) -> list[float]:
@@ -366,58 +210,14 @@ class WaveFunctionSAUPS:
         # Move current expansion point.
         self._c_mo = self.c_mo
         self._kappa_old = self.kappa
-        self._state_ci_coeffs = None
-
-    @property
-    def ci_coeffs(self) -> list[np.ndarray]:
-        """Get CI coefficients.
-
-        Returns:
-            State vector.
-        """
-        if self._ci_coeffs is None:
-            self._ci_coeffs = construct_ups_state_SA(
-                self.csf_coeffs,
-                self.ci_info,
-                self.thetas,
-                self.ups_layout,
-            )
-        return self._ci_coeffs  # type: ignore[return-value]
-
-    @property
-    def thetas(self) -> list[float]:
-        """Get theta values.
-
-        Returns:
-            theta values.
-        """
-        return self._thetas.copy()
-
-    @thetas.setter
-    def thetas(self, theta_vals: list[float]) -> None:
-        """Set theta values.
-
-        Args:
-            theta_vals: theta values.
-        """
-        if len(theta_vals) != len(self._thetas):
-            raise ValueError(f"Expected {len(self._thetas)} theta1 values got {len(theta_vals)}")
-        self._rdm1 = None
-        self._rdm2 = None
-        self._sa_energy = None
-        self._state_energies = None
-        self._state_ci_coeffs = None
-        self._ci_coeffs = None
-        self._thetas = theta_vals.copy()
 
     @property
     def c_mo(self) -> np.ndarray:
-        """Get orbital coefficients.
+        """Get molecular orbital coefficients.
 
         Returns:
-            Orbital coefficients.
+            Molecular orbital coefficients.
         """
-        # Construct anti-hermitian kappa matrix
         kappa_mat = np.zeros_like(self._c_mo)
         if len(self.kappa) != 0:
             # The MO transformation is calculated as a difference between current kappa and kappa old.
@@ -427,7 +227,6 @@ class WaveFunctionSAUPS:
                 for kappa_val, kappa_old, (p, q) in zip(self.kappa, self._kappa_old, self.kappa_idx):
                     kappa_mat[p, q] = kappa_val - kappa_old
                     kappa_mat[q, p] = -(kappa_val - kappa_old)
-        # Apply orbital rotation unitary to MO coefficients
         return np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
 
     @property
@@ -453,8 +252,84 @@ class WaveFunctionSAUPS:
         return self._g_mo
 
     @property
+    def thetas(self) -> list[float]:
+        """Getter for ansatz parameters.
+
+        Returns:
+            Ansatz parameters.
+        """
+        return self.QI.parameters
+
+    @thetas.setter
+    def thetas(self, parameters: list[float]) -> None:
+        """Setter for ansatz paramters.
+
+        Args:
+            parameters: New ansatz paramters.
+        """
+        self._rdm1 = None
+        self._rdm2 = None
+        self._sa_energy = None
+        self._state_energies = None
+        self._state_ci_coeffs = None
+        self._ci_coeffs = None
+        self.QI.parameters = parameters
+
+    def change_primitive(self, primitive: BaseSamplerV1 | BaseSamplerV2, verbose: bool = True) -> None:
+        """Change the primitive expectation value calculator.
+
+        Args:
+            primitive: Primitive object.
+            verbose: Print more info.
+        """
+        if verbose:
+            print(
+                "Using this function is only recommended for switching from ideal simulator to shot-noise or quantum hardware.\n \
+                Multiple switching back and forth can lead to un-expected outcomes and is an experimental feature.\n"
+            )
+
+        if isinstance(primitive, (BaseEstimatorV1, BaseEstimatorV2)):
+            raise ValueError("Estimator is not supported.")
+        elif not isinstance(primitive, (BaseSamplerV1, BaseSamplerV2)):
+            raise TypeError(f"Unsupported Qiskit primitive, {type(primitive)}")
+        self.QI._primitive = primitive
+        if verbose:
+            if self.QI.mitigation_flags.do_M_ansatz0:
+                print("Reset RDMs, energies, QI metrics, and correlation matrix.")
+            else:
+                print("Reset RDMs, energies, and QI metrics.")
+        self._rdm1 = None
+        self._rdm2 = None
+        self._sa_energy = None
+        self._state_energies = None
+        self.QI.total_device_calls = 0
+        self.QI.total_shots_used = 0
+        self.QI.total_paulis_evaluated = 0
+
+        # Reset circuit and initiate re-transpiling
+        ISA_old = self.QI.ISA
+        self._reconstruct_circuit()  # Reconstruct circuit but keeping parameters
+        self.QI._transpiled = False
+        self.QI.ISA = ISA_old  # Redo ISA including transpilation if requested
+        self.QI.shots = self.QI.shots  # Redo shots parameter check
+
+        if verbose:
+            self.QI.get_info()
+
+    def _reconstruct_circuit(self) -> None:
+        """Construct circuit again."""
+        self.QI.construct_circuit(
+            self.num_active_orbs, (self.num_active_elec_alpha, self.num_active_elec_beta)
+        )
+
+    @property
     def rdm1(self) -> np.ndarray:
-        """Calculate one-electron reduced density matrix in the active space.
+        r"""Calculate one-electron reduced density matrix.
+
+        The trace condition is enforced:
+
+        .. math::
+            \sum_i\Gamma^{[1]}_{ii} = N_e
 
         Returns:
             One-electron reduced density matrix.
@@ -465,25 +340,25 @@ class WaveFunctionSAUPS:
                 p_idx = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
                     q_idx = q - self.num_inactive_orbs
+                    rdm1_op = Epq(p, q).get_folded_operator(
+                        self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+                    )
                     val = 0.0
-                    Epq_op = Epq(
-                        p_idx,
-                        q_idx,
-                    )
-                    val = expectation_value_SA(
-                        self.ci_coeffs,
-                        [Epq_op],
-                        self.ci_coeffs,
-                        self.ci_info,
-                        do_folding=False,
-                    )
-                    self._rdm1[p_idx, q_idx] = val  # type: ignore
-                    self._rdm1[q_idx, p_idx] = val  # type: ignore
+                    for coeffs, csf in zip(self.states[0], self.states[1]):
+                        val += self.QI.quantum_expectation_value_csfs((coeffs, csf), rdm1_op, (coeffs, csf))
+                    val = val / self.num_states
+                    self._rdm1[p_idx, q_idx] = val  # type: ignore [index]
+                    self._rdm1[q_idx, p_idx] = val  # type: ignore [index]
         return self._rdm1
 
     @property
     def rdm2(self) -> np.ndarray:
-        """Calculate two-electron reduced density matrix in the active space.
+        r"""Calculate two-electron reduced density matrix.
+
+        The trace condition is enforced:
+
+        .. math::
+            \sum_{ij}\Gamma^{[2]}_{iijj} = N_e(N_e-1)
 
         Returns:
             Two-electron reduced density matrix.
@@ -501,10 +376,6 @@ class WaveFunctionSAUPS:
                 p_idx = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
                     q_idx = q - self.num_inactive_orbs
-                    Epq_op = Epq(
-                        p_idx,
-                        q_idx,
-                    )
                     for r in range(self.num_inactive_orbs, p + 1):
                         r_idx = r - self.num_inactive_orbs
                         if p == q:
@@ -517,23 +388,21 @@ class WaveFunctionSAUPS:
                             s_lim = p + 1
                         for s in range(self.num_inactive_orbs, s_lim):
                             s_idx = s - self.num_inactive_orbs
-                            Ers_op = Epq(
-                                r_idx,
-                                s_idx,
+                            pdm2_op = (Epq(p, q) * Epq(r, s)).get_folded_operator(
+                                self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                             )
-                            val = expectation_value_SA(
-                                self.ci_coeffs,
-                                [Epq_op, Ers_op],
-                                self.ci_coeffs,
-                                self.ci_info,
-                                do_folding=False,
-                            )
+                            val = 0.0
+                            for coeffs, csf in zip(self.states[0], self.states[1]):
+                                val += self.QI.quantum_expectation_value_csfs(
+                                    (coeffs, csf), pdm2_op, (coeffs, csf)
+                                )
+                            val = val / self.num_states
                             if q == r:
                                 val -= self.rdm1[p_idx, s_idx]
-                            self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
-                            self._rdm2[r_idx, s_idx, p_idx, q_idx] = val  # type: ignore
-                            self._rdm2[q_idx, p_idx, s_idx, r_idx] = val  # type: ignore
-                            self._rdm2[s_idx, r_idx, q_idx, p_idx] = val  # type: ignore
+                            self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore [index]
+                            self._rdm2[r_idx, s_idx, p_idx, q_idx] = val  # type: ignore [index]
+                            self._rdm2[q_idx, p_idx, s_idx, r_idx] = val  # type: ignore [index]
+                            self._rdm2[s_idx, r_idx, q_idx, p_idx] = val  # type: ignore [index]
         return self._rdm2
 
     def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
@@ -558,19 +427,36 @@ class WaveFunctionSAUPS:
             State-averaged electronic energy.
         """
         if self._sa_energy is None:
-            Hamiltonian = hamiltonian_0i_0a(
+            H = hamiltonian_0i_0a(
                 self.h_mo,
                 self.g_mo,
                 self.num_inactive_orbs,
                 self.num_active_orbs,
             )
-            self._sa_energy = expectation_value_SA(
-                self.ci_coeffs,
-                [Hamiltonian],
-                self.ci_coeffs,
-                self.ci_info,
-            )
+            H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+            sa_energy = 0.0
+            for coeffs, csf in zip(self.states[0], self.states[1]):
+                sa_energy += self.QI.quantum_expectation_value_csfs((coeffs, csf), H, (coeffs, csf))
+            self._sa_energy = sa_energy / self.num_states
         return self._sa_energy
+
+    def _calc_energy_elec(self) -> float:
+        """Run electronic energy simulation, regardless of self._sa_energy_elec variable.
+
+        Returns:
+            State-averaged electronic energy.
+        """
+        H = hamiltonian_0i_0a(
+            self.h_mo,
+            self.g_mo,
+            self.num_inactive_orbs,
+            self.num_active_orbs,
+        )
+        H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+        sa_energy = 0.0
+        for coeffs, csf in zip(self.states[0], self.states[1]):
+            sa_energy += self.QI.quantum_expectation_value_csfs((coeffs, csf), H, (coeffs, csf))
+        return sa_energy / self.num_states
 
     def run_wf_optimization_2step(
         self,
@@ -589,10 +475,12 @@ class WaveFunctionSAUPS:
             maxiter: Maximum number of iterations.
             is_silent_subiterations: Silence subiterations.
         """
+        if isinstance(self.QI.ansatz, QuantumCircuit) and optimizer_name.lower() not in ("cobyla", "cobyqa"):
+            raise ValueError("Custom Ansatz in QI only works with COBYLA and COBYQA as optimizer.")
         print("### Parameters information:")
         if orbital_optimization:
             print(f"### Number kappa: {len(self.kappa)}")
-        print(f"### Number theta: {self.ups_layout.n_params}")
+        print(f"### Number theta: {len(self.thetas)}")
         e_old = 1e12
         print("Full optimization")
         print("Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #")
@@ -605,11 +493,21 @@ class WaveFunctionSAUPS:
                 print(
                     "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
                 )
-            energy_theta = partial(
-                self._calc_energy_optimization,
-                theta_optimization=True,
-                kappa_optimization=False,
-            )
+            if optimizer_name.lower() in ("rotosolve",):
+                # For RotoSolve type solvers the energy per state is needed in the optimization,
+                # instead of only the state-averaged energy.
+                energy_theta = partial(
+                    self._calc_energy_optimization,
+                    theta_optimization=True,
+                    kappa_optimization=False,
+                    return_all_states=True,
+                )
+            else:
+                energy_theta = partial(
+                    self._calc_energy_optimization,
+                    theta_optimization=True,
+                    kappa_optimization=False,
+                )
             gradient_theta = partial(
                 self._calc_gradient_optimization,
                 theta_optimization=True,
@@ -626,19 +524,10 @@ class WaveFunctionSAUPS:
             )
             self._old_opt_parameters = np.zeros_like(self.thetas) + 10**20
             self._E_opt_old = 0.0
-            if optimizer_name.lower() == "rotosolve":
-                res = optimizer.minimize(
-                    self.thetas,
-                    extra_options={
-                        "R": self.ups_layout.grad_param_R,
-                        "param_names": self.ups_layout.param_names,
-                        "f_rotosolve_optimized": self._calc_energy_rotosolve_optimization,
-                    },
-                )
-            else:
-                res = optimizer.minimize(
-                    self.thetas,
-                )
+            res = optimizer.minimize(
+                self.thetas,
+                extra_options={"R": self.QI.grad_param_R, "param_names": self.QI.param_names},
+            )
             self.thetas = res.x.tolist()
 
             if orbital_optimization and len(self.kappa) != 0:
@@ -710,10 +599,12 @@ class WaveFunctionSAUPS:
             tol: Convergence tolerance.
             maxiter: Maximum number of iterations.
         """
+        if isinstance(self.QI.ansatz, QuantumCircuit) and optimizer_name.lower() not in ("cobyla", "cobyqa"):
+            raise ValueError("Custom Ansatz in QI only works with COBYLA and COBYQA as optimizer.")
         print("### Parameters information:")
         if orbital_optimization:
             print(f"### Number kappa: {len(self.kappa)}")
-        print(f"### Number theta: {self.ups_layout.n_params}")
+        print(f"### Number theta: {len(self.thetas)}")
         if optimizer_name.lower() == "rotosolve":
             if orbital_optimization and len(self.kappa) != 0:
                 raise ValueError(
@@ -762,6 +653,15 @@ class WaveFunctionSAUPS:
                 parameters = self.kappa
         else:
             parameters = self.thetas
+        if optimizer_name.lower() in ("rotosolve",):
+            # For RotoSolve type solvers the energy per state is needed in the optimization,
+            # instead of only the state-averaged energy.
+            energy = partial(
+                self._calc_energy_optimization,
+                theta_optimization=True,
+                kappa_optimization=False,
+                return_all_states=True,
+            )
         optimizer = Optimizers(
             energy,
             optimizer_name,
@@ -772,19 +672,10 @@ class WaveFunctionSAUPS:
         )
         self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0
-        if optimizer_name.lower() == "rotosolve":
-            res = optimizer.minimize(
-                parameters,
-                extra_options={
-                    "R": self.ups_layout.grad_param_R,
-                    "param_names": self.ups_layout.param_names,
-                    "f_rotosolve_optimized": self._calc_energy_rotosolve_optimization,
-                },
-            )
-        else:
-            res = optimizer.minimize(
-                parameters,
-            )
+        res = optimizer.minimize(
+            parameters,
+            extra_options={"R": self.QI.grad_param_R, "param_names": self.QI.param_names},
+        )
         if orbital_optimization:
             self.thetas = res.x[len(self.kappa) :].tolist()
             for i in range(len(self.kappa)):
@@ -796,40 +687,25 @@ class WaveFunctionSAUPS:
         self._do_state_ci()
         self._sa_energy = res.fun
 
-    def _run_constrained_state_averaged_optimization(
-        self,
-        optimizer_name: str,
-        orbital_optimization: bool = False,
-        tol: float = 1e-10,
-        maxiter: int = 1000,
-    ) -> tuple[list[float], np.ndarray]:
-        return self.thetas, self.c_mo
-
     def _do_state_ci(self) -> None:
         r"""Do subspace diagonalisation.
 
-        #. 10.1103/PhysRevLett.122.230401, Eq. (2)
+        #. 10.1103/PhysRevLett.122.230401, Eq. 2
         """
         state_H = np.zeros((self.num_states, self.num_states))
-        Hamiltonian = hamiltonian_0i_0a(
+        H = hamiltonian_0i_0a(
             self.h_mo,
             self.g_mo,
             self.num_inactive_orbs,
             self.num_active_orbs,
         ).get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
-        # Create SA H matrix
-        for i, coeff_i in enumerate(self.ci_coeffs):
-            for j, coeff_j in enumerate(self.ci_coeffs):
+        for i, (coeffs_i, csf_i) in enumerate(zip(self.states[0], self.states[1])):
+            for j, (coeffs_j, csf_j) in enumerate(zip(self.states[0], self.states[1])):
                 if j > i:
                     continue
-                state_H[i, j] = state_H[j, i] = expectation_value(
-                    coeff_i,
-                    [Hamiltonian],
-                    coeff_j,
-                    self.ci_info,
-                    do_folding=False,
+                state_H[i, j] = state_H[j, i] = self.QI.quantum_expectation_value_csfs(
+                    (coeffs_i, csf_i), H, (coeffs_j, csf_j)
                 )
-        # Diagonalize
         eigval, eigvec = scipy.linalg.eig(state_H)
         sorting = np.argsort(eigval)
         self._state_energies = np.real(eigval[sorting])
@@ -844,6 +720,8 @@ class WaveFunctionSAUPS:
         """
         if self._state_energies is None:
             self._do_state_ci()
+        if self._state_energies is None:
+            raise ValueError("_state_energies is None")
         return self._state_energies
 
     @property
@@ -877,24 +755,17 @@ class WaveFunctionSAUPS:
             self._do_state_ci()
         if self._state_ci_coeffs is None:
             raise ValueError("_state_ci_coeffs is None")
-        # MO integrals
         mo_integral = one_electron_integral_transform(self.c_mo, ao_integral)
         transition_property = np.zeros(self.num_states - 1)
         state_op = np.zeros((self.num_states, self.num_states))
-        # One-electron operator matrix
         op = one_elec_op_0i_0a(mo_integral, self.num_inactive_orbs, self.num_active_orbs).get_folded_operator(
             self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
         )
-        for i, coeff_i in enumerate(self.ci_coeffs):
-            for j, coeff_j in enumerate(self.ci_coeffs):
-                state_op[i, j] = expectation_value(
-                    coeff_i,
-                    [op],
-                    coeff_j,
-                    self.ci_info,
-                    do_folding=False,
+        for i, (coeffs_i, csf_i) in enumerate(zip(self.states[0], self.states[1])):
+            for j, (coeffs_j, csf_j) in enumerate(zip(self.states[0], self.states[1])):
+                state_op[i, j] = self.QI.quantum_expectation_value_csfs(
+                    (coeffs_i, csf_i), op, (coeffs_j, csf_j)
                 )
-        # Transition between SA states (after diagonalization)
         for i in range(self.num_states - 1):
             transition_property[i] = self._state_ci_coeffs[:, i + 1] @ state_op @ self._state_ci_coeffs[:, 0]
         return transition_property
@@ -949,35 +820,17 @@ class WaveFunctionSAUPS:
             self.kappa = parameters[:num_kappa]
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
-        Hamiltonian = hamiltonian_0i_0a(
-            self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
-        ).get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+        H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+        H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+        energy_states = []
+        for coeffs, csf in zip(self.states[0], self.states[1]):
+            energy_states.append(self.QI.quantum_expectation_value_csfs((coeffs, csf), H, (coeffs, csf)))
+        self.num_energy_evals += self.num_states  # count one measurement per state
         if return_all_states:
-            energies = []
-            # Energy for each state in SA
-            for coeffs in self.ci_coeffs:
-                energies.append(
-                    expectation_value(
-                        coeffs,
-                        [Hamiltonian],
-                        coeffs,
-                        self.ci_info,
-                        do_folding=False,
-                    )
-                )
-            self._E_opt_old = np.copy(np.array(energies))
-            self._old_opt_parameters = np.copy(parameters)
-            return np.array(energies)
-        E = expectation_value_SA(
-            self.ci_coeffs,
-            [Hamiltonian],
-            self.ci_coeffs,
-            self.ci_info,
-            do_folding=False,
-        )
+            return np.array(energy_states)
+        E = np.mean(energy_states)
         self._E_opt_old = E
         self._old_opt_parameters = np.copy(parameters)
-        self.num_energy_evals += self.num_states  # count one measurement per state
         return E
 
     def _calc_gradient_optimization(
@@ -1015,135 +868,58 @@ class WaveFunctionSAUPS:
                 self.rdm2,
             )
         if theta_optimization:
-            Hamiltonian = hamiltonian_0i_0a(
-                self.h_mo,
-                self.g_mo,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-            )
-            # Reference bra state (no differentiations)
-            bra_vec = propagate_state_SA(
-                [Hamiltonian],
-                self.ci_coeffs,
-                self.ci_info,
-            )
-            bra_vec = construct_ups_state_SA(
-                bra_vec,
-                self.ci_info,
-                self.thetas,
-                self.ups_layout,
-                dagger=True,
-            )
-            # CSF reference state on ket
-            ket_vec = np.copy(self.csf_coeffs)
-            ket_vec_tmp = np.copy(self.csf_coeffs)
-            # Calculate analytical derivative w.r.t. each theta using gradient_action function
+            H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+            H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             for i in range(len(self.thetas)):
-                # Loop over each state in SA
-                ket_vec_tmp = get_grad_action_SA(
-                    ket_vec,
-                    i,
-                    self.ci_info,
-                    self.ups_layout,
-                )
-                for bra, ket in zip(bra_vec, ket_vec_tmp):
-                    gradient[i + num_kappa] += 2 * np.matmul(bra, ket) / len(bra_vec)
-                # Product rule implications on reference bra and CSF ket
-                # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
-                bra_vec = propagate_unitary_SA(
-                    bra_vec,
-                    i,
-                    self.ci_info,
-                    self.thetas,
-                    self.ups_layout,
-                )
-                ket_vec = propagate_unitary_SA(
-                    ket_vec,
-                    i,
-                    self.ci_info,
-                    self.thetas,
-                    self.ups_layout,
-                )
+                R = self.QI.grad_param_R[self.QI.param_names[i]]
+                e_vals_grad = get_energy_evals_for_grad(H, self.QI, self.thetas, i, R, self.states)
+                grad = 0.0
+                for j, mu in enumerate(list(range(1, 2 * R + 1))):
+                    x_mu = (2 * mu - 1) / (2 * R) * np.pi
+                    grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R * (np.sin(1 / 2 * x_mu)) ** 2)
+                gradient[i + num_kappa] += grad
             self.num_energy_evals += (
-                2 * np.sum(list(self.ups_layout.grad_param_R.values())) * self.num_states
+                2 * np.sum(list(self.QI.grad_param_R.values())) * self.num_states
             )  # Count energy measurements for all gradients
         return gradient
 
-    def _calc_energy_rotosolve_optimization(
-        self,
-        parameters: list[float],
-        theta_diffs: list[float],
-        theta_idx: int,
-    ) -> list[float]:
-        """Calculate electronic energy.
 
-        Args:
-            parameters: Ansatz parameters.
-            theta_diffs: List of theta shifts for RotoSolve.
-            theta_idx: Index of theta parameter being optimized.
+def get_energy_evals_for_grad(
+    operator: FermionicOperator,
+    quantum_interface: QuantumInterface,
+    parameters: list[float],
+    idx: int,
+    R: int,
+    states: tuple[list[list[float]], list[list[str]]],
+) -> list[float]:
+    r"""Get energy evaluations needed for the gradient calculation.
 
-        Returns:
-            Electronic energies for all shifted thetas.
-        """
-        # copy of parameters
-        thetas_local = np.asarray(parameters)
+    The gradient formula is defined for x=0,
+    so x_shift is used to shift ensure we can get the energy in the point we actually want.
 
-        # Prepare reference state up to theta_idx
-        state_vec = np.copy(self.csf_coeffs)
-        for i in range(0, theta_idx):
-            state_vec = propagate_unitary_SA(
-                state_vec,
-                i,
-                self.ci_info,
-                thetas_local,
-                self.ups_layout,
+    Args:
+        operator: Operator which the derivative is with respect to.
+        quantum_interface: Quantum interface object
+        parameters: Paramters.
+        idx: Parameter idx.
+        R: Parameter to control we get the needed points.
+        states: Reference states in the SA wave function.
+
+    Returns:
+        Energies in a few fixed points.
+    """
+    e_vals = []
+    x = parameters.copy()
+    x_shift = x[idx]
+    for mu in range(1, 2 * R + 1):
+        x_mu = (2 * mu - 1) / (2 * R) * np.pi
+        x[idx] = x_mu + x_shift
+        energy_states = []
+        for coeffs, csf in zip(states[0], states[1]):
+            energy_states.append(
+                quantum_interface.quantum_expectation_value_csfs(
+                    (coeffs, csf), operator, (coeffs, csf), custom_parameters=x
+                )
             )
-
-        n_shifts = len(theta_diffs)
-        n_state = state_vec[0].size
-
-        # Preallocate array for shifted states
-        state_vecs = np.empty((n_shifts * self.num_states, n_state), dtype=state_vec.dtype)
-
-        # Propagate unitary with all shifted theta at theta_idx
-        theta_tmp = thetas_local.copy()
-        for j, theta_diff in enumerate(theta_diffs):
-            theta_tmp[theta_idx] = theta_diff
-            state_tmp = propagate_unitary_SA(
-                state_vec,
-                theta_idx,
-                self.ci_info,
-                theta_tmp,
-                self.ups_layout,
-            )
-            for k, state in enumerate(state_tmp):
-                state_vecs[j * self.num_states + k, :] = state
-
-        # Propagate remaining unitaries for all shifted states in batch using SA propagation
-        for i in range(theta_idx + 1, len(self.thetas)):
-            state_vecs = propagate_unitary_SA(
-                state_vecs,
-                i,
-                self.ci_info,
-                thetas_local,
-                self.ups_layout,
-            )
-
-        Hamiltonian = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
-        bra_vec = propagate_state_SA(
-            [Hamiltonian],
-            state_vecs,
-            self.ci_info,
-            thetas_local,
-            self.ups_layout,
-        )
-
-        energies = np.zeros(len(theta_diffs))
-        idx = -1
-        for i, (bra, ket) in enumerate(zip(bra_vec, state_vecs)):
-            if i % len(self.csf_coeffs) == 0:
-                idx += 1
-            energies[idx] += bra @ ket
-        self.num_energy_evals += self.num_states  # count one measurement per state
-
-        return energies
+        e_vals.append(np.mean(energy_states))
+    return e_vals

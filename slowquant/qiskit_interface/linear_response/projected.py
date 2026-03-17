@@ -1,7 +1,4 @@
-from collections.abc import Sequence
-
 import numpy as np
-from qiskit.primitives import BaseSampler
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
@@ -42,8 +39,7 @@ class quantumLR(quantumLRBaseClass):
 
         if self.num_q != 0:
             if do_rdm:
-                if isinstance(self.wf.QI._primitive, BaseSampler):
-                    self.wf.precalc_rdm_paulis(2)
+                self.wf.precalc_rdm_paulis(2)
                 # RDMs
                 if do_gradients:
                     # Check gradients
@@ -489,19 +485,14 @@ class quantumLR(quantumLRBaseClass):
         self._analyze_std(A, B, Sigma, verbose=verbose, cv=cv, save=save)
         return A, B, Sigma
 
-    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_transition_dipole(self) -> np.ndarray:
         """Calculate transition dipole moment.
-
-        Args:
-            dipole_integrals: Dipole integrals ordered as (x,y,z).
 
         Returns:
             Transition dipole moment.
         """
-        if len(dipole_integrals) != 3:
-            raise ValueError(f"Expected 3 dipole integrals got {len(dipole_integrals)}")
         number_excitations = len(self.excitation_energies)
-
+        dipole_integrals = self.wf.int_gen.electric_dipole
         mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
         muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
         muz = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[2])
