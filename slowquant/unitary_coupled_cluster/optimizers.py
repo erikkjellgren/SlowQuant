@@ -29,6 +29,7 @@ class Optimizers:
         fun: Callable[[list[float]], float | np.ndarray],
         method: str,
         grad: Callable[[list[float]], np.ndarray] | None = None,
+        hessp = None,
         maxiter: int = 1000,
         tol: float = 10e-8,
         is_silent: bool = False,
@@ -47,6 +48,7 @@ class Optimizers:
         """
         self.fun = fun
         self.grad = grad
+        self.hessp = hessp
         self.method = method.lower()
         self.maxiter = maxiter
         self.tol = tol
@@ -111,6 +113,17 @@ class Optimizers:
                     callback=print_progress,
                     options={"maxiter": self.maxiter, "disp": True},
                 )
+        elif self.method in ("newton-cg", "trust-ncg", "trust-krylov", "trust-constr"):
+            res = scipy.optimize.minimize(
+                self.fun,
+                x0,
+                jac=self.grad,
+                method=self.method,
+                hessp=self.hessp,
+                tol=self.tol,
+                callback=print_progress,
+                options={"maxiter": self.maxiter, "disp": True},
+            )
         elif self.method in ("cobyla", "cobyqa"):
             res = scipy.optimize.minimize(
                 self.fun,

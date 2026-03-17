@@ -712,6 +712,11 @@ class WaveFunctionSAUPS:
                 theta_optimization=True,
                 kappa_optimization=False,
             )
+            hvp = partial(
+                self._calc_hvp_optimization,
+                theta_optimization=True,
+                kappa_optimization=False,
+            )
         if orbital_optimization:
             if len(self.thetas) > 0:
                 parameters = self.kappa + self.thetas
@@ -723,6 +728,7 @@ class WaveFunctionSAUPS:
             energy,
             optimizer_name,
             grad=gradient,
+            hessp=hvp,
             maxiter=maxiter,
             tol=tol,
             is_silent=is_silent,
@@ -1196,6 +1202,18 @@ class WaveFunctionSAUPS:
                 2 * np.sum(list(self.ups_layout.grad_param_R.values())) * self.num_states
             )  # Count energy measurements for all gradients
         return gradient
+
+    def _calc_hvp_optimization(self, parameters: list[float], b, theta_optimization: bool, kappa_optimization: bool):
+        if kappa_optimization:
+            raise ValueError("Does not work with kappa_optimization")
+        h = 10**-3
+        theta_plus = (np.array(parameters) + h*b).tolist()
+        g_plus = self._calc_gradient_optimization(theta_plus, theta_optimization, kappa_optimization)
+        theta_minus = (np.array(parameters) - h*b).tolist()
+        g_minus = self._calc_gradient_optimization(theta_minus, theta_optimization, kappa_optimization)
+        self.thetas = parameters
+        return (g_plus - g_minus)/(2*h)
+
 
     def _calc_energy_rotosolve_optimization(
         self,
