@@ -908,9 +908,6 @@ class WaveFunctionSAUPS:
             else:
                 raise ValueError(f"Got unknown excitation type, {excitation_pool_type[max_arg]}")
             self.ups_layout.n_params += 1
-            if do_noplaceback:
-                excitation_pool.pop(max_arg)
-                excitation_pool_type.pop(max_arg)
 
             self._thetas.append(0.0)
             if optimizer_type == "1step":
@@ -929,6 +926,9 @@ class WaveFunctionSAUPS:
             print(
                 f"{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {grad_str.center(19)} | {excitation_pool_type[max_arg]}{tuple([int(x) for x in excitation_pool[max_arg]])}"
             )
+            if do_noplaceback:
+                excitation_pool.pop(max_arg)
+                excitation_pool_type.pop(max_arg)
             start = time.time()
 
     def _do_state_ci(self) -> None:
