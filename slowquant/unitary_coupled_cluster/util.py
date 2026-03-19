@@ -89,9 +89,9 @@ def iterate_t2_sa_generalized(
         Spin-adapted T2 operator iteration.
     """
     for i in range(num_orbs):
-        for j in range(num_orbs):
+        for j in range(i, num_orbs):
             for a in range(max(i, j) + 1, num_orbs):
-                for b in range(max(i, j) + 1, num_orbs):
+                for b in range(a, num_orbs):
                     fac = 1.0
                     if a == b:
                         fac *= 2.0
@@ -222,9 +222,9 @@ def iterate_t2_generalized(
         T2 operator iteration.
     """
     for i in range(num_spin_orbs):
-        for j in range(num_spin_orbs):
+        for j in range(i, num_spin_orbs):
             for a in range(max(i, j) + 1, num_spin_orbs):
-                for b in range(max(i, j) + 1, num_spin_orbs):
+                for b in range(a, num_spin_orbs):
                     num_alpha = 0
                     num_beta = 0
                     if a % 2 == 0:
