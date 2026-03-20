@@ -301,3 +301,33 @@ class Davidson(Solvers):
         new_trial = gram_schmidt(new_trial)
         new_trial /= np.linalg.norm(new_trial)
         return new_trial[:, np.newaxis]
+
+def one_index_transform(K: np.ndarray, h_mo: np.ndarray, g_mo: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    r"""One index transformation of the Hamiltonian.
+
+    .. math::
+        \sum_\mu [\hat{H}, \kappa_\mu \hat{q}_\mu^\dagger + h \kappa_\mu^* \hat{q}_\mu] = \hat{\tilde{H}}_h, h \in {+1, -1}
+
+    Args:
+        K: Orbital rotation parameters (h=\pm 1).
+        num_orbs: Number of spatial orbitals.
+        h_mo: One-electron integrals in molecular orbital basis.
+        g_mo: Two-electron integrals in molecular orbital basis.
+
+    Returns:
+        One index transformed h_{h} (h=\pm1)
+        One index transformed g_{h} (h=\pm1)
+    """
+    inv_sqrt_2 = 1 / np.sqrt(2)
+    h = np.einsum("pt,tqn->pqn", h_mo, K) - np.einsum("tq,ptn->pqn", h_mo, K)
+
+    g = (
+        np.einsum("ptrs,tqn->pqrsn", g_mo, K)
+        - np.einsum("tqrs,ptn->pqrsn", g_mo, K)
+    )
+    g += np.einsum("pqrsn->rspqn", g)
+
+    h *= inv_sqrt_2
+    g *= inv_sqrt_2
+
+    return h, g
