@@ -82,15 +82,6 @@ class LinearResponse(LinearResponseBaseClass):
         self.Sigma = np.zeros((num_parameters, num_parameters))
         self.Delta = np.zeros((num_parameters, num_parameters))
 
-        H_2i_2a = hamiltonian_2i_2a(
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-        )
-
-        idx_shift = len(self.q_ops)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
         grad = np.zeros(2 * len(self.q_ops))
@@ -126,6 +117,17 @@ class LinearResponse(LinearResponseBaseClass):
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
                 raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
+
+    def _construct_hessian_metric_blocks(self) -> None:
+        H_2i_2a = hamiltonian_2i_2a(
+            self.wf.h_mo,
+            self.wf.g_mo,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
+        )
+
+        idx_shift = len(self.q_ops)
         for j, qJ in enumerate(self.q_ops):
             UdHUqJ = propagate_state(
                 ["Ud", H_2i_2a, "U", qJ],

@@ -27,6 +27,7 @@ from slowquant.unitary_coupled_cluster.util import (
     iterate_t5,
     iterate_t6,
 )
+from slowquant.unitary_coupled_cluster.linear_response.solvers import Davidson
 
 
 class LinearResponseBaseClass:
@@ -109,8 +110,52 @@ class LinearResponseBaseClass:
             self.wf.num_active_orbs,
         )
 
-    def calc_excitation_energies(self) -> None:
-        """Calculate excitation energies."""
+    def _construct_hessian_metric_blocks(self):
+        """Construct Hessian and metric blocks."""
+        raise NotImplementedError
+
+    def _right_transform(self, trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Right transform for Davidson solver.
+
+        Args:
+            trial: Trial vectors.
+        """
+        raise NotImplementedError
+
+    def calc_excitation_energies(self, n_roots: int = 0, solver_settings: dict | None = None) -> None:
+        """Calculate excitation energies.
+
+        Args:
+            n_roots: Number of roots to calculate. If 0, calculate all roots.
+            solver_settings: Settings for the Davidson solver:
+                max_iteration: Maximum number of iterations.
+                tolerance: Convergence tolerance.
+                max_reduced_space: Maximum size of the reduced space.
+                is_silent: Whether to print convergence information.
+        """
+        if n_roots <= 0:
+            self._all_excitation_energies()
+        else:
+            solver = Davidson()
+            if solver_settings is None:
+                solver_settings = {}
+
+            # Temporary for precondition matrices
+            self._construct_hessian_metric_blocks()
+
+            solver.solve(
+                self._right_transform,
+                (np.diag(self.A), np.diag(self.Sigma)),
+                max_iteration=solver_settings.get("max_iteration", 100),
+                tolerance=solver_settings.get("tolerance", 1e-8),
+                n_roots=n_roots,
+                max_reduced_space=solver_settings.get("max_reduced_space", None),
+                is_silent=solver_settings.get("is_silent", False),
+            )
+
+    def _all_excitation_energies(self):
+        self._construct_hessian_metric_blocks()
+
         size = len(self.A)
         E2 = np.zeros((size * 2, size * 2))
         E2[:size, :size] = self.A

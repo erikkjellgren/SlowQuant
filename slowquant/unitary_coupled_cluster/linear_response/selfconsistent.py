@@ -73,7 +73,6 @@ class LinearResponse(LinearResponseBaseClass):
         hf_det = int("1" * self.wf.num_elec + "0" * (self.wf.num_spin_orbs - self.wf.num_elec), 2)
         self.csf_coeffs[ci_info.det2idx[hf_det]] = 1
         self.ci_coeffs = propagate_state(["U"], self.csf_coeffs, *self.index_info_extended)
-        idx_shift = len(self.q_ops)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
         if len(self.q_ops) != 0:
@@ -115,6 +114,10 @@ class LinearResponse(LinearResponseBaseClass):
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
                 raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
+
+    def _construct_hessian_metric_blocks(self) -> None:
+        UdH00_ket = propagate_state(["Ud", self.H_0i_0a], self.ci_coeffs, *self.index_info_extended)
+        idx_shift = len(self.q_ops)
         if len(self.q_ops) != 0:
             # Do orbital-orbital blocks
             self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(

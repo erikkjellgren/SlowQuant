@@ -16,7 +16,7 @@ from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.linear_response.solvers import Davidson
 
 
-def test_lih_naive():
+def test_lih_naive_explicit():
     """Test LiH energies for naive q LR methods."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -43,6 +43,7 @@ def test_lih_naive():
 
     # naive
     LR_naive = naive.LinearResponse(WF, excitations="SD")
+    LR_naive._construct_hessian_metric_blocks()
 
     A = LR_naive.A
     B = LR_naive.B

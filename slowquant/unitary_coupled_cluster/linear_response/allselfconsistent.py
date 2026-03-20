@@ -82,15 +82,6 @@ class LinearResponse(LinearResponseBaseClass):
         self.Sigma = np.zeros((num_parameters, num_parameters))
         self.Delta = np.zeros((num_parameters, num_parameters))
 
-        H_2i_2a = hamiltonian_2i_2a(
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-        )
-
-        idx_shift = len(self.q_ops)
         print("Gs", len(self.G_ops))
         print("qs", len(self.q_ops))
         grad = np.zeros(2 * len(self.q_ops))
@@ -122,6 +113,18 @@ class LinearResponse(LinearResponseBaseClass):
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
                 raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad)))
+
+    def _construct_hessian_metric_blocks(self) -> None:
+        UdH00_ket = propagate_state(["Ud", self.H_0i_0a], self.ci_coeffs, *self.index_info_extended)
+        H_2i_2a = hamiltonian_2i_2a(
+            self.wf.h_mo,
+            self.wf.g_mo,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
+        )
+
+        idx_shift = len(self.q_ops)
         H_ket = propagate_state([H_2i_2a], self.ci_coeffs, *self.index_info_extended, do_unsafe=True)  # type: ignore
         UdH_ket = propagate_state(["Ud"], H_ket, *self.index_info_extended, do_unsafe=True)  # type: ignore
         for j, qJ in enumerate(self.q_ops):
