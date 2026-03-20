@@ -148,7 +148,7 @@ def test_LiH_naiveq_methods_energies() -> None:
         g_eri,
         "SD",
     )
-    WF.run_wf_optimization_1step("BFGS", True)
+    WF.run_wf_optimization_1step("L-BFGS-B", True)
 
     threshold = 10 ** (-5)
 
