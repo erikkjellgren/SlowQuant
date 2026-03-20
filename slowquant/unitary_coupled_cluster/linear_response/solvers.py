@@ -319,13 +319,13 @@ def one_index_transform(K: np.ndarray, h_mo: np.ndarray, g_mo: np.ndarray) -> tu
         One index transformed g_{h} (h=\pm1)
     """
     inv_sqrt_2 = 1 / np.sqrt(2)
-    h = np.einsum("pt,tqn->pqn", h_mo, K) - np.einsum("tq,ptn->pqn", h_mo, K)
+    h = np.einsum("pt,tq->pq", h_mo, K) - np.einsum("tq,pt->pq", h_mo, K)
 
     g = (
-        np.einsum("ptrs,tqn->pqrsn", g_mo, K)
-        - np.einsum("tqrs,ptn->pqrsn", g_mo, K)
+        np.einsum("ptrs,tq->pqrs", g_mo, K)
+        - np.einsum("tqrs,pt->pqrs", g_mo, K)
     )
-    g += np.einsum("pqrsn->rspqn", g)
+    g += np.einsum("pqrs->rspq", g)
 
     h *= inv_sqrt_2
     g *= inv_sqrt_2

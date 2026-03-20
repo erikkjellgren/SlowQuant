@@ -339,21 +339,19 @@ class LinearResponse(LinearResponseBaseClass):
                 K_plus[q, p, :] = kappa.conjugate()
                 K_minus[p, q, :] = kappa
                 K_minus[q, p, :] = - kappa.conjugate()
-            h_plus, g_plus = one_index_transform(K_plus, self.wf.h_mo, self.wf.g_mo)
 
             for root in range(n_roots):
-                h = h_plus[:, :, root]
-                g = g_plus[:, :, :, :, root]
+                h_plus, g_plus = one_index_transform(K_plus[:, :, root], self.wf.h_mo, self.wf.g_mo)
                 H_0i_0a = hamiltonian_0i_0a(
-                    h,
-                    g,
+                    h_plus,
+                    g_plus,
                     self.wf.num_inactive_orbs,
                     self.wf.num_active_orbs,
                 )
 
                 H_1i_1a = hamiltonian_1i_1a(
-                    h,
-                    g,
+                    h_plus,
+                    g_plus,
                     self.wf.num_inactive_orbs,
                     self.wf.num_active_orbs,
                     self.wf.num_virtual_orbs,
@@ -434,20 +432,18 @@ class LinearResponse(LinearResponseBaseClass):
                         *self.index_info,
                     )
 
-            h_minus, g_minus = one_index_transform(K_minus, self.wf.h_mo, self.wf.g_mo)
             for root in range(n_roots):
-                h = h_minus[:, :, root]
-                g = g_minus[:, :, :, :, root]
+                h_minus, g_minus = one_index_transform(K_minus[:, :, root], self.wf.h_mo, self.wf.g_mo)
                 H_0i_0a = hamiltonian_0i_0a(
-                    h,
-                    g,
+                    h_minus,
+                    g_minus,
                     self.wf.num_inactive_orbs,
                     self.wf.num_active_orbs,
                 )
 
                 H_1i_1a = hamiltonian_1i_1a(
-                    h,
-                    g,
+                    h_minus,
+                    g_minus,
                     self.wf.num_inactive_orbs,
                     self.wf.num_active_orbs,
                     self.wf.num_virtual_orbs,
