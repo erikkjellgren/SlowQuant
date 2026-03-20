@@ -143,16 +143,17 @@ class LinearResponseBaseClass:
             # Temporary for precondition matrices
             self._construct_hessian_metric_blocks()
 
-            solver.solve(
-                self._right_transform,
-                (np.diag(self.A), np.diag(self.Sigma)),
-                max_iteration=solver_settings.get("max_iteration", 100),
-                tolerance=solver_settings.get("tolerance", 1e-8),
-                n_roots=n_roots,
-                max_reduced_space=solver_settings.get("max_reduced_space", None),
-                is_silent=solver_settings.get("is_silent", False),
+            self.excitation_energies, self.normed_response_vectors = (
+                solver.solve(
+                    self._right_transform,
+                    (np.diag(self.A), np.diag(self.Sigma)),
+                    max_iteration=solver_settings.get("max_iteration", 100),
+                    tolerance=solver_settings.get("tolerance", 1e-8),
+                    n_roots=n_roots,
+                    max_reduced_space=solver_settings.get("max_reduced_space", None),
+                    is_silent=solver_settings.get("is_silent", False),
+                )
             )
-
     def _all_excitation_energies(self):
         self._construct_hessian_metric_blocks()
 
