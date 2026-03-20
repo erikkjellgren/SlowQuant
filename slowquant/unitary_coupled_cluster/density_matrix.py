@@ -338,7 +338,7 @@ def get_orbital_response_metric_sigma(
     r"""Calculate the Sigma matrix orbital-orbital block.
 
     .. math::
-        \Sigma_{pq,pq}^{\hat{q},\hat{q}} = \left<0\left|\left[\hat{q}_{pq}^\dagger,\hat{q}_{pq}\right]\right|0\right>
+        \Sigma_{pq,mn}^{\hat{q},\hat{q}} = \left<0\left|\left[\hat{q}_{pq}^\dagger,\hat{q}_{mn}\right]\right|0\right>
 
     Args:
         kappa_idx: Orbital parameter indices in spatial basis.
