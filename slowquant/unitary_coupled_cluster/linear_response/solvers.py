@@ -70,6 +70,10 @@ class Davidson(Solvers):
             n_roots: Number of lowest eigenpairs to compute.
             max_reduced_space: Maximum dimension of the reduced space before a restart (default 8*n_roots).
             is_silent: Suppress progress output.
+
+        Returns:
+            omega: Eigenvalues.
+            X: Eigenvectors.
         """
 
         self._start = time.time()
