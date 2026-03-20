@@ -215,7 +215,10 @@ class FermionicOperator:
             operators = copy.copy(self.operators)
             for op_key in self.operators.keys():
                 # The name fermistring is misleading here.
-                operators[op_key] *= fermistring  # type: ignore
+                if abs(fermistring) < 10**-14:  # type: ignore
+                    operators.pop(op_key, None)
+                else:
+                    operators[op_key] *= fermistring  # type: ignore
         elif type(fermistring) is FermionicOperator:
             operators = {}  # type: ignore
             # Iterate over all strings in both FermionicOperators
@@ -248,9 +251,13 @@ class FermionicOperator:
             Updated fermionic operator.
         """
         if type(fermistring) in (float, int):
-            for op_key in self.operators.keys():
+            operators = copy.copy(self.operators)
+            for op_key in operators.keys():
                 # The name fermistring is misleading here.
-                self.operators[op_key] *= fermistring  # type: ignore
+                if abs(fermistring) < 10**-14:  # type: ignore
+                    self.operators.pop(op_key, None)
+                else:
+                    self.operators[op_key] *= fermistring  # type: ignore
         elif type(fermistring) is FermionicOperator:
             operators: dict[tuple[tuple[int, bool], ...], float] = {}
             # Iterate over all strings in both FermionicOperators
@@ -285,7 +292,10 @@ class FermionicOperator:
         """
         operators = {}
         for op_key in self.operators.keys():
-            operators[op_key] = self.operators[op_key] * number
+            if abs(number) < 10**-14:
+                operators.pop(op_key, None)
+            else:
+                operators[op_key] = self.operators[op_key] * number
         return FermionicOperator(operators)
 
     def __neg__(self):
