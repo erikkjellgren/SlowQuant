@@ -242,13 +242,11 @@ class WaveFunctionUCC:
         Args:
             k: orbital rotation parameters.
         """
-        self._h_mo = None
-        self._g_mo = None
-        self._energy_elec = None
-        self._kappa = k.copy()
-        # Move current expansion point.
-        self._c_mo = self.c_mo
-        self._kappa_old = self.kappa
+        if np.max(np.abs(np.array(self._kappa) - np.array(k))) > 0.0:
+            self._h_mo = None
+            self._g_mo = None
+            self._energy_elec = None
+            self._kappa = k.copy()
 
     @property
     def ci_coeffs(self) -> np.ndarray:
@@ -284,13 +282,14 @@ class WaveFunctionUCC:
         """
         if len(theta) != len(self._thetas):
             raise ValueError(f"Expected {len(self._thetas)} theta1 values got {len(theta)}")
-        self._rdm1 = None
-        self._rdm2 = None
-        self._rdm3 = None
-        self._rdm4 = None
-        self._energy_elec = None
-        self._ci_coeffs = None
-        self._thetas = theta.copy()
+        if np.max(np.abs(np.array(self._thetas) - np.array(theta))) > 0.0:
+            self._rdm1 = None
+            self._rdm2 = None
+            self._rdm3 = None
+            self._rdm4 = None
+            self._energy_elec = None
+            self._ci_coeffs = None
+            self._thetas = theta.copy()
 
     @property
     def c_mo(self) -> np.ndarray:
@@ -311,6 +310,10 @@ class WaveFunctionUCC:
                     kappa_mat[q, p] = -(kappa_val - kappa_old)
         # Apply orbital rotation unitary to MO coefficients
         return np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
+
+    def _move_cep(self) -> None:
+        self._c_mo = self.c_mo
+        self._kappa_old = self.kappa
 
     @property
     def h_mo(self) -> np.ndarray:
@@ -829,10 +832,12 @@ class WaveFunctionUCC:
                     maxiter=maxiter,
                     tol=tol,
                     is_silent=is_silent_subiterations,
+                    cep_move=self._move_cep,
                 )
                 self._old_opt_parameters = np.zeros(len(self.kappa_idx)) + 10**20
                 self._E_opt_old = 0.0
                 res = optimizer.minimize([0.0] * len(self.kappa_idx))
+                self._move_cep()
                 for i in range(len(self.kappa)):
                     self.kappa[i] = 0.0
                     self._kappa_old[i] = 0.0
@@ -942,13 +947,15 @@ class WaveFunctionUCC:
                 kappa_optimization=False,
             )
         if orbital_optimization:
+            cep_move_fun = self._move_cep
             if len(self.thetas) > 0:
                 parameters = self.kappa + self.thetas
             else:
                 parameters = self.kappa
         else:
+            cep_move_fun = None
             parameters = self.thetas
-        optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol)
+        optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol, cep_move=cep_move_fun)
         self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0
         res = optimizer.minimize(
@@ -956,6 +963,7 @@ class WaveFunctionUCC:
         )
         if orbital_optimization:
             self.thetas = res.x[len(self.kappa) :].tolist()
+            self._move_cep()
             for i in range(len(self.kappa)):
                 self._kappa[i] = 0.0
                 self._kappa_old[i] = 0.0

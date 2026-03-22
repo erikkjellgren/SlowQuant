@@ -29,10 +29,12 @@ class Optimizers:
         fun: Callable[[list[float]], float | np.ndarray],
         method: str,
         grad: Callable[[list[float]], np.ndarray] | None = None,
+        hessp: Callable[[list[float], list[float]], np.ndarray] | None = None,
         maxiter: int = 1000,
         tol: float = 10e-8,
         is_silent: bool = False,
         energy_eval_callback: Callable[[], int] | None = None,
+        cep_move: Callable[[], None] | None = None
     ) -> None:
         """Initialize optimizer class.
 
@@ -40,18 +42,22 @@ class Optimizers:
             fun: Function to minimize.
             method: Optimization method.
             grad: Gradient of function.
+            hessp: Hessian vector product function.
             maxiter: Maximum iterations.
             tol: Convergence tolerance.
             is_silent: Suppress progress output.
             energy_eval_callback: Callback to fetch num_energy_evals.
+            cep_move: Callback function to move current expansion point.
         """
         self.fun = fun
         self.grad = grad
+        self.hessp = hessp
         self.method = method.lower()
         self.maxiter = maxiter
         self.tol = tol
         self.is_silent = is_silent
         self.energy_eval_callback = energy_eval_callback
+        self.cep_move = cep_move
 
     def _print_progress(
         self, x: Sequence[float], fun: Callable[[list[float]], float | np.ndarray], silent: bool = False
@@ -63,6 +69,9 @@ class Optimizers:
             fun: Function.
             silent: Silence progress print.
         """
+        if self.cep_move is not None:
+            # Move current expansion point
+            self.cep_move()
         if not silent:
             e = fun(list(x))
             if isinstance(e, np.ndarray):
@@ -92,26 +101,29 @@ class Optimizers:
         self._iteration = 0
         print_progress = partial(self._print_progress, fun=self.fun, silent=self.is_silent)
         if self.method in ("bfgs", "l-bfgs-b", "slsqp"):
-            if self.grad is not None:
-                res = scipy.optimize.minimize(
-                    self.fun,
-                    x0,
-                    jac=self.grad,
-                    method=self.method,
-                    tol=self.tol,
-                    callback=print_progress,
-                    options={"maxiter": self.maxiter, "disp": True},
-                )
-            else:
-                res = scipy.optimize.minimize(
-                    self.fun,
-                    x0,
-                    method=self.method,
-                    tol=self.tol,
-                    callback=print_progress,
-                    options={"maxiter": self.maxiter, "disp": True},
-                )
+            res = scipy.optimize.minimize(
+                self.fun,
+                x0,
+                jac=self.grad,
+                method=self.method,
+                tol=self.tol,
+                callback=print_progress,
+                options={"maxiter": self.maxiter, "disp": True},
+            )
+        elif self.method in ("newton-cg",):
+            res = scipy.optimize.minimize(
+                self.fun,
+                x0,
+                jac=self.grad,
+                hessp=self.hessp,
+                method=self.method,
+                tol=self.tol,
+                callback=print_progress,
+                options={"maxiter": self.maxiter, "disp": True},
+            )
         elif self.method in ("cobyla", "cobyqa"):
+            # Does not work with moving the expansion point.
+            self.cep_move = None
             res = scipy.optimize.minimize(
                 self.fun,
                 x0,

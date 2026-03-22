@@ -30,7 +30,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     propagate_unitary,
     propagate_unitary_SA,
 )
-from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
+from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a, commutator, hamiltonian_1i_1a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import UpsStructure
 
@@ -266,13 +266,11 @@ class WaveFunctionUPS:
         Args:
             k: orbital rotation parameters.
         """
-        self._h_mo = None
-        self._g_mo = None
-        self._energy_elec = None
-        self._kappa = k.copy()
-        # Move current expansion point.
-        self._c_mo = self.c_mo
-        self._kappa_old = self.kappa
+        if np.max(np.abs(np.array(self._kappa) - np.array(k))) > 10**-28:
+            self._h_mo = None
+            self._g_mo = None
+            self._energy_elec = None
+            self._kappa = k.copy()
 
     @property
     def thetas(self) -> list[float]:
@@ -292,18 +290,19 @@ class WaveFunctionUPS:
         """
         if len(theta_vals) != len(self._thetas):
             raise ValueError(f"Expected {len(self._thetas)} theta1 values got {len(theta_vals)}")
-        self._rdm1 = None
-        self._rdm2 = None
-        self._rdm3 = None
-        self._rdm4 = None
-        self._energy_elec = None
-        self._thetas = theta_vals.copy()
-        self.ci_coeffs = construct_ups_state(
-            self.csf_coeffs,
-            self.ci_info,
-            self.thetas,
-            self.ups_layout,
-        )
+        if np.max(np.abs(np.array(self._thetas) - np.array(theta_vals))) > 10**-28:
+            self._rdm1 = None
+            self._rdm2 = None
+            self._rdm3 = None
+            self._rdm4 = None
+            self._energy_elec = None
+            self._thetas = theta_vals.copy()
+            self.ci_coeffs = construct_ups_state(
+                self.csf_coeffs,
+                self.ci_info,
+                self.thetas,
+                self.ups_layout,
+            )
 
     @property
     def c_mo(self) -> np.ndarray:
@@ -318,12 +317,16 @@ class WaveFunctionUPS:
             # The MO transformation is calculated as a difference between current kappa and kappa old.
             # This is to make the moving of the expansion point to work with SciPy optimization algorithms.
             # Resetting kappa to zero would mess with any algorithm that has any memory f.x. BFGS.
-            if np.max(np.abs(np.array(self.kappa) - np.array(self._kappa_old))) > 0.0:
+            if np.max(np.abs(np.array(self.kappa) - np.array(self._kappa_old))) > 10**-28:
                 for kappa_val, kappa_old, (p, q) in zip(self.kappa, self._kappa_old, self.kappa_idx):
                     kappa_mat[p, q] = kappa_val - kappa_old
                     kappa_mat[q, p] = -(kappa_val - kappa_old)
         # Apply orbital rotation unitary to MO coefficients
         return np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
+
+    def _move_cep(self) -> None:
+        self._c_mo = self.c_mo
+        self._kappa_old = self.kappa
 
     @property
     def h_mo(self) -> np.ndarray:
@@ -780,10 +783,16 @@ class WaveFunctionUPS:
                 theta_optimization=True,
                 kappa_optimization=False,
             )
+            hessp_theta = partial(
+                self._calc_hessian_vector_product_optimization,
+                theta_optimization=True,
+                kappa_optimization=False,
+            )
             optimizer = Optimizers(
                 energy_theta,
                 optimizer_name,
                 grad=gradient_theta,
+                hessp=hessp_theta,
                 maxiter=maxiter,
                 tol=tol,
                 is_silent=is_silent_subiterations,
@@ -822,19 +831,26 @@ class WaveFunctionUPS:
                     theta_optimization=False,
                     kappa_optimization=True,
                 )
-
+                hessp_oo = partial(
+                    self._calc_hessian_vector_product_optimization,
+                    theta_optimization=False,
+                    kappa_optimization=True,
+                )
                 optimizer = Optimizers(
                     energy_oo,
                     "l-bfgs-b",
                     grad=gradient_oo,
+                    hessp=hessp_oo,
                     maxiter=maxiter,
                     tol=tol,
                     is_silent=is_silent_subiterations,
                     energy_eval_callback=lambda: self.num_energy_evals,
+                    cep_move=self._move_cep,
                 )
                 self._old_opt_parameters = np.zeros(len(self.kappa_idx)) + 10**20
                 self._E_opt_old = 0.0
                 res = optimizer.minimize([0.0] * len(self.kappa_idx))
+                self._move_cep()
                 for i in range(len(self.kappa)):
                     self._kappa[i] = 0.0
                     self._kappa_old[i] = 0.0
@@ -896,6 +912,11 @@ class WaveFunctionUPS:
                     theta_optimization=True,
                     kappa_optimization=True,
                 )
+                hessp = partial(
+                    self._calc_hessian_vector_product_optimization,
+                    theta_optimization=True,
+                    kappa_optimization=True,
+                )
             else:
                 energy = partial(
                     self._calc_energy_optimization,
@@ -904,6 +925,11 @@ class WaveFunctionUPS:
                 )
                 gradient = partial(
                     self._calc_gradient_optimization,
+                    theta_optimization=False,
+                    kappa_optimization=True,
+                )
+                hessp = partial(
+                    self._calc_hessian_vector_product_optimization,
                     theta_optimization=False,
                     kappa_optimization=True,
                 )
@@ -918,20 +944,29 @@ class WaveFunctionUPS:
                 theta_optimization=True,
                 kappa_optimization=False,
             )
+            hessp = partial(
+                self._calc_hessian_vector_product_optimization,
+                theta_optimization=True,
+                kappa_optimization=False,
+            )
         if orbital_optimization:
+            cep_move_fun = self._move_cep
             if len(self.thetas) > 0:
                 parameters = self.kappa + self.thetas
             else:
                 parameters = self.kappa
         else:
+            cep_move_fun = None
             parameters = self.thetas
         optimizer = Optimizers(
             energy,
             optimizer_name,
             grad=gradient,
+            hessp=hessp,
             maxiter=maxiter,
             tol=tol,
             energy_eval_callback=lambda: self.num_energy_evals,
+            cep_move=cep_move_fun,
         )
         self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0
@@ -949,6 +984,7 @@ class WaveFunctionUPS:
                 parameters,
             )
         if orbital_optimization:
+            self._move_cep()
             self.thetas = res.x[len(self.kappa) :].tolist()
             for i in range(len(self.kappa)):
                 self._kappa[i] = 0.0
@@ -956,6 +992,55 @@ class WaveFunctionUPS:
         else:
             self.thetas = res.x.tolist()
         self._energy_elec = res.fun
+
+    def _theta_gradient(self, operator: FermionicOperator) -> np.ndarray:
+        gradient = np.zeros(len(self.thetas))
+        # Reference bra state (no differentiations)
+        bra_vec = propagate_state(
+            [operator],
+            self.ci_coeffs,
+            self.ci_info,
+        )
+        bra_vec = construct_ups_state(
+            bra_vec,
+            self.ci_info,
+            self.thetas,
+            self.ups_layout,
+            dagger=True,
+        )
+        # CSF reference state on ket
+        ket_vec = np.copy(self.csf_coeffs)
+        ket_vec_tmp = np.copy(self.csf_coeffs)
+        # Calculate analytical derivative w.r.t. each theta using gradient_action function
+        for i in range(len(self.thetas)):
+            # Derivative action w.r.t. i-th theta on CSF ket
+            ket_vec_tmp = get_grad_action(
+                ket_vec,
+                i,
+                self.ci_info,
+                self.ups_layout,
+            )
+            gradient[i] += 2 * np.matmul(bra_vec, ket_vec_tmp)
+            # Product rule implications on reference bra and CSF ket
+            # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
+            bra_vec = propagate_unitary(
+                bra_vec,
+                i,
+                self.ci_info,
+                self.thetas,
+                self.ups_layout,
+            )
+            ket_vec = propagate_unitary(
+                ket_vec,
+                i,
+                self.ci_info,
+                self.thetas,
+                self.ups_layout,
+            )
+        self.num_energy_evals += 2 * np.sum(
+            list(self.ups_layout.grad_param_R.values())
+        )  # Count energy measurements for all gradients
+        return gradient
 
     def _calc_energy_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
@@ -1035,52 +1120,90 @@ class WaveFunctionUPS:
                 self.num_inactive_orbs,
                 self.num_active_orbs,
             )
-            # Reference bra state (no differentiations)
-            bra_vec = propagate_state(
-                [Hamiltonian],
-                self.ci_coeffs,
-                self.ci_info,
-            )
-            bra_vec = construct_ups_state(
-                bra_vec,
-                self.ci_info,
-                self.thetas,
-                self.ups_layout,
-                dagger=True,
-            )
-            # CSF reference state on ket
-            ket_vec = np.copy(self.csf_coeffs)
-            ket_vec_tmp = np.copy(self.csf_coeffs)
-            # Calculate analytical derivative w.r.t. each theta using gradient_action function
-            for i in range(len(self.thetas)):
-                # Derivative action w.r.t. i-th theta on CSF ket
-                ket_vec_tmp = get_grad_action(
-                    ket_vec,
-                    i,
-                    self.ci_info,
-                    self.ups_layout,
-                )
-                gradient[i + num_kappa] += 2 * np.matmul(bra_vec, ket_vec_tmp)
-                # Product rule implications on reference bra and CSF ket
-                # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
-                bra_vec = propagate_unitary(
-                    bra_vec,
-                    i,
-                    self.ci_info,
-                    self.thetas,
-                    self.ups_layout,
-                )
-                ket_vec = propagate_unitary(
-                    ket_vec,
-                    i,
-                    self.ci_info,
-                    self.thetas,
-                    self.ups_layout,
-                )
-            self.num_energy_evals += 2 * np.sum(
-                list(self.ups_layout.grad_param_R.values())
-            )  # Count energy measurements for all gradients
+            gradient[num_kappa:] = self._theta_gradient(Hamiltonian)
         return gradient
+
+    def _calc_hessian_vector_product_optimization(
+            self, parameters: list[float], trial_vec: list[float], theta_optimization: bool, kappa_optimization: bool,
+        ) -> np.ndarray:
+        """Calculate Hessian vector product.
+
+        Args:
+            parameters: Ansatz and orbital rotation parameters.
+            trial_vec: Trial vector.
+            theta_optimization: If used in theta optimization.
+            kappa_optimization: If used in kappa optimization.
+
+        Returns:
+            Hessian vector product.
+        """
+        hvp = np.zeros(len(parameters))
+        num_kappa = 0
+        if kappa_optimization:
+            num_kappa = len(self.kappa_idx)
+            self.kappa = parameters[:num_kappa]
+        if theta_optimization:
+            self.thetas = parameters[num_kappa:]
+        if kappa_optimization:
+            b_kappa = trial_vec[:num_kappa]
+            kappa_mat = np.zeros_like(self._c_mo)
+            for kappa_val, (p, q) in zip(b_kappa, self.kappa_idx):
+                kappa_mat[p, q] = kappa_val
+                kappa_mat[q, p] = -kappa_val
+            h_k = np.einsum('po,oq->pq', kappa_mat, self.h_mo)
+            h_k += np.einsum('qo,po->pq', kappa_mat, self.h_mo)
+            g_k = np.einsum('po,oqrs->pqrs', kappa_mat, self.g_mo)
+            g_k += np.einsum('qo,pors->pqrs', kappa_mat, self.g_mo)
+            g_k += np.einsum('ro,pqos->pqrs', kappa_mat, self.g_mo)
+            g_k += np.einsum('so,pqro->pqrs', kappa_mat, self.g_mo)
+            grad_kappa = get_orbital_gradient(
+                self.h_mo,
+                self.g_mo,
+                self.kappa_idx,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.rdm1,
+                self.rdm2,
+            )
+            grad_kappa_mat  = np.zeros_like(self._c_mo) 
+            for grad, (p, q) in zip(grad_kappa, self.kappa_idx):
+                grad_kappa_mat[p, q] = grad
+                grad_kappa_mat[q, p] = -grad
+            Ek_mat = np.matmul(grad_kappa_mat, b_kappa) - np.matmul(b_kappa, grad_kappa_mat)
+            grad_k = get_orbital_gradient(
+                h_k,
+                g_k,
+                self.kappa_idx,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.rdm1,
+                self.rdm2,
+            )
+            # E_{kappa,kappa}b_kappa contribution to sigma_kappa
+            for i, (p,q) in enumerate(self.kappa_idx):
+                hvp[i] += grad_k[i] + Ek_mat[p,q]
+            if theta_optimization:
+                b_theta = trial_vec[num_kappa:]
+                H_k = hamiltonian_0i_0a(
+                    h_k,
+                    g_k,
+                    self.num_inactive_orbs,
+                    self.num_active_orbs,
+                )
+                H_1i_1a = hamiltonian_1i_1a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+                # E_{kappa,theta}b_theta contribution to sigma_kappa
+                for i, (p,q) in enumerate(self.kappa_idx):
+                    hvp[i] += np.sum(self._theta_gradient(commutator(Epq(p,q)-Epq(q,p),H_1i_1a))*b_theta)
+                # E_{theta,kappa}b_kappa contribution to sigma_theta
+                hvp[num_kappa:] += self._theta_gradient(H_k)
+        if theta_optimization:
+            # E_{theta,theta}b_theta contribution to sigma_theta
+            b_theta = trial_vec[num_kappa:]
+            # Some adjoint thingy
+            self.num_energy_evals += (2 * np.sum(
+                list(self.ups_layout.grad_param_R.values())
+            ))**2  # Count energy measurements for theta theta Hessian
+        return hvp
 
     def _calc_energy_rotosolve_optimization(
         self,
