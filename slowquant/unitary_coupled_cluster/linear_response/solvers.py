@@ -1,10 +1,13 @@
 import time
 import scipy
 import numpy as np
+import numba as nb
 
 from typing import Any
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
+
+from slowquant.unitary_coupled_cluster.density_matrix import RDM1, RDM2
 
 class Solvers(ABC):
 
@@ -331,3 +334,49 @@ def one_index_transform(K: np.ndarray, h_mo: np.ndarray, g_mo: np.ndarray) -> tu
     g *= inv_sqrt_2
 
     return h, g
+
+@nb.jit(nopython=True)
+def get_orbital_rotation_gradient(
+    h_int: np.ndarray,
+    g_int: np.ndarray,
+    q_idx: list[tuple[int, int]],
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    rdm1: np.ndarray,
+    rdm2: np.ndarray,
+) -> np.ndarray:
+    r"""Calculate the orbital gradient.
+
+    .. math::
+        g_{pq}^{\hat{q}} = \left<0\left|\left[\hat{q}_{pq},\hat{H}\right]\right|0\right>
+
+    Args:
+        h_int: One-electron integrals in MO in Hamiltonian.
+        g_int: Two-electron integrals in MO in Hamiltonian.
+        q_idx: Orbital rotation parameter indices in spatial basis.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        rdm1: Active part of 1-RDM.
+        rdm2: Active part of 2-RDM.
+
+    Returns:
+        Orbital gradient.
+    """
+    inv_sqrt_2 = 1 / np.sqrt(2)
+    gradient = np.zeros(len(q_idx))
+    for idx, (t, u) in enumerate(q_idx):
+        # 1e contribution
+        for p in range(num_inactive_orbs + num_active_orbs):
+            gradient[idx] += h_int[u, p] * RDM1(t, p, num_inactive_orbs, num_active_orbs, rdm1)
+            gradient[idx] -= h_int[p, t] * RDM1(p, u, num_inactive_orbs, num_active_orbs, rdm1)
+        # 2e contribution
+        for p in range(num_inactive_orbs + num_active_orbs):
+            for q in range(num_inactive_orbs + num_active_orbs):
+                for r in range(num_inactive_orbs + num_active_orbs):
+                    gradient[idx] += g_int[u, p, q, r] * RDM2(
+                        t, p, q, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                    )
+                    gradient[idx] -= g_int[p, q, r, t] * RDM2(
+                        p, q, r, u, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                    )
+    return inv_sqrt_2 * gradient

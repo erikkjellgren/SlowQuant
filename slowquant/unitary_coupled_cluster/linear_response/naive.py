@@ -16,6 +16,7 @@ from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
     LinearResponseBaseClass,
 )
 from slowquant.unitary_coupled_cluster.linear_response.solvers import (
+    get_orbital_rotation_gradient,
     one_index_transform,
 )
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
@@ -351,38 +352,18 @@ class LinearResponse(LinearResponseBaseClass):
                     self.wf.num_active_orbs,
                 )
 
-                tH_1i_1a = hamiltonian_1i_1a(
-                    h_plus,
-                    g_plus,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
-                )
                 tH00_ket = propagate_state([tH_0i_0a], self.wf.ci_coeffs, *self.index_info)
 
-                qs = FermionicOperator({})
-                for kappa, q in zip(kappas[:, root], self.q_ops):
-                    qs += kappa * q + kappa.conjugate() * q.dagger
-
-                # # (A+B)_qq @ b_q
-                # sigma_plus[:num_q, root] = get_orbital_gradient(
-                #     h,
-                #     g,
-                #     self.wf.kappa_no_activeactive_idx_dagger,
-                #     self.wf.num_inactive_orbs,
-                #     self.wf.num_active_orbs,
-                #     self.wf.rdm1,
-                #     self.wf.rdm2,
-                # )
-
                 # (A+B)_qq @ b_q
-                for i, qI in enumerate(self.q_ops):
-                    sigma_plus[i, root] = expectation_value(
-                        self.wf.ci_coeffs,
-                        [qI.dagger * tH_1i_1a],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
+                sigma_plus[:num_q, root] = get_orbital_rotation_gradient(
+                    h_plus,
+                    g_plus,
+                    self.wf.kappa_no_activeactive_idx_dagger,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.wf.rdm2,
+                )
 
                 qs = FermionicOperator({})
                 for kappa, q in zip(kappas[:, root], self.q_ops):
@@ -447,38 +428,18 @@ class LinearResponse(LinearResponseBaseClass):
                     self.wf.num_active_orbs,
                 )
 
-                tH_1i_1a = hamiltonian_1i_1a(
-                    h_minus,
-                    g_minus,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                    self.wf.num_virtual_orbs,
-                )
                 tH00_ket = propagate_state([tH_0i_0a], self.wf.ci_coeffs, *self.index_info)
 
-                qs = FermionicOperator({})
-                for kappa, q in zip(kappas[:, root], self.q_ops):
-                    qs += kappa * q - kappa.conjugate() * q.dagger
-
-                # # (A-B)_qq @ b_q
-                # sigma_minus[:num_q, root] = get_orbital_gradient(
-                #     h,
-                #     g,
-                #     self.wf.kappa_no_activeactive_idx_dagger,
-                #     self.wf.num_inactive_orbs,
-                #     self.wf.num_active_orbs,
-                #     self.wf.rdm1,
-                #     self.wf.rdm2,
-                # )
-
-                # (A+B)_qq @ b_q
-                for i, qI in enumerate(self.q_ops):
-                    sigma_minus[i, root] = expectation_value(
-                        self.wf.ci_coeffs,
-                        [qI.dagger * tH_1i_1a],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
+                # (A-B)_qq @ b_q
+                sigma_minus[:num_q, root] = get_orbital_rotation_gradient(
+                    h_minus,
+                    g_minus,
+                    self.wf.kappa_no_activeactive_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.wf.rdm2,
+                )
 
                 qs = FermionicOperator({})
                 for kappa, q in zip(kappas[:, root], self.q_ops):
