@@ -19,6 +19,7 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
     get_electronic_energy,
     get_orbital_gradient,
 )
+from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.integral_manager import IntegralManager
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     build_operator_matrix,
@@ -27,7 +28,13 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     get_ucc_T,
     propagate_state,
 )
-from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
+from slowquant.unitary_coupled_cluster.operators import (
+    Eminuspq,
+    Epq,
+    commutator,
+    hamiltonian_0i_0a,
+    hamiltonian_1i_1a,
+)
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import UccStructure
 
@@ -733,6 +740,9 @@ class WaveFunctionUCC:
     ) -> None:
         """Run two step optimization of wave function.
 
+        Optimizers using Hessian vector product for theta are not very stable,
+        due to finite difference of finite difference.
+
         Args:
             optimizer_name: Name of optimizer.
             orbital_optimization: Perform orbital optimization.
@@ -797,10 +807,16 @@ class WaveFunctionUCC:
                 theta_optimization=True,
                 kappa_optimization=False,
             )
+            hessp_theta = partial(
+                self._calc_hessian_vector_product_optimization,
+                theta_optimization=True,
+                kappa_optimization=False,
+            )
             optimizer = Optimizers(
                 energy_theta,
                 optimizer_name,
                 grad=gradient_theta,
+                hessp=hessp_theta,
                 maxiter=maxiter,
                 tol=tol,
                 is_silent=is_silent_subiterations,
@@ -824,11 +840,17 @@ class WaveFunctionUCC:
                     theta_optimization=False,
                     kappa_optimization=True,
                 )
+                hessp_oo = partial(
+                    self._calc_hessian_vector_product_optimization,
+                    theta_optimization=False,
+                    kappa_optimization=True,
+                )
 
                 optimizer = Optimizers(
                     energy_oo,
                     "l-bfgs-b",
                     grad=gradient_oo,
+                    hessp=hessp_oo,
                     maxiter=maxiter,
                     tol=tol,
                     is_silent=is_silent_subiterations,
@@ -867,6 +889,9 @@ class WaveFunctionUCC:
         maxiter: int = 1000,
     ) -> None:
         """Run one step optimization of wave function.
+
+        Optimizers using Hessian vector product for theta are not very stable,
+        due to finite difference of finite difference.
 
         Args:
             optimizer_name: Name of optimizer.
@@ -924,6 +949,11 @@ class WaveFunctionUCC:
                     theta_optimization=True,
                     kappa_optimization=True,
                 )
+                hessp = partial(
+                    self._calc_hessian_vector_product_optimization,
+                    theta_optimization=True,
+                    kappa_optimization=True,
+                )
             else:
                 energy = partial(
                     self._calc_energy_optimization,
@@ -932,6 +962,11 @@ class WaveFunctionUCC:
                 )
                 gradient = partial(
                     self._calc_gradient_optimization,
+                    theta_optimization=False,
+                    kappa_optimization=True,
+                )
+                hessp = partial(
+                    self._calc_hessian_vector_product_optimization,
                     theta_optimization=False,
                     kappa_optimization=True,
                 )
@@ -946,6 +981,11 @@ class WaveFunctionUCC:
                 theta_optimization=True,
                 kappa_optimization=False,
             )
+            hessp = partial(
+                self._calc_hessian_vector_product_optimization,
+                theta_optimization=True,
+                kappa_optimization=False,
+            )
         if orbital_optimization:
             cep_move_fun = self._move_cep
             if len(self.thetas) > 0:
@@ -955,7 +995,15 @@ class WaveFunctionUCC:
         else:
             cep_move_fun = None
             parameters = self.thetas
-        optimizer = Optimizers(energy, optimizer_name, grad=gradient, maxiter=maxiter, tol=tol, cep_move=cep_move_fun)
+        optimizer = Optimizers(
+            energy,
+            optimizer_name,
+            grad=gradient,
+            hessp=hessp,
+            maxiter=maxiter,
+            tol=tol,
+            cep_move=cep_move_fun,
+        )
         self._old_opt_parameters = np.zeros_like(parameters) + 10**20
         self._E_opt_old = 0.0
         res = optimizer.minimize(
@@ -1030,8 +1078,47 @@ class WaveFunctionUCC:
         self._old_opt_parameters = np.copy(parameters)
         return E
 
+    def _theta_gradient(self, operator: FermionicOperator, set_step_size: None | float = None) -> np.ndarray:
+        gradient = np.zeros(len(self.thetas))
+        # Numerical finite difference gradient
+        eps = np.finfo(np.float64).eps ** (1 / 2)  # half-precision of double-precision floating-point numbers
+        if eps < 10e-13:
+            raise ValueError(f"Cannot perform finite-difference step-size is too small, {eps}")
+        Hket = propagate_state(
+            [operator],
+            self.ci_coeffs,
+            self.ci_info,
+        )
+        E = self.ci_coeffs @ Hket
+        theta_params = np.zeros_like(self.thetas)
+        Tmat = build_operator_matrix(
+            get_ucc_T(self.thetas, self.ucc_layout),
+            self.ci_info,
+        )
+        for i in range(len(theta_params)):
+            sign_step = (theta_params[i] >= 0).astype(float) * 2 - 1  # type: ignore [attr-defined]
+            if set_step_size is None:
+                sign_step = (theta_params[i] >= 0).astype(float) * 2 - 1  # type: ignore [attr-defined]
+                step_size = eps * sign_step * max(1, abs(theta_params[i]))
+            else:
+                step_size = set_step_size
+            theta_params[i] += step_size
+            Tmat_plus = build_operator_matrix(
+                get_ucc_T(theta_params, self.ucc_layout),
+                self.ci_info,
+            )
+            bra = ss.linalg.expm_multiply(Tmat + Tmat_plus, self.csf_coeffs, traceA=0.0)
+            E_plus = bra @ Hket
+            theta_params[i] -= step_size
+            gradient[i] = 2 * (E_plus - E) / step_size
+        return gradient
+
     def _calc_gradient_optimization(
-        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
+        self,
+        parameters: list[float],
+        theta_optimization: bool,
+        kappa_optimization: bool,
+        set_step_size: None | float = None,
     ) -> np.ndarray:
         r"""Calculate electronic gradient.
 
@@ -1074,33 +1161,96 @@ class WaveFunctionUCC:
                 self.num_inactive_orbs,
                 self.num_active_orbs,
             )
-            # Numerical finite difference gradient
-            eps = np.finfo(np.float64).eps ** (
-                1 / 2
-            )  # half-precision of double-precision floating-point numbers
-            if eps < 10e-13:
-                raise ValueError(f"Cannot perform finite-difference step-size is too small, {eps}")
-            Hket = propagate_state(
-                [Hamiltonian],
-                self.ci_coeffs,
-                self.ci_info,
-            )
-            E = self.ci_coeffs @ Hket
-            theta_params = np.zeros_like(self.thetas)
-            Tmat = build_operator_matrix(
-                get_ucc_T(self.thetas, self.ucc_layout),
-                self.ci_info,
-            )
-            for i in range(len(theta_params)):
-                sign_step = (theta_params[i] >= 0).astype(float) * 2 - 1  # type: ignore [attr-defined]
-                step_size = eps * sign_step * max(1, abs(theta_params[i]))
-                theta_params[i] += step_size
-                Tmat_plus = build_operator_matrix(
-                    get_ucc_T(theta_params, self.ucc_layout),
-                    self.ci_info,
-                )
-                bra = ss.linalg.expm_multiply(Tmat + Tmat_plus, self.csf_coeffs, traceA=0.0)
-                E_plus = bra @ Hket
-                theta_params[i] -= step_size
-                gradient[i + num_kappa] = 2 * (E_plus - E) / step_size
+            gradient[num_kappa:] = self._theta_gradient(Hamiltonian, set_step_size=set_step_size)
         return gradient
+
+    def _calc_hessian_vector_product_optimization(
+        self,
+        parameters: list[float],
+        trial_vec: list[float],
+        theta_optimization: bool,
+        kappa_optimization: bool,
+    ) -> np.ndarray:
+        """Calculate Hessian vector product.
+
+        Args:
+            parameters: Ansatz and orbital rotation parameters.
+            trial_vec: Trial vector.
+            theta_optimization: If used in theta optimization.
+            kappa_optimization: If used in kappa optimization.
+
+        Returns:
+            Hessian vector product.
+        """
+        hvp = np.zeros(len(parameters))
+        num_kappa = 0
+        if kappa_optimization:
+            num_kappa = len(self.kappa_idx)
+            self.kappa = parameters[:num_kappa]
+        if theta_optimization:
+            self.thetas = parameters[num_kappa:]
+        if kappa_optimization:
+            b_kappa = trial_vec[:num_kappa]
+            kappa_mat = np.zeros_like(self._c_mo)
+            for kappa_val, (p, q) in zip(b_kappa, self.kappa_idx):
+                kappa_mat[p, q] = kappa_val
+                kappa_mat[q, p] = -kappa_val
+            h_k = np.einsum("po,oq->pq", kappa_mat, self.h_mo)
+            h_k += np.einsum("qo,po->pq", kappa_mat, self.h_mo)
+            g_k = np.einsum("po,oqrs->pqrs", kappa_mat, self.g_mo)
+            g_k += np.einsum("qo,pors->pqrs", kappa_mat, self.g_mo)
+            g_k += np.einsum("ro,pqos->pqrs", kappa_mat, self.g_mo)
+            g_k += np.einsum("so,pqro->pqrs", kappa_mat, self.g_mo)
+            grad_kappa = get_orbital_gradient(
+                self.h_mo,
+                self.g_mo,
+                self.kappa_idx,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.rdm1,
+                self.rdm2,
+            )
+            grad_kappa_mat = np.zeros_like(self._c_mo)
+            for grad, (p, q) in zip(grad_kappa, self.kappa_idx):
+                grad_kappa_mat[p, q] = grad
+                grad_kappa_mat[q, p] = -grad
+            Ek_mat = np.matmul(grad_kappa_mat, kappa_mat) - np.matmul(kappa_mat, grad_kappa_mat)
+            grad_k = get_orbital_gradient(
+                h_k,
+                g_k,
+                self.kappa_idx,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.rdm1,
+                self.rdm2,
+            )
+            # E_{kappa,kappa}b_kappa contribution to sigma_kappa
+            for i, (p, q) in enumerate(self.kappa_idx):
+                hvp[i] += grad_k[i] + Ek_mat[p, q]
+            if theta_optimization:
+                b_theta = trial_vec[num_kappa:]
+                H_k = hamiltonian_0i_0a(
+                    h_k,
+                    g_k,
+                    self.num_inactive_orbs,
+                    self.num_active_orbs,
+                )
+                H_1i_1a = hamiltonian_1i_1a(
+                    self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+                )
+                # E_{kappa,theta}b_theta contribution to sigma_kappa
+                for i, (p, q) in enumerate(self.kappa_idx):
+                    hvp[i] += np.sum(self._theta_gradient(commutator(Eminuspq(p, q), H_1i_1a)) * b_theta)
+                # E_{theta,kappa}b_kappa contribution to sigma_theta
+                hvp[num_kappa:] += self._theta_gradient(H_k)
+        if theta_optimization:
+            # E_{theta,theta}b_theta contribution to sigma_theta
+            b_theta = trial_vec[num_kappa:]
+            h = 10**-3
+            parameters_plus = (np.array(parameters[num_kappa:]) + h * np.array(b_theta)).tolist()
+            g_plus = self._calc_gradient_optimization(parameters_plus, True, False, set_step_size=h)
+            parameters_minus = (np.array(parameters[num_kappa:]) - h * np.array(b_theta)).tolist()
+            g_minus = self._calc_gradient_optimization(parameters_minus, True, False, set_step_size=h)
+            self.thetas = parameters[num_kappa:]
+            hvp[num_kappa:] = (g_plus - g_minus) / (2 * h)
+        return hvp
