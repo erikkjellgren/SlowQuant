@@ -30,7 +30,13 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     propagate_unitary,
     propagate_unitary_SA,
 )
-from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a, commutator, hamiltonian_1i_1a
+from slowquant.unitary_coupled_cluster.operators import (
+    Eminuspq,
+    Epq,
+    commutator,
+    hamiltonian_0i_0a,
+    hamiltonian_1i_1a,
+)
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import UpsStructure
 
@@ -1123,9 +1129,33 @@ class WaveFunctionUPS:
             gradient[num_kappa:] = self._theta_gradient(Hamiltonian)
         return gradient
 
+    def _calc_hessian_vector_product_optimization2(
+        self,
+        parameters: list[float],
+        trial_vec: list[float],
+        theta_optimization: bool,
+        kappa_optimization: bool,
+    ) -> np.ndarray:
+        h = 10**-3
+        parameters_plus = (np.array(parameters) + h * np.array(trial_vec)).tolist()
+        g_plus = self._calc_gradient_optimization(parameters_plus, theta_optimization, kappa_optimization)
+        parameters_minus = (np.array(parameters) - h * np.array(trial_vec)).tolist()
+        g_minus = self._calc_gradient_optimization(parameters_minus, theta_optimization, kappa_optimization)
+        num_kappa = 0
+        if kappa_optimization:
+            num_kappa = len(self.kappa_idx)
+            self.kappa = parameters[:num_kappa]
+        if theta_optimization:
+            self.thetas = parameters[num_kappa:]
+        return (g_plus - g_minus) / (2 * h)
+
     def _calc_hessian_vector_product_optimization(
-            self, parameters: list[float], trial_vec: list[float], theta_optimization: bool, kappa_optimization: bool,
-        ) -> np.ndarray:
+        self,
+        parameters: list[float],
+        trial_vec: list[float],
+        theta_optimization: bool,
+        kappa_optimization: bool,
+    ) -> np.ndarray:
         """Calculate Hessian vector product.
 
         Args:
@@ -1150,12 +1180,12 @@ class WaveFunctionUPS:
             for kappa_val, (p, q) in zip(b_kappa, self.kappa_idx):
                 kappa_mat[p, q] = kappa_val
                 kappa_mat[q, p] = -kappa_val
-            h_k = np.einsum('po,oq->pq', kappa_mat, self.h_mo)
-            h_k += np.einsum('qo,po->pq', kappa_mat, self.h_mo)
-            g_k = np.einsum('po,oqrs->pqrs', kappa_mat, self.g_mo)
-            g_k += np.einsum('qo,pors->pqrs', kappa_mat, self.g_mo)
-            g_k += np.einsum('ro,pqos->pqrs', kappa_mat, self.g_mo)
-            g_k += np.einsum('so,pqro->pqrs', kappa_mat, self.g_mo)
+            h_k = np.einsum("po,oq->pq", kappa_mat, self.h_mo)
+            h_k += np.einsum("qo,po->pq", kappa_mat, self.h_mo)
+            g_k = np.einsum("po,oqrs->pqrs", kappa_mat, self.g_mo)
+            g_k += np.einsum("qo,pors->pqrs", kappa_mat, self.g_mo)
+            g_k += np.einsum("ro,pqos->pqrs", kappa_mat, self.g_mo)
+            g_k += np.einsum("so,pqro->pqrs", kappa_mat, self.g_mo)
             grad_kappa = get_orbital_gradient(
                 self.h_mo,
                 self.g_mo,
@@ -1165,11 +1195,11 @@ class WaveFunctionUPS:
                 self.rdm1,
                 self.rdm2,
             )
-            grad_kappa_mat  = np.zeros_like(self._c_mo) 
+            grad_kappa_mat = np.zeros_like(self._c_mo)
             for grad, (p, q) in zip(grad_kappa, self.kappa_idx):
                 grad_kappa_mat[p, q] = grad
                 grad_kappa_mat[q, p] = -grad
-            Ek_mat = np.matmul(grad_kappa_mat, b_kappa) - np.matmul(b_kappa, grad_kappa_mat)
+            Ek_mat = np.matmul(grad_kappa_mat, kappa_mat) - np.matmul(kappa_mat, grad_kappa_mat)
             grad_k = get_orbital_gradient(
                 h_k,
                 g_k,
@@ -1180,8 +1210,8 @@ class WaveFunctionUPS:
                 self.rdm2,
             )
             # E_{kappa,kappa}b_kappa contribution to sigma_kappa
-            for i, (p,q) in enumerate(self.kappa_idx):
-                hvp[i] += grad_k[i] + Ek_mat[p,q]
+            for i, (p, q) in enumerate(self.kappa_idx):
+                hvp[i] += grad_k[i] + Ek_mat[p, q]
             if theta_optimization:
                 b_theta = trial_vec[num_kappa:]
                 H_k = hamiltonian_0i_0a(
@@ -1190,19 +1220,29 @@ class WaveFunctionUPS:
                     self.num_inactive_orbs,
                     self.num_active_orbs,
                 )
-                H_1i_1a = hamiltonian_1i_1a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+                H_1i_1a = hamiltonian_1i_1a(
+                    self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+                )
                 # E_{kappa,theta}b_theta contribution to sigma_kappa
-                for i, (p,q) in enumerate(self.kappa_idx):
-                    hvp[i] += np.sum(self._theta_gradient(commutator(Epq(p,q)-Epq(q,p),H_1i_1a))*b_theta)
+                for i, (p, q) in enumerate(self.kappa_idx):
+                    hvp[i] += np.sum(self._theta_gradient(commutator(Eminuspq(p, q), H_1i_1a)) * b_theta)
                 # E_{theta,kappa}b_kappa contribution to sigma_theta
                 hvp[num_kappa:] += self._theta_gradient(H_k)
         if theta_optimization:
             # E_{theta,theta}b_theta contribution to sigma_theta
             b_theta = trial_vec[num_kappa:]
-            # Some adjoint thingy
-            self.num_energy_evals += (2 * np.sum(
-                list(self.ups_layout.grad_param_R.values())
-            ))**2  # Count energy measurements for theta theta Hessian
+            # Doing finite diff right now.
+            # The proper way should be figured out.
+            h = 10**-4
+            parameters_plus = (np.array(parameters[num_kappa:]) + h * np.array(b_theta)).tolist()
+            g_plus = self._calc_gradient_optimization(parameters_plus, True, False)
+            parameters_minus = (np.array(parameters[num_kappa:]) - h * np.array(b_theta)).tolist()
+            g_minus = self._calc_gradient_optimization(parameters_minus, True, False)
+            self.thetas = parameters[num_kappa:]
+            hvp[num_kappa:] = (g_plus - g_minus) / (2 * h)
+            self.num_energy_evals += (
+                2 * np.sum(list(self.ups_layout.grad_param_R.values()))
+            ) ** 2  # Count energy measurements for theta theta Hessian
         return hvp
 
     def _calc_energy_rotosolve_optimization(
