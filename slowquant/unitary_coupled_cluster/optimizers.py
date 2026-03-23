@@ -34,7 +34,7 @@ class Optimizers:
         tol: float = 10e-8,
         is_silent: bool = False,
         energy_eval_callback: Callable[[], int] | None = None,
-        cep_move: Callable[[], None] | None = None
+        cep_move: Callable[[], None] | None = None,
     ) -> None:
         """Initialize optimizer class.
 
