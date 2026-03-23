@@ -348,7 +348,7 @@ def get_orbital_rotation_gradient(
     r"""Calculate the orbital gradient.
 
     .. math::
-        g_{pq}^{\hat{q}} = \left<0\left|\left[\hat{q}_{pq},\hat{H}\right]\right|0\right>
+        g_{tu}^{\hat{q}} = \left<0\left|\left[\hat{q}_{tu},\hat{H}\right]\right|0\right>
 
     Args:
         h_int: One-electron integrals in MO in Hamiltonian.
@@ -380,3 +380,35 @@ def get_orbital_rotation_gradient(
                         p, q, r, u, num_inactive_orbs, num_active_orbs, rdm1, rdm2
                     )
     return inv_sqrt_2 * gradient
+
+@nb.jit(nopython=True)
+def get_orbital_metric_qq_block(
+    q_idx: list[tuple[int, int]],
+    trial: np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    rdm1: np.ndarray,
+) -> np.ndarray:
+    r"""Calculate the Sigma matrix orbital-orbital block.
+
+    .. math::
+        \Sum_{tu}\Sigma_{pq,tu}^{\hat{q},\hat{q}} = \left<0\left|\left[\hat{q}_{pq}^\dagger,\hat{q}_{tu}\right]\right|0\right>
+
+    Args:
+        q_idx: Orbital rotation parameter indices in spatial basis.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        rdm1: Active part of 1-RDM.
+
+    Returns:
+        Sigma matrix orbital-orbital block.
+    """
+    sigma = np.zeros(len(q_idx))
+    for idx1, (u, t) in enumerate(q_idx):
+        for idx2, (p, q) in enumerate(q_idx):
+            if p == u:
+                sigma[idx1] += RDM1(t, q, num_inactive_orbs, num_active_orbs, rdm1) * trial[idx2]
+            if t == q:
+                sigma[idx1] -= RDM1(p, u, num_inactive_orbs, num_active_orbs, rdm1) * trial[idx2]
+    return - 0.5 * sigma
+

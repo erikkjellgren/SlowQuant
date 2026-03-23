@@ -17,6 +17,7 @@ from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
 )
 from slowquant.unitary_coupled_cluster.linear_response.solvers import (
     get_orbital_rotation_gradient,
+    get_orbital_metric_qq_block,
     one_index_transform,
 )
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
@@ -496,17 +497,13 @@ class LinearResponse(LinearResponseBaseClass):
                     )
 
             for root in range(n_roots):
-                qs = FermionicOperator({})
-                for kappa, q in zip(kappas[:, root], self.q_ops):
-                    qs += kappa * q
-                # Sigma_qq @ b_q
-                for i, qI in enumerate(self.q_ops):
-                    tau_minus[i, root] = expectation_value(
-                        self.wf.ci_coeffs,
-                        [qI.dagger * qs],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
+                tau_minus[:num_q, root] = get_orbital_metric_qq_block(
+                    self.wf.kappa_no_activeactive_idx,
+                    trial[:, root],
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                )
 
         for root in range(n_roots):
 
@@ -617,17 +614,19 @@ class LinearResponse(LinearResponseBaseClass):
             Gs = FermionicOperator({})
             for S, G in zip(Ss[:, root], self.G_ops):
                 Gs += S * G
+            Gs_ket = propagate_state([Gs], self.wf.ci_coeffs, *self.index_info)
+            Gsd_ket = propagate_state([Gs.dagger], self.wf.ci_coeffs, *self.index_info)
             # Sigma_GG @ b
             for i, GI in enumerate(self.G_ops):
                 tau_minus[num_q + i, root] = expectation_value(
                     self.wf.ci_coeffs,
-                    [GI.dagger * Gs],
-                    self.wf.ci_coeffs,
+                    [GI.dagger],
+                    Gs_ket,
                     *self.index_info,
                 )
                 tau_minus[num_q + i, root] -= expectation_value(
-                    self.wf.ci_coeffs,
-                    [Gs * GI.dagger],
+                    Gsd_ket,
+                    [GI.dagger],
                     self.wf.ci_coeffs,
                     *self.index_info,
                 )
