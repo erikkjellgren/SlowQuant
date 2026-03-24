@@ -396,25 +396,26 @@ class LinearResponse(LinearResponseBaseClass):
                     Gs += S * G + S.conjugate() * G.dagger
                 Gs_ket = propagate_state([Gs], self.wf.ci_coeffs, *self.index_info)
                 Gsd_ket = propagate_state([Gs.dagger], self.wf.ci_coeffs, *self.index_info)
+                GsH11 = Gs * self.H_1i_1a
 
                 # (A+B)_qG @ b_G
                 for i, qi in enumerate(self.q_ops):
-                    qi_ket = propagate_state([qi], self.wf.ci_coeffs, *self.index_info)
+                    qidH11 = qi.dagger * self.H_1i_1a
                     sigma_plus[i, root] += expectation_value(
                         self.wf.ci_coeffs,
-                        [qi.dagger * self.H_1i_1a],
+                        [qidH11],
                         Gs_ket,
                         *self.index_info,
                     )
                     sigma_plus[i, root] -= 0.5 * expectation_value(
                         Gsd_ket,
-                        [qi.dagger * self.H_1i_1a],
+                        [qidH11],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
                     sigma_plus[i, root] -= 0.5 * expectation_value(
-                        qi_ket,
-                        [Gs * self.H_1i_1a],
+                        self.wf.ci_coeffs,
+                        [qi.dagger * GsH11],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
@@ -472,25 +473,26 @@ class LinearResponse(LinearResponseBaseClass):
                     Gs += S * G - S.conjugate() * G.dagger
                 Gs_ket = propagate_state([Gs], self.wf.ci_coeffs, *self.index_info)
                 Gsd_ket = propagate_state([Gs.dagger], self.wf.ci_coeffs, *self.index_info)
+                GsH11 = Gs * self.H_1i_1a
 
                 # (A-B)_qG @ b_G
                 for i, qi in enumerate(self.q_ops):
-                    qi_ket = propagate_state([qi], self.wf.ci_coeffs, *self.index_info)
+                    qidH11 = qi.dagger * self.H_1i_1a
                     sigma_minus[i, root] += expectation_value(
                         self.wf.ci_coeffs,
-                        [qi.dagger * self.H_1i_1a],
+                        [qidH11],
                         Gs_ket,
                         *self.index_info,
                     )
                     sigma_minus[i, root] -= 0.5 * expectation_value(
                         Gsd_ket,
-                        [qi.dagger * self.H_1i_1a],
+                        [qidH11],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
                     sigma_minus[i, root] -= 0.5 * expectation_value(
-                        qi_ket,
-                        [Gs * self.H_1i_1a],
+                        self.wf.ci_coeffs,
+                        [qi.dagger * GsH11],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
