@@ -310,6 +310,7 @@ class LinearResponse(LinearResponseBaseClass):
         sigma_plus = np.zeros((num_ops, n_roots))
         sigma_minus = np.zeros((num_ops, n_roots))
         tau_minus = np.zeros((num_ops, n_roots))
+        H00_ket = propagate_state([self.H_0i_0a], self.wf.ci_coeffs, *self.index_info)
 
         if num_q != 0:
             K_plus = np.zeros((self.wf.num_orbs, self.wf.num_orbs, n_roots))
@@ -437,6 +438,7 @@ class LinearResponse(LinearResponseBaseClass):
                 )
 
         GI_expect = np.zeros(len(self.G_ops))
+        GIdH_expect = np.zeros(len(self.G_ops))
         for i, GI in enumerate(self.G_ops):
             GI_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
 
@@ -446,6 +448,12 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.ci_coeffs,
                 *self.index_info,
             )
+            GIdH_expect[i] = expectation_value(
+                    GI_ket,
+                    [],
+                    H00_ket,
+                    *self.index_info,
+                )
 
         for root in range(n_roots):
 
@@ -454,6 +462,8 @@ class LinearResponse(LinearResponseBaseClass):
                 Gs += S * G
             Gs_ket = propagate_state([Gs], self.wf.ci_coeffs, *self.index_info)
             HGs_ket = propagate_state([self.H_0i_0a], Gs_ket, *self.index_info)
+            Gs_expect = sum(Ss[:, root] * GI_expect)
+            GsdH_expect = sum(Ss[:, root] * GIdH_expect)
 
             for i, GI in enumerate(self.G_ops):
                 GI_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
@@ -475,10 +485,14 @@ class LinearResponse(LinearResponseBaseClass):
                 sigma_minus[num_q + i, root] -= self.wf.energy_elec * val
                 tau_minus[num_q + i, root] += val
 
-            Gs_expect = sum(Ss[:, root] * GI_expect)
+                sigma_minus[num_q + i, root] += 2 * self.wf.energy_elec * GI_expect[i] * Gs_expect
+                sigma_minus[num_q + i, root] -= GI_expect[i] * GsdH_expect
+                sigma_minus[num_q + i, root] -= GIdH_expect[i] * Gs_expect
+
             # Sigma_GG @ b_G
             for i, _ in enumerate(self.G_ops):
                 tau_minus[num_q + i, root] -= GI_expect[i] * Gs_expect
+
 
         return sigma_plus, sigma_minus, tau_minus
 
