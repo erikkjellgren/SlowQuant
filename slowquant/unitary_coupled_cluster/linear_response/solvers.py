@@ -150,14 +150,13 @@ class Davidson(Solvers):
 
     @staticmethod
     def _orthonormalize(trial: np.ndarray) -> np.ndarray:
-        """Orthonormalize columns of trial_plus and trial_minus using QR and return Q with collapsed tiny columns removed."""
-        Q, R = np.linalg.qr(np.vstack((trial, trial)))
+        """Orthonormalize columns of trial using QR and return Q with collapsed tiny columns removed."""
+        Q, R = np.linalg.qr(trial)
         # remove near-zero columns (if any)
         diagR = np.abs(np.diag(R))
         keep = diagR > 1e-12
         new_trial = Q[:, keep]
         new_trial /= np.linalg.norm(new_trial, axis=0)
-        new_trial = new_trial[:trial.shape[0], :]
         return new_trial
 
     def _compute_residual_vectors(self, n_roots: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -282,11 +281,22 @@ class Davidson(Solvers):
         return new_trial
 
     def _remove_linear_dependencies(self, trial: np.ndarray) -> np.ndarray:
-        """Remove linearly dependent trial vectors by checking the rank."""
-        u, s, vh = np.linalg.svd(trial, full_matrices=False)
+        """Remove linearly dependent trial vectors."""
         tol = 1e-12
-        keep = s > tol
-        new_vector = (u[:, keep] * s[keep]) @ vh[keep, :]
+
+        nvecs = trial.shape[1]
+        Sb = np.zeros((nvecs, nvecs))
+        for i in range(nvecs):
+            Sb[i, i] = np.dot(trial[:, i], trial[:, i])
+            for j in range(i):
+                Sb[i, j] = np.dot(trial[:, i], trial[:, j])
+                Sb[j, i] = Sb[i, j]
+
+        l, T = np.linalg.eigh(Sb)
+        b_norm = np.sqrt(Sb.diagonal())
+        keep = l > b_norm * tol
+
+        new_vector = trial @ T[:, keep]
         return new_vector
 
     def _random_trial_vector(self) -> np.ndarray:
