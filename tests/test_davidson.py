@@ -180,7 +180,7 @@ def test_lih_proj_explicit():
     )
     assert np.allclose(eigvals, solutions, atol=threshold)
 
-def test_lih_proj():
+def test_lih_projected():
     """Test LiH energies for projected q LR methods."""
     SQobj = sq.SlowQuant()
     SQobj.set_molecule(
@@ -214,6 +214,44 @@ def test_lih_proj():
             0.12957561,
             0.17886086,
             0.17886086,
+        ]
+    )
+    assert np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)
+
+def test_lih_allprojected():
+    """Test LiH energies for projected q LR methods."""
+    SQobj = sq.SlowQuant()
+    SQobj.set_molecule(
+        """Li   0.0           0.0  0.0;
+        H   1.67  0.0  0.0;""",
+        distance_unit="angstrom",
+    )
+    SQobj.set_basis_set("sto-3g")
+    SQobj.init_hartree_fock()
+    SQobj.hartree_fock.run_restricted_hartree_fock()
+    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
+    g_eri = SQobj.integral.electron_repulsion_tensor
+    WF = WaveFunctionUCC(
+        SQobj.molecule.number_electrons,
+        (2, 2),
+        SQobj.hartree_fock.mo_coeff,
+        h_core,
+        g_eri,
+        "SD",
+    )
+    WF.run_wf_optimization_1step("L-BFGS-B", True)
+
+    threshold = 10 ** (-5)
+
+    # naive
+    LR_naive = allprojected.LinearResponse(WF, excitations="SD")
+    LR_naive.calc_excitation_energies(3, {"max_iterations": 50, "tolerance": 1e-8})
+
+    solutions = np.array(
+        [
+            0.12973291,
+            0.18092743,
+            0.18092743,
         ]
     )
     assert np.allclose(LR_naive.excitation_energies, solutions, atol=threshold)
