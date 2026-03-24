@@ -69,9 +69,9 @@ def test_lih_naive():
 
     _sp, _sm, _tm = LR_naive._right_transform(trial)
 
-    np.allclose(sp, _sp, atol=1e-12)
-    np.allclose(sm, _sm, atol=1e-12)
-    np.allclose(tm, _tm, atol=1e-12)
+    assert np.allclose(sp, _sp, atol=1e-12)
+    assert np.allclose(sm, _sm, atol=1e-12)
+    assert np.allclose(tm, _tm, atol=1e-12)
 
 def test_lih_projected():
     """Test LiH energies for naive q LR methods."""
@@ -126,6 +126,6 @@ def test_lih_projected():
 
     _sp, _sm, _tm = LR_naive._right_transform(trial)
 
-    np.allclose(sp, _sp, atol=1e-12)
-    np.allclose(sm, _sm, atol=1e-12)
-    np.allclose(tm, _tm, atol=1e-12)
+    assert np.allclose(sp, _sp, atol=1e-12)
+    assert np.allclose(sm, _sm, atol=1e-12)
+    assert np.allclose(tm, _tm, atol=1e-12)
