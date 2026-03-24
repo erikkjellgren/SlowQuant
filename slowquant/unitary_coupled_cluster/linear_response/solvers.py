@@ -255,11 +255,14 @@ class Davidson(Solvers):
     @staticmethod
     def _update_trial_vectors(omega: np.ndarray, R_plus: np.ndarray, R_minus: np.ndarray, diagonal_A: np.ndarray, diagonal_Sigma: np.ndarray) -> np.ndarray:
         """Update trial vectors using the residuals and the diagonal preconditioner."""
-        denominator = (
-            -1
-            / (diagonal_A.reshape(-1, 1) - diagonal_Sigma.reshape(-1, 1) @ omega.reshape(1, -1))
-            / (diagonal_A.reshape(-1, 1) + diagonal_Sigma.reshape(-1, 1) @ omega.reshape(1, -1))
-        )
+        minus_contribution = diagonal_A.reshape(-1, 1) - diagonal_Sigma.reshape(-1, 1) @ omega.reshape(1, -1)
+        plus_contribution = diagonal_A.reshape(-1, 1) + diagonal_Sigma.reshape(-1, 1) @ omega.reshape(1, -1)
+        denominator = -1
+        # Check if any of the contributions are close to zero to avoid division by zero, if so skip the division for that contribution
+        if not np.any(np.isclose(minus_contribution, 0)):
+            denominator /= minus_contribution
+        if not np.any(np.isclose(plus_contribution, 0)):
+            denominator /= plus_contribution
         new_trial = denominator * (
             diagonal_A.reshape(-1, 1) * R_plus + diagonal_Sigma.reshape(-1, 1) * R_minus * omega.reshape(1, -1)
             + diagonal_A.reshape(-1, 1) * R_minus + diagonal_Sigma.reshape(-1, 1) * R_plus * omega.reshape(1, -1))
