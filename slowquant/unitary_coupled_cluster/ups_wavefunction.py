@@ -276,6 +276,8 @@ class WaveFunctionUPS:
             self._h_mo = None
             self._g_mo = None
             self._energy_elec = None
+            if isinstance(k, np.ndarray):
+                k = k.tolist()
             self._kappa = k.copy()
 
     @property
@@ -302,6 +304,8 @@ class WaveFunctionUPS:
             self._rdm3 = None
             self._rdm4 = None
             self._energy_elec = None
+            if isinstance(theta_vals, np.ndarray):
+                theta_vals = theta_vals.tolist()
             self._thetas = theta_vals.copy()
             self.ci_coeffs = construct_ups_state(
                 self.csf_coeffs,
@@ -1136,7 +1140,7 @@ class WaveFunctionUPS:
         theta_optimization: bool,
         kappa_optimization: bool,
     ) -> np.ndarray:
-        h = 10**-3
+        h = 10**-4
         parameters_plus = (np.array(parameters) + h * np.array(trial_vec)).tolist()
         g_plus = self._calc_gradient_optimization(parameters_plus, theta_optimization, kappa_optimization)
         parameters_minus = (np.array(parameters) - h * np.array(trial_vec)).tolist()
@@ -1230,16 +1234,50 @@ class WaveFunctionUPS:
                 hvp[num_kappa:] += self._theta_gradient(H_k)
         if theta_optimization:
             # E_{theta,theta}b_theta contribution to sigma_theta
+            H = hamiltonian_0i_0a(
+                self.h_mo,
+                self.g_mo,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+            )
             b_theta = trial_vec[num_kappa:]
-            # Doing finite diff right now.
-            # The proper way should be figured out.
-            h = 10**-4
-            parameters_plus = (np.array(parameters[num_kappa:]) + h * np.array(b_theta)).tolist()
-            g_plus = self._calc_gradient_optimization(parameters_plus, True, False)
-            parameters_minus = (np.array(parameters[num_kappa:]) - h * np.array(b_theta)).tolist()
-            g_minus = self._calc_gradient_optimization(parameters_minus, True, False)
-            self.thetas = parameters[num_kappa:]
-            hvp[num_kappa:] = (g_plus - g_minus) / (2 * h)
+            psi_vec = np.copy(self.csf_coeffs)
+            phi_vec = np.zeros_like(psi_vec)
+            for i in range(len(self.thetas)):
+                # $|\psi_i\rangle = U_i(\theta_i) |\psi_{i-1}\rangle$
+                psi_vec = propagate_unitary(psi_vec, i, self.ci_info, self.thetas, self.ups_layout)
+                # $$|\Phi_i\rangle = U_i(\theta_i) |\Phi_{i-1}\rangle + v_i \frac{\partial U_i}{\partial \theta_i} |\psi_{i-1}\rangle$$
+                phi_vec = propagate_unitary(phi_vec, i, self.ci_info, self.thetas, self.ups_layout)
+                # Remember gradient action does not apply U, but only the operator part, hence using psi_{i} instead of psi_{i-1}
+                phi_vec += b_theta[i] * get_grad_action(psi_vec, i, self.ci_info, self.ups_layout)
+            lambda_vec = propagate_state([H], psi_vec, self.ci_info, self.thetas, self.ups_layout)
+            mu_vec = propagate_state([H], phi_vec, self.ci_info, self.thetas, self.ups_layout)
+            for i in range(len(self.thetas) - 1, -1, -1):
+                # 1. Get gradient actions at the current state
+                dpsi_vec = get_grad_action(psi_vec, i, self.ci_info, self.ups_layout)
+                d2psi_vec = get_grad_action(dpsi_vec, i, self.ci_info, self.ups_layout)
+
+                # 4. Calculate actions on the unwound Tangent Ket
+                dphi_past = get_grad_action(phi_vec - b_theta[i] * dpsi_vec, i, self.ci_info, self.ups_layout)
+
+                # 5. Assemble HvP
+                term_overlap_and_future = np.vdot(mu_vec, dpsi_vec)
+                term_past_curve = np.vdot(lambda_vec, dphi_past)
+                term_diag_curve = b_theta[i] * np.vdot(lambda_vec, d2psi_vec)
+
+                hvp[i + num_kappa] = 2 * np.real(term_overlap_and_future + term_past_curve + term_diag_curve)
+
+                lambda_vec = propagate_unitary(
+                    lambda_vec, i, self.ci_info, self.thetas, self.ups_layout, dagger=True
+                )
+                mu_vec = propagate_unitary(mu_vec, i, self.ci_info, self.thetas, self.ups_layout, dagger=True)
+                psi_vec = propagate_unitary(
+                    psi_vec, i, self.ci_info, self.thetas, self.ups_layout, dagger=True
+                )
+                phi_vec = propagate_unitary(
+                    phi_vec, i, self.ci_info, self.thetas, self.ups_layout, dagger=True
+                )
+
             self.num_energy_evals += (
                 2 * np.sum(list(self.ups_layout.grad_param_R.values()))
             ) ** 2  # Count energy measurements for theta theta Hessian
