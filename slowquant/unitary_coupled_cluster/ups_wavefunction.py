@@ -15,10 +15,6 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.SlowQuant import SlowQuant
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
-from slowquant.unitary_coupled_cluster.density_matrix import (
-    get_electronic_energy,
-    get_orbital_gradient,
-)
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.integral_manager import IntegralManager
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
@@ -31,15 +27,21 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     propagate_unitary_SA,
 )
 from slowquant.unitary_coupled_cluster.operators import (
-    Eminuspq,
     Epq,
-    commutator,
+    epqrs,
+    hamiltonian_wf_opt,
     hamiltonian_0i_0a,
-    hamiltonian_1i_1a,
 )
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import UpsStructure
-
+from slowquant.unitary_coupled_cluster.fock_matrix import (
+    build_fock_active,
+    build_fock_inactive,
+    build_fock_matrix,
+    get_electronic_energy,
+    get_orbital_gradient,
+)
+from slowquant.unitary_coupled_cluster.density_matrix import get_orbital_gradient as get_orbital_gradient_den
 
 class WaveFunctionUPS:
     def __init__(
@@ -88,8 +90,26 @@ class WaveFunctionUPS:
         self.num_virtual_spin_orbs = 0
         self._rdm1 = None
         self._rdm2 = None
+        self._rdm3 = None
+        self._rdm4 = None
+        self._fock_mat = None
+        self._fock_mat_inactive = None
+        self._fock_mat_inactive_ao = None
+        self._fock_mat_active = None
+        self._fock_mat_active_ao = None
+        self._DI_ao = None
+        self._DA_ao = None
+        self._h_ii = None
+        self._h_vw = None
+        self._g_iijj = None
+        self._g_ijji = None
+        self._g_iivw = None
+        self._g_iviw = None
+        self._g_vwxy = None
+        self._g_Pvwx = None
         self._h_mo = None
         self._g_mo = None
+        self._H_wf_opt = None
         self._energy_elec: float | None = None
         self.ansatz_options = ansatz_options
         self.num_energy_evals = 0
@@ -275,6 +295,22 @@ class WaveFunctionUPS:
         if np.max(np.abs(np.array(self._kappa) - np.array(k))) > 10**-28:
             self._h_mo = None
             self._g_mo = None
+            self._h_ii = None
+            self._h_vw = None
+            self._g_iijj = None
+            self._g_ijji = None
+            self._g_iivw = None
+            self._g_iviw = None
+            self._g_vwxy = None
+            self._g_Pvwx = None
+            self._fock_mat = None
+            self._fock_mat_inactive = None
+            self._fock_mat_inactive_ao = None
+            self._fock_mat_active = None
+            self._fock_mat_active_ao = None
+            self._DI_ao = None
+            self._DA_ao = None
+            self._H_wf_opt = None
             self._energy_elec = None
             if isinstance(k, np.ndarray):
                 k = k.tolist()
@@ -303,6 +339,10 @@ class WaveFunctionUPS:
             self._rdm2 = None
             self._rdm3 = None
             self._rdm4 = None
+            self._fock_mat = None
+            self._fock_mat_active = None
+            self._fock_mat_active_ao = None
+            self._DA_ao = None
             self._energy_elec = None
             if isinstance(theta_vals, np.ndarray):
                 theta_vals = theta_vals.tolist()
@@ -350,6 +390,18 @@ class WaveFunctionUPS:
         return self._h_mo
 
     @property
+    def h_ii(self) -> np.ndarray:
+        if self._h_ii is None:
+            self._h_ii = np.einsum("Pi,Qi,PQ->i", self.c_mo[:, : self.num_inactive_orbs], self.c_mo[:, : self.num_inactive_orbs], self.int_gen.h_ao, optimize=True)
+        return self._h_ii
+
+    @property
+    def h_vw(self) -> np.ndarray:
+        if self._h_vw is None:
+            self._h_vw = np.einsum("Pv,Qw,PQ->vw", self.c_mo[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs], self.c_mo[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs], self.int_gen.h_ao, optimize=True)
+        return self._h_vw
+
+    @property
     def g_mo(self) -> np.ndarray:
         """Get two-electron Hamiltonian integrals in MO basis.
 
@@ -357,8 +409,172 @@ class WaveFunctionUPS:
             Two-electron Hamiltonian integrals in MO basis.
         """
         if self._g_mo is None:
-            self._g_mo = two_electron_integral_transform(self.c_mo, self.int_gen.electron_electron_repulsion)
+            self._g_mo = two_electron_integral_transform(self.c_mo, self.int_gen.g_ao)
         return self._g_mo
+
+    @property
+    def g_iijj(self) -> np.ndarray:
+        if self._g_iijj is None:
+            self._g_iijj = np.einsum("Pi,Qi,Rj,Sj,PQRS->ij", self.c_mo[:, : self.num_inactive_orbs], self.c_mo[:, : self.num_inactive_orbs], self.c_mo[:, : self.num_inactive_orbs], self.c_mo[:, : self.num_inactive_orbs], self.int_gen.g_ao, optimize=True)
+        return self._g_iijj
+
+    @property
+    def g_ijji(self) -> np.ndarray:
+        if self._g_ijji is None:
+            self._g_ijji = np.einsum("Pi,Qj,Rj,Si,PQRS->ij", self.c_mo[:, : self.num_inactive_orbs], self.c_mo[:, : self.num_inactive_orbs], self.c_mo[:, : self.num_inactive_orbs], self.c_mo[:, : self.num_inactive_orbs], self.int_gen.g_ao, optimize=True)
+        return self._g_ijji
+
+    @property
+    def g_iivw(self) -> np.ndarray:
+        if self._g_iivw is None:
+            self._g_iivw = np.einsum("Pi,Qi,Rv,Sw,PQRS->ivw", self.c_mo[:, : self.num_inactive_orbs], self.c_mo[:, : self.num_inactive_orbs], self.c_mo[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs], self.c_mo[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs], self.int_gen.g_ao, optimize=True)
+        return self._g_iivw
+
+    @property
+    def g_iviw(self) -> np.ndarray:
+        if self._g_iviw is None:
+            self._g_iviw = np.einsum("Pi,Qv,Ri,Sw,PQRS->ivw", self.c_mo[:, : self.num_inactive_orbs], self.c_mo[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs], self.c_mo[:, : self.num_inactive_orbs], self.c_mo[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs], self.int_gen.g_ao, optimize=True)
+        return self._g_iviw
+
+    @property
+    def g_Pvwx(self) -> np.ndarray:
+        if self._g_Pvwx is None:
+            n_ao = self.num_orbs
+            n_in = self.num_inactive_orbs
+            n_act = self.num_active_orbs
+            C_act = self.c_mo[:, n_in : n_in + n_act]
+            # Transform S -> y (Index 3), make g_PQRy
+            tmp = self.int_gen.g_ao.reshape(-1, n_ao) @ C_act  # (P*Q*R, y)
+            tmp = tmp.reshape(n_ao, n_ao, n_ao, n_act)
+            # Transform R -> x (Index 2), make g_PQyx
+            tmp = tmp.transpose(0, 1, 3, 2).reshape(-1, n_ao) @ C_act  # (P*Q*y, x)
+            tmp = tmp.reshape(n_ao, n_ao, n_act, n_act)
+            # Transform Q -> w (Index 1), make g_Pyxw
+            tmp = tmp.transpose(0, 2, 3, 1).reshape(-1, n_ao) @ C_act  # (P*x*y, w)
+            tmp = tmp.reshape(n_ao, n_act, n_act, n_act)
+            # Resulting mixed integral: g_Pwxy (renamed to g_Pvwx)
+            self._g_Pvwx = tmp.transpose(0, 3, 2, 1)
+            if self._g_vwxy is None:
+                # Also making g_vwxy
+                # Transform P -> v (Index 0), make g_yxwv
+                tmp = tmp.transpose(1, 2, 3, 0).reshape(-1, n_ao) @ C_act  # (w*x*y, v)
+                tmp = tmp.reshape(n_act, n_act, n_act, n_act)
+                # Resulting integral: g_vwxy
+                self._g_vwxy = tmp.reshape(n_act, n_act, n_act, n_act).transpose(3, 2, 1, 0)
+        return self._g_Pvwx
+
+    @property
+    def g_vwxy(self) -> np.ndarray:
+        if self._g_vwxy is None:
+            n_ao = self.num_orbs
+            n_in = self.num_inactive_orbs
+            n_act = self.num_active_orbs
+            C_act = self.c_mo[:, n_in : n_in + n_act]
+            # Transform S -> y (Index 3), make g_PQRy
+            tmp = self.int_gen.g_ao.reshape(-1, n_ao) @ C_act  # (P*Q*R, y)
+            tmp = tmp.reshape(n_ao, n_ao, n_ao, n_act)
+            # Transform R -> x (Index 2), make g_PQyx
+            tmp = tmp.transpose(0, 1, 3, 2).reshape(-1, n_ao) @ C_act  # (P*Q*y, x)
+            tmp = tmp.reshape(n_ao, n_ao, n_act, n_act)
+            # Transform Q -> w (Index 1), make g_Pyxw
+            tmp = tmp.transpose(0, 2, 3, 1).reshape(-1, n_ao) @ C_act  # (P*x*y, w)
+            tmp = tmp.reshape(n_ao, n_act, n_act, n_act)
+            # Resulting mixed integral: g_Pwxy (renamed to g_Pvwx)
+            self._g_Pvwx = tmp.transpose(0, 3, 2, 1)
+            # Also making g_vwxy
+            # Transform P -> v (Index 0), make g_yxwv
+            tmp = tmp.transpose(1, 2, 3, 0).reshape(-1, n_ao) @ C_act  # (w*x*y, v)
+            tmp = tmp.reshape(n_act, n_act, n_act, n_act)
+            # Resulting integral: g_vwxy
+            self._g_vwxy = tmp.reshape(n_act, n_act, n_act, n_act).transpose(3, 2, 1, 0)
+        return self._g_vwxy
+
+    @property
+    def fock_mat_inactive(self) -> np.ndarray:
+        if self._fock_mat_inactive is None:
+            self._fock_mat_inactive, self._fock_mat_inactive_ao = build_fock_inactive(
+                self.int_gen.h_ao, self.int_gen.g_ao, self.c_mo, self.DI_ao
+            )
+        return self._fock_mat_inactive
+
+    @property
+    def fock_mat_inactive_ao(self) -> np.ndarray:
+        if self._fock_mat_inactive_ao is None:
+            self._fock_mat_inactive, self._fock_mat_inactive_ao = build_fock_inactive(
+                self.int_gen.h_ao, self.int_gen.g_ao, self.c_mo, self.DI_ao
+            )
+        return self._fock_mat_inactive_ao
+
+    @property
+    def fock_mat_active(self) -> np.ndarray:
+        if self._fock_mat_active is None:
+            self._fock_mat_active, self._fock_mat_active_ao = build_fock_active(
+                self.int_gen.g_ao,
+                self.c_mo,
+                self.DA_ao,
+            )
+        return self._fock_mat_active
+
+    @property
+    def fock_mat_active_ao(self) -> np.ndarray:
+        if self._fock_mat_active_ao is None:
+            self._fock_mat_active, self._fock_mat_active_ao = build_fock_active(
+                self.int_gen.g_ao,
+                self.c_mo,
+                self.DA_ao,
+            )
+        return self._fock_mat_active_ao
+
+    @property
+    def fock_mat(self) -> np.ndarray:
+        if self._fock_mat is None:
+            self._fock_mat = build_fock_matrix(
+                self.g_Pvwx,
+                self.c_mo,
+                self.fock_mat_inactive,
+                self.fock_mat_active,
+                self.rdm1,
+                self.rdm2,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
+                self.num_virtual_orbs,
+            )
+        return self._fock_mat
+
+    @property
+    def DI_ao(self) -> np.ndarray:
+        if self._DI_ao is None:
+            self._DI_ao = 2 * np.einsum(
+                "Pi,Qi->PQ", self.c_mo[:, : self.num_inactive_orbs], self.c_mo[:, : self.num_inactive_orbs]
+            )
+        return self._DI_ao
+
+    @property
+    def DA_ao(self) -> np.ndarray:
+        if self._DA_ao is None:
+            self._DA_ao = np.einsum(
+                "vw,Pv,Qw->PQ",
+                self.rdm1,
+                self.c_mo[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs],
+                self.c_mo[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs],
+            )
+        return self._DA_ao
+
+    @property
+    def H_wf_opt(self) -> FermionicOperator:
+        if self._H_wf_opt is None:
+            self._H_wf_opt = hamiltonian_wf_opt(
+                        self.h_ii,
+                        self.h_vw,
+                        self.g_iijj,
+                        self.g_ijji,
+                        self.g_iivw,
+                        self.g_iviw,
+                        self.g_vwxy,
+                        self.num_inactive_orbs,
+                        self.num_active_orbs
+            )
+        return self._H_wf_opt
 
     @property
     def rdm1(self) -> np.ndarray:
@@ -731,7 +947,7 @@ class WaveFunctionUPS:
         if self._energy_elec is None:
             self._energy_elec = expectation_value(
                 self.ci_coeffs,
-                [hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)],
+                [self.H_wf_opt],
                 self.ci_coeffs,
                 self.ci_info,
             )
@@ -743,7 +959,7 @@ class WaveFunctionUPS:
         Returns:
             FermionicOperator.
         """
-        H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+        H = self.H_wf_opt
         H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
 
         if qiskit_form:
@@ -1075,16 +1291,21 @@ class WaveFunctionUPS:
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:
-            # RDM is more expensive than evaluation of the Hamiltonian.
-            # Thus only construct these if orbital-optimization is turned on,
-            # since the RDMs will be reused in the oo gradient calculation.
             E = get_electronic_energy(
-                self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.rdm1, self.rdm2
+                self.int_gen.h_ao,
+                self.g_vwxy,
+                self.fock_mat_inactive_ao,
+                self.fock_mat_inactive,
+                self.DI_ao,
+                self.rdm1,
+                self.rdm2,
+                self.num_inactive_orbs,
+                self.num_active_orbs,
             )
         else:
             E = expectation_value(
                 self.ci_coeffs,
-                [hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)],
+                [self.H_wf_opt],
                 self.ci_coeffs,
                 self.ci_info,
             )
@@ -1114,23 +1335,9 @@ class WaveFunctionUPS:
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:
-            gradient[:num_kappa] = get_orbital_gradient(
-                self.h_mo,
-                self.g_mo,
-                self.kappa_idx,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.rdm1,
-                self.rdm2,
-            )
+            gradient[:num_kappa] = get_orbital_gradient(self.kappa_idx, self.fock_mat)
         if theta_optimization:
-            Hamiltonian = hamiltonian_0i_0a(
-                self.h_mo,
-                self.g_mo,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-            )
-            gradient[num_kappa:] = self._theta_gradient(Hamiltonian)
+            gradient[num_kappa:] = self._theta_gradient(self.H_wf_opt)
         return gradient
 
     def _calc_hessian_vector_product_optimization2(
@@ -1190,21 +1397,13 @@ class WaveFunctionUPS:
             g_k += np.einsum("qo,pors->pqrs", kappa_mat, self.g_mo)
             g_k += np.einsum("ro,pqos->pqrs", kappa_mat, self.g_mo)
             g_k += np.einsum("so,pqro->pqrs", kappa_mat, self.g_mo)
-            grad_kappa = get_orbital_gradient(
-                self.h_mo,
-                self.g_mo,
-                self.kappa_idx,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-                self.rdm1,
-                self.rdm2,
-            )
+            grad_kappa = get_orbital_gradient(self.kappa_idx, self.fock_mat)
             grad_kappa_mat = np.zeros_like(self._c_mo)
             for grad, (p, q) in zip(grad_kappa, self.kappa_idx):
                 grad_kappa_mat[p, q] = grad
                 grad_kappa_mat[q, p] = -grad
             Ek_mat = np.matmul(grad_kappa_mat, kappa_mat) - np.matmul(kappa_mat, grad_kappa_mat)
-            grad_k = get_orbital_gradient(
+            grad_k = get_orbital_gradient_den(
                 h_k,
                 g_k,
                 self.kappa_idx,
@@ -1217,29 +1416,16 @@ class WaveFunctionUPS:
             for i, (p, q) in enumerate(self.kappa_idx):
                 hvp[i] += grad_k[i] + Ek_mat[p, q]
             if theta_optimization:
-                b_theta = trial_vec[num_kappa:]
                 H_k = hamiltonian_0i_0a(
                     h_k,
                     g_k,
                     self.num_inactive_orbs,
                     self.num_active_orbs,
                 )
-                H_1i_1a = hamiltonian_1i_1a(
-                    self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
-                )
-                # E_{kappa,theta}b_theta contribution to sigma_kappa
-                for i, (p, q) in enumerate(self.kappa_idx):
-                    hvp[i] += np.sum(self._theta_gradient(commutator(Eminuspq(p, q), H_1i_1a)) * b_theta)
                 # E_{theta,kappa}b_kappa contribution to sigma_theta
                 hvp[num_kappa:] += self._theta_gradient(H_k)
         if theta_optimization:
             # E_{theta,theta}b_theta contribution to sigma_theta
-            H = hamiltonian_0i_0a(
-                self.h_mo,
-                self.g_mo,
-                self.num_inactive_orbs,
-                self.num_active_orbs,
-            )
             b_theta = trial_vec[num_kappa:]
             psi_vec = np.copy(self.csf_coeffs)
             phi_vec = np.zeros_like(psi_vec)
@@ -1250,8 +1436,66 @@ class WaveFunctionUPS:
                 phi_vec = propagate_unitary(phi_vec, i, self.ci_info, self.thetas, self.ups_layout)
                 # Remember gradient action does not apply U, but only the operator part, hence using psi_{i} instead of psi_{i-1}
                 phi_vec += b_theta[i] * get_grad_action(psi_vec, i, self.ci_info, self.ups_layout)
-            lambda_vec = propagate_state([H], psi_vec, self.ci_info, self.thetas, self.ups_layout)
-            mu_vec = propagate_state([H], phi_vec, self.ci_info, self.thetas, self.ups_layout)
+
+            if kappa_optimization:
+                # E_{kappa,theta}b_theta contribution to sigma_kappa
+                tdm1 = np.zeros((self.num_active_orbs, self.num_active_orbs))
+                for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                    p_idx = p - self.num_inactive_orbs
+                    for q in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                        q_idx = q - self.num_inactive_orbs
+                        op = Epq(p,q)
+                        Ephi_vec = propagate_state([op], phi_vec, self.ci_info, wf_struct=self.ups_layout)
+                        Epsi_vec = propagate_state([op], psi_vec, self.ci_info, wf_struct=self.ups_layout)
+                        tdm1[p_idx, q_idx] = psi_vec@Ephi_vec + phi_vec@Epsi_vec
+                        
+                tdm2 = np.zeros((self.num_active_orbs, self.num_active_orbs, self.num_active_orbs, self.num_active_orbs))
+                pairs = []
+                for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                    for q in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                        pairs.append((p,q))
+                for i in range(len(pairs)):
+                    p,q = pairs[i]
+                    p_idx = p - self.num_inactive_orbs
+                    q_idx = q - self.num_inactive_orbs
+                    for j in range(i, len(pairs)):
+                        r,s = pairs[j]
+                        r_idx = r - self.num_inactive_orbs
+                        s_idx = s - self.num_inactive_orbs
+                        op = epqrs(p,q,r,s)
+                        ephi_vec = propagate_state([op], phi_vec, self.ci_info, self.thetas, self.ups_layout)
+                        epsi_vec = propagate_state([op], psi_vec, self.ci_info, self.thetas, self.ups_layout)
+                        val = psi_vec@ephi_vec + phi_vec@epsi_vec
+                        tdm2[p_idx, q_idx, r_idx, s_idx] = val
+                        tdm2[r_idx, s_idx, p_idx, q_idx] = val
+
+                DA_ao_trans = np.einsum(
+                    "vw,Pv,Qw->PQ",
+                    tdm1,
+                    self.c_mo[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs],
+                    self.c_mo[:, self.num_inactive_orbs : self.num_inactive_orbs + self.num_active_orbs],
+                )
+                fock_mat_active_trans, _ = build_fock_active(
+                    self.int_gen.g_ao,
+                    self.c_mo,
+                    DA_ao_trans,
+                )
+                fock_trans = build_fock_matrix(
+                        self.g_Pvwx,
+                        self.c_mo,
+                        self.fock_mat_inactive,
+                        fock_mat_active_trans,
+                        tdm1,
+                        tdm2,
+                        self.num_inactive_orbs,
+                        self.num_active_orbs,
+                        self.num_virtual_orbs,
+                        do_resp = True,
+                )
+                hvp[:num_kappa] += get_orbital_gradient(self.kappa_idx, fock_trans)
+
+            lambda_vec = propagate_state([self.H_wf_opt], psi_vec, self.ci_info, self.thetas, self.ups_layout)
+            mu_vec = propagate_state([self.H_wf_opt], phi_vec, self.ci_info, self.thetas, self.ups_layout)
             for i in range(len(self.thetas) - 1, -1, -1):
                 # 1. Get gradient actions at the current state
                 dpsi_vec = get_grad_action(psi_vec, i, self.ci_info, self.ups_layout)
@@ -1265,7 +1509,7 @@ class WaveFunctionUPS:
                 term_past_curve = np.vdot(lambda_vec, dphi_past)
                 term_diag_curve = b_theta[i] * np.vdot(lambda_vec, d2psi_vec)
 
-                hvp[i + num_kappa] = 2 * np.real(term_overlap_and_future + term_past_curve + term_diag_curve)
+                hvp[i + num_kappa] += 2 * np.real(term_overlap_and_future + term_past_curve + term_diag_curve)
 
                 lambda_vec = propagate_unitary(
                     lambda_vec, i, self.ci_info, self.thetas, self.ups_layout, dagger=True
@@ -1325,8 +1569,7 @@ class WaveFunctionUPS:
         for i in range(theta_idx + 1, len(thetas_local)):
             state_vecs = propagate_unitary_SA(state_vecs, i, self.ci_info, thetas_local, self.ups_layout)
 
-        Hamiltonian = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
-        bra_vec = propagate_state_SA([Hamiltonian], state_vecs, self.ci_info, thetas_local, self.ups_layout)
+        bra_vec = propagate_state_SA([self.H_wf_opt], state_vecs, self.ci_info, thetas_local, self.ups_layout)
 
         energies = []
         for bra, ket in zip(bra_vec, state_vecs):

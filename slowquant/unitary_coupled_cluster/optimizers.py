@@ -110,7 +110,7 @@ class Optimizers:
                 callback=print_progress,
                 options={"maxiter": self.maxiter, "disp": True},
             )
-        elif self.method in ("newton-cg",):
+        elif self.method in ("newton-cg", "trust-krylov", "trust-ncg"):
             res = scipy.optimize.minimize(
                 self.fun,
                 x0,
@@ -119,7 +119,7 @@ class Optimizers:
                 method=self.method,
                 tol=self.tol,
                 callback=print_progress,
-                options={"maxiter": self.maxiter, "disp": True},
+                options={"maxiter": self.maxiter},#, "disp": True},
             )
         elif self.method in ("cobyla", "cobyqa"):
             # Does not work with moving the expansion point.

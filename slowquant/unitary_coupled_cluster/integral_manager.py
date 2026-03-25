@@ -123,3 +123,8 @@ class IntegralManager:
             raise ValueError("Got unknown integral object, {type(self.int_obj)}")
         self._h_ao = h_core
         return h_core
+
+    @property
+    def g_ao(self) -> np.ndarray:
+        """Electron-electron repulsion integrals."""
+        return self.electron_electron_repulsion 

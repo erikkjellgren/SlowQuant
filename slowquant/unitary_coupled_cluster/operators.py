@@ -663,6 +663,73 @@ def hamiltonian_2i_2a(
     return hamiltonian_operator
 
 
+def hamiltonian_wf_opt(
+    h_ii,
+    h_vw,
+    g_iijj,
+    g_ijji,
+    g_iivw,
+    g_iviw,
+    g_vwxy,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+) -> FermionicOperator:
+    """Get wavefunction optimziation relevant Hamiltonian operator.
+
+    Args:
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+
+    Returns:
+        Energy Hamiltonian fermionic operator.
+    """
+    hamiltonian_operator = FermionicOperator({})
+    # Inactive one-electron
+    for i in range(num_inactive_orbs):
+        if abs(h_ii[i]) > 10**-14:
+            hamiltonian_operator += h_ii[i] * Epq(i, i)
+    # Active one-electron
+    for v in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+        vshift = v - num_inactive_orbs
+        for w in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+            wshift = w - num_inactive_orbs
+            if abs(h_vw[vshift, wshift]) > 10**-14:
+                hamiltonian_operator += h_vw[vshift, wshift] * Epq(v, w)
+    # Inactive two-electron
+    for i in range(num_inactive_orbs):
+        for j in range(num_inactive_orbs):
+            if abs(g_iijj[i, j]) > 10**-14:
+                hamiltonian_operator += 1 / 2 * g_iijj[i, j] * epqrs(i, i, j, j)
+            if i != j and abs(g_ijji[i, j]) > 10**-14:
+                hamiltonian_operator += 1 / 2 * g_ijji[i, j] * epqrs(j, i, i, j)
+    # Inactive-Active two-electron
+    for i in range(num_inactive_orbs):
+        for v in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+            vshift = v - num_inactive_orbs
+            for w in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+                wshift = w - num_inactive_orbs
+                if abs(g_iivw[i, vshift, wshift]) > 10**-14:
+                    hamiltonian_operator += 1 / 2 * g_iivw[i, vshift, wshift] * epqrs(i, i, v, w)
+                    hamiltonian_operator += 1 / 2 * g_iivw[i, vshift, wshift] * epqrs(v, w, i, i)
+                if abs(g_iviw[i, vshift, wshift]) > 10**-14:
+                    hamiltonian_operator += 1 / 2 * g_iviw[i, vshift, wshift] * epqrs(v, i, i, w)
+                    hamiltonian_operator += 1 / 2 * g_iviw[i, vshift, wshift] * epqrs(i, v, w, i)
+    # Active two-electron
+    for v in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+        vshift = v - num_inactive_orbs
+        for w in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+            wshift = w - num_inactive_orbs
+            for x in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+                xshift = x - num_inactive_orbs
+                for y in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+                    yshift = y - num_inactive_orbs
+                    if abs(g_vwxy[vshift, wshift, xshift, yshift]) > 10**-14:
+                        hamiltonian_operator += (
+                            1 / 2 * g_vwxy[vshift, wshift, xshift, yshift] * epqrs(v, w, x, y)
+                        )
+    return hamiltonian_operator
+
+
 def one_elec_op_full_space(ints_mo: np.ndarray, num_orbs: int) -> FermionicOperator:
     r"""Construct full-space one-electron operator.
 
