@@ -18,6 +18,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     two_electron_integral_transform,
 )
 from slowquant.qiskit_interface.interface import QuantumInterface
+from slowquant.qiskit_interface.interface_tiled import QuantumInterfaceTiled
 from slowquant.unitary_coupled_cluster.density_matrix import (
     get_electronic_energy,
     get_orbital_gradient,
@@ -25,7 +26,6 @@ from slowquant.unitary_coupled_cluster.density_matrix import (
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.operators import Epq, hamiltonian_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
-
 
 class WaveFunctionCircuit:
     def __init__(
@@ -35,7 +35,7 @@ class WaveFunctionCircuit:
         mo_coeffs: np.ndarray,
         h_ao: np.ndarray,
         g_ao: np.ndarray,
-        quantum_interface: QuantumInterface,
+        quantum_interface: QuantumInterface | QuantumInterfaceTiled,
         include_active_kappa: bool = False,
     ) -> None:
         """Initialize for UCC wave function.

@@ -156,6 +156,7 @@ class MitigationFlags:
         do_M_ansatz0: bool = False,
         do_M_ansatz0_plus: bool = False,
         do_postselection: bool = False,
+        do_tiledM0: bool = False
     ):
         """Initialize mitigation flags.
 
@@ -174,8 +175,9 @@ class MitigationFlags:
         self.do_M_ansatz0 = do_M_ansatz0
         self.do_M_ansatz0_plus = do_M_ansatz0_plus
         self.do_postselection = do_postselection
+        self.do_tiledM0 = do_tiledM0
         # Tuple of flag names in the order they should be processed.
-        self._flag_order = ("do_M_mitigation", "do_M_ansatz0", "do_M_ansatz0_plus", "do_postselection")
+        self._flag_order = ("do_M_mitigation", "do_M_ansatz0", "do_M_ansatz0_plus", "do_postselection", "do_tiledM0")
 
         print("You selected the following mitigation flags:\n" + self.status_report())
 
