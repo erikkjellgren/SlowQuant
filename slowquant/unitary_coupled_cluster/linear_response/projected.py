@@ -346,6 +346,7 @@ class LinearResponse(LinearResponseBaseClass):
                 qs = FermionicOperator({})
                 for kappa, q in zip(kappas[:, root], self.q_ops):
                     qs += kappa * q.dagger
+                qH_ket = propagate_state([qs * self.H_1i_1a], self.wf.ci_coeffs, *self.index_info)
 
                 # (A+B)_Gq @ b_q
                 # (A-B)_Gq @ b_q (partly)
@@ -359,8 +360,8 @@ class LinearResponse(LinearResponseBaseClass):
                     )
                     val = 0.5 * expectation_value(
                         GI_ket,
-                        [qs * self.H_1i_1a],
-                        self.wf.ci_coeffs,
+                        [],
+                        qH_ket,
                         *self.index_info,
                     )
                     sigma_plus[num_q + i, root] += val
@@ -485,9 +486,13 @@ class LinearResponse(LinearResponseBaseClass):
                 sigma_minus[num_q + i, root] -= self.wf.energy_elec * val
                 tau_minus[num_q + i, root] += val
 
-                sigma_minus[num_q + i, root] += 2 * self.wf.energy_elec * GI_expect[i] * Gs_expect
-                sigma_minus[num_q + i, root] -= GI_expect[i] * GsdH_expect
-                sigma_minus[num_q + i, root] -= GIdH_expect[i] * Gs_expect
+                sigma_plus[num_q + i, root] += self.wf.energy_elec * GI_expect[i] * (Gs_expect - Gs_expect.conjugate())
+                sigma_plus[num_q + i, root] -= 0.5 * GI_expect[i] * (GsdH_expect - GsdH_expect.conjugate())
+                sigma_plus[num_q + i, root] -= 0.5 * GIdH_expect[i] * (Gs_expect - Gs_expect.conjugate())
+
+                sigma_minus[num_q + i, root] += self.wf.energy_elec * GI_expect[i] * (Gs_expect + Gs_expect.conjugate())
+                sigma_minus[num_q + i, root] -= 0.5 * GI_expect[i] * (GsdH_expect + GsdH_expect.conjugate())
+                sigma_minus[num_q + i, root] -= 0.5 * GIdH_expect[i] * (Gs_expect + Gs_expect.conjugate())
 
             # Sigma_GG @ b_G
             for i, _ in enumerate(self.G_ops):

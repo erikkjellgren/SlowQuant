@@ -367,7 +367,7 @@ class LinearResponse(LinearResponseBaseClass):
 
                 qs = FermionicOperator({})
                 for kappa, q in zip(kappas[:, root], self.q_ops):
-                    qs += kappa * q.dagger
+                    qs += kappa * q
 
                 # (A+B)_Gq @ b_q
                 for i, GI in enumerate(self.G_ops):
@@ -383,10 +383,17 @@ class LinearResponse(LinearResponseBaseClass):
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
-                    Gqd = commutator(GI + GI.dagger, qs)
+                    qGd = commutator(qs, GI.dagger)
                     sigma_plus[num_q + i, root] += 0.5 * expectation_value(
                         self.wf.ci_coeffs,
-                        [Gqd * self.H_1i_1a],
+                        [self.H_1i_1a * qGd],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                    Gdqd = commutator(GI.dagger, qs.dagger)
+                    sigma_plus[num_q + i, root] += 0.5 * expectation_value(
+                        self.wf.ci_coeffs,
+                        [Gdqd * self.H_1i_1a],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
@@ -444,7 +451,7 @@ class LinearResponse(LinearResponseBaseClass):
 
                 qs = FermionicOperator({})
                 for kappa, q in zip(kappas[:, root], self.q_ops):
-                    qs += kappa * q.dagger
+                    qs += kappa * q
 
                 # (A+B)_Gq @ b_q
                 for i, GI in enumerate(self.G_ops):
@@ -460,10 +467,17 @@ class LinearResponse(LinearResponseBaseClass):
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
-                    Gqd = commutator(GI - GI.dagger, qs)
+                    qGd = commutator(qs, GI.dagger)
                     sigma_minus[num_q + i, root] += 0.5 * expectation_value(
                         self.wf.ci_coeffs,
-                        [Gqd * self.H_1i_1a],
+                        [self.H_1i_1a * qGd],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                    Gdqd = commutator(GI.dagger, qs.dagger)
+                    sigma_minus[num_q + i, root] -= 0.5 * expectation_value(
+                        self.wf.ci_coeffs,
+                        [Gdqd * self.H_1i_1a],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
