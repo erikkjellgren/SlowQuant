@@ -213,9 +213,9 @@ class FermionicOperator:
         """
         if type(fermistring) in (float, int):
             operators = copy.copy(self.operators)
-            for op_key in self.operators.keys():
+            for op_key, op_value in self.operators.items():
                 # The name fermistring is misleading here.
-                if abs(fermistring) < 10**-14:  # type: ignore
+                if abs(fermistring * op_value) < 10**-14:  # type: ignore
                     operators.pop(op_key, None)
                 else:
                     operators[op_key] *= fermistring  # type: ignore
@@ -252,9 +252,9 @@ class FermionicOperator:
         """
         if type(fermistring) in (float, int):
             operators = copy.copy(self.operators)
-            for op_key in operators.keys():
+            for op_key, op_value in operators.items():
                 # The name fermistring is misleading here.
-                if abs(fermistring) < 10**-14:  # type: ignore
+                if abs(fermistring * op_value) < 10**-14:  # type: ignore
                     self.operators.pop(op_key, None)
                 else:
                     self.operators[op_key] *= fermistring  # type: ignore
@@ -291,10 +291,8 @@ class FermionicOperator:
             New fermionic operator.
         """
         operators = {}
-        for op_key in self.operators.keys():
-            if abs(number) < 10**-14:
-                operators.pop(op_key, None)
-            else:
+        for op_key, op_value in self.operators.items():
+            if abs(number * op_value) > 10**-14:
                 operators[op_key] = self.operators[op_key] * number
         return FermionicOperator(operators)
 
