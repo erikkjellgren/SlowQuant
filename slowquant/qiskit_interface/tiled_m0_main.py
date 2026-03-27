@@ -411,7 +411,7 @@ class TiledM0:
                 seed_transpiler = 1
             )
 
-            transpiledTileCircuits = [0 for i in range(self.tilesInFirstLayer_Count)]
+            transpiledTileCircuits = [0 for i in range(len(self.pretTileCircuits))]
             for i in range(len(self.pretTileCircuits)):
                 tmpCircuit = passManager.run(self.pretTileCircuits[i])
                 add_permutation_gate(tmpCircuit, tmpCircuit.layout.routing_permutation(), self.backend.coupling_map) # Add swap gates to undo the swaps inserted during routing

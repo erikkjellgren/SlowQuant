@@ -56,11 +56,6 @@ class QuantumInterfaceTiled:
             tiledM0_shots: Number of shots used for tiled M0 per column of each assignment matrix.
             do_postselection: Use postselection to preserve number of particles in the computational basis.
         """
-        if ansatz_options is None:
-            ansatz_options = {"layers" : 1}
-        elif "layers" not in ansatz_options:
-            print("Number of layers not specified. Set to 1.")
-            ansatz_options["layers"] = 1
         allowed_ansatz = (
             "tUPS",
         )
@@ -69,6 +64,15 @@ class QuantumInterfaceTiled:
                 "The chosen Ansatz is not available. Choose from: ",
                 allowed_ansatz
             )
+        if ansatz_options is None:
+            print("Number of layers and input state not specified. Defaults to 1 and perfect pairing.")
+            ansatz_options = {"layers" : 1, "input_state" : "pp"}
+        if "layers" not in ansatz_options:
+            print("Number of layers not specified. Defaults to 1.")
+            ansatz_options["layers"] = 1
+        if "input_state" not in ansatz_options:
+            print("Input state not specified. Defaults to perfect pairing.")
+            ansatz_options["input_state"] = "pp"
         if pass_manager_options is None:
             pass_manager_options = {}
         self.pass_manager_options = pass_manager_options
@@ -135,7 +139,14 @@ class QuantumInterfaceTiled:
         # Note: ``self.grad_param_R`` is passed by reference here
         tileCircuits, tileQubits = tiled_m0_helper.GetTileCircuitsAndQubits_TUPS(self.num_orbs, self.backend.num_qubits, self.ansatz_options["layers"], self.grad_param_R)
 
-        ppInputState = "1100" * (self.num_spin_orbs // 4) # pp input state by default
+        inputState = ""
+        if self.ansatz_options["input_state"] == "pp" or self.ansatz_options["input_state"] == "PP" or self.ansatz_options["input_state"] == "Pp":
+            inputState = "1100" * (self.num_spin_orbs // 4)
+        elif self.ansatz_options["input_state"] == "hf" or self.ansatz_options["input_state"] == "HF" or self.ansatz_options["input_state"] == "Hf":
+            inputState = "1" * sum(self.num_elec) + "0" * (self.num_spin_orbs - sum(self.num_elec))
+        else: # Input state specified as bitstring
+            inputState = self.ansatz_options["input_state"]
+
         self.tiledM0 = tiled_m0_main.TiledM0(
             tileCircuits = tileCircuits,
             tileQubits = tileQubits,
@@ -145,7 +156,7 @@ class QuantumInterfaceTiled:
             shots = self.shots,
             sampler = self._primitive,
             mitigatorShots = self.tiledM0_shots,
-            inputState = ppInputState,
+            inputState = inputState,
             doPatchParallelization = False
         )
 
