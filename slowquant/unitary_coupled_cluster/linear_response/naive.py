@@ -377,9 +377,9 @@ class LinearResponse(LinearResponseBaseClass):
                         tH00_ket,
                         *self.index_info,
                     )
-                    sigma_plus[num_q + i, root] -= expectation_value(
-                        self.wf.ci_coeffs,
-                        [tH_0i_0a * GI.dagger],
+                    sigma_plus[num_q + i, root] += expectation_value(
+                        tH00_ket,
+                        [GI.dagger],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
