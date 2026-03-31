@@ -249,7 +249,6 @@ def add_operator_matrix(
         idx2det: Maps index to determinant.
         det2idx: Maps determinant to index.
         do_unsafe: Do unsafe.
-        tmp_state: New state.
         factor: Factor in front of operator.
 
     Returns:
