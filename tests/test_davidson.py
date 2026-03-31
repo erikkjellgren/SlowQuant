@@ -27,14 +27,10 @@ def test_lih_naive_explicit():
     SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
     )
     WF.run_wf_optimization_1step("L-BFGS-B", True)
@@ -90,14 +86,10 @@ def test_lih_naive():
     SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
     )
     WF.run_wf_optimization_1step("L-BFGS-B", True)
@@ -128,14 +120,10 @@ def test_lih_projected_explicit():
     SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
     )
     WF.run_wf_optimization_1step("L-BFGS-B", True)
@@ -191,14 +179,10 @@ def test_lih_projected():
     SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
     )
     WF.run_wf_optimization_1step("L-BFGS-B", True)
@@ -229,14 +213,10 @@ def test_lih_allprojected_explicit():
     SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
     )
     WF.run_wf_optimization_1step("L-BFGS-B", True)
@@ -292,14 +272,10 @@ def test_lih_allprojected():
     SQobj.set_basis_set("sto-3g")
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         (2, 2),
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
     )
     WF.run_wf_optimization_1step("L-BFGS-B", True)
