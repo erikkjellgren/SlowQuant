@@ -24,9 +24,86 @@ def operator_to_qiskit_key(operator_string: tuple[tuple[int, bool], ...], remapp
     return op_key[1:]
 
 
-def do_extended_normal_ordering(
-    fermistring: FermionicOperator,
-) -> dict[tuple[tuple[int, bool], ...], float]:
+from collections import deque
+
+def do_extended_normal_ordering_string(
+    fermistring: tuple[tuple[int, bool], ...],
+) -> tuple[tuple[tuple[int, bool], ...], list[float]]:
+    """Reorder fermionic operator string."""
+
+    # 1. Use deque for O(1) left-pops
+    operator_queue = deque([list(fermistring)])
+    factor_queue = deque([1.0]) # Use float to match return type hint
+
+    new_ops = []
+    new_phases = []
+
+    while operator_queue:
+        next_operator = operator_queue.popleft()
+        factor = factor_queue.popleft()
+
+        # Doing a dumb version of cycle-sort
+        while True:
+            changed = False
+            is_zero = False
+            i = 0
+
+            # 4. Streamlined loop structure
+            while i < len(next_operator) - 1:
+                a = next_operator[i]
+                b = next_operator[i + 1]
+
+                # 3. Fast tuple unpacking
+                idx_a, is_cr_a = a
+                idx_b, is_cr_b = b
+
+                if is_cr_a and is_cr_b:  # Creation / Creation
+                    if idx_a == idx_b:
+                        is_zero = True
+                        break
+                    elif idx_a < idx_b:
+                        next_operator[i], next_operator[i + 1] = b, a
+                        factor *= -1
+                        changed = True
+
+                elif not is_cr_a and is_cr_b:  # Annihilation / Creation
+                    if idx_a == idx_b:
+                        # 2. Fast list duplication and modification via slicing
+                        new_op = next_operator[:i] + next_operator[i + 2:]
+                        if new_op:
+                            operator_queue.append(new_op)
+                            factor_queue.append(factor)
+
+                    next_operator[i], next_operator[i + 1] = b, a
+                    factor *= -1
+                    changed = True
+
+                elif not is_cr_a and not is_cr_b:  # Annihilation / Annihilation
+                    if idx_a == idx_b:
+                        is_zero = True
+                        break
+                    elif idx_a < idx_b:
+                        next_operator[i], next_operator[i + 1] = b, a
+                        factor *= -1
+                        changed = True
+
+                # If it's Creation / Annihilation, it's already in correct order
+                i += 1
+
+            if is_zero:
+                break
+
+            if not changed:
+                new_ops.append(tuple(next_operator))
+                new_phases.append(factor)
+                break
+
+    return new_ops, new_phases
+
+
+def do_extended_normal_ordering_string2(
+    fermistring: tuple[tuple[int, bool], ...],
+) -> tuple[tuple[tuple[int, bool], ...], list[float]]:
     """Reorder fermionic operator string.
 
     The string will be ordered such that all creation operators are first,
@@ -37,12 +114,10 @@ def do_extended_normal_ordering(
     Returns:
         Reordered operator dict and factor dict.
     """
-    operator_queue = []
-    factor_queue = []
-    new_operators = {}
-    for key in fermistring.operators.keys():
-        operator_queue.append(list(key))
-        factor_queue.append(fermistring.operators[key])
+    operator_queue = [list(fermistring)]
+    factor_queue = [1]
+    new_ops = []
+    new_phases = []
     while len(operator_queue) > 0:
         next_operator = operator_queue.pop(0)
         factor = factor_queue.pop(0)
@@ -93,14 +168,36 @@ def do_extended_normal_ordering(
                     break
             if not changed or is_zero:
                 if not is_zero:
-                    op_key = tuple(next_operator)
-                    if op_key not in new_operators:
-                        new_operators[op_key] = factor
-                    else:
-                        new_operators[op_key] += factor
-                        if abs(new_operators[op_key]) < 10**-14:
-                            del new_operators[op_key]
+                    new_ops.append(tuple(next_operator))
+                    new_phases.append(factor)
                 break
+    return new_ops, new_phases
+
+
+def do_extended_normal_ordering(
+    fermistring: FermionicOperator,
+) -> dict[tuple[tuple[int, bool], ...], float]:
+    """Reorder fermionic operator string.
+
+    The string will be ordered such that all creation operators are first,
+    and annihilation operators are second.
+    Within a block of creation or annihilation operators the largest spin index
+    will be first and the ordering will be descending.
+
+    Returns:
+        Reordered operator dict and factor dict.
+    """
+    new_operators = {}
+    for operator_string in fermistring.operators.keys():
+        factor = fermistring.operators[operator_string]
+        new_strings, phases = do_extended_normal_ordering_string(operator_string)
+        for op_key, phase in zip(new_strings, phases):
+            if op_key not in new_operators:
+                new_operators[op_key] = factor*phase
+            else:
+                new_operators[op_key] += factor*phase
+                if abs(new_operators[op_key]) < 10**-14:
+                    del new_operators[op_key]
     return new_operators
 
 
