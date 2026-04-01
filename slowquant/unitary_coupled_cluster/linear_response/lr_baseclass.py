@@ -152,6 +152,7 @@ class LinearResponseBaseClass:
                     is_silent=solver_settings.get("is_silent", False),
                 )
             )
+
     def _all_excitation_energies(self):
         self._construct_hessian_metric_blocks()
 

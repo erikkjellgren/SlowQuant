@@ -353,7 +353,7 @@ def one_index_transform(K: np.ndarray, h_mo: np.ndarray, g_mo: np.ndarray) -> tu
 def get_orbital_rotation_gradient(
     h_int: np.ndarray,
     g_int: np.ndarray,
-    q_idx: list[tuple[int, int]],
+    q_idx: list[tuple[int, int]] | np.ndarray,
     num_inactive_orbs: int,
     num_active_orbs: int,
     rdm1: np.ndarray,
@@ -397,7 +397,7 @@ def get_orbital_rotation_gradient(
 
 @nb.jit(nopython=True)
 def get_orbital_metric_qq_block(
-    q_idx: list[tuple[int, int]],
+    q_idx: list[tuple[int, int]] | np.ndarray,
     trial: np.ndarray,
     num_inactive_orbs: int,
     num_active_orbs: int,
