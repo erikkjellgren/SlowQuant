@@ -1142,11 +1142,11 @@ def test_variance_nocm() -> None:
     qWF.thetas = WF.thetas
 
     assert abs(qWF._calc_energy_elec() - -9.418383329562078) < 10**-6  # type: ignore
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.10213270381462243) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian(), do_no_corr=True) - 0.10213270381462243) < 10**-6  # type: ignore
 
     QI.update_mitigation_flags(do_postselection=True)
     assert abs(qWF._calc_energy_elec() - -9.602601639646656) < 10**-6  # type: ignore
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.052830412154174874) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian(), do_no_corr=True) - 0.052830412154174874) < 10**-6  # type: ignore
 
 
 def test_variance() -> None:
@@ -1196,8 +1196,10 @@ def test_variance() -> None:
     qWF.thetas = WF.thetas
 
     assert abs(qWF._calc_energy_elec() - -9.233747228500063) < 10**-6  # type: ignore
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.13667860748213662) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian(), do_no_corr=True) - 0.13667860748213662) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.2176947578575442) < 10**-6  # type: ignore
 
     QI.update_mitigation_flags(do_postselection=True)
     assert abs(qWF._calc_energy_elec() - -9.530550958752345) < 10**-6  # type: ignore
-    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.08149072047975339) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian(), do_no_corr=True) - 0.08149072047975339) < 10**-6  # type: ignore
+    assert abs(QI.quantum_variance(qWF._get_hamiltonian()) - 0.12548161863195212) < 10**-6  # type: ignore

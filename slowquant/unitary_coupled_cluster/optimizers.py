@@ -35,6 +35,7 @@ class Optimizers:
         is_silent: bool = False,
         energy_eval_callback: Callable[[], int] | None = None,
         cep_move: Callable[[], None] | None = None,
+        std_callback: Callable[[], float] | None = None,
     ) -> None:
         """Initialize optimizer class.
 
@@ -48,6 +49,7 @@ class Optimizers:
             is_silent: Suppress progress output.
             energy_eval_callback: Callback to fetch num_energy_evals.
             cep_move: Callback function to move current expansion point.
+            std_callback: Callback to fetch std.
         """
         self.fun = fun
         self.grad = grad
@@ -58,6 +60,7 @@ class Optimizers:
         self.is_silent = is_silent
         self.energy_eval_callback = energy_eval_callback
         self.cep_move = cep_move
+        self.std_callback = std_callback
 
     def _print_progress(
         self, x: Sequence[float], fun: Callable[[list[float]], float | np.ndarray], silent: bool = False
@@ -69,9 +72,6 @@ class Optimizers:
             fun: Function.
             silent: Silence progress print.
         """
-        if self.cep_move is not None:
-            # Move current expansion point
-            self.cep_move()
         if not silent:
             e = fun(list(x))
             if isinstance(e, np.ndarray):
@@ -79,12 +79,22 @@ class Optimizers:
             else:
                 e_str = f"{e:3.16f}"
             time_str = f"{time.time() - self._start:7.2f}"
-            evals_str = str(self.energy_eval_callback()) if self.energy_eval_callback else "N/A"
+            evals_str = ""
+            if self.energy_eval_callback:
+                evals_str = str(self.energy_eval_callback())
+            std_str = ""
+            if self.std_callback is not None:
+                var = self.std_callback()
+                if var is not None:
+                    std_str = f" | {np.sqrt(var):.6e}"
             print(
-                f"--------{str(self._iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {evals_str.center(11)}"
+                f"--------{str(self._iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {evals_str.center(20)}{std_str}"
             )
             self._iteration += 1
             self._start = time.time()
+        if self.cep_move is not None:
+            # Move current expansion point
+            self.cep_move()
 
     def minimize(self, x0: Sequence[float], extra_options: dict[str, Any] | None = None) -> Result:
         """Minimize function.
@@ -119,7 +129,7 @@ class Optimizers:
                 method=self.method,
                 tol=self.tol,
                 callback=print_progress,
-                options={"maxiter": self.maxiter},#, "disp": True},
+                options={"maxiter": self.maxiter},  # , "disp": True},
             )
         elif self.method in ("cobyla", "cobyqa"):
             # Does not work with moving the expansion point.
