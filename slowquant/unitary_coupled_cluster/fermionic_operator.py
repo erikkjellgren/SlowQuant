@@ -24,86 +24,66 @@ def operator_to_qiskit_key(operator_string: tuple[tuple[int, bool], ...], remapp
     return op_key[1:]
 
 
-from collections import deque
-
-def do_extended_normal_ordering_string(
-    fermistring: tuple[tuple[int, bool], ...],
-) -> tuple[tuple[tuple[int, bool], ...], list[float]]:
+def nondagger_dagger_sort(
+    fermistring: list[int],
+    daggers: list[bool],
+    phase: int,
+):
     """Reorder fermionic operator string."""
 
-    # 1. Use deque for O(1) left-pops
-    operator_queue = deque([list(fermistring)])
-    factor_queue = deque([1.0]) # Use float to match return type hint
+    factor = phase
+    next_operator = fermistring
+    # Doing a dumb version of cycle-sort
+    while True:
+        changed = False
+        is_zero = False
+        i = 0
 
-    new_ops = []
-    new_phases = []
+        while i < len(next_operator) - 1:
+            idx_a = next_operator[i]
+            idx_b = next_operator[i + 1]
+            is_cr_a = daggers[i]
+            is_cr_b = daggers[i + 1]
 
-    while operator_queue:
-        next_operator = operator_queue.popleft()
-        factor = factor_queue.popleft()
-
-        # Doing a dumb version of cycle-sort
-        while True:
-            changed = False
-            is_zero = False
-            i = 0
-
-            # 4. Streamlined loop structure
-            while i < len(next_operator) - 1:
-                a = next_operator[i]
-                b = next_operator[i + 1]
-
-                # 3. Fast tuple unpacking
-                idx_a, is_cr_a = a
-                idx_b, is_cr_b = b
-
-                if is_cr_a and is_cr_b:  # Creation / Creation
-                    if idx_a == idx_b:
-                        is_zero = True
-                        break
-                    elif idx_a < idx_b:
-                        next_operator[i], next_operator[i + 1] = b, a
-                        factor *= -1
-                        changed = True
-
-                elif not is_cr_a and is_cr_b:  # Annihilation / Creation
-                    if idx_a == idx_b:
-                        # 2. Fast list duplication and modification via slicing
+            if not is_cr_a and is_cr_b:  # Annihilation / Creation
+                if idx_a == idx_b:
+                    if len(next_operator) > 2:
                         new_op = next_operator[:i] + next_operator[i + 2:]
-                        if new_op:
-                            operator_queue.append(new_op)
-                            factor_queue.append(factor)
+                        new_daggers = daggers[:i] + daggers[i + 2:]
+                        yield from nondagger_dagger_sort(new_op, new_daggers, factor)
 
-                    next_operator[i], next_operator[i + 1] = b, a
-                    factor *= -1
-                    changed = True
+                next_operator[i], next_operator[i + 1] = next_operator[i + 1], next_operator[i]
+                daggers[i], daggers[i + 1] = daggers[i + 1], daggers[i]
+                factor *= -1
+                changed = True
 
-                elif not is_cr_a and not is_cr_b:  # Annihilation / Annihilation
-                    if idx_a == idx_b:
-                        is_zero = True
-                        break
-                    elif idx_a < idx_b:
-                        next_operator[i], next_operator[i + 1] = b, a
-                        factor *= -1
-                        changed = True
+            # If it's Creation / Annihilation, it's already in correct order
+            i += 1
 
-                # If it's Creation / Annihilation, it's already in correct order
-                i += 1
+        if is_zero:
+            break
 
-            if is_zero:
-                break
-
-            if not changed:
-                new_ops.append(tuple(next_operator))
-                new_phases.append(factor)
-                break
-
-    return new_ops, new_phases
+        if not changed:
+            num_daggers = sum(daggers)
+            yield next_operator[:num_daggers], next_operator[num_daggers:], factor
+            break
 
 
-def do_extended_normal_ordering_string2(
-    fermistring: tuple[tuple[int, bool], ...],
-) -> tuple[tuple[tuple[int, bool], ...], list[float]]:
+def insertion_sort(indices: list[int]) -> tuple[list[int], int]:
+    phase = 1
+    for i in range(1, len(indices)):
+        j = i
+        while j > 0 and indices[j] > indices[j-1]:
+            indices[j], indices[j-1] = indices[j-1], indices[j]
+            phase *= -1
+            j -= 1
+    return indices, phase
+
+
+def do_product_extended_normal_ordering(
+    fermistring1: tuple[tuple[int, ...], tuple[int, ...]],
+    fermistring2: tuple[tuple[int, ...], tuple[int, ...]],
+) -> tuple[list[tuple[tuple[int, ...], tuple[int, ...]]], list[int]]:
     """Reorder fermionic operator string.
 
     The string will be ordered such that all creation operators are first,
@@ -114,91 +94,48 @@ def do_extended_normal_ordering_string2(
     Returns:
         Reordered operator dict and factor dict.
     """
-    operator_queue = [list(fermistring)]
-    factor_queue = [1]
-    new_ops = []
+    dagger1_set = set(fermistring1[0])
+    dagger2_set = set(fermistring2[0])
+    nondagger1_set = set(fermistring1[1])
+    nondagger2_set = set(fermistring2[1])
+    if len(nondagger1_set) + len(dagger2_set) == len(nondagger1_set.union(dagger2_set)):
+        # No index overlap between non-dagger left-side and dagger right-side.
+        if len(dagger1_set) + len(dagger2_set) != len(dagger1_set.union(dagger2_set)):
+            # Same index creation operator.
+            return [], []
+        elif len(nondagger1_set) + len(nondagger2_set) != len(nondagger1_set.union(nondagger2_set)):
+            # Same index annihilation operator.
+            return [], []
+        phase = 1
+        if len(fermistring1[1]) % 2 != 0 and len(fermistring2[0]) % 2 != 0:
+            # Only phase change if both are an odd lenght.
+            phase *= -1
+        dagger_list, phase_fac = insertion_sort(list(fermistring1[0]) + list(fermistring2[0]))
+        phase *= phase_fac
+        nondagger_list, phase_fac = insertion_sort(list(fermistring1[1]) + list(fermistring2[1]))
+        phase *= phase_fac
+        return [(tuple(dagger_list), tuple(nondagger_list))], [phase] 
+
+    new_operators = []
     new_phases = []
-    while len(operator_queue) > 0:
-        next_operator = operator_queue.pop(0)
-        factor = factor_queue.pop(0)
-        # Doing a dumb version of cycle-sort (it is easy, but N**2)
-        while True:
-            current_idx = 0
-            changed = False
-            is_zero = False
-            while True:
-                if len(next_operator) == 0:
-                    break
-                a = next_operator[current_idx]
-                b = next_operator[current_idx + 1]
-                i = current_idx
-                j = current_idx + 1
-                if a[1] and b[1]:
-                    if a[0] == b[0]:
-                        is_zero = True
-                    elif a[0] < b[0]:
-                        next_operator[i], next_operator[j] = next_operator[j], next_operator[i]
-                        factor *= -1
-                        changed = True
-                elif not a[1] and b[1]:
-                    if a[0] == b[0]:
-                        new_op = copy.copy(next_operator)
-                        new_op.pop(j)
-                        new_op.pop(i)
-                        if len(new_op) > 0:
-                            operator_queue.append(new_op)
-                            factor_queue.append(factor)
-                        next_operator[i], next_operator[j] = next_operator[j], next_operator[i]
-                        factor *= -1
-                        changed = True
-                    else:
-                        next_operator[i], next_operator[j] = next_operator[j], next_operator[i]
-                        factor *= -1
-                        changed = True
-                elif a[1] and not b[1]:
-                    pass
-                elif a[0] == b[0]:
-                    is_zero = True
-                elif a[0] < b[0]:
-                    next_operator[i], next_operator[j] = next_operator[j], next_operator[i]
-                    factor *= -1
-                    changed = True
-                current_idx += 1
-                if current_idx + 1 == len(next_operator) or is_zero:
-                    break
-            if not changed or is_zero:
-                if not is_zero:
-                    new_ops.append(tuple(next_operator))
-                    new_phases.append(factor)
-                break
-    return new_ops, new_phases
-
-
-def do_extended_normal_ordering(
-    fermistring: FermionicOperator,
-) -> dict[tuple[tuple[int, bool], ...], float]:
-    """Reorder fermionic operator string.
-
-    The string will be ordered such that all creation operators are first,
-    and annihilation operators are second.
-    Within a block of creation or annihilation operators the largest spin index
-    will be first and the ordering will be descending.
-
-    Returns:
-        Reordered operator dict and factor dict.
-    """
-    new_operators = {}
-    for operator_string in fermistring.operators.keys():
-        factor = fermistring.operators[operator_string]
-        new_strings, phases = do_extended_normal_ordering_string(operator_string)
-        for op_key, phase in zip(new_strings, phases):
-            if op_key not in new_operators:
-                new_operators[op_key] = factor*phase
-            else:
-                new_operators[op_key] += factor*phase
-                if abs(new_operators[op_key]) < 10**-14:
-                    del new_operators[op_key]
-    return new_operators
+    fermistring = list(fermistring1[1]) + list(fermistring2[0])
+    daggers = [False]*len(fermistring1[1]) + [True]*len(fermistring2[0])
+    for dagger_tmp, nondagger_tmp, phase in nondagger_dagger_sort(fermistring, daggers, 1):
+        dagger_tmp_set = set(dagger_tmp)
+        nondagger_tmp_set = set(nondagger_tmp)
+        if len(dagger1_set) + len(dagger_tmp_set) != len(dagger1_set.union(dagger_tmp_set)):
+            # Same index creation operator.
+            continue
+        elif len(nondagger_tmp_set) + len(nondagger2_set) != len(nondagger_tmp_set.union(nondagger2_set)):
+            # Same index annihilation operator.
+            continue
+        dagger_list, phase_fac = insertion_sort(list(fermistring1[0]) + dagger_tmp)
+        phase *= phase_fac
+        nondagger_list, phase_fac = insertion_sort(nondagger_tmp + list(fermistring2[1]))
+        phase *= phase_fac
+        new_operators.append((tuple(dagger_list), tuple(nondagger_list)))
+        new_phases.append(phase)
+    return new_operators, new_phases
 
 
 class FermionicOperator:
@@ -206,7 +143,7 @@ class FermionicOperator:
 
     def __init__(
         self,
-        annihilation_operator: dict[tuple[tuple[int, bool], ...], float],
+        annihilation_operator: dict[tuple[tuple[int, ...], tuple[int, ...]], float],
     ) -> None:
         """Initialize fermionic operator class.
 
@@ -318,17 +255,16 @@ class FermionicOperator:
             # Iterate over all strings in both FermionicOperators
             for op_key1 in fermistring.operators.keys():
                 for op_key2 in self.operators.keys():
+                    factor = self.operators[op_key2] * fermistring.operators[op_key1]
+                    if abs(factor) < 10**-14:
+                        continue
                     # Build new strings and factors via normal ordering of product of two strings
-                    new_ops = do_extended_normal_ordering(
-                        FermionicOperator(
-                            {op_key2 + op_key1: self.operators[op_key2] * fermistring.operators[op_key1]}
-                        )
-                    )
-                    for op_key in new_ops.keys():
+                    new_ops, phases = do_product_extended_normal_ordering(self.operators[op_key2], fermistring.operators[op_key1])
+                    for op_key, phase in zip(new_ops, phases):
                         if op_key not in operators.keys():
-                            operators[op_key] = new_ops[op_key]
+                            operators[op_key] = factor*phase
                         else:
-                            operators[op_key] += new_ops[op_key]
+                            operators[op_key] += factor*phase
                             if abs(operators[op_key]) < 10**-14:
                                 del operators[op_key]
         else:
@@ -353,17 +289,16 @@ class FermionicOperator:
             # Iterate over all strings in both FermionicOperators
             for op_key1 in fermistring.operators.keys():
                 for op_key2 in self.operators.keys():
+                    factor = self.operators[op_key2] * fermistring.operators[op_key1]
+                    if abs(factor) < 10**-14:
+                        continue
                     # Build new strings and factors via normal ordering of product of two strings
-                    new_ops = do_extended_normal_ordering(
-                        FermionicOperator(
-                            {op_key2 + op_key1: self.operators[op_key2] * fermistring.operators[op_key1]}
-                        )
-                    )
-                    for op_key in new_ops.keys():
+                    new_ops, phases = do_product_extended_normal_ordering(self.operators[op_key2], fermistring.operators[op_key1])
+                    for op_key, phase in zip(new_ops, phases):
                         if op_key not in operators.keys():
-                            operators[op_key] = new_ops[op_key]
+                            operators[op_key] = factor*phase
                         else:
-                            operators[op_key] += new_ops[op_key]
+                            operators[op_key] += factor*phase
                             if abs(operators[op_key]) < 10**-14:
                                 del operators[op_key]
             self.operators = operators

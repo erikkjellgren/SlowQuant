@@ -21,7 +21,9 @@ def a_op(spinless_idx: int, spin: str, dagger: bool) -> FermionicOperator:
     idx = 2 * spinless_idx
     if spin == "beta":
         idx += 1
-    return FermionicOperator({((idx, dagger),): 1})
+    if dagger:
+        return FermionicOperator({((idx,),()): 1})
+    return FermionicOperator({((),(idx,)): 1})
 
 
 def a_op_spin(spin_idx: int, dagger: bool) -> FermionicOperator:
@@ -34,7 +36,9 @@ def a_op_spin(spin_idx: int, dagger: bool) -> FermionicOperator:
     Returns:
         Annihilation/creation operator.
     """
-    return FermionicOperator({((spin_idx, dagger),): 1})
+    if dagger:
+        return FermionicOperator({((spin_idx,),()): 1})
+    return FermionicOperator({((),(spin_idx,)): 1})
 
 
 def Epq(p: int, q: int) -> FermionicOperator:
