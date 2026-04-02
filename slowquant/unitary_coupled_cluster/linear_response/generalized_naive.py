@@ -798,12 +798,6 @@ class LinearResponse(LinearResponseBaseClass):
                     # - < 0 | E G | 0 >
                     val -= generalized_expectation_value(Ed_ket, [], G_ket, *self.index_info)
                     V[idx + idx_shift_q, :] += mo[:, p, q] * val
-        if np.allclose(mo, mo.transpose(0, -1, -2)):
-            return np.vstack((V, -1 * V)).reshape(-1, *in_shape)
-        return np.vstack((V, V)).reshape(-1, *in_shape)
-    
-
-
-
-    
-
+        if np.allclose(mo, mo.conj().transpose(0, -1, -2)):
+            return np.vstack((V, -1 * V.conj())).reshape(-1, *in_shape)
+        return np.vstack((V, V.conj())).reshape(-1, *in_shape)
