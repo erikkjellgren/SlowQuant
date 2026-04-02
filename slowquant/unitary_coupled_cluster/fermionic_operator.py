@@ -259,7 +259,7 @@ class FermionicOperator:
                     if abs(factor) < 10**-14:
                         continue
                     # Build new strings and factors via normal ordering of product of two strings
-                    new_ops, phases = do_product_extended_normal_ordering(self.operators[op_key2], fermistring.operators[op_key1])
+                    new_ops, phases = do_product_extended_normal_ordering(op_key2, op_key1)
                     for op_key, phase in zip(new_ops, phases):
                         if op_key not in operators.keys():
                             operators[op_key] = factor*phase
@@ -285,7 +285,7 @@ class FermionicOperator:
                 # The name fermistring is misleading here.
                 self.operators[op_key] *= fermistring  # type: ignore
         elif type(fermistring) is FermionicOperator:
-            operators: dict[tuple[tuple[int, bool], ...], float] = {}
+            operators = {}
             # Iterate over all strings in both FermionicOperators
             for op_key1 in fermistring.operators.keys():
                 for op_key2 in self.operators.keys():
@@ -293,7 +293,7 @@ class FermionicOperator:
                     if abs(factor) < 10**-14:
                         continue
                     # Build new strings and factors via normal ordering of product of two strings
-                    new_ops, phases = do_product_extended_normal_ordering(self.operators[op_key2], fermistring.operators[op_key1])
+                    new_ops, phases = do_product_extended_normal_ordering(op_key2, op_key1)
                     for op_key, phase in zip(new_ops, phases):
                         if op_key not in operators.keys():
                             operators[op_key] = factor*phase
@@ -340,17 +340,10 @@ class FermionicOperator:
         """
         operators = {}
         for op_key in self.operators.keys():
-            new_op = []
-            for op in reversed(op_key):
-                if op[1]:
-                    new_op.append((op[0], False))
-                else:
-                    new_op.append((op[0], True))
-            new_op_key = tuple(new_op)
-            operators[new_op_key] = self.operators[op_key]
-        # Do normal ordering of comlex conjugated operator.
-        operators_ordered = do_extended_normal_ordering(FermionicOperator(operators))
-        return FermionicOperator(operators_ordered)
+            dagger_op, phase1 = insertion_sort(list(op_key[1]))
+            nondagger_op, phase2 = insertion_sort(list(op_key[0]))
+            operators[(tuple(dagger_op), tuple(nondagger_op))] = self.operators[op_key]*phase1*phase2
+        return FermionicOperator(operators)
 
     @property
     def operator_count(self) -> dict[int, int]:
@@ -376,13 +369,12 @@ class FermionicOperator:
             Operator in humanreable format.
         """
         operator = {}
-        for string, fac in self.operators.items():
+        for (dagger_string, nondagger_string), fac in self.operators.items():
             op_key = ""
-            for a in string:
-                if a[1]:
-                    op_key += f"c{a[0]}"
-                else:
-                    op_key += f"a{a[0]}"
+            for a in dagger_string:
+                op_key += f"c{a}"
+            for a in nondagger_string:
+                op_key += f"a{a}"
             operator[op_key] = fac
         return operator
 
@@ -440,7 +432,7 @@ class FermionicOperator:
         Returns:
            Folded fermionic operator.
         """
-        operators: dict[tuple[tuple[int, bool], ...], float] = {}
+        operators = {}
         inactive_idx = []
         active_idx = []
         virtual_idx = []
@@ -463,24 +455,26 @@ class FermionicOperator:
             active_dagger = []
             fac = 1
             # Loop over individual annihilation operator and sort into spaces
-            for anni in op_key:
-                if anni[1]:
-                    if anni[0] in inactive_idx:
-                        inactive_dagger.append(anni[0])
-                    elif anni[0] in active_idx:
-                        active_dagger.append((anni[0] - 2 * num_inactive_orbs, anni[1]))
-                    elif anni[0] in virtual_idx:
-                        virtual_dagger.append(anni[0])
-                elif anni[0] in inactive_idx:
-                    inactive.append(anni[0])
-                elif anni[0] in active_idx:
-                    active.append((anni[0] - 2 * num_inactive_orbs, anni[1]))
-                elif anni[0] in virtual_idx:
-                    virtual.append(anni[0])
+            # Loop over daggers
+            for anni in op_key[0]:
+                if anni in inactive_idx:
+                    inactive_dagger.append(anni)
+                elif anni in active_idx:
+                    active_dagger.append(anni - 2 * num_inactive_orbs)
+                elif anni in virtual_idx:
+                    virtual_dagger.append(anni)
+            # Loop over non-daggers
+            for anni in op_key[1]:
+                if anni in inactive_idx:
+                    inactive.append(anni)
+                elif anni in active_idx:
+                    active.append(anni - 2 * num_inactive_orbs)
+                elif anni in virtual_idx:
+                    virtual.append(anni)
             # Any virtual indices will make the operator evaluate to zero.
             if len(virtual) != 0 or len(virtual_dagger) != 0:
                 continue
-            active_op = active_dagger + active  # list
+            active_op = (tuple(active_dagger), tuple(active))
             bra_side = inactive_dagger
             ket_side = inactive
             # The inactive bra and ket side must end up giving identical state vectors.
@@ -495,11 +489,10 @@ class FermionicOperator:
                 if i % 2 == 0:
                     ket_flip_fac *= -1
             fac *= ket_flip_fac
-            new_key = tuple(active_op)
-            if new_key in operators.keys():
-                operators[new_key] += fac * self.operators[op_key]
+            if active_op in operators.keys():
+                operators[active_op] += fac * self.operators[op_key]
             else:
-                operators[new_key] = fac * self.operators[op_key]
+                operators[active_op] = fac * self.operators[op_key]
         return FermionicOperator(operators)
 
     def get_info(self) -> tuple[list[list[int]], list[list[int]], list[float]]:
