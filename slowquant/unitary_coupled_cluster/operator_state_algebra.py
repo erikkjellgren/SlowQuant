@@ -591,7 +591,7 @@ def propagate_state(
                     for idx in create_idx:
                         if idx not in anni_idx:
                             create_screen.append(idx)
-                    a_string = np.concatenate((create_idx, anni_idx))
+                    a_string = np.concatenate((anni_idx, create_idx))
                     create_screen = np.array(create_screen, dtype=np.int64)
                     tmp_state = apply_operator_serial(
                         new_state,
@@ -693,13 +693,8 @@ def propagate_state_SA(
             if is_parallel:
                 for fermi_label in op_folded.operators.keys():
                     # Separate each annihilation operator string in creation and annihilation indices
-                    anni_idx = []
-                    create_idx = []
-                    for fermi_op in fermi_label:
-                        if fermi_op[1]:
-                            create_idx.append(fermi_op[0])
-                        else:
-                            anni_idx.append(fermi_op[0])
+                    anni_idx = np.array(fermi_label[1], dtype=np.int64)
+                    create_idx = np.array(fermi_label[0], dtype=np.int64)
                     # When screening determinants,
                     # no need to consider the annihilation index of an
                     # operator that has the same creation index.
@@ -707,9 +702,8 @@ def propagate_state_SA(
                     for idx in anni_idx:
                         if idx not in create_idx:
                             anni_screen.append(idx)
-                    a_string = np.array(create_idx + anni_idx, dtype=np.int64)
+                    a_string = np.concatenate((create_idx, anni_idx))
                     anni_screen = np.array(anni_screen, dtype=np.int64)
-                    create_idx = np.array(create_idx, dtype=np.int64)
                     tmp_state = apply_operator_SA_threaded(
                         new_state,
                         a_string,
@@ -726,13 +720,8 @@ def propagate_state_SA(
             else:
                 for fermi_label in op_folded.operators.keys():
                     # Separate each annihilation operator string in creation and annihilation indices
-                    anni_idx = []
-                    create_idx = []
-                    for fermi_op in fermi_label:
-                        if fermi_op[1]:
-                            create_idx.append(fermi_op[0])
-                        else:
-                            anni_idx.append(fermi_op[0])
+                    anni_idx = np.array(fermi_label[1], dtype=np.int64)
+                    create_idx = np.array(fermi_label[0], dtype=np.int64)
                     # When screening determinants,
                     # no need to consider the annihilation index of an
                     # operator that has the same creation index.
@@ -740,10 +729,8 @@ def propagate_state_SA(
                     for idx in create_idx:
                         if idx not in anni_idx:
                             create_screen.append(idx)
-                    a_string = np.array(anni_idx + create_idx, dtype=np.int64)
+                    a_string = np.concatenate((anni_idx, create_idx))
                     create_screen = np.array(create_screen, dtype=np.int64)
-                    create_idx = np.array(create_idx, dtype=np.int64)
-                    anni_idx = np.array(anni_idx, dtype=np.int64)
                     tmp_state = apply_operator_SA_serial(
                         new_state,
                         a_string,

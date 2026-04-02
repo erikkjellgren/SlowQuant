@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import copy
 import re
+from collections import defaultdict
 
 
-def operator_to_qiskit_key(operator_string: tuple[tuple[int, bool], ...], remapping: dict[int, int]) -> str:
+def operator_to_qiskit_key(
+    operator_string: tuple[tuple[int, ...], tuple[int, ...]], remapping: dict[int, int]
+) -> str:
     """Make key string to index a fermionic operator in a dict structure.
 
     Args:
@@ -16,11 +19,10 @@ def operator_to_qiskit_key(operator_string: tuple[tuple[int, bool], ...], remapp
         Dictionary key.
     """
     op_key = ""
-    for a in operator_string:
-        if a[1]:
-            op_key += f" +_{remapping[a[0]]}"
-        else:
-            op_key += f" -_{remapping[a[0]]}"
+    for a in operator_string[0]:
+        op_key += f" +_{remapping[a]}"
+    for a in operator_string[1]:
+        op_key += f" -_{remapping[a]}"
     return op_key[1:]
 
 
@@ -30,7 +32,6 @@ def nondagger_dagger_sort(
     phase: int,
 ):
     """Reorder fermionic operator string."""
-
     factor = phase
     next_operator = fermistring
     # Doing a dumb version of cycle-sort
@@ -47,10 +48,9 @@ def nondagger_dagger_sort(
 
             if not is_cr_a and is_cr_b:  # Annihilation / Creation
                 if idx_a == idx_b:
-                    if len(next_operator) > 2:
-                        new_op = next_operator[:i] + next_operator[i + 2:]
-                        new_daggers = daggers[:i] + daggers[i + 2:]
-                        yield from nondagger_dagger_sort(new_op, new_daggers, factor)
+                    new_op = next_operator[:i] + next_operator[i + 2 :]
+                    new_daggers = daggers[:i] + daggers[i + 2 :]
+                    yield from nondagger_dagger_sort(new_op, new_daggers, factor)
 
                 next_operator[i], next_operator[i + 1] = next_operator[i + 1], next_operator[i]
                 daggers[i], daggers[i + 1] = daggers[i + 1], daggers[i]
@@ -73,8 +73,8 @@ def insertion_sort(indices: list[int]) -> tuple[list[int], int]:
     phase = 1
     for i in range(1, len(indices)):
         j = i
-        while j > 0 and indices[j] > indices[j-1]:
-            indices[j], indices[j-1] = indices[j-1], indices[j]
+        while j > 0 and indices[j] > indices[j - 1]:
+            indices[j], indices[j - 1] = indices[j - 1], indices[j]
             phase *= -1
             j -= 1
     return indices, phase
@@ -114,12 +114,12 @@ def do_product_extended_normal_ordering(
         phase *= phase_fac
         nondagger_list, phase_fac = insertion_sort(list(fermistring1[1]) + list(fermistring2[1]))
         phase *= phase_fac
-        return [(tuple(dagger_list), tuple(nondagger_list))], [phase] 
+        return [(tuple(dagger_list), tuple(nondagger_list))], [phase]
 
     new_operators = []
     new_phases = []
     fermistring = list(fermistring1[1]) + list(fermistring2[0])
-    daggers = [False]*len(fermistring1[1]) + [True]*len(fermistring2[0])
+    daggers = [False] * len(fermistring1[1]) + [True] * len(fermistring2[0])
     for dagger_tmp, nondagger_tmp, phase in nondagger_dagger_sort(fermistring, daggers, 1):
         dagger_tmp_set = set(dagger_tmp)
         nondagger_tmp_set = set(nondagger_tmp)
@@ -170,13 +170,13 @@ class FermionicOperator:
         """
         # Combine annihilation string entries of two FermionicOperators.
         operators = copy.copy(self.operators)
-        for op_key in fermistring.operators.keys():
+        for op_key, fac in fermistring.operators.items():
             if op_key in operators.keys():
-                operators[op_key] += fermistring.operators[op_key]
+                operators[op_key] += fac
                 if abs(operators[op_key]) < 10**-14:
                     del operators[op_key]
             else:
-                operators[op_key] = fermistring.operators[op_key]
+                operators[op_key] = fac
         return FermionicOperator(operators)
 
     def __iadd__(self, fermistring: FermionicOperator) -> FermionicOperator:
@@ -188,13 +188,13 @@ class FermionicOperator:
         Returns:
             Updated fermionic operator.
         """
-        for op_key in fermistring.operators.keys():
+        for op_key, fac in fermistring.operators.items():
             if op_key in self.operators.keys():
-                self.operators[op_key] += fermistring.operators[op_key]
+                self.operators[op_key] += fac
                 if abs(self.operators[op_key]) < 10**-14:
                     del self.operators[op_key]
             else:
-                self.operators[op_key] = fermistring.operators[op_key]
+                self.operators[op_key] = fac
         return self
 
     def __sub__(self, fermistring: FermionicOperator) -> FermionicOperator:
@@ -208,13 +208,13 @@ class FermionicOperator:
         """
         # Combine annihilation string entries of two FermionicOperators with relevant sign flip.
         operators = copy.copy(self.operators)
-        for op_key in fermistring.operators.keys():
+        for op_key, fac in fermistring.operators.items():
             if op_key in operators.keys():
-                operators[op_key] -= fermistring.operators[op_key]
+                operators[op_key] -= fac
                 if abs(operators[op_key]) < 10**-14:
                     del operators[op_key]
             else:
-                operators[op_key] = -fermistring.operators[op_key]
+                operators[op_key] = -fac
         return FermionicOperator(operators)
 
     def __isub__(self, fermistring: FermionicOperator) -> FermionicOperator:
@@ -227,13 +227,13 @@ class FermionicOperator:
             Update fermionic operator.
         """
         # Combine annihilation string entries of two FermionicOperators with relevant sign flip.
-        for op_key in fermistring.operators.keys():
+        for op_key, fac in fermistring.operators.items():
             if op_key in self.operators.keys():
-                self.operators[op_key] -= fermistring.operators[op_key]
+                self.operators[op_key] -= fac
                 if abs(self.operators[op_key]) < 10**-14:
                     del self.operators[op_key]
             else:
-                self.operators[op_key] = -fermistring.operators[op_key]
+                self.operators[op_key] = -fac
         return self
 
     def __mul__(self, fermistring: FermionicOperator | float | int) -> FermionicOperator:
@@ -246,27 +246,22 @@ class FermionicOperator:
             New fermionic operator.
         """
         if type(fermistring) in (float, int):
-            operators = copy.copy(self.operators)
-            for op_key in self.operators.keys():
-                # The name fermistring is misleading here.
-                operators[op_key] *= fermistring  # type: ignore
+            # The name fermistring is misleading here.
+            operators = {
+                op: fac * fermistring for op, fac in operators.items() if abs(fac * fermistring) >= 1e-14
+            }  # type: ignore
         elif type(fermistring) is FermionicOperator:
-            operators = {}  # type: ignore
+            operators = defaultdict(float)
             # Iterate over all strings in both FermionicOperators
-            for op_key1 in fermistring.operators.keys():
-                for op_key2 in self.operators.keys():
-                    factor = self.operators[op_key2] * fermistring.operators[op_key1]
-                    if abs(factor) < 10**-14:
+            for op_key1, fac1 in fermistring.operators.items():
+                for op_key2, fac2 in self.operators.items():
+                    if abs(fac1 * fac2) < 10**-14:
                         continue
                     # Build new strings and factors via normal ordering of product of two strings
                     new_ops, phases = do_product_extended_normal_ordering(op_key2, op_key1)
                     for op_key, phase in zip(new_ops, phases):
-                        if op_key not in operators.keys():
-                            operators[op_key] = factor*phase
-                        else:
-                            operators[op_key] += factor*phase
-                            if abs(operators[op_key]) < 10**-14:
-                                del operators[op_key]
+                        operators[op_key] += fac1 * fac2 * phase
+            operators = {op: fac for op, fac in operators.items() if abs(fac) >= 1e-14}
         else:
             raise TypeError(f"Got unknown type of fermistring: {type(fermistring)}")
         return FermionicOperator(operators)
@@ -284,24 +279,19 @@ class FermionicOperator:
             for op_key in self.operators.keys():
                 # The name fermistring is misleading here.
                 self.operators[op_key] *= fermistring  # type: ignore
+            self.operators = {op: fac for op, fac in self.operators.items() if abs(fac) >= 1e-14}
         elif type(fermistring) is FermionicOperator:
-            operators = {}
+            operators = defaultdict(float)
             # Iterate over all strings in both FermionicOperators
-            for op_key1 in fermistring.operators.keys():
-                for op_key2 in self.operators.keys():
-                    factor = self.operators[op_key2] * fermistring.operators[op_key1]
-                    if abs(factor) < 10**-14:
+            for op_key1, fac1 in fermistring.operators.items():
+                for op_key2, fac2 in self.operators.items():
+                    if abs(fac1 * fac2) < 10**-14:
                         continue
                     # Build new strings and factors via normal ordering of product of two strings
                     new_ops, phases = do_product_extended_normal_ordering(op_key2, op_key1)
                     for op_key, phase in zip(new_ops, phases):
-                        if op_key not in operators.keys():
-                            operators[op_key] = factor*phase
-                        else:
-                            operators[op_key] += factor*phase
-                            if abs(operators[op_key]) < 10**-14:
-                                del operators[op_key]
-            self.operators = operators
+                        operators[op_key] += fac1 * fac2 * phase
+            self.operators = {op: fac for op, fac in operators.items() if abs(fac) >= 1e-14}
         else:
             raise TypeError(f"Got unknown type of fermistring: {type(fermistring)}")
         return self
@@ -315,9 +305,7 @@ class FermionicOperator:
         Returns:
             New fermionic operator.
         """
-        operators = {}
-        for op_key in self.operators.keys():
-            operators[op_key] = self.operators[op_key] * number
+        operators = {op: fac * number for op, fac in self.operators.items() if abs(fac * number) >= 1e-14}
         return FermionicOperator(operators)
 
     def __neg__(self):
@@ -326,9 +314,7 @@ class FermionicOperator:
         Retunrs:
             New fermionic operator.
         """
-        operators = copy.copy(self.operators)
-        for op_key in self.operators.keys():
-            operators[op_key] = -operators[op_key]
+        operators = {op: -fac for op, fac in self.operators.items()}
         return FermionicOperator(operators)
 
     @property
@@ -339,10 +325,10 @@ class FermionicOperator:
             New fermionic operator.
         """
         operators = {}
-        for op_key in self.operators.keys():
+        for op_key, fac in self.operators.items():
             dagger_op, phase1 = insertion_sort(list(op_key[1]))
             nondagger_op, phase2 = insertion_sort(list(op_key[0]))
-            operators[(tuple(dagger_op), tuple(nondagger_op))] = self.operators[op_key]*phase1*phase2
+            operators[(tuple(dagger_op), tuple(nondagger_op))] = fac * phase1 * phase2
         return FermionicOperator(operators)
 
     @property
@@ -446,14 +432,14 @@ class FermionicOperator:
                 virtual_idx.append(i)
 
         # Loop over string of annihilation operators
-        for op_key in self.operators.keys():
+        for op_key, fac in self.operators.items():
             virtual = []
             virtual_dagger = []
             inactive = []
             inactive_dagger = []
             active = []
             active_dagger = []
-            fac = 1
+            phase = 1
             # Loop over individual annihilation operator and sort into spaces
             # Loop over daggers
             for anni in op_key[0]:
@@ -481,18 +467,18 @@ class FermionicOperator:
             if bra_side != ket_side:
                 continue
             if len(inactive_dagger) % 2 == 1 and len(active_dagger) % 2 == 1:
-                fac *= -1
+                phase *= -1
             # Calculate sign coming from flipping the order of the ket side.
             # It has to be "flipped" to match the order on the bra side.
             ket_flip_fac = 1
             for i in range(1, len(ket_side) + 1):
                 if i % 2 == 0:
                     ket_flip_fac *= -1
-            fac *= ket_flip_fac
+            phase *= ket_flip_fac
             if active_op in operators.keys():
-                operators[active_op] += fac * self.operators[op_key]
+                operators[active_op] += fac * phase
             else:
-                operators[active_op] = fac * self.operators[op_key]
+                operators[active_op] = fac * phase
         return FermionicOperator(operators)
 
     def get_info(self) -> tuple[list[list[int]], list[list[int]], list[float]]:
