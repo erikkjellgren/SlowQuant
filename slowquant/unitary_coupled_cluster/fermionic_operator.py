@@ -31,15 +31,44 @@ def do_product_extended_normal_ordering(
     fermistring1: tuple[tuple[int, ...], tuple[int, ...]],
     fermistring2: tuple[tuple[int, ...], tuple[int, ...]],
 ) -> Generator[tuple[tuple[tuple[int, ...], tuple[int, ...]], int], None, None]:
-    """Reorder fermionic operator string.
+    r"""Generate all fermistrings from the product of two fermistrings.
 
-    The string will be ordered such that all creation operators are first,
-    and annihilation operators are second.
-    Within a block of creation or annihilation operators the largest spin index
-    will be first and the ordering will be descending.
+    In the following text by contraction it is meant that,
+
+    .. math::
+        \left[\hat{a}^\dagger_p,\hat{a}_q\right] = \delta_{pq}
+
+    The contraction term is the extra term that comes when :math:`p=q`.
+    aX, cX denotes the annihilation and creation part of fermistringX.
+
+    Takes as input two fermistrings that are already assumed to be sorted.
+    If a1 has no index overlap with c2, then strings are sorted as follows,
+
+    a) Screen out string that give zero, if there is index overlap in a1 and a2, or, c1 and c2.
+
+    b) Switch around a1 and c2, as there is no overlapping indices, a contraction cannot occour.
+       The phase multiplier is 1 if a1 or c2 is of even length, and, is -1 if both are of odd lenght.
+
+    c) The new fermistring now has the form, ((c1 + c2, a1 + a2)).
+       The strings 'c1 + c2' and 'a1 + a2' are now sorted using insertion sort.
+
+    If the annihilation part of fermstring1 has index overlap with the creation part of fermistring2,
+    then strings are sorted as follows,
+
+    x) Insertion sort a1 + c2, and keep track of contraction terms.
+       This gives new strings (cK, aK).
+
+    y) Screen out string that give zero, if there is index overlap in a2 and aK, or, c1 and cK.
+
+    z) Create new strings of the form, ((c1 + cK, aK + a2)).
+       The strings 'c1 + cK' and 'aK + a2' are now sorted using insertion sort.
+
+    Args:
+        fermistring1: Left-side fermistring, tuple of creation string and annihilation string.
+        fermistring2: Right-side fermistring, tuple of creation string and annihilation string.
 
     Returns:
-        Reordered operator dict and factor dict.
+        Creation string, annihilation string, and, phase.
     """
     dagger1_set = set(fermistring1[0])
     dagger2_set = set(fermistring2[0])
@@ -61,8 +90,9 @@ def do_product_extended_normal_ordering(
                 phase *= -1
             # sort the dagger part
             dagger_list = [*fermistring1[0], *fermistring2[0]]
-            # Doing insertion sort
-            for i in range(1, len(dagger_list)):
+            # Doing insertion sort, left-side part is already sorted.
+            # Hence not starting from 1.
+            for i in range(len(fermistring1[0]), len(dagger_list)):
                 j = i
                 while j > 0 and dagger_list[j] > dagger_list[j - 1]:
                     dagger_list[j], dagger_list[j - 1] = dagger_list[j - 1], dagger_list[j]
@@ -70,8 +100,9 @@ def do_product_extended_normal_ordering(
                     j -= 1
             # sort non-dagger part
             nondagger_list = [*fermistring1[1], *fermistring2[1]]
-            # Doing insertion sort
-            for i in range(1, len(nondagger_list)):
+            # Doing insertion sort, left-side part is already sorted.
+            # Hence not starting from 1.
+            for i in range(len(fermistring1[1]), len(nondagger_list)):
                 j = i
                 while j > 0 and nondagger_list[j] > nondagger_list[j - 1]:
                     nondagger_list[j], nondagger_list[j - 1] = nondagger_list[j - 1], nondagger_list[j]
@@ -79,6 +110,7 @@ def do_product_extended_normal_ordering(
                     j -= 1
             yield (tuple(dagger_list), tuple(nondagger_list)), phase
     else:
+        # stack to keep track of contractions.
         stack: list[tuple[list[int], list[bool], int]] = [
             (
                 [*fermistring1[1], *fermistring2[0]],
@@ -91,7 +123,7 @@ def do_product_extended_normal_ordering(
             for i in range(0, len(next_string)):
                 j = i
                 while j > 0 and (not next_dagger[j - 1] and next_dagger[j]):
-                    if next_string[j - 1] == next_string[j]:  # Annihilation / Creation
+                    if next_string[j - 1] == next_string[j]:  # Contraction
                         stack.append(
                             (
                                 next_string[: j - 1] + next_string[j + 1 :],
@@ -115,8 +147,9 @@ def do_product_extended_normal_ordering(
                 continue
             # sort the dagger part
             dagger_list = [*fermistring1[0], *dagger_tmp]
-            # Doing insertion sort
-            for i in range(1, len(dagger_list)):
+            # Doing insertion sort, left-side part is already sorted.
+            # Hence not starting from 1.
+            for i in range(len(fermistring1[0]), len(dagger_list)):
                 j = i
                 while j > 0 and dagger_list[j] > dagger_list[j - 1]:
                     dagger_list[j], dagger_list[j - 1] = dagger_list[j - 1], dagger_list[j]
@@ -124,8 +157,9 @@ def do_product_extended_normal_ordering(
                     j -= 1
             # sort non-dagger part
             nondagger_list = [*nondagger_tmp, *fermistring2[1]]
-            # Doing insertion sort
-            for i in range(1, len(nondagger_list)):
+            # Doing insertion sort, left-side part is already sorted.
+            # Hence not starting from 1.
+            for i in range(len(nondagger_tmp), len(nondagger_list)):
                 j = i
                 while j > 0 and nondagger_list[j] > nondagger_list[j - 1]:
                     nondagger_list[j], nondagger_list[j - 1] = nondagger_list[j - 1], nondagger_list[j]
