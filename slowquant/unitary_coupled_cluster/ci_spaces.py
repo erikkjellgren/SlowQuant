@@ -16,6 +16,7 @@ class CI_Info:
         "num_inactive_orbs",
         "num_virtual_orbs",
         "space_extension_offset",
+        "num_positronic_orbs",
     )
 
     def __init__(
@@ -27,6 +28,7 @@ class CI_Info:
         num_active_elec_beta: int,
         idx2det: np.ndarray,
         det2idx: dict[int, int],
+        num_positronic_orbs = 0,
     ) -> None:
         """Initialize configuration expansion information object.
 
@@ -44,6 +46,7 @@ class CI_Info:
         self.num_virtual_orbs = num_virtual_orbs
         self.num_active_elec_alpha = num_active_elec_alpha
         self.num_active_elec_beta = num_active_elec_beta
+        self.num_positronic_orbs = num_positronic_orbs
         self.idx2det = idx2det
         # Unfortunately, Numba needs a little bit of typing help.
         nb_dict = nbt.Dict.empty(key_type=nb.int64, value_type=nb.int64)
@@ -130,6 +133,41 @@ def get_indexing_generalized(
         num_active_elec_beta,
         np.array(idx2det, dtype=int),
         det2idx,
+    )
+
+
+def get_indexing_DHF(
+    num_inactive_spin_orbs: int,
+    num_active_spin_orbs: int,
+    num_virtual_spin_orbs: int,
+    num_active_elec_alpha: int,
+    num_active_elec_beta: int,
+    num_positronic_spin_orbs: int,
+) -> CI_Info:
+    idx = 0
+    idx2det = []
+    det2idx = {}
+    num_active_elec = num_active_elec_alpha + num_active_elec_beta
+    # Loop over all possible particle conserving determinants
+    for string in multiset_permutations(
+        [1] * num_active_elec + [0] * (num_active_spin_orbs - num_active_elec)
+    ):
+        det_str = ""
+        for occ in string:
+            det_str += str(occ)
+        det = int(det_str, 2)  # save determinant as int
+        idx2det.append(det)  # relate index to determinant
+        det2idx[det] = idx  # relate determinant to index
+        idx += 1
+    return CI_Info(
+        num_inactive_spin_orbs // 2,
+        num_active_spin_orbs // 2,
+        num_virtual_spin_orbs // 2,
+        num_active_elec_alpha,
+        num_active_elec_beta,
+        np.array(idx2det, dtype=int),
+        det2idx,
+        num_positronic_orbs = num_positronic_spin_orbs // 2,
     )
 
 

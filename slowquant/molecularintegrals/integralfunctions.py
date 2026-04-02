@@ -354,7 +354,6 @@ def DHF_two_electron_transform(C: np.ndarray, int_2e_inp: np.array) -> np.ndarra
     return cont1 + cont2 + cont3 + cont4
 
 
-
 # def generalized_two_electron_transform(C: np.ndarray, int_2e_inp_spinor: np.ndarray) -> np.ndarray: #change name AE
 #     # C: (nao2c, nmo), eri_ao: (nao2c,nao2c,nao2c,nao2c)
 #     return np.einsum("aP,bQ,cR,dS,abcd->PQRS",

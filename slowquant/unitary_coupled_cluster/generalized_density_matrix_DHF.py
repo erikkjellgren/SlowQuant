@@ -5,7 +5,7 @@ import scipy as scipy
 from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import (generalized_expectation_value,
 generalized_expectation_value_energy)
 from slowquant.unitary_coupled_cluster.operators import a_op_spin
-from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, generalized_hamiltonian_0i_0a
+from slowquant.unitary_coupled_cluster.generalized_operators import generalized_hamiltonian_full_space, generalized_hamiltonian_0i_0a, DHF_hamiltonian_full_space
 
 
 from slowquant.molecularintegrals.integralfunctions import (
@@ -37,7 +37,7 @@ def strip_imag(A, tol=1e-10):
         return A.real.astype(np.float64)
 
 @nb.jit(nopython=True)
-def RDM1(p: int, q: int, num_PES: int, num_inactive_spin_orbs: int, num_active_spin_orbs: int, rdm1: np.ndarray) -> float:
+def RDM1(p: int, q: int, num_NES: int, num_inactive_spin_orbs: int, num_active_spin_orbs: int, rdm1: np.ndarray) -> float:
     r"""Get full space one-electron reduced density matrix element.
 
     The only non-zero elements are:
@@ -63,16 +63,16 @@ def RDM1(p: int, q: int, num_PES: int, num_inactive_spin_orbs: int, num_active_s
     """
     # Annika has made numbers complex
 
-    virt_start = num_inactive_spin_orbs + num_active_spin_orbs
+    virt_start = num_NES + num_inactive_spin_orbs + num_active_spin_orbs
     if p >= virt_start or q >= virt_start:
         # Zero if any virtual index
         return 0 + 0j
-    elif p >= num_inactive_spin_orbs and q >= num_inactive_spin_orbs:
+    elif p >= (num_NES + num_inactive_spin_orbs) and q >= (num_NES + num_inactive_spin_orbs):
         # All active index
-        return rdm1[p - num_inactive_spin_orbs, q - num_inactive_spin_orbs]
-    elif p < num_inactive_spin_orbs and q < num_inactive_spin_orbs:
+        return rdm1[p - num_inactive_spin_orbs - num_NES, q - num_inactive_spin_orbs - num_NES]
+    elif p < (num_NES + num_inactive_spin_orbs) and q < (num_NES + num_inactive_spin_orbs):
         # All inactive indx
-        if p == q and p > num_PES and q > num_PES:
+        if p == q and p >= num_NES and q >= num_NES:
             return 1 + 0j
         return 0 + 0j
     # One inactive and one active index
@@ -128,7 +128,7 @@ def RDM2(
     q: int,
     r: int,
     s: int,
-    num_PES: int,
+    num_NES: int,
     num_inactive_spin_orbs: int,
     num_active_spin_orbs: int,
     rdm1: np.ndarray,
@@ -162,62 +162,94 @@ def RDM2(
     """
     # Annika has made numbers complex:
 
-    virt_start = num_inactive_spin_orbs + num_active_spin_orbs
+    virt_start = num_NES + num_inactive_spin_orbs + num_active_spin_orbs
     if p >= virt_start or q >= virt_start or r >= virt_start or s >= virt_start:
         # Zero if any virtual index
         return 0 +0j
+    elif p < num_NES or q < num_NES or r < num_NES or s < num_NES:
+        # Zero if any virtual index
+        return 0 +0j
     elif (
-        p >= num_inactive_spin_orbs
-        and q >= num_inactive_spin_orbs
-        and r >= num_inactive_spin_orbs
-        and s >= num_inactive_spin_orbs
+        p >= num_NES + num_inactive_spin_orbs
+        and q >= num_NES + num_inactive_spin_orbs
+        and r >= num_NES + num_inactive_spin_orbs
+        and s >= num_NES + num_inactive_spin_orbs
     ):
         return rdm2[
-            p - num_inactive_spin_orbs,
-            q - num_inactive_spin_orbs,
-            r - num_inactive_spin_orbs,
-            s - num_inactive_spin_orbs,
+            p - num_inactive_spin_orbs - num_NES,
+            q - num_inactive_spin_orbs - num_NES,
+            r - num_inactive_spin_orbs - num_NES,
+            s - num_inactive_spin_orbs - num_NES,
         ]
 
     elif (
-        (num_PES < p < num_inactive_spin_orbs) and q >= num_inactive_spin_orbs and r >= num_inactive_spin_orbs and (num_PES < s < num_inactive_spin_orbs)
+        (num_NES <= p < (num_NES + num_inactive_spin_orbs)) and q >= (num_NES + num_inactive_spin_orbs) and r >= (num_NES + num_inactive_spin_orbs) and (num_NES <= s < (num_NES + num_inactive_spin_orbs))
     ):
         # iuvj type index
         if p == s:
-            return  -rdm1[r - num_inactive_spin_orbs, q - num_inactive_spin_orbs]
+            return  -rdm1[r - num_inactive_spin_orbs - num_NES, q - num_inactive_spin_orbs - num_NES]
         return 0 + 0j
     elif (
-        p >= num_inactive_spin_orbs and (num_PES < q < num_inactive_spin_orbs) and (num_PES < r < num_inactive_spin_orbs) and s >= num_inactive_spin_orbs
+        p >= (num_NES + num_inactive_spin_orbs) and (num_NES <= q < (num_NES + num_inactive_spin_orbs)) and (num_NES <= r < (num_NES + num_inactive_spin_orbs)) and s >= (num_NES + num_inactive_spin_orbs)
     ):
         # uijv type index
         if q == r:
-            return -rdm1[p - num_inactive_spin_orbs, s - num_inactive_spin_orbs]
+            return -rdm1[p - num_inactive_spin_orbs - num_NES, s - num_inactive_spin_orbs - num_NES]
         return 0 + 0j
     elif (
-        p >= num_inactive_spin_orbs and q >= num_inactive_spin_orbs and (num_PES < r < num_inactive_spin_orbs) and (num_PES < s < num_inactive_spin_orbs)
+        p >= (num_NES + num_inactive_spin_orbs) and q >= (num_NES + num_inactive_spin_orbs) and (num_NES <= r < (num_NES + num_inactive_spin_orbs)) and (num_NES <= s < (num_NES + num_inactive_spin_orbs))
     ):
         # uvij type index
         if r == s:
-            return rdm1[p - num_inactive_spin_orbs, q - num_inactive_spin_orbs]
+            return rdm1[p - num_inactive_spin_orbs - num_NES, q - num_inactive_spin_orbs - num_NES]
         return 0 + 0j
     elif (
-        (num_PES < p < num_inactive_spin_orbs) and (num_PES < q < num_inactive_spin_orbs) and r >= num_inactive_spin_orbs and s >= num_inactive_spin_orbs
+        (num_NES <= p < (num_NES + num_inactive_spin_orbs)) and (num_NES <= q < (num_NES + num_inactive_spin_orbs)) and r >= (num_NES + num_inactive_spin_orbs) and s >= (num_NES + num_inactive_spin_orbs)
     ):
         # ijuv type index
         if p == q:
-            return rdm1[r - num_inactive_spin_orbs, s - num_inactive_spin_orbs]
+            return rdm1[r - num_inactive_spin_orbs - num_NES, s - num_inactive_spin_orbs - num_NES]
         return 0 + 0j
-    elif p < num_inactive_spin_orbs and q < num_inactive_spin_orbs and r < num_inactive_spin_orbs and s < num_inactive_spin_orbs:
-        val = 0 + 0j
-        if  p < num_PES or q < num_PES or r < num_PES or s < num_PES:
-            return val
-        # All inactive index
-        elif p == q and r == s:
-            val += (1 + 0j)
-            if q == r and p == s:
-                val -= (1 - 0j)
-            return val
+    elif p < (num_NES + num_inactive_spin_orbs) and q < (num_NES + num_inactive_spin_orbs) and r < (num_NES + num_inactive_spin_orbs) and s < (num_NES + num_inactive_spin_orbs):
+        # val = 0 + 0j
+        # if  p < num_NES or q < num_NES or r < num_NES or s < num_NES:
+        #     return val
+        # # All inactive index
+        # elif p == q and r == s:
+        #     val += (1 + 0j)
+        #     if q == r and p == s:
+        #         val -= (1 - 0j)
+        #     return val
+
+
+        # gamma(p,q) for NES + inactive block
+        # def gamma(a, b):
+        #     # NES orbitals are empty
+        #     if a < num_NES or b < num_NES:
+        #         return 0.0 + 0j
+
+        #     # inactive orbitals: occupation = 1
+        #     return (1.0 + 0j) if a == b else (0.0 + 0j)
+
+        # return gamma(p, q) * gamma(r, s) - gamma(p, s) * gamma(r, q)
+
+            # NES orbitals are empty
+        # if p < num_NES or q < num_NES or r < num_NES or s < num_NES:
+        #     return 0+0j
+
+        # inactive orbitals
+        if p == q and r == s:
+            val = 1+0j
+        else:
+            val = 0+0j
+
+        if p == s and r == q:
+            val -= 1+0j
+
+        return val
+    
     # Everything else
+    #print(p,q,r,s)
     return 0+0j
 
 @nb.jit(nopython=True)
@@ -334,7 +366,7 @@ def RDM2_new(
 def get_electronic_energy_generalized(
     h_int: np.ndarray,
     g_int: np.ndarray,
-    num_PES: int,
+    num_NES: int,
     num_inactive_spin_orbs: int,
     num_active_spin_orbs: int,
     rdm1: np.ndarray,
@@ -357,18 +389,18 @@ def get_electronic_energy_generalized(
         Electronic energy.
     """
     energy = 0
-    for p in range(num_PES, num_inactive_spin_orbs + num_active_spin_orbs):
-        for q in range(num_PES, num_inactive_spin_orbs + num_active_spin_orbs):
-            energy += h_int[p, q] * RDM1(p, q, num_PES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
-    for p in range(num_PES, num_inactive_spin_orbs + num_active_spin_orbs):
-        for q in range(num_PES, num_inactive_spin_orbs + num_active_spin_orbs):
-            for r in range(num_PES, num_inactive_spin_orbs + num_active_spin_orbs):
-                for s in range(num_PES, num_inactive_spin_orbs + num_active_spin_orbs):
+    for p in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+        for q in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+            energy += h_int[p, q] * RDM1(p, q, num_NES, num_NES + num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+    for p in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+        for q in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+            for r in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+                for s in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
                     energy += (
                         1
                         / 2
                         * g_int[p, q, r, s]
-                        * RDM2(p, q, r, s, num_PES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        * RDM2(p, q, r, s, num_NES, num_NES + num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
                     )
     if energy.imag > 1e-10:
         print("Warning: Complex energy!",energy)
@@ -378,7 +410,7 @@ def get_electronic_energy_generalized(
 def get_electronic_energy_generalized(
     h_int: np.ndarray,
     g_int: np.ndarray,
-    num_PES: int,
+    num_NES: int,
     num_inactive_spin_orbs: int,
     num_active_spin_orbs: int,
     rdm1: np.ndarray,
@@ -401,22 +433,35 @@ def get_electronic_energy_generalized(
         Electronic energy.
     """
     energy = 0
-    for p in range(num_inactive_spin_orbs + num_active_spin_orbs):
-        for q in range(num_inactive_spin_orbs + num_active_spin_orbs):
-            energy += h_int[p, q] * RDM1(p, q, num_PES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
-    for p in range(num_PES, num_inactive_spin_orbs + num_active_spin_orbs):
-        for q in range(num_PES, num_inactive_spin_orbs + num_active_spin_orbs):
-            for r in range(num_PES, num_inactive_spin_orbs + num_active_spin_orbs):
-                for s in range(num_PES, num_inactive_spin_orbs + num_active_spin_orbs):
+    e1 = 0
+    e2 = 0
+    for p in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+        for q in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+            energy += h_int[p, q] * RDM1(p, q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            e1 += h_int[p, q] * RDM1(p, q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+    for p in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+        for q in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+            for r in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+                for s in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
                     energy += (
                         1
                         / 2
                         * g_int[p, q, r, s]
-                        * RDM2(p, q, r, s, num_PES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        * RDM2(p, q, r, s, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
                     )
+                    e2 += (
+                        1
+                        / 2
+                        * g_int[p, q, r, s]
+                        * RDM2(p, q, r, s, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                    )
+    #print(e1)
+    #print(e2)
     if energy.imag > 1e-10:
         print("Warning: Complex energy!",energy)
     return energy.real
+
+
 
 
 @nb.jit(nopython=True)
@@ -482,43 +527,46 @@ def get_orbital_gradient_expvalue_real_imag(
     kappa_idx: list[tuple[int, int]],
 ) -> tuple[np.ndarray]:
     
-    H = generalized_hamiltonian_full_space(h_eri_mo, g_eri_mo,num_spin_orbs)
+    H = DHF_hamiltonian_full_space(h_eri_mo, g_eri_mo,num_spin_orbs)
 
     gradient_R = np.zeros(len(kappa_idx),dtype=np.complex128)
     gradient_I = np.zeros(len(kappa_idx),dtype=np.complex128)
 
     for idx, (M,N) in enumerate(kappa_idx):
+        s = 1
+        if M < num_spin_orbs or N < num_spin_orbs:
+            s = -1
         if M == N:
-            gradient_I[idx] +=  generalized_expectation_value(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
+            gradient_I[idx] +=  s * generalized_expectation_value(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
                                 ci_coeffs, ci_info)
             
-            gradient_I[idx] -=  generalized_expectation_value(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
+            gradient_I[idx] -=  s * generalized_expectation_value(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
                                 ci_coeffs, ci_info)
         else:
             # Real  
-            gradient_R[idx] +=  generalized_expectation_value(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
+            gradient_R[idx] +=  s* generalized_expectation_value(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
                                 ci_coeffs, ci_info)
                         
-            gradient_R[idx] -=  generalized_expectation_value(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
+            gradient_R[idx] -=  s* generalized_expectation_value(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
                                     ci_coeffs, ci_info)
             
-            gradient_R[idx] -=  generalized_expectation_value(ci_coeffs, [(a_op_spin(N,True)*a_op_spin(M,False))*H], 
+            gradient_R[idx] -=  s* generalized_expectation_value(ci_coeffs, [(a_op_spin(N,True)*a_op_spin(M,False))*H], 
                                 ci_coeffs, ci_info)
                         
-            gradient_R[idx] +=  generalized_expectation_value(ci_coeffs, [H*(a_op_spin(N,True)*a_op_spin(M,False))], 
+            gradient_R[idx] +=  s* generalized_expectation_value(ci_coeffs, [H*(a_op_spin(N,True)*a_op_spin(M,False))], 
                                     ci_coeffs, ci_info)
 
             # Imaginary
-            gradient_I[idx] +=  generalized_expectation_value(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
+            gradient_I[idx] +=  s* generalized_expectation_value(ci_coeffs, [(a_op_spin(M,True)*a_op_spin(N,False))*H], 
                                 ci_coeffs, ci_info)
                         
-            gradient_I[idx] -=  generalized_expectation_value(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
+            gradient_I[idx] -=  s* generalized_expectation_value(ci_coeffs, [H*(a_op_spin(M,True)*a_op_spin(N,False))], 
                                     ci_coeffs, ci_info)
             
-            gradient_I[idx] +=  generalized_expectation_value(ci_coeffs, [(a_op_spin(N,True)*a_op_spin(M,False))*H], 
+            gradient_I[idx] +=  s* generalized_expectation_value(ci_coeffs, [(a_op_spin(N,True)*a_op_spin(M,False))*H], 
                                 ci_coeffs, ci_info)
                         
-            gradient_I[idx] -=  generalized_expectation_value(ci_coeffs, [H*(a_op_spin(N,True)*a_op_spin(M,False))], 
+            gradient_I[idx] -=  s* generalized_expectation_value(ci_coeffs, [H*(a_op_spin(N,True)*a_op_spin(M,False))], 
                                     ci_coeffs, ci_info)
         
     gradient_total = np.concatenate((gradient_R, 1j*gradient_I))
@@ -664,7 +712,7 @@ def get_orbital_gradient_generalized_real_imag(
     h_int: np.ndarray,
     g_int: np.ndarray,
     kappa_idx: list[tuple[int, int]],
-    num_PES: int,
+    num_NES: int,
     num_inactive_spin_orbs: int,
     num_active_spin_orbs: int,
     rdm1: np.ndarray,
@@ -687,58 +735,73 @@ def get_orbital_gradient_generalized_real_imag(
     Returns:
         Orbital gradient.
     """
+
     gradient_r = np.zeros(len(kappa_idx), dtype=np.complex128)
     gradient_i = np.zeros(len(kappa_idx), dtype=np.complex128)
+
     for idx, (M, N) in enumerate(kappa_idx):
+        s = 1
+
+        if M < num_NES or N < num_NES:
+            #print(M,N)
+            s = -1 
+
+        # if M < num_NES and N > num_NES:
+        #     #print(M,N)
+        #     s = -1
+
+        # if M < num_NES and N > num_NES:
+        #     print(M,N)
+
         # 1-electron contribution
-        for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
+        for P in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
             if M==N:
                 #Imaginary diagonal contribution
-                gradient_i[idx] += h_int[M,P]*RDM1(M,P, num_PES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #diagonal element 
-                gradient_i[idx] -= h_int[P,M]*RDM1(P,M, num_PES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #diagonal element 
+                gradient_i[idx] += s * h_int[M,P]*RDM1(M,P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #diagonal element 
+                gradient_i[idx] -= s * h_int[P,M]*RDM1(P,M, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #diagonal element 
             else: 
                 # #Imaginary off-diagonal contribution
-                gradient_i[idx] += h_int[N,P]*RDM1(M,P, num_PES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
-                gradient_i[idx] += h_int[M,P]*RDM1(N,P, num_PES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
-                gradient_i[idx] -= h_int[P,M]*RDM1(P,N, num_PES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
-                gradient_i[idx] -= h_int[P,N]*RDM1(P,M, num_PES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
+                gradient_i[idx] += s * h_int[N,P]*RDM1(M,P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
+                gradient_i[idx] += s * h_int[M,P]*RDM1(N,P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
+                gradient_i[idx] -= s * h_int[P,M]*RDM1(P,N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
+                gradient_i[idx] -= s * h_int[P,N]*RDM1(P,M, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
                 #Real off-diagonal contribution 
-                gradient_r[idx] += h_int[N,P]*RDM1(M,P, num_PES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
-                gradient_r[idx] -= h_int[M,P]*RDM1(N,P, num_PES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
-                gradient_r[idx] -= h_int[P,M]*RDM1(P,N, num_PES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
-                gradient_r[idx] += h_int[P,N]*RDM1(P,M, num_PES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
+                gradient_r[idx] += s * h_int[N,P]*RDM1(M,P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
+                gradient_r[idx] -= s * h_int[M,P]*RDM1(N,P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
+                gradient_r[idx] -= s * h_int[P,M]*RDM1(P,N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
+                gradient_r[idx] += s * h_int[P,N]*RDM1(P,M, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
 
         #2-electron contribution
-        for P in range(num_inactive_spin_orbs+num_active_spin_orbs):
-            for Q in range(num_inactive_spin_orbs+num_active_spin_orbs):
-                for R in range(num_inactive_spin_orbs+num_active_spin_orbs):
+        for P in range(num_NES, num_NES + num_inactive_spin_orbs+num_active_spin_orbs):
+            for Q in range(num_NES, num_NES + num_inactive_spin_orbs+num_active_spin_orbs):
+                for R in range(num_NES, num_NES + num_inactive_spin_orbs+num_active_spin_orbs):
                     if M==N:
                         #Imaginray off-diagonal contribution
-                        gradient_i[idx] += (1/2)*g_int[M,P,Q,R]*RDM2(M,P,Q,R,num_PES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_i[idx] -= (1/2)*g_int[P,Q,M,R]*RDM2(M,Q,P,R,num_PES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_i[idx] -= (1/2)*g_int[P,M,Q,R]*RDM2(P,M,Q,R,num_PES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_i[idx] += (1/2)*g_int[P,Q,R,M]*RDM2(P,M,R,Q,num_PES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] += s * (1/2)*g_int[M,P,Q,R]*RDM2(M,P,Q,R,num_NES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] -= s * (1/2)*g_int[P,Q,M,R]*RDM2(M,Q,P,R,num_NES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] -= s * (1/2)*g_int[P,M,Q,R]*RDM2(P,M,Q,R,num_NES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] += s * (1/2)*g_int[P,Q,R,M]*RDM2(P,M,R,Q,num_NES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
 
                     else: 
                         #Imaginary off-diagonal contribution 
-                        gradient_i[idx] += (1/2)*g_int[N,P,Q,R]*RDM2(M,P,Q,R,num_PES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_i[idx] += (1/2)*g_int[N,R,P,Q]*RDM2(M,R,P,Q,num_PES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_i[idx] += (1/2)*g_int[M,P,Q,R]*RDM2(N,P,Q,R,num_PES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_i[idx] += (1/2)*g_int[M,R,P,Q]*RDM2(N,R,P,Q,num_PES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_i[idx] -= (1/2)*g_int[P,M,Q,R]*RDM2(P,N,Q,R,num_PES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_i[idx] -= (1/2)*g_int[R,M,P,Q]*RDM2(R,N,P,Q,num_PES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_i[idx] -= (1/2)*g_int[P,N,Q,R]*RDM2(P,M,Q,R,num_PES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_i[idx] -= (1/2)*g_int[R,N,P,Q]*RDM2(R,M,P,Q,num_PES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] += s * (1/2)*g_int[N,P,Q,R]*RDM2(M,P,Q,R,num_NES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] += s * (1/2)*g_int[N,R,P,Q]*RDM2(M,R,P,Q,num_NES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] += s * (1/2)*g_int[M,P,Q,R]*RDM2(N,P,Q,R,num_NES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] += s * (1/2)*g_int[M,R,P,Q]*RDM2(N,R,P,Q,num_NES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] -= s * (1/2)*g_int[P,M,Q,R]*RDM2(P,N,Q,R,num_NES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] -= s * (1/2)*g_int[R,M,P,Q]*RDM2(R,N,P,Q,num_NES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] -= s * (1/2)*g_int[P,N,Q,R]*RDM2(P,M,Q,R,num_NES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] -= s * (1/2)*g_int[R,N,P,Q]*RDM2(R,M,P,Q,num_NES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
                         
                         #Real off-diagonal contribution
-                        gradient_r[idx] += (1/2)*g_int[N,P,Q,R]*RDM2(M,P,Q,R,num_PES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_r[idx] += (1/2)*g_int[N,R,P,Q]*RDM2(M,R,P,Q,num_PES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_r[idx] -= (1/2)*g_int[M,P,Q,R]*RDM2(N,P,Q,R,num_PES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_r[idx] -= (1/2)*g_int[M,R,P,Q]*RDM2(N,R,P,Q,num_PES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_r[idx] -= (1/2)*g_int[P,M,Q,R]*RDM2(P,N,Q,R,num_PES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_r[idx] -= (1/2)*g_int[R,M,P,Q]*RDM2(R,N,P,Q,num_PES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_r[idx] += (1/2)*g_int[P,N,Q,R]*RDM2(P,M,Q,R,num_PES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_r[idx] += (1/2)*g_int[R,N,P,Q]*RDM2(R,M,P,Q,num_PES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] += s * (1/2)*g_int[N,P,Q,R]*RDM2(M,P,Q,R,num_NES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] += s * (1/2)*g_int[N,R,P,Q]*RDM2(M,R,P,Q,num_NES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] -= s * (1/2)*g_int[M,P,Q,R]*RDM2(N,P,Q,R,num_NES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] -= s * (1/2)*g_int[M,R,P,Q]*RDM2(N,R,P,Q,num_NES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] -= s * (1/2)*g_int[P,M,Q,R]*RDM2(P,N,Q,R,num_NES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] -= s * (1/2)*g_int[R,M,P,Q]*RDM2(R,N,P,Q,num_NES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] += s * (1/2)*g_int[P,N,Q,R]*RDM2(P,M,Q,R,num_NES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] += s * (1/2)*g_int[R,N,P,Q]*RDM2(R,M,P,Q,num_NES,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
                         
     gradient = np.concatenate((gradient_r, 1j*gradient_i))
     final_gradient = strip_imag(gradient,tol=1e-10)     
@@ -817,6 +880,7 @@ def get_orbital_gradient_response_real_imag(
     h_int: np.ndarray,
     g_int: np.ndarray,
     kappa_idx: list[tuple[int, int]],
+    num_NES: int,
     num_inactive_spin_orbs: int,
     num_active_spin_orbs: int,
     rdm1: np.ndarray,
@@ -844,53 +908,53 @@ def get_orbital_gradient_response_real_imag(
     shift=len(kappa_idx)
     for idx, (M, N) in enumerate(kappa_idx):
         # 1e contribution
-        for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
+        for P in range(num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
             if M==N:
                 #Imaginary diagonal contribution
-                gradient_i[idx] += h_int[M,P]*RDM1(M,P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #diagonal element 
-                gradient_i[idx] -= h_int[P,M]*RDM1(P,M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #diagonal element 
+                gradient_i[idx] += h_int[M,P]*RDM1(M,P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #diagonal element 
+                gradient_i[idx] -= h_int[P,M]*RDM1(P,M, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #diagonal element 
             else: 
                 # #Imaginary off-diagonal contribution
-                gradient_i[idx] += h_int[N,P]*RDM1(M,P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
-                gradient_i[idx] += h_int[M,P]*RDM1(N,P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
-                gradient_i[idx] -= h_int[P,M]*RDM1(P,N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
-                gradient_i[idx] -= h_int[P,N]*RDM1(P,M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
+                gradient_i[idx] += h_int[N,P]*RDM1(M,P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
+                gradient_i[idx] += h_int[M,P]*RDM1(N,P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
+                gradient_i[idx] -= h_int[P,M]*RDM1(P,N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
+                gradient_i[idx] -= h_int[P,N]*RDM1(P,M, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal imarginary element
                 #Real off-diagonal contribution 
-                gradient_r[idx] += h_int[N,P]*RDM1(M,P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
-                gradient_r[idx] -= h_int[M,P]*RDM1(N,P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
-                gradient_r[idx] -= h_int[P,M]*RDM1(P,N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
-                gradient_r[idx] += h_int[P,N]*RDM1(P,M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
+                gradient_r[idx] += h_int[N,P]*RDM1(M,P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
+                gradient_r[idx] -= h_int[M,P]*RDM1(N,P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
+                gradient_r[idx] -= h_int[P,M]*RDM1(P,N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
+                gradient_r[idx] += h_int[P,N]*RDM1(P,M, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #off diagonal real element
         #2-electron contribution
-        for P in range(num_inactive_spin_orbs+num_active_spin_orbs):
-            for Q in range(num_inactive_spin_orbs+num_active_spin_orbs):
-                for R in range(num_inactive_spin_orbs+num_active_spin_orbs):
+        for P in range(num_NES + num_inactive_spin_orbs+num_active_spin_orbs):
+            for Q in range(num_NES + num_inactive_spin_orbs+num_active_spin_orbs):
+                for R in range(num_NES + num_inactive_spin_orbs+num_active_spin_orbs):
                     if M==N:
                         #Imaginray off-diagonal contribution
-                        gradient_i[idx] += (1/2)*g_int[M,P,Q,R]*RDM2(M,P,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_i[idx] -= (1/2)*g_int[P,Q,M,R]*RDM2(M,Q,P,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_i[idx] -= (1/2)*g_int[P,M,Q,R]*RDM2(P,M,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_i[idx] += (1/2)*g_int[P,Q,R,M]*RDM2(P,M,R,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] += (1/2)*g_int[M,P,Q,R]*RDM2(M,P,Q,R,num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] -= (1/2)*g_int[P,Q,M,R]*RDM2(M,Q,P,R,num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] -= (1/2)*g_int[P,M,Q,R]*RDM2(P,M,Q,R,num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] += (1/2)*g_int[P,Q,R,M]*RDM2(P,M,R,Q,num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
 
                     else: 
                         #Imaginary off-diagonal contribution 
-                        gradient_i[idx] += (1/2)*g_int[N,P,Q,R]*RDM2(M,P,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_i[idx] += (1/2)*g_int[N,R,P,Q]*RDM2(M,R,P,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_i[idx] += (1/2)*g_int[M,P,Q,R]*RDM2(N,P,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_i[idx] += (1/2)*g_int[M,R,P,Q]*RDM2(N,R,P,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_i[idx] -= (1/2)*g_int[P,M,Q,R]*RDM2(P,N,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_i[idx] -= (1/2)*g_int[R,M,P,Q]*RDM2(R,N,P,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_i[idx] -= (1/2)*g_int[P,N,Q,R]*RDM2(P,M,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_i[idx] -= (1/2)*g_int[R,N,P,Q]*RDM2(R,M,P,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] += (1/2)*g_int[N,P,Q,R]*RDM2(M,P,Q,R,num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] += (1/2)*g_int[N,R,P,Q]*RDM2(M,R,P,Q,num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] += (1/2)*g_int[M,P,Q,R]*RDM2(N,P,Q,R,num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] += (1/2)*g_int[M,R,P,Q]*RDM2(N,R,P,Q,num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] -= (1/2)*g_int[P,M,Q,R]*RDM2(P,N,Q,R,num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] -= (1/2)*g_int[R,M,P,Q]*RDM2(R,N,P,Q,num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] -= (1/2)*g_int[P,N,Q,R]*RDM2(P,M,Q,R,num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_i[idx] -= (1/2)*g_int[R,N,P,Q]*RDM2(R,M,P,Q,num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
                         
                         #Real off-diagonal contribution
-                        gradient_r[idx] += (1/2)*g_int[N,P,Q,R]*RDM2(M,P,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_r[idx] += (1/2)*g_int[N,R,P,Q]*RDM2(M,R,P,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_r[idx] -= (1/2)*g_int[M,P,Q,R]*RDM2(N,P,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_r[idx] -= (1/2)*g_int[M,R,P,Q]*RDM2(N,R,P,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_r[idx] -= (1/2)*g_int[P,M,Q,R]*RDM2(P,N,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_r[idx] -= (1/2)*g_int[R,M,P,Q]*RDM2(R,N,P,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_r[idx] += (1/2)*g_int[P,N,Q,R]*RDM2(P,M,Q,R,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
-                        gradient_r[idx] += (1/2)*g_int[R,N,P,Q]*RDM2(R,M,P,Q,num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] += (1/2)*g_int[N,P,Q,R]*RDM2(M,P,Q,R,num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] += (1/2)*g_int[N,R,P,Q]*RDM2(M,R,P,Q,num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] -= (1/2)*g_int[M,P,Q,R]*RDM2(N,P,Q,R,num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] -= (1/2)*g_int[M,R,P,Q]*RDM2(N,R,P,Q,num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] -= (1/2)*g_int[P,M,Q,R]*RDM2(P,N,Q,R,num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] -= (1/2)*g_int[R,M,P,Q]*RDM2(R,N,P,Q,num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] += (1/2)*g_int[P,N,Q,R]*RDM2(P,M,Q,R,num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
+                        gradient_r[idx] += (1/2)*g_int[R,N,P,Q]*RDM2(R,M,P,Q,num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2)
                         
     gradient = np.concatenate((gradient_r, 1j*gradient_i))
     final_gradient = strip_imag(gradient,tol=1e-8)      
@@ -899,6 +963,7 @@ def get_orbital_gradient_response_real_imag(
 @nb.jit(nopython=True)
 def get_orbital_response_metric_sigma(
     kappa_spin_idx: list[tuple[int, int]],
+    num_NES: int, 
     num_inactive_spin_orbs: int,
     num_active_spin_orbs: int,
     rdm1: np.ndarray,
@@ -921,9 +986,9 @@ def get_orbital_response_metric_sigma(
     for idx1, (M, N) in enumerate(kappa_spin_idx):
         for idx2, (P, Q) in enumerate(kappa_spin_idx):
             if Q == N:
-                sigma[idx1, idx2] += RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+                sigma[idx1, idx2] += RDM1(M, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             if P == M:
-                sigma[idx1, idx2] -= RDM1(Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+                sigma[idx1, idx2] -= RDM1(Q, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
     if sigma.imag.any() > 1e-10:
         print("Warning: Response metric is complex!")
     return sigma
@@ -933,6 +998,7 @@ def get_orbital_response_metric_sigma(
 @nb.jit(nopython=True)
 def get_orbital_response_metric_sigma_real_imag(
     kappa_spin_idx: list[tuple[int, int]],
+    num_NES: int, 
     num_inactive_spin_orbs: int,
     num_active_spin_orbs: int,
     rdm1: np.ndarray,
@@ -955,67 +1021,67 @@ def get_orbital_response_metric_sigma_real_imag(
     for idx1, (M, N) in enumerate(kappa_spin_idx):
         for idx2, (P, Q) in enumerate(kappa_spin_idx):
             if P == M:
-                sigma[idx1, idx2] -= RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diag, Q diag
-                sigma[idx1, idx2] += RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diag, Q diag
-                sigma[idx1, idx2] += RDM1(P, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diag Q imag (1)
-                sigma[idx1, idx2] -= RDM1(N, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diag, Q imag (2)
-                sigma[idx1, idx2] += RDM1(P, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diag Q real (1)
-                sigma[idx1, idx2] += RDM1(N, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diag Q real (2)
-                sigma[idx1, idx2] -= RDM1(M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(1) Q diag
-                sigma[idx1, idx2] -= RDM1(N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(1) Q imag (2)
-                sigma[idx1, idx2] -= RDM1(M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(1) Q real (1)
-                sigma[idx1, idx2] += RDM1(N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(1) Q real (2)
-                sigma[idx1, idx2] += RDM1(Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(2) Q diag
-                sigma[idx1, idx2] += RDM1(Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(2) Q imag (1)
-                sigma[idx1, idx2] += RDM1(Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(2) Q real (1)
-                sigma[idx1, idx2] -= RDM1(M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real(1) Q diag
-                sigma[idx1, idx2] -= RDM1(N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1) Q imag (2)
-                sigma[idx1, idx2] += RDM1(N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1) Q real (2)
-                sigma[idx1, idx2] -= RDM1(Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2) Q diag
-                sigma[idx1, idx2] -= RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2) Q imag (1)
-                sigma[idx1, idx2] -= RDM1(Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2) Q real (1)
+                sigma[idx1, idx2] -= RDM1(M, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diag, Q diag
+                sigma[idx1, idx2] += RDM1(M, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diag, Q diag
+                sigma[idx1, idx2] += RDM1(P, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diag Q imag (1)
+                sigma[idx1, idx2] -= RDM1(N, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diag, Q imag (2)
+                sigma[idx1, idx2] += RDM1(P, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diag Q real (1)
+                sigma[idx1, idx2] += RDM1(N, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diag Q real (2)
+                sigma[idx1, idx2] -= RDM1(M, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(1) Q diag
+                sigma[idx1, idx2] -= RDM1(N, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(1) Q imag (2)
+                sigma[idx1, idx2] -= RDM1(M, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(1) Q real (1)
+                sigma[idx1, idx2] += RDM1(N, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(1) Q real (2)
+                sigma[idx1, idx2] += RDM1(Q, M, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(2) Q diag
+                sigma[idx1, idx2] += RDM1(Q, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(2) Q imag (1)
+                sigma[idx1, idx2] += RDM1(Q, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(2) Q real (1)
+                sigma[idx1, idx2] -= RDM1(M, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real(1) Q diag
+                sigma[idx1, idx2] -= RDM1(N, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1) Q imag (2)
+                sigma[idx1, idx2] += RDM1(N, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1) Q real (2)
+                sigma[idx1, idx2] -= RDM1(Q, M, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2) Q diag
+                sigma[idx1, idx2] -= RDM1(M, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2) Q imag (1)
+                sigma[idx1, idx2] -= RDM1(Q, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2) Q real (1)
 
 
 
             if N == P:
-                sigma[idx1, idx2] -= RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diag Q imag (1)
-                sigma[idx1, idx2] += RDM1(P, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diag, Q imag (2)
-                sigma[idx1, idx2] -= RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diag Q real (1)
-                sigma[idx1, idx2] -= RDM1(P, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diag Q real (2)
-                sigma[idx1, idx2] -= RDM1(M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(1) Q imag (1)
-                sigma[idx1, idx2] += RDM1(Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(2) Q imag (2)
-                sigma[idx1, idx2] -= RDM1(N, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(2) Q real (2)
-                sigma[idx1, idx2] -= RDM1(M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1) Q imag (1)
-                sigma[idx1, idx2] -= RDM1(M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1) Q real (1)
-                sigma[idx1, idx2] -= RDM1(Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2) Q imag (2)
-                sigma[idx1, idx2] += RDM1(Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2) Q real (2)
+                sigma[idx1, idx2] -= RDM1(M, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diag Q imag (1)
+                sigma[idx1, idx2] += RDM1(P, M, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diag, Q imag (2)
+                sigma[idx1, idx2] -= RDM1(M, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diag Q real (1)
+                sigma[idx1, idx2] -= RDM1(P, M, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diag Q real (2)
+                sigma[idx1, idx2] -= RDM1(M, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(1) Q imag (1)
+                sigma[idx1, idx2] += RDM1(Q, M, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(2) Q imag (2)
+                sigma[idx1, idx2] -= RDM1(N, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(2) Q real (2)
+                sigma[idx1, idx2] -= RDM1(M, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1) Q imag (1)
+                sigma[idx1, idx2] -= RDM1(M, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1) Q real (1)
+                sigma[idx1, idx2] -= RDM1(Q, M, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2) Q imag (2)
+                sigma[idx1, idx2] += RDM1(Q, M, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2) Q real (2)
 
 
 
             if M == Q:
-                sigma[idx1, idx2] -= RDM1(P, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(1) Q diag
-                sigma[idx1, idx2] += RDM1(P, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(1) Q imag (1)
-                sigma[idx1, idx2] += RDM1(P, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(1) Q imag (2)
-                sigma[idx1, idx2] += RDM1(P, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(1) Q real (1)
-                sigma[idx1, idx2] -= RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(2) Q diag
-                sigma[idx1, idx2] -= RDM1(N, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(2) Q imag (2)
-                sigma[idx1, idx2] += RDM1(N, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(2) Q real (2)
-                sigma[idx1, idx2] += RDM1(P, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real(1) Q diag
-                sigma[idx1, idx2] += RDM1(P, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1) Q imag (1)
-                sigma[idx1, idx2] += RDM1(P, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1) Q real (1)
-                sigma[idx1, idx2] += RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2) Q diag
-                sigma[idx1, idx2] += RDM1(N, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2) Q imag (2)
-                sigma[idx1, idx2] -= RDM1(N, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2) Q real (2)
+                sigma[idx1, idx2] -= RDM1(P, M, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(1) Q diag
+                sigma[idx1, idx2] += RDM1(P, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(1) Q imag (1)
+                sigma[idx1, idx2] += RDM1(P, M, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(1) Q imag (2)
+                sigma[idx1, idx2] += RDM1(P, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(1) Q real (1)
+                sigma[idx1, idx2] -= RDM1(M, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(2) Q diag
+                sigma[idx1, idx2] -= RDM1(N, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(2) Q imag (2)
+                sigma[idx1, idx2] += RDM1(N, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(2) Q real (2)
+                sigma[idx1, idx2] += RDM1(P, M, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real(1) Q diag
+                sigma[idx1, idx2] += RDM1(P, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1) Q imag (1)
+                sigma[idx1, idx2] += RDM1(P, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1) Q real (1)
+                sigma[idx1, idx2] += RDM1(M, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2) Q diag
+                sigma[idx1, idx2] += RDM1(N, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2) Q imag (2)
+                sigma[idx1, idx2] -= RDM1(N, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2) Q real (2)
 
 
             if N == Q:
-                sigma[idx1, idx2] -= RDM1(P, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(1) Q real (2)
-                sigma[idx1, idx2] -= RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(2) Q imag (1)
-                sigma[idx1, idx2] -= RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(2) Q real (1)
-                sigma[idx1, idx2] += RDM1(P, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1) Q imag (2)
-                sigma[idx1, idx2] -= RDM1(P, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1) Q real (2)
-                sigma[idx1, idx2] += RDM1(N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2) Q imag (1)
-                sigma[idx1, idx2] += RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2) Q real (1)
+                sigma[idx1, idx2] -= RDM1(P, M, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(1) Q real (2)
+                sigma[idx1, idx2] -= RDM1(M, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(2) Q imag (1)
+                sigma[idx1, idx2] -= RDM1(M, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag(2) Q real (1)
+                sigma[idx1, idx2] += RDM1(P, M, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1) Q imag (2)
+                sigma[idx1, idx2] -= RDM1(P, M, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1) Q real (2)
+                sigma[idx1, idx2] += RDM1(N, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2) Q imag (1)
+                sigma[idx1, idx2] += RDM1(M, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2) Q real (1)
 
                 
     if sigma.imag.any() > 1e-10:
@@ -1026,6 +1092,7 @@ def get_orbital_response_metric_sigma_real_imag(
 @nb.jit(nopython=True)
 def get_orbital_response_vector_norm(
     kappa_idx: list[list[int]],
+    num_NES: int, 
     num_inactive_orbs: int,
     num_active_orbs: int,
     rdm1: np.ndarray,
@@ -1057,25 +1124,25 @@ def get_orbital_response_vector_norm(
                 norm += (
                     response_vectors[i, state_number]
                     * response_vectors[j, state_number]
-                    * RDM1(m, t, num_inactive_orbs, num_active_orbs, rdm1)
+                    * RDM1(m, t, num_NES, num_inactive_orbs, num_active_orbs, rdm1)
                 )
             if m == t:
                 norm -= (
                     response_vectors[i, state_number]
                     * response_vectors[j, state_number]
-                    * RDM1(n, u, num_inactive_orbs, num_active_orbs, rdm1)
+                    * RDM1(n, u, num_NES, num_inactive_orbs, num_active_orbs, rdm1)
                 )
             if m == t:
                 norm += (
                     response_vectors[i + number_excitations, state_number]
                     * response_vectors[j + number_excitations, state_number]
-                    * RDM1(n, u, num_inactive_orbs, num_active_orbs, rdm1)
+                    * RDM1(n, u, num_NES, num_inactive_orbs, num_active_orbs, rdm1)
                 )
             if n == u:
                 norm -= (
                     response_vectors[i + number_excitations, state_number]
                     * response_vectors[j + number_excitations, state_number]
-                    * RDM1(m, t, num_inactive_orbs, num_active_orbs, rdm1)
+                    * RDM1(m, t, num_NES, num_inactive_orbs, num_active_orbs, rdm1)
                 )
     return 1 / 2 * norm
 
@@ -1085,6 +1152,7 @@ def get_orbital_response_vector_norm(
 def get_orbital_response_property_gradient_annika(
     x_mo: np.ndarray,
     kappa_spin_idx: list[tuple[int, int]],
+    num_NES: int, 
     num_inactive_spin_orbs: int,
     num_active_spin_orbs: int,
     rdm1: np.ndarray,
@@ -1131,22 +1199,22 @@ def get_orbital_response_property_gradient_annika(
             prop_grad += (
                 response_vectors[i + number_excitations, state_number]
                 * x_mo[Q, M]
-                * RDM1(P, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+                * RDM1(P, M, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             )
             prop_grad += (
                 response_vectors[i, state_number]
                 * x_mo[P, M]
-                * RDM1(Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+                * RDM1(Q, M, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             )
             prop_grad -= (
                 response_vectors[i + number_excitations, state_number]
                 * x_mo[M, P]
-                * RDM1(M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+                * RDM1(M, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             )
             prop_grad -= (
                 response_vectors[i, state_number]
                 * x_mo[M, Q]
-                * RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+                * RDM1(M, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             )
     return prop_grad
 
@@ -1254,6 +1322,7 @@ def get_orbital_response_hessian_block(
     g: np.ndarray,
     kappa_spin_idx1: list[tuple[int, int]],
     kappa_spin_idx2: list[tuple[int, int]],
+    num_NES: int, 
     num_inactive_spin_orbs: int,
     num_active_spin_orbs: int,
     rdm1: np.ndarray,
@@ -1277,3586 +1346,146 @@ def get_orbital_response_hessian_block(
     Returns:
         Hessian-like orbital-orbital block.
     """
-    A1e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx1)), dtype=np.complex128)
-    A2e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx1)),  dtype=np.complex128)
+    A1e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)), dtype=np.complex128)
+    A2e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx2)),  dtype=np.complex128)
     for idx1, (T, U) in enumerate(kappa_spin_idx1):
         for idx2, (M, N) in enumerate(kappa_spin_idx2):
             # 1e contribution
-            A1e[idx1, idx2] += h[N, T] * RDM1(M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
-            A1e[idx1, idx2] += h[U, M] * RDM1(T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
-            for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
+            A1e[idx1, idx2] += h[N, T] * RDM1(M, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            A1e[idx1, idx2] += h[U, M] * RDM1(T, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            for P in range(num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
                 if M == U:
-                    A1e[idx1, idx2] -= h[N, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+                    A1e[idx1, idx2] -= h[N, P] * RDM1(T, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
                 if T == N:
-                    A1e[idx1, idx2] -= h[P, M] * RDM1(P, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+                    A1e[idx1, idx2] -= h[P, M] * RDM1(P, U, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
             # 2e contribution
-            for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
-                for Q in range(num_inactive_spin_orbs + num_active_spin_orbs):
+            for P in range(num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+                for Q in range(num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
                     A2e[idx1, idx2] += g[U, M, P, Q] * RDM2(
-                        T, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                        T, N, P, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )                 
                     A2e[idx1, idx2] -= g[P, M, U, Q] * RDM2(
-                        T, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                        T, N, P, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
                     A2e[idx1, idx2] -= g[U, P, Q, M] * RDM2(
-                        T, N, Q, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                        T, N, Q, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
                     A2e[idx1, idx2] += g[P, Q, U, M] * RDM2(
-                        T, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                        T, N, P, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
                     A2e[idx1, idx2] += g[N, P, U, Q] * RDM2(
-                        T, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                        T, P, M, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
                     A2e[idx1, idx2] -= g[U, P, N, Q] * RDM2(
-                        T, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                        T, P, M, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
                     A2e[idx1, idx2] += g[P, M, Q, T] * RDM2(
-                        P, U, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                        P, U, Q, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
                     A2e[idx1, idx2] -= g[P, T, Q, M] * RDM2(
-                        P, U, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                        P, U, Q, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
                     A2e[idx1, idx2] += g[N, T, P, Q] * RDM2(
-                        M, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                        M, U, P, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
                     A2e[idx1, idx2] -= g[N, P, Q, T] * RDM2(
-                        M, U, Q, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                        M, U, Q, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
                     A2e[idx1, idx2] -= g[P, T, N, Q] * RDM2(
-                        M, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                        M, U, P, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
                     A2e[idx1, idx2] += g[P, Q, N, T] * RDM2(
-                        M, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                        M, U, P, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                     )
-            for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
-                for Q in range(num_inactive_spin_orbs + num_active_spin_orbs):
-                    for R in range(num_inactive_spin_orbs + num_active_spin_orbs):
+            for P in range(num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+                for Q in range(num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+                    for R in range(num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
                         if M == U:
                             A2e[idx1, idx2] -= g[N, P, Q, R] * RDM2(
-                                T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                                T, P, Q, R, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                             )
                             A2e[idx1, idx2] += g[P,Q,N,R]* RDM2(
-                                T, Q, P, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                                T, Q, P, R, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                             )
                         if T == N:
                             A2e[idx1, idx2] -= g[P, M, Q, R] * RDM2(
-                                P, U, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                                P, U, Q, R, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                             )
                             A2e[idx1, idx2] += g[P, Q, R, M] * RDM2(
-                                P, U, R, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
+                                P, U, R, Q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
                             )
-    if A1e.imag.any() > 1e-10 or A2e.imag.any() > 1e-10:
-        print("Warning: Response Hessian is complex!")
+
+
+
+    #if A1e.imag.any() > 1e-10 or A2e.imag.any() > 1e-10:
+        #print("Warning: Response Hessian is complex!")
+    #print("Hermiticity check of A2e: max|A2e - A2e†| = ", A1e - A1e.conj().T) 
+    #print("Hermiticity check of A2e: max|A2e - A2e†| = ", A2e - A2e.conj().T) 
+    #print("Hermiticity check of A2e: max|A2e - A2e†| = ", (A1e + (1/2)*A2e) - (A1e + (1/2)*A2e).conj().T) 
     return A1e + (1/2)*A2e
 
 
+@nb.jit(nopython=True) 
+def get_orbital_response_static_property_gradient_DHF(
+    mo: np.ndarray,
+    kappa_spin_idx: list[tuple[int, int]],
+    num_NES: int, 
+    num_inactive_spin_orbs: int,
+    num_active_spin_orbs: int,
+    rdm1: np.array,
+) -> np.ndarray:
+    r"""Calculate the orbital part of static property gradient.
+
+    .. math::
+        P^{\hat{q}} = \frac{1}{\sqrt{2}}\sum_{p}\left(x_{np}\Gamma^{[1]}_{mp} - x_{pm}\Gamma^{[1]}_{pn}\right)
+
+    Args:
+       mo: Property integral in MO basis.
+       kappa_idx: Orbital parameter indicies in spatial basis.
+       num_inactive_orbs: Number of inactive orbitals in spatial basis.
+       num_active_orbs: Number of active orbitals in spatial basis.
+       rdm1: Active part of 1-RDM
+
+    Returns:
+        Orbital part of static property gradient.
+    """
+    prop_grad = np.zeros((len(kappa_spin_idx), len(mo)), dtype=np.complex128)
+    for idx, (N, M) in enumerate(kappa_spin_idx):
+        for P in range(num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+            prop_grad[idx, :] += mo[:, N, P] * RDM1(M, P, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+            prop_grad[idx, :] -= mo[:, P, M] * RDM1(P, N, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+    return  prop_grad
+
+@nb.jit(nopython=True)
+def get_1e_exp_value(
+    h_int: np.ndarray,
+    num_NES: int,
+    num_inactive_spin_orbs: int,
+    num_active_spin_orbs: int,
+    rdm1: np.ndarray,
+) -> float:
+    r"""Calculate electronic energy.
+
+    .. math::
+        E = \sum_{pq}h_{pq}\Gamma^{[1]}_{pq} + \frac{1}{2}\sum_{pqrs}g_{pqrs}\Gamma^{[2]}_{pqrs}
+
+    Args:
+        h_int: One-electron integrals in MO.
+        g_int: Two-electron integrals in MO.
+        num_inactive_orbs: Number of inactive orbitals.
+        num_active_orbs: Number of active orbitals.
+        rdm1: Active part of 1-RDM.
+        rdm2: Active part of 2-RDM.
+
+    Returns:
+        Electronic energy.
+    """
+    exp_value = 0
+    for p in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+        for q in range(num_NES, num_NES + num_inactive_spin_orbs + num_active_spin_orbs):
+    # for p in range(2*num_NES):
+    #     for q in range(2*num_NES):
+            exp_value += h_int[p, q] * RDM1(p, q, num_NES, num_inactive_spin_orbs, num_active_spin_orbs, rdm1)
+    return exp_value
 
-# @nb.jit(nopython=True)
-# def get_orbital_response_hessian_block_real_imag_changesign( ###HUSK T>U ET STED LIGESOM MED M>N!!!, fortegn
-#     h: np.ndarray,
-#     g: np.ndarray,
-#     kappa_spin_idx1: list[tuple[int, int]],
-#     kappa_spin_idx2: list[tuple[int, int]],
-#     num_inactive_spin_orbs: int,
-#     num_active_spin_orbs: int,
-#     rdm1: np.ndarray,
-#     rdm2: np.ndarray,
-# ) -> np.ndarray:
-#     r"""Calculate Hessian-like orbital-orbital block.
 
-#     .. math::
-#         H^{\hat{q},\hat{q}}_{tu,mn} = \left<0\left|\left[\hat{q}_{tu},\left[\hat{H},\hat{q}_{mn}\right]\right]\right|0\right>
-
-#     Args:
-#         h: Hamiltonian one-electron integrals in MO basis.
-#         g: Hamiltonian two-electron integrals in MO basis.
-#         kappa_idx1: Orbital parameter indices in spatial basis.
-#         kappa_idx2: Orbital parameter indices in spatial basis.
-#         num_inactive_orbs: Number of inactive orbitals in spatial basis.
-#         num_active_orbs: Number of active orbitals in spatial basis.
-#         rdm1: Active part of 1-RDM.
-#         rdm2: Active part of 2-RDM.
-
-#     Returns:
-#         Hessian-like orbital-orbital block.
-#     """
-
-#     A1e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx1)), dtype=np.complex128)
-#     A2e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx1)),  dtype=np.complex128)
-
-    
-#     for idx1, (T, U) in enumerate(kappa_spin_idx1):
-#         for idx2, (M, N) in enumerate(kappa_spin_idx2):
-#             # 1e contribution
-#             if T==U and M==N: 
-#                 A1e[idx1, idx2] -= h[T,M] * RDM1(T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q diagonal
-#                 A1e[idx1, idx2] -= h[M, T] * RDM1(M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q diagonal
-#                 A1e[idx1, idx2] += 1j*h[T,M] * RDM1(T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q real off (1)
-#                 A1e[idx1, idx2] += 1j*h[N,T] * RDM1(M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q real off (1)
-#                 A1e[idx1, idx2] -= h[T,M] * RDM1(T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q imag off (1)
-#                 A1e[idx1, idx2] -= h[N,T] * RDM1(M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q imag off (1)
-#                 A1e[idx1, idx2] -= 1j*h[T, N] * RDM1(T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q real off (2)
-#                 A1e[idx1, idx2] -= 1j*h[M, T] * RDM1(N, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q real off (2)
-#                 A1e[idx1, idx2] -= h[T, N] * RDM1(T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q imag off (2)
-#                 A1e[idx1, idx2] -= h[M, T] * RDM1(N, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q imag off (2)
-#                 A1e[idx1, idx2] += 1j*h[U, M] * RDM1(T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q diagonal
-#                 A1e[idx1, idx2] += 1j*h[M, T] * RDM1(M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q diagonal
-#                 A1e[idx1, idx2] += 1j*h[T, M] * RDM1(U, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q diagonal
-#                 A1e[idx1, idx2] += 1j*h[M, U] * RDM1(M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q diagonal
-#                 A1e[idx1, idx2] += h[U, M] * RDM1(T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q real (1)
-#                 A1e[idx1, idx2] += h[N, T] * RDM1(M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q real (1)
-#                 A1e[idx1, idx2] -= h[T, M] * RDM1(U, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q real (1)
-#                 A1e[idx1, idx2] -= h[N, U] * RDM1(M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q real (1)
-#                 A1e[idx1, idx2] -= h[U, N] * RDM1(T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q real (2)
-#                 A1e[idx1, idx2] -= h[M, T] * RDM1(N, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q real (2)
-#                 A1e[idx1, idx2] += h[T, N] * RDM1(U, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q real (2)
-#                 A1e[idx1, idx2] += h[M, U] * RDM1(N, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q real (2)
-#                 A1e[idx1, idx2] += 1j*h[U, M] * RDM1(T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q imag (1)
-#                 A1e[idx1, idx2] += 1j*h[N, T] * RDM1(M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q imag (1)
-#                 A1e[idx1, idx2] -= 1j*h[T, M] * RDM1(U, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q imag (1)
-#                 A1e[idx1, idx2] -= 1j*h[N, U] * RDM1(M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q imag (1)
-#                 A1e[idx1, idx2] += 1j*h[U, N] * RDM1(T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q imag (2)
-#                 A1e[idx1, idx2] += 1j*h[M, T] * RDM1(N, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q imag (2)
-#                 A1e[idx1, idx2] -= 1j*h[N, U] * RDM1(M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q imag (1)
-#                 A1e[idx1, idx2] -= 1j*h[M, T] * RDM1(U, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q imag (1)
-#                 A1e[idx1, idx2] -= h[M, T] * RDM1(M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q diagonal
-#                 A1e[idx1, idx2] -= h[U, M] * RDM1(T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q diagonal
-#                 A1e[idx1, idx2] -= h[M, U] * RDM1(M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q diagonal
-#                 A1e[idx1, idx2] -= h[T,M] * RDM1(U, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q diagonal
-#                 A1e[idx1, idx2] += 1j*h[N,T] * RDM1(M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q real (1)
-#                 A1e[idx1, idx2] += 1j*h[U,M] * RDM1(T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q real (1)
-#                 A1e[idx1, idx2] -= 1j*h[M,T] * RDM1(N, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q real (2)
-#                 A1e[idx1, idx2] -= 1j*h[U,N] * RDM1(T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q real (2)
-#                 A1e[idx1, idx2] += 1j*h[N,U] * RDM1(M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q real (1)
-#                 A1e[idx1, idx2] += 1j*h[T,M] * RDM1(U, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q real (1)
-#                 A1e[idx1, idx2] -= 1j*h[M,U] * RDM1(N, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q real (2)
-#                 A1e[idx1, idx2] -= 1j*h[T,N] * RDM1(U, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q real (2)
-#                 A1e[idx1, idx2] -= h[N,T] * RDM1(M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q imag (1)
-#                 A1e[idx1, idx2] -= h[M,T] * RDM1(N, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q imag (2)
-#                 A1e[idx1, idx2] -= h[U,N] * RDM1(T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q imag (2)
-#                 A1e[idx1, idx2] -= h[N,U] * RDM1(M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q imag (1)
-#                 A1e[idx1, idx2] -= h[T,M] * RDM1(U, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q imag (1)
-#                 A1e[idx1, idx2] -= h[M,U] * RDM1(N,T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q imag (2)
-#                 A1e[idx1, idx2] -= h[T,N] * RDM1(U,M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q imag (2)
-
-
-#             for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
-#                 if T==N:
-#                     A1e[idx1, idx2] -= 1j*h[P,M] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q real off (1)
-#                     A1e[idx1, idx2] -= 1j*h[M,P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q real off (2)
-#                     A1e[idx1, idx2] += h[P,M] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q imag off (1)
-#                     A1e[idx1, idx2] += 1j*h[M,P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q real off (2)
-#                     A1e[idx1, idx2] -= h[P,M] * RDM1(P, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q real (1)
-#                     A1e[idx1, idx2] -= h[M,P] * RDM1(U, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q real (2)
-#                     A1e[idx1, idx2] -= 1j*h[P,M] * RDM1(P, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q imag (1)
-#                     A1e[idx1, idx2] += 1j*h[M,P] * RDM1(U, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q imag (2)
-#                     A1e[idx1, idx2] += h[P,M] * RDM1(P, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q imag (1)
-#                     A1e[idx1, idx2] += h[M,P] * RDM1(U, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q imag (1)
-
-          
-#                 if T==M:
-#                     A1e[idx1, idx2] += h[P, M] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q diagonal
-#                     A1e[idx1, idx2] += h[N, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q diagonal
-#                     A1e[idx1, idx2] -= 1j*h[N,P] * RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q real off (1)
-#                     A1e[idx1, idx2] -= 1j*h[P,N] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q real off (2)
-#                     A1e[idx1, idx2] += h[N,P] * RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q imag off (1)
-#                     A1e[idx1, idx2] += 1j*h[P,N] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q real off (2)
-#                     A1e[idx1, idx2] -= 1j*h[P,M] * RDM1(P, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q diagonal
-#                     A1e[idx1, idx2] -= 1j*h[M,P] * RDM1(U, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q diagonal
-#                     A1e[idx1, idx2] += h[P,N] * RDM1(P, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q real (2)
-#                     A1e[idx1, idx2] += 1j*h[N,P] * RDM1(U, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q imag (1)
-#                     A1e[idx1, idx2] -= 1j*h[P,N] * RDM1(P, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q imag (2)
-#                     A1e[idx1, idx2] += 1j*h[N,P] * RDM1(U, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q imag (1)
-#                     A1e[idx1, idx2] += h[P,M] * RDM1(P, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q diagonal
-#                     A1e[idx1, idx2] += h[M,P] * RDM1(U, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q diagonal
-#                     A1e[idx1, idx2] += 1j*h[P,N] * RDM1(P, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q real (2)
-#                     A1e[idx1, idx2] += 1j*h[N,P] * RDM1(U, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q real (2)
-#                     A1e[idx1, idx2] += h[P,N] * RDM1(P, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q imag (2)
-#                     A1e[idx1, idx2] += h[N,P] * RDM1(U, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q imag (1)
-
-
-#                 if U==M:
-#                     A1e[idx1, idx2] -= 1j*h[M, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q diagonal
-#                     A1e[idx1, idx2] -= 1j*h[P, M] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q diagonal
-#                     A1e[idx1, idx2] -= h[N, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q real (1)
-#                     A1e[idx1, idx2] -= h[P, N] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q real (2)
-#                     A1e[idx1, idx2] += h[M, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q diagonal
-#                     A1e[idx1, idx2] += h[P, M] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q diagonal
-#                     A1e[idx1, idx2] -= 1j*h[N, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q reel (1)
-#                     A1e[idx1, idx2] += 1j*h[P, N] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q reel (2)
-#                     A1e[idx1, idx2] -= 1j*h[N, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q reel (1)
-#                     A1e[idx1, idx2] += h[P, N] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q imag (2)
-
-                 
-#                 if U==N:
-#                     A1e[idx1, idx2] += h[P,M] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q real (1)
-#                     A1e[idx1, idx2] += h[M, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q real (2)
-#                     A1e[idx1, idx2] += 1j*h[P,M] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q imag (1)
-#                     A1e[idx1, idx2] -= 1j*h[M, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q imag (2)
-#                     A1e[idx1, idx2] += 1j*h[P, M] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q imag (1)
-#                     A1e[idx1, idx2] += 1j*h[M, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q real (2)
-#                     A1e[idx1, idx2] -= 1j*h[P, M] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q real (1)
-#                     A1e[idx1, idx2] += h[M, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q imag (2)
-#                     A1e[idx1, idx2] += h[P, M] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q imag (1)
-
-
-
-#             # 2e contribution
-#             for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
-#                 for Q in range(num_inactive_spin_orbs + num_active_spin_orbs):
-#                     A2e[idx1, idx2] += g[M, T, P, Q] * RDM2(
-#                         M, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[M,P,Q,T] * RDM2(
-#                         M, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[M,P,T,Q] * RDM2(
-#                         M, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[P,T,M,Q] * RDM2(
-#                         P, T, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[P,Q,M,T] * RDM2(
-#                         P, Q, M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[P,T,Q,M] * RDM2(
-#                         P, T, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[P,M,Q,T] * RDM2(
-#                         P, M, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[P,Q,T,M] * RDM2(
-#                         P, Q, T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[P,M,T,Q] * RDM2(
-#                         P, M, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                   
-#                     A2e[idx1, idx2] -= g[T,P,M,Q] * RDM2(
-#                         T, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[T,P,Q,M] * RDM2(
-#                         T, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[T,M,P,Q] * RDM2(
-#                         T, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                    
-#                     A2e[idx1, idx2] -= 1j*g[N,P,Q,T] * RDM2(
-#                         M, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                    
-#                     A2e[idx1, idx2] += 1j*g[N,P,T,Q] * RDM2(
-#                         M, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                    
-#                     A2e[idx1, idx2] -= 1j*g[N, T, P, Q] * RDM2(
-#                         M, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-
-#                     A2e[idx1, idx2] += 1j*g[P,M,Q,T] * RDM2(
-#                         P, N, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                    
-#                     A2e[idx1, idx2] -= 1j*g[P,M,T,Q] * RDM2(
-#                         P, N, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                   
-                                       
-#                     A2e[idx1, idx2] -= 1j*g[P,Q,N,T] * RDM2(
-#                         P, Q, M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                                      
-                                      
-#                     A2e[idx1, idx2] -= 1j*g[P,Q,T,M] * RDM2(
-#                         P, Q, T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-
-#                     A2e[idx1, idx2] -= 1j*g[P,T,N,Q] * RDM2(
-#                         P, T, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                    
-#                     A2e[idx1, idx2] += 1j*g[P,T,Q,M] * RDM2(
-#                         P, T, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                    
-                    
-#                     A2e[idx1, idx2] -= 1j*g[T,M,P,Q] * RDM2(
-#                         T, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                    
-                    
-#                     A2e[idx1, idx2] += 1j*g[T,P,N,Q] * RDM2(
-#                         T, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                    
-                    
-#                     A2e[idx1, idx2] -= 1j*g[T,P,Q,M] * RDM2(
-#                         T, P, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-
-#                     A2e[idx1, idx2] += 1j*g[M,P,Q,T] * RDM2(
-#                         N, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-                    
-#                     A2e[idx1, idx2] -= 1j*g[M,P,T,Q] * RDM2(
-#                         N, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-                    
-#                     A2e[idx1, idx2] += 1j*g[M,T,P,Q] * RDM2(
-#                         N, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-
-#                     A2e[idx1, idx2] -= 1j*g[P,N,Q,T] * RDM2(
-#                         P, M, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-
-#                     A2e[idx1, idx2] += 1j*g[P,N,T,Q] * RDM2(
-#                         P, M, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-                    
-#                     A2e[idx1, idx2] += 1j*g[P,Q,M,T] * RDM2(
-#                         P, Q, N, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-                    
-#                     A2e[idx1, idx2] += 1j*g[P,Q,T,N] * RDM2(
-#                         P, Q, T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-
-#                     A2e[idx1, idx2] += 1j*g[P,T,M,Q] * RDM2(
-#                         P, T, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-
-#                     A2e[idx1, idx2] -= 1j*g[P,T,Q,N] * RDM2(
-#                         P, T, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-
-#                     A2e[idx1, idx2] += 1j*g[T,N,P,Q] * RDM2(
-#                         T, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-
-#                     A2e[idx1, idx2] -= 1j*g[T,P,M,Q] * RDM2(
-#                         T, P, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-
-
-#                     A2e[idx1, idx2] += 1j*g[T,P,Q,N] * RDM2(
-#                         T, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-
-
-#                     A2e[idx1, idx2] += g[N,P,Q,T] * RDM2(
-#                         M, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-                    
-#                     A2e[idx1, idx2] -= g[N,P,T,Q] * RDM2(
-#                         M, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-                    
-#                     A2e[idx1, idx2] += g[N, T, P, Q] * RDM2(
-#                         M, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-
-#                     A2e[idx1, idx2] -= g[P,M,Q,T] * RDM2(
-#                         P, N, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-                    
-#                     A2e[idx1, idx2] += g[P,M,T,Q] * RDM2(
-#                         P, N, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-                   
-                                       
-#                     A2e[idx1, idx2] += g[P,Q,N,T] * RDM2(
-#                         P, Q, M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-                                      
-                                      
-#                     A2e[idx1, idx2] += g[P,Q,T,M] * RDM2(
-#                         P, Q, T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-
-#                     A2e[idx1, idx2] += g[P,T,N,Q] * RDM2(
-#                         P, T, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-                    
-#                     A2e[idx1, idx2] -= g[P,T,Q,M] * RDM2(
-#                         P, T, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-                    
-                    
-#                     A2e[idx1, idx2] += g[T,M,P,Q] * RDM2(
-#                         T, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-                    
-                    
-#                     A2e[idx1, idx2] -= g[T,P,N,Q] * RDM2(
-#                         T, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-                    
-                    
-#                     A2e[idx1, idx2] += g[T,P,Q,M] * RDM2(
-#                         T, P, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-
-
-#                     A2e[idx1, idx2] += g[M,P,Q,T] * RDM2(
-#                         N, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-                    
-#                     A2e[idx1, idx2] -= g[M,P,T,Q] * RDM2(
-#                         N, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-                    
-#                     A2e[idx1, idx2] += g[M,T,P,Q] * RDM2(
-#                         N, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-
-#                     A2e[idx1, idx2] -= g[P,N,Q,T] * RDM2(
-#                         P, M, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-
-#                     A2e[idx1, idx2] += g[P,N,T,Q] * RDM2(
-#                         P, M, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-                    
-#                     A2e[idx1, idx2] += g[P,Q,M,T] * RDM2(
-#                         P, Q, N, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-                    
-#                     A2e[idx1, idx2] += g[P,Q,T,N] * RDM2(
-#                         P, Q, T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-
-#                     A2e[idx1, idx2] += g[P,T,M,Q] * RDM2(
-#                         P, T, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-
-#                     A2e[idx1, idx2] -= g[P,T,Q,N] * RDM2(
-#                         P, T, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-
-#                     A2e[idx1, idx2] += g[T,N,P,Q] * RDM2(
-#                         T, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-
-#                     A2e[idx1, idx2] -= g[T,P,M,Q] * RDM2(
-#                         T, P, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-
-
-#                     A2e[idx1, idx2] += g[T,P,Q,N] * RDM2(
-#                         T, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-
-#                     A2e[idx1, idx2] -= 1j*g[M,P,Q,T] * RDM2(
-#                         M, P, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-
-#                     A2e[idx1, idx2] += g[M,P,U,Q] * RDM2(
-#                         M, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] -= 1j*g[M,T,P,Q] * RDM2(
-#                         M, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-
-                    
-#                     A2e[idx1, idx2] += 1j*g[P,M,Q,T] * RDM2(
-#                         P, M, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-      
-#                     A2e[idx1, idx2] -= 1j*g[P,M,U,Q] * RDM2(
-#                         P, M, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-      
-#                     A2e[idx1, idx2] -= 1j*g[P,Q,M,T] * RDM2(
-#                         P, Q, M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-      
-#                     A2e[idx1, idx2] -= 1j*g[P,Q,U,M] * RDM2(
-#                         P, Q, T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] -= 1j*g[P,T,M,Q] * RDM2(
-#                         P, U, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] += 1j*g[P,T,Q,M] * RDM2(
-#                         P, U, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] -= 1j*g[U,M,P,Q] * RDM2(
-#                         T, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] += 1j*g[U,P,M,Q] * RDM2(
-#                         T, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-                    
-                    
-#                     A2e[idx1, idx2] -= 1j*g[U,P,Q,M] * RDM2(
-#                         T, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-  
-                        
-#                     A2e[idx1, idx2] += 1j*g[M,P,Q,U] * RDM2(
-#                         M, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-        
-        
-#                     A2e[idx1, idx2] -= 1j*g[M,P,T,Q] * RDM2(
-#                         M, P, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-        
-
-#                     A2e[idx1, idx2] += 1j*g[M,U,P,Q] * RDM2(
-#                         M, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-                         
-#                     A2e[idx1, idx2] -= 1j*g[P,M,Q,U] * RDM2(
-#                         P, M, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-        
-                     
-#                     A2e[idx1, idx2] += 1j*g[P, M, T, Q] * RDM2(
-#                         P, M, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-            
-#                     A2e[idx1, idx2] += 1j*g[P,Q,M,U] * RDM2(
-#                         P, Q, M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-                    
-                    
-#                     A2e[idx1, idx2] += 1j*g[P,Q,T,M] * RDM2(
-#                         P, Q, U, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-        
-        
-#                     A2e[idx1, idx2] += 1j*g[P,U,M,Q] * RDM2(
-#                         P, T, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-        
-         
-#                     A2e[idx1, idx2] -= 1j*g[P,U,Q,M] * RDM2(
-#                         P, T, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-        
-        
-#                     A2e[idx1, idx2] += 1j*g[T,M,P,Q] * RDM2(
-#                         U, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-         
-#                     A2e[idx1, idx2] -= 1j*g[T,P,M,Q] * RDM2(
-#                         U, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-        
-        
-#                     A2e[idx1, idx2] += 1j*g[T,P,Q,M] * RDM2(
-#                         U, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-        
-        
-#                     A2e[idx1, idx2] -= g[N,P,Q,T] * RDM2(
-#                         M, P, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-        
-#                     A2e[idx1, idx2] += g[N,P,U,Q] * RDM2(
-#                         M, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-
-#                     A2e[idx1, idx2] -= g[N,T,P,Q] * RDM2(
-#                         M, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-                    
-#                     A2e[idx1, idx2] += g[P,M,Q,T] * RDM2(
-#                         P, N, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-                    
-#                     A2e[idx1, idx2] -= g[P,M,U,Q] * RDM2(
-#                         P, N, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,N,T] * RDM2(
-#                         P, Q, M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,U,M] * RDM2(
-#                         P, Q, T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-  
-#                     A2e[idx1, idx2] -= g[P,T,N,Q] * RDM2(
-#                         P, U, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-                         
-#                     A2e[idx1, idx2] += g[P,T,Q,M] * RDM2(
-#                         P, U, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-
-#                     A2e[idx1, idx2] -= g[U,M,P,Q] * RDM2(
-#                         T, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-
-#                     A2e[idx1, idx2] += g[U,P,N,Q] * RDM2(
-#                         T, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-                    
-#                     A2e[idx1, idx2] -= g[U,P,Q,M] * RDM2(
-#                         T, P, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
- 
-#                     A2e[idx1, idx2] -= 1j*g[N,P,Q,T] * RDM2(
-#                         M, P, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-        
-#                     A2e[idx1, idx2] += 1j*g[N,P,U,Q] * RDM2(
-#                         M, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-
-#                     A2e[idx1, idx2] -= 1j*g[N,T,P,Q] * RDM2(
-#                         M, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-                    
-#                     A2e[idx1, idx2] += 1j*g[P,M,Q,T] * RDM2(
-#                         P, N, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-                    
-#                     A2e[idx1, idx2] -= 1j*g[P,M,U,Q] * RDM2(
-#                         P, N, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-                    
-#                     A2e[idx1, idx2] -= 1j*g[P,Q,N,T] * RDM2(
-#                         P, Q, M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-
-#                     A2e[idx1, idx2] -= 1j*g[P,Q,U,M] * RDM2(
-#                         P, Q, T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-  
-#                     A2e[idx1, idx2] -= 1j*g[P,T,N,Q] * RDM2(
-#                         P, U, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-                         
-#                     A2e[idx1, idx2] += 1j*g[P,T,Q,M] * RDM2(
-#                         P, U, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-
-#                     A2e[idx1, idx2] -= 1j*g[U,M,P,Q] * RDM2(
-#                         T, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-
-#                     A2e[idx1, idx2] += 1j*g[U,P,N,Q] * RDM2(
-#                         T, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-                    
-#                     A2e[idx1, idx2] -= 1j*g[U,P,Q,M] * RDM2(
-#                         T, P, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-
-#                     A2e[idx1, idx2] += g[N,P,Q,T] * RDM2(
-#                         M, P, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-        
-#                     A2e[idx1, idx2] -= g[N,P,U,Q] * RDM2(
-#                         M, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-
-#                     A2e[idx1, idx2] += g[N,T,P,Q] * RDM2(
-#                         M, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-                    
-#                     A2e[idx1, idx2] -= g[P,M,Q,T] * RDM2(
-#                         P, N, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-                    
-#                     A2e[idx1, idx2] += g[P,M,U,Q] * RDM2(
-#                         P, N, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-                    
-#                     A2e[idx1, idx2] += g[P,Q,N,T] * RDM2(
-#                         P, Q, M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-                    
-#                     A2e[idx1, idx2] += g[P,Q,U,M] * RDM2(
-#                         P, Q, T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-                      
-#                     A2e[idx1, idx2] += g[P,T,N,Q] * RDM2(
-#                         P, U, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-                         
-#                     A2e[idx1, idx2] -= g[P,T,Q,M] * RDM2(
-#                         P, U, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-
-#                     A2e[idx1, idx2] += g[U,M,P,Q] * RDM2(
-#                         T, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-
-#                     A2e[idx1, idx2] -= g[U,P,N,Q] * RDM2(
-#                         T, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-                    
-#                     A2e[idx1, idx2] += g[U,P,Q,M] * RDM2(
-#                         T, P, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-
-#                     A2e[idx1, idx2] -= 1j*g[N,P,Q,T] * RDM2(
-#                         M, P, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-        
-#                     A2e[idx1, idx2] += 1j*g[N,P,U,Q] * RDM2(
-#                         M, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-
-#                     A2e[idx1, idx2] -= 1j*g[N,T,P,Q] * RDM2(
-#                         M, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-                    
-#                     A2e[idx1, idx2] += 1j*g[P,M,Q,T] * RDM2(
-#                         P, N, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-                    
-#                     A2e[idx1, idx2] -= 1j*g[P,M,U,Q] * RDM2(
-#                         P, N, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-                    
-#                     A2e[idx1, idx2] -= 1j*g[P,Q,N,T] * RDM2(
-#                         P, Q, M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-
-                    
-#                     A2e[idx1, idx2] -= 1j*g[P,Q,U,M] * RDM2(
-#                         P, Q, T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-  
-                    
-#                     A2e[idx1, idx2] -= 1j*g[P,T,N,Q] * RDM2(
-#                         P, U, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-                         
-#                     A2e[idx1, idx2] += 1j*g[P,T,Q,M] * RDM2(
-#                         P, U, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-
-#                     A2e[idx1, idx2] -= 1j*g[U,M,P,Q] * RDM2(
-#                         T, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-
-#                     A2e[idx1, idx2] += 1j*g[U,P,N,Q] * RDM2(
-#                         T, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-                    
-#                     A2e[idx1, idx2] -= 1j*g[U,P,Q,M] * RDM2(
-#                         T, P, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-
-#                     A2e[idx1, idx2] += g[N,P,Q,U] * RDM2(
-#                         M, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-
-#                     A2e[idx1, idx2] -= g[N,P,T,Q] * RDM2(
-#                         M, P, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-
-#                     A2e[idx1, idx2] += g[N,U,P,Q] * RDM2(
-#                         M, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-
-#                     A2e[idx1, idx2] -= g[P,M,Q,U] * RDM2(
-#                         P, N, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-
-#                     A2e[idx1, idx2] += g[P,M,T,Q] * RDM2(
-#                         P, N, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-
-#                     A2e[idx1, idx2] += g[P,Q,N,U] * RDM2(
-#                         P, Q, M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-
-#                     A2e[idx1, idx2] += g[P,Q,T,M] * RDM2(
-#                         P, Q, U, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-                    
-#                     A2e[idx1, idx2] += g[P,U,N,Q] * RDM2(
-#                         P, T, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-
-#                     A2e[idx1, idx2] -= g[P,U,Q,M] * RDM2(
-#                         P, T, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-                    
-#                     A2e[idx1, idx2] += g[T,M,P,Q] * RDM2(
-#                         U, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-                    
-#                     A2e[idx1, idx2] -= g[T,P,N,Q] * RDM2(
-#                         U, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-                    
-#                     A2e[idx1, idx2] += g[T,P,Q,M] * RDM2(
-#                         U, P, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-
-#                     A2e[idx1, idx2] += 1j*g[N,P,Q,U] * RDM2(
-#                         M, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-
-#                     A2e[idx1, idx2] -= 1j*g[N,P,T,Q] * RDM2(
-#                         M, P, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-
-#                     A2e[idx1, idx2] += 1j*g[N,U,P,Q] * RDM2(
-#                         M, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-
-#                     A2e[idx1, idx2] -= 1j*g[P,M,Q,U] * RDM2(
-#                         P, N, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-
-#                     A2e[idx1, idx2] += 1j*g[P,M,T,Q] * RDM2(
-#                         P, N, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-
-#                     A2e[idx1, idx2] += 1j*g[P,Q,N,U] * RDM2(
-#                         P, Q, M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-
-#                     A2e[idx1, idx2] += 1j*g[P,Q,T,M] * RDM2(
-#                         P, Q, U, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-                    
-#                     A2e[idx1, idx2] += 1j*g[P,U,N,Q] * RDM2(
-#                         P, T, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-
-#                     A2e[idx1, idx2] -= 1j*g[P,U,Q,M] * RDM2(
-#                         P, T, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-                    
-#                     A2e[idx1, idx2] += 1j*g[T,M,P,Q] * RDM2(
-#                         U, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-                    
-#                     A2e[idx1, idx2] -= 1j*g[T,P,N,Q] * RDM2(
-#                         U, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-                    
-#                     A2e[idx1, idx2] += 1j*g[T,P,Q,M] * RDM2(
-#                         U, P, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-
-
-#                     A2e[idx1, idx2] += g[M,P,Q,T] * RDM2(
-#                         N, P, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-                    
-#                     A2e[idx1, idx2] -= g[M,P,U,Q] * RDM2(
-#                         N, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-                    
-#                     A2e[idx1, idx2] += g[M,T,P,Q] * RDM2(
-#                         N, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-
-#                     A2e[idx1, idx2] -= g[P,N,Q,T] * RDM2(
-#                         P, M, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-
-#                     A2e[idx1, idx2] += g[P,N,U,Q] * RDM2(
-#                         P, M, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-
-#                     A2e[idx1, idx2] += g[P,Q,M,T] * RDM2(
-#                         P, Q, N, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-                    
-#                     A2e[idx1, idx2] += g[P,Q,U,N] * RDM2(
-#                         P, Q, T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-
-#                     A2e[idx1, idx2] += g[P,T,M,Q] * RDM2(
-#                         P, U, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-
-#                     A2e[idx1, idx2] -= g[P,T,Q,N] * RDM2(
-#                         P, U, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-
-#                     A2e[idx1, idx2] += g[U,N,P,Q] * RDM2(
-#                         T, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-
-#                     A2e[idx1, idx2] -= g[U,P,M,Q] * RDM2(
-#                         T, P, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-                    
-#                     A2e[idx1, idx2] += g[U,P,Q,N] * RDM2(
-#                         T, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-
-#                     A2e[idx1, idx2] -= 1j*g[M,P,Q,T] * RDM2(
-#                         N, P, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-                    
-#                     A2e[idx1, idx2] += 1j*g[M,P,U,Q] * RDM2(
-#                         N, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-                    
-#                     A2e[idx1, idx2] -= 1j*g[M,T,P,Q] * RDM2(
-#                         N, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-
-#                     A2e[idx1, idx2] += 1j*g[P,N,Q,T] * RDM2(
-#                         P, M, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-
-#                     A2e[idx1, idx2] -= 1j*g[P,N,U,Q] * RDM2(
-#                         P, M, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-
-#                     A2e[idx1, idx2] -= 1j*g[P,Q,M,T] * RDM2(
-#                         P, Q, N, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-                    
-#                     A2e[idx1, idx2] -= 1j*g[P,Q,U,N] * RDM2(
-#                         P, Q, T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-
-#                     A2e[idx1, idx2] -= 1j*g[P,T,M,Q] * RDM2(
-#                         P, U, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-
-#                     A2e[idx1, idx2] += 1j*g[P,T,Q,N] * RDM2(
-#                         P, U, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-
-#                     A2e[idx1, idx2] -= 1j*g[U,N,P,Q] * RDM2(
-#                         T, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-
-#                     A2e[idx1, idx2] += 1j*g[U,P,M,Q] * RDM2(
-#                         T, P, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-                    
-#                     A2e[idx1, idx2] -= 1j*g[U,P,Q,N] * RDM2(
-#                         T, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-
-#                     A2e[idx1, idx2] += g[M,P,Q,U] * RDM2(
-#                         N, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-                    
-#                     A2e[idx1, idx2] -= g[M,P,T,Q] * RDM2(
-#                         N, P, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-                    
-#                     A2e[idx1, idx2] += g[M,U,P,Q] * RDM2(
-#                         N, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-
-#                     A2e[idx1, idx2] -= g[P,N,Q,U] * RDM2(
-#                         P, M, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-
-#                     A2e[idx1, idx2] += g[P,N,T,Q] * RDM2(
-#                         P, M, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-
-#                     A2e[idx1, idx2] += g[P,Q,M,U] * RDM2(
-#                         P, Q, N, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,T,N] * RDM2(
-#                         P, Q, U, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-
-#                     A2e[idx1, idx2] += g[P,U,M,Q] * RDM2(
-#                         P, T, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-                                    
-#                     A2e[idx1, idx2] -= g[P,U,Q,N] * RDM2(
-#                         P, T, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-                    
-#                     A2e[idx1, idx2] += g[T,N,P,Q] * RDM2(
-#                         U, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-                    
-#                     A2e[idx1, idx2] -= g[T,P,M,Q] * RDM2(
-#                         U, P, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-
-#                     A2e[idx1, idx2] += g[T,P,Q,N] * RDM2(
-#                         U, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-
-#                     A2e[idx1, idx2] += g[M,P,Q,T] * RDM2(
-#                         M, P, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-
-#                     A2e[idx1, idx2] -= g[M,P,U,Q] * RDM2(
-#                         M, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-
-#                     A2e[idx1, idx2] += g[M,T,P,Q] * RDM2(
-#                         M, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                    
-                    
-#                     A2e[idx1, idx2] -= g[P,M,Q,T] * RDM2(
-#                         P, M, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[P,M,U,Q] * RDM2(
-#                         P, M, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[P,Q,M,T] * RDM2(
-#                         P, Q, M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[P,Q,U,M] * RDM2(
-#                         P, Q, T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[P,T,M,Q] * RDM2(
-#                         P, U, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[P,T,Q,M] * RDM2(
-#                         P, U, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[U,M,P,Q] * RDM2(
-#                         T, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[U,P,M,Q] * RDM2(
-#                         T, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[U,P,Q,M] * RDM2(
-#                         T, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-
-#                     A2e[idx1, idx2] += g[M,P,Q,U] * RDM2(
-#                         M, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-
-#                     A2e[idx1, idx2] -= g[M,P,T,Q] * RDM2(
-#                         M, P, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-
-#                     A2e[idx1, idx2] += g[M,U,P,Q] * RDM2(
-#                         M, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[P,M,Q,U] * RDM2(
-#                         P, M, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[P,M,T,Q] * RDM2(
-#                         P, M, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[P,Q,M,U] * RDM2(
-#                         P, Q, M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[P,Q,T,M] * RDM2(
-#                         P, Q, U, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[P,U,M,Q] * RDM2(
-#                         P, T, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[P,U,Q,M] * RDM2(
-#                         P, T, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[T,M,P,Q] * RDM2(
-#                         U, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[T,P,M,Q] * RDM2(
-#                         U, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[T,P,Q,M] * RDM2(
-#                         U, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-
-#                     A2e[idx1, idx2] += 1j*g[M,P,Q,T] * RDM2(
-#                         N, P, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (2)
-                    
-#                     A2e[idx1, idx2] -= 1j*g[M,P,U,Q] * RDM2(
-#                         N, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (2)
-
-#                     A2e[idx1, idx2] += 1j*g[M,T,P,Q] * RDM2(
-#                         N, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (2)
-                    
-#                     A2e[idx1, idx2] -= 1j*g[P,N,Q,T] * RDM2(
-#                         P, M, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (2)
-                    
-#                     A2e[idx1, idx2] += 1j*g[P,Q,U,Q] * RDM2(
-#                         P, M, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (2)
-                    
-#                     A2e[idx1, idx2] += 1j*g[P,Q,M,T] * RDM2(
-#                         P, Q, N, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (2)
-                    
-                    
-#                     A2e[idx1, idx2] += 1j*g[P,Q,U,N] * RDM2(
-#                         P, Q, T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (2)
-                    
-                    
-#                     A2e[idx1, idx2] += 1j*g[P,T,M,Q] * RDM2(
-#                         P, U, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )   #Q' imag (1), Q real (2)
-                    
-#                     A2e[idx1, idx2] -= 1j*g[P,T,Q,N] * RDM2(
-#                         P, U, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (2)
-                    
-#                     A2e[idx1, idx2] += 1j*g[U,N,P,Q] * RDM2(
-#                         T, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (2)
-                    
-#                     A2e[idx1, idx2] -= 1j*g[U,P,M,Q] * RDM2(
-#                         T, P, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (2)
-                                        
-#                     A2e[idx1, idx2] += 1j*g[U,P,Q,N] * RDM2(
-#                         T, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (2)
-    
-#                     A2e[idx1, idx2] += g[M,P,Q,T] * RDM2(
-#                         N, P, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (2)
-                    
-#                     A2e[idx1, idx2] -= g[M,P,U,Q] * RDM2(
-#                         N, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (2)
-
-#                     A2e[idx1, idx2] += g[M,T,P,Q] * RDM2(
-#                         N, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (2)
-                    
-#                     A2e[idx1, idx2] -= g[P,N,Q,T] * RDM2(
-#                         P, M, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (2)
-                    
-#                     # A2e[idx1, idx2] += g[P,Q,U,Q] * RDM2(
-#                     #     P, M, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     # )  #Q' imag (1), Q imag (2)
-                    
-#                     A2e[idx1, idx2] += g[P,Q,M,T] * RDM2(
-#                         P, Q, N, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (2)
-                    
-                    
-#                     A2e[idx1, idx2] += g[P,Q,U,N] * RDM2(
-#                         P, Q, T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (2)
-                    
-                    
-#                     A2e[idx1, idx2] += g[P,T,M,Q] * RDM2(
-#                         P, U, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )   #Q' imag (1), Q imag (2)
-                    
-#                     A2e[idx1, idx2] -= g[P,T,Q,N] * RDM2(
-#                         P, U, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (2)
-                    
-#                     A2e[idx1, idx2] += g[U,N,P,Q] * RDM2(
-#                         T, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (2)
-                    
-#                     A2e[idx1, idx2] -= g[U,P,M,Q] * RDM2(
-#                         T, P, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (2)
-                                        
-#                     A2e[idx1, idx2] += g[U,P,Q,N] * RDM2(
-#                         T, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (2)
-                    
-
-#                     A2e[idx1, idx2] -= 1j*g[N,P,Q,U] * RDM2(
-#                             M, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-
-
-#                     A2e[idx1, idx2] += 1j*g[N,P,T,Q] * RDM2(
-#                             M, P, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                        
-#                     A2e[idx1, idx2] -= 1j*g[N,U,P,Q] * RDM2(
-#                             M, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                        
-#                     A2e[idx1, idx2] += 1j*g[P,M,Q,U] * RDM2(
-#                             P, N, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                        
-#                     A2e[idx1, idx2] -= 1j*g[P,M,T,Q] * RDM2(
-#                             P, N, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                        
-#                     A2e[idx1, idx2] -= 1j*g[P,M,N,T] * RDM2(
-#                             P, Q, M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                        
-#                     A2e[idx1, idx2] -= 1j*g[P,Q,T,M] * RDM2(
-#                             P, Q, U, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                        
-#                     A2e[idx1, idx2] -= 1j*g[P,U,N,Q] * RDM2(
-#                             P, T, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                                                
-#                     A2e[idx1, idx2] += 1j*g[P,U,Q,M] * RDM2(
-#                             P, T, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                        
-#                     A2e[idx1, idx2] -= 1j*g[T,M,P,Q] * RDM2(
-#                             U, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                        
-#                     A2e[idx1, idx2] += 1j*g[T,P,N,Q] * RDM2(
-#                             U, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                        
-                        
-#                     A2e[idx1, idx2] -= 1j*g[T,P,Q,M] * RDM2(
-#                             U, P, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-
-                                                
-#                     A2e[idx1, idx2] += g[N,P,Q,U] * RDM2(
-#                             M, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-
-
-#                     A2e[idx1, idx2] -= g[N,P,T,Q] * RDM2(
-#                             M, P, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                        
-#                     A2e[idx1, idx2] += g[N,U,P,Q] * RDM2(
-#                             M, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                        
-#                     A2e[idx1, idx2] -= g[P,M,Q,U] * RDM2(
-#                             P, N, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                        
-#                     A2e[idx1, idx2] += g[P,M,T,Q] * RDM2(
-#                             P, N, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                        
-#                     A2e[idx1, idx2] += g[P,M,N,T] * RDM2(
-#                             P, Q, M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                        
-#                     A2e[idx1, idx2] += g[P,Q,T,M] * RDM2(
-#                             P, Q, U, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                        
-#                     A2e[idx1, idx2] += g[P,U,N,Q] * RDM2(
-#                             P, T, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                                                
-#                     A2e[idx1, idx2] -= g[P,U,Q,M] * RDM2(
-#                             P, T, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                        
-#                     A2e[idx1, idx2] += g[T,M,P,Q] * RDM2(
-#                             U, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                        
-#                     A2e[idx1, idx2] -= g[T,P,N,Q] * RDM2(
-#                             U, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                        
-                        
-#                     A2e[idx1, idx2] += g[T,P,Q,M] * RDM2(
-#                             U, P, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                                                
-
-#                     A2e[idx1, idx2] += 1j*g[M,P,Q,U] * RDM2(
-#                             N, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-    
-    
-#                     A2e[idx1, idx2] -= 1j*g[M,P,T,Q] * RDM2(
-#                             N, P, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-                    
-#                     A2e[idx1, idx2] += 1j*g[M,U,P,Q] * RDM2(
-#                             N, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-
-#                     A2e[idx1, idx2] -= 1j*g[P,N,Q,U] * RDM2(
-#                             P, M, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-
-#                     A2e[idx1, idx2] += 1j*g[P,N,T,Q] * RDM2(
-#                             P, M, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-
-#                     A2e[idx1, idx2] += 1j*g[P,Q,M,U] * RDM2(
-#                             P, Q, N, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-
-#                     A2e[idx1, idx2] += 1j*g[P,Q,T,N] * RDM2(
-#                             P, Q, U, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-                    
-#                     A2e[idx1, idx2] += 1j*g[P,U,M,Q] * RDM2(
-#                             P, T, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-                    
-#                     A2e[idx1, idx2] -= 1j*g[P,U,Q,N] * RDM2(
-#                             P, T, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-
-#                     A2e[idx1, idx2] += 1j*g[T,N,P,Q] * RDM2(
-#                             U, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-                    
-#                     A2e[idx1, idx2] -= 1j*g[T,P,M,Q] * RDM2(
-#                             U, P, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-
-#                     A2e[idx1, idx2] += 1j*g[T,P,Q,N] * RDM2(
-#                             U, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-
-#                     A2e[idx1, idx2] += g[M,P,Q,U] * RDM2(
-#                             N, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-                    
-#                     A2e[idx1, idx2] -= g[M,P,T,Q] * RDM2(
-#                             N, P, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-                    
-#                     A2e[idx1, idx2] += g[M,U,P,Q] * RDM2(
-#                             N, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-
-#                     A2e[idx1, idx2] -= g[P,N,Q,U] * RDM2(
-#                             P, M, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-
-#                     A2e[idx1, idx2] += g[P,N,T,Q] * RDM2(
-#                             P, M, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-
-#                     A2e[idx1, idx2] += g[P,Q,M,U] * RDM2(
-#                             P, Q, N, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-
-#                     A2e[idx1, idx2] += g[P,Q,T,N] * RDM2(
-#                             P, Q, U, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-                    
-#                     A2e[idx1, idx2] += g[P,U,M,Q] * RDM2(
-#                             P, T, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-                    
-#                     A2e[idx1, idx2] -= g[P,U,Q,N] * RDM2(
-#                             P, T, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-
-#                     A2e[idx1, idx2] += g[T,N,P,Q] * RDM2(
-#                             U, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-                    
-#                     A2e[idx1, idx2] -= g[T,P,M,Q] * RDM2(
-#                             U, P, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-
-#                     A2e[idx1, idx2] += g[T,P,Q,N] * RDM2(
-#                             U, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
- 
-#             for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
-#                 for Q in range(num_inactive_spin_orbs + num_active_spin_orbs):
-#                     for R in range(num_inactive_spin_orbs + num_active_spin_orbs):
-#                         if M == T:
-#                             A2e[idx1, idx2] -= g[P,M,Q,R] * RDM2(
-#                         P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-#                             A2e[idx1, idx2] -= g[P,Q,R,M] * RDM2(
-#                         P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-#                             A2e[idx1, idx2] -= g[P,Q,M,R] * RDM2(
-#                         P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-#                             A2e[idx1, idx2] -= g[M,P,Q,R] * RDM2(
-#                         T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagoal
-#                             A2e[idx1, idx2] += 1j*g[P,Q,N,R] * RDM2(
-#                         P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                            
-#                             A2e[idx1, idx2] += 1j*g[M,P,Q,R] * RDM2(
-#                         T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                             
-#                             A2e[idx1, idx2] -= 1j*g[P,Q,R,N] * RDM2(
-#                         P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-
-#                             A2e[idx1, idx2] -= 1j*g[P,N,Q,R] * RDM2(
-#                         P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-
-#                             A2e[idx1, idx2] -= g[P,Q,N,R] * RDM2(
-#                         P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag (1)
-                            
-#                             A2e[idx1, idx2] -= g[M,P,Q,R] * RDM2(
-#                         T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag (1)
-
-#                             A2e[idx1, idx2] += 1j*g[P,Q,R,M] * RDM2(
-#                         P, Q, R, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-                    
-                    
-#                             A2e[idx1, idx2] += 1j*g[P,M,Q,R] * RDM2(
-#                         P, U, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-                    
-#                             A2e[idx1, idx2] -= 1j*g[P,Q,M,R] * RDM2(
-#                         P, Q, U, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-        
-#                             A2e[idx1, idx2] -= 1j*g[M,P,Q,R] * RDM2(
-#                         U, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-
-#                             A2e[idx1, idx2] -= g[P,Q,N,R] * RDM2(
-#                         P, Q, U, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-                            
-#                             A2e[idx1, idx2] -= g[N,P,Q,R] * RDM2(
-#                         U, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-
-#                             A2e[idx1, idx2] -= 1j*g[P,Q,N,R] * RDM2(
-#                         P, Q, U, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-                            
-                            
-#                             A2e[idx1, idx2] -= 1j*g[N,P,Q,R] * RDM2(
-#                         U, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-
-#                             A2e[idx1, idx2] -= g[P,Q,R,N] * RDM2(
-#                         P, Q, R, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-                        
-#                             A2e[idx1, idx2] -= g[P,N,Q,R] * RDM2(
-#                             P, U, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' real (1), Q real (2)
-
-
-#                             A2e[idx1, idx2] += 1j*g[P,Q,R,N] * RDM2(
-#                             P, Q, R, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' real (1), Q imag (2)
-                            
-#                             A2e[idx1, idx2] += 1j*g[P,N,Q,R] * RDM2(
-#                             P, U, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' real (1), Q imag (2)
-
-#                             A2e[idx1, idx2] -= g[P,Q,R,M] * RDM2(
-#                             P, Q, R, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (1), Q diagonal
-                            
-#                             A2e[idx1, idx2] -= g[P,M,Q,R] * RDM2(
-#                             P, U, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (1), Q diagonal
-                            
-                            
-#                             A2e[idx1, idx2] -= g[P,Q,M,R] * RDM2(
-#                             P, Q, U, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (1), Q diagonal
-                            
-#                             A2e[idx1, idx2] -= g[M,P,Q,R] * RDM2(
-#                             U, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (1), Q diagonal
-
-
-#                             A2e[idx1, idx2] -= 1j*g[P,Q,R,N] * RDM2(
-#                                 P, Q, R, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (1), Q real (2)
-
-#                             A2e[idx1, idx2] -= 1j*g[P,N,Q,R] * RDM2(
-#                                 P, U, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (1), Q real (2)
-                            
-                            
-#                             A2e[idx1, idx2] -= g[P,Q,R,N] * RDM2(
-#                                 P, Q, R, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (1), Q imag (2)
-
-#                             A2e[idx1, idx2] -= g[P,N,Q,R] * RDM2(
-#                                 P, U, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (1), Q imag (2)
-
-
-#                             A2e[idx1, idx2] += 1j*g[P,Q,M,R] * RDM2(
-#                                 P, Q, U, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (2), Q real (1)
-                            
-#                             A2e[idx1, idx2] += 1j*g[M,P,Q,R] * RDM2(
-#                                 U, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (2), Q real (1)
-                            
-#                             A2e[idx1, idx2] -= g[P,Q,M,R] * RDM2(
-#                                 P, Q, U, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (2), Q imag (1)
-                            
-#                             A2e[idx1, idx2] -= g[M,P,Q,R] * RDM2(
-#                                 U, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (2), Q imag (1)
-   
-#                         if N==T: 
-#                             A2e[idx1, idx2] += 1j*g[P,Q,R,M] * RDM2(
-#                         P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                   
-#                             A2e[idx1, idx2] += 1j*g[P,M,Q,R] * RDM2(
-#                         P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                             
-#                             A2e[idx1, idx2] -= 1j*g[P,Q,M,R] * RDM2(
-#                         P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-
-#                             A2e[idx1, idx2] -= 1j*g[M,P,Q,R] * RDM2(
-#                         T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-                    
-#                             A2e[idx1, idx2] -= g[P,Q,R,M] * RDM2(
-#                         P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag (1)
-                   
-#                             A2e[idx1, idx2] -= g[P,M,Q,R] * RDM2(
-#                         P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-                         
-#                             A2e[idx1, idx2] += g[P,Q,R,M] * RDM2(
-#                         P, Q, R, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-                    
-#                             A2e[idx1, idx2] += g[P,M,Q,R] * RDM2(
-#                         P, U, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-                        
-#                             A2e[idx1, idx2] += 1j*g[P,Q,R,M] * RDM2(
-#                         P, Q, R, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-                    
-#                             A2e[idx1, idx2] += 1j*g[P,M,Q,R] * RDM2(
-#                             P, U, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' real (1), Q imag (1)
-                    
-#                             A2e[idx1, idx2] -= g[P,Q,R,M] * RDM2(
-#                             P, Q, R, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (1), Q imag (1)
-                    
-#                             A2e[idx1, idx2] -= g[P,M,Q,R] * RDM2(
-#                             P, U, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (1), Q imag (1)
-                        
-                        
-#                             A2e[idx1, idx2] += 1j*g[P,Q,R,M] * RDM2(
-#                             P, Q, R, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (1), Q real (1)
-                    
-#                             A2e[idx1, idx2] += 1j*g[P,M,Q,R] * RDM2(
-#                             P, U, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (1), Q real (1)
-                        
-#                             A2e[idx1, idx2] += g[P,Q,M,R] * RDM2(
-#                             P, Q, U, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' real (2), Q real (2)
-                        
-#                             A2e[idx1, idx2] += g[M,P,Q,R] * RDM2(
-#                             U, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' real (2), Q real (2)
-                            
-#                             A2e[idx1, idx2] -= 1j*g[P,Q,M,R] * RDM2(
-#                             P, Q, U, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (2), Q real (2)
-
-#                             A2e[idx1, idx2] -= 1j*g[M,P,Q,R] * RDM2(
-#                             U, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (2), Q real (2)
-                        
-#                             A2e[idx1, idx2] -= g[P,Q,M,R] * RDM2(
-#                             P, Q, U, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (2), Q imag (2)
-
-#                             A2e[idx1, idx2] -= g[M,P,Q,R] * RDM2(
-#                             U, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (2), Q imag (2)
-     
-#                         if M==U:
-#                             A2e[idx1, idx2] += 1j*g[P,Q,M,R] * RDM2(
-#                             P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' real (1), Q diagonal
-            
-#                             A2e[idx1, idx2] += 1j*g[M,P,Q,R] * RDM2(
-#                             T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' real (1), Q diagonal
-                            
-#                             A2e[idx1, idx2] -= 1j*g[P,Q,R,M] * RDM2(
-#                             P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' real (2), Q diagonal
-            
-#                             A2e[idx1, idx2] -= 1j*g[P,M,Q,R] * RDM2(
-#                             P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' real (2), Q diagonal
-                            
-#                             A2e[idx1, idx2] += g[P,Q,N,R] * RDM2(
-#                             P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' real (1), Q real (1)
-                        
-#                             A2e[idx1, idx2] += g[N,P,Q,R] * RDM2(
-#                             T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' real (1), Q real (1)
-                        
-#                             A2e[idx1, idx2] += 1j*g[P,Q,N,R] * RDM2(
-#                             P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' real (1), Q imag (1)
-                        
-#                             A2e[idx1, idx2] += 1j*g[N,P,Q,R] * RDM2(
-#                             T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' real (1), Q imag (1)
-                                
-#                             A2e[idx1, idx2] -= g[P,Q,N,R] * RDM2(
-#                             P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (1), Q imag (1)
-                        
-#                             A2e[idx1, idx2] -= g[N,P,Q,R] * RDM2(
-#                             T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (1), Q imag (1)
-                                
-#                             A2e[idx1, idx2] += 1j*g[P,Q,N,R] * RDM2(
-#                             P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (1), Q real (1)
-                        
-#                             A2e[idx1, idx2] += 1j*g[N,P,Q,R] * RDM2(
-#                             T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (1), Q real (1)
-              
-#                             A2e[idx1, idx2] += g[P,Q,R,N] * RDM2(
-#                             P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' real (2), Q real (2)
-            
-#                             A2e[idx1, idx2] += g[P,N,Q,R] * RDM2(
-#                             P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' real (2), Q real (2)
-                            
-#                             A2e[idx1, idx2] -= g[P,Q,M,R] * RDM2(
-#                             P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (1), Q diagonal
-                            
-#                             A2e[idx1, idx2] -= g[M,P,Q,R] * RDM2(
-#                             T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (1), Q diagonal
-                            
-#                             A2e[idx1, idx2] -= g[P,Q,R,M] * RDM2(
-#                             P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (2), Q diagonal
-                            
-#                             A2e[idx1, idx2] -= g[P,M,Q,R] * RDM2(
-#                             P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (2), Q diagonal
-                            
-#                             A2e[idx1, idx2] -= 1j*g[P,Q,R,N] * RDM2(
-#                                 P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (2), Q real (2)
-
-#                             A2e[idx1, idx2] -= 1j*g[P,N,Q,R] * RDM2(
-#                                 P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (2), Q real (2)
-
-#                             A2e[idx1, idx2] -= g[P,Q,R,N] * RDM2(
-#                                 P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (2), Q imag (2)
-
-#                             A2e[idx1, idx2] -= g[P,N,Q,R] * RDM2(
-#                                 P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (2), Q imag (2)
-
-#                         if N==U:
-#                             A2e[idx1, idx2] -= g[P,Q,R,M] * RDM2(
-#                             P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' real (2), Q real (1)
-
-#                             A2e[idx1, idx2] -= g[P,M,Q,R] * RDM2(
-#                             P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' real (2), Q real (1)
-
-#                             A2e[idx1, idx2] -= 1j*g[P,Q,R,M] * RDM2(
-#                             P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' real (2), Q imag (1)
-
-#                             A2e[idx1, idx2] -= 1j*g[P,M,Q,R] * RDM2(
-#                             P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' real (2), Q imag (1)
-            
-#                             A2e[idx1, idx2] -= g[P,Q,M,R] * RDM2(
-#                             P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' real (1), Q real (2)
-                            
-#                             A2e[idx1, idx2] -= g[M,P,Q,R] * RDM2(
-#                             T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' real (1), Q real (2)
-                        
-#                             A2e[idx1, idx2] += 1j*g[P,Q,M,R] * RDM2(
-#                             P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' real (1), Q imag (2)
-                            
-#                             A2e[idx1, idx2] += 1j*g[M,P,Q,R] * RDM2(
-#                             T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' real (1), Q imag (2)
-                            
-#                             A2e[idx1, idx2] -= 1j*g[M,P,Q,R] * RDM2(
-#                                 T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (1), Q real (2)
-                            
-#                             A2e[idx1, idx2] -= 1j*g[P,Q,M,R] * RDM2(
-#                                 P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (1), Q real (2)
-                            
-#                             A2e[idx1, idx2] -= g[M,P,Q,R] * RDM2(
-#                                 T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (1), Q imag (2)
-                            
-#                             A2e[idx1, idx2] += g[P,Q,M,R] * RDM2(
-#                                 P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (1), Q imag (2)
-                            
-#                             A2e[idx1, idx2] += 1j*g[P,Q,R,M] * RDM2(
-#                                 P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (2), Q real (1)
-                            
-#                             A2e[idx1, idx2] += 1j*g[P,M,Q,R] * RDM2(
-#                                 P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (2), Q real (1)  
-                                                    
-#                             A2e[idx1, idx2] -= g[P,Q,R,M] * RDM2(
-#                                 P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (2), Q imag (1)
-                            
-#                             A2e[idx1, idx2] -= g[P,M,Q,R] * RDM2(
-#                                 P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                             )  #Q' imag (2), Q imag (1)
-
-#     if A1e.imag.any() > 1e-10 or A2e.imag.any() > 1e-10:
-#         print("Warning: Response Hessian is complex!")
-#     return A1e.real + (1/2)*A2e.real
-
-
-# @nb.jit(nopython=True)
-# def get_orbital_response_hessian_block_real_imag( ###HUSK T>U ET STED LIGESOM MED M>N!!!, fortegn
-#     h: np.ndarray,
-#     g: np.ndarray,
-#     kappa_spin_idx1: list[tuple[int, int]],
-#     kappa_spin_idx2: list[tuple[int, int]],
-#     num_inactive_spin_orbs: int,
-#     num_active_spin_orbs: int,
-#     rdm1: np.ndarray,
-#     rdm2: np.ndarray,
-# ) -> np.ndarray:
-#     r"""Calculate Hessian-like orbital-orbital block.
-
-#     .. math::
-#         H^{\hat{q},\hat{q}}_{tu,mn} = \left<0\left|\left[\hat{q}_{tu},\left[\hat{H},\hat{q}_{mn}\right]\right]\right|0\right>
-
-#     Args:
-#         h: Hamiltonian one-electron integrals in MO basis.
-#         g: Hamiltonian two-electron integrals in MO basis.
-#         kappa_idx1: Orbital parameter indices in spatial basis.
-#         kappa_idx2: Orbital parameter indices in spatial basis.
-#         num_inactive_orbs: Number of inactive orbitals in spatial basis.
-#         num_active_orbs: Number of active orbitals in spatial basis.
-#         rdm1: Active part of 1-RDM.
-#         rdm2: Active part of 2-RDM.
-
-#     Returns:
-#         Hessian-like orbital-orbital block.
-#     """
-
-#     A1e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx1)), dtype=np.complex128)
-#     A2e = np.zeros((len(kappa_spin_idx1), len(kappa_spin_idx1)),  dtype=np.complex128)
-
-    
-#     for idx1, (T, U) in enumerate(kappa_spin_idx1):
-#         for idx2, (M, N) in enumerate(kappa_spin_idx2):
-#             # 1e contribution
-#             if T==U and M==N: 
-#                 A1e[idx1, idx2] += h[T,M] * RDM1(T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q diagonal
-#                 A1e[idx1, idx2] += h[M, T] * RDM1(M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q diagonal
-#                 A1e[idx1, idx2] += h[T,M] * RDM1(T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q real off (1)
-#                 A1e[idx1, idx2] += h[N,T] * RDM1(M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q real off (1)
-#                 A1e[idx1, idx2] += h[T,M] * RDM1(T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q imag off (1)
-#                 A1e[idx1, idx2] += h[N,T] * RDM1(M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q imag off (1)
-#                 A1e[idx1, idx2] -= h[T, N] * RDM1(T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q real off (2)
-#                 A1e[idx1, idx2] -= h[M, T] * RDM1(N, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q real off (2)
-#                 A1e[idx1, idx2] += h[T, N] * RDM1(T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q imag off (2)
-#                 A1e[idx1, idx2] += h[M, T] * RDM1(N, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q imag off (2)
-#                 A1e[idx1, idx2] += h[U, M] * RDM1(T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q diagonal
-#                 A1e[idx1, idx2] += h[M, T] * RDM1(M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q diagonal
-#                 A1e[idx1, idx2] += h[T, M] * RDM1(U, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q diagonal
-#                 A1e[idx1, idx2] += h[M, U] * RDM1(M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q diagonal
-#                 A1e[idx1, idx2] += h[U, M] * RDM1(T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q real (1)
-#                 A1e[idx1, idx2] += h[N, T] * RDM1(M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q real (1)
-#                 A1e[idx1, idx2] -= h[T, P] * RDM1(U, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q real (1)
-#                 A1e[idx1, idx2] -= h[N, U] * RDM1(M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q real (1)
-#                 A1e[idx1, idx2] -= h[U, N] * RDM1(T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q real (2)
-#                 A1e[idx1, idx2] -= h[M, T] * RDM1(N, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q real (2)
-#                 A1e[idx1, idx2] += h[T, N] * RDM1(U, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q real (2)
-#                 A1e[idx1, idx2] += h[M, U] * RDM1(N, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q real (2)
-#                 A1e[idx1, idx2] += h[U, M] * RDM1(T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q imag (1)
-#                 A1e[idx1, idx2] += h[N, T] * RDM1(M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q imag (1)
-#                 A1e[idx1, idx2] -= h[T, M] * RDM1(U, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q imag (1)
-#                 A1e[idx1, idx2] -= h[N, U] * RDM1(M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q imag (1)
-#                 A1e[idx1, idx2] += h[U, N] * RDM1(T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q imag (2)
-#                 A1e[idx1, idx2] += h[M, T] * RDM1(N, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q imag (2)
-#                 A1e[idx1, idx2] -= h[N, U] * RDM1(M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q imag (1)
-#                 A1e[idx1, idx2] -= h[M, T] * RDM1(U, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q imag (1)
-#                 A1e[idx1, idx2] += h[M, T] * RDM1(M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q diagonal
-#                 A1e[idx1, idx2] += h[U, M] * RDM1(T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q diagonal
-#                 A1e[idx1, idx2] += h[M, U] * RDM1(M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q diagonal
-#                 A1e[idx1, idx2] += h[T,M] * RDM1(U, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q diagonal
-#                 A1e[idx1, idx2] += h[N,T] * RDM1(M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q real (1)
-#                 A1e[idx1, idx2] += h[U,M] * RDM1(T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q real (1)
-#                 A1e[idx1, idx2] -= h[M,T] * RDM1(N, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q real (2)
-#                 A1e[idx1, idx2] -= h[U,N] * RDM1(T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q real (2)
-#                 A1e[idx1, idx2] += h[N,U] * RDM1(M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q real (1)
-#                 A1e[idx1, idx2] += h[T,M] * RDM1(U, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q real (1)
-#                 A1e[idx1, idx2] -= h[M,U] * RDM1(N, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q real (2)
-#                 A1e[idx1, idx2] -= h[T,N] * RDM1(U, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q real (2)
-#                 A1e[idx1, idx2] += h[N,T] * RDM1(M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q imag (1)
-#                 A1e[idx1, idx2] += h[M,T] * RDM1(N, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q imag (2)
-#                 A1e[idx1, idx2] += h[U,N] * RDM1(T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q imag (2)
-#                 A1e[idx1, idx2] += h[P,U] * RDM1(M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q imag (1)
-#                 A1e[idx1, idx2] += h[T,M] * RDM1(U, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q imag (1)
-#                 A1e[idx1, idx2] += h[M,U] * RDM1(N,T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q imag (2)
-#                 A1e[idx1, idx2] += h[T,N] * RDM1(U,M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q imag (2)
-
-
-#             for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
-#                 A1e[idx1, idx2] -= h[P, M] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q diagonal
-#                 A1e[idx1, idx2] -= h[N, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q diagonal
-#                 if T==N:
-#                     A1e[idx1, idx2] -= h[P,M] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q real off (1)
-#                     A1e[idx1, idx2] -= h[M,P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q real off (2)
-#                     A1e[idx1, idx2] -= h[P,M] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q imag off (1)
-#                     A1e[idx1, idx2] += h[M,P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q real off (2)
-#                     A1e[idx1, idx2] -= h[P,M] * RDM1(P, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q real (1)
-#                     A1e[idx1, idx2] -= h[M,P] * RDM1(U, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q real (2)
-#                     A1e[idx1, idx2] -= h[P,M] * RDM1(P, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q imag (1)
-#                     A1e[idx1, idx2] += h[M,P] * RDM1(U, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q imag (2)
-#                     A1e[idx1, idx2] -= h[P,M] * RDM1(P, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q imag (1)
-#                     A1e[idx1, idx2] -= h[M,P] * RDM1(U, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q imag (1)
-
-          
-#                 if T==M:
-#                     A1e[idx1, idx2] -= h[N,P] * RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q real off (1)
-#                     A1e[idx1, idx2] -= h[P,N] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q real off (2)
-#                     A1e[idx1, idx2] -= h[N,P] * RDM1(M, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q imag off (1)
-#                     A1e[idx1, idx2] += h[P,N] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' diagonal, Q real off (2)
-#                     A1e[idx1, idx2] -= h[P,M] * RDM1(P, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q diagonal
-#                     A1e[idx1, idx2] -= h[M,P] * RDM1(U, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q diagonal
-#                     A1e[idx1, idx2] += h[P,N] * RDM1(P, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q real (2)
-#                     A1e[idx1, idx2] += h[N,P] * RDM1(U, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q imag (1)
-#                     A1e[idx1, idx2] -= h[P,N] * RDM1(P, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q imag (2)
-#                     A1e[idx1, idx2] += h[N,P] * RDM1(U, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q imag (1)
-#                     A1e[idx1, idx2] -= h[P,M] * RDM1(P, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q diagonal
-#                     A1e[idx1, idx2] -= h[M,P] * RDM1(U, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q diagonal
-#                     A1e[idx1, idx2] += h[P,N] * RDM1(P, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q real (2)
-#                     A1e[idx1, idx2] += h[N,P] * RDM1(U, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q real (2)
-#                     A1e[idx1, idx2] -= h[P,N] * RDM1(P, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q imag (2)
-#                     A1e[idx1, idx2] -= h[N,P] * RDM1(U, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q imag (1)
-
-
-#                 if U==M:
-#                     A1e[idx1, idx2] -= h[M, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q diagonal
-#                     A1e[idx1, idx2] -= h[P, M] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q diagonal
-#                     A1e[idx1, idx2] -= h[N, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q real (1)
-#                     A1e[idx1, idx2] -= h[P, N] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q real (2)
-#                     A1e[idx1, idx2] -= h[M, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q diagonal
-#                     A1e[idx1, idx2] -= h[P, M] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q diagonal
-#                     A1e[idx1, idx2] -= h[N, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q reel (1)
-#                     A1e[idx1, idx2] += h[P, N] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q reel (2)
-#                     A1e[idx1, idx2] -= h[N, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q reel (1)
-#                     A1e[idx1, idx2] -= h[P, N] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q imag (2)
-
-                 
-#                 if U==N:
-#                     A1e[idx1, idx2] += h[P,M] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q real (1)
-#                     A1e[idx1, idx2] += h[M, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q real (2)
-#                     A1e[idx1, idx2] += h[P,M] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q imag (1)
-#                     A1e[idx1, idx2] -= h[M, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (1), Q imag (2)
-#                     A1e[idx1, idx2] += h[P, M] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' real (2), Q imag (1)
-#                     A1e[idx1, idx2] += h[M, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q real (2)
-#                     A1e[idx1, idx2] -= h[P, M] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q real (1)
-#                     A1e[idx1, idx2] -= h[M, P] * RDM1(T, P, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (1), Q imag (2)
-#                     A1e[idx1, idx2] -= h[P, M] * RDM1(P, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1) #Q' imag (2), Q imag (1)
-
-
-
-#             # 2e contribution
-#             for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
-#                 for Q in range(num_inactive_spin_orbs + num_active_spin_orbs):
-#                     A2e[idx1, idx2] -= g[M, T, P, Q] * RDM2(
-#                         M, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[M,P,Q,T] * RDM2(
-#                         M, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[M,P,T,Q] * RDM2(
-#                         M, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[P,T,M,Q] * RDM2(
-#                         P, T, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,M,T] * RDM2(
-#                         P, Q, M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[P,T,Q,M] * RDM2(
-#                         P, T, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[P,M,Q,T] * RDM2(
-#                         P, M, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,T,M] * RDM2(
-#                         P, Q, T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[P,M,T,Q] * RDM2(
-#                         P, M, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                   
-#                     A2e[idx1, idx2] += g[T,P,M,Q] * RDM2(
-#                         T, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[T,P,Q,M] * RDM2(
-#                         T, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[T,M,P,Q] * RDM2(
-#                         T, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[N,P,Q,T] * RDM2(
-#                         M, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                    
-#                     A2e[idx1, idx2] += g[N,P,T,Q] * RDM2(
-#                         M, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                    
-#                     A2e[idx1, idx2] -= g[N, T, P, Q] * RDM2(
-#                         M, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-
-#                     A2e[idx1, idx2] += g[P,M,Q,T] * RDM2(
-#                         P, N, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                    
-#                     A2e[idx1, idx2] -= g[P,M,T,Q] * RDM2(
-#                         P, N, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                   
-                                       
-#                     A2e[idx1, idx2] -= g[P,Q,N,T] * RDM2(
-#                         P, Q, M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                                      
-                                      
-#                     A2e[idx1, idx2] -= g[P,Q,T,M] * RDM2(
-#                         P, Q, T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-
-#                     A2e[idx1, idx2] -= g[P,T,N,Q] * RDM2(
-#                         P, T, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                    
-#                     A2e[idx1, idx2] += g[P,T,Q,M] * RDM2(
-#                         P, T, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                    
-                    
-#                     A2e[idx1, idx2] -= g[T,M,P,Q] * RDM2(
-#                         T, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                    
-                    
-#                     A2e[idx1, idx2] += g[T,P,N,Q] * RDM2(
-#                         T, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                    
-                    
-#                     A2e[idx1, idx2] -= g[T,P,Q,M] * RDM2(
-#                         T, P, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-
-#                     A2e[idx1, idx2] += g[M,P,Q,T] * RDM2(
-#                         N, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-                    
-#                     A2e[idx1, idx2] -= g[M,P,T,Q] * RDM2(
-#                         N, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-                    
-#                     A2e[idx1, idx2] += g[M,T,P,Q] * RDM2(
-#                         N, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-
-#                     A2e[idx1, idx2] -= g[P,N,Q,T] * RDM2(
-#                         P, M, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-
-#                     A2e[idx1, idx2] += g[P,N,T,Q] * RDM2(
-#                         P, M, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-                    
-#                     A2e[idx1, idx2] += g[P,Q,M,T] * RDM2(
-#                         P, Q, N, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-                    
-#                     A2e[idx1, idx2] += g[P,Q,T,N] * RDM2(
-#                         P, Q, T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-
-#                     A2e[idx1, idx2] += g[P,T,M,Q] * RDM2(
-#                         P, T, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-
-#                     A2e[idx1, idx2] -= g[P,T,Q,N] * RDM2(
-#                         P, T, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-
-#                     A2e[idx1, idx2] += g[T,N,P,Q] * RDM2(
-#                         T, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-
-#                     A2e[idx1, idx2] -= g[T,P,M,Q] * RDM2(
-#                         T, P, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-
-
-#                     A2e[idx1, idx2] += g[T,P,Q,N] * RDM2(
-#                         T, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-
-
-#                     A2e[idx1, idx2] -= g[N,P,Q,T] * RDM2(
-#                         M, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-                    
-#                     A2e[idx1, idx2] += g[N,P,T,Q] * RDM2(
-#                         M, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-                    
-#                     A2e[idx1, idx2] -= g[N, T, P, Q] * RDM2(
-#                         M, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-
-#                     A2e[idx1, idx2] += g[P,M,Q,T] * RDM2(
-#                         P, N, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-                    
-#                     A2e[idx1, idx2] -= g[P,M,T,Q] * RDM2(
-#                         P, N, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-                   
-                                       
-#                     A2e[idx1, idx2] -= g[P,Q,N,T] * RDM2(
-#                         P, Q, M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-                                      
-                                      
-#                     A2e[idx1, idx2] -= g[P,Q,T,M] * RDM2(
-#                         P, Q, T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-
-#                     A2e[idx1, idx2] -= g[P,T,N,Q] * RDM2(
-#                         P, T, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-                    
-#                     A2e[idx1, idx2] += g[P,T,Q,M] * RDM2(
-#                         P, T, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-                    
-                    
-#                     A2e[idx1, idx2] -= g[T,M,P,Q] * RDM2(
-#                         T, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-                    
-                    
-#                     A2e[idx1, idx2] += g[T,P,N,Q] * RDM2(
-#                         T, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-                    
-                    
-#                     A2e[idx1, idx2] -= g[T,P,Q,M] * RDM2(
-#                         T, P, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-
-
-#                     A2e[idx1, idx2] -= g[M,P,Q,T] * RDM2(
-#                         N, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-                    
-#                     A2e[idx1, idx2] += g[M,P,T,Q] * RDM2(
-#                         N, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-                    
-#                     A2e[idx1, idx2] -= g[M,T,P,Q] * RDM2(
-#                         N, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-
-#                     A2e[idx1, idx2] += g[P,N,Q,T] * RDM2(
-#                         P, M, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-
-#                     A2e[idx1, idx2] -= g[P,N,T,Q] * RDM2(
-#                         P, M, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,M,T] * RDM2(
-#                         P, Q, N, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,T,N] * RDM2(
-#                         P, Q, T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-
-#                     A2e[idx1, idx2] -= g[P,T,M,Q] * RDM2(
-#                         P, T, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-
-#                     A2e[idx1, idx2] += g[P,T,Q,N] * RDM2(
-#                         P, T, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-
-#                     A2e[idx1, idx2] -= g[T,N,P,Q] * RDM2(
-#                         T, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-
-#                     A2e[idx1, idx2] += g[T,P,M,Q] * RDM2(
-#                         T, P, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-
-
-#                     A2e[idx1, idx2] -= g[T,P,Q,N] * RDM2(
-#                         T, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(2)
-
-#                     A2e[idx1, idx2] -= g[M,P,Q,T] * RDM2(
-#                         M, P, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-
-#                     A2e[idx1, idx2] += g[M,P,U,Q] * RDM2(
-#                         M, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-
-                   
-                    
-#                     A2e[idx1, idx2] -= g[M,T,P,Q] * RDM2(
-#                         M, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-
-                    
-#                     A2e[idx1, idx2] += g[P,M,Q,T] * RDM2(
-#                         P, M, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-      
-#                     A2e[idx1, idx2] -= g[P,M,U,Q] * RDM2(
-#                         P, M, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-      
-#                     A2e[idx1, idx2] -= g[P,Q,M,T] * RDM2(
-#                         P, Q, M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-      
-#                     A2e[idx1, idx2] -= g[P,Q,U,M] * RDM2(
-#                         P, Q, T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[P,T,M,Q] * RDM2(
-#                         P, U, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[P,T,Q,M] * RDM2(
-#                         P, U, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[U,M,P,Q] * RDM2(
-#                         T, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[U,P,M,Q] * RDM2(
-#                         T, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-                    
-                    
-#                     A2e[idx1, idx2] -= g[U,P,Q,M] * RDM2(
-#                         T, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-  
-                        
-#                     A2e[idx1, idx2] += g[M,P,Q,U] * RDM2(
-#                         M, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-        
-        
-#                     A2e[idx1, idx2] -= g[M,P,T,Q] * RDM2(
-#                         M, P, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-        
-
-#                     A2e[idx1, idx2] += g[M,U,P,Q] * RDM2(
-#                         M, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-                         
-#                     A2e[idx1, idx2] -= g[P,M,Q,U] * RDM2(
-#                         P, M, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-        
-                     
-#                     A2e[idx1, idx2] += g[P, M, T, Q] * RDM2(
-#                         P, M, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-            
-#                     A2e[idx1, idx2] += g[P,Q,M,U] * RDM2(
-#                         P, Q, M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-                    
-                    
-#                     A2e[idx1, idx2] += g[P,Q,T,M] * RDM2(
-#                         P, Q, U, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-        
-        
-#                     A2e[idx1, idx2] += g[P,U,M,Q] * RDM2(
-#                         P, T, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-        
-         
-#                     A2e[idx1, idx2] -= g[P,U,Q,M] * RDM2(
-#                         P, T, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-        
-        
-#                     A2e[idx1, idx2] += g[T,M,P,Q] * RDM2(
-#                         U, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-         
-#                     A2e[idx1, idx2] -= g[T,P,M,Q] * RDM2(
-#                         U, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-        
-        
-#                     A2e[idx1, idx2] += g[T,P,Q,M] * RDM2(
-#                         U, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-        
-        
-#                     A2e[idx1, idx2] -= g[N,P,Q,T] * RDM2(
-#                         M, P, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-        
-#                     A2e[idx1, idx2] += g[N,P,U,Q] * RDM2(
-#                         M, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-
-#                     A2e[idx1, idx2] -= g[N,T,P,Q] * RDM2(
-#                         M, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-                    
-#                     A2e[idx1, idx2] += g[P,M,Q,T] * RDM2(
-#                         P, N, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-                    
-#                     A2e[idx1, idx2] -= g[P,M,U,Q] * RDM2(
-#                         P, N, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,N,T] * RDM2(
-#                         P, Q, M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-                    
-                    
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,U,M] * RDM2(
-#                         P, Q, T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-  
-                    
-#                     A2e[idx1, idx2] -= g[P,T,N,Q] * RDM2(
-#                         P, U, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-                         
-#                     A2e[idx1, idx2] += g[P,T,Q,M] * RDM2(
-#                         P, U, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-
-#                     A2e[idx1, idx2] -= g[U,M,P,Q] * RDM2(
-#                         T, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-
-#                     A2e[idx1, idx2] += g[U,P,N,Q] * RDM2(
-#                         T, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-                    
-#                     A2e[idx1, idx2] -= g[U,P,Q,M] * RDM2(
-#                         T, P, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
- 
-#                     A2e[idx1, idx2] -= g[N,P,Q,T] * RDM2(
-#                         M, P, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-        
-#                     A2e[idx1, idx2] += g[N,P,U,Q] * RDM2(
-#                         M, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-
-#                     A2e[idx1, idx2] -= g[N,T,P,Q] * RDM2(
-#                         M, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-                    
-#                     A2e[idx1, idx2] += g[P,M,Q,T] * RDM2(
-#                         P, N, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-                    
-#                     A2e[idx1, idx2] -= g[P,M,U,Q] * RDM2(
-#                         P, N, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,N,T] * RDM2(
-#                         P, Q, M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,U,M] * RDM2(
-#                         P, Q, T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-  
-                    
-#                     A2e[idx1, idx2] -= g[P,T,N,Q] * RDM2(
-#                         P, U, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-                         
-#                     A2e[idx1, idx2] += g[P,T,Q,M] * RDM2(
-#                         P, U, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-
-#                     A2e[idx1, idx2] -= g[U,M,P,Q] * RDM2(
-#                         T, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-
-#                     A2e[idx1, idx2] += g[U,P,N,Q] * RDM2(
-#                         T, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-                    
-#                     A2e[idx1, idx2] -= g[U,P,Q,M] * RDM2(
-#                         T, P, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-
-#                     A2e[idx1, idx2] -= g[N,P,Q,T] * RDM2(
-#                         M, P, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-        
-#                     A2e[idx1, idx2] += g[N,P,U,Q] * RDM2(
-#                         M, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-
-#                     A2e[idx1, idx2] -= g[N,T,P,Q] * RDM2(
-#                         M, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-                    
-#                     A2e[idx1, idx2] += g[P,M,Q,T] * RDM2(
-#                         P, N, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-                    
-#                     A2e[idx1, idx2] -= g[P,M,U,Q] * RDM2(
-#                         P, N, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,N,T] * RDM2(
-#                         P, Q, M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,U,M] * RDM2(
-#                         P, Q, T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-  
-                    
-#                     A2e[idx1, idx2] -= g[P,T,N,Q] * RDM2(
-#                         P, U, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-                         
-#                     A2e[idx1, idx2] += g[P,T,Q,M] * RDM2(
-#                         P, U, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-
-#                     A2e[idx1, idx2] -= g[U,M,P,Q] * RDM2(
-#                         T, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-
-#                     A2e[idx1, idx2] += g[U,P,N,Q] * RDM2(
-#                         T, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-                    
-#                     A2e[idx1, idx2] -= g[U,P,Q,M] * RDM2(
-#                         T, P, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-
-#                     A2e[idx1, idx2] -= g[N,P,Q,T] * RDM2(
-#                         M, P, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-        
-#                     A2e[idx1, idx2] += g[N,P,U,Q] * RDM2(
-#                         M, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-
-#                     A2e[idx1, idx2] -= g[N,T,P,Q] * RDM2(
-#                         M, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-                    
-#                     A2e[idx1, idx2] += g[P,M,Q,T] * RDM2(
-#                         P, N, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-                    
-#                     A2e[idx1, idx2] -= g[P,M,U,Q] * RDM2(
-#                         P, N, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,N,T] * RDM2(
-#                         P, Q, M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,U,M] * RDM2(
-#                         P, Q, T, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-  
-                    
-#                     A2e[idx1, idx2] -= g[P,T,N,Q] * RDM2(
-#                         P, U, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-                         
-#                     A2e[idx1, idx2] += g[P,T,Q,M] * RDM2(
-#                         P, U, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-
-#                     A2e[idx1, idx2] -= g[U,M,P,Q] * RDM2(
-#                         T, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-
-#                     A2e[idx1, idx2] += g[U,P,N,Q] * RDM2(
-#                         T, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-                    
-#                     A2e[idx1, idx2] -= g[U,P,Q,M] * RDM2(
-#                         T, P, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-
-#                     A2e[idx1, idx2] += g[N,P,Q,U] * RDM2(
-#                         M, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-
-#                     A2e[idx1, idx2] -= g[N,P,T,Q] * RDM2(
-#                         M, P, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-
-#                     A2e[idx1, idx2] += g[N,U,P,Q] * RDM2(
-#                         M, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-
-#                     A2e[idx1, idx2] -= g[P,M,Q,U] * RDM2(
-#                         P, N, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-
-#                     A2e[idx1, idx2] += g[P,M,T,Q] * RDM2(
-#                         P, N, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-
-#                     A2e[idx1, idx2] += g[P,Q,N,U] * RDM2(
-#                         P, Q, M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-
-#                     A2e[idx1, idx2] += g[P,Q,T,M] * RDM2(
-#                         P, Q, U, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-                    
-#                     A2e[idx1, idx2] += g[P,U,N,Q] * RDM2(
-#                         P, T, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-
-#                     A2e[idx1, idx2] -= g[P,U,Q,M] * RDM2(
-#                         P, T, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-                    
-#                     A2e[idx1, idx2] += g[T,M,P,Q] * RDM2(
-#                         U, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-                    
-#                     A2e[idx1, idx2] -= g[T,P,N,Q] * RDM2(
-#                         U, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-                    
-#                     A2e[idx1, idx2] += g[T,P,Q,M] * RDM2(
-#                         U, P, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-
-#                     A2e[idx1, idx2] += g[N,P,Q,U] * RDM2(
-#                         M, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-
-#                     A2e[idx1, idx2] -= g[N,P,T,Q] * RDM2(
-#                         M, P, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-
-#                     A2e[idx1, idx2] += g[N,U,P,Q] * RDM2(
-#                         M, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-
-#                     A2e[idx1, idx2] -= g[P,M,Q,U] * RDM2(
-#                         P, N, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-
-#                     A2e[idx1, idx2] += g[P,M,T,Q] * RDM2(
-#                         P, N, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-
-#                     A2e[idx1, idx2] += g[P,Q,N,U] * RDM2(
-#                         P, Q, M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-
-#                     A2e[idx1, idx2] += g[P,Q,T,M] * RDM2(
-#                         P, Q, U, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-                    
-#                     A2e[idx1, idx2] += g[P,U,N,Q] * RDM2(
-#                         P, T, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-
-#                     A2e[idx1, idx2] -= g[P,U,Q,M] * RDM2(
-#                         P, T, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-                    
-#                     A2e[idx1, idx2] += g[T,M,P,Q] * RDM2(
-#                         U, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-                    
-#                     A2e[idx1, idx2] -= g[T,P,N,Q] * RDM2(
-#                         U, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-                    
-#                     A2e[idx1, idx2] += g[T,P,Q,M] * RDM2(
-#                         U, P, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-
-
-#                     A2e[idx1, idx2] += g[M,P,Q,T] * RDM2(
-#                         N, P, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-                    
-#                     A2e[idx1, idx2] -= g[M,P,U,Q] * RDM2(
-#                         N, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-                    
-#                     A2e[idx1, idx2] += g[M,T,P,Q] * RDM2(
-#                         N, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-
-#                     A2e[idx1, idx2] -= g[P,N,Q,T] * RDM2(
-#                         P, M, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-
-#                     A2e[idx1, idx2] += g[P,N,U,Q] * RDM2(
-#                         P, M, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-
-#                     A2e[idx1, idx2] += g[P,Q,M,T] * RDM2(
-#                         P, Q, N, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-                    
-#                     A2e[idx1, idx2] += g[P,Q,U,N] * RDM2(
-#                         P, Q, T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-
-#                     A2e[idx1, idx2] += g[P,T,M,R] * RDM2(
-#                         P, U, N, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-
-#                     A2e[idx1, idx2] -= g[P,T,Q,N] * RDM2(
-#                         P, U, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-
-#                     A2e[idx1, idx2] += g[U,N,P,Q] * RDM2(
-#                         T, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-
-#                     A2e[idx1, idx2] -= g[U,P,M,Q] * RDM2(
-#                         T, P, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-                    
-#                     A2e[idx1, idx2] += g[U,P,Q,N] * RDM2(
-#                         T, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-
-#                     A2e[idx1, idx2] -= g[M,P,Q,T] * RDM2(
-#                         N, P, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-                    
-#                     A2e[idx1, idx2] += g[M,P,U,Q] * RDM2(
-#                         N, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-                    
-#                     A2e[idx1, idx2] -= g[M,T,P,Q] * RDM2(
-#                         N, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-
-#                     A2e[idx1, idx2] += g[P,N,Q,T] * RDM2(
-#                         P, M, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-
-#                     A2e[idx1, idx2] -= g[P,N,U,Q] * RDM2(
-#                         P, M, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-
-#                     A2e[idx1, idx2] -= g[P,Q,M,T] * RDM2(
-#                         P, Q, N, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,U,N] * RDM2(
-#                         P, Q, T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-
-#                     A2e[idx1, idx2] -= g[P,T,M,R] * RDM2(
-#                         P, U, N, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-
-#                     A2e[idx1, idx2] += g[P,T,Q,N] * RDM2(
-#                         P, U, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-
-#                     A2e[idx1, idx2] -= g[U,N,P,Q] * RDM2(
-#                         T, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-
-#                     A2e[idx1, idx2] += g[U,P,M,Q] * RDM2(
-#                         T, P, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-                    
-#                     A2e[idx1, idx2] -= g[U,P,Q,N] * RDM2(
-#                         T, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-
-#                     A2e[idx1, idx2] -= g[M,P,Q,U] * RDM2(
-#                         N, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-                    
-#                     A2e[idx1, idx2] += g[M,P,T,Q] * RDM2(
-#                         N, P, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-                    
-                    
-#                     A2e[idx1, idx2] -= g[M,U,P,Q] * RDM2(
-#                         N, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-
-
-#                     A2e[idx1, idx2] += g[P,N,Q,U] * RDM2(
-#                         P, M, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-
-
-#                     A2e[idx1, idx2] -= g[P,N,T,Q] * RDM2(
-#                         P, M, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-
-#                     A2e[idx1, idx2] -= g[P,Q,M,U] * RDM2(
-#                         P, Q, N, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,R,N] * RDM2(
-#                         P, Q, U, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-
-#                     A2e[idx1, idx2] -= g[P,U,M,Q] * RDM2(
-#                         P, T, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-                                    
-#                     A2e[idx1, idx2] += g[P,U,Q,N] * RDM2(
-#                         P, T, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-                    
-#                     A2e[idx1, idx2] -= g[T,N,P,Q] * RDM2(
-#                         U, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-                    
-#                     A2e[idx1, idx2] += g[T,P,M,Q] * RDM2(
-#                         U, P, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-
-#                     A2e[idx1, idx2] -= g[T,P,Q,N] * RDM2(
-#                         U, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-
-
-
-#                     A2e[idx1, idx2] -= g[M,P,Q,T] * RDM2(
-#                         M, P, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-
-#                     A2e[idx1, idx2] += g[M,P,U,Q] * RDM2(
-#                         M, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-
-#                     A2e[idx1, idx2] -= g[M,T,P,Q] * RDM2(
-#                         M, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                    
-                    
-#                     A2e[idx1, idx2] += g[P,M,Q,T] * RDM2(
-#                         P, M, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[P,M,U,Q] * RDM2(
-#                         P, M, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,M,T] * RDM2(
-#                         P, Q, M, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,U,M] * RDM2(
-#                         P, Q, T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[P,T,M,Q] * RDM2(
-#                         P, U, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[P,T,Q,M] * RDM2(
-#                         P, U, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[U,M,P,Q] * RDM2(
-#                         T, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[U,P,M,Q] * RDM2(
-#                         T, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[U,P,Q,M] * RDM2(
-#                         T, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-   
-
-#                     A2e[idx1, idx2] -= g[M,P,Q,U] * RDM2(
-#                         M, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-
-#                     A2e[idx1, idx2] += g[M,P,T,Q] * RDM2(
-#                         M, P, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-
-#                     A2e[idx1, idx2] -= g[M,U,P,Q] * RDM2(
-#                         M, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-                    
-                    
-#                     A2e[idx1, idx2] += g[P,M,Q,U] * RDM2(
-#                         P, M, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[P,M,T,Q] * RDM2(
-#                         P, M, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,M,U] * RDM2(
-#                         P, Q, M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,T,M] * RDM2(
-#                         P, Q, U, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[P,U,M,Q] * RDM2(
-#                         P, T, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[P,U,Q,M] * RDM2(
-#                         P, T, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[T,M,P,Q] * RDM2(
-#                         U, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-                    
-#                     A2e[idx1, idx2] += g[T,P,M,Q] * RDM2(
-#                         U, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-                    
-#                     A2e[idx1, idx2] -= g[T,P,Q,M] * RDM2(
-#                         U, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-
-#                     A2e[idx1, idx2] += g[M,P,Q,T] * RDM2(
-#                         N, P, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (2)
-                    
-#                     A2e[idx1, idx2] -= g[M,P,U,Q] * RDM2(
-#                         N, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (2)
-
-#                     A2e[idx1, idx2] += g[M,T,P,Q] * RDM2(
-#                         N, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (2)
-                    
-#                     A2e[idx1, idx2] -= g[P,N,R,T] * RDM2(
-#                         P, M, R, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (2)
-                    
-                    
-#                     A2e[idx1, idx2] += g[P,Q,U,Q] * RDM2(
-#                         P, M, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (2)
-                    
-#                     A2e[idx1, idx2] += g[P,Q,M,T] * RDM2(
-#                         P, Q, N, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (2)
-                    
-                    
-#                     A2e[idx1, idx2] += g[P,Q,U,N] * RDM2(
-#                         P, Q, T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (2)
-                    
-                    
-#                     A2e[idx1, idx2] += g[P,T,M,Q] * RDM2(
-#                         P, U, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )   #Q' imag (1), Q real (2)
-                    
-#                     A2e[idx1, idx2] -= g[P,T,Q,N] * RDM2(
-#                         P, U, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (2)
-                    
-#                     A2e[idx1, idx2] += g[U,N,P,Q] * RDM2(
-#                         T, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (2)
-                    
-#                     A2e[idx1, idx2] -= g[U,P,M,Q] * RDM2(
-#                         T, P, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (2)
-                                        
-#                     A2e[idx1, idx2] += g[U,P,Q,N] * RDM2(
-#                         T, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (2)
-    
-#                     A2e[idx1, idx2] -= g[M,P,Q,T] * RDM2(
-#                         N, P, Q, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (2)
-                    
-#                     A2e[idx1, idx2] += g[M,P,U,Q] * RDM2(
-#                         N, P, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (2)
-
-#                     A2e[idx1, idx2] -= g[M,T,P,Q] * RDM2(
-#                         N, U, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (2)
-                    
-#                     A2e[idx1, idx2] += g[P,N,R,T] * RDM2(
-#                         P, M, R, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (2)
-                    
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,U,Q] * RDM2(
-#                         P, M, T, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (2)
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,M,T] * RDM2(
-#                         P, Q, N, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (2)
-                    
-                    
-#                     A2e[idx1, idx2] -= g[P,Q,U,N] * RDM2(
-#                         P, Q, T, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (2)
-                    
-                    
-#                     A2e[idx1, idx2] -= g[P,T,M,Q] * RDM2(
-#                         P, U, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )   #Q' imag (1), Q imag (2)
-                    
-#                     A2e[idx1, idx2] += g[P,T,Q,N] * RDM2(
-#                         P, U, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (2)
-                    
-#                     A2e[idx1, idx2] -= g[U,N,P,Q] * RDM2(
-#                         T, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (2)
-                    
-#                     A2e[idx1, idx2] += g[U,P,M,Q] * RDM2(
-#                         T, P, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (2)
-                                        
-#                     A2e[idx1, idx2] -= g[U,P,Q,N] * RDM2(
-#                         T, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (2)
-                    
-
-#                     A2e[idx1, idx2] -= g[N,P,Q,U] * RDM2(
-#                             M, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-
-
-#                     A2e[idx1, idx2] += g[N,P,T,Q] * RDM2(
-#                             M, P, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                        
-#                     A2e[idx1, idx2] -= g[N,U,P,Q] * RDM2(
-#                             M, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                        
-#                     A2e[idx1, idx2] += g[P,M,Q,U] * RDM2(
-#                             P, N, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                        
-#                     A2e[idx1, idx2] -= g[P,M,T,Q] * RDM2(
-#                             P, N, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                        
-#                     A2e[idx1, idx2] -= g[P,M,N,T] * RDM2(
-#                             P, Q, M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                        
-#                     A2e[idx1, idx2] -= g[P,Q,T,M] * RDM2(
-#                             P, Q, U, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                        
-#                     A2e[idx1, idx2] -= g[P,U,N,Q] * RDM2(
-#                             P, T, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                                                
-#                     A2e[idx1, idx2] += g[P,U,Q,M] * RDM2(
-#                             P, T, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                        
-#                     A2e[idx1, idx2] -= g[T,M,P,Q] * RDM2(
-#                             U, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                        
-#                     A2e[idx1, idx2] += g[T,P,N,Q] * RDM2(
-#                             U, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                        
-                        
-#                     A2e[idx1, idx2] -= g[T,P,Q,M] * RDM2(
-#                             U, P, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-
-                                                
-#                     A2e[idx1, idx2] -= g[N,P,Q,U] * RDM2(
-#                             M, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-
-
-#                     A2e[idx1, idx2] += g[N,P,T,Q] * RDM2(
-#                             M, P, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                        
-#                     A2e[idx1, idx2] -= g[N,U,P,Q] * RDM2(
-#                             M, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                        
-#                     A2e[idx1, idx2] += g[P,M,Q,U] * RDM2(
-#                             P, N, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                        
-#                     A2e[idx1, idx2] -= g[P,M,T,Q] * RDM2(
-#                             P, N, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                        
-#                     A2e[idx1, idx2] -= g[P,M,N,T] * RDM2(
-#                             P, Q, M, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                        
-#                     A2e[idx1, idx2] -= g[P,Q,T,M] * RDM2(
-#                             P, Q, U, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                        
-#                     A2e[idx1, idx2] -= g[P,U,N,Q] * RDM2(
-#                             P, T, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                                                
-#                     A2e[idx1, idx2] += g[P,U,Q,M] * RDM2(
-#                             P, T, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                        
-#                     A2e[idx1, idx2] -= g[T,M,P,Q] * RDM2(
-#                             U, N, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q rimagal (1)
-                        
-#                     A2e[idx1, idx2] += g[T,P,N,Q] * RDM2(
-#                             U, P, M, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                        
-                        
-#                     A2e[idx1, idx2] -= g[T,P,Q,M] * RDM2(
-#                             U, P, Q, N, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                                                
-
-#                     A2e[idx1, idx2] += g[M,P,Q,U] * RDM2(
-#                             N, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-    
-    
-#                     A2e[idx1, idx2] -= g[M,P,T,Q] * RDM2(
-#                             N, P, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-                    
-#                     A2e[idx1, idx2] += g[M,U,P,Q] * RDM2(
-#                             N, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-
-#                     A2e[idx1, idx2] -= g[P,N,Q,U] * RDM2(
-#                             P, M, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-
-#                     A2e[idx1, idx2] += g[P,N,T,Q] * RDM2(
-#                             P, M, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-
-#                     A2e[idx1, idx2] += g[P,Q,M,U] * RDM2(
-#                             P, Q, N, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-
-#                     A2e[idx1, idx2] += g[P,Q,T,N] * RDM2(
-#                             P, Q, U, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-                    
-#                     A2e[idx1, idx2] += g[P,U,M,Q] * RDM2(
-#                             P, T, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-                    
-#                     A2e[idx1, idx2] -= g[P,U,R,N] * RDM2(
-#                             P, T, R, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-
-#                     A2e[idx1, idx2] += g[T,N,P,Q] * RDM2(
-#                             U, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-                    
-#                     A2e[idx1, idx2] -= g[T,P,M,Q] * RDM2(
-#                             U, P, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-
-#                     A2e[idx1, idx2] += g[T,P,Q,N] * RDM2(
-#                             U, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-
-
-
-
-#                     A2e[idx1, idx2] -= g[M,P,Q,U] * RDM2(
-#                             N, P, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-    
-    
-#                     A2e[idx1, idx2] += g[M,P,T,Q] * RDM2(
-#                             N, P, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-                    
-#                     A2e[idx1, idx2] -= g[M,U,P,Q] * RDM2(
-#                             N, T, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-
-#                     A2e[idx1, idx2] += g[P,N,Q,U] * RDM2(
-#                             P, M, Q, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-
-#                     A2e[idx1, idx2] -= g[P,N,T,Q] * RDM2(
-#                             P, M, U, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-
-#                     A2e[idx1, idx2] -= g[P,Q,M,U] * RDM2(
-#                             P, Q, N, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-
-#                     A2e[idx1, idx2] -= g[P,Q,T,N] * RDM2(
-#                             P, Q, U, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-                    
-#                     A2e[idx1, idx2] -= g[P,U,M,Q] * RDM2(
-#                             P, T, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-                    
-#                     A2e[idx1, idx2] += g[P,U,R,N] * RDM2(
-#                             P, T, R, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-
-#                     A2e[idx1, idx2] -= g[T,N,P,Q] * RDM2(
-#                             U, M, P, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-                    
-#                     A2e[idx1, idx2] += g[T,P,M,Q] * RDM2(
-#                             U, P, N, Q, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-
-#                     A2e[idx1, idx2] -= g[T,P,Q,N] * RDM2(
-#                             U, P, Q, M, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
- 
-#             for P in range(num_inactive_spin_orbs + num_active_spin_orbs):
-#                 for Q in range(num_inactive_spin_orbs + num_active_spin_orbs):
-#                     for R in range(num_inactive_spin_orbs + num_active_spin_orbs):
-#                         if M == T:
-#                             A2e[idx1, idx2] += g[P,M,Q,R] * RDM2(
-#                         P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-#                             A2e[idx1, idx2] += g[P,Q,R,M] * RDM2(
-#                         P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-#                             A2e[idx1, idx2] += g[P,Q,M,R] * RDM2(
-#                         P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagonal
-#                             A2e[idx1, idx2] += g[M,P,Q,R] * RDM2(
-#                         T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q diagoal
-                            
-#                             A2e[idx1, idx2] += g[P,Q,N,R] * RDM2(
-#                         P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                            
-#                             A2e[idx1, idx2] += g[M,P,Q,R] * RDM2(
-#                         T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                             
-#                             A2e[idx1, idx2] -= g[P,Q,R,N] * RDM2(
-#                         P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-
-#                             A2e[idx1, idx2] -= g[P,N,Q,R] * RDM2(
-#                         P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-
-#                             A2e[idx1, idx2] += g[P,Q,N,R] * RDM2(
-#                         P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag (1)
-                            
-#                             A2e[idx1, idx2] += g[M,P,Q,R] * RDM2(
-#                         T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag (1)
-
-#                             A2e[idx1, idx2] += g[P,Q,R,M] * RDM2(
-#                         P, Q, R, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-                    
-                    
-#                             A2e[idx1, idx2] += g[P,M,Q,R] * RDM2(
-#                         P, U, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-                    
-#                             A2e[idx1, idx2] -= g[P,Q,M,R] * RDM2(
-#                         P, Q, U, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-        
-#                             A2e[idx1, idx2] -= g[M,P,Q,R] * RDM2(
-#                         U, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-
-#                             A2e[idx1, idx2] -= g[P,Q,N,R] * RDM2(
-#                         P, Q, U, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-                            
-#                             A2e[idx1, idx2] -= g[N,P,Q,R] * RDM2(
-#                         U, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-
-#                         A2e[idx1, idx2] -= g[P,Q,N,R] * RDM2(
-#                         P, Q, U, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-                            
-                            
-#                         A2e[idx1, idx2] -= g[N,P,Q,R] * RDM2(
-#                         U, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-
-#                         A2e[idx1, idx2] -= g[P,Q,R,N] * RDM2(
-#                         P, Q, R, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-                        
-#                         A2e[idx1, idx2] -= g[P,N,Q,R] * RDM2(
-#                         P, U, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-
-
-#                         A2e[idx1, idx2] += g[P,Q,R,N] * RDM2(
-#                         P, Q, R, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-                        
-#                         A2e[idx1, idx2] += g[P,N,Q,R] * RDM2(
-#                         P, U, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-
-#                         A2e[idx1, idx2] += g[P,Q,R,M] * RDM2(
-#                         P, Q, R, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                        
-#                         A2e[idx1, idx2] += g[P,M,Q,R] * RDM2(
-#                         P, U, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                        
-                        
-#                         A2e[idx1, idx2] += g[P,Q,M,R] * RDM2(
-#                         P, Q, U, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                        
-#                         A2e[idx1, idx2] += g[M,P,Q,R] * RDM2(
-#                         U, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-
-
-#                         A2e[idx1, idx2] -= g[P,Q,R,N] * RDM2(
-#                             P, Q, R, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (1), Q real (2)
-
-#                         A2e[idx1, idx2] -= g[P,N,Q,R] * RDM2(
-#                             P, U, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (1), Q real (2)
-                        
-                        
-#                         A2e[idx1, idx2] += g[P,Q,R,N] * RDM2(
-#                             P, Q, R, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (1), Q imag (2)
-
-#                         A2e[idx1, idx2] += g[P,N,Q,R] * RDM2(
-#                             P, U, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (1), Q imag (2)
-
-
-#                         A2e[idx1, idx2] += g[P,Q,M,R] * RDM2(
-#                             P, Q, U, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                        
-#                         A2e[idx1, idx2] += g[M,P,Q,R] * RDM2(
-#                             U, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                        
-#                         A2e[idx1, idx2] += g[P,Q,M,R] * RDM2(
-#                             P, Q, U, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                        
-#                         A2e[idx1, idx2] += g[M,P,Q,R] * RDM2(
-#                             U, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                        
-
-
-
-#                         if N==T:
-                                
-#                             A2e[idx1, idx2] += g[P,Q,R,M] * RDM2(
-#                         P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                   
-                   
-#                             A2e[idx1, idx2] += g[P,M,Q,R] * RDM2(
-#                         P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(1)
-                            
-                            
-#                             A2e[idx1, idx2] -= g[P,Q,M,R] * RDM2(
-#                         P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-
-#                         A2e[idx1, idx2] -= g[M,P,Q,R] * RDM2(
-#                         T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q real(2)
-                    
-#                         A2e[idx1, idx2] += g[P,Q,R,M] * RDM2(
-#                         P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag (1)
-                   
-                   
-#                         A2e[idx1, idx2] += g[P,M,Q,R] * RDM2(
-#                         P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' diagonal, Q imag(1)
-                        
-                        
-#                         A2e[idx1, idx2] += g[P,Q,R,M] * RDM2(
-#                         P, Q, R, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-                    
-#                         A2e[idx1, idx2] += g[P,M,Q,R] * RDM2(
-#                         P, U, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-                        
-#                         A2e[idx1, idx2] += g[P,Q,R,M] * RDM2(
-#                         P, Q, R, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-                    
-#                         A2e[idx1, idx2] += g[P,M,Q,R] * RDM2(
-#                         P, U, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-                    
-                    
-#                         A2e[idx1, idx2] += g[P,Q,R,M] * RDM2(
-#                         P, Q, R, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-                    
-#                         A2e[idx1, idx2] += g[P,M,Q,R] * RDM2(
-#                         P, U, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-                        
-                        
-#                         A2e[idx1, idx2] += g[P,Q,R,M] * RDM2(
-#                         P, Q, R, U, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-                    
-#                         A2e[idx1, idx2] += g[P,M,Q,R] * RDM2(
-#                         P, U, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-                        
-                        
-#                         A2e[idx1, idx2] -= g[P,Q,M,R] * RDM2(
-#                         P, Q, U, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-                        
-#                         A2e[idx1, idx2] -= g[M,P,Q,R] * RDM2(
-#                         U, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-                    
-                            
-#                         A2e[idx1, idx2] -= g[P,Q,M,R] * RDM2(
-#                             P, Q, U, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-
-#                         A2e[idx1, idx2] -= g[M,P,Q,R] * RDM2(
-#                             U, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-                        
-#                         A2e[idx1, idx2] += g[P,Q,M,R] * RDM2(
-#                             P, Q, U, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-
-#                         A2e[idx1, idx2] += g[M,P,Q,R] * RDM2(
-#                             U, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-     
-#                     if M==U:
-#                         A2e[idx1, idx2] += g[P,Q,M,R] * RDM2(
-#                         P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-        
-#                         A2e[idx1, idx2] += g[M,P,Q,R] * RDM2(
-#                         T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q diagonal
-                        
-#                         A2e[idx1, idx2] -= g[P,Q,R,M] * RDM2(
-#                         P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-        
-#                         A2e[idx1, idx2] -= g[P,M,Q,R] * RDM2(
-#                         P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q diagonal
-                        
-#                         A2e[idx1, idx2] += g[P,Q,N,R] * RDM2(
-#                         P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-                    
-                    
-#                         A2e[idx1, idx2] += g[N,P,Q,R] * RDM2(
-#                         T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (1)
-                    
-                    
-#                         A2e[idx1, idx2] += g[P,Q,N,R] * RDM2(
-#                         P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-                    
-                    
-#                         A2e[idx1, idx2] += g[N,P,Q,R] * RDM2(
-#                         T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (1)
-                             
-#                         A2e[idx1, idx2] += g[P,Q,N,R] * RDM2(
-#                         P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-                    
-                    
-#                         A2e[idx1, idx2] += g[N,P,Q,R] * RDM2(
-#                         T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q imag (1)
-                             
-                             
-#                         A2e[idx1, idx2] += g[P,Q,N,R] * RDM2(
-#                         P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-                    
-                    
-#                         A2e[idx1, idx2] += g[N,P,Q,R] * RDM2(
-#                         T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q real (1)
-        
-        
-                            
-#                         A2e[idx1, idx2] -= g[P,Q,R,N] * RDM2(
-#                         P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-        
-#                         A2e[idx1, idx2] -= g[P,N,Q,R] * RDM2(
-#                         P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (2)
-                        
- 
-#                         A2e[idx1, idx2] += g[P,Q,M,R] * RDM2(
-#                         P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                        
-#                         A2e[idx1, idx2] += g[M,P,Q,R] * RDM2(
-#                         T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (1), Q diagonal
-                        
-#                         A2e[idx1, idx2] += g[P,Q,R,M] * RDM2(
-#                         P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-                        
-#                         A2e[idx1, idx2] += g[P,M,Q,R] * RDM2(
-#                         P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' imag (2), Q diagonal
-                        
-#                         A2e[idx1, idx2] -= g[P,Q,R,N] * RDM2(
-#                             P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-
-#                         A2e[idx1, idx2] -= g[P,N,Q,R] * RDM2(
-#                             P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (2)
-
-#                         A2e[idx1, idx2] += g[P,Q,R,N] * RDM2(
-#                             P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-
-#                         A2e[idx1, idx2] += g[P,N,Q,R] * RDM2(
-#                             P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (2)
-
-#                     if N==U:
-#                         A2e[idx1, idx2] -= g[P,Q,R,M] * RDM2(
-#                         P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-
-#                         A2e[idx1, idx2] -= g[P,M,Q,R] * RDM2(
-#                         P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q real (1)
-
-#                         A2e[idx1, idx2] -= g[P,Q,R,M] * RDM2(
-#                         P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-
-#                         A2e[idx1, idx2] -= g[P,M,Q,R] * RDM2(
-#                         P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (2), Q imag (1)
-        
-
-#                         A2e[idx1, idx2] -= g[P,Q,M,R] * RDM2(
-#                         P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-                        
-                        
-#                         A2e[idx1, idx2] -= g[M,P,Q,R] * RDM2(
-#                         T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q real (2)
-                     
-                     
-#                         A2e[idx1, idx2] += g[P,Q,M,R] * RDM2(
-#                         P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-                        
-                        
-#                         A2e[idx1, idx2] += g[M,P,Q,R] * RDM2(
-#                         T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                     )  #Q' real (1), Q imag (2)
-                        
-                        
-#                         A2e[idx1, idx2] -= g[M,P,Q,R] * RDM2(
-#                             T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (1), Q real (2)
-                        
-#                         A2e[idx1, idx2] -= g[P,Q,M,R] * RDM2(
-#                             P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (1), Q real (2)
-                        
-                        
-#                         A2e[idx1, idx2] += g[M,P,Q,R] * RDM2(
-#                             T, P, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (1), Q imag (2)
-                        
-#                         A2e[idx1, idx2] -= g[P,Q,M,R] * RDM2(
-#                             P, Q, T, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (1), Q imag (2)
-                        
-#                         A2e[idx1, idx2] += g[P,Q,R,M] * RDM2(
-#                             P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)
-                        
-#                         A2e[idx1, idx2] += g[P,M,Q,R] * RDM2(
-#                             P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q real (1)  
-                                                
-#                         A2e[idx1, idx2] += g[P,Q,R,M] * RDM2(
-#                             P, Q, R, T, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-                        
-#                         A2e[idx1, idx2] += g[P,M,Q,R] * RDM2(
-#                             P, T, Q, R, num_inactive_spin_orbs, num_active_spin_orbs, rdm1, rdm2
-#                         )  #Q' imag (2), Q imag (1)
-
-#     if A1e.imag.any() > 1e-10 or A2e.imag.any() > 1e-10:
-#         print("Warning: Response Hessian is complex!")
-#     return A1e.real + (1/2)*A2e.real

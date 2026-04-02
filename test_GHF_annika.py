@@ -231,7 +231,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # mc = mcscf.UCASCI(mf, active_space[1], active_space[0])
     # # Slowquant
 
-     # small random anti-Hermitian
+    # small random anti-Hermitian
     eps = 0.005  # controls "step size"
     X_anti = np.random.randn(c.shape[0],c.shape[0]) + 1j*np.random.randn(c.shape[0],c.shape[0])
     A_mat = eps * (X_anti - X_anti.conj().T)/2  # make anti-Hermitian

@@ -3,7 +3,7 @@ from collections.abc import Sequence
 import numpy as np
 
 from slowquant.molecularintegrals.integralfunctions import (
-    one_electron_integral_transform, generalized_one_electron_transform
+    one_electron_integral_transform, generalized_one_electron_transform,
 )
 from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_orbital_gradient_response, get_orbital_gradient_response_real_imag,
@@ -12,6 +12,7 @@ from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_orbital_response_property_gradient_annika, get_orbital_response_property_gradient_real_imag, 
     get_orbital_response_metric_sigma_real_imag,  get_orbital_response_static_property_gradient, 
 )
+
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.linear_response.generalized_lr_baseclass import (
     LinearResponseBaseClass,
@@ -150,182 +151,182 @@ class LinearResponse(LinearResponseBaseClass):
             )
         
         if len(grad) != 0:
-        #     print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
-        #     if np.max(np.abs(grad)) > 10**-3:
-        #         print("Large Gradient detected in G of ", np.max(np.abs(grad)))
-        #         # raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad))) #AE udkommenteret
-        # if len(self.q_ops) != 0:
-        #     # Do orbital-orbital blocks
-        #     self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
-        #         self.wf.h_mo,
-        #         self.wf.g_mo,
-        #         self.wf.kappa_no_activeactive_spin_idx_dagger,
-        #         self.wf.kappa_no_activeactive_spin_idx,
-        #         self.wf.num_inactive_spin_orbs,
-        #         self.wf.num_active_spin_orbs,
-        #         self.wf.rdm1,
-        #         self.wf.rdm2,
-        #     )
+            print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
+            if np.max(np.abs(grad)) > 10**-3:
+                print("Large Gradient detected in G of ", np.max(np.abs(grad)))
+                # raise ValueError("Large Gradient detected in G of ", np.max(np.abs(grad))) #AE udkommenteret
+        if len(self.q_ops) != 0:
+            # Do orbital-orbital blocks
+            self.A[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.kappa_no_activeactive_spin_idx_dagger,
+                self.wf.kappa_no_activeactive_spin_idx,
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.rdm1,
+                self.wf.rdm2,
+            )
 
-        #     self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
-        #         self.wf.h_mo,
-        #         self.wf.g_mo,
-        #         self.wf.kappa_no_activeactive_spin_idx_dagger,
-        #         self.wf.kappa_no_activeactive_spin_idx_dagger,
-        #         self.wf.num_inactive_spin_orbs,
-        #         self.wf.num_active_spin_orbs,
-        #         self.wf.rdm1,
-        #         self.wf.rdm2,
-        #     )
+            self.B[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_hessian_block(
+                self.wf.h_mo,
+                self.wf.g_mo,
+                self.wf.kappa_no_activeactive_spin_idx_dagger,
+                self.wf.kappa_no_activeactive_spin_idx_dagger,
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.rdm1,
+                self.wf.rdm2,
+            )
 
-        #     self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
-        #         self.wf.kappa_no_activeactive_spin_idx,
-        #         self.wf.num_inactive_spin_orbs,
-        #         self.wf.num_active_spin_orbs,
-        #         self.wf.rdm1,
-        #     )
+            self.Sigma[: len(self.q_ops), : len(self.q_ops)] = get_orbital_response_metric_sigma(
+                self.wf.kappa_no_activeactive_spin_idx,
+                self.wf.num_inactive_spin_orbs,
+                self.wf.num_active_spin_orbs,
+                self.wf.rdm1,
+            )
       
         # qq block manual
-            for j, qJ in enumerate(self.q_ops):
-                for i, qI in enumerate(self.q_ops):
+            # for j, qJ in enumerate(self.q_ops):
+            #     for i, qI in enumerate(self.q_ops):
 
-                    # Test Anna
-                    # Make A
-                    # <0| qJd H qI |0>
-                    val = generalized_expectation_value(
-                        self.wf.ci_coeffs,
-                        [qJ.dagger*H*qI],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    # <0| qI H qJd |0>
-                    val += generalized_expectation_value(
-                        self.wf.ci_coeffs,
-                        [qI*H*qJ.dagger],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
+            #         # Test Anna
+            #         # Make A
+            #         # <0| qJd H qI |0>
+            #         val = generalized_expectation_value(
+            #             self.wf.ci_coeffs,
+            #             [qJ.dagger*H*qI],
+            #             self.wf.ci_coeffs,
+            #             *self.index_info,
+            #         )
+            #         # <0| qI H qJd |0>
+            #         val += generalized_expectation_value(
+            #             self.wf.ci_coeffs,
+            #             [qI*H*qJ.dagger],
+            #             self.wf.ci_coeffs,
+            #             *self.index_info,
+            #         )
 
-                    # - 1/2<0| qJd qI H |0>
-                    val -= (
-                        1
-                        / 2
-                        * generalized_expectation_value(
-                            self.wf.ci_coeffs,
-                            [qJ.dagger*qI*H],
-                            self.wf.ci_coeffs,
-                            *self.index_info,
-                        )
-                    )
-                    # - 1/2*<0| H qI qJd |0>
-                    val -= (
-                        1/2
-                        * generalized_expectation_value(
-                            self.wf.ci_coeffs,
-                            [H*qI*qJ.dagger],
-                            self.wf.ci_coeffs,
-                            *self.index_info,
-                        )
-                    )
-                    # - 1/2*<0| qI qJd H |0> # minus Pernille
-                    val -= (
-                        1
-                        / 2
-                        * generalized_expectation_value(
-                            self.wf.ci_coeffs,
-                            [qI*qJ.dagger*H],
-                            self.wf.ci_coeffs,
-                            *self.index_info,
-                        )
-                    )
-                    # - 1/2*<0| H qJd qI |0> # minus Pernille
-                    val -= (
-                        1
-                        / 2
-                        * generalized_expectation_value(
-                            self.wf.ci_coeffs,
-                            [H*qJ.dagger*qI],
-                            self.wf.ci_coeffs,
-                            *self.index_info,
-                        )
-                    )
-                    self.A[i, j] = val
+            #         # - 1/2<0| qJd qI H |0>
+            #         val -= (
+            #             1
+            #             / 2
+            #             * generalized_expectation_value(
+            #                 self.wf.ci_coeffs,
+            #                 [qJ.dagger*qI*H],
+            #                 self.wf.ci_coeffs,
+            #                 *self.index_info,
+            #             )
+            #         )
+            #         # - 1/2*<0| H qI qJd |0>
+            #         val -= (
+            #             1/2
+            #             * generalized_expectation_value(
+            #                 self.wf.ci_coeffs,
+            #                 [H*qI*qJ.dagger],
+            #                 self.wf.ci_coeffs,
+            #                 *self.index_info,
+            #             )
+            #         )
+            #         # - 1/2*<0| qI qJd H |0> # minus Pernille
+            #         val -= (
+            #             1
+            #             / 2
+            #             * generalized_expectation_value(
+            #                 self.wf.ci_coeffs,
+            #                 [qI*qJ.dagger*H],
+            #                 self.wf.ci_coeffs,
+            #                 *self.index_info,
+            #             )
+            #         )
+            #         # - 1/2*<0| H qJd qI |0> # minus Pernille
+            #         val -= (
+            #             1
+            #             / 2
+            #             * generalized_expectation_value(
+            #                 self.wf.ci_coeffs,
+            #                 [H*qJ.dagger*qI],
+            #                 self.wf.ci_coeffs,
+            #                 *self.index_info,
+            #             )
+            #         )
+            #         self.A[i, j] = val
                     
-            # print('qq blok regnet med expectation values',self.A)
-                    # Make B
-                    #<0| qJd H qId |0>
-                    val = generalized_expectation_value(
-                        self.wf.ci_coeffs,
-                        [qJ.dagger*H*qI.dagger],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    # <0| qId H qJd |0>
-                    val += generalized_expectation_value(
-                        self.wf.ci_coeffs,
-                        [qI.dagger*H*qJ.dagger],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    # - 1/2<0| qJd qId H |0>
-                    val -= (
-                        1
-                        / 2
-                        * generalized_expectation_value(
-                            self.wf.ci_coeffs,
-                            [qJ.dagger*qI.dagger*H],
-                            self.wf.ci_coeffs,
-                            *self.index_info,
-                        )
-                    )
-                    # - 1/2*<0| H qId qJd |0>
-                    val -= (
-                        1/2
-                        * generalized_expectation_value(
-                            self.wf.ci_coeffs,
-                            [H*qI.dagger*qJ.dagger],
-                            self.wf.ci_coeffs,
-                            *self.index_info,
-                        )
-                    )
-                    # - 1/2*<0| qId qJd H |0> # minus Pernille
-                    val -= (
-                        1
-                        / 2
-                        * generalized_expectation_value(
-                            self.wf.ci_coeffs,
-                            [qI.dagger*qJ.dagger*H],
-                            self.wf.ci_coeffs,
-                            *self.index_info,
-                        )
-                    )
-                    # - 1/2*<0| H qJd qId |0> # minus Pernille
-                    val -= (
-                        1
-                        / 2
-                        * generalized_expectation_value(
-                            self.wf.ci_coeffs,
-                            [H*qJ.dagger*qI.dagger],
-                            self.wf.ci_coeffs,
-                            *self.index_info,
-                        )
-                    )
-                    self.B[i, j] = val
+            # # print('qq blok regnet med expectation values',self.A)
+            #         # Make B
+            #         #<0| qJd H qId |0>
+            #         val = generalized_expectation_value(
+            #             self.wf.ci_coeffs,
+            #             [qJ.dagger*H*qI.dagger],
+            #             self.wf.ci_coeffs,
+            #             *self.index_info,
+            #         )
+            #         # <0| qId H qJd |0>
+            #         val += generalized_expectation_value(
+            #             self.wf.ci_coeffs,
+            #             [qI.dagger*H*qJ.dagger],
+            #             self.wf.ci_coeffs,
+            #             *self.index_info,
+            #         )
+            #         # - 1/2<0| qJd qId H |0>
+            #         val -= (
+            #             1
+            #             / 2
+            #             * generalized_expectation_value(
+            #                 self.wf.ci_coeffs,
+            #                 [qJ.dagger*qI.dagger*H],
+            #                 self.wf.ci_coeffs,
+            #                 *self.index_info,
+            #             )
+            #         )
+            #         # - 1/2*<0| H qId qJd |0>
+            #         val -= (
+            #             1/2
+            #             * generalized_expectation_value(
+            #                 self.wf.ci_coeffs,
+            #                 [H*qI.dagger*qJ.dagger],
+            #                 self.wf.ci_coeffs,
+            #                 *self.index_info,
+            #             )
+            #         )
+            #         # - 1/2*<0| qId qJd H |0> # minus Pernille
+            #         val -= (
+            #             1
+            #             / 2
+            #             * generalized_expectation_value(
+            #                 self.wf.ci_coeffs,
+            #                 [qI.dagger*qJ.dagger*H],
+            #                 self.wf.ci_coeffs,
+            #                 *self.index_info,
+            #             )
+            #         )
+            #         # - 1/2*<0| H qJd qId |0> # minus Pernille
+            #         val -= (
+            #             1
+            #             / 2
+            #             * generalized_expectation_value(
+            #                 self.wf.ci_coeffs,
+            #                 [H*qJ.dagger*qI.dagger],
+            #                 self.wf.ci_coeffs,
+            #                 *self.index_info,
+            #             )
+            #         )
+            #         self.B[i, j] = val
 
-                    #Make Sigma ##fejl rettet her??
-                    val = generalized_expectation_value(
-                        self.wf.ci_coeffs,
-                        [qI.dagger*qJ],
-                        self.wf.ci_coeffs,
-                        *self.index_info
-                    )
-                    val -= generalized_expectation_value(
-                        self.wf.ci_coeffs,
-                        [qJ*qI.dagger],
-                        self.wf.ci_coeffs,
-                        *self.index_info
-                    )
-                    self.Sigma[i, j] =  val   
+            #         #Make Sigma ##fejl rettet her??
+            #         val = generalized_expectation_value(
+            #             self.wf.ci_coeffs,
+            #             [qI.dagger*qJ],
+            #             self.wf.ci_coeffs,
+            #             *self.index_info
+            #         )
+            #         val -= generalized_expectation_value(
+            #             self.wf.ci_coeffs,
+            #             [qJ*qI.dagger],
+            #             self.wf.ci_coeffs,
+            #             *self.index_info
+            #         )
+            #         self.Sigma[i, j] =  val   
 
                     
 
@@ -563,10 +564,10 @@ class LinearResponse(LinearResponseBaseClass):
             f"{np.max(np.abs(self.B - self.B.T)):.2e}")  
         
                         
-        print("H shape:", E2.shape)
-        print("sigma shape:", self.Sigma.shape)
-        print("H diagonal:", np.diag(E2).real)
-        print("sigma diagonal:", np.diag(self.Sigma).real)
+        #print("H shape:", E2.shape)
+        #print("sigma shape:", self.Sigma.shape)
+        #print("H diagonal:", np.diag(E2).real)
+        #print("sigma diagonal:", np.diag(self.Sigma).real)
         
         # print(f"Hermiticity check of A qG: max|A - A†| = "
         #     f"{np.max(np.abs(self.A[:idx_shift,idx_shift:] - self.A[idx_shift:,:idx_shift].conj().T)):.2e}") 
@@ -800,3 +801,9 @@ class LinearResponse(LinearResponseBaseClass):
         if np.allclose(mo, mo.transpose(0, -1, -2)):
             return np.vstack((V, -1 * V)).reshape(-1, *in_shape)
         return np.vstack((V, V)).reshape(-1, *in_shape)
+    
+
+
+
+    
+

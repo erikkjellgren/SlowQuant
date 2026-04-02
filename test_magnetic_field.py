@@ -280,7 +280,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     h_core_pyscf = np.kron(np.eye(2), h_core_pyscf_1dim)
 
-    H_zora= read_zora_so("Cl_so.zora_so")
+    #H_zora= read_zora_so("Cl_so.zora_so")
 
     #h_core_tot = (h_core_pyscf + H_zora)
 
@@ -291,7 +291,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # Magnetic field Hamiltonian: 
     # ── Gauge origin at coordinate origin (matches DIRAC default) ─────────────────
-    mol.set_common_origin([0.0, 0.0, 0.0])
+    #mol.set_common_origin([0.0, 0.0, 0.0])
 
     # ── Angular momentum integrals ────────────────────────────────────────────────
     # int1e_cg_irxp returns <mu|i*(r-Rg)×p|nu> as REAL numbers
@@ -359,7 +359,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # # Slowquant
 
      # small random anti-Hermitian
-    eps = 0.7  # controls "step size"
+    eps = 0.2  # controls "step size"
     X_anti = np.random.randn(c_MO.shape[0],c_MO.shape[0]) + 1j*np.random.randn(c_MO.shape[0],c_MO.shape[0])
     A_mat = eps * (X_anti - X_anti.conj().T)/2  # make anti-Hermitian
 
@@ -367,7 +367,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     c_u = c_MO @ U_step
 
-    print("MAX", np.max(c_MO.imag))
+    print("MAX in C_MO directly from pyscf", np.max(c_MO.imag))
     #print(mf.mo_coeff)
 
 
@@ -388,7 +388,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     )
 
 
-    print(mf.energy_elec()[0])
+    print("GHF", mf.energy_elec()[0])
     #print(mf.energy_nuc())
     #print(mf.energy_elec()[0]+0.715104390540)
 
@@ -524,9 +524,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
                             print(WF.kappa_spin_idx[i-len(WF.kappa_spin_idx)],WF.kappa_spin_idx[j-len(WF.kappa_spin_idx)])'''
 
 
-    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
+    #WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
     
-    
+    #print("MAX in C_MO after optimization", np.max(WF.c_mo.imag))
     
     #WF.do_adapt(["S","D"])
 
@@ -591,14 +591,14 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print(exp_value_gradient_nonsplit)'''
 
 
-    LR = generalized_naive.LinearResponse(WF, excitations="S")  #, excitations="SD")
+    LR = generalized_naive.LinearResponse(WF, excitations="S")
     LR.calc_excitation_energies()
     print("Excitation energies")
-    print(LR.excitation_energies)
+    print(np.round(LR.excitation_energies,6))
     print("Transition dipole moments")
-    print(np.round(LR.get_transition_dipole(dip_int).real,5))
+    print(np.round(LR.get_transition_dipole(dip_int).real,6))
     print("Oscillator strengths")
-    print(np.round(LR.get_oscillator_strengths(dip_int),5))
+    print(np.round(LR.get_oscillator_strengths(dip_int),6))
 
 
 
@@ -635,9 +635,9 @@ def h3():
                   H  0.500000   0.8660254038   0.000000"""
     #basis = "cc-pvdz"
     #basis = "631-g"
-    basis = "sto-6g"
+    basis = "sto-3g"
     #basis = ""
-    active_space = ((1, 2), 4)
+    active_space = ((2, 1), 6)
     #active_space = (2, 4)
     charge = 0
     spin = 1
@@ -689,14 +689,14 @@ def h2o():
     with open('dyall2zp_O.nwchem', 'w') as f:
         f.write(dyall2zp_O)
         f.close()
-    basis = {'H': gto.basis.load('dyall2zp_H.nwchem', 'H'),'O': gto.basis.load('dyall2zp_O.nwchem', 'O')}
+    #basis = {'H': gto.basis.load('dyall2zp_H.nwchem', 'H'),'O': gto.basis.load('dyall2zp_O.nwchem', 'O')}
     #basis = "dyallv2z"
     #basis = "cc-pvdz"
     #basis = "631-g"
-    #basis = "sto-3g"
+    basis = "sto-3g"
     #basis = "sto-6g"
     #active_space = ((5, 5), 14)
-    active_space = ((2,2),6)
+    active_space = ((3,3),8)
     charge = 0
     spin = 0
 
@@ -768,7 +768,7 @@ def BeH():
     geometry = """Be 0.0 0.0 0.0;
                   H 0.0 0.0 1.3426"""
     basis="sto-3g"
-    active_space = ((2,3),5)
+    active_space = ((1,2),6)
     charge = 0
     spin = 1
     NR(
@@ -778,7 +778,7 @@ def BeH():
 
 ###SPIN ELLER RUMLIGE ORBITALER###
 
-h3()
+h2()
 
 
 # h2o()

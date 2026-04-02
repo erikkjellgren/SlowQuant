@@ -13,7 +13,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     DHF_one_electron_transform,
     DHF_two_electron_transform,
 )
-from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_generalized
+from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_generalized, get_indexing_DHF
 from slowquant.unitary_coupled_cluster.generalized_density_matrix_DHF import (
     get_electronic_energy_generalized,
     get_orbital_gradient_expvalue_real_imag,
@@ -22,6 +22,7 @@ from slowquant.unitary_coupled_cluster.generalized_density_matrix_DHF import (
 from slowquant.unitary_coupled_cluster.generalized_operators import (
     a_op_spin,
     generalized_hamiltonian_full_space,
+    DHF_hamiltonian_full_space,
 )
 from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import (
     generalized_construct_ups_state, generalized_construct_ups_state_test_anna,
@@ -109,38 +110,43 @@ class GeneralizedWaveFunctionUPS:
         self.num_elec = num_elec
         self.num_elec_alpha = (num_elec - np.sum(cas[0])) // 2 + cas[0][0]
         self.num_elec_beta = (num_elec - np.sum(cas[0])) // 2 + cas[0][1]
-        self.num_spin_orbs = mo_coeffs.shape[1]
+        self.num_spin_orbs = mo_coeffs.shape[1]   # divide by 2??
 
-        self.num_spin_orbs_PES = int(self.num_spin_orbs/2) #DHF 
+        self.num_spin_orbs_NES = int(self.num_spin_orbs/2) #DHF 
 
         self._include_active_kappa = include_active_kappa
         self.num_active_elec_alpha = cas[0][0]
         self.num_active_elec_beta = cas[0][1]
         self.num_active_elec = self.num_active_elec_alpha + self.num_active_elec_beta
         self.num_active_spin_orbs = cas[1]
-        self.num_inactive_spin_orbs = num_elec - self.num_active_elec + self.num_spin_orbs_PES
+        self.num_inactive_spin_orbs = num_elec - self.num_active_elec
         self.num_virtual_spin_orbs = (
-            self.num_spin_orbs - self.num_active_spin_orbs - self.num_inactive_spin_orbs
+            self.num_spin_orbs - self.num_active_spin_orbs - self.num_inactive_spin_orbs - self.num_spin_orbs_NES
         )
-        self.num_virtual_spin_orbs_PES = (
-            self.num_spin_orbs_PES - self.num_active_spin_orbs - self.num_inactive_spin_orbs  #DHF
-        )                                                                                      
-        self.inactive_spin_idx = [x for x in range(self.num_inactive_spin_orbs)]
-        self.active_spin_idx = [x + self.num_inactive_spin_orbs for x in range(self.num_active_spin_orbs)]
-        self.virtual_spin_idx = [
-            x + self.num_inactive_spin_orbs + self.num_active_spin_orbs
-            for x in range(self.num_virtual_spin_orbs)
-        ]
+
+
+        # New idx for DHF:
+        self.inactive_spin_idx = [self.num_spin_orbs_NES + x for x in range(self.num_inactive_spin_orbs)]
+        self.active_spin_idx = [self.num_spin_orbs_NES + x + self.num_inactive_spin_orbs for x in range(self.num_active_spin_orbs)]
+
+        # Positronic states are all treated as virtual
+        self.positronic_spin_idx = list(range(self.num_spin_orbs_NES))
+
+        # Electronic virtual orbitals shifted past positronic block
+        self.virtual_spin_idx = list(range(self.active_spin_idx[-1]+1, self.num_spin_orbs))
+
         self.active_occ_spin_idx = []
         for i in range(self.num_active_elec_alpha):
-            self.active_occ_spin_idx.append(2 * i + self.num_inactive_spin_orbs)
+            self.active_occ_spin_idx.append(self.num_spin_orbs_NES + 2 * i + self.num_inactive_spin_orbs)
         for i in range(self.num_active_elec_beta):
-            self.active_occ_spin_idx.append(2 * i + 1 + self.num_inactive_spin_orbs)
+            self.active_occ_spin_idx.append(self.num_spin_orbs_NES + 2 * i + 1 + self.num_inactive_spin_orbs)
         self.active_occ_spin_idx.sort()
+
         self.active_unocc_spin_idx = []
-        for i in range(self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs):
+        for i in range(self.num_spin_orbs_NES + self.num_inactive_spin_orbs, self.num_spin_orbs_NES + self.num_inactive_spin_orbs + self.num_active_spin_orbs):
             if i not in self.active_occ_spin_idx:
                 self.active_unocc_spin_idx.append(i)
+
         # Make shifted indices
         if len(self.active_spin_idx) != 0:
             active_shift = np.min(self.active_spin_idx)
@@ -150,22 +156,85 @@ class GeneralizedWaveFunctionUPS:
                 self.active_occ_spin_idx_shifted.append(active_idx - active_shift)
             for active_idx in self.active_unocc_spin_idx:
                 self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
+
+
+        # Old idx
+
+        # self.inactive_spin_idx = [x for x in range(self.num_inactive_spin_orbs)]
+        # self.active_spin_idx = [x + self.num_inactive_spin_orbs for x in range(self.num_active_spin_orbs)]
+        # self.virtual_spin_idx = [
+        #     x + self.num_inactive_spin_orbs + self.num_active_spin_orbs
+        #     for x in range(self.num_virtual_spin_orbs)
+        # ]
+        # self.active_occ_spin_idx = []
+        # for i in range(self.num_active_elec_alpha):
+        #     self.active_occ_spin_idx.append(2 * i + self.num_inactive_spin_orbs)
+        # for i in range(self.num_active_elec_beta):
+        #     self.active_occ_spin_idx.append(2 * i + 1 + self.num_inactive_spin_orbs)
+        # self.active_occ_spin_idx.sort()
+        # self.active_unocc_spin_idx = []
+        # for i in range(self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs):
+        #     if i not in self.active_occ_spin_idx:
+        #         self.active_unocc_spin_idx.append(i)
+        # # Make shifted indices
+        # if len(self.active_spin_idx) != 0:
+        #     active_shift = np.min(self.active_spin_idx)
+        #     for active_idx in self.active_spin_idx:
+        #         self.active_spin_idx_shifted.append(active_idx - active_shift)
+        #     for active_idx in self.active_occ_spin_idx:
+        #         self.active_occ_spin_idx_shifted.append(active_idx - active_shift)
+        #     for active_idx in self.active_unocc_spin_idx:
+        #         self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
+
+
+
         # Find non-redundant kappas
         self._kappa_real = []
         self._kappa_imag = []
         self.kappa_spin_idx = []
+        self.kappa_spin_idx_dagger = []
+
+        self._kappa_real_ep = [] # Positronic
+        self._kappa_imag_ep = [] # Positronic
+        self.kappa_spin_idx_ep = [] # Positronic
+        self.kappa_spin_idx_ep_dagger = [] # Positronic
+
         self.kappa_no_activeactive_spin_idx = []
         self.kappa_no_activeactive_spin_idx_dagger = []
+
+        self.kappa_no_activeactive_spin_idx_resp = []
+        self.kappa_no_activeactive_spin_idx_dagger_resp = []
+
         self._kappa_real_redundant = []
         self._kappa_imag_redundant = []
         self.kappa_redundant_spin_idx = []
         self._kappa_real_old = []
         self._kappa_imag_old = []
+
+        self._kappa_real_old_ep = [] # Positronic
+        self._kappa_imag_old_ep = [] # Positronic
+
         self._kappa_real_redundant_old = []
         self._kappa_imag_redundant_old = []
         # Annika has modified this, since non-redundant orbital rotations had been left out!
         for P in range(0, self.num_spin_orbs):
             for Q in range(P, self.num_spin_orbs): 
+                if P < self.num_spin_orbs_NES and Q < self.num_spin_orbs_NES: #No p-p rotations
+                    self._kappa_real_redundant.append(0.0)
+                    self._kappa_imag_redundant.append(0.0)
+                    self._kappa_real_redundant_old.append(0.0)
+                    self._kappa_imag_redundant_old.append(0.0)
+                    self.kappa_redundant_spin_idx.append((P, Q))
+                    continue
+
+                # if P < self.num_spin_orbs_NES or Q < self.num_spin_orbs_NES: #No e-p rotations
+                #     self._kappa_real_redundant.append(0.0)
+                #     self._kappa_imag_redundant.append(0.0)
+                #     self._kappa_real_redundant_old.append(0.0)
+                #     self._kappa_imag_redundant_old.append(0.0)
+                #     self.kappa_redundant_spin_idx.append((P, Q))
+                #     continue
+
                 if P in self.inactive_spin_idx and Q in self.inactive_spin_idx:
                     self._kappa_real_redundant.append(0.0)
                     self._kappa_imag_redundant.append(0.0)
@@ -205,22 +274,58 @@ class GeneralizedWaveFunctionUPS:
                         self.kappa_redundant_spin_idx.append((P, Q))
                         continue
                 if not (P in self.active_spin_idx and Q in self.active_spin_idx):
-                    self.kappa_no_activeactive_spin_idx.append((P, Q))
-                    self.kappa_no_activeactive_spin_idx_dagger.append((Q, P))
+                    if P not in self.positronic_spin_idx and Q not in self.positronic_spin_idx:
+                        self.kappa_no_activeactive_spin_idx_resp.append((P, Q))
+                        self.kappa_no_activeactive_spin_idx_dagger_resp.append((Q, P))
+
+                    if P in self.positronic_spin_idx and Q not in self.positronic_spin_idx:
+                        if Q not in self.virtual_spin_idx:
+                            self.kappa_no_activeactive_spin_idx_resp.append((Q, P)) # positronic included, Which one is dagger?
+                            self.kappa_no_activeactive_spin_idx_dagger_resp.append((P, Q))
+
+                    if P not in self.positronic_spin_idx and Q not in self.positronic_spin_idx:
+                        self.kappa_no_activeactive_spin_idx.append((P, Q))
+                        self.kappa_no_activeactive_spin_idx_dagger.append((Q, P))
+
+
+                if P < self.num_spin_orbs_NES and Q >= self.num_spin_orbs_NES and Q not in self.virtual_spin_idx: # Positronic
+                    self._kappa_real_ep.append(0.0) # Positronic
+                    self._kappa_imag_ep.append(0.0) # Positronic 
+                    self._kappa_real_old_ep.append(0.0) # Positronic
+                    self._kappa_imag_old_ep.append(0.0) # Positronic 
+                    self.kappa_spin_idx_ep.append((Q, P))
+                    self.kappa_spin_idx_ep_dagger.append((P, Q)) # Positronic included, AND WHICH IS FIRST P OR Q?
+                    continue
+
+                if P < self.num_spin_orbs_NES and Q >= self.num_spin_orbs_NES and Q in self.virtual_spin_idx: # Positronic
+                    self._kappa_real_redundant.append(0.0)
+                    self._kappa_imag_redundant.append(0.0)
+                    self._kappa_real_redundant_old.append(0.0)
+                    self._kappa_imag_redundant_old.append(0.0)
+                    self.kappa_redundant_spin_idx.append((P, Q))
+                    continue
+
                 self._kappa_real.append(0.0)
                 self._kappa_imag.append(0.0)
                 self._kappa_real_old.append(0.0)
                 self._kappa_imag_old.append(0.0)
                 self.kappa_spin_idx.append((P, Q))
+                self.kappa_spin_idx_dagger.append((Q, P))
+
+
+
+
+
         # print('self.kappa_spin_idx', self.kappa_spin_idx) ###AE skal de krydse over (Juliane)
 
         # Construct determinant basis
-        self.ci_info = get_indexing_generalized(
+        self.ci_info = get_indexing_DHF(
             self.num_inactive_spin_orbs,
             self.num_active_spin_orbs,
             self.num_virtual_spin_orbs,
             self.num_active_elec_alpha,
             self.num_active_elec_beta,
+            self.num_spin_orbs_NES,
         )
         self.num_det = len(self.ci_info.idx2det)
         self.csf_coeffs = np.zeros(self.num_det, dtype=np.complex128)
@@ -289,11 +394,21 @@ class GeneralizedWaveFunctionUPS:
     def kappa_real(self) -> list[float]:
         """Get real orbital rotation parameters."""
         return self._kappa_real.copy()
+    
+    @property
+    def kappa_real_ep(self) -> list[float]:  # Positronic
+        """Get real orbital rotation parameters."""
+        return self._kappa_real_ep.copy()
 
     @property
     def kappa_imag(self) -> list[float]:
         """Get imaginary orbital rotation parameters."""
         return self._kappa_imag.copy()
+    
+    @property
+    def kappa_imag_ep(self) -> list[float]:  # Positronic
+        """Get imaginary orbital rotation parameters."""
+        return self._kappa_imag_ep.copy()
 
     def set_kappa_cep(self, k_real: list[float], k_imag: list[float]) -> None:
         """Set orbital rotation parameters, and move current expansion point.
@@ -309,11 +424,31 @@ class GeneralizedWaveFunctionUPS:
         if isinstance(self._kappa_real, np.ndarray):
             self._kappa_real = self._kappa_real.tolist()
         if isinstance(self._kappa_imag, np.ndarray):
-            self._kappa_img = self._kappa_imag.tolist()
+            self._kappa_imag = self._kappa_imag.tolist()
         # Move current expansion point.
         self._c_mo = self.c_mo
         self._kappa_real_old = self.kappa_real
         self._kappa_imag_old = self.kappa_imag
+
+    def set_kappa_cep_ep(self, k_real_ep: list[float], k_imag_ep: list[float]) -> None: # Positronic
+        """Set orbital rotation parameters, and move current expansion point.
+
+        Args:
+            k: orbital rotation parameters.
+        """
+        self._h_mo = None
+        self._g_mo = None
+        self._energy_elec = None
+        self._kappa_real_ep = k_real_ep.copy()
+        self._kappa_imag_ep = k_imag_ep.copy()
+        if isinstance(self._kappa_real_ep, np.ndarray):
+            self._kappa_real_ep = self._kappa_real_ep.tolist()
+        if isinstance(self._kappa_imag_ep, np.ndarray):
+            self._kappa_imag_ep = self._kappa_imag_ep.tolist()
+        # Move current expansion point.
+        self._c_mo = self.c_mo_ep
+        self._kappa_real_old_ep = self.kappa_real_ep
+        self._kappa_imag_old_ep = self.kappa_imag_ep
 
     @property
     def thetas_real(self) -> list[float]:
@@ -363,7 +498,7 @@ class GeneralizedWaveFunctionUPS:
         if isinstance(self._thetas_real, np.ndarray):
             self._thetas_real = self._thetas_real.tolist()
         if isinstance(self._thetas_imag, np.ndarray):
-            self._thetas_img = self._thetas_imag.tolist()
+            self._thetas_imag = self._thetas_imag.tolist()
         
         self.ci_coeffs = generalized_construct_ups_state_test_erik(
             self.csf_coeffs,
@@ -432,6 +567,37 @@ class GeneralizedWaveFunctionUPS:
         return np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
 
     @property
+    def c_mo_ep(self) -> np.ndarray:  # Positronic
+        """Get molecular orbital coefficients.
+
+        Returns:
+            Molecular orbital coefficients.
+        """
+        # Construct anti-hermitian kappa matrix
+        kappa_mat = np.zeros_like(self._c_mo)
+        if len(self.kappa_real_ep) != 0:
+            # The MO transformation is calculated as a difference between current kappa and kappa old.
+            # This is to make the moving of the expansion point to work with SciPy optimization algorithms.
+            # Resetting kappa to zero would mess with any algorithm that has any memory f.x. BFGS.
+            if np.max(np.abs(np.array(self.kappa_real_ep) - np.array(self._kappa_real_old_ep))) > 0.0:
+                for kappa_val, kappa_old, (p, q) in zip(
+                    self.kappa_real_ep, self._kappa_real_old_ep, self.kappa_spin_idx_ep
+                ):
+                    if p == q:
+                        continue
+                    kappa_mat[p, q] = kappa_val - kappa_old
+                    kappa_mat[q, p] = -(kappa_val - kappa_old)
+            if np.max(np.abs(np.array(self.kappa_imag_ep) - np.array(self._kappa_imag_old_ep))) > 0.0:
+                for kappa_val, kappa_old, (p, q) in zip(
+                    self.kappa_imag_ep, self._kappa_imag_old_ep, self.kappa_spin_idx_ep
+                ):
+                    kappa_mat[p, q] += (kappa_val - kappa_old) * 1.0j
+                    kappa_mat[q, p] += (kappa_val - kappa_old) * 1.0j
+        # Apply orbital rotation unitary to MO coefficients
+        return np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
+
+
+    @property
     def h_mo(self) -> np.ndarray:
         """Get one-electron Hamiltonian integrals in MO basis.
 
@@ -439,7 +605,7 @@ class GeneralizedWaveFunctionUPS:
             One-electron Hamiltonian integrals in MO basis.
         """
         if self._h_mo is None:
-            self._h_mo = DHF_one_electron_transform(self.c_mo_int, self._h_ao) #DHF
+            self._h_mo = DHF_one_electron_transform(self.c_mo, self._h_ao) #DHF
         return self._h_mo
 
     @property
@@ -450,7 +616,29 @@ class GeneralizedWaveFunctionUPS:
             Two-electron Hamiltonian integrals in MO basis.
         """
         if self._g_mo is None:
-            self._g_mo = DHF_two_electron_transform(self.c_mo_int, self._g_ao) #DHF
+            self._g_mo = DHF_two_electron_transform(self.c_mo, self._g_ao) #DHF
+        return self._g_mo
+
+    @property
+    def h_mo_ep(self) -> np.ndarray:
+        """Get one-electron Hamiltonian integrals in MO basis.
+
+        Returns:
+            One-electron Hamiltonian integrals in MO basis.
+        """
+        if self._h_mo is None:
+            self._h_mo = DHF_one_electron_transform(self.c_mo_ep, self._h_ao) #DHF
+        return self._h_mo
+
+    @property
+    def g_mo_ep(self) -> np.ndarray:
+        """Get two-electron Hamiltonian integrals in MO basis.
+
+        Returns:
+            Two-electron Hamiltonian integrals in MO basis.
+        """
+        if self._g_mo is None:
+            self._g_mo = DHF_two_electron_transform(self.c_mo_ep, self._g_ao) #DHF
         return self._g_mo
 
     @property
@@ -464,11 +652,11 @@ class GeneralizedWaveFunctionUPS:
         if self._rdm1 is None:
             self._rdm1 = np.zeros((self.num_active_spin_orbs, self.num_active_spin_orbs), dtype=np.complex128)
             for P in range(
-                self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
+                self.num_spin_orbs_NES + self.num_inactive_spin_orbs, self.num_spin_orbs_NES + self.num_inactive_spin_orbs + self.num_active_spin_orbs
             ):
-                P_idx = P - self.num_inactive_spin_orbs
-                for Q in range(self.num_inactive_spin_orbs, P + 1):
-                    Q_idx = Q - self.num_inactive_spin_orbs
+                P_idx = P - self.num_inactive_spin_orbs - self.num_spin_orbs_NES
+                for Q in range(self.num_spin_orbs_NES + self.num_inactive_spin_orbs, P + 1):
+                    Q_idx = Q - self.num_inactive_spin_orbs - self.num_spin_orbs_NES
                     val = generalized_expectation_value(
                         self.ci_coeffs,
                         [(a_op_spin(P, True) * a_op_spin(Q, False))],
@@ -476,6 +664,7 @@ class GeneralizedWaveFunctionUPS:
                         self.ci_info,
                         do_folding = True,
                     )
+                    #print("P",P,"Q",Q,"val",val)
                     self._rdm1[P_idx, Q_idx] = val  # type: ignore
                     self._rdm1[Q_idx, P_idx] = val.conjugate()  # type: ignore (1.7.7 EST)
         return self._rdm1
@@ -499,13 +688,13 @@ class GeneralizedWaveFunctionUPS:
                 dtype=np.complex128,
             )
             for P in range(
-                self.num_inactive_spin_orbs, self.num_inactive_spin_orbs + self.num_active_spin_orbs
+                self.num_spin_orbs_NES + self.num_inactive_spin_orbs, self.num_spin_orbs_NES + self.num_inactive_spin_orbs + self.num_active_spin_orbs
             ):
-                P_idx = P - self.num_inactive_spin_orbs
-                for Q in range(self.num_inactive_spin_orbs, P+1):
-                    Q_idx = Q - self.num_inactive_spin_orbs
-                    for R in range(self.num_inactive_spin_orbs, P+1):
-                        R_idx = R - self.num_inactive_spin_orbs
+                P_idx = P - self.num_inactive_spin_orbs - self.num_spin_orbs_NES
+                for Q in range(self.num_spin_orbs_NES + self.num_inactive_spin_orbs, P+1):
+                    Q_idx = Q - self.num_inactive_spin_orbs - self.num_spin_orbs_NES
+                    for R in range(self.num_spin_orbs_NES + self.num_inactive_spin_orbs, P+1):
+                        R_idx = R - self.num_inactive_spin_orbs - self.num_spin_orbs_NES
                         if P == Q:
                             S_lim = R + 1
                         elif P == R:
@@ -514,8 +703,8 @@ class GeneralizedWaveFunctionUPS:
                             S_lim = P  # Not sure I understand this limit? Why not R?
                         else:
                             S_lim = P + 1
-                        for S in range(self.num_inactive_spin_orbs, S_lim):
-                            S_idx = S - self.num_inactive_spin_orbs
+                        for S in range(self.num_spin_orbs_NES + self.num_inactive_spin_orbs, S_lim):
+                            S_idx = S - self.num_inactive_spin_orbs - self.num_spin_orbs_NES
                             val = generalized_expectation_value(
                                 self.ci_coeffs,
                                 [
@@ -693,6 +882,8 @@ class GeneralizedWaveFunctionUPS:
         Returns:
             Electronic energy.
         """
+        NES = self.num_spin_orbs_NES
+
         if self._energy_elec is None:
             self._energy_elec = generalized_expectation_value_energy(
                 self.ci_coeffs,
@@ -702,7 +893,7 @@ class GeneralizedWaveFunctionUPS:
                 #         self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs
                 #     )
                 # ],
-                [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
+                [DHF_hamiltonian_full_space(self.h_mo[NES:,NES:], self.g_mo[NES:,NES:,NES:,NES:], self.num_spin_orbs_NES)],
                 self.ci_coeffs,
                 self.ci_info,
             )
@@ -829,6 +1020,175 @@ class GeneralizedWaveFunctionUPS:
                 break
             e_old = e_new
         self._energy_elec = e_new
+    
+    def run_wf_optimization_2step_DHF(
+        self,
+        optimizer_name: str,
+        orbital_optimization: bool = False,
+        tol: float = 1e-10,
+        maxiter: int = 1000,
+        is_silent_subiterations: bool = False,
+    ) -> None:
+        """Run two step optimization of wave function.
+
+        Args:
+            optimizer_name: Name of optimizer.
+            orbital_optimization: Perform orbital optimization.
+            tol: Convergence tolerance.
+            maxiter: Maximum number of iterations.
+            is_silent_subiterations: Silence subiterations.
+        """
+        print("### Parameters information:")
+        if orbital_optimization:
+            print(f"### Number kappa: {len(self.kappa_real) + len(self.kappa_real_ep)}")
+        print(f"### Number theta: {self.ups_layout.n_params}")
+        e_old = 1e12
+        print("Full optimization")
+        print("Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #")
+        for full_iter in range(0, int(maxiter)):
+            full_start = time.time()
+            if len(self.thetas) != 0:
+                # Do ansatz optimization
+                if not is_silent_subiterations:
+                    print("--------Ansatz optimization")
+                    print(
+                        "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
+                    )
+                energy_theta = partial(
+                    self._calc_energy_optimization,
+                    theta_optimization=True,
+                    kappa_optimization=False,
+                )
+                gradient_theta = partial(
+                    self._calc_gradient_optimization,
+                    theta_optimization=True,
+                    kappa_optimization=False,
+                )
+                optimizer = Optimizers(
+                    energy_theta,
+                    optimizer_name,
+                    grad=gradient_theta,
+                    maxiter=maxiter,
+                    tol=tol,
+                    is_silent=is_silent_subiterations,
+                    energy_eval_callback=lambda: self.num_energy_evals,
+                )
+                self._old_opt_parameters = np.zeros(2*len(self.thetas), dtype=np.float64) + 10**20
+                self._E_opt_old = 0.0
+                thetas = self.thetas_real + self.thetas_imag
+                res = optimizer.minimize(
+                    thetas,
+                    extra_options={"R": self.ups_layout.grad_param_R, "param_names": self.ups_layout.param_names},
+                )
+                thetas_r = []
+                thetas_i = []
+                for i in range(len(self.thetas)):
+                    thetas_r.append(res.x[i])
+                    thetas_i.append(res.x[i + len(self.thetas)])
+                self.set_thetas(thetas_r, thetas_i)
+
+            # Electronic 
+            if orbital_optimization and len(self.kappa_real) != 0:
+                if not is_silent_subiterations:
+                    print("--------Orbital optimization e-e")
+                    print(
+                        "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
+                    )
+                energy_ee = partial(
+                    self._calc_energy_optimization_DHF,
+                    theta_optimization=False,
+                    kappa_ee_optimization=True,
+                    kappa_ep_optimization=False,
+                )
+                gradient_ee = partial(
+                    self._calc_gradient_optimization_DHF,
+                    theta_optimization=False,
+                    kappa_ee_optimization=True,
+                    kappa_ep_optimization=False,
+                )
+
+                optimizer = Optimizers(
+                    energy_ee,
+                    optimizer_name,
+                    grad=gradient_ee,
+                    maxiter=maxiter,
+                    tol=tol,
+                    is_silent=is_silent_subiterations,
+                    energy_eval_callback=lambda: self.num_energy_evals,
+                )
+
+                self._old_opt_parameters = np.zeros(2 * len(self.kappa_spin_idx), dtype=np.float64) + 10**20
+                self._E_opt_old = 0.0
+                parameters = np.zeros(2 * len(self.kappa_real), dtype=float).tolist()
+                res = optimizer.minimize(parameters)
+                for i in range(len(self.kappa_real)):
+                    self._kappa_real[i] = 0.0
+                    self._kappa_imag[i] = 0.0
+                    self._kappa_real_old[i] = 0.0
+                    self._kappa_imag_old[i] = 0.0
+
+
+                # Positronic
+                if not is_silent_subiterations:
+                    print("--------Orbital optimization e-p")
+                    print(
+                        "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
+                    )
+                energy_ep = partial(
+                    self._calc_energy_optimization_DHF,
+                    theta_optimization=False,
+                    kappa_ep_optimization=True,
+                    kappa_ee_optimization=False,
+                )
+                gradient_ep = partial(
+                    self._calc_gradient_optimization_DHF,
+                    theta_optimization=False,
+                    kappa_ep_optimization=True,
+                    kappa_ee_optimization=False,
+                )
+
+                optimizer = Optimizers(
+                    energy_ep,
+                    #"SLSQP",
+                    optimizer_name,
+                    grad=gradient_ep,
+                    maxiter=maxiter,
+                    tol=tol,
+                    is_silent=is_silent_subiterations,
+                    energy_eval_callback=lambda: self.num_energy_evals,
+                    #options={"maxls": 5},
+                    #bounds = [(-0.02, 0.02)] * 2 * len(self.kappa_real_ep),
+                )
+
+                self._old_opt_parameters = np.zeros(2 * len(self.kappa_spin_idx_ep), dtype=np.float64) + 10**20
+                self._E_opt_old = 0.0
+                parameters = np.zeros(2 * len(self.kappa_real_ep), dtype=float).tolist()
+                res = optimizer.minimize(parameters)
+                for i in range(len(self.kappa_real_ep)):
+                    self._kappa_real_ep[i] = 0.0
+                    self._kappa_imag_ep[i] = 0.0
+                    self._kappa_real_old_ep[i] = 0.0
+                    self._kappa_imag_old_ep[i] = 0.0
+            else:
+                # If there is no orbital optimization, then the algorithm is already converged.
+                e_new = res.fun
+                if orbital_optimization and len(self.kappa_real) == 0:
+                    print(
+                        "WARNING: No orbital optimization performed, because there is no non-redundant orbital parameters."
+                    )
+                break
+
+            e_new = res.fun
+            time_str = f"{time.time() - full_start:7.2f}"
+            e_str = f"{e_new:3.12f}"
+            print(
+                f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {str(self.num_energy_evals).center(11)}"
+            )
+            if abs(e_new - e_old) < tol:
+                break
+            e_old = e_new
+        self._energy_elec = e_new
+
 
     def run_wf_optimization_1step(
         self,
@@ -1042,8 +1402,8 @@ class GeneralizedWaveFunctionUPS:
                 f"{str(iteration + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {grad_str.center(19)} | {excitation_pool_type[max_arg]}{tuple([int(x) for x in excitation_pool[max_arg]])}"
             )
 
-    def _calc_energy_optimization(
-        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
+    def _calc_energy_optimization_DHF(
+        self, parameters: list[float], theta_optimization: bool, kappa_ee_optimization: bool, kappa_ep_optimization : bool, 
     ) -> float:
         """Calculate electronic energy.
 
@@ -1060,7 +1420,7 @@ class GeneralizedWaveFunctionUPS:
         if np.max(np.abs(np.array(self._old_opt_parameters) - np.array(parameters))) < 10**-14:
             return self._E_opt_old
         num_kappa = 0
-        if kappa_optimization:
+        if kappa_ee_optimization:
             num_kappa = 2 * len(self.kappa_spin_idx)
             kappa_r = []
             kappa_i = []
@@ -1068,6 +1428,14 @@ class GeneralizedWaveFunctionUPS:
                 kappa_r.append(parameters[i])
                 kappa_i.append(parameters[i + len(self.kappa_real)])
             self.set_kappa_cep(kappa_r, kappa_i)
+        if kappa_ep_optimization:
+            num_kappa = 2 * len(self.kappa_spin_idx_ep)
+            kappa_r = []
+            kappa_i = []
+            for i in range(len(self.kappa_real_ep)):
+                kappa_r.append(parameters[i])
+                kappa_i.append(parameters[i + len(self.kappa_real_ep)])
+            self.set_kappa_cep_ep(kappa_r, kappa_i)
         if theta_optimization:
             thetas_r = []
             thetas_i = []
@@ -1075,30 +1443,34 @@ class GeneralizedWaveFunctionUPS:
                 thetas_r.append(parameters[i + num_kappa])
                 thetas_i.append(parameters[i + num_kappa + len(self.thetas)])
             self.set_thetas(thetas_r, thetas_i)
-        if kappa_optimization:
+        if kappa_ee_optimization:
             # RDM is more expensive than evaluation of the Hamiltonian.
             # Thus only construct these if orbital-optimization is turned on,
             # since the RDMs will be reused in the oo gradient calculation.
             E = get_electronic_energy_generalized(
-                self.h_mo[self.num_spin_orbs_PES:,self.num_spin_orbs_PES:],
-                self.g_mo[self.num_spin_orbs_PES:,self.num_spin_orbs_PES:,self.num_spin_orbs_PES:,self.num_spin_orbs_PES:],
-                self.num_spin_orbs_PES,
+                self.h_mo,
+                self.g_mo,
+                self.num_spin_orbs_NES,
                 self.num_inactive_spin_orbs,
                 self.num_active_spin_orbs,
                 self.rdm1,
                 self.rdm2,
-            )
-            '''E = generalized_expectation_value_energy(
-                self.ci_coeffs,
-                # [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
-                [generalized_hamiltonian_full_space(self.h_mo[self.num_spin_orbs_PES:,self.num_spin_orbs_PES:],
-                                                    self.g_mo[self.num_spin_orbs_PES:,self.num_spin_orbs_PES:,
-                                                              self.num_spin_orbs_PES:,self.num_spin_orbs_PES:],
-                                                    self.num_spin_orbs_PES)],
-                self.ci_coeffs,
-                self.ci_info,
-            )'''
-        else:
+            ) 
+        if kappa_ep_optimization:
+            # RDM is more expensive than evaluation of the Hamiltonian.
+            # Thus only construct these if orbital-optimization is turned on,
+            # since the RDMs will be reused in the oo gradient calculation.
+            E = -get_electronic_energy_generalized(
+                self.h_mo_ep,
+                self.g_mo_ep,
+                self.num_spin_orbs_NES,
+                self.num_inactive_spin_orbs,
+                self.num_active_spin_orbs,
+                self.rdm1,
+                self.rdm2,
+            ) 
+            print("E", E)
+        if theta_optimization:
             E = generalized_expectation_value_energy(
                 self.ci_coeffs,
                 # [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
@@ -1111,8 +1483,8 @@ class GeneralizedWaveFunctionUPS:
         self.num_energy_evals += 1  # count one measurement
         return E.real
 
-    def _calc_gradient_optimization(
-        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
+    def _calc_gradient_optimization_DHF(
+        self, parameters: list[float], theta_optimization: bool, kappa_ee_optimization: bool, kappa_ep_optimization: bool,
     ) -> np.ndarray:
         """Calculate electronic gradient.
 
@@ -1126,7 +1498,7 @@ class GeneralizedWaveFunctionUPS:
         """
         gradient = np.zeros(len(parameters), dtype=np.float64)
         num_kappa = 0
-        if kappa_optimization:
+        if kappa_ee_optimization:
             num_kappa = 2 * len(self.kappa_spin_idx)
             kappa_r = []
             kappa_i = []
@@ -1134,6 +1506,14 @@ class GeneralizedWaveFunctionUPS:
                 kappa_r.append(parameters[i])
                 kappa_i.append(parameters[i + len(self.kappa_real)])
             self.set_kappa_cep(kappa_r, kappa_i)
+        if kappa_ep_optimization:
+            num_kappa = 2 * len(self.kappa_spin_idx_ep)
+            kappa_r = []
+            kappa_i = []
+            for i in range(len(self.kappa_real_ep)):
+                kappa_r.append(parameters[i])
+                kappa_i.append(parameters[i + len(self.kappa_real_ep)])
+            self.set_kappa_cep_ep(kappa_r, kappa_i)
         if theta_optimization:
             thetas_r = []
             thetas_i = []
@@ -1141,17 +1521,45 @@ class GeneralizedWaveFunctionUPS:
                 thetas_r.append(parameters[i + num_kappa])
                 thetas_i.append(parameters[i + num_kappa + len(self.thetas)])
             self.set_thetas(thetas_r, thetas_i)
-        if kappa_optimization:
+        if kappa_ee_optimization:
             gradient[:num_kappa] = get_orbital_gradient_generalized_real_imag(
                 self.h_mo,
                 self.g_mo,
                 self.kappa_spin_idx,
-                self.num_spin_orbs_PES,
+                self.num_spin_orbs_NES,
                 self.num_inactive_spin_orbs,
                 self.num_active_spin_orbs,
                 self.rdm1,
                 self.rdm2,
             )
+        if kappa_ep_optimization:
+            gradient[:num_kappa] = get_orbital_gradient_generalized_real_imag(
+                self.h_mo_ep,
+                self.g_mo_ep,
+                self.kappa_spin_idx_ep,
+                self.num_spin_orbs_NES,
+                self.num_inactive_spin_orbs,
+                self.num_active_spin_orbs,
+                self.rdm1,
+                self.rdm2,
+            )
+            print("gradient", np.max(np.abs(gradient[:num_kappa])))
+        
+            # for idx, (M, N) in enumerate(self.kappa_spin_idx):
+            #     if M < self.num_spin_orbs_NES:
+            #         print(gradient[idx])
+
+            # print(gradient[:num_kappa])
+
+            # gradient[:num_kappa] = get_orbital_gradient_expvalue_real_imag(
+            #     self.ci_coeffs,
+            #     self.ci_info,
+            #     self.h_mo[size:,size:],
+            #     self.g_mo[size:,size:,size:,size:],
+            #     self.num_spin_orbs_NES,
+            #     self.kappa_spin_idx,
+            # )
+
         if theta_optimization:
             # Hamiltonian = generalized_hamiltonian_0i_0a(
             #    self.h_mo,
@@ -1159,10 +1567,12 @@ class GeneralizedWaveFunctionUPS:
             #    self.num_inactive_spin_orbs,
             #    self.num_active_spin_orbs,
             # )
-            Hamiltonian = generalized_hamiltonian_full_space(
-                self.h_mo,
-                self.g_mo,
-                self.num_spin_orbs,
+            size = self.num_spin_orbs_NES
+
+            Hamiltonian = DHF_hamiltonian_full_space(
+                self.h_mo[size:,size:],
+                self.g_mo[size:,size:,size:,size:],
+                self.num_spin_orbs_NES,
             )
             # Reference bra state (no differentiations)
             bra_vec = generalized_propagate_state(
@@ -1214,6 +1624,208 @@ class GeneralizedWaveFunctionUPS:
             self.num_energy_evals += 2 * np.sum(
                 list(self.ups_layout.grad_param_R.values())
             )  # Count energy measurements for all gradients
+            #print(np.max(np.abs(gradient)))
+        return gradient
+
+    def _calc_energy_optimization(
+        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
+    ) -> float:
+        """Calculate electronic energy.
+
+        Args:
+            parameters: Ansatz and orbital rotation parameters.
+            theta_optimization: If used in theta optimization.
+            kappa_optimization: If used in kappa optimization.
+
+        Returns:
+            Electronic energy.
+        """
+        # Avoid recalculating energy in callback
+        # print(self._old_opt_parameters, parameters)
+        if np.max(np.abs(np.array(self._old_opt_parameters) - np.array(parameters))) < 10**-14:
+            return self._E_opt_old
+        num_kappa = 0
+        if kappa_optimization:
+            num_kappa = 2 * len(self.kappa_spin_idx)
+            kappa_r = []
+            kappa_i = []
+            for i in range(len(self.kappa_real)):
+                kappa_r.append(parameters[i])
+                kappa_i.append(parameters[i + len(self.kappa_real)])
+            self.set_kappa_cep(kappa_r, kappa_i)
+        if theta_optimization:
+            thetas_r = []
+            thetas_i = []
+            for i in range(len(self.thetas)):
+                thetas_r.append(parameters[i + num_kappa])
+                thetas_i.append(parameters[i + num_kappa + len(self.thetas)])
+            self.set_thetas(thetas_r, thetas_i)
+        if kappa_optimization:
+            # RDM is more expensive than evaluation of the Hamiltonian.
+            # Thus only construct these if orbital-optimization is turned on,
+            # since the RDMs will be reused in the oo gradient calculation.
+            NES = self.num_spin_orbs_NES 
+
+            E1 = get_electronic_energy_generalized(
+                self.h_mo,
+                self.g_mo,
+                self.num_spin_orbs_NES,
+                self.num_inactive_spin_orbs,
+                self.num_active_spin_orbs,
+                self.rdm1,
+                self.rdm2,
+            ) 
+
+            # E2 = generalized_expectation_value_energy(
+            #     self.ci_coeffs,
+            #     # [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
+            #     [DHF_hamiltonian_full_space(self.h_mo[NES:,NES:], self.g_mo[NES:,NES:,NES:,NES:], self.num_spin_orbs_NES)],
+            #     self.ci_coeffs,
+            #     self.ci_info,
+            # )
+            E = E1
+            #E = 2*E1-E2
+            #E = E2
+            #print(E)
+            #print(E2)
+        else:
+            NES = self.num_spin_orbs_NES 
+            E = generalized_expectation_value_energy(
+                self.ci_coeffs,
+                # [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
+                [DHF_hamiltonian_full_space(self.h_mo[NES:,NES:], self.g_mo[NES:,NES:,NES:,NES:], self.num_spin_orbs_NES)],
+                self.ci_coeffs,
+                self.ci_info,
+            )
+        self._E_opt_old = E.real
+        self._old_opt_parameters = np.copy(parameters)
+        self.num_energy_evals += 1  # count one measurement
+        return E.real
+
+    def _calc_gradient_optimization(
+        self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
+    ) -> np.ndarray:
+        """Calculate electronic gradient.
+
+        Args:
+            parameters: Ansatz and orbital rotation parameters.
+            theta_optimization: If used in theta optimization.
+            kappa_optimization: If used in kappa optimization.
+
+        Returns:
+            Electronic gradient.
+        """
+        gradient = np.zeros(len(parameters), dtype=np.float64)
+        num_kappa = 0
+        if kappa_optimization:
+            num_kappa = 2 * len(self.kappa_spin_idx)
+            kappa_r = []
+            kappa_i = []
+            for i in range(len(self.kappa_real)):
+                kappa_r.append(parameters[i])
+                kappa_i.append(parameters[i + len(self.kappa_real)])
+            self.set_kappa_cep(kappa_r, kappa_i)
+        if theta_optimization:
+            thetas_r = []
+            thetas_i = []
+            for i in range(len(self.thetas)):
+                thetas_r.append(parameters[i + num_kappa])
+                thetas_i.append(parameters[i + num_kappa + len(self.thetas)])
+            self.set_thetas(thetas_r, thetas_i)
+        if kappa_optimization:
+            size = self.num_spin_orbs_NES
+
+            gradient[:num_kappa] = get_orbital_gradient_generalized_real_imag(
+                self.h_mo,
+                self.g_mo,
+                self.kappa_spin_idx,
+                self.num_spin_orbs_NES,
+                self.num_inactive_spin_orbs,
+                self.num_active_spin_orbs,
+                self.rdm1,
+                self.rdm2,
+            )
+
+            # for idx, (M, N) in enumerate(self.kappa_spin_idx):
+            #     if M < self.num_spin_orbs_NES:
+            #         print(gradient[idx])
+
+            # print(gradient[:num_kappa])
+
+            # gradient[:num_kappa] = get_orbital_gradient_expvalue_real_imag(
+            #     self.ci_coeffs,
+            #     self.ci_info,
+            #     self.h_mo[size:,size:],
+            #     self.g_mo[size:,size:,size:,size:],
+            #     self.num_spin_orbs_NES,
+            #     self.kappa_spin_idx,
+            # )
+
+        if theta_optimization:
+            # Hamiltonian = generalized_hamiltonian_0i_0a(
+            #    self.h_mo,
+            #    self.g_mo,
+            #    self.num_inactive_spin_orbs,
+            #    self.num_active_spin_orbs,
+            # )
+            size = self.num_spin_orbs_NES
+
+            Hamiltonian = DHF_hamiltonian_full_space(
+                self.h_mo[size:,size:],
+                self.g_mo[size:,size:,size:,size:],
+                self.num_spin_orbs_NES,
+            )
+            # Reference bra state (no differentiations)
+            bra_vec = generalized_propagate_state(
+                [Hamiltonian],
+                self.ci_coeffs,
+                self.ci_info,
+            )
+            # Reference ket state (no differentiations)
+            bra_vec = generalized_construct_ups_state_test_erik(
+                bra_vec,
+                self.ci_info,
+                self.thetas,
+                self.ups_layout,
+                dagger=True,
+            )
+            # CSF reference state on ket
+            ket_vec = np.copy(self.csf_coeffs)
+            # Calculate analytical derivative w.r.t. each theta using gradient_action function
+            for i in range(len(self.thetas)):
+                # Remove the i-th U^dagger from bra_vec.
+                # The effect of this unitary will be included from the derivative added to ket_vec.
+                bra_vec = generalized_propagate_unitary_test_anna(
+                    bra_vec,
+                    i,
+                    self.ci_info,
+                    self.thetas,
+                    self.ups_layout,
+                )
+                # Derivative action w.r.t. i-th theta on CSF ket
+                ket_vec_tmp_R, ket_vec_tmp_I = generalized_get_grad_action(
+                    ket_vec,
+                    i,
+                    self.ci_info,
+                    self.thetas,
+                    self.ups_layout,
+                )
+                gradient[i + num_kappa] += 2*np.matmul(bra_vec.conj(), ket_vec_tmp_R).real
+                gradient[i + num_kappa + len(self.thetas)] += 2*np.matmul(bra_vec.conj(), ket_vec_tmp_I).real
+               
+                # Product rule implications on reference bra and CSF ket
+                # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
+                ket_vec = generalized_propagate_unitary_test_anna(
+                    ket_vec,
+                    i,
+                    self.ci_info,
+                    self.thetas,
+                    self.ups_layout,
+                )
+            self.num_energy_evals += 2 * np.sum(
+                list(self.ups_layout.grad_param_R.values())
+            )  # Count energy measurements for all gradients
+            #print(np.max(np.abs(gradient)))
         return gradient
 
     def get_gradient_finite_diff_theta(self,
