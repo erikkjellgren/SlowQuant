@@ -248,8 +248,8 @@ class FermionicOperator:
         if type(fermistring) in (float, int):
             # The name fermistring is misleading here.
             operators = {
-                op: fac * fermistring for op, fac in operators.items() if abs(fac * fermistring) >= 1e-14
-            }  # type: ignore
+                op: fac * fermistring for op, fac in self.operators.items() if abs(fac * fermistring) >= 1e-14 # type: ignore
+            }
         elif type(fermistring) is FermionicOperator:
             operators = defaultdict(float)
             # Iterate over all strings in both FermionicOperators
