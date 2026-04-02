@@ -441,7 +441,9 @@ def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bo
         # When screening determinants,
         # no need to consider the annihilation index of an
         # operator that has the same creation index.
-        create_screen = np.array([idx for idx in fermi_label[0] if idx not in set(fermi_label[1])], dtype=np.int64)
+        create_screen = np.array(
+            [idx for idx in fermi_label[0] if idx not in set(fermi_label[1])], dtype=np.int64
+        )
         a_string = np.concatenate((anni_idx, create_idx))
         op_mat = add_operator_matrix(
             op_mat,
@@ -556,7 +558,9 @@ def propagate_state(
                     # When screening determinants,
                     # no need to consider the annihilation index of an
                     # operator that has the same creation index.
-                    anni_screen = np.array([idx for idx in fermi_label[1] if idx not in set(fermi_label[0])], dtype=np.int64)
+                    anni_screen = np.array(
+                        [idx for idx in fermi_label[1] if idx not in set(fermi_label[0])], dtype=np.int64
+                    )
                     a_string = np.concatenate((create_idx, anni_idx))
                     tmp_state = apply_operator_threaded(
                         new_state,
@@ -579,7 +583,9 @@ def propagate_state(
                     # When screening determinants,
                     # no need to consider the annihilation index of an
                     # operator that has the same creation index.
-                    create_screen = np.array([idx for idx in fermi_label[0] if idx not in set(fermi_label[1])], dtype=np.int64)
+                    create_screen = np.array(
+                        [idx for idx in fermi_label[0] if idx not in set(fermi_label[1])], dtype=np.int64
+                    )
                     a_string = np.concatenate((anni_idx, create_idx))
                     tmp_state = apply_operator_serial(
                         new_state,
@@ -686,7 +692,9 @@ def propagate_state_SA(
                     # When screening determinants,
                     # no need to consider the annihilation index of an
                     # operator that has the same creation index.
-                    anni_screen = np.array([idx for idx in fermi_label[1] if idx not in set(fermi_label[0])], dtype=np.int64)
+                    anni_screen = np.array(
+                        [idx for idx in fermi_label[1] if idx not in set(fermi_label[0])], dtype=np.int64
+                    )
                     a_string = np.concatenate((create_idx, anni_idx))
                     tmp_state = apply_operator_SA_threaded(
                         new_state,
@@ -709,7 +717,9 @@ def propagate_state_SA(
                     # When screening determinants,
                     # no need to consider the annihilation index of an
                     # operator that has the same creation index.
-                    create_screen = np.array([idx for idx in fermi_label[0] if idx not in set(fermi_label[1])], dtype=np.int64)
+                    create_screen = np.array(
+                        [idx for idx in fermi_label[0] if idx not in set(fermi_label[1])], dtype=np.int64
+                    )
                     a_string = np.concatenate((anni_idx, create_idx))
                     tmp_state = apply_operator_SA_serial(
                         new_state,

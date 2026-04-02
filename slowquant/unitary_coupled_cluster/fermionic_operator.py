@@ -27,38 +27,6 @@ def operator_to_qiskit_key(
     return op_key[1:]
 
 
-def nondagger_dagger_sort(
-    fermistring: list[int],
-    daggers: list[bool],
-    phase: int,
-) -> Generator[tuple[list[int], list[int], int], None, None]:
-    """Reorder fermionic operator string using insertion-sort logic."""
-    for i in range(0, len(fermistring)):
-        j = i
-        while j > 0 and (not daggers[j - 1] and daggers[j]):
-            if fermistring[j - 1] == fermistring[j]: # Annihilation / Creation
-                new_op = fermistring[: j - 1] + fermistring[j + 1 :]
-                new_daggers = daggers[: j - 1] + daggers[j + 1 :]
-                yield from nondagger_dagger_sort(new_op, new_daggers, phase)
-            fermistring[j - 1], fermistring[j] = fermistring[j], fermistring[j - 1]
-            daggers[j - 1], daggers[j] = daggers[j], daggers[j - 1]
-            phase *= -1
-            j -= 1
-    num_daggers = sum(daggers)
-    yield fermistring[:num_daggers], fermistring[num_daggers:], phase
-
-
-def insertion_sort(indices: list[int]) -> tuple[list[int], int]:
-    phase = 1
-    for i in range(1, len(indices)):
-        j = i
-        while j > 0 and indices[j] > indices[j - 1]:
-            indices[j], indices[j - 1] = indices[j - 1], indices[j]
-            phase *= -1
-            j -= 1
-    return indices, phase
-
-
 def do_product_extended_normal_ordering(
     fermistring1: tuple[tuple[int, ...], tuple[int, ...]],
     fermistring2: tuple[tuple[int, ...], tuple[int, ...]],
@@ -91,15 +59,52 @@ def do_product_extended_normal_ordering(
             if len(fermistring1[1]) % 2 != 0 and len(fermistring2[0]) % 2 != 0:
                 # Only phase change if both are an odd lenght.
                 phase *= -1
-            dagger_list, phase_fac = insertion_sort([*fermistring1[0], *fermistring2[0]])
-            phase *= phase_fac
-            nondagger_list, phase_fac = insertion_sort([*fermistring1[1], *fermistring2[1]])
-            phase *= phase_fac
+            # sort the dagger part
+            dagger_list = [*fermistring1[0], *fermistring2[0]]
+            # Doing insertion sort
+            for i in range(1, len(dagger_list)):
+                j = i
+                while j > 0 and dagger_list[j] > dagger_list[j - 1]:
+                    dagger_list[j], dagger_list[j - 1] = dagger_list[j - 1], dagger_list[j]
+                    phase *= -1
+                    j -= 1
+            # sort non-dagger part
+            nondagger_list = [*fermistring1[1], *fermistring2[1]]
+            # Doing insertion sort
+            for i in range(1, len(nondagger_list)):
+                j = i
+                while j > 0 and nondagger_list[j] > nondagger_list[j - 1]:
+                    nondagger_list[j], nondagger_list[j - 1] = nondagger_list[j - 1], nondagger_list[j]
+                    phase *= -1
+                    j -= 1
             yield (tuple(dagger_list), tuple(nondagger_list)), phase
     else:
-        fermistring = [*fermistring1[1], *fermistring2[0]]
-        daggers = [False] * len(fermistring1[1]) + [True] * len(fermistring2[0])
-        for dagger_tmp, nondagger_tmp, phase in nondagger_dagger_sort(fermistring, daggers, 1):
+        stack: list[tuple[list[int], list[bool], int]] = [
+            (
+                [*fermistring1[1], *fermistring2[0]],
+                [False] * len(fermistring1[1]) + [True] * len(fermistring2[0]),
+                1,
+            )
+        ]
+        while stack:
+            next_string, next_dagger, phase = stack.pop()
+            for i in range(0, len(next_string)):
+                j = i
+                while j > 0 and (not next_dagger[j - 1] and next_dagger[j]):
+                    if next_string[j - 1] == next_string[j]:  # Annihilation / Creation
+                        stack.append(
+                            (
+                                next_string[: j - 1] + next_string[j + 1 :],
+                                next_dagger[: j - 1] + next_dagger[j + 1 :],
+                                phase,
+                            )
+                        )
+                    next_string[j - 1], next_string[j] = next_string[j], next_string[j - 1]
+                    next_dagger[j - 1], next_dagger[j] = next_dagger[j], next_dagger[j - 1]
+                    phase *= -1
+                    j -= 1
+            num_daggers = sum(next_dagger)
+            dagger_tmp, nondagger_tmp = next_string[:num_daggers], next_string[num_daggers:]
             dagger_tmp_set = set(dagger_tmp)
             nondagger_tmp_set = set(nondagger_tmp)
             if not dagger1_set.isdisjoint(dagger_tmp_set):
@@ -108,10 +113,24 @@ def do_product_extended_normal_ordering(
             elif not nondagger_tmp_set.isdisjoint(nondagger2_set):
                 # Same index annihilation operator.
                 continue
-            dagger_list, phase_fac = insertion_sort([*fermistring1[0], *dagger_tmp])
-            phase *= phase_fac
-            nondagger_list, phase_fac = insertion_sort([*nondagger_tmp, *fermistring2[1]])
-            phase *= phase_fac
+            # sort the dagger part
+            dagger_list = [*fermistring1[0], *dagger_tmp]
+            # Doing insertion sort
+            for i in range(1, len(dagger_list)):
+                j = i
+                while j > 0 and dagger_list[j] > dagger_list[j - 1]:
+                    dagger_list[j], dagger_list[j - 1] = dagger_list[j - 1], dagger_list[j]
+                    phase *= -1
+                    j -= 1
+            # sort non-dagger part
+            nondagger_list = [*nondagger_tmp, *fermistring2[1]]
+            # Doing insertion sort
+            for i in range(1, len(nondagger_list)):
+                j = i
+                while j > 0 and nondagger_list[j] > nondagger_list[j - 1]:
+                    nondagger_list[j], nondagger_list[j - 1] = nondagger_list[j - 1], nondagger_list[j]
+                    phase *= -1
+                    j -= 1
             yield (tuple(dagger_list), tuple(nondagger_list)), phase
 
 
@@ -257,7 +276,7 @@ class FermionicOperator:
                 self.operators[op_key] *= fermistring  # type: ignore
             self.operators = {op: fac for op, fac in self.operators.items() if abs(fac) >= 1e-14}
         elif type(fermistring) is FermionicOperator:
-            operators = defaultdict(float)
+            operators: dict[tuple[tuple[int, ...], tuple[int, ...]], float] = defaultdict(float)
             # Iterate over all strings in both FermionicOperators
             for op_key1, fac1 in fermistring.operators.items():
                 for op_key2, fac2 in self.operators.items():
@@ -294,16 +313,26 @@ class FermionicOperator:
 
     @property
     def dagger(self) -> FermionicOperator:
-        """Complex conjugation of fermionic operator.
+        r"""Complex conjugation of fermionic operator.
+
+        After dagger'ing, the operator blocks need to be reversed.
+        This give a number phase change that follows a shifted triangular number sequence,
+
+        .. math::
+            \Gamma = (-1)^{(k(k-1)/2 + l(l-1)/2}
+
+        with :math:`k` being the number of creation and l the number of annihilation operators.
 
         Returns:
             New fermionic operator.
         """
         operators = {}
         for op_key, fac in self.operators.items():
-            dagger_op, phase1 = insertion_sort(list(op_key[1]))
-            nondagger_op, phase2 = insertion_sort(list(op_key[0]))
-            operators[(tuple(dagger_op), tuple(nondagger_op))] = fac * phase1 * phase2
+            k = len(op_key[1])
+            l = len(op_key[0])
+            phase_changes = (k * k - k + l * l - l) // 2
+            sign = 1.0 - 2.0 * (phase_changes & 1)
+            operators[(op_key[1][::-1], op_key[0][::-1])] = fac * sign
         return FermionicOperator(operators)
 
     @property
@@ -393,7 +422,7 @@ class FermionicOperator:
         Returns:
            Folded fermionic operator.
         """
-        operators = {}
+        operators: dict[tuple[tuple[int, ...], tuple[int, ...]], float] = {}
         inactive_idx = []
         active_idx = []
         virtual_idx = []
