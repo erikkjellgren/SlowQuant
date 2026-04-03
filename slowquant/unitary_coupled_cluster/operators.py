@@ -2,6 +2,7 @@ import numpy as np
 
 from slowquant.unitary_coupled_cluster.fermionic_operator import (
     FermionicOperator,
+    commutator_multiply,
 )
 
 
@@ -115,7 +116,7 @@ def commutator(A: FermionicOperator, B: FermionicOperator) -> FermionicOperator:
     Returns:
         Operator from commutator.
     """
-    return A * B - B * A
+    return commutator_multiply(A, B)
 
 
 def double_commutator(
@@ -124,13 +125,13 @@ def double_commutator(
     r"""Construct operator double commutator.
 
     .. math::
-        \left[\hat{A},\left[\hat{B},\hat{C}\right]\right] = \hat{A}\hat{B}\hat{C} - \hat{A}\hat{C}\hat{B} - \hat{B}\hat{C}\hat{A} + \hat{C}\hat{B}\hat{A}
+        \left[\hat{A},\left[\hat{B},\hat{C}\right]\right]
 
     or for the symmetrized version,
 
     .. math::
         \left[\hat{A},\hat{B},\hat{C}\right] =
-        \hat{A}\hat{H}\hat{B} + \hat{B}\hat{H}\hat{A} - \frac{1}{2}\left(\hat{A}\hat{B}\hat{H} + \hat{H}\hat{B}\hat{A} + \hat{B}\hat{A}\hat{H} + \hat{H}\hat{A}\hat{B}\right)
+        \frac{1}{2}\left(\left[\hat{A},\left[\hat{B},\hat{C}\right]\right] + \left[\left[\hat{A},\hat{B}\right],\hat{C}\right]\right)
 
     Args:
         A: Fermionic operator.
@@ -142,8 +143,8 @@ def double_commutator(
         Operator from double commutator.
     """
     if do_symmetrized:
-        return A * B * C + C * B * A - 1 / 2 * (A * C * B + B * C * A + C * A * B + B * A * C)
-    return A * B * C - A * C * B - B * C * A + C * B * A
+        return 1 / 2 * (commutator(A, commutator(B, C)) + commutator(commutator(A, B), C))
+    return commutator(A, commutator(B, C))
 
 
 def G1(i: int, a: int, return_anti_hermitian: bool = False) -> FermionicOperator:

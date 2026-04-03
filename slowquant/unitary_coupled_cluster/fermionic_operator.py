@@ -172,6 +172,163 @@ def do_product_extended_normal_ordering(
             yield (tuple(dagger_list), tuple(nondagger_list)), phase
 
 
+def do_product_extended_normal_ordering_rankreduction(
+    fermistring1: tuple[tuple[int, ...], tuple[int, ...]],
+    fermistring2: tuple[tuple[int, ...], tuple[int, ...]],
+    dagger1_set: set[int],
+    dagger2_set: set[int],
+    nondagger1_set: set[int],
+    nondagger2_set: set[int],
+) -> Generator[tuple[tuple[tuple[int, ...], tuple[int, ...]], int], None, None]:
+    """Generate all fermistrings from the product of two fermistrings with the assumption of rank reduction.
+
+    Takes as input two fermistrings that are already assumed to be sorted.
+    If a1 has no index overlap with c2, then strings are sorted as follows, then rank reduction cannot happen,
+    and the term is skipped.
+
+    If the annihilation part of fermstring1 has index overlap with the creation part of fermistring2,
+    then strings are sorted as follows,
+
+    x) Insertion sort a1 + c2, and keep track of contraction terms.
+       This gives new strings (cK, aK).
+
+    y) Screen out strings that have not been rank reduced.
+       Screen out string that give zero, if there is index overlap in a2 and aK, or, c1 and cK.
+
+    z) Create new strings of the form, ((c1 + cK, aK + a2)).
+       The strings 'c1 + cK' and 'aK + a2' are now sorted using insertion sort.
+
+    Args:
+        fermistring1: Left-side fermistring, tuple of creation string and annihilation string.
+        fermistring2: Right-side fermistring, tuple of creation string and annihilation string.
+        dagger1_set: Left-side dagger idx set.
+        dagger2_set: Right-side dagger idx set.
+        nondagger1_set: Left-side non-dagger idx set.
+        nondagger2_set: Right-side non-dagger idx set.
+
+    Returns:
+        Creation string, annihilation string, and, phase.
+    """
+    no_reduction = False
+    if nondagger1_set.isdisjoint(dagger2_set):
+        # If there is no overlap in indices, then there can be no rank reduction.
+        # The term can be skipped.
+        no_reduction = True
+    if not no_reduction:
+        op_middle_size = len(fermistring1[1]) + len(fermistring2[0])
+        # stack to keep track of contractions.
+        stack: list[tuple[list[int], list[bool], int]] = [
+            (
+                [*fermistring1[1], *fermistring2[0]],
+                [False] * len(fermistring1[1]) + [True] * len(fermistring2[0]),
+                1,
+            )
+        ]
+        while stack:
+            next_string, next_dagger, phase = stack.pop()
+            for i in range(0, len(next_string)):
+                j = i
+                while j > 0 and (not next_dagger[j - 1] and next_dagger[j]):
+                    if next_string[j - 1] == next_string[j]:  # Contraction
+                        stack.append(
+                            (
+                                next_string[: j - 1] + next_string[j + 1 :],
+                                next_dagger[: j - 1] + next_dagger[j + 1 :],
+                                phase,
+                            )
+                        )
+                    next_string[j - 1], next_string[j] = next_string[j], next_string[j - 1]
+                    next_dagger[j - 1], next_dagger[j] = next_dagger[j], next_dagger[j - 1]
+                    phase *= -1
+                    j -= 1
+            if len(next_string) == op_middle_size:
+                # Terms without rank reduction can be skipped, as they have to cancel each other.
+                continue
+            num_daggers = sum(next_dagger)
+            dagger_tmp, nondagger_tmp = next_string[:num_daggers], next_string[num_daggers:]
+            dagger_tmp_set = set(dagger_tmp)
+            nondagger_tmp_set = set(nondagger_tmp)
+            if not dagger1_set.isdisjoint(dagger_tmp_set):
+                # Same index creation operator.
+                continue
+            elif not nondagger_tmp_set.isdisjoint(nondagger2_set):
+                # Same index annihilation operator.
+                continue
+            # sort the dagger part
+            dagger_list = [*fermistring1[0], *dagger_tmp]
+            # Doing insertion sort, left-side part is already sorted.
+            # Hence not starting from 1.
+            for i in range(len(fermistring1[0]), len(dagger_list)):
+                j = i
+                while j > 0 and dagger_list[j] > dagger_list[j - 1]:
+                    dagger_list[j], dagger_list[j - 1] = dagger_list[j - 1], dagger_list[j]
+                    phase *= -1
+                    j -= 1
+            # sort non-dagger part
+            nondagger_list = [*nondagger_tmp, *fermistring2[1]]
+            # Doing insertion sort, left-side part is already sorted.
+            # Hence not starting from 1.
+            for i in range(len(nondagger_tmp), len(nondagger_list)):
+                j = i
+                while j > 0 and nondagger_list[j] > nondagger_list[j - 1]:
+                    nondagger_list[j], nondagger_list[j - 1] = nondagger_list[j - 1], nondagger_list[j]
+                    phase *= -1
+                    j -= 1
+            yield (tuple(dagger_list), tuple(nondagger_list)), phase
+
+
+def commutator_multiply(A: FermionicOperator, B: FermionicOperator) -> FermionicOperator:
+    r"""Calculates the commutator between two fermionic operators.
+
+    .. math::
+        \hat{O} = \left[\hat{A}, \hat{B}\right]
+
+    This function exploits that if either :math:`\hat{A}` or :math:`\hat{B}` has an even number of operators,
+    then rank reduction will happen.
+    All terms where len(O) = len(A) + len(B) can be screen out early.
+
+    Args:
+        A: Fermionic operator.
+        B: Fermionic operator.
+
+    Returns:
+        Resulting fermionic operator.
+    """
+    operators: dict[tuple[tuple[int, ...], tuple[int, ...]], float] = defaultdict(float)
+    # Iterate over all strings in both FermionicOperators
+    for op_key1, fac1 in B.operators.items():
+        dagger1_set, nondagger1_set = B.operator_sets(op_key1)
+        for op_key2, fac2 in A.operators.items():
+            fac = fac1 * fac2
+            if abs(fac) < 10**-14:
+                continue
+            dagger2_set, nondagger2_set = A.operator_sets(op_key2)
+            if (len(dagger1_set) + len(nondagger1_set)) % 2 == 0 or (
+                len(dagger2_set) + len(nondagger2_set)
+            ) % 2 == 0:
+                # If number of operators is even, then there is rank reduction.
+                for op_key, phase in do_product_extended_normal_ordering_rankreduction(
+                    op_key2, op_key1, dagger2_set, dagger1_set, nondagger2_set, nondagger1_set
+                ):
+                    operators[op_key] += fac * phase
+                for op_key, phase in do_product_extended_normal_ordering_rankreduction(
+                    op_key1, op_key2, dagger1_set, dagger2_set, nondagger1_set, nondagger2_set
+                ):
+                    operators[op_key] -= fac * phase
+            else:
+                # Default to normal multiplication.
+                for op_key, phase in do_product_extended_normal_ordering(
+                    op_key2, op_key1, dagger2_set, dagger1_set, nondagger2_set, nondagger1_set
+                ):
+                    operators[op_key] += fac * phase
+                for op_key, phase in do_product_extended_normal_ordering(
+                    op_key1, op_key2, dagger1_set, dagger2_set, nondagger1_set, nondagger2_set
+                ):
+                    operators[op_key] -= fac * phase
+    operators = {op: fac for op, fac in operators.items() if abs(fac) >= 1e-14}
+    return FermionicOperator(operators)
+
+
 class FermionicOperator:
     __slots__ = ("_operator_sets", "operators")
 
@@ -197,7 +354,7 @@ class FermionicOperator:
             raise ValueError(f"Could not assign operator of {type(annihilation_operator)}.")
 
     def operator_sets(self, key: tuple[tuple[int, ...], tuple[int, ...]]) -> tuple[set[int], set[int]]:
-        """Get set represtion of ferminonic string.
+        """Get set represtion of fermionic string.
 
         Args:
             key: Fermionic string.
@@ -306,9 +463,6 @@ class FermionicOperator:
                 operators[op_key] *= fermistring  # type: ignore
         elif type(fermistring) is FermionicOperator:
             operators = defaultdict(float)
-            operator_sets = {}
-            for op_key in self.operators:
-                operator_sets[op_key] = (set(op_key[0]), set(op_key[1]))
             # Iterate over all strings in both FermionicOperators
             for op_key1, fac1 in fermistring.operators.items():
                 dagger1_set, nondagger1_set = fermistring.operator_sets(op_key1)
