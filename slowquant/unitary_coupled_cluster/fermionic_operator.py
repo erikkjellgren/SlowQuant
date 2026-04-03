@@ -173,7 +173,7 @@ def do_product_extended_normal_ordering(
 
 
 class FermionicOperator:
-    __slots__ = ("operators","_operator_sets")
+    __slots__ = ("_operator_sets", "operators")
 
     def __init__(
         self,
@@ -190,11 +190,21 @@ class FermionicOperator:
         """
         if isinstance(annihilation_operator, dict):
             self.operators = annihilation_operator
-            self._operator_sets = None
+            self._operator_sets: (
+                dict[tuple[tuple[int, ...], tuple[int, ...]], tuple[set[int], set[int]]] | None
+            ) = None
         else:
             raise ValueError(f"Could not assign operator of {type(annihilation_operator)}.")
 
-    def operator_sets(self, key) -> tuple[set[int], set[int]]:
+    def operator_sets(self, key: tuple[tuple[int, ...], tuple[int, ...]]) -> tuple[set[int], set[int]]:
+        """Get set represtion of ferminonic string.
+
+        Args:
+            key: Fermionic string.
+
+        Returns:
+            Set of creation operators and set of annihilation operators.
+        """
         if self._operator_sets is None:
             self._operator_sets = {}
             for op_key in self.operators:
@@ -303,14 +313,15 @@ class FermionicOperator:
             for op_key1, fac1 in fermistring.operators.items():
                 dagger1_set, nondagger1_set = fermistring.operator_sets(op_key1)
                 for op_key2, fac2 in self.operators.items():
-                    if abs(fac1 * fac2) < 10**-14:
+                    fac = fac1 * fac2
+                    if abs(fac) < 10**-14:
                         continue
                     dagger2_set, nondagger2_set = self.operator_sets(op_key2)
                     # Build new strings and factors via normal ordering of product of two strings
                     for op_key, phase in do_product_extended_normal_ordering(
                         op_key2, op_key1, dagger2_set, dagger1_set, nondagger2_set, nondagger1_set
                     ):
-                        operators[op_key] += fac1 * fac2 * phase
+                        operators[op_key] += fac * phase
         else:
             raise TypeError(f"Got unknown type of fermistring: {type(fermistring)}")
         operators = {op: fac for op, fac in operators.items() if abs(fac) >= 1e-14}
@@ -336,14 +347,15 @@ class FermionicOperator:
             for op_key1, fac1 in fermistring.operators.items():
                 dagger1_set, nondagger1_set = fermistring.operator_sets(op_key1)
                 for op_key2, fac2 in self.operators.items():
-                    if abs(fac1 * fac2) < 10**-14:
+                    fac = fac1 * fac2
+                    if abs(fac) < 10**-14:
                         continue
                     dagger2_set, nondagger2_set = self.operator_sets(op_key2)
                     # Build new strings and factors via normal ordering of product of two strings
                     for op_key, phase in do_product_extended_normal_ordering(
                         op_key2, op_key1, dagger2_set, dagger1_set, nondagger2_set, nondagger1_set
                     ):
-                        operators[op_key] += fac1 * fac2 * phase
+                        operators[op_key] += fac * phase
             self.operators = {op: fac for op, fac in operators.items() if abs(fac) >= 1e-14}
             self._operator_sets = None
         else:
