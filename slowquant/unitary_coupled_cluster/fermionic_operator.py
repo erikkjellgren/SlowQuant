@@ -30,6 +30,10 @@ def operator_to_qiskit_key(
 def do_product_extended_normal_ordering(
     fermistring1: tuple[tuple[int, ...], tuple[int, ...]],
     fermistring2: tuple[tuple[int, ...], tuple[int, ...]],
+    dagger1_set: set[int],
+    dagger2_set: set[int],
+    nondagger1_set: set[int],
+    nondagger2_set: set[int],
 ) -> Generator[tuple[tuple[tuple[int, ...], tuple[int, ...]], int], None, None]:
     r"""Generate all fermistrings from the product of two fermistrings.
 
@@ -66,14 +70,14 @@ def do_product_extended_normal_ordering(
     Args:
         fermistring1: Left-side fermistring, tuple of creation string and annihilation string.
         fermistring2: Right-side fermistring, tuple of creation string and annihilation string.
+        dagger1_set: Left-side dagger idx set.
+        dagger2_set: Right-side dagger idx set.
+        nondagger1_set: Left-side non-dagger idx set.
+        nondagger2_set: Right-side non-dagger idx set.
 
     Returns:
         Creation string, annihilation string, and, phase.
     """
-    dagger1_set = set(fermistring1[0])
-    dagger2_set = set(fermistring2[0])
-    nondagger1_set = set(fermistring1[1])
-    nondagger2_set = set(fermistring2[1])
     if nondagger1_set.isdisjoint(dagger2_set):
         # No index overlap between non-dagger left-side and dagger right-side.
         is_zero = False
@@ -284,11 +288,17 @@ class FermionicOperator:
             operators = defaultdict(float)
             # Iterate over all strings in both FermionicOperators
             for op_key1, fac1 in fermistring.operators.items():
+                dagger1_set = set(op_key1[0])
+                nondagger1_set = set(op_key1[1])
                 for op_key2, fac2 in self.operators.items():
                     if abs(fac1 * fac2) < 10**-14:
                         continue
+                    dagger2_set = set(op_key2[0])
+                    nondagger2_set = set(op_key2[1])
                     # Build new strings and factors via normal ordering of product of two strings
-                    for op_key, phase in do_product_extended_normal_ordering(op_key2, op_key1):
+                    for op_key, phase in do_product_extended_normal_ordering(
+                        op_key2, op_key1, dagger2_set, dagger1_set, nondagger2_set, nondagger1_set
+                    ):
                         operators[op_key] += fac1 * fac2 * phase
         else:
             raise TypeError(f"Got unknown type of fermistring: {type(fermistring)}")
@@ -313,11 +323,17 @@ class FermionicOperator:
             operators: dict[tuple[tuple[int, ...], tuple[int, ...]], float] = defaultdict(float)
             # Iterate over all strings in both FermionicOperators
             for op_key1, fac1 in fermistring.operators.items():
+                dagger1_set = set(op_key1[0])
+                nondagger1_set = set(op_key1[1])
                 for op_key2, fac2 in self.operators.items():
                     if abs(fac1 * fac2) < 10**-14:
                         continue
+                    dagger2_set = set(op_key2[0])
+                    nondagger2_set = set(op_key2[1])
                     # Build new strings and factors via normal ordering of product of two strings
-                    for op_key, phase in do_product_extended_normal_ordering(op_key2, op_key1):
+                    for op_key, phase in do_product_extended_normal_ordering(
+                        op_key2, op_key1, dagger2_set, dagger1_set, nondagger2_set, nondagger1_set
+                    ):
                         operators[op_key] += fac1 * fac2 * phase
             self.operators = {op: fac for op, fac in operators.items() if abs(fac) >= 1e-14}
         else:
