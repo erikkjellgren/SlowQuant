@@ -17,7 +17,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     expectation_value,
     propagate_state,
 )
-from slowquant.unitary_coupled_cluster.operators import one_elec_op_0i_0a
+from slowquant.unitary_coupled_cluster.operators import double_commutator, one_elec_op_0i_0a
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
 
@@ -119,71 +119,23 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.rdm1,
             )
         for j, qJ in enumerate(self.q_ops):
-            Hq_ket = propagate_state([self.H_1i_1a * qJ], self.wf.ci_coeffs, *self.index_info)
-            qdH_ket = propagate_state([qJ.dagger * self.H_1i_1a], self.wf.ci_coeffs, *self.index_info)
             for i, GI in enumerate(self.G_ops):
-                G_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
-                Gd_ket = propagate_state([GI.dagger], self.wf.ci_coeffs, *self.index_info)
                 # Make A
-                # <0| Gd H q |0>
+                # <0| [GId, H, qJ] |0>
                 val = expectation_value(
-                    G_ket,
-                    [],
-                    Hq_ket,
+                    self.wf.ci_coeffs,
+                    [double_commutator(GI.dagger, self.H_1i_1a, qJ, do_symmetrized=True)],
+                    self.wf.ci_coeffs,
                     *self.index_info,
-                )
-                # - 1/2<0| H q Gd |0>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
-                        qdH_ket,
-                        [],
-                        Gd_ket,
-                        *self.index_info,
-                    )
-                )
-                # - 1/2<0| H Gd q |0>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [self.H_1i_1a * GI.dagger * qJ],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
                 )
                 self.A[i + idx_shift, j] = self.A[j, i + idx_shift] = val
                 # Make B
-                # <0| qd H Gd |0>
+                # <0| [GId, H, qJd] |0>
                 val = expectation_value(
-                    Hq_ket,
-                    [],
-                    Gd_ket,
+                    self.wf.ci_coeffs,
+                    [double_commutator(GI.dagger, self.H_1i_1a, qJ.dagger, do_symmetrized=True)],
+                    self.wf.ci_coeffs,
                     *self.index_info,
-                )
-                # - 1/2*<0| Gd qd H |0>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
-                        G_ket,
-                        [],
-                        qdH_ket,
-                        *self.index_info,
-                    )
-                )
-                # - 1/2*<0| qd Gd H |0>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [qJ.dagger * GI.dagger * self.H_1i_1a],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
                 )
                 self.B[i + idx_shift, j] = self.B[j, i + idx_shift] = val
         for j, GJ in enumerate(self.G_ops):
