@@ -2,7 +2,7 @@ import numpy as np
 import scipy
 
 from slowquant.qiskit_interface.circuit_wavefunction import WaveFunctionCircuit
-from slowquant.unitary_coupled_cluster.linear_response.solvers import Davidson
+from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.operators import (
     G3,
     G4,
@@ -42,8 +42,8 @@ class quantumLRBaseClass:
             wf.h_mo, wf.g_mo, wf.num_inactive_orbs, wf.num_active_orbs, wf.num_virtual_orbs
         )
 
-        self.G_ops = []
-        self.q_ops = []
+        self.G_ops: list[FermionicOperator] = []
+        self.q_ops: list[FermionicOperator] = []
         excitations = excitations.lower()
 
         if "s" in excitations:
@@ -303,52 +303,7 @@ class quantumLRBaseClass:
                                 + f" | {Sigma_row[nr]:3.6f}".center(10)
                             )
 
-    def _right_transform(self, trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Right transform for Davidson solver.
-
-        Args:
-            trial: Trial vectors.
-        """
-        raise NotImplementedError
-
-    def get_excitation_energies(self, n_roots: int = 0, solver_settings: dict | None = None) -> np.ndarray:
-        """Calculate excitation energies.
-
-        Args:
-            n_roots: Number of roots to calculate. If 0, calculate all roots.
-            solver_settings: Settings for the Davidson solver:
-                max_iteration: Maximum number of iterations.
-                tolerance: Convergence tolerance.
-                max_reduced_space: Maximum size of the reduced space.
-                is_silent: Whether to print convergence information.
-        """
-        if n_roots <= 0:
-            self._all_excitation_energies()
-        else:
-            solver = Davidson()
-            if solver_settings is None:
-                solver_settings = {}
-
-            # Temporary for precondition matrices
-            self.run()
-
-            self.excitation_energies, self.normed_response_vectors = (
-                solver.solve(
-                    self._right_transform,
-                    (np.diag(self.A), np.diag(self.Sigma)),
-                    max_iteration=solver_settings.get("max_iteration", 100),
-                    tolerance=solver_settings.get("tolerance", 1e-8),
-                    n_roots=n_roots,
-                    max_reduced_space=solver_settings.get("max_reduced_space", None),
-                    is_silent=solver_settings.get("is_silent", False),
-                )
-            )
-        return self.excitation_energies
-
-    def _all_excitation_energies(self) -> np.ndarray:
-        if not hasattr(self, "A") or not hasattr(self, "B") or not hasattr(self, "Sigma"):
-            self.run()
-
+    def get_excitation_energies(self) -> np.ndarray:
         """Solve LR eigenvalue problem."""
         # Build Hessian and Metric
         size = len(self.A)
