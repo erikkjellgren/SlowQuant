@@ -12,7 +12,6 @@ from slowquant.qiskit_interface.util import Clique
 from slowquant.unitary_coupled_cluster.density_matrix import (
     get_orbital_response_property_gradient,
 )
-from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.operators import (
     hamiltonian_2i_2a,
     one_elec_op_0i_0a,
@@ -121,106 +120,6 @@ class quantumLR(quantumLRBaseClass):
                 self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = (
                     GG_exp - (self._G_exp[i] * self._G_exp[j])
                 )
-
-    def _right_transform(self, trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Right transform for Davidson solver.
-
-        Args:
-            trial: Trial vectors.
-
-        Returns:
-            sigma_plus, sigma_minus, tau_minus as defined in the Davidson solver.
-        """
-        num_q = len(self.q_ops)
-        num_G = len(self.G_ops)
-        num_ops = num_q + num_G
-        n_roots = trial.shape[1]
-        kappas = trial[:num_q, :]
-        Ss = trial[num_q:, :]
-        sigma_plus = np.zeros((num_ops, n_roots))
-        sigma_minus = np.zeros((num_ops, n_roots))
-        tau_minus = np.zeros((num_ops, n_roots))
-        H_2i_2a = hamiltonian_2i_2a(
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-        )
-
-        # pre-calculate <0|G|0> and <0|HG|0>
-        self._G_exp = []
-        self._HG_exp = []
-        for GJ in self.G_ops:
-            self._G_exp.append(self.wf.QI.quantum_expectation_value(GJ.get_folded_operator(*self.orbs)))
-            self._HG_exp.append(
-                self.wf.QI.quantum_expectation_value((self.H_0i_0a * GJ).get_folded_operator(*self.orbs))
-            )
-
-        if num_q != 0:
-            for root in range(n_roots):
-
-                qs = FermionicOperator({})
-                for kappa, q in zip(kappas[:, root], self.q_ops):
-                    qs += kappa * q
-
-                # (A+B)_qq @ b_q
-                # (A-B)_qq @ b_q
-                # Sigma_qq @ b_q
-                for i, qi in enumerate(self.q_ops):
-                    val = self.wf.QI.quantum_expectation_value((qi.dagger * H_2i_2a * qs).get_folded_operator(*self.orbs))
-                    sigma_plus[i, root] += val
-                    sigma_minus[i, root] += val
-                    val = self.wf.QI.quantum_expectation_value((qi.dagger * qs).get_folded_operator(*self.orbs))
-                    sigma_plus[i, root] -= self.wf.energy_elec * val
-                    sigma_minus[i, root] -= self.wf.energy_elec * val
-                    tau_minus[i, root] += val
-
-                # (A+B)_Gq @ b_q
-                # (A-B)_Gq @ b_q
-                for i, GI in enumerate(self.G_ops):
-                    val = self.wf.QI.quantum_expectation_value((GI.dagger * self.H_1i_1a * qs).get_folded_operator(*self.orbs))
-                    sigma_plus[num_q + i, root] += val
-                    sigma_minus[num_q + i, root] += val
-
-                Gs = FermionicOperator({})
-                for S, G in zip(Ss[:, root], self.G_ops):
-                    Gs += S * G
-
-                # (A+B)_qG @ b_G
-                # (A-B)_qG @ b_G
-                for i, qi in enumerate(self.q_ops):
-                    val = self.wf.QI.quantum_expectation_value((Gs.dagger * self.H_1i_1a * qi).get_folded_operator(*self.orbs))
-                    sigma_plus[i, root] += val
-                    sigma_minus[i, root] += val
-
-        for root in range(n_roots):
-
-            Gs = FermionicOperator({})
-            for S, G in zip(Ss[:, root], self.G_ops):
-                Gs += S * G
-
-            Gsd_expect = sum(Ss[:, root] * self._G_exp)
-            GsdH_expect = sum(Ss[:, root] * self._HG_exp)
-
-            # (A+B)_GG @ b_G
-            # (A-B)_GG @ b_G
-            # Sigma_GG @ b_G
-            for i, GI in enumerate(self.G_ops):
-                val = self.wf.QI.quantum_expectation_value((GI.dagger * self.H_0i_0a * Gs).get_folded_operator(*self.orbs))
-                sigma_plus[num_q + i, root] += val
-                sigma_minus[num_q + i, root] += val
-                val = self.wf.QI.quantum_expectation_value((GI.dagger * Gs).get_folded_operator(*self.orbs))
-                sigma_plus[num_q + i, root] -= self.wf.energy_elec * val
-                sigma_minus[num_q + i, root] -= self.wf.energy_elec * val
-                tau_minus[num_q + i, root] += val
-
-                sigma_minus[num_q + i, root] += 2 * self.wf.energy_elec * self._G_exp[i] * Gsd_expect
-                sigma_minus[num_q + i, root] -= self._G_exp[i] * GsdH_expect
-                sigma_minus[num_q + i, root] -= self._HG_exp[i] * Gsd_expect
-                tau_minus[num_q + i, root] -= self._G_exp[i] * Gsd_expect
-
-        return sigma_plus, sigma_minus, tau_minus
 
     def _get_qbitmap(
         self,
