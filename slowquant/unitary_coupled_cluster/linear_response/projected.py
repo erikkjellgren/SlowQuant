@@ -437,7 +437,6 @@ class LinearResponse(LinearResponseBaseClass):
                 )
 
         GId_expect = np.zeros(len(self.G_ops))
-        GIdH_expect = np.zeros(len(self.G_ops))
         for i, GI in enumerate(self.G_ops):
             GI_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
 
@@ -447,55 +446,46 @@ class LinearResponse(LinearResponseBaseClass):
                 self.wf.ci_coeffs,
                 *self.index_info,
             )
-            GIdH_expect[i] = expectation_value(
-                    GI_ket,
-                    [],
-                    H00_ket,
-                    *self.index_info,
-                )
 
         for root in range(n_roots):
 
             Gs = FermionicOperator({})
             for S, G in zip(Ss[:, root], self.G_ops):
                 Gs += S * G
-            Gs_ket = propagate_state([Gs], self.wf.ci_coeffs, *self.index_info)
-            HGs_ket = propagate_state([self.H_0i_0a], Gs_ket, *self.index_info)
             Gsd_expect = sum(Ss[:, root] * GId_expect)
-            GsdH_expect = sum(Ss[:, root] * GIdH_expect)
+
+            Gs_plus_ket = propagate_state([Gs], self.wf.ci_coeffs, *self.index_info)
+            Gs_minus_ket = Gs_plus_ket - Gsd_expect * self.wf.ci_coeffs
+
+            HGs_plus_ket = propagate_state([self.H_0i_0a], Gs_plus_ket, *self.index_info) - self.wf.energy_elec * Gs_plus_ket
+            HGs_minus_ket = HGs_plus_ket - Gsd_expect * H00_ket
 
             # (A+B)_GG @ b_G
             # (A-B)_GG @ b_G
             # Sigma_GG @ b_G
             for i, GI in enumerate(self.G_ops):
-                GI_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
-                val = expectation_value(
-                    GI_ket,
+                GI_plus_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
+                GI_minus_ket = GI_plus_ket - GId_expect[i] * self.wf.ci_coeffs
+
+                sigma_plus[num_q + i, root] += expectation_value(
+                    GI_plus_ket,
                     [],
-                    HGs_ket,
+                    HGs_plus_ket,
                     *self.index_info,
                 )
-                sigma_plus[num_q + i, root] += val
-                sigma_minus[num_q + i, root] += val
-                val = expectation_value(
-                    GI_ket,
+                sigma_minus[num_q + i, root] += expectation_value(
+                    GI_minus_ket,
                     [],
-                    Gs_ket,
+                    HGs_minus_ket,
                     *self.index_info,
                 )
-                sigma_plus[num_q + i, root] -= self.wf.energy_elec * val
-                sigma_minus[num_q + i, root] -= self.wf.energy_elec * val
-                tau_minus[num_q + i, root] += val
 
-                sigma_plus[num_q + i, root] += self.wf.energy_elec * GId_expect[i] * (Gsd_expect - Gsd_expect.conjugate())
-                sigma_plus[num_q + i, root] -= 0.5 * GId_expect[i] * (GsdH_expect - GsdH_expect.conjugate())
-                sigma_plus[num_q + i, root] -= 0.5 * GIdH_expect[i] * (Gsd_expect - Gsd_expect.conjugate())
-
-                sigma_minus[num_q + i, root] += self.wf.energy_elec * GId_expect[i] * (Gsd_expect + Gsd_expect.conjugate())
-                sigma_minus[num_q + i, root] -= 0.5 * GId_expect[i] * (GsdH_expect + GsdH_expect.conjugate())
-                sigma_minus[num_q + i, root] -= 0.5 * GIdH_expect[i] * (Gsd_expect + Gsd_expect.conjugate())
-                tau_minus[num_q + i, root] -= GId_expect[i] * Gsd_expect
-
+                tau_minus[num_q + i, root] += expectation_value(
+                    GI_plus_ket,
+                    [],
+                    Gs_minus_ket,
+                    *self.index_info,
+                )
 
         return sigma_plus, sigma_minus, tau_minus
 
