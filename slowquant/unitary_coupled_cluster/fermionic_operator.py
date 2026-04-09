@@ -54,19 +54,18 @@ def do_product_extended_normal_ordering(
     b) Switch around a1 and c2, as there is no overlapping indices, a contraction cannot occour.
        The phase multiplier is 1 if a1 or c2 is of even length, and, is -1 if both are of odd lenght.
 
-    c) The new fermistring now has the form, ((c1 + c2, a1 + a2)).
-       The strings 'c1 + c2' and 'a1 + a2' are now sorted using insertion sort.
+    c) The new fermistring now has the form, ((c1 * c2, a1 * a2)).
+       The strings 'c1 * c2' and 'a1 * a2' are now sorted using insertion sort.
 
     If the annihilation part of fermstring1 has index overlap with the creation part of fermistring2,
     then strings are sorted as follows,
 
-    x) Insertion sort a1 + c2, and keep track of contraction terms.
-       This gives new strings (cK, aK).
+    x) Apply Wick's theorem to generate all possible contractions giving cK and aK, originating from a1 * c2.
 
     y) Screen out string that give zero, if there is index overlap in a2 and aK, or, c1 and cK.
 
-    z) Create new strings of the form, ((c1 + cK, aK + a2)).
-       The strings 'c1 + cK' and 'aK + a2' are now sorted using insertion sort.
+    z) Create new strings of the form, ((c1 * cK, aK * a2)).
+       The strings 'c1 * cK' and 'aK * a2' are now sorted using insertion sort.
 
     Args:
         fermistring1: Left-side fermistring, tuple of creation string and annihilation string.
@@ -117,6 +116,7 @@ def do_product_extended_normal_ordering(
     else:
         overlap_idxs = nondagger1_set.intersection(dagger2_set)
         for k in range(0, len(overlap_idxs) + 1):
+            # Wick's theorem, can loop over all possible contractions.
             for contract_idxs in itertools.combinations(overlap_idxs, k):
                 nondagger_tmp = list(fermistring1[1])
                 dagger_tmp = list(fermistring2[0])
@@ -124,11 +124,13 @@ def do_product_extended_normal_ordering(
                 for contract_idx in contract_idxs:
                     nondagger_loc = nondagger_tmp.index(contract_idx)
                     dagger_loc = dagger_tmp.index(contract_idx)
-                    # phase *= (-1)**(len(nondagger_tmp) - 1 - nondagger_loc) * (-1)**(dagger_loc)
+                    # Get phase from moving nondagger to the right, and dagger to the left.
                     phase *= 1 if (len(nondagger_tmp) - 1 - nondagger_loc + dagger_loc) % 2 == 0 else -1
+                    # Remove index (contraction)
                     nondagger_tmp.pop(nondagger_loc)
                     dagger_tmp.pop(dagger_loc)
                 if len(nondagger_tmp) % 2 == 1 and len(dagger_tmp) % 2 == 1:
+                    # Get phase from changing order of nondagger and dagger block.
                     phase *= -1
                 dagger_tmp_set = set(dagger_tmp)
                 nondagger_tmp_set = set(nondagger_tmp)
@@ -178,14 +180,13 @@ def do_product_extended_normal_ordering_rankreduction(
     If the annihilation part of fermstring1 has index overlap with the creation part of fermistring2,
     then strings are sorted as follows,
 
-    x) Insertion sort a1 + c2, and keep track of contraction terms.
-       This gives new strings (cK, aK).
+    x) Apply Wick's theorem to generate all possible contractions giving cK and aK, originating from a1 * c2.
 
     y) Screen out strings that have not been rank reduced.
        Screen out string that give zero, if there is index overlap in a2 and aK, or, c1 and cK.
 
-    z) Create new strings of the form, ((c1 + cK, aK + a2)).
-       The strings 'c1 + cK' and 'aK + a2' are now sorted using insertion sort.
+    z) Create new strings of the form, ((c1 * cK, aK * a2)).
+       The strings 'c1 * cK' and 'aK * a2' are now sorted using insertion sort.
 
     Args:
         fermistring1: Left-side fermistring, tuple of creation string and annihilation string.
@@ -205,7 +206,9 @@ def do_product_extended_normal_ordering_rankreduction(
         do_reduction = False
     if do_reduction:
         overlap_idxs = nondagger1_set.intersection(dagger2_set)
+        # k = 0, is the case without rank-reduction, this case does not contribute.
         for k in range(1, len(overlap_idxs) + 1):
+            # Wick's theorem, can loop over all possible contractions.
             for contract_idxs in itertools.combinations(overlap_idxs, k):
                 nondagger_tmp = list(fermistring1[1])
                 dagger_tmp = list(fermistring2[0])
@@ -213,11 +216,13 @@ def do_product_extended_normal_ordering_rankreduction(
                 for contract_idx in contract_idxs:
                     nondagger_loc = nondagger_tmp.index(contract_idx)
                     dagger_loc = dagger_tmp.index(contract_idx)
-                    # phase *= (-1)**(len(nondagger_tmp) - 1 - nondagger_loc) * (-1)**(dagger_loc)
+                    # Get phase from moving nondagger to the right, and dagger to the left.
                     phase *= 1 if (len(nondagger_tmp) - 1 - nondagger_loc + dagger_loc) % 2 == 0 else -1
+                    # Remove index (contraction)
                     nondagger_tmp.pop(nondagger_loc)
                     dagger_tmp.pop(dagger_loc)
                 if len(nondagger_tmp) % 2 == 1 and len(dagger_tmp) % 2 == 1:
+                    # Get phase from changing order of nondagger and dagger block.
                     phase *= -1
                 dagger_tmp_set = set(dagger_tmp)
                 nondagger_tmp_set = set(nondagger_tmp)
