@@ -548,7 +548,7 @@ class FermionicOperator:
         """
         op_count = {}
         for op_key in self.operators.keys():
-            op_lenght = len(op_key)
+            op_lenght = len(op_key[0]) + len(op_key[1])
             if op_lenght not in op_count:
                 op_count[op_lenght] = 1
             else:
