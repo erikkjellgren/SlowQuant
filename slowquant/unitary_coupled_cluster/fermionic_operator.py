@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import itertools
 import re
 from collections import defaultdict
 from collections.abc import Generator
@@ -53,19 +54,18 @@ def do_product_extended_normal_ordering(
     b) Switch around a1 and c2, as there is no overlapping indices, a contraction cannot occour.
        The phase multiplier is 1 if a1 or c2 is of even length, and, is -1 if both are of odd lenght.
 
-    c) The new fermistring now has the form, ((c1 + c2, a1 + a2)).
-       The strings 'c1 + c2' and 'a1 + a2' are now sorted using insertion sort.
+    c) The new fermistring now has the form, ((c1 * c2, a1 * a2)).
+       The strings 'c1 * c2' and 'a1 * a2' are now sorted using insertion sort.
 
     If the annihilation part of fermstring1 has index overlap with the creation part of fermistring2,
     then strings are sorted as follows,
 
-    x) Insertion sort a1 + c2, and keep track of contraction terms.
-       This gives new strings (cK, aK).
+    x) Apply Wick's theorem to generate all possible contractions giving cK and aK, originating from a1 * c2.
 
     y) Screen out string that give zero, if there is index overlap in a2 and aK, or, c1 and cK.
 
-    z) Create new strings of the form, ((c1 + cK, aK + a2)).
-       The strings 'c1 + cK' and 'aK + a2' are now sorted using insertion sort.
+    z) Create new strings of the form, ((c1 * cK, aK * a2)).
+       The strings 'c1 * cK' and 'aK * a2' are now sorted using insertion sort.
 
     Args:
         fermistring1: Left-side fermistring, tuple of creation string and annihilation string.
@@ -114,62 +114,53 @@ def do_product_extended_normal_ordering(
                     j -= 1
             yield (tuple(dagger_list), tuple(nondagger_list)), phase
     else:
-        # stack to keep track of contractions.
-        stack: list[tuple[list[int], list[bool], int]] = [
-            (
-                [*fermistring1[1], *fermistring2[0]],
-                [False] * len(fermistring1[1]) + [True] * len(fermistring2[0]),
-                1,
-            )
-        ]
-        while stack:
-            next_string, next_dagger, phase = stack.pop()
-            for i in range(0, len(next_string)):
-                j = i
-                while j > 0 and (not next_dagger[j - 1] and next_dagger[j]):
-                    if next_string[j - 1] == next_string[j]:  # Contraction
-                        stack.append(
-                            (
-                                next_string[: j - 1] + next_string[j + 1 :],
-                                next_dagger[: j - 1] + next_dagger[j + 1 :],
-                                phase,
-                            )
-                        )
-                    next_string[j - 1], next_string[j] = next_string[j], next_string[j - 1]
-                    next_dagger[j - 1], next_dagger[j] = next_dagger[j], next_dagger[j - 1]
+        overlap_idxs = nondagger1_set.intersection(dagger2_set)
+        for k in range(0, len(overlap_idxs) + 1):
+            # Wick's theorem, can loop over all possible contractions.
+            for contract_idxs in itertools.combinations(overlap_idxs, k):
+                nondagger_tmp = list(fermistring1[1])
+                dagger_tmp = list(fermistring2[0])
+                phase = 1
+                for contract_idx in contract_idxs:
+                    nondagger_loc = nondagger_tmp.index(contract_idx)
+                    dagger_loc = dagger_tmp.index(contract_idx)
+                    # Get phase from moving nondagger to the right, and dagger to the left.
+                    phase *= 1 if (len(nondagger_tmp) - 1 - nondagger_loc + dagger_loc) % 2 == 0 else -1
+                    # Remove index (contraction)
+                    nondagger_tmp.pop(nondagger_loc)
+                    dagger_tmp.pop(dagger_loc)
+                if len(nondagger_tmp) % 2 == 1 and len(dagger_tmp) % 2 == 1:
+                    # Get phase from changing order of nondagger and dagger block.
                     phase *= -1
-                    j -= 1
-            num_daggers = sum(next_dagger)
-            dagger_tmp, nondagger_tmp = next_string[:num_daggers], next_string[num_daggers:]
-            dagger_tmp_set = set(dagger_tmp)
-            nondagger_tmp_set = set(nondagger_tmp)
-            if not dagger1_set.isdisjoint(dagger_tmp_set):
-                # Same index creation operator.
-                continue
-            elif not nondagger_tmp_set.isdisjoint(nondagger2_set):
-                # Same index annihilation operator.
-                continue
-            # sort the dagger part
-            dagger_list = [*fermistring1[0], *dagger_tmp]
-            # Doing insertion sort, left-side part is already sorted.
-            # Hence not starting from 1.
-            for i in range(len(fermistring1[0]), len(dagger_list)):
-                j = i
-                while j > 0 and dagger_list[j] > dagger_list[j - 1]:
-                    dagger_list[j], dagger_list[j - 1] = dagger_list[j - 1], dagger_list[j]
-                    phase *= -1
-                    j -= 1
-            # sort non-dagger part
-            nondagger_list = [*nondagger_tmp, *fermistring2[1]]
-            # Doing insertion sort, left-side part is already sorted.
-            # Hence not starting from 1.
-            for i in range(len(nondagger_tmp), len(nondagger_list)):
-                j = i
-                while j > 0 and nondagger_list[j] > nondagger_list[j - 1]:
-                    nondagger_list[j], nondagger_list[j - 1] = nondagger_list[j - 1], nondagger_list[j]
-                    phase *= -1
-                    j -= 1
-            yield (tuple(dagger_list), tuple(nondagger_list)), phase
+                dagger_tmp_set = set(dagger_tmp)
+                nondagger_tmp_set = set(nondagger_tmp)
+                if not dagger1_set.isdisjoint(dagger_tmp_set):
+                    # Same index creation operator.
+                    continue
+                elif not nondagger_tmp_set.isdisjoint(nondagger2_set):
+                    # Same index annihilation operator.
+                    continue
+                # sort the dagger part
+                dagger_list = [*fermistring1[0], *dagger_tmp]
+                # Doing insertion sort, left-side part is already sorted.
+                # Hence not starting from 1.
+                for i in range(len(fermistring1[0]), len(dagger_list)):
+                    j = i
+                    while j > 0 and dagger_list[j] > dagger_list[j - 1]:
+                        dagger_list[j], dagger_list[j - 1] = dagger_list[j - 1], dagger_list[j]
+                        phase *= -1
+                        j -= 1
+                # sort non-dagger part
+                nondagger_list = [*nondagger_tmp, *fermistring2[1]]
+                # Doing insertion sort, left-side part is already sorted.
+                # Hence not starting from 1.
+                for i in range(len(nondagger_tmp), len(nondagger_list)):
+                    j = i
+                    while j > 0 and nondagger_list[j] > nondagger_list[j - 1]:
+                        nondagger_list[j], nondagger_list[j - 1] = nondagger_list[j - 1], nondagger_list[j]
+                        phase *= -1
+                        j -= 1
+                yield (tuple(dagger_list), tuple(nondagger_list)), phase
 
 
 def do_product_extended_normal_ordering_rankreduction(
@@ -189,14 +180,13 @@ def do_product_extended_normal_ordering_rankreduction(
     If the annihilation part of fermstring1 has index overlap with the creation part of fermistring2,
     then strings are sorted as follows,
 
-    x) Insertion sort a1 + c2, and keep track of contraction terms.
-       This gives new strings (cK, aK).
+    x) Apply Wick's theorem to generate all possible contractions giving cK and aK, originating from a1 * c2.
 
     y) Screen out strings that have not been rank reduced.
        Screen out string that give zero, if there is index overlap in a2 and aK, or, c1 and cK.
 
-    z) Create new strings of the form, ((c1 + cK, aK + a2)).
-       The strings 'c1 + cK' and 'aK + a2' are now sorted using insertion sort.
+    z) Create new strings of the form, ((c1 * cK, aK * a2)).
+       The strings 'c1 * cK' and 'aK * a2' are now sorted using insertion sort.
 
     Args:
         fermistring1: Left-side fermistring, tuple of creation string and annihilation string.
@@ -209,72 +199,60 @@ def do_product_extended_normal_ordering_rankreduction(
     Returns:
         Creation string, annihilation string, and, phase.
     """
-    no_reduction = False
+    do_reduction = True
     if nondagger1_set.isdisjoint(dagger2_set):
         # If there is no overlap in indices, then there can be no rank reduction.
         # The term can be skipped.
-        no_reduction = True
-    if not no_reduction:
-        op_middle_size = len(fermistring1[1]) + len(fermistring2[0])
-        # stack to keep track of contractions.
-        stack: list[tuple[list[int], list[bool], int]] = [
-            (
-                [*fermistring1[1], *fermistring2[0]],
-                [False] * len(fermistring1[1]) + [True] * len(fermistring2[0]),
-                1,
-            )
-        ]
-        while stack:
-            next_string, next_dagger, phase = stack.pop()
-            for i in range(0, len(next_string)):
-                j = i
-                while j > 0 and (not next_dagger[j - 1] and next_dagger[j]):
-                    if next_string[j - 1] == next_string[j]:  # Contraction
-                        stack.append(
-                            (
-                                next_string[: j - 1] + next_string[j + 1 :],
-                                next_dagger[: j - 1] + next_dagger[j + 1 :],
-                                phase,
-                            )
-                        )
-                    next_string[j - 1], next_string[j] = next_string[j], next_string[j - 1]
-                    next_dagger[j - 1], next_dagger[j] = next_dagger[j], next_dagger[j - 1]
+        do_reduction = False
+    if do_reduction:
+        overlap_idxs = nondagger1_set.intersection(dagger2_set)
+        # k = 0, is the case without rank-reduction, this case does not contribute.
+        for k in range(1, len(overlap_idxs) + 1):
+            # Wick's theorem, can loop over all possible contractions.
+            for contract_idxs in itertools.combinations(overlap_idxs, k):
+                nondagger_tmp = list(fermistring1[1])
+                dagger_tmp = list(fermistring2[0])
+                phase = 1
+                for contract_idx in contract_idxs:
+                    nondagger_loc = nondagger_tmp.index(contract_idx)
+                    dagger_loc = dagger_tmp.index(contract_idx)
+                    # Get phase from moving nondagger to the right, and dagger to the left.
+                    phase *= 1 if (len(nondagger_tmp) - 1 - nondagger_loc + dagger_loc) % 2 == 0 else -1
+                    # Remove index (contraction)
+                    nondagger_tmp.pop(nondagger_loc)
+                    dagger_tmp.pop(dagger_loc)
+                if len(nondagger_tmp) % 2 == 1 and len(dagger_tmp) % 2 == 1:
+                    # Get phase from changing order of nondagger and dagger block.
                     phase *= -1
-                    j -= 1
-            if len(next_string) == op_middle_size:
-                # Terms without rank reduction can be skipped, as they have to cancel each other.
-                continue
-            num_daggers = sum(next_dagger)
-            dagger_tmp, nondagger_tmp = next_string[:num_daggers], next_string[num_daggers:]
-            dagger_tmp_set = set(dagger_tmp)
-            nondagger_tmp_set = set(nondagger_tmp)
-            if not dagger1_set.isdisjoint(dagger_tmp_set):
-                # Same index creation operator.
-                continue
-            elif not nondagger_tmp_set.isdisjoint(nondagger2_set):
-                # Same index annihilation operator.
-                continue
-            # sort the dagger part
-            dagger_list = [*fermistring1[0], *dagger_tmp]
-            # Doing insertion sort, left-side part is already sorted.
-            # Hence not starting from 1.
-            for i in range(len(fermistring1[0]), len(dagger_list)):
-                j = i
-                while j > 0 and dagger_list[j] > dagger_list[j - 1]:
-                    dagger_list[j], dagger_list[j - 1] = dagger_list[j - 1], dagger_list[j]
-                    phase *= -1
-                    j -= 1
-            # sort non-dagger part
-            nondagger_list = [*nondagger_tmp, *fermistring2[1]]
-            # Doing insertion sort, left-side part is already sorted.
-            # Hence not starting from 1.
-            for i in range(len(nondagger_tmp), len(nondagger_list)):
-                j = i
-                while j > 0 and nondagger_list[j] > nondagger_list[j - 1]:
-                    nondagger_list[j], nondagger_list[j - 1] = nondagger_list[j - 1], nondagger_list[j]
-                    phase *= -1
-                    j -= 1
-            yield (tuple(dagger_list), tuple(nondagger_list)), phase
+                dagger_tmp_set = set(dagger_tmp)
+                nondagger_tmp_set = set(nondagger_tmp)
+                if not dagger1_set.isdisjoint(dagger_tmp_set):
+                    # Same index creation operator.
+                    continue
+                elif not nondagger_tmp_set.isdisjoint(nondagger2_set):
+                    # Same index annihilation operator.
+                    continue
+                # sort the dagger part
+                dagger_list = [*fermistring1[0], *dagger_tmp]
+                # Doing insertion sort, left-side part is already sorted.
+                # Hence not starting from 1.
+                for i in range(len(fermistring1[0]), len(dagger_list)):
+                    j = i
+                    while j > 0 and dagger_list[j] > dagger_list[j - 1]:
+                        dagger_list[j], dagger_list[j - 1] = dagger_list[j - 1], dagger_list[j]
+                        phase *= -1
+                        j -= 1
+                # sort non-dagger part
+                nondagger_list = [*nondagger_tmp, *fermistring2[1]]
+                # Doing insertion sort, left-side part is already sorted.
+                # Hence not starting from 1.
+                for i in range(len(nondagger_tmp), len(nondagger_list)):
+                    j = i
+                    while j > 0 and nondagger_list[j] > nondagger_list[j - 1]:
+                        nondagger_list[j], nondagger_list[j - 1] = nondagger_list[j - 1], nondagger_list[j]
+                        phase *= -1
+                        j -= 1
+                yield (tuple(dagger_list), tuple(nondagger_list)), phase
 
 
 def commutator_multiply(A: FermionicOperator, B: FermionicOperator) -> FermionicOperator:
@@ -574,7 +552,7 @@ class FermionicOperator:
         """
         op_count = {}
         for op_key in self.operators.keys():
-            op_lenght = len(op_key)
+            op_lenght = len(op_key[0]) + len(op_key[1])
             if op_lenght not in op_count:
                 op_count[op_lenght] = 1
             else:
