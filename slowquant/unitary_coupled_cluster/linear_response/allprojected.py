@@ -1,3 +1,4 @@
+import time
 import numpy as np
 
 from slowquant.molecularintegrals.integralfunctions import (
@@ -310,10 +311,15 @@ class LinearResponse(LinearResponseBaseClass):
             self.wf.num_virtual_orbs,
         )
 
+        qq_time = 0.0
+        qG_time = 0.0
+        Gq_time = 0.0
+        GG_time = 0.0
 
         if num_q != 0:
             for root in range(n_roots):
 
+                start_time = time.time()
                 qs = FermionicOperator({})
                 for kappa, q in zip(kappas[:, root], self.q_ops):
                     qs += kappa * q
@@ -323,6 +329,7 @@ class LinearResponse(LinearResponseBaseClass):
                 # Sigma_qq @ b_q
                 H22qs = H_2i_2a * qs
                 for i, qi in enumerate(self.q_ops):
+                    # <0| [qid, H qs] |0>
                     val = expectation_value(
                         self.wf.ci_coeffs,
                         [commutator(qi.dagger, H22qs)],
@@ -331,7 +338,7 @@ class LinearResponse(LinearResponseBaseClass):
                     )
                     sigma_plus[i, root] += val
                     sigma_minus[i, root] += val
-
+                # <0| [qid, qs] |0>
                 val = get_orbital_metric_qq_block(
                     self.wf.kappa_no_activeactive_idx,
                     trial[:, root],
@@ -342,11 +349,14 @@ class LinearResponse(LinearResponseBaseClass):
                 sigma_plus[:num_q, root] -= self.wf.energy_elec * val
                 sigma_minus[:num_q, root] -= self.wf.energy_elec * val
                 tau_minus[:num_q, root] += val
+                qq_time += time.time() - start_time
 
+                start_time = time.time()
                 # (A+B)_Gq @ b_q
                 # (A-B)_Gq @ b_q
                 Hqs_ket = propagate_state([self.H_1i_1a * qs], self.wf.ci_coeffs, *self.index_info)
                 for i, GI in enumerate(self.G_ops):
+                    # <0| GId H qs |0>
                     val = expectation_value(
                         self.wf.ci_coeffs,
                         [GI.dagger],
@@ -355,7 +365,9 @@ class LinearResponse(LinearResponseBaseClass):
                     )
                     sigma_plus[num_q + i, root] += val
                     sigma_minus[num_q + i, root] += val
+                Gq_time += time.time() - start_time
 
+                start_time = time.time()
                 Gs = FermionicOperator({})
                 for S, G in zip(Ss[:, root], self.G_ops):
                     Gs += S * G
@@ -364,6 +376,7 @@ class LinearResponse(LinearResponseBaseClass):
                 # (A+B)_qG @ b_G
                 # (A-B)_qG @ b_G
                 for i, qi in enumerate(self.q_ops):
+                    # <0| Gsd H qi |0>
                     val = expectation_value(
                         Gs_ket,
                         [self.H_1i_1a * qi],
@@ -372,6 +385,7 @@ class LinearResponse(LinearResponseBaseClass):
                     )
                     sigma_plus[i, root] += val
                     sigma_minus[i, root] += val
+                qG_time += time.time() - start_time
 
         GId_expect = np.zeros(len(self.G_ops))
         for i, GI in enumerate(self.G_ops):
@@ -386,43 +400,58 @@ class LinearResponse(LinearResponseBaseClass):
 
         for root in range(n_roots):
 
+            start_time = time.time()
             Gs = FermionicOperator({})
             for S, G in zip(Ss[:, root], self.G_ops):
                 Gs += S * G
             Gsd_expect = sum(Ss[:, root] * GId_expect)
 
+            # Gs |0>
             Gs_plus_ket = propagate_state([Gs], self.wf.ci_coeffs, *self.index_info)
+            # Gs |0> - |0> <0| Gs |0>
             Gs_minus_ket = Gs_plus_ket - Gsd_expect * self.wf.ci_coeffs
 
+            # H Gs |0> - E Gs |0>
             HGs_plus_ket = propagate_state([self.H_0i_0a], Gs_plus_ket, *self.index_info) - self.wf.energy_elec * Gs_plus_ket
+            # H Gs |0> - E Gs |0> - H |0> <0| Gs |0>
             HGs_minus_ket = HGs_plus_ket - Gsd_expect * H00_ket
 
             # (A+B)_GG @ b_G
             # (A-B)_GG @ b_G
             # Sigma_GG @ b_G
             for i, GI in enumerate(self.G_ops):
+                # Gi |0>
                 GI_plus_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
+                # Gi |0> - |0> <0| Gi |0>
                 GI_minus_ket = GI_plus_ket - GId_expect[i] * self.wf.ci_coeffs
 
+                # <0| GId ( H Gs |0> - E Gs |0> )
                 sigma_plus[num_q + i, root] += expectation_value(
                     GI_plus_ket,
                     [],
                     HGs_plus_ket,
                     *self.index_info,
                 )
+                # ( <0| Gid - <0| Gi |0> <0| ) ( H Gs |0> - E Gs |0> - H |0> <0| Gs |0> )
                 sigma_minus[num_q + i, root] += expectation_value(
                     GI_minus_ket,
                     [],
                     HGs_minus_ket,
                     *self.index_info,
                 )
-
+                # <0| GId Gs |0>
                 tau_minus[num_q + i, root] += expectation_value(
                     GI_plus_ket,
                     [],
                     Gs_minus_ket,
                     *self.index_info,
                 )
+            GG_time += time.time() - start_time
+
+        print("qq time:", qq_time)
+        print("qG time:", qG_time)
+        print("Gq time:", Gq_time)
+        print("GG time:", GG_time)
 
         return sigma_plus, sigma_minus, tau_minus
 
