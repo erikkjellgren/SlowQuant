@@ -295,14 +295,23 @@ class LinearResponse(LinearResponseBaseClass):
 
             for root in range(n_roots):
                 h_plus, g_plus = one_index_transform(K_plus[:, :, root], self.wf.h_mo, self.wf.g_mo)
-                tH_0i_0a = hamiltonian_0i_0a(
+                h_minus, g_minus = one_index_transform(K_minus[:, :, root], self.wf.h_mo, self.wf.g_mo)
+
+                tH00_plus = hamiltonian_0i_0a(
                     h_plus,
                     g_plus,
                     self.wf.num_inactive_orbs,
                     self.wf.num_active_orbs,
                 )
+                tH00_minus = hamiltonian_0i_0a(
+                    h_minus,
+                    g_minus,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                )
 
-                tH00_ket = propagate_state([tH_0i_0a], self.wf.ci_coeffs, *self.index_info)
+                tH00p_ket = propagate_state([tH00_plus], self.wf.ci_coeffs, *self.index_info)
+                tH00m_ket = propagate_state([tH00_minus], self.wf.ci_coeffs, *self.index_info)
 
                 # (A+B)_qq @ b_q
                 sigma_plus[:num_q, root] = get_orbital_rotation_gradient(
@@ -314,80 +323,6 @@ class LinearResponse(LinearResponseBaseClass):
                     self.wf.rdm1,
                     self.wf.rdm2,
                 )
-
-                qs = FermionicOperator({})
-                for kappa, q in zip(kappas[:, root], self.q_ops):
-                    qs += kappa * q
-
-                # (A+B)_Gq @ b_q
-                for i, GI in enumerate(self.G_ops):
-                    sigma_plus[num_q + i, root] = expectation_value(
-                        self.wf.ci_coeffs,
-                        [GI.dagger],
-                        tH00_ket,
-                        *self.index_info,
-                    )
-                    sigma_plus[num_q + i, root] += expectation_value(
-                        tH00_ket,
-                        [GI.dagger],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    qGd = commutator(qs, GI.dagger)
-                    sigma_plus[num_q + i, root] += 0.5 * expectation_value(
-                        self.wf.ci_coeffs,
-                        [self.H_1i_1a * qGd],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    Gdqd = commutator(GI.dagger, qs.dagger)
-                    sigma_plus[num_q + i, root] += 0.5 * expectation_value(
-                        self.wf.ci_coeffs,
-                        [Gdqd * self.H_1i_1a],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-
-                Gs = FermionicOperator({})
-                for S, G in zip(Ss[:, root], self.G_ops):
-                    Gs += S * G + S.conjugate() * G.dagger
-                Gs_ket = propagate_state([Gs], self.wf.ci_coeffs, *self.index_info)
-                Gsd_ket = propagate_state([Gs.dagger], self.wf.ci_coeffs, *self.index_info)
-                GsH11 = Gs * self.H_1i_1a
-
-                # (A+B)_qG @ b_G
-                for i, qi in enumerate(self.q_ops):
-                    qidH11 = qi.dagger * self.H_1i_1a
-                    sigma_plus[i, root] += expectation_value(
-                        self.wf.ci_coeffs,
-                        [qidH11],
-                        Gs_ket,
-                        *self.index_info,
-                    )
-                    sigma_plus[i, root] -= 0.5 * expectation_value(
-                        Gsd_ket,
-                        [qidH11],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    sigma_plus[i, root] -= 0.5 * expectation_value(
-                        self.wf.ci_coeffs,
-                        [qi.dagger * GsH11],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-
-            for root in range(n_roots):
-                h_minus, g_minus = one_index_transform(K_minus[:, :, root], self.wf.h_mo, self.wf.g_mo)
-                tH_0i_0a = hamiltonian_0i_0a(
-                    h_minus,
-                    g_minus,
-                    self.wf.num_inactive_orbs,
-                    self.wf.num_active_orbs,
-                )
-
-                tH00_ket = propagate_state([tH_0i_0a], self.wf.ci_coeffs, *self.index_info)
-
                 # (A-B)_qq @ b_q
                 sigma_minus[:num_q, root] = get_orbital_rotation_gradient(
                     h_minus,
@@ -405,29 +340,58 @@ class LinearResponse(LinearResponseBaseClass):
 
                 # (A+B)_Gq @ b_q
                 for i, GI in enumerate(self.G_ops):
-                    sigma_minus[num_q + i, root] = expectation_value(
+                    GI_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
+                    GId_ket = propagate_state([GI.dagger], self.wf.ci_coeffs, *self.index_info)
+                    sigma_plus[num_q + i, root] = expectation_value(
+                        GI_ket,
+                        [],
+                        tH00p_ket,
+                        *self.index_info,
+                    )
+                    sigma_plus[num_q + i, root] += expectation_value(
+                        tH00p_ket,
+                        [],
+                        GId_ket,
+                        *self.index_info,
+                    )
+                    qGd = commutator(qs, GI.dagger + GI)
+                    sigma_plus[num_q + i, root] += 0.5 * expectation_value(
                         self.wf.ci_coeffs,
-                        [GI.dagger],
-                        tH00_ket,
+                        [self.H_1i_1a * qGd],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+
+                    sigma_minus[num_q + i, root] = expectation_value(
+                        GI_ket,
+                        [],
+                        tH00m_ket,
                         *self.index_info,
                     )
                     sigma_minus[num_q + i, root] -= expectation_value(
-                        tH00_ket,
-                        [GI.dagger],
-                        self.wf.ci_coeffs,
+                        tH00m_ket,
+                        [],
+                        GId_ket,
                         *self.index_info,
                     )
-                    qGd = commutator(qs, GI.dagger)
+                    qGd = commutator(qs, GI.dagger - GI)
                     sigma_minus[num_q + i, root] += 0.5 * expectation_value(
                         self.wf.ci_coeffs,
                         [self.H_1i_1a * qGd],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
-                    Gdqd = commutator(GI.dagger, qs.dagger)
-                    sigma_minus[num_q + i, root] -= 0.5 * expectation_value(
+
+                Gs = FermionicOperator({})
+                for S, G in zip(Ss[:, root], self.G_ops):
+                    Gs += S * G + S.conjugate() * G.dagger
+                Gs_ket = propagate_state([Gs], self.wf.ci_coeffs, *self.index_info)
+
+                # (A+B)_qG @ b_G
+                for i, qi in enumerate(self.q_ops):
+                    sigma_plus[i, root] += expectation_value(
                         self.wf.ci_coeffs,
-                        [Gdqd * self.H_1i_1a],
+                        [double_commutator(qi.dagger, self.H_1i_1a, Gs, do_symmetrized=True)],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
@@ -436,32 +400,16 @@ class LinearResponse(LinearResponseBaseClass):
                 for S, G in zip(Ss[:, root], self.G_ops):
                     Gs += S * G - S.conjugate() * G.dagger
                 Gs_ket = propagate_state([Gs], self.wf.ci_coeffs, *self.index_info)
-                Gsd_ket = propagate_state([Gs.dagger], self.wf.ci_coeffs, *self.index_info)
-                GsH11 = Gs * self.H_1i_1a
 
                 # (A-B)_qG @ b_G
                 for i, qi in enumerate(self.q_ops):
-                    qidH11 = qi.dagger * self.H_1i_1a
                     sigma_minus[i, root] += expectation_value(
                         self.wf.ci_coeffs,
-                        [qidH11],
-                        Gs_ket,
-                        *self.index_info,
-                    )
-                    sigma_minus[i, root] -= 0.5 * expectation_value(
-                        Gsd_ket,
-                        [qidH11],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    sigma_minus[i, root] -= 0.5 * expectation_value(
-                        self.wf.ci_coeffs,
-                        [qi.dagger * GsH11],
+                        [double_commutator(qi.dagger, self.H_1i_1a, Gs, do_symmetrized=True)],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
 
-            for root in range(n_roots):
                 tau_minus[:num_q, root] = get_orbital_metric_qq_block(
                     self.wf.kappa_no_activeactive_idx,
                     trial[:, root],
@@ -477,26 +425,16 @@ class LinearResponse(LinearResponseBaseClass):
                 Gs += S * G + S.conjugate() * G.dagger
 
             Gs_ket = propagate_state([Gs], self.wf.ci_coeffs, *self.index_info)
-            Gsd_ket = propagate_state([Gs.dagger], self.wf.ci_coeffs, *self.index_info)
             GsH_ket = propagate_state([Gs], H00_ket, *self.index_info)
-            GsdH_ket = propagate_state([Gs.dagger], H00_ket, *self.index_info)
             HGs_ket = propagate_state([self.H_0i_0a], Gs_ket, *self.index_info)
-            HGsd_ket = propagate_state([self.H_0i_0a], Gsd_ket, *self.index_info)
 
             # (A+B)_GG @ b_G
             for i, GI in enumerate(self.G_ops):
-                GI_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
-                GId_ket = propagate_state([GI.dagger], self.wf.ci_coeffs, *self.index_info)
+                GI_ket = propagate_state([GI + GI.dagger], self.wf.ci_coeffs, *self.index_info)
                 sigma_plus[num_q + i, root] += expectation_value(
                     GI_ket,
                     [],
                     HGs_ket,
-                    *self.index_info,
-                )
-                sigma_plus[num_q + i, root] += expectation_value(
-                    HGsd_ket,
-                    [],
-                    GId_ket,
                     *self.index_info,
                 )
                 sigma_plus[num_q + i, root] -= 0.5 * expectation_value(
@@ -506,48 +444,27 @@ class LinearResponse(LinearResponseBaseClass):
                     *self.index_info,
                 )
                 sigma_plus[num_q + i, root] -= 0.5 * expectation_value(
-                    GsdH_ket,
-                    [],
-                    GId_ket,
-                    *self.index_info,
-                )
-                sigma_plus[num_q + i, root] -= 0.5 * expectation_value(
-                    Gsd_ket,
-                    [GI.dagger],
-                    H00_ket,
-                    *self.index_info,
-                )
-                sigma_plus[num_q + i, root] -= 0.5 * expectation_value(
-                    H00_ket,
-                    [GI.dagger],
                     Gs_ket,
+                    [GI.dagger + GI],
+                    H00_ket,
                     *self.index_info,
                 )
+
 
             Gs = FermionicOperator({})
             for S, G in zip(Ss[:, root], self.G_ops):
                 Gs += S * G - S.conjugate() * G.dagger
             Gs_ket = propagate_state([Gs], self.wf.ci_coeffs, *self.index_info)
-            Gsd_ket = propagate_state([Gs.dagger], self.wf.ci_coeffs, *self.index_info)
             GsH_ket = propagate_state([Gs], H00_ket, *self.index_info)
-            GsdH_ket = propagate_state([Gs.dagger], H00_ket, *self.index_info)
             HGs_ket = propagate_state([self.H_0i_0a], Gs_ket, *self.index_info)
-            HGsd_ket = propagate_state([self.H_0i_0a], Gsd_ket, *self.index_info)
 
             # (A-B)_GG @ b_G
             for i, GI in enumerate(self.G_ops):
-                GI_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
-                GId_ket = propagate_state([GI.dagger], self.wf.ci_coeffs, *self.index_info)
+                GI_ket = propagate_state([GI - GI.dagger], self.wf.ci_coeffs, *self.index_info)
                 sigma_minus[num_q + i, root] += expectation_value(
                     GI_ket,
                     [],
                     HGs_ket,
-                    *self.index_info,
-                )
-                sigma_minus[num_q + i, root] += expectation_value(
-                    HGsd_ket,
-                    [],
-                    GId_ket,
                     *self.index_info,
                 )
                 sigma_minus[num_q + i, root] -= 0.5 * expectation_value(
@@ -556,24 +473,13 @@ class LinearResponse(LinearResponseBaseClass):
                     GsH_ket,
                     *self.index_info,
                 )
-                sigma_minus[num_q + i, root] -= 0.5 * expectation_value(
-                    GsdH_ket,
-                    [],
-                    GId_ket,
-                    *self.index_info,
-                )
-                sigma_minus[num_q + i, root] -= 0.5 * expectation_value(
-                    Gsd_ket,
-                    [GI.dagger],
-                    H00_ket,
-                    *self.index_info,
-                )
-                sigma_minus[num_q + i, root] -= 0.5 * expectation_value(
-                    H00_ket,
-                    [GI.dagger],
+                sigma_minus[num_q + i, root] += 0.5 * expectation_value(
                     Gs_ket,
+                    [GI.dagger - GI],
+                    H00_ket,
                     *self.index_info,
                 )
+
 
         for root in range(n_roots):
             Gs = FermionicOperator({})

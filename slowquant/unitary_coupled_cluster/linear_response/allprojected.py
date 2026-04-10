@@ -325,7 +325,7 @@ class LinearResponse(LinearResponseBaseClass):
                 for i, qi in enumerate(self.q_ops):
                     val = expectation_value(
                         self.wf.ci_coeffs,
-                        [qi.dagger * H22qs],
+                        [commutator(qi.dagger, H22qs)],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
