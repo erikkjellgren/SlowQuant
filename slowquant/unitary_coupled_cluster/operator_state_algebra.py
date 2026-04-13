@@ -7,6 +7,7 @@ import scipy.sparse as ss
 
 from slowquant.unitary_coupled_cluster.ci_spaces import CI_Info
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
+from slowquant.unitary_coupled_cluster.hardcoreboson_operator import HardcorebosonOperator
 from slowquant.unitary_coupled_cluster.operators import (
     G1,
     G2,
@@ -470,7 +471,7 @@ def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bo
 
 
 def propagate_state(
-    operators: list[FermionicOperator | str],
+    operators: list[FermionicOperator | HardcorebosonOperator | str],
     state: np.ndarray,
     ci_info: CI_Info,
     thetas: Sequence[float] | None = None,
@@ -550,8 +551,7 @@ def propagate_state(
                 )
             else:
                 raise TypeError(f"Got unknown wave function structure type, {type(wf_struct)}")
-        # FermionicOperator in operators
-        else:
+        elif isinstance(op, FermionicOperator):
             tmp_state[:] = 0.0
             # Fold operator to only get active contributions
             if do_folding:
@@ -627,6 +627,10 @@ def propagate_state(
                         op_folded.operators[fermi_label],
                     )
             new_state = np.copy(tmp_state)
+        elif isinstance(op, HardcorebosonOperator):
+            None
+        else:
+            raise ValueError(f"Got unknown operator type: {type(op)}")
     return new_state
 
 
@@ -783,7 +787,7 @@ def propagate_state_SA(
 
 def expectation_value(
     bra: np.ndarray,
-    operators: list[FermionicOperator | str],
+    operators: list[FermionicOperator | HardcorebosonOperator | str],
     ket: np.ndarray,
     ci_info: CI_Info,
     thetas: Sequence[float] | None = None,

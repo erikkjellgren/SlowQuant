@@ -3,6 +3,9 @@ import numpy as np
 from slowquant.unitary_coupled_cluster.fermionic_operator import (
     FermionicOperator,
 )
+from slowquant.unitary_coupled_cluster.hardcoreboson_operator import (
+    HardcorebosonOperator,
+)
 
 
 def a_op(spinless_idx: int, spin: str, dagger: bool) -> FermionicOperator:
@@ -36,6 +39,9 @@ def a_op_spin(spin_idx: int, dagger: bool) -> FermionicOperator:
     """
     return FermionicOperator({((spin_idx, dagger),): 1})
 
+
+def b_op(idx: int, dagger: bool) -> HardcorebosonOperator:
+    return HardcorebosonOperator({((idx, dagger),): 1})
 
 def Epq(p: int, q: int) -> FermionicOperator:
     r"""Construct the singlet one-electron excitation operator.
@@ -661,6 +667,18 @@ def hamiltonian_2i_2a(
                     if abs(g_mo[p, q, r, s]) > 10**-14:
                         hamiltonian_operator += 1 / 2 * g_mo[p, q, r, s] * epqrs(p, q, r, s)
     return hamiltonian_operator
+
+
+def hamiltonian_hcb_full_space(hr1: np.ndarray, hr2: np.ndarray, num_orbs: int) -> HardcorebosonOperator:
+    H = HardcorebosonOperator({})
+    for p in range(num_orbs):
+        for q in range(num_orbs):
+            if abs(hr1[p,q]) > 10**-14:
+                H += hr1[p,q]*b_op(p,True)*b_op(q,False)
+            if p != q:
+                if abs(hr2[p,q]) > 10**-14:
+                    H += hr2[p,q]*b_op(p,True)*b_op(p,False)*b_op(q,True)*b_op(q,False)
+    return H
 
 
 def one_elec_op_full_space(ints_mo: np.ndarray, num_orbs: int) -> FermionicOperator:
