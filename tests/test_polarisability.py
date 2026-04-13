@@ -16,11 +16,9 @@ def get_polarisability(geometry, basis, active_space, charge=0, unit='bohr'):
 
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nelectron,
         active_space,
         mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         "SD",
     )
 
@@ -32,7 +30,7 @@ def get_polarisability(geometry, basis, active_space, charge=0, unit='bohr'):
     print("Energy elec", WF.energy_elec)
 
     # Singlet Linear Response
-    LR = naive.LinearResponseUCC(WF, excitations="SD")
+    LR = naive.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
 
     # Dipole integrals

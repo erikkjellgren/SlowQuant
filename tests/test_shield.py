@@ -18,11 +18,9 @@ def get_shield(geometry, basis, active_space, charge=0, unit='bohr'):
 
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nelectron,
         active_space,
         mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         "SD",
     )
 
@@ -53,7 +51,7 @@ def get_shield(geometry, basis, active_space, charge=0, unit='bohr'):
 
 
     # Singlet Linear Response
-    LR = naive.LinearResponseUCC(WF, excitations="SD")
+    LR = naive.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
 
     #Paramagnetic term
@@ -118,4 +116,3 @@ def test_LiH_sto3g_naive():
     # Check shielding constant - reference dalton mcscf
     assert abs(38.7983 - sigma[0]) < thresh
     assert abs(72.9730 - sigma[1]) < thresh
-

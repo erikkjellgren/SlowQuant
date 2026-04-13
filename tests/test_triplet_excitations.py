@@ -15,16 +15,12 @@ def get_triplet_excita(geometry, basis, active_space, unit='bohr'):
     # HF
     SQobj.init_hartree_fock()
     SQobj.hartree_fock.run_restricted_hartree_fock()
-    h_core = SQobj.integral.kinetic_energy_matrix + SQobj.integral.nuclear_attraction_matrix
-    g_eri = SQobj.integral.electron_repulsion_tensor
 
     # OO-UCCSD
     WF = WaveFunctionUCC(
-        SQobj.molecule.number_electrons,
         active_space,
         SQobj.hartree_fock.mo_coeff,
-        h_core,
-        g_eri,
+        SQobj,
         "SD",
     )
 
@@ -35,7 +31,7 @@ def get_triplet_excita(geometry, basis, active_space, unit='bohr'):
         WF.run_wf_optimization_1step('SLSQP', True)
 
     # Linear Response
-    LR = naive_triplet.LinearResponseUCC(WF, excitations="SD")
+    LR = naive_triplet.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
 
     print('Triplet excitation energies (hartree):')

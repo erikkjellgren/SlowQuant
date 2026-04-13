@@ -79,11 +79,9 @@ def get_sscc(geometry, basis, active_space, charge=0, unit='bohr'):
 
     # SlowQuant
     WF = WaveFunctionUCC(
-        mol.nelectron,
         active_space,
         mo_coeff,
-        mol.intor("int1e_kin") + mol.intor("int1e_nuc"),
-        mol.intor("int2e"),
+        mol,
         "SD",
     )
 
@@ -108,7 +106,7 @@ def get_sscc(geometry, basis, active_space, charge=0, unit='bohr'):
         dso[k,:,:] += a11 - a11.trace() * np.eye(3)
 
     # Singlet Linear Response
-    LR = naive.LinearResponseUCC(WF, excitations="SD")
+    LR = naive.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
 
     # PSO
@@ -126,7 +124,7 @@ def get_sscc(geometry, basis, active_space, charge=0, unit='bohr'):
         pso[k,:,:] -= np.einsum('ix,iy->xy', d1[i], h1[j])
 
     # Triplet Linear Response
-    LR = naive_t.LinearResponseUCC(WF, excitations="SD")
+    LR = naive_t.LinearResponse(WF, excitations="SD")
     LR.calc_excitation_energies()
 
     # FC
@@ -202,4 +200,3 @@ def test_LiH_sto3g_naive():
 
     # Check coupling constant - reference dalton mcscf
     assert abs(-68.2687 - sscc[0,1]) < thresh
-
