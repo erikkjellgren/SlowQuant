@@ -195,6 +195,7 @@ def generalized_propagate_state(
     num_inactive_orbs = ci_info.num_inactive_orbs
     num_active_orbs = ci_info.num_active_orbs
     num_virtual_orbs = ci_info.num_virtual_orbs
+    num_positronic_orbs = ci_info.num_positronic_orbs
     if len(operators) == 0:
         return np.copy(state)
     new_state = np.copy(state)
@@ -233,7 +234,7 @@ def generalized_propagate_state(
             tmp_state[:] = 0.0
             # Fold operator to only get active contributions
             if do_folding:
-                op_folded = op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs)
+                op_folded = op.get_folded_operator(num_inactive_orbs + num_positronic_orbs, num_active_orbs, num_virtual_orbs)
             else:
                 op_folded = op
             # loop over all strings of annihilation operators in FermionicOperator sum

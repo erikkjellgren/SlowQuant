@@ -3,7 +3,7 @@ from collections.abc import Sequence
 import numpy as np
 
 from slowquant.molecularintegrals.integralfunctions import (
-    one_electron_integral_transform, generalized_one_electron_transform
+    one_electron_integral_transform, generalized_one_electron_transform,
 )
 from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_orbital_gradient_response, get_orbital_gradient_response_real_imag,
@@ -12,6 +12,7 @@ from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_orbital_response_property_gradient_annika, get_orbital_response_property_gradient_real_imag, 
     get_orbital_response_metric_sigma_real_imag,  get_orbital_response_static_property_gradient, 
 )
+
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.linear_response.generalized_lr_baseclass import (
     LinearResponseBaseClass,
@@ -561,10 +562,10 @@ class LinearResponse(LinearResponseBaseClass):
             f"{np.max(np.abs(self.B - self.B.T)):.2e}")  
         
                         
-        # print("H shape:", E2.shape)
-        # print("sigma shape:", self.Sigma.shape)
-        # print("H diagonal:", np.diag(E2).real)
-        # print("sigma diagonal:", np.diag(self.Sigma).real)
+        #print("H shape:", E2.shape)
+        #print("sigma shape:", self.Sigma.shape)
+        #print("H diagonal:", np.diag(E2).real)
+        #print("sigma diagonal:", np.diag(self.Sigma).real)
         
         # print(f"Hermiticity check of A qG: max|A - A†| = "
         #     f"{np.max(np.abs(self.A[:idx_shift,idx_shift:] - self.A[idx_shift:,:idx_shift].conj().T)):.2e}") 

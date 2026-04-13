@@ -148,6 +148,10 @@ class LinearResponseBaseClass:
         elif np.min(hess_eigval) < 0:
             print("Negative eigenvalue in Hessian.")
             #raise ValueError("Negative eigenvalue in Hessian.")
+        for i in hess_eigval:
+            if i < 0:
+                print("Negative eigenvalue in Hessian:",i)
+            #raise ValueError("Negative eigenvalue in Hessian.")
 
         S = np.zeros((size * 2, size * 2), dtype=complex) #AE complex
         S[:size, :size] = self.Sigma
@@ -165,9 +169,9 @@ class LinearResponseBaseClass:
         # for i in range(len(self.hessian)):
         #     print(self.hessian[i][i], i)
                 
-        eigval, eigvec, sigma_eigs, keep = solve_lr_drop_sigma_null(self.hessian, self.metric, cut=1e-10)
+        # eigval, eigvec, sigma_eigs, keep = solve_lr_drop_sigma_null(self.hessian, self.metric, cut=1e-10)
 
-        # eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)     
+        eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)     
      
             
         #     # num=(eigvec.conj().T@(self.hessian)@eigvec)

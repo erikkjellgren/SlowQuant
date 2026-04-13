@@ -12,7 +12,7 @@ from slowquant.SlowQuant import SlowQuant
 from slowquant.molecularintegrals.integralfunctions import (
     generalized_one_electron_transform,
     generalized_two_electron_transform,
-    # DHF_one_electron_transform,
+    DHF_one_electron_transform,
 )
 from slowquant.unitary_coupled_cluster.generalized_integral_manager import IntegralManager
 
@@ -331,7 +331,7 @@ class GeneralizedWaveFunctionUPS:
         if isinstance(self._kappa_real, np.ndarray):
             self._kappa_real = self._kappa_real.tolist()
         if isinstance(self._kappa_imag, np.ndarray):
-            self._kappa_img = self._kappa_imag.tolist()
+            self._kappa_imag = self._kappa_imag.tolist()
         # Move current expansion point.
         self._c_mo = self.c_mo
         self._kappa_real_old = self.kappa_real
@@ -385,7 +385,7 @@ class GeneralizedWaveFunctionUPS:
         if isinstance(self._thetas_real, np.ndarray):
             self._thetas_real = self._thetas_real.tolist()
         if isinstance(self._thetas_imag, np.ndarray):
-            self._thetas_img = self._thetas_imag.tolist()
+            self._thetas_imag = self._thetas_imag.tolist()
 
         self.ci_coeffs = generalized_construct_ups_state_test_erik(
             self.csf_coeffs,
