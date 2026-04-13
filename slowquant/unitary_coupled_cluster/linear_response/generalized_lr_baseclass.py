@@ -80,18 +80,14 @@ class LinearResponseBaseClass:
             # print("Excitation idx")
             for a, i in iterate_t1(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx, is_spin_conserving=False): ## -diagonal jf HJ. Cross?, # is_spin_conserving  AWE
                 self.G_ops.append(G1(i, a)) #AE from G1
-                print('G1', i,a)
                 self.operator_labels_G.append(('G1',i,a))
         if "d" in excitations:
             for a, i, b, j in iterate_t2(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx, is_spin_conserving=False): 
                 self.G_ops.append(G2(i, j, a, b)) #AE from G2
-                print('G2',i, j, a, b)
                 self.operator_labels_G.append(('G2',i,j,a,b))
         if "t" in excitations:
             for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
                 self.G_ops.append(G3(i, j, k, a, b, c))
-                # print('G3',a, i, b, j, c, k)
-                # print(i,k,k,a,b,c)
         if "q" in excitations:
             for a, i, b, j, c, k, d, l in iterate_t4(
                 self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx
@@ -112,8 +108,6 @@ class LinearResponseBaseClass:
             self.q_ops.append(G1(p, q)) #AE from G1 skal det være generalized??
             self.operator_labels_q.append(('q',p,q))
             # print('qs:',p,q)
-        # print('no active active', self.wf.kappa_no_activeactive_spin_idx)
-        # print(operator_labels)
         num_parameters = len(self.G_ops) + len(self.q_ops)
         self.A = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
         self.B = np.zeros((num_parameters, num_parameters), dtype=complex) #AE complex
@@ -126,12 +120,12 @@ class LinearResponseBaseClass:
             self.wf.num_active_spin_orbs,
             self.wf.num_virtual_spin_orbs,
         )
-        # self.H_0i_0a = generalized_hamiltonian_0i_0a( #AE: virker ikke!
-        #     self.wf.h_mo,
-        #     self.wf.g_mo,
-        #     self.wf.num_inactive_spin_orbs,
-        #     self.wf.num_active_spin_orbs,
-        # )
+        self.H_0i_0a = generalized_hamiltonian_0i_0a(
+            self.wf.h_mo,
+            self.wf.g_mo,
+            self.wf.num_inactive_spin_orbs,
+            self.wf.num_active_spin_orbs,
+        )
         
 
     def calc_excitation_energies(self) -> None:
@@ -171,9 +165,9 @@ class LinearResponseBaseClass:
         # for i in range(len(self.hessian)):
         #     print(self.hessian[i][i], i)
                 
-        # eigval, eigvec, sigma_eigs, keep = solve_lr_drop_sigma_null(self.hessian, self.metric, cut=1e-10)
+        eigval, eigvec, sigma_eigs, keep = solve_lr_drop_sigma_null(self.hessian, self.metric, cut=1e-10)
 
-        eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)     
+        # eigval, eigvec = scipy.linalg.eig(self.hessian, self.metric)     
      
             
         #     # num=(eigvec.conj().T@(self.hessian)@eigvec)
@@ -220,27 +214,27 @@ class LinearResponseBaseClass:
         
         
         #PERNILLES
-        # self.num_q = self.q_ops_finite
-        # self.num_qG = size
+        self.num_q = self.q_ops_finite
+        self.num_qG = size
         
         
-        self.num_G = size - self.num_q
-        self.Z_q = self.response_vectors[: self.num_q, :]
-        self.Z_G = self.response_vectors[self.num_q : self.num_q + self.num_G, :]
-        self.Y_q = self.response_vectors[self.num_q + self.num_G : 2 * self.num_q + self.num_G]
-        self.Y_G = self.response_vectors[2 * self.num_q + self.num_G :]
+        # self.num_G = size - self.num_q
+        # self.Z_q = self.response_vectors[: self.num_q, :]
+        # self.Z_G = self.response_vectors[self.num_q : self.num_q + self.num_G, :]
+        # self.Y_q = self.response_vectors[self.num_q + self.num_G : 2 * self.num_q + self.num_G]
+        # self.Y_G = self.response_vectors[2 * self.num_q + self.num_G :]
         
         
         #Pernille
-        # self.Z_qG = self.response_vectors[: self.num_qG, :]
-        # self.Y_qG = self.response_vectors[self.num_qG :]
-        # self.Z_qG_normed = np.zeros_like(self.Z_qG, dtype=complex)
-        # self.Y_qG_normed = np.zeros_like(self.Y_qG, dtype=complex)
+        self.Z_qG = self.response_vectors[: self.num_qG, :]
+        self.Y_qG = self.response_vectors[self.num_qG :]
+        self.Z_qG_normed = np.zeros_like(self.Z_qG, dtype=complex)
+        self.Y_qG_normed = np.zeros_like(self.Y_qG, dtype=complex)
         
-        self.Z_q_normed = np.zeros_like(self.Z_q, dtype=complex) #AE
-        self.Z_G_normed = np.zeros_like(self.Z_G, dtype=complex) #AE
-        self.Y_q_normed = np.zeros_like(self.Y_q, dtype=complex) #AE
-        self.Y_G_normed = np.zeros_like(self.Y_G, dtype=complex) #AE
+        # self.Z_q_normed = np.zeros_like(self.Z_q, dtype=complex) #AE
+        # self.Z_G_normed = np.zeros_like(self.Z_G, dtype=complex) #AE
+        # self.Y_q_normed = np.zeros_like(self.Y_q, dtype=complex) #AE
+        # self.Y_G_normed = np.zeros_like(self.Y_G, dtype=complex) #AE
 
 
         norms = self.get_excited_state_norm()
@@ -248,14 +242,14 @@ class LinearResponseBaseClass:
             if abs(norm) < 10**-10: #AE change to abs
                 print(f"WARNING: State number {state_number} could not be normalized. Norm of {norm}.")
                 continue
-            self.Z_q_normed[:, state_number] = self.Z_q[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real) # AE added abs and np.sign
-            self.Z_G_normed[:, state_number] = self.Z_G[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real)
-            self.Y_q_normed[:, state_number] = self.Y_q[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real)
-            self.Y_G_normed[:, state_number] = self.Y_G[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real)
+            # self.Z_q_normed[:, state_number] = self.Z_q[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real) # AE added abs and np.sign
+            # self.Z_G_normed[:, state_number] = self.Z_G[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real)
+            # self.Y_q_normed[:, state_number] = self.Y_q[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real)
+            # self.Y_G_normed[:, state_number] = self.Y_G[:, state_number] * (1/abs(norm))**0.5 * np.sign(norm.real)
             
             # #Pernille
-            # self.Z_qG_normed[:, state_number] = self.Z_qG[:, state_number] * (1 / norm) ** 0.5
-            # self.Y_qG_normed[:, state_number] = self.Y_qG[:, state_number] * (1 / norm) ** 0.5
+            self.Z_qG_normed[:, state_number] = self.Z_qG[:, state_number] * (1 / norm) ** 0.5 * np.sign(norm.real)
+            self.Y_qG_normed[:, state_number] = self.Y_qG[:, state_number] * (1 / norm) ** 0.5 * np.sign(norm.real)
         
             
             self.normed_response_vectors[:, state_number] = (
@@ -274,22 +268,22 @@ class LinearResponseBaseClass:
         norms = np.zeros(len(self.response_vectors[0]),dtype=complex) #AE complex
         for state_number in range(len(self.response_vectors[0])):
             # Get Z_q Z_G Y_q and Y_G matrices
-            ZZq = np.outer(self.Z_q[:, state_number], self.Z_q[:, state_number].conj().T) #AE transpose to conj
-            YYq = np.outer(self.Y_q[:, state_number], self.Y_q[:, state_number].conj().T)
-            ZZG = np.outer(self.Z_G[:, state_number], self.Z_G[:, state_number].conj().T)
-            YYG = np.outer(self.Y_G[:, state_number], self.Y_G[:, state_number].conj().T)
+            # ZZq = np.outer(self.Z_q[:, state_number], self.Z_q[:, state_number].conj().T) #AE transpose to conj
+            # YYq = np.outer(self.Y_q[:, state_number], self.Y_q[:, state_number].conj().T)
+            # ZZG = np.outer(self.Z_G[:, state_number], self.Z_G[:, state_number].conj().T)
+            # YYG = np.outer(self.Y_G[:, state_number], self.Y_G[:, state_number].conj().T)
 
             
-            norms[state_number] = np.sum(self.metric[: self.num_q, : self.num_q] * (ZZq - YYq)) + np.sum(
-                self.metric[self.num_q : self.num_q + self.num_G, self.num_q : self.num_q + self.num_G]
-                * (ZZG - YYG)
-            )
+            # norms[state_number] = np.sum(self.metric[: self.num_q, : self.num_q] * (ZZq - YYq)) + np.sum(
+            #     self.metric[self.num_q : self.num_q + self.num_G, self.num_q : self.num_q + self.num_G]
+            #     * (ZZG - YYG)
+            # )
 
             
             #Pernille
-            # ZZqG = np.outer(self.Z_qG[:, state_number], self.Z_qG[:, state_number].transpose())
-            # YYqG = np.outer(self.Y_qG[:, state_number], self.Y_qG[:, state_number].transpose())
-            # norms[state_number] = np.sum(self.metric[: self.num_qG, : self.num_qG] * (ZZqG - YYqG))
+            ZZqG = np.outer(self.Z_qG[:, state_number], self.Z_qG[:, state_number].conj().transpose())
+            YYqG = np.outer(self.Y_qG[:, state_number], self.Y_qG[:, state_number].conj().transpose())
+            norms[state_number] = np.sum(self.metric[: self.num_qG, : self.num_qG] * (ZZqG - YYqG))
             
         return norms
 
