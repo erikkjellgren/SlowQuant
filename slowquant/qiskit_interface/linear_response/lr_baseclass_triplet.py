@@ -7,14 +7,24 @@ from slowquant.qiskit_interface.circuit_wavefunction import WaveFunctionCircuit
 from slowquant.unitary_coupled_cluster.operators import (
     G1_tsa,
     G2_tsa,
+    G3,
+    G4,
+    G5,
+    G6,
     hamiltonian_0i_0a,
     hamiltonian_1i_1a,
 )
-from slowquant.unitary_coupled_cluster.util import iterate_t1_sa, iterate_t2_tsa
+from slowquant.unitary_coupled_cluster.util import (
+    iterate_t1_sa, 
+    iterate_t2_tsa,
+    iterate_t3,
+    iterate_t4,
+    iterate_t5,
+    iterate_t6,
+    )
 
 
 class quantumLRBaseClass:
-
     def __init__(
         self,
         wf: WaveFunctionCircuit,
@@ -24,6 +34,7 @@ class quantumLRBaseClass:
 
         Args:
             wf: Wavefunction object.
+            excitations: Which excitation orders to include in response.
         """
         self.wf = wf
         # Create operators
@@ -33,14 +44,34 @@ class quantumLRBaseClass:
         )
 
         self.G_ops = []
-        # G1
-        for a, i, _ in iterate_t1_sa(wf.active_occ_idx, wf.active_unocc_idx):
-            self.G_ops.append(G1_tsa(i, a))
-        # G2
-        for a, i, b, j, _, op_type in iterate_t2_tsa(wf.active_occ_idx, wf.active_unocc_idx):
-            self.G_ops.append(G2_tsa(i, j, a, b, op_type))
-        # q
         self.q_ops = []
+        excitations = excitations.lower()
+
+        if "s" in excitations:
+            for a, i, _ in iterate_t1_sa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
+                self.G_ops.append(G1_tsa(i, a))
+        if "d" in excitations:
+            for a, i, b, j, _, op_type in iterate_t2_tsa(self.wf.active_occ_idx, self.wf.active_unocc_idx):
+                self.G_ops.append(G2_tsa(i, j, a, b, op_type))
+        if "t" in excitations:
+            for a, i, b, j, c, k in iterate_t3(self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx):
+                self.G_ops.append(G3(i, j, k, a, b, c))
+        if "q" in excitations:
+            for a, i, b, j, c, k, d, l in iterate_t4(
+                self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx
+            ):
+                self.G_ops.append(G4(i, j, k, l, a, b, c, d))
+        if "5" in excitations:
+            for a, i, b, j, c, k, d, l, e, m in iterate_t5(
+                self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx
+            ):
+                self.G_ops.append(G5(i, j, k, l, m, a, b, c, d, e))
+        if "6" in excitations:
+            for a, i, b, j, c, k, d, l, e, m, f, n in iterate_t6(
+                self.wf.active_occ_spin_idx, self.wf.active_unocc_spin_idx
+            ):
+                self.G_ops.append(G6(i, j, k, l, m, n, a, b, c, d, e, f))
+        # q
         for p, q in wf.kappa_no_activeactive_idx:
             self.q_ops.append(G1_tsa(p, q))
 
