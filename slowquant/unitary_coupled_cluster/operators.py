@@ -43,6 +43,7 @@ def a_op_spin(spin_idx: int, dagger: bool) -> FermionicOperator:
 def b_op(idx: int, dagger: bool) -> HardcorebosonOperator:
     return HardcorebosonOperator({((idx, dagger),): 1})
 
+
 def Epq(p: int, q: int) -> FermionicOperator:
     r"""Construct the singlet one-electron excitation operator.
 
@@ -681,11 +682,11 @@ def hamiltonian_hcb_full_space(hr1: np.ndarray, hr2: np.ndarray, num_orbs: int) 
     H = HardcorebosonOperator({})
     for p in range(num_orbs):
         for q in range(num_orbs):
-            if abs(hr1[p,q]) > 10**-14:
-                H += hr1[p,q]*b_op(p,True)*b_op(q,False)
+            if abs(hr1[p, q]) > 10**-14:
+                H += hr1[p, q] * b_op(p, True) * b_op(q, False)
             if p != q:
-                if abs(hr2[p,q]) > 10**-14:
-                    H += hr2[p,q]*b_op(p,True)*b_op(p,False)*b_op(q,True)*b_op(q,False)
+                if abs(hr2[p, q]) > 10**-14:
+                    H += hr2[p, q] * b_op(p, True) * b_op(p, False) * b_op(q, True) * b_op(q, False)
     return H
 
 

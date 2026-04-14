@@ -1,5 +1,4 @@
 from __future__ import annotations
-from re import I
 
 import time
 from collections.abc import Sequence
@@ -16,20 +15,18 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.SlowQuant import SlowQuant
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_hcb
-#from slowquant.unitary_coupled_cluster.density_matrix import (
+
+# from slowquant.unitary_coupled_cluster.density_matrix import (
 #    get_electronic_energy_hcb,
 #    get_orbital_gradient_hcb,
-#)
-from slowquant.unitary_coupled_cluster.hardcoreboson_operator import HardcorebosonOperator
+# )
 from slowquant.unitary_coupled_cluster.integral_manager import IntegralManager
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     construct_ups_state,
     expectation_value,
     get_grad_action,
     propagate_state,
-    propagate_state_SA,
     propagate_unitary,
-    propagate_unitary_SA,
 )
 from slowquant.unitary_coupled_cluster.operators import hamiltonian_hcb_full_space
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
@@ -64,23 +61,19 @@ class WaveFunctionHCBUPS:
         # Init stuff
         self.int_gen = IntegralManager(integral_generator)
         self._c_mo = mo_coeffs
-        self.inactive_spin_idx = []
-        self.virtual_spin_idx = []
-        self.active_spin_idx = []
-        self.active_occ_spin_idx = []
-        self.active_unocc_spin_idx = []
-        self.active_spin_idx_shifted = []
-        self.active_occ_spin_idx_shifted = []
-        self.active_unocc_spin_idx_shifted = []
+        self.inactive_idx = []
+        self.virtual_idx = []
+        self.active_idx = []
+        self.active_occ_idx = []
+        self.active_unocc_idx = []
         self.active_idx_shifted = []
         self.active_occ_idx_shifted = []
         self.active_unocc_idx_shifted = []
-        self.num_spin_orbs = 2 * len(self.int_gen.kinetic_energy)
         self.num_orbs = len(self.int_gen.kinetic_energy)
         self.num_active_elec = 0
-        self.num_active_spin_orbs = 0
-        self.num_inactive_spin_orbs = 0
-        self.num_virtual_spin_orbs = 0
+        self.num_active_orbs = 0
+        self.num_inactive_orbs = 0
+        self.num_virtual_orbs = 0
         self._rdm1 = None
         self._rdm2 = None
         self._hr1 = None
@@ -88,67 +81,33 @@ class WaveFunctionHCBUPS:
         self._energy_elec: float | None = None
         self.ansatz_options = ansatz_options
         self.num_energy_evals = 0
-        # Construct spin orbital spaces and indices
+        # Construct spatial orbital spaces and indices
         active_space = []
         orbital_counter = 0
         num_elec = self.int_gen.num_elec
-        for i in range(num_elec - cas[0], num_elec):
+        for i in range(num_elec // 2 - cas[0] // 2, num_elec // 2):
             active_space.append(i)
             orbital_counter += 1
-        for i in range(num_elec, num_elec + 2 * cas[1] - orbital_counter):
+        for i in range(num_elec // 2, num_elec // 2 + cas[1] - orbital_counter):
             active_space.append(i)
-        for i in range(num_elec):
+        for i in range(num_elec // 2):
             if i in active_space:
-                self.active_spin_idx.append(i)
-                self.active_occ_spin_idx.append(i)
-                self.num_active_spin_orbs += 1
-                self.num_active_elec += 1
+                self.active_idx.append(i)
+                self.active_occ_idx.append(i)
+                self.num_active_orbs += 1
+                self.num_active_elec += 2
             else:
-                self.inactive_spin_idx.append(i)
-                self.num_inactive_spin_orbs += 1
-        for i in range(num_elec, self.num_spin_orbs):
+                self.inactive_idx.append(i)
+                self.num_inactive_orbs += 1
+        for i in range(num_elec // 2, self.num_orbs):
             if i in active_space:
-                self.active_spin_idx.append(i)
-                self.active_unocc_spin_idx.append(i)
-                self.num_active_spin_orbs += 1
+                self.active_idx.append(i)
+                self.active_unocc_idx.append(i)
+                self.num_active_orbs += 1
             else:
-                self.virtual_spin_idx.append(i)
-                self.num_virtual_spin_orbs += 1
-        self.num_active_elec_alpha = self.num_active_elec // 2
-        self.num_active_elec_beta = self.num_active_elec // 2
-        self.num_inactive_orbs = self.num_inactive_spin_orbs // 2
-        self.num_active_orbs = self.num_active_spin_orbs // 2
-        self.num_virtual_orbs = self.num_virtual_spin_orbs // 2
-        # Construct spatial idx
-        self.inactive_idx: list[int] = []
-        self.virtual_idx: list[int] = []
-        self.active_idx: list[int] = []
-        self.active_occ_idx: list[int] = []
-        self.active_unocc_idx: list[int] = []
-        for idx in self.inactive_spin_idx:
-            if idx // 2 not in self.inactive_idx:
-                self.inactive_idx.append(idx // 2)
-        for idx in self.active_spin_idx:
-            if idx // 2 not in self.active_idx:
-                self.active_idx.append(idx // 2)
-        for idx in self.virtual_spin_idx:
-            if idx // 2 not in self.virtual_idx:
-                self.virtual_idx.append(idx // 2)
-        for idx in self.active_occ_spin_idx:
-            if idx // 2 not in self.active_occ_idx:
-                self.active_occ_idx.append(idx // 2)
-        for idx in self.active_unocc_spin_idx:
-            if idx // 2 not in self.active_unocc_idx:
-                self.active_unocc_idx.append(idx // 2)
+                self.virtual_idx.append(i)
+                self.num_virtual_orbs += 1
         # Make shifted indices
-        if len(self.active_spin_idx) != 0:
-            active_shift = np.min(self.active_spin_idx)
-            for active_idx in self.active_spin_idx:
-                self.active_spin_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_occ_spin_idx:
-                self.active_occ_spin_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_unocc_spin_idx:
-                self.active_unocc_spin_idx_shifted.append(active_idx - active_shift)
         if len(self.active_idx) != 0:
             active_shift = np.min(self.active_idx)
             for active_idx in self.active_idx:
@@ -210,7 +169,9 @@ class WaveFunctionHCBUPS:
         )
         self.num_det = len(self.ci_info.idx2det)
         self.csf_coeffs = np.zeros(self.num_det)
-        hf_det = int("1" * (self.num_active_elec // 2) + "0" * (self.num_active_orbs - self.num_active_elec//2), 2)
+        hf_det = int(
+            "1" * (self.num_active_elec // 2) + "0" * (self.num_active_orbs - self.num_active_elec // 2), 2
+        )
         self.csf_coeffs[self.ci_info.det2idx[hf_det]] = 1
         self.ci_coeffs = np.copy(self.csf_coeffs)
         # Construct UPS Structure
@@ -311,9 +272,9 @@ class WaveFunctionHCBUPS:
             for p in range(self.num_orbs):
                 for q in range(self.num_orbs):
                     if p == q:
-                        self._hr1[p,q] = 2*h_mo[p,p] + g_mo[p,p,p,p]
+                        self._hr1[p, q] = 2 * h_mo[p, p] + g_mo[p, p, p, p]
                     else:
-                        self._hr1[p,q] = g_mo[p,q,p,q]
+                        self._hr1[p, q] = g_mo[p, q, p, q]
         return self._hr1
 
     @property
@@ -324,7 +285,7 @@ class WaveFunctionHCBUPS:
             for p in range(self.num_orbs):
                 for q in range(self.num_orbs):
                     if p != q:
-                        self._hr2[p,q] = 2*g_mo[p,p,q,q] - g_mo[p,q,p,q]
+                        self._hr2[p, q] = 2 * g_mo[p, p, q, q] - g_mo[p, q, p, q]
         return self._hr2
 
     @property

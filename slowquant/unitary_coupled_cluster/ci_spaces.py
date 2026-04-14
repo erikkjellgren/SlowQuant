@@ -111,7 +111,7 @@ def get_indexing_hcb(
     det2idx = {}
     # Loop over all possible particle conserving determinants
     for string in multiset_permutations(
-        [1] * (num_active_elec//2) + [0] * (num_active_orbs - num_active_elec//2)
+        [1] * (num_active_elec // 2) + [0] * (num_active_orbs - num_active_elec // 2)
     ):
         det_str = ""
         for occ in string:
@@ -129,6 +129,7 @@ def get_indexing_hcb(
         np.array(idx2det, dtype=int),
         det2idx,
     )
+
 
 def get_indexing_extended(
     num_inactive_orbs: int,

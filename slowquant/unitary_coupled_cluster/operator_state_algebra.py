@@ -16,8 +16,8 @@ from slowquant.unitary_coupled_cluster.operators import (
     G5,
     G6,
     G1_sa,
-    G2_sa,
     G2_bch,
+    G2_sa,
 )
 from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
 
