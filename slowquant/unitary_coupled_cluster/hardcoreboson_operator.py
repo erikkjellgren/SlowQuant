@@ -423,7 +423,7 @@ class HardcorebosonOperator:
         virtual_idx = []
         # Get indices of spaces
         for i in range(num_inactive_orbs + num_active_orbs + num_virtual_orbs):
-            if i < 2 * num_inactive_orbs:
+            if i < num_inactive_orbs:
                 inactive_idx.append(i)
             elif i < num_inactive_orbs + num_active_orbs:
                 active_idx.append(i)
