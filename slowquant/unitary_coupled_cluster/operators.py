@@ -449,6 +449,14 @@ def G2_sa(
     return op
 
 
+def G2_bch(i: int, a: int, return_anti_hermitian: bool = False) -> HardcorebosonOperator:
+    op = b_op(a, dagger=True)
+    op *= b_op(i, dagger=False)
+    if return_anti_hermitian:
+        op -= op.dagger
+    return op
+
+
 def hamiltonian_full_space(h_mo: np.ndarray, g_mo: np.ndarray, num_orbs: int) -> FermionicOperator:
     r"""Construct full-space electronic Hamiltonian.
 

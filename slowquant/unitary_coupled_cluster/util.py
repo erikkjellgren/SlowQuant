@@ -648,6 +648,8 @@ class UpsStructure:
             * D [bool]: Add double excitations.
             * pD [bool]: Add pair double excitations.
             * GpD [bool]: Add generalized pair double excitations.
+            * HCBD [bool]: Hardcoreboson double exciation.
+            * HCBGD [bool]: Hardcoreboson generalized double exciation.
 
         Args:
             num_orbs: Number of active spatial orbitals.
@@ -658,7 +660,7 @@ class UpsStructure:
             Factorized UCC ansatz.
         """
         # Options
-        valid_options = ("n_layers", "S", "D", "SAGS", "pD", "GpD", "SAS", "SAD")
+        valid_options = ("n_layers", "S", "D", "SAGS", "pD", "GpD", "SAS", "SAD", "HCBD", "HCBGD")
         for option in ansatz_options:
             if option not in valid_options:
                 raise ValueError(f"Got unknown option for fUCC, {option}. Valid options are: {valid_options}")
@@ -671,6 +673,8 @@ class UpsStructure:
         do_pD = False
         do_GpD = False
         do_SAD = False
+        do_HCBD = False
+        do_HCBGD = False
         if "S" in ansatz_options.keys():
             if ansatz_options["S"]:
                 do_S = True
@@ -692,8 +696,16 @@ class UpsStructure:
         if "SAD" in ansatz_options.keys():
             if ansatz_options["SAD"]:
                 do_SAD = True
-        if True not in (do_S, do_SAS, do_SAGS, do_D, do_pD, do_GpD, do_SAD):
+        if "HCBD" in ansatz_options.keys():
+            if ansatz_options["HCBD"]:
+                do_HCBD = True
+        if "HCBGD" in ansatz_options.keys():
+            if ansatz_options["HCBGD"]:
+                do_HCBGD = True
+        if True not in (do_S, do_SAS, do_SAGS, do_D, do_pD, do_GpD, do_SAD, do_HCBD, do_HCBGD):
             raise ValueError("fUCC requires some excitations got none.")
+        if True in (do_HCBD, do_HCBGD) and True in (do_S, do_SAS, do_SAGS, do_D, do_pD, do_GpD, do_SAD):
+            raise ValueError("Cannot mix HCB operators with other operators.")
         n_layers = ansatz_options["n_layers"]
         num_spin_orbs = 2 * num_orbs
         occ_spin = []
@@ -761,6 +773,22 @@ class UpsStructure:
                     self.excitation_indices.append((i, j, a, b))
                     # Rotosolve not implemented for SA doubles
                     # self.grad_param_R[f"p{self.n_params:09d}"] = None
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+            if do_HCBD:
+                # Can use the same iterator as spin-adapted singles.
+                for a, i, _ in iterate_t1_sa(occ, unocc):
+                    self.excitation_operator_type.append("hcb_double")
+                    self.excitation_indices.append((i, a))
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
+                    self.param_names.append(f"p{self.n_params:09d}")
+                    self.n_params += 1
+            if do_HCBGD:
+                # Can use the same iterator as spin-adapted singles.
+                for a, i, _ in iterate_t1_sa_generalized(num_orbs):
+                    self.excitation_operator_type.append("hcb_double")
+                    self.excitation_indices.append((i, a))
+                    self.grad_param_R[f"p{self.n_params:09d}"] = 2
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
 

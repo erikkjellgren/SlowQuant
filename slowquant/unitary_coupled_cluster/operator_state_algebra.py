@@ -17,6 +17,7 @@ from slowquant.unitary_coupled_cluster.operators import (
     G6,
     G1_sa,
     G2_sa,
+    G2_bch,
 )
 from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
 
@@ -217,6 +218,44 @@ def apply_operator_threaded(
                 continue
         sign = 1.0 - 2.0 * (phase_changes & 1)
         tmp_state[i] += sign * factor * state[det2idx[det]]
+    return tmp_state
+
+
+@nb.jit(nopython=True)
+def apply_hcb_operator_serial(
+    state: np.ndarray,
+    a_string: np.ndarray,
+    create_screen: np.ndarray,
+    anni_idx: np.ndarray,
+    num_active_orbs: int,
+    idx2det: np.ndarray,
+    det2idx: dict[int, int],
+    do_unsafe: bool,
+    tmp_state: np.ndarray,
+    factor: float,
+) -> np.ndarray:
+    num_orbs_m1 = num_active_orbs - 1
+    anni_mask = 0
+    for orb_idx in anni_idx:
+        anni_mask |= 1 << (num_orbs_m1 - orb_idx)
+    create_mask = 0
+    for orb_idx in create_screen:
+        create_mask |= 1 << (num_orbs_m1 - orb_idx)
+    for i in range(len(idx2det)):
+        det = idx2det[i]
+        if (det & anni_mask) != anni_mask:
+            continue
+        if (det & create_mask) != 0:
+            continue
+        state_i = state[i]
+        if abs(state_i) < 10**-28:
+            continue
+        for orb_idx in a_string:
+            det = det ^ (1 << (num_orbs_m1 - orb_idx))
+        if do_unsafe:
+            if det not in det2idx:
+                continue
+        tmp_state[det2idx[det]] += factor * state_i
     return tmp_state
 
 
@@ -628,7 +667,45 @@ def propagate_state(
                     )
             new_state = np.copy(tmp_state)
         elif isinstance(op, HardcorebosonOperator):
-            None
+            tmp_state[:] = 0.0
+            # Fold operator to only get active contributions
+            if do_folding:
+                op_folded = op.get_folded_operator(num_inactive_orbs, num_active_orbs, num_virtual_orbs)
+            else:
+                op_folded = op
+            for hcb_label in op_folded.operators.keys():
+                # Separate each annihilation operator string in creation and annihilation indices
+                anni_idx = []
+                create_idx = []
+                for hcb_op in hcb_label:
+                    if hcb_op[1]:
+                        create_idx.append(hcb_op[0])
+                    else:
+                        anni_idx.append(hcb_op[0])
+                # When screening determinants,
+                # no need to consider the annihilation index of an
+                # operator that has the same creation index.
+                create_screen = []
+                for idx in create_idx:
+                    if idx not in anni_idx:
+                        create_screen.append(idx)
+                a_string = np.array(anni_idx + create_idx, dtype=np.int64)
+                create_screen = np.array(create_screen, dtype=np.int64)
+                create_idx = np.array(create_idx, dtype=np.int64)
+                anni_idx = np.array(anni_idx, dtype=np.int64)
+                tmp_state = apply_hcb_operator_serial(
+                    new_state,
+                    a_string,
+                    create_screen,
+                    anni_idx,
+                    num_active_orbs,
+                    idx2det,
+                    det2idx,
+                    do_unsafe,
+                    tmp_state,
+                    op_folded.operators[hcb_label],
+                )
+            new_state = np.copy(tmp_state)
         else:
             raise ValueError(f"Got unknown operator type: {type(op)}")
     return new_state
@@ -1044,7 +1121,7 @@ def construct_ups_state(
                     do_folding=False,
                 )
             )
-        elif exc_type in ("single", "double", "sa_double_1"):
+        elif exc_type in ("single", "double", "sa_double_1", "hcb_double"):
             # Create T matrix
             if exc_type == "single":
                 (i, a) = np.array(exc_indices) + 2 * offset
@@ -1055,6 +1132,9 @@ def construct_ups_state(
             elif exc_type == "sa_double_1":
                 (i, j, a, b) = np.array(exc_indices) + offset
                 T = G2_sa(i, j, a, b, 1, True)
+            elif exc_type == "hcb_double":
+                (i, a) = np.array(exc_indices) + offset
+                T = G2_bch(i, a, True)
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
             # Analytical application on state vector
@@ -1399,6 +1479,27 @@ def construct_ups_state(
                 + k10[3] * (np.cos(S[3] * theta) - 1)  # type: ignore
                 + k10[4] * (np.cos(S[4] * theta) - 1)  # type: ignore
             ) * tmp
+        elif exc_type in ("bch_double",):
+            (i, a) = np.array(exc_indices) + 2 * offset
+            T = G2_bch(i, a, True)
+            # Analytical application on state vector
+            out = (
+                out
+                + np.sin(theta)
+                * propagate_state(
+                    [T],
+                    out,
+                    ci_info,
+                    do_folding=False,
+                )
+                + (1 - np.cos(theta))
+                * propagate_state(
+                    [T, T],
+                    out,
+                    ci_info,
+                    do_folding=False,
+                )
+            )
         else:
             raise ValueError(f"Got unknown excitation type, {exc_type}")
     return out
@@ -1914,7 +2015,7 @@ def propagate_unitary(
                 do_folding=False,
             )
         )
-    elif exc_type in ("single", "double", "sa_double_1"):
+    elif exc_type in ("single", "double", "sa_double_1", "hcb_double"):
         # Create T matrix
         if exc_type == "single":
             (i, a) = np.array(exc_indices) + 2 * offset
@@ -1925,6 +2026,9 @@ def propagate_unitary(
         elif exc_type == "sa_double_1":
             (i, j, a, b) = np.array(exc_indices) + offset
             T = G2_sa(i, j, a, b, 1, True)
+        elif exc_type == "hcb_double":
+            (i, a) = np.array(exc_indices) + offset
+            T = G2_bch(i, a, True)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Analytical application on state vector
@@ -2768,6 +2872,7 @@ def get_grad_action(
         "sa_double_3",
         "sa_double_4",
         "sa_double_5",
+        "hcb_double",
     ):
         # Create T matrix
         if exc_type == "single":
@@ -2791,6 +2896,9 @@ def get_grad_action(
         elif exc_type == "sa_double_5":
             (i, j, a, b) = np.array(exc_indices) + offset
             T = G2_sa(i, j, a, b, 5, True)
+        elif exc_type == "hcb_double":
+            (i, a) = np.array(exc_indices) + offset
+            T = G2_bch(i, a, True)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Apply missing T factor of derivative

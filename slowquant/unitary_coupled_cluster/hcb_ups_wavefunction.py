@@ -1,4 +1,5 @@
 from __future__ import annotations
+from re import I
 
 import time
 from collections.abc import Sequence
@@ -14,7 +15,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     two_electron_integral_transform,
 )
 from slowquant.SlowQuant import SlowQuant
-from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing
+from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_hcb
 #from slowquant.unitary_coupled_cluster.density_matrix import (
 #    get_electronic_energy_hcb,
 #    get_orbital_gradient_hcb,
@@ -35,7 +36,7 @@ from slowquant.unitary_coupled_cluster.optimizers import Optimizers
 from slowquant.unitary_coupled_cluster.util import UpsStructure
 
 
-class WaveFunctionUPS:
+class WaveFunctionHCBUPS:
     def __init__(
         self,
         cas: Sequence[int],
@@ -201,12 +202,11 @@ class WaveFunctionUPS:
         self.kappa_redundant_idx = np.array(kappa_redundant_idx, dtype=int)
         self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
         # Construct determinant basis
-        self.ci_info = get_indexing(
+        self.ci_info = get_indexing_hcb(
             self.num_inactive_orbs,
             self.num_active_orbs,
             self.num_virtual_orbs,
-            self.num_active_elec_alpha,
-            self.num_active_elec_beta,
+            self.num_active_elec,
         )
         self.num_det = len(self.ci_info.idx2det)
         self.csf_coeffs = np.zeros(self.num_det)
@@ -216,13 +216,13 @@ class WaveFunctionUPS:
         # Construct UPS Structure
         self.ups_layout = UpsStructure()
         if ansatz.lower() == "fuccpd":
-            self.ansatz_options["pD"] = True
+            self.ansatz_options["HCBD"] = True
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
             self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
         elif ansatz.lower() == "fuccgpd":
-            self.ansatz_options["GpD"] = True
+            self.ansatz_options["HCBGD"] = True
             self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
         elif ansatz.lower() == "fucc":
             if "n_layers" not in self.ansatz_options.keys():
@@ -305,13 +305,26 @@ class WaveFunctionUPS:
     @property
     def hr1(self) -> np.ndarray:
         if self._hr1 is None:
-            self._hr1 = one_electron_integral_transform(self.c_mo, self.int_gen.h_ao)
+            self._hr1 = np.zeros_like(self.int_gen.h_ao)
+            h_mo = one_electron_integral_transform(self.c_mo, self.int_gen.h_ao)
+            g_mo = two_electron_integral_transform(self.c_mo, self.int_gen.electron_electron_repulsion)
+            for p in range(self.num_orbs):
+                for q in range(self.num_orbs):
+                    if p == q:
+                        self._hr1[p,q] = 2*h_mo[p,p] + g_mo[p,p,p,p]
+                    else:
+                        self._hr1[p,q] = g_mo[p,q,p,q]
         return self._hr1
 
     @property
     def hr2(self) -> np.ndarray:
         if self._hr2 is None:
-            self._hr2 = two_electron_integral_transform(self.c_mo, self.int_gen.electron_electron_repulsion)
+            self._hr2 = np.zeros_like(self.int_gen.h_ao)
+            g_mo = two_electron_integral_transform(self.c_mo, self.int_gen.electron_electron_repulsion)
+            for p in range(self.num_orbs):
+                for q in range(self.num_orbs):
+                    if p != q:
+                        self._hr2[p,q] = 2*g_mo[p,p,q,q] - g_mo[p,q,p,q]
         return self._hr2
 
     @property

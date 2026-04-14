@@ -100,6 +100,36 @@ def get_indexing(
     )
 
 
+def get_indexing_hcb(
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    num_virtual_orbs: int,
+    num_active_elec: int,
+) -> CI_Info:
+    idx = 0
+    idx2det = []
+    det2idx = {}
+    # Loop over all possible particle conserving determinants
+    for string in multiset_permutations(
+        [1] * (num_active_elec//2) + [0] * (num_active_orbs - num_active_elec//2)
+    ):
+        det_str = ""
+        for occ in string:
+            det_str += str(occ)
+        det = int(det_str, 2)  # save determinant as int
+        idx2det.append(det)  # relate index to determinant
+        det2idx[det] = idx  # relate determinant to index
+        idx += 1
+    return CI_Info(
+        num_inactive_orbs,
+        num_active_orbs,
+        num_virtual_orbs,
+        num_active_elec // 2,
+        num_active_elec // 2,
+        np.array(idx2det, dtype=int),
+        det2idx,
+    )
+
 def get_indexing_extended(
     num_inactive_orbs: int,
     num_active_orbs: int,

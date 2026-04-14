@@ -5,10 +5,10 @@ import re
 
 
 def operator_to_qiskit_key(operator_string: tuple[tuple[int, bool], ...], remapping: dict[int, int]) -> str:
-    """Make key string to index a fermionic operator in a dict structure.
+    """Make key string to index a hardcoreboson operator in a dict structure.
 
     Args:
-        operator_string: Fermionic operators.
+        operator_string: Hardcoreboson operators.
         remapping: Map that takes indices from alpha,beta,alpha,beta
                    to alpha,alpha,beta,beta ordering.
 
@@ -27,12 +27,15 @@ def operator_to_qiskit_key(operator_string: tuple[tuple[int, bool], ...], remapp
 def do_extended_normal_ordering(
     fermistring: HardcorebosonOperator,
 ) -> dict[tuple[tuple[int, bool], ...], float]:
-    """Reorder fermionic operator string.
+    r"""Reorder fermionic operator string.
 
     The string will be ordered such that all creation operators are first,
     and annihilation operators are second.
     Within a block of creation or annihilation operators the largest spin index
     will be first and the ordering will be descending.
+
+    $$\hat{b}_p \hat{b}_p^\dagger = 1 - \hat{b}_p^\dagger \hat{b}_p$$
+    $$\hat{b}_q \hat{b}_p^\dagger = \hat{b}_p^\dagger \hat{b}_q, p\neq q$$
 
     Returns:
         Reordered operator dict and factor dict.
@@ -58,14 +61,18 @@ def do_extended_normal_ordering(
                 b = next_operator[current_idx + 1]
                 i = current_idx
                 j = current_idx + 1
+                # both dagger
                 if a[1] and b[1]:
+                    # same index
                     if a[0] == b[0]:
                         is_zero = True
+                    # different index
                     elif a[0] < b[0]:
                         next_operator[i], next_operator[j] = next_operator[j], next_operator[i]
-                        factor *= -1
                         changed = True
+                # not-dagger and dagger
                 elif not a[1] and b[1]:
+                    # Same index
                     if a[0] == b[0]:
                         new_op = copy.copy(next_operator)
                         new_op.pop(j)
@@ -76,17 +83,19 @@ def do_extended_normal_ordering(
                         next_operator[i], next_operator[j] = next_operator[j], next_operator[i]
                         factor *= -1
                         changed = True
+                    # Different index
                     else:
                         next_operator[i], next_operator[j] = next_operator[j], next_operator[i]
-                        factor *= -1
                         changed = True
+                # dagger and not-dagger
                 elif a[1] and not b[1]:
                     pass
+                # not-dagger and not not-dagger same index
                 elif a[0] == b[0]:
                     is_zero = True
+                # not-dagger and not-dagger
                 elif a[0] < b[0]:
                     next_operator[i], next_operator[j] = next_operator[j], next_operator[i]
-                    factor *= -1
                     changed = True
                 current_idx += 1
                 if current_idx + 1 == len(next_operator) or is_zero:
@@ -355,13 +364,13 @@ class HardcorebosonOperator:
         return operator
 
     def get_qiskit_form(self, num_orbs: int) -> dict[str, float]:
-        """Get fermionic operator on qiskit form.
+        """Get hardcoreboson operator on qiskit form.
 
         Args:
             num_orbs: Number of spatial orbitals.
 
         Returns:
-            Fermionic operators on qiskit form.
+            Hardcoreboson operators on qiskit form.
         """
         qiskit_form = {}
         remapping = {}
@@ -413,10 +422,10 @@ class HardcorebosonOperator:
         active_idx = []
         virtual_idx = []
         # Get indices of spaces
-        for i in range(2 * num_inactive_orbs + 2 * num_active_orbs + 2 * num_virtual_orbs):
+        for i in range(num_inactive_orbs + num_active_orbs + num_virtual_orbs):
             if i < 2 * num_inactive_orbs:
                 inactive_idx.append(i)
-            elif i < 2 * num_inactive_orbs + 2 * num_active_orbs:
+            elif i < num_inactive_orbs + num_active_orbs:
                 active_idx.append(i)
             else:
                 virtual_idx.append(i)
@@ -429,20 +438,19 @@ class HardcorebosonOperator:
             inactive_dagger = []
             active = []
             active_dagger = []
-            fac = 1
             # Loop over individual annihilation operator and sort into spaces
             for anni in op_key:
                 if anni[1]:
                     if anni[0] in inactive_idx:
                         inactive_dagger.append(anni[0])
                     elif anni[0] in active_idx:
-                        active_dagger.append((anni[0] - 2 * num_inactive_orbs, anni[1]))
+                        active_dagger.append((anni[0] - num_inactive_orbs, anni[1]))
                     elif anni[0] in virtual_idx:
                         virtual_dagger.append(anni[0])
                 elif anni[0] in inactive_idx:
                     inactive.append(anni[0])
                 elif anni[0] in active_idx:
-                    active.append((anni[0] - 2 * num_inactive_orbs, anni[1]))
+                    active.append((anni[0] - num_inactive_orbs, anni[1]))
                 elif anni[0] in virtual_idx:
                     virtual.append(anni[0])
             # Any virtual indices will make the operator evaluate to zero.
@@ -454,20 +462,11 @@ class HardcorebosonOperator:
             # The inactive bra and ket side must end up giving identical state vectors.
             if bra_side != ket_side:
                 continue
-            if len(inactive_dagger) % 2 == 1 and len(active_dagger) % 2 == 1:
-                fac *= -1
-            # Calculate sign coming from flipping the order of the ket side.
-            # It has to be "flipped" to match the order on the bra side.
-            ket_flip_fac = 1
-            for i in range(1, len(ket_side) + 1):
-                if i % 2 == 0:
-                    ket_flip_fac *= -1
-            fac *= ket_flip_fac
             new_key = tuple(active_op)
             if new_key in operators.keys():
-                operators[new_key] += fac * self.operators[op_key]
+                operators[new_key] += self.operators[op_key]
             else:
-                operators[new_key] = fac * self.operators[op_key]
+                operators[new_key] = self.operators[op_key]
         return HardcorebosonOperator(operators)
 
     def get_info(self) -> tuple[list[list[int]], list[list[int]], list[float]]:
