@@ -1,59 +1,55 @@
-from __future__ import annotations
-
 import time
 from collections.abc import Sequence
 from functools import partial
-from typing import Any
 
 import numpy as np
 import pyscf
 import scipy
+from qiskit import QuantumCircuit
+from qiskit.primitives import (
+    BaseEstimatorV1,
+    BaseEstimatorV2,
+    BaseSamplerV1,
+    BaseSamplerV2,
+)
+from qiskit.quantum_info import SparsePauliOp
 
 from slowquant.molecularintegrals.integralfunctions import (
     one_electron_integral_transform,
     two_electron_integral_transform,
 )
+from slowquant.qiskit_interface.hcb_interface import HCBQuantumInterface
 from slowquant.SlowQuant import SlowQuant
-from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_hcb
 from slowquant.unitary_coupled_cluster.integral_manager import IntegralManager
-from slowquant.unitary_coupled_cluster.operator_state_algebra import (
-    construct_ups_state,
-    expectation_value,
-    get_grad_action,
-    propagate_state,
-    propagate_unitary,
-)
 from slowquant.unitary_coupled_cluster.operators import hamiltonian_hcb_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
-from slowquant.unitary_coupled_cluster.util import UpsStructure
 
 
-class WaveFunctionHCBUPS:
+class WaveFunctionHCBCircuit:
     def __init__(
         self,
         cas: Sequence[int],
         mo_coeffs: np.ndarray,
         integral_generator: SlowQuant | pyscf.gto.mole.Mole,
-        ansatz: str,
-        ansatz_options: dict[str, Any] | None = None,
+        quantum_interface: QuantumInterface,
         include_active_kappa: bool = False,
     ) -> None:
-        """Initialize for UPS wave function.
+        """Initialize circuit based UPS wave function.
 
         Args:
             cas: CAS(num_active_elec, num_active_orbs),
                  orbitals are counted in spatial basis.
             mo_coeffs: Initial orbital coefficients.
             integral_generator: Integral generator object.
-            ansatz: Name of ansatz.
-            ansatz_options: Ansatz options.
+            quantum_interface: QuantumInterface.
             include_active_kappa: Include active-active orbital rotations.
         """
-        if ansatz_options is None:
-            ansatz_options = {}
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
-        # Init stuff
+        if isinstance(quantum_interface.ansatz, QuantumCircuit):
+            print(
+                "WARNING: A QI with a custom Ansatz was passed. VQE will only work with COBYLA and COBYQA optimizer."
+            )
         self.int_gen = IntegralManager(integral_generator)
         self._c_mo = mo_coeffs
         self.inactive_idx = []
@@ -61,9 +57,6 @@ class WaveFunctionHCBUPS:
         self.active_idx = []
         self.active_occ_idx = []
         self.active_unocc_idx = []
-        self.active_idx_shifted = []
-        self.active_occ_idx_shifted = []
-        self.active_unocc_idx_shifted = []
         self.num_orbs = len(self.int_gen.kinetic_energy)
         self.num_active_elec = 0
         self.num_active_orbs = 0
@@ -74,9 +67,7 @@ class WaveFunctionHCBUPS:
         self._hr1 = None
         self._hr2 = None
         self._energy_elec: float | None = None
-        self.ansatz_options = ansatz_options
-        self.num_energy_evals = 0
-        # Construct spatial orbital spaces and indices
+        self.num_energy_evals = 0  # number of energy measurements on quanutm
         active_space = []
         orbital_counter = 0
         num_elec = self.int_gen.num_elec
@@ -102,15 +93,6 @@ class WaveFunctionHCBUPS:
             else:
                 self.virtual_idx.append(i)
                 self.num_virtual_orbs += 1
-        # Make shifted indices
-        if len(self.active_idx) != 0:
-            active_shift = np.min(self.active_idx)
-            for active_idx in self.active_idx:
-                self.active_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_occ_idx:
-                self.active_occ_idx_shifted.append(active_idx - active_shift)
-            for active_idx in self.active_unocc_idx:
-                self.active_unocc_idx_shifted.append(active_idx - active_shift)
         # Find non-redundant kappas
         self._kappa = []
         kappa_idx = []
@@ -119,10 +101,8 @@ class WaveFunctionHCBUPS:
         kappa_redundant_idx = []
         self._kappa_old = []
         # kappa can be optimized in spatial basis
-        # Loop over all q>p orb combinations and find redundant kappas
         for p in range(0, self.num_orbs):
             for q in range(p + 1, self.num_orbs):
-                # find redundant kappas
                 if p in self.inactive_idx and q in self.inactive_idx:
                     kappa_redundant_idx.append((p, q))
                     continue
@@ -136,7 +116,6 @@ class WaveFunctionHCBUPS:
                 if not (p in self.active_idx and q in self.active_idx):
                     kappa_no_activeactive_idx.append((p, q))
                     kappa_no_activeactive_idx_dagger.append((q, p))
-                # the rest is non-redundant
                 self._kappa.append(0.0)
                 self._kappa_old.append(0.0)
                 kappa_idx.append((p, q))
@@ -155,39 +134,11 @@ class WaveFunctionHCBUPS:
         self.kappa_no_activeactive_idx_dagger = np.array(kappa_no_activeactive_idx_dagger, dtype=int)
         self.kappa_redundant_idx = np.array(kappa_redundant_idx, dtype=int)
         self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
-        # Construct determinant basis
-        self.ci_info = get_indexing_hcb(
-            self.num_inactive_orbs,
-            self.num_active_orbs,
-            self.num_virtual_orbs,
-            self.num_active_elec,
+        # Setup Qiskit stuff
+        self.QI = quantum_interface
+        self.QI.construct_circuit(
+            self.num_active_orbs, self.num_active_elec
         )
-        self.num_det = len(self.ci_info.idx2det)
-        self.csf_coeffs = np.zeros(self.num_det)
-        hf_det = int(
-            "1" * (self.num_active_elec // 2) + "0" * (self.num_active_orbs - self.num_active_elec // 2), 2
-        )
-        self.csf_coeffs[self.ci_info.det2idx[hf_det]] = 1
-        self.ci_coeffs = np.copy(self.csf_coeffs)
-        # Construct UPS Structure
-        self.ups_layout = UpsStructure()
-        if ansatz.lower() == "fuccpd":
-            self.ansatz_options["HCBD"] = True
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
-        elif ansatz.lower() == "fuccgpd":
-            self.ansatz_options["HCBGD"] = True
-            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
-        elif ansatz.lower() == "fucc":
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.ups_layout.create_fUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
-        else:
-            raise ValueError(f"Got unknown ansatz, {ansatz}")
-        self._thetas = np.zeros(self.ups_layout.n_params).tolist()
 
     @property
     def kappa(self) -> list[float]:
@@ -210,42 +161,12 @@ class WaveFunctionHCBUPS:
         self._kappa_old = self.kappa
 
     @property
-    def thetas(self) -> list[float]:
-        """Get theta values.
-
-        Returns:
-            theta values.
-        """
-        return self._thetas.copy()
-
-    @thetas.setter
-    def thetas(self, theta_vals: list[float]) -> None:
-        """Set theta values.
-
-        Args:
-            theta_vals: theta values.
-        """
-        if len(theta_vals) != len(self._thetas):
-            raise ValueError(f"Expected {len(self._thetas)} theta1 values got {len(theta_vals)}")
-        self._rdm1 = None
-        self._rdm2 = None
-        self._energy_elec = None
-        self._thetas = theta_vals.copy()
-        self.ci_coeffs = construct_ups_state(
-            self.csf_coeffs,
-            self.ci_info,
-            self.thetas,
-            self.ups_layout,
-        )
-
-    @property
     def c_mo(self) -> np.ndarray:
         """Get molecular orbital coefficients.
 
         Returns:
             Molecular orbital coefficients.
         """
-        # Construct anti-hermitian kappa matrix
         kappa_mat = np.zeros_like(self._c_mo)
         if len(self.kappa) != 0:
             # The MO transformation is calculated as a difference between current kappa and kappa old.
@@ -255,7 +176,6 @@ class WaveFunctionHCBUPS:
                 for kappa_val, kappa_old, (p, q) in zip(self.kappa, self._kappa_old, self.kappa_idx):
                     kappa_mat[p, q] = kappa_val - kappa_old
                     kappa_mat[q, p] = -(kappa_val - kappa_old)
-        # Apply orbital rotation unitary to MO coefficients
         return np.matmul(self._c_mo, scipy.linalg.expm(-kappa_mat))
 
     @property
@@ -284,8 +204,80 @@ class WaveFunctionHCBUPS:
         return self._hr2
 
     @property
+    def thetas(self) -> list[float]:
+        """Getter for ansatz parameters.
+
+        Returns:
+            Ansatz parameters.
+        """
+        return self.QI.parameters
+
+    @thetas.setter
+    def thetas(self, parameters: list[float]) -> None:
+        """Setter for ansatz paramters.
+
+        Args:
+            parameters: New ansatz paramters.
+        """
+        self._rdm1 = None
+        self._rdm2 = None
+        self._energy_elec = None
+        self.QI.parameters = parameters
+
+    def change_primitive(self, primitive: BaseSamplerV1 | BaseSamplerV2, verbose: bool = True) -> None:
+        """Change the primitive expectation value calculator.
+
+        Args:
+            primitive: Primitive object.
+            verbose: Print more info.
+        """
+        if verbose:
+            print(
+                "Using this function is only recommended for switching from ideal simulator to shot-noise or quantum hardware.\n \
+                Multiple switching back and forth can lead to un-expected outcomes and is an experimental feature.\n"
+            )
+
+        if isinstance(primitive, (BaseEstimatorV1, BaseEstimatorV2)):
+            raise ValueError("Estimator is not supported.")
+        elif not isinstance(primitive, (BaseSamplerV1, BaseSamplerV2)):
+            raise TypeError(f"Unsupported primitive, {type(primitive)}")
+        self.QI._primitive = primitive
+        if verbose:
+            if self.QI.mitigation_flags.do_M_ansatz0:
+                print("Reset RDMs, energies, QI metrics, and correlation matrix.")
+            else:
+                print("Reset RDMs, energies, and QI metrics.")
+        self._rdm1 = None
+        self._rdm2 = None
+        self._energy_elec = None
+        self.QI.total_device_calls = 0
+        self.QI.total_shots_used = 0
+        self.QI.total_paulis_evaluated = 0
+
+        # Reset circuit and initiate re-transpiling
+        ISA_old = self.QI.ISA
+        self._reconstruct_circuit()  # Reconstruct circuit but keeping parameters
+        self.QI._transpiled = False
+        self.QI.ISA = ISA_old  # Redo ISA including transpilation if requested
+        self.QI.shots = self.QI.shots  # Redo shots parameter check
+
+        if verbose:
+            self.QI.get_info()
+
+    def _reconstruct_circuit(self) -> None:
+        """Construct circuit again."""
+        self.QI.construct_circuit(
+            self.num_active_orbs, self.num_active_elec
+        )
+
+    @property
     def rdm1(self) -> np.ndarray:
-        """Calculate one-electron reduced density matrix in the active space.
+        r"""Calculate one-electron reduced density matrix.
+
+        The trace condition is enforced:
+
+        .. math::
+            \sum_i\Gamma^{[1]}_{ii} = N_e
 
         Returns:
             One-electron reduced density matrix.
@@ -296,19 +288,22 @@ class WaveFunctionHCBUPS:
                 p_idx = p - self.num_inactive_orbs
                 for q in range(self.num_inactive_orbs, p + 1):
                     q_idx = q - self.num_inactive_orbs
-                    val = expectation_value(
-                        self.ci_coeffs,
-                        [Epq(p, q)],
-                        self.ci_coeffs,
-                        self.ci_info,
+                    rdm1_op = Epq(p, q).get_folded_operator(
+                        self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                     )
-                    self._rdm1[p_idx, q_idx] = val  # type: ignore
-                    self._rdm1[q_idx, p_idx] = val  # type: ignore
+                    val = self.QI.quantum_expectation_value(rdm1_op)
+                    self._rdm1[p_idx, q_idx] = val  # type: ignore [index]
+                    self._rdm1[q_idx, p_idx] = val  # type: ignore [index]
         return self._rdm1
 
     @property
     def rdm2(self) -> np.ndarray:
-        """Calculate two-electron reduced density matrix in the active space.
+        r"""Calculate two-electron reduced density matrix.
+
+        The trace condition is enforced:
+
+        .. math::
+            \sum_{ij}\Gamma^{[2]}_{iijj} = N_e(N_e-1)
 
         Returns:
             Two-electron reduced density matrix.
@@ -338,19 +333,76 @@ class WaveFunctionHCBUPS:
                             s_lim = p + 1
                         for s in range(self.num_inactive_orbs, s_lim):
                             s_idx = s - self.num_inactive_orbs
-                            val = expectation_value(
-                                self.ci_coeffs,
-                                [Epq(p, q) * Epq(r, s)],
-                                self.ci_coeffs,
-                                self.ci_info,
+                            pdm2_op = (Epq(p, q) * Epq(r, s)).get_folded_operator(
+                                self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                             )
+                            val = self.QI.quantum_expectation_value(pdm2_op)
                             if q == r:
                                 val -= self.rdm1[p_idx, s_idx]
-                            self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore
-                            self._rdm2[r_idx, s_idx, p_idx, q_idx] = val  # type: ignore
-                            self._rdm2[q_idx, p_idx, s_idx, r_idx] = val  # type: ignore
-                            self._rdm2[s_idx, r_idx, q_idx, p_idx] = val  # type: ignore
+                            self._rdm2[p_idx, q_idx, r_idx, s_idx] = val  # type: ignore [index]
+                            self._rdm2[r_idx, s_idx, p_idx, q_idx] = val  # type: ignore [index]
+                            self._rdm2[q_idx, p_idx, s_idx, r_idx] = val  # type: ignore [index]
+                            self._rdm2[s_idx, r_idx, q_idx, p_idx] = val  # type: ignore [index]
         return self._rdm2
+
+    def precalc_rdm_paulis(self, rdm_order: int) -> None:
+        """Pre-calculate all Paulis used to construct RDMs up to a certain order.
+
+        This utilizes the saving feature in QuantumInterface when using the Sampler primitive.
+        If saving is turned up in QuantumInterface this function will do nothing but waste device time.
+
+        Args:
+            rdm_order: Max order RDM.
+        """
+        if not isinstance(
+            self.QI._primitive,
+            (BaseSamplerV1, BaseSamplerV2),
+        ):
+            raise TypeError(
+                f"This feature is only supported for Sampler got {type(self.QI._primitive)} from QuantumInterface"
+            )
+        if rdm_order > 2:
+            raise ValueError(f"Precalculation only supported up to order 4 got {rdm_order}")
+        if rdm_order < 1:
+            raise ValueError(f"Precalculation need at least an order of 1 got {rdm_order}")
+        cumulated_paulis = None
+        if rdm_order >= 1:
+            self._rdm1 = None
+            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                for q in range(self.num_inactive_orbs, p + 1):
+                    rdm1_op = Epq(p, q).get_folded_operator(
+                        self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+                    )
+                    mapped_op = self.QI.op_to_qbit(rdm1_op)
+                    if cumulated_paulis is None:
+                        cumulated_paulis = set(mapped_op.paulis)
+                    else:
+                        cumulated_paulis = cumulated_paulis.union(mapped_op.paulis)
+        if rdm_order >= 2:
+            self._rdm2 = None
+            for p in range(self.num_inactive_orbs, self.num_inactive_orbs + self.num_active_orbs):
+                for q in range(self.num_inactive_orbs, p + 1):
+                    for r in range(self.num_inactive_orbs, p + 1):
+                        if p == q:
+                            s_lim = r + 1
+                        elif p == r:
+                            s_lim = q + 1
+                        elif q < r:
+                            s_lim = p
+                        else:
+                            s_lim = p + 1
+                        for s in range(self.num_inactive_orbs, s_lim):
+                            pdm2_op = (Epq(p, q) * Epq(r, s)).get_folded_operator(
+                                self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+                            )
+                            mapped_op = self.QI.op_to_qbit(pdm2_op)
+                            cumulated_paulis = cumulated_paulis.union(mapped_op.paulis)  # type: ignore[union-attr]
+        # Calling expectation value to put all Paulis in cliques
+        # and compute distributions for the cliques.
+        # The coefficients are set to one, so the Paulis cannot cancel out.
+        _ = self.QI._sampler_quantum_expectation_value(
+            SparsePauliOp(cumulated_paulis, np.ones(len(cumulated_paulis)))  # type: ignore[arg-type]
+        )
 
     def check_orthonormality(self, overlap_integral: np.ndarray) -> None:
         r"""Check orthonormality of orbitals.
@@ -368,19 +420,25 @@ class WaveFunctionHCBUPS:
 
     @property
     def energy_elec(self) -> float:
-        """Get the electronic energy.
+        """Get electronic energy.
 
         Returns:
             Electronic energy.
         """
         if self._energy_elec is None:
-            self._energy_elec = expectation_value(
-                self.ci_coeffs,
-                [hamiltonian_hcb_0i_0a(self.hr1, self.hr2, self.num_inactive_orbs, self.num_active_orbs)],
-                self.ci_coeffs,
-                self.ci_info,
-            )
+            self._energy_elec = self._calc_energy_elec()
         return self._energy_elec
+
+    def _calc_energy_elec(self) -> float:
+        """Run electronic energy simulation, regardless of self._energy_elec variable.
+
+        Returns:
+            Electronic energy.
+        """
+        H = hamiltonian_hcb_0i_0a(self.hr1, self.hr2, self.num_inactive_orbs, self.num_active_orbs)
+        H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+        energy_elec = self.QI.quantum_expectation_value(H)
+        return energy_elec
 
     def run_wf_optimization_2step(
         self,
@@ -389,6 +447,7 @@ class WaveFunctionHCBUPS:
         tol: float = 1e-10,
         maxiter: int = 1000,
         is_silent_subiterations: bool = False,
+        print_std: bool = False,
     ) -> None:
         """Run two step optimization of wave function.
 
@@ -398,11 +457,14 @@ class WaveFunctionHCBUPS:
             tol: Convergence tolerance.
             maxiter: Maximum number of iterations.
             is_silent_subiterations: Silence subiterations.
+            print_std: Print standard deviation of the electronic Hamiltonian during optimization.
         """
+        if isinstance(self.QI.ansatz, QuantumCircuit) and optimizer_name.lower() not in ("cobyla", "cobyqa"):
+            raise ValueError("Custom Ansatz in QI only works with COBYLA and COBYQA as optimizer.")
         print("### Parameters information:")
         if orbital_optimization:
             print(f"### Number kappa: {len(self.kappa)}")
-        print(f"### Number theta: {self.ups_layout.n_params}")
+        print(f"### Number theta: {len(self.thetas)}")
         e_old = 1e12
         print("Full optimization")
         print("Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #")
@@ -412,9 +474,11 @@ class WaveFunctionHCBUPS:
             # Do ansatz optimization
             if not is_silent_subiterations:
                 print("--------Ansatz optimization")
-                print(
-                    "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
-                )
+                subheader = "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
+                if print_std:
+                    subheader += " | Std(H)"
+                print(subheader)
+
             energy_theta = partial(
                 self._calc_energy_optimization,
                 theta_optimization=True,
@@ -433,30 +497,34 @@ class WaveFunctionHCBUPS:
                 tol=tol,
                 is_silent=is_silent_subiterations,
                 energy_eval_callback=lambda: self.num_energy_evals,
+                std_callback=(
+                    (
+                        lambda: self.QI.quantum_variance(
+                            hamiltonian_0i_0a(
+                                self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
+                            ).get_folded_operator(
+                                self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+                            )
+                        )
+                    )
+                    if print_std
+                    else None
+                ),
             )
-            self._old_opt_parameters = np.zeros_like(self.thetas) + 10**20
-            self._E_opt_old = 0.0
-            if optimizer_name.lower() == "rotosolve":
-                res = optimizer.minimize(
-                    self.thetas,
-                    extra_options={
-                        "R": self.ups_layout.grad_param_R,
-                        "param_names": self.ups_layout.param_names,
-                        "f_rotosolve_optimized": self._calc_energy_rotosolve_optimization,
-                    },
-                )
-            else:
-                res = optimizer.minimize(
-                    self.thetas,
-                )
+            res = optimizer.minimize(
+                self.thetas,
+                extra_options={"R": self.QI.grad_param_R, "param_names": self.QI.param_names},
+            )
             self.thetas = res.x.tolist()
 
             if orbital_optimization and len(self.kappa) != 0:
                 if not is_silent_subiterations:
                     print("--------Orbital optimization")
-                    print(
-                        "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
-                    )
+                    subheader = "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
+                    if print_std:
+                        subheader += " | Std(H)"
+                    print(subheader)
+
                 energy_oo = partial(
                     self._calc_energy_optimization,
                     theta_optimization=False,
@@ -476,9 +544,20 @@ class WaveFunctionHCBUPS:
                     tol=tol,
                     is_silent=is_silent_subiterations,
                     energy_eval_callback=lambda: self.num_energy_evals,
+                    std_callback=(
+                        (
+                            lambda: self.QI.quantum_variance(
+                                hamiltonian_0i_0a(
+                                    self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
+                                ).get_folded_operator(
+                                    self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+                                )
+                            )
+                        )
+                        if print_std
+                        else None
+                    ),
                 )
-                self._old_opt_parameters = np.zeros(len(self.kappa_idx)) + 10**20
-                self._E_opt_old = 0.0
                 res = optimizer.minimize([0.0] * len(self.kappa_idx))
                 for i in range(len(self.kappa)):
                     self._kappa[i] = 0.0
@@ -488,16 +567,16 @@ class WaveFunctionHCBUPS:
                 e_new = res.fun
                 if orbital_optimization and len(self.kappa) == 0:
                     print(
-                        "WARNING: No orbital optimization performed, because there is no non-redundant orbital parameters."
+                        "WARNING: No orbital optimization performed, because there is no non-redundant orbital parameters"
                     )
                 break
 
             e_new = res.fun
-            time_str = f"{time.time() - full_start:7.2f}"
+            time_str = f"{time.time() - full_start:7.2f}"  # type: ignore
             e_str = f"{e_new:3.12f}"
             print(
                 f"{str(full_iter + 1).center(11)} | {time_str.center(18)} | {e_str.center(27)} | {str(self.num_energy_evals).center(11)}"
-            )
+            )  # type: ignore
             if abs(e_new - e_old) < tol:
                 break
             e_old = e_new
@@ -509,6 +588,7 @@ class WaveFunctionHCBUPS:
         orbital_optimization: bool = False,
         tol: float = 1e-10,
         maxiter: int = 1000,
+        print_std: bool = False,
     ) -> None:
         """Run one step optimization of wave function.
 
@@ -517,18 +597,26 @@ class WaveFunctionHCBUPS:
             orbital_optimization: Perform orbital optimization.
             tol: Convergence tolerance.
             maxiter: Maximum number of iterations.
+            print_std: Print standard deviation in sub-iteration headers.
         """
+        if isinstance(self.QI.ansatz, QuantumCircuit) and optimizer_name.lower() not in ("cobyla", "cobyqa"):
+            raise ValueError("Custom Ansatz in QI only works with COBYLA and COBYQA as optimizer.")
         print("### Parameters information:")
         if orbital_optimization:
             print(f"### Number kappa: {len(self.kappa)}")
-        print(f"### Number theta: {self.ups_layout.n_params}")
+        print(f"### Number theta: {len(self.thetas)}")
         if optimizer_name.lower() == "rotosolve":
             if orbital_optimization and len(self.kappa) != 0:
                 raise ValueError(
                     "Cannot use RotoSolve together with orbital optimization in the one-step solver."
                 )
 
-        print("--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #")
+        header = (
+            "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
+        )
+        if print_std:
+            header += " | Std(H)"
+        print(header)
         if orbital_optimization:
             if len(self.thetas) > 0:
                 energy = partial(
@@ -577,22 +665,23 @@ class WaveFunctionHCBUPS:
             maxiter=maxiter,
             tol=tol,
             energy_eval_callback=lambda: self.num_energy_evals,
+            std_callback=(
+                (
+                    lambda: self.QI.quantum_variance(
+                        hamiltonian_0i_0a(
+                            self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
+                        ).get_folded_operator(
+                            self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
+                        )
+                    )
+                )
+                if print_std
+                else None
+            ),
         )
-        self._old_opt_parameters = np.zeros_like(parameters) + 10**20
-        self._E_opt_old = 0.0
-        if optimizer_name.lower() == "rotosolve":
-            res = optimizer.minimize(
-                parameters,
-                extra_options={
-                    "R": self.ups_layout.grad_param_R,
-                    "param_names": self.ups_layout.param_names,
-                    "f_rotosolve_optimized": self._calc_energy_rotosolve_optimization,
-                },
-            )
-        else:
-            res = optimizer.minimize(
-                parameters,
-            )
+        res = optimizer.minimize(
+            parameters, extra_options={"R": self.QI.grad_param_R, "param_names": self.QI.param_names}
+        )
         if orbital_optimization:
             self.thetas = res.x[len(self.kappa) :].tolist()
             for i in range(len(self.kappa)):
@@ -609,42 +698,29 @@ class WaveFunctionHCBUPS:
 
         Args:
             parameters: Ansatz and orbital rotation parameters.
-            theta_optimization: If used in theta optimization.
-            kappa_optimization: If used in kappa optimization.
+            theta_optimization: Doing theta optimization.
+            kappa_optimization: Doing kappa optimization.
 
         Returns:
             Electronic energy.
         """
-        # Avoid recalculating energy in callback
-        if np.max(np.abs(np.array(self._old_opt_parameters) - np.array(parameters))) < 10**-14:
-            return self._E_opt_old
         num_kappa = 0
+        self.num_energy_evals += 1  # count one measurement
         if kappa_optimization:
             num_kappa = len(self.kappa_idx)
             self.kappa = parameters[:num_kappa]
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
-        if kappa_optimization:
-            assert False
-            """
-            # RDM is more expensive than evaluation of the Hamiltonian.
-            # Thus only construct these if orbital-optimization is turned on,
-            # since the RDMs will be reused in the oo gradient calculation.
-            E = get_electronic_energy(
-                self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.rdm1, self.rdm2
-            )
-            """
-        else:
-            E = expectation_value(
-                self.ci_coeffs,
-                [hamiltonian_hcb_0i_0a(self.hr1, self.hr2, self.num_inactive_orbs, self.num_active_orbs)],
-                self.ci_coeffs,
-                self.ci_info,
-            )
-        self._E_opt_old = E
-        self._old_opt_parameters = np.copy(parameters)
-        self.num_energy_evals += 1  # count one measurement
-        return E
+            # Build operator
+            H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+            H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+            return self.QI.quantum_expectation_value(H)
+        # RDM is more expensive than evaluation of the Hamiltonian.
+        # Thus only construct these if orbital-optimization is turned on,
+        # since the RDMs will be reused in the oo gradient calculation.
+        return get_electronic_energy(
+            self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs, self.rdm1, self.rdm2
+        )
 
     def _calc_gradient_optimization(
         self, parameters: list[float], theta_optimization: bool, kappa_optimization: bool
@@ -653,12 +729,13 @@ class WaveFunctionHCBUPS:
 
         Args:
             parameters: Ansatz and orbital rotation parameters.
-            theta_optimization: If used in theta optimization.
-            kappa_optimization: If used in kappa optimization.
+            theta_optimization: Doing theta optimization.
+            kappa_optimization: Doing kappa optimization.
 
         Returns:
             Electronic gradient.
         """
+        num_kappa = 0
         gradient = np.zeros(len(parameters))
         num_kappa = 0
         if kappa_optimization:
@@ -667,9 +744,7 @@ class WaveFunctionHCBUPS:
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
         if kappa_optimization:
-            assert False
-            """
-            gradient[:num_kappa] = get_orbital_gradient_hcb(
+            gradient[:num_kappa] = get_orbital_gradient(
                 self.h_mo,
                 self.g_mo,
                 self.kappa_idx,
@@ -678,52 +753,50 @@ class WaveFunctionHCBUPS:
                 self.rdm1,
                 self.rdm2,
             )
-            """
         if theta_optimization:
-            Hamiltonian = hamiltonian_hcb_0i_0a(self.hr1, self.hr2, self.num_inactive_orbs, self.num_active_orbs)
-            # Reference bra state (no differentiations)
-            bra_vec = propagate_state(
-                [Hamiltonian],
-                self.ci_coeffs,
-                self.ci_info,
-            )
-            bra_vec = construct_ups_state(
-                bra_vec,
-                self.ci_info,
-                self.thetas,
-                self.ups_layout,
-                dagger=True,
-            )
-            # CSF reference state on ket
-            ket_vec = np.copy(self.csf_coeffs)
-            ket_vec_tmp = np.copy(self.csf_coeffs)
-            # Calculate analytical derivative w.r.t. each theta using gradient_action function
-            for i in range(len(self.thetas)):
-                # Derivative action w.r.t. i-th theta on CSF ket
-                ket_vec_tmp = get_grad_action(
-                    ket_vec,
-                    i,
-                    self.ci_info,
-                    self.ups_layout,
-                )
-                gradient[i + num_kappa] += 2 * np.matmul(bra_vec, ket_vec_tmp)
-                # Product rule implications on reference bra and CSF ket
-                # See 10.48550/arXiv.2303.10825, Eq. 20 (appendix - v1)
-                bra_vec = propagate_unitary(
-                    bra_vec,
-                    i,
-                    self.ci_info,
-                    self.thetas,
-                    self.ups_layout,
-                )
-                ket_vec = propagate_unitary(
-                    ket_vec,
-                    i,
-                    self.ci_info,
-                    self.thetas,
-                    self.ups_layout,
-                )
+            H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+            H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
+            for i in range(len(parameters[num_kappa:])):
+                R = self.QI.grad_param_R[self.QI.param_names[i]]
+                e_vals_grad = _get_energy_evals_for_grad(H, self.QI, parameters, i, R)
+                grad = 0.0
+                for j, mu in enumerate(list(range(1, 2 * R + 1))):
+                    x_mu = (2 * mu - 1) / (2 * R) * np.pi
+                    grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R * (np.sin(1 / 2 * x_mu)) ** 2)
+                gradient[num_kappa + i] = grad
             self.num_energy_evals += 2 * np.sum(
-                list(self.ups_layout.grad_param_R.values())
+                list(self.QI.grad_param_R.values())
             )  # Count energy measurements for all gradients
         return gradient
+
+
+def _get_energy_evals_for_grad(
+    operator: FermionicOperator,
+    quantum_interface: QuantumInterface,
+    parameters: list[float],
+    idx: int,
+    R: int,
+) -> list[float]:
+    """Get energy evaluations needed for the gradient calculation.
+
+    The gradient formula is defined for x=0.
+    The x_shift variable is used to shift the energy function, such that current parameter value is in zero.
+
+    Args:
+        operator: Operator which the derivative is with respect to.
+        quantum_interface: Quantum interface class object.
+        parameters: Parameters.
+        idx: Parameter idx.
+        R: Parameter to control we get the needed points.
+
+    Returns:
+        Energies in a few fixed points.
+    """
+    e_vals = []
+    x = parameters.copy()
+    x_shift = x[idx]
+    for mu in range(1, 2 * R + 1):
+        x_mu = (2 * mu - 1) / (2 * R) * np.pi
+        x[idx] = x_mu + x_shift
+        e_vals.append(quantum_interface.quantum_expectation_value(operator, custom_parameters=x))
+    return e_vals

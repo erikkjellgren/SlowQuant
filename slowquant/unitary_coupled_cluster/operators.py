@@ -690,6 +690,23 @@ def hamiltonian_hcb_full_space(hr1: np.ndarray, hr2: np.ndarray, num_orbs: int) 
     return H
 
 
+def hamiltonian_hcb_0i_0a(hr1: np.ndarray, hr2: np.ndarray, num_inactive_orbs: int, num_active_orbs: int) -> HardcorebosonOperator:
+    H = HardcorebosonOperator({})
+    for i in range(num_inactive_orbs):
+        if abs(hr1[i, i]) > 10**-14:
+            H += hr1[i, i] * b_op(i, True) * b_op(i, False)
+    for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+        for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+            if abs(hr1[p, q]) > 10**-14:
+                H += hr1[p, q] * b_op(p, True) * b_op(q, False)
+    for p in range(num_inactive_orbs + num_active_orbs):
+        for q in range(num_inactive_orbs + num_active_orbs):
+            if p != q:
+                if abs(hr2[p, q]) > 10**-14:
+                    H += hr2[p, q] * b_op(p, True) * b_op(p, False) * b_op(q, True) * b_op(q, False)
+    return H
+
+
 def one_elec_op_full_space(ints_mo: np.ndarray, num_orbs: int) -> FermionicOperator:
     r"""Construct full-space one-electron operator.
 
