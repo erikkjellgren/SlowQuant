@@ -84,6 +84,8 @@ class Davidson(Solvers):
         self._sigma_minus = np.array(())
         self._tau_minus = np.array(())
 
+        self._print_citation()
+
         if not is_silent:
             print(f" Iteration | Time [s] | Max. residual norm | Subspace size | Roots ...")
 
@@ -133,6 +135,12 @@ class Davidson(Solvers):
                 self._print_iteration_info(res_norms, omega, tolerance)
 
         raise RuntimeError(f"Davidson did not converge.")
+
+    @abstractmethod
+    def _print_citation(self) -> None:
+        """Print the citation for the Davidson method."""
+        print()
+        print("Davidson solver for eigenvalue problems (J. Comput. Phys. 17, 87-94 (1975))")
 
     @staticmethod
     def _orthonormalize(trial: np.ndarray) -> np.ndarray:
@@ -239,6 +247,11 @@ class PairedDavidson(Davidson):
     """Subspace matrix A @ b - B @ b*"""
     _tau_minus: np.typing.NDArray[np.complexfloating]
     """Subspace matrix Sigma @ b"""
+
+    def _print_citation(self) -> None:
+        """Print the citation for the Davidson method."""
+        super()._print_citation()
+        print("Davidson solver for paired eigenvalue problems (J. Chem. Phys. 150, 174121 (2019))")
 
     def _add_iteration_data(self, trial: np.ndarray, right_transformed_vectors: tuple[np.ndarray, ...]) -> None:
         """Add trial and right transformed matrices for the current iteration to the arrays."""
