@@ -25,7 +25,7 @@ from slowquant.unitary_coupled_cluster.util import (
     iterate_t5,
     iterate_t6,
 )
-from slowquant.unitary_coupled_cluster.linear_response.solvers import Davidson
+from slowquant.unitary_coupled_cluster.linear_response.solvers import PairedDavidson
 
 
 class LinearResponseBaseClass:
@@ -134,7 +134,7 @@ class LinearResponseBaseClass:
         if n_roots <= 0:
             self._all_excitation_energies()
         else:
-            solver = Davidson()
+            solver = PairedDavidson()
             if solver_settings is None:
                 solver_settings = {}
 

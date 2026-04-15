@@ -13,7 +13,7 @@ from slowquant.unitary_coupled_cluster.linear_response import (
     statetransfer,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
-from slowquant.unitary_coupled_cluster.linear_response.solvers import Davidson
+from slowquant.unitary_coupled_cluster.linear_response.solvers import PairedDavidson
 
 
 def test_lih_naive():
@@ -54,7 +54,7 @@ def test_lih_naive():
         tau_minus = Sb
         return sigma_plus, sigma_minus, tau_minus
 
-    d = Davidson()
+    d = PairedDavidson()
     num_exc = 13
 
     start_guess = np.zeros((A.shape[0], num_exc))
@@ -107,7 +107,7 @@ def test_lih_projected():
         tau_minus = Sb
         return sigma_plus, sigma_minus, tau_minus
 
-    d = Davidson()
+    d = PairedDavidson()
     num_exc = 13
 
     start_guess = np.zeros((A.shape[0], num_exc))
@@ -160,7 +160,7 @@ def test_lih_allprojected():
         tau_minus = Sb
         return sigma_plus, sigma_minus, tau_minus
 
-    d = Davidson()
+    d = PairedDavidson()
     num_exc = 13
 
     start_guess = np.zeros((A.shape[0], num_exc))

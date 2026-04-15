@@ -5,7 +5,7 @@ import numba as nb
 
 from typing import Any
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 
 from slowquant.unitary_coupled_cluster.density_matrix import RDM1, RDM2
 
@@ -21,7 +21,7 @@ class Solvers(ABC):
     def solve(
         self,
         right_transform: Callable[..., Any],
-        preconditioner: Sequence[np.ndarray],
+        preconditioner: tuple[np.ndarray, ...],
         max_iteration: int,
         tolerance: float,
         n_roots: int,
@@ -45,17 +45,11 @@ class Davidson(Solvers):
 
     _trial: np.typing.NDArray[np.complexfloating]
     """Subspace trial vectors"""
-    _sigma_plus: np.typing.NDArray[np.complexfloating]
-    """Subspace matrix A @ b + B @ b*"""
-    _sigma_minus: np.typing.NDArray[np.complexfloating]
-    """Subspace matrix A @ b - B @ b*"""
-    _tau_minus: np.typing.NDArray[np.complexfloating]
-    """Subspace matrix Sigma @ b"""
 
     def solve(
         self,
-        right_transform: Callable[[np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray]],
-        preconditioner: Sequence[np.ndarray],
+        right_transform: Callable[[np.ndarray], Any],
+        preconditioner: tuple[np.ndarray, ...],
         max_iteration: int,
         tolerance: float,
         n_roots: int,
@@ -92,30 +86,32 @@ class Davidson(Solvers):
         if max_reduced_space is None:
             max_reduced_space = 8 * n_roots
 
-        diagonal_A, diagonal_Sigma = preconditioner
-        dim = len(diagonal_A)
+        if isinstance(preconditioner, tuple):
+            diag = preconditioner[0]
+        else:
+            raise ValueError("Preconditioner must be a tuple of numpy arrays.")
+        dim = diag.shape[-1]
 
         if n_roots > dim:
             raise ValueError(f"Number of roots to compute (n_roots={n_roots}) cannot exceed the dimension of the problem (dim={dim}).")
 
         start_guess = np.zeros((dim, n_roots))
-        start_guess[np.argsort(diagonal_A)[:n_roots], np.arange(n_roots)] = 1.0
+        start_guess[np.argsort(diag)[:n_roots], np.arange(n_roots)] = 1.0
         trial = self._orthonormalize(start_guess)
-
         for _ in range(max_iteration):
             self._iteration += 1
 
-            sigma_plus, sigma_minus, tau_minus = right_transform(trial)
-            self._add_iteration_data(trial, sigma_plus, sigma_minus, tau_minus)
-            omega, X, R_plus, R_minus = self._compute_residual_vectors(n_roots)
-            converged, res_norms = self._check_convergence(R_plus, tolerance)
+            right_transformed_vectors = right_transform(trial)
+            self._add_iteration_data(trial, right_transformed_vectors)
+            omega, X, R = self._compute_residual_vectors(n_roots)
+            converged, res_norms = self._check_convergence(R, tolerance)
 
             if converged:
                 if not is_silent:
                     self._print_iteration_info(res_norms, omega, tolerance)
                 return omega, X
 
-            trial = self._update_trial_vectors(omega, R_plus, R_minus, diagonal_A, diagonal_Sigma)
+            trial = self._update_trial_vectors(omega, R, preconditioner)
             trial = self._remove_converged(trial, res_norms, tolerance)
             trial = self._project_trial_vectors(trial)
             trial = self._remove_linear_dependencies(trial)
@@ -127,26 +123,12 @@ class Davidson(Solvers):
             if self._trial.shape[1] + trial.shape[1] > max_reduced_space:
                 if not is_silent:
                     print(f"Davidson iter {self._iteration+1:4d}: subspace dimension {self._trial.shape[1]+trial.shape[1]} exceeds max_red_space {max_reduced_space}, restarting with current Ritz vectors")
-                self._trial = self._orthonormalize(X[:dim, :] + X[dim:, :])
-                self._sigma_plus, self._sigma_minus, self._tau_minus = right_transform(self._trial)
+                self._reset_reduced_space(right_transform)
 
             if not is_silent:
                 self._print_iteration_info(res_norms, omega, tolerance)
 
         raise RuntimeError(f"Davidson did not converge.")
-
-    def _add_iteration_data(self, trial: np.ndarray, sigma_plus: np.ndarray, sigma_minus: np.ndarray, tau_minus: np.ndarray) -> None:
-        """Add Z, Y, Ab, Bb, Sb, and Db matrices for the current iteration to the arrays."""
-        if self._iteration == 1:
-            self._trial = trial.copy()
-            self._sigma_plus = sigma_plus.copy()
-            self._sigma_minus = sigma_minus.copy()
-            self._tau_minus = tau_minus.copy()
-        else:
-            self._trial = np.hstack((self._trial, trial))
-            self._sigma_plus = np.hstack((self._sigma_plus, sigma_plus))
-            self._sigma_minus = np.hstack((self._sigma_minus, sigma_minus))
-            self._tau_minus = np.hstack((self._tau_minus, tau_minus))
 
     @staticmethod
     def _orthonormalize(trial: np.ndarray) -> np.ndarray:
@@ -159,7 +141,112 @@ class Davidson(Solvers):
         new_trial /= np.linalg.norm(new_trial, axis=0)
         return new_trial
 
-    def _compute_residual_vectors(self, n_roots: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def _print_iteration_info(self, res_norms_plus: np.ndarray, omega: np.ndarray, tolerance: float) -> None:
+        """Print iteration information including the maximum residual norm."""
+        roots = "  ".join(
+            f"{f'{o:<.4e}' + '*' if r <= tolerance
+               else f'{o:<.4e}' + ' '}"
+               for o, r in zip(omega, res_norms_plus)
+            )
+        print(f" {self._iteration:^9} | {time.time() - self._start:^8.2f} | {max(res_norms_plus):^18.4e} | {self._trial.shape[1]:^13} | {roots}")
+        self._start = time.time()
+
+    @staticmethod
+    def _remove_converged(trial: np.ndarray, res_norms: np.ndarray, tol: float) -> np.ndarray:
+        """Remove converged trial vectors based on residual norms."""
+        keep = res_norms > tol
+        if trial.ndim == 1:
+            new_trial = trial[:, np.newaxis].copy()
+        else:
+            new_trial = trial.copy()
+        return new_trial[:, keep]
+
+    def _project_trial_vectors(self, trial: np.ndarray) -> np.ndarray:
+        """Project trial vectors to be orthogonal to the current subspace."""
+        new_trial = trial - self._trial @ (self._trial.conj().T @ trial)
+        return new_trial
+
+    def _remove_linear_dependencies(self, trial: np.ndarray) -> np.ndarray:
+        """Remove linearly dependent trial vectors."""
+        tol = 1e-12
+
+        nvecs = trial.shape[1]
+        Sb = np.zeros((nvecs, nvecs))
+        for i in range(nvecs):
+            Sb[i, i] = np.dot(trial[:, i], trial[:, i])
+            for j in range(i):
+                Sb[i, j] = np.dot(trial[:, i], trial[:, j])
+                Sb[j, i] = Sb[i, j]
+
+        l, T = np.linalg.eigh(Sb)
+        b_norm = np.sqrt(Sb.diagonal())
+        keep = l > b_norm * tol
+
+        new_vector = trial @ T[:, keep]
+        return new_vector
+
+    def _random_trial_vector(self) -> np.ndarray:
+        """Generate a orthogonal trial vector."""
+        def gram_schmidt(vector: np.ndarray) -> np.ndarray:
+            """Orthogonalize a vector using the Gram-Schmidt process."""
+            w = vector.copy()
+            for v in self._trial.T:
+                w -= np.dot(w, v) / np.dot(v, v) * v
+            return w
+
+        print("No trial vectors left, adding a random one.")
+        rng = np.random.default_rng()
+        new_trial = rng.random(self._trial.shape[0])
+        new_trial = gram_schmidt(new_trial)
+        new_trial /= np.linalg.norm(new_trial)
+        return new_trial[:, np.newaxis]
+
+    @abstractmethod
+    def _add_iteration_data(self, trial: np.ndarray, right_transformed_vectors: tuple[np.ndarray, ...]) -> None:
+        """Add trial and right transformed matrices for the current iteration to the arrays."""
+
+    @abstractmethod
+    def _compute_residual_vectors(self, n_roots: int) -> tuple[np.ndarray, np.ndarray, tuple[np.ndarray, ...]]:
+        """Compute residual vectors for the given Ritz vectors and values."""
+
+    @staticmethod
+    @abstractmethod
+    def _check_convergence(R: tuple[np.ndarray, ...], tolerance: float) -> tuple[bool, np.ndarray]:
+        """Check if the maximum residual norm is below the tolerance."""
+
+    @staticmethod
+    @abstractmethod
+    def _update_trial_vectors(omega: np.ndarray, R: tuple[np.ndarray, ...], preconditioner: tuple[np.ndarray, ...]) -> np.ndarray:
+        """Update trial vectors using the residuals and the diagonal preconditioner."""
+
+    @abstractmethod
+    def _reset_reduced_space(self, right_transform: Callable[[np.ndarray], Any]) -> None:
+        """Reset the reduced space by keeping only the current Ritz vectors."""
+
+class PairedDavidson(Davidson):
+
+    _sigma_plus: np.typing.NDArray[np.complexfloating]
+    """Subspace matrix A @ b + B @ b*"""
+    _sigma_minus: np.typing.NDArray[np.complexfloating]
+    """Subspace matrix A @ b - B @ b*"""
+    _tau_minus: np.typing.NDArray[np.complexfloating]
+    """Subspace matrix Sigma @ b"""
+
+    def _add_iteration_data(self, trial: np.ndarray, right_transformed_vectors: tuple[np.ndarray, ...]) -> None:
+        """Add trial and right transformed matrices for the current iteration to the arrays."""
+        sigma_plus, sigma_minus, tau_minus = right_transformed_vectors
+        if self._iteration == 1:
+            self._trial = trial.copy()
+            self._sigma_plus = sigma_plus.copy()
+            self._sigma_minus = sigma_minus.copy()
+            self._tau_minus = tau_minus.copy()
+        else:
+            self._trial = np.hstack((self._trial, trial))
+            self._sigma_plus = np.hstack((self._sigma_plus, sigma_plus))
+            self._sigma_minus = np.hstack((self._sigma_minus, sigma_minus))
+            self._tau_minus = np.hstack((self._tau_minus, tau_minus))
+
+    def _compute_residual_vectors(self, n_roots: int) -> tuple[np.ndarray, np.ndarray, tuple[np.ndarray, np.ndarray]]:
         """Compute residual vectors for the given Ritz vectors and values."""
 
         def _split_vector(vector: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -234,27 +321,21 @@ class Davidson(Solvers):
         R_plus = self._sigma_plus @ x_plus - self._tau_minus @ x_minus * omega
         R_minus = self._sigma_minus @ x_minus - self._tau_minus @ x_plus * omega
 
-        return omega, X, R_plus, R_minus
+        return omega, X, (R_plus, R_minus)
 
     @staticmethod
-    def _check_convergence(R_plus: np.ndarray, tolerance: float) -> tuple[bool, np.ndarray]:
+    def _check_convergence(R: tuple[np.ndarray, ...], tolerance: float) -> tuple[bool, np.ndarray]:
         """Check if the maximum residual norm is below the tolerance."""
+        R_plus, _ = R
         res_norms = np.linalg.norm(R_plus, axis=0)
         return all(res_norms <= tolerance), res_norms
 
-    def _print_iteration_info(self, res_norms_plus: np.ndarray, omega: np.ndarray, tolerance: float) -> None:
-        """Print iteration information including the maximum residual norm."""
-        roots = "  ".join(
-            f"{f'{o:<.4e}' + '*' if r <= tolerance
-               else f'{o:<.4e}' + ' '}"
-               for o, r in zip(omega, res_norms_plus)
-            )
-        print(f" {self._iteration:^9} | {time.time() - self._start:^8.2f} | {max(res_norms_plus):^18.4e} | {self._trial.shape[1]:^13} | {roots}")
-        self._start = time.time()
-
     @staticmethod
-    def _update_trial_vectors(omega: np.ndarray, R_plus: np.ndarray, R_minus: np.ndarray, diagonal_A: np.ndarray, diagonal_Sigma: np.ndarray) -> np.ndarray:
+    def _update_trial_vectors(omega: np.ndarray, R: tuple[np.ndarray, ...], preconditioner: tuple[np.ndarray, ...]) -> np.ndarray:
         """Update trial vectors using the residuals and the diagonal preconditioner."""
+        diagonal_A, diagonal_Sigma = preconditioner
+        R_plus, R_minus = R
+
         minus_contribution = diagonal_A.reshape(-1, 1) - diagonal_Sigma.reshape(-1, 1) @ omega.reshape(1, -1)
         plus_contribution = diagonal_A.reshape(-1, 1) + diagonal_Sigma.reshape(-1, 1) @ omega.reshape(1, -1)
         denominator = -1
@@ -269,55 +350,10 @@ class Davidson(Solvers):
         )
         return new_trial
 
-    @staticmethod
-    def _remove_converged(trial: np.ndarray, res_norms: np.ndarray, tol: float) -> np.ndarray:
-        """Remove converged trial vectors based on residual norms."""
-        keep = res_norms > tol
-        if trial.ndim == 1:
-            new_trial = trial[:, np.newaxis].copy()
-        else:
-            new_trial = trial.copy()
-        return new_trial[:, keep]
-
-    def _project_trial_vectors(self, trial: np.ndarray) -> np.ndarray:
-        """Project trial vectors to be orthogonal to the current subspace."""
-        new_trial = trial - self._trial @ (self._trial.conj().T @ trial)
-        return new_trial
-
-    def _remove_linear_dependencies(self, trial: np.ndarray) -> np.ndarray:
-        """Remove linearly dependent trial vectors."""
-        tol = 1e-12
-
-        nvecs = trial.shape[1]
-        Sb = np.zeros((nvecs, nvecs))
-        for i in range(nvecs):
-            Sb[i, i] = np.dot(trial[:, i], trial[:, i])
-            for j in range(i):
-                Sb[i, j] = np.dot(trial[:, i], trial[:, j])
-                Sb[j, i] = Sb[i, j]
-
-        l, T = np.linalg.eigh(Sb)
-        b_norm = np.sqrt(Sb.diagonal())
-        keep = l > b_norm * tol
-
-        new_vector = trial @ T[:, keep]
-        return new_vector
-
-    def _random_trial_vector(self) -> np.ndarray:
-        """Generate a orthogonal trial vector."""
-        def gram_schmidt(vector: np.ndarray) -> np.ndarray:
-            """Orthogonalize a vector using the Gram-Schmidt process."""
-            w = vector.copy()
-            for v in self._trial.T:
-                w -= np.dot(w, v) / np.dot(v, v) * v
-            return w
-
-        print("No trial vectors left, adding a random one.")
-        rng = np.random.default_rng()
-        new_trial = rng.random(self._trial.shape[0])
-        new_trial = gram_schmidt(new_trial)
-        new_trial /= np.linalg.norm(new_trial)
-        return new_trial[:, np.newaxis]
+    def _reset_reduced_space(self, right_transform: Callable[[np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray]]) -> None:
+        """Reset the reduced space by keeping only the current Ritz vectors."""
+        self._trial = self._orthonormalize(self._trial)
+        self._sigma_plus, self._sigma_minus, self._tau_minus = right_transform(self._trial)
 
 def one_index_transform(K: np.ndarray, h_mo: np.ndarray, g_mo: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     r"""One index transformation of the Hamiltonian.

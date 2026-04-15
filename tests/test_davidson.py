@@ -13,7 +13,7 @@ from slowquant.unitary_coupled_cluster.linear_response import (
     statetransfer,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
-from slowquant.unitary_coupled_cluster.linear_response.solvers import Davidson
+from slowquant.unitary_coupled_cluster.linear_response.solvers import PairedDavidson
 
 
 def test_lih_naive_explicit():
@@ -56,7 +56,7 @@ def test_lih_naive_explicit():
         tau_minus = Sb
         return sigma_plus, sigma_minus, tau_minus
 
-    d = Davidson()
+    d = PairedDavidson()
     eigvals, eigvecs = d.solve(
         right_transform,
         (np.diag(A), np.diag(Sigma)),
@@ -149,7 +149,7 @@ def test_lih_projected_explicit():
         tau_minus = Sb
         return sigma_plus, sigma_minus, tau_minus
 
-    d = Davidson()
+    d = PairedDavidson()
     eigvals, eigvecs = d.solve(
         right_transform,
         (np.diag(A), np.diag(Sigma)),
@@ -242,7 +242,7 @@ def test_lih_allprojected_explicit():
         tau_minus = Sb
         return sigma_plus, sigma_minus, tau_minus
 
-    d = Davidson()
+    d = PairedDavidson()
     eigvals, eigvecs = d.solve(
         right_transform,
         (np.diag(A), np.diag(Sigma)),
