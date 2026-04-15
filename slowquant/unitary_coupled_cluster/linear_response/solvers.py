@@ -42,6 +42,10 @@ class Solvers(ABC):
         """
 
 class Davidson(Solvers):
+    """Davidson solver for the standard eigenvalue problem.
+
+    J. Comput. Phys. 17, 87-94 (1975).
+    """
 
     _trial: np.typing.NDArray[np.complexfloating]
     """Subspace trial vectors"""
@@ -224,6 +228,10 @@ class Davidson(Solvers):
         """Reset the reduced space by keeping only the current Ritz vectors."""
 
 class PairedDavidson(Davidson):
+    """Davidson solver for the paired eigenvalue problem arising in the CASSCF linear response equations.
+
+    J. Chem. Phys. 150, 174121 (2019)
+    """
 
     _sigma_plus: np.typing.NDArray[np.complexfloating]
     """Subspace matrix A @ b + B @ b*"""
