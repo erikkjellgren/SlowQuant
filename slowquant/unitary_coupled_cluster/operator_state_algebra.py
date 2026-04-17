@@ -16,7 +16,7 @@ from slowquant.unitary_coupled_cluster.operators import (
     G5,
     G6,
     G1_sa,
-    G2_bch,
+    G2_hcb,
     G2_sa,
 )
 from slowquant.unitary_coupled_cluster.util import UccStructure, UpsStructure
@@ -1134,7 +1134,7 @@ def construct_ups_state(
                 T = G2_sa(i, j, a, b, 1, True)
             elif exc_type == "hcb_double":
                 (i, a) = np.array(exc_indices) + offset
-                T = G2_bch(i, a, True)
+                T = G2_hcb(i, a, True)
             else:
                 raise ValueError(f"Got unknown excitation type: {exc_type}")
             # Analytical application on state vector
@@ -1481,7 +1481,7 @@ def construct_ups_state(
             ) * tmp
         elif exc_type in ("bch_double",):
             (i, a) = np.array(exc_indices) + 2 * offset
-            T = G2_bch(i, a, True)
+            T = G2_hcb(i, a, True)
             # Analytical application on state vector
             out = (
                 out
@@ -2028,7 +2028,7 @@ def propagate_unitary(
             T = G2_sa(i, j, a, b, 1, True)
         elif exc_type == "hcb_double":
             (i, a) = np.array(exc_indices) + offset
-            T = G2_bch(i, a, True)
+            T = G2_hcb(i, a, True)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Analytical application on state vector
@@ -2898,7 +2898,7 @@ def get_grad_action(
             T = G2_sa(i, j, a, b, 5, True)
         elif exc_type == "hcb_double":
             (i, a) = np.array(exc_indices) + offset
-            T = G2_bch(i, a, True)
+            T = G2_hcb(i, a, True)
         else:
             raise ValueError(f"Got unknown excitation type: {exc_type}")
         # Apply missing T factor of derivative

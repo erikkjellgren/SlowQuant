@@ -450,7 +450,7 @@ def G2_sa(
     return op
 
 
-def G2_bch(i: int, a: int, return_anti_hermitian: bool = False) -> HardcorebosonOperator:
+def G2_hcb(i: int, a: int, return_anti_hermitian: bool = False) -> HardcorebosonOperator:
     op = b_op(a, dagger=True)
     op *= b_op(i, dagger=False)
     if return_anti_hermitian:
@@ -690,7 +690,9 @@ def hamiltonian_hcb_full_space(hr1: np.ndarray, hr2: np.ndarray, num_orbs: int) 
     return H
 
 
-def hamiltonian_hcb_0i_0a(hr1: np.ndarray, hr2: np.ndarray, num_inactive_orbs: int, num_active_orbs: int) -> HardcorebosonOperator:
+def hamiltonian_hcb_0i_0a(
+    hr1: np.ndarray, hr2: np.ndarray, num_inactive_orbs: int, num_active_orbs: int
+) -> HardcorebosonOperator:
     H = HardcorebosonOperator({})
     for i in range(num_inactive_orbs):
         if abs(hr1[i, i]) > 10**-14:
