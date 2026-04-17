@@ -98,6 +98,25 @@ def sa_single_excitation(
     return qc
 
 
+def hcb_double_excitation(
+    i: int,
+    a: int,
+    qc: QuantumCircuit,
+    theta: Parameter | ParameterExpression,
+) -> QuantumCircuit:
+    qc.rz(np.pi / 2, i)
+    qc.rx(np.pi / 2, i)
+    qc.rx(np.pi / 2, a)
+    qc.cx(i, a)
+    qc.rx(theta, i)
+    qc.rz(theta, a)
+    qc.cx(i, a)
+    qc.rx(-np.pi / 2, a)
+    qc.rx(-np.pi / 2, i)
+    qc.rz(-np.pi / 2, i)
+    return qc
+
+
 def _single_excitation_efficient(
     k: int, i: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression
 ) -> QuantumCircuit:

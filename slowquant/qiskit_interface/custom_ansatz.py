@@ -10,6 +10,7 @@ from slowquant.qiskit_interface.operators_circuits import (
     double_excitation,
     sa_single_excitation,
     single_excitation,
+    hcb_double_excitation,
 )
 from slowquant.unitary_coupled_cluster.util import (
     iterate_pair_t2,
@@ -140,6 +141,8 @@ def fUCC(
         * D [bool]: Add double excitations.
         * pD [bool]: Add pair double excitations.
         * GpD [bool]: Add generalized pair double excitations.
+        * HCBD [bool]: Hardcoreboson double exciation.
+        * HCBGD [bool]: Hardcoreboson generalized double exciation.
 
     Args:
         num_orbs: Number of spatial orbitals.
@@ -150,7 +153,7 @@ def fUCC(
     Returns:
         Factorized UCC ansatz circuit and R parameters needed for gradients.
     """
-    valid_options = ("n_layers", "S", "D", "SAGS", "pD", "GpD", "SAS")
+    valid_options = ("n_layers", "S", "D", "SAGS", "pD", "GpD", "SAS", "HCBD", "HCBGD")
     for option in ansatz_options:
         if option not in valid_options:
             raise ValueError(f"Got unknown option for fUCC, {option}. Valid options are: {valid_options}")
@@ -162,6 +165,8 @@ def fUCC(
     do_D = False
     do_pD = False
     do_GpD = False
+    do_HCBD = False
+    do_HCBGD = False
     if "S" in ansatz_options.keys():
         if ansatz_options["S"]:
             do_S = True
@@ -180,8 +185,16 @@ def fUCC(
     if "GpD" in ansatz_options.keys():
         if ansatz_options["GpD"]:
             do_GpD = True
-    if True not in (do_S, do_SAS, do_SAGS, do_D, do_pD, do_GpD):
+    if "HCBD" in ansatz_options.keys():
+        if ansatz_options["HCBD"]:
+            do_HCBD = True
+    if "HCBGD" in ansatz_options.keys():
+        if ansatz_options["HCBGD"]:
+            do_HCBGD = True
+    if True not in (do_S, do_SAS, do_SAGS, do_D, do_pD, do_GpD, do_HCBD, do_HCBGD):
         raise ValueError("fUCC requires some excitations got none.")
+    if True in (do_HCBD, do_HCBGD) and True in (do_S, do_SAS, do_SAGS, do_D, do_pD, do_GpD):
+        raise ValueError("Cannot mix HCB operators with other operators.")
     n_layers = ansatz_options["n_layers"]
     num_spin_orbs = 2 * num_orbs
     occ = []
@@ -226,6 +239,18 @@ def fUCC(
         if do_GpD:
             for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
                 qc = double_excitation(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
+                grad_param_R[f"p{idx:09d}"] = 2
+                idx += 1
+        if do_HCBD:
+            # Can use the same iterator as spin-adapted singles.
+            for a, i, _ in iterate_t1_sa(occ, unocc):
+                qc = hcb_double_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
+                grad_param_R[f"p{idx:09d}"] = 2
+                idx += 1
+        if do_HCBGD:
+            # Can use the same iterator as spin-adapted singles.
+            for a, i, _ in iterate_t1_sa_generalized(num_orbs):
+                qc = hcb_double_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 2
                 idx += 1
     return qc, grad_param_R

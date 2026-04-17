@@ -17,12 +17,10 @@ from qiskit.primitives import (
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler import PassManager
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
-from qiskit_nature.second_q.circuit.library import HartreeFock
 from qiskit_nature.second_q.mappers import JordanWignerMapper
-from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
-from slowquant.qiskit_interface.custom_ansatz import SDSfUCC, fUCC, tUPS
+from slowquant.qiskit_interface.custom_ansatz import fUCC
 from slowquant.qiskit_interface.util import (
     Clique,
     MitigationFlags,
@@ -40,7 +38,7 @@ from slowquant.qiskit_interface.util import (
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 
 
-class QuantumInterface:
+class HCBQuantumInterface:
     """Quantum interface class.
 
     This class handles the interface with qiskit and the communication with quantum hardware.
@@ -50,7 +48,6 @@ class QuantumInterface:
         self,
         primitive: BaseSamplerV1 | BaseSamplerV2,
         ansatz: str | QuantumCircuit,
-        mapper: FermionicMapper,
         ISA: bool = False,
         pass_manager_options: dict[str, Any] | None = None,
         ansatz_options: dict[str, Any] | None = None,
@@ -66,7 +63,6 @@ class QuantumInterface:
         Args:
             primitive: Qiskit Sampler object.
             ansatz: Name of ansatz to be used.
-            mapper: Qiskit mapper object, e.g. JW or Parity.
             ISA: Use ISA for submitting to IBM quantum. Locally transpiling is performed.
             pass_manager_options: Dictionary to define custom pass manager.
             ansatz_options: Ansatz options.
@@ -80,19 +76,11 @@ class QuantumInterface:
         if ansatz_options is None:
             ansatz_options = {}
         allowed_ansatz = (
-            "fUCCpD",
-            "fUCCD",
-            "tUPS",
-            "fUCCSD",
-            "QNP",
-            "kSAfUpCCGSD",
-            "SDSfUCCSD",
-            "kSASDSfUpCCGSD",
-            "fUCC",
-            "SDSfUCC",
-            "HF",
+            "fuccpd",
+            "fuccgpd",
+            "hf",
         )
-        if not isinstance(ansatz, QuantumCircuit) and ansatz not in allowed_ansatz:
+        if not isinstance(ansatz, QuantumCircuit) and ansatz.lower() not in allowed_ansatz:
             raise ValueError(
                 "The chosen Ansatz is not available. Choose from: ",
                 allowed_ansatz,
@@ -111,7 +99,6 @@ class QuantumInterface:
         self.pass_manager_options = pass_manager_options
         self.ISA = ISA
         self.shots = shots
-        self.mapper = mapper
         self.mitigation_flags: MitigationFlags = MitigationFlags(
             do_M_mitigation=do_M_mitigation,
             do_M_ansatz0=do_M_ansatz0,
@@ -129,16 +116,15 @@ class QuantumInterface:
         self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
         self._M_shots = None  # define a separate number of shots for M
 
-    def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int]) -> None:
+    def construct_circuit(self, num_orbs: int, num_elec_pair: int) -> None:
         """Construct qiskit circuit.
 
         Args:
             num_orbs: Number of orbitals in spatial basis.
-            num_elec: Number of electrons (alpha, beta).
+            num_elec_pair: Number of electrons pairs.
         """
         self.num_orbs = num_orbs
-        self.num_spin_orbs = 2 * num_orbs
-        self.num_elec = num_elec
+        self.num_elec_pair = num_elec_pair
         self.grad_param_R: dict[
             str, int
         ] = {}  # Contains information about the parameterization needed for gradient evaluations.
@@ -148,18 +134,6 @@ class QuantumInterface:
             self.state_circuit: QuantumCircuit = QuantumCircuit(
                 self.ansatz.num_qubits
             )  # empty state as custom circuit is passed
-        elif self.ansatz == "tUPS" and "do_pp" in self.ansatz_options.keys() and self.ansatz_options["do_pp"]:
-            # HF in pp-tUPS ordering
-            if not isinstance(self.mapper, JordanWignerMapper):
-                raise ValueError(f"pp-tUPS only implemented for JW mapper, got: {type(self.mapper)}")
-            if np.sum(num_elec) != num_orbs:
-                raise ValueError(
-                    f"pp-tUPS only implemented for number of electrons and number of orbitals being the same, got: ({np.sum(num_elec)}, {num_orbs}), (elec, orbs)"
-                )
-            self.state_circuit = QuantumCircuit(2 * num_orbs)
-            for p in range(0, 2 * num_orbs):
-                if p % 2 == 0:
-                    self.state_circuit.x(p)
         else:
             self.state_circuit = HartreeFock(num_orbs, num_elec, self.mapper)
         self.num_qubits = self.state_circuit.num_qubits
@@ -170,63 +144,18 @@ class QuantumInterface:
                 "QI was initialized with a custom QuantumCircuit object. This is assumed to be the Ansatz (without state preparation circuit)"
             )
             self.circuit = self.ansatz
-        elif self.ansatz == "fUCCpD":
-            self.ansatz_options["pD"] = True
+        elif self.ansatz.lower() == "fuccpd":
+            self.ansatz_options["HCBD"] = True
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
             self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
-        elif self.ansatz == "fUCCD":
-            self.ansatz_options["D"] = True
+        elif self.ansatz.lower() == "fuccgpd":
+            self.ansatz_options["HCBGD"] = True
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
             self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
-        elif self.ansatz == "HF":
-            if len(self.ansatz_options) != 0:
-                raise ValueError(f"No options available for HF got {self.ansatz_options}")
-            self.circuit = QuantumCircuit(self.num_qubits)  # empty ansatz circuit
-        elif self.ansatz == "tUPS":
-            self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
-        elif self.ansatz == "QNP":
-            self.ansatz_options["do_qnp"] = True
-            self.circuit, self.grad_param_R = tUPS(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
-        elif self.ansatz == "fUCCSD":
-            self.ansatz_options["S"] = True
-            self.ansatz_options["D"] = True
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
-        elif self.ansatz == "kSAfUpCCGSD":
-            self.ansatz_options["SAGS"] = True
-            self.ansatz_options["GpD"] = True
-            self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
-        elif self.ansatz == "SDSfUCCSD":
-            self.ansatz_options["D"] = True
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = SDSfUCC(
-                num_orbs, self.num_elec, self.mapper, self.ansatz_options
-            )
-        elif self.ansatz == "kSASDSfUpCCGSD":
-            self.ansatz_options["GpD"] = True
-            self.circuit, self.grad_param_R = SDSfUCC(
-                num_orbs, self.num_elec, self.mapper, self.ansatz_options
-            )
-        elif self.ansatz == "fUCC":
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
-        elif self.ansatz == "SDSfUCC":
-            if "n_layers" not in self.ansatz_options.keys():
-                # default option
-                self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = SDSfUCC(
-                num_orbs, self.num_elec, self.mapper, self.ansatz_options
-            )
         else:
             raise ValueError(f"Unknown ansatz: {self.ansatz}")
 
