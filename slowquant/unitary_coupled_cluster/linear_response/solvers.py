@@ -125,7 +125,7 @@ class Davidson(Solvers):
             if self._trial.shape[1] + trial.shape[1] > max_reduced_space:
                 if not is_silent:
                     print(f"Davidson iter {self._iteration+1:4d}: subspace dimension {self._trial.shape[1]+trial.shape[1]} exceeds max_red_space {max_reduced_space}, restarting with current Ritz vectors")
-                self._reset_reduced_space(right_transform)
+                self._reset_reduced_space(trial, right_transform)
 
             if not is_silent:
                 self._print_iteration_info(res_norms, omega, tolerance)
@@ -232,7 +232,7 @@ class Davidson(Solvers):
         """Update trial vectors using the residuals and the diagonal preconditioner."""
 
     @abstractmethod
-    def _reset_reduced_space(self, right_transform: Callable[[np.ndarray], Any]) -> None:
+    def _reset_reduced_space(self, trial: np.ndarray, right_transform: Callable[[np.ndarray], Any]) -> None:
         """Reset the reduced space by keeping only the current Ritz vectors."""
 
 class PairedDavidson(Davidson):
@@ -377,9 +377,9 @@ class PairedDavidson(Davidson):
         )
         return new_trial
 
-    def _reset_reduced_space(self, right_transform: Callable[[np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray]]) -> None:
+    def _reset_reduced_space(self, trial: np.ndarray, right_transform: Callable[[np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray]]) -> None:
         """Reset the reduced space by keeping only the current Ritz vectors."""
-        self._trial = self._orthonormalize(self._trial)
+        self._trial = self._orthonormalize(trial)
         self._sigma_plus, self._sigma_minus, self._tau_minus = right_transform(self._trial)
 
 def one_index_transform(K: np.ndarray, h_mo: np.ndarray, g_mo: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
