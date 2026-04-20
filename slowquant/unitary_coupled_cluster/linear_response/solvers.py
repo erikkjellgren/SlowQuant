@@ -80,26 +80,22 @@ class Davidson(Solvers):
         self._start = time.time()
         self._iteration = 0
         self._trial = np.array(())
-        self._sigma_plus = np.array(())
-        self._sigma_minus = np.array(())
-        self._tau_minus = np.array(())
-
-        self._print_citation()
-
-        if not is_silent:
-            print(f" Iteration | Time [s] | Max. residual norm | Subspace size | Roots ...")
+        self._setup_right_transformed_arrays()
 
         if max_reduced_space is None:
             max_reduced_space = 8 * n_roots
 
-        if isinstance(preconditioner, tuple):
-            diag = preconditioner[0]
-        else:
+        if not isinstance(preconditioner, tuple):
             raise ValueError("Preconditioner must be a tuple of numpy arrays.")
+        diag = preconditioner[0]
         dim = diag.shape[-1]
 
         if n_roots > dim:
             raise ValueError(f"Number of roots to compute (n_roots={n_roots}) cannot exceed the dimension of the problem (dim={dim}).")
+
+        self._print_citation()
+        if not is_silent:
+            print(f" Iteration | Time [s] | Max. residual norm | Subspace size | Roots ...")
 
         start_guess = np.zeros((dim, n_roots))
         start_guess[np.argsort(diag)[:n_roots], np.arange(n_roots)] = 1.0
@@ -214,6 +210,10 @@ class Davidson(Solvers):
         return new_trial[:, np.newaxis]
 
     @abstractmethod
+    def _setup_right_transformed_arrays(self) -> None:
+        """Setup arrays to store right transformed vectors."""
+
+    @abstractmethod
     def _add_iteration_data(self, trial: np.ndarray, right_transformed_vectors: tuple[np.ndarray, ...]) -> None:
         """Add trial and right transformed matrices for the current iteration to the arrays."""
 
@@ -247,6 +247,12 @@ class PairedDavidson(Davidson):
     """Subspace matrix A @ b - B @ b*"""
     _tau_minus: np.typing.NDArray[np.complexfloating]
     """Subspace matrix Sigma @ b"""
+
+    def _setup_right_transformed_arrays(self) -> None:
+        """Setup arrays to store right transformed vectors."""
+        self._sigma_plus = np.array(())
+        self._sigma_minus = np.array(())
+        self._tau_minus = np.array(())
 
     def _print_citation(self) -> None:
         """Print the citation for the Davidson method."""
@@ -453,7 +459,7 @@ def get_orbital_rotation_gradient(
     return inv_sqrt_2 * gradient
 
 @nb.jit(nopython=True)
-def get_orbital_metric_qq_block(
+def get_orbital_metric_block(
     q_idx: list[tuple[int, int]] | np.ndarray,
     trial: np.ndarray,
     num_inactive_orbs: int,
@@ -483,3 +489,97 @@ def get_orbital_metric_qq_block(
                 sigma[idx1] -= RDM1(p, u, num_inactive_orbs, num_active_orbs, rdm1) * trial[idx2]
     return - 0.5 * sigma
 
+@nb.jit(nopython=True)
+def get_orbital_hessian_diagonal(
+    h: np.ndarray,
+    g: np.ndarray,
+    q_idx: list[tuple[int, int]] | np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    rdm1: np.ndarray,
+    rdm2: np.ndarray,
+) -> np.ndarray:
+    r"""Calculate the diagonal of the A matrix orbital-orbital block.
+
+    .. math::
+        A_{pq,pq}^{\hat{q},\hat{q}} = \left<0\left|\left[\hat{q}_{pq}^\dagger,\left[\hat{H},\hat{q}_{pq}\right]\right]\right|0\right>
+
+    Args:
+        h: One-electron integrals in MO in Hamiltonian.
+        g: Two-electron integrals in MO in Hamiltonian.
+        q_idx: Orbital rotation parameter indices in spatial basis.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        rdm1: Active part of 1-RDM.
+        rdm2: Active part of 2-RDM.
+
+    Returns:
+        Diagonal of the A matrix orbital-orbital block.
+    """
+    diagonal = np.zeros(len(q_idx))
+    for idx1, (t, u) in enumerate(q_idx):
+        # 1e contribution
+        diagonal[idx1] += h[t, t] * RDM1(u, u, num_inactive_orbs, num_active_orbs, rdm1)
+        diagonal[idx1] += h[u, u] * RDM1(t, t, num_inactive_orbs, num_active_orbs, rdm1)
+        for p in range(num_inactive_orbs + num_active_orbs):
+            diagonal[idx1] -= h[t, p] * RDM1(t, p, num_inactive_orbs, num_active_orbs, rdm1)
+            diagonal[idx1] -= h[p, u] * RDM1(p, u, num_inactive_orbs, num_active_orbs, rdm1)
+        # 2e contribution
+        for p in range(num_inactive_orbs + num_active_orbs):
+            for q in range(num_inactive_orbs + num_active_orbs):
+                diagonal[idx1] += g[t, t, p, q] * RDM2(
+                    u, u, p, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                )
+                diagonal[idx1] -= g[t, p, u, q] * RDM2(
+                    u, p, t, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                )
+                diagonal[idx1] += g[t, p, q, t] * RDM2(
+                    u, p, q, u, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                )
+                diagonal[idx1] += g[u, u, p, q] * RDM2(
+                    t, t, p, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                )
+                diagonal[idx1] += g[p, u, u, q] * RDM2(
+                    p, t, t, q, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                )
+                diagonal[idx1] -= g[p, u, q, t] * RDM2(
+                    p, t, q, u, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                )
+        for p in range(num_inactive_orbs + num_active_orbs):
+            for q in range(num_inactive_orbs + num_active_orbs):
+                for r in range(num_inactive_orbs + num_active_orbs):
+                    diagonal[idx1] -= g[t, p, q, r] * RDM2(
+                        t, p, q, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                    )
+                    diagonal[idx1] -= g[p, u, q, r] * RDM2(
+                        p, u, q, r, num_inactive_orbs, num_active_orbs, rdm1, rdm2
+                    )
+    return 0.5 * diagonal
+
+@nb.jit(nopython=True)
+def get_orbital_metric_diagonal(
+    q_idx: np.ndarray,
+    num_inactive_orbs: int,
+    num_active_orbs: int,
+    rdm1: np.ndarray,
+) -> np.ndarray:
+    r"""Calculate the diagonal of the Sigma matrix orbital-orbital block.
+
+    .. math::
+        \Sigma_{pq,pq}^{\hat{q},\hat{q}} = \left<0\left|\left[\hat{q}_{pq}^\dagger,\hat{q}_{pq}\right]\right|0\right>
+
+    Args:
+        q_idx: Orbital rotation parameter indices in spatial basis.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+        rdm1: Active part of 1-RDM.
+
+    Returns:
+        Diagonal of the sigma matrix orbital-orbital block.
+    """
+    diagonal = np.zeros(len(q_idx))
+    for idx1, (p, q) in enumerate(q_idx):
+        diagonal[idx1] += RDM1(p, p, num_inactive_orbs, num_active_orbs, rdm1)
+        diagonal[idx1] -= RDM1(q, q, num_inactive_orbs, num_active_orbs, rdm1)
+    diagonal *= 0.5
+    return diagonal

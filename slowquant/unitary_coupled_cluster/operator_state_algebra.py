@@ -1791,6 +1791,7 @@ def propagate_unitary(
     ci_info: CI_Info,
     thetas: Sequence[float],
     ups_struct: UpsStructure,
+    dagger: bool = False,
 ) -> np.ndarray:
     """Apply unitary from UPS operator number 'idx' to state.
 
@@ -1803,6 +1804,7 @@ def propagate_unitary(
         ci_info: Information about the CI space.
         thetas: Values for ansatz parameters.
         ups_struct: UPS structure object.
+        dagger: If dagger.
 
     Returns:
         State with unitary applied.
@@ -1814,6 +1816,8 @@ def propagate_unitary(
     offset = ci_info.space_extension_offset
     if abs(theta) < 10**-28:
         return np.copy(state)
+    if dagger:
+        theta = -theta
     if exc_type in ("sa_single",):
         A = 1  # 2**(-1/2)
         (i, a) = np.array(exc_indices) + offset

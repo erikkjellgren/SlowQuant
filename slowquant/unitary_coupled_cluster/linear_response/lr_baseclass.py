@@ -1,5 +1,6 @@
 import numpy as np
 import scipy
+import time
 
 from slowquant.unitary_coupled_cluster.ci_spaces import CI_Info
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
@@ -26,7 +27,6 @@ from slowquant.unitary_coupled_cluster.util import (
     iterate_t6,
 )
 from slowquant.unitary_coupled_cluster.linear_response.solvers import PairedDavidson
-
 
 class LinearResponseBaseClass:
     index_info: tuple[CI_Info, list[float], UpsStructure] | tuple[CI_Info, list[float], UccStructure]
@@ -112,6 +112,10 @@ class LinearResponseBaseClass:
         """Construct Hessian and metric blocks."""
         raise NotImplementedError
 
+    def _compute_preconditioner(self) -> tuple[np.ndarray, np.ndarray]:
+        """Compute preconditioner for Davidson solver."""
+        raise NotImplementedError
+
     def _right_transform(self, trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Right transform for Davidson solver.
 
@@ -126,10 +130,10 @@ class LinearResponseBaseClass:
         Args:
             n_roots: Number of roots to calculate. If 0, calculate all roots.
             solver_settings: Settings for the Davidson solver:
-                max_iteration: Maximum number of iterations.
-                tolerance: Convergence tolerance.
-                max_reduced_space: Maximum size of the reduced space.
-                is_silent: Whether to print convergence information.
+                max_iteration: Maximum number of iterations. Default is 100.
+                tolerance: Convergence tolerance. Default is 1e-8.
+                max_reduced_space: Maximum size of the reduced space. Default is 8*num_roots.
+                is_silent: Whether to print convergence information. Default is False.
         """
         if n_roots <= 0:
             self._all_excitation_energies()
@@ -138,13 +142,14 @@ class LinearResponseBaseClass:
             if solver_settings is None:
                 solver_settings = {}
 
-            # Temporary for precondition matrices
-            self._construct_hessian_metric_blocks()
+            start_time = time.time()
+            preconditioner = self._compute_preconditioner()
+            print("pc time:", time.time() - start_time)
 
             self.excitation_energies, self.normed_response_vectors = (
                 solver.solve(
                     self._right_transform,
-                    (np.diag(self.A), np.diag(self.Sigma)),
+                    preconditioner,
                     max_iteration=solver_settings.get("max_iteration", 100),
                     tolerance=solver_settings.get("tolerance", 1e-8),
                     n_roots=n_roots,

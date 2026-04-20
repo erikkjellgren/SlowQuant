@@ -12,7 +12,11 @@ from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperat
 from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
     LinearResponseBaseClass,
 )
-from slowquant.unitary_coupled_cluster.linear_response.solvers import get_orbital_metric_qq_block
+from slowquant.unitary_coupled_cluster.linear_response.solvers import (
+    get_orbital_metric_block,
+    get_orbital_hessian_diagonal,
+    get_orbital_metric_diagonal
+)
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     expectation_value,
     propagate_state,
@@ -339,7 +343,7 @@ class LinearResponse(LinearResponseBaseClass):
                     sigma_plus[i, root] += val
                     sigma_minus[i, root] += val
                 # <0| [qid, qs] |0>
-                val = get_orbital_metric_qq_block(
+                val = get_orbital_metric_block(
                     self.wf.kappa_no_activeactive_idx,
                     trial[:, root],
                     self.wf.num_inactive_orbs,
@@ -455,6 +459,68 @@ class LinearResponse(LinearResponseBaseClass):
 
         return sigma_plus, sigma_minus, tau_minus
 
+    def _compute_preconditioner(self) -> tuple[np.ndarray, np.ndarray]:
+        """Compute the preconditioner for the Davidson solver.
+
+        Returns:
+            prec_A, prec_sigma: Preconditioner for A and Sigma blocks.
+        """
+        num_q = len(self.q_ops)
+        num_G = len(self.G_ops)
+        prec_A = np.zeros(num_q + num_G)
+        prec_sigma = np.zeros(num_q + num_G)
+
+        # Can easily do exact diagonal for q block
+        prec_A[:num_q] = get_orbital_hessian_diagonal(
+            self.wf.h_mo,
+            self.wf.g_mo,
+            self.wf.kappa_no_activeactive_idx,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.rdm1,
+            self.wf.rdm2,
+        )
+        prec_sigma[:num_q] = get_orbital_metric_diagonal(
+            self.wf.kappa_no_activeactive_idx,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.rdm1,
+        )
+        # Approximate G diagonal
+        H00_ket = propagate_state([self.H_0i_0a], self.wf.ci_coeffs, *self.index_info)
+        for i, GI in enumerate(self.G_ops):
+            GI_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
+            prec_A[i + num_q] += expectation_value(
+                GI_ket,
+                [self.H_0i_0a],
+                GI_ket,
+                *self.index_info,
+            )
+            GI_expect = expectation_value(
+                self.wf.ci_coeffs,
+                [],
+                GI_ket,
+                *self.index_info,
+            )
+            GIGI_expect = expectation_value(
+                GI_ket,
+                [],
+                GI_ket,
+                *self.index_info,
+            )
+            HGI_expect = expectation_value(
+                H00_ket,
+                [],
+                GI_ket,
+                *self.index_info,
+            )
+            prec_A[i + num_q] -= self.wf.energy_elec * GIGI_expect
+            prec_A[i + num_q] += self.wf.energy_elec * GI_expect**2
+            prec_A[i + num_q] -= GI_expect * HGI_expect
+            prec_sigma[i + num_q] += GIGI_expect
+            prec_sigma[i + num_q] -= GI_expect**2
+
+        return prec_A, prec_sigma
 
     def get_transition_dipole(self) -> np.ndarray:
         """Calculate transition dipole moment.

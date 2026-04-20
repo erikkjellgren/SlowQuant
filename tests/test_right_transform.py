@@ -57,8 +57,7 @@ def test_lih_naive():
     d = PairedDavidson()
     num_exc = 13
 
-    start_guess = np.zeros((A.shape[0], num_exc))
-    start_guess[np.argsort(np.diag(A))[:num_exc], np.arange(num_exc)] = 1.0
+    start_guess = np.random.rand(A.shape[0], num_exc)
     trial = d._orthonormalize(start_guess)
 
     sp, sm, tm = right_transform(trial)
@@ -110,8 +109,7 @@ def test_lih_projected():
     d = PairedDavidson()
     num_exc = 13
 
-    start_guess = np.zeros((A.shape[0], num_exc))
-    start_guess[np.argsort(np.diag(A))[:num_exc], np.arange(num_exc)] = 1.0
+    start_guess = np.random.rand(A.shape[0], num_exc)
     trial = d._orthonormalize(start_guess)
 
     sp, sm, tm = right_transform(trial)
@@ -163,8 +161,7 @@ def test_lih_allprojected():
     d = PairedDavidson()
     num_exc = 13
 
-    start_guess = np.zeros((A.shape[0], num_exc))
-    start_guess[np.argsort(np.diag(A))[:num_exc], np.arange(num_exc)] = 1.0
+    start_guess = np.random.rand(A.shape[0], num_exc)
     trial = d._orthonormalize(start_guess)
 
     sp, sm, tm = right_transform(trial)
