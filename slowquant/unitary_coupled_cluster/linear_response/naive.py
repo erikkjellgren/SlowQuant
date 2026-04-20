@@ -359,6 +359,7 @@ class LinearResponse(LinearResponseBaseClass):
                 qs = FermionicOperator({})
                 for kappa, q in zip(kappas[:, root], self.q_ops):
                     qs += kappa * q
+                qH_ket = propagate_state([qs * self.H_1i_1a], self.wf.ci_coeffs, *self.index_info)
 
                 # (A+B)_Gq @ b_q
                 # (A-B)_Gq @ b_q
@@ -387,6 +388,12 @@ class LinearResponse(LinearResponseBaseClass):
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
+                    sigma_plus[num_q + i, root] += expectation_value(
+                        GI_ket + GId_ket,
+                        [],
+                        qH_ket,
+                        *self.index_info,
+                    )
 
                     # <0| GId tH00m |0>
                     sigma_minus[num_q + i, root] = expectation_value(
@@ -408,6 +415,12 @@ class LinearResponse(LinearResponseBaseClass):
                         self.wf.ci_coeffs,
                         [self.H_1i_1a * qGd],
                         self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                    sigma_minus[num_q + i, root] += expectation_value(
+                        GI_ket - GId_ket,
+                        [],
+                        qH_ket,
                         *self.index_info,
                     )
                 Gq_time += time.time() - start_time
