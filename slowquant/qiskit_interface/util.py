@@ -333,10 +333,11 @@ class Clique:
     #. 10.1109/TQE.2020.3035814, Sec. IV. A, IV. B, and VIII.
     """
 
-    def __init__(self, csfs_option: int = 1) -> None:
+    def __init__(self, csfs_option: int = 1, is_hcb: bool = False) -> None:
         """Initialize clique class."""
         self.cliques: list[CliqueHead] = []
         self.csfs_option = csfs_option
+        self.is_hcb = is_hcb
 
     def add_paulis(self, paulis: list[str]) -> list[str]:
         """Add list of Pauli strings to cliques and return clique heads to be simulated.
@@ -351,6 +352,10 @@ class Clique:
         # should always be the first clique.
         if len(self.cliques) == 0:
             self.cliques.append(CliqueHead("Z" * len(paulis[0])))
+            if self.is_hcb:
+                # For hard-core boson model, all X and all Y heads should exist.
+                self.cliques.append(CliqueHead("X" * len(paulis[0])))
+                self.cliques.append(CliqueHead("Y" * len(paulis[0])))
 
         # Loop over Pauli strings (passed via observable) in reverse sorted order
         for pauli in sorted(paulis, reverse=True):
@@ -367,6 +372,9 @@ class Clique:
             else:  # no break
                 # Pauli String does not fit any simulated Clique head and has to be simulated
                 self.cliques.append(CliqueHead(pauli))
+                if self.is_hcb:
+                    print("WARNING: Found Pauli outside of Z, X, Y heads for hard-core boson model.")
+                    print(f"{pauli}")
 
         # Find new Paulis that need to be measured
         new_heads = []

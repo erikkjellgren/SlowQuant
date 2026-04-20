@@ -924,7 +924,7 @@ class HCBQuantumInterface:
             )
 
         if det_int not in self.saver:
-            self.saver[det_int] = Clique(csfs_option)
+            self.saver[det_int] = Clique(csfs_option, is_hcb=True)
         # If a different csfs option has been used in SA-VQE that means the circuit has been altered.
         # Thus, we cannot use raw results from an unaltered circuit run with a different csfs_option.
         elif self.saver[det_int].csfs_option != csfs_option:
@@ -933,7 +933,7 @@ class HCBQuantumInterface:
                 det,
                 " has different csfs_option than requested. Rerunning raw data.",
             )
-            self.saver[det_int] = Clique(csfs_option)
+            self.saver[det_int] = Clique(csfs_option, is_hcb=True)
 
         paulis_str = [str(x) for x in observables.paulis]
         new_heads = self.saver[det_int].add_paulis(paulis_str)
@@ -1022,7 +1022,7 @@ class HCBQuantumInterface:
         paulis_str = [str(x) for x in observables.paulis]
         if do_cliques:
             # Obtain cliques for operator's Pauli strings
-            cliques = Clique()
+            cliques = Clique(is_hcb=True)
 
             new_heads = cliques.add_paulis(paulis_str)
 
