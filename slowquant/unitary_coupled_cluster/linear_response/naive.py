@@ -379,7 +379,7 @@ class LinearResponse(LinearResponseBaseClass):
                         GId_ket,
                         *self.index_info,
                     )
-                    # 0.5 * <0| H, [qs, GId + GI] |0>
+                    # 0.5 * <0| H [qs, GId + GI] |0>
                     qGd = commutator(qs, GI.dagger + GI)
                     sigma_plus[num_q + i, root] += 0.5 * expectation_value(
                         self.wf.ci_coeffs,
@@ -402,7 +402,7 @@ class LinearResponse(LinearResponseBaseClass):
                         GId_ket,
                         *self.index_info,
                     )
-                    # 0.5 * <0| H, [qs, GId - GI] |0>
+                    # 0.5 * <0| H [qs, GId - GI] |0>
                     qGd = commutator(qs, GI.dagger - GI)
                     sigma_minus[num_q + i, root] += 0.5 * expectation_value(
                         self.wf.ci_coeffs,
