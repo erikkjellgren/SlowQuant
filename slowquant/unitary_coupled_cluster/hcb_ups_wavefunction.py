@@ -680,7 +680,9 @@ class WaveFunctionHCBUPS:
             )
             """
         if theta_optimization:
-            Hamiltonian = hamiltonian_hcb_0i_0a(self.hr1, self.hr2, self.num_inactive_orbs, self.num_active_orbs)
+            Hamiltonian = hamiltonian_hcb_0i_0a(
+                self.hr1, self.hr2, self.num_inactive_orbs, self.num_active_orbs
+            )
             # Reference bra state (no differentiations)
             bra_vec = propagate_state(
                 [Hamiltonian],

@@ -94,7 +94,7 @@ def get_bitstring_sign(op: str, binary: int) -> int:
     return 1
 
 
-def swap_indices(num_qubits: int, swap: tuple[int, int]) -> list[int]:
+def swap_indices(num_qubits: int, swap: tuple[int, int]) -> np.ndarray:
     """Find new bit ordering based on a bit swap.
 
     Args:
@@ -455,40 +455,6 @@ class Clique:
                 return clique_head.distr.get_distr(mitigation_flags)
         raise ValueError(f"Could not find matching clique for Pauli, {pauli}")
 
-    def get_head(self, pauli: str) -> str:
-        """Get clique head for a Pauli string.
-
-        Args:
-            pauli: Pauli string.
-
-        Returns:
-            Clique head for the Pauli string.
-        """
-        for clique_head in self.cliques:
-            do_fit, head_fit = fit_in_clique(pauli, clique_head.head)
-            if do_fit:
-                if clique_head.head != head_fit:
-                    raise ValueError(
-                        f"Found matching clique, but head will be mutated. Head; {clique_head.head}, Pauli; {pauli}"
-                    )
-                return clique_head.head
-        raise ValueError(f"Could not find matching clique for Pauli, {pauli}")
-
-    def get_empty_heads(self, mitigation_int) -> list[str]:
-        """Return all heads that do not have any data for a specific mitigation int.
-
-        Args:
-            mitigation_int: Mitigation integer, default is 0.
-
-        Returns:
-            List of heads that have no data for the given mitigation integer.
-        """
-        empties = []
-        for clique_head in self.cliques:
-            if clique_head.distr.is_empty(mitigation_int):
-                empties.append(clique_head.head)
-        return empties
-
     def get_distr_heads(
         self, heads: list[str], mitigation_flags: MitigationFlags | None = None
     ) -> list[dict[int, float]]:
@@ -546,20 +512,12 @@ class Clique:
         for clique_head in self.cliques:
             print(f"Head: {clique_head.head}, Distribution: {clique_head.distr.data}")
 
-    def get_clique_heads(self) -> list[str]:
-        """Return all clique heads.
-
-        Returns:
-            List of clique heads.
-        """
+    def print_clique_heads(self) -> None:
+        """Print all clique heads."""
         heads = []
         for clique_head in self.cliques:
             heads.append(clique_head.head)
-        return heads
-
-    def print_clique_heads(self) -> None:
-        """Print all clique heads."""
-        print(self.get_clique_heads())
+        print(heads)
 
 
 def fit_in_clique(pauli: str, head: str) -> tuple[bool, str]:

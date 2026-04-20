@@ -3,14 +3,14 @@ from typing import Any
 import numpy as np
 from qiskit.circuit import Parameter, QuantumCircuit
 from qiskit_nature.second_q.circuit.library import HartreeFock
-from qiskit_nature.second_q.mappers import JordanWignerMapper
+from qiskit_nature.second_q.mappers import JordanWignerMapper, LinearMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 
 from slowquant.qiskit_interface.operators_circuits import (
     double_excitation,
+    hcb_double_excitation,
     sa_single_excitation,
     single_excitation,
-    hcb_double_excitation,
 )
 from slowquant.unitary_coupled_cluster.util import (
     iterate_pair_t2,
@@ -141,8 +141,6 @@ def fUCC(
         * D [bool]: Add double excitations.
         * pD [bool]: Add pair double excitations.
         * GpD [bool]: Add generalized pair double excitations.
-        * HCBD [bool]: Hardcoreboson double exciation.
-        * HCBGD [bool]: Hardcoreboson generalized double exciation.
 
     Args:
         num_orbs: Number of spatial orbitals.
@@ -153,7 +151,7 @@ def fUCC(
     Returns:
         Factorized UCC ansatz circuit and R parameters needed for gradients.
     """
-    valid_options = ("n_layers", "S", "D", "SAGS", "pD", "GpD", "SAS", "HCBD", "HCBGD")
+    valid_options = ("n_layers", "S", "D", "SAGS", "pD", "GpD", "SAS")
     for option in ansatz_options:
         if option not in valid_options:
             raise ValueError(f"Got unknown option for fUCC, {option}. Valid options are: {valid_options}")
@@ -165,8 +163,6 @@ def fUCC(
     do_D = False
     do_pD = False
     do_GpD = False
-    do_HCBD = False
-    do_HCBGD = False
     if "S" in ansatz_options.keys():
         if ansatz_options["S"]:
             do_S = True
@@ -185,16 +181,8 @@ def fUCC(
     if "GpD" in ansatz_options.keys():
         if ansatz_options["GpD"]:
             do_GpD = True
-    if "HCBD" in ansatz_options.keys():
-        if ansatz_options["HCBD"]:
-            do_HCBD = True
-    if "HCBGD" in ansatz_options.keys():
-        if ansatz_options["HCBGD"]:
-            do_HCBGD = True
-    if True not in (do_S, do_SAS, do_SAGS, do_D, do_pD, do_GpD, do_HCBD, do_HCBGD):
+    if True not in (do_S, do_SAS, do_SAGS, do_D, do_pD, do_GpD):
         raise ValueError("fUCC requires some excitations got none.")
-    if True in (do_HCBD, do_HCBGD) and True in (do_S, do_SAS, do_SAGS, do_D, do_pD, do_GpD):
-        raise ValueError("Cannot mix HCB operators with other operators.")
     n_layers = ansatz_options["n_layers"]
     num_spin_orbs = 2 * num_orbs
     occ = []
@@ -241,16 +229,75 @@ def fUCC(
                 qc = double_excitation(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 2
                 idx += 1
+    return qc, grad_param_R
+
+
+def HCBfUCC(
+    num_orbs: int,
+    num_elec_pair: int,
+    mapper: LinearMapper,
+    ansatz_options: dict[str, Any],
+) -> tuple[QuantumCircuit, dict[str, int]]:
+    """Create factorized UCC ansatz.
+
+    #. 10.1103/PhysRevA.102.062612 (efficient circuits for JW)
+    #. 10.1021/acs.jctc.8b01004 (k-UpCCGSD)
+
+    Ansatz Options:
+        * n_layers [int]: Number of layers.
+        * HCBD [bool]: Hardcoreboson double exciation.
+        * HCBGD [bool]: Hardcoreboson generalized double exciation.
+
+    Args:
+        num_orbs: Number of spatial orbitals.
+        num_elec_pair: Number of electron pairs.
+        mapper: Fermionic to qubit mapper.
+        ansatz_options: Ansatz options.
+
+    Returns:
+        Factorized UCC ansatz circuit and R parameters needed for gradients.
+    """
+    valid_options = ("HCBD", "HCBGD")
+    for option in ansatz_options:
+        if option not in valid_options:
+            raise ValueError(f"Got unknown option for fUCC, {option}. Valid options are: {valid_options}")
+    if "n_layers" not in ansatz_options.keys():
+        raise ValueError("fUCC require the option 'n_layers'")
+    do_HCBD = False
+    do_HCBGD = False
+    if "HCBD" in ansatz_options.keys():
+        if ansatz_options["HCBD"]:
+            do_HCBD = True
+    if "HCBGD" in ansatz_options.keys():
+        if ansatz_options["HCBGD"]:
+            do_HCBGD = True
+    if True not in (do_HCBD, do_HCBGD):
+        raise ValueError("fUCC requires some excitations got none.")
+    n_layers = ansatz_options["n_layers"]
+    occ = []
+    unocc = []
+    idx = 0
+    for _ in range(num_elec_pair):
+        occ.append(idx)
+        idx += 1
+    for _ in range(num_orbs - num_elec_pair):
+        unocc.append(idx)
+        idx += 1
+    qc = HartreeFock(num_orbs, (0, 0), mapper)  # empty circuit with qubit number based on mapper
+    grad_param_R = {}
+    idx = 0
+    # Layer loop
+    for _ in range(n_layers):
         if do_HCBD:
             # Can use the same iterator as spin-adapted singles.
             for a, i, _ in iterate_t1_sa(occ, unocc):
-                qc = hcb_double_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
+                qc = hcb_double_excitation(i, a, qc, Parameter(f"p{idx:09d}"))
                 grad_param_R[f"p{idx:09d}"] = 2
                 idx += 1
         if do_HCBGD:
             # Can use the same iterator as spin-adapted singles.
             for a, i, _ in iterate_t1_sa_generalized(num_orbs):
-                qc = hcb_double_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
+                qc = hcb_double_excitation(i, a, qc, Parameter(f"p{idx:09d}"))
                 grad_param_R[f"p{idx:09d}"] = 2
                 idx += 1
     return qc, grad_param_R

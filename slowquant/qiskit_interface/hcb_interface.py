@@ -17,10 +17,9 @@ from qiskit.primitives import (
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler import PassManager
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
-from qiskit_nature.second_q.mappers import JordanWignerMapper
-from qiskit_nature.second_q.operators import FermionicOp
+from qiskit_nature.second_q.mappers import LinearMapper
 
-from slowquant.qiskit_interface.custom_ansatz import fUCC
+from slowquant.qiskit_interface.custom_ansatz import HCBfUCC
 from slowquant.qiskit_interface.util import (
     Clique,
     MitigationFlags,
@@ -35,7 +34,7 @@ from slowquant.qiskit_interface.util import (
     postselection,
     to_CBS_measurement,
 )
-from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
+from slowquant.unitary_coupled_cluster.hardcoreboson_operator import HardcorebosonOperator
 
 
 class HCBQuantumInterface:
@@ -99,6 +98,7 @@ class HCBQuantumInterface:
         self.pass_manager_options = pass_manager_options
         self.ISA = ISA
         self.shots = shots
+        self.mapper = LinearMapper()
         self.mitigation_flags: MitigationFlags = MitigationFlags(
             do_M_mitigation=do_M_mitigation,
             do_M_ansatz0=do_M_ansatz0,
@@ -135,7 +135,10 @@ class HCBQuantumInterface:
                 self.ansatz.num_qubits
             )  # empty state as custom circuit is passed
         else:
-            self.state_circuit = HartreeFock(num_orbs, num_elec, self.mapper)
+            self.state_circuit = QuantumCircuit(self.num_orbs)
+            for p in range(0, self.num_orbs):
+                if p < self.num_elec_pair:
+                    self.state_circuit.x(p)
         self.num_qubits = self.state_circuit.num_qubits
 
         # Ansatz Circuit
@@ -149,13 +152,17 @@ class HCBQuantumInterface:
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
+            self.circuit, self.grad_param_R = HCBfUCC(
+                num_orbs, self.num_elec_pair, self.mapper, self.ansatz_options
+            )
         elif self.ansatz.lower() == "fuccgpd":
             self.ansatz_options["HCBGD"] = True
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
+            self.circuit, self.grad_param_R = HCBfUCC(
+                num_orbs, self.num_elec_pair, self.mapper, self.ansatz_options
+            )
         else:
             raise ValueError(f"Unknown ansatz: {self.ansatz}")
 
@@ -528,13 +535,13 @@ class HCBQuantumInterface:
         if verbose:
             print("M matrix for error mitigation has been reset.")
 
-    def op_to_qbit(self, op: FermionicOperator) -> SparsePauliOp:
+    def op_to_qbit(self, op: HardcorebosonOperator) -> SparsePauliOp:
         """Fermionic operator to qbit rep.
 
         The Pauli string representation is in qiskit's format of qN,qN-1,...,q0.
 
         Args:
-            op: Operator as SlowQuant's FermionicOperator object
+            op: Operator as SlowQuant's HardcorebosonOperator object
 
         Returns:
             Qubit representation of operator.
@@ -572,16 +579,16 @@ class HCBQuantumInterface:
         return 2
 
     def quantum_expectation_value(
-        self, op: FermionicOperator, custom_parameters: list[float] | None = None
+        self, op: HardcorebosonOperator, custom_parameters: list[float] | None = None
     ) -> float:
         """Calculate expectation value of circuit and observables.
 
         Args:
-            op: Operator as SlowQuant's FermionicOperator object.
+            op: Operator as SlowQuant's HardcorebosonOperator object.
             custom_parameters: optional custom circuit parameters.
 
         Returns:
-            Expectation value of fermionic operator.
+            Expectation value of hard-core bosonic operator.
         """
         save_paulis = self._save_paulis
         if custom_parameters is None:
@@ -607,7 +614,7 @@ class HCBQuantumInterface:
     def quantum_expectation_value_csfs(
         self,
         bra_csf: tuple[list[float], list[str]],
-        op: FermionicOperator,
+        op: HardcorebosonOperator,
         ket_csf: tuple[list[float], list[str]],
         custom_parameters: list[float] | None = None,
         ISA_csfs_option: int = 0,
@@ -641,7 +648,7 @@ class HCBQuantumInterface:
 
         Args:
             bra_csf: Bra CSF.
-            op: Hermitian fermionic operator.
+            op: Hermitian hard-core bosonic operator.
             ket_csf: Ket CSF.
             custom_parameters: Non-default run parameters.
             ISA_csfs_option: Option on how to treat the composing of superposition state and Ansatz:
@@ -734,38 +741,41 @@ class HCBQuantumInterface:
                 state = get_determinant_superposition_reference(bra_det, ket_det, self.num_orbs, self.mapper)
                 # Superposition state contains non-native gates for ISA -> transpilation needed.
                 if self.ISA:
-                    match ISA_csfs_option:
-                        case 1:  # Option 1: flexible layout
-                            # Use untranspiled ansatz and compose with superposition state
-                            circuit = self._ansatz_circuit_raw.compose(state, front=True)
-                            # Transpile freely
-                            circuit = self._pass_manager.run(circuit)  # type: ignore
-                        case 2:  # Option 2: fixed layout - flexible order (needed with M)
-                            # Use untranspiled ansatz and compose with superposition state
-                            circuit = self._ansatz_circuit_raw.compose(state, front=True)
-                            # Transpile the composed circuit together using the correct layout
-                            # This will however still introduce routing swaps (flexible order)
-                            circuit = self._initialfixedlayout_pm.run(circuit)
-                        case 3:  # Option 3: fixed layout - fixed order without optimization (needed with M_Ansatz0)
-                            circuit = layout_conserving_compose(
-                                self.ansatz_circuit,
-                                state,
-                                self._initialfixedlayout_pm,
-                                coupling_map=self.pass_manager_options.get("backend").coupling_map,  # type: ignore
-                                optimization=False,
-                            )
-                        case (
-                            4
-                        ):  # Option 4: fixed layout - fixed order with optimization (needed with M_Ansatz0)
-                            circuit = layout_conserving_compose(
-                                self.ansatz_circuit,
-                                state,
-                                self._initialfixedlayout_pm,
-                                coupling_map=self.pass_manager_options.get("backend").coupling_map,  # type: ignore
-                                optimization=True,
-                            )
-                        case _:
-                            raise ValueError("Wrong ISA_csfs_option specified. Needs to be 1,2,3,4.")
+                    if ISA_csfs_option == 1:  # Option 1: flexible layout
+                        # Use untranspiled ansatz and compose with superposition state
+                        circuit = self._ansatz_circuit_raw.compose(state, front=True)
+                        # Transpile freely
+                        circuit = self._pass_manager.run(circuit)  # type: ignore
+                    elif ISA_csfs_option == 2:  # Option 2: fixed layout - flexible order (needed with M)
+                        # Use untranspiled ansatz and compose with superposition state
+                        circuit = self._ansatz_circuit_raw.compose(state, front=True)
+                        # Transpile the composed circuit together using the correct layout
+                        # This will however still introduce routing swaps (flexible order)
+                        circuit = self._initialfixedlayout_pm.run(circuit)
+                    elif (
+                        ISA_csfs_option == 3
+                    ):  # Option 3: fixed layout - fixed order without optimization (needed with M_Ansatz0)
+                        circuit = layout_conserving_compose(
+                            self.ansatz_circuit,
+                            state,
+                            self._initialfixedlayout_pm,
+                            coupling_map=self.pass_manager_options.get("backend").coupling_map,  # type: ignore
+                            optimization=False,
+                        )
+                    elif (
+                        ISA_csfs_option == 4
+                    ):  # Option 4: fixed layout - fixed order with optimization (needed with M_Ansatz0)
+                        circuit = layout_conserving_compose(
+                            self.ansatz_circuit,
+                            state,
+                            self._initialfixedlayout_pm,
+                            coupling_map=self.pass_manager_options.get("backend").coupling_map,  # type: ignore
+                            optimization=True,
+                        )
+                    else:
+                        raise ValueError(
+                            f"Wrong ISA_csfs_option specified, {ISA_csfs_option}. Needs to be 1,2,3,4."
+                        )
                 else:
                     circuit = self.ansatz_circuit.compose(state, front=True)
                 # Check if M per superposition circuit is requested
@@ -866,7 +876,7 @@ class HCBQuantumInterface:
 
     def _sampler_quantum_expectation_value(
         self,
-        op: FermionicOperator | SparsePauliOp,
+        op: HardcorebosonOperator | SparsePauliOp,
         run_circuit: QuantumCircuit | None = None,
         det: str | None = None,
         circuit_M: None | QuantumCircuit = None,
@@ -876,7 +886,7 @@ class HCBQuantumInterface:
 
         Calculated Pauli expectation values will be saved in memory.
 
-        The expectation value over a fermionic operator is calculated as:
+        The expectation value over a hard-core bosonic operator is calculated as:
 
         .. math::
             E = \sum_i^N c_i\left<0\left|P_i\right|0\right>
@@ -904,13 +914,13 @@ class HCBQuantumInterface:
             run_circuit = self.circuit
         values = 0.0
         # Map Fermionic to Qubit
-        if isinstance(op, FermionicOperator):
+        if isinstance(op, HardcorebosonOperator):
             observables = self.op_to_qbit(op)
         elif isinstance(op, SparsePauliOp):
             observables = op
         else:
             raise ValueError(
-                f"Got unknown operator type {type(op)}, expected FermionicOperator or SparsePauliOp"
+                f"Got unknown operator type {type(op)}, expected HardcorebosonOperator or SparsePauliOp"
             )
 
         if det_int not in self.saver:
@@ -970,7 +980,7 @@ class HCBQuantumInterface:
 
     def _sampler_quantum_expectation_value_nosave(
         self,
-        op: FermionicOperator | SparsePauliOp,
+        op: HardcorebosonOperator | SparsePauliOp,
         run_parameters: list[float],
         run_circuit: QuantumCircuit,
         do_cliques: bool = True,
@@ -1000,13 +1010,13 @@ class HCBQuantumInterface:
         """
         values = 0.0
         # Map Fermionic to Qubit
-        if isinstance(op, FermionicOperator):
+        if isinstance(op, HardcorebosonOperator):
             observables = self.op_to_qbit(op)
         elif isinstance(op, SparsePauliOp):
             observables = op
         else:
             raise ValueError(
-                f"Got unknown operator type {type(op)}, expected FermionicOperator or SparsePauliOp"
+                f"Got unknown operator type {type(op)}, expected HardcorebosonOperator or SparsePauliOp"
             )
 
         paulis_str = [str(x) for x in observables.paulis]
@@ -1057,7 +1067,7 @@ class HCBQuantumInterface:
 
     def quantum_variance(
         self,
-        op: FermionicOperator | SparsePauliOp,
+        op: HardcorebosonOperator | SparsePauliOp,
         do_cliques: bool = True,
         no_coeffs: bool = False,
         do_no_corr: bool = False,
@@ -1089,13 +1099,13 @@ class HCBQuantumInterface:
             run_parameters = custom_parameters
 
         # Map Fermionic to Qubit
-        if isinstance(op, FermionicOperator):
+        if isinstance(op, HardcorebosonOperator):
             observables = self.op_to_qbit(op)
         elif isinstance(op, SparsePauliOp):
             observables = op
         else:
             raise ValueError(
-                f"Got unknown operator type {type(op)}, expected FermionicOperator or SparsePauliOp"
+                f"Got unknown operator type {type(op)}, expected HardcorebosonOperator or SparsePauliOp"
             )
 
         # Loop over all Pauli strings in observable and build final result with coefficients

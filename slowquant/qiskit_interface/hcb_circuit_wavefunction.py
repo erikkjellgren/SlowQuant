@@ -20,6 +20,7 @@ from slowquant.molecularintegrals.integralfunctions import (
 )
 from slowquant.qiskit_interface.hcb_interface import HCBQuantumInterface
 from slowquant.SlowQuant import SlowQuant
+from slowquant.unitary_coupled_cluster.hardcoreboson_operator import HardcorebosonOperator
 from slowquant.unitary_coupled_cluster.integral_manager import IntegralManager
 from slowquant.unitary_coupled_cluster.operators import hamiltonian_hcb_0i_0a
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
@@ -31,7 +32,7 @@ class WaveFunctionHCBCircuit:
         cas: Sequence[int],
         mo_coeffs: np.ndarray,
         integral_generator: SlowQuant | pyscf.gto.mole.Mole,
-        quantum_interface: QuantumInterface,
+        quantum_interface: HCBQuantumInterface,
         include_active_kappa: bool = False,
     ) -> None:
         """Initialize circuit based UPS wave function.
@@ -136,9 +137,7 @@ class WaveFunctionHCBCircuit:
         self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
         # Setup Qiskit stuff
         self.QI = quantum_interface
-        self.QI.construct_circuit(
-            self.num_active_orbs, self.num_active_elec
-        )
+        self.QI.construct_circuit(self.num_active_orbs, self.num_active_elec)
 
     @property
     def kappa(self) -> list[float]:
@@ -266,9 +265,7 @@ class WaveFunctionHCBCircuit:
 
     def _reconstruct_circuit(self) -> None:
         """Construct circuit again."""
-        self.QI.construct_circuit(
-            self.num_active_orbs, self.num_active_elec
-        )
+        self.QI.construct_circuit(self.num_active_orbs, self.num_active_elec)
 
     @property
     def rdm1(self) -> np.ndarray:
@@ -771,8 +768,8 @@ class WaveFunctionHCBCircuit:
 
 
 def _get_energy_evals_for_grad(
-    operator: FermionicOperator,
-    quantum_interface: QuantumInterface,
+    operator: HardcorebosonOperator,
+    quantum_interface: HCBQuantumInterface,
     parameters: list[float],
     idx: int,
     R: int,

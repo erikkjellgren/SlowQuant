@@ -805,38 +805,41 @@ class QuantumInterface:
                 state = get_determinant_superposition_reference(bra_det, ket_det, self.num_orbs, self.mapper)
                 # Superposition state contains non-native gates for ISA -> transpilation needed.
                 if self.ISA:
-                    match ISA_csfs_option:
-                        case 1:  # Option 1: flexible layout
-                            # Use untranspiled ansatz and compose with superposition state
-                            circuit = self._ansatz_circuit_raw.compose(state, front=True)
-                            # Transpile freely
-                            circuit = self._pass_manager.run(circuit)  # type: ignore
-                        case 2:  # Option 2: fixed layout - flexible order (needed with M)
-                            # Use untranspiled ansatz and compose with superposition state
-                            circuit = self._ansatz_circuit_raw.compose(state, front=True)
-                            # Transpile the composed circuit together using the correct layout
-                            # This will however still introduce routing swaps (flexible order)
-                            circuit = self._initialfixedlayout_pm.run(circuit)
-                        case 3:  # Option 3: fixed layout - fixed order without optimization (needed with M_Ansatz0)
-                            circuit = layout_conserving_compose(
-                                self.ansatz_circuit,
-                                state,
-                                self._initialfixedlayout_pm,
-                                coupling_map=self.pass_manager_options.get("backend").coupling_map,  # type: ignore
-                                optimization=False,
-                            )
-                        case (
-                            4
-                        ):  # Option 4: fixed layout - fixed order with optimization (needed with M_Ansatz0)
-                            circuit = layout_conserving_compose(
-                                self.ansatz_circuit,
-                                state,
-                                self._initialfixedlayout_pm,
-                                coupling_map=self.pass_manager_options.get("backend").coupling_map,  # type: ignore
-                                optimization=True,
-                            )
-                        case _:
-                            raise ValueError("Wrong ISA_csfs_option specified. Needs to be 1,2,3,4.")
+                    if ISA_csfs_option == 1:  # Option 1: flexible layout
+                        # Use untranspiled ansatz and compose with superposition state
+                        circuit = self._ansatz_circuit_raw.compose(state, front=True)
+                        # Transpile freely
+                        circuit = self._pass_manager.run(circuit)  # type: ignore
+                    elif ISA_csfs_option == 2:  # Option 2: fixed layout - flexible order (needed with M)
+                        # Use untranspiled ansatz and compose with superposition state
+                        circuit = self._ansatz_circuit_raw.compose(state, front=True)
+                        # Transpile the composed circuit together using the correct layout
+                        # This will however still introduce routing swaps (flexible order)
+                        circuit = self._initialfixedlayout_pm.run(circuit)
+                    elif (
+                        ISA_csfs_option == 3
+                    ):  # Option 3: fixed layout - fixed order without optimization (needed with M_Ansatz0)
+                        circuit = layout_conserving_compose(
+                            self.ansatz_circuit,
+                            state,
+                            self._initialfixedlayout_pm,
+                            coupling_map=self.pass_manager_options.get("backend").coupling_map,  # type: ignore
+                            optimization=False,
+                        )
+                    elif (
+                        ISA_csfs_option == 4
+                    ):  # Option 4: fixed layout - fixed order with optimization (needed with M_Ansatz0)
+                        circuit = layout_conserving_compose(
+                            self.ansatz_circuit,
+                            state,
+                            self._initialfixedlayout_pm,
+                            coupling_map=self.pass_manager_options.get("backend").coupling_map,  # type: ignore
+                            optimization=True,
+                        )
+                    else:
+                        raise ValueError(
+                            f"Wrong ISA_csfs_option specified, {ISA_csfs_option}. Needs to be 1,2,3,4."
+                        )
                 else:
                     circuit = self.ansatz_circuit.compose(state, front=True)
                 # Check if M per superposition circuit is requested
