@@ -33,33 +33,17 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     mf = scf.GHF(mol).x2c()
     # mf = scf.GHF(mol)
 
+    # mf.conv_tol_grad = 1e-10 #gradient tolerance form PYSCF
     mf.conv_tol_grad = 1e-10 #gradient tolerance form PYSCF
+
     mf.max_cycle = 50000
 
-    mf.scf()
+    # mf.scf()
     mf.kernel()
     coeff=np.array(mf.mo_coeff, dtype=complex)
     # print(np.round(np.array(mf.mo_coeff),3))
 
-    
-    
-    # dip_ao_picture_changed = mf.with_x2c.picture_change(('int1e_r_spinor',
-    #                                        'int1e_sprsp_spinor'))
-    # dip_mom = mf.dip_moment() #with picture change DEBYE!
-    # print(dip_mom/2.541746)
-
-    # print(dip_mom)
-    #     dip_ao = mol.intor('int1e_r')
-    # dip_ao = mol.intor('int1e_r')
-    
-    efg_ints =  mol.intor("int1e_ipiprinv") + mol.intor("int1e_ipiprinv").transpose(0,2,1) + 2*mol.intor("int1e_iprinvip")
-
-    # print(dip_ao)
-    
-    # dip_ao = dip_ao_picture_changed
-
-
-    # e_nuc=mf.energy_nuc()
+    e_nuc=mf.energy_nuc()
     # "Non-relativistic integrals"
     # h_1e = mol.intor("int1e_kin")  
     # h_nuc=mol.intor("int1e_nuc")
@@ -81,66 +65,6 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # C_u = c @ u[0] 
     # mc = mcscf.CASCI(mf, active_space[1], active_space[0])
     
-
-
-#     #OH-
-#     a_coeff = np.array([[ 9.94283934e-01, -2.47147351e-01,  8.84345292e-02, -1.04931221e-16,
-#    4.98504451e-17,  8.87761432e-02],
-#  [ 2.46612046e-02,  9.23518351e-01, -4.60553400e-01,  5.63817654e-16,
-#   -3.29178647e-16, -6.02389631e-01],
-#  [ 6.41847722e-20,  3.70605100e-18, -6.64972350e-16, -9.54228556e-02,
-#    9.95436828e-01,  3.48320571e-18],
-#  [-2.40347744e-19,  3.37265339e-17,  1.12383261e-15,  9.95436828e-01,
-#    9.54228556e-02,  3.50915198e-18],
-#  [ 3.78067107e-03,  1.10921733e-01,  6.99509652e-01, -8.07764775e-16,
-#    2.20170396e-16, -8.60048674e-01],
-#  [-6.73367151e-03,  1.66893530e-01,  4.98356847e-01, -6.64122021e-16,
-#    5.92613678e-16,  1.14798745e+00]])
-
-#     b_coeff = np.array([[ 9.94838460e-01, -2.35098607e-01,  1.06423085e-01,  1.11493778e-18,
-#     1.41895386e-17,  9.53070591e-02],
-#     [ 2.23637389e-02, 8.64871528e-01, -5.39424304e-01, -3.10852643e-18,
-#     -9.11874175e-17, -6.23695073e-01],
-#     [ 3.34318062e-19, 3.05002044e-18,  1.35789227e-16,  9.95436828e-01,
-#     -9.54228556e-02,  1.35923643e-17],
-#     [-1.84716405e-19, -4.10677643e-17, -1.36337584e-16,  9.54228556e-02,
-#     9.95436828e-01, -7.13968485e-17],
-#     [ 3.50286689e-03,  1.15481521e-01,  6.60661375e-01, -1.24566491e-16,
-#     -6.15518707e-17, -8.89659314e-01],
-#     [-6.15012305e-03, 2.49307848e-01,  5.26233905e-01, -8.52475019e-18,
-#     1.61881459e-16,  1.12027638e+00]]
-#     )
-
-#     coeff = np.zeros((2*len(a_coeff),2*len(a_coeff)))
-#     coeff[:len(a_coeff), :len(a_coeff)] = a_coeff
-#     coeff[len(a_coeff):,len(a_coeff):] = b_coeff
-
-    #H3 STO-3G ((2,1),6)
-#     a_coeff = np.array([[ 3.74625869e-01, -5.98253789e-01,  9.96507453e-01],
-#  [ 3.74627020e-01, -5.98267504e-01, -9.96498786e-01],
-#  [ 4.75551085e-01,  1.12478016e+00, -7.46562486e-06]], dtype=complex)
-    
-#     b_coeff = np.array([[ 4.86934286e-01,  9.96504863e-01, -5.11030627e-01],
-#  [ 4.86929093e-01, -9.96501377e-01, -5.11042372e-01],
-#  [ 2.40466742e-01, -7.68214821e-06,  1.19726981e+00]], dtype=complex)
-
-#     coeff = np.zeros((2*len(a_coeff),2*len(a_coeff)))
-#     coeff[:len(a_coeff), :len(a_coeff)] = a_coeff
-#     coeff[len(a_coeff):,len(a_coeff):] = b_coeff
-
-    # coeff[0::2, :len(a_coeff)] = a_coeff.T   # even rows: columns of a in left block
-    # coeff[1::2, len(a_coeff):] = b_coeff.T   # odd rows: columns of b in right block
-
-    # print(coeff)
-
-    # coeff[:len(a_coeff), 0::2] = a_coeff
-    # coeff[len(a_coeff):, 1::2] = b_coeff
-
-    # n = len(a_coeff)
-    # coeff = np.zeros((2*n, 2*n), dtype=complex)
-    # coeff[:n, 0::2] = a_coeff   # alpha AOs, even columns = alpha MOs
-    # coeff[n:, 1::2] = b_coeff   # beta AOs, odd columns = beta MOs
-
     # # Slowquant
     
     WF =GeneralizedWaveFunctionUPS(
@@ -160,8 +84,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     # WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=False, tol=1e-5, maxiter = 2000)
 
-    print("E_opt:", WF._energy_elec)
-    # print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
+    # print("E_opt:", WF._energy_elec)
+    print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
     
     # print(WF.ci_coeffs)
 
@@ -175,9 +99,9 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # print("dip_ao[0] shape:", dip_ao[0].shape)
 
     "Calculate Excitation energies"
-    LR = generalized_naive.LinearResponse(WF, excitations="sd")
-    LR.calc_excitation_energies()
-    print(LR.excitation_energies)
+    # LR = generalized_naive.LinearResponse(WF, excitations="sd")
+    # LR.calc_excitation_energies()
+    # print(LR.excitation_energies)
 
     
     # "Calculate polarizability"
@@ -213,52 +137,52 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
 
-    # "Electric field gradients"
-    # coords = mol.atom_coords()
-    # charges = mol.atom_charges()
+    "Electric field gradients"
+    coords = mol.atom_coords()
+    charges = mol.atom_charges()
 
-    # # for A in range(mol.natm):
-    # #     int_pc = build_x2c_pc_operator_efg(mf, mol, A, c, x2c=True, picture_change=True)  # (3, 3, 2*nao_c, 2*nao_c)
+    for A in range(mol.natm):
+        int_pc = build_x2c_pc_operator_efg(mf, mol, A, c, x2c=True, picture_change=True)  # (3, 3, 2*nao_c, 2*nao_c)
 
-    # #     efg_elec = np.zeros((3, 3)) #create the EFG matrix
-    # #     for alpha in range(3):
-    # #         for beta in range(3):
-    # #             mo = generalized_one_electron_transform(WF.c_mo, int_pc[alpha, beta], x2c=True)
-    # #             op = generalized_one_elec_op_0i_0a(mo, WF.num_inactive_spin_orbs, WF.num_active_spin_orbs)
-    # #             efg_elec[alpha, beta] = generalized_expectation_value(
-    # #                 WF.ci_coeffs, [op], WF.ci_coeffs, WF.ci_info
-    #             ) #har fjernet .real
-    #             # print('GFG real?', np.isreal(efg_elec[alpha, beta]))
+        efg_elec = np.zeros((3, 3)) #create the EFG matrix
+        for alpha in range(3):
+            for beta in range(3):
+                mo = generalized_one_electron_transform(WF.c_mo, int_pc[alpha, beta], x2c=True)
+                op = generalized_one_elec_op_0i_0a(mo, WF.num_inactive_spin_orbs, WF.num_active_spin_orbs)
+                efg_elec[alpha, beta] = generalized_expectation_value(
+                    WF.ci_coeffs, [op], WF.ci_coeffs, WF.ci_info
+                ) #har fjernet .real
+                # print('GFG real?', np.isreal(efg_elec[alpha, beta]))
 
-    #     # Make traceless
-    #     trace = np.trace(efg_elec) / 3
-    #     for alpha in range(3):
-    #         efg_elec[alpha, alpha] -= trace
+        # Make traceless
+        trace = np.trace(efg_elec) / 3
+        for alpha in range(3):
+            efg_elec[alpha, alpha] -= trace
 
-    #     efg_elec *= -1  # electrons charge -1
+        efg_elec *= -1  # electrons charge -1
 
-    #     #Nuclear part
-    #     efg_nuc = np.zeros((3, 3))
-    #     for B in range(mol.natm):
-    #         if B == A:
-    #             continue
-    #         R_AB = coords[B] - coords[A] #A os expansion point
-    #         r = np.linalg.norm(R_AB)
-    #         # efg_nuc += charges[B] * (3 * np.outer(R_AB, R_AB) - np.eye(3) * r**2) / r**5
-    #         for alpha in range(3):
-    #             for beta in range(3):
-    #                 efg_nuc[alpha, beta] += charges[B] * (3 * R_AB[alpha] * R_AB[beta]/r**5 - (alpha == beta) / r**3) 
+        #Nuclear part
+        efg_nuc = np.zeros((3, 3))
+        for B in range(mol.natm):
+            if B == A:
+                continue
+            R_AB = coords[B] - coords[A] #A os expansion point
+            r = np.linalg.norm(R_AB)
+            # efg_nuc += charges[B] * (3 * np.outer(R_AB, R_AB) - np.eye(3) * r**2) / r**5
+            for alpha in range(3):
+                for beta in range(3):
+                    efg_nuc[alpha, beta] += charges[B] * (3 * R_AB[alpha] * R_AB[beta]/r**5 - (alpha == beta) / r**3) 
 
 
-    #     #Total EFG
-    #     efg_total = efg_elec + efg_nuc
+        #Total EFG
+        efg_total = efg_elec + efg_nuc
 
-        # print(f"EFG at atom {A} ({mol.atom_symbol(A)}):")
-        # print(f"  xx={efg_total[0,0]:.4f}  xy={efg_total[0,1]:.4f}  xz={efg_total[0,2]:.4f}")
-        # print(f"  yy={efg_total[1,1]:.4f}  yz={efg_total[1,2]:.4f}")
-        # print(f"  zz={efg_total[2,2]:.4f}")
-        # print(f"  Trace: {np.trace(efg_total):.2e}")
-        # print(f"  Symmetric: {np.allclose(efg_total, efg_total.T)}")
+        print(f"EFG at atom {A} ({mol.atom_symbol(A)}):")
+        print(f"  xx={efg_total[0,0]:.4f}  xy={efg_total[0,1]:.4f}  xz={efg_total[0,2]:.4f}")
+        print(f"  yy={efg_total[1,1]:.4f}  yz={efg_total[1,2]:.4f}")
+        print(f"  zz={efg_total[2,2]:.4f}")
+        print(f"  Trace: {np.trace(efg_total):.2e}")
+        print(f"  Symmetric: {np.allclose(efg_total, efg_total.T)}")
 
 
     
@@ -381,7 +305,7 @@ def build_x2c_pc_operator_efg(mf, mol, atom_idx, c, x2c=True, picture_change=Tru
 def h2():
     geometry = """H  0.0   0.0  0.0;
         H  0.0  0.0  0.74"""
-    basis = "631-g"
+    basis = "STO-3G"
     active_space = ((1, 1), 4) #spin orbitaler or spinor basis
     # active_space = (2, 4)
     charge = 0
@@ -513,7 +437,7 @@ def h4_rektangle():
                   H 0.0 1.11 0.74;
                   H 0.0 1.11 0.0;"""
     basis = "STO-3g"
-    active_space = ((1,1), 4)
+    active_space = ((2,2), 8)
     charge = 0
     spin = 0
     NR(geometry=geometry, basis=basis, active_space=active_space, charge=charge, spin=spin, unit="angstrom")
@@ -549,7 +473,7 @@ def LiH():
 
 
 # h3()
-h2()
+# h2()
 # h4_rektangle()
 # HI()
 # HBr()
@@ -557,4 +481,4 @@ h2()
 # BeH()
 # h2o()
 # LiH()
-# HCl()
+HCl()

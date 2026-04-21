@@ -929,28 +929,7 @@ class WaveFunctionCircuit:
             #    list(self.QI.grad_param_R.values())
             # )  # Count energy measurements for all gradients
 
-            #AE ADDED
-            for i in range(len(self.thetas)):
-                R = self.QI.grad_param_R[self.QI.param_names[i]]
-                
-                # Reel
-                e_vals_real = _get_energy_evals_for_grad_real_anna(H, self.QI, parameters, i, R)
-                grad_a = 0.0
-                for j, mu in enumerate(range(1, 2 * R + 1)):
-                    x_mu = (2 * mu - 1) / (2 * R) * np.pi
-                    grad_a += e_vals_real[j] * (-1)**(mu-1) / (4 * R * np.sin(x_mu / 2)**2)
-
-                # Imag
-                e_vals_imag = _get_energy_evals_for_grad_imag_anna(H, self.QI, parameters, i, R)
-                grad_b = 0.0
-                for j, mu in enumerate(range(1, 2 * R + 1)):
-                    x_mu = (2 * mu - 1) / (2 * R) * np.pi
-                    grad_b += e_vals_imag[j] * (-1)**(mu-1) / (4 * R * np.sin(x_mu / 2)**2)
-
-                gradient[num_kappa + i] = grad_a                         #reel
-                gradient[num_kappa + i + len(self.thetas)] = grad_b      #imag
-
-            self.num_energy_evals += 4 * np.sum(list(self.QI.grad_param_R.values()))  
+    
         return gradient
 
 
@@ -986,27 +965,3 @@ def _get_energy_evals_for_grad(
         e_vals.append(quantum_interface.quantum_expectation_value_complex(operator, custom_parameters=x).real)
     return e_vals
 
-
-#AE ADDED
-def _get_energy_evals_for_grad_real_anna(operator, quantum_interface, parameters, idx, R):
-    """Shifts Re(theta) by x_mu, keeps Im(theta) fixed."""
-    e_vals = []
-    x = parameters.copy()
-    x_shift = x[idx]
-    for mu in range(1, 2 * R + 1):
-        x_mu = (2 * mu - 1) / (2 * R) * np.pi
-        x[idx] = (x_shift.real + x_mu) + 1j * x_shift.imag  # shift only real part
-        e_vals.append(quantum_interface.quantum_expectation_value_complex(operator, custom_parameters=x).real)
-    return e_vals
-
-#AE ADDED
-def _get_energy_evals_for_grad_imag_anna(operator, quantum_interface, parameters, idx, R):
-    """Shifts Im(theta) by x_mu, keeps Re(theta) fixed."""
-    e_vals = []
-    x = parameters.copy()
-    x_shift = x[idx]
-    for mu in range(1, 2 * R + 1):
-        x_mu = (2 * mu - 1) / (2 * R) * np.pi
-        x[idx] = x_shift.real + 1j * (x_shift.imag + x_mu)  # shift only imag part
-        e_vals.append(quantum_interface.quantum_expectation_value_complex(operator, custom_parameters=x).real)
-    return e_vals

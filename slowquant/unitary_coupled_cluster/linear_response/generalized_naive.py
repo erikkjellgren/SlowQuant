@@ -539,8 +539,8 @@ class LinearResponse(LinearResponseBaseClass):
 
 
         # Check hermiticity of the Metric:
-        print(f"Hermiticity check of the metric: max|S - S†| = "
-            f"{np.max(np.abs(self.Sigma - self.Sigma.conj().T)):.2e}")
+        # print(f"Hermiticity check of the metric: max|S - S†| = "
+        #     f"{np.max(np.abs(self.Sigma - self.Sigma.conj().T)):.2e}")
         
          
         
@@ -562,10 +562,10 @@ class LinearResponse(LinearResponseBaseClass):
             f"{np.max(np.abs(self.B - self.B.T)):.2e}")  
         
                         
-        #print("H shape:", E2.shape)
-        #print("sigma shape:", self.Sigma.shape)
-        #print("H diagonal:", np.diag(E2).real)
-        #print("sigma diagonal:", np.diag(self.Sigma).real)
+        # print("H shape:", E2.shape)
+        # print("sigma shape:", self.Sigma.shape)
+        # print("H diagonal:", np.diag(E2).real)
+        # print("sigma diagonal:", np.diag(self.Sigma).real)
         
         # print(f"Hermiticity check of A qG: max|A - A†| = "
         #     f"{np.max(np.abs(self.A[:idx_shift,idx_shift:] - self.A[idx_shift:,:idx_shift].conj().T)):.2e}") 
@@ -576,7 +576,7 @@ class LinearResponse(LinearResponseBaseClass):
         # print(f"Symmetry check of B qG: max|B - B.T| = "
         #     f"{np.max(np.abs(self.B[:idx_shift,idx_shift:] - self.B[idx_shift:,:idx_shift].T)):.2e}") 
         
-        #print(np.round(np.diag(Hessian_matrix),5))
+        # print(np.round(np.diag(Hessian_matrix),5))
 
 
                 
