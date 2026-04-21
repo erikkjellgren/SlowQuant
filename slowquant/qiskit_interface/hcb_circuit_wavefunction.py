@@ -59,7 +59,7 @@ class WaveFunctionHCBCircuit:
         self.active_occ_idx = []
         self.active_unocc_idx = []
         self.num_orbs = len(self.int_gen.kinetic_energy)
-        self.num_active_elec = 0
+        self.num_active_elec_pair = 0
         self.num_active_orbs = 0
         self.num_inactive_orbs = 0
         self.num_virtual_orbs = 0
@@ -71,22 +71,22 @@ class WaveFunctionHCBCircuit:
         self.num_energy_evals = 0  # number of energy measurements on quanutm
         active_space = []
         orbital_counter = 0
-        num_elec = self.int_gen.num_elec
-        for i in range(num_elec // 2 - cas[0] // 2, num_elec // 2):
+        num_elec_pair = self.int_gen.num_elec // 2
+        for i in range(num_elec_pair - cas[0] // 2, num_elec_pair):
             active_space.append(i)
             orbital_counter += 1
-        for i in range(num_elec // 2, num_elec // 2 + cas[1] - orbital_counter):
+        for i in range(num_elec_pair, num_elec_pair + cas[1] - orbital_counter):
             active_space.append(i)
-        for i in range(num_elec // 2):
+        for i in range(num_elec_pair):
             if i in active_space:
                 self.active_idx.append(i)
                 self.active_occ_idx.append(i)
                 self.num_active_orbs += 1
-                self.num_active_elec += 2
+                self.num_active_elec_pair += 1
             else:
                 self.inactive_idx.append(i)
                 self.num_inactive_orbs += 1
-        for i in range(num_elec // 2, self.num_orbs):
+        for i in range(num_elec_pair, self.num_orbs):
             if i in active_space:
                 self.active_idx.append(i)
                 self.active_unocc_idx.append(i)
@@ -137,7 +137,7 @@ class WaveFunctionHCBCircuit:
         self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
         # Setup Qiskit stuff
         self.QI = quantum_interface
-        self.QI.construct_circuit(self.num_active_orbs, self.num_active_elec)
+        self.QI.construct_circuit(self.num_active_orbs, self.num_active_elec_pair)
 
     @property
     def kappa(self) -> list[float]:
@@ -265,7 +265,7 @@ class WaveFunctionHCBCircuit:
 
     def _reconstruct_circuit(self) -> None:
         """Construct circuit again."""
-        self.QI.construct_circuit(self.num_active_orbs, self.num_active_elec)
+        self.QI.construct_circuit(self.num_active_orbs, self.num_active_elec_pair)
 
     @property
     def rdm1(self) -> np.ndarray:

@@ -304,7 +304,7 @@ class HCBQuantumInterface:
         # In case of switching to new PassManager in later workflow
         if pass_manager_options is not None and hasattr(self, "circuit") and not redo_ISA:
             print("Change in PassManager. Reconstructing circuit.")
-            self.construct_circuit(self.num_orbs, self.num_elec)
+            self.construct_circuit(self.num_orbs, self.num_elec_pair)
 
     def redo_M_mitigation(self, shots: int | None = None) -> None:
         """Redo M_mitigation.
@@ -546,9 +546,13 @@ class HCBQuantumInterface:
         Returns:
             Qubit representation of operator.
         """
-        mapped_op = self.mapper.map(FermionicOp(op.get_qiskit_form(self.num_orbs), self.num_spin_orbs))
+        from slowquant.qiskit_interface.util import hcb_mapper
+
+        # mapped_op = self.mapper.map(SpinOp(op.get_qiskit_form(self.num_orbs), num_spins=self.num_orbs, spin=0.5))
+        mapped_op = hcb_mapper(op.get_qiskit_form(), self.num_orbs)
         if not isinstance(mapped_op, SparsePauliOp):
             raise TypeError(f"The qubit form of the operator is not SparsePauliOp got, {type(mapped_op)}")
+        print(mapped_op)
         return mapped_op
 
     def _check_layout_conflict(self, circuit_in: QuantumCircuit) -> int:
@@ -906,9 +910,7 @@ class HCBQuantumInterface:
         """
         # Get HF determinant string
         if det is None:
-            det = "1" * (self.num_elec[0] + self.num_elec[1]) + "0" * (
-                self.num_spin_orbs - (self.num_elec[0] + self.num_elec[1])
-            )
+            det = "1" * self.num_elec_pair + "0" * (self.num_orbs - self.num_elec_pair)
         det_int = int(det, 2)
         if run_circuit is None:
             run_circuit = self.circuit

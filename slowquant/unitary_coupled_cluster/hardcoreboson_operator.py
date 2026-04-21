@@ -4,13 +4,11 @@ import copy
 import re
 
 
-def operator_to_qiskit_key(operator_string: tuple[tuple[int, bool], ...], remapping: dict[int, int]) -> str:
+def operator_to_qiskit_key(operator_string: tuple[tuple[int, bool], ...]) -> str:
     """Make key string to index a hardcoreboson operator in a dict structure.
 
     Args:
         operator_string: Hardcoreboson operators.
-        remapping: Map that takes indices from alpha,beta,alpha,beta
-                   to alpha,alpha,beta,beta ordering.
 
     Returns:
         Dictionary key.
@@ -18,9 +16,9 @@ def operator_to_qiskit_key(operator_string: tuple[tuple[int, bool], ...], remapp
     op_key = ""
     for a in operator_string:
         if a[1]:
-            op_key += f" +_{remapping[a[0]]}"
+            op_key += f" +_{a[0]}"
         else:
-            op_key += f" -_{remapping[a[0]]}"
+            op_key += f" -_{a[0]}"
     return op_key[1:]
 
 
@@ -363,7 +361,7 @@ class HardcorebosonOperator:
             operator[op_key] = fac
         return operator
 
-    def get_qiskit_form(self, num_orbs: int) -> dict[str, float]:
+    def get_qiskit_form(self) -> dict[str, float]:
         """Get hardcoreboson operator on qiskit form.
 
         Args:
@@ -373,15 +371,8 @@ class HardcorebosonOperator:
             Hardcoreboson operators on qiskit form.
         """
         qiskit_form = {}
-        remapping = {}
-        #  Map indices from alpha,beta,alpha,beta to alpha,alpha,beta,beta.
-        for i in range(2 * num_orbs):
-            if i < num_orbs:
-                remapping[2 * i] = i
-            else:
-                remapping[2 * i + 1 - 2 * num_orbs] = i
         for op_key in self.operators.keys():
-            qiskit_str = operator_to_qiskit_key(op_key, remapping)
+            qiskit_str = operator_to_qiskit_key(op_key)
             qiskit_form[qiskit_str] = self.operators[op_key]
         return qiskit_form
 

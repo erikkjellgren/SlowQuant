@@ -257,7 +257,7 @@ def HCBfUCC(
     Returns:
         Factorized UCC ansatz circuit and R parameters needed for gradients.
     """
-    valid_options = ("HCBD", "HCBGD")
+    valid_options = ("n_layers", "HCBD", "HCBGD")
     for option in ansatz_options:
         if option not in valid_options:
             raise ValueError(f"Got unknown option for fUCC, {option}. Valid options are: {valid_options}")
@@ -283,7 +283,7 @@ def HCBfUCC(
     for _ in range(num_orbs - num_elec_pair):
         unocc.append(idx)
         idx += 1
-    qc = HartreeFock(num_orbs, (0, 0), mapper)  # empty circuit with qubit number based on mapper
+    qc = QuantumCircuit(num_orbs)
     grad_param_R = {}
     idx = 0
     # Layer loop

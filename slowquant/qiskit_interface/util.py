@@ -1073,3 +1073,26 @@ def pauliop_to_dict(op: SparsePauliOp) -> dict[str, float]:
         pauli_str = pauli.to_label()
         pauli_dict[pauli_str] = coeff.real
     return pauli_dict
+
+
+def hcb_mapper(hcb_op: dict[str, float], num_orbs: int) -> SparsePauliOp:
+    mapped_op = SparsePauliOp("I" * num_orbs, coeffs=np.array([0.0]))
+    for hcb_string, coeff in hcb_op.items():
+        op_tmp = SparsePauliOp("I" * num_orbs, coeffs=np.array([1.0]))
+        for b in hcb_string.split():
+            idx = int(b.split("_")[1])
+            sX = ["I"] * num_orbs
+            sY = ["I"] * num_orbs
+            sX[num_orbs - 1 - idx] = "X"
+            sY[num_orbs - 1 - idx] = "Y"
+            X = SparsePauliOp("".join(sX), coeffs=np.array([1.0]))
+            Y = SparsePauliOp("".join(sY), coeffs=np.array([1.0]))
+            if "-" in b:  # annihilation
+                local_op = 0.5 * (X + 1j * Y)
+            elif "+" in b:  # creation
+                local_op = 0.5 * (X - 1j * Y)
+            else:
+                raise ValueError(f"Unknown operator: {b}")
+            op_tmp = op_tmp @ local_op
+        mapped_op += coeff * op_tmp
+    return mapped_op.simplify()
