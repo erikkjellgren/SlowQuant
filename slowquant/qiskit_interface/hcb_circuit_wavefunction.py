@@ -497,8 +497,8 @@ class WaveFunctionHCBCircuit:
                 std_callback=(
                     (
                         lambda: self.QI.quantum_variance(
-                            hamiltonian_0i_0a(
-                                self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
+                            hamiltonian_hcb_0i_0a(
+                                self.hr1, self.hr2, self.num_inactive_orbs, self.num_active_orbs
                             ).get_folded_operator(
                                 self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                             )
@@ -544,8 +544,8 @@ class WaveFunctionHCBCircuit:
                     std_callback=(
                         (
                             lambda: self.QI.quantum_variance(
-                                hamiltonian_0i_0a(
-                                    self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
+                                hamiltonian_hcb_0i_0a(
+                                    self.hr1, self.hr2, self.num_inactive_orbs, self.num_active_orbs
                                 ).get_folded_operator(
                                     self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                                 )
@@ -665,8 +665,8 @@ class WaveFunctionHCBCircuit:
             std_callback=(
                 (
                     lambda: self.QI.quantum_variance(
-                        hamiltonian_0i_0a(
-                            self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs
+                        hamiltonian_hcb_0i_0a(
+                            self.hr1, self.hr2, self.num_inactive_orbs, self.num_active_orbs
                         ).get_folded_operator(
                             self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs
                         )
@@ -709,7 +709,7 @@ class WaveFunctionHCBCircuit:
         if theta_optimization:
             self.thetas = parameters[num_kappa:]
             # Build operator
-            H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+            H = hamiltonian_hcb_0i_0a(self.hr1, self.hr2, self.num_inactive_orbs, self.num_active_orbs)
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             return self.QI.quantum_expectation_value(H)
         # RDM is more expensive than evaluation of the Hamiltonian.
@@ -751,7 +751,7 @@ class WaveFunctionHCBCircuit:
                 self.rdm2,
             )
         if theta_optimization:
-            H = hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_orbs, self.num_active_orbs)
+            H = hamiltonian_hcb_0i_0a(self.hr1, self.hr2, self.num_inactive_orbs, self.num_active_orbs)
             H = H.get_folded_operator(self.num_inactive_orbs, self.num_active_orbs, self.num_virtual_orbs)
             for i in range(len(parameters[num_kappa:])):
                 R = self.QI.grad_param_R[self.QI.param_names[i]]

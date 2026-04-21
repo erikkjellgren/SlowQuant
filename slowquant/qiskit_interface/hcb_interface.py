@@ -552,7 +552,6 @@ class HCBQuantumInterface:
         mapped_op = hcb_mapper(op.get_qiskit_form(), self.num_orbs)
         if not isinstance(mapped_op, SparsePauliOp):
             raise TypeError(f"The qubit form of the operator is not SparsePauliOp got, {type(mapped_op)}")
-        print(mapped_op)
         return mapped_op
 
     def _check_layout_conflict(self, circuit_in: QuantumCircuit) -> int:
