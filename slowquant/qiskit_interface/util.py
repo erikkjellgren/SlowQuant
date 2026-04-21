@@ -916,6 +916,39 @@ def postselection(
     return new_dist
 
 
+def postselection_hcb(
+    dist: dict[int, float],
+    num_elec_pair: int,
+    num_qubits: int,
+) -> dict[int, float]:
+    r"""Perform post-selection on distribution in computational basis.
+
+    For the hard-core boson model the post-selection ensure that,
+
+    .. math::
+        \text{sum}\left(\left|1\right>\right) = N_\text{electron pairs}
+
+    Args:
+        dist: Measured quasi-distribution.
+        num_elec_pair: Number of electron pairs.
+        num_qubits: Number of qubits.
+
+    Returns:
+        Post-selected distribution.
+    """
+    new_dist = {}
+    prob_sum = 0.0
+    for bitint, val in dist.items():
+        bitstr = format(bitint, f"0{num_qubits}b")
+        if bitstr.count("1") == num_elec_pair:
+            new_dist[int(bitstr, 2)] = val
+            prob_sum += val
+    # Renormalize distribution
+    for bitint, val in new_dist.items():
+        new_dist[bitint] = val / prob_sum
+    return new_dist
+
+
 def f2q(i: int, num_orbs: int) -> int:
     r"""Convert fermionic index to qubit index.
 
@@ -1076,6 +1109,23 @@ def pauliop_to_dict(op: SparsePauliOp) -> dict[str, float]:
 
 
 def hcb_mapper(hcb_op: dict[str, float], num_orbs: int) -> SparsePauliOp:
+    r"""Mapper for hard-core boson model.
+
+    ..math::
+        \hat{b}_p^\dagger = \frac{1}{2}\left(\hat{X}_p - \mathrm{i}\hat{Y}_p\right)
+
+    and,
+
+    ..math::
+        \hat{b}_p = \frac{1}{2}\left(\hat{X}_p + \mathrm{i}\hat{Y}_p\right)
+
+    Args:
+        hcb_op: Hardcore boson operator.
+        num_orbs: Number of spatial orbitals.
+
+    Returns:
+        Hard-core boson operator in Pauli strings.
+    """
     mapped_op = SparsePauliOp("I" * num_orbs, coeffs=np.array([0.0]))
     for hcb_string, coeff in hcb_op.items():
         op_tmp = SparsePauliOp("I" * num_orbs, coeffs=np.array([1.0]))

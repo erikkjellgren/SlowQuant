@@ -3,7 +3,7 @@ from typing import Any
 import numpy as np
 from qiskit.circuit import Parameter, QuantumCircuit
 from qiskit_nature.second_q.circuit.library import HartreeFock
-from qiskit_nature.second_q.mappers import JordanWignerMapper, LinearMapper
+from qiskit_nature.second_q.mappers import JordanWignerMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 
 from slowquant.qiskit_interface.operators_circuits import (
@@ -235,13 +235,9 @@ def fUCC(
 def HCBfUCC(
     num_orbs: int,
     num_elec_pair: int,
-    mapper: LinearMapper,
     ansatz_options: dict[str, Any],
 ) -> tuple[QuantumCircuit, dict[str, int]]:
-    """Create factorized UCC ansatz.
-
-    #. 10.1103/PhysRevA.102.062612 (efficient circuits for JW)
-    #. 10.1021/acs.jctc.8b01004 (k-UpCCGSD)
+    """Create factorized UCC ansatz for hard-core boson model.
 
     Ansatz Options:
         * n_layers [int]: Number of layers.
@@ -251,7 +247,6 @@ def HCBfUCC(
     Args:
         num_orbs: Number of spatial orbitals.
         num_elec_pair: Number of electron pairs.
-        mapper: Fermionic to qubit mapper.
         ansatz_options: Ansatz options.
 
     Returns:
