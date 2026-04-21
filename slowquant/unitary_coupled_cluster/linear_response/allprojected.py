@@ -15,7 +15,8 @@ from slowquant.unitary_coupled_cluster.linear_response.lr_baseclass import (
 from slowquant.unitary_coupled_cluster.linear_response.solvers import (
     get_orbital_metric_block,
     get_orbital_hessian_diagonal,
-    get_orbital_metric_diagonal
+    get_orbital_metric_diagonal,
+    one_index_transform
 )
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
     expectation_value,
@@ -23,6 +24,7 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import (
 )
 from slowquant.unitary_coupled_cluster.operators import (
     commutator,
+    hamiltonian_0i_0a,
     hamiltonian_2i_2a,
     one_elec_op_0i_0a,
 )
@@ -321,7 +323,18 @@ class LinearResponse(LinearResponseBaseClass):
         GG_time = 0.0
 
         if num_q != 0:
+            K_lower = np.zeros((self.wf.num_orbs, self.wf.num_orbs, n_roots))
+            for kappa, (q, p) in zip(kappas, self.wf.kappa_no_activeactive_idx):
+                K_lower[p, q, :] = kappa
             for root in range(n_roots):
+                h_lower, g_lower = one_index_transform(K_lower[:, :, root], self.wf.h_mo, self.wf.g_mo)
+                tH00_lower = hamiltonian_0i_0a(
+                    h_lower,
+                    g_lower,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                )
+                tH00l_ket = propagate_state([tH00_lower], self.wf.ci_coeffs, *self.index_info)
 
                 start_time = time.time()
                 qs = FermionicOperator({})
@@ -358,13 +371,12 @@ class LinearResponse(LinearResponseBaseClass):
                 start_time = time.time()
                 # (A+B)_Gq @ b_q
                 # (A-B)_Gq @ b_q
-                Hqs_ket = propagate_state([self.H_1i_1a * qs], self.wf.ci_coeffs, *self.index_info)
                 for i, GI in enumerate(self.G_ops):
                     # <0| GId H qs |0>
                     val = expectation_value(
                         self.wf.ci_coeffs,
                         [GI.dagger],
-                        Hqs_ket,
+                        tH00l_ket,
                         *self.index_info,
                     )
                     sigma_plus[num_q + i, root] += val
@@ -383,7 +395,7 @@ class LinearResponse(LinearResponseBaseClass):
                     # <0| Gsd H qi |0>
                     val = expectation_value(
                         Gs_ket,
-                        [self.H_1i_1a * qi],
+                        [commutator(self.H_1i_1a, qi)],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
