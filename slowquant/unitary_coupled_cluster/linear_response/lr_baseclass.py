@@ -1,6 +1,5 @@
 import numpy as np
 import scipy
-import time
 
 from slowquant.unitary_coupled_cluster.ci_spaces import CI_Info
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
@@ -142,9 +141,7 @@ class LinearResponseBaseClass:
             if solver_settings is None:
                 solver_settings = {}
 
-            start_time = time.time()
             preconditioner = self._compute_preconditioner()
-            print("pc time:", time.time() - start_time)
 
             self.excitation_energies, self.normed_response_vectors = (
                 solver.solve(

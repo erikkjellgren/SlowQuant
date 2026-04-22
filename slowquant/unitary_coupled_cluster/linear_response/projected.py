@@ -61,28 +61,30 @@ class LinearResponse(LinearResponseBaseClass):
                 raise ValueError("Large Gradient detected in q of ", np.max(np.abs(grad)))
         grad = np.zeros(2 * len(self.G_ops))
         H00_ket = propagate_state([self.H_0i_0a], self.wf.ci_coeffs, *self.index_info)
+        self._G_expect = np.zeros(len(self.G_ops))
+        self._HG_expect = np.zeros(len(self.G_ops))
         for i, op in enumerate(self.G_ops):
             G_ket = propagate_state([op], self.wf.ci_coeffs, *self.index_info)
+            self._G_expect[i] = expectation_value(
+                self.wf.ci_coeffs,
+                [],
+                G_ket,
+                *self.index_info,
+            )
+            self._HG_expect[i] = expectation_value(
+                H00_ket,
+                [],
+                G_ket,
+                *self.index_info,
+            )
             # <0| H G |0>
-            grad[i] = expectation_value(
-                H00_ket,
-                [],
-                G_ket,
-                *self.index_info,
-            )
+            grad[i] = self._HG_expect[i]
             # - E * <0| G |0>
-            grad[i] -= self.wf.energy_elec * expectation_value(self.wf.ci_coeffs, [], G_ket, *self.index_info)
+            grad[i] -= self.wf.energy_elec * self._G_expect[i]
             # <0| Gd H |0>
-            grad[i + len(self.G_ops)] = expectation_value(
-                G_ket,
-                [],
-                H00_ket,
-                *self.index_info,
-            )
+            grad[i + len(self.G_ops)] = self._HG_expect[i]
             # - E * <0| Gd |0>
-            grad[i + len(self.G_ops)] -= self.wf.energy_elec * expectation_value(
-                G_ket, [], self.wf.ci_coeffs, *self.index_info
-            )
+            grad[i + len(self.G_ops)] -= self.wf.energy_elec * self._G_expect[i]
         if len(grad) != 0:
             print("idx, max(abs(grad active)):", np.argmax(np.abs(grad)), np.max(np.abs(grad)))
             if np.max(np.abs(grad)) > 10**-3:
@@ -161,21 +163,7 @@ class LinearResponse(LinearResponseBaseClass):
                     *self.index_info,
                 )
                 # <0 | GId |0> * <0| GJ |0> * E
-                val += (
-                    expectation_value(
-                        GI_ket,
-                        [],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [],
-                        GJ_ket,
-                        *self.index_info,
-                    )
-                    * self.wf.energy_elec
-                )
+                val += self._G_expect[i] * self._G_expect[j] * self.wf.energy_elec
                 # - <0| GId GJ |0> * E
                 val -= (
                     expectation_value(
@@ -187,91 +175,17 @@ class LinearResponse(LinearResponseBaseClass):
                     * self.wf.energy_elec
                 )
                 # - 1/2*<0| GId |0> * <0| H GJ |0>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
-                        GI_ket,
-                        [],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [],
-                        HGJ_ket,
-                        *self.index_info,
-                    )
-                )
+                val -= 0.5 * self._G_expect[i] * self._HG_expect[j]
                 # - 1/2*<0| GJ |0> * <0| GId H |0>
-                val -= (
-                    1
-                    / 2
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [],
-                        GJ_ket,
-                        *self.index_info,
-                    )
-                    * expectation_value(
-                        GI_ket,
-                        [self.H_0i_0a],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                )
+                val -= 0.5 * self._G_expect[j] * self._HG_expect[i]
                 self.A[i + idx_shift, j + idx_shift] = self.A[j + idx_shift, i + idx_shift] = val
                 # Make B
                 # 1/2<0| GId H |0> * <0| GJd |0>
-                val = (
-                    1
-                    / 2
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [GI.dagger, self.H_0i_0a],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [GJ.dagger],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                )
+                val = 0.5 * self._HG_expect[i] * self._G_expect[j]
                 # 1/2<0| GJd H |0> * <0| GId |0>
-                val += (
-                    1
-                    / 2
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [GJ.dagger, self.H_0i_0a],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    * expectation_value(
-                        self.wf.ci_coeffs,
-                        [GI.dagger],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                )
+                val += 0.5 * self._HG_expect[j] * self._G_expect[i]
                 # - <0| GId |0> * <0| GJd |0> * E
-                val -= (
-                    expectation_value(
-                        GI_ket,
-                        [],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    * expectation_value(
-                        GJ_ket,
-                        [],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-                    * self.wf.energy_elec
-                )
+                val -= self._G_expect[i] * self._G_expect[j] * self.wf.energy_elec
                 self.B[i + idx_shift, j + idx_shift] = self.B[j + idx_shift, i + idx_shift] = val
                 # Make Sigma
                 # <0| GId GJ |0>
@@ -282,17 +196,7 @@ class LinearResponse(LinearResponseBaseClass):
                     *self.index_info,
                 )
                 # - <0| GId |0> * <0| GJ |0>
-                val -= expectation_value(
-                    GI_ket,
-                    [],
-                    self.wf.ci_coeffs,
-                    *self.index_info,
-                ) * expectation_value(
-                    self.wf.ci_coeffs,
-                    [],
-                    GJ_ket,
-                    *self.index_info,
-                )
+                val -= self._G_expect[i] * self._G_expect[j]
                 self.Sigma[i + idx_shift, j + idx_shift] = self.Sigma[j + idx_shift, i + idx_shift] = val
 
     def _right_transform(self, trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -313,7 +217,6 @@ class LinearResponse(LinearResponseBaseClass):
         sigma_plus = np.zeros((num_ops, n_roots))
         sigma_minus = np.zeros((num_ops, n_roots))
         tau_minus = np.zeros((num_ops, n_roots))
-        H00_ket = propagate_state([self.H_0i_0a], self.wf.ci_coeffs, *self.index_info)
 
         if num_q != 0:
             K_plus = np.zeros((self.wf.num_orbs, self.wf.num_orbs, n_roots))
@@ -437,64 +340,49 @@ class LinearResponse(LinearResponseBaseClass):
                     sigma_plus[i, root] -= val
                     sigma_minus[i, root] += val
 
-        GId_expect = np.zeros(len(self.G_ops))
-        for i, GI in enumerate(self.G_ops):
-            GI_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
-
-            GId_expect[i] = expectation_value(
-                GI_ket,
-                [],
-                self.wf.ci_coeffs,
-                *self.index_info,
-            )
-
         for root in range(n_roots):
-
             Gs = FermionicOperator({})
             for S, G in zip(Ss[:, root], self.G_ops):
                 Gs += S * G
-            Gsd_expect = sum(Ss[:, root] * GId_expect)
+            Gs_expect = sum(Ss[:, root] * self._G_expect)
+            HGs_expect = sum(Ss[:, root] * self._HG_expect)
 
             # Gs |0>
-            Gs_plus_ket = propagate_state([Gs], self.wf.ci_coeffs, *self.index_info)
-            # Gs |0> - |0> <0| Gs |0>
-            Gs_minus_ket = Gs_plus_ket - Gsd_expect * self.wf.ci_coeffs
-
-            # H Gs |0> - E Gs |0>
-            HGs_plus_ket = propagate_state([self.H_0i_0a], Gs_plus_ket, *self.index_info) - self.wf.energy_elec * Gs_plus_ket
-            # H Gs |0> - E Gs |0> - H |0> <0| Gs |0>
-            HGs_minus_ket = HGs_plus_ket - Gsd_expect * H00_ket
+            Gs_ket = propagate_state([Gs], self.wf.ci_coeffs, *self.index_info)
+            # ( H - E ) Gs |0>
+            HGs_ket = propagate_state([self.H_0i_0a], Gs_ket, *self.index_info) - self.wf.energy_elec * Gs_ket
 
             # (A+B)_GG @ b_G
             # (A-B)_GG @ b_G
             # Sigma_GG @ b_G
             for i, GI in enumerate(self.G_ops):
                 # Gi |0>
-                GI_plus_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
-                # Gi |0> - |0> <0| Gi |0>
-                GI_minus_ket = GI_plus_ket - GId_expect[i] * self.wf.ci_coeffs
+                GI_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
 
-                # <0| GId ( H Gs |0> - E Gs |0> )
-                sigma_plus[num_q + i, root] += expectation_value(
-                    GI_plus_ket,
+                # <0| GId ( H - E ) Gs |0>
+                val = expectation_value(
+                    GI_ket,
                     [],
-                    HGs_plus_ket,
+                    HGs_ket,
                     *self.index_info,
                 )
-                # ( <0| Gid - <0| Gi |0> <0| ) ( H Gs |0> - E Gs |0> - H |0> <0| Gs |0> )
-                sigma_minus[num_q + i, root] += expectation_value(
-                    GI_minus_ket,
-                    [],
-                    HGs_minus_ket,
-                    *self.index_info,
-                )
+                sigma_plus[num_q + i, root] += val
+                sigma_minus[num_q + i, root] += val
+                # ( 1 - h ) E <0| GId |0> <0| Gs |0>
+                sigma_minus[num_q + i, root] += 2 * self.wf.energy_elec * self._G_expect[i] * Gs_expect
+                # - 0.5 ( 1 - h ) <0| GId |0> <0| H Gs |0>
+                sigma_minus[num_q + i, root] -= self._G_expect[i] * HGs_expect
+                # - 0.5 ( 1 - h ) <0| Gs |0> <0| GId H |0>
+                sigma_minus[num_q + i, root] -= Gs_expect * self._HG_expect[i]
                 # <0| GId Gs |0>
                 tau_minus[num_q + i, root] += expectation_value(
-                    GI_plus_ket,
+                    GI_ket,
                     [],
-                    Gs_minus_ket,
+                    Gs_ket,
                     *self.index_info,
                 )
+                # - <0| GId |0> <0| Gs |0>
+                tau_minus[num_q + i, root] -= self._G_expect[i] * Gs_expect
 
         return sigma_plus, sigma_minus, tau_minus
 
@@ -526,18 +414,11 @@ class LinearResponse(LinearResponseBaseClass):
             self.wf.rdm1,
         )
         # Approximate G diagonal
-        H00_ket = propagate_state([self.H_0i_0a], self.wf.ci_coeffs, *self.index_info)
         for i, GI in enumerate(self.G_ops):
             GI_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
             prec_A[i + num_q] += expectation_value(
                 GI_ket,
                 [self.H_0i_0a],
-                GI_ket,
-                *self.index_info,
-            )
-            GI_expect = expectation_value(
-                self.wf.ci_coeffs,
-                [],
                 GI_ket,
                 *self.index_info,
             )
@@ -547,17 +428,11 @@ class LinearResponse(LinearResponseBaseClass):
                 GI_ket,
                 *self.index_info,
             )
-            HGI_expect = expectation_value(
-                H00_ket,
-                [],
-                GI_ket,
-                *self.index_info,
-            )
             prec_A[i + num_q] -= self.wf.energy_elec * GIGI_expect
-            prec_A[i + num_q] += self.wf.energy_elec * GI_expect**2
-            prec_A[i + num_q] -= GI_expect * HGI_expect
+            prec_A[i + num_q] += self.wf.energy_elec * self._G_expect[i]**2
+            prec_A[i + num_q] -= self._G_expect[i] * self._HG_expect[i]
             prec_sigma[i + num_q] += GIGI_expect
-            prec_sigma[i + num_q] -= GI_expect**2
+            prec_sigma[i + num_q] -= self._G_expect[i]**2
 
         return prec_A, prec_sigma
 
