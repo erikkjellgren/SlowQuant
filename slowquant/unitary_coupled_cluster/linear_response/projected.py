@@ -315,11 +315,6 @@ class LinearResponse(LinearResponseBaseClass):
         tau_minus = np.zeros((num_ops, n_roots))
         H00_ket = propagate_state([self.H_0i_0a], self.wf.ci_coeffs, *self.index_info)
 
-        qq_time = 0.0
-        qG_time = 0.0
-        Gq_time = 0.0
-        GG_time = 0.0
-
         if num_q != 0:
             K_plus = np.zeros((self.wf.num_orbs, self.wf.num_orbs, n_roots))
             K_minus = np.zeros((self.wf.num_orbs, self.wf.num_orbs, n_roots))
@@ -349,7 +344,6 @@ class LinearResponse(LinearResponseBaseClass):
                 tH00p_ket = propagate_state([tH00_plus], self.wf.ci_coeffs, *self.index_info)
                 tH00m_ket = propagate_state([tH00_minus], self.wf.ci_coeffs, *self.index_info)
 
-                start_time = time.time()
                 # (A+B)_qq @ b_q
                 # <0| [GId, H, qs + qsd] |0>
                 sigma_plus[:num_q, root] = get_orbital_rotation_gradient(
@@ -381,9 +375,7 @@ class LinearResponse(LinearResponseBaseClass):
                     self.wf.num_active_orbs,
                     self.wf.rdm1,
                 )
-                qq_time += time.time() - start_time
 
-                start_time = time.time()
                 qs = FermionicOperator({})
                 for kappa, q in zip(kappas[:, root], self.q_ops):
                     qs += kappa * q
@@ -416,9 +408,7 @@ class LinearResponse(LinearResponseBaseClass):
                     )
                     sigma_plus[num_q + i, root] += val
                     sigma_minus[num_q + i, root] -= val
-                Gq_time += time.time() - start_time
 
-                start_time = time.time()
                 Gs = FermionicOperator({})
                 for S, G in zip(Ss[:, root], self.G_ops):
                     Gs += S * G
@@ -446,7 +436,6 @@ class LinearResponse(LinearResponseBaseClass):
                     )
                     sigma_plus[i, root] -= val
                     sigma_minus[i, root] += val
-                qG_time += time.time() - start_time
 
         GId_expect = np.zeros(len(self.G_ops))
         for i, GI in enumerate(self.G_ops):
@@ -461,7 +450,6 @@ class LinearResponse(LinearResponseBaseClass):
 
         for root in range(n_roots):
 
-            start_time = time.time()
             Gs = FermionicOperator({})
             for S, G in zip(Ss[:, root], self.G_ops):
                 Gs += S * G
@@ -507,12 +495,6 @@ class LinearResponse(LinearResponseBaseClass):
                     Gs_minus_ket,
                     *self.index_info,
                 )
-            GG_time += time.time() - start_time
-
-        print("qq time:", qq_time)
-        print("qG time:", qG_time)
-        print("Gq time:", Gq_time)
-        print("GG time:", GG_time)
 
         return sigma_plus, sigma_minus, tau_minus
 
