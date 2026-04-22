@@ -438,9 +438,9 @@ class LinearResponse(LinearResponseBaseClass):
         Returns:
             Property gradient.
         """
-        in_shape = property_integrals.shape[:-2]
+        #in_shape = property_integrals.shape[:-2]
         size_mo = self.wf.num_inactive_orbs + self.wf.num_active_orbs + self.wf.num_virtual_orbs
-        property_integrals = property_integrals.reshape(-1, size_mo, size_mo)
+        #property_integrals = property_integrals.reshape(-1, size_mo, size_mo)
         num_mo = len(property_integrals)
         mo = np.zeros((num_mo, size_mo, size_mo))
         for i, ao in enumerate(property_integrals):
@@ -482,5 +482,5 @@ class LinearResponse(LinearResponseBaseClass):
                     val -= expectation_value(Ed_ket, [], G_ket, *self.index_info)
                     V[idx + idx_shift_q, :] += mo[:, p, q] * val
         if np.allclose(mo, mo.transpose(0, -1, -2)):
-            return np.vstack((V, -1 * V)).reshape(-1, *in_shape)
-        return np.vstack((V, V)).reshape(-1, *in_shape)
+            return np.vstack((V, -1 * V))#.reshape(-1, *in_shape)
+        return np.vstack((V, V))#.reshape(-1, *in_shape)

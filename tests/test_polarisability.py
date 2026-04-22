@@ -1,5 +1,3 @@
-import numpy as np
-from scipy.linalg import solve
 import pyscf
 import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
@@ -31,13 +29,7 @@ def get_polarisability(geometry, basis, active_space, charge=0, unit='bohr'):
 
     # Singlet Linear Response
     LR = naive.LinearResponse(WF, excitations="SD")
-    LR.calc_excitation_energies()
-
-    # Dipole integrals
-    dip_ao = mol.intor('int1e_r')
-    prop_grad = LR.get_property_gradient(dip_ao)
-    response = solve(LR.hessian, prop_grad)
-    alpha = np.einsum('ix,ix->x', prop_grad, response)
+    alpha = LR.get_polarisability()
 
     print(f'Polarisabilities:\n \t xx: {alpha[0]:.4f} \t yy: {alpha[1]:.4f} \t zz: {alpha[2]:.4f}')
 

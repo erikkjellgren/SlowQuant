@@ -8,6 +8,7 @@ from slowquant.SlowQuant import SlowQuant
 
 class IntegralManager:
     __slots__ = (
+        "_dia_shield",
         "_electric_dipole",
         "_electron_electron_repulsion",
         "_h_ao",
@@ -28,6 +29,7 @@ class IntegralManager:
         self._electron_electron_repulsion: np.ndarray | None = None
         self._electric_dipole: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
         self._h_ao: np.ndarray | None = None
+        self._dia_shield: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None = None
 
     @property
     def num_elec(self) -> int:
@@ -123,3 +125,20 @@ class IntegralManager:
             raise ValueError("Got unknown integral object, {type(self.int_obj)}")
         self._h_ao = h_core
         return h_core
+
+    @property
+    def diamagnetic_shielding(self, common_orig = (0,0,0)) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Diamagnetic shielding integrals."""
+        if isinstance(self._dia_shield, np.ndarray):
+            return self._dia_shield
+        if isinstance(self.int_obj, SlowQuant):
+            raise ValueError("Diamagnetic shielding integrals not implemented for integral object, {type(self.int_obj)}. Use integral object, {pyscf.gto.mole.Mole}")
+        elif isinstance(self.int_obj, pyscf.gto.mole.Mole):
+            self.int_obj.set_common_orig(common_orig)
+            self.int_obj.set_rinv_origin(common_orig)
+            xx, xy, xz, yx, yy, yz, zx, zy, zz = self.int_obj.intor('int1e_cg_a11part', comp=9)
+            dia_shield = (xx, xy, xz, yx, yy, yz, zx, zy, zz)
+        else:
+            raise ValueError("Got unknown integral object, {type(self.int_obj)}")
+        self._dia_shield = dia_shield
+        return dia_shield

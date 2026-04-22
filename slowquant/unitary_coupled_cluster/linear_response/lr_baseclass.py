@@ -238,3 +238,17 @@ class LinearResponseBaseClass:
             osc_str = f"{osc_strength:1.6f}"
             output += f"{str(i + 1).center(12)} | {exc_str.center(27)} | {exc_str_ev.center(22)} | {osc_str.center(20)}\n"
         return output
+
+    def get_polarisability(self, freq=0) -> np.ndarray:
+        """Calculate the frequency dependent polarisability.
+
+        Returns:
+            Polarisability.
+        """
+        if not hasattr(self, "hessian") or not hasattr(self, "metric"):
+            self.calc_excitation_energies()
+        
+        prop_grad = self.get_property_gradient(self.wf.int_gen.electric_dipole)
+        response = scipy.linalg.solve(self.hessian - freq * self.metric, prop_grad)
+        
+        return np.einsum('ix,ix->x', prop_grad, response)

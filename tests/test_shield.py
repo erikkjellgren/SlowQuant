@@ -41,10 +41,12 @@ def get_shield(geometry, basis, active_space, charge=0, unit='bohr'):
     dia = np.zeros((mol.natm, 3, 3))
 
     for i in range(mol.natm):
+        print(type(mol.atom_coord(i)))
         mol.set_common_orig(mol.atom_coord(i))
         mol.set_rinv_origin(mol.atom_coord(i))
 
         dia_ao = mol.intor('int1e_cg_a11part', comp=9)
+        print(dia_ao.shape)
         mo_integrals = np.einsum('uj,xuv,vi->xij', WF.c_mo, dia_ao, WF.c_mo)
         e11 = np.einsum('xij,ij->x', mo_integrals, RDM1).reshape(3,3)
         dia[i,:,:] = e11 - e11.trace() * np.eye(3)
@@ -116,3 +118,5 @@ def test_LiH_sto3g_naive():
     # Check shielding constant - reference dalton mcscf
     assert abs(38.7983 - sigma[0]) < thresh
     assert abs(72.9730 - sigma[1]) < thresh
+
+test_H2_sto3g_naive()
