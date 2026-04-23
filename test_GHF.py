@@ -30,8 +30,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # mf = scf.GHF(mol).x2c
 
     
-    mf = scf.GHF(mol).x2c()
-    # mf = scf.GHF(mol)
+    # mf = scf.GHF(mol).x2c()
+    mf = scf.GHF(mol)
 
     # mf.conv_tol_grad = 1e-10 #gradient tolerance form PYSCF
     mf.conv_tol_grad = 1e-10 #gradient tolerance form PYSCF
@@ -78,20 +78,20 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         {"n_layers": 1, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
-    WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
+    # WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 2000)
 
     # print(WF.c_mo)
 
     # WF.run_wf_optimization_2step("l-bfgs-b", orbital_optimization=False, tol=1e-5, maxiter = 2000)
 
     # print("E_opt:", WF._energy_elec)
-    print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
+    # print("E_opt: (+nuc!)", WF._energy_elec + e_nuc)
     
     # print(WF.ci_coeffs)
 
 
     
-    dip_ao = build_x2c_pc_operator(mf, mol, "int1e_r", 'int1e_sprsp', c, x2c=True, picture_change=False)
+    dip_ao = build_x2c_pc_operator(mf, mol, "int1e_r", 'int1e_sprsp', c, x2c=False, picture_change=False)
 
 
     # print("C shape:", WF.c_mo.shape)
@@ -99,22 +99,22 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # print("dip_ao[0] shape:", dip_ao[0].shape)
 
     "Calculate Excitation energies"
-    # LR = generalized_naive.LinearResponse(WF, excitations="sd")
-    # LR.calc_excitation_energies()
-    # print(LR.excitation_energies)
+    LR = generalized_naive.LinearResponse(WF, excitations="sd")
+    LR.calc_excitation_energies()
+    print(LR.excitation_energies)
 
     
     # "Calculate polarizability"
-    # prop_grad = LR.get_property_gradient(dip_ao) #Computes property gradient V
-    # response = solve(LR.hessian, prop_grad) # solve (E-h_bar omega S)X=V (the solution/responsevector) with omega =0 response = solve(LR.hessian- omega LR.metric, prop_grad) for non-static?
-    # alpha = np.einsum('ix,ix->x', prop_grad, response)
+    prop_grad = LR.get_property_gradient(dip_ao) #Computes property gradient V
+    response = solve(LR.hessian, prop_grad) # solve (E-h_bar omega S)X=V (the solution/responsevector) with omega =0 response = solve(LR.hessian- omega LR.metric, prop_grad) for non-static?
+    alpha = np.einsum('ix,ix->x', prop_grad, response)
 
-    # print(f'Polarizabilities:\n \t xx: {alpha[0]:.4f} \t yy: {alpha[1]:.4f} \t zz: {alpha[2]:.4f}')
+    print(f'Polarizabilities:\n \t xx: {alpha[0]:.4f} \t yy: {alpha[1]:.4f} \t zz: {alpha[2]:.4f}')
 
     "Calculate dipole moments"
-    mux = generalized_one_electron_transform(WF.c_mo, dip_ao[0], x2c=True)
-    muy = generalized_one_electron_transform(WF.c_mo, dip_ao[1], x2c=True)
-    muz = generalized_one_electron_transform(WF.c_mo, dip_ao[2], x2c=True)
+    mux = generalized_one_electron_transform(WF.c_mo, dip_ao[0], x2c=False)
+    muy = generalized_one_electron_transform(WF.c_mo, dip_ao[1], x2c=False)
+    muz = generalized_one_electron_transform(WF.c_mo, dip_ao[2], x2c=False)
     mu_op_x = generalized_one_elec_op_0i_0a(mux, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
     mu_op_y = generalized_one_elec_op_0i_0a(muy, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
     mu_op_z = generalized_one_elec_op_0i_0a(muz, WF.num_inactive_spin_orbs,WF.num_active_spin_orbs,)
@@ -123,66 +123,66 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     dip_z=generalized_expectation_value(WF.ci_coeffs, [mu_op_z], WF.ci_coeffs, WF.ci_info)
 
 
-    # print(f'Electric Dipolemoments:\n \t xx: {dip_x:.4f} \t yy: {dip_y:.4f} \t zz: {dip_z:.4f}')
+    print(f'Electric Dipolemoments:\n \t xx: {dip_x:.4f} \t yy: {dip_y:.4f} \t zz: {dip_z:.4f}')
 
 
-    # charges = mol.atom_charges()
-    # coords = mol.atom_coords()
-    # nuclear_dipole = np.einsum('i,ij->j', charges, coords)
-
-
-    # # print('Nuclear dipole moments',nuclear_dipole)
-
-    # # print(f'Total Dipolemoments:\n \t xx: {-dip_x+nuclear_dipole[0]:.4f} \t yy: {-dip_y+nuclear_dipole[1]:.4f} \t zz: {-dip_z+nuclear_dipole[2]:.4f}')
-
-
-
-    "Electric field gradients"
-    coords = mol.atom_coords()
     charges = mol.atom_charges()
-
-    for A in range(mol.natm):
-        int_pc = build_x2c_pc_operator_efg(mf, mol, A, c, x2c=True, picture_change=True)  # (3, 3, 2*nao_c, 2*nao_c)
-
-        efg_elec = np.zeros((3, 3)) #create the EFG matrix
-        for alpha in range(3):
-            for beta in range(3):
-                mo = generalized_one_electron_transform(WF.c_mo, int_pc[alpha, beta], x2c=True)
-                op = generalized_one_elec_op_0i_0a(mo, WF.num_inactive_spin_orbs, WF.num_active_spin_orbs)
-                efg_elec[alpha, beta] = generalized_expectation_value(
-                    WF.ci_coeffs, [op], WF.ci_coeffs, WF.ci_info
-                ) #har fjernet .real
-                # print('GFG real?', np.isreal(efg_elec[alpha, beta]))
-
-        # Make traceless
-        trace = np.trace(efg_elec) / 3
-        for alpha in range(3):
-            efg_elec[alpha, alpha] -= trace
-
-        efg_elec *= -1  # electrons charge -1
-
-        #Nuclear part
-        efg_nuc = np.zeros((3, 3))
-        for B in range(mol.natm):
-            if B == A:
-                continue
-            R_AB = coords[B] - coords[A] #A os expansion point
-            r = np.linalg.norm(R_AB)
-            # efg_nuc += charges[B] * (3 * np.outer(R_AB, R_AB) - np.eye(3) * r**2) / r**5
-            for alpha in range(3):
-                for beta in range(3):
-                    efg_nuc[alpha, beta] += charges[B] * (3 * R_AB[alpha] * R_AB[beta]/r**5 - (alpha == beta) / r**3) 
+    coords = mol.atom_coords()
+    nuclear_dipole = np.einsum('i,ij->j', charges, coords)
 
 
-        #Total EFG
-        efg_total = efg_elec + efg_nuc
+    # print('Nuclear dipole moments',nuclear_dipole)
 
-        print(f"EFG at atom {A} ({mol.atom_symbol(A)}):")
-        print(f"  xx={efg_total[0,0]:.4f}  xy={efg_total[0,1]:.4f}  xz={efg_total[0,2]:.4f}")
-        print(f"  yy={efg_total[1,1]:.4f}  yz={efg_total[1,2]:.4f}")
-        print(f"  zz={efg_total[2,2]:.4f}")
-        print(f"  Trace: {np.trace(efg_total):.2e}")
-        print(f"  Symmetric: {np.allclose(efg_total, efg_total.T)}")
+    print(f'Total Dipolemoments:\n \t xx: {-dip_x+nuclear_dipole[0]:.4f} \t yy: {-dip_y+nuclear_dipole[1]:.4f} \t zz: {-dip_z+nuclear_dipole[2]:.4f}')
+
+
+
+    # "Electric field gradients"
+    # coords = mol.atom_coords()
+    # charges = mol.atom_charges()
+
+    # for A in range(mol.natm):
+    #     int_pc = build_x2c_pc_operator_efg(mf, mol, A, c, x2c=False, picture_change=False)  # (3, 3, 2*nao_c, 2*nao_c)
+
+    #     efg_elec = np.zeros((3, 3)) #create the EFG matrix
+    #     for alpha in range(3):
+    #         for beta in range(3):
+    #             mo = generalized_one_electron_transform(WF.c_mo, int_pc[alpha, beta], x2c=False)
+    #             op = generalized_one_elec_op_0i_0a(mo, WF.num_inactive_spin_orbs, WF.num_active_spin_orbs)
+    #             efg_elec[alpha, beta] = generalized_expectation_value(
+    #                 WF.ci_coeffs, [op], WF.ci_coeffs, WF.ci_info
+    #             ) #har fjernet .real
+    #             # print('GFG real?', np.isreal(efg_elec[alpha, beta]))
+
+    #     # Make traceless
+    #     trace = np.trace(efg_elec) / 3
+    #     for alpha in range(3):
+    #         efg_elec[alpha, alpha] -= trace
+
+    #     efg_elec *= -1  # electrons charge -1
+
+    #     #Nuclear part
+    #     efg_nuc = np.zeros((3, 3))
+    #     for B in range(mol.natm):
+    #         if B == A:
+    #             continue
+    #         R_AB = coords[B] - coords[A] #A os expansion point
+    #         r = np.linalg.norm(R_AB)
+    #         # efg_nuc += charges[B] * (3 * np.outer(R_AB, R_AB) - np.eye(3) * r**2) / r**5
+    #         for alpha in range(3):
+    #             for beta in range(3):
+    #                 efg_nuc[alpha, beta] += charges[B] * (3 * R_AB[alpha] * R_AB[beta]/r**5 - (alpha == beta) / r**3) 
+
+
+    #     #Total EFG
+    #     efg_total = efg_elec + efg_nuc
+
+    #     print(f"EFG at atom {A} ({mol.atom_symbol(A)}):")
+    #     print(f"  xx={efg_total[0,0]:.4f}  xy={efg_total[0,1]:.4f}  xz={efg_total[0,2]:.4f}")
+    #     print(f"  yy={efg_total[1,1]:.4f}  yz={efg_total[1,2]:.4f}")
+    #     print(f"  zz={efg_total[2,2]:.4f}")
+    #     print(f"  Trace: {np.trace(efg_total):.2e}")
+    #     print(f"  Symmetric: {np.allclose(efg_total, efg_total.T)}")
 
 
     
@@ -243,7 +243,7 @@ def _sigma_dot(prp4: np.ndarray) -> np.ndarray:
         [w + z,        x - 1j * y],
         [x + 1j * y,   w - z     ]
     ])
-def build_x2c_pc_operator(mf, mol, int_LL, int_SS, c, x2c=True, picture_change=True): 
+def build_x2c_pc_operator(mf, mol, int_LL, int_SS, c, x2c=False, picture_change=False): 
     with mol.with_common_orig((0, 0, 0)):
         if x2c==False:
             return mol.intor_symmetric(int_LL)    
@@ -266,7 +266,7 @@ def build_x2c_pc_operator(mf, mol, int_LL, int_SS, c, x2c=True, picture_change=T
 
 
 
-def build_x2c_pc_operator_efg(mf, mol, atom_idx, c, x2c=True, picture_change=True):
+def build_x2c_pc_operator_efg(mf, mol, atom_idx, c, x2c=False, picture_change=False):
     with mol.with_rinv_origin(mol.atom_coord(atom_idx)):
         xmol = mf.with_x2c.get_xmol()[0]
         nao_x = xmol.nao
@@ -400,7 +400,7 @@ def HCl():
     # basis = {'H':'sto-3g','Cl': 'x2c-SVPall.nw'}
     basis = {'H': gto.uncontract(load('x2c-SVPall.nw', 'H')),
                 'Cl': gto.uncontract(load('x2c-SVPall.nw', 'Cl'))}
-    active_space = ((2,2), 6) #spin orbitaler or spinor basis
+    active_space = ((1,1), 2) #spin orbitaler or spinor basis
     # active_space = (2, 4)
     charge = 0
     spin = 0

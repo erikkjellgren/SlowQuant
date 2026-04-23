@@ -627,7 +627,7 @@ def get_orbital_gradient_response(
 
 
 @nb.jit(nopython=True)
-def get_orbital_gradient_response_real_imag(
+def get_orbital_gradient_response_real_imag( #Tjek for fejl??
     h_int: np.ndarray,
     g_int: np.ndarray,
     kappa_idx: list[tuple[int, int]],

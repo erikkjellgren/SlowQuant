@@ -101,7 +101,7 @@ class LinearResponse(LinearResponseBaseClass):
               
                 
         if len(self.q_ops) != 0:
-            grad = get_orbital_gradient_response_real_imag(
+            grad = get_orbital_gradient_response_real_imag(  #tjek om det er den rigtige, og om der er fejl.
                 self.wf.h_mo,
                 self.wf.g_mo,
                 self.wf.kappa_no_activeactive_spin_idx,
