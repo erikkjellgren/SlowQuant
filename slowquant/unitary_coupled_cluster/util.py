@@ -1,8 +1,6 @@
 from collections.abc import Generator, Sequence
 from typing import Any
 
-import numpy as np
-
 
 def iterate_t1_sa(
     active_occ_idx: Sequence[int],
@@ -908,7 +906,7 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_GpD:
-                for a, i, b, j in iterate_pair_t2_generalized(2 * num_orbs):
+                for a, i, b, j in iterate_pair_t2_generalized(num_orbs):
                     self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i, j, a, b))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 2
@@ -949,7 +947,15 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
 
-    def create_SDSfUCC(self, num_orbs: int, num_elec: int, ansatz_options: dict[str, Any]) -> None:
+    def create_SDSfUCC(
+        self,
+        occ_idx: list[int],
+        unocc_idx: list[int],
+        occ_spin_idx: list[int],
+        unocc_spin_idx: list[int],
+        num_orbs: int,
+        ansatz_options: dict[str, Any],
+    ) -> None:
         r"""Create SDS ordered factorized UCC.
 
         The operator ordering of this implementation is,
@@ -997,21 +1003,11 @@ class UpsStructure:
         if True not in (do_D, do_pD, do_GpD):
             raise ValueError("SDSfUCC requires some excitations got none.")
         n_layers = ansatz_options["n_layers"]
-        num_spin_orbs = 2 * num_orbs
-        occ = []
-        unocc = []
-        idx = 0
-        for _ in range(np.sum(num_elec)):
-            occ.append(idx)
-            idx += 1
-        for _ in range(num_spin_orbs - np.sum(num_elec)):
-            unocc.append(idx)
-            idx += 1
         # Layer loop
         for _ in range(n_layers):
             # Kind of D excitation determines indices for complete SDS block
             if do_D:
-                for a, i, b, j in iterate_t2(occ, unocc):
+                for a, i, b, j in iterate_t2(occ_spin_idx, unocc_spin_idx):
                     if i % 2 == a % 2:
                         self.excitation_indices.append((i, a))
                     else:
@@ -1034,8 +1030,8 @@ class UpsStructure:
                     self.param_names.append(f"p{self.n_params:09d}")
                     self.n_params += 1
             if do_pD:
-                for a, i, b, j in iterate_pair_t2(occ, unocc):
-                    self.excitation_operator_type.append("sa_single")
+                for a, i, b, j in iterate_pair_t2(occ_idx, unocc_idx):
+                    self.excitation_operator_type.append("double")
                     self.excitation_indices.append((i // 2, a // 2))
                     self.grad_param_R[f"p{self.n_params:09d}"] = 4
                     self.param_names.append(f"p{self.n_params:09d}")

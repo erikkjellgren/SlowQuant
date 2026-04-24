@@ -240,15 +240,22 @@ class WaveFunctionSAUPS:
                     )
         # Construct UPS Structure
         self.ups_layout = UpsStructure()
-        if ansatz.lower() == "tups":
-            self.ansatz_options["do_tups"] = True
+        if ansatz.lower() in ("tups", "qnp"):
+            if ansatz.lower() == "tups":
+                self.ansatz_options["do_tups"] = True
+            elif ansatz.lower() == "qnp":
+                self.ansatz_options["do_qnp"] = True
             self.ups_layout.create_tiled(self.num_active_orbs, self.ansatz_options)
-        elif ansatz.lower() == "qnp":
-            self.ansatz_options["do_qnp"] = True
-            self.ups_layout.create_tiled(self.num_active_orbs, self.ansatz_options)
-        elif ansatz.lower() == "ksafupccgsd":
-            self.ansatz_options["SAGS"] = True
-            self.ansatz_options["GpD"] = True
+        elif ansatz.lower() in ("fucc", "ksafupccgsd", "safuccsd"):
+            if ansatz.lower() == "ksafupccgsd":
+                self.ansatz_options["SAGS"] = True
+                self.ansatz_options["GpD"] = True
+            elif ansatz.lower() == "safuccsd":
+                self.ansatz_options["SAS"] = True
+                self.ansatz_options["SAD"] = True
+            if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
             self.ups_layout.create_fUCC(
                 self.active_occ_idx_shifted,
                 self.active_unocc_idx_shifted,
@@ -259,14 +266,10 @@ class WaveFunctionSAUPS:
             )
         elif ansatz.lower() == "ksasdsfupccgsd":
             self.ansatz_options["GpD"] = True
-            self.ups_layout.create_SDSfUCC(self.num_active_orbs, self.num_active_elec, self.ansatz_options)
-        elif ansatz.lower() == "safuccsd":
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
-            self.ansatz_options["SAS"] = True
-            self.ansatz_options["SAD"] = True
-            self.ups_layout.create_fUCC(
+            self.ups_layout.create_SDSfUCC(
                 self.active_occ_idx_shifted,
                 self.active_unocc_idx_shifted,
                 self.active_occ_spin_idx_shifted,
