@@ -475,25 +475,12 @@ def build_operator_matrix(op: FermionicOperator, ci_info: CI_Info, do_unsafe: bo
         parity_check[2 * num_active_orbs - i] = num
     # loop over all strings of annihilation operators in FermionicOperator sum
     for fermi_label in op.operators.keys():
-        # Separate each annihilation operator string in creation and annihilation indices
-        anni_idx = []
-        create_idx = []
-        for fermi_op in fermi_label:
-            if fermi_op[1]:
-                create_idx.append(fermi_op[0])
-            else:
-                anni_idx.append(fermi_op[0])
         # When screening determinants,
         # no need to consider the annihilation index of an
         # operator that has the same creation index.
-        create_screen = []
-        for idx in create_idx:
-            if idx not in anni_idx:
-                create_screen.append(idx)
-        a_string = np.array(anni_idx + create_idx, dtype=np.int64)
-        create_screen = np.array(create_screen, dtype=np.int64)
-        create_idx = np.array(create_idx, dtype=np.int64)
-        anni_idx = np.array(anni_idx, dtype=np.int64)
+        create_screen = np.array([idx for idx in fermi_label[0] if idx not in fermi_label[1]], dtype=np.int64)
+        anni_idx = np.array(fermi_label[1], dtype=np.int64)
+        a_string = np.array([*fermi_label[1], *fermi_label[0]], dtype=np.int64)
         op_mat = add_operator_matrix(
             op_mat,
             a_string,
@@ -600,24 +587,14 @@ def propagate_state(
             # loop over all strings of annihilation operators in FermionicOperator sum
             if is_parallel:
                 for fermi_label in op_folded.operators.keys():
-                    # Separate each annihilation operator string in creation and annihilation indices
-                    anni_idx = []
-                    create_idx = []
-                    for fermi_op in fermi_label:
-                        if fermi_op[1]:
-                            create_idx.append(fermi_op[0])
-                        else:
-                            anni_idx.append(fermi_op[0])
                     # When screening determinants,
                     # no need to consider the annihilation index of an
                     # operator that has the same creation index.
-                    anni_screen = []
-                    for idx in anni_idx:
-                        if idx not in create_idx:
-                            anni_screen.append(idx)
-                    a_string = np.array(create_idx + anni_idx, dtype=np.int64)
-                    anni_screen = np.array(anni_screen, dtype=np.int64)
-                    create_idx = np.array(create_idx, dtype=np.int64)
+                    anni_screen = np.array(
+                        [idx for idx in fermi_label[1] if idx not in fermi_label[0]], dtype=np.int64
+                    )
+                    create_idx = np.array(fermi_label[0], dtype=np.int64)
+                    a_string = np.array([*fermi_label[0], *fermi_label[1]], dtype=np.int64)
                     tmp_state = apply_operator_threaded(
                         new_state,
                         a_string,
@@ -633,25 +610,14 @@ def propagate_state(
                     )
             else:
                 for fermi_label in op_folded.operators.keys():
-                    # Separate each annihilation operator string in creation and annihilation indices
-                    anni_idx = []
-                    create_idx = []
-                    for fermi_op in fermi_label:
-                        if fermi_op[1]:
-                            create_idx.append(fermi_op[0])
-                        else:
-                            anni_idx.append(fermi_op[0])
                     # When screening determinants,
                     # no need to consider the annihilation index of an
                     # operator that has the same creation index.
-                    create_screen = []
-                    for idx in create_idx:
-                        if idx not in anni_idx:
-                            create_screen.append(idx)
-                    a_string = np.array(anni_idx + create_idx, dtype=np.int64)
-                    create_screen = np.array(create_screen, dtype=np.int64)
-                    create_idx = np.array(create_idx, dtype=np.int64)
-                    anni_idx = np.array(anni_idx, dtype=np.int64)
+                    create_screen = np.array(
+                        [idx for idx in fermi_label[0] if idx not in fermi_label[1]], dtype=np.int64
+                    )
+                    anni_idx = np.array(fermi_label[1], dtype=np.int64)
+                    a_string = np.array([*fermi_label[1], *fermi_label[0]], dtype=np.int64)
                     tmp_state = apply_operator_serial(
                         new_state,
                         a_string,
@@ -793,24 +759,14 @@ def propagate_state_SA(
             # loop over all strings of annihilation operators in FermionicOperator sum
             if is_parallel:
                 for fermi_label in op_folded.operators.keys():
-                    # Separate each annihilation operator string in creation and annihilation indices
-                    anni_idx = []
-                    create_idx = []
-                    for fermi_op in fermi_label:
-                        if fermi_op[1]:
-                            create_idx.append(fermi_op[0])
-                        else:
-                            anni_idx.append(fermi_op[0])
                     # When screening determinants,
                     # no need to consider the annihilation index of an
                     # operator that has the same creation index.
-                    anni_screen = []
-                    for idx in anni_idx:
-                        if idx not in create_idx:
-                            anni_screen.append(idx)
-                    a_string = np.array(create_idx + anni_idx, dtype=np.int64)
-                    anni_screen = np.array(anni_screen, dtype=np.int64)
-                    create_idx = np.array(create_idx, dtype=np.int64)
+                    anni_screen = np.array(
+                        [idx for idx in fermi_label[1] if idx not in fermi_label[0]], dtype=np.int64
+                    )
+                    create_idx = np.array(fermi_label[0], dtype=np.int64)
+                    a_string = np.array([*fermi_label[0], *fermi_label[1]], dtype=np.int64)
                     tmp_state = apply_operator_SA_threaded(
                         new_state,
                         a_string,
@@ -826,25 +782,14 @@ def propagate_state_SA(
                     )
             else:
                 for fermi_label in op_folded.operators.keys():
-                    # Separate each annihilation operator string in creation and annihilation indices
-                    anni_idx = []
-                    create_idx = []
-                    for fermi_op in fermi_label:
-                        if fermi_op[1]:
-                            create_idx.append(fermi_op[0])
-                        else:
-                            anni_idx.append(fermi_op[0])
                     # When screening determinants,
                     # no need to consider the annihilation index of an
                     # operator that has the same creation index.
-                    create_screen = []
-                    for idx in create_idx:
-                        if idx not in anni_idx:
-                            create_screen.append(idx)
-                    a_string = np.array(anni_idx + create_idx, dtype=np.int64)
-                    create_screen = np.array(create_screen, dtype=np.int64)
-                    create_idx = np.array(create_idx, dtype=np.int64)
-                    anni_idx = np.array(anni_idx, dtype=np.int64)
+                    create_screen = np.array(
+                        [idx for idx in fermi_label[0] if idx not in fermi_label[1]], dtype=np.int64
+                    )
+                    anni_idx = np.array(fermi_label[1], dtype=np.int64)
+                    a_string = np.array([*fermi_label[1], *fermi_label[0]], dtype=np.int64)
                     tmp_state = apply_operator_SA_serial(
                         new_state,
                         a_string,
@@ -3043,23 +2988,28 @@ def get_determinant_expansion_from_operator_on_HF(
     for i in range(2 * num_active_orbs - 1, -1, -1):
         num += 2**i
         parity_check[2 * num_active_orbs - i] = num
-    for anni_string in operator.operators:
+    for anni_string, fac in operator.operators.items():
         det = hf_det
         phase_changes = 0
-        for orb_idx, dagger in anni_string[::-1]:
+        is_killstate = False
+        # Do annihilation
+        for orb_idx in anni_string[1][::-1]:
             nth_bit = (det >> 2 * num_active_orbs - 1 - orb_idx) & 1
-            if nth_bit == 0 and dagger:
-                det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
-                phase_changes += (det & parity_check[orb_idx]).bit_count()
-            elif nth_bit == 1 and dagger:
+            if nth_bit == 0:
+                is_killstate = True
                 break
-            elif nth_bit == 0 and not dagger:
+            det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
+            phase_changes += (det & parity_check[orb_idx]).bit_count()
+        # Do creation
+        for orb_idx in anni_string[0][::-1]:
+            nth_bit = (det >> 2 * num_active_orbs - 1 - orb_idx) & 1
+            if nth_bit == 1:
+                is_killstate = True
                 break
-            elif nth_bit == 1 and not dagger:
-                det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
-                phase_changes += (det & parity_check[orb_idx]).bit_count()
-        else:  # nobreak
-            val = operator.operators[anni_string] * (-1) ** phase_changes
+            det = det ^ 2 ** (2 * num_active_orbs - 1 - orb_idx)
+            phase_changes += (det & parity_check[orb_idx]).bit_count()
+        if not is_killstate:
+            val = fac * (-1) ** phase_changes
             coeffs.append(val)
             dets.append(format(det, f"0{2 * num_active_orbs}b"))
     return coeffs, dets
