@@ -640,25 +640,14 @@ def propagate_state(
             else:
                 op_folded = op
             for hcb_label in op_folded.operators.keys():
-                # Separate each annihilation operator string in creation and annihilation indices
-                anni_idx = []
-                create_idx = []
-                for hcb_op in hcb_label:
-                    if hcb_op[1]:
-                        create_idx.append(hcb_op[0])
-                    else:
-                        anni_idx.append(hcb_op[0])
                 # When screening determinants,
                 # no need to consider the annihilation index of an
                 # operator that has the same creation index.
-                create_screen = []
-                for idx in create_idx:
-                    if idx not in anni_idx:
-                        create_screen.append(idx)
-                a_string = np.array(anni_idx + create_idx, dtype=np.int64)
-                create_screen = np.array(create_screen, dtype=np.int64)
-                create_idx = np.array(create_idx, dtype=np.int64)
-                anni_idx = np.array(anni_idx, dtype=np.int64)
+                create_screen = np.array(
+                    [idx for idx in hcb_label[0] if idx not in hcb_label[1]], dtype=np.int64
+                )
+                anni_idx = np.array(hcb_label[1], dtype=np.int64)
+                a_string = np.array([*hcb_label[1], *hcb_label[0]], dtype=np.int64)
                 tmp_state = apply_hcb_operator_serial(
                     new_state,
                     a_string,

@@ -501,7 +501,7 @@ class FermionicOperator:
         operators = {op: fac * number for op, fac in self.operators.items() if abs(fac * number) >= 1e-14}
         return FermionicOperator(operators)
 
-    def __neg__(self):
+    def __neg__(self) -> FermionicOperator:
         """Negate the factors in a fermionic operator.
 
         Retunrs:
