@@ -2,7 +2,6 @@ import copy
 import itertools
 import math
 import pickle
-from collections import defaultdict
 from typing import Any
 
 import numpy as np
@@ -17,7 +16,6 @@ from qiskit.primitives import (
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler import PassManager
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
-from qiskit_nature.second_q.mappers import LinearMapper
 
 from slowquant.qiskit_interface.custom_ansatz import HCBfUCC
 from slowquant.qiskit_interface.util import (
@@ -26,19 +24,16 @@ from slowquant.qiskit_interface.util import (
     correct_distribution,
     correct_distribution_with_layout_v2,
     get_bitstring_sign,
-    get_determinant_reference,
-    get_determinant_superposition_reference,
-    get_reordering_sign,
-    layout_conserving_compose,
+    hcb_mapper,
     pauliop_to_dict,
-    postselection,
+    postselection_hcb,
     to_CBS_measurement,
 )
 from slowquant.unitary_coupled_cluster.hardcoreboson_operator import HardcorebosonOperator
 
 
 class HCBQuantumInterface:
-    """Quantum interface class.
+    """Quantum interface class for hard-core boson model.
 
     This class handles the interface with qiskit and the communication with quantum hardware.
     """
@@ -98,7 +93,6 @@ class HCBQuantumInterface:
         self.pass_manager_options = pass_manager_options
         self.ISA = ISA
         self.shots = shots
-        self.mapper = LinearMapper()
         self.mitigation_flags: MitigationFlags = MitigationFlags(
             do_M_mitigation=do_M_mitigation,
             do_M_ansatz0=do_M_ansatz0,
@@ -152,17 +146,13 @@ class HCBQuantumInterface:
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = HCBfUCC(
-                num_orbs, self.num_elec_pair, self.mapper, self.ansatz_options
-            )
+            self.circuit, self.grad_param_R = HCBfUCC(num_orbs, self.num_elec_pair, self.ansatz_options)
         elif self.ansatz.lower() == "fuccgpd":
             self.ansatz_options["HCBGD"] = True
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R = HCBfUCC(
-                num_orbs, self.num_elec_pair, self.mapper, self.ansatz_options
-            )
+            self.circuit, self.grad_param_R = HCBfUCC(num_orbs, self.num_elec_pair, self.ansatz_options)
         else:
             raise ValueError(f"Unknown ansatz: {self.ansatz}")
 
@@ -536,9 +526,7 @@ class HCBQuantumInterface:
             print("M matrix for error mitigation has been reset.")
 
     def op_to_qbit(self, op: HardcorebosonOperator) -> SparsePauliOp:
-        """Fermionic operator to qbit rep.
-
-        The Pauli string representation is in qiskit's format of qN,qN-1,...,q0.
+        """Hard-core boson operator to qbit rep.
 
         Args:
             op: Operator as SlowQuant's HardcorebosonOperator object
@@ -546,13 +534,9 @@ class HCBQuantumInterface:
         Returns:
             Qubit representation of operator.
         """
-        from slowquant.qiskit_interface.util import hcb_mapper
-
-        # mapped_op = self.mapper.map(SpinOp(op.get_qiskit_form(self.num_orbs), num_spins=self.num_orbs, spin=0.5))
         mapped_op = hcb_mapper(op.get_qiskit_form(), self.num_orbs)
         if not isinstance(mapped_op, SparsePauliOp):
             raise TypeError(f"The qubit form of the operator is not SparsePauliOp got, {type(mapped_op)}")
-        print(mapped_op)
         return mapped_op
 
     def _check_layout_conflict(self, circuit_in: QuantumCircuit) -> int:
@@ -615,269 +599,6 @@ class HCBQuantumInterface:
             "The Quantum Interface was initiated with an unknown Qiskit primitive, {type(self._primitive)}"
         )
 
-    def quantum_expectation_value_csfs(
-        self,
-        bra_csf: tuple[list[float], list[str]],
-        op: HardcorebosonOperator,
-        ket_csf: tuple[list[float], list[str]],
-        custom_parameters: list[float] | None = None,
-        ISA_csfs_option: int = 0,
-        reverse_csfs_order: bool = False,
-        verbose: bool = False,
-    ) -> float:
-        r"""Calculate expectation value using different bra and ket of a Hermitian operator.
-
-        I.e. expectation values of the type,
-
-        .. math::
-            M_{IJ} = \left<\text{CSF}_I\left|\boldsymbol{U}^\dagger\hat{O}_\text{H}\boldsymbol{U}\right|\text{CSF}_J\right>
-
-        The expectation value is calculated as:
-
-        .. math::
-            M_{IJ} = \sum_{\text{det}_i\in\text{CSF}_I}\sum_{\text{det}_j\in\text{CSF}_J}m_{ij}
-
-        with,
-
-        .. math::
-            \begin{align}
-            m_{ij} &= \left<\text{det}_i\left|\boldsymbol{U}^\dagger\hat{O}_\text{H}\boldsymbol{U}\right|\text{det}_j\right>\\
-                   &= \left<\frac{1}{\sqrt{2}}
-                   \left(\text{det}_i+\text{det}_j\right)\left|\boldsymbol{U}^\dagger\hat{O}_\text{H}\boldsymbol{U}\right|\frac{1}{\sqrt{2}}\left(\text{det}_i+\text{det}_j\right)\right>
-                   - \frac{1}{2}\left<\text{det}_i\left|\boldsymbol{U}^\dagger\hat{O}_\text{H}\boldsymbol{U}\right|\text{det}_i\right>
-                   - \frac{1}{2}\left<\text{det}_j\left|\boldsymbol{U}^\dagger\hat{O}_\text{H}\boldsymbol{U}\right|\text{det}_j\right>
-            \end{align}
-
-        #. 10.1103/PhysRevResearch.1.033062, Eq. (1)
-
-        Args:
-            bra_csf: Bra CSF.
-            op: Hermitian hard-core bosonic operator.
-            ket_csf: Ket CSF.
-            custom_parameters: Non-default run parameters.
-            ISA_csfs_option: Option on how to treat the composing of superposition state and Ansatz:
-                0: Find default based on error mitigation. Default without EM: 1.
-                1: Allow flexible (changing) layout.
-                2: Fixed layout but allow change in order (swaps).
-                3: Fixed layout, fixed order, without optimizing circuit after composing.
-                4: Fixed layout, fixed order, with optimizing circuit after composing.
-            reverse_csfs_order: If true, the pair-entangled superposition states' order is reversed.
-                This might be relevant as the order can influence the circuit depths.
-            verbose: Print additional details.
-
-        Returns:
-            Expectation value of operator.
-        """
-        save_paulis = self._save_paulis
-        if not isinstance(self.mapper, JordanWignerMapper):
-            raise TypeError(
-                f"Expectation values for custom CSFs only implemented for JordanWignerMapper. Got; {type(self.mapper)}"
-            )
-        if not isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)):
-            raise ValueError(
-                "quantum_expectation_value_csfs got unsupported Qiskit primitive, {type(self._primitive)}"
-            )
-
-        # Option handling
-        if ISA_csfs_option == 0:
-            ISA_csfs_option = 1  # could also be 2
-            if (
-                self.mitigation_flags.do_M_mitigation
-                and self.ansatz_circuit.layout is not None
-                and not self.mitigation_flags.do_M_ansatz0_plus
-            ):
-                ISA_csfs_option = 2
-                if self.mitigation_flags.do_M_ansatz0:
-                    ISA_csfs_option = 4  # could also be 3
-        if verbose:
-            print("CSFs expectation value with circuit composing option: ", ISA_csfs_option)
-
-        if custom_parameters is None:
-            run_parameters = self.parameters
-        else:
-            run_parameters = custom_parameters
-            save_paulis = False
-
-        # Check if ISA beforehand.
-        if self.ISA:
-            connection_order = self._initial_ansatz_indices
-        else:
-            connection_order = np.arange(self.num_qubits)
-        val = 0.0
-
-        # Create list of all combinations with their weight consisting of coefficient and reordering sign
-        all_combinations = [
-            (
-                tuple(sorted((bra_csf[1][i], ket_csf[1][j]), reverse=reverse_csfs_order)),
-                bra_csf[0][i]
-                * ket_csf[0][j]
-                * get_reordering_sign(bra_csf[1][i])
-                * get_reordering_sign(ket_csf[1][j]),
-            )
-            for i, j in itertools.product(range(len(bra_csf[1])), range(len(ket_csf[1])))
-        ]
-        # Only unique combinations
-        unique_combinations: dict = defaultdict(float)
-        for combo, weight in all_combinations:
-            unique_combinations[combo] += weight
-
-        # Calculate all unique combinations
-        for (bra_det, ket_det), N in unique_combinations.items():
-            # I == J (diagonals)
-            if bra_det == ket_det:
-                # Get det circuit. Only X-Gates -> no transpilation.
-                circuit = get_determinant_reference(bra_det, self.num_orbs, self.mapper)
-                # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
-                circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
-                if save_paulis:
-                    val += N * self._sampler_quantum_expectation_value(op, run_circuit=circuit, det=bra_det)
-                else:
-                    val += N * self._sampler_quantum_expectation_value_nosave(
-                        op,
-                        run_parameters,
-                        circuit,
-                        do_cliques=self._do_cliques,
-                    )
-            # I != J (off-diagonals)
-            else:
-                # First term of off-diagonal element involving I and J
-                # I and J superposition state of determinants
-                state = get_determinant_superposition_reference(bra_det, ket_det, self.num_orbs, self.mapper)
-                # Superposition state contains non-native gates for ISA -> transpilation needed.
-                if self.ISA:
-                    if ISA_csfs_option == 1:  # Option 1: flexible layout
-                        # Use untranspiled ansatz and compose with superposition state
-                        circuit = self._ansatz_circuit_raw.compose(state, front=True)
-                        # Transpile freely
-                        circuit = self._pass_manager.run(circuit)  # type: ignore
-                    elif ISA_csfs_option == 2:  # Option 2: fixed layout - flexible order (needed with M)
-                        # Use untranspiled ansatz and compose with superposition state
-                        circuit = self._ansatz_circuit_raw.compose(state, front=True)
-                        # Transpile the composed circuit together using the correct layout
-                        # This will however still introduce routing swaps (flexible order)
-                        circuit = self._initialfixedlayout_pm.run(circuit)
-                    elif (
-                        ISA_csfs_option == 3
-                    ):  # Option 3: fixed layout - fixed order without optimization (needed with M_Ansatz0)
-                        circuit = layout_conserving_compose(
-                            self.ansatz_circuit,
-                            state,
-                            self._initialfixedlayout_pm,
-                            coupling_map=self.pass_manager_options.get("backend").coupling_map,  # type: ignore
-                            optimization=False,
-                        )
-                    elif (
-                        ISA_csfs_option == 4
-                    ):  # Option 4: fixed layout - fixed order with optimization (needed with M_Ansatz0)
-                        circuit = layout_conserving_compose(
-                            self.ansatz_circuit,
-                            state,
-                            self._initialfixedlayout_pm,
-                            coupling_map=self.pass_manager_options.get("backend").coupling_map,  # type: ignore
-                            optimization=True,
-                        )
-                    else:
-                        raise ValueError(
-                            f"Wrong ISA_csfs_option specified, {ISA_csfs_option}. Needs to be 1,2,3,4."
-                        )
-                else:
-                    circuit = self.ansatz_circuit.compose(state, front=True)
-                # Check if M per superposition circuit is requested
-                if self.mitigation_flags.do_M_ansatz0_plus:
-                    state_corr = state.copy()
-                    # Get state circuit without non-local gates
-                    for idx, instruction in reversed(list(enumerate(state_corr.data))):
-                        if instruction.is_controlled_gate():
-                            del state_corr.data[idx]
-                    if self.ISA:
-                        # Translate and optimize
-                        state_corr = self._pass_manager.optimization.run(
-                            self._pass_manager.translation.run(state_corr)
-                        )  # type: ignore
-                    # Negate
-                    if circuit.layout is not None:
-                        circuit_M = circuit.compose(
-                            state_corr,
-                            front=True,
-                            qubits=circuit.layout.initial_index_layout(filter_ancillas=True),
-                        )
-                    else:
-                        circuit_M = circuit.compose(state_corr, front=True)
-
-                    if save_paulis:
-                        val += N * self._sampler_quantum_expectation_value(
-                            op,
-                            run_circuit=circuit,
-                            det=bra_det + ket_det,
-                            circuit_M=circuit_M,
-                        )
-                    else:
-                        val += N * self._sampler_quantum_expectation_value_nosave(
-                            op,
-                            run_parameters,
-                            circuit,
-                            do_cliques=self._do_cliques,
-                            circuit_M=circuit_M,
-                        )
-                elif save_paulis:
-                    val += N * self._sampler_quantum_expectation_value(
-                        op, run_circuit=circuit, det=bra_det + ket_det, csfs_option=ISA_csfs_option
-                    )
-                else:
-                    val += N * self._sampler_quantum_expectation_value_nosave(
-                        op,
-                        run_parameters,
-                        circuit,
-                        do_cliques=self._do_cliques,
-                    )
-
-                # Second term of off-diagonal element involving only I
-                # Get det circuit. Only X-Gates -> no transpilation.
-                circuit = get_determinant_reference(bra_det, self.num_orbs, self.mapper)
-                # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
-                circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
-                if save_paulis:
-                    val -= (
-                        0.5
-                        * N
-                        * self._sampler_quantum_expectation_value(op, run_circuit=circuit, det=bra_det)
-                    )
-                else:
-                    val -= (
-                        0.5
-                        * N
-                        * self._sampler_quantum_expectation_value_nosave(
-                            op,
-                            run_parameters,
-                            circuit,
-                            do_cliques=self._do_cliques,
-                        )
-                    )
-
-                # Third term of off-diagonal element involving only J
-                # Get det circuit. Only X-Gates -> no transpilation.
-                circuit = get_determinant_reference(ket_det, self.num_orbs, self.mapper)
-                # Combine: circuit/det + Ansatz. Map det circuit onto transpiled ansatz circuit order.
-                circuit = self.ansatz_circuit.compose(circuit, qubits=connection_order, front=True)
-                if save_paulis:
-                    val -= (
-                        0.5
-                        * N
-                        * self._sampler_quantum_expectation_value(op, run_circuit=circuit, det=ket_det)
-                    )
-                else:
-                    val -= (
-                        0.5
-                        * N
-                        * self._sampler_quantum_expectation_value_nosave(
-                            op,
-                            run_parameters,
-                            circuit,
-                            do_cliques=self._do_cliques,
-                        )
-                    )
-        return val
-
     def _sampler_quantum_expectation_value(
         self,
         op: HardcorebosonOperator | SparsePauliOp,
@@ -898,7 +619,7 @@ class HCBQuantumInterface:
         With :math:`c_i` being the :math:`i` the coefficient and :math:`P_i` the :math:`i` the Pauli string.
 
         Args:
-            op: SlowQuant fermionic operator.
+            op: SlowQuant hard-core boson operator.
             run_circuit: custom circuit to be run. If not specified, HF+Ansatz circuit is used.
             det: Classify state (determinant) of circuit for Pauli saving.
                 Specified in chemistry form, i.e. left-to-right, alternating alpha and beta.
@@ -993,7 +714,7 @@ class HCBQuantumInterface:
         Calling this function will not use any pre-calculated Pauli expectation values.
         Nor will it save any of the calculated Pauli expectation values.
 
-        The expectation value over a fermionic operator is calculated as:
+        The expectation value over a hard-core boson operator is calculated as:
 
         .. math::
             E = \sum_i^N c_i\left<0\left|P_i\right|0\right>
@@ -1001,7 +722,7 @@ class HCBQuantumInterface:
         With :math:`c_i` being the :math:`i` the coefficient and :math:`P_i` the :math:`i` the Pauli string.
 
         Args:
-            op: SlowQuant fermionic operator.
+            op: SlowQuant hard-core boson operator.
             run_parameters: Circuit parameters.
             run_circuit: Quantum Circuit.
             do_cliques: If True, use cliques (QWC).
@@ -1081,7 +802,7 @@ class HCBQuantumInterface:
         If they are calculated from scratch, no error mitigation can be applied.
 
         Args:
-            op: SlowQuant fermionic operator.
+            op: SlowQuant hard-core boson operator.
             do_cliques: boolean if cliques are used. They are accessed via the saver.
             no_coeffs: boolean if coefficients of each Pauli string are used or all st to 1.
             do_no_corr: If True, no correlation between Pauli strings in a clique is considered.
@@ -1091,8 +812,7 @@ class HCBQuantumInterface:
             Variance of expectation value.
         """
         det_int = int(
-            "1" * (self.num_elec[0] + self.num_elec[1])
-            + "0" * (self.num_spin_orbs - (self.num_elec[0] + self.num_elec[1])),
+            "1" * self.num_elec_pair + "0" * (self.num_orbs - self.num_elec_pair),
             2,
         )
         if custom_parameters is None:
@@ -1223,7 +943,7 @@ class HCBQuantumInterface:
         """
         for i, (dist, head) in enumerate(zip(distr, heads)):
             if "X" not in head and "Y" not in head:
-                distr[i] = postselection(dist, self.mapper, self.num_elec, self.num_qubits)
+                distr[i] = postselection_hcb(dist, self.num_elec_pair, self.num_qubits)
 
     def _one_call_sampler_distributions(
         self,
