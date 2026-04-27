@@ -16,6 +16,7 @@ from slowquant.unitary_coupled_cluster.linear_response.solvers import (
     get_orbital_metric_block,
     get_orbital_hessian_diagonal,
     get_orbital_metric_diagonal,
+    get_orbital_rotation_gradient,
     one_index_transform
 )
 from slowquant.unitary_coupled_cluster.operator_state_algebra import (
@@ -233,14 +234,23 @@ class LinearResponse(LinearResponseBaseClass):
                 # (A+B)_qq @ b_q
                 # (A-B)_qq @ b_q
                 # Sigma_qq @ b_q
-                H22qs = H_2i_2a * qs
+                val = get_orbital_rotation_gradient(
+                    h_lower,
+                    g_lower,
+                    self.wf.kappa_no_activeactive_idx,
+                    self.wf.num_inactive_orbs,
+                    self.wf.num_active_orbs,
+                    self.wf.rdm1,
+                    self.wf.rdm2,
+                )
+                sigma_plus[:num_q, root] = val
+                sigma_minus[:num_q, root] = val
                 for i, qi in enumerate(self.q_ops):
-                    # <0| [qid, H qs] |0>
                     val = expectation_value(
-                        self.wf.ci_coeffs,
-                        [commutator(qi.dagger, H22qs)],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
+                            self.wf.ci_coeffs,
+                            [commutator(qi.dagger, qs) * self.H_1i_1a],
+                            self.wf.ci_coeffs,
+                            *self.index_info,
                     )
                     sigma_plus[i, root] += val
                     sigma_minus[i, root] += val
