@@ -60,7 +60,7 @@ def circuit_wavefunction_from_ups(
     )
     if isinstance(ups_wf, WaveFunctionUPS):
         wf = WaveFunctionCircuit(
-            (ups_wf.num_active_orbs, ups_wf.num_active_elec),
+            (ups_wf.num_active_elec, ups_wf.num_active_orbs),
             ups_wf.c_mo,
             ups_wf.int_gen.int_obj,
             QI,
@@ -70,7 +70,7 @@ def circuit_wavefunction_from_ups(
         return wf
     elif isinstance(ups_wf, WaveFunctionSAUPS):
         sawf = WaveFunctionSACircuit(
-            (ups_wf.num_active_orbs, ups_wf.num_active_elec),
+            (ups_wf.num_active_elec, ups_wf.num_active_orbs),
             ups_wf.c_mo,
             ups_wf.int_gen.int_obj,
             ups_wf._states,
