@@ -627,7 +627,7 @@ def get_orbital_gradient_response(
 
 
 @nb.jit(nopython=True)
-def get_orbital_gradient_response_real_imag(
+def get_orbital_gradient_response_real_imag( #Tjek for fejl??
     h_int: np.ndarray,
     g_int: np.ndarray,
     kappa_idx: list[tuple[int, int]],
@@ -1174,7 +1174,7 @@ def get_orbital_response_static_property_gradient(
     r"""Calculate the orbital part of static property gradient.
 
     .. math::
-        P^{\hat{q}} = \frac{1}{\sqrt{2}}\sum_{p}\left(x_{np}\Gamma^{[1]}_{mp} - x_{pm}\Gamma^{[1]}_{pn}\right)
+        P^{\hat{q}} = \sum_{p}\left(x_{np}\Gamma^{[1]}_{mp} - x_{pm}\Gamma^{[1]}_{pn}\right)
 
     Args:
        mo: Property integral in MO basis.

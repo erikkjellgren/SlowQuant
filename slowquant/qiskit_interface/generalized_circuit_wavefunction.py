@@ -918,6 +918,7 @@ class WaveFunctionCircuit:
             #
             # Here we need to implement parameter-shift for complex.
             #
+<<<<<<< HEAD
             num_theta = len(parameters[num_kappa:]) // 2
 
             # Norm theta (r) kommer først, derefter phi i parameters AWE
@@ -952,6 +953,21 @@ class WaveFunctionCircuit:
                     list(self.QI.grad_param_R.values()) # to be corrected
                     )  # Count energy measurements for all gradients
 
+=======
+            # for i in range(len(parameters[num_kappa:])):
+            #    R = self.QI.grad_param_R[self.QI.param_names[i]]
+            #    e_vals_grad = _get_energy_evals_for_grad(H, self.QI, parameters, i, R)
+            #    grad = 0.0
+            #    for j, mu in enumerate(list(range(1, 2 * R + 1))):
+            #        x_mu = (2 * mu - 1) / (2 * R) * np.pi
+            #        grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R * (np.sin(1 / 2 * x_mu)) ** 2)
+            #    gradient[num_kappa + i] = grad
+            # self.num_energy_evals += 2 * np.sum(
+            #    list(self.QI.grad_param_R.values())
+            # )  # Count energy measurements for all gradients
+
+    
+>>>>>>> 9621414cd707321b5309699a86a1acdda9d497bc
         return gradient
 
 
@@ -986,3 +1002,4 @@ def _get_energy_evals_for_grad(
         # Real? because Hermitian?
         e_vals.append(quantum_interface.quantum_expectation_value_complex(operator, custom_parameters=x).real)
     return e_vals
+

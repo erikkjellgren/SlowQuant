@@ -3,15 +3,19 @@ from __future__ import annotations
 import time
 from functools import partial
 from typing import Any
+import pyscf
 
 import numpy as np
 import scipy
 
+from slowquant.SlowQuant import SlowQuant
 from slowquant.molecularintegrals.integralfunctions import (
     generalized_one_electron_transform,
     generalized_two_electron_transform,
     DHF_one_electron_transform,
 )
+from slowquant.unitary_coupled_cluster.generalized_integral_manager import IntegralManager
+
 from slowquant.unitary_coupled_cluster.ci_spaces import get_indexing_generalized
 from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_electronic_energy_generalized,
@@ -44,12 +48,14 @@ from slowquant.unitary_coupled_cluster.util import (
 class GeneralizedWaveFunctionUPS:
     def __init__(
         self,
-        num_elec: int,
+        # num_elec: int,
         cas: tuple[tuple[int, int], int],
         mo_coeffs: np.ndarray,
-        h_ao: np.ndarray,
-        g_ao: np.ndarray,
+        # h_ao: np.ndarray,
+        # g_ao: np.ndarray,
+        integral_generator: SlowQuant | pyscf.gto.mole.Mole,
         ansatz: str,
+        do_x2c: bool = False,
         ansatz_options: dict[str, Any] | None = None,
         include_active_kappa: bool = False,
     ) -> None:
@@ -78,14 +84,16 @@ class GeneralizedWaveFunctionUPS:
             raise ValueError(
                 f"More spatial active orbitls than total orbitals. Got {cas[1]} active orbitals, and {mo_coeffs.shape[1]} total orbitals."
             )
-        if np.sum(cas[0]) > num_elec:
-            raise ValueError(
-                f"More active electrons than total electrons. Got {np.sum(cas[0])} active electrons, and {num_elec} total electrons."
-            )
+        # if np.sum(cas[0]) > num_elec: #AE udkommenteret
+        #     raise ValueError(
+        #         f"More active electrons than total electrons. Got {np.sum(cas[0])} active electrons, and {num_elec} total electrons."
+        #     )
         # Init stuff
+        self.x2c=do_x2c #AE added this
+        self.int_gen: IntegralManager = IntegralManager(integral_generator, x2c=do_x2c)
         self._c_mo = np.copy(mo_coeffs).astype(np.complex128)
-        self._h_ao = h_ao
-        self._g_ao = g_ao
+        # self._h_ao = h_ao
+        # self._g_ao = g_ao
         self._rdm1 = None
         self._rdm2 = None
         self._h_mo = None
@@ -102,7 +110,8 @@ class GeneralizedWaveFunctionUPS:
         self.active_spin_idx_shifted = []
         self.active_occ_spin_idx_shifted = []
         self.active_unocc_spin_idx_shifted = []
-        self.num_elec = num_elec
+        # self.num_elec = num_elec
+        num_elec = self.int_gen.num_elec #AE
         self.num_elec_alpha = (num_elec - np.sum(cas[0])) // 2 + cas[0][0]
         self.num_elec_beta = (num_elec - np.sum(cas[0])) // 2 + cas[0][1]
         self.num_spin_orbs = mo_coeffs.shape[1]
@@ -188,16 +197,6 @@ class GeneralizedWaveFunctionUPS:
                             self._kappa_imag_redundant_old.append(0.0)
                             self.kappa_redundant_spin_idx.append((P, Q))
                         continue
-
-                # #AE ER IKKE SIKKER PÅ DETTE??
-                # if not (((P in self.inactive_spin_idx) or (P in self.active_occ_spin_idx)) and ((Q in self.active_unocc_spin_idx) or (Q in self.virtual_spin_idx))): #AE
-                #     self._kappa_real_redundant.append(0.0)
-                #     self._kappa_imag_redundant.append(0.0)
-                #     self._kappa_real_redundant_old.append(0.0)
-                #     self._kappa_imag_redundant_old.append(0.0)
-                #     self.kappa_redundant_spin_idx.append((P, Q))
-                #     continue
-                
                 
                 if not (P in self.active_spin_idx and Q in self.active_spin_idx):
                     self.kappa_no_activeactive_spin_idx.append((P, Q))
@@ -297,6 +296,23 @@ class GeneralizedWaveFunctionUPS:
                 self.num_active_spin_orbs // 2,
                 self.ansatz_options,
                 )
+        elif ansatz.lower() == "fuccsdtq": ##AE
+            if "n_layers" not in self.ansatz_options.keys():
+                # default option
+                self.ansatz_options["n_layers"] = 1
+            self.ansatz_options["S"] = True
+            self.ansatz_options["D"] = True
+            self.ansatz_options["T"] = True
+            self.ansatz_options["Q"] = True
+            self.ups_layout.create_fUCC(
+                [],
+                [],
+                self.active_occ_spin_idx_shifted,
+                self.active_unocc_spin_idx_shifted,
+                self.num_active_spin_orbs // 2,
+                self.ansatz_options,
+                )
+
         elif ansatz.lower() == "adapt":
             None
         else:
@@ -435,7 +451,7 @@ class GeneralizedWaveFunctionUPS:
         if self._h_mo is None:
 
 
-            self._h_mo = DHF_one_electron_transform(self.c_mo, self._h_ao)
+            self._h_mo = generalized_one_electron_transform(self.c_mo, self.int_gen.h_ao, x2c=self.int_gen.x2c) #AE self._h_ao
         return self._h_mo
 
     @property
@@ -446,7 +462,7 @@ class GeneralizedWaveFunctionUPS:
             Two-electron Hamiltonian integrals in MO basis.
         """
         if self._g_mo is None:
-            self._g_mo = generalized_two_electron_transform(self.c_mo, self._g_ao)
+            self._g_mo = generalized_two_electron_transform(self.c_mo,  self.int_gen.electron_electron_repulsion) #AE self._g_ao
         return self._g_mo
 
     @property
