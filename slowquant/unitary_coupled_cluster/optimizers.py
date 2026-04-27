@@ -33,6 +33,8 @@ class Optimizers:
         tol: float = 10e-8,
         is_silent: bool = False,
         energy_eval_callback: Callable[[], int] | None = None,
+        maxls: int = 100,
+        maxcor: int = 100,
     ) -> None:
         """Initialize optimizer class.
 
@@ -52,6 +54,9 @@ class Optimizers:
         self.tol = tol
         self.is_silent = is_silent
         self.energy_eval_callback = energy_eval_callback
+        self.maxls = maxls
+        self.maxcor = maxcor
+
 
     def _print_progress(
         self, x: Sequence[float], fun: Callable[[list[float]], float | np.ndarray], silent: bool = False
@@ -100,7 +105,7 @@ class Optimizers:
                     method=self.method,
                     tol=self.tol,
                     callback=print_progress,
-                    options={"maxiter": self.maxiter, "disp": True},
+                    options={"maxiter": self.maxiter, "disp": True, "maxls": self.maxls, "maxcor":self.maxcor},
                 )
             else:
                 res = scipy.optimize.minimize(

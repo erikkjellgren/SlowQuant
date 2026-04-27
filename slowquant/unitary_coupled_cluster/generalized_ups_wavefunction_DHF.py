@@ -94,7 +94,9 @@ class GeneralizedWaveFunctionUPS:
         self._rdm1 = None
         self._rdm2 = None
         self._h_mo = None
+        self._h_mo_ep = None
         self._g_mo = None
+        self._g_mo_ep = None
         self._energy_elec: float | None = None
         self.ansatz_options = ansatz_options
         self.num_energy_evals = 0
@@ -436,8 +438,8 @@ class GeneralizedWaveFunctionUPS:
         Args:
             k: orbital rotation parameters.
         """
-        self._h_mo = None
-        self._g_mo = None
+        self._h_mo_ep = None
+        self._g_mo_ep = None
         self._energy_elec = None
         self._kappa_real_ep = k_real_ep.copy()
         self._kappa_imag_ep = k_imag_ep.copy()
@@ -626,9 +628,9 @@ class GeneralizedWaveFunctionUPS:
         Returns:
             One-electron Hamiltonian integrals in MO basis.
         """
-        if self._h_mo is None:
-            self._h_mo = DHF_one_electron_transform(self.c_mo_ep, self._h_ao) #DHF
-        return self._h_mo
+        if self._h_mo_ep is None:
+            self._h_mo_ep = DHF_one_electron_transform(self.c_mo_ep, self._h_ao) #DHF
+        return self._h_mo_ep
 
     @property
     def g_mo_ep(self) -> np.ndarray:
@@ -637,9 +639,9 @@ class GeneralizedWaveFunctionUPS:
         Returns:
             Two-electron Hamiltonian integrals in MO basis.
         """
-        if self._g_mo is None:
-            self._g_mo = DHF_two_electron_transform(self.c_mo_ep, self._g_ao) #DHF
-        return self._g_mo
+        if self._g_mo_ep is None:
+            self._g_mo_ep = DHF_two_electron_transform(self.c_mo_ep, self._g_ao) #DHF
+        return self._g_mo_ep
 
     @property
     def rdm1(self) -> np.ndarray:
@@ -1055,14 +1057,16 @@ class GeneralizedWaveFunctionUPS:
                         "--------Iteration # | Iteration time [s] | Electronic energy [Hartree] | Energy measurement #"
                     )
                 energy_theta = partial(
-                    self._calc_energy_optimization,
+                    self._calc_energy_optimization_DHF,
                     theta_optimization=True,
-                    kappa_optimization=False,
+                    kappa_ee_optimization=False,
+                    kappa_ep_optimization=False,
                 )
                 gradient_theta = partial(
-                    self._calc_gradient_optimization,
+                    self._calc_gradient_optimization_DHF,
                     theta_optimization=True,
-                    kappa_optimization=False,
+                    kappa_ee_optimization=False,
+                    kappa_ep_optimization=False,
                 )
                 optimizer = Optimizers(
                     energy_theta,
@@ -1156,8 +1160,8 @@ class GeneralizedWaveFunctionUPS:
                     tol=tol,
                     is_silent=is_silent_subiterations,
                     energy_eval_callback=lambda: self.num_energy_evals,
-                    #options={"maxls": 5},
-                    #bounds = [(-0.02, 0.02)] * 2 * len(self.kappa_real_ep),
+                    maxls = 50,
+                    maxcor = 1,
                 )
 
                 self._old_opt_parameters = np.zeros(2 * len(self.kappa_spin_idx_ep), dtype=np.float64) + 10**20
@@ -1471,10 +1475,11 @@ class GeneralizedWaveFunctionUPS:
             ) 
             print("E", E)
         if theta_optimization:
+            NES = self.num_spin_orbs_NES 
             E = generalized_expectation_value_energy(
                 self.ci_coeffs,
                 # [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
-                [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
+                [DHF_hamiltonian_full_space(self.h_mo[NES:,NES:], self.g_mo[NES:,NES:,NES:,NES:], self.num_spin_orbs_NES)],
                 self.ci_coeffs,
                 self.ci_info,
             )

@@ -582,10 +582,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     print("Positronic spin orbitals idx:", WF.positronic_spin_idx)
     print("Active occupied:",WF.active_occ_spin_idx)
     print("Active unoccupied:",WF.active_unocc_spin_idx)
-    print("noactive_active", WF.kappa_no_activeactive_spin_idx)
-    print("noactive_active resp", WF.kappa_no_activeactive_spin_idx_resp)
-    print("Kappas ep:", WF.kappa_spin_idx_ep)
-    print("Kappas ee:", WF.kappa_spin_idx)
+    # print("noactive_active", WF.kappa_no_activeactive_spin_idx)
+    # print("noactive_active resp", WF.kappa_no_activeactive_spin_idx_resp)
+    # print("Kappas ep:", WF.kappa_spin_idx_ep)
+    # print("Kappas ee:", WF.kappa_spin_idx)
 
 
 
@@ -613,7 +613,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     #WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
 
-    WF.run_wf_optimization_1step(optimizer_name = "l-bfgs-b", orbital_optimization = True,tol = 1e-10, maxiter = 1000)
+    WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True,tol = 1e-10, maxiter = 1000)
 
     #kappas = np.concatenate([WF.kappa_real, WF.kappa_real_ep, WF.kappa_imag, WF.kappa_imag_ep])
 
