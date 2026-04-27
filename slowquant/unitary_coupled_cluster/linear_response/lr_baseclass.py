@@ -1,5 +1,3 @@
-from collections.abc import Sequence
-
 import numpy as np
 import scipy
 
@@ -186,30 +184,24 @@ class LinearResponseBaseClass:
 
         return norms
 
-    def get_transition_dipole(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_transition_dipole(self) -> np.ndarray:
         """Calculate transition dipole moment.
-
-        Args:
-            dipole_integrals: Dipole integrals (x,y,z) in AO basis.
 
         Returns:
             Transition dipole moment.
         """
         raise NotImplementedError
 
-    def get_oscillator_strength(self, dipole_integrals: Sequence[np.ndarray]) -> np.ndarray:
+    def get_oscillator_strength(self) -> np.ndarray:
         r"""Calculate oscillator strength.
 
         .. math::
             f_n = \frac{2}{3}e_n\left|\left<0\left|\hat{\mu}\right|n\right>\right|^2
 
-        Args:
-            dipole_integrals: Dipole integrals (x,y,z) in AO basis.
-
         Returns:
             Oscillator Strength.
         """
-        transition_dipoles = self.get_transition_dipole(dipole_integrals)
+        transition_dipoles = self.get_transition_dipole()
         osc_strs = np.zeros(len(transition_dipoles))
         for idx, (excitation_energy, transition_dipole) in enumerate(
             zip(self.excitation_energies, transition_dipoles)
@@ -225,9 +217,6 @@ class LinearResponseBaseClass:
 
     def get_formatted_oscillator_strength(self) -> str:
         """Create table of excitation energies and oscillator strengths.
-
-        Args:
-            dipole_integrals: Dipole integrals (x,y,z) in AO basis.
 
         Returns:
             Nicely formatted table.
