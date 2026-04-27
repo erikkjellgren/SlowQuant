@@ -918,42 +918,6 @@ class WaveFunctionCircuit:
             #
             # Here we need to implement parameter-shift for complex.
             #
-<<<<<<< HEAD
-            num_theta = len(parameters[num_kappa:]) // 2
-
-            # Norm theta (r) kommer først, derefter phi i parameters AWE
-
-            for i in range(len(parameters[num_kappa:])):
-                R_norm = self.QI.grad_param_R_norm[self.QI.param_names[i]]
-                R_phi  = self.QI.grad_param_R_phi[self.QI.param_names[i]]
-
-                if i < num_theta:
-                    e_vals_grad = _get_energy_evals_for_grad(H, self.QI, parameters, i, R_norm)
-                    grad = 0.0
-                    for j, mu in enumerate(list(range(1, 2 * R_norm + 1))):
-                        x_mu = (2 * mu - 1) / (2 * R_norm) * np.pi
-                        grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R_norm * (np.sin(1 / 2 * x_mu)) ** 2)
-                    gradient[num_kappa + i] = grad
-                    self.num_energy_evals += 2 * np.sum(
-                    list(self.QI.grad_param_R.values())
-                    )  # Count energy measurements for all gradients
-
-                else:
-                    e_vals_grad_pre = _get_energy_evals_for_grad(H, self.QI, parameters, i, R_phi)
-                    e_vals_grad_post = _get_energy_evals_for_grad(H, self.QI, parameters, i, R_phi)
-                                                                  
-                    grad = 0.0
-                    for j, mu in enumerate(list(range(1, 2 * R_phi + 1))):
-                        x_mu = (2 * mu - 1) / (2 * R_phi) * np.pi
-                        grad += e_vals_grad_pre[j] * (-1) ** (mu - 1) / (4 * R_phi * (np.sin(1 / 2 * x_mu)) ** 2)
-                        grad += e_vals_grad_post[j] * (-1) ** (mu - 1) / (4 * R_phi * (np.sin(1 / 2 * x_mu)) ** 2)
-
-                    gradient[num_kappa + i] = grad
-                    self.num_energy_evals += 2 * np.sum(
-                    list(self.QI.grad_param_R.values()) # to be corrected
-                    )  # Count energy measurements for all gradients
-
-=======
             # for i in range(len(parameters[num_kappa:])):
             #    R = self.QI.grad_param_R[self.QI.param_names[i]]
             #    e_vals_grad = _get_energy_evals_for_grad(H, self.QI, parameters, i, R)
@@ -967,7 +931,6 @@ class WaveFunctionCircuit:
             # )  # Count energy measurements for all gradients
 
     
->>>>>>> 9621414cd707321b5309699a86a1acdda9d497bc
         return gradient
 
 
