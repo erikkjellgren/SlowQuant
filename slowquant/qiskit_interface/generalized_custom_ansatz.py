@@ -205,13 +205,16 @@ def fUCC(
         idx += 1
     qc = HartreeFock(num_orbs, (0, 0), mapper)  # empty circuit with qubit number based on mapper
     grad_param_R = {}
+    grad_param_R_norm = {}
+    grad_param_R_phi = {}
     idx = 0
     # Layer loop
     for _ in range(n_layers):
         if do_S:
             for a, i in iterate_t1(occ, unocc):
                 qc = single_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
-                grad_param_R[f"p{idx:09d}"] = 2
+                grad_param_R_norm[f"p{idx:09d}"] = 2
+                grad_param_R_phi[f"p{idx:09d}"] = 2
                 # Insert extra grad_param_R for phi AWE
                 idx += 1
         if do_SAS:
@@ -230,7 +233,8 @@ def fUCC(
         if do_D:
             for a, i, b, j in iterate_t2(occ, unocc):
                 qc = double_excitation(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
-                grad_param_R[f"p{idx:09d}"] = 2
+                grad_param_R_norm[f"p{idx:09d}"] = 2
+                grad_param_R_phi[f"p{idx:09d}"] = 4
                 # Insert extra grad_param_R for phi AWE
                 idx += 1
         if do_pD:
@@ -246,7 +250,7 @@ def fUCC(
         if do_cD:
             # Add some code for complex doubles
             None
-    return qc, grad_param_R
+    return qc, grad_param_R_norm, grad_param_R_phi
 
 
 def SDSfUCC(

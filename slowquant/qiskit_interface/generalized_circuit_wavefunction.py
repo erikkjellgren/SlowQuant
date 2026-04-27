@@ -767,6 +767,7 @@ class WaveFunctionCircuit:
         res = optimizer.minimize(
             parameters, extra_options={"R": self.QI.grad_param_R, "param_names": self.QI.param_names}
         )
+        # AWE two R lists
         if orbital_optimization:
             if len(self.thetas) > 0:
                 thetas_r = []
@@ -787,7 +788,7 @@ class WaveFunctionCircuit:
                 thetas_r.append(res.x[i])
                 thetas_i.append(res.x[i + len(self.thetas)])
             self.set_thetas(thetas_r, thetas_i)
-        self._energy_elec = res.fun
+        #self._energy_elec = res.fun AWE og AE har udkommenteret
         self._energy_elec = res.fun
 
     def _calc_energy_optimization(
@@ -849,7 +850,7 @@ class WaveFunctionCircuit:
                 self.num_inactive_spin_orbs // 2,
                 self.num_active_spin_orbs // 2,
                 self.num_virtual_spin_orbs // 2,
-            )
+            )  # Skal det deles med 2? Ser fishy ud AWE
             # Hermitian so expecation value should be real
             E = self.QI.quantum_expectation_value_complex(H)
         # Hermitian so expecation value should be real
@@ -917,17 +918,40 @@ class WaveFunctionCircuit:
             #
             # Here we need to implement parameter-shift for complex.
             #
-            # for i in range(len(parameters[num_kappa:])):
-            #    R = self.QI.grad_param_R[self.QI.param_names[i]]
-            #    e_vals_grad = _get_energy_evals_for_grad(H, self.QI, parameters, i, R)
-            #    grad = 0.0
-            #    for j, mu in enumerate(list(range(1, 2 * R + 1))):
-            #        x_mu = (2 * mu - 1) / (2 * R) * np.pi
-            #        grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R * (np.sin(1 / 2 * x_mu)) ** 2)
-            #    gradient[num_kappa + i] = grad
-            # self.num_energy_evals += 2 * np.sum(
-            #    list(self.QI.grad_param_R.values())
-            # )  # Count energy measurements for all gradients
+            num_theta = len(parameters[num_kappa:]) // 2
+
+            # Norm theta (r) kommer først, derefter phi i parameters AWE
+
+            for i in range(len(parameters[num_kappa:])):
+                R_norm = self.QI.grad_param_R_norm[self.QI.param_names[i]]
+                R_phi  = self.QI.grad_param_R_phi[self.QI.param_names[i]]
+
+                if i < num_theta:
+                    e_vals_grad = _get_energy_evals_for_grad(H, self.QI, parameters, i, R_norm)
+                    grad = 0.0
+                    for j, mu in enumerate(list(range(1, 2 * R_norm + 1))):
+                        x_mu = (2 * mu - 1) / (2 * R_norm) * np.pi
+                        grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R_norm * (np.sin(1 / 2 * x_mu)) ** 2)
+                    gradient[num_kappa + i] = grad
+                    self.num_energy_evals += 2 * np.sum(
+                    list(self.QI.grad_param_R.values())
+                    )  # Count energy measurements for all gradients
+
+                else:
+                    e_vals_grad_pre = _get_energy_evals_for_grad(H, self.QI, parameters, i, R_phi)
+                    e_vals_grad_post = _get_energy_evals_for_grad(H, self.QI, parameters, i, R_phi)
+                                                                  
+                    grad = 0.0
+                    for j, mu in enumerate(list(range(1, 2 * R_phi + 1))):
+                        x_mu = (2 * mu - 1) / (2 * R_phi) * np.pi
+                        grad += e_vals_grad_pre[j] * (-1) ** (mu - 1) / (4 * R_phi * (np.sin(1 / 2 * x_mu)) ** 2)
+                        grad += e_vals_grad_post[j] * (-1) ** (mu - 1) / (4 * R_phi * (np.sin(1 / 2 * x_mu)) ** 2)
+
+                    gradient[num_kappa + i] = grad
+                    self.num_energy_evals += 2 * np.sum(
+                    list(self.QI.grad_param_R.values()) # to be corrected
+                    )  # Count energy measurements for all gradients
+
         return gradient
 
 
