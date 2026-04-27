@@ -31,7 +31,7 @@ def get_polarisability(geometry, basis, active_space, charge=0, unit='bohr'):
     LR = naive.LinearResponse(WF, excitations="SD")
     alpha = LR.get_polarisability()
 
-    print(f'Polarisabilities:\n \t xx: {alpha[0]:.4f} \t yy: {alpha[1]:.4f} \t zz: {alpha[2]:.4f}')
+    print(f'Polarisabilities:\n \t xx: {alpha[0,0]:.4f} \t yy: {alpha[1,1]:.4f} \t zz: {alpha[2,2]:.4f}')
 
     return alpha
 

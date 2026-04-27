@@ -1,5 +1,7 @@
 import numpy as np
 import scipy
+import pyscf
+from slowquant.SlowQuant import SlowQuant
 
 from slowquant.unitary_coupled_cluster.ci_spaces import CI_Info
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
@@ -12,6 +14,7 @@ from slowquant.unitary_coupled_cluster.operators import (
     G2_sa,
     hamiltonian_0i_0a,
     hamiltonian_1i_1a,
+    hamiltonian_2i_2a,
 )
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.unitary_coupled_cluster.ups_wavefunction import WaveFunctionUPS
@@ -105,6 +108,13 @@ class LinearResponseBaseClass:
             self.wf.g_mo,
             self.wf.num_inactive_orbs,
             self.wf.num_active_orbs,
+        )
+        self.H_2i_2a = hamiltonian_2i_2a(
+            self.wf.h_mo,
+            self.wf.g_mo,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+            self.wf.num_virtual_orbs,
         )
 
     def calc_excitation_energies(self) -> None:
@@ -240,10 +250,10 @@ class LinearResponseBaseClass:
         return output
 
     def get_polarisability(self, freq=0) -> np.ndarray:
-        """Calculate the frequency dependent polarisability.
+        """Calculate the frequency dependent polarisability tensor.
 
         Returns:
-            Polarisability.
+            Polarisability tensor.
         """
         if not hasattr(self, "hessian") or not hasattr(self, "metric"):
             self.calc_excitation_energies()
@@ -251,4 +261,35 @@ class LinearResponseBaseClass:
         prop_grad = self.get_property_gradient(self.wf.int_gen.electric_dipole)
         response = scipy.linalg.solve(self.hessian - freq * self.metric, prop_grad)
         
-        return np.einsum('ix,ix->x', prop_grad, response)
+        return np.einsum('ix,iy->xy', prop_grad, response)
+    
+    def get_paramagnetic_shielding(self) -> np.ndarray:
+        """Calculate the paramagnetic shielding tensor of each nuclei.
+
+        Returns:
+            Paramagnetic shielding tensor for each nuclei.
+        """
+        if not hasattr(self, "hessian"):
+            self.calc_excitation_energies()
+
+        atoms = self.wf.int_gen.atom_coordinates
+        para_shield = np.zeros((len(atoms), 3, 3))
+
+        for i in range(len(atoms)):
+            origin = atoms[i,:]
+            
+            # PSO
+            property_gradient = self.get_property_gradient(
+                self.wf.int_gen.orbital_paramagnetic(origin)
+                )
+            response_vector = scipy.linalg.solve(self.hessian, property_gradient)
+
+            # Anguar Momentum
+            property_gradient = self.get_property_gradient(
+                self.wf.int_gen.angular_momentum(origin)
+                )
+            
+            # Paramagnetic shielding tensor
+            para_shield[i,:,:] -= np.einsum('ix,iy->xy', response_vector, property_gradient)
+
+        return para_shield
