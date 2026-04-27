@@ -1,18 +1,10 @@
 import networkx as nx
 import numpy as np
-from qiskit.circuit import Parameter, QuantumCircuit
+from qiskit.circuit import QuantumCircuit
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler import CouplingMap, PassManager
-from qiskit_nature.second_q.circuit.library import HartreeFock
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
-
-from slowquant.qiskit_interface.operators_circuits import (
-    double_excitation,
-    sa_single_excitation,
-    single_excitation,
-)
-from slowquant.unitary_coupled_cluster.util import UpsStructure
 
 
 def to_CBS_measurement(op: str, transpiled: None | list[QuantumCircuit] = None) -> QuantumCircuit:
@@ -1115,30 +1107,3 @@ def pauliop_to_dict(op: SparsePauliOp) -> dict[str, float]:
         pauli_str = pauli.to_label()
         pauli_dict[pauli_str] = coeff.real
     return pauli_dict
-
-
-def upslayout2circuit(
-    upslayout: UpsStructure, num_orbs: int, mapper: FermionicMapper
-) -> tuple[QuantumCircuit, dict[str, int]]:
-    grad_param_R = {}
-    idx = 0
-    qc = HartreeFock(num_orbs, (0, 0), mapper)  # empty circuit with qubit number based on mapper
-    for exc_type, exc_indices in zip(upslayout.excitation_operator_type, upslayout.excitation_indices):
-        if exc_type == "single":
-            (i, a) = exc_indices
-            qc = single_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
-            grad_param_R[f"p{idx:09d}"] = 2
-            idx += 1
-        elif exc_type == "double":
-            (i, j, a, b) = exc_indices
-            qc = double_excitation(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
-            grad_param_R[f"p{idx:09d}"] = 2
-            idx += 1
-        elif exc_type == "sa_single":
-            (i, a) = exc_indices
-            qc = sa_single_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
-            grad_param_R[f"p{idx:09d}"] = 4
-            idx += 1
-        else:
-            raise ValueError(f"Got unknown excitation type: {exc_type}")
-    return qc, grad_param_R

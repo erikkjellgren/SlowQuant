@@ -6,8 +6,7 @@ from collections import defaultdict
 from typing import Any
 
 import numpy as np
-from qiskit import QuantumCircuit
-from qiskit.circuit import ClassicalRegister
+from qiskit.circuit import ClassicalRegister, QuantumCircuit
 from qiskit.primitives import (
     BaseEstimatorV1,
     BaseEstimatorV2,
@@ -22,6 +21,7 @@ from qiskit_nature.second_q.mappers import JordanWignerMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
+from slowquant.qiskit_interface.operators_circuits import upslayout2circuit
 from slowquant.qiskit_interface.util import (
     Clique,
     MitigationFlags,
@@ -35,7 +35,6 @@ from slowquant.qiskit_interface.util import (
     pauliop_to_dict,
     postselection,
     to_CBS_measurement,
-    upslayout2circuit,
 )
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.util import UpsStructure
@@ -133,17 +132,31 @@ class QuantumInterface:
         self._M_shots = None  # define a separate number of shots for M
 
     def construct_circuit(
-        self, occ_idx, unocc_idx, occ_spin_idx, unocc_spin_idx, num_orbs: int, num_elec: tuple[int, int]
+        self,
+        occ_idx: list[int],
+        unocc_idx: list[int],
+        occ_spin_idx: list[int],
+        unocc_spin_idx: list[int],
+        num_orbs: int,
+        num_elec: tuple[int, int],
     ) -> None:
         """Construct qiskit circuit.
 
         Args:
-            num_orbs: Number of orbitals in spatial basis.
+            occ_idx: Strongly occupied spatial orbital indices.
+            unocc_idx: Weakly occupied spatial orbital indices.
+            occ_spin_idx: Stongly occupied spin orbital indices.
+            unocc_spin_idx: Weakly occupied spin orbital indices.
+            num_orbs: Number of spatial orbitals.
             num_elec: Number of electrons (alpha, beta).
         """
         self.num_orbs = num_orbs
         self.num_spin_orbs = 2 * num_orbs
         self.num_elec = num_elec
+        self.occ_idx = occ_idx.copy()
+        self.unocc_idx = unocc_idx.copy()
+        self.occ_spin_idx = occ_spin_idx.copy()
+        self.unocc_spin_idx = unocc_spin_idx.copy()
         self.grad_param_R: dict[
             str, int
         ] = {}  # Contains information about the parameterization needed for gradient evaluations.
@@ -175,22 +188,25 @@ class QuantumInterface:
                 "QI was initialized with a custom QuantumCircuit object. This is assumed to be the Ansatz (without state preparation circuit)"
             )
             self.circuit = self.ansatz
-        elif (
-            self.ansatz.lower() == "tups"
-            and "do_pp" in self.ansatz_options.keys()
-            and self.ansatz_options["do_pp"]
-        ):
-            # HF in pp-tUPS ordering
-            if not isinstance(self.mapper, JordanWignerMapper):
-                raise ValueError(f"pp-tUPS only implemented for JW mapper, got: {type(self.mapper)}")
-            if np.sum(num_elec) != num_orbs:
-                raise ValueError(
-                    f"pp-tUPS only implemented for number of electrons and number of orbitals being the same, got: ({np.sum(num_elec)}, {num_orbs}), (elec, orbs)"
-                )
-            self.state_circuit = QuantumCircuit(2 * num_orbs)
-            for p in range(0, 2 * num_orbs):
-                if p % 2 == 0:
-                    self.state_circuit.x(p)
+        elif isinstance(self.ansatz, str):
+            if (
+                self.ansatz.lower() == "tups"
+                and "do_pp" in self.ansatz_options.keys()
+                and self.ansatz_options["do_pp"]
+            ):
+                # HF in pp-tUPS ordering
+                if not isinstance(self.mapper, JordanWignerMapper):
+                    raise ValueError(f"pp-tUPS only implemented for JW mapper, got: {type(self.mapper)}")
+                if np.sum(num_elec) != num_orbs:
+                    raise ValueError(
+                        f"pp-tUPS only implemented for number of electrons and number of orbitals being the same, got: ({np.sum(num_elec)}, {num_orbs}), (elec, orbs)"
+                    )
+                self.state_circuit = QuantumCircuit(2 * num_orbs)
+                for p in range(0, 2 * num_orbs):
+                    if p % 2 == 0:
+                        self.state_circuit.x(p)
+            else:
+                self.state_circuit = HartreeFock(num_orbs, num_elec, self.mapper)
         else:
             self.state_circuit = HartreeFock(num_orbs, num_elec, self.mapper)
         self.num_qubits = self.state_circuit.num_qubits
@@ -396,7 +412,14 @@ class QuantumInterface:
         # In case of switching to new PassManager in later workflow
         if pass_manager_options is not None and hasattr(self, "circuit") and not redo_ISA:
             print("Change in PassManager. Reconstructing circuit.")
-            self.construct_circuit(self.num_orbs, self.num_elec)
+            self.construct_circuit(
+                self.occ_idx,
+                self.unocc_idx,
+                self.occ_spin_idx,
+                self.unocc_spin_idx,
+                self.num_orbs,
+                self.num_elec,
+            )
 
     def redo_M_mitigation(self, shots: int | None = None) -> None:
         """Redo M_mitigation.

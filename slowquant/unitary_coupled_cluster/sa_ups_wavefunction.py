@@ -93,6 +93,9 @@ class WaveFunctionSAUPS:
         self._state_energies = None
         self.ansatz_options = ansatz_options
         self.num_energy_evals = 0
+        # Used when converting to circuit wavefunction.
+        self._include_active_kappa = include_active_kappa
+        self._states = states
         # Construct spin orbital spaces and indices
         active_space = []
         orbital_counter = 0

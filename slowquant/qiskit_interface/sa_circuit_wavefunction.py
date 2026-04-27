@@ -5,7 +5,7 @@ from functools import partial
 import numpy as np
 import pyscf
 import scipy
-from qiskit import QuantumCircuit
+from qiskit.circuit import QuantumCircuit
 from qiskit.primitives import BaseEstimatorV1, BaseEstimatorV2, BaseSamplerV1, BaseSamplerV2
 
 from slowquant.molecularintegrals.integralfunctions import (

@@ -638,7 +638,14 @@ def test_custom() -> None:
     QI = QuantumInterface(sampler, qc, mapper, shots=None)
 
     # Construct circuit
-    QI.construct_circuit(2, (1, 1))
+    QI.construct_circuit(
+        qWF.active_occ_idx_shifted,
+        qWF.active_unocc_idx_shifted,
+        qWF.active_occ_spin_idx_shifted,
+        qWF.active_unocc_spin_idx_shifted,
+        qWF.num_active_orbs,
+        (qWF.num_active_elec_alpha, qWF.num_active_elec_beta),
+    )
 
     # Define parameters
     QI.parameters = qc_param
