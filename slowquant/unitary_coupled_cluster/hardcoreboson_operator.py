@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import copy
+import itertools
 import re
-
 from collections import defaultdict
 from collections.abc import Generator
-import itertools
 
 
 def operator_to_qiskit_key(operator_string: tuple[tuple[int, ...], tuple[int, ...]]) -> str:
@@ -33,6 +32,19 @@ def do_product_extended_normal_ordering(
     nondagger1_set: set[int],
     nondagger2_set: set[int],
 ) -> Generator[tuple[tuple[tuple[int, ...], tuple[int, ...]], int], None, None]:
+    r"""Reorder fermionic operator string.
+
+    The string will be ordered such that all creation operators are first,
+    and annihilation operators are second.
+    Within a block of creation or annihilation operators the largest spin index
+    will be first and the ordering will be descending.
+
+    $$\hat{b}_p \hat{b}_p^\dagger = 1 - \hat{b}_p^\dagger \hat{b}_p$$
+    $$\hat{b}_q \hat{b}_p^\dagger = \hat{b}_p^\dagger \hat{b}_q, p\neq q$$
+
+    Returns:
+        Reordered operator dict and factor dict.
+    """
     if nondagger1_set.isdisjoint(dagger2_set):
         # No index overlap between non-dagger left-side and dagger right-side.
         is_zero = False
@@ -43,33 +55,25 @@ def do_product_extended_normal_ordering(
             # Same index annihilation operator.
             is_zero = True
         if not is_zero:
-            phase = 1
-            if len(fermistring1[1]) % 2 != 0 and len(fermistring2[0]) % 2 != 0:
-                # Only phase change if both are an odd lenght.
-                phase *= -1
             # sort the dagger part
             dagger_list = [*fermistring1[0], *fermistring2[0]]
             dagger_list.sort()
             # sort non-dagger part
             nondagger_list = [*fermistring1[1], *fermistring2[1]]
             nondagger_list.sort()
-            yield (tuple(dagger_list), tuple(nondagger_list)), phase
+            yield (tuple(dagger_list), tuple(nondagger_list)), 1
     else:
         overlap_idxs = nondagger1_set.intersection(dagger2_set)
         for k in range(0, len(overlap_idxs) + 1):
             for contract_idxs in itertools.combinations(overlap_idxs, k):
                 nondagger_tmp = list(fermistring1[1])
                 dagger_tmp = list(fermistring2[0])
-                phase = 1
+                phase = (-1) ** (len(overlap_idxs) - len(contract_idxs))
                 for contract_idx in contract_idxs:
                     nondagger_loc = nondagger_tmp.index(contract_idx)
                     dagger_loc = dagger_tmp.index(contract_idx)
-                    # phase *= (-1)**(len(nondagger_tmp) - 1 - nondagger_loc) * (-1)**(dagger_loc)
-                    phase *= 1 if (len(nondagger_tmp) - 1 - nondagger_loc + dagger_loc) % 2 == 0 else -1
                     nondagger_tmp.pop(nondagger_loc)
                     dagger_tmp.pop(dagger_loc)
-                if len(nondagger_tmp) % 2 == 1 and len(dagger_tmp) % 2 == 1:
-                    phase *= -1
                 dagger_tmp_set = set(dagger_tmp)
                 nondagger_tmp_set = set(nondagger_tmp)
                 if not dagger1_set.isdisjoint(dagger_tmp_set):
@@ -80,24 +84,10 @@ def do_product_extended_normal_ordering(
                     continue
                 # sort the dagger part
                 dagger_list = [*fermistring1[0], *dagger_tmp]
-                # Doing insertion sort, left-side part is already sorted.
-                # Hence not starting from 1.
-                for i in range(len(fermistring1[0]), len(dagger_list)):
-                    j = i
-                    while j > 0 and dagger_list[j] > dagger_list[j - 1]:
-                        dagger_list[j], dagger_list[j - 1] = dagger_list[j - 1], dagger_list[j]
-                        phase *= -1
-                        j -= 1
+                dagger_list.sort()
                 # sort non-dagger part
                 nondagger_list = [*nondagger_tmp, *fermistring2[1]]
-                # Doing insertion sort, left-side part is already sorted.
-                # Hence not starting from 1.
-                for i in range(len(nondagger_tmp), len(nondagger_list)):
-                    j = i
-                    while j > 0 and nondagger_list[j] > nondagger_list[j - 1]:
-                        nondagger_list[j], nondagger_list[j - 1] = nondagger_list[j - 1], nondagger_list[j]
-                        phase *= -1
-                        j -= 1
+                nondagger_list.sort()
                 yield (tuple(dagger_list), tuple(nondagger_list)), phase
 
 
@@ -311,26 +301,14 @@ class HardcorebosonOperator:
 
     @property
     def dagger(self) -> HardcorebosonOperator:
-        r"""Complex conjugation of fermionic operator.
-
-        After dagger'ing, the operator blocks need to be reversed.
-        This give a number phase change that follows a shifted triangular number sequence,
-
-        .. math::
-            \Gamma = (-1)^{(k(k-1)/2 + l(l-1)/2}
-
-        with :math:`k` being the number of creation and l the number of annihilation operators.
+        """Complex conjugation of hard-core boson operator.
 
         Returns:
-            New fermionic operator.
+            New hard-core boson operator.
         """
         operators = {}
         for op_key, fac in self.operators.items():
-            k = len(op_key[1])
-            l = len(op_key[0])
-            phase_changes = (k * k - k + l * l - l) // 2
-            sign = 1.0 - 2.0 * (phase_changes & 1)
-            operators[(op_key[1][::-1], op_key[0][::-1])] = fac * sign
+            operators[(op_key[1][::-1], op_key[0][::-1])] = fac
         return HardcorebosonOperator(operators)
 
     @property
@@ -415,10 +393,10 @@ class HardcorebosonOperator:
         active_idx = []
         virtual_idx = []
         # Get indices of spaces
-        for i in range(2 * num_inactive_orbs + 2 * num_active_orbs + 2 * num_virtual_orbs):
-            if i < 2 * num_inactive_orbs:
+        for i in range(num_inactive_orbs + num_active_orbs + num_virtual_orbs):
+            if i < num_inactive_orbs:
                 inactive_idx.append(i)
-            elif i < 2 * num_inactive_orbs + 2 * num_active_orbs:
+            elif i < num_inactive_orbs + num_active_orbs:
                 active_idx.append(i)
             else:
                 virtual_idx.append(i)
@@ -431,14 +409,13 @@ class HardcorebosonOperator:
             inactive_dagger = []
             active = []
             active_dagger = []
-            phase = 1
             # Loop over individual annihilation operator and sort into spaces
             # Loop over daggers
             for anni in op_key[0]:
                 if anni in inactive_idx:
                     inactive_dagger.append(anni)
                 elif anni in active_idx:
-                    active_dagger.append(anni - 2 * num_inactive_orbs)
+                    active_dagger.append(anni - num_inactive_orbs)
                 elif anni in virtual_idx:
                     virtual_dagger.append(anni)
             # Loop over non-daggers
@@ -446,7 +423,7 @@ class HardcorebosonOperator:
                 if anni in inactive_idx:
                     inactive.append(anni)
                 elif anni in active_idx:
-                    active.append(anni - 2 * num_inactive_orbs)
+                    active.append(anni - num_inactive_orbs)
                 elif anni in virtual_idx:
                     virtual.append(anni)
             # Any virtual indices will make the operator evaluate to zero.
@@ -458,19 +435,10 @@ class HardcorebosonOperator:
             # The inactive bra and ket side must end up giving identical state vectors.
             if bra_side != ket_side:
                 continue
-            if len(inactive_dagger) % 2 == 1 and len(active_dagger) % 2 == 1:
-                phase *= -1
-            # Calculate sign coming from flipping the order of the ket side.
-            # It has to be "flipped" to match the order on the bra side.
-            ket_flip_fac = 1
-            for i in range(1, len(ket_side) + 1):
-                if i % 2 == 0:
-                    ket_flip_fac *= -1
-            phase *= ket_flip_fac
             if active_op in operators.keys():
-                operators[active_op] += fac * phase
+                operators[active_op] += fac
             else:
-                operators[active_op] = fac * phase
+                operators[active_op] = fac
         return HardcorebosonOperator(operators)
 
     def get_info(self) -> tuple[list[list[int]], list[list[int]], list[float]]:
@@ -489,4 +457,3 @@ class HardcorebosonOperator:
             creation.append(c)
             annihilation.append(a)
         return annihilation, creation, coefficients
-

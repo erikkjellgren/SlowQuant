@@ -6,6 +6,8 @@ import re
 from collections import defaultdict
 from collections.abc import Generator
 
+from slowquant.unitary_coupled_cluster.hardcoreboson_operator import HardcorebosonOperator
+
 
 def operator_to_qiskit_key(
     operator_string: tuple[tuple[int, ...], tuple[int, ...]], remapping: dict[int, int]
@@ -700,3 +702,65 @@ class FermionicOperator:
             creation.append(c)
             annihilation.append(a)
         return annihilation, creation, coefficients
+
+    def get_hardcoreboson_form(self) -> HardcorebosonOperator:
+        """Get hard-core boson form of fermionic operator.
+
+        Returns:
+            Hard-core boson operator.
+        """
+        hcb_op = HardcorebosonOperator({})
+        for fermi_string, coeff in self.operators.items():
+            hcb_tmp = HardcorebosonOperator({((), ()): 1})
+            is_zero = False
+            daggers = list(fermi_string[0])
+            nondaggers = list(fermi_string[1])
+            phase = 1
+            # Resolve number operators.
+            for idx in daggers.copy():
+                if idx in nondaggers:
+                    nondagger_loc = nondaggers.index(idx)
+                    dagger_loc = daggers.index(idx)
+                    phase *= (-1) ** (len(daggers) - 1 - dagger_loc) * (-1) ** nondagger_loc
+                    hcb_tmp *= HardcorebosonOperator({((idx // 2,), (idx // 2,)): 1})
+                    nondaggers.pop(nondagger_loc)
+                    daggers.pop(dagger_loc)
+            # Resolve non-number operators.
+            if len(nondaggers) % 2 == 1 or len(daggers) % 2 == 1:
+                # Cannot pair up odd lenght strings.
+                continue
+            for i, idx in enumerate(daggers):
+                if idx % 2 == 1:
+                    # beta must be paired with a alpha to contribute.
+                    if daggers[i + 1] == idx - 1:
+                        hcb_tmp *= HardcorebosonOperator({((idx // 2,), ()): 1})
+                        # b^dagger is alpha,beta (b is beta,alpha)
+                        phase *= -1
+                    else:
+                        is_zero = True
+                        break
+                elif idx % 2 == 0:
+                    # alpha must be paired with a beta.
+                    if daggers[i - 1] != idx + 1:
+                        is_zero = True
+                        break
+            if is_zero:
+                continue
+            for i, idx in enumerate(nondaggers):
+                if idx % 2 == 1:
+                    # beta must be paired with a alpha to contribute.
+                    # Only counting the operator contribution for the beta case.
+                    if nondaggers[i + 1] == idx - 1:
+                        hcb_tmp *= HardcorebosonOperator({((), (idx // 2,)): 1})
+                    else:
+                        is_zero = True
+                        break
+                elif idx % 2 == 0:
+                    # alpha must be paired with a beta.
+                    if nondaggers[i - 1] != idx + 1:
+                        is_zero = True
+                        break
+            if is_zero:
+                continue
+            hcb_op += coeff * phase * hcb_tmp
+        return hcb_op

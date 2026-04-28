@@ -46,7 +46,9 @@ def a_op_spin(spin_idx: int, dagger: bool) -> FermionicOperator:
 
 
 def b_op(idx: int, dagger: bool) -> HardcorebosonOperator:
-    return HardcorebosonOperator({((idx, dagger),): 1})
+    if dagger:
+        return HardcorebosonOperator({((idx,), ()): 1})
+    return HardcorebosonOperator({((), (idx,)): 1})
 
 
 def Epq(p: int, q: int) -> FermionicOperator:
