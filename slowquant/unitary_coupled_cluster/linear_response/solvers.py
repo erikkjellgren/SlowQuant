@@ -104,6 +104,11 @@ class Davidson(Solvers):
             self._iteration += 1
 
             right_transformed_vectors = right_transform(trial)
+            if self._iteration > 1 and self._trial.shape[1] + trial.shape[1] > max_reduced_space:
+                if not is_silent:
+                    print(f"Davidson iter {self._iteration+1:4d}: subspace dimension {self._trial.shape[1]+trial.shape[1]} exceeds max_red_space {max_reduced_space}, restarting with current Ritz vectors")
+                self._reset_reduced_space(trial, right_transformed_vectors)
+            else:
             self._add_iteration_data(trial, right_transformed_vectors)
             omega, X, R = self._compute_residual_vectors(n_roots)
             converged, res_norms = self._check_convergence(R, tolerance)
@@ -121,11 +126,6 @@ class Davidson(Solvers):
             # In case of no trial vector add a random one
             if trial.size == 0:
                 trial = self._random_trial_vector()
-
-            if self._trial.shape[1] + trial.shape[1] > max_reduced_space:
-                if not is_silent:
-                    print(f"Davidson iter {self._iteration+1:4d}: subspace dimension {self._trial.shape[1]+trial.shape[1]} exceeds max_red_space {max_reduced_space}, restarting with current Ritz vectors")
-                self._reset_reduced_space(trial, right_transform)
 
             if not is_silent:
                 self._print_iteration_info(res_norms, omega, tolerance)
@@ -232,7 +232,7 @@ class Davidson(Solvers):
         """Update trial vectors using the residuals and the diagonal preconditioner."""
 
     @abstractmethod
-    def _reset_reduced_space(self, trial: np.ndarray, right_transform: Callable[[np.ndarray], Any]) -> None:
+    def _reset_reduced_space(self, trial: np.ndarray, right_transformed_vectors: tuple[np.ndarray, ...]) -> None:
         """Reset the reduced space by keeping only the current Ritz vectors."""
 
 class PairedDavidson(Davidson):
@@ -282,29 +282,6 @@ class PairedDavidson(Davidson):
             plus, minus = vector[:n, :], vector[n:, :]
             return plus, minus
 
-        def _real_eigvals(
-                w: np.typing.NDArray[np.complexfloating],
-                v: np.typing.NDArray[np.complexfloating],
-            ) -> tuple[np.ndarray, np.ndarray]:
-            """Find the real eigenvalues or eigenvalues with small imaginary component."""
-            imag_threshold = 1e-3
-            abs_imag = abs(w.imag)
-
-            # Determine the smallest imaginary components
-            max_imag_tol = max(imag_threshold, np.sort(abs_imag)[min(w.size, n_roots) - 1])
-            real_idx = np.where((abs_imag <= max_imag_tol))[0]
-
-            idx = real_idx[w[real_idx].real.argsort()]
-            w = w[idx]
-            v = v[:, idx]
-
-            degen_idx = np.where(w.imag != 0)[0]
-            if degen_idx.size > 0:
-                # Take the imaginary part of the "degenerated" eigenvectors as an
-                # independent eigenvector then discard the imaginary part of v
-                v[:, degen_idx[1::2]] = v[:, degen_idx[1::2]].imag
-            return w.real, v.real
-
         E_plus = 2 * self._trial.conj().T @ self._sigma_plus
         E_minus = 2 * self._trial.conj().T @ self._sigma_minus
         # S_plus = S_minus.T
@@ -321,7 +298,7 @@ class PairedDavidson(Davidson):
 
         # Solve the generalized eigenvalue problem E v = omega S v
         eigval, eigvec = scipy.linalg.eig(E, S)
-        eigval, eigvec = _real_eigvals(eigval, eigvec)
+        eigval, eigvec = _real_eigvals(eigval, eigvec, n_roots)
 
         # Take positive eigenvalues and sort them
         sorting = eigval > 0
@@ -363,9 +340,9 @@ class PairedDavidson(Davidson):
         diagonal_A, diagonal_Sigma = preconditioner
         R_plus, R_minus = R
 
-        minus_contribution = diagonal_A.reshape(-1, 1) - diagonal_Sigma.reshape(-1, 1) @ omega.reshape(1, -1)
-        plus_contribution = diagonal_A.reshape(-1, 1) + diagonal_Sigma.reshape(-1, 1) @ omega.reshape(1, -1)
-        denominator = -1
+        minus_contribution = diagonal_A.reshape(-1, 1) - diagonal_Sigma.reshape(-1, 1) * omega.reshape(1, -1)
+        plus_contribution = diagonal_A.reshape(-1, 1) + diagonal_Sigma.reshape(-1, 1) * omega.reshape(1, -1)
+        denominator = - np.ones_like(R_plus)
         # Check if any of the contributions are close to zero to avoid division by zero, if so skip the division for that contribution
         if not np.any(np.isclose(minus_contribution, 0)):
             denominator /= minus_contribution
@@ -377,10 +354,10 @@ class PairedDavidson(Davidson):
         )
         return new_trial
 
-    def _reset_reduced_space(self, trial: np.ndarray, right_transform: Callable[[np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray]]) -> None:
+    def _reset_reduced_space(self, trial: np.ndarray, right_transformed_vectors: tuple[np.ndarray, ...]) -> None:
         """Reset the reduced space by keeping only the current Ritz vectors."""
         self._trial = self._orthonormalize(trial)
-        self._sigma_plus, self._sigma_minus, self._tau_minus = right_transform(self._trial)
+        self._sigma_plus, self._sigma_minus, self._tau_minus = right_transformed_vectors
 
 def one_index_transform(K: np.ndarray, h_mo: np.ndarray, g_mo: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     r"""One index transformation of the Hamiltonian.
@@ -583,3 +560,27 @@ def get_orbital_metric_diagonal(
         diagonal[idx1] -= RDM1(q, q, num_inactive_orbs, num_active_orbs, rdm1)
     diagonal *= 0.5
     return diagonal
+
+def _real_eigvals(
+        w: np.typing.NDArray[np.complexfloating],
+        v: np.typing.NDArray[np.complexfloating],
+        n_roots: int,
+    ) -> tuple[np.ndarray, np.ndarray]:
+    """Find the real eigenvalues or eigenvalues with small imaginary component."""
+    imag_threshold = 1e-3
+    abs_imag = abs(w.imag)
+
+    # Determine the smallest imaginary components
+    max_imag_tol = max(imag_threshold, np.sort(abs_imag)[min(w.size, n_roots) - 1])
+    real_idx = np.where((abs_imag <= max_imag_tol))[0]
+
+    idx = real_idx[w[real_idx].real.argsort()]
+    w = w[idx]
+    v = v[:, idx]
+
+    degen_idx = np.where(w.imag != 0)[0]
+    if degen_idx.size > 0:
+        # Take the imaginary part of the "degenerated" eigenvectors as an
+        # independent eigenvector then discard the imaginary part of v
+        v[:, degen_idx[1::2]] = v[:, degen_idx[1::2]].imag
+    return w.real, v.real
