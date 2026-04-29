@@ -5,8 +5,8 @@ import pyscf
 import slowquant.unitary_coupled_cluster.linear_response.naive as naive  # pylint: disable=consider-using-from-import
 from slowquant.unitary_coupled_cluster.ucc_wavefunction import WaveFunctionUCC
 from slowquant.molecularintegrals.integralfunctions import one_electron_integral_transform
-from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
 from slowquant.unitary_coupled_cluster.operators import one_elec_op_0i_0a
+from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation_value
 
 
 def get_shield(geometry, basis, active_space, charge=0, unit='bohr'):
@@ -33,12 +33,6 @@ def get_shield(geometry, basis, active_space, charge=0, unit='bohr'):
         WF.run_wf_optimization_1step('SLSQP', True)
     print("Energy elec", WF.energy_elec)
 
-
-    # full space 1-RDM
-    RDM1 = np.zeros((WF.num_inactive_orbs + WF.num_active_orbs + WF.num_virtual_orbs, WF.num_inactive_orbs + WF.num_active_orbs + WF.num_virtual_orbs))
-    RDM1[:WF.num_inactive_orbs,:WF.num_inactive_orbs] += np.eye(WF.num_inactive_orbs) * 2
-    RDM1[WF.num_inactive_orbs:WF.num_inactive_orbs + WF.num_active_orbs,WF.num_inactive_orbs:WF.num_inactive_orbs + WF.num_active_orbs] += WF.rdm1
-
     # Diamagnetic term
     atoms = WF.int_gen.atom_coordinates
     dia = np.zeros((len(atoms), 3, 3))
@@ -55,7 +49,6 @@ def get_shield(geometry, basis, active_space, charge=0, unit='bohr'):
         
         dia_i = np.array(dia_i).reshape((3,3))
         dia[i,:,:] = dia_i - dia_i.trace() * np.eye(3)
-    
 
     # Paramagnetic term
     LR = naive.LinearResponse(WF, excitations="SD")
