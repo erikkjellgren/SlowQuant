@@ -918,17 +918,18 @@ class WaveFunctionCircuit:
             #
             # Here we need to implement parameter-shift for complex.
             #
-            # for i in range(len(parameters[num_kappa:])):
-            #    R = self.QI.grad_param_R[self.QI.param_names[i]]
-            #    e_vals_grad = _get_energy_evals_for_grad(H, self.QI, parameters, i, R)
-            #    grad = 0.0
-            #    for j, mu in enumerate(list(range(1, 2 * R + 1))):
-            #        x_mu = (2 * mu - 1) / (2 * R) * np.pi
-            #        grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R * (np.sin(1 / 2 * x_mu)) ** 2)
-            #    gradient[num_kappa + i] = grad
-            # self.num_energy_evals += 2 * np.sum(
-            #    list(self.QI.grad_param_R.values())
-            # )  # Count energy measurements for all gradients
+            
+            for i in range(len(parameters[num_kappa:])):
+               R = self.QI.grad_param_R[self.QI.param_names[i]]
+               e_vals_grad = _get_energy_evals_for_grad(H, self.QI, parameters, i, R)
+               grad = 0.0
+               for j, mu in enumerate(list(range(1, 2 * R + 1))):
+                   x_mu = (2 * mu - 1) / (2 * R) * np.pi
+                   grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R * (np.sin(1 / 2 * x_mu)) ** 2)
+               gradient[num_kappa + i] = grad
+            self.num_energy_evals += 2 * np.sum(
+               list(self.QI.grad_param_R.values())
+            )  # Count energy measurements for all gradients
 
     
         return gradient
