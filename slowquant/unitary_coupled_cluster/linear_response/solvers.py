@@ -350,7 +350,6 @@ class PairedDavidson(Davidson):
             denominator /= plus_contribution
         new_trial = denominator * (
             diagonal_A.reshape(-1, 1) * R_plus + diagonal_Sigma.reshape(-1, 1) * R_minus * omega.reshape(1, -1)
-            + diagonal_A.reshape(-1, 1) * R_minus + diagonal_Sigma.reshape(-1, 1) * R_plus * omega.reshape(1, -1)
         )
         return new_trial
 

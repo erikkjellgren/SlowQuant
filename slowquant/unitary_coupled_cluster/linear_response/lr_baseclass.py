@@ -131,7 +131,7 @@ class LinearResponseBaseClass:
             solver_settings: Settings for the Davidson solver:
                 max_iteration: Maximum number of iterations. Default is 100.
                 tolerance: Convergence tolerance. Default is 1e-8.
-                max_reduced_space: Maximum size of the reduced space. Default is 8*num_roots.
+                max_reduced_space: Maximum size of the reduced space. Default is 8*n_roots.
                 is_silent: Whether to print convergence information. Default is False.
         """
         if n_roots <= 0:
@@ -150,10 +150,14 @@ class LinearResponseBaseClass:
                     max_iteration=solver_settings.get("max_iteration", 100),
                     tolerance=solver_settings.get("tolerance", 1e-8),
                     n_roots=n_roots,
-                    max_reduced_space=solver_settings.get("max_reduced_space", None),
+                    max_reduced_space=solver_settings.get("max_reduced_space", 8*n_roots),
                     is_silent=solver_settings.get("is_silent", False),
                 )
             )
+            self.Z_q_normed = self.normed_response_vectors[: len(self.q_ops), :]
+            self.Z_G_normed = self.normed_response_vectors[len(self.q_ops) : len(self.q_ops) + len(self.G_ops), :]
+            self.Y_q_normed = self.normed_response_vectors[len(self.q_ops) + len(self.G_ops) : 2 * len(self.q_ops) + len(self.G_ops), :]
+            self.Y_G_normed = self.normed_response_vectors[2 * len(self.q_ops) + len(self.G_ops) :, :]
 
     def _all_excitation_energies(self):
         self._construct_hessian_metric_blocks()

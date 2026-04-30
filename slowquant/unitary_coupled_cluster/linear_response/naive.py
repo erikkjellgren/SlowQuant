@@ -601,6 +601,7 @@ class LinearResponse(LinearResponseBaseClass):
             Transition dipole moment.
         """
         number_excitations = len(self.excitation_energies)
+        num_ops = len(self.q_ops) + len(self.G_ops)
         dipole_integrals = self.wf.int_gen.electric_dipole
         mux = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[0])
         muy = one_electron_integral_transform(self.wf.c_mo, dipole_integrals[1])
@@ -648,7 +649,7 @@ class LinearResponse(LinearResponseBaseClass):
                     self.wf.rdm1,
                     self.normed_response_vectors,
                     state_number,
-                    number_excitations,
+                    num_ops,
                 )
                 q_part_y = get_orbital_response_property_gradient(
                     muy,
@@ -658,7 +659,7 @@ class LinearResponse(LinearResponseBaseClass):
                     self.wf.rdm1,
                     self.normed_response_vectors,
                     state_number,
-                    number_excitations,
+                    num_ops,
                 )
                 q_part_z = get_orbital_response_property_gradient(
                     muz,
@@ -668,7 +669,7 @@ class LinearResponse(LinearResponseBaseClass):
                     self.wf.rdm1,
                     self.normed_response_vectors,
                     state_number,
-                    number_excitations,
+                    num_ops,
                 )
             transfer_ket = propagate_state([transfer_op], self.wf.ci_coeffs, *self.index_info)
             transferd_ket = propagate_state([transfer_op.dagger], self.wf.ci_coeffs, *self.index_info)
