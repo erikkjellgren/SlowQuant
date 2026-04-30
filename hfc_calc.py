@@ -147,16 +147,24 @@ def get_hcf_fc_unrestricted(geometry, basis, active_space, unit='bohr', charge=0
     r""" a_{iso}^K = \frac{f_k}{2\pi M} \bigg\{\bigg [[A^K_{\alpha}]_I - [A^K_{\beta}]_I\bigg] + \bigg[[A^K_{\alpha}]_A \Gamma^{[1]}_{\alpha} - [A^K_{\beta}]_A \Gamma^{[1]}_{\beta}\bigg] \bigg\}"""
     for atom in mol._atom:
         print(atom[0])
+        print("active", WF.num_active_orbs)
+        print("inactive", WF.num_inactive_orbs)
         amp_basis = mol.eval_gto("GTOval_sph", coords=[atom[1]])[0]
         mo_basis_a = amp_basis@WF.c_a_mo
         mo_basis_b = amp_basis@WF.c_b_mo
         h1mo_a = np.outer(np.conj(mo_basis_a), mo_basis_a)[:WF.num_inactive_orbs + WF.num_active_orbs, :WF.num_inactive_orbs + WF.num_active_orbs]
         h1mo_b = np.outer(np.conj(mo_basis_b), mo_basis_b)[:WF.num_inactive_orbs + WF.num_active_orbs, :WF.num_inactive_orbs + WF.num_active_orbs] 
+        
         rdma = np.eye(WF.num_inactive_orbs + WF.num_active_orbs)
         rdmb = np.eye(WF.num_inactive_orbs + WF.num_active_orbs)
+        
         rdma[WF.num_inactive_orbs: , WF.num_inactive_orbs:] = WF.rdm1aa
+        print(len(rdma[WF.num_inactive_orbs: , WF.num_inactive_orbs:]))
         rdmb[WF.num_inactive_orbs: , WF.num_inactive_orbs:] = WF.rdm1bb
+        print("len rdma", len(rdma))
+        print("h_mo", len(h1mo_a))
         hfc = np.trace(h1mo_a@rdma  - h1mo_b@rdmb)
+        
         m = spin * (1/2)
         f_k = calculate_constant()
         g_k = nuclear_g_factor(atom=atom[0])

@@ -689,6 +689,41 @@ def one_elec_op_0i_0a(
             one_elec_op += intsbb_mo[p, q] * a_op(p, "beta", True) * a_op(q, "beta", False)
     return one_elec_op
 
+def one_elec_op_0i_0a_HFC(
+    intsaa_mo: np.ndarray, intsbb_mo: np.ndarray, num_inactive_orbs: int, num_active_orbs: int
+) -> FermionicOperator:
+    """Create one-electron operator that makes no changes in the inactive and virtual orbitals.
+
+    Args:
+        ints_mo: One-electron integrals for operator in MO basis.
+        num_inactive_orbs: Number of inactive orbitals in spatial basis.
+        num_active_orbs: Number of active orbitals in spatial basis.
+
+    Returns:
+        One-electron operator for active-space.
+    """
+    one_elec_op = FermionicOperator({})
+    # Inactive one-electron
+    for i in range(num_inactive_orbs):
+        if abs(intsaa_mo[i, i]) > 10**-14 or abs(intsbb_mo[i, i]) > 10**-14:
+            one_elec_op += intsaa_mo[i, i] * a_op(i, "alpha", True) * a_op(i, "alpha", False)
+            one_elec_op -= intsbb_mo[i, i] * a_op(i, "beta", True) * a_op(i, "beta", False)
+    # Active one-electron
+    for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+        for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+            if abs(intsaa_mo[p, q]) < 10**-14 and abs(intsbb_mo[p, q]) < 10**-14:
+                continue
+            # one_elec_op += intsaa_mo[p, q] * a_op(p, "alpha", True) * a_op(q, "alpha", False)
+            # one_elec_op -= intsbb_mo[p, q] * a_op(p, "beta", True) * a_op(q, "beta", False)
+            one_elec_op += intsaa_mo[p, q] * a_op(q, "alpha", True) * a_op(p, "alpha", False)
+            one_elec_op -= intsbb_mo[p, q] * a_op(q, "beta", True) * a_op(p, "beta", False)
+    # for p in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+    #     # for q in range(num_inactive_orbs, num_inactive_orbs + num_active_orbs):
+    #     if abs(intsaa_mo[p, p]) < 10**-14 and abs(intsbb_mo[p, p]) < 10**-14:
+    #         continue
+    #     one_elec_op += intsaa_mo[p, p] * a_op(p, "alpha", True) * a_op(p, "alpha", False)
+    #     one_elec_op -= intsbb_mo[p, p] * a_op(p, "beta", True) * a_op(p, "beta", False)
+    return one_elec_op
 
 def unrestricted_one_elec_op_1i_1a(
     intsaa_mo: np.ndarray,
