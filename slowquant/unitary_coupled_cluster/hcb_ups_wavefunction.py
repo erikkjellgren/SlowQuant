@@ -36,7 +36,6 @@ class WaveFunctionHCBUPS:
         integral_generator: SlowQuant | pyscf.gto.mole.Mole,
         ansatz: str,
         ansatz_options: dict[str, Any] | None = None,
-        include_active_kappa: bool = False,
     ) -> None:
         """Initialize for UPS wave function.
 
@@ -47,7 +46,6 @@ class WaveFunctionHCBUPS:
             integral_generator: Integral generator object.
             ansatz: Name of ansatz.
             ansatz_options: Ansatz options.
-            include_active_kappa: Include active-active orbital rotations.
         """
         if ansatz_options is None:
             ansatz_options = {}
@@ -114,8 +112,6 @@ class WaveFunctionHCBUPS:
         # Find non-redundant kappas
         self._kappa = []
         kappa_idx = []
-        kappa_no_activeactive_idx = []
-        kappa_no_activeactive_idx_dagger = []
         kappa_redundant_idx = []
         self._kappa_old = []
         # kappa can be optimized in spatial basis
@@ -129,13 +125,6 @@ class WaveFunctionHCBUPS:
                 if p in self.virtual_idx and q in self.virtual_idx:
                     kappa_redundant_idx.append((p, q))
                     continue
-                if not include_active_kappa:
-                    if p in self.active_idx and q in self.active_idx:
-                        kappa_redundant_idx.append((p, q))
-                        continue
-                if not (p in self.active_idx and q in self.active_idx):
-                    kappa_no_activeactive_idx.append((p, q))
-                    kappa_no_activeactive_idx_dagger.append((q, p))
                 # the rest is non-redundant
                 self._kappa.append(0.0)
                 self._kappa_old.append(0.0)
@@ -151,8 +140,6 @@ class WaveFunctionHCBUPS:
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     kappa_hf_like_idx.append((p, q))
         self.kappa_idx = np.array(kappa_idx, dtype=int)
-        self.kappa_no_activeactive_idx = np.array(kappa_no_activeactive_idx, dtype=int)
-        self.kappa_no_activeactive_idx_dagger = np.array(kappa_no_activeactive_idx_dagger, dtype=int)
         self.kappa_redundant_idx = np.array(kappa_redundant_idx, dtype=int)
         self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
         # Construct determinant basis

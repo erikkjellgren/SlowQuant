@@ -33,7 +33,6 @@ class WaveFunctionHCBCircuit:
         mo_coeffs: np.ndarray,
         integral_generator: SlowQuant | pyscf.gto.mole.Mole,
         quantum_interface: HCBQuantumInterface,
-        include_active_kappa: bool = False,
     ) -> None:
         """Initialize circuit based UPS wave function.
 
@@ -43,7 +42,6 @@ class WaveFunctionHCBCircuit:
             mo_coeffs: Initial orbital coefficients.
             integral_generator: Integral generator object.
             quantum_interface: QuantumInterface.
-            include_active_kappa: Include active-active orbital rotations.
         """
         if len(cas) != 2:
             raise ValueError(f"cas must have two elements, got {len(cas)} elements.")
@@ -97,8 +95,6 @@ class WaveFunctionHCBCircuit:
         # Find non-redundant kappas
         self._kappa = []
         kappa_idx = []
-        kappa_no_activeactive_idx = []
-        kappa_no_activeactive_idx_dagger = []
         kappa_redundant_idx = []
         self._kappa_old = []
         # kappa can be optimized in spatial basis
@@ -110,13 +106,6 @@ class WaveFunctionHCBCircuit:
                 if p in self.virtual_idx and q in self.virtual_idx:
                     kappa_redundant_idx.append((p, q))
                     continue
-                if not include_active_kappa:
-                    if p in self.active_idx and q in self.active_idx:
-                        kappa_redundant_idx.append((p, q))
-                        continue
-                if not (p in self.active_idx and q in self.active_idx):
-                    kappa_no_activeactive_idx.append((p, q))
-                    kappa_no_activeactive_idx_dagger.append((q, p))
                 self._kappa.append(0.0)
                 self._kappa_old.append(0.0)
                 kappa_idx.append((p, q))
@@ -131,8 +120,6 @@ class WaveFunctionHCBCircuit:
                 elif p in self.active_occ_idx and q in self.virtual_idx:
                     kappa_hf_like_idx.append((p, q))
         self.kappa_idx = np.array(kappa_idx, dtype=int)
-        self.kappa_no_activeactive_idx = np.array(kappa_no_activeactive_idx, dtype=int)
-        self.kappa_no_activeactive_idx_dagger = np.array(kappa_no_activeactive_idx_dagger, dtype=int)
         self.kappa_redundant_idx = np.array(kappa_redundant_idx, dtype=int)
         self.kappa_hf_like_idx = np.array(kappa_hf_like_idx, dtype=int)
         # Setup Qiskit stuff
