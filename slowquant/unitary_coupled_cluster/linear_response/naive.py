@@ -408,34 +408,75 @@ class LinearResponse(LinearResponseBaseClass):
                     )
 
                 Gs = FermionicOperator({})
+                Gsd = FermionicOperator({})
                 for S, G in zip(Ss[:, root], self.G_ops):
-                    Gs += S * G + S.conjugate() * G.dagger
+                    Gs += S * G
+                    Gsd += S.conjugate() * G.dagger
                 Gs_ket = propagate_state([Gs], self.wf.ci_coeffs, *self.index_info)
+                Gsd_ket = propagate_state([Gsd], self.wf.ci_coeffs, *self.index_info)
+                HGs = commutator(self.H_1i_1a, Gs)
+                HGsd = commutator(self.H_1i_1a, Gsd)
 
                 # (A+B)_qG @ b_G
-                for i, qi in enumerate(self.q_ops):
-                    # <0| [qid, H, Gs + Gsd] |0>
-                    sigma_plus[i, root] += expectation_value(
-                        self.wf.ci_coeffs,
-                        [double_commutator(qi.dagger, self.H_1i_1a, Gs, do_symmetrized=True)],
-                        self.wf.ci_coeffs,
-                        *self.index_info,
-                    )
-
-                Gs = FermionicOperator({})
-                for S, G in zip(Ss[:, root], self.G_ops):
-                    Gs += S * G - S.conjugate() * G.dagger
-                Gs_ket = propagate_state([Gs], self.wf.ci_coeffs, *self.index_info)
-
                 # (A-B)_qG @ b_G
                 for i, qi in enumerate(self.q_ops):
-                    # <0| [qid, H, Gs - Gsd] |0>
-                    sigma_minus[i, root] += expectation_value(
+                    qdH = commutator(qi.dagger, self.H_1i_1a)
+                    qdH_ket = propagate_state([qdH], self.wf.ci_coeffs, *self.index_info)
+                    Hq_ket = propagate_state([qdH.dagger], self.wf.ci_coeffs, *self.index_info)
+                    # 0.5 <0| qid H Gs |0>
+                    val = 0.5 * expectation_value(
+                        Hq_ket,
+                        [],
+                        Gs_ket,
+                        *self.index_info,
+                    )
+                    sigma_plus[i, root] += val
+                    sigma_minus[i, root] += val
+                    # 0.5 h <0| qid H Gsd |0>
+                    val = 0.5 * expectation_value(
+                        Hq_ket,
+                        [],
+                        Gsd_ket,
+                        *self.index_info,
+                    )
+                    sigma_plus[i, root] += val
+                    sigma_minus[i, root] -= val
+                    # - 0.5 <0| Gs qid H |0>
+                    val = - 0.5 * expectation_value(
+                        Gsd_ket,
+                        [],
+                        qdH_ket,
+                        *self.index_info,
+                    )
+                    sigma_plus[i, root] += val
+                    sigma_minus[i, root] += val
+                    # - 0.5 h <0| Gsd qid H |0>
+                    val = - 0.5 * expectation_value(
+                        Gs_ket,
+                        [],
+                        qdH_ket,
+                        *self.index_info,
+                    )
+                    sigma_plus[i, root] += val
+                    sigma_minus[i, root] -= val
+                    # 0.5 <0 | qid [H, Gs] |0>
+                    val = 0.5 * expectation_value(
                         self.wf.ci_coeffs,
-                        [double_commutator(qi.dagger, self.H_1i_1a, Gs, do_symmetrized=True)],
+                        [commutator(qi.dagger, HGs)],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
+                    sigma_plus[i, root] += val
+                    sigma_minus[i, root] += val
+                    # 0.5 h <0| qid [H, Gsd] |0>
+                    val = 0.5 * expectation_value(
+                        self.wf.ci_coeffs,
+                        [commutator(qi.dagger, HGsd)],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                    sigma_plus[i, root] += val
+                    sigma_minus[i, root] -= val
 
         for root in range(n_roots):
             Gs = FermionicOperator({})
