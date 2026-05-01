@@ -205,13 +205,6 @@ class LinearResponse(LinearResponseBaseClass):
         sigma_plus = np.zeros((num_ops, n_roots))
         sigma_minus = np.zeros((num_ops, n_roots))
         tau_minus = np.zeros((num_ops, n_roots))
-        H_2i_2a = hamiltonian_2i_2a(
-            self.wf.h_mo,
-            self.wf.g_mo,
-            self.wf.num_inactive_orbs,
-            self.wf.num_active_orbs,
-            self.wf.num_virtual_orbs,
-        )
 
         if num_q != 0:
             K_lower = np.zeros((self.wf.num_orbs, self.wf.num_orbs, n_roots))
@@ -243,8 +236,8 @@ class LinearResponse(LinearResponseBaseClass):
                     self.wf.rdm1,
                     self.wf.rdm2,
                 )
-                sigma_plus[:num_q, root] = val
-                sigma_minus[:num_q, root] = val
+                sigma_plus[:num_q, root] += val
+                sigma_minus[:num_q, root] += val
                 for i, qi in enumerate(self.q_ops):
                     val = expectation_value(
                             self.wf.ci_coeffs,
@@ -326,11 +319,14 @@ class LinearResponse(LinearResponseBaseClass):
                 sigma_plus[num_q + i, root] += val
                 sigma_minus[num_q + i, root] += val
                 # ( 1 - h ) E <0| GId |0> <0| Gs |0>
-                sigma_minus[num_q + i, root] += 2 * self.wf.energy_elec * self._G_expect[i] * Gs_expect
+                sigma_plus[num_q + i, root] += self.wf.energy_elec * self._G_expect[i] * (Gs_expect - Gs_expect.conjugate())
+                sigma_minus[num_q + i, root] += self.wf.energy_elec * self._G_expect[i] * (Gs_expect + Gs_expect.conjugate())
                 # - 0.5 ( 1 - h ) <0| GId |0> <0| H Gs |0>
-                sigma_minus[num_q + i, root] -= self._G_expect[i] * HGs_expect
+                sigma_plus[num_q + i, root] -= 0.5 * self._G_expect[i] * (HGs_expect - HGs_expect.conjugate())
+                sigma_minus[num_q + i, root] -= 0.5 * self._G_expect[i] * (HGs_expect + HGs_expect.conjugate())
                 # - 0.5 ( 1 - h ) <0| Gs |0> <0| GId H |0>
-                sigma_minus[num_q + i, root] -= Gs_expect * self._HG_expect[i]
+                sigma_plus[num_q + i, root] -= 0.5 * (Gs_expect - Gs_expect.conjugate()) * self._HG_expect[i]
+                sigma_minus[num_q + i, root] -= 0.5 * (Gs_expect + Gs_expect.conjugate()) * self._HG_expect[i]
                 # <0| GId Gs |0>
                 tau_minus[num_q + i, root] += expectation_value(
                     GI_ket,
@@ -468,19 +464,7 @@ class LinearResponse(LinearResponseBaseClass):
             for i, G in enumerate(self.G_ops):
                 G_ket = propagate_state([G], self.wf.ci_coeffs, *self.index_info)
                 # <0| G |0>
-                exp_G = expectation_value(
-                    self.wf.ci_coeffs,
-                    [],
-                    G_ket,
-                    *self.index_info,
-                )
-                # <0| Gd |0>
-                exp_G_dagger = expectation_value(
-                    G_ket,
-                    [],
-                    self.wf.ci_coeffs,
-                    *self.index_info,
-                )
+                exp_G = exp_G_dagger = self._G_expect[i]
                 # Z * <0| Gd |0> * <0| mux |0>
                 g_part_x += (
                     self.Z_G_normed[i, state_number]

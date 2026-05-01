@@ -318,7 +318,7 @@ class LinearResponse(LinearResponseBaseClass):
 
                 # (A+B)_qq @ b_q
                 # <0| [GId, H, qs + qsd] |0>
-                sigma_plus[:num_q, root] = get_orbital_rotation_gradient(
+                sigma_plus[:num_q, root] += get_orbital_rotation_gradient(
                     h_plus,
                     g_plus,
                     self.wf.kappa_no_activeactive_idx_dagger,
@@ -329,7 +329,7 @@ class LinearResponse(LinearResponseBaseClass):
                 )
                 # (A-B)_qq @ b_q
                 # <0| [GId, H, qs - qsd] |0>
-                sigma_minus[:num_q, root] = get_orbital_rotation_gradient(
+                sigma_minus[:num_q, root] += get_orbital_rotation_gradient(
                     h_minus,
                     g_minus,
                     self.wf.kappa_no_activeactive_idx,
@@ -340,7 +340,7 @@ class LinearResponse(LinearResponseBaseClass):
                 )
                 # Sigma_qq @ b_q
                 # <0| [qid, qs] |0>
-                tau_minus[:num_q, root] = get_orbital_metric_block(
+                tau_minus[:num_q, root] += get_orbital_metric_block(
                     self.wf.kappa_no_activeactive_idx,
                     trial[:, root],
                     self.wf.num_inactive_orbs,
@@ -349,8 +349,10 @@ class LinearResponse(LinearResponseBaseClass):
                 )
 
                 qs = FermionicOperator({})
+                qsd = FermionicOperator({})
                 for kappa, q in zip(kappas[:, root], self.q_ops):
                     qs += kappa * q
+                    qsd += kappa.conjugate() * q.dagger
 
                 # (A+B)_Gq @ b_q
                 # (A-B)_Gq @ b_q
@@ -358,7 +360,7 @@ class LinearResponse(LinearResponseBaseClass):
                     GI_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
                     GId_ket = propagate_state([GI.dagger], self.wf.ci_coeffs, *self.index_info)
                     # <0| GId tH00p |0>
-                    sigma_plus[num_q + i, root] = expectation_value(
+                    sigma_plus[num_q + i, root] += expectation_value(
                         GI_ket,
                         [],
                         tH00p_ket,
@@ -371,17 +373,27 @@ class LinearResponse(LinearResponseBaseClass):
                         GId_ket,
                         *self.index_info,
                     )
-                    # 0.5 * <0| H [qs, GId + GI] |0>
-                    qGd = commutator(qs, GI.dagger + GI)
-                    sigma_plus[num_q + i, root] += 0.5 * expectation_value(
+                    # 0.5 <0| H [qs, Gid] |0>
+                    val = 0.5 * expectation_value(
                         self.wf.ci_coeffs,
-                        [self.H_1i_1a * qGd],
+                        [double_commutator(self.H_1i_1a, qs, GI.dagger)],
                         self.wf.ci_coeffs,
                         *self.index_info,
                     )
+                    sigma_plus[num_q + i, root] += val
+                    sigma_minus[num_q + i, root] += val
+                    # 0.5 h <0| [Gd, qsd] H |0>
+                    val = - 0.5 * expectation_value(
+                        self.wf.ci_coeffs,
+                        [double_commutator(self.H_1i_1a, GI.dagger, qsd)],
+                        self.wf.ci_coeffs,
+                        *self.index_info,
+                    )
+                    sigma_plus[num_q + i, root] += val
+                    sigma_minus[num_q + i, root] -= val
 
                     # <0| GId tH00m |0>
-                    sigma_minus[num_q + i, root] = expectation_value(
+                    sigma_minus[num_q + i, root] += expectation_value(
                         GI_ket,
                         [],
                         tH00m_ket,
@@ -392,14 +404,6 @@ class LinearResponse(LinearResponseBaseClass):
                         tH00m_ket,
                         [],
                         GId_ket,
-                        *self.index_info,
-                    )
-                    # 0.5 * <0| H [qs, GId - GI] |0>
-                    qGd = commutator(qs, GI.dagger - GI)
-                    sigma_minus[num_q + i, root] += 0.5 * expectation_value(
-                        self.wf.ci_coeffs,
-                        [self.H_1i_1a * qGd],
-                        self.wf.ci_coeffs,
                         *self.index_info,
                     )
 
@@ -507,7 +511,7 @@ class LinearResponse(LinearResponseBaseClass):
             # Sigma_GG @ b_G
             for i, GI in enumerate(self.G_ops):
                 # <0| GId Gs |0>
-                tau_minus[num_q + i, root] = expectation_value(
+                tau_minus[num_q + i, root] += expectation_value(
                     self.wf.ci_coeffs,
                     [GI.dagger],
                     Gs_ket,

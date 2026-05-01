@@ -259,7 +259,7 @@ class LinearResponse(LinearResponseBaseClass):
 
                 # (A+B)_qq @ b_q
                 # <0| [GId, H, qs + qsd] |0>
-                sigma_plus[:num_q, root] = get_orbital_rotation_gradient(
+                sigma_plus[:num_q, root] += get_orbital_rotation_gradient(
                     h_plus,
                     g_plus,
                     self.wf.kappa_no_activeactive_idx_dagger,
@@ -281,7 +281,7 @@ class LinearResponse(LinearResponseBaseClass):
                 )
                 # Sigma_qq @ b_q
                 # <0| [qid, qs] |0>
-                tau_minus[:num_q, root] = get_orbital_metric_block(
+                tau_minus[:num_q, root] += get_orbital_metric_block(
                     self.wf.kappa_no_activeactive_idx,
                     trial[:, root],
                     self.wf.num_inactive_orbs,
@@ -294,7 +294,7 @@ class LinearResponse(LinearResponseBaseClass):
                 for i, GI in enumerate(self.G_ops):
                     GI_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
                     # <0| GId tH00p |0>
-                    sigma_plus[num_q + i, root] = expectation_value(
+                    sigma_plus[num_q + i, root] += expectation_value(
                         GI_ket,
                         [],
                         tH00p_ket,
@@ -334,7 +334,7 @@ class LinearResponse(LinearResponseBaseClass):
                         *self.index_info,
                     )
                     sigma_plus[i, root] += val
-                    sigma_minus[i, root] += val
+                    sigma_minus[i, root] += val.conjugate()
                     # 0.5 <0| Gsd, [qid, H] |0>
                     val = 0.5 * expectation_value(
                         Gs_ket,
@@ -343,7 +343,7 @@ class LinearResponse(LinearResponseBaseClass):
                         *self.index_info,
                     )
                     sigma_plus[i, root] -= val
-                    sigma_minus[i, root] += val
+                    sigma_minus[i, root] += val.conjugate()
 
         for root in range(n_roots):
             Gs = FermionicOperator({})
@@ -374,11 +374,14 @@ class LinearResponse(LinearResponseBaseClass):
                 sigma_plus[num_q + i, root] += val
                 sigma_minus[num_q + i, root] += val
                 # ( 1 - h ) E <0| GId |0> <0| Gs |0>
-                sigma_minus[num_q + i, root] += 2 * self.wf.energy_elec * self._G_expect[i] * Gs_expect
+                sigma_plus[num_q + i, root] += self.wf.energy_elec * self._G_expect[i] * (Gs_expect - Gs_expect.conjugate())
+                sigma_minus[num_q + i, root] += self.wf.energy_elec * self._G_expect[i] * (Gs_expect + Gs_expect.conjugate())
                 # - 0.5 ( 1 - h ) <0| GId |0> <0| H Gs |0>
-                sigma_minus[num_q + i, root] -= self._G_expect[i] * HGs_expect
+                sigma_plus[num_q + i, root] -= 0.5 * self._G_expect[i] * (HGs_expect - HGs_expect.conjugate())
+                sigma_minus[num_q + i, root] -= 0.5 * self._G_expect[i] * (HGs_expect + HGs_expect.conjugate())
                 # - 0.5 ( 1 - h ) <0| Gs |0> <0| GId H |0>
-                sigma_minus[num_q + i, root] -= Gs_expect * self._HG_expect[i]
+                sigma_plus[num_q + i, root] -= 0.5 * (Gs_expect - Gs_expect.conjugate()) * self._HG_expect[i]
+                sigma_minus[num_q + i, root] -= 0.5 * (Gs_expect + Gs_expect.conjugate()) * self._HG_expect[i]
                 # <0| GId Gs |0>
                 tau_minus[num_q + i, root] += expectation_value(
                     GI_ket,
@@ -519,7 +522,7 @@ class LinearResponse(LinearResponseBaseClass):
             for i, G in enumerate(self.G_ops):
                 G_ket = propagate_state([G], self.wf.ci_coeffs, *self.index_info)
                 # <0| G |0>
-                exp_G = expectation_value(self.wf.ci_coeffs, [], G_ket, *self.index_info)
+                exp_G = self._G_expect[i]
                 # <0| Gd mux |0>
                 exp_Gmux = expectation_value(G_ket, [], mux_ket, *self.index_info)
                 # <0| Gd muy |0>
