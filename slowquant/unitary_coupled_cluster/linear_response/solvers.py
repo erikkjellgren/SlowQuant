@@ -4,49 +4,19 @@ import numpy as np
 import numba as nb
 
 from typing import Any
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from collections.abc import Callable
 
 from slowquant.unitary_coupled_cluster.density_matrix import RDM1, RDM2
 
-class Solvers(ABC):
-
-    _start: float
-    _iteration: int
-
-    def __init__(self) -> None:
-        ...
-
-    @abstractmethod
-    def solve(
-        self,
-        right_transform: Callable[..., Any],
-        preconditioner: tuple[np.ndarray, ...],
-        max_iteration: int,
-        tolerance: float,
-        n_roots: int,
-        max_reduced_space: int,
-        is_silent: bool,
-    ) -> Any:
-        """
-        Solve the problem.
-
-        Args:
-            right_transform: Right transformation function.
-            preconditioner: Preconditioner matrices.
-            max_iteration: Maximum iterations.
-            tolerance: Convergence tolerance.
-            n_roots: Number of lowest eigenpairs to compute.
-            max_reduced_space: Maximum dimension of the reduced space before a restart.
-            is_silent: Suppress progress output.
-        """
-
-class Davidson(Solvers):
+class Davidson:
     """Davidson solver for the standard eigenvalue problem.
 
     J. Comput. Phys. 17, 87-94 (1975).
     """
 
+    _start: float
+    _iteration: int
     _trial: np.typing.NDArray[np.complexfloating]
     """Subspace trial vectors"""
 
