@@ -579,7 +579,7 @@ class LinearResponse(LinearResponseBaseClass):
         prec_A = np.zeros(num_q + num_G)
         prec_sigma = np.zeros(num_q + num_G)
 
-        # Can easily do exact diagonal for q block
+        # Exact q diagonal
         prec_A[:num_q] = get_orbital_hessian_diagonal(
             self.wf.h_mo,
             self.wf.g_mo,
@@ -595,7 +595,7 @@ class LinearResponse(LinearResponseBaseClass):
             self.wf.num_active_orbs,
             self.wf.rdm1,
         )
-        # Approximate G diagonal
+        # Exact G diagonal
         H00_ket = propagate_state([self.H_0i_0a], self.wf.ci_coeffs, *self.index_info)
         for i, GI in enumerate(self.G_ops):
             GI_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
