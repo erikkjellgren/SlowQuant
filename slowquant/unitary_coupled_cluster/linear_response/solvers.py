@@ -205,6 +205,98 @@ class Davidson:
     def _reset_reduced_space(self, trial: np.ndarray, right_transformed_vectors: tuple[np.ndarray, ...]) -> None:
         """Reset the reduced space by keeping only the current Ritz vectors."""
 
+class UnpairedDavidson(Davidson):
+    """Davidson solver for the unpaired eigenvalue problem arising in the CASSCF linear response equations under the Tamm-Dancoff approximation.
+
+    J. Comput. Phys. 17, 87-94 (1975).
+    """
+
+    _sigma: np.typing.NDArray[np.complexfloating]
+    """Subspace matrix A @ b*"""
+    _tau: np.typing.NDArray[np.complexfloating]
+    """Subspace matrix Sigma @ b"""
+
+    def _setup_right_transformed_arrays(self) -> None:
+        """Setup arrays to store right transformed vectors."""
+        self._sigma = np.array(())
+        self._tau = np.array(())
+
+    def _print_citation(self) -> None:
+        """Print the citation for the Davidson method."""
+        super()._print_citation()
+
+    def _add_iteration_data(self, trial: np.ndarray, right_transformed_vectors: tuple[np.ndarray, ...]) -> None:
+        """Add trial and right transformed matrices for the current iteration to the arrays."""
+        sigma, tau = right_transformed_vectors
+        if self._iteration == 1:
+            self._trial = trial.copy()
+            self._sigma = sigma.copy()
+            self._tau = tau.copy()
+        else:
+            self._trial = np.hstack((self._trial, trial))
+            self._sigma = np.hstack((self._sigma, sigma))
+            self._tau = np.hstack((self._tau, tau))
+
+    def _compute_residual_vectors(self, n_roots: int) -> tuple[np.ndarray, np.ndarray, tuple[np.ndarray]]:
+        """Compute residual vectors for the given Ritz vectors and values."""
+
+        E = self._trial.conj().T @ self._sigma
+        S = self._trial.conj().T @ self._tau
+
+        # Solve the generalized eigenvalue problem E v = omega S v
+        eigval, eigvec = scipy.linalg.eig(E, S)
+        eigval, eigvec = _real_eigvals(eigval, eigvec, n_roots)
+
+        # Take positive eigenvalues and sort them
+        sorting = eigval > 0
+        eigval = eigval[sorting]
+        eigvec = eigvec[:, sorting]
+        sorting = np.argsort(eigval)
+        eigval = eigval[sorting]
+        eigvec = eigvec[:, sorting]
+
+        # Extract the lowest n_roots eigenvalues and corresponding eigenvectors
+        omega = np.real(eigval[:n_roots])
+        x = eigvec[:, :n_roots]
+
+        # Compute Ritz vectors (X) and residuals (R)
+        norm = np.sqrt(np.abs(np.diag(
+            x.T @ S @ x
+        )))
+        x /= norm
+        X = self._trial @ x
+
+        # tau_plus = tau_minus
+        R = self._sigma @ x - self._tau @ x * omega
+
+        return omega, X, (R, )
+
+    @staticmethod
+    def _check_convergence(R: tuple[np.ndarray, ...], tolerance: float) -> tuple[bool, np.ndarray]:
+        """Check if the maximum residual norm is below the tolerance."""
+        _R, *_ = R
+        res_norms = np.linalg.norm(_R, axis=0)
+        return all(res_norms <= tolerance), res_norms
+
+    @staticmethod
+    def _update_trial_vectors(omega: np.ndarray, R: tuple[np.ndarray, ...], preconditioner: tuple[np.ndarray, ...]) -> np.ndarray:
+        """Update trial vectors using the residuals and the diagonal preconditioner."""
+        diagonal_A, diagonal_Sigma = preconditioner
+        _R, *_ = R
+
+        contribution = diagonal_A.reshape(-1, 1) - diagonal_Sigma.reshape(-1, 1) @ omega.reshape(1, -1)
+        denominator = - np.ones_like(_R)
+        # Check if any of the contributions are close to zero to avoid division by zero, if so skip the division for that contribution
+        if not np.any(np.isclose(contribution, 0)):
+            denominator /= contribution
+        new_trial = denominator * _R
+        return new_trial
+
+    def _reset_reduced_space(self, trial: np.ndarray, right_transformed_vectors: tuple[np.ndarray, ...]) -> None:
+        """Reset the reduced space by keeping only the current Ritz vectors."""
+        self._trial = self._orthonormalize(trial)
+        self._sigma, self._tau = right_transformed_vectors
+
 class PairedDavidson(Davidson):
     """Davidson solver for the paired eigenvalue problem arising in the CASSCF linear response equations.
 
