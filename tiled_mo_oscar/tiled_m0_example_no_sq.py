@@ -3,7 +3,7 @@ import os
 import pickle
 sys.path.insert(0, os.path.abspath("../../SlowQuant"))
 
-import tiled_m0_main
+import tiled_mo_oscar.tiled_m0_main as tiled_m0_main
 import tiled_m0_helper
 from qiskit.circuit import (QuantumCircuit, Parameter)
 from qiskit_ibm_runtime import (QiskitRuntimeService, Batch)
@@ -58,25 +58,28 @@ service = QiskitRuntimeService(
 )
 
 # check backends available
-# print(service.backends())
+print(service.backends())
 
 # ----------- Backend  -----------
 # On hardware:
 # backend = service.backend("ibm_aachen")
 
 # Noisy simulator:
-backend = AerSimulator.from_backend(service.backend("ibm_aachen"))
-
+# backend = AerSimulator.from_backend(service.backend("ibm_aachen"))
+backend = AerSimulator()
 
 # ---------- Molecule -----------
 atomCoords =  """N  0.0  0.0 0.0;
                 H   0.0  0.0 1.0362;"""
 
-basis = "6-31g"
+basis = "../aug-cc-pvtz-j.nw"
+
+name = "0.5324456570951184"
 
 activeElecCount = 2
+# activeSpatOrbCount = np.load(f"../{name}_num_active_orbs.npy")
 activeSpatOrbCount = 4
-name = "0.08030958600035343"
+
 
 
 layerCount = 2
@@ -91,15 +94,21 @@ parameters = np.load(f"../{name}_thetas.npy")
 
 # The operator as a dictionary where the keys are the Pauli strings and the values are the coefficients / weights.
 # operator = {"Z" * 4 : 1.0} #LoadOperator("SavedStuff/Butadiene/operator_L1")
-with open(f"../{name}_N_operator", "rb") as f:
+with open(f"../{name}_N_operator_active", "rb") as f:
     operator = pickle.load(f)
 
-referenceValue = 1.0 # The reference / exact expectation value of the operator (to print in the output file together with the results)
+# with open(f"{name}_N_operator", "rb") as f:
+#     tmp_operator = pickle.load(f)
+# operator = {}
+# for key, val in tmp_operator.items():
+#     operator[key.to_label()] = val.real
 
-expectationValueShots = 10000
-mitigatorShots = int(min(15000 * (1.2**len(tileQubits))**2, 100000))
-# mitigatorShots = 15000
-print(mitigatorShots)
+referenceValue = 12.139967517980319 # The reference / exact expectation value of the operator (to print in the output file together with the results)
+
+expectationValueShots = 10000000
+# mitigatorShots = int(min(15000 * (1.2**len(tileQubits))**2, 100000))
+mitigatorShots = 100000
+# print(mitigatorShots)
 
 tiledM0 = tiled_m0_main.TiledM0(tileCircuits = tileCircuits,                        # Only tile circuits for the first layer (list of qiskit QuantumCircuits, pre-transpilation, not parameterized)
                                 tileQubits = tileQubits,                            # Only tile qubits for the first layer formatted like [[q0,q1,q2,q3], [q4,q5,q6,q7], ...]
@@ -109,7 +118,7 @@ tiledM0 = tiled_m0_main.TiledM0(tileCircuits = tileCircuits,                    
                                 backend = backend,
                                 expectationValueShots = expectationValueShots,      # Total number of shots to use for expectation value
                                 mitigatorShots = mitigatorShots,                    # The number of shots to use per column in the assignment matrices. The total number of mitigation shots will be 64 * mitigatorShots (in the case of tUPS and when the qubit count is a multiple of 4 but greater than 4)
-                                inputState = "10001000",                                # Passed in Fermi-order: alpha0 beta0 alpha1 beta1 ...
+                                inputState = "10001000",                               # Passed in Fermi-order: alpha0 beta0 alpha1 beta1 ...
                                 doPatchParallelization = False
 )
 

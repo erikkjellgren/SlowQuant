@@ -22,9 +22,9 @@ from slowquant.unitary_coupled_cluster.operator_state_algebra import expectation
 
 
 mol = pyscf.M(atom="N   0.0  0.0           0.0; H   0.0  0.0 1.0362", basis="6-31g", unit="angstrom", spin=2)
+# mol = pyscf.M(atom="N   0.0  0.0           0.0; H1   0.0  0.0 0.9948; H2 0.0  0.0  -0.8199", basis="sto-3g", unit="angstrom", spin=1)
 uhf = pyscf.scf.UHF(mol).run()
 
-# mc = mcscf.UCASCI(uhf, (4,2), 8)
 mc = mcscf.UCASCI(uhf, (2,0), 4)
 
 h_core = mol.intor("int1e_kin") + mol.intor("int1e_nuc")
@@ -42,7 +42,7 @@ WF = UnrestrictedWaveFunctionUPS(
     include_active_kappa=True,
 )
 
-WF.thetas = (2*np.pi*np.random.random(len(WF.thetas)) - np.pi).tolist()   
+# WF.thetas = (2*np.pi*np.random.random(len(WF.thetas)) - np.pi).tolist()   
 WF.run_wf_optimization_1step("bfgs", orbital_optimization=True, tol=1e-8, maxiter=5000)
 
 print("")
@@ -106,7 +106,7 @@ def nuclear_g_factor(atom):
         print(f"No nuclear g-value is found for atom: {atom}")
     return g_k
 
-spin = 2
+spin = 1
 mapper = JordanWignerMapper()
 # Fermi-contact operator, with RDM formulation:
 # r""" a_{iso}^K = \frac{f_k}{2\pi M} \bigg\{\bigg [[A^K_{\alpha}]_I - [A^K_{\beta}]_I\bigg] + \bigg[[A^K_{\alpha}]_A \Gamma^{[1]}_{\alpha} - [A^K_{\beta}]_A \Gamma^{[1]}_{\beta}\bigg] \bigg\}"""
@@ -148,16 +148,27 @@ for atom in mol._atom:
     
     print("HFC without factor:", expectation_value(WF.ci_coeffs, [operator], WF.ci_coeffs, WF.ci_info))
     print("HFC:", f_k*g_k/m*expectation_value(WF.ci_coeffs, [operator], WF.ci_coeffs, WF.ci_info))
-
-
     print("HFC without factor (active):", expectation_value(WF.ci_coeffs, [operator_active], WF.ci_coeffs, WF.ci_info, do_folding=False)-operator_active.operators[()])
     print("HFC (active):", f_k*g_k/m*(expectation_value(WF.ci_coeffs, [operator_active], WF.ci_coeffs, WF.ci_info, do_folding=False)-operator_active.operators[()]))
 
-    mapped_op = mapper.map(FermionicOp(operator_active.get_qiskit_form(WF.num_active_orbs), WF.num_active_spin_orbs))
+    # np.save(f"{name}_{atom_name}_inactive_operator", operator_active.operators[()])
+    # print(operator_active.operators)
+    # print(operator_active[0,3])
+    # for o in operator_active.operators:
+    #     print(o)
 
+    operator_active.operators.pop(())
+    mapped_op = mapper.map(FermionicOp(operator_active.get_qiskit_form(WF.num_active_orbs), WF.num_active_spin_orbs))
+    # print(mapped_op)
     t_mo_operator = {}
-    for c in mapped_op.coeffs:
-        for p in mapped_op.paulis:
-            t_mo_operator[p.to_label()] = c.real
-        with open(f"{name}_{atom_name}_operator", "wb") as f:
-            pickle.dump(t_mo_operator, f)
+    for c, p in zip(mapped_op.coeffs, mapped_op.paulis):
+        t_mo_operator[p.to_label()] = c.real
+    # with open(f"{name}_{atom_name}_operator_with_inactive", "wb") as f:
+    with open(f"{name}_{atom_name}_operator_active", "wb") as f:
+        pickle.dump(t_mo_operator, f)
+    
+    # t_mo_operator.pop("IIIIIIII")
+    # print(t_mo_operator)
+    # print("inaktiv:", operator_active.operators[()])
+    # with open(f"{name}_{atom_name}_operator_without_inactive", "wb") as f:
+    #     pickle.dump(t_mo_operator, f)

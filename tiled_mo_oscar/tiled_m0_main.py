@@ -70,7 +70,7 @@ class TiledM0:
         self.backend = backend
         self.expectationValueShots = expectationValueShots
         self.mitigatorShots = mitigatorShots
-
+        print("OPERATOR", self.operator)
         self.totQubitCount = len(list(self.operator.keys())[0])
         if (self.totQubitCount % 4 != 0):
             raise ValueError("The total number of qubits must be a multiple of 4.") # Because the current implementation assumes RE mitigators of size 16x16.
@@ -92,7 +92,7 @@ class TiledM0:
         if self.runOnHardware == False and self.doPatchParallelization == True:
             print("Patch parallelization is turned off for simulations.")
             self.doPatchParallelization = False
-
+        
         self.posttFullNonParameterizedCircuit = None # The transpiled and non-parameterized quantum circuit with the ansatz on all patches. Doesn't include state preparation or measurement modifications.
         self.posttFullParameterizedCircuit = None # The transpiled and parameterized quantum circuit with the ansatz on all patches. Doesn't include state preparation or measurement modifications.
         self.patches = None # A list of the physical qubits in every patch. ``self.patches[i]`` gives the physical qubits in patch number i. ``self.patches[i][j]`` is the physical qubit in patch i that the virtual qubit j (pre-transpilation) is mapped to i.e. ``self.patches[i]`` is a mapping from virtual to physical qubits in patch i.
@@ -131,7 +131,10 @@ class TiledM0:
         self.inputStatePrepQc = None
         self.parameters = None
 
-        self.InitializePatches(savedPatches)
+        if self.backend.name != 'aer_simulator':
+            self.InitializePatches(savedPatches)
+        elif self.backend.name == 'aer_simulator':
+            self.patches = [[i for i in range(self.totQubitCount)]]
         self.TranspileTileCircuits()
         self.GetInputStatePreparationCircuit()
         self.FindNonOverlappingTiles()
@@ -157,6 +160,7 @@ class TiledM0:
         self.quantumCircuitsBatch = list()
         self.jobResults = list()
         self.jobResultsIndex = 0
+
         if self.runOnHardware == False:
             self.RunPass()
         else:
@@ -216,6 +220,7 @@ class TiledM0:
         self.tileMitigators_All = [([0]) * len(self.pretTileQubits) for i in range(len(self.patches))] # Use placeholder 0's for the mitigators
         self.tileRems_All = [([0]) * len(self.pretTileQubits) for i in range(len(self.patches))] # A REM for every tile to remove the readout part of the tile mitigators
         self.firstPass = (len(self.jobResults) == 0)
+
         for i in range(len(self.nonOverLappingTiles_Indices)):
             tileCircuitsSubset = list()
             if (self.runOnHardware == False or self.firstPass == True): # If we run on a simulator or if it is the first pass of a hardware run
@@ -284,6 +289,7 @@ class TiledM0:
         # delta, q = 0.01, 0.90
         # shotCount = int(np.log((2 / (1 - q))) / (2 * delta * delta)) + 1
         # ~15000
+
         if (self.runOnHardware == False or self.firstPass == True): # If we run on a simulator or if it is the first pass of a hardware run
             # Compose all the quantum circuits and assign all parameters to 0
             ansatzQc = QuantumCircuit()
@@ -365,15 +371,15 @@ class TiledM0:
         self.mitigatedExpectationValue_All = [0 for i in range(len(self.patches))]
         self.rawExpectationValue_All = [0 for i in range(len(self.patches))]
         # Loop over all Pauli string groups
-        for i in range(0, len(self.operatorGroupedByQwc)):
-            shotCount = int((self.qwcGroupsOneNorms[i] / self.operatorSumOfWeights) * self.expectationValueShots) + 1
-            self.qwcGroups_ShotCounts[i] = shotCount
+        for psGroup in range(0, len(self.operatorGroupedByQwc)):
+            shotCount = int((self.qwcGroupsOneNorms[psGroup] / self.operatorSumOfWeights) * self.expectationValueShots) + 1
+            self.qwcGroups_ShotCounts[psGroup] = shotCount
             print(shotCount, end = ", ")
             shotCountSaved = shotCount
             maxShotCount = 10000000 # If shotCount > 10 million, we need to split up the job
             while shotCount > 0:
                 shotCountRestricted = min(maxShotCount, shotCount)
-                p_All = self.GetProbabilityVectorForPauliStringGroup(self.operatorGroupedByQwc[i], shotCountRestricted)
+                p_All = self.GetProbabilityVectorForPauliStringGroup(self.operatorGroupedByQwc[psGroup], shotCountRestricted)
 
                 if (self.runOnHardware == True and self.firstPass == True): # If it is the first pass of a hardware run
                     shotCount -= maxShotCount
@@ -406,9 +412,10 @@ class TiledM0:
                     pNoisy = p_All[patchIdx].copy()
                     p = p_All[patchIdx].copy()
 
-                    for j in range(len(mitigators) - 1, -1, -1):
-                        ApplyMitigator(p, mitigatedQubits[j], mitigators[j])
-                    for ps in self.operatorGroupedByQwc[i]:
+                    for mitigatorIdx in range(len(mitigators) - 1, -1, -1):
+                        ApplyMitigator(p, mitigatedQubits[mitigatorIdx], mitigators[mitigatorIdx])
+                    
+                    for ps in self.operatorGroupedByQwc[psGroup]:
                         if ps == 'I' * self.totQubitCount:
                             self.mitigatedExpectationValue_All[patchIdx] += (shotCountRestricted / shotCountSaved) * self.operator[ps]
                             self.rawExpectationValue_All[patchIdx] += (shotCountRestricted / shotCountSaved) * self.operator[ps]
@@ -525,7 +532,7 @@ class TiledM0:
                 tmpCircuit = self.pretTileCircuits[0].copy()
                 for i in range(1, len(self.pretTileCircuits)):
                     tmpCircuit.compose(self.pretTileCircuits[i], inplace = True)
-                tmpCircuit = transpile(tmpCircuit, self.backend, optimization_level = 3, seed_transpiler = 1)                    
+                tmpCircuit = transpile(tmpCircuit, self.backend, optimization_level = 3, seed_transpiler = 1)              
                 self.patches = [tmpCircuit.layout.initial_index_layout()[0:self.totQubitCount]]
                 return
 
