@@ -415,6 +415,9 @@ def make_h1_ao(mol):
     n4c = 2 * n2c
     natm = mol.natm
 
+    g_e = 2.00231930436256
+    spin_factor = g_e / 2.0
+
     h1 = np.zeros((natm, 3, n4c, n4c), dtype=np.complex128)
 
     for I in range(natm):
@@ -426,6 +429,8 @@ def make_h1_ao(mol):
         a01 = mol.intor('int1e_sa01sp_spinor', comp=3)  *.5#*(0.25/c**2)  
 
         for a in range(3):
+                # h1[I, a, :n2c, n2c:] = spin_factor*a01[a]      # LS block
+                # h1[I, a, n2c:, :n2c] = spin_factor*a01[a].conj().T  # SL block
                 h1[I, a, :n2c, n2c:] = a01[a]      # LS block
                 h1[I, a, n2c:, :n2c] = a01[a].conj().T  # SL block
 
@@ -447,8 +452,8 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
 
     mf = scf.DHF(mol)
-    mf.conv_tol = 1e-8        # Energy convergence (Hartree)
-    mf.conv_tol_grad = 1e-8   # Optional: gradient convergence
+    mf.conv_tol = 1e-10        # Energy convergence (Hartree)
+    mf.conv_tol_grad = 1e-10   # Optional: gradient convergence
     mf.max_cycle = 500
     #mf.with_ssss
 
@@ -467,8 +472,10 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     sscobj = SSC(mf)
     sscobj.cphf = True
-    sscobj.mb = "RMB"
+    sscobj.conv_tol = 1e-9
+    sscobj.mb = "RKB"
     sscobj.verbose = 5
+    sscobj.with_fcsd = True
     jj = sscobj.kernel()
 
 
@@ -523,7 +530,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
         h_core,
         g_eri,
         "fuccsd",
-        {"n_layers":1, "is_spin_conserving" : False},
+        {"n_layers":0, "is_spin_conserving" : False},
         include_active_kappa=True,
     )
 
@@ -613,7 +620,7 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
 
     #WF.run_wf_optimization_1step("l-bfgs-b", orbital_optimization=True, tol=1e-10, maxiter = 10000)
 
-    WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True,tol = 1e-10, maxiter = 1000)
+    #WF.run_wf_optimization_2step_DHF(optimizer_name = "l-bfgs-b", orbital_optimization = True,tol = 1e-10, maxiter = 1000)
 
     #kappas = np.concatenate([WF.kappa_real, WF.kappa_real_ep, WF.kappa_imag, WF.kappa_imag_ep])
 
@@ -682,14 +689,14 @@ def NR(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
     # print(E_tester_post)
 
     LR = generalized_naive_DHF.LinearResponse(WF, excitations="S")
-    LR.calc_excitation_energies()
-    print("Excitation energies:", LR.excitation_energies)
+    #LR.calc_excitation_energies()
+    #print("Excitation energies:", LR.excitation_energies)
     #print(np.round(LR.get_transition_dipole(dip_int).real,5))
     #print(LR.get_oscillator_strengths(dip_int))
     SSCC = LR.get_SSCC_4comp_iso(h1, h2)
     for I in range(SSCC.shape[0]):
         for J in range(I+1, SSCC.shape[1]):
-            print(f"K({mol.atom_symbol(I)}{I} - {mol.atom_symbol(J)}{J}) = {SSCC[I,J]:.4f} Hz")
+            print(f"K({mol.atom_symbol(I)}{I} - {mol.atom_symbol(J)}{J}) = {SSCC[I,J]:.5f} Hz")
 
 
 
@@ -750,7 +757,7 @@ def HF():
     #basis = "631-g"
     basis = "sto-3g"
     #active_space = ((1, 1), 4)
-    active_space = ((2, 2), 6)
+    active_space = ((2, 2), 4)
     #active_space = (2, 4)
     charge = 0
     spin = 0
@@ -770,7 +777,7 @@ def H2O():
     #basis = "sto-6g"
     #active_space = ((5, 5), 14)
     #active_space = ((3,3),8)
-    active_space = ((2, 2), 6)
+    active_space = ((2, 2), 4)
     charge = 0
     spin = 0
     NR(
@@ -782,7 +789,7 @@ def HI():
         I  0.0  0.0  1.60916 """
     #basis = "dyall-v2z"
     basis = "sto-3g"
-    active_space = (4, 6)
+    active_space = ((2,2), 4)
     charge = 0
     spin = 0
     NR(
@@ -794,7 +801,7 @@ def HBr():
         Br  0.0  0.0  1.41443 """
     #basis = "dyall-v2z"
     basis = "sto-3g"
-    active_space = ((3,3), 8)
+    active_space = ((2,2), 4)
     charge = 0
     spin = 0
     NR(
@@ -807,7 +814,7 @@ def HCl():
     #basis = "dyall-v2z"
     basis = "sto-3g"
     #active_space = ((2,2), 6)
-    active_space = ((9,9), 18)
+    active_space = ((2,2), 4)
     charge = 0
     spin = 0
     NR(
@@ -816,4 +823,4 @@ def HCl():
     
 ###RUN SCRIPT###
 
-H2O()
+HF()

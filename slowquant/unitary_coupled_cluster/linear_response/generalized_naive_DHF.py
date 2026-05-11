@@ -1109,6 +1109,8 @@ class LinearResponse(LinearResponseBaseClass):
         prop_grads = [self.get_property_gradient_4comp(h1_int[I]) for I in range(natm)]
         responses  = [solve(self.hessian, prop_grads[I]) for I in range(natm)]
 
+
+
         nuc_mag = 0.5 * (nist.E_MASS / nist.PROTON_MASS)  # e*hbar/2m
         au2Hz   = nist.HARTREE2J / nist.PLANCK
 
@@ -1272,7 +1274,14 @@ class LinearResponse(LinearResponseBaseClass):
 
         # Property gradients and responses for all nuclei
         prop_grads = [self.get_property_gradient_4comp(h1_int[I]) for I in range(natm)]
-        responses  = [solve(E2_mat, prop_grads[I]) for I in range(natm)]
+        #responses  = [solve(E2_mat, prop_grads[I]) for I in range(natm)]
+
+        responses = [
+            np.linalg.pinv(E2_mat, rcond=1e-10) @ prop_grads[I]
+            for I in range(natm)
+        ]
+
+
 
         nuc_mag = 0.5 * (nist.E_MASS / nist.PROTON_MASS)
         au2Hz   = nist.HARTREE2J / nist.PLANCK
