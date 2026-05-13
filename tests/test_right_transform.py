@@ -36,13 +36,13 @@ def test_lih_naive():
     WF.run_wf_optimization_1step("L-BFGS-B", True)
 
     # naive
-    LR_naive = naive.LinearResponse(WF, excitations="SDTQ")
-    LR_naive._construct_hessian_metric_blocks()
+    LR = naive.LinearResponse(WF, excitations="SDTQ")
+    LR._construct_hessian_metric_blocks()
 
-    A = LR_naive.A
-    B = LR_naive.B
-    Sigma = LR_naive.Sigma
-    Delta = LR_naive.Delta
+    A = LR.A
+    B = LR.B
+    Sigma = LR.Sigma
+    Delta = LR.Delta
 
     def right_transform(trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         Ab = A @ trial
@@ -51,21 +51,24 @@ def test_lih_naive():
 
         sigma_plus = Ab + Bb
         sigma_minus = Ab - Bb
+        tau_plus = Sb
         tau_minus = Sb
-        return sigma_plus, sigma_minus, tau_minus
+        return sigma_plus, sigma_minus, tau_plus, tau_minus
 
     d = PairedDavidson()
     num_exc = 13
 
     start_guess = np.random.rand(A.shape[0], num_exc)
+    start_guess = np.vstack((start_guess, start_guess.conj()))
     trial = d._orthonormalize(start_guess)
 
-    sp, sm, tm = right_transform(trial)
+    sp, sm, tp, tm = right_transform(trial[:A.shape[0], :])
 
-    _sp, _sm, _tm = LR_naive._right_transform(trial)
+    _sp, _sm, _tp, _tm = LR._right_transform(trial)
 
     assert np.allclose(sp, _sp, atol=1e-12)
     assert np.allclose(sm, _sm, atol=1e-12)
+    assert np.allclose(tp, _tp, atol=1e-12)
     assert np.allclose(tm, _tm, atol=1e-12)
 
 def test_lih_projected():
@@ -88,13 +91,13 @@ def test_lih_projected():
     WF.run_wf_optimization_1step("L-BFGS-B", True)
 
     # naive
-    LR_naive = projected.LinearResponse(WF, excitations="SDTQ")
-    LR_naive._construct_hessian_metric_blocks()
+    LR = projected.LinearResponse(WF, excitations="SDTQ")
+    LR._construct_hessian_metric_blocks()
 
-    A = LR_naive.A
-    B = LR_naive.B
-    Sigma = LR_naive.Sigma
-    Delta = LR_naive.Delta
+    A = LR.A
+    B = LR.B
+    Sigma = LR.Sigma
+    Delta = LR.Delta
 
     def right_transform(trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         Ab = A @ trial
@@ -103,21 +106,24 @@ def test_lih_projected():
 
         sigma_plus = Ab + Bb
         sigma_minus = Ab - Bb
+        tau_plus = Sb
         tau_minus = Sb
-        return sigma_plus, sigma_minus, tau_minus
+        return sigma_plus, sigma_minus, tau_plus, tau_minus
 
     d = PairedDavidson()
     num_exc = 13
 
     start_guess = np.random.rand(A.shape[0], num_exc)
+    start_guess = np.vstack((start_guess, start_guess.conj()))
     trial = d._orthonormalize(start_guess)
 
-    sp, sm, tm = right_transform(trial)
+    sp, sm, tp, tm = right_transform(trial[:A.shape[0], :])
 
-    _sp, _sm, _tm = LR_naive._right_transform(trial)
+    _sp, _sm, _tp, _tm = LR._right_transform(trial)
 
     assert np.allclose(sp, _sp, atol=1e-12)
     assert np.allclose(sm, _sm, atol=1e-12)
+    assert np.allclose(tp, _tp, atol=1e-12)
     assert np.allclose(tm, _tm, atol=1e-12)
 
 def test_lih_allprojected():
@@ -140,13 +146,13 @@ def test_lih_allprojected():
     WF.run_wf_optimization_1step("L-BFGS-B", True)
 
     # naive
-    LR_naive = allprojected.LinearResponse(WF, excitations="SDTQ")
-    LR_naive._construct_hessian_metric_blocks()
+    LR = allprojected.LinearResponse(WF, excitations="SDTQ")
+    LR._construct_hessian_metric_blocks()
 
-    A = LR_naive.A
-    B = LR_naive.B
-    Sigma = LR_naive.Sigma
-    Delta = LR_naive.Delta
+    A = LR.A
+    B = LR.B
+    Sigma = LR.Sigma
+    Delta = LR.Delta
 
     def right_transform(trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         Ab = A @ trial
@@ -155,19 +161,22 @@ def test_lih_allprojected():
 
         sigma_plus = Ab + Bb
         sigma_minus = Ab - Bb
+        tau_plus = Sb
         tau_minus = Sb
-        return sigma_plus, sigma_minus, tau_minus
+        return sigma_plus, sigma_minus, tau_plus, tau_minus
 
     d = PairedDavidson()
     num_exc = 13
 
     start_guess = np.random.rand(A.shape[0], num_exc)
+    start_guess = np.vstack((start_guess, start_guess.conj()))
     trial = d._orthonormalize(start_guess)
 
-    sp, sm, tm = right_transform(trial)
+    sp, sm, tp, tm = right_transform(trial[:A.shape[0], :])
 
-    _sp, _sm, _tm = LR_naive._right_transform(trial)
+    _sp, _sm, _tp, _tm = LR._right_transform(trial)
 
     assert np.allclose(sp, _sp, atol=1e-12)
     assert np.allclose(sm, _sm, atol=1e-12)
+    assert np.allclose(tp, _tp, atol=1e-12)
     assert np.allclose(tm, _tm, atol=1e-12)

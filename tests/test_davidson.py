@@ -47,14 +47,21 @@ def test_lih_naive_explicit():
     Delta = LR.Delta
 
     def right_transform(trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        Ab = A @ trial
-        Bb = B @ trial.conj()
-        Sb = Sigma @ trial
+        trial_plus = trial[: trial.shape[0] // 2]
+        trial_minus = trial[trial.shape[0] // 2 :]
 
-        sigma_plus = Ab + Bb
-        sigma_minus = Ab - Bb
-        tau_minus = Sb
-        return sigma_plus, sigma_minus, tau_minus
+        Abp = A @ trial_plus
+        Abm = A @ trial_minus
+        Bbp = B @ trial_plus.conj()
+        Bbm = B @ trial_minus.conj()
+        Sbp = Sigma @ trial_minus
+        Sbm = Sigma @ trial_plus
+
+        sigma_plus = Abp + Bbp
+        sigma_minus = Abm - Bbm
+        tau_plus = Sbp
+        tau_minus = Sbm
+        return sigma_plus, sigma_minus, tau_plus, tau_minus
 
     d = PairedDavidson()
     eigvals, eigvecs = d.solve(
@@ -168,14 +175,21 @@ def test_lih_projected_explicit():
     Delta = LR.Delta
 
     def right_transform(trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        Ab = A @ trial
-        Bb = B @ trial.conj()
-        Sb = Sigma @ trial
+        trial_plus = trial[: trial.shape[0] // 2]
+        trial_minus = trial[trial.shape[0] // 2 :]
 
-        sigma_plus = Ab + Bb
-        sigma_minus = Ab - Bb
-        tau_minus = Sb
-        return sigma_plus, sigma_minus, tau_minus
+        Abp = A @ trial_plus
+        Abm = A @ trial_minus
+        Bbp = B @ trial_plus.conj()
+        Bbm = B @ trial_minus.conj()
+        Sbp = Sigma @ trial_minus
+        Sbm = Sigma @ trial_plus
+
+        sigma_plus = Abp + Bbp
+        sigma_minus = Abm - Bbm
+        tau_plus = Sbp
+        tau_minus = Sbm
+        return sigma_plus, sigma_minus, tau_plus, tau_minus
 
     d = PairedDavidson()
     eigvals, eigvecs = d.solve(
@@ -289,14 +303,21 @@ def test_lih_allprojected_explicit():
     Delta = LR.Delta
 
     def right_transform(trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        Ab = A @ trial
-        Bb = B @ trial.conj()
-        Sb = Sigma @ trial
+        trial_plus = trial[: trial.shape[0] // 2]
+        trial_minus = trial[trial.shape[0] // 2 :]
 
-        sigma_plus = Ab + Bb
-        sigma_minus = Ab - Bb
-        tau_minus = Sb
-        return sigma_plus, sigma_minus, tau_minus
+        Abp = A @ trial_plus
+        Abm = A @ trial_minus
+        Bbp = B @ trial_plus.conj()
+        Bbm = B @ trial_minus.conj()
+        Sbp = Sigma @ trial_minus
+        Sbm = Sigma @ trial_plus
+
+        sigma_plus = Abp + Bbp
+        sigma_minus = Abm - Bbm
+        tau_plus = Sbp
+        tau_minus = Sbm
+        return sigma_plus, sigma_minus, tau_plus, tau_minus
 
     d = PairedDavidson()
     eigvals, eigvecs = d.solve(
