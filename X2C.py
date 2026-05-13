@@ -1,11 +1,9 @@
 import numpy as np
 import pyscf
 from pyscf import mcscf, scf, gto, x2c
-from scipy.linalg import eig, lstsq
+from scipy.linalg import eig, lstsq, sqrtm, inv
 
-def test_x2c(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137.036):
-    mol = pyscf.M(atom=geometry, basis=basis, unit=unit, charge=charge, spin=spin)
-    mol.build()
+def test_x2c(mol, c=137.036):
 
     # mf = scf.HF(mol)
     mf = scf.GHF(mol)
@@ -27,7 +25,7 @@ def test_x2c(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137
     nao = len(coeff[0])
     #construct matrix
     D = np.zeros((2*nao, 2*nao), dtype=complex)   #2*nao since it is in spinor basis
-    S=  np.zeros((2*nao, 2*nao), dtype=complex)   #overlap in spinor basis (RKB)
+    S =  np.zeros((2*nao, 2*nao), dtype=complex)   #overlap in spinor basis (RKB)
     
     #create Dirac Hamiltonian
     D[:nao, :nao] = v #Upper left
@@ -47,7 +45,7 @@ def test_x2c(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137
     #solve 4-component generalized eigenvalue problem D@C = e*S@C
     
     E, C = eig(D,S)
-    print(C)
+    # print(C)
     #take only the positive part of the spectrum
     C_positive = []
     E_positive = []
@@ -59,7 +57,7 @@ def test_x2c(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137
     positive_int = np.real(E) > -2 * c**2
     C_positive = C[:, positive_int]
 
-    print(C_positive)
+    # print(C_positive)
 
     if C_positive.shape[1] != nao:
         raise ValueError(f"Expected {nao} positive-energy solutions, "
@@ -88,14 +86,98 @@ def test_x2c(geometry, basis, active_space, unit="bohr", charge=0, spin=0, c=137
     h_fw = v + t + X.conj().T @ (w / (4 * c**2)) @ X
 
     h_x2c = R.conj().T @ h_fw @ R
-    
-    
-    
+    return h_x2c, R, X
 
 
+
+def density_mat(C):
+    return C @ C.conj().T
+
+
+def build_X2C_Fock_mat(mol, density_matrix, h_x2c):
+    print(type(mol))
+
+    eri=mol.intor('int2e_spinor')
+
+    D=density_matrix.copy()
+
+    J = np.einsum('pqrs,rs->pq', eri, D)
+    K = np.einsum('prqs,rs->pq', eri, D)
+
+    F = h_x2c + J - K
+    return F
+
+
+
+def scf_x2c_hf(mol, n_occ, max_iter=100, tol=1e-10):
+    """
+    h_x2c : (nao, nao) complex
+    n_occ : number of occupied spinors
+    """
+    from scipy.linalg import eigh
+    s   = mol.intor('int1e_ovlp_spinor')
+
+
+    h_x2c, R, X =test_x2c(mol)
+    nao = h_x2c.shape[0]
+    s   = mol.intor('int1e_ovlp_spinor')
+    
+    V_ext = build_point_charge_potential(mol, charge=0, coord=[0.0, 0.0, 2.0])
+    #skal v_ext picture changes??
+    
+    # Initialize
+    # F = h_x2c.copy()
+    F = h_x2c + V_ext
+    
+    # Solve FC = SCe for initial orbitals
+    eps, C = eigh(F, s)      
+    C_occ  = C[:, :n_occ]
+    D      = density_mat(C_occ)
+    print(D.shape)
+    E_prev = 0.0
+
+    print(F.shape)
+    print(D.shape)
+    print(h_x2c.shape)
+    for iteration in range(max_iter):
+
+        # Build Fock matrix from current density
+        # F = build_X2C_Fock_mat(mol, D, h_x2c)
+        F = build_X2C_Fock_mat(mol, D, h_x2c) + V_ext
+
+        #Build the induction potential 
+        "V_ind = ..."
+        # print('HERER F', F)
+        # Compute HF energy
+        # E = (1/2) Tr[D(h + F)] + nuclear repulsion
+        E_elec = 0.5 * np.real(np.einsum('mn,nm->', D, h_x2c+F)) #TRANSPONERING?
+        E_total = E_elec + mol.energy_nuc()
         
+        # Diagonalize F in the metric S
+        eps, C = eigh(F, s)
+        C_occ_new = C[:, :n_occ]
+        D_new     = density_mat(C_occ_new)
+        
+        # Check convergence on density matrix
+        delta_D = np.max(np.abs(D_new - D))
+        print(f"Iter {iteration:3d}  E = {E_total:.10f}  dD = {delta_D:.2e}")
+        
+        D = D_new
+        C_occ = C_occ_new
+        
+        if delta_D < tol:
+            print("Converged!")
+            break
     
-    
+    return E_total, C, eps, D
+
+
+def build_point_charge_potential(mol, charge, coord):
+    with mol.with_rinv_orig(coord):
+        V = mol.intor('int1e_rinv_spinor')
+    return charge * V
+
+
     
 
 
@@ -107,9 +189,12 @@ def h2():
     # active_space = (2, 4)
     charge = 0
     spin = 0
-    test_x2c(
-        geometry=geometry, basis=basis, active_space=active_space_u, charge=charge, spin=spin, unit="angstrom"
-    )
+    mol = pyscf.M(atom=geometry, basis=basis, unit="angstrom", charge=charge, spin=spin)
+    # eri=mol.intor('int2e_spinor')
+    # print('ok eri',eri)
+    mol.build()
+    n_occ=2
+    scf_x2c_hf(mol, n_occ)
 
 
 h2()

@@ -32,7 +32,7 @@ from slowquant.unitary_coupled_cluster.generalized_operator_state_algebra import
 )
 from slowquant.unitary_coupled_cluster.generalized_operators import (
     a_op_spin,
-    generalized_hamiltonian_full_space,
+    generalized_hamiltonian_full_space, generalized_hamiltonian_0i_0a
 )
 from slowquant.unitary_coupled_cluster.operators import G1, G2
 from slowquant.unitary_coupled_cluster.optimizers import Optimizers
@@ -698,12 +698,12 @@ class GeneralizedWaveFunctionUPS:
             self._energy_elec = generalized_expectation_value_energy(
                 self.ci_coeffs,
                 # Skal ændres til generalized_hamiltonian_0i_0a på et tidspunkt.
-                # [ virker ikke AE
-                #     generalized_hamiltonian_0i_0a(
-                #         self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs
-                #     )
-                # ],
-                [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
+                [ #virker ikke AE
+                    generalized_hamiltonian_0i_0a(
+                        self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs
+                    )
+                ],
+                # [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
             )
@@ -994,17 +994,17 @@ class GeneralizedWaveFunctionUPS:
         )
         start = time.time()
         for iteration in range(maxiter):
-            # Hamiltonian = generalized_hamiltonian_0i_0a(
-            #     self.h_mo,
-            #     self.g_mo,
-            #     self.num_inactive_spin_orbs,
-            #     self.num_active_spin_orbs,
-            # )
-            Hamiltonian = generalized_hamiltonian_full_space(  # AE rettet virker ikke (H0i_ai)
+            Hamiltonian = generalized_hamiltonian_0i_0a(
                 self.h_mo,
                 self.g_mo,
-                self.num_spin_orbs,
+                self.num_inactive_spin_orbs,
+                self.num_active_spin_orbs,
             )
+            # Hamiltonian = generalized_hamiltonian_full_space(  # AE rettet virker ikke (H0i_ai)
+            #     self.h_mo,
+            #     self.g_mo,
+            #     self.num_spin_orbs,
+            # )
             H_ket = generalized_propagate_state(
                 [Hamiltonian],
                 self.ci_coeffs,
@@ -1094,8 +1094,8 @@ class GeneralizedWaveFunctionUPS:
         else:
             E = generalized_expectation_value_energy(
                 self.ci_coeffs,
-                # [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
-                [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
+                [generalized_hamiltonian_0i_0a(self.h_mo, self.g_mo, self.num_inactive_spin_orbs, self.num_active_spin_orbs)],
+                # [generalized_hamiltonian_full_space(self.h_mo, self.g_mo, self.num_spin_orbs)],
                 self.ci_coeffs,
                 self.ci_info,
             )
@@ -1145,17 +1145,17 @@ class GeneralizedWaveFunctionUPS:
                 self.rdm2,
             )
         if theta_optimization:
-            # Hamiltonian = generalized_hamiltonian_0i_0a(
-            #    self.h_mo,
-            #    self.g_mo,
-            #    self.num_inactive_spin_orbs,
-            #    self.num_active_spin_orbs,
-            # )
-            Hamiltonian = generalized_hamiltonian_full_space(
-                self.h_mo,
-                self.g_mo,
-                self.num_spin_orbs,
+            Hamiltonian = generalized_hamiltonian_0i_0a(
+               self.h_mo,
+               self.g_mo,
+               self.num_inactive_spin_orbs,
+               self.num_active_spin_orbs,
             )
+            # Hamiltonian = generalized_hamiltonian_full_space(
+            #     self.h_mo,
+            #     self.g_mo,
+            #     self.num_spin_orbs,
+            # )
             # Reference bra state (no differentiations)
             bra_vec = generalized_propagate_state(
                 [Hamiltonian],

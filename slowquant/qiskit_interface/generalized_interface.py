@@ -128,7 +128,7 @@ class QuantumInterface:
         self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
         self._M_shots = None  # define a separate number of shots for M
 
-    def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int]) -> None:
+    def construct_circuit(self, occ_spin_idx, unocc_spin_idx, num_orbs: int, num_elec: tuple[int, int]) -> None:
         """Construct qiskit circuit.
 
         Args:
@@ -138,7 +138,7 @@ class QuantumInterface:
         self.num_orbs = num_orbs
         self.num_spin_orbs = 2 * num_orbs
         self.num_elec = num_elec
-        self.grad_param_R_norm: dict[
+        self.grad_param_R_r: dict[
             str, int
         ] = {}  # Contains information about the parameterization needed for gradient evaluations.
         self.grad_param_R_phi: dict[
@@ -200,7 +200,7 @@ class QuantumInterface:
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R_r, self.grad_param_R_phi = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
+            self.circuit, self.grad_param_R_r, self.grad_param_R_phi = fUCC(occ_spin_idx, unocc_spin_idx, num_orbs, self.num_elec, self.mapper, self.ansatz_options) #AE
         elif self.ansatz == "kSAfUpCCGSD":
             self.ansatz_options["SAGS"] = True
             self.ansatz_options["GpD"] = True

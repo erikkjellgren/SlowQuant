@@ -140,7 +140,6 @@ def iterate_t1(
             else:
                 num_beta -= 1
             if (num_alpha != 0 or num_beta != 0) and is_spin_conserving:
-                print("yes")
                 continue
             yield a, i
 
