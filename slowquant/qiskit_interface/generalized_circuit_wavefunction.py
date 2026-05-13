@@ -189,14 +189,9 @@ class GeneralizedWaveFunctionCircuit:
                 self.kappa_spin_idx.append((P, Q))
         # Setup Qiskit stuff
         self.QI = quantum_interface
-        self.QI.construct_circuit(self.active_occ_spin_idx_shifted,
-            self.active_unocc_spin_idx_shifted,
-            2 * self.num_active_spin_orbs, (self.num_active_elec_alpha, self.num_active_elec_beta) #AE
-        )
-
-        self._thetas_real = [0.0] * self.QI.circuit.num_parameters #AE
-        self._thetas_imag = [0.0] * self.QI.circuit.num_parameters #AE
-
+        self.QI.construct_circuit(occ_spin_idx=self.active_occ_spin_idx, unocc_spin_idx= self.active_unocc_spin_idx, 
+                                  num_orbs=self.num_orbs, num_elec=(self.num_active_elec_alpha, self.num_active_elec_beta),
+                                )
 
     @property
     def kappa_real(self) -> list[float]:
