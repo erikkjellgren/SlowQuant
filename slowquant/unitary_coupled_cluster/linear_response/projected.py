@@ -406,6 +406,7 @@ class LinearResponse(LinearResponseBaseClass):
         prec_A = np.zeros(num_q + num_G)
         prec_sigma = np.zeros(num_q + num_G)
 
+        if len(self.q_ops) != 0:
         # Exact q diagonal
         prec_A[:num_q] = get_orbital_hessian_diagonal(
             self.wf.h_mo,
