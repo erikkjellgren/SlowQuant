@@ -505,6 +505,52 @@ class LinearResponse(LinearResponseBaseClass):
 
         return prec_A, prec_sigma
 
+    def property_gradient(self, integral: np.ndarray) -> np.ndarray:
+        """Calculate top half of the property gradient.
+        Bottom half can be found through conjugation and sign change.
+
+        Args:
+            integral: MO integral for which to calculate the gradient.
+
+        Returns:
+            Gradient of property.
+        """
+        num_q = len(self.q_ops)
+        num_G = len(self.G_ops)
+        num_ops = num_q + num_G
+        gradient = np.zeros((num_ops))
+        if num_q != 0:
+            gradient[:num_q] = get_orbital_rotation_gradient(
+                integral,
+                None,
+                self.wf.kappa_no_activeactive_idx,
+                self.wf.num_inactive_orbs,
+                self.wf.num_active_orbs,
+                self.wf.rdm1,
+                self.wf.rdm2,
+            )
+        op = one_elec_op_0i_0a(
+            integral,
+            self.wf.num_inactive_orbs,
+            self.wf.num_active_orbs,
+        )
+        op_ket = propagate_state([op], self.wf.ci_coeffs, *self.index_info)
+        for i, GI in enumerate(self.G_ops):
+            GI_ket = propagate_state([GI], self.wf.ci_coeffs, *self.index_info)
+            gradient[num_q + i] = expectation_value(
+                GI_ket,
+                [],
+                op_ket,
+                *self.index_info,
+            )
+            gradient[num_q + i] -= self._G_expect[i] * expectation_value(
+                self.wf.ci_coeffs,
+                [],
+                op_ket,
+                *self.index_info,
+            )
+        return gradient.reshape(-1, 1)
+
     def get_transition_dipole(self) -> np.ndarray:
         """Calculate transition dipole moment.
 
