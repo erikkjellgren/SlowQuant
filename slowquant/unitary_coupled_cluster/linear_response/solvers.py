@@ -69,6 +69,7 @@ class Davidson:
 
         start_guess = np.zeros((dim, n_roots))
         start_guess[np.argsort(diag)[:n_roots], np.arange(n_roots)] = 1.0
+        start_guess = np.vstack((start_guess, start_guess))
         trial = self._orthonormalize(start_guess)
         for _ in range(max_iteration):
             self._iteration += 1
@@ -86,6 +87,7 @@ class Davidson:
             if converged:
                 if not is_silent:
                     self._print_iteration_info(res_norms, omega, tolerance)
+                    print()
                 return omega, X
 
             trial = self._update_trial_vectors(omega, R, preconditioner)
@@ -107,17 +109,6 @@ class Davidson:
         """Print the citation for the Davidson method."""
         print()
         print("Davidson solver for eigenvalue problems (J. Comput. Phys. 17, 87-94 (1975))")
-
-    @staticmethod
-    def _orthonormalize(trial: np.ndarray) -> np.ndarray:
-        """Orthonormalize columns of trial using QR and return Q with collapsed tiny columns removed."""
-        Q, R = np.linalg.qr(trial)
-        # remove near-zero columns (if any)
-        diagR = np.abs(np.diag(R))
-        keep = diagR > 1e-12
-        new_trial = Q[:, keep]
-        new_trial /= np.linalg.norm(new_trial, axis=0)
-        return new_trial
 
     def _print_iteration_info(self, res_norms_plus: np.ndarray, omega: np.ndarray, tolerance: float) -> None:
         """Print iteration information including the maximum residual norm."""
@@ -183,6 +174,11 @@ class Davidson:
     def _setup_right_transformed_arrays(self) -> None:
         """Setup arrays to store right transformed vectors."""
 
+    @staticmethod
+    @abstractmethod
+    def _orthonormalize(trial: np.ndarray) -> np.ndarray:
+        """Orthogonalize columns of trial using QR and return Q with collapsed tiny columns removed."""
+
     @abstractmethod
     def _add_iteration_data(self, trial: np.ndarray, right_transformed_vectors: tuple[np.ndarray, ...]) -> None:
         """Add trial and right transformed matrices for the current iteration to the arrays."""
@@ -224,6 +220,18 @@ class UnpairedDavidson(Davidson):
     def _print_citation(self) -> None:
         """Print the citation for the Davidson method."""
         super()._print_citation()
+
+    @staticmethod
+    def _orthonormalize(trial: np.ndarray) -> np.ndarray:
+        """Orthogonalize columns of trial using QR and return Q with collapsed tiny columns removed."""
+        Q, R = np.linalg.qr(trial)
+        # remove near-zero columns (if any)
+        diagR = np.abs(np.diag(R))
+        keep = diagR > 1e-12
+        new_trial = Q[:, keep]
+        new_trial /= np.linalg.norm(new_trial, axis=0)
+
+        return new_trial
 
     def _add_iteration_data(self, trial: np.ndarray, right_transformed_vectors: tuple[np.ndarray, ...]) -> None:
         """Add trial and right transformed matrices for the current iteration to the arrays."""
@@ -306,14 +314,16 @@ class PairedDavidson(Davidson):
     _sigma_plus: np.typing.NDArray[np.complexfloating]
     """Subspace matrix A @ b + B @ b*"""
     _sigma_minus: np.typing.NDArray[np.complexfloating]
-    """Subspace matrix A @ b - B @ b*"""
+    _tau_plus: np.typing.NDArray[np.complexfloating]
+    """Subspace matrix Sigma @ b-"""
     _tau_minus: np.typing.NDArray[np.complexfloating]
-    """Subspace matrix Sigma @ b"""
+    """Subspace matrix Sigma @ b+"""
 
     def _setup_right_transformed_arrays(self) -> None:
         """Setup arrays to store right transformed vectors."""
         self._sigma_plus = np.array(())
         self._sigma_minus = np.array(())
+        self._tau_plus = np.array(())
         self._tau_minus = np.array(())
 
     def _print_citation(self) -> None:
@@ -321,18 +331,47 @@ class PairedDavidson(Davidson):
         super()._print_citation()
         print("Davidson solver for paired eigenvalue problems (J. Chem. Phys. 150, 174121 (2019))")
 
+    @staticmethod
+    def _orthonormalize(trial: np.ndarray) -> np.ndarray:
+        """Orthogonalize columns of trial using QR and return Q with collapsed tiny columns removed."""
+        trial_plus = trial[:trial.shape[0] // 2, :]
+        trial_minus = trial[trial.shape[0] // 2:, :]
+
+        Q, R = np.linalg.qr(trial_plus)
+        # remove near-zero columns (if any)
+        diagR = np.abs(np.diag(R))
+        keep_plus = diagR > 1e-12
+
+        Q, R = np.linalg.qr(trial_minus)
+        # remove near-zero columns (if any)
+        diagR = np.abs(np.diag(R))
+        keep_minus = diagR > 1e-12
+
+        keep = keep_plus & keep_minus
+        new_trial_plus = Q[:, keep]
+        new_trial_minus = Q[:, keep]
+
+        new_trial_plus /= np.linalg.norm(new_trial_plus, axis=0)
+        new_trial_minus /= np.linalg.norm(new_trial_minus, axis=0)
+
+        new_trial = np.vstack((new_trial_plus, new_trial_minus))
+
+        return new_trial
+
     def _add_iteration_data(self, trial: np.ndarray, right_transformed_vectors: tuple[np.ndarray, ...]) -> None:
         """Add trial and right transformed matrices for the current iteration to the arrays."""
-        sigma_plus, sigma_minus, tau_minus = right_transformed_vectors
+        sigma_plus, sigma_minus, tau_plus, tau_minus = right_transformed_vectors
         if self._iteration == 1:
             self._trial = trial.copy()
             self._sigma_plus = sigma_plus.copy()
             self._sigma_minus = sigma_minus.copy()
+            self._tau_plus = tau_plus.copy()
             self._tau_minus = tau_minus.copy()
         else:
             self._trial = np.hstack((self._trial, trial))
             self._sigma_plus = np.hstack((self._sigma_plus, sigma_plus))
             self._sigma_minus = np.hstack((self._sigma_minus, sigma_minus))
+            self._tau_plus = np.hstack((self._tau_plus, tau_plus))
             self._tau_minus = np.hstack((self._tau_minus, tau_minus))
 
     def _compute_residual_vectors(self, n_roots: int) -> tuple[np.ndarray, np.ndarray, tuple[np.ndarray, np.ndarray]]:
@@ -344,10 +383,12 @@ class PairedDavidson(Davidson):
             plus, minus = vector[:n, :], vector[n:, :]
             return plus, minus
 
-        E_plus = 2 * self._trial.conj().T @ self._sigma_plus
-        E_minus = 2 * self._trial.conj().T @ self._sigma_minus
+        trial_plus, trial_minus = _split_vector(self._trial)
+
+        E_plus = 2 * np.real(trial_plus.conj().T @ self._sigma_plus)
+        E_minus = 2 * np.real(trial_minus.conj().T @ self._sigma_minus)
         # S_plus = S_minus.T
-        S_minus = 2 * self._trial.conj().T @ self._tau_minus
+        S_minus = 2 * np.real(trial_minus.conj().T @ self._tau_minus)
 
         E = np.block([
             [E_plus, np.zeros_like(E_minus)],
@@ -376,24 +417,28 @@ class PairedDavidson(Davidson):
 
         # Compute Ritz vectors (X) and residuals (R)
         x_plus, x_minus = _split_vector(x)
+        X = np.vstack((trial_plus @ x_plus + trial_minus @ x_minus, trial_plus @ x_plus - trial_minus @ x_minus))
+
+        R_plus = self._sigma_plus @ x_plus - self._tau_plus @ x_minus * omega
+        R_minus = self._sigma_minus @ x_minus - self._tau_minus @ x_plus * omega
         norm = np.sqrt(np.abs(np.diag(
             x_minus.T @ S_minus @ x_plus + x_plus.T @ S_minus.T @ x_minus
         )))
-        x_plus /= norm
-        x_minus /= norm
-        X = np.vstack((self._trial @ (x_plus + x_minus), self._trial @ (x_plus - x_minus)))
-
-        # tau_plus = tau_minus
-        R_plus = self._sigma_plus @ x_plus - self._tau_minus @ x_minus * omega
-        R_minus = self._sigma_minus @ x_minus - self._tau_minus @ x_plus * omega
+        norm[np.isclose(norm, 0)] = 1
+        X /= norm
 
         return omega, X, (R_plus, R_minus)
 
     @staticmethod
     def _check_convergence(R: tuple[np.ndarray, ...], tolerance: float) -> tuple[bool, np.ndarray]:
         """Check if the maximum residual norm is below the tolerance."""
-        R_plus, _ = R
-        res_norms = np.linalg.norm(R_plus, axis=0)
+        R_plus, R_minus = R
+        plus_norms = np.linalg.norm(R_plus, axis=0)
+        minus_norms = np.linalg.norm(R_minus, axis=0)
+        if max(plus_norms) > max(minus_norms):
+            res_norms = plus_norms
+        else:
+            res_norms = minus_norms
         return all(res_norms <= tolerance), res_norms
 
     @staticmethod
@@ -402,26 +447,29 @@ class PairedDavidson(Davidson):
         diagonal_A, diagonal_Sigma = preconditioner
         R_plus, R_minus = R
 
-        minus_contribution = diagonal_A.reshape(-1, 1) - diagonal_Sigma.reshape(-1, 1) * omega.reshape(1, -1)
-        plus_contribution = diagonal_A.reshape(-1, 1) + diagonal_Sigma.reshape(-1, 1) * omega.reshape(1, -1)
+        plus_contribution = diagonal_A.reshape(-1, 1) + diagonal_Sigma.reshape(-1, 1) * o.reshape(1, -1)
+        minus_contribution = diagonal_A.reshape(-1, 1) - diagonal_Sigma.reshape(-1, 1) * o.reshape(1, -1)
         denominator = - np.ones_like(R_plus)
         # Check if any of the contributions are close to zero to avoid division by zero, if so skip the division for that contribution
-        if not np.any(np.isclose(minus_contribution, 0)):
+        plus_contribution[np.isclose(plus_contribution, 0)] = 1
+        minus_contribution[np.isclose(minus_contribution, 0)] = 1
+        denominator /= plus_contribution
             denominator /= minus_contribution
-        if not np.any(np.isclose(plus_contribution, 0)):
-            denominator /= plus_contribution
-        new_trial = denominator * (
-            diagonal_A.reshape(-1, 1) * R_plus + diagonal_Sigma.reshape(-1, 1) * R_minus * omega.reshape(1, -1)
-            + diagonal_A.reshape(-1, 1) * R_minus + diagonal_Sigma.reshape(-1, 1) * R_plus * omega.reshape(1, -1)
+        new_trial_plus = denominator * (
+            diagonal_A.reshape(-1, 1) * R_plus + diagonal_Sigma.reshape(-1, 1) * R_minus * o.reshape(1, -1)
         )
+        new_trial_minus = denominator * (
+            diagonal_A.reshape(-1, 1) * R_minus + diagonal_Sigma.reshape(-1, 1) * R_plus * o.reshape(1, -1)
+        )
+        new_trial = np.vstack((new_trial_plus, new_trial_minus))
         return new_trial
 
     def _reset_reduced_space(self, trial: np.ndarray, right_transformed_vectors: tuple[np.ndarray, ...]) -> None:
         """Reset the reduced space by keeping only the current Ritz vectors."""
         self._trial = self._orthonormalize(trial)
-        self._sigma_plus, self._sigma_minus, self._tau_minus = right_transformed_vectors
+        self._sigma_plus, self._sigma_minus, self._tau_plus, self._tau_minus = right_transformed_vectors
 
-def one_index_transform(K: np.ndarray, h_mo: np.ndarray, g_mo: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def one_index_transform(K: np.ndarray, h_mo: np.ndarray, g_mo: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray]:
     r"""One index transformation of the Hamiltonian.
 
     .. math::

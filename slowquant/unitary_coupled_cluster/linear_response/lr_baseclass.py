@@ -115,7 +115,7 @@ class LinearResponseBaseClass:
         """Compute preconditioner for Davidson solver."""
         raise NotImplementedError
 
-    def _right_transform(self, trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _right_transform(self, trial: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Right transform for Davidson solver.
 
         Args:
