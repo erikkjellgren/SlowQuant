@@ -122,11 +122,8 @@ def tUPS(
 
 
 def fUCC(
-<<<<<<< HEAD
     occ_spin_idx: list[int], #AE
     unocc_spin_idx: list[int], #AE  
-=======
->>>>>>> 16a9e5705778e0b87237b77084692bd4550463fd
     num_orbs: int,
     num_elec: tuple[int, int],
     mapper: FermionicMapper,
@@ -157,11 +154,7 @@ def fUCC(
     Returns:
         Factorized UCC ansatz circuit and R parameters needed for gradients.
     """
-<<<<<<< HEAD
     valid_options = ("n_layers", "S", "D", "SAGS", "pD", "GpD", "SAS", "cS", "cD", "is_spin_conserving")
-=======
-    valid_options = ("n_layers", "S", "D", "SAGS", "pD", "GpD", "SAS", "cS", "cD")
->>>>>>> 16a9e5705778e0b87237b77084692bd4550463fd
     for option in ansatz_options:
         if option not in valid_options:
             raise ValueError(f"Got unknown option for fUCC, {option}. Valid options are: {valid_options}")
@@ -214,7 +207,6 @@ def fUCC(
         idx += 1
     qc = HartreeFock(num_orbs, (0, 0), mapper)  # empty circuit with qubit number based on mapper
     grad_param_R = {}
-<<<<<<< HEAD
     idx = 0
     #AE start
     if "is_spin_conserving" in ansatz_options.keys():
@@ -233,19 +225,6 @@ def fUCC(
             for a, i in iterate_t1(occ_spin_idx, unocc_spin_idx, is_spin_conserving=is_spin_conserving):
                 qc = single_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 2
-=======
-    grad_param_R_norm = {}
-    grad_param_R_phi = {}
-    idx = 0
-    # Layer loop
-    for _ in range(n_layers):
-        if do_S:
-            for a, i in iterate_t1(occ, unocc):
-                qc = single_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
-                grad_param_R_norm[f"p{idx:09d}"] = 2
-                grad_param_R_phi[f"p{idx:09d}"] = 2
-                # Insert extra grad_param_R for phi AWE
->>>>>>> 16a9e5705778e0b87237b77084692bd4550463fd
                 idx += 1
         if do_SAS:
             for a, i, _ in iterate_t1_sa(occ, unocc):
@@ -261,17 +240,9 @@ def fUCC(
             # Add some code for complex singles
             None
         if do_D:
-<<<<<<< HEAD
             for a, i, b, j in iterate_t2(occ_spin_idx, unocc_spin_idx, is_spin_conserving=is_spin_conserving):
                 qc = double_excitation(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 2
-=======
-            for a, i, b, j in iterate_t2(occ, unocc):
-                qc = double_excitation(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
-                grad_param_R_norm[f"p{idx:09d}"] = 2
-                grad_param_R_phi[f"p{idx:09d}"] = 4
-                # Insert extra grad_param_R for phi AWE
->>>>>>> 16a9e5705778e0b87237b77084692bd4550463fd
                 idx += 1
         if do_pD:
             for a, i, b, j in iterate_pair_t2(occ, unocc):
@@ -286,11 +257,7 @@ def fUCC(
         if do_cD:
             # Add some code for complex doubles
             None
-<<<<<<< HEAD
     return qc, grad_param_R
-=======
-    return qc, grad_param_R_norm, grad_param_R_phi
->>>>>>> 16a9e5705778e0b87237b77084692bd4550463fd
 
 
 def SDSfUCC(
