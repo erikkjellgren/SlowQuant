@@ -141,49 +141,41 @@ class LinearResponseBaseClass:
         Returns:
             Linear response function at given frequency.
         """
-        output = np.array(())
         if solver_settings is None:
             solver_settings = {}
         if lr_property.lower() in ("dipole polarizability", "dp"):
-            property_strings = (
-                "Calculating x component of dipole polarizability.",
-                "Calculating y component of dipole polarizability.",
-                "Calculating z component of dipole polarizability.",
-            )
+            title_string = f"Calculating dipole polarizability at frequency {frequency} a.u."
             integrals = self.wf.int_gen.electric_dipole
             property_gradient_x = self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[0]))
             property_gradient_y = self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[1]))
             property_gradient_z = self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[2]))
-            property_gradient = np.array([property_gradient_x, property_gradient_y, property_gradient_z])
-            full_gradient = np.hstack((
+            property_gradient = np.hstack([property_gradient_x, property_gradient_y, property_gradient_z])
+            full_gradient = np.vstack((
                 property_gradient.reshape(len(property_gradient), -1),
                 -property_gradient.reshape(len(property_gradient), -1)
-            )).T
+            ))
         else:
             raise ValueError(f"Unknown property {lr_property} for linear response function.")
 
-        num_ops = len(self.q_ops) + len(self.G_ops)
+        print()
+        print(title_string)
+
         preconditioner = self._compute_preconditioner()
-        response_vectors = np.zeros((len(property_gradient), 2*(num_ops)))
         solver = PairedDavidson()
-        for i, (info, grad) in enumerate(zip(property_strings, property_gradient)):
-            print()
-            print(info)
-            _, rv = (
-                solver.solve(
-                    self._right_transform,
-                    preconditioner,
-                    max_iteration=solver_settings.get("max_iteration", 100),
-                    tolerance=solver_settings.get("tolerance", 1e-8),
-                    n_roots=1,
-                    max_reduced_space=solver_settings.get("max_reduced_space", 8),
-                    frequency=frequency,
-                    property_gradient=grad,
-                    is_silent=solver_settings.get("is_silent", False),
-                    _start_guess=solver_settings.get("_start_guess", None),
-                )
+        _, response_vectors = (
+            solver.solve(
+                self._right_transform,
+                preconditioner,
+                max_iteration=solver_settings.get("max_iteration", 100),
+                tolerance=solver_settings.get("tolerance", 1e-8),
+                n_roots=property_gradient.shape[-1],
+                max_reduced_space=solver_settings.get("max_reduced_space", 8),
+                frequency=frequency,
+                property_gradient=property_gradient,
+                is_silent=solver_settings.get("is_silent", False),
+                _start_guess=solver_settings.get("_start_guess", None),
             )
-            response_vectors[i] = rv[:, 0]
+        )
 
         return response_vectors, full_gradient
 

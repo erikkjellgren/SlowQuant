@@ -450,7 +450,7 @@ class PairedDavidson(Davidson):
         R_minus = self._sigma_minus @ x_minus - self._tau_minus @ x_plus * omega
         if frequency is not None and property_gradient is not None:
             V = np.vstack((property_gradient, -property_gradient.conj()))
-            omega = (X.T @ V).reshape(-1)
+            omega = np.diag(X.T @ V)
             if np.iscomplex(frequency):
                 R_plus += property_gradient
             if np.isreal(frequency):
