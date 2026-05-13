@@ -31,6 +31,7 @@ class Davidson:
         frequency: float | None = None,
         property_gradient: np.ndarray | None = None,
         is_silent: bool = False,
+        _start_guess: np.ndarray | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
         """
         Solve the problem.
@@ -45,6 +46,7 @@ class Davidson:
             frequency: Frequency for the linear response calculation.
             property_gradient: The property gradient.
             is_silent: Suppress progress output.
+            _start_guess: Optional initial guess for the trial vectors.
 
         Returns:
             omega: Eigenvalues.
@@ -81,6 +83,8 @@ class Davidson:
         start_guess[np.argsort(diag)[:n_roots], np.arange(n_roots)] = 1.0
         start_guess = np.vstack((start_guess, start_guess))
         trial = self._orthonormalize(start_guess)
+        if _start_guess is not None:
+            trial = _start_guess
         for _ in range(max_iteration):
             self._iteration += 1
 
