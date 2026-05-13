@@ -124,6 +124,68 @@ class LinearResponseBaseClass:
         """
         raise NotImplementedError
 
+    def linear_response_function(self, frequency: float, lr_property: str, solver_settings: dict | None = None) -> tuple[np.ndarray, np.ndarray]:
+        """Calculate linear response function at given frequency.
+
+        Args:
+            frequency: Frequency to calculate response function at.
+            lr_property: Property for which to calculate the response function.
+                Dipole Polarizability can be calculated by setting lr_property to "dipole polarizability" or "dp".
+            solver_settings: Settings for the Davidson solver:
+                max_iteration: Maximum number of iterations. Default is 100.
+                tolerance: Convergence tolerance. Default is 1e-8.
+                max_reduced_space: Maximum size of the reduced space. Default is 8.
+                is_silent: Whether to print convergence information. Default is False.
+                _start_guess: Optional starting guess for the response vector. Default is None.
+
+        Returns:
+            Linear response function at given frequency.
+        """
+        output = np.array(())
+        if solver_settings is None:
+            solver_settings = {}
+        if lr_property.lower() in ("dipole polarizability", "dp"):
+            property_strings = (
+                "Calculating x component of dipole polarizability.",
+                "Calculating y component of dipole polarizability.",
+                "Calculating z component of dipole polarizability.",
+            )
+            integrals = self.wf.int_gen.electric_dipole
+            property_gradient_x = self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[0]))
+            property_gradient_y = self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[1]))
+            property_gradient_z = self.property_gradient(one_electron_integral_transform(self.wf.c_mo, integrals[2]))
+            property_gradient = np.array([property_gradient_x, property_gradient_y, property_gradient_z])
+            full_gradient = np.hstack((
+                property_gradient.reshape(len(property_gradient), -1),
+                -property_gradient.reshape(len(property_gradient), -1)
+            )).T
+        else:
+            raise ValueError(f"Unknown property {lr_property} for linear response function.")
+
+        num_ops = len(self.q_ops) + len(self.G_ops)
+        preconditioner = self._compute_preconditioner()
+        response_vectors = np.zeros((len(property_gradient), 2*(num_ops)))
+        solver = PairedDavidson()
+        for i, (info, grad) in enumerate(zip(property_strings, property_gradient)):
+            print()
+            print(info)
+            _, rv = (
+                solver.solve(
+                    self._right_transform,
+                    preconditioner,
+                    max_iteration=solver_settings.get("max_iteration", 100),
+                    tolerance=solver_settings.get("tolerance", 1e-8),
+                    n_roots=1,
+                    max_reduced_space=solver_settings.get("max_reduced_space", 8),
+                    frequency=frequency,
+                    property_gradient=grad,
+                    is_silent=solver_settings.get("is_silent", False),
+                    _start_guess=solver_settings.get("_start_guess", None),
+                )
+            )
+            response_vectors[i] = rv[:, 0]
+
+        return response_vectors, full_gradient
 
     def property_gradient(self, integral: np.ndarray) -> np.ndarray:
         """Calculate gradient of property.
