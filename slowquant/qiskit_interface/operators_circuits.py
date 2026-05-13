@@ -37,6 +37,34 @@ def single_excitation(
         qc = _single_excitation_trotter(i, a, num_orbs, qc, theta, mapper)
     return qc
 
+def single_excitation_generalized(
+    i: int,
+    a: int,
+    num_orbs: int,
+    qc: QuantumCircuit,
+    theta: Parameter | ParameterExpression,
+    phi: Parameter | ParameterExpression,
+    mapper: FermionicMapper,
+) -> QuantumCircuit:
+    """Get single excitation circuit.
+
+    Args:
+        i: Strongly occupied spin orbital index.
+        a: Weakly occupied spin orbital index.
+        num_orbs: Number of spatial orbitals.
+        qc: Quantum circuit.
+        theta: Circuit parameter.
+        mapper: Fermionic to qubit mapper.
+
+    Returns:
+        Single excitation circuit.
+    """
+    if isinstance(mapper, JordanWignerMapper):
+        qc = _single_excitation_efficient_generalized(a, i, num_orbs, qc, theta, phi)
+    else:
+        qc = _single_excitation_trotter(i, a, num_orbs, qc, theta, mapper)
+    return qc
+
 
 def double_excitation(
     i: int,
@@ -65,6 +93,38 @@ def double_excitation(
     """
     if isinstance(mapper, JordanWignerMapper):
         qc = _double_excitation_efficient(a, b, i, j, num_orbs, qc, theta)
+    else:
+        qc = _double_excitation_trotter(i, j, a, b, num_orbs, qc, theta, mapper)
+    return qc
+
+def double_excitation_generalized(
+    i: int,
+    j: int,
+    a: int,
+    b: int,
+    num_orbs: int,
+    qc: QuantumCircuit,
+    theta: Parameter | ParameterExpression,
+    phi: Parameter | ParameterExpression,
+    mapper: FermionicMapper,
+) -> QuantumCircuit:
+    """Get double excitation circuit.
+
+    Args:
+        i: Strongly occupied spin orbital index.
+        j: Strongly occupied spin orbital index.
+        a: Weakly occupied spin orbital index.
+        b: Weakly occupied spin orbital index.
+        num_orbs: Number of spatial orbitals.
+        qc: Quantum circuit.
+        theta: Circuit parameter.
+        mapper: Fermionic to qubit mapper.
+
+    Returns:
+        Single excitation circuit.
+    """
+    if isinstance(mapper, JordanWignerMapper):
+        qc = _double_excitation_efficient_generalized(a, b, i, j, num_orbs, qc, theta, phi)
     else:
         qc = _double_excitation_trotter(i, j, a, b, num_orbs, qc, theta, mapper)
     return qc
@@ -153,7 +213,7 @@ def _single_excitation_efficient(
 
 
 def _single_excitation_efficient_generalized(
-    k: int, i: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression
+    k: int, i: int, num_orbs: int, qc: QuantumCircuit, theta_complex: Parameter | ParameterExpression
 ) -> QuantumCircuit:
     r"""Exact circuit for single excitation.
 
@@ -175,6 +235,10 @@ def _single_excitation_efficient_generalized(
     Returns:
         Single excitation circuit.
     """
+    phi = np.arccos(theta_complex.real)
+    theta = np.sqrt(theta_complex.real**2 + theta_complex.imag**2)
+
+
     k = f2q(k, num_orbs)
     i = f2q(i, num_orbs)
     if k <= i:
@@ -349,7 +413,7 @@ def _double_excitation_efficient(
 
 
 def _double_excitation_efficient_generalized(
-    k: int, l: int, i: int, j: int, num_orbs: int, qc: QuantumCircuit, theta: Parameter | ParameterExpression
+    k: int, l: int, i: int, j: int, num_orbs: int, qc: QuantumCircuit, theta_complex: Parameter | ParameterExpression
 ) -> QuantumCircuit:
     r"""Exact circuit for double excitation.
 
@@ -373,6 +437,11 @@ def _double_excitation_efficient_generalized(
     Returns:
         Double excitation circuit.
     """
+
+    phi = np.arccos(theta_complex.real)
+    theta = np.sqrt(theta_complex.real**2 + theta_complex.imag**2)
+
+
     if k < i or k < j:
         raise ValueError(f"Operator only implemented for k, {k}, larger than i, {i}, and j, {j}")
     if l < i or l < j:

@@ -10,6 +10,8 @@ from slowquant.qiskit_interface.operators_circuits import (
     double_excitation,
     sa_single_excitation,
     single_excitation,
+    single_excitation_generalized,
+    double_excitation_generalized,
 )
 from slowquant.unitary_coupled_cluster.util import (
     iterate_pair_t2,
@@ -212,7 +214,7 @@ def fUCC(
     for _ in range(n_layers):
         if do_S:
             for a, i in iterate_t1(occ, unocc):
-                qc = single_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
+                qc = single_excitation_generalized(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R_norm[f"p{idx:09d}"] = 2
                 grad_param_R_phi[f"p{idx:09d}"] = 2
                 # Insert extra grad_param_R for phi AWE
@@ -232,7 +234,7 @@ def fUCC(
             None
         if do_D:
             for a, i, b, j in iterate_t2(occ, unocc):
-                qc = double_excitation(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
+                qc = double_excitation_generalized(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R_norm[f"p{idx:09d}"] = 2
                 grad_param_R_phi[f"p{idx:09d}"] = 4
                 # Insert extra grad_param_R for phi AWE

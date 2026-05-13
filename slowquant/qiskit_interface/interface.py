@@ -138,7 +138,7 @@ class QuantumInterface:
         self.num_orbs = num_orbs
         self.num_spin_orbs = 2 * num_orbs
         self.num_elec = num_elec
-        self.grad_param_R: dict[
+        self.grad_param_R_r: dict[
             str, int
         ] = {}  # Contains information about the parameterization needed for gradient evaluations.
 

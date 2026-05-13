@@ -22,7 +22,7 @@ from qiskit_nature.second_q.mappers import JordanWignerMapper
 from qiskit_nature.second_q.mappers.fermionic_mapper import FermionicMapper
 from qiskit_nature.second_q.operators import FermionicOp
 
-from slowquant.qiskit_interface.custom_ansatz import SDSfUCC, fUCC, tUPS
+from slowquant.qiskit_interface.generalized_custom_ansatz import SDSfUCC, fUCC, tUPS
 from slowquant.qiskit_interface.util import (
     Clique,
     MitigationFlags,
@@ -184,7 +184,7 @@ class QuantumInterface:
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R_norm, self.grad_param_R_phi = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
+            self.circuit, self.grad_param_R_r, self.grad_param_R_phi = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
         elif self.ansatz == "HF":
             if len(self.ansatz_options) != 0:
                 raise ValueError(f"No options available for HF got {self.ansatz_options}")
@@ -200,7 +200,7 @@ class QuantumInterface:
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
-            self.circuit, self.grad_param_R_norm, self.grad_param_R_phi = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
+            self.circuit, self.grad_param_R_r, self.grad_param_R_phi = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
         elif self.ansatz == "kSAfUpCCGSD":
             self.ansatz_options["SAGS"] = True
             self.ansatz_options["GpD"] = True

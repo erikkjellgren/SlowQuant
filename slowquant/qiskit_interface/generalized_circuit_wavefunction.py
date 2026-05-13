@@ -16,7 +16,7 @@ from slowquant.molecularintegrals.integralfunctions import (
     generalized_one_electron_transform,
     generalized_two_electron_transform,
 )
-from slowquant.qiskit_interface.interface import QuantumInterface
+from slowquant.qiskit_interface.generalized_interface import QuantumInterface
 from slowquant.unitary_coupled_cluster.fermionic_operator import FermionicOperator
 from slowquant.unitary_coupled_cluster.generalized_density_matrix import (
     get_electronic_energy_generalized,
@@ -916,20 +916,34 @@ class WaveFunctionCircuit:
                 self.num_virtual_spin_orbs // 2,
             )
             #
-            # Here we need to implement parameter-shift for complex.
-            #
+            # Here we need to implement parameter-shift for complex WF
             
-            for i in range(len(parameters[num_kappa:])):
-               R = self.QI.grad_param_R[self.QI.param_names[i]]
-               e_vals_grad = _get_energy_evals_for_grad(H, self.QI, parameters, i, R)
+            for i in range(len(self.thetas)):
+               i_phi = len(self.thetas) + i
+
+               R_r = self.QI.grad_param_R_r[self.QI.param_names[i]]
+               R_phi = self.QI.grad_param_R_phi[self.QI.param_names[i]]
+
+               e_vals_grad_r   = _get_energy_evals_for_grad(H, self.QI, parameters[num_kappa:], i, R_r,   "r"  )
+               e_vals_grad_phi = _get_energy_evals_for_grad(H, self.QI, parameters[num_kappa:], i, R_phi, "phi" )
+
                grad = 0.0
-               for j, mu in enumerate(list(range(1, 2 * R + 1))):
-                   x_mu = (2 * mu - 1) / (2 * R) * np.pi
-                   grad += e_vals_grad[j] * (-1) ** (mu - 1) / (4 * R * (np.sin(1 / 2 * x_mu)) ** 2)
+               for j, mu in enumerate(list(range(1, 2 * R_r + 1))):
+                   x_mu = (2 * mu - 1) / (2 * R_r) * np.pi
+                   grad += e_vals_grad_r[j] * (-1) ** (mu - 1) / (4 * R_r * (np.sin(1 / 2 * x_mu)) ** 2)
                gradient[num_kappa + i] = grad
+
+               grad = 0.0
+               for j, mu in enumerate(list(range(1, 2 * R_phi + 1))):
+                   x_mu = (2 * mu - 1) / (2 * R_phi) * np.pi
+                   grad += e_vals_grad_phi[j] * (-1) ** (mu - 1) / (4 * R_phi * (np.sin(1 / 2 * x_mu)) ** 2)
+               gradient[num_kappa + i_phi] = grad
+
+
             self.num_energy_evals += 2 * np.sum(
-               list(self.QI.grad_param_R.values())
+               list(self.QI.grad_param_R_r.values())
             )  # Count energy measurements for all gradients
+            # This count has not been updated AWE
 
     
         return gradient
@@ -941,6 +955,8 @@ def _get_energy_evals_for_grad(
     parameters: list[complex],
     idx: int,
     R: int,
+    var: str,
+
 ) -> list[float]:
     """Get energy evaluations needed for the gradient calculation.
 
@@ -959,11 +975,34 @@ def _get_energy_evals_for_grad(
     """
     e_vals = []
     x = parameters.copy()
-    x_shift = x[idx]
-    for mu in range(1, 2 * R + 1):
-        x_mu = (2 * mu - 1) / (2 * R) * np.pi
-        x[idx] = x_mu + x_shift
-        # Real? because Hermitian?
-        e_vals.append(quantum_interface.quantum_expectation_value_complex(operator, custom_parameters=x).real)
+    nr = len(x)
+
+    x_complex = x[:nr//2] * np.exp(1j * x[nr//2:])
+
+
+    if var == "r":
+        theta_r = x[idx]
+        theta_phi = x[idx + nr]
+    
+    if var == "phi":
+        theta_phi = x[idx]
+        theta_r = x[idx-nr]
+
+    if var == "r":
+        for mu in range(1, 2 * R + 1):
+            x_mu = (2 * mu - 1) / (2 * R) * np.pi
+            theta_r_shifted = theta_r + x_mu 
+            theta = theta_r_shifted * np.exp(1j * theta_phi)
+            x_complex[idx] = theta
+            e_vals.append(quantum_interface.quantum_expectation_value_complex(operator, custom_parameters=x_complex).real)
+
+    if var == "phi":
+        for mu in range(1, 2 * R + 1):
+            x_mu = (2 * mu - 1) / (2 * R) * np.pi
+            theta_phi_shifted = theta_phi + x_mu 
+            theta = theta_r * np.exp(1j * theta_phi_shifted)
+            x_complex[idx] = theta
+            e_vals.append(quantum_interface.quantum_expectation_value_complex(operator, custom_parameters=x_complex).real)
+
     return e_vals
 
