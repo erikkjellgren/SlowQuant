@@ -134,7 +134,7 @@ class LinearResponseBaseClass:
             solver_settings: Settings for the Davidson solver:
                 max_iteration: Maximum number of iterations. Default is 100.
                 tolerance: Convergence tolerance. Default is 1e-8.
-                max_reduced_space: Maximum size of the reduced space. Default is 8.
+                max_reduced_space: Maximum size of the reduced space. Default is 8 times number of roots for the lr_property.
                 is_silent: Whether to print convergence information. Default is False.
                 _start_guess: Optional starting guess for the response vector. Default is None.
 
@@ -160,6 +160,7 @@ class LinearResponseBaseClass:
         print()
         print(title_string)
 
+        n_roots = property_gradient.shape[-1]
         preconditioner = self._compute_preconditioner()
         solver = PairedDavidson()
         _, response_vectors = (
@@ -168,8 +169,8 @@ class LinearResponseBaseClass:
                 preconditioner,
                 max_iteration=solver_settings.get("max_iteration", 100),
                 tolerance=solver_settings.get("tolerance", 1e-8),
-                n_roots=property_gradient.shape[-1],
-                max_reduced_space=solver_settings.get("max_reduced_space", 8),
+                n_roots=n_roots,
+                max_reduced_space=solver_settings.get("max_reduced_space", n_roots * 8),
                 frequency=frequency,
                 property_gradient=property_gradient,
                 is_silent=solver_settings.get("is_silent", False),
