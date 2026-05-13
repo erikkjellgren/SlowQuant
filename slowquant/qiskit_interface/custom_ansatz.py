@@ -212,6 +212,7 @@ def fUCC(
             for a, i in iterate_t1(occ, unocc):
                 qc = single_excitation(i, a, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 2
+                # Insert extra grad_param_R for phi AWE
                 idx += 1
         if do_SAS:
             for a, i, _ in iterate_t1_sa(occ, unocc):
@@ -230,6 +231,7 @@ def fUCC(
             for a, i, b, j in iterate_t2(occ, unocc):
                 qc = double_excitation(i, j, a, b, num_orbs, qc, Parameter(f"p{idx:09d}"), mapper)
                 grad_param_R[f"p{idx:09d}"] = 2
+                # Insert extra grad_param_R for phi AWE
                 idx += 1
         if do_pD:
             for a, i, b, j in iterate_pair_t2(occ, unocc):

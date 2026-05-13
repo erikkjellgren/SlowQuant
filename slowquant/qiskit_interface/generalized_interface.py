@@ -128,7 +128,11 @@ class QuantumInterface:
         self._do_cliques = True  # hard switch to stop using QWC (debugging tool).
         self._M_shots = None  # define a separate number of shots for M
 
+<<<<<<< HEAD
     def construct_circuit(self, occ_spin_idx, unocc_spin_idx, num_orbs: int, num_elec: tuple[int, int]) -> None:
+=======
+    def construct_circuit(self, num_orbs: int, num_elec: tuple[int, int]) -> None:
+>>>>>>> 16a9e5705778e0b87237b77084692bd4550463fd
         """Construct qiskit circuit.
 
         Args:
@@ -138,9 +142,19 @@ class QuantumInterface:
         self.num_orbs = num_orbs
         self.num_spin_orbs = 2 * num_orbs
         self.num_elec = num_elec
+<<<<<<< HEAD
         self.grad_param_R: dict[
             str, int
         ] = {}  # Contains information about the parameterization needed for gradient evaluations.
+=======
+        self.grad_param_R_norm: dict[
+            str, int
+        ] = {}  # Contains information about the parameterization needed for gradient evaluations.
+        self.grad_param_R_phi: dict[
+            str, int
+        ] = {}  # Contains information about the parameterization needed for gradient evaluations.
+
+>>>>>>> 16a9e5705778e0b87237b77084692bd4550463fd
 
         # State prep circuit
         if isinstance(self.ansatz, QuantumCircuit):
@@ -180,7 +194,11 @@ class QuantumInterface:
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
+<<<<<<< HEAD
             self.circuit, self.grad_param_R = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
+=======
+            self.circuit, self.grad_param_R_norm, self.grad_param_R_phi = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
+>>>>>>> 16a9e5705778e0b87237b77084692bd4550463fd
         elif self.ansatz == "HF":
             if len(self.ansatz_options) != 0:
                 raise ValueError(f"No options available for HF got {self.ansatz_options}")
@@ -196,7 +214,11 @@ class QuantumInterface:
             if "n_layers" not in self.ansatz_options.keys():
                 # default option
                 self.ansatz_options["n_layers"] = 1
+<<<<<<< HEAD
             self.circuit, self.grad_param_R = fUCC(occ_spin_idx, unocc_spin_idx, num_orbs, self.num_elec, self.mapper, self.ansatz_options) #AE
+=======
+            self.circuit, self.grad_param_R_norm, self.grad_param_R_phi = fUCC(num_orbs, self.num_elec, self.mapper, self.ansatz_options)
+>>>>>>> 16a9e5705778e0b87237b77084692bd4550463fd
         elif self.ansatz == "kSAfUpCCGSD":
             self.ansatz_options["SAGS"] = True
             self.ansatz_options["GpD"] = True
@@ -660,7 +682,10 @@ class QuantumInterface:
             run_parameters = custom_parameters
             save_paulis = False
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 16a9e5705778e0b87237b77084692bd4550463fd
         # Check if saving is requested
         if isinstance(self._primitive, (BaseSamplerV1, BaseSamplerV2)) and save_paulis:
             return self._sampler_quantum_expectation_value(op)
@@ -1365,12 +1390,19 @@ class QuantumInterface:
                         circuits[(nr_circuit + (nr_pauli * num_circuits))] = ansatz_w_obs
                 circuits = circuits * self._circuit_multipl
 
+<<<<<<< HEAD
                 # Create parameters array for V1
             if num_circuits == 1:
                 print('heri1 - interface')
                 parameter_values = [run_parameters] * (num_paulis * self._circuit_multipl)
             else:
                 print('heri2 - interface')
+=======
+            # Create parameters array for V1
+            if num_circuits == 1:
+                parameter_values = [run_parameters] * (num_paulis * self._circuit_multipl)
+            else:
+>>>>>>> 16a9e5705778e0b87237b77084692bd4550463fd
                 parameter_values = run_parameters * (num_paulis * self._circuit_multipl)  # type: ignore
 
             # Run sampler
