@@ -80,8 +80,8 @@ class Davidson:
             ))
         else:
             start_guess = np.zeros((dim, n_roots), dtype=np.float64)
-        start_guess[np.argsort(diag)[:n_roots], np.arange(n_roots)] = 1.0
-        start_guess = np.vstack((start_guess, start_guess))
+            start_guess[np.argsort(diag)[:n_roots], np.arange(n_roots)] = 1.0
+            start_guess = np.vstack((start_guess, start_guess))
         trial = self._orthonormalize(start_guess)
         if _start_guess is not None:
             trial = _start_guess
@@ -94,7 +94,7 @@ class Davidson:
                     print(f"Davidson iter {self._iteration+1:4d}: subspace dimension {self._trial.shape[1]+trial.shape[1]} exceeds max_red_space {max_reduced_space}, restarting with current Ritz vectors")
                 self._reset_reduced_space(trial, right_transformed_vectors)
             else:
-            self._add_iteration_data(trial, right_transformed_vectors)
+                self._add_iteration_data(trial, right_transformed_vectors)
             omega, X, R = self._compute_residual_vectors(n_roots, frequency, property_gradient)
             converged, res_norms = self._check_convergence(R, tolerance)
 
@@ -426,21 +426,21 @@ class PairedDavidson(Davidson):
             x = scipy.linalg.solve(E - frequency * S, bV).reshape(-1, n_roots)
             omega = np.array([frequency])
         else:
-        # Solve the generalized eigenvalue problem E v = omega S v
-        eigval, eigvec = scipy.linalg.eig(E, S)
-        eigval, eigvec = _real_eigvals(eigval, eigvec, n_roots)
+            # Solve the generalized eigenvalue problem E v = omega S v
+            eigval, eigvec = scipy.linalg.eig(E, S)
+            eigval, eigvec = _real_eigvals(eigval, eigvec, n_roots)
 
-        # Take positive eigenvalues and sort them
-        sorting = eigval > 0
-        eigval = eigval[sorting]
-        eigvec = eigvec[:, sorting]
-        sorting = np.argsort(eigval)
-        eigval = eigval[sorting]
-        eigvec = eigvec[:, sorting]
+            # Take positive eigenvalues and sort them
+            sorting = eigval > 0
+            eigval = eigval[sorting]
+            eigvec = eigvec[:, sorting]
+            sorting = np.argsort(eigval)
+            eigval = eigval[sorting]
+            eigvec = eigvec[:, sorting]
 
-        # Extract the lowest n_roots eigenvalues and corresponding eigenvectors
-        omega = np.real(eigval[:n_roots])
-        x = eigvec[:, :n_roots]
+            # Extract the lowest n_roots eigenvalues and corresponding eigenvectors
+            omega = np.real(eigval[:n_roots])
+            x = eigvec[:, :n_roots]
 
         # Compute Ritz vectors (X) and residuals (R)
         x_plus, x_minus = _split_vector(x)
@@ -490,7 +490,7 @@ class PairedDavidson(Davidson):
         plus_contribution[np.isclose(plus_contribution, 0)] = 1
         minus_contribution[np.isclose(minus_contribution, 0)] = 1
         denominator /= plus_contribution
-            denominator /= minus_contribution
+        denominator /= minus_contribution
         new_trial_plus = denominator * (
             diagonal_A.reshape(-1, 1) * R_plus + diagonal_Sigma.reshape(-1, 1) * R_minus * o.reshape(1, -1)
         )
